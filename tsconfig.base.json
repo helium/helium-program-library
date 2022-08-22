@@ -1,0 +1,17 @@
+{
+  "include": [],
+  "compilerOptions": {
+    "lib": ["ES2021.String"],
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "noEmitOnError": true,
+    "resolveJsonModule": true,
+    "strict": false,
+    "stripInternal": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true
+  }
+}
