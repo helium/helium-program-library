@@ -8,8 +8,8 @@ pub mod state;
 pub mod token_metadata;
 pub mod utils;
 
-pub use state::*;
 pub use instructions::*;
+pub use state::*;
 
 #[program]
 pub mod lazy_distributor {
@@ -22,16 +22,15 @@ pub mod lazy_distributor {
     initialize_lazy_distributor_v0::handler(ctx, args)
   }
 
-  pub fn initialize_recipient_v0(
-    ctx: Context<InitializeRecipientV0>,
-  ) -> Result<()> {
+  pub fn initialize_recipient_v0(ctx: Context<InitializeRecipientV0>) -> Result<()> {
     initialize_recipient_v0::handler(ctx)
   }
 
-  pub fn set_current_rewards_v0(
-    ctx: Context<SetRewardsV0>,
-    args: SetRewardsV0Args
-  ) -> Result<()> {
+  pub fn set_current_rewards_v0(ctx: Context<SetRewardsV0>, args: SetRewardsV0Args) -> Result<()> {
     set_current_rewards_v0::handler(ctx, args)
+  }
+
+  pub fn distribute_rewards_v0(ctx: Context<DistributeRewardsV0>) -> Result<()> {
+    distribute_rewards_v0::handler(ctx)
   }
 }

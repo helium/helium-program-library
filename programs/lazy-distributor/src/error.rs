@@ -4,4 +4,7 @@ use anchor_lang::prelude::*;
 pub enum ErrorCode {
   #[msg("The realloc increase was too large")]
   InvalidDataIncrease,
+
+  #[msg("Error in arithmetic")]
+  ArithmeticError
 }

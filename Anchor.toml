@@ -1,7 +1,12 @@
 [features]
 seeds = false
 [programs.localnet]
-helium = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+lazy_distributor = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+
+[workspace]
+members = [
+  "programs/lazy-distributor", 
+]
 
 [registry]
 url = "https://anchor.projectserum.com"

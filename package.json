@@ -2,7 +2,8 @@
   "scripts": {
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
-    "build": "lerna run --parallel prebuild && tsc --build"
+    "build": "lerna run --parallel prebuild && tsc --build",
+    "watch": "lerna run --parallel prebuild && tsc --build --watch"
   },
   "workspaces": [
     "packages/*"

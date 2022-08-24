@@ -4,5 +4,8 @@
     {
       "path": "./packages/lazy-distributor-sdk"
     },
+    {
+      "path": "./packages/spl-utils"
+    }
   ]
 }

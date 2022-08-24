@@ -2,9 +2,10 @@ import {
   InstructionResult,
   AnchorSdk,
   TypedAccountParser,
-} from "@strata-foundation/spl-utils";
+  toBN,
+} from "@helium-foundation/spl-utils";
 import { LazyDistributor } from "../../../target/types/lazy_distributor";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Commitment, TransactionInstruction } from "@solana/web3.js";
 import {
   AnchorProvider,
   IdlAccounts,
@@ -13,6 +14,13 @@ import {
 } from "@project-serum/anchor";
 import BN from "bn.js";
 import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
+import {
+  createAssociatedTokenAccount,
+  createAssociatedTokenAccountInstruction,
+  getAccount,
+  getAssociatedTokenAddress,
+  getMint,
+} from "@solana/spl-token";
 
 type LazyDistributorV0 = IdlAccounts<LazyDistributor>["lazyDistributorV0"];
 type RecipientV0 = IdlAccounts<LazyDistributor>["recipientV0"];
@@ -31,13 +39,13 @@ export interface IInitializeDistributorArgs {
    */
   payer?: PublicKey;
   /**
-   * The account holding the rewards that are distributed
+   * The wallet that can make changes to this distributor. **Default**: this.wallet
    */
-  rewardsAccount: PublicKey;
+  authority?: PublicKey;
   /**
-   * The wallet that can make changes to this distributor
+   * The mint that is rewarded
    */
-  authority: PublicKey;
+  rewardsMint: PublicKey;
   /**
    * The metaplex collection for the recipient nfts
    */
@@ -63,10 +71,7 @@ export interface ISetCurrentRewardsArgs {
   payer?: PublicKey;
   /** The current oracle, **Default**: this.wallet */
   oracle?: PublicKey;
-  /** The lazy distributor this recipient is under */
-  lazyDistributor: PublicKey;
-  /** The mint to be rewarded */
-  mint: PublicKey;
+  recipient: PublicKey;
   amount: BN | number;
 }
 
@@ -111,7 +116,7 @@ export class LazyDistributorSdk extends AnchorSdk<LazyDistributor> {
 
   async getLazyDistributor(
     lazyDistributor: PublicKey
-  ): Promise<ILazyDistributor> {
+  ): Promise<ILazyDistributor | null> {
     return this.getAccount(lazyDistributor, this.lazyDistributorDecoder);
   }
 
@@ -127,9 +132,7 @@ export class LazyDistributorSdk extends AnchorSdk<LazyDistributor> {
     };
   };
 
-  async getRecipient(
-    recipient: PublicKey
-  ): Promise<ILazyDistributor> {
+  async getRecipient(recipient: PublicKey): Promise<IRecipient | null> {
     return this.getAccount(recipient, this.recipientDecoder);
   }
 
@@ -150,38 +153,63 @@ export class LazyDistributorSdk extends AnchorSdk<LazyDistributor> {
 
   static lazyDistributorKey(
     collection: PublicKey,
+    mint: PublicKey,
     programId: PublicKey = LazyDistributorSdk.ID
   ): Promise<[PublicKey, number]> {
     return PublicKey.findProgramAddress(
-      [Buffer.from("lazy-distributor", "utf-8"), collection.toBuffer()],
+      [
+        Buffer.from("lazy-distributor", "utf-8"),
+        collection.toBuffer(),
+        mint.toBuffer(),
+      ],
+      programId
+    );
+  }
+
+  static rewardAccountKey(
+    lazyDistributor: PublicKey,
+    programId: PublicKey = LazyDistributorSdk.ID
+  ): Promise<[PublicKey, number]> {
+    return PublicKey.findProgramAddress(
+      [
+        Buffer.from("lazy-distributor-rewards", "utf-8"),
+        lazyDistributor.toBuffer(),
+      ],
       programId
     );
   }
 
   async initializeLazyDistributorInstructions({
     payer = this.wallet.publicKey,
-    rewardsAccount,
-    authority,
+    authority = this.wallet.publicKey,
+    rewardsMint,
     collection,
     oracles,
   }: IInitializeDistributorArgs): Promise<
     InstructionResult<{ lazyDistributor: PublicKey }>
   > {
-    const [lazyDistributor] = await this.lazyDistributorDecoder(
+    const [lazyDistributor] = await LazyDistributorSdk.lazyDistributorKey(
       collection,
-      this.program.ID
+      rewardsMint,
+      this.programId
     );
-    const instruction = this.program.method.initializeLazyDistributorV0
-      .accounts({
-        payer,
-        lazyDistributor,
-        rewardsAccount,
-      })
-      .args({
+    const [rewardsAccount] = await LazyDistributorSdk.rewardAccountKey(
+      lazyDistributor,
+      this.programId
+    );
+    const instruction = await this.program.methods
+      .initializeLazyDistributorV0({
         collection,
         oracles,
         authority,
-      });
+      })
+      .accounts({
+        payer,
+        lazyDistributor,
+        rewardsMint,
+        rewardsAccount,
+      })
+      .instruction();
 
     return {
       signers: [],
@@ -190,6 +218,17 @@ export class LazyDistributorSdk extends AnchorSdk<LazyDistributor> {
         lazyDistributor,
       },
     };
+  }
+
+  async initializeLazyDistributor(
+    args: IInitializeDistributorArgs,
+    commitment: Commitment = "confirmed"
+  ): Promise<{ lazyDistributor: PublicKey }> {
+    return this.execute(
+      await this.initializeLazyDistributorInstructions(args),
+      args.payer,
+      commitment
+    );
   }
 
   async initializeRecipientInstructions({
@@ -199,28 +238,29 @@ export class LazyDistributorSdk extends AnchorSdk<LazyDistributor> {
   }: IInitializeRecipientArgs): Promise<
     InstructionResult<{ recipient: PublicKey }>
   > {
-    const [recipient] = await this.lazyDistributorDecoder(
+    const [recipient] = await LazyDistributorSdk.recipientKey(
       lazyDistributor,
       mint,
-      this.program.ID
+      this.programId
     );
-    const [tragetMetadata] = await PublicKey.findProgramAddress(
-      [Buffer.from("metadata", "utf-8"), mint.toBuffer()],
+    const [targetMetadata] = await PublicKey.findProgramAddress(
+      [
+        Buffer.from("metadata", "utf-8"),
+        TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+        mint.toBuffer(),
+      ],
       TOKEN_METADATA_PROGRAM_ID
     );
-    const instruction = this.program.method.initializeRecipientV0
+    const instruction = await this.program.methods
+      .initializeRecipientV0()
       .accounts({
         payer,
         lazyDistributor,
         recipient,
         mint,
-        tragetMetadata,
+        targetMetadata,
       })
-      .args({
-        collection,
-        oracles,
-        authority,
-      });
+      .instruction();
 
     return {
       signers: [],
@@ -231,36 +271,136 @@ export class LazyDistributorSdk extends AnchorSdk<LazyDistributor> {
     };
   }
 
-  async setRewardsInstructinos({
+  async initializeRecipient(
+    args: IInitializeRecipientArgs,
+    commitment: Commitment = "confirmed"
+  ): Promise<{ recipient: PublicKey }> {
+    return this.execute(
+      await this.initializeRecipientInstructions(args),
+      args.payer,
+      commitment
+    );
+  }
+
+  async setCurrentRewardsInstructions({
     payer = this.wallet.publicKey,
     oracle = this.wallet.publicKey,
     amount,
-    lazyDistributor,
-  }): Promise<InstructionResult<null>> {
-    const [recipient] = await LazyDistributorSdk.recipientKey(
-      lazyDistributor,
-      this.program.ID
-    );
-    const distributor = await this.getLazyDistributor(lazyDistributor);
-    const mintAccount = await getMintInfo(this.provider, distributor.rewardsMint)
+    recipient,
+  }: ISetCurrentRewardsArgs): Promise<InstructionResult<null>> {
+    const recipientAcc = (await this.getRecipient(recipient!))!;
+    const lazyDistributor = recipientAcc.lazyDistributor;
 
-    const instruction = this.program.method.setRewardsV0
+    const distributor = await this.getLazyDistributor(lazyDistributor!);
+    const mintAccount = await getMint(
+      this.provider.connection,
+      distributor!.rewardsMint
+    );
+    const oracles = distributor?.oracles as { oracle: PublicKey }[];
+    const oracleIndex = oracles.findIndex(({ oracle: passed }) =>
+      passed.equals(oracle)
+    );
+    const instruction = await this.program.methods
+      .setCurrentRewardsV0({
+        oracleIndex,
+        currentRewards: toBN(amount, mintAccount),
+      })
       .accounts({
         payer,
-        lazyDistributor,
+        lazyDistributor: lazyDistributor!,
         recipient,
         oracle,
       })
-      .args({
-        oracleIndex: distributor.oracles.findIndex((oracle) =>
-          oracle.oracle.equals(oracle)
-        ),
-        currentRewards: toBN(amount, mintAccount),
-      });
+      .instruction();
     return {
       instructions: [instruction],
       signers: [],
       output: null,
     };
+  }
+
+  async setCurrentRewards(
+    args: ISetCurrentRewardsArgs,
+    commitment: Commitment = "confirmed"
+  ): Promise<null> {
+    return this.execute(
+      await this.setCurrentRewardsInstructions(args),
+      args.payer,
+      commitment
+    );
+  }
+
+  async distributeRewardsInstructions({
+    recipient,
+    payer = this.wallet.publicKey,
+  }: {
+    payer?: PublicKey;
+    recipient: PublicKey;
+  }): Promise<InstructionResult<{ destination: PublicKey; owner: PublicKey }>> {
+    const recipientAcc = (await this.getRecipient(recipient!))!;
+    const mint = recipientAcc.mint;
+    const lazyDistributor = recipientAcc.lazyDistributor;
+    const lazyDistributorAcc = (await this.getLazyDistributor(
+      recipientAcc.lazyDistributor
+    ))!;
+
+    const recipientMintAccount = (
+      await this.provider.connection.getTokenLargestAccounts(mint)
+    ).value[0].address;
+    const recipientMintOwner = (await getAccount(
+      this.provider.connection,
+      recipientMintAccount
+    ))!.owner;
+    const destinationAccount = await getAssociatedTokenAddress(
+      lazyDistributorAcc.rewardsMint,
+      recipientMintOwner
+    );
+
+    const instructions: TransactionInstruction[] = [];
+
+    // If ata doesn't exist create it
+    if (!(await this.provider.connection.getAccountInfo(destinationAccount))) {
+      instructions.push(
+        createAssociatedTokenAccountInstruction(
+          payer,
+          destinationAccount,
+          recipientMintOwner,
+          lazyDistributorAcc.rewardsMint
+        )
+      );
+    }
+
+    instructions.push(
+      await this.program.methods
+        .distributeRewardsV0()
+        .accounts({
+          lazyDistributor: lazyDistributor!,
+          recipient,
+          rewardsAccount: lazyDistributorAcc.rewardsAccount,
+          destinationAccount,
+          recipientMintAccount,
+        })
+        .instruction()
+    );
+
+    return {
+      instructions,
+      signers: [],
+      output: {
+        destination: destinationAccount,
+        owner: recipientMintOwner
+      },
+    };
+  }
+
+  async distributeRewards(
+    args: { payer?: PublicKey; recipient: PublicKey },
+    commitment: Commitment = "confirmed"
+  ): Promise<{ destination: PublicKey; owner: PublicKey }> {
+    return this.execute(
+      await this.distributeRewardsInstructions(args),
+      args.payer,
+      commitment
+    );
   }
 }

@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct SetRewardsV0Args {
-  pub oracle_index: usize,
+  pub oracle_index: u16,
   pub current_rewards: u64,
 }
 
@@ -20,7 +20,7 @@ pub struct SetRewardsV0<'info> {
   )]
   pub recipient: Box<Account<'info, RecipientV0>>,
   #[account(
-    constraint = oracle.key() == lazy_distributor.oracles[args.oracle_index].oracle
+    constraint = oracle.key() == lazy_distributor.oracles[usize::try_from(args.oracle_index).unwrap()].oracle
   )]
   pub oracle: Signer<'info>,
   pub system_program: Program<'info, System>,
@@ -33,7 +33,7 @@ pub fn handler(ctx: Context<SetRewardsV0>, args: SetRewardsV0Args) -> Result<()>
       vec![None; ctx.accounts.lazy_distributor.oracles.len()];
   }
 
-  ctx.accounts.recipient.current_rewards[args.oracle_index] = Some(args.current_rewards);
+  ctx.accounts.recipient.current_rewards[usize::try_from(args.oracle_index).unwrap()] = Some(args.current_rewards);
 
   resize_to_fit(
     &ctx.accounts.payer.to_account_info(),

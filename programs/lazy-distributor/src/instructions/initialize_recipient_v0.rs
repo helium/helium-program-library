@@ -1,4 +1,4 @@
-use crate::state::*;
+use crate::{state::*};
 use crate::token_metadata::Metadata;
 use crate::{utils::resize_to_fit};
 use anchor_lang::prelude::*;
@@ -32,8 +32,9 @@ pub fn handler(ctx: Context<InitializeRecipientV0>) -> Result<()> {
     mint: ctx.accounts.mint.key(),
     total_rewards: 0,
     current_config_version: 0,
-    current_rewards: vec![],
-    lazy_distributor: ctx.accounts.lazy_distributor.key()
+    current_rewards: vec![None; ctx.accounts.lazy_distributor.oracles.len()],
+    lazy_distributor: ctx.accounts.lazy_distributor.key(),
+    bump_seed: ctx.bumps["recipient"]
   });
 
   resize_to_fit(

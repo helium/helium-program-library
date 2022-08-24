@@ -1,7 +1,7 @@
 use crate::state::*;
 use crate::utils::resize_to_fit;
 use anchor_lang::prelude::*;
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token::{TokenAccount, Mint, Token};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeLazyDistributorV0Args {
@@ -19,15 +19,23 @@ pub struct InitializeLazyDistributorV0<'info> {
     init,
     payer = payer,
     space = std::cmp::max(8 + std::mem::size_of::<LazyDistributorV0>(), lazy_distributor.data.borrow_mut().len()),
-    seeds = ["lazy-distributor".as_bytes(), args.collection.as_ref()],
+    seeds = ["lazy-distributor".as_bytes(), args.collection.as_ref(), rewards_mint.key().as_ref()],
     bump,
   )]
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
+  pub rewards_mint: Box<Account<'info, Mint>>,
   #[account(
-    constraint = rewards_account.owner == lazy_distributor.key(),
+    init,
+    payer = payer,
+    seeds = ["lazy-distributor-rewards".as_bytes(), lazy_distributor.key().as_ref()],
+    bump,
+    token::mint = rewards_mint,
+    token::authority = lazy_distributor,
   )]
   pub rewards_account: Box<Account<'info, TokenAccount>>,
   pub system_program: Program<'info, System>,
+  pub token_program: Program<'info, Token>,
+  pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(
@@ -36,11 +44,12 @@ pub fn handler(
 ) -> Result<()> {
   ctx.accounts.lazy_distributor.set_inner(LazyDistributorV0 {
     rewards_account: ctx.accounts.rewards_account.key(),
-    rewards_mint: ctx.accounts.rewards_account.mint,
+    rewards_mint: ctx.accounts.rewards_mint.key(),
     oracles: args.oracles,
     collection: args.collection,
     version: 0,
-    authority: args.authority
+    authority: args.authority,
+    bump_seed: ctx.bumps["lazy_distributor"]
   });
 
   resize_to_fit(

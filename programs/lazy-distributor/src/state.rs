@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 
-#[account]
-#[derive(Default)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct OracleConfigV0 {
   pub oracle: Pubkey,
   pub url: String,
@@ -16,6 +15,7 @@ pub struct LazyDistributorV0 {
   pub collection: Pubkey, // The metaplex collection of hotspot NFTs
   pub authority: Pubkey,
   pub oracles: Vec<OracleConfigV0>,
+  pub bump_seed: u8,
 }
 
 #[account]
@@ -26,4 +26,5 @@ pub struct RecipientV0 {
   pub total_rewards: u64,
   pub current_config_version: u16,
   pub current_rewards: Vec<Option<u64>>, // One for each oracle, matching indexes in` LazyDistrubutorV0`
+  pub bump_seed: u8,
 }
