@@ -11,7 +11,7 @@ of particular NFTs as specified by oracles.
 
 ### Oracle Architecture
 
-In order to facilatitate setting rewards _and_ distributing rewards in a single Solana transaction,
+In order to facilitate setting rewards _and_ distributing rewards in a single Solana transaction,
 I propose at the url specified in the oracle configuration, supporting `GET` and `POST` 
 
 #### GET Request
