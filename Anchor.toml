@@ -2,10 +2,12 @@
 seeds = false
 [programs.localnet]
 lazy_distributor = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+hotspot_issuer = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 
 [workspace]
 members = [
-  "programs/lazy-distributor", 
+  "programs/lazy-distributor",
+  "programs/hotspot-issuer"
 ]
 
 [registry]
@@ -13,7 +15,7 @@ url = "https://anchor.projectserum.com"
 
 [provider]
 cluster = "localnet"
-wallet = "/Users/nprince/.config/solana/id.json"
+wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
