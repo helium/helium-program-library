@@ -2,10 +2,12 @@
 seeds = false
 [programs.localnet]
 lazy_distributor = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+data_credits = "5BAQuzGE1z8CTcrSdfbfdBF2fdXrwb4iMcxDMrvhz8L8"
 
 [workspace]
 members = [
   "programs/lazy-distributor", 
+  "programs/data-credits",
 ]
 
 [registry]
