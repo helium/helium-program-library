@@ -13,7 +13,7 @@ pub use state::*;
 pub mod hotspot_issuer {
   use super::*;
 
-  pub fn initialize(ctx: Context<InitializeHotspotIssuerV0>) -> Result<()> {
+  pub fn initialize(ctx: Context<InitializeHotspotIssuanceV0>) -> Result<()> {
     Ok(())
   }
 }
