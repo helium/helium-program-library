@@ -30,18 +30,23 @@ export interface IDataCredits extends DataCreditsV0 {
 
 export interface IInitializeDataCreditsArgs {
   /** The mint for HNT token. These tokens are burned to mint DC */
-  hntMint: PublicKey,
+  hntMint: PublicKey;
   /** The mint for the DC token. These tokens can be minted and burned, but not transferred */
-  dcMint: PublicKey,
+  dcMint: PublicKey;
   /** Payer for this transaction. **Default** this.wallet */
-  payer?: PublicKey,
+  payer?: PublicKey;
   /** General authority for changing the program config. **Default** this.wallet */
-  authority?: PublicKey
+  authority?: PublicKey;
 }
 
+
 export interface IMintDataCreditsArgs {
-  auth_bump: number;
+  /** Amount of HNT to burn */
   amount: BN | number;
+  /** Address to send the DC to. **Default** this.wallet */
+  recipient?: PublicKey;
+  /** Payer for this transaction, and holder of the HNT. **Default** this.wallet */
+  owner?: PublicKey;
 }
 
 export class DataCreditsSdk extends AnchorSdk<DataCredits> {
@@ -144,5 +149,61 @@ export class DataCreditsSdk extends AnchorSdk<DataCredits> {
       commitment
     );
   }
-  
+
+  async mintDataCreditsInstructions({
+    amount,
+    owner = this.wallet.publicKey,
+    recipient = this.wallet.publicKey,
+  }: IMintDataCreditsArgs) {
+    const [dataCredits] = await DataCreditsSdk.dataCreditsKey();
+    const dataCreditsAcc = await this.getDataCredits(dataCredits);
+    if (!dataCreditsAcc) throw new Error("Data credits not available at the expected address.")
+    const hntMintAcc = await getMint(
+      this.provider.connection,
+      dataCreditsAcc!.hntMint
+    );
+    const [tokenAuthority, authBump] = await DataCreditsSdk.tokenAuthorityKey();
+
+    const burner = await getAssociatedTokenAddress(dataCreditsAcc.hntMint, owner);
+    const recipientAcc = await getAssociatedTokenAddress(dataCreditsAcc.dcMint, recipient);
+
+    const instructions: TransactionInstruction[] = [];
+
+    if (!(await this.provider.connection.getAccountInfo(recipientAcc))) {
+      instructions.push(
+        createAssociatedTokenAccountInstruction(
+          owner,
+          recipientAcc,
+          owner,
+          dataCreditsAcc.dcMint
+        )
+      );
+    }
+    instructions.push(await this.program.methods.mintDataCreditsV0({authBump, amount: toBN(amount, hntMintAcc)}).accounts({
+      burner,
+      recipient: recipientAcc,
+      tokenAuthority,
+      hntMint: dataCreditsAcc.hntMint,
+      dcMint: dataCreditsAcc.dcMint,
+    }).instruction());
+
+    return {
+      signers: [],
+      instructions,
+      output: {
+        dataCredits,
+      },
+    };
+  }
+
+  async mintDataCredits(
+    args: IMintDataCreditsArgs,
+    commitment: Commitment = "confirmed"
+  ) {
+    return this.execute(
+      await this.mintDataCreditsInstructions(args),
+      args.owner,
+      commitment
+    );
+  }
 }

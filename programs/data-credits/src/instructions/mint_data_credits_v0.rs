@@ -24,11 +24,14 @@ pub struct MintDataCreditsV0<'info> {
   )]
   pub recipient: Box<Account<'info, TokenAccount>>,
 
-  pub authority: UncheckedAccount<'info>,
+  ///CHECK: cpi calls will fail tx if not the correct authorised key
+  pub token_authority: UncheckedAccount<'info>,
 
   pub owner: Signer<'info>,
 
+  #[account(mut)]
   pub hnt_mint: Box<Account<'info, Mint>>,
+  #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,
   pub token_program: Program<'info, Token>,
 }
@@ -44,85 +47,53 @@ impl<'info> MintDataCreditsV0<'info> {
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 
-  fn thaw_ctx(
-    &self,
-    authority: AccountInfo<'info>,
-    auth_bump: u8,
-  ) -> CpiContext<'_, '_, '_, 'info, ThawAccount<'info>> {
+  fn thaw_ctx(&self) -> CpiContext<'_, '_, '_, 'info, ThawAccount<'info>> {
     let cpi_accounts = ThawAccount {
       account: self.recipient.to_account_info(),
       mint: self.dc_mint.to_account_info(),
-      authority: authority,
+      authority: self.token_authority.to_account_info(),
     };
-    let signer_seeds: &[&[&[u8]]] = &[&[b"dc_auth", &[auth_bump]]];
-    CpiContext::new_with_signer(
-      self.token_program.to_account_info(),
-      cpi_accounts,
-      signer_seeds,
-    )
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 
-  fn mint_ctx(
-    &self,
-    authority: AccountInfo<'info>,
-    auth_bump: u8,
-  ) -> CpiContext<'_, '_, '_, 'info, MintTo<'info>> {
+  fn mint_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintTo<'info>> {
     let cpi_accounts = MintTo {
       mint: self.dc_mint.to_account_info(),
       to: self.recipient.to_account_info(),
-      authority: authority,
+      authority: self.token_authority.to_account_info(),
     };
-    let signer_seeds: &[&[&[u8]]] = &[&[b"dc_auth", &[auth_bump]]];
-    CpiContext::new_with_signer(
-      self.token_program.to_account_info(),
-      cpi_accounts,
-      signer_seeds,
-    )
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 
-  fn freeze_ctx(
-    &self,
-    authority: AccountInfo<'info>,
-    auth_bump: u8,
-  ) -> CpiContext<'_, '_, '_, 'info, FreezeAccount<'info>> {
+  fn freeze_ctx(&self) -> CpiContext<'_, '_, '_, 'info, FreezeAccount<'info>> {
     let cpi_accounts = FreezeAccount {
       account: self.recipient.to_account_info(),
       mint: self.dc_mint.to_account_info(),
-      authority: authority,
+      authority: self.token_authority.to_account_info(),
     };
-    let signer_seeds: &[&[&[u8]]] = &[&[b"dc_auth", &[auth_bump]]];
-    CpiContext::new_with_signer(
-      self.token_program.to_account_info(),
-      cpi_accounts,
-      signer_seeds,
-    )
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 }
 
 pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsV0Args) -> Result<()> {
+  let signer_seeds: &[&[&[u8]]] = &[&[b"dc_token_auth", &[args.auth_bump]]];
+
   // burn the hnt tokens
-  token::burn(ctx.accounts.burn_ctx(), args.amount);
+  token::burn(ctx.accounts.burn_ctx(), args.amount)?;
 
   // unfreeze the recipient if necessary
-  token::thaw_account(
-    ctx
-      .accounts
-      .thaw_ctx(ctx.accounts.authority.to_account_info(), args.auth_bump),
-  )?;
+  if ctx.accounts.recipient.is_frozen() {
+    token::thaw_account(ctx.accounts.thaw_ctx().with_signer(signer_seeds))?;
+  }
 
   // mint the new tokens to recipient
+  // TODO needs to mint at an oracle provided rate to hnt
   token::mint_to(
-    ctx
-      .accounts
-      .mint_ctx(ctx.accounts.authority.to_account_info(), args.auth_bump),
+    ctx.accounts.mint_ctx().with_signer(signer_seeds),
     args.amount,
   )?;
 
   // freeze the recipient
-  token::freeze_account(
-    ctx
-      .accounts
-      .freeze_ctx(ctx.accounts.authority.to_account_info(), args.auth_bump),
-  )?;
+  token::freeze_account(ctx.accounts.freeze_ctx().with_signer(signer_seeds))?;
   Ok(())
 }
