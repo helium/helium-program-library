@@ -68,6 +68,27 @@ export class DataCreditsSdk extends AnchorSdk<DataCredits> {
     super({ provider, program });
   }
 
+  dataCreditsDecoder: TypedAccountParser<IDataCredits> = (
+    pubkey,
+    account
+  ) => {
+    const coded = this.program.coder.accounts.decode<DataCreditsV0>(
+      "DataCreditsV0",
+      account.data
+    );
+
+    return {
+      ...coded,
+      publicKey: pubkey,
+    };
+  };
+
+  async getDataCredits(
+    dataCredits: PublicKey
+  ): Promise<IDataCredits | null> {
+    return this.getAccount(dataCredits, this.dataCreditsDecoder);
+  }
+
   static dataCreditsKey(
     programId: PublicKey = DataCreditsSdk.ID
   ): Promise<[PublicKey, number]> {
