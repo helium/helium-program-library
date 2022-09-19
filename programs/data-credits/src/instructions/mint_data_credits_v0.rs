@@ -3,6 +3,8 @@ use anchor_spl::token::{
   self, Burn, FreezeAccount, Mint, MintTo, ThawAccount, Token, TokenAccount,
 };
 
+use crate::DataCreditsV0;
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MintDataCreditsV0Args {
   auth_bump: u8,
@@ -12,6 +14,9 @@ pub struct MintDataCreditsV0Args {
 #[derive(Accounts)]
 #[instruction(args: MintDataCreditsV0Args)]
 pub struct MintDataCreditsV0<'info> {
+  #[account(seeds=[b"dc"], bump=data_credits.data_credits_bump, has_one=hnt_mint, has_one=dc_mint)]
+  pub data_credits: Box<Account<'info, DataCreditsV0>>,
+
   // hnt tokens from this account are burned
   #[account(mut,
     constraint = burner.mint == hnt_mint.key(),

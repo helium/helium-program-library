@@ -180,6 +180,7 @@ export class DataCreditsSdk extends AnchorSdk<DataCredits> {
       );
     }
     instructions.push(await this.program.methods.mintDataCreditsV0({authBump, amount: toBN(amount, hntMintAcc)}).accounts({
+      dataCredits,
       burner,
       recipient: recipientAcc,
       tokenAuthority,

@@ -8,4 +8,5 @@ pub struct DataCreditsV0 {
   pub authority: Pubkey,       // EOA auth for managing this struct
   pub token_authority: Pubkey, // PDA that holds mint/freeze auth for dc_mint
   pub token_authority_bump: u8,
+  pub data_credits_bump: u8,
 }

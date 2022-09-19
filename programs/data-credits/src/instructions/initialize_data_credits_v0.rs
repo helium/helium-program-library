@@ -1,3 +1,4 @@
+use crate::errors::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
@@ -41,5 +42,9 @@ pub fn handler(
 
   ctx.accounts.data_credits.token_authority = token_auth;
   ctx.accounts.data_credits.token_authority_bump = token_auth_bump;
+  ctx.accounts.data_credits.data_credits_bump = *ctx
+    .bumps
+    .get("data_credits")
+    .ok_or(DataCreditsErrors::BumpNotAvailable)?;
   Ok(())
 }
