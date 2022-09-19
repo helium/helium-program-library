@@ -28,7 +28,10 @@ pub mod data_credits {
     instructions::mint_data_credits_v0::handler(ctx, args)
   }
 
-  pub fn burn_data_credits_v0(ctx: Context<BurnDataCreditsV0>) -> Result<()> {
-    Ok(())
+  pub fn burn_data_credits_v0(
+    ctx: Context<BurnDataCreditsV0>,
+    args: BurnDataCreditsV0Args,
+  ) -> Result<()> {
+    instructions::burn_data_credits_v0::handler(ctx, args)
   }
 }

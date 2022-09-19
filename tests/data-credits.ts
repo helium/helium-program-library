@@ -57,7 +57,7 @@ describe("data-credits", () => {
         amount: 1,
         owner: me,
         recipient: me,
-      })
+      });
 
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
       const dcAtaAcc = await getAccount(provider.connection, dcAta);
@@ -67,6 +67,20 @@ describe("data-credits", () => {
       const hntBal = await provider.connection.getTokenAccountBalance(await getAssociatedTokenAddress(hntMint, me));
       assert(dcBal.value.uiAmount == 1);
       assert(hntBal.value.uiAmount == 99);      
+    })
+
+    it("burns some data credits", async() => {
+      await dataCreditsSdk.burnDataCredits({
+        amount: 1,
+        owner: me,
+      });
+
+      const dcAta = await getAssociatedTokenAddress(dcMint, me);
+      const dcAtaAcc = await getAccount(provider.connection, dcAta);
+
+      assert(dcAtaAcc.isFrozen);
+      const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
+      assert(dcBal.value.uiAmount == 0);
     })
   })
 });

@@ -49,6 +49,13 @@ export interface IMintDataCreditsArgs {
   owner?: PublicKey;
 }
 
+export interface IBurnDataCreditsArgs {
+  /** Amount of HNT to burn */
+  amount: BN | number;
+  /** Payer for this transaction, and holder of the DC to burn. **Default** this.wallet */
+  owner?: PublicKey;
+}
+
 export class DataCreditsSdk extends AnchorSdk<DataCredits> {
   static ID = new PublicKey("5BAQuzGE1z8CTcrSdfbfdBF2fdXrwb4iMcxDMrvhz8L8");
 
@@ -162,7 +169,7 @@ export class DataCreditsSdk extends AnchorSdk<DataCredits> {
       this.provider.connection,
       dataCreditsAcc!.hntMint
     );
-    const [tokenAuthority, authBump] = await DataCreditsSdk.tokenAuthorityKey();
+    const [tokenAuthority] = await DataCreditsSdk.tokenAuthorityKey();
 
     const burner = await getAssociatedTokenAddress(dataCreditsAcc.hntMint, owner);
     const recipientAcc = await getAssociatedTokenAddress(dataCreditsAcc.dcMint, recipient);
@@ -179,7 +186,7 @@ export class DataCreditsSdk extends AnchorSdk<DataCredits> {
         )
       );
     }
-    instructions.push(await this.program.methods.mintDataCreditsV0({authBump, amount: toBN(amount, hntMintAcc)}).accounts({
+    instructions.push(await this.program.methods.mintDataCreditsV0({amount: toBN(amount, hntMintAcc)}).accounts({
       dataCredits,
       burner,
       recipient: recipientAcc,
@@ -203,6 +210,50 @@ export class DataCreditsSdk extends AnchorSdk<DataCredits> {
   ) {
     return this.execute(
       await this.mintDataCreditsInstructions(args),
+      args.owner,
+      commitment
+    );
+  }
+
+  async burnDataCreditsInstructions({
+    amount,
+    owner = this.wallet.publicKey,
+  }: IBurnDataCreditsArgs) {
+    const [dataCredits] = await DataCreditsSdk.dataCreditsKey();
+    const dataCreditsAcc = await this.getDataCredits(dataCredits);
+    if (!dataCreditsAcc) throw new Error("Data credits not available at the expected address.")
+    const dcMintAcc = await getMint(
+      this.provider.connection,
+      dataCreditsAcc!.dcMint
+    );
+    const [tokenAuthority] = await DataCreditsSdk.tokenAuthorityKey();
+
+    const burner = await getAssociatedTokenAddress(dataCreditsAcc.dcMint, owner);
+
+    const instructions: TransactionInstruction[] = [];
+
+    instructions.push(await this.program.methods.burnDataCreditsV0({amount: toBN(amount, dcMintAcc)}).accounts({
+      dataCredits,
+      burner,
+      tokenAuthority,
+      dcMint: dataCreditsAcc.dcMint,
+    }).instruction());
+
+    return {
+      signers: [],
+      instructions,
+      output: {
+        dataCredits,
+      },
+    };
+  }
+
+  async burnDataCredits(
+    args: IBurnDataCreditsArgs,
+    commitment: Commitment = "confirmed"
+  ) {
+    return this.execute(
+      await this.burnDataCreditsInstructions(args),
       args.owner,
       commitment
     );
