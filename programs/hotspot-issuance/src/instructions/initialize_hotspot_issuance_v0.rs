@@ -2,10 +2,10 @@ use crate::state::*;
 use crate::utils::resize_to_fit;
 use anchor_lang::{
   prelude::*,
-  solana_program::program::{invoke, invoke_signed},
+  solana_program::program::{invoke_signed},
 };
 use anchor_spl::token::{Mint, Token};
-use mpl_token_metadata::instruction::create_metadata_accounts_v3;
+use mpl_token_metadata::{instruction::{create_metadata_accounts_v3}, state::Collection};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeHotspotIssuanceV0Args {
@@ -34,7 +34,7 @@ pub struct InitializeHotspotIssuanceV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = std::cmp::max(8 + std::mem::size_of::<HotspotIssuanceV0>(), hotspot_issuance.data.borrow_mut().leng()),
+    space = std::cmp::max(8 + std::mem::size_of::<HotspotIssuanceV0>(), hotspot_issuance.data.borrow_mut().len()),
     seeds = [b"hotspot_issuance", collection_mint.key().as_ref()],
     bump,
   )]
@@ -105,7 +105,7 @@ pub fn handler(
   resize_to_fit(
     &ctx.accounts.payer.to_account_info(),
     &ctx.accounts.system_program.to_account_info(),
-    &ctx.accounts_lazy_distributor,
+    &ctx.accounts.hotspot_issuance,
   )?;
 
   Ok(())

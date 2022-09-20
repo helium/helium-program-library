@@ -10,7 +10,3 @@ pub struct HotspotIssuanceV0 {
 
   pub bump_seed: u8,
 }
-
-// maker => payer
-// onboarding service (configurable onChain)
-// auhtorites need to sign off on hotspots (a pda of collection)
