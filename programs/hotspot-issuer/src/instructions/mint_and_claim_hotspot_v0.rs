@@ -11,3 +11,10 @@ pub struct MintAndClaimHotspotV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
 }
+
+pub fn handler(
+  ctx: Context<MintAndClaimHotspotV0>,
+  args: MintAndClaimHotspotV0Args,
+) -> Result<()> {
+  Ok(())
+}

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("mXiWEGtETaoSV4e9VgVg9i5Atf95DRN7Pn3L9dXLi6A");
 
 pub mod error;
 pub mod instructions;
@@ -14,11 +14,11 @@ pub use state::*;
 pub mod hotspot_issuer {
   use super::*;
 
-  pub fn initialize_hotspot_issuance_v0(
-    ctx: Context<InitializeHotspotIssuanceV0>,
-    args: InitializeHotspotIssuanceV0Args,
+  pub fn initialize_hotspot_issuer_v0(
+    ctx: Context<InitializeHotspotIssuerV0>,
+    args: InitializeHotspotIssuerV0Args,
   ) -> Result<()> {
-    initialize_hotspot_issuance_v0::handler(ctx, args)
+    initialize_hotspot_issuer_v0::handler(ctx, args)
   }
 
   pub fn mint_and_claim_hotspot_v0(

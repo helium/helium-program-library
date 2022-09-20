@@ -5,40 +5,40 @@ use anchor_lang::{
   solana_program::program::{invoke_signed},
 };
 use anchor_spl::token::{Mint, Token};
-use mpl_token_metadata::{instruction::{create_metadata_accounts_v3}, state::Collection};
+use mpl_token_metadata::{instruction::{create_metadata_accounts_v3}, state::CollectionDetails};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct InitializeHotspotIssuanceV0Args {
-  pub collection_name: String,
-  pub collection_symbol: String,
-  pub collection_metadata_uri: String,
+pub struct InitializeHotspotIssuerV0Args {
+  pub name: String,
+  pub symbol: String,
+  pub uri: String,
   pub onboarding_server: Pubkey,
   pub authority: Pubkey,
 }
 
 #[derive(Accounts)]
-pub struct InitializeHotspotIssuanceV0<'info> {
+pub struct InitializeHotspotIssuerV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
     init,
     payer = payer,
     mint::decimals = 0,
-    mint::authority = hotspot_issuance,
-    mint::freeze_authority = hotspot_issuance,
+    mint::authority = hotspot_issuer,
+    mint::freeze_authority = hotspot_issuer,
   )]
-  pub collection_mint: Box<Account<'info, Mint>>,
+  pub collection: Box<Account<'info, Mint>>,
   /// CHECK: This is not dangerous because we don't read or write from this account
   #[account(mut)]
-  pub collection_metadata: UncheckedAccount<'info>,
+  pub metadata: UncheckedAccount<'info>,
   #[account(
     init,
     payer = payer,
-    space = std::cmp::max(8 + std::mem::size_of::<HotspotIssuanceV0>(), hotspot_issuance.data.borrow_mut().len()),
-    seeds = [b"hotspot_issuance", collection_mint.key().as_ref()],
+    space = std::cmp::max(8 + std::mem::size_of::<HotspotIssuerV0>(), hotspot_issuer.data.borrow_mut().len()),
+    seeds = [b"hotspot_issuer", collection.key().as_ref()],
     bump,
   )]
-  pub hotspot_issuance: Box<Account<'info, HotspotIssuanceV0>>,
+  pub hotspot_issuer: Box<Account<'info, HotspotIssuerV0>>,
 
   pub system_program: Program<'info, System>,
   /// CHECK: This is not dangerous because we don't read or write from this account
@@ -48,13 +48,13 @@ pub struct InitializeHotspotIssuanceV0<'info> {
 }
 
 pub fn handler(
-  ctx: Context<InitializeHotspotIssuanceV0>,
-  args: InitializeHotspotIssuanceV0Args,
+  ctx: Context<InitializeHotspotIssuerV0>,
+  args: InitializeHotspotIssuerV0Args,
 ) -> Result<()> {
   let account_info = vec![
-    ctx.accounts.collection_metadata.to_account_info(),
-    ctx.accounts.collection_mint.to_account_info(),
-    ctx.accounts.hotspot_issuance.to_account_info(),
+    ctx.accounts.metadata.to_account_info(),
+    ctx.accounts.collection.to_account_info(),
+    ctx.accounts.hotspot_issuer.to_account_info(),
     ctx.accounts.payer.to_account_info(),
     ctx.accounts.token_metadata_program.to_account_info(),
     ctx.accounts.token_program.to_account_info(),
@@ -63,49 +63,46 @@ pub fn handler(
   ];
 
   let seeds: &[&[&[u8]]] = &[&[
-    b"hotspot_issuance",
-    ctx.accounts.collection_mint.to_account_info().key.as_ref(),
-    &[ctx.bumps["hotspot_issuance"]],
+    b"hotspot_issuer",
+    ctx.accounts.collection.to_account_info().key.as_ref(),
+    &[ctx.bumps["hotspot_issuer"]],
   ]];
 
   invoke_signed(
     &create_metadata_accounts_v3(
       ctx.accounts.token_metadata_program.key(),
-      ctx.accounts.collection_metadata.key(),
-      ctx.accounts.collection_mint.key(),
-      ctx.accounts.hotspot_issuance.key(),
+      ctx.accounts.metadata.key(),
+      ctx.accounts.collection.key(),
+      ctx.accounts.hotspot_issuer.key(),
       ctx.accounts.payer.key(),
-      ctx.accounts.hotspot_issuance.key(),
-      args.collection_name,
-      args.collection_symbol,
-      args.collection_metadata_uri,
+      ctx.accounts.hotspot_issuer.key(),
+      args.name,
+      args.symbol,
+      args.uri,
       None,
       0,
       true,
       false,
-      Some(Collection {
-        key: ctx.accounts.collection_mint.key(),
-        verified: true,
-      }),
       None,
       None,
+      Some(CollectionDetails::V1 { size: 0 }),
     ),
     account_info.as_slice(),
     seeds,
   )?;
 
-  ctx.accounts.hotspot_issuance.set_inner(HotspotIssuanceV0 {
+  ctx.accounts.hotspot_issuer.set_inner(HotspotIssuerV0 {
     count: 0,
     onboarding_server: args.onboarding_server,
-    collection_mint: ctx.accounts.collection_mint.key(),
+    collection: ctx.accounts.collection.key(),
     authority: args.authority,
-    bump_seed: ctx.bumps["hotspot_issuance"],
+    bump_seed: ctx.bumps["hotspot_issuer"],
   });
 
   resize_to_fit(
     &ctx.accounts.payer.to_account_info(),
     &ctx.accounts.system_program.to_account_info(),
-    &ctx.accounts.hotspot_issuance,
+    &ctx.accounts.hotspot_issuer,
   )?;
 
   Ok(())

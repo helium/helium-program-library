@@ -610,7 +610,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hotspot-issuance"
+name = "hotspot-issuer"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",

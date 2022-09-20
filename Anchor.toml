@@ -1,13 +1,13 @@
 [features]
 seeds = false
 [programs.localnet]
-lazy_distributor = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
-hotspot_issuance = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+lazy_distributor = "HNLCNtFkjJiCTC9BV7cTCVmQaSx6d6yzp2Pk1A4h2bHt"
+hotspot_issuer = "mXiWEGtETaoSV4e9VgVg9i5Atf95DRN7Pn3L9dXLi6A"
 
 [workspace]
 members = [
   "programs/lazy-distributor",
-  "programs/hotspot-issuance"
+  "programs/hotspot-issuer"
 ]
 
 [registry]

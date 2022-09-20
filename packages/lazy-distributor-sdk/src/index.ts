@@ -76,7 +76,7 @@ export interface ISetCurrentRewardsArgs {
 }
 
 export class LazyDistributorSdk extends AnchorSdk<LazyDistributor> {
-  static ID = new PublicKey("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+  static ID = new PublicKey("HNLCNtFkjJiCTC9BV7cTCVmQaSx6d6yzp2Pk1A4h2bHt");
 
   static async init(
     provider: AnchorProvider,
@@ -388,7 +388,7 @@ export class LazyDistributorSdk extends AnchorSdk<LazyDistributor> {
       signers: [],
       output: {
         destination: destinationAccount,
-        owner: recipientMintOwner
+        owner: recipientMintOwner,
       },
     };
   }
