@@ -1,8 +1,8 @@
-use crate::{state::*};
+use crate::state::*;
 use crate::token_metadata::Metadata;
-use crate::{utils::resize_to_fit};
+use crate::utils::resize_to_fit;
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint};
+use anchor_spl::token::Mint;
 
 #[derive(Accounts)]
 pub struct InitializeRecipientV0<'info> {
@@ -34,7 +34,7 @@ pub fn handler(ctx: Context<InitializeRecipientV0>) -> Result<()> {
     current_config_version: 0,
     current_rewards: vec![None; ctx.accounts.lazy_distributor.oracles.len()],
     lazy_distributor: ctx.accounts.lazy_distributor.key(),
-    bump_seed: ctx.bumps["recipient"]
+    bump_seed: ctx.bumps["recipient"],
   });
 
   resize_to_fit(

@@ -1,13 +1,13 @@
 use crate::state::*;
 use crate::utils::resize_to_fit;
 use anchor_lang::prelude::*;
-use anchor_spl::token::{TokenAccount, Mint, Token};
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeLazyDistributorV0Args {
   pub collection: Pubkey,
   pub oracles: Vec<OracleConfigV0>,
-  pub authority: Pubkey
+  pub authority: Pubkey,
 }
 
 #[derive(Accounts)]
@@ -49,7 +49,7 @@ pub fn handler(
     collection: args.collection,
     version: 0,
     authority: args.authority,
-    bump_seed: ctx.bumps["lazy_distributor"]
+    bump_seed: ctx.bumps["lazy_distributor"],
   });
 
   resize_to_fit(

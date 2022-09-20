@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 pub struct HotspotIssuanceV0 {
   pub count: u64, // Track count of issuance
   pub onboarding_server: Pubkey,
-  pub collection: Pubkey, // The metaplex collection of hotspot NFTs to be issued
+  pub collection_mint: Pubkey, // The metaplex collection to be issued
   pub authority: Pubkey,
 
   pub bump_seed: u8,

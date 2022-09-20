@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MintAndClaimHotspotV0Args {
-  pub authority: Pubkey
+  pub authority: Pubkey,
 }
 
 #[derive(Accounts)]

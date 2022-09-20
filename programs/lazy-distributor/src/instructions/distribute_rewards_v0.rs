@@ -1,7 +1,7 @@
-use crate::state::*;
 use crate::error::ErrorCode;
+use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::{TokenAccount, Token, self, Transfer};
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 #[derive(Accounts)]
 pub struct DistributeRewardsV0<'info> {
@@ -38,15 +38,21 @@ pub fn handler(ctx: Context<DistributeRewardsV0>) -> Result<()> {
     &[ctx.accounts.lazy_distributor.bump_seed],
   ]];
   let recipient = &mut ctx.accounts.recipient;
-  let mut filtered: Vec<u64> = recipient.current_rewards.clone().into_iter().flatten().collect();
+  let mut filtered: Vec<u64> = recipient
+    .current_rewards
+    .clone()
+    .into_iter()
+    .flatten()
+    .collect();
   filtered.sort();
   let median_idx = filtered.len() / 2;
   let median = filtered[median_idx];
 
   recipient.current_rewards = vec![None; ctx.accounts.lazy_distributor.oracles.len()];
-  let to_dist = median.checked_sub(recipient.total_rewards).ok_or_else( || error!(ErrorCode::ArithmeticError))?;
+  let to_dist = median
+    .checked_sub(recipient.total_rewards)
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
   recipient.total_rewards = median;
-
 
   token::transfer(
     CpiContext::new_with_signer(
