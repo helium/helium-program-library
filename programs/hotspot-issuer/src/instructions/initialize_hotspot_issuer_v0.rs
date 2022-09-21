@@ -17,6 +17,7 @@ pub struct InitializeHotspotIssuerV0Args {
 }
 
 #[derive(Accounts)]
+#[instruction(args: InitializeHotspotIssuerV0Args)]
 pub struct InitializeHotspotIssuerV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
@@ -35,14 +36,15 @@ pub struct InitializeHotspotIssuerV0<'info> {
     init,
     payer = payer,
     space = std::cmp::max(8 + std::mem::size_of::<HotspotIssuerV0>(), hotspot_issuer.data.borrow_mut().len()),
-    seeds = [b"hotspot_issuer", collection.key().as_ref()],
+    seeds = ["hotspot_issuer".as_bytes(), collection.key().as_ref()],
     bump,
   )]
   pub hotspot_issuer: Box<Account<'info, HotspotIssuerV0>>,
 
-  pub system_program: Program<'info, System>,
+
   /// CHECK: This is not dangerous because we don't read or write from this account
   pub token_metadata_program: UncheckedAccount<'info>,
+  pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub rent: Sysvar<'info, Rent>,
 }
@@ -63,7 +65,7 @@ pub fn handler(
   ];
 
   let seeds: &[&[&[u8]]] = &[&[
-    b"hotspot_issuer",
+    "hotspot_issuer".as_bytes(),
     ctx.accounts.collection.to_account_info().key.as_ref(),
     &[ctx.bumps["hotspot_issuer"]],
   ]];

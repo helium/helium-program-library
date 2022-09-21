@@ -1,5 +1,5 @@
 [features]
-seeds = false
+seeds = true
 [programs.localnet]
 lazy_distributor = "HNLCNtFkjJiCTC9BV7cTCVmQaSx6d6yzp2Pk1A4h2bHt"
 hotspot_issuer = "mXiWEGtETaoSV4e9VgVg9i5Atf95DRN7Pn3L9dXLi6A"
