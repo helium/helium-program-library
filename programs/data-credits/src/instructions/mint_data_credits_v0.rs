@@ -12,7 +12,7 @@ pub struct MintDataCreditsV0Args {
 #[derive(Accounts)]
 #[instruction(args: MintDataCreditsV0Args)]
 pub struct MintDataCreditsV0<'info> {
-  #[account(seeds=[b"dc"], bump=data_credits.data_credits_bump, has_one=hnt_mint, has_one=dc_mint)]
+  #[account(seeds=["dc".as_bytes()], bump=data_credits.data_credits_bump, has_one=hnt_mint, has_one=dc_mint)]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
 
   // hnt tokens from this account are burned
@@ -27,8 +27,9 @@ pub struct MintDataCreditsV0<'info> {
   )]
   pub recipient: Box<Account<'info, TokenAccount>>,
 
-  ///CHECK: cpi calls will fail tx if not the correct authorised key
-  pub token_authority: UncheckedAccount<'info>,
+  #[account(seeds=["dc_token_auth".as_bytes()], bump=data_credits.token_authority_bump)]
+  ///CHECK: seeds verified and cpi calls will be unauthorised if incorrect
+  pub token_authority: AccountInfo<'info>,
 
   pub owner: Signer<'info>,
 

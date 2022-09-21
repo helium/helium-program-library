@@ -1,4 +1,4 @@
-import { AnchorProvider } from "@project-serum/anchor";
+import { AnchorProvider, Program, Idl } from "@project-serum/anchor";
 import {
   Commitment,
   Connection,
@@ -151,6 +151,63 @@ export async function sendMultipleInstructions(
     const wrappedE = ProgramError.parse(e, idlErrors);
     throw wrappedE == null ? e : wrappedE;
   }
+}
+
+export async function execute<Output>(
+  program: Program<any>,
+  provider: AnchorProvider,
+  command: InstructionResult<Output>,
+  payer: PublicKey = provider.wallet.publicKey,
+  commitment?: Commitment
+): Promise<Output & { txid?: string }> {
+  const { instructions, signers, output } = command;
+  const errors = program.idl.errors?.reduce((acc, err) => {
+    acc.set(err.code, `${err.name}: ${err.msg}`);
+    return acc;
+  }, new Map<number, string>());
+  if (instructions.length > 0) {
+    const txid = await sendInstructions(
+      errors,
+      provider,
+      instructions,
+      signers,
+      payer,
+      commitment
+    );
+    return { txid, ...output };
+  }
+
+  return output;
+}
+
+export async function executeBig<Output>(
+  program: Program,
+  provider: AnchorProvider,
+  command: BigInstructionResult<Output>,
+  payer: PublicKey = provider.wallet.publicKey,
+  finality?: Finality
+): Promise<Output & { txids?: string[] }> {
+  const { instructions, signers, output } = command;
+  const errors = program.idl.errors?.reduce((acc, err) => {
+    acc.set(err.code, `${err.name}: ${err.msg}`);
+    return acc;
+  }, new Map<number, string>());
+  if (instructions.length > 0) {
+    const txids = await sendMultipleInstructions(
+      errors,
+      provider,
+      instructions,
+      signers,
+      payer || this.wallet.publicKey,
+      finality
+    );
+    return {
+      ...output,
+      txids: Array.from(txids),
+    }
+  }
+
+  return output;
 }
 
 function getUnixTime(): number {
