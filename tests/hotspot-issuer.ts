@@ -30,43 +30,46 @@ describe("hotspot-issuer", () => {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
 
-  let collectionKey: PublicKey;
-  let onboardingServerKey: PublicKey;
-  let hotspotIssuerPDA: PublicKey;
-  let metadataPDA: PublicKey;
-
-  before(async () => {
-    collectionKey = Keypair.generate().publicKey;
-    onboardingServerKey = Keypair.generate().publicKey;
-    hotspotIssuerPDA = hotspotIssuerKey({ collection: collectionKey })[0];
-    metadataPDA = collectionMetadataKey({ collection: collectionKey })[0];
-
-    await program.methods
+  const initTestHotspotIssuer = async (): Promise<{
+    collection: PublicKey;
+    hotspotIssuer: PublicKey;
+    onboardingServer: PublicKey;
+  }> => {
+    const onboardingServer = Keypair.generate().publicKey;
+    const method = await program.methods
       .initializeHotspotIssuerV0({
         authority: me,
         name: "HNT Mobile Hotspots",
         symbol: "HNTMOBILE",
         uri: DEFAULT_METADATA_URI,
-        onboardingServer: onboardingServerKey,
+        onboardingServer,
       })
       .accounts({
         payer: me,
-        collection: collectionKey,
-        metadata: metadataPDA,
-        hotspotIssuer: hotspotIssuerPDA,
         tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
-      })
-      .rpc();
-  });
+      });
+
+    const { collection, hotspotIssuer } = await method.pubkeys();
+    await method.rpc();
+
+    return {
+      collection: collection!,
+      hotspotIssuer: hotspotIssuer!,
+      onboardingServer,
+    };
+  };
 
   it("initializes hotspot issuer", async () => {
+    const { hotspotIssuer, collection, onboardingServer } =
+      await initTestHotspotIssuer();
+
     const hotspotIssuerAcc = await program.account.hotspotIssuerV0.fetch(
-      hotspotIssuerPDA
+      hotspotIssuer
     );
 
     assert(hotspotIssuerAcc?.authority.equals(me));
-    assert(hotspotIssuerAcc?.collection.equals(collectionKey));
-    assert(hotspotIssuerAcc?.onboardingServer.equals(onboardingServerKey));
+    assert(hotspotIssuerAcc?.collection.equals(collection));
+    assert(hotspotIssuerAcc?.onboardingServer.equals(onboardingServer));
     assert(hotspotIssuerAcc?.count.toNumber() == 0);
   });
 });
