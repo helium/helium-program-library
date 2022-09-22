@@ -1,5 +1,6 @@
 import { assert } from "chai";
-import anchor, { Program } from "@project-serum/anchor";
+import * as anchor from "@project-serum/anchor";
+import { Program } from "@project-serum/anchor";
 import { PublicKey, Keypair } from "@solana/web3.js";
 import {
   getAssociatedTokenAddress,
@@ -7,6 +8,7 @@ import {
   getMint,
 } from "@solana/spl-token";
 import { execute, executeBig } from "@helium-foundation/spl-utils";
+import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import { createAtaAndMint, createMint, mintTo } from "./utils/token";
 import { HotspotIssuer } from "../target/types/hotspot_issuer";
 import {
@@ -41,14 +43,18 @@ describe("hotspot-issuer", () => {
 
     await program.methods
       .initializeHotspotIssuerV0({
+        authority: me,
         name: "HNT Mobile Hotspots",
         symbol: "HNTMOBILE",
         uri: DEFAULT_METADATA_URI,
         onboardingServer: onboardingServerKey,
-        authority: me,
       })
       .accounts({
         payer: me,
+        collection: collectionKey,
+        metadata: metadataPDA,
+        hotspotIssuer: hotspotIssuerPDA,
+        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
       })
       .rpc();
   });

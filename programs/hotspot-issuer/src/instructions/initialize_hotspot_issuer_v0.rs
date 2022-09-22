@@ -41,7 +41,6 @@ pub struct InitializeHotspotIssuerV0<'info> {
   )]
   pub hotspot_issuer: Box<Account<'info, HotspotIssuerV0>>,
 
-
   /// CHECK: This is not dangerous because we don't read or write from this account
   pub token_metadata_program: UncheckedAccount<'info>,
   pub system_program: Program<'info, System>,
@@ -64,8 +63,8 @@ pub fn handler(
     ctx.accounts.rent.to_account_info(),
   ];
 
-  let seeds: &[&[&[u8]]] = &[&[
-    "hotspot_issuer".as_bytes(),
+  let signer_seeds: &[&[&[u8]]] = &[&[
+    b"hotspot_issuer",
     ctx.accounts.collection.to_account_info().key.as_ref(),
     &[ctx.bumps["hotspot_issuer"]],
   ]];
@@ -90,7 +89,7 @@ pub fn handler(
       Some(CollectionDetails::V1 { size: 0 }),
     ),
     account_info.as_slice(),
-    seeds,
+    signer_seeds,
   )?;
 
   ctx.accounts.hotspot_issuer.set_inner(HotspotIssuerV0 {

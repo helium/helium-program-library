@@ -10,7 +10,7 @@ export const hotspotIssuerKey = ({
   collection: PublicKey;
 }) =>
   PublicKey.findProgramAddressSync(
-    [Buffer.from("hotspot-issuer", "utf-8"), collection.toBuffer()],
+    [Buffer.from("hotspot_issuer", "utf-8"), collection.toBuffer()],
     programId
   );
 
@@ -24,7 +24,7 @@ export const collectionMetadataKey = ({
   PublicKey.findProgramAddressSync(
     [
       Buffer.from("metadata", "utf-8"),
-      TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+      programId.toBuffer(),
       collection.toBuffer(),
     ],
     programId
