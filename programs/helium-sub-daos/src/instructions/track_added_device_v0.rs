@@ -20,7 +20,7 @@ pub struct TrackAddedDeviceV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    space = std::cmp::max(8 + std::mem::size_of::<SubDaoEpochInfoV0>(), sub_dao_epoch_info.data.borrow_mut().len()),
+    space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(),  &current_epoch(clock.unix_timestamp).to_le_bytes()], // Break into 30m epochs
     bump,
   )]

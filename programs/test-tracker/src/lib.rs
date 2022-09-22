@@ -116,8 +116,6 @@ impl<'info> TrackAddedDeviceV0Wrapper<'info> {
 
 #[derive(Accounts)]
 pub struct TrackDcBurnV0Wrapper<'info> {
-  #[account(mut)]
-  pub payer: Signer<'info>,
   /// CHECK: Verified by cpi
   #[account(
     mut,
@@ -129,6 +127,7 @@ pub struct TrackDcBurnV0Wrapper<'info> {
   /// CHECK: Verified by cpi
   pub sub_dao: AccountInfo<'info>,
   #[account(
+    mut,
     seeds = [b"dc_token_auth"],
     bump,
   )]
@@ -142,7 +141,6 @@ pub struct TrackDcBurnV0Wrapper<'info> {
 impl<'info> TrackDcBurnV0Wrapper<'info> {
   fn unwrap(self: &TrackDcBurnV0Wrapper<'info>) -> TrackDcBurnV0<'info> {
     TrackDcBurnV0 {
-      payer: self.payer.to_account_info(),
       sub_dao_epoch_info: self.sub_dao_epoch_info.to_account_info(),
       sub_dao: self.sub_dao.to_account_info(),
       authority: self.authority.to_account_info(),

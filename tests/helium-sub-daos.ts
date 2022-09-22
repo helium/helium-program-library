@@ -1,6 +1,6 @@
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
+import { SystemProgram, PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { expect } from "chai";
 import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
@@ -119,6 +119,8 @@ describe("helium-sub-daos", () => {
         skipPreflight: true,
       });
 
+      console.log(subDaoEpochInfo.toBase58())
+
       const epochInfo = await program.account.subDaoEpochInfoV0.fetch(
         subDaoEpochInfo
       );
@@ -128,6 +130,11 @@ describe("helium-sub-daos", () => {
     it("allows tracking dc spend", async () => {
       const method = await testTracker.methods
         .testDcBurn(new anchor.BN(2))
+        .preInstructions([SystemProgram.transfer({
+          fromPubkey: me,
+          toPubkey: PublicKey.findProgramAddressSync([Buffer.from("dc_token_auth", "utf8")], testTracker.programId)[0],
+          lamports: 100000000
+        })])
         .accounts({
           // @ts-ignore
           trackerAccounts: {

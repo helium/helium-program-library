@@ -14,18 +14,17 @@ pub struct TrackDcBurnArgsV0 {
 #[derive(Accounts)]
 #[instruction(args: TrackDcBurnArgsV0)]
 pub struct TrackDcBurnV0<'info> {
-  #[account(mut)]
-  pub payer: Signer<'info>,
   #[account(
     init_if_needed,
-    payer = payer,
-    space = std::cmp::max(8 + std::mem::size_of::<SubDaoEpochInfoV0>(), sub_dao_epoch_info.data.borrow_mut().len()),
+    payer = authority,
+    space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(clock.unix_timestamp).to_le_bytes()], // Break into 30m epochs
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
+    mut,
     seeds = [b"dc_token_auth"],
     seeds::program = Pubkey::from_str(DC_KEY).unwrap(),
     bump = args.authority_bump,
