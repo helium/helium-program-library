@@ -59,6 +59,15 @@ async function resolveIndividualImpl({
   }
 }
 
+/**
+ * Allows custom account resolution by functionaly operating on one account at a time.
+ * 
+ * Check the `path` arg to see the account name being operated on, and use `accounts` and `provider` to fill in any
+ * details necessary
+ * 
+ * @param resolver 
+ * @returns 
+ */
 export function resolveIndividual<T extends anchor.Idl>(
   resolver: IndividualResolver
 ): CustomAccountResolver<T> {
