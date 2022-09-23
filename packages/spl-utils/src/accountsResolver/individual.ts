@@ -30,6 +30,7 @@ async function resolveIndividualImpl({
   resolver: IndividualResolver;
 }): Promise<void> {
   const newPath = [...path, camelCase(idlAccounts.name)];
+
   if ((idlAccounts as IdlAccounts).accounts) {
     const subAccounts = (idlAccounts as IdlAccounts).accounts;
     for (let k = 0; k < subAccounts.length; k += 1) {

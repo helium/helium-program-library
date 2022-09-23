@@ -6,6 +6,8 @@ pub mod error;
 pub mod instructions;
 pub mod state;
 pub mod utils;
+pub mod uint;
+pub mod precise_number;
 
 pub use instructions::*;
 pub use state::*;
@@ -38,5 +40,19 @@ pub mod helium_sub_daos {
     args: TrackDcBurnArgsV0,
   ) -> Result<()> {
     track_dc_burn_v0::handler(ctx, args)
+  }
+
+  pub fn calculate_utility_score_v0(
+    ctx: Context<CalculateUtilityScoreV0>,
+    args: CalculateUtilityScoreArgsV0,
+  ) -> Result<()> {
+    calculate_utility_score_v0::handler(ctx, args)
+  }
+
+  pub fn issue_rewards_v0(
+    ctx: Context<IssueRewardsV0>,
+    args: IssueRewardsArgsV0,
+  ) -> Result<()> {
+    issue_rewards_v0::handler(ctx, args)
   }
 }

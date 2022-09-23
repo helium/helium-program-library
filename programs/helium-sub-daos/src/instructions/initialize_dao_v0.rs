@@ -5,6 +5,7 @@ use anchor_spl::token::{Mint, TokenAccount, Token};
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDaoArgsV0 {
   pub authority: Pubkey,
+  pub reward_per_epoch: u64,
 }
 
 #[derive(Accounts)]
@@ -28,7 +29,7 @@ pub struct InitializeDaoV0<'info> {
   #[account(
     init,
     payer = payer,
-    seeds = ["dao-treasury".as_bytes(), dao.key().as_ref()],
+    seeds = ["dao_treasury".as_bytes(), dao.key().as_ref()],
     bump,
     token::mint = mint,
     token::authority = dao,
@@ -44,7 +45,10 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
     mint: ctx.accounts.mint.key(),
     treasury: ctx.accounts.treasury.key(),
     authority: args.authority,
+    num_sub_daos: 0,
+    reward_per_epoch: args.reward_per_epoch,
     bump_seed: ctx.bumps["dao"],
+    treasury_bump_seed: ctx.bumps["treasury"]
   });
 
   Ok(())
