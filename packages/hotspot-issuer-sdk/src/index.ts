@@ -1,11 +1,7 @@
-import { AnchorSdk } from "@helium-foundation/spl-utils";
 import { AnchorProvider, Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { HotspotIssuer } from "../../../target/types/hotspot_issuer";
-
-export const PROGRAM_ID = new PublicKey(
-  "mXiWEGtETaoSV4e9VgVg9i5Atf95DRN7Pn3L9dXLi6A"
-);
+import { PROGRAM_ID } from "./constants";
 
 export const init = async (
   provider: AnchorProvider,

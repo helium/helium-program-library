@@ -2,9 +2,15 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum ErrorCode {
-  #[msg("The realloc increase was too large")]
-  InvalidDataIncrease,
+  #[msg("Invalid string length, your string was likely too long")]
+  InvalidStringLength,
 
-  #[msg("Error in arithmetic")]
-  ArithmeticError,
+  #[msg("The string was not alphanumeric")]
+  StringNotAlphanumeric,
+  
+  #[msg("Metadata Program Mismatch")]
+  InvalidMetadataProgram,
+
+  #[msg("The realloc increase was too large")]
+  InvalidDataIncrease,  
 }
