@@ -1,7 +1,8 @@
 use crate::DataCreditsV0;
 use anchor_lang::prelude::*;
-use anchor_spl::token::{
-  self, Burn, FreezeAccount, Mint, MintTo, ThawAccount, Token, TokenAccount,
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token::{self, Burn, FreezeAccount, Mint, MintTo, ThawAccount, Token, TokenAccount},
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -22,8 +23,11 @@ pub struct MintDataCreditsV0<'info> {
     has_one = owner
   )]
   pub burner: Box<Account<'info, TokenAccount>>,
-  #[account(mut,
-    constraint = recipient.mint == dc_mint.key()
+  #[account(
+    init_if_needed,
+    payer = owner,
+    associated_token::mint = dc_mint,
+    associated_token::authority = owner,
   )]
   pub recipient: Box<Account<'info, TokenAccount>>,
 
@@ -31,6 +35,7 @@ pub struct MintDataCreditsV0<'info> {
   ///CHECK: seeds verified and cpi calls will be unauthorised if incorrect
   pub token_authority: AccountInfo<'info>,
 
+  #[account(mut)]
   pub owner: Signer<'info>,
 
   #[account(mut)]
@@ -38,6 +43,9 @@ pub struct MintDataCreditsV0<'info> {
   #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,
   pub token_program: Program<'info, Token>,
+  pub rent: Sysvar<'info, Rent>,
+  pub system_program: Program<'info, System>,
+  pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 impl<'info> MintDataCreditsV0<'info> {

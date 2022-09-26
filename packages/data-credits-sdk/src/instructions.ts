@@ -11,7 +11,6 @@ import {
   getAssociatedTokenAddress,
   getMint,
 } from "@solana/spl-token";
-import { dataCreditsKey } from "./pdas";
 
 export interface IMintDataCreditsArgs {
   program: Program<DataCredits>;
@@ -31,8 +30,8 @@ export async function mintDataCreditsInstructions({
   owner = provider.wallet.publicKey,
   recipient = provider.wallet.publicKey,
 }: IMintDataCreditsArgs) {
-  const [dataCredits] = dataCreditsKey();
-  const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dataCredits);
+  const { dataCredits } = await program.methods.mintDataCreditsV0({amount: new BN(0)}).pubkeys();
+  const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dataCredits!);
   if (!dataCreditsAcc) throw new Error("Data credits not available at the expected address.");
 
   const hntMintAcc = await getMint(
@@ -42,19 +41,8 @@ export async function mintDataCreditsInstructions({
 
   const burner = await getAssociatedTokenAddress(dataCreditsAcc.hntMint, owner);
   const recipientAcc = await getAssociatedTokenAddress(dataCreditsAcc.dcMint, recipient);
+  
   const instructions: TransactionInstruction[] = [];
-
-  if (!(await provider.connection.getAccountInfo(recipientAcc))) {
-    instructions.push(
-      createAssociatedTokenAccountInstruction(
-        owner,
-        recipientAcc,
-        owner,
-        dataCreditsAcc.dcMint
-      )
-    );
-  }
-
   instructions.push(await program.methods.mintDataCreditsV0({amount: toBN(amount, hntMintAcc)}).accounts({
     burner,
     recipient: recipientAcc,
@@ -86,8 +74,8 @@ export async function burnDataCreditsInstructions({
   amount,
   owner = provider.wallet.publicKey,
 }: IBurnDataCreditsArgs) {
-  const [dataCredits] = dataCreditsKey();
-  const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dataCredits);
+  const { dataCredits } = await program.methods.mintDataCreditsV0({amount: new BN(0)}).pubkeys();
+  const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dataCredits!);
   if (!dataCreditsAcc) throw new Error("Data credits not available at the expected address.")
   const dcMintAcc = await getMint(
     provider.connection,

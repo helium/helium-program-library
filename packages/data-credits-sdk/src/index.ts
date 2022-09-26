@@ -4,8 +4,8 @@ import {
   AnchorProvider,
   Program,
 } from "@project-serum/anchor";
+import { PROGRAM_ID } from "./constants";
 
-export const PROGRAM_ID = new PublicKey("5BAQuzGE1z8CTcrSdfbfdBF2fdXrwb4iMcxDMrvhz8L8");
 
 export async function init(provider: AnchorProvider, dataCreditsProgramId: PublicKey = PROGRAM_ID) {
   const dataCreditsIdlJson = await Program.fetchIdl(
@@ -19,7 +19,6 @@ export async function init(provider: AnchorProvider, dataCreditsProgramId: Publi
   ) as Program<DataCredits>;
   return dataCredits;
 }
-
 
 export * from "./instructions";
 export * from "./pdas"

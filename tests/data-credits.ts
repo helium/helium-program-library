@@ -21,8 +21,8 @@ describe("data-credits", () => {
 
   let hntMint: PublicKey;
   let dcMint: PublicKey;
-  const hntDecimals = 5;
-  const dcDecimals = 5;
+  const hntDecimals = 8;
+  const dcDecimals = 8;
   let dcKey: PublicKey;
   before(async () => {
     const [tokenAuth] = tokenAuthorityKey();
