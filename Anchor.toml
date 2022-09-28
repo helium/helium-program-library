@@ -1,11 +1,15 @@
 [features]
-seeds = false
+seeds = true
 [programs.localnet]
 lazy_distributor = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+helium_sub_daos = "daoK94GYdvRjVxkSyTxNLxtAEYZohLJqmwad8pBK261"
+test_tracker = "tes8BDewkpUpfqx7VDXUJzTFugjqHJugCEBP5sDrrCf"
 
 [workspace]
 members = [
   "programs/lazy-distributor", 
+  "programs/helium-sub-daos",
+  "programs/test-tracker", 
 ]
 
 [registry]

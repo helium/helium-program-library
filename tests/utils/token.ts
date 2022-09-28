@@ -4,7 +4,7 @@ import {
 import * as anchor from "@project-serum/anchor";
 import {
   createAssociatedTokenAccountInstruction, createInitializeMintInstruction,
-  createMintToInstruction, getAssociatedTokenAddress, TOKEN_PROGRAM_ID
+  createMintToInstruction, getAssociatedTokenAddress, TOKEN_PROGRAM_ID, 
 } from "@solana/spl-token";
 import {
   Keypair, PublicKey, SystemProgram,
@@ -14,7 +14,7 @@ import {
 export async function mintTo(
   provider: anchor.AnchorProvider,
   mint: PublicKey,
-  amount: number,
+  amount: number | bigint,
   destination: PublicKey
 ): Promise<void> {
   const mintTx = new Transaction();
