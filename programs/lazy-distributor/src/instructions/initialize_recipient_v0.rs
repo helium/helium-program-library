@@ -8,6 +8,10 @@ use anchor_spl::token::{Mint};
 pub struct InitializeRecipientV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
+  #[account(
+    seeds = ["lazy-distributor".as_bytes(), lazy_distributor.collection.as_ref(), lazy_distributor.rewards_mint.as_ref()],
+    bump = lazy_distributor.bump_seed,
+  )]
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
   #[account(
     init,
