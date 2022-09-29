@@ -59,12 +59,12 @@ export abstract class AnchorSdk<IDL extends Idl> {
   ): Promise<string> {
     try {
       return await sendInstructions(
-        this.errors || new Map(),
         this.provider,
         instructions,
         signers,
         payer,
-        commitment
+        commitment,
+        this.errors || new Map(),
       );
     } catch (e: any) {
       // If all compute was consumed, this can often mean that the bonding price moved too much, causing
@@ -110,12 +110,12 @@ export abstract class AnchorSdk<IDL extends Idl> {
     const { instructions, signers, output } = command;
     if (instructions.length > 0) {
       const txids = await sendMultipleInstructions(
-        this.errors || new Map(),
         this.provider,
         instructions,
         signers,
         payer || this.wallet.publicKey,
-        finality
+        finality,
+        this.errors || new Map()
       );
       return {
         ...output,

@@ -226,7 +226,6 @@ describe("lazy-distributor", () => {
 
       // Run the full set oracle pricing, distribute rewards, all at once
       await sendInstructions(
-        new Map(),
         provider,
         [...setRewardsInstructions, ...distributeInstructions],
         [oracle1, oracle2, oracle3]

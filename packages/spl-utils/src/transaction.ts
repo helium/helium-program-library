@@ -44,12 +44,12 @@ export interface BigInstructionResult<A> {
 }
 
 export async function sendInstructions(
-  idlErrors: Map<number, string>,
   provider: AnchorProvider,
   instructions: TransactionInstruction[],
-  signers: Signer[],
+  signers: Signer[] = [],
   payer: PublicKey = provider.wallet.publicKey,
-  commitment: Commitment = "confirmed"
+  commitment: Commitment = "confirmed",
+  idlErrors: Map<number, string> = new Map()
 ): Promise<string> {
   let tx = new Transaction();
   tx.recentBlockhash = (
@@ -86,12 +86,12 @@ function truthy<T>(value: T): value is Truthy<T> {
 }
 
 export async function sendMultipleInstructions(
-  idlErrors: Map<number, string>,
   provider: AnchorProvider,
   instructionGroups: TransactionInstruction[][],
   signerGroups: Signer[][],
   payer?: PublicKey,
-  finality: Finality = "confirmed"
+  finality: Finality = "confirmed",
+  idlErrors: Map<number, string> = new Map()
 ): Promise<Iterable<string>> {
   const recentBlockhash = (
     await provider.connection.getRecentBlockhash("confirmed")
