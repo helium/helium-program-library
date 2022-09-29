@@ -1,11 +1,11 @@
 {
-  "name": "@helium-foundation/hotspot-issuer-sdk",
+  "name": "@helium-foundation/hotspot-issuance-sdk",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
   "version": "0.0.1",
-  "description": "Interface to the hotspot-issuer smart contract",
+  "description": "Interface to the hotspot-issuance smart contract",
   "repository": {
     "type": "git",
     "url": "https://github.com/HeliumFoundation/helium-program-libary"
