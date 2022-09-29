@@ -232,7 +232,6 @@ pub fn handler(
 
   // TODO: CPI call to increment count of dao/subdao
 
-  // increment count on hotspot_issuer
   ctx.accounts.hotspot_issuer.count += 1;
 
   Ok(())
