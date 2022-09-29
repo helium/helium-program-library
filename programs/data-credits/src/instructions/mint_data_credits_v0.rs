@@ -27,9 +27,11 @@ pub struct MintDataCreditsV0<'info> {
     init_if_needed,
     payer = owner,
     associated_token::mint = dc_mint,
-    associated_token::authority = owner,
+    associated_token::authority = recipient,
   )]
-  pub recipient: Box<Account<'info, TokenAccount>>,
+  pub recipient_token_account: Box<Account<'info, TokenAccount>>,
+  /// CHECK: DC credits sent here
+  pub recipient: AccountInfo<'info>,
 
   #[account(seeds=["dc_token_auth".as_bytes()], bump=data_credits.token_authority_bump)]
   ///CHECK: seeds verified and cpi calls will be unauthorised if incorrect
@@ -61,7 +63,7 @@ impl<'info> MintDataCreditsV0<'info> {
 
   fn thaw_ctx(&self) -> CpiContext<'_, '_, '_, 'info, ThawAccount<'info>> {
     let cpi_accounts = ThawAccount {
-      account: self.recipient.to_account_info(),
+      account: self.recipient_token_account.to_account_info(),
       mint: self.dc_mint.to_account_info(),
       authority: self.token_authority.to_account_info(),
     };
@@ -71,7 +73,7 @@ impl<'info> MintDataCreditsV0<'info> {
   fn mint_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintTo<'info>> {
     let cpi_accounts = MintTo {
       mint: self.dc_mint.to_account_info(),
-      to: self.recipient.to_account_info(),
+      to: self.recipient_token_account.to_account_info(),
       authority: self.token_authority.to_account_info(),
     };
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
@@ -79,7 +81,7 @@ impl<'info> MintDataCreditsV0<'info> {
 
   fn freeze_ctx(&self) -> CpiContext<'_, '_, '_, 'info, FreezeAccount<'info>> {
     let cpi_accounts = FreezeAccount {
-      account: self.recipient.to_account_info(),
+      account: self.recipient_token_account.to_account_info(),
       mint: self.dc_mint.to_account_info(),
       authority: self.token_authority.to_account_info(),
     };
@@ -96,8 +98,8 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsV0Args) -> 
   // burn the hnt tokens
   token::burn(ctx.accounts.burn_ctx(), args.amount)?;
 
-  // unfreeze the recipient if necessary
-  if ctx.accounts.recipient.is_frozen() {
+  // unfreeze the recipient_token_account if necessary
+  if ctx.accounts.recipient_token_account.is_frozen() {
     token::thaw_account(ctx.accounts.thaw_ctx().with_signer(signer_seeds))?;
   }
 

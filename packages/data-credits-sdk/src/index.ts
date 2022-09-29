@@ -5,17 +5,37 @@ import {
   Program,
 } from "@project-serum/anchor";
 import { PROGRAM_ID } from "./constants";
+import { ataResolver, combineResolvers } from "@helium-foundation/spl-utils";
 
 
-export async function init(provider: AnchorProvider, dataCreditsProgramId: PublicKey = PROGRAM_ID) {
-  const dataCreditsIdlJson = await Program.fetchIdl(
-    dataCreditsProgramId,
-    provider
-  );
+export async function init(provider: AnchorProvider, dataCreditsProgramId: PublicKey = PROGRAM_ID, dataCreditsIdl?): Promise<Program<DataCredits>> {
+  if (!dataCreditsIdl) {
+    dataCreditsIdl = await Program.fetchIdl(
+      dataCreditsProgramId,
+      provider
+    );
+  }
   const dataCredits = new Program<DataCredits>(
-    dataCreditsIdlJson as DataCredits,
+    dataCreditsIdl as DataCredits,
     dataCreditsProgramId,
-    provider
+    provider,
+    undefined,
+    () => {
+      return combineResolvers(
+        ataResolver({
+          instruction: "mintDataCreditsV0",
+          account: "recipientTokenAccount",
+          mint: "dcMint",
+          owner: "recipient",
+        }),
+        ataResolver({
+          instruction: "mintDataCreditsV0",
+          account: "burner",
+          mint: "hntMint",
+          owner: "owner",
+        })
+      )
+    }
   ) as Program<DataCredits>;
   return dataCredits;
 }

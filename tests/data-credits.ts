@@ -2,7 +2,7 @@ import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { assert } from "chai";
-import { dataCreditsKey, tokenAuthorityKey, mintDataCreditsInstructions, burnDataCreditsInstructions } from "../packages/data-credits-sdk/src";
+import { init, dataCreditsKey, tokenAuthorityKey, mintDataCreditsInstructions, burnDataCreditsInstructions } from "../packages/data-credits-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { createAtaAndMint, createMint, mintTo } from "./utils/token";
 import {
@@ -10,12 +10,13 @@ import {
   getAccount,
   getMint,
 } from "@solana/spl-token";
-import { toBN, toNumber, execute, executeBig } from "@helium-foundation/spl-utils";
+import { toBN, execute } from "@helium-foundation/spl-utils";
+import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
 
 describe("data-credits", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
-  const program = anchor.workspace.DataCredits as Program<DataCredits>;
+  let program: Program<DataCredits>;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
 
@@ -25,6 +26,7 @@ describe("data-credits", () => {
   const dcDecimals = 8;
   let dcKey: PublicKey;
   before(async () => {
+    program = await init(provider, PROGRAM_ID, anchor.workspace.DataCredits.idl);
     const [tokenAuth] = tokenAuthorityKey();
     hntMint = await createMint(provider, hntDecimals, me, me);
     dcMint = await createMint(provider, dcDecimals, tokenAuth, tokenAuth);
@@ -47,7 +49,6 @@ describe("data-credits", () => {
 
   describe("with data credits", async() => {
     it("mints some data credits", async () => {
-
       const ix = await mintDataCreditsInstructions({
         program,
         provider,
