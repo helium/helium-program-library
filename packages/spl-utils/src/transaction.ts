@@ -167,12 +167,12 @@ export async function execute<Output>(
   }, new Map<number, string>());
   if (instructions.length > 0) {
     const txid = await sendInstructions(
-      errors,
       provider,
       instructions,
       signers,
       payer,
-      commitment
+      commitment,
+      errors
     );
     return { txid, ...output };
   }
@@ -194,12 +194,12 @@ export async function executeBig<Output>(
   }, new Map<number, string>());
   if (instructions.length > 0) {
     const txids = await sendMultipleInstructions(
-      errors,
       provider,
       instructions,
       signers,
       payer || this.wallet.publicKey,
-      finality
+      finality,
+      errors
     );
     return {
       ...output,

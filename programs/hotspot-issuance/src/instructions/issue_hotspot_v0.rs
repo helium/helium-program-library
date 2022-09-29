@@ -6,13 +6,16 @@ use anchor_spl::{
   associated_token::AssociatedToken,  
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use mpl_token_metadata::{instruction::{create_metadata_accounts_v3, create_master_edition_v3}, state::Collection, ID as TOKEN_METADATA_ID};
+use mpl_token_metadata::{
+  instruction::{create_metadata_accounts_v3, create_master_edition_v3, verify_sized_collection_item}, 
+  state::Collection, 
+  ID as TOKEN_METADATA_ID
+};
 use crate::state::*;
 use crate::{error::ErrorCode};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHotspotV0Args {
-  pub maker: Pubkey,
   pub name: String,
   pub symbol: String,
   pub metadata_url: String,
@@ -24,23 +27,45 @@ pub struct IssueHotspotV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(mut)]
-  pub dc_fee_payer: Signer<'info>,  
-  #[account(mut)]
-  pub hotspot_owner: Signer<'info>,
+  pub dc_fee_payer: Signer<'info>,
+  pub onboarding_server: Signer<'info>,
+  pub maker: Signer<'info>,
+  
+  /// CHECK: Hotspot nft sent here
+  pub hotspot_owner: AccountInfo<'info>,
   pub collection: Box<Account<'info, Mint>>,
+
+  /// CHECK: Handled by cpi
+  #[account(
+    mut,
+    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), collection.key().as_ref()],
+    seeds::program = token_metadata_program.key(),
+    bump,
+  )]
+  pub collection_metadata: UncheckedAccount<'info>,
+  /// CHECK: Handled By cpi account
+  #[account(
+    mut,
+    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), collection.key().as_ref(), "edition".as_bytes()],
+    seeds::program = token_metadata_program.key(),
+    bump,
+  )]
+  pub collection_master_edition: UncheckedAccount<'info>,  
 
   #[account(
     seeds = ["hotspot_config".as_bytes(), collection.key().as_ref()],
     bump = hotspot_config.bump_seed,
     has_one = collection,
+    has_one = onboarding_server
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
 
   #[account(
     mut,
-    seeds = ["hotspot_issuer".as_bytes(), hotspot_config.key().as_ref(), args.maker.as_ref()],
+    seeds = ["hotspot_issuer".as_bytes(), hotspot_config.key().as_ref(), maker.key().as_ref()],
     bump = hotspot_issuer.bump_seed,
-    has_one = hotspot_config,    
+    has_one = hotspot_config,
+    has_one = maker,
   )]
   pub hotspot_issuer: Box<Account<'info, HotspotIssuerV0>>,
 
@@ -61,7 +86,7 @@ pub struct IssueHotspotV0<'info> {
   )]
   pub hotspot: Box<Account<'info, Mint>>,
 
-  /// CHECK: This is not dangerous because we don't read or write from this account
+  /// CHECK: Handled by cpi
   #[account(
     mut,
     seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), hotspot.key().as_ref()],
@@ -69,7 +94,8 @@ pub struct IssueHotspotV0<'info> {
     bump,
   )]
   pub metadata: UncheckedAccount<'info>,
-  /// CHECK: This is not dangerous because we don't read or write from this account
+
+  /// CHECK: Handled by cpi
   #[account(
     mut,
     seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), hotspot.key().as_ref(), "edition".as_bytes()],
@@ -84,7 +110,7 @@ pub struct IssueHotspotV0<'info> {
     associated_token::mint = hotspot,
     associated_token::authority = hotspot_owner,
   )]
-  pub recipient: Box<Account<'info, TokenAccount>>,
+  pub recipient_token_account: Box<Account<'info, TokenAccount>>,
 
   /// CHECK: This is not dangerous because we don't read or write from this account
   #[account(address = TOKEN_METADATA_ID @ ErrorCode::InvalidMetadataProgram)]
@@ -99,7 +125,7 @@ impl<'info> IssueHotspotV0<'info> {
   fn mint_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintTo<'info>> {
     let cpi_accounts = MintTo {
       mint: self.hotspot.to_account_info(),
-      to: self.recipient.to_account_info(),
+      to: self.recipient_token_account.to_account_info(),
       authority: self.hotspot_issuer.to_account_info(),
     };
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
@@ -117,7 +143,7 @@ pub fn handler(
   let signer_seeds: &[&[&[u8]]] = &[&[
     b"hotspot_issuer",
     ctx.accounts.hotspot_config.to_account_info().key.as_ref(),
-    args.maker.as_ref(),
+    ctx.accounts.maker.to_account_info().key.as_ref(),
     &[ctx.accounts.hotspot_issuer.bump_seed],
   ]];
 
@@ -137,6 +163,10 @@ pub fn handler(
     ctx.accounts.token_program.to_account_info(),
     ctx.accounts.system_program.to_account_info(),
     ctx.accounts.rent.to_account_info(),
+    ctx.accounts.hotspot_config.to_account_info(),
+    ctx.accounts.collection.to_account_info(),
+    ctx.accounts.collection_metadata.to_account_info(),
+    ctx.accounts.collection_master_edition.to_account_info(),
   ];
 
   invoke_signed(&create_metadata_accounts_v3(
@@ -177,6 +207,27 @@ pub fn handler(
     ),
     account_infos.as_slice(),
     signer_seeds,
+  )?;
+
+  let verify_signer_seeds: &[&[&[u8]]] = &[&[
+    b"hotspot_config",
+    ctx.accounts.collection.to_account_info().key.as_ref(),
+    &[ctx.accounts.hotspot_config.bump_seed],    
+  ]];  
+
+  invoke_signed(
+    &verify_sized_collection_item(
+      ctx.accounts.token_metadata_program.key(),
+      ctx.accounts.metadata.key(),
+      ctx.accounts.hotspot_config.key(),
+      ctx.accounts.payer.key(),
+      ctx.accounts.collection.key(),
+      ctx.accounts.collection_metadata.key(),
+      ctx.accounts.collection_master_edition.key(),
+      None
+    ),
+    account_infos.as_slice(),
+    verify_signer_seeds,
   )?;
 
   // TODO: CPI call to increment count of dao/subdao

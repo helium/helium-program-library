@@ -1,8 +1,11 @@
 import * as anchor from "@project-serum/anchor";
 import {
-  IdlAccountItem, IdlAccounts
+  IdlAccountItem,
+  IdlAccounts,
+  IdlInstruction,
 } from "@project-serum/anchor/dist/cjs/idl";
 import { CustomAccountResolver } from "@project-serum/anchor/dist/cjs/program/accounts-resolver";
+import { AllInstructions } from "@project-serum/anchor/dist/cjs/program/namespace/types";
 import { PublicKey } from "@solana/web3.js";
 import camelCase from "camelcase";
 import { Accounts, get, set } from "./utils";
@@ -12,6 +15,7 @@ type IndividualResolver = (args: {
   provider: anchor.Provider;
   path: string[];
   accounts: Accounts;
+  idlIx: AllInstructions<anchor.Idl>;
 }) => Promise<PublicKey | undefined>;
 
 async function resolveIndividualImpl({
@@ -21,6 +25,7 @@ async function resolveIndividualImpl({
   accounts,
   path = [],
   resolver,
+  idlIx,
 }: {
   idlAccounts: IdlAccountItem;
   provider: anchor.Provider;
@@ -28,6 +33,7 @@ async function resolveIndividualImpl({
   accounts: Accounts;
   path?: string[];
   resolver: IndividualResolver;
+  idlIx: AllInstructions<anchor.Idl>;
 }): Promise<void> {
   const newPath = [...path, camelCase(idlAccounts.name)];
 
@@ -42,6 +48,7 @@ async function resolveIndividualImpl({
         accounts,
         path: newPath,
         resolver,
+        idlIx,
       });
     }
   } else {
@@ -54,6 +61,7 @@ async function resolveIndividualImpl({
           provider,
           path: newPath,
           accounts,
+          idlIx,
         }))
     );
   }
@@ -61,12 +69,12 @@ async function resolveIndividualImpl({
 
 /**
  * Allows custom account resolution by functionaly operating on one account at a time.
- * 
+ *
  * Check the `path` arg to see the account name being operated on, and use `accounts` and `provider` to fill in any
  * details necessary
- * 
- * @param resolver 
- * @returns 
+ *
+ * @param resolver
+ * @returns
  */
 export function resolveIndividual<T extends anchor.Idl>(
   resolver: IndividualResolver
@@ -79,6 +87,7 @@ export function resolveIndividual<T extends anchor.Idl>(
         provider,
         resolver,
         accounts,
+        idlIx,
       });
     }
     return accounts;
