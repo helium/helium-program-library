@@ -3,11 +3,7 @@ import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { PublicKey, Keypair } from "@solana/web3.js";
 import { toBN } from "@helium-foundation/spl-utils";
-import {
-  getAssociatedTokenAddress,
-  getAccount,
-  getMint,
-} from "@solana/spl-token";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import { HotspotIssuance } from "../target/types/hotspot_issuance";
 import { init } from "../packages/hotspot-issuance-sdk/src";

@@ -1,18 +1,17 @@
-use anchor_lang::{
-  prelude::*,
-  solana_program::program::{invoke_signed}
-};
+use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,  
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use mpl_token_metadata::{
-  instruction::{create_metadata_accounts_v3, create_master_edition_v3, verify_sized_collection_item}, 
-  state::Collection, 
-  ID as TOKEN_METADATA_ID
-};
 use crate::state::*;
 use crate::{error::ErrorCode};
+use crate::token_metadata::{
+  Collection,
+  create_metadata_account_v3, CreateMetadataAccount, CreateMetadataAccountArgs,
+  create_master_edition_v3, CreateMasterEdition, CreateMasterEditionArgs,
+  verify_sized_collection_item, VerifySizedCollectionItem, VerifySizedCollectionItemArgs
+};
+
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHotspotV0Args {
@@ -112,9 +111,9 @@ pub struct IssueHotspotV0<'info> {
   )]
   pub recipient_token_account: Box<Account<'info, TokenAccount>>,
 
-  /// CHECK: This is not dangerous because we don't read or write from this account
-  #[account(address = TOKEN_METADATA_ID @ ErrorCode::InvalidMetadataProgram)]
-  pub token_metadata_program: UncheckedAccount<'info>,
+  /// CHECK: Checked with constraints
+  #[account(address = mpl_token_metadata::ID)]
+  pub token_metadata_program: AccountInfo<'info>,
   pub associated_token_program: Program<'info, AssociatedToken>,  
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
@@ -154,59 +153,51 @@ pub fn handler(
     1
   )?;
 
-  let account_infos = vec![
-    ctx.accounts.metadata.to_account_info(),
-    ctx.accounts.hotspot.to_account_info(),
-    ctx.accounts.hotspot_issuer.to_account_info(),
-    ctx.accounts.master_edition.to_account_info(),
-    ctx.accounts.payer.to_account_info(),
-    ctx.accounts.token_program.to_account_info(),
-    ctx.accounts.system_program.to_account_info(),
-    ctx.accounts.rent.to_account_info(),
-    ctx.accounts.hotspot_config.to_account_info(),
-    ctx.accounts.collection.to_account_info(),
-    ctx.accounts.collection_metadata.to_account_info(),
-    ctx.accounts.collection_master_edition.to_account_info(),
-  ];
-
-  invoke_signed(&create_metadata_accounts_v3(
-      ctx.accounts.token_metadata_program.key(),
-      ctx.accounts.metadata.key(),
-      ctx.accounts.hotspot.key(),
-      ctx.accounts.hotspot_issuer.key(),
-      ctx.accounts.payer.key(),
-      ctx.accounts.hotspot_issuer.key(),
-      args.name,
-      args.symbol,
-      args.metadata_url,
-      None,
-      0,
-      false,
-      true,
-      Some(Collection {
-        key: ctx.accounts.collection.key(),
-        verified: false,
-      }),
-      None,
-      None,
+  create_metadata_account_v3(
+    CpiContext::new_with_signer(
+      ctx.accounts.token_metadata_program.clone(),
+      CreateMetadataAccount {
+        metadata_account: ctx.accounts.metadata.to_account_info().clone(),
+        mint: ctx.accounts.hotspot.to_account_info().clone(),
+        mint_authority: ctx.accounts.hotspot_issuer.to_account_info().clone(),
+        payer: ctx.accounts.payer.to_account_info().clone(),
+        update_authority: ctx.accounts.hotspot_issuer.to_account_info().clone(),
+        system_program: ctx.accounts.system_program.to_account_info().clone(),
+        rent: ctx.accounts.rent.to_account_info().clone(),
+      },
+      signer_seeds
     ),
-    account_infos.as_slice(),
-    signer_seeds,
+    CreateMetadataAccountArgs {
+      name: args.name,
+      symbol: args.symbol,
+      uri: args.metadata_url,
+      collection: Some(Collection {
+        key: ctx.accounts.collection.key(),
+        verified: false
+      }),
+      collection_details: None
+    }
   )?;
   
-  invoke_signed(
-    &create_master_edition_v3(
-      ctx.accounts.token_metadata_program.key(),
-      ctx.accounts.master_edition.key(),
-      ctx.accounts.hotspot.key(),
-      ctx.accounts.hotspot_issuer.key(),
-      ctx.accounts.hotspot_issuer.key(),
-      ctx.accounts.metadata.key(),
-      ctx.accounts.payer.key(),
-      Some(0)
-    ),
-    account_infos.as_slice(),
-    signer_seeds,
+  create_master_edition_v3(
+    CpiContext::new_with_signer(
+      ctx.accounts.token_metadata_program.clone(),
+      CreateMasterEdition {
+        edition: ctx.accounts.master_edition.to_account_info().clone(),
+        mint: ctx.accounts.hotspot.to_account_info().clone(),
+        update_authority: ctx.accounts.hotspot_issuer.to_account_info().clone(),
+        mint_authority: ctx.accounts.hotspot_issuer.to_account_info().clone(),
+        metadata: ctx.accounts.metadata.to_account_info().clone(),
+        payer: ctx.accounts.payer.to_account_info().clone(),
+        token_program: ctx.accounts.token_program.to_account_info().clone(),        
+        system_program: ctx.accounts.system_program.to_account_info().clone(),        
+        rent: ctx.accounts.rent.to_account_info().clone(),
+      }, 
+      signer_seeds
+    ), 
+    CreateMasterEditionArgs {
+      max_supply: Some(0)
+    }
   )?;
 
   let verify_signer_seeds: &[&[&[u8]]] = &[&[
@@ -215,19 +206,22 @@ pub fn handler(
     &[ctx.accounts.hotspot_config.bump_seed],    
   ]];  
 
-  invoke_signed(
-    &verify_sized_collection_item(
-      ctx.accounts.token_metadata_program.key(),
-      ctx.accounts.metadata.key(),
-      ctx.accounts.hotspot_config.key(),
-      ctx.accounts.payer.key(),
-      ctx.accounts.collection.key(),
-      ctx.accounts.collection_metadata.key(),
-      ctx.accounts.collection_master_edition.key(),
-      None
+  verify_sized_collection_item(
+    CpiContext::new_with_signer(
+      ctx.accounts.token_metadata_program.clone(),
+      VerifySizedCollectionItem {
+        metadata: ctx.accounts.metadata.to_account_info().clone(),
+        collection_authority: ctx.accounts.hotspot_config.to_account_info().clone(),
+        payer: ctx.accounts.payer.to_account_info().clone(),
+        collection_mint: ctx.accounts.collection.to_account_info().clone(),
+        collection_metadata: ctx.accounts.collection_metadata.to_account_info().clone(),
+        collection_master_edition_account: ctx.accounts.collection_master_edition.to_account_info().clone(),
+      },
+      verify_signer_seeds
     ),
-    account_infos.as_slice(),
-    verify_signer_seeds,
+    VerifySizedCollectionItemArgs {
+      collection_authority_record: None
+    }
   )?;
 
   // TODO: CPI call to increment count of dao/subdao
