@@ -2,7 +2,6 @@ import * as anchor from "@project-serum/anchor";
 import {
   IdlAccountItem,
   IdlAccounts,
-  IdlInstruction,
 } from "@project-serum/anchor/dist/cjs/idl";
 import { CustomAccountResolver } from "@project-serum/anchor/dist/cjs/program/accounts-resolver";
 import { AllInstructions } from "@project-serum/anchor/dist/cjs/program/namespace/types";

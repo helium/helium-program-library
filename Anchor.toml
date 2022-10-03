@@ -10,6 +10,7 @@ hotspot_issuance = "8DV471AvMNBCDTPoa2gzffrYFEJmDU56GDgTBv48RBZR"
 [workspace]
 members = [
   "programs/lazy-distributor", 
+  "programs/data-credits",
   "programs/helium-sub-daos",
   "programs/test-tracker", 
   "programs/hotspot-issuance"  
