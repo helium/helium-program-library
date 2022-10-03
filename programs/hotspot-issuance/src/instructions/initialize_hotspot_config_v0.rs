@@ -4,7 +4,8 @@ use anchor_spl::{
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
 use crate::state::*;
-use crate::{error::ErrorCode, utils::resize_to_fit};
+use shared_utils::resize_to_fit;
+use crate::error::ErrorCode;
 use crate::token_metadata::{
   CollectionDetails,
   create_metadata_account_v3, CreateMetadataAccount, CreateMetadataAccountArgs,

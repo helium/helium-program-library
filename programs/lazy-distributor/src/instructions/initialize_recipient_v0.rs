@@ -1,8 +1,8 @@
 use crate::state::*;
 use crate::token_metadata::Metadata;
-use crate::utils::resize_to_fit;
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
+use shared_utils::resize_to_fit;
 
 #[derive(Accounts)]
 pub struct InitializeRecipientV0<'info> {

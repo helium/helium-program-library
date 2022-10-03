@@ -5,7 +5,6 @@ declare_id!("8DV471AvMNBCDTPoa2gzffrYFEJmDU56GDgTBv48RBZR");
 pub mod error;
 pub mod instructions;
 pub mod state;
-pub mod utils;
 pub mod token_metadata;
 
 pub use instructions::*;

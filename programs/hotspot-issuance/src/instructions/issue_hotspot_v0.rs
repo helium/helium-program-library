@@ -1,3 +1,4 @@
+
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,  
@@ -5,13 +6,13 @@ use anchor_spl::{
 };
 use crate::state::*;
 use crate::{error::ErrorCode};
+use data_credits::{DataCreditsV0, BurnDataCreditsV0, BurnDataCreditsV0Args};
 use crate::token_metadata::{
   Collection,
   create_metadata_account_v3, CreateMetadataAccount, CreateMetadataAccountArgs,
   create_master_edition_v3, CreateMasterEdition, CreateMasterEditionArgs,
   verify_sized_collection_item, VerifySizedCollectionItem, VerifySizedCollectionItemArgs
 };
-
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHotspotV0Args {
@@ -25,8 +26,6 @@ pub struct IssueHotspotV0Args {
 pub struct IssueHotspotV0<'info> {  
   #[account(mut)]
   pub payer: Signer<'info>,
-  #[account(mut)]
-  pub dc_fee_payer: Signer<'info>,
   pub onboarding_server: Signer<'info>,
   pub maker: Signer<'info>,
   
@@ -110,14 +109,45 @@ pub struct IssueHotspotV0<'info> {
     associated_token::authority = hotspot_owner,
   )]
   pub recipient_token_account: Box<Account<'info, TokenAccount>>,
+  
+  
+  #[account(
+    mut,
+    seeds = ["dc".as_bytes()],
+    seeds::program = data_credits_program.key(),
+    bump
+  )]
+  pub dc: Box<Account<'info, DataCreditsV0>>,
+  #[account(mut)]
+  pub dc_fee_payer: Signer<'info>,
+  #[account(mut)]
+  pub dc_mint: Box<Account<'info, Mint>>,  
+  #[account(
+    init_if_needed,
+    payer = dc_fee_payer,
+    associated_token::mint = dc_mint,
+    associated_token::authority = dc_fee_payer
+  )]
+  pub dc_ata: Box<Account<'info, TokenAccount>>,
+  #[account(
+    mut,
+    seeds = ["dc_token_auth".as_bytes()],
+    seeds::program = data_credits_program.key(),
+    bump
+  )]
+  pub dc_token_authority: AccountInfo<'info>,
+
 
   /// CHECK: Checked with constraints
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
+  /// CHECK: Checked with constraints  
+  #[account(address = data_credits::ID)]
+  pub data_credits_program: AccountInfo<'info>,
   pub associated_token_program: Program<'info, AssociatedToken>,  
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
-  pub rent: Sysvar<'info, Rent>,    
+  pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> IssueHotspotV0<'info> {

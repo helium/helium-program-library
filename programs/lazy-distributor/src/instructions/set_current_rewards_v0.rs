@@ -1,6 +1,6 @@
 use crate::state::*;
-use crate::utils::resize_to_fit;
 use anchor_lang::prelude::*;
+use shared_utils::resize_to_fit;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct SetRewardsV0Args {

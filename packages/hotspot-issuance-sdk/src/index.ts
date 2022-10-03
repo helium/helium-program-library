@@ -34,6 +34,12 @@ export const init = async (
           account: "recipientTokenAccount",
           mint: "hotspot",
           owner: "hotspotOwner",
+        }),
+        ataResolver({
+          instruction: "issueHotspotV0",
+          account: "dcAta",
+          mint: "dcMint",
+          owner: "dcFeePayer",
         })
       )
   ) as Program<HotspotIssuance>;
