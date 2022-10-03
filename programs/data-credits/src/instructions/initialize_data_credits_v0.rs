@@ -14,7 +14,7 @@ pub struct InitializeDataCreditsV0<'info> {
   #[account(
     init, // prevents from reinit attack
     payer = payer,
-    space = std::cmp::max(8 + std::mem::size_of::<DataCreditsV0>(), data_credits.data.borrow_mut().len()),
+    space = 60 + std::mem::size_of::<DataCreditsV0>(),
     seeds = ["dc".as_bytes()],
     bump,
   )]
