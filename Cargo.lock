@@ -641,6 +641,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "data-credits",
+ "helium-sub-daos",
  "mpl-token-metadata",
  "shared-utils",
 ]

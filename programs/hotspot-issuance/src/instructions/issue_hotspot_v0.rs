@@ -1,17 +1,26 @@
-
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,  
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use crate::state::*;
-use crate::{error::ErrorCode};
-use data_credits::{DataCreditsV0, BurnDataCreditsV0, BurnDataCreditsV0Args};
 use crate::token_metadata::{
   Collection,
   create_metadata_account_v3, CreateMetadataAccount, CreateMetadataAccountArgs,
   create_master_edition_v3, CreateMasterEdition, CreateMasterEditionArgs,
   verify_sized_collection_item, VerifySizedCollectionItem, VerifySizedCollectionItemArgs
+};
+use crate::state::*;
+use crate::{error::ErrorCode};
+use shared_utils::resize_to_fit;
+use data_credits::{
+  cpi::{accounts::{ BurnDataCreditsV0 }, burn_data_credits_v0},
+  DataCreditsV0, BurnDataCreditsV0Args
+};
+use helium_sub_daos::{
+  current_epoch,
+  cpi::{accounts::{TrackAddedDeviceV0}, track_added_device_v0},
+  SubDaoEpochInfoV0,
+  TrackAddedDeviceArgsV0,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -19,6 +28,8 @@ pub struct IssueHotspotV0Args {
   pub name: String,
   pub symbol: String,
   pub metadata_url: String,
+  pub ecc_compact: Vec<u8>,
+  pub location: String,
 }
 
 #[derive(Accounts)]
@@ -26,13 +37,12 @@ pub struct IssueHotspotV0Args {
 pub struct IssueHotspotV0<'info> {  
   #[account(mut)]
   pub payer: Signer<'info>,
+  pub dc_fee_payer: Signer<'info>,  
   pub onboarding_server: Signer<'info>,
   pub maker: Signer<'info>,
-  
   /// CHECK: Hotspot nft sent here
   pub hotspot_owner: AccountInfo<'info>,
   pub collection: Box<Account<'info, Mint>>,
-
   /// CHECK: Handled by cpi
   #[account(
     mut,
@@ -49,7 +59,6 @@ pub struct IssueHotspotV0<'info> {
     bump,
   )]
   pub collection_master_edition: UncheckedAccount<'info>,  
-
   #[account(
     seeds = ["hotspot_config".as_bytes(), collection.key().as_ref()],
     bump = hotspot_config.bump_seed,
@@ -57,7 +66,6 @@ pub struct IssueHotspotV0<'info> {
     has_one = onboarding_server
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
-
   #[account(
     mut,
     seeds = ["hotspot_issuer".as_bytes(), hotspot_config.key().as_ref(), maker.key().as_ref()],
@@ -66,7 +74,6 @@ pub struct IssueHotspotV0<'info> {
     has_one = maker,
   )]
   pub hotspot_issuer: Box<Account<'info, HotspotIssuerV0>>,
-
   #[account(
     init,
     payer = payer,
@@ -74,16 +81,23 @@ pub struct IssueHotspotV0<'info> {
     mint::authority = hotspot_issuer,
     mint::freeze_authority = hotspot_issuer,
     seeds = [
-      "hotspot".as_bytes(), 
-      hotspot_owner.key().as_ref(),
-      hotspot_issuer.key().as_ref(),
-      hotspot_issuer.count.to_le_bytes().as_ref(),
-      args.symbol.as_bytes(),
+      "hotspot".as_bytes(),
+      &args.ecc_compact,
     ],
     bump
   )]
   pub hotspot: Box<Account<'info, Mint>>,
-
+  #[account(
+    init_if_needed,
+    payer = payer,
+    space = std::cmp::max(8 + std::mem::size_of::<HotspotStorageV0>(), storage.data.borrow_mut().len()),
+    seeds = [
+      "storage".as_bytes(),
+      hotspot.key().as_ref()
+    ],
+    bump
+  )]
+  pub storage: Box<Account<'info, HotspotStorageV0>>,
   /// CHECK: Handled by cpi
   #[account(
     mut,
@@ -92,7 +106,6 @@ pub struct IssueHotspotV0<'info> {
     bump,
   )]
   pub metadata: UncheckedAccount<'info>,
-
   /// CHECK: Handled by cpi
   #[account(
     mut,
@@ -101,7 +114,6 @@ pub struct IssueHotspotV0<'info> {
     bump,
   )]
   pub master_edition: UncheckedAccount<'info>,  
-
   #[account(
     init_if_needed,
     payer = payer,
@@ -109,44 +121,57 @@ pub struct IssueHotspotV0<'info> {
     associated_token::authority = hotspot_owner,
   )]
   pub recipient_token_account: Box<Account<'info, TokenAccount>>,
-  
-  
+
+  /// CHECK: Verified by cpi  
   #[account(
     mut,
-    seeds = ["dc".as_bytes()],
-    seeds::program = data_credits_program.key(),
+    seeds=["dc".as_bytes()],
+    seeds::program = data_credits::ID,
     bump
   )]
   pub dc: Box<Account<'info, DataCreditsV0>>,
   #[account(mut)]
-  pub dc_fee_payer: Signer<'info>,
-  #[account(mut)]
-  pub dc_mint: Box<Account<'info, Mint>>,  
+  pub dc_mint: Box<Account<'info, Mint>>,
   #[account(
     init_if_needed,
-    payer = dc_fee_payer,
+    payer = payer,
     associated_token::mint = dc_mint,
-    associated_token::authority = dc_fee_payer
+    associated_token::authority = dc_fee_payer,
   )]
-  pub dc_ata: Box<Account<'info, TokenAccount>>,
+  pub dc_burner: Box<Account<'info, TokenAccount>>,
+  /// CHECK: Verified by cpi
   #[account(
     mut,
     seeds = ["dc_token_auth".as_bytes()],
-    seeds::program = data_credits_program.key(),
+    seeds::program = data_credits::ID,
     bump
   )]
   pub dc_token_authority: AccountInfo<'info>,
 
+  /// CHECK: Verified by cpi    
+  #[account(
+    mut,
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(),  &current_epoch(clock.unix_timestamp).to_le_bytes()], // Break into 30m epochs
+    seeds::program = helium_sub_daos::ID,
+    bump
+  )]
+  pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
+  /// CHECK: Verified by cpi
+  pub sub_dao: AccountInfo<'info>,
 
-  /// CHECK: Checked with constraints
+  /// CHECK: Verified by constraint  
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
-  /// CHECK: Checked with constraints  
+  /// CHECK: Verified by constraint  
   #[account(address = data_credits::ID)]
   pub data_credits_program: AccountInfo<'info>,
+  /// CHECK: Verified by constraint  
+  #[account(address = helium_sub_daos::ID)]
+  pub sub_doas_program: AccountInfo<'info>,
   pub associated_token_program: Program<'info, AssociatedToken>,  
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
+  pub clock: Sysvar<'info, Clock>,      
   pub rent: Sysvar<'info, Rent>,
 }
 
@@ -158,6 +183,29 @@ impl<'info> IssueHotspotV0<'info> {
       authority: self.hotspot_issuer.to_account_info(),
     };
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+  }
+  fn burn_dc_ctx(&self) -> CpiContext<'_, '_, '_, 'info, BurnDataCreditsV0<'info>> {
+    let cpi_accounts = BurnDataCreditsV0 {
+      data_credits: self.dc.to_account_info(),
+      burner: self.dc_burner.to_account_info(),
+      token_authority: self.dc_token_authority.to_account_info(),
+      owner: self.dc_fee_payer.to_account_info(),
+      dc_mint: self.dc_mint.to_account_info(),
+      token_program: self.token_program.to_account_info(),
+    };
+    CpiContext::new(self.data_credits_program.to_account_info(), cpi_accounts) 
+  }
+  fn add_device_ctx(&self) -> CpiContext<'_, '_, '_, 'info, TrackAddedDeviceV0<'info>> {
+    let cpi_accounts = TrackAddedDeviceV0 {
+      payer: self.payer.to_account_info(),
+      sub_dao_epoch_info: self.sub_dao_epoch_info.to_account_info(),
+      sub_dao: self.sub_dao.to_account_info(),
+      authority: self.hotspot_config.to_account_info(),
+      system_program: self.system_program.to_account_info(),
+      clock: self.clock.to_account_info(),
+      rent: self.rent.to_account_info(),
+    };    
+    CpiContext::new(self.sub_doas_program.to_account_info(), cpi_accounts)
   }
 }
 
@@ -176,7 +224,10 @@ pub fn handler(
     &[ctx.accounts.hotspot_issuer.bump_seed],
   ]];
 
-  // TODO: CPI call to burn hotspot_config.dc_fee from maker
+  burn_data_credits_v0(
+    ctx.accounts.burn_dc_ctx(),
+    BurnDataCreditsV0Args { amount: ctx.accounts.hotspot_config.dc_fee }
+  )?;
 
   token::mint_to(
     ctx.accounts.mint_ctx().with_signer(signer_seeds),
@@ -254,9 +305,29 @@ pub fn handler(
     }
   )?;
 
-  // TODO: CPI call to increment count of dao/subdao
+  track_added_device_v0(
+    ctx.accounts.add_device_ctx().with_signer(signer_seeds),
+    TrackAddedDeviceArgsV0 {
+      collection: ctx.accounts.collection.key(),
+      authority_bump: ctx.accounts.hotspot_config.bump_seed
+    }    
+  )?;
 
   ctx.accounts.hotspot_issuer.count += 1;
+
+  ctx.accounts.storage.set_inner(HotspotStorageV0 {
+    ecc_compact: args.ecc_compact,
+    location: args.location,
+    authority: ctx.accounts.hotspot.key(),
+    
+    bump_seed: ctx.bumps["storage"],
+  });
+
+  resize_to_fit(
+    &ctx.accounts.payer.to_account_info(), 
+    &ctx.accounts.system_program.to_account_info(),
+    &ctx.accounts.storage
+  )?;
 
   Ok(())
 }

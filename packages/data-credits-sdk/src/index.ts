@@ -1,44 +1,28 @@
+import { AnchorProvider, Idl, Program } from "@project-serum/anchor";
 import { DataCredits } from "../../../target/types/data_credits";
 import { PublicKey } from "@solana/web3.js";
-import {
-  AnchorProvider,
-  Program,
-} from "@project-serum/anchor";
 import { PROGRAM_ID } from "./constants";
-import { ataResolver, combineResolvers } from "@helium-foundation/spl-utils";
+import { dataCreditsResolvers } from "./resolvers";
+export * from "./instructions";
+export * from "./pdas";
+export * from "./constants";
 
-
-export async function init(provider: AnchorProvider, dataCreditsProgramId: PublicKey = PROGRAM_ID, dataCreditsIdl?): Promise<Program<DataCredits>> {
-  if (!dataCreditsIdl) {
-    dataCreditsIdl = await Program.fetchIdl(
-      dataCreditsProgramId,
-      provider
-    );
+export async function init(
+  provider: AnchorProvider,
+  programId: PublicKey = PROGRAM_ID,
+  idl?: Idl | null
+): Promise<Program<DataCredits>> {
+  if (!idl) {
+    idl = await Program.fetchIdl(programId, provider);
   }
+
   const dataCredits = new Program<DataCredits>(
-    dataCreditsIdl as DataCredits,
-    dataCreditsProgramId,
+    idl as DataCredits,
+    programId,
     provider,
     undefined,
-    () => {
-      return combineResolvers(
-        ataResolver({
-          instruction: "mintDataCreditsV0",
-          account: "recipientTokenAccount",
-          mint: "dcMint",
-          owner: "recipient",
-        }),
-        ataResolver({
-          instruction: "mintDataCreditsV0",
-          account: "burner",
-          mint: "hntMint",
-          owner: "owner",
-        })
-      )
-    }
+    () => dataCreditsResolvers
   ) as Program<DataCredits>;
+
   return dataCredits;
 }
-
-export * from "./instructions";
-export * from "./pdas"

@@ -5,6 +5,7 @@ seeds = true
 lazy_distributor = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 helium_sub_daos = "daoK94GYdvRjVxkSyTxNLxtAEYZohLJqmwad8pBK261"
 test_tracker = "tes8BDewkpUpfqx7VDXUJzTFugjqHJugCEBP5sDrrCf"
+data_credits = "5BAQuzGE1z8CTcrSdfbfdBF2fdXrwb4iMcxDMrvhz8L8"
 hotspot_issuance = "8DV471AvMNBCDTPoa2gzffrYFEJmDU56GDgTBv48RBZR"
 
 [workspace]

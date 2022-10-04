@@ -4,7 +4,6 @@ use anchor_spl::{
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
 use crate::state::*;
-use shared_utils::resize_to_fit;
 use crate::error::ErrorCode;
 use crate::token_metadata::{
   CollectionDetails,
@@ -62,7 +61,7 @@ pub struct InitializeHotspotConfigV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = std::cmp::max(8 + std::mem::size_of::<HotspotConfigV0>(), hotspot_config.data.borrow_mut().len()),
+    space = 60 + std::mem::size_of::<HotspotConfigV0>(),
     seeds = ["hotspot_config".as_bytes(), collection.key().as_ref()],
     bump,
   )]
@@ -160,12 +159,6 @@ pub fn handler(
     bump_seed: ctx.bumps["hotspot_config"],
     collection_bump_seed: ctx.bumps["collection"],
   });
-
-  resize_to_fit(
-    &ctx.accounts.payer.to_account_info(),
-    &ctx.accounts.system_program.to_account_info(),
-    &ctx.accounts.hotspot_config,
-  )?;  
 
   Ok(())
 }

@@ -18,6 +18,18 @@ export const hotspotIssuerKey = (hotspotConfig: PublicKey, maker: PublicKey) =>
     PROGRAM_ID
   );
 
+export const hotspotKey = (eccCompact: string) =>
+  PublicKey.findProgramAddressSync(
+    [Buffer.from("hotspot", "utf-8"), Buffer.from(eccCompact, "utf-8")],
+    PROGRAM_ID
+  );
+
+export const hotspotStorage = (hotspot: PublicKey) =>
+  PublicKey.findProgramAddressSync(
+    [Buffer.from("storage", "utf-8"), hotspot.toBuffer()],
+    PROGRAM_ID
+  );
+
 export const collectionMetadataKey = (collection: PublicKey) =>
   PublicKey.findProgramAddressSync(
     [

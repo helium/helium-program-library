@@ -21,4 +21,14 @@ pub struct HotspotIssuerV0 {
   pub authority: Pubkey,
 
   pub bump_seed: u8,
- }
+}
+
+#[account]
+#[derive(Default)]
+pub struct HotspotStorageV0 {
+  pub ecc_compact: Vec<u8>,
+  pub location: String,
+  pub authority: Pubkey,
+  
+  pub bump_seed: u8,
+}

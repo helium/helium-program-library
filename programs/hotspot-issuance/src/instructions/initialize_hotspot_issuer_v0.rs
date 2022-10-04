@@ -1,7 +1,5 @@
 use anchor_lang::prelude::*;
 use crate::state::*;
-use shared_utils::resize_to_fit;
-
   
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeHotspotIssuerV0Args {
@@ -22,7 +20,7 @@ pub struct InitializeHotspotIssuerV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = std::cmp::max(8 + std::mem::size_of::<HotspotIssuerV0>(), hotspot_issuer.data.borrow_mut().len()),
+    space = 60 + std::mem::size_of::<HotspotIssuerV0>(),
     seeds = ["hotspot_issuer".as_bytes(), hotspot_config.key().as_ref(), args.maker.as_ref()],
     bump,
   )]
@@ -43,12 +41,6 @@ pub fn handler(
     authority: args.authority,
     bump_seed: ctx.bumps["hotspot_issuer"],
   });
-
-  resize_to_fit(
-    &ctx.accounts.payer.to_account_info(),
-    &ctx.accounts.system_program.to_account_info(),
-    &ctx.accounts.hotspot_issuer,
-  )?;
 
   Ok(())
 }

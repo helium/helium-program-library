@@ -4,7 +4,7 @@ use anchor_spl::token::{self, Burn, FreezeAccount, Mint, ThawAccount, Token, Tok
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct BurnDataCreditsV0Args {
-  amount: u64,
+  pub amount: u64,
 }
 
 #[derive(Accounts)]
