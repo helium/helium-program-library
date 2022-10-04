@@ -27,6 +27,66 @@ import { init as initHotspotIssuance } from "../packages/hotspot-issuance-sdk/sr
 const DEFAULT_METADATA_URL =
   "https://c3zu2nc2m4x6zvqf5lofrtdbsa4niuh6drvzi7lq4n465ykbd3fa.arweave.net/FvNNNFpnL-zWBercWMxhkDjUUP4ca5R9cON57uFBHso/";
 
+export const initTestHotspotConfig = async (
+  program: Program<HotspotIssuance>,
+  provider: anchor.AnchorProvider
+): Promise<{
+  collection: PublicKey;
+  hotspotConfig: PublicKey;
+  onboardingServerKeypair: Keypair;
+}> => {
+  const onboardingServerKeypair = Keypair.generate();
+  const method = await program.methods
+    .initializeHotspotConfigV0({
+      name: "Helium Network Hotspots",
+      symbol: random(), // symbol is unique would need to restart localnet everytime
+      metadataUrl: DEFAULT_METADATA_URL,
+      dcFee: toBN(50, 8),
+      onboardingServer: onboardingServerKeypair.publicKey,
+    })
+    .accounts({
+      payer: provider.wallet.publicKey,
+      tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+    });
+
+  const { collection, hotspotConfig } = await method.pubkeys();
+  await method.rpc();
+
+  return {
+    collection: collection!,
+    hotspotConfig: hotspotConfig!,
+    onboardingServerKeypair,
+  };
+};
+
+export const initTestHotspotIssuer = async (
+  program: Program<HotspotIssuance>,
+  provider: anchor.AnchorProvider,
+  hotspotConfig: PublicKey
+): Promise<{
+  hotspotIssuer: PublicKey;
+  makerKeypair: Keypair;
+}> => {
+  const makerKeypair = Keypair.generate();
+  const method = await program.methods
+    .initializeHotspotIssuerV0({
+      maker: makerKeypair.publicKey,
+      authority: provider.wallet.publicKey,
+    })
+    .accounts({
+      payer: provider.wallet.publicKey,
+      hotspotConfig,
+    });
+
+  const { hotspotIssuer } = await method.pubkeys();
+  await method.rpc();
+
+  return {
+    hotspotIssuer: hotspotIssuer!,
+    makerKeypair,
+  };
+};
+
 describe("hotspot-issuance", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
@@ -109,64 +169,9 @@ describe("hotspot-issuance", () => {
     };
   };
 
-  const initTestHotspotConfig = async (): Promise<{
-    collection: PublicKey;
-    hotspotConfig: PublicKey;
-    onboardingServerKeypair: Keypair;
-  }> => {
-    const onboardingServerKeypair = Keypair.generate();
-    const method = await hsProgram.methods
-      .initializeHotspotConfigV0({
-        name: "Helium Network Hotspots",
-        symbol: random(), // symbol is unique would need to restart localnet everytime
-        metadataUrl: DEFAULT_METADATA_URL,
-        dcFee: toBN(50, 8),
-        onboardingServer: onboardingServerKeypair.publicKey,
-      })
-      .accounts({
-        payer: me,
-        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
-      });
-
-    const { collection, hotspotConfig } = await method.pubkeys();
-    await method.rpc();
-
-    return {
-      collection: collection!,
-      hotspotConfig: hotspotConfig!,
-      onboardingServerKeypair,
-    };
-  };
-
-  const initTestHotspotIssuer = async (
-    hotspotConfig: PublicKey
-  ): Promise<{
-    hotspotIssuer: PublicKey;
-    makerKeypair: Keypair;
-  }> => {
-    const makerKeypair = Keypair.generate();
-    const method = await hsProgram.methods
-      .initializeHotspotIssuerV0({
-        maker: makerKeypair.publicKey,
-        authority: me,
-      })
-      .accounts({
-        payer: me,
-        hotspotConfig,
-      });
-
-    const { hotspotIssuer } = await method.pubkeys();
-    await method.rpc();
-
-    return {
-      hotspotIssuer: hotspotIssuer!,
-      makerKeypair,
-    };
-  };
-
   it("initializes a hotspot config", async () => {
     const { hotspotConfig, collection, onboardingServerKeypair } =
-      await initTestHotspotConfig();
+      await initTestHotspotConfig(hsProgram, provider);
 
     const account = await hsProgram.account.hotspotConfigV0.fetch(
       hotspotConfig
@@ -183,8 +188,10 @@ describe("hotspot-issuance", () => {
   });
 
   it("initializes a hotspot issuer", async () => {
-    const { hotspotConfig } = await initTestHotspotConfig();
+    const { hotspotConfig } = await initTestHotspotConfig(hsProgram, provider);
     const { hotspotIssuer, makerKeypair } = await initTestHotspotIssuer(
+      hsProgram,
+      provider,
       hotspotConfig
     );
 
@@ -208,9 +215,11 @@ describe("hotspot-issuance", () => {
       } = await initWorld();
 
       const { hotspotConfig, collection, onboardingServerKeypair } =
-        await initTestHotspotConfig();
+        await initTestHotspotConfig(hsProgram, provider);
 
       const { hotspotIssuer, makerKeypair } = await initTestHotspotIssuer(
+        hsProgram,
+        provider,
         hotspotConfig
       );
 
