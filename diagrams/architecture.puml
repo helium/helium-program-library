@@ -1,0 +1,90 @@
+@startuml
+
+skinparam linetype polyline
+
+control crank
+
+
+frame Solana {
+  collections hotspots [
+    Hotspot NFTs
+  ]
+  component lazy_distributor {
+    card dnt_mint
+  }
+  component hotspot_issuer
+  component data_credits
+  component helium_sub_daos {
+    card hnt_mint
+  }
+  component token_bonding {
+    card sub_dao_treasury
+  }
+
+  card user_wallet
+
+  dnt_mint --> user_wallet : DNT
+
+  hnt_mint --> sub_dao_treasury : Mint HNT
+
+  hotspot_issuer --> hotspots : Create
+
+  hotspots --> lazy_distributor
+
+  hotspot_issuer --> helium_sub_daos : Device Count
+
+  data_credits --> helium_sub_daos : DC Burned
+
+  hotspot_issuer --> data_credits : Burn DC
+}
+
+collections oracles [
+  DNT Rewards Oracle
+]
+
+agent wallet [
+  Wallet App
+]
+
+agent maker [
+  Maker App
+]
+
+agent onboarding [
+  Onboarding Server
+]
+
+agent indexer [
+  Solana Indexer
+]
+
+agent wallet_api [
+  Wallet API
+]
+
+database postgres [
+  Postgres
+]
+
+oracles -> wallet_api : Pending Rewards
+
+crank -> hnt_mint : issue rewards
+
+maker -> onboarding : issue hotspot, assert location tx
+
+maker --> hotspot_issuer : issue hotspot, assert location tx
+
+oracles <-> wallet : set and distribute rewards tx
+
+wallet --> lazy_distributor : set and distribute rewards
+
+Solana --> indexer : hotspots, locations, wallets, balances
+
+indexer -> postgres
+
+postgres -> wallet_api
+
+wallet_api --> wallet
+
+
+@enduml
