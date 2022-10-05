@@ -5,8 +5,8 @@ import { BN, Program } from "@project-serum/anchor";
 import { SystemProgram, PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { expect } from "chai";
 import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
-import { HeliumSubDaos } from "@helium-foundation/idls/lib/esm/helium_sub_daos";
-import { TestTracker } from "@helium-foundation/idls/lib/esm/test_tracker";
+import { HeliumSubDaos } from "@helium-foundation/idls/lib/types/helium_sub_daos";
+import { TestTracker } from "@helium-foundation/idls/lib/types/test_tracker";
 import { createAtaAndMint, createMint, mintTo } from "./utils/token";
 
 const EPOCH_REWARDS = 100000000;

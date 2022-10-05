@@ -1,4 +1,4 @@
-import { DataCredits } from "@helium-foundation/idls/lib/esm/data_credits";
+import { DataCredits } from "@helium-foundation/idls/lib/types/data_credits";
 import { AnchorProvider, Idl, Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";

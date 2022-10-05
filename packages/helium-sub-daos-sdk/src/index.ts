@@ -1,4 +1,4 @@
-import { HeliumSubDaos } from "@helium-foundation/idls/lib/esm/helium_sub_daos";
+import { HeliumSubDaos } from "@helium-foundation/idls/lib/types/helium_sub_daos";
 import { AnchorProvider, Idl, Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";

@@ -3,7 +3,7 @@ import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mp
 import { AnchorProvider, Program } from "@project-serum/anchor";
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import { LazyDistributor } from "@helium-foundation/idls/lib/esm/lazy_distributor";
+import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
 import { PROGRAM_ID } from "./constants";
 
 export async function init(

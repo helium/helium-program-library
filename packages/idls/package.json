@@ -25,7 +25,7 @@
   "scripts": {
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
-    "clean": "npx shx mkdir -p lib && npx shx rm -rf lib",
+    "clean": "npx shx rm -rf lib && npx shx mkdir -p lib",
     "package": "npx shx mkdir -p lib/cjs lib/esm",
     "prebuild": "npm run clean && npm run package"
   },

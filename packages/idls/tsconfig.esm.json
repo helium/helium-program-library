@@ -3,7 +3,7 @@
   "include": ["../../target/types/**/*"],
   "compilerOptions": {
     "rootDir": "../../target/types",
-    "outDir": "lib/esm",
-    "declarationDir": "lib/types"
+    "outDir": "./lib/esm",
+    "declarationDir": "./lib/types"
   }
 }
