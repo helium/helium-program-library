@@ -139,14 +139,6 @@ pub struct IssueHotspotV0<'info> {
     associated_token::authority = dc_fee_payer,
   )]
   pub dc_burner: Box<Account<'info, TokenAccount>>,
-  /// CHECK: Verified by cpi
-  #[account(
-    mut,
-    seeds = ["dc_token_auth".as_bytes()],
-    seeds::program = data_credits::ID,
-    bump
-  )]
-  pub dc_token_authority: AccountInfo<'info>,
 
   /// CHECK: Verified by cpi    
   #[account(
@@ -188,7 +180,6 @@ impl<'info> IssueHotspotV0<'info> {
     let cpi_accounts = BurnDataCreditsV0 {
       data_credits: self.dc.to_account_info(),
       burner: self.dc_burner.to_account_info(),
-      token_authority: self.dc_token_authority.to_account_info(),
       owner: self.dc_fee_payer.to_account_info(),
       dc_mint: self.dc_mint.to_account_info(),
       token_program: self.token_program.to_account_info(),

@@ -27,7 +27,6 @@ export const initTestDataCredits = async (
 }> => {
   const dcKey = dataCreditsKey()[0];
   const me = provider.wallet.publicKey;
-  const [tokenAuth] = tokenAuthorityKey();
   let hntMint;
   let hntBal = startingHntbal;
   let dcMint;
@@ -39,11 +38,17 @@ export const initTestDataCredits = async (
     hntMint = dcAcc.hntMint;
     dcMint = dcAcc.dcMint;
 
-    const dcAta = await getAssociatedTokenAddress(dcMint, me);
-
-    dcBal =
-      (await provider.connection.getTokenAccountBalance(dcAta)).value
-        .uiAmount || 0;
+    if (
+      await provider.connection.getAccountInfo(
+        await getAssociatedTokenAddress(dcMint, me)
+      )
+    ) {
+      dcBal = (
+        await provider.connection.getTokenAccountBalance(
+          await getAssociatedTokenAddress(dcMint, me)
+        )
+      ).value.uiAmount!;
+    }
 
     hntBal =
       (
@@ -53,11 +58,7 @@ export const initTestDataCredits = async (
       ).value.uiAmount || 0;
   } else {
     hntMint = await createMint(provider, 8, me, me);
-    dcMint = await createMint(provider, 8, tokenAuth, tokenAuth);
-
-    const initDataCredits = await program.methods
-      .initializeDataCreditsV0({ authority: me })
-      .accounts({ hntMint, dcMint });
+    dcMint = await createMint(provider, 8, dcKey, dcKey);
 
     await createAtaAndMint(
       provider,
@@ -65,6 +66,10 @@ export const initTestDataCredits = async (
       toBN(startingHntbal, 8).toNumber(),
       me
     );
+
+    const initDataCredits = await program.methods
+      .initializeDataCreditsV0({ authority: me })
+      .accounts({ hntMint, dcMint });
 
     await initDataCredits.rpc();
   }
@@ -95,12 +100,11 @@ describe("data-credits", () => {
 
     const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dcKey);
     const [dc, dcBump] = dataCreditsKey();
-    const [tokenAuth, tokenAuthBump] = tokenAuthorityKey();
 
     expect(dataCreditsAcc?.dcMint.toBase58()).eq(dcMint.toBase58());
     expect(dataCreditsAcc?.hntMint.toBase58()).eq(hntMint.toBase58());
     expect(dataCreditsAcc?.authority.toBase58()).eq(me.toBase58());
-    expect(dataCreditsAcc?.dataCreditsBump).eq(dcbump);
+    expect(dataCreditsAcc?.dataCreditsBump).eq(dcBump);
   });
 
   describe("with data credits", async () => {
