@@ -2,6 +2,9 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum ErrorCode {
+  #[msg("Invalid ecc compcat")]
+  InvalidEccCompact,
+
   #[msg("Invalid string length, your string was likely too long")]
   InvalidStringLength,
 

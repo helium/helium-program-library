@@ -196,6 +196,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "angry-purple-tiger"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49c749eb8b90a5c85a879ac35bba5374ba18ff41d609878d7d37dd2ac0122a3c"
+dependencies = [
+ "md5",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.62"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -640,6 +649,7 @@ version = "0.0.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "angry-purple-tiger",
  "data-credits",
  "helium-sub-daos",
  "mpl-token-metadata",
@@ -779,6 +789,12 @@ checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
 dependencies = [
  "cfg-if",
 ]
+
+[[package]]
+name = "md5"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 
 [[package]]
 name = "memchr"
