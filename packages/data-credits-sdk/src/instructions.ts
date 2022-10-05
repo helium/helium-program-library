@@ -30,7 +30,7 @@ export async function mintDataCreditsInstructions({
   recipient = provider.wallet.publicKey,
 }: IMintDataCreditsArgs) {
   const { dataCredits } = await program.methods.burnDataCreditsV0({amount: new BN(0)}).pubkeys();
-  const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dataCredits!);
+  const dataCreditsAcc = await program.account.dataCreditsV0.fetchNullable(dataCredits!);
   if (!dataCreditsAcc) throw new Error("Data credits not available at the expected address.");
 
   const hntMintAcc = await getMint(

@@ -180,11 +180,12 @@ describe("hotspot-issuance", () => {
     expect(account.maker.toBase58()).eq(makerKeypair.publicKey.toBase58());
   });
 
-  describe("with issuer and data credits", async () => {
+  describe("with issuer and data credits", () => {
     let dcMint: PublicKey;
     let subDao: PublicKey;
 
     before(async () => {
+      const { subDao: sub, dataCredits } = await initWorld();
       const ix = await mintDataCreditsInstructions({
         program: dcProgram,
         provider,
@@ -193,13 +194,12 @@ describe("hotspot-issuance", () => {
 
       await execute(dcProgram, provider, ix);
 
-      const { subDao: sub, dataCredits } = await initWorld();
       subDao = sub.subDao;
       dcMint = dataCredits.dcMint;
     });
 
     it("issues a hotspot", async () => {
-      const ecc = await (await HeliumKeypair.makeRandom()).address.bin;
+      const ecc = await (await HeliumKeypair.makeRandom()).address.publicKey;
       const hotspotOwner = Keypair.generate().publicKey;
       const { hotspotConfig, collection, onboardingServerKeypair } =
         await initTestHotspotConfig(hsProgram, provider);
@@ -211,7 +211,7 @@ describe("hotspot-issuance", () => {
       );
 
       const method = await hsProgram.methods
-        .issueHotspotV0({ eccCompact: ecc })
+        .issueHotspotV0({ eccCompact: Buffer.from(ecc) })
         .accounts({
           payer: me,
           dcFeePayer: me,
