@@ -77,6 +77,7 @@ describe("helium-sub-daos", () => {
         subDaoMint,
         hotspotCollection: collection,
         treasury,
+        mint: daoAcc.mint,
       });
     const { subDao } = await method.pubkeys();
     await method.rpc();
