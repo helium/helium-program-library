@@ -63,7 +63,6 @@ export const lazyDistributorResolvers = combineResolvers(
   },
 );
 
-
 export * from "./constants";
 export * from "./pdas";
 

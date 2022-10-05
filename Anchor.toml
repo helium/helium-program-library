@@ -1,10 +1,12 @@
 [features]
 seeds = true
+
 [programs.localnet]
 lazy_distributor = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 helium_sub_daos = "daoK94GYdvRjVxkSyTxNLxtAEYZohLJqmwad8pBK261"
 test_tracker = "tes8BDewkpUpfqx7VDXUJzTFugjqHJugCEBP5sDrrCf"
 data_credits = "5BAQuzGE1z8CTcrSdfbfdBF2fdXrwb4iMcxDMrvhz8L8"
+hotspot_issuance = "8DV471AvMNBCDTPoa2gzffrYFEJmDU56GDgTBv48RBZR"
 
 [workspace]
 members = [
@@ -12,6 +14,7 @@ members = [
   "programs/data-credits",
   "programs/helium-sub-daos",
   "programs/test-tracker", 
+  "programs/hotspot-issuance"  
 ]
 
 [registry]
@@ -19,7 +22,7 @@ url = "https://anchor.projectserum.com"
 
 [provider]
 cluster = "localnet"
-wallet = "/Users/nprince/.config/solana/id.json"
+wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

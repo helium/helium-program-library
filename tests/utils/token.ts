@@ -1,14 +1,24 @@
 import {
-  createCreateMasterEditionV3Instruction, createCreateMetadataAccountV3Instruction, createVerifyCollectionInstruction, PROGRAM_ID as METADATA_PROGRAM_ID
+  createCreateMasterEditionV3Instruction,
+  createCreateMetadataAccountV3Instruction,
+  createVerifyCollectionInstruction,
+  PROGRAM_ID as METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
 import {
-  createAssociatedTokenAccountInstruction, createInitializeMintInstruction,
-  createMintToInstruction, getAssociatedTokenAddress, TOKEN_PROGRAM_ID, 
+  createAssociatedTokenAccountInstruction,
+  createInitializeMintInstruction,
+  createMintToInstruction,
+  getAssociatedTokenAddress,
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import {
-  Keypair, PublicKey, SystemProgram,
-  Transaction, TransactionInstruction
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  TransactionInstruction,
+  ConfirmOptions,
 } from "@solana/web3.js";
 
 export async function mintTo(
@@ -67,7 +77,7 @@ export async function createAtaAndMint(
   to: PublicKey = provider.wallet.publicKey,
   authority: PublicKey = provider.wallet.publicKey,
   payer: PublicKey = provider.wallet.publicKey,
-  confirmOptions: any = undefined
+  confirmOptions?: ConfirmOptions
 ): Promise<PublicKey> {
   const mintTx = new Transaction();
   const { instructions, ata } = await createAtaAndMintInstructions(
@@ -135,7 +145,6 @@ export async function createMint(
     ))
   );
 
-  console.log("Creating mint");
   try {
     await provider.sendAndConfirm(tx, [mintKeypair]);
   } catch (e: any) {

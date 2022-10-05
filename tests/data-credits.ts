@@ -1,17 +1,81 @@
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { assert } from "chai";
-import { init, dataCreditsKey, mintDataCreditsInstructions, burnDataCreditsInstructions, isInitialized } from "../packages/data-credits-sdk/src";
+import { expect } from "chai";
+import {
+  init,
+  isInitialized,
+  dataCreditsKey,
+  mintDataCreditsInstructions,
+  burnDataCreditsInstructions,
+} from "../packages/data-credits-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { createAtaAndMint, createMint, mintTo } from "./utils/token";
-import {
-  getAssociatedTokenAddress,
-  getAccount,
-  getMint,
-} from "@solana/spl-token";
+import { getAssociatedTokenAddress, getAccount, burn } from "@solana/spl-token";
 import { toBN, execute } from "@helium-foundation/spl-utils";
-import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
+
+export const initTestDataCredits = async (
+  program: Program<DataCredits>,
+  provider: anchor.AnchorProvider,
+  startingHntbal: number = 100
+): Promise<{
+  dcKey: PublicKey;
+  hntMint: PublicKey;
+  dcMint: PublicKey;
+  hntBal: number;
+  dcBal: number;
+}> => {
+  const dcKey = dataCreditsKey()[0];
+  const me = provider.wallet.publicKey;
+  let hntMint;
+  let hntBal = startingHntbal;
+  let dcMint;
+  let dcBal = 0;
+
+  if (await isInitialized(program)) {
+    // accounts for rerunning tests on same localnet
+    const dcAcc = await program.account.dataCreditsV0.fetch(dcKey);
+    hntMint = dcAcc.hntMint;
+    dcMint = dcAcc.dcMint;
+
+    if (
+      await provider.connection.getAccountInfo(
+        await getAssociatedTokenAddress(dcMint, me)
+      )
+    ) {
+      dcBal = (
+        await provider.connection.getTokenAccountBalance(
+          await getAssociatedTokenAddress(dcMint, me)
+        )
+      ).value.uiAmount!;
+    }
+
+    hntBal =
+      (
+        await provider.connection.getTokenAccountBalance(
+          await getAssociatedTokenAddress(hntMint, me)
+        )
+      ).value.uiAmount || 0;
+  } else {
+    hntMint = await createMint(provider, 8, me, me);
+    dcMint = await createMint(provider, 8, dcKey, dcKey);
+
+    await createAtaAndMint(
+      provider,
+      hntMint,
+      toBN(startingHntbal, 8).toNumber(),
+      me
+    );
+
+    const initDataCredits = await program.methods
+      .initializeDataCreditsV0({ authority: me })
+      .accounts({ hntMint, dcMint });
+
+    await initDataCredits.rpc();
+  }
+
+  return { dcKey, hntMint, hntBal, dcMint, dcBal };
+};
 
 describe("data-credits", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -20,45 +84,38 @@ describe("data-credits", () => {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
 
-  let hntMint: PublicKey;
-  let dcMint: PublicKey;
-  const hntDecimals = 8;
-  const dcDecimals = 8;
-  let startHntBal = 100;
-  let startDcBal = 0;
-  let dcKey: PublicKey;
   before(async () => {
-    program = await init(provider, PROGRAM_ID, anchor.workspace.DataCredits.idl);
-    dcKey = dataCreditsKey()[0];
-    if (await isInitialized(program)) {
-      // accounts for rerunning tests on same localnet
-      const dcAcc = await program.account.dataCreditsV0.fetch(dcKey);
-      hntMint = dcAcc.hntMint;
-      dcMint = dcAcc.dcMint;
-      startHntBal = (await provider.connection.getTokenAccountBalance(await getAssociatedTokenAddress(hntMint, me))).value.uiAmount!;
-      if (await provider.connection.getAccountInfo(await getAssociatedTokenAddress(dcMint, me))) {
-        startDcBal = (await provider.connection.getTokenAccountBalance(await getAssociatedTokenAddress(dcMint, me))).value.uiAmount!;
-      }
-    } else {
-      // fresh start
-      hntMint = await createMint(provider, hntDecimals, me, me);
-      dcMint = await createMint(provider, dcDecimals, dcKey, dcKey);
-      await createAtaAndMint(provider, hntMint, toBN(startHntBal, hntDecimals).toNumber(), me);
-      await program.methods.initializeDataCreditsV0({authority: me}).accounts({hntMint, dcMint, payer: me}).rpc();
-    }
+    program = await init(
+      provider,
+      anchor.workspace.DataCredits.programId,
+      anchor.workspace.DataCredits.idl
+    );
   });
 
   it("initializes data credits", async () => {
+    const { dcKey, dcMint, hntMint } = await initTestDataCredits(
+      program,
+      provider
+    );
+
     const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dcKey);
     const [dc, dcBump] = dataCreditsKey();
-    assert(dataCreditsAcc?.dcMint.equals(dcMint));
-    assert(dataCreditsAcc?.hntMint.equals(hntMint));
-    assert(dataCreditsAcc?.authority.equals(me));
-    assert(dataCreditsAcc?.dataCreditsBump == dcBump);
+
+    expect(dataCreditsAcc?.dcMint.toBase58()).eq(dcMint.toBase58());
+    expect(dataCreditsAcc?.hntMint.toBase58()).eq(hntMint.toBase58());
+    expect(dataCreditsAcc?.authority.toBase58()).eq(me.toBase58());
+    expect(dataCreditsAcc?.dataCreditsBump).eq(dcBump);
   });
 
-  describe("with data credits", async() => {
+  describe("with data credits", async () => {
     it("mints some data credits", async () => {
+      const {
+        dcMint,
+        dcBal: previousDcBal,
+        hntMint,
+        hntBal: previousHntBal,
+      } = await initTestDataCredits(program, provider);
+
       const ix = await mintDataCreditsInstructions({
         program,
         provider,
@@ -69,14 +126,23 @@ describe("data-credits", () => {
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
       const dcAtaAcc = await getAccount(provider.connection, dcAta);
 
-      assert(dcAtaAcc.isFrozen);
-      const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
-      const hntBal = await provider.connection.getTokenAccountBalance(await getAssociatedTokenAddress(hntMint, me));
-      assert(dcBal.value.uiAmount == startDcBal + 1);
-      assert(hntBal.value.uiAmount == startHntBal - 1);      
-    })
+      expect(dcAtaAcc.isFrozen);
 
-    it("burns some data credits", async() => {
+      const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
+      const hntBal = await provider.connection.getTokenAccountBalance(
+        await getAssociatedTokenAddress(hntMint, me)
+      );
+
+      expect(dcBal.value.uiAmount).eq(previousDcBal + 1);
+      expect(hntBal.value.uiAmount).eq(previousHntBal - 1);
+    });
+
+    it("burns some data credits", async () => {
+      const { dcMint, dcBal: previousDcBal } = await initTestDataCredits(
+        program,
+        provider
+      );
+
       const ix = await burnDataCreditsInstructions({
         program,
         provider,
@@ -87,9 +153,9 @@ describe("data-credits", () => {
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
       const dcAtaAcc = await getAccount(provider.connection, dcAta);
 
-      assert(dcAtaAcc.isFrozen);
+      expect(dcAtaAcc.isFrozen);
       const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
-      assert(dcBal.value.uiAmount == startDcBal);
-    })
-  })
+      expect(dcBal.value.uiAmount).eq(previousDcBal - 1);
+    });
+  });
 });

@@ -9,7 +9,7 @@ export type AtaResolverArgs = {
   account: string;
   mint: string;
   owner: string;
-} 
+};
 
 export function ataResolver<T extends anchor.Idl>({
   instruction,
@@ -17,21 +17,19 @@ export function ataResolver<T extends anchor.Idl>({
   mint,
   owner,
 }: AtaResolverArgs): anchor.CustomAccountResolver<T> {
-  return resolveIndividual(
-    async ({ path, accounts, idlIx }) => {
-      if (idlIx.name === instruction && path[path.length - 1] === account) {
-        const mintKey = get(accounts, [
-          ...path.slice(0, path.length - 1),
-          mint,
-        ]) as PublicKey;
-        const ownerKey = get(accounts, [
-          ...path.slice(0, path.length - 1),
-          owner,
-        ]) as PublicKey;
+  return resolveIndividual(async ({ path, accounts, idlIx }) => {
+    if (idlIx.name === instruction && path[path.length - 1] === account) {
+      const mintKey = get(accounts, [
+        ...path.slice(0, path.length - 1),
+        mint,
+      ]) as PublicKey;
+      const ownerKey = get(accounts, [
+        ...path.slice(0, path.length - 1),
+        owner,
+      ]) as PublicKey;
 
-        return getAssociatedTokenAddress(mintKey, ownerKey);
-      }
-      return undefined;
+      return getAssociatedTokenAddress(mintKey, ownerKey, true);
     }
-  )
+    return undefined;
+  });
 }

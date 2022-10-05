@@ -1,24 +1,30 @@
 import { HeliumSubDaos } from "@helium-foundation/idls/lib/esm/helium_sub_daos";
+import { AnchorProvider, Idl, Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { AnchorProvider, Program } from "@project-serum/anchor";
 import { PROGRAM_ID } from "./constants";
-export { subDaoEpochInfoResolver, heliumSubDaosResolvers } from "./resolvers";
-export { subDaoEpochInfoKey } from "./pdas"
+import { heliumSubDaosResolvers } from "./resolvers";
+export * from "./constants";
+export * from "./pdas";
+export * from "./resolvers";
 
 export async function init(
   provider: AnchorProvider,
-  programId?: PublicKey
+  programId: PublicKey = PROGRAM_ID,
+  idl?: Idl | null
 ) {
-  const dataCreditsIdlJson = await Program.fetchIdl(
+  if (!idl) {
+    idl = await Program.fetchIdl(programId, provider);
+  }
+
+  const heliumSubDaos = new Program<HeliumSubDaos>(
+    idl as HeliumSubDaos,
     programId ?? PROGRAM_ID,
-    provider
-  );
-  const dataCredits = new Program<HeliumSubDaos>(
-    dataCreditsIdlJson as HeliumSubDaos,
-    programId ?? PROGRAM_ID,
-    provider
+    provider,
+    undefined,
+    () => heliumSubDaosResolvers
   ) as Program<HeliumSubDaos>;
-  return dataCredits;
+
+  return heliumSubDaos;
 }
 
 export * from "./pdas";

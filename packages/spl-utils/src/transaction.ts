@@ -199,12 +199,12 @@ export async function executeBig<Output>(
       signers,
       payer || this.wallet.publicKey,
       finality,
-      errors,
+      errors
     );
     return {
       ...output,
       txids: Array.from(txids),
-    }
+    };
   }
 
   return output;
@@ -375,7 +375,7 @@ export async function sendAndConfirmWithRetry(
 
     if (confirmation.err) {
       const tx = await connection.getTransaction(txid, {
-        commitment: "confirmed"
+        commitment: "confirmed",
       });
       console.error(tx?.meta?.logMessages?.join("\n"));
       console.error(confirmation.err);
@@ -390,7 +390,7 @@ export async function sendAndConfirmWithRetry(
     }
 
     const tx = await connection.getTransaction(txid, {
-      commitment: "confirmed"
+      commitment: "confirmed",
     });
     if (tx && tx.meta.logMessages) {
       console.error(tx.meta.logMessages.join("\n"));
