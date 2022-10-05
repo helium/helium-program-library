@@ -40,5 +40,13 @@ export async function init(provider: AnchorProvider, dataCreditsProgramId: Publi
   return dataCredits;
 }
 
+export async function isInitialized(program: Program<DataCredits>) {
+  if (await program.provider.connection.getAccountInfo(dataCreditsKey()[0])) {
+    return true
+  }
+  return false;
+}
+
 export * from "./instructions";
-export * from "./pdas"
+export * from "./pdas";
+export * from "./constants";
