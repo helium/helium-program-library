@@ -384,7 +384,6 @@ impl PreciseNumber {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use proptest::prelude::*;
 
   fn check_pow_approximation(base: InnerUint, exponent: InnerUint, expected: InnerUint) {
     let precision = InnerUint::from(5_000_000); // correct to at least 3 decimal places
@@ -609,13 +608,5 @@ mod tests {
     let ceiling_again = ceiling.ceiling().unwrap();
     assert_eq!(whole_number.value, ceiling.value);
     assert_eq!(whole_number.value, ceiling_again.value);
-  }
-
-  proptest! {
-      #[test]
-      fn test_square_root(a in 0..u128::MAX) {
-          let a = PreciseNumber { value: InnerUint::from(a) };
-          check_square_root(&a);
-      }
   }
 }
