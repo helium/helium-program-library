@@ -57,9 +57,9 @@ fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
 
 pub fn handler(ctx: Context<IssueRewardsV0>, _args: IssueRewardsArgsV0) -> Result<()> {
   let utility_score = to_prec(ctx.accounts.sub_dao_epoch_info.utility_score)
-    .ok_or(error!(ErrorCode::NoUtilityScore))?;
+    .ok_or_else(|| error!(ErrorCode::NoUtilityScore))?;
   let total_utility_score = to_prec(Some(ctx.accounts.dao_epoch_info.total_utility_score))
-    .ok_or(error!(ErrorCode::NoUtilityScore))?;
+    .ok_or_else(|| error!(ErrorCode::NoUtilityScore))?;
 
   let percent_share = utility_score
     .checked_div(&total_utility_score)
@@ -71,11 +71,17 @@ pub fn handler(ctx: Context<IssueRewardsV0>, _args: IssueRewardsArgsV0) -> Resul
     .floor() // Ensure we never overspend the defined rewards
     .or_arith_error()?
     .to_imprecise()
-    .ok_or(error!(ErrorCode::ArithmeticError))?
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?
     .try_into()
     .unwrap();
 
-  msg!("Rewards amount: {} {} {} {}", rewards_amount, ctx.accounts.sub_dao_epoch_info.utility_score.unwrap(), ctx.accounts.dao_epoch_info.total_utility_score, ctx.accounts.dao.reward_per_epoch);
+  msg!(
+    "Rewards amount: {} {} {} {}",
+    rewards_amount,
+    ctx.accounts.sub_dao_epoch_info.utility_score.unwrap(),
+    ctx.accounts.dao_epoch_info.total_utility_score,
+    ctx.accounts.dao.reward_per_epoch
+  );
 
   transfer(
     CpiContext::new_with_signer(
@@ -96,7 +102,8 @@ pub fn handler(ctx: Context<IssueRewardsV0>, _args: IssueRewardsArgsV0) -> Resul
 
   ctx.accounts.dao_epoch_info.num_rewards_issued += 1;
   ctx.accounts.sub_dao_epoch_info.rewards_issued = true;
-  ctx.accounts.dao_epoch_info.done_issuing_rewards = ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
+  ctx.accounts.dao_epoch_info.done_issuing_rewards =
+    ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 
   Ok(())
 }

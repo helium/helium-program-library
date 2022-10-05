@@ -1,8 +1,10 @@
 use anchor_lang::prelude::*;
 use helium_sub_daos::{
-  current_epoch,
-  cpi::{accounts::{TrackDcBurnV0, TrackAddedDeviceV0}, track_added_device_v0, track_dc_burn_v0},
-  TrackAddedDeviceArgsV0,
+  cpi::{
+    accounts::{TrackAddedDeviceV0, TrackDcBurnV0},
+    track_added_device_v0, track_dc_burn_v0,
+  },
+  current_epoch, TrackAddedDeviceArgsV0,
 };
 
 declare_id!("tes8BDewkpUpfqx7VDXUJzTFugjqHJugCEBP5sDrrCf");
@@ -12,41 +14,36 @@ pub mod test_tracker {
 
   use helium_sub_daos::TrackDcBurnArgsV0;
 
-use super::*;
+  use super::*;
 
   pub fn test_add_device(ctx: Context<TestAddDevice>, collection: Pubkey) -> Result<()> {
-    let bump = ctx.bumps.get("authority").unwrap().clone();
+    let bump = *ctx.bumps.get("authority").unwrap();
     track_added_device_v0(
       CpiContext::new_with_signer(
         ctx.accounts.helium_sub_daos.to_account_info(),
         ctx.accounts.tracker_accounts.unwrap(),
-        &[
-          &["hotspot_issuance".as_bytes(), collection.as_ref(), &[bump]]
-        ]
+        &[&["hotspot_issuance".as_bytes(), collection.as_ref(), &[bump]]],
       ),
       TrackAddedDeviceArgsV0 {
         authority_bump: bump,
-        collection
-      }
+        collection,
+      },
     )?;
     Ok(())
   }
 
-
   pub fn test_dc_burn(ctx: Context<TestDcBurn>, amount: u64) -> Result<()> {
-    let bump = ctx.bumps.get("authority").unwrap().clone();
+    let bump = *ctx.bumps.get("authority").unwrap();
     track_dc_burn_v0(
       CpiContext::new_with_signer(
         ctx.accounts.helium_sub_daos.to_account_info(),
         ctx.accounts.tracker_accounts.unwrap(),
-        &[
-          &["dc_token_auth".as_bytes(), &[bump]]
-        ]
+        &[&["dc".as_bytes(), &[bump]]],
       ),
       TrackDcBurnArgsV0 {
         authority_bump: bump,
-        dc_burned: amount
-      }
+        dc_burned: amount,
+      },
     )?;
     Ok(())
   }
@@ -57,7 +54,6 @@ pub struct TestAddDevice<'info> {
   pub tracker_accounts: TrackAddedDeviceV0Wrapper<'info>,
   pub helium_sub_daos: Program<'info, HeliumSubDaos>,
 }
-
 
 #[derive(Accounts)]
 pub struct TestDcBurn<'info> {
@@ -90,7 +86,8 @@ pub struct TrackAddedDeviceV0Wrapper<'info> {
   /// CHECK: Verified by cpi
   pub sub_dao: AccountInfo<'info>,
   #[account(
-    seeds = [b"hotspot_issuance", collection.as_ref()],
+    mut,
+    seeds = ["hotspot_issuance".as_bytes(), collection.as_ref()],
     bump,
   )]
   /// CHECK: Verified by cpi
@@ -128,7 +125,7 @@ pub struct TrackDcBurnV0Wrapper<'info> {
   pub sub_dao: AccountInfo<'info>,
   #[account(
     mut,
-    seeds = [b"dc_token_auth"],
+    seeds = ["dc".as_bytes()],
     bump,
   )]
   /// CHECK: Verified by cpi

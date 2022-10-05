@@ -20,10 +20,6 @@ pub struct BurnDataCreditsV0<'info> {
   )]
   pub burner: Box<Account<'info, TokenAccount>>,
 
-  #[account(seeds=["dc_token_auth".as_bytes()], bump=data_credits.token_authority_bump)]
-  ///CHECK: seeds verified and cpi calls will be unauthorised if incorrect
-  pub token_authority: AccountInfo<'info>,
-
   pub owner: Signer<'info>,
 
   #[account(mut)]
@@ -46,7 +42,7 @@ impl<'info> BurnDataCreditsV0<'info> {
     let cpi_accounts = ThawAccount {
       account: self.burner.to_account_info(),
       mint: self.dc_mint.to_account_info(),
-      authority: self.token_authority.to_account_info(),
+      authority: self.data_credits.to_account_info(),
     };
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
@@ -55,17 +51,14 @@ impl<'info> BurnDataCreditsV0<'info> {
     let cpi_accounts = FreezeAccount {
       account: self.burner.to_account_info(),
       mint: self.dc_mint.to_account_info(),
-      authority: self.token_authority.to_account_info(),
+      authority: self.data_credits.to_account_info(),
     };
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 }
 
 pub fn handler(ctx: Context<BurnDataCreditsV0>, args: BurnDataCreditsV0Args) -> Result<()> {
-  let signer_seeds: &[&[&[u8]]] = &[&[
-    b"dc_token_auth",
-    &[ctx.accounts.data_credits.token_authority_bump],
-  ]];
+  let signer_seeds: &[&[&[u8]]] = &[&[b"dc", &[ctx.accounts.data_credits.data_credits_bump]]];
 
   // unfreeze the burner if necessary
   if ctx.accounts.burner.is_frozen() {

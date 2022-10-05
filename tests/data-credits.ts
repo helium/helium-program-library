@@ -6,12 +6,11 @@ import {
   init,
   isInitialized,
   dataCreditsKey,
-  tokenAuthorityKey,
   mintDataCreditsInstructions,
   burnDataCreditsInstructions,
 } from "../packages/data-credits-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
-import { createAtaAndMint, createMint } from "./utils/token";
+import { createAtaAndMint, createMint, mintTo } from "./utils/token";
 import { getAssociatedTokenAddress, getAccount, burn } from "@solana/spl-token";
 import { toBN, execute } from "@helium-foundation/spl-utils";
 
@@ -95,14 +94,13 @@ describe("data-credits", () => {
     );
 
     const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dcKey);
-
+    const [dc, dcBump] = dataCreditsKey();
     const [tokenAuth, tokenAuthBump] = tokenAuthorityKey();
 
     expect(dataCreditsAcc?.dcMint.toBase58()).eq(dcMint.toBase58());
     expect(dataCreditsAcc?.hntMint.toBase58()).eq(hntMint.toBase58());
     expect(dataCreditsAcc?.authority.toBase58()).eq(me.toBase58());
-    expect(dataCreditsAcc?.tokenAuthority.toBase58()).eq(tokenAuth.toBase58());
-    expect(dataCreditsAcc?.tokenAuthorityBump).eq(tokenAuthBump);
+    expect(dataCreditsAcc?.dataCreditsBump).eq(dcbump);
   });
 
   describe("with data credits", async () => {

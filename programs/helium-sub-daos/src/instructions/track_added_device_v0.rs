@@ -11,7 +11,6 @@ pub struct TrackAddedDeviceArgsV0 {
   pub authority_bump: u8,
 }
 
-
 #[derive(Accounts)]
 #[instruction(args: TrackAddedDeviceArgsV0)]
 pub struct TrackAddedDeviceV0<'info> {
@@ -41,7 +40,7 @@ pub fn handler(ctx: Context<TrackAddedDeviceV0>, _args: TrackAddedDeviceArgsV0) 
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
   ctx.accounts.sub_dao_epoch_info.bump_seed = *ctx.bumps.get("sub_dao_epoch_info").unwrap();
   ctx.accounts.sub_dao.total_devices += 1;
-  ctx.accounts.sub_dao_epoch_info.total_devices = ctx.accounts.sub_dao.total_devices;  
+  ctx.accounts.sub_dao_epoch_info.total_devices = ctx.accounts.sub_dao.total_devices;
   ctx.accounts.sub_dao_epoch_info.epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
 
   Ok(())

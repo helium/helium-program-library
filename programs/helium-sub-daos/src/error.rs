@@ -18,5 +18,5 @@ pub enum ErrorCode {
   MissingUtilityScores,
 
   #[msg("The subdao does not have a utility score")]
-  NoUtilityScore
+  NoUtilityScore,
 }

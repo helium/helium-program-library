@@ -1,6 +1,6 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, TokenAccount, Token};
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDaoArgsV0 {
@@ -48,7 +48,7 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
     num_sub_daos: 0,
     reward_per_epoch: args.reward_per_epoch,
     bump_seed: ctx.bumps["dao"],
-    treasury_bump_seed: ctx.bumps["treasury"]
+    treasury_bump_seed: ctx.bumps["treasury"],
   });
 
   Ok(())

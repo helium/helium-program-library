@@ -59,6 +59,7 @@ export const initTestSubdao = async (
       subDaoMint,
       hotspotCollection: collection,
       treasury,
+      mint: daoAcc.mint,
     });
   const { subDao } = await method.pubkeys();
   await method.rpc();
@@ -169,7 +170,7 @@ describe("helium-sub-daos", () => {
           SystemProgram.transfer({
             fromPubkey: me,
             toPubkey: PublicKey.findProgramAddressSync(
-              [Buffer.from("dc_token_auth", "utf8")],
+              [Buffer.from("dc", "utf8")],
               testTracker.programId
             )[0],
             lamports: 100000000,
@@ -254,6 +255,7 @@ describe("helium-sub-daos", () => {
           })
           .accounts({
             subDao,
+            dao,
           })
           .prepare();
         await sendInstructions(provider, [instruction2], []);
@@ -285,6 +287,7 @@ describe("helium-sub-daos", () => {
             })
             .accounts({
               subDao,
+              dao,
             })
             .rpc();
         });

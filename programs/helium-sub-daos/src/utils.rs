@@ -1,6 +1,5 @@
 use crate::{error::ErrorCode, precise_number::PreciseNumber};
 use std::convert::TryInto;
-
 use anchor_lang::prelude::*;
 
 pub trait OrArithError<T> {
@@ -9,7 +8,7 @@ pub trait OrArithError<T> {
 
 impl OrArithError<PreciseNumber> for Option<PreciseNumber> {
   fn or_arith_error(self) -> Result<PreciseNumber> {
-    self.ok_or(ErrorCode::ArithmeticError.into())
+    self.ok_or_else(|| ErrorCode::ArithmeticError.into())
   }
 }
 

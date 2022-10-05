@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 
-
 #[account]
 #[derive(Default)]
 pub struct DaoV0 {
@@ -12,7 +11,6 @@ pub struct DaoV0 {
   pub bump_seed: u8,
   pub treasury_bump_seed: u8,
 }
-
 
 #[account]
 #[derive(Default)]
@@ -26,7 +24,6 @@ pub struct DaoEpochInfoV0 {
   pub done_issuing_rewards: bool,
   pub bump_seed: u8,
 }
-
 
 #[account]
 #[derive(Default)]
@@ -46,8 +43,8 @@ pub struct SubDaoEpochInfoV0 {
 pub struct SubDaoV0 {
   pub dao: Pubkey,
   pub hotspot_collection: Pubkey, // The metaplex collection of hotspot NFTs
-  pub mint: Pubkey, // The mint of the subdao token
-  pub treasury: Pubkey, // The treasury for rewards
+  pub mint: Pubkey,               // The mint of the subdao token
+  pub treasury: Pubkey,           // The treasury for rewards
   pub authority: Pubkey,
   pub total_devices: u64,
   pub bump_seed: u8,

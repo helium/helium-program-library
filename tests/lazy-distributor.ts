@@ -133,6 +133,7 @@ describe("lazy-distributor", () => {
             oracleIndex: 0,
           })
           .accounts({
+            lazyDistributor,
             recipient,
           })
           .rpc();
@@ -151,12 +152,13 @@ describe("lazy-distributor", () => {
             oracleIndex: 0,
           })
           .accounts({
+            lazyDistributor,
             recipient,
           })
           .rpc();
         const method = await program.methods
           .distributeRewardsV0()
-          .accounts({ recipient });
+          .accounts({ recipient, lazyDistributor, rewardsMint });
         await method.rpc();
         const destination = (await method.pubkeys()).destinationAccount!;
 
@@ -172,12 +174,13 @@ describe("lazy-distributor", () => {
             oracleIndex: 0,
           })
           .accounts({
+            lazyDistributor,
             recipient,
           })
           .rpc();
         await program.methods
           .distributeRewardsV0()
-          .accounts({ recipient })
+          .accounts({ recipient, lazyDistributor, rewardsMint })
           .rpc();
         const balance2 = await provider.connection.getTokenAccountBalance(
           destination
@@ -244,6 +247,7 @@ describe("lazy-distributor", () => {
                 oracleIndex: index,
               })
               .accounts({
+                lazyDistributor,
                 recipient,
                 oracle: oracle.publicKey,
               })
@@ -255,7 +259,7 @@ describe("lazy-distributor", () => {
       // Distribute rewards
       const { instruction: distributeInstruction, pubkeys: { destinationAccount: destination } } = await program.methods
         .distributeRewardsV0()
-        .accounts({ recipient })
+        .accounts({ recipient, lazyDistributor, rewardsMint })
         .prepare();
 
       // Run the full set oracle pricing, distribute rewards, all at once
