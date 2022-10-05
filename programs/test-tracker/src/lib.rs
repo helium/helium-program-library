@@ -17,7 +17,7 @@ pub mod test_tracker {
   use super::*;
 
   pub fn test_add_device(ctx: Context<TestAddDevice>, collection: Pubkey) -> Result<()> {
-    let bump = ctx.bumps.get("authority").unwrap().clone();
+    let bump = *ctx.bumps.get("authority").unwrap();
     track_added_device_v0(
       CpiContext::new_with_signer(
         ctx.accounts.helium_sub_daos.to_account_info(),
@@ -33,7 +33,7 @@ pub mod test_tracker {
   }
 
   pub fn test_dc_burn(ctx: Context<TestDcBurn>, amount: u64) -> Result<()> {
-    let bump = ctx.bumps.get("authority").unwrap().clone();
+    let bump = *ctx.bumps.get("authority").unwrap();
     track_dc_burn_v0(
       CpiContext::new_with_signer(
         ctx.accounts.helium_sub_daos.to_account_info(),

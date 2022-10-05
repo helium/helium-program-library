@@ -57,7 +57,7 @@ pub fn handler(ctx: Context<DistributeRewardsV0>) -> Result<()> {
     .into_iter()
     .flatten()
     .collect();
-  filtered.sort();
+  filtered.sort_unstable();
   let median_idx = filtered.len() / 2;
   let median = filtered[median_idx];
 
