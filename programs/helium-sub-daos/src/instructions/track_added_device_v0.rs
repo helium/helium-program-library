@@ -1,5 +1,5 @@
 use crate::state::*;
-use crate::utils::{current_epoch};
+use crate::utils::current_epoch;
 use anchor_lang::prelude::*;
 use std::str::FromStr;
 
@@ -10,7 +10,6 @@ pub struct TrackAddedDeviceArgsV0 {
   pub collection: Pubkey,
   pub authority_bump: u8,
 }
-
 
 #[derive(Accounts)]
 #[instruction(args: TrackAddedDeviceArgsV0)]

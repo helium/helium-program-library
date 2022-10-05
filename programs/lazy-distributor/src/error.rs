@@ -6,5 +6,5 @@ pub enum ErrorCode {
   InvalidDataIncrease,
 
   #[msg("Error in arithmetic")]
-  ArithmeticError
+  ArithmeticError,
 }

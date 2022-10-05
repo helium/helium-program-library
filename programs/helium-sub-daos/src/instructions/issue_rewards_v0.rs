@@ -75,7 +75,13 @@ pub fn handler(ctx: Context<IssueRewardsV0>, _args: IssueRewardsArgsV0) -> Resul
     .try_into()
     .unwrap();
 
-  msg!("Rewards amount: {} {} {} {}", rewards_amount, ctx.accounts.sub_dao_epoch_info.utility_score.unwrap(), ctx.accounts.dao_epoch_info.total_utility_score, ctx.accounts.dao.reward_per_epoch);
+  msg!(
+    "Rewards amount: {} {} {} {}",
+    rewards_amount,
+    ctx.accounts.sub_dao_epoch_info.utility_score.unwrap(),
+    ctx.accounts.dao_epoch_info.total_utility_score,
+    ctx.accounts.dao.reward_per_epoch
+  );
 
   transfer(
     CpiContext::new_with_signer(
@@ -96,7 +102,8 @@ pub fn handler(ctx: Context<IssueRewardsV0>, _args: IssueRewardsArgsV0) -> Resul
 
   ctx.accounts.dao_epoch_info.num_rewards_issued += 1;
   ctx.accounts.sub_dao_epoch_info.rewards_issued = true;
-  ctx.accounts.dao_epoch_info.done_issuing_rewards = ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
+  ctx.accounts.dao_epoch_info.done_issuing_rewards =
+    ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 
   Ok(())
 }

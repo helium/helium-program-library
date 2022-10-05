@@ -1,5 +1,5 @@
 use crate::state::*;
-use crate::utils::{current_epoch};
+use crate::utils::current_epoch;
 use anchor_lang::prelude::*;
 use std::str::FromStr;
 

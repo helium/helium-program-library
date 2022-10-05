@@ -1,5 +1,5 @@
 use crate::state::*;
-use crate::utils::{resize_to_fit};
+use crate::utils::resize_to_fit;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 
