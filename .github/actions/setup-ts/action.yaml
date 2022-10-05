@@ -26,6 +26,6 @@ runs:
     - run: yarn && ./node_modules/.bin/lerna bootstrap
       shell: bash
       if: steps.cache-typescript-node-modules.outputs.cache-hit != 'true'
-    - run: yarn run build-sdks
+    - run: yarn run build
       shell: bash
       if: steps.cache-typescript-dist.outputs.cache-hit != 'true'
