@@ -23,7 +23,7 @@ runs:
           ./packages/react/lib/
           ./packages/**/lib/
         key: solana-${{ runner.os }}-v0000-${{ env.NODE_VERSION }}-${{ hashFiles('./packages/**/*.ts') }}
-    - run: yarn && ./node_modules/.bin/lerna bootstrap && cd .. && git clone https://github.com/coral-xyz/anchor.git && cd helium-program-library && build-anchor-ts.sh
+    - run: yarn && ./node_modules/.bin/lerna bootstrap
       shell: bash
       if: steps.cache-typescript-node-modules.outputs.cache-hit != 'true'
     - run: yarn run build
