@@ -2,6 +2,7 @@ import { expect } from "chai";
 import * as anchor from "@project-serum/anchor";
 import { BN, Program } from "@project-serum/anchor";
 import { PublicKey, Keypair } from "@solana/web3.js";
+import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { execute, toBN } from "@helium-foundation/spl-utils";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
@@ -198,9 +199,8 @@ describe("hotspot-issuance", () => {
     });
 
     it("issues a hotspot", async () => {
-      const ecc = Keypair.generate().publicKey;
+      const ecc = await (await HeliumKeypair.makeRandom()).address.bin;
       const hotspotOwner = Keypair.generate().publicKey;
-
       const { hotspotConfig, collection, onboardingServerKeypair } =
         await initTestHotspotConfig(hsProgram, provider);
 
@@ -211,7 +211,7 @@ describe("hotspot-issuance", () => {
       );
 
       const method = await hsProgram.methods
-        .issueHotspotV0({ eccCompact: ecc.toBuffer() })
+        .issueHotspotV0({ eccCompact: ecc })
         .accounts({
           payer: me,
           dcFeePayer: me,
@@ -219,16 +219,16 @@ describe("hotspot-issuance", () => {
           maker: makerKeypair.publicKey,
           hotspotOwner: hotspotOwner,
           collection,
-          dcMint: dcMint,
-          subDao: subDao,
+          dcMint,
+          subDao,
           tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
           dataCreditsProgram: DATA_CREDITS_PROGRAM_ID,
-          subDoasProgram: HELIUM_SUB_DAOS_PROGRAM_ID,
+          subDaosProgram: HELIUM_SUB_DAOS_PROGRAM_ID,
         })
         .signers([onboardingServerKeypair, makerKeypair]);
 
       const { hotspot } = await method.pubkeys();
-
+      console.log(hotspot?.toBase58());
       await method.rpc();
 
       const ata = await getAssociatedTokenAddress(hotspot!, hotspotOwner);

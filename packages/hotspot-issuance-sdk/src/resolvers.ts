@@ -16,6 +16,7 @@ export const hotspotIssuanceResolvers = combineResolvers(
   }),
   resolveIndividual(async ({ path, args }) => {
     if (path[path.length - 1] === "hotspot") {
+      console.log;
       return (
         await PublicKey.findProgramAddress(
           [Buffer.from("hotspot", "utf-8"), args[args.length - 1].eccCompact],

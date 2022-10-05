@@ -9,8 +9,9 @@ use crate::token_metadata::{
   create_master_edition_v3, CreateMasterEdition, CreateMasterEditionArgs,
   verify_sized_collection_item, VerifySizedCollectionItem, VerifySizedCollectionItemArgs
 };
+use angry_purple_tiger::AnimalName;
 use crate::state::*;
-use crate::{error::ErrorCode};
+use crate::error::ErrorCode;
 use shared_utils::resize_to_fit;
 use data_credits::{
   cpi::{accounts::{ BurnDataCreditsV0 }, burn_data_credits_v0},
@@ -122,7 +123,7 @@ pub struct IssueHotspotV0<'info> {
   #[account(
     mut,
     seeds=["dc".as_bytes()],
-    seeds::program = data_credits::ID,
+    seeds::program = data_credits_program.key(),
     bump
   )]
   pub dc: Box<Account<'info, DataCreditsV0>>,
@@ -140,7 +141,7 @@ pub struct IssueHotspotV0<'info> {
   #[account(
     mut,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(),  &current_epoch(clock.unix_timestamp).to_le_bytes()], // Break into 30m epochs
-    seeds::program = helium_sub_daos::ID,
+    seeds::program = sub_daos_program.key(),
     bump
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
@@ -155,7 +156,7 @@ pub struct IssueHotspotV0<'info> {
   pub data_credits_program: AccountInfo<'info>,
   /// CHECK: Verified by constraint  
   #[account(address = helium_sub_daos::ID)]
-  pub sub_doas_program: AccountInfo<'info>,
+  pub sub_daos_program: AccountInfo<'info>,
   pub associated_token_program: Program<'info, AssociatedToken>,  
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
@@ -192,7 +193,7 @@ impl<'info> IssueHotspotV0<'info> {
       clock: self.clock.to_account_info(),
       rent: self.rent.to_account_info(),
     };    
-    CpiContext::new(self.sub_doas_program.to_account_info(), cpi_accounts)
+    CpiContext::new(self.sub_daos_program.to_account_info(), cpi_accounts)
   }
 }
 
@@ -200,6 +201,14 @@ pub fn handler(
   ctx: Context<IssueHotspotV0>,
   args: IssueHotspotV0Args,
 ) -> Result<()> {
+  let animal_name = match String::from_utf8(args.ecc_compact.clone()) {
+    Ok(v) => match v.parse::<AnimalName>() {
+      Ok(name) => Ok(name.to_string()),
+      Err(_) => err!(ErrorCode::InvalidEccCompact)
+    },
+    Err(_) => err!(ErrorCode::InvalidEccCompact)
+  }?;
+
   let signer_seeds: &[&[&[u8]]] = &[&[
     b"hotspot_issuer",
     ctx.accounts.hotspot_config.to_account_info().key.as_ref(),
@@ -207,10 +216,10 @@ pub fn handler(
     &[ctx.accounts.hotspot_issuer.bump_seed],
   ]];
 
-  burn_data_credits_v0(
-    ctx.accounts.burn_dc_ctx(),
-    BurnDataCreditsV0Args { amount: ctx.accounts.hotspot_config.dc_fee }
-  )?;
+  // burn_data_credits_v0(
+  //   ctx.accounts.burn_dc_ctx(),
+  //   BurnDataCreditsV0Args { amount: ctx.accounts.hotspot_config.dc_fee }
+  // )?;
 
   token::mint_to(
     ctx.accounts.mint_ctx().with_signer(signer_seeds),
@@ -232,7 +241,7 @@ pub fn handler(
       signer_seeds
     ),
     CreateMetadataAccountArgs {
-      name: String::from("feisty-glass-dalmatian"),
+      name: animal_name,
       symbol: String::from("HOTSPOT"),
       uri: String::from("https://c3zu2nc2m4x6zvqf5lofrtdbsa4niuh6drvzi7lq4n465ykbd3fa.arweave.net/FvNNNFpnL-zWBercWMxhkDjUUP4ca5R9cON57uFBHso/"),
       collection: Some(Collection {
@@ -288,13 +297,13 @@ pub fn handler(
     }
   )?;
 
-  track_added_device_v0(
-    ctx.accounts.add_device_ctx().with_signer(signer_seeds),
-    TrackAddedDeviceArgsV0 {
-      collection: ctx.accounts.collection.key(),
-      authority_bump: ctx.accounts.hotspot_config.bump_seed
-    }    
-  )?;
+  // track_added_device_v0(
+  //   ctx.accounts.add_device_ctx().with_signer(signer_seeds),
+  //   TrackAddedDeviceArgsV0 {
+  //     collection: ctx.accounts.collection.key(),
+  //     authority_bump: ctx.accounts.hotspot_config.bump_seed
+  //   }    
+  // )?;
 
   ctx.accounts.hotspot_issuer.count += 1;
 
