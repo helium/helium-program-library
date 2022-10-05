@@ -13,6 +13,7 @@ type IndividualResolver = (args: {
   programId: PublicKey;
   provider: anchor.Provider;
   path: string[];
+  args: Array<any>;
   accounts: Accounts;
   idlIx: AllInstructions<anchor.Idl>;
 }) => Promise<PublicKey | undefined>;
@@ -21,6 +22,7 @@ async function resolveIndividualImpl({
   idlAccounts,
   programId,
   provider,
+  args,
   accounts,
   path = [],
   resolver,
@@ -29,6 +31,7 @@ async function resolveIndividualImpl({
   idlAccounts: IdlAccountItem;
   provider: anchor.Provider;
   programId: PublicKey;
+  args: Array<any>;
   accounts: Accounts;
   path?: string[];
   resolver: IndividualResolver;
@@ -40,10 +43,13 @@ async function resolveIndividualImpl({
     const subAccounts = (idlAccounts as IdlAccounts).accounts;
     for (let k = 0; k < subAccounts.length; k += 1) {
       const subAccount = subAccounts[k];
+      const subArgs = args[k];
+
       await resolveIndividualImpl({
         idlAccounts: subAccount,
         programId,
         provider,
+        args,
         accounts,
         path: newPath,
         resolver,
@@ -59,6 +65,7 @@ async function resolveIndividualImpl({
           programId,
           provider,
           path: newPath,
+          args,
           accounts,
           idlIx,
         }))
@@ -69,7 +76,7 @@ async function resolveIndividualImpl({
 /**
  * Allows custom account resolution by functionaly operating on one account at a time.
  *
- * Check the `path` arg to see the account name being operated on, and use `accounts` and `provider` to fill in any
+ * Check the `path` arg to see the account name being operated on, and use `accounts` , `args` , and `provider` to fill in any
  * details necessary
  *
  * @param resolver
@@ -78,13 +85,14 @@ async function resolveIndividualImpl({
 export function resolveIndividual<T extends anchor.Idl>(
   resolver: IndividualResolver
 ): CustomAccountResolver<T> {
-  return async ({ idlIx, accounts, programId, provider }) => {
+  return async ({ idlIx, args, accounts, programId, provider }) => {
     for (let k = 0; k < idlIx.accounts.length; k += 1) {
       await resolveIndividualImpl({
         idlAccounts: idlIx.accounts[k],
         programId,
         provider,
         resolver,
+        args,
         accounts,
         idlIx,
       });

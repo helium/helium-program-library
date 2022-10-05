@@ -127,50 +127,21 @@ describe("hotspot-issuance", () => {
       treasury: PublicKey;
     };
     dataCredits: {
+      dcKey: PublicKey;
       hntMint: PublicKey;
+      hntBal: number;
       dcMint: PublicKey;
-      dataCredits: PublicKey;
+      dcBal: number;
     };
   }> => {
-    const {
-      mint: daoMint,
-      dao,
-      treasury: daoTreasury,
-    } = await initTestDao(hsdProgram, provider);
-
-    const {
-      mint: subDaoMint,
-      subDao,
-      collection,
-      treasury: subDaoTreasury,
-    } = await initTestSubdao(hsdProgram, provider, dao);
-
-    const { hntMint, dcMint, dataCredits } = await initTestDataCredits(
-      dcProgram,
-      provider,
-      100
-    );
-
-    // mint some hnt
-    await createAtaAndMint(provider, hntMint, toBN(100, 8).toNumber(), me);
+    const dao = await initTestDao(hsdProgram, provider);
+    const subDao = await initTestSubdao(hsdProgram, provider, dao.dao);
+    const dataCredits = await initTestDataCredits(dcProgram, provider);
 
     return {
-      dao: {
-        mint: daoMint,
-        dao: dao,
-        treasury: daoTreasury,
-      },
-      subDao: {
-        mint: subDaoMint,
-        subDao,
-        collection,
-        treasury: subDaoTreasury,
-      },
-      dataCredits: {
-        hntMint,
-        dcMint,
-        dataCredits: dataCredits!,
-      },
+      dao,
+      subDao,
+      dataCredits,
     };
   };
 
@@ -210,15 +181,12 @@ describe("hotspot-issuance", () => {
   });
 
   describe("with hotspot issuer", async () => {
-    describe("without data credits", async () => {
-      it("dosent issue a hotspot");
-    });
     describe("with data credits", async () => {
       before(async () => {
         const ix = await mintDataCreditsInstructions({
           program: dcProgram,
           provider,
-          amount: 100,
+          amount: 1,
         });
 
         console.log("Minting Datacredits to me");
@@ -243,41 +211,41 @@ describe("hotspot-issuance", () => {
           hotspotConfig
         );
 
-        // const method = await hsProgram.methods
-        //   .issueHotspotV0({
-        //     name: "Helium Network Hotspot",
-        //     symbol: "MOBILE",
-        //     metadataUrl: DEFAULT_METADATA_URL,
-        //     eccCompact: ecc.toBuffer(),
-        //     location: "Chicago",
-        //   })
-        //   .accounts({
-        //     payer: me,
-        //     dcFeePayer: me,
-        //     onboardingServer: onboardingServerKeypair.publicKey,
-        //     maker: makerKeypair.publicKey,
-        //     hotspotOwner: hotspotOwner,
-        //     collection,
-        //     dcMint: dcMint,
-        //     subDao: subDao,
-        //     tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
-        //     dataCreditsProgram: DATA_CREDITS_PROGRAM_ID,
-        //     subDoasProgram: HELIUM_SUB_DAOS_PROGRAM_ID,
-        //   })
-        //   .signers([onboardingServerKeypair, makerKeypair]);
+        const method = await hsProgram.methods
+          .issueHotspotV0({
+            name: "Helium Network Hotspot",
+            symbol: "MOBILE",
+            metadataUrl: DEFAULT_METADATA_URL,
+            eccCompact: ecc.toBuffer(),
+            location: "Chicago",
+          })
+          .accounts({
+            payer: me,
+            dcFeePayer: me,
+            onboardingServer: onboardingServerKeypair.publicKey,
+            maker: makerKeypair.publicKey,
+            hotspotOwner: hotspotOwner,
+            collection,
+            dcMint: dcMint,
+            subDao: subDao,
+            tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+            dataCreditsProgram: DATA_CREDITS_PROGRAM_ID,
+            subDoasProgram: HELIUM_SUB_DAOS_PROGRAM_ID,
+          })
+          .signers([onboardingServerKeypair, makerKeypair]);
 
-        // const { hotspot } = await method.pubkeys();
+        const { hotspot } = await method.pubkeys();
 
-        // await method.rpc();
+        await method.rpc();
 
-        // const ata = await getAssociatedTokenAddress(hotspot!, hotspotOwner);
-        // const ataBal = await provider.connection.getTokenAccountBalance(ata);
-        // const issuerAccount = await hsProgram.account.hotspotIssuerV0.fetch(
-        //   hotspotIssuer
-        // );
+        const ata = await getAssociatedTokenAddress(hotspot!, hotspotOwner);
+        const ataBal = await provider.connection.getTokenAccountBalance(ata);
+        const issuerAccount = await hsProgram.account.hotspotIssuerV0.fetch(
+          hotspotIssuer
+        );
 
-        // expect(ataBal.value.uiAmount).eq(1);
-        // expect(issuerAccount.count.toNumber()).eq(1);
+        expect(ataBal.value.uiAmount).eq(1);
+        expect(issuerAccount.count.toNumber()).eq(1);
       });
     });
   });

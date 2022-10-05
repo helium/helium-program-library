@@ -20,13 +20,13 @@ export const initTestDataCredits = async (
   provider: anchor.AnchorProvider,
   startingHntbal: number = 100
 ): Promise<{
+  dcKey: PublicKey;
   hntMint: PublicKey;
   dcMint: PublicKey;
-  dataCredits: PublicKey;
   hntBal: number;
   dcBal: number;
 }> => {
-  const dataCredits = dataCreditsKey()[0];
+  const dcKey = dataCreditsKey()[0];
   const me = provider.wallet.publicKey;
   const [tokenAuth] = tokenAuthorityKey();
   let hntMint;
@@ -36,7 +36,7 @@ export const initTestDataCredits = async (
 
   if (await isInitialized(program)) {
     // accounts for rerunning tests on same localnet
-    const dcAcc = await program.account.dataCreditsV0.fetch(dataCredits);
+    const dcAcc = await program.account.dataCreditsV0.fetch(dcKey);
     hntMint = dcAcc.hntMint;
     dcMint = dcAcc.dcMint;
 
@@ -70,7 +70,7 @@ export const initTestDataCredits = async (
     await initDataCredits.rpc();
   }
 
-  return { hntMint, hntBal, dcMint, dcBal, dataCredits: dataCredits };
+  return { dcKey, hntMint, hntBal, dcMint, dcBal };
 };
 
 describe("data-credits", () => {
@@ -89,14 +89,12 @@ describe("data-credits", () => {
   });
 
   it("initializes data credits", async () => {
-    const { dataCredits, dcMint, hntMint } = await initTestDataCredits(
+    const { dcKey, dcMint, hntMint } = await initTestDataCredits(
       program,
       provider
     );
 
-    const dataCreditsAcc = await program.account.dataCreditsV0.fetch(
-      dataCredits
-    );
+    const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dcKey);
 
     const [tokenAuth, tokenAuthBump] = tokenAuthorityKey();
 
