@@ -1,4 +1,4 @@
-import { HeliumSubDaos } from "../../../target/types/helium_sub_daos";
+import { HeliumSubDaos } from "@helium-foundation/idls/lib/esm/helium_sub_daos";
 import { PublicKey } from "@solana/web3.js";
 import { AnchorProvider, Program } from "@project-serum/anchor";
 import { PROGRAM_ID } from "./constants";
@@ -20,3 +20,5 @@ export async function init(
   ) as Program<HeliumSubDaos>;
   return dataCredits;
 }
+
+export * from "./pdas";

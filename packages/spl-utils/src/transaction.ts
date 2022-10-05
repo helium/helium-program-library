@@ -238,7 +238,6 @@ export const awaitTransactionSignatureConfirmation = async (
       reject({ timeout: true });
     }, timeout);
     try {
-      console.log("COMMIMENT", commitment);
       subId = connection.onSignature(
         txid,
         (result: any, context: any) => {
@@ -252,7 +251,6 @@ export const awaitTransactionSignatureConfirmation = async (
             console.log("Rejected via websocket", result.err);
             reject(status);
           } else {
-            console.log("Resolved via websocket", result);
             resolve(status);
           }
         },
@@ -272,7 +270,6 @@ export const awaitTransactionSignatureConfirmation = async (
           status = signatureStatuses && signatureStatuses.value[0];
           if (!done) {
             if (!status) {
-              console.log("REST null result for", txid, status);
             } else if (status.err) {
               console.log("REST error for", txid, status);
               done = true;
@@ -309,7 +306,6 @@ export const awaitTransactionSignatureConfirmation = async (
     connection.removeSignatureListener(subId);
   }
   done = true;
-  console.log("Returning status ", status);
   return status;
 };
 

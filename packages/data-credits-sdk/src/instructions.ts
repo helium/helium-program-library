@@ -1,5 +1,5 @@
 import { toBN } from "@helium-foundation/spl-utils";
-import { DataCredits } from "../../../target/types/data_credits";
+import { DataCredits } from "@helium-foundation/idls/lib/esm/data_credits";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import {
   AnchorProvider,
