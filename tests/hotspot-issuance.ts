@@ -116,6 +116,8 @@ describe("hotspot-issuance", () => {
       anchor.workspace.HotspotIssuance.programId,
       anchor.workspace.HotspotIssuance.idl
     );
+
+    await initWorld();
   });
 
   const initWorld = async (): Promise<{
@@ -180,11 +182,11 @@ describe("hotspot-issuance", () => {
     expect(account.maker.toBase58()).eq(makerKeypair.publicKey.toBase58());
   });
 
-  describe("with issuer and data credits", async () => {
+  describe("with issuer and data credits", () => {
     let dcMint: PublicKey;
     let subDao: PublicKey;
 
-    beforeEach(async () => {
+    before(async () => {
       const ix = await mintDataCreditsInstructions({
         program: dcProgram,
         provider,
