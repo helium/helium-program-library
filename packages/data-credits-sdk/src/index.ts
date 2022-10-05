@@ -6,6 +6,7 @@ import {
 } from "@project-serum/anchor";
 import { PROGRAM_ID } from "./constants";
 import { ataResolver, combineResolvers } from "@helium-foundation/spl-utils";
+import { dataCreditsKey } from "./pdas";
 
 
 export async function init(provider: AnchorProvider, dataCreditsProgramId: PublicKey = PROGRAM_ID, dataCreditsIdl?: any): Promise<Program<DataCredits>> {
