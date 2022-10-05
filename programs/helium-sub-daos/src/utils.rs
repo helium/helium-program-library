@@ -12,7 +12,7 @@ pub trait OrArithError<T> {
 
 impl OrArithError<PreciseNumber> for Option<PreciseNumber> {
   fn or_arith_error(self) -> Result<PreciseNumber> {
-    self.ok_or(ErrorCode::ArithmeticError.into())
+    self.ok_or_else(|| ErrorCode::ArithmeticError.into())
   }
 }
 

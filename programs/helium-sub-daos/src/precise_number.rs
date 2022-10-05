@@ -1,6 +1,7 @@
 //! Defines PreciseNumber, a U256 wrapper with float-like operations
 
 use crate::uint::U256;
+use std::cmp::Ordering;
 
 // Allows for easy swapping between different internal representations
 pub type InnerUint = U256;
@@ -9,10 +10,16 @@ pub type InnerUint = U256;
 pub const ONE: u128 = 1_000_000_000_000;
 
 /// Struct encapsulating a fixed-point number that allows for decimal calculations
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PreciseNumber {
   /// Wrapper over the inner value, which is multiplied by ONE
   pub value: InnerUint,
+}
+
+impl PartialOrd for PreciseNumber {
+  fn partial_cmp(&self, other: &PreciseNumber) -> Option<Ordering> {
+    Some(self.cmp(other))
+  }
 }
 
 impl Ord for PreciseNumber {

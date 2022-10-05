@@ -57,9 +57,9 @@ fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
 
 pub fn handler(ctx: Context<IssueRewardsV0>, _args: IssueRewardsArgsV0) -> Result<()> {
   let utility_score = to_prec(ctx.accounts.sub_dao_epoch_info.utility_score)
-    .ok_or(error!(ErrorCode::NoUtilityScore))?;
+    .ok_or_else(|| error!(ErrorCode::NoUtilityScore))?;
   let total_utility_score = to_prec(Some(ctx.accounts.dao_epoch_info.total_utility_score))
-    .ok_or(error!(ErrorCode::NoUtilityScore))?;
+    .ok_or_else(|| error!(ErrorCode::NoUtilityScore))?;
 
   let percent_share = utility_score
     .checked_div(&total_utility_score)
@@ -71,7 +71,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, _args: IssueRewardsArgsV0) -> Resul
     .floor() // Ensure we never overspend the defined rewards
     .or_arith_error()?
     .to_imprecise()
-    .ok_or(error!(ErrorCode::ArithmeticError))?
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?
     .try_into()
     .unwrap();
 
