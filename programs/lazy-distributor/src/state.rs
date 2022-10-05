@@ -10,7 +10,6 @@ pub struct OracleConfigV0 {
 #[derive(Default)]
 pub struct LazyDistributorV0 {
   pub version: u16, // Track version so we can invalidate all reward receipts if the config changes
-  pub rewards_account: Pubkey,
   pub rewards_mint: Pubkey,
   pub collection: Pubkey, // The metaplex collection of hotspot NFTs
   pub authority: Pubkey,

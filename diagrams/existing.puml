@@ -1,0 +1,83 @@
+@startuml
+
+skinparam linetype polyline
+
+frame helium {
+}
+
+collections price_oracles [
+  HNT Price oracles
+]
+
+agent wallet [
+  Wallet App
+]
+
+agent maker [
+  Maker App
+]
+
+agent onboarding [
+  Onboarding Server
+]
+
+agent wallet_api [
+  Wallet API
+]
+
+agent explorer_etl [
+  Explorer Etl
+]
+
+agent explorer_api [
+  Explorer API
+]
+
+agent explorer [
+  Explorer
+]
+
+database postgres [
+  Postgres
+]
+
+agent cli [
+  HNT Wallet Cli
+]
+
+agent hotspot_app [
+  Hotspot App
+]
+
+agent hotspot_api [
+  Hotspot Api
+]
+
+
+maker <-> onboarding : issue hotspot, assert location tx
+
+maker --> helium : issue hotspot, assert location tx
+
+price_oracles --> helium
+
+postgres <-> wallet_api
+
+wallet_api --> wallet
+
+explorer_api <- postgres
+
+explorer_api --> explorer
+
+helium --> wallet_api : account activity, balances, rewards, votes, notifications, hotspots
+
+helium --> explorer_etl
+explorer_etl --> postgres
+
+cli --> helium : assert location tx
+hotspot_app --> helium : assert location tx
+
+hotspot_api --> hotspot_app
+postgres <-> hotspot_api
+
+
+@enduml
