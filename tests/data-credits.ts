@@ -2,7 +2,7 @@ import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { assert } from "chai";
-import { init, dataCreditsKey, tokenAuthorityKey, mintDataCreditsInstructions, burnDataCreditsInstructions, isInitialized } from "../packages/data-credits-sdk/src";
+import { init, dataCreditsKey, mintDataCreditsInstructions, burnDataCreditsInstructions, isInitialized } from "../packages/data-credits-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { createAtaAndMint, createMint, mintTo } from "./utils/token";
 import {
@@ -41,9 +41,8 @@ describe("data-credits", () => {
       }
     } else {
       // fresh start
-      const [tokenAuth] = tokenAuthorityKey();
       hntMint = await createMint(provider, hntDecimals, me, me);
-      dcMint = await createMint(provider, dcDecimals, tokenAuth, tokenAuth);
+      dcMint = await createMint(provider, dcDecimals, dcKey, dcKey);
       await createAtaAndMint(provider, hntMint, toBN(startHntBal, hntDecimals).toNumber(), me);
       await program.methods.initializeDataCreditsV0({authority: me}).accounts({hntMint, dcMint, payer: me}).rpc();
     }
@@ -51,13 +50,11 @@ describe("data-credits", () => {
 
   it("initializes data credits", async () => {
     const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dcKey);
-    const [tokenAuth, tokenAuthBump] = tokenAuthorityKey();
-
+    const [dc, dcBump] = dataCreditsKey();
     assert(dataCreditsAcc?.dcMint.equals(dcMint));
     assert(dataCreditsAcc?.hntMint.equals(hntMint));
     assert(dataCreditsAcc?.authority.equals(me));
-    assert(dataCreditsAcc?.tokenAuthority.equals(tokenAuth));
-    assert(dataCreditsAcc?.tokenAuthorityBump == tokenAuthBump);
+    assert(dataCreditsAcc?.dataCreditsBump == dcBump);
   });
 
   describe("with data credits", async() => {
