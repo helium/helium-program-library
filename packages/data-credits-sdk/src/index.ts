@@ -3,6 +3,7 @@ import { DataCredits } from "../../../target/types/data_credits";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { dataCreditsResolvers } from "./resolvers";
+import { dataCreditsKey } from "./pdas";
 export * from "./instructions";
 export * from "./pdas";
 export * from "./constants";
@@ -26,3 +27,8 @@ export async function init(
 
   return dataCredits;
 }
+
+export const isInitialized = async (program: Program<DataCredits>) =>
+  (await program.provider.connection.getAccountInfo(dataCreditsKey()[0]))
+    ? true
+    : false;
