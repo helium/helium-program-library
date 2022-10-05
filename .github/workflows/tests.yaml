@@ -1,0 +1,89 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+env:
+  SOLANA_CLI_VERSION: 1.10.29
+  NODE_VERSION: 17.0.1
+
+jobs:
+  test-rust-lint:
+    name: Test Rust Lint
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/setup/
+      - uses: actions/cache@v2
+        name: Cache Cargo registry + index
+        id: cache-cargo-build
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo fmt -- --check
+      - run: cargo clippy --all-targets -- -D warnings
+
+  test-unit:
+    name: Rust Unit Tests
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/setup/
+      - uses: actions/cache@v2
+        name: Cache Cargo registry + index
+        id: cache-cargo-build
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo test --lib
+
+
+  test-contracts:
+    name: Test Anchor Contracts
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/setup/
+      - uses: ./.github/actions/setup-anchor/
+      - uses: ./.github/actions/setup-ts/
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/cache@v2
+        name: Cache Cargo registry + index
+        id: cache-cargo-registry
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/cache@v2
+        name: Cache Builds
+        id: cache-cargo-builds
+        with:
+          path: |
+            ./target/
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('./**/Cargo.lock') }}-target
+      - name: Cache Deps Builds
+        uses: actions/cache@v2
+        id: cache-cargo-deps-builds
+        with:
+          path: |
+            ./deps/metaplex-program-library/target
+            ./deps/solana-program-library/target
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('./deps/**/Cargo.lock') }}-deps
+      - run: ~/.cargo/bin/anchor run build-deps
+      - run: ~/.cargo/bin/anchor test --provider.cluster localnet
