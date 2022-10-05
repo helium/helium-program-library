@@ -86,4 +86,4 @@ jobs:
             ./deps/solana-program-library/target
           key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('./deps/**/Cargo.lock') }}-deps
       - run: ~/.cargo/bin/anchor run build-deps
-      - run: ~/.cargo/bin/anchor test --provider.cluster localnet
+      - run: ~/.cargo/bin/anchor test --provider.cluster localnet --provider.wallet ~/.config/solana/id.json
