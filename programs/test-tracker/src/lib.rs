@@ -38,7 +38,7 @@ pub mod test_tracker {
       CpiContext::new_with_signer(
         ctx.accounts.helium_sub_daos.to_account_info(),
         ctx.accounts.tracker_accounts.unwrap(),
-        &[&["dc_token_auth".as_bytes(), &[bump]]],
+        &[&["dc".as_bytes(), &[bump]]],
       ),
       TrackDcBurnArgsV0 {
         authority_bump: bump,
@@ -86,7 +86,8 @@ pub struct TrackAddedDeviceV0Wrapper<'info> {
   /// CHECK: Verified by cpi
   pub sub_dao: AccountInfo<'info>,
   #[account(
-    seeds = [b"hotspot_issuance", collection.as_ref()],
+    mut,
+    seeds = ["hotspot_issuance".as_bytes(), collection.as_ref()],
     bump,
   )]
   /// CHECK: Verified by cpi
@@ -124,7 +125,7 @@ pub struct TrackDcBurnV0Wrapper<'info> {
   pub sub_dao: AccountInfo<'info>,
   #[account(
     mut,
-    seeds = [b"dc_token_auth"],
+    seeds = ["dc".as_bytes()],
     bump,
   )]
   /// CHECK: Verified by cpi
