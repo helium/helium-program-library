@@ -27,7 +27,8 @@ pub struct HotspotIssuerV0 {
 #[derive(Default)]
 pub struct HotspotStorageV0 {
   pub ecc_compact: Vec<u8>,
-  pub location: String,
+
+  pub location: Option<String>,
   pub authority: Pubkey,
   
   pub bump_seed: u8,

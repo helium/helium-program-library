@@ -25,11 +25,7 @@ use helium_sub_daos::{
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHotspotV0Args {
-  pub name: String,
-  pub symbol: String,
-  pub metadata_url: String,
   pub ecc_compact: Vec<u8>,
-  pub location: String,
 }
 
 #[derive(Accounts)]
@@ -204,10 +200,6 @@ pub fn handler(
   ctx: Context<IssueHotspotV0>,
   args: IssueHotspotV0Args,
 ) -> Result<()> {
-  require!(args.name.len() <= 32, ErrorCode::InvalidStringLength);
-  require!(args.symbol.len() <= 10, ErrorCode::InvalidStringLength);
-  require!(args.metadata_url.len() <= 200, ErrorCode::InvalidStringLength);
-
   let signer_seeds: &[&[&[u8]]] = &[&[
     b"hotspot_issuer",
     ctx.accounts.hotspot_config.to_account_info().key.as_ref(),
@@ -240,9 +232,9 @@ pub fn handler(
       signer_seeds
     ),
     CreateMetadataAccountArgs {
-      name: args.name,
-      symbol: args.symbol,
-      uri: args.metadata_url,
+      name: String::from("feisty-glass-dalmatian"),
+      symbol: String::from("HOTSPOT"),
+      uri: String::from("https://c3zu2nc2m4x6zvqf5lofrtdbsa4niuh6drvzi7lq4n465ykbd3fa.arweave.net/FvNNNFpnL-zWBercWMxhkDjUUP4ca5R9cON57uFBHso/"),
       collection: Some(Collection {
         key: ctx.accounts.collection.key(),
         verified: false
@@ -308,7 +300,7 @@ pub fn handler(
 
   ctx.accounts.storage.set_inner(HotspotStorageV0 {
     ecc_compact: args.ecc_compact,
-    location: args.location,
+    location: None,
     authority: ctx.accounts.hotspot.key(),
     
     bump_seed: ctx.bumps["storage"],
