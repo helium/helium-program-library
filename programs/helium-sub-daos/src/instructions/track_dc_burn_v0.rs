@@ -1,5 +1,5 @@
 use crate::state::*;
-use crate::utils::{current_epoch};
+use crate::utils::current_epoch;
 use anchor_lang::prelude::*;
 use std::str::FromStr;
 
@@ -25,7 +25,7 @@ pub struct TrackDcBurnV0<'info> {
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
     mut,
-    seeds = [b"dc_token_auth"],
+    seeds = [b"dc"],
     seeds::program = Pubkey::from_str(DC_KEY).unwrap(),
     bump = args.authority_bump,
   )]

@@ -1,11 +1,10 @@
 use crate::{error::ErrorCode, precise_number::PreciseNumber};
-use std::{io::Write, convert::TryInto};
+use std::{convert::TryInto, io::Write};
 
 use anchor_lang::{
   prelude::*,
   solana_program::{entrypoint::MAX_PERMITTED_DATA_INCREASE, program::invoke, system_instruction},
 };
-
 
 pub trait OrArithError<T> {
   fn or_arith_error(self) -> Result<T>;
@@ -13,7 +12,7 @@ pub trait OrArithError<T> {
 
 impl OrArithError<PreciseNumber> for Option<PreciseNumber> {
   fn or_arith_error(self) -> Result<PreciseNumber> {
-    self.ok_or(ErrorCode::ArithmeticError.into())
+    self.ok_or_else(|| ErrorCode::ArithmeticError.into())
   }
 }
 

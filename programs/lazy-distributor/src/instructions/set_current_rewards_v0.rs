@@ -33,7 +33,8 @@ pub fn handler(ctx: Context<SetRewardsV0>, args: SetRewardsV0Args) -> Result<()>
       vec![None; ctx.accounts.lazy_distributor.oracles.len()];
   }
 
-  ctx.accounts.recipient.current_rewards[usize::try_from(args.oracle_index).unwrap()] = Some(args.current_rewards);
+  ctx.accounts.recipient.current_rewards[usize::try_from(args.oracle_index).unwrap()] =
+    Some(args.current_rewards);
 
   resize_to_fit(
     &ctx.accounts.payer.to_account_info(),

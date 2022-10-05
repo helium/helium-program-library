@@ -1,7 +1,10 @@
-use crate::state::*;
 use crate::error::ErrorCode;
+use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::{token::{TokenAccount, Token, Mint, self, MintTo}, associated_token::AssociatedToken};
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token::{self, Mint, MintTo, Token, TokenAccount},
+};
 
 #[derive(Accounts)]
 pub struct DistributeRewardsV0<'info> {
@@ -17,9 +20,7 @@ pub struct DistributeRewardsV0<'info> {
     constraint = recipient.current_rewards.iter().flatten().count() >= ((lazy_distributor.oracles.len() + 1) / 2)
   )]
   pub recipient: Box<Account<'info, RecipientV0>>,
-  #[account(
-    mut
-  )]
+  #[account(mut)]
   pub rewards_mint: Box<Account<'info, Mint>>,
   #[account(
     constraint = recipient_mint_account.mint == recipient.mint,
@@ -39,7 +40,7 @@ pub struct DistributeRewardsV0<'info> {
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
-  pub rent: Sysvar<'info, Rent>
+  pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(ctx: Context<DistributeRewardsV0>) -> Result<()> {
@@ -50,15 +51,21 @@ pub fn handler(ctx: Context<DistributeRewardsV0>) -> Result<()> {
     &[ctx.accounts.lazy_distributor.bump_seed],
   ]];
   let recipient = &mut ctx.accounts.recipient;
-  let mut filtered: Vec<u64> = recipient.current_rewards.clone().into_iter().flatten().collect();
-  filtered.sort();
+  let mut filtered: Vec<u64> = recipient
+    .current_rewards
+    .clone()
+    .into_iter()
+    .flatten()
+    .collect();
+  filtered.sort_unstable();
   let median_idx = filtered.len() / 2;
   let median = filtered[median_idx];
 
   recipient.current_rewards = vec![None; ctx.accounts.lazy_distributor.oracles.len()];
-  let to_dist = median.checked_sub(recipient.total_rewards).ok_or_else( || error!(ErrorCode::ArithmeticError))?;
+  let to_dist = median
+    .checked_sub(recipient.total_rewards)
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
   recipient.total_rewards = median;
-
 
   token::mint_to(
     CpiContext::new_with_signer(

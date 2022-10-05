@@ -33,10 +33,6 @@ pub struct MintDataCreditsV0<'info> {
   /// CHECK: DC credits sent here
   pub recipient: AccountInfo<'info>,
 
-  #[account(seeds=["dc_token_auth".as_bytes()], bump=data_credits.token_authority_bump)]
-  ///CHECK: seeds verified and cpi calls will be unauthorised if incorrect
-  pub token_authority: AccountInfo<'info>,
-
   #[account(mut)]
   pub owner: Signer<'info>,
 
@@ -65,7 +61,7 @@ impl<'info> MintDataCreditsV0<'info> {
     let cpi_accounts = ThawAccount {
       account: self.recipient_token_account.to_account_info(),
       mint: self.dc_mint.to_account_info(),
-      authority: self.token_authority.to_account_info(),
+      authority: self.data_credits.to_account_info(),
     };
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
@@ -74,7 +70,7 @@ impl<'info> MintDataCreditsV0<'info> {
     let cpi_accounts = MintTo {
       mint: self.dc_mint.to_account_info(),
       to: self.recipient_token_account.to_account_info(),
-      authority: self.token_authority.to_account_info(),
+      authority: self.data_credits.to_account_info(),
     };
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
@@ -83,17 +79,14 @@ impl<'info> MintDataCreditsV0<'info> {
     let cpi_accounts = FreezeAccount {
       account: self.recipient_token_account.to_account_info(),
       mint: self.dc_mint.to_account_info(),
-      authority: self.token_authority.to_account_info(),
+      authority: self.data_credits.to_account_info(),
     };
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 }
 
 pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsV0Args) -> Result<()> {
-  let signer_seeds: &[&[&[u8]]] = &[&[
-    b"dc_token_auth",
-    &[ctx.accounts.data_credits.token_authority_bump],
-  ]];
+  let signer_seeds: &[&[&[u8]]] = &[&[b"dc", &[ctx.accounts.data_credits.data_credits_bump]]];
 
   // burn the hnt tokens
   token::burn(ctx.accounts.burn_ctx(), args.amount)?;

@@ -37,11 +37,6 @@ pub fn handler(
   ctx.accounts.data_credits.hnt_mint = ctx.accounts.hnt_mint.key();
   ctx.accounts.data_credits.authority = args.authority;
 
-  let (token_auth, token_auth_bump) =
-    Pubkey::find_program_address(&["dc_token_auth".as_ref()], ctx.program_id);
-
-  ctx.accounts.data_credits.token_authority = token_auth;
-  ctx.accounts.data_credits.token_authority_bump = token_auth_bump;
   ctx.accounts.data_credits.data_credits_bump = *ctx
     .bumps
     .get("data_credits")
