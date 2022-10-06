@@ -15,7 +15,6 @@ pub struct IssueRewardsArgsV0 {
 #[derive(Accounts)]
 #[instruction(args: IssueRewardsArgsV0)]
 pub struct IssueRewardsV0<'info> {
-  #[account()]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
     has_one = dao,

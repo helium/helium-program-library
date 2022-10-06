@@ -2,7 +2,8 @@ import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { assert } from "chai";
-import { init, dataCreditsKey, mintDataCreditsInstructions, burnDataCreditsInstructions, isInitialized } from "../packages/data-credits-sdk/src";
+import { init, dataCreditsKey, mintDataCreditsInstructions, burnDataCreditsInstructions, isInitialized, accountPayerKey } from "../packages/data-credits-sdk/src";
+import * as hsd from "../packages/helium-sub-daos-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { createAtaAndMint, createMint, mintTo } from "./utils/token";
 import {
@@ -10,13 +11,19 @@ import {
   getAccount,
   getMint,
 } from "@solana/spl-token";
-import { toBN, execute } from "@helium-foundation/spl-utils";
+import { toBN, toNumber, execute } from "../packages/spl-utils/src";
 import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
+import { initTestDao, initTestSubdao } from "./utils/daos";
+import { HeliumSubDaos } from "../target/types/helium_sub_daos";
+import * as web3 from "@solana/web3.js";
+
+const EPOCH_REWARDS = 100000000;
 
 describe("data-credits", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
   let program: Program<DataCredits>;
+  let hsdProgram: Program<HeliumSubDaos>;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
 
@@ -28,7 +35,9 @@ describe("data-credits", () => {
   let startDcBal = 0;
   let dcKey: PublicKey;
   before(async () => {
+    console.log(anchor.workspace.DataCredits.idl);
     program = await init(provider, PROGRAM_ID, anchor.workspace.DataCredits.idl);
+    hsdProgram = await hsd.init(provider, hsd.PROGRAM_ID, anchor.workspace.HeliumSubDaos.idl);
     dcKey = dataCreditsKey()[0];
     if (await isInitialized(program)) {
       // accounts for rerunning tests on same localnet
@@ -50,7 +59,7 @@ describe("data-credits", () => {
 
   it("initializes data credits", async () => {
     const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dcKey);
-    const [dc, dcBump] = dataCreditsKey();
+    const [_, dcBump] = dataCreditsKey();
     assert(dataCreditsAcc?.dcMint.equals(dcMint));
     assert(dataCreditsAcc?.hntMint.equals(hntMint));
     assert(dataCreditsAcc?.authority.equals(me));
@@ -58,6 +67,12 @@ describe("data-credits", () => {
   });
 
   describe("with data credits", async() => {
+    let dao: PublicKey;
+    let subDao: PublicKey
+    before(async () => {
+      ({ dao } = await initTestDao(hsdProgram, provider, EPOCH_REWARDS, me));
+      ({ subDao } = await initTestSubdao(hsdProgram, provider, me, dao));
+    })
     it("mints some data credits", async () => {
       const ix = await mintDataCreditsInstructions({
         program,
@@ -77,10 +92,15 @@ describe("data-credits", () => {
     })
 
     it("burns some data credits", async() => {
+      await provider.connection.requestAirdrop(
+        accountPayerKey()[0],
+        web3.LAMPORTS_PER_SOL,
+      );
       const ix = await burnDataCreditsInstructions({
         program,
         provider,
         amount: 1,
+        subDao,
       });
       await execute(program, provider, ix);
 
@@ -90,6 +110,13 @@ describe("data-credits", () => {
       assert(dcAtaAcc.isFrozen);
       const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
       assert(dcBal.value.uiAmount == startDcBal);
+
+      // check that epoch info was tracked correctly
+      const epochInfo = await hsdProgram.account.subDaoEpochInfoV0.fetch(
+        ix.output.subDaoEpochInfo
+      );
+      const numBurned = toNumber(epochInfo.dcBurned, dcDecimals);
+      assert.equal(numBurned, 1);
     })
   })
 });

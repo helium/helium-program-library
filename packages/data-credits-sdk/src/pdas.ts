@@ -18,3 +18,12 @@ export function tokenAuthorityKey(programId: PublicKey = PROGRAM_ID): [PublicKey
     programId
   );
 }
+
+export function accountPayerKey(
+  programId: PublicKey = PROGRAM_ID
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("account_payer", "utf-8")],
+    programId
+  )
+}

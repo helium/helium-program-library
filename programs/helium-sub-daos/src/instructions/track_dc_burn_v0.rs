@@ -3,12 +3,12 @@ use crate::utils::current_epoch;
 use anchor_lang::prelude::*;
 use std::str::FromStr;
 
-pub const DC_KEY: &str = "tes8BDewkpUpfqx7VDXUJzTFugjqHJugCEBP5sDrrCf";
+pub const DC_KEY: &str = "5BAQuzGE1z8CTcrSdfbfdBF2fdXrwb4iMcxDMrvhz8L8";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TrackDcBurnArgsV0 {
   pub dc_burned: u64,
-  pub authority_bump: u8,
+  pub bump: u8,
 }
 
 #[derive(Accounts)]
@@ -16,20 +16,21 @@ pub struct TrackDcBurnArgsV0 {
 pub struct TrackDcBurnV0<'info> {
   #[account(
     init_if_needed,
-    payer = authority,
+    payer = account_payer,
     space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(clock.unix_timestamp).to_le_bytes()], // Break into 30m epochs
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
+
   #[account(
     mut,
-    seeds = [b"dc"],
+    seeds = ["account_payer".as_bytes()],
     seeds::program = Pubkey::from_str(DC_KEY).unwrap(),
-    bump = args.authority_bump,
+    bump = args.bump,
   )]
-  pub authority: Signer<'info>,
+  pub account_payer: Signer<'info>, // can't be a HSD PDA because init_if_needed can't be used
   pub system_program: Program<'info, System>,
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,

@@ -7,18 +7,19 @@ import {
 import { PROGRAM_ID } from "./constants";
 import { ataResolver, combineResolvers } from "@helium-foundation/spl-utils";
 import { dataCreditsKey } from "./pdas";
+import { heliumSubDaosResolvers } from "../../helium-sub-daos-sdk/src";
 
 
-export async function init(provider: AnchorProvider, dataCreditsProgramId: PublicKey = PROGRAM_ID, dataCreditsIdl?: any): Promise<Program<DataCredits>> {
-  if (!dataCreditsIdl) {
-    dataCreditsIdl = await Program.fetchIdl(
-      dataCreditsProgramId,
+export async function init(provider: AnchorProvider, programId: PublicKey = PROGRAM_ID, idl?: any): Promise<Program<DataCredits>> {
+  if (!idl) {
+    idl = await Program.fetchIdl(
+      programId,
       provider
     );
   }
   const dataCredits = new Program<DataCredits>(
-    dataCreditsIdl as DataCredits,
-    dataCreditsProgramId,
+    idl as DataCredits,
+    programId,
     provider,
     undefined,
     () => {
@@ -34,7 +35,8 @@ export async function init(provider: AnchorProvider, dataCreditsProgramId: Publi
           account: "burner",
           mint: "hntMint",
           owner: "owner",
-        })
+        }),
+        heliumSubDaosResolvers,
       )
     }
   ) as Program<DataCredits>;
