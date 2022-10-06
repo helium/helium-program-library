@@ -238,6 +238,7 @@ describe("helium-sub-daos", () => {
               .accounts({
                 subDao,
                 dao,
+                treasury,
               })
               .instruction(),
           ]);
