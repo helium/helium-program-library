@@ -1,86 +1,31 @@
-import { HeliumSubDaos } from "@helium-foundation/idls/lib/types/helium_sub_daos";
-import { TestTracker } from "@helium-foundation/idls/lib/types/test_tracker";
-import { sendInstructions, toBN } from "@helium-foundation/spl-utils";
-import { Keypair as HeliumKeypair } from "@helium/crypto";
+import { sendInstructions } from "@helium-foundation/spl-utils";
+import { AccountLayout } from "@solana/spl-token";
 import * as anchor from "@project-serum/anchor";
 import { BN, Program } from "@project-serum/anchor";
-import { AccountLayout } from "@solana/spl-token";
-import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import { SystemProgram, PublicKey, Keypair } from "@solana/web3.js";
 import { expect } from "chai";
-import { init as dcInit } from "../packages/data-credits-sdk/src";
 import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
-import { init as issuerInit } from "../packages/hotspot-issuance-sdk/src";
+import { HeliumSubDaos } from "../target/types/helium_sub_daos";
+import { TestTracker } from "../target/types/test_tracker";
+import { createAtaAndMint, createMint, mintTo } from "./utils/token";
+import { initTestDao, initTestSubdao } from "./utils/daos";
 import { DataCredits } from "../target/types/data_credits";
-import { HotspotIssuance } from "../target/types/hotspot_issuance";
-import { ensureDCIdl, initWorld } from "./utils/fixtures";
+import * as dc from "../packages/data-credits-sdk/src";
+import { burnDataCreditsInstructions } from "../packages/data-credits-sdk/src";
 import {
-  createAtaAndMint,
-  createMint,
-  createTestNft,
-  mintTo,
-} from "./utils/token";
+  getAssociatedTokenAddress,
+  getAccount,
+  getMint,
+} from "@solana/spl-token";
+import { toBN, toNumber, execute } from "../packages/spl-utils/src";
 
 const EPOCH_REWARDS = 100000000;
-
-export const initTestDao = async (
-  program: Program<HeliumSubDaos>,
-  provider: anchor.AnchorProvider
-): Promise<{
-  mint: PublicKey;
-  dao: PublicKey;
-  treasury: PublicKey;
-}> => {
-  const me = provider.wallet.publicKey;
-  const mint = await createMint(provider, 6, me, me);
-  const method = await program.methods
-    .initializeDaoV0({
-      authority: me,
-      rewardPerEpoch: new BN(EPOCH_REWARDS),
-    })
-    .accounts({
-      mint,
-    });
-  const { dao, treasury } = await method.pubkeys();
-  await method.rpc();
-
-  return { mint, dao: dao!, treasury: treasury! };
-};
-
-export const initTestSubdao = async (
-  program: Program<HeliumSubDaos>,
-  provider: anchor.AnchorProvider,
-  dao: PublicKey,
-  collection: PublicKey
-): Promise<{
-  mint: PublicKey;
-  subDao: PublicKey;
-  treasury: PublicKey;
-}> => {
-  const me = provider.wallet.publicKey;
-  const daoAcc = await program.account.daoV0.fetch(dao);
-  const subDaoMint = await createMint(provider, 6, me, me);
-  const treasury = await createAtaAndMint(provider, daoAcc.mint, 0);
-  const method = await program.methods
-    .initializeSubDaoV0({
-      authority: me,
-    })
-    .accounts({
-      dao,
-      subDaoMint,
-      hotspotCollection: collection,
-      treasury,
-      mint: daoAcc.mint,
-    });
-  const { subDao } = await method.pubkeys();
-  await method.rpc();
-
-  return { mint: subDaoMint, subDao: subDao!, treasury };
-};
 
 describe("helium-sub-daos", () => {
   // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
+  let dcProgram: Program<DataCredits>;
   const program = new Program<HeliumSubDaos>(
     anchor.workspace.HeliumSubDaos.idl,
     anchor.workspace.HeliumSubDaos.programId,
@@ -90,30 +35,69 @@ describe("helium-sub-daos", () => {
       return heliumSubDaosResolvers;
     }
   );
-
-  let dcProgram: Program<DataCredits>;
-  let issuerProgram: Program<HotspotIssuance>;
+  const testTracker = new Program<TestTracker>(
+    anchor.workspace.TestTracker.idl,
+    anchor.workspace.TestTracker.programId,
+    anchor.workspace.TestTracker.provider,
+    anchor.workspace.TestTracker.coder,
+    () => {
+      return heliumSubDaosResolvers;
+    }
+  );
 
   anchor.workspace.TestTracker as Program<TestTracker>;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
 
+  const hntDecimals = 8;
+  const dcDecimals = 8;
+
   before(async () => {
-    dcProgram = await dcInit(
+    dcProgram = await dc.init(
       provider,
-      anchor.workspace.DataCredits.programId,
+      dc.PROGRAM_ID,
       anchor.workspace.DataCredits.idl
     );
-    ensureDCIdl(dcProgram);
-    issuerProgram = await issuerInit(
+    const dcKey = dc.dataCreditsKey()[0];
+    let hntMint: PublicKey;
+    let dcMint: PublicKey;
+    // setup data credits
+    if (await dc.isInitialized(dcProgram)) {
+      // accounts for rerunning tests on same localnet
+      const dcAcc = await dcProgram.account.dataCreditsV0.fetch(dcKey);
+      hntMint = dcAcc.hntMint;
+      dcMint = dcAcc.dcMint;
+    } else {
+      // fresh start
+      hntMint = await createMint(provider, hntDecimals, me, me);
+      dcMint = await createMint(provider, dcDecimals, dcKey, dcKey);
+
+      await dcProgram.methods
+        .initializeDataCreditsV0({ authority: me })
+        .accounts({ hntMint, dcMint, payer: me })
+        .rpc();
+    }
+    await createAtaAndMint(
       provider,
-      anchor.workspace.HotspotIssuance.programId,
-      anchor.workspace.HotspotIssuance.idl
+      hntMint,
+      toBN(4000000, hntDecimals).toNumber(),
+      me
     );
+    const ix = await dc.mintDataCreditsInstructions({
+      program: dcProgram,
+      provider,
+      amount: 4000000,
+    });
+    await execute(program, provider, ix);
   });
 
   it("initializes a dao", async () => {
-    const { dao, treasury, mint } = await initTestDao(program, provider);
+    const { dao, treasury, mint } = await initTestDao(
+      program,
+      provider,
+      EPOCH_REWARDS,
+      me
+    );
     const account = await program.account.daoV0.fetch(dao!);
     expect(account.authority.toBase58()).eq(me.toBase58());
     expect(account.mint.toBase58()).eq(mint.toBase58());
@@ -121,13 +105,12 @@ describe("helium-sub-daos", () => {
   });
 
   it("initializes a subdao", async () => {
-    const { dao } = await initTestDao(program, provider);
-    const collection = (await createTestNft(provider, me)).mintKey;
-    const { subDao, treasury, mint } = await initTestSubdao(
+    const { dao } = await initTestDao(program, provider, EPOCH_REWARDS, me);
+    const { subDao, collection, treasury, mint } = await initTestSubdao(
       program,
       provider,
-      dao,
-      collection
+      me,
+      dao
     );
 
     const account = await program.account.subDaoV0.fetch(subDao!);
@@ -142,102 +125,94 @@ describe("helium-sub-daos", () => {
   describe("with dao and subdao", () => {
     let dao: PublicKey;
     let subDao: PublicKey;
-    let hotspotIssuer: PublicKey;
+    let collection: PublicKey;
     let treasury: PublicKey;
     let daoTreasury: PublicKey;
     let mint: PublicKey;
-    let onboardingServerKeypair: Keypair;
-    let makerKeypair: Keypair;
-    let subDaoEpochInfo: PublicKey;
 
     beforeEach(async () => {
       ({
-        hotspotConfig: { onboardingServerKeypair },
-        subDao: { subDao, treasury, mint },
-        dao: { dao, treasury: daoTreasury },
-        issuer: { makerKeypair, hotspotIssuer },
-      } = await initWorld(provider, issuerProgram, program, dcProgram));
-
-      const ecc = await (await HeliumKeypair.makeRandom()).address.publicKey;
-      const hotspotOwner = Keypair.generate().publicKey;
-
-      const method = await issuerProgram.methods
-        .issueHotspotV0({ eccCompact: Buffer.from(ecc) })
-        .accounts({
-          hotspotIssuer,
-          onboardingServer: onboardingServerKeypair.publicKey,
-          maker: makerKeypair.publicKey,
-          hotspotOwner,
-          subDao,
-        })
-        .signers([onboardingServerKeypair, makerKeypair]);
-
-      subDaoEpochInfo = (await method.pubkeys()).subDaoEpochInfo!;
-      await method.rpc();
+        dao,
+        treasury: daoTreasury,
+        mint,
+      } = await initTestDao(program, provider, EPOCH_REWARDS, me));
+      ({ subDao, collection, treasury } = await initTestSubdao(
+        program,
+        provider,
+        me,
+        dao
+      ));
     });
 
     it("allows tracking hotspots", async () => {
+      const method = await testTracker.methods
+        .testAddDevice(collection)
+        .accounts({
+          // @ts-ignore
+          trackerAccounts: {
+            subDao,
+          },
+        });
+      const {
+        // @ts-ignore
+        trackerAccounts: { subDaoEpochInfo },
+      } = await method.pubkeys();
+      await method.rpc({
+        skipPreflight: true,
+      });
+
       const epochInfo = await program.account.subDaoEpochInfoV0.fetch(
         subDaoEpochInfo
       );
       expect(epochInfo.totalDevices.toNumber()).eq(1);
     });
 
-    it("allows tracking dc spend", async () => {
-      await sendInstructions(provider, [
-        SystemProgram.transfer({
-          fromPubkey: me,
-          toPubkey: PublicKey.findProgramAddressSync(
-            [Buffer.from("dc", "utf8")],
-            dcProgram.programId
-          )[0],
-          lamports: 100000000,
-        }),
-      ]);
-
-      const epochInfo = await program.account.subDaoEpochInfoV0.fetch(
-        subDaoEpochInfo
-      );
-      expect(epochInfo.dcBurned.toNumber()).eq(toBN(1, 8).toNumber());
-    });
-
-    it("calculates subdao rewards", async () => {
-      const epoch = (
-        await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
-      ).epoch;
-
-      const { pubkeys, instruction: instruction2 } = await program.methods
-        .calculateUtilityScoreV0({
-          epoch,
-        })
-        .accounts({
-          subDao,
-          dao,
-        })
-        .prepare();
-      await sendInstructions(provider, [instruction2], []);
-
-      const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
-        subDaoEpochInfo
-      );
-      const daoInfo = await program.account.daoEpochInfoV0.fetch(
-        pubkeys.daoEpochInfo!
-      );
-
-      expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
-      // sqrt(50) * sqrt(1 * 0.00001 + 50) = ...
-      const totalUtility = "20000000000000";
-      expect(daoInfo.totalUtilityScore.toString()).to.eq(totalUtility);
-      expect(subDaoInfo.utilityScore!.toString()).to.eq(totalUtility);
-    });
-
-    describe("with calculated rewards", () => {
-      let epoch: anchor.BN;
-
+    describe("with tracked state", () => {
+      let subDaoEpochInfo: PublicKey;
       beforeEach(async () => {
-        epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
-          .epoch;
-        await program.methods
+        const ix = await burnDataCreditsInstructions({
+          program: dcProgram,
+          provider,
+          amount: 400000,
+          subDao,
+          owner: me,
+        });
+        subDaoEpochInfo = ix.output.subDaoEpochInfo;
+        const { instruction: instruction1, signers: signers1 } =
+          await testTracker.methods
+            .testAddDevice(collection)
+            .accounts({
+              // @ts-ignore
+              trackerAccounts: {
+                subDao,
+              },
+            })
+            .prepare();
+
+        await sendInstructions(
+          provider,
+          [
+            SystemProgram.transfer({
+              fromPubkey: me,
+              toPubkey: PublicKey.findProgramAddressSync(
+                [Buffer.from("account_payer", "utf8")],
+                dc.PROGRAM_ID
+              )[0],
+              lamports: 100000000,
+            }),
+            ix.instructions[0],
+            instruction1,
+          ],
+          [...ix.signers, ...signers1]
+        );
+      });
+
+      it("calculates subdao rewards", async () => {
+        const epoch = (
+          await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+        ).epoch;
+
+        const { pubkeys, instruction: instruction2 } = await program.methods
           .calculateUtilityScoreV0({
             epoch,
           })
@@ -245,26 +220,61 @@ describe("helium-sub-daos", () => {
             subDao,
             dao,
           })
-          .rpc();
+          .prepare();
+        await sendInstructions(provider, [instruction2], []);
+
+        const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
+          subDaoEpochInfo
+        );
+        const daoInfo = await program.account.daoEpochInfoV0.fetch(
+          pubkeys.daoEpochInfo!
+        );
+
+        expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
+        // sqrt(4) * sqrt(1 * 50) = 14.14213562373095 = 14_142_135_623_730
+        const totalUtility = "14142135623730";
+        expect(daoInfo.totalUtilityScore.toString()).to.eq(totalUtility);
+        expect(subDaoInfo.utilityScore!.toString()).to.eq(totalUtility);
       });
 
-      it("issues rewards to subdaos", async () => {
-        await mintTo(provider, mint, EPOCH_REWARDS, daoTreasury);
-        await sendInstructions(provider, [
+      describe("with calculated rewards", () => {
+        let epoch: anchor.BN;
+
+        beforeEach(async () => {
+          epoch = (
+            await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+          ).epoch;
           await program.methods
-            .issueRewardsV0({
+            .calculateUtilityScoreV0({
               epoch,
             })
             .accounts({
               subDao,
+              dao,
             })
-            .instruction(),
-        ]);
+            .rpc();
+        });
 
-        const accountInfo = AccountLayout.decode(
-          (await provider.connection.getAccountInfo(treasury))?.data!
-        );
-        expect(accountInfo.amount.toString()).to.eq(EPOCH_REWARDS.toString());
+        it("issues rewards to subdaos", async () => {
+          await mintTo(provider, mint, EPOCH_REWARDS, daoTreasury);
+          await sendInstructions(provider, [
+            await program.methods
+              .issueRewardsV0({
+                epoch,
+              })
+              .accounts({
+                subDao,
+                dao,
+                treasury,
+              })
+              .instruction(),
+          ]);
+
+          const accountInfo = AccountLayout.decode(
+            (await provider.connection.getAccountInfo(treasury))?.data!
+          );
+          expect(accountInfo.amount.toString()).to.eq(EPOCH_REWARDS.toString());
+        });
       });
     });
   });

@@ -2,11 +2,13 @@ import { DataCredits } from "@helium-foundation/idls/lib/types/data_credits";
 import { AnchorProvider, Idl, Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
-import { dataCreditsResolvers } from "./resolvers";
 import { dataCreditsKey } from "./pdas";
+import { dataCreditsResolvers } from "./resolvers";
+
+
+export * from "./constants";
 export * from "./instructions";
 export * from "./pdas";
-export * from "./constants";
 
 export async function init(
   provider: AnchorProvider,
