@@ -36,7 +36,7 @@ async function resolveIndividualImpl({
   path?: string[];
   resolver: IndividualResolver;
   idlIx: AllInstructions<anchor.Idl>;
-}): Promise<void> {
+}): Promise<number> {
   const newPath = [...path, camelCase(idlAccounts.name)];
 
   if ((idlAccounts as IdlAccounts).accounts) {
@@ -45,7 +45,7 @@ async function resolveIndividualImpl({
       const subAccount = subAccounts[k];
       const subArgs = args[k];
 
-      await resolveIndividualImpl({
+      return await resolveIndividualImpl({
         idlAccounts: subAccount,
         programId,
         provider,
@@ -57,19 +57,27 @@ async function resolveIndividualImpl({
       });
     }
   } else {
+    let resolved = 0;
+    let value = get(accounts, newPath);
+    if (!value) {
+      value = await resolver({
+        programId,
+        provider,
+        path: newPath,
+        args,
+        accounts,
+        idlIx,
+      });
+      if (value) {
+        resolved = 1;
+      }
+    }
     set(
       accounts,
       newPath,
-      get(accounts, newPath) ||
-        (await resolver({
-          programId,
-          provider,
-          path: newPath,
-          args,
-          accounts,
-          idlIx,
-        }))
+      value
     );
+    return resolved;
   }
 }
 
@@ -86,8 +94,9 @@ export function resolveIndividual<T extends anchor.Idl>(
   resolver: IndividualResolver
 ): CustomAccountResolver<T> {
   return async ({ idlIx, args, accounts, programId, provider }) => {
+    let resolved = 0;
     for (let k = 0; k < idlIx.accounts.length; k += 1) {
-      await resolveIndividualImpl({
+      resolved += await resolveIndividualImpl({
         idlAccounts: idlIx.accounts[k],
         programId,
         provider,
@@ -97,6 +106,9 @@ export function resolveIndividual<T extends anchor.Idl>(
         idlIx,
       });
     }
-    return accounts;
+    return {
+      accounts,
+      resolved
+    }
   };
 }

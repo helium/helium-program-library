@@ -28,7 +28,9 @@ export function ataResolver<T extends anchor.Idl>({
         owner,
       ]) as PublicKey;
 
-      return getAssociatedTokenAddress(mintKey, ownerKey, true);
+      if (mintKey && ownerKey) {
+        return getAssociatedTokenAddress(mintKey, ownerKey, true);
+      }
     }
     return undefined;
   });

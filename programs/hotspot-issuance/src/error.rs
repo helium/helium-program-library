@@ -10,10 +10,10 @@ pub enum ErrorCode {
 
   #[msg("The string was not alphanumeric")]
   StringNotAlphanumeric,
-  
+
   #[msg("Metadata Program Mismatch")]
   InvalidMetadataProgram,
 
   #[msg("The realloc increase was too large")]
-  InvalidDataIncrease,  
+  InvalidDataIncrease,
 }

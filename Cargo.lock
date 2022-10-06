@@ -650,6 +650,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "angry-purple-tiger",
+ "bs58 0.3.1",
  "data-credits",
  "helium-sub-daos",
  "mpl-token-metadata",

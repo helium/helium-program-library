@@ -1,28 +1,25 @@
+use crate::error::ErrorCode;
+use crate::state::*;
+use crate::token_metadata::{
+  create_master_edition_v3, create_metadata_account_v3, verify_sized_collection_item, Collection,
+  CreateMasterEdition, CreateMasterEditionArgs, CreateMetadataAccount, CreateMetadataAccountArgs,
+  VerifySizedCollectionItem, VerifySizedCollectionItemArgs,
+};
 use anchor_lang::prelude::*;
 use anchor_spl::{
-  associated_token::AssociatedToken,  
+  associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use crate::token_metadata::{
-  Collection,
-  create_metadata_account_v3, CreateMetadataAccount, CreateMetadataAccountArgs,
-  create_master_edition_v3, CreateMasterEdition, CreateMasterEditionArgs,
-  verify_sized_collection_item, VerifySizedCollectionItem, VerifySizedCollectionItemArgs
-};
 use angry_purple_tiger::AnimalName;
-use crate::state::*;
-use crate::error::ErrorCode;
-use shared_utils::resize_to_fit;
 use data_credits::{
-  cpi::{accounts::{ BurnDataCreditsV0 }, burn_data_credits_v0},
-  DataCreditsV0, BurnDataCreditsV0Args
+  cpi::{accounts::BurnDataCreditsV0, burn_data_credits_v0},
+  BurnDataCreditsV0Args, DataCreditsV0,
 };
 use helium_sub_daos::{
-  current_epoch,
-  cpi::{accounts::{TrackAddedDeviceV0}, track_added_device_v0},
-  SubDaoEpochInfoV0,
+  cpi::{accounts::TrackAddedDeviceV0, track_added_device_v0},
   TrackAddedDeviceArgsV0,
 };
+use shared_utils::resize_to_fit;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHotspotV0Args {
@@ -31,10 +28,10 @@ pub struct IssueHotspotV0Args {
 
 #[derive(Accounts)]
 #[instruction(args: IssueHotspotV0Args)]
-pub struct IssueHotspotV0<'info> {  
+pub struct IssueHotspotV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub dc_fee_payer: Signer<'info>,  
+  pub dc_fee_payer: Signer<'info>,
   pub onboarding_server: Signer<'info>,
   pub maker: Signer<'info>,
   /// CHECK: Hotspot nft sent here
@@ -55,7 +52,7 @@ pub struct IssueHotspotV0<'info> {
     seeds::program = token_metadata_program.key(),
     bump,
   )]
-  pub collection_master_edition: UncheckedAccount<'info>,  
+  pub collection_master_edition: UncheckedAccount<'info>,
   #[account(
     seeds = ["hotspot_config".as_bytes(), collection.key().as_ref()],
     bump = hotspot_config.bump_seed,
@@ -110,7 +107,7 @@ pub struct IssueHotspotV0<'info> {
     seeds::program = token_metadata_program.key(),
     bump,
   )]
-  pub master_edition: UncheckedAccount<'info>,  
+  pub master_edition: UncheckedAccount<'info>,
   #[account(
     init_if_needed,
     payer = payer,
@@ -121,14 +118,15 @@ pub struct IssueHotspotV0<'info> {
 
   /// CHECK: Verified by cpi  
   #[account(
-    mut,
     seeds=["dc".as_bytes()],
     seeds::program = data_credits_program.key(),
-    bump
+    bump,
+    has_one = dc_mint
   )]
-  pub dc: Box<Account<'info, DataCreditsV0>>,
+  pub dc: Account<'info, DataCreditsV0>,
   #[account(mut)]
-  pub dc_mint: Box<Account<'info, Mint>>,
+  /// CHECK: Verified by cpi
+  pub dc_mint: AccountInfo<'info>,
   #[account(
     init_if_needed,
     payer = payer,
@@ -138,13 +136,8 @@ pub struct IssueHotspotV0<'info> {
   pub dc_burner: Box<Account<'info, TokenAccount>>,
 
   /// CHECK: Verified by cpi    
-  #[account(
-    mut,
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(),  &current_epoch(clock.unix_timestamp).to_le_bytes()], // Break into 30m epochs
-    seeds::program = sub_daos_program.key(),
-    bump
-  )]
-  pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
+  #[account(mut)]
+  pub sub_dao_epoch_info: AccountInfo<'info>,
   /// CHECK: Verified by cpi
   pub sub_dao: AccountInfo<'info>,
 
@@ -157,10 +150,10 @@ pub struct IssueHotspotV0<'info> {
   /// CHECK: Verified by constraint  
   #[account(address = helium_sub_daos::ID)]
   pub sub_daos_program: AccountInfo<'info>,
-  pub associated_token_program: Program<'info, AssociatedToken>,  
+  pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
-  pub clock: Sysvar<'info, Clock>,      
+  pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
 }
 
@@ -181,7 +174,7 @@ impl<'info> IssueHotspotV0<'info> {
       dc_mint: self.dc_mint.to_account_info(),
       token_program: self.token_program.to_account_info(),
     };
-    CpiContext::new(self.data_credits_program.to_account_info(), cpi_accounts) 
+    CpiContext::new(self.data_credits_program.to_account_info(), cpi_accounts)
   }
   fn add_device_ctx(&self) -> CpiContext<'_, '_, '_, 'info, TrackAddedDeviceV0<'info>> {
     let cpi_accounts = TrackAddedDeviceV0 {
@@ -192,22 +185,16 @@ impl<'info> IssueHotspotV0<'info> {
       system_program: self.system_program.to_account_info(),
       clock: self.clock.to_account_info(),
       rent: self.rent.to_account_info(),
-    };    
+    };
     CpiContext::new(self.sub_daos_program.to_account_info(), cpi_accounts)
   }
 }
 
-pub fn handler(
-  ctx: Context<IssueHotspotV0>,
-  args: IssueHotspotV0Args,
-) -> Result<()> {
-  let animal_name = match String::from_utf8(args.ecc_compact.clone()) {
-    Ok(v) => match v.parse::<AnimalName>() {
-      Ok(name) => Ok(name.to_string()),
-      Err(_) => err!(ErrorCode::InvalidEccCompact)
-    },
-    Err(_) => err!(ErrorCode::InvalidEccCompact)
-  }?;
+pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotV0Args) -> Result<()> {
+  let decoded = bs58::encode(args.ecc_compact.clone()).into_string();
+  let animal_name: AnimalName = decoded
+    .parse()
+    .map_err(|e| error!(ErrorCode::InvalidEccCompact))?;
 
   let signer_seeds: &[&[&[u8]]] = &[&[
     b"hotspot_issuer",
@@ -216,15 +203,14 @@ pub fn handler(
     &[ctx.accounts.hotspot_issuer.bump_seed],
   ]];
 
-  // burn_data_credits_v0(
-  //   ctx.accounts.burn_dc_ctx(),
-  //   BurnDataCreditsV0Args { amount: ctx.accounts.hotspot_config.dc_fee }
-  // )?;
-
-  token::mint_to(
-    ctx.accounts.mint_ctx().with_signer(signer_seeds),
-    1
+  burn_data_credits_v0(
+    ctx.accounts.burn_dc_ctx(),
+    BurnDataCreditsV0Args {
+      amount: ctx.accounts.hotspot_config.dc_fee,
+    },
   )?;
+
+  token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
 
   create_metadata_account_v3(
     CpiContext::new_with_signer(
@@ -241,7 +227,7 @@ pub fn handler(
       signer_seeds
     ),
     CreateMetadataAccountArgs {
-      name: animal_name,
+      name: animal_name.to_string(),
       symbol: String::from("HOTSPOT"),
       uri: String::from("https://c3zu2nc2m4x6zvqf5lofrtdbsa4niuh6drvzi7lq4n465ykbd3fa.arweave.net/FvNNNFpnL-zWBercWMxhkDjUUP4ca5R9cON57uFBHso/"),
       collection: Some(Collection {
@@ -251,7 +237,7 @@ pub fn handler(
       collection_details: None
     }
   )?;
-  
+
   create_master_edition_v3(
     CpiContext::new_with_signer(
       ctx.accounts.token_metadata_program.clone(),
@@ -262,22 +248,22 @@ pub fn handler(
         mint_authority: ctx.accounts.hotspot_issuer.to_account_info().clone(),
         metadata: ctx.accounts.metadata.to_account_info().clone(),
         payer: ctx.accounts.payer.to_account_info().clone(),
-        token_program: ctx.accounts.token_program.to_account_info().clone(),        
-        system_program: ctx.accounts.system_program.to_account_info().clone(),        
+        token_program: ctx.accounts.token_program.to_account_info().clone(),
+        system_program: ctx.accounts.system_program.to_account_info().clone(),
         rent: ctx.accounts.rent.to_account_info().clone(),
-      }, 
-      signer_seeds
-    ), 
+      },
+      signer_seeds,
+    ),
     CreateMasterEditionArgs {
-      max_supply: Some(0)
-    }
+      max_supply: Some(0),
+    },
   )?;
 
   let verify_signer_seeds: &[&[&[u8]]] = &[&[
     b"hotspot_config",
     ctx.accounts.collection.to_account_info().key.as_ref(),
-    &[ctx.accounts.hotspot_config.bump_seed],    
-  ]];  
+    &[ctx.accounts.hotspot_config.bump_seed],
+  ]];
 
   verify_sized_collection_item(
     CpiContext::new_with_signer(
@@ -288,22 +274,29 @@ pub fn handler(
         payer: ctx.accounts.payer.to_account_info().clone(),
         collection_mint: ctx.accounts.collection.to_account_info().clone(),
         collection_metadata: ctx.accounts.collection_metadata.to_account_info().clone(),
-        collection_master_edition_account: ctx.accounts.collection_master_edition.to_account_info().clone(),
+        collection_master_edition_account: ctx
+          .accounts
+          .collection_master_edition
+          .to_account_info()
+          .clone(),
       },
-      verify_signer_seeds
+      verify_signer_seeds,
     ),
     VerifySizedCollectionItemArgs {
-      collection_authority_record: None
-    }
+      collection_authority_record: None,
+    },
   )?;
 
-  // track_added_device_v0(
-  //   ctx.accounts.add_device_ctx().with_signer(signer_seeds),
-  //   TrackAddedDeviceArgsV0 {
-  //     collection: ctx.accounts.collection.key(),
-  //     authority_bump: ctx.accounts.hotspot_config.bump_seed
-  //   }    
-  // )?;
+  track_added_device_v0(
+    ctx.accounts.add_device_ctx().with_signer(&[&[
+      b"hotspot_config",
+      ctx.accounts.collection.key().as_ref(),
+      &[ctx.accounts.hotspot_config.bump_seed],
+    ]]),
+    TrackAddedDeviceArgsV0 {
+      authority_bump: ctx.accounts.hotspot_config.bump_seed,
+    },
+  )?;
 
   ctx.accounts.hotspot_issuer.count += 1;
 
@@ -311,14 +304,14 @@ pub fn handler(
     ecc_compact: args.ecc_compact,
     location: None,
     authority: ctx.accounts.hotspot.key(),
-    
+
     bump_seed: ctx.bumps["storage"],
   });
 
   resize_to_fit(
-    &ctx.accounts.payer.to_account_info(), 
+    &ctx.accounts.payer.to_account_info(),
     &ctx.accounts.system_program.to_account_info(),
-    &ctx.accounts.storage
+    &ctx.accounts.storage,
   )?;
 
   Ok(())

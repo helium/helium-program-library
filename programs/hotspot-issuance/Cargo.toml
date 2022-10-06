@@ -19,6 +19,7 @@ default = []
 overflow-checks = true
 
 [dependencies]
+bs58 = "0.3.1"
 anchor-lang = { version = "0.24.2", features = ["init-if-needed"]}
 anchor-spl = "0.24.2"
 angry-purple-tiger = "0.1.0"

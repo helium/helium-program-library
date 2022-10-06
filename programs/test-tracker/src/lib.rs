@@ -26,7 +26,6 @@ pub mod test_tracker {
       ),
       TrackAddedDeviceArgsV0 {
         authority_bump: bump,
-        collection,
       },
     )?;
     Ok(())

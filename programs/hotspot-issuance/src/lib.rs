@@ -28,10 +28,7 @@ pub mod hotspot_issuance {
     initialize_hotspot_issuer_v0::handler(ctx, args)
   }
 
-  pub fn issue_hotspot_v0(
-    ctx: Context<IssueHotspotV0>,
-    args: IssueHotspotV0Args,
-  ) -> Result<()> {
+  pub fn issue_hotspot_v0(ctx: Context<IssueHotspotV0>, args: IssueHotspotV0Args) -> Result<()> {
     issue_hotspot_v0::handler(ctx, args)
   }
 }

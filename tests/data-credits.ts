@@ -1,81 +1,14 @@
+import { execute } from "@helium-foundation/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import { PublicKey } from "@solana/web3.js";
+import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import { expect } from "chai";
 import {
-  init,
-  isInitialized,
-  dataCreditsKey,
-  mintDataCreditsInstructions,
-  burnDataCreditsInstructions,
+  burnDataCreditsInstructions, dataCreditsKey, init, mintDataCreditsInstructions
 } from "../packages/data-credits-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
-import { createAtaAndMint, createMint, mintTo } from "./utils/token";
-import { getAssociatedTokenAddress, getAccount, burn } from "@solana/spl-token";
-import { toBN, execute } from "@helium-foundation/spl-utils";
+import { initTestDataCredits } from "./utils/fixtures";
 
-export const initTestDataCredits = async (
-  program: Program<DataCredits>,
-  provider: anchor.AnchorProvider,
-  startingHntbal: number = 100
-): Promise<{
-  dcKey: PublicKey;
-  hntMint: PublicKey;
-  dcMint: PublicKey;
-  hntBal: number;
-  dcBal: number;
-}> => {
-  const dcKey = dataCreditsKey()[0];
-  const me = provider.wallet.publicKey;
-  let hntMint;
-  let hntBal = startingHntbal;
-  let dcMint;
-  let dcBal = 0;
-
-  if (await isInitialized(program)) {
-    // accounts for rerunning tests on same localnet
-    const dcAcc = await program.account.dataCreditsV0.fetch(dcKey);
-    hntMint = dcAcc.hntMint;
-    dcMint = dcAcc.dcMint;
-
-    if (
-      await provider.connection.getAccountInfo(
-        await getAssociatedTokenAddress(dcMint, me)
-      )
-    ) {
-      dcBal = (
-        await provider.connection.getTokenAccountBalance(
-          await getAssociatedTokenAddress(dcMint, me)
-        )
-      ).value.uiAmount!;
-    }
-
-    hntBal =
-      (
-        await provider.connection.getTokenAccountBalance(
-          await getAssociatedTokenAddress(hntMint, me)
-        )
-      ).value.uiAmount || 0;
-  } else {
-    hntMint = await createMint(provider, 8, me, me);
-    dcMint = await createMint(provider, 8, dcKey, dcKey);
-
-    await createAtaAndMint(
-      provider,
-      hntMint,
-      toBN(startingHntbal, 8).toNumber(),
-      me
-    );
-
-    const initDataCredits = await program.methods
-      .initializeDataCreditsV0({ authority: me })
-      .accounts({ hntMint, dcMint });
-
-    await initDataCredits.rpc();
-  }
-
-  return { dcKey, hntMint, hntBal, dcMint, dcBal };
-};
 
 describe("data-credits", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));

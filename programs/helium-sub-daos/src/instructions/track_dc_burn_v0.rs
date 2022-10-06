@@ -3,7 +3,7 @@ use crate::utils::current_epoch;
 use anchor_lang::prelude::*;
 use std::str::FromStr;
 
-pub const DC_KEY: &str = "tes8BDewkpUpfqx7VDXUJzTFugjqHJugCEBP5sDrrCf";
+pub const DC_KEY: &str = "5BAQuzGE1z8CTcrSdfbfdBF2fdXrwb4iMcxDMrvhz8L8";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TrackDcBurnArgsV0 {

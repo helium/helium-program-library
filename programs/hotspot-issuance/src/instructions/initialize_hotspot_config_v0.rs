@@ -1,14 +1,13 @@
+use crate::error::ErrorCode;
+use crate::state::*;
+use crate::token_metadata::{
+  create_master_edition_v3, create_metadata_account_v3, CollectionDetails, CreateMasterEdition,
+  CreateMasterEditionArgs, CreateMetadataAccount, CreateMetadataAccountArgs,
+};
 use anchor_lang::prelude::*;
 use anchor_spl::{
-  associated_token::AssociatedToken,  
+  associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
-};
-use crate::state::*;
-use crate::error::ErrorCode;
-use crate::token_metadata::{
-  CollectionDetails,
-  create_metadata_account_v3, CreateMetadataAccount, CreateMetadataAccountArgs,
-  create_master_edition_v3, CreateMasterEdition, CreateMasterEditionArgs,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -70,10 +69,10 @@ pub struct InitializeHotspotConfigV0<'info> {
   /// CHECK: Checked with constraints
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
-  pub associated_token_program: Program<'info, AssociatedToken>,    
+  pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
-  pub rent: Sysvar<'info, Rent>,  
+  pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> InitializeHotspotConfigV0<'info> {
@@ -89,11 +88,14 @@ impl<'info> InitializeHotspotConfigV0<'info> {
 
 pub fn handler(
   ctx: Context<InitializeHotspotConfigV0>,
-  args: InitializeHotspotConfigV0Args,  
+  args: InitializeHotspotConfigV0Args,
 ) -> Result<()> {
   require!(args.name.len() <= 32, ErrorCode::InvalidStringLength);
   require!(args.symbol.len() <= 10, ErrorCode::InvalidStringLength);
-  require!(args.metadata_url.len() <= 200, ErrorCode::InvalidStringLength);
+  require!(
+    args.metadata_url.len() <= 200,
+    ErrorCode::InvalidStringLength
+  );
 
   let signer_seeds: &[&[&[u8]]] = &[&[
     b"hotspot_config",
@@ -101,10 +103,7 @@ pub fn handler(
     &[ctx.bumps["hotspot_config"]],
   ]];
 
-  token::mint_to(
-    ctx.accounts.mint_ctx().with_signer(signer_seeds),
-    1
-  )?;
+  token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
 
   create_metadata_account_v3(
     CpiContext::new_with_signer(
@@ -118,15 +117,15 @@ pub fn handler(
         system_program: ctx.accounts.system_program.to_account_info().clone(),
         rent: ctx.accounts.rent.to_account_info().clone(),
       },
-      signer_seeds
+      signer_seeds,
     ),
     CreateMetadataAccountArgs {
       name: args.name,
       symbol: args.symbol,
       uri: args.metadata_url,
       collection: None,
-      collection_details: Some(CollectionDetails::V1 { size: 0 })
-    }
+      collection_details: Some(CollectionDetails::V1 { size: 0 }),
+    },
   )?;
 
   create_master_edition_v3(
@@ -139,15 +138,15 @@ pub fn handler(
         mint_authority: ctx.accounts.hotspot_config.to_account_info().clone(),
         metadata: ctx.accounts.metadata.to_account_info().clone(),
         payer: ctx.accounts.payer.to_account_info().clone(),
-        token_program: ctx.accounts.token_program.to_account_info().clone(),        
+        token_program: ctx.accounts.token_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
         rent: ctx.accounts.rent.to_account_info().clone(),
       },
-      signer_seeds
+      signer_seeds,
     ),
     CreateMasterEditionArgs {
-      max_supply: Some(0)
-    }
+      max_supply: Some(0),
+    },
   )?;
 
   ctx.accounts.hotspot_config.set_inner(HotspotConfigV0 {
@@ -155,7 +154,6 @@ pub fn handler(
     collection: ctx.accounts.collection.key(),
     onboarding_server: args.onboarding_server,
     authority: args.onboarding_server,
-    
     bump_seed: ctx.bumps["hotspot_config"],
     collection_bump_seed: ctx.bumps["collection"],
   });

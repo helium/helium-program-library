@@ -1,9 +1,6 @@
 use anchor_lang::{prelude::*, solana_program};
-use mpl_token_metadata::{
-  state::{
-    Collection as MplCollection, 
-    CollectionDetails as MplCollectionDetails
-  }
+use mpl_token_metadata::state::{
+  Collection as MplCollection, CollectionDetails as MplCollectionDetails,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -26,7 +23,7 @@ pub struct CreateMetadataAccountArgs {
   /// URI pointing to JSON representing the asset
   pub uri: String,
   pub collection: Option<Collection>,
-  pub collection_details: Option<CollectionDetails>
+  pub collection_details: Option<CollectionDetails>,
 }
 
 #[derive(Accounts)]
@@ -44,26 +41,26 @@ pub struct CreateMetadataAccount<'info> {
   /// CHECK: Checked with cpi
   pub system_program: AccountInfo<'info>,
   /// CHECK: Checked with cpi
-  pub rent: AccountInfo<'info>,  
+  pub rent: AccountInfo<'info>,
 }
 
 pub fn create_metadata_account_v3<'a, 'b, 'c, 'info>(
   ctx: CpiContext<'a, 'b, 'c, 'info, CreateMetadataAccount<'info>>,
-  args: CreateMetadataAccountArgs
+  args: CreateMetadataAccountArgs,
 ) -> Result<()> {
   let collection: Option<MplCollection> = match args.collection {
-    Some(c) => Some(MplCollection { 
-      key: c.key, 
-      verified: c.verified
+    Some(c) => Some(MplCollection {
+      key: c.key,
+      verified: c.verified,
     }),
-    None => None
+    None => None,
   };
 
   let collection_details: Option<MplCollectionDetails> = match args.collection_details {
     Some(cd) => match cd {
-      CollectionDetails::V1 { size: s} => Some(MplCollectionDetails::V1 { size: s}),
+      CollectionDetails::V1 { size: s } => Some(MplCollectionDetails::V1 { size: s }),
     },
-    None => None
+    None => None,
   };
 
   let ix = mpl_token_metadata::instruction::create_metadata_accounts_v3(
@@ -82,7 +79,7 @@ pub fn create_metadata_account_v3<'a, 'b, 'c, 'info>(
     true,
     collection,
     None,
-    collection_details
+    collection_details,
   );
 
   solana_program::program::invoke_signed(
@@ -97,13 +94,14 @@ pub fn create_metadata_account_v3<'a, 'b, 'c, 'info>(
       ctx.accounts.system_program.clone(),
       ctx.accounts.rent.clone(),
     ],
-    ctx.signer_seeds
-  ).map_err(|e| e.into())
+    ctx.signer_seeds,
+  )
+  .map_err(|e| e.into())
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CreateMasterEditionArgs {
-  pub max_supply: Option<u64>
+  pub max_supply: Option<u64>,
 }
 
 #[derive(Accounts)]
@@ -113,7 +111,7 @@ pub struct CreateMasterEdition<'info> {
   /// CHECK: Checked with cpi  
   pub mint: AccountInfo<'info>,
   /// CHECK: Checked with cpi  
-  pub update_authority: AccountInfo<'info>,  
+  pub update_authority: AccountInfo<'info>,
   /// CHECK: Checked with cpi  
   pub mint_authority: AccountInfo<'info>,
   /// CHECK: Checked with cpi  
@@ -123,14 +121,14 @@ pub struct CreateMasterEdition<'info> {
   /// CHECK: Checked with cpi
   pub system_program: AccountInfo<'info>,
   /// CHECK: Checked with cpi
-  pub token_program: AccountInfo<'info>,  
+  pub token_program: AccountInfo<'info>,
   /// CHECK: Checked with cpi
   pub rent: AccountInfo<'info>,
 }
 
 pub fn create_master_edition_v3<'a, 'b, 'c, 'info>(
   ctx: CpiContext<'a, 'b, 'c, 'info, CreateMasterEdition<'info>>,
-  args: CreateMasterEditionArgs
+  args: CreateMasterEditionArgs,
 ) -> Result<()> {
   let ix = mpl_token_metadata::instruction::create_master_edition_v3(
     mpl_token_metadata::ID,
@@ -157,8 +155,9 @@ pub fn create_master_edition_v3<'a, 'b, 'c, 'info>(
       ctx.accounts.system_program.clone(),
       ctx.accounts.rent.clone(),
     ],
-    ctx.signer_seeds
-  ).map_err(|e| e.into())
+    ctx.signer_seeds,
+  )
+  .map_err(|e| e.into())
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -184,7 +183,7 @@ pub struct VerifySizedCollectionItem<'info> {
 
 pub fn verify_sized_collection_item<'a, 'b, 'c, 'info>(
   ctx: CpiContext<'a, 'b, 'c, 'info, VerifySizedCollectionItem<'info>>,
-  args: VerifySizedCollectionItemArgs
+  args: VerifySizedCollectionItemArgs,
 ) -> Result<()> {
   let ix = mpl_token_metadata::instruction::verify_sized_collection_item(
     mpl_token_metadata::ID,
@@ -205,9 +204,10 @@ pub fn verify_sized_collection_item<'a, 'b, 'c, 'info>(
       ctx.accounts.payer.clone(),
       ctx.accounts.collection_mint.clone(),
       ctx.accounts.collection_metadata.clone(),
-      ctx.accounts.collection_master_edition_account.clone(),      
+      ctx.accounts.collection_master_edition_account.clone(),
       ctx.program.clone(),
     ],
-    ctx.signer_seeds
-  ).map_err(|e| e.into())
+    ctx.signer_seeds,
+  )
+  .map_err(|e| e.into())
 }
