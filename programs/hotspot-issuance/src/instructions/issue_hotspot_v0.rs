@@ -12,7 +12,7 @@ use anchor_spl::{
 };
 use angry_purple_tiger::AnimalName;
 use data_credits::{
-  cpi::{accounts::BurnDataCreditsV0, burn_data_credits_v0},
+  cpi::{accounts::{TrackDcBurnV0Wrapper, BurnDataCreditsV0}, burn_data_credits_v0},
   BurnDataCreditsV0Args, DataCreditsV0,
 };
 use helium_sub_daos::{
@@ -124,6 +124,14 @@ pub struct IssueHotspotV0<'info> {
     has_one = dc_mint
   )]
   pub dc: Account<'info, DataCreditsV0>,
+  /// CHECK: Verified by cpi
+  #[account(
+    mut,
+    seeds=["account_payer".as_bytes()],
+    seeds::program = data_credits_program.key(),
+    bump,
+  )]
+  pub dc_account_payer: AccountInfo<'info>,
   #[account(mut)]
   /// CHECK: Verified by cpi
   pub dc_mint: AccountInfo<'info>,
@@ -149,7 +157,7 @@ pub struct IssueHotspotV0<'info> {
   pub data_credits_program: AccountInfo<'info>,
   /// CHECK: Verified by constraint  
   #[account(address = helium_sub_daos::ID)]
-  pub sub_daos_program: AccountInfo<'info>,
+  pub helium_sub_daos_program: AccountInfo<'info>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
@@ -168,6 +176,16 @@ impl<'info> IssueHotspotV0<'info> {
   }
   fn burn_dc_ctx(&self) -> CpiContext<'_, '_, '_, 'info, BurnDataCreditsV0<'info>> {
     let cpi_accounts = BurnDataCreditsV0 {
+      tracker_accounts: TrackDcBurnV0Wrapper {
+        sub_dao_epoch_info: self.sub_dao_epoch_info.to_account_info(),
+        sub_dao: self.sub_dao.to_account_info(),
+        authority: self.dc.to_account_info(),
+        account_payer: self.dc_account_payer.to_account_info(),
+        system_program: self.system_program.to_account_info(),
+        clock: self.clock.to_account_info(),
+        rent: self.rent.to_account_info(),
+      },
+      helium_sub_daos_program: self.helium_sub_daos_program.to_account_info(),
       data_credits: self.dc.to_account_info(),
       burner: self.dc_burner.to_account_info(),
       owner: self.dc_fee_payer.to_account_info(),
@@ -186,7 +204,7 @@ impl<'info> IssueHotspotV0<'info> {
       clock: self.clock.to_account_info(),
       rent: self.rent.to_account_info(),
     };
-    CpiContext::new(self.sub_daos_program.to_account_info(), cpi_accounts)
+    CpiContext::new(self.helium_sub_daos_program.to_account_info(), cpi_accounts)
   }
 }
 

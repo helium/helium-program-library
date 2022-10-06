@@ -24,7 +24,7 @@ export const subDaoEpochInfoResolver = resolveIndividual(
 
 export const heliumSubDaosProgramResolver = resolveIndividual(
   async ({ path }) => {
-    if (path[path.length - 1] === "heliumSubDaos") {
+    if (path[path.length - 1] === "heliumSubDaos" || path[path.length - 1] === "heliumSubDaosProgram") {
       return PROGRAM_ID;
     }
   }

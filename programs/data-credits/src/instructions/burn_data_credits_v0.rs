@@ -80,7 +80,7 @@ pub struct BurnDataCreditsV0<'info> {
 
   pub owner: Signer<'info>,
 
-  pub helium_sub_daos: Program<'info, HeliumSubDaos>,
+  pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
   #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,
   pub token_program: Program<'info, Token>,
@@ -137,7 +137,7 @@ pub fn handler(ctx: Context<BurnDataCreditsV0>, args: BurnDataCreditsV0Args) -> 
   let cpi_accounts = ctx.accounts.tracker_accounts.unwrap();
   track_dc_burn_v0(
     CpiContext::new_with_signer(
-      ctx.accounts.helium_sub_daos.to_account_info(),
+      ctx.accounts.helium_sub_daos_program.to_account_info(),
       cpi_accounts,
       payer_seeds,
     ),

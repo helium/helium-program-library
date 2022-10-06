@@ -40,12 +40,13 @@ async function resolveIndividualImpl({
   const newPath = [...path, camelCase(idlAccounts.name)];
 
   if ((idlAccounts as IdlAccounts).accounts) {
+    let resolved = 0;
     const subAccounts = (idlAccounts as IdlAccounts).accounts;
     for (let k = 0; k < subAccounts.length; k += 1) {
       const subAccount = subAccounts[k];
       const subArgs = args[k];
 
-      return await resolveIndividualImpl({
+      resolved += await resolveIndividualImpl({
         idlAccounts: subAccount,
         programId,
         provider,
@@ -56,6 +57,8 @@ async function resolveIndividualImpl({
         idlIx,
       });
     }
+    
+    return resolved;
   } else {
     let resolved = 0;
     let value = get(accounts, newPath);

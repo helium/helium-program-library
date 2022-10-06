@@ -11,7 +11,7 @@ import {
 import { DataCredits } from "../../target/types/data_credits";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { HotspotIssuance } from "../../target/types/hotspot_issuance";
-import { initTestDao, initTestSubdao } from "../helium-sub-daos";
+import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
 import { createAtaAndMint, createMint } from "./token";
 import { execSync } from "child_process";
@@ -183,7 +183,7 @@ export const initWorld = async (
 }> => {
   const hotspotConfig = await initTestHotspotConfig(hsProgram, provider);
 
-  const dao = await initTestDao(hsdProgram, provider);
+  const dao = await initTestDao(hsdProgram, provider, 50, provider.wallet.publicKey);
   const subDao = await initTestSubdao(
     hsdProgram,
     provider,

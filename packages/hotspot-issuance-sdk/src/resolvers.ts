@@ -14,7 +14,7 @@ export const hotspotIssuanceResolvers = combineResolvers(
         return new PublicKey("5BAQuzGE1z8CTcrSdfbfdBF2fdXrwb4iMcxDMrvhz8L8");
       case "tokenMetadataProgram":
         return new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-      case "subDaosProgram":
+      case "heliumSubDaosProgram":
         return new PublicKey("daoK94GYdvRjVxkSyTxNLxtAEYZohLJqmwad8pBK261");
       default:
         return;

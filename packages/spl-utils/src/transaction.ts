@@ -161,7 +161,7 @@ export async function execute<Output>(
   commitment?: Commitment
 ): Promise<Output & { txid?: string }> {
   const { instructions, signers, output } = command;
-  const errors = program.idl.errors?.reduce((acc, err) => {
+  const errors = program.idl.errors?.reduce((acc: any, err: any) => {
     acc.set(err.code, `${err.name}: ${err.msg}`);
     return acc;
   }, new Map<number, string>());
@@ -197,7 +197,7 @@ export async function executeBig<Output>(
       provider,
       instructions,
       signers,
-      payer || this.wallet.publicKey,
+      payer || provider.wallet.publicKey,
       finality,
       errors
     );
@@ -392,7 +392,7 @@ export async function sendAndConfirmWithRetry(
     const tx = await connection.getTransaction(txid, {
       commitment: "confirmed",
     });
-    if (tx && tx.meta.logMessages) {
+    if (tx && tx.meta && tx.meta.logMessages) {
       console.error(tx.meta.logMessages.join("\n"));
     }
 

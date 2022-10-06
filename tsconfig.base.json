@@ -12,6 +12,7 @@
     "strict": false,
     "stripInternal": true,
     "skipLibCheck": true,
+    "noEmit": false,
     "allowSyntheticDefaultImports": true
   }
 }
