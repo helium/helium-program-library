@@ -23,6 +23,14 @@ pub struct InitializeDataCreditsV0<'info> {
   pub hnt_mint: Box<Account<'info, Mint>>,
   pub dc_mint: Box<Account<'info, Mint>>,
 
+  /// CHECK: Verified by cpi
+  #[account(
+    mut,
+    seeds = ["account_payer".as_bytes()],
+    bump,
+  )]
+  pub account_payer: AccountInfo<'info>,
+
   #[account(mut)]
   pub payer: Signer<'info>,
   pub system_program: Program<'info, System>,
@@ -40,6 +48,12 @@ pub fn handler(
   ctx.accounts.data_credits.data_credits_bump = *ctx
     .bumps
     .get("data_credits")
+    .ok_or(DataCreditsErrors::BumpNotAvailable)?;
+
+  ctx.accounts.data_credits.account_payer = ctx.accounts.account_payer.key();
+  ctx.accounts.data_credits.account_payer_bump = *ctx
+    .bumps
+    .get("account_payer")
     .ok_or(DataCreditsErrors::BumpNotAvailable)?;
   Ok(())
 }

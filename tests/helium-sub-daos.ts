@@ -8,6 +8,7 @@ import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { TestTracker } from "../target/types/test_tracker";
 import { createAtaAndMint, createMint, mintTo } from "./utils/token";
+import { initTestDao, initTestSubdao } from "./utils/daos";
 
 const EPOCH_REWARDS = 100000000;
 
@@ -38,55 +39,8 @@ describe("helium-sub-daos", () => {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
 
-  async function initTestDao(): Promise<{
-    mint: PublicKey;
-    dao: PublicKey;
-    treasury: PublicKey;
-  }> {
-    const mint = await createMint(provider, 6, me, me);
-    const method = await program.methods
-      .initializeDaoV0({
-        authority: me,
-        rewardPerEpoch: new BN(EPOCH_REWARDS)
-      })
-      .accounts({
-        mint,
-      });
-    const { dao, treasury } = await method.pubkeys();
-    await method.rpc();
-
-    return { mint, dao: dao!, treasury: treasury! };
-  }
-
-  async function initTestSubdao(dao: PublicKey): Promise<{
-    mint: PublicKey;
-    subDao: PublicKey;
-    collection: PublicKey;
-    treasury: PublicKey;
-  }> {
-    const daoAcc = await program.account.daoV0.fetch(dao);
-    const subDaoMint = await createMint(provider, 6, me, me);
-    const treasury = await createAtaAndMint(provider, daoAcc.mint, 0);
-    const collection = await createMint(provider, 6, me, me);
-    const method = await program.methods
-      .initializeSubDaoV0({
-        authority: me,
-      })
-      .accounts({
-        dao,
-        subDaoMint,
-        hotspotCollection: collection,
-        treasury,
-        mint: daoAcc.mint,
-      });
-    const { subDao } = await method.pubkeys();
-    await method.rpc();
-
-    return { mint: subDaoMint, subDao: subDao!, collection, treasury };
-  }
-
   it("initializes a dao", async () => {
-    const { dao, treasury, mint } = await initTestDao();
+    const { dao, treasury, mint } = await initTestDao(program, provider, EPOCH_REWARDS, me);
     const account = await program.account.daoV0.fetch(dao!);
     expect(account.authority.toBase58()).eq(me.toBase58());
     expect(account.mint.toBase58()).eq(mint.toBase58());
@@ -94,8 +48,8 @@ describe("helium-sub-daos", () => {
   });
 
   it("initializes a subdao", async () => {
-    const { dao } = await initTestDao();
-    const { subDao, collection, treasury, mint } = await initTestSubdao(dao);
+    const { dao } = await initTestDao(program, provider, EPOCH_REWARDS, me);
+    const { subDao, collection, treasury, mint } = await initTestSubdao(program, provider, me, dao);
 
     const account = await program.account.subDaoV0.fetch(subDao!);
 
@@ -115,8 +69,8 @@ describe("helium-sub-daos", () => {
     let mint: PublicKey;
 
     beforeEach(async () => {
-      ({ dao, treasury: daoTreasury, mint } = await initTestDao());
-      ({ subDao, collection, treasury } = await initTestSubdao(dao));
+      ({ dao, treasury: daoTreasury, mint } = await initTestDao(program, provider, EPOCH_REWARDS, me));
+      ({ subDao, collection, treasury } = await initTestSubdao(program, provider, me, dao));
     });
 
     it("allows tracking hotspots", async () => {
@@ -143,7 +97,7 @@ describe("helium-sub-daos", () => {
     });
 
     it("allows tracking dc spend", async () => {
-      const method = await testTracker.methods
+      const method = testTracker.methods
         .testDcBurn(new anchor.BN(2))
         .preInstructions([
           SystemProgram.transfer({
@@ -156,7 +110,7 @@ describe("helium-sub-daos", () => {
           }),
         ])
         .accounts({
-          // @ts-ignore
+          //@ts-ignore
           trackerAccounts: {
             subDao,
           },

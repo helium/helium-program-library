@@ -7,6 +7,7 @@ import {
 import { PROGRAM_ID } from "./constants";
 import { ataResolver, combineResolvers } from "@helium-foundation/spl-utils";
 import { dataCreditsKey } from "./pdas";
+import { heliumSubDaosResolvers } from "../../helium-sub-daos-sdk/src";
 
 
 export async function init(provider: AnchorProvider, dataCreditsProgramId: PublicKey = PROGRAM_ID, dataCreditsIdl?: any): Promise<Program<DataCredits>> {
@@ -34,7 +35,8 @@ export async function init(provider: AnchorProvider, dataCreditsProgramId: Publi
           account: "burner",
           mint: "hntMint",
           owner: "owner",
-        })
+        }),
+        heliumSubDaosResolvers,
       )
     }
   ) as Program<DataCredits>;

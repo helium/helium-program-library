@@ -10,6 +10,7 @@ import {
   getAssociatedTokenAddress,
   getMint,
 } from "@solana/spl-token";
+import { accountPayerKey, dataCreditsKey } from "./pdas";
 
 export interface IMintDataCreditsArgs {
   program: Program<DataCredits>;
@@ -29,7 +30,7 @@ export async function mintDataCreditsInstructions({
   owner = provider.wallet.publicKey,
   recipient = provider.wallet.publicKey,
 }: IMintDataCreditsArgs) {
-  const { dataCredits } = await program.methods.burnDataCreditsV0({amount: new BN(0)}).pubkeys();
+  const [dataCredits] = dataCreditsKey()
   const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dataCredits!);
   if (!dataCreditsAcc) throw new Error("Data credits not available at the expected address.");
 
@@ -60,6 +61,8 @@ export interface IBurnDataCreditsArgs {
   provider: AnchorProvider;
   /** Amount of HNT to burn */
   amount: BN | number;
+  /** The subdao that earns the rewards for burning this DC */
+  subDao: PublicKey;
   /** Payer for this transaction, and holder of the DC to burn. **Default** this.wallet */
   owner?: PublicKey;
 }
@@ -68,9 +71,10 @@ export async function burnDataCreditsInstructions({
   program,
   provider,
   amount,
+  subDao,
   owner = provider.wallet.publicKey,
 }: IBurnDataCreditsArgs) {
-  const { dataCredits } = await program.methods.burnDataCreditsV0({amount: new BN(0)}).pubkeys();
+  const [dataCredits] = dataCreditsKey()
   const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dataCredits!);
   if (!dataCreditsAcc) throw new Error("Data credits not available at the expected address.")
   const dcMintAcc = await getMint(
@@ -85,6 +89,10 @@ export async function burnDataCreditsInstructions({
   instructions.push(await program.methods.burnDataCreditsV0({amount: toBN(amount, dcMintAcc)}).accounts({
     burner,
     dcMint: dataCreditsAcc.dcMint,
+    //@ts-ignore
+    trackerAccounts: {
+      subDao,
+    },
   }).instruction());
 
   return {

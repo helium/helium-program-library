@@ -7,4 +7,6 @@ pub struct DataCreditsV0 {
   pub hnt_mint: Pubkey,  // must be burned to mint dc
   pub authority: Pubkey, // EOA auth for managing this struct
   pub data_credits_bump: u8,
+  pub account_payer: Pubkey,
+  pub account_payer_bump: u8,
 }
