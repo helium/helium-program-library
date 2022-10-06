@@ -85,21 +85,28 @@ export async function burnDataCreditsInstructions({
   const burner = await getAssociatedTokenAddress(dataCreditsAcc.dcMint, owner);
 
   const instructions: TransactionInstruction[] = [];
-
-  instructions.push(await program.methods.burnDataCreditsV0({amount: toBN(amount, dcMintAcc)}).accounts({
+  const method = program.methods.burnDataCreditsV0({amount: toBN(amount, dcMintAcc)}).accounts({
     burner,
     dcMint: dataCreditsAcc.dcMint,
     //@ts-ignore
     trackerAccounts: {
       subDao,
     },
-  }).instruction());
+  })
+
+  const {
+    // @ts-ignore
+    trackerAccounts: { subDaoEpochInfo },
+  } = await method.pubkeys();
+
+  instructions.push(await method.instruction());
 
   return {
     signers: [],
     instructions,
     output: {
       dataCredits,
+      subDaoEpochInfo
     },
   };
 }

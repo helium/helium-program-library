@@ -33,15 +33,15 @@ pub mod test_tracker {
   }
 
   pub fn test_dc_burn(ctx: Context<TestDcBurn>, amount: u64) -> Result<()> {
-    let bump = *ctx.bumps.get("authority").unwrap();
+    let bump = *ctx.bumps.get("account_payer").unwrap();
     track_dc_burn_v0(
       CpiContext::new_with_signer(
         ctx.accounts.helium_sub_daos.to_account_info(),
         ctx.accounts.tracker_accounts.unwrap(),
-        &[&["dc".as_bytes(), &[bump]]],
+        &[&["account_payer".as_bytes(), &[bump]]],
       ),
       TrackDcBurnArgsV0 {
-        authority_bump: bump,
+        bump,
         dc_burned: amount,
       },
     )?;
@@ -125,11 +125,11 @@ pub struct TrackDcBurnV0Wrapper<'info> {
   pub sub_dao: AccountInfo<'info>,
   #[account(
     mut,
-    seeds = ["dc".as_bytes()],
+    seeds = ["account_payer".as_bytes()],
     bump,
   )]
   /// CHECK: Verified by cpi
-  pub authority: AccountInfo<'info>,
+  pub account_payer: AccountInfo<'info>,
   pub system_program: Program<'info, System>,
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
@@ -140,7 +140,7 @@ impl<'info> TrackDcBurnV0Wrapper<'info> {
     TrackDcBurnV0 {
       sub_dao_epoch_info: self.sub_dao_epoch_info.to_account_info(),
       sub_dao: self.sub_dao.to_account_info(),
-      authority: self.authority.to_account_info(),
+      account_payer: self.account_payer.to_account_info(),
       system_program: self.system_program.to_account_info(),
       clock: self.clock.to_account_info(),
       rent: self.rent.to_account_info(),

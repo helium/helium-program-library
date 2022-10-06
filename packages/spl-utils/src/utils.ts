@@ -5,18 +5,22 @@ export type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T;
 
 export const truthy = <T>(value: T): value is Truthy<T> => !!value;
 
-export function toNumber(numberOrBn: BN | number, mint: Mint): number {
+export function toNumber(numberOrBn: BN | number, mintOrDecimals: Mint | number): number {
   if (BN.isBN(numberOrBn)) {
-    return amountAsNum(numberOrBn, mint);
+    return amountAsNum(numberOrBn, mintOrDecimals);
   } else {
     return numberOrBn;
   }
 }
 
-export function amountAsNum(amount: BN, mint: Mint): number {
-  const decimals = new BN(Math.pow(10, mint.decimals).toString());
-  const decimal = amount.mod(decimals).toNumber() / decimals.toNumber();
-  return amount.div(decimals).toNumber() + decimal;
+export function amountAsNum(amount: BN, mintOrDecimals: Mint | number): number {
+  const decimals: number =
+    typeof mintOrDecimals === "number"
+      ? mintOrDecimals
+      : (mintOrDecimals as Mint).decimals;
+  const factor = new BN(Math.pow(10, decimals).toString());
+  const decimal = amount.mod(factor).toNumber() / factor.toNumber();
+  return amount.div(factor).toNumber() + decimal;
 }
 
 export function toBN(

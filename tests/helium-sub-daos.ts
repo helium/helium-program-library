@@ -2,13 +2,23 @@ import { sendInstructions } from "@helium-foundation/spl-utils";
 import { AccountLayout } from "@solana/spl-token";
 import * as anchor from "@project-serum/anchor";
 import { BN, Program } from "@project-serum/anchor";
-import { SystemProgram, PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
+import { SystemProgram, PublicKey, Keypair } from "@solana/web3.js";
 import { expect } from "chai";
 import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { TestTracker } from "../target/types/test_tracker";
 import { createAtaAndMint, createMint, mintTo } from "./utils/token";
 import { initTestDao, initTestSubdao } from "./utils/daos";
+import { DataCredits } from "../target/types/data_credits";
+import * as dc from "../packages/data-credits-sdk/src";
+import { burnDataCreditsInstructions } from "../packages/data-credits-sdk/src";
+import {
+  getAssociatedTokenAddress,
+  getAccount,
+  getMint,
+} from "@solana/spl-token";
+import { toBN, toNumber, execute } from "../packages/spl-utils/src";
+
 
 const EPOCH_REWARDS = 100000000;
 
@@ -16,6 +26,7 @@ describe("helium-sub-daos", () => {
   // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
+  let dcProgram: Program<DataCredits>;
   const program = new Program<HeliumSubDaos>(
     anchor.workspace.HeliumSubDaos.idl,
     anchor.workspace.HeliumSubDaos.programId,
@@ -38,6 +49,38 @@ describe("helium-sub-daos", () => {
   anchor.workspace.TestTracker as Program<TestTracker>;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
+
+  const hntDecimals = 8;
+  const dcDecimals = 8;
+
+  before(async() => {
+    dcProgram = await dc.init(provider, dc.PROGRAM_ID, anchor.workspace.DataCredits.idl);
+    const dcKey = dc.dataCreditsKey()[0];
+    let hntMint: PublicKey;
+    let dcMint: PublicKey;
+    // setup data credits
+    if (await dc.isInitialized(dcProgram)) {
+      // accounts for rerunning tests on same localnet
+      const dcAcc = await dcProgram.account.dataCreditsV0.fetch(dcKey);
+      hntMint = dcAcc.hntMint;
+      dcMint = dcAcc.dcMint;
+
+    } else {
+      // fresh start
+      hntMint = await createMint(provider, hntDecimals, me, me);
+      dcMint = await createMint(provider, dcDecimals, dcKey, dcKey);
+
+      await dcProgram.methods.initializeDataCreditsV0({authority: me}).accounts({hntMint, dcMint, payer: me}).rpc();
+    }
+    await createAtaAndMint(provider, hntMint, toBN(4000000, hntDecimals).toNumber(), me);
+    const ix = await dc.mintDataCreditsInstructions({
+      program: dcProgram,
+      provider,
+      amount: 4000000,
+    });
+    await execute(program, provider, ix);
+
+  })
 
   it("initializes a dao", async () => {
     const { dao, treasury, mint } = await initTestDao(program, provider, EPOCH_REWARDS, me);
@@ -96,58 +139,18 @@ describe("helium-sub-daos", () => {
       expect(epochInfo.totalDevices.toNumber()).eq(1);
     });
 
-    it("allows tracking dc spend", async () => {
-      const method = testTracker.methods
-        .testDcBurn(new anchor.BN(2))
-        .preInstructions([
-          SystemProgram.transfer({
-            fromPubkey: me,
-            toPubkey: PublicKey.findProgramAddressSync(
-              [Buffer.from("dc", "utf8")],
-              testTracker.programId
-            )[0],
-            lamports: 100000000,
-          }),
-        ])
-        .accounts({
-          //@ts-ignore
-          trackerAccounts: {
-            subDao,
-          },
-        });
-      const {
-        // @ts-ignore
-        trackerAccounts: { subDaoEpochInfo },
-      } = await method.pubkeys();
-      await method.rpc();
-
-      const epochInfo = await program.account.subDaoEpochInfoV0.fetch(
-        subDaoEpochInfo
-      );
-      expect(epochInfo.dcBurned.toNumber()).eq(2);
-    });
-
     describe("with tracked state", () => {
       let subDaoEpochInfo: PublicKey;
       beforeEach(async () => {
-        const {
-          instruction,
-          signers,
-          pubkeys: {
-            // @ts-ignore
-            trackerAccounts: { subDaoEpochInfo: resultSubDaoEpochInfo },
-          },
-        } = await testTracker.methods
-          // $4 worth
-          .testDcBurn(new anchor.BN("40000000000000"))
-          .accounts({
-            // @ts-ignore
-            trackerAccounts: {
-              subDao,
-            },
-          })
-          .prepare();
-        subDaoEpochInfo = resultSubDaoEpochInfo;
+
+        const ix = await burnDataCreditsInstructions({
+          program: dcProgram,
+          provider,
+          amount: 400000,
+          subDao,
+          owner: me,
+        })
+        subDaoEpochInfo = ix.output.subDaoEpochInfo;
         const { instruction: instruction1, signers: signers1 } =
           await testTracker.methods
             .testAddDevice(collection)
@@ -165,15 +168,15 @@ describe("helium-sub-daos", () => {
             SystemProgram.transfer({
               fromPubkey: me,
               toPubkey: PublicKey.findProgramAddressSync(
-                [Buffer.from("dc_token_auth", "utf8")],
-                testTracker.programId
+                [Buffer.from("account_payer", "utf8")],
+                dc.PROGRAM_ID
               )[0],
               lamports: 100000000,
             }),
-            instruction,
+            ix.instructions[0],
             instruction1,
           ],
-          [...signers, ...signers1]
+          [...ix.signers, ...signers1]
         );
       });
 

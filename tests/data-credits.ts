@@ -11,7 +11,7 @@ import {
   getAccount,
   getMint,
 } from "@solana/spl-token";
-import { toBN, execute } from "@helium-foundation/spl-utils";
+import { toBN, toNumber, execute } from "../packages/spl-utils/src";
 import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
@@ -109,6 +109,13 @@ describe("data-credits", () => {
       assert(dcAtaAcc.isFrozen);
       const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
       assert(dcBal.value.uiAmount == startDcBal);
+
+      // check that epoch info was tracked correctly
+      const epochInfo = await hsdProgram.account.subDaoEpochInfoV0.fetch(
+        ix.output.subDaoEpochInfo
+      );
+      const numBurned = toNumber(epochInfo.dcBurned, dcDecimals);
+      assert.equal(numBurned, 1);
     })
   })
 });
