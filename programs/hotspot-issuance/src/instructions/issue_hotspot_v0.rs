@@ -12,8 +12,11 @@ use anchor_spl::{
 };
 use angry_purple_tiger::AnimalName;
 use data_credits::{
-  cpi::{accounts::{TrackDcBurnV0Wrapper, BurnDataCreditsV0}, burn_data_credits_v0},
-  BurnDataCreditsV0Args, DataCreditsV0,
+  cpi::{
+    accounts::{BurnCommonV0, BurnFromIssuanceV0},
+    burn_from_issuance_v0,
+  },
+  BurnFromIssuanceV0Args, DataCreditsV0,
 };
 use helium_sub_daos::{
   cpi::{accounts::TrackAddedDeviceV0, track_added_device_v0},
@@ -118,20 +121,15 @@ pub struct IssueHotspotV0<'info> {
 
   /// CHECK: Verified by cpi  
   #[account(
-    seeds=["dc".as_bytes()],
+    seeds=[
+      "dc".as_bytes(),
+      dc_mint.key().as_ref()
+    ],
     seeds::program = data_credits_program.key(),
     bump,
     has_one = dc_mint
   )]
   pub dc: Account<'info, DataCreditsV0>,
-  /// CHECK: Verified by cpi
-  #[account(
-    mut,
-    seeds=["account_payer".as_bytes()],
-    seeds::program = data_credits_program.key(),
-    bump,
-  )]
-  pub dc_account_payer: AccountInfo<'info>,
   #[account(mut)]
   /// CHECK: Verified by cpi
   pub dc_mint: AccountInfo<'info>,
@@ -174,23 +172,19 @@ impl<'info> IssueHotspotV0<'info> {
     };
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
-  fn burn_dc_ctx(&self) -> CpiContext<'_, '_, '_, 'info, BurnDataCreditsV0<'info>> {
-    let cpi_accounts = BurnDataCreditsV0 {
-      tracker_accounts: TrackDcBurnV0Wrapper {
-        sub_dao_epoch_info: self.sub_dao_epoch_info.to_account_info(),
-        sub_dao: self.sub_dao.to_account_info(),
-        authority: self.dc.to_account_info(),
-        account_payer: self.dc_account_payer.to_account_info(),
-        system_program: self.system_program.to_account_info(),
-        clock: self.clock.to_account_info(),
+  fn burn_dc_ctx(&self) -> CpiContext<'_, '_, '_, 'info, BurnFromIssuanceV0<'info>> {
+    let cpi_accounts = BurnFromIssuanceV0 {
+      burn_accounts: BurnCommonV0 {
+        data_credits: self.dc.to_account_info(),
+        burner: self.dc_burner.to_account_info(),
+        owner: self.dc_fee_payer.to_account_info(),
+        dc_mint: self.dc_mint.to_account_info(),
+        token_program: self.token_program.to_account_info(),
+        associated_token_program: self.associated_token_program.to_account_info(),
         rent: self.rent.to_account_info(),
+        system_program: self.system_program.to_account_info(),
       },
-      helium_sub_daos_program: self.helium_sub_daos_program.to_account_info(),
-      data_credits: self.dc.to_account_info(),
-      burner: self.dc_burner.to_account_info(),
-      owner: self.dc_fee_payer.to_account_info(),
-      dc_mint: self.dc_mint.to_account_info(),
-      token_program: self.token_program.to_account_info(),
+      authority: self.hotspot_config.to_account_info(),
     };
     CpiContext::new(self.data_credits_program.to_account_info(), cpi_accounts)
   }
@@ -221,10 +215,17 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotV0Args) -> Result
     &[ctx.accounts.hotspot_issuer.bump_seed],
   ]];
 
-  burn_data_credits_v0(
-    ctx.accounts.burn_dc_ctx(),
-    BurnDataCreditsV0Args {
+  let hotspot_config_seeds: &[&[&[u8]]] = &[&[
+    b"hotspot_config",
+    ctx.accounts.collection.to_account_info().key.as_ref(),
+    &[ctx.accounts.hotspot_config.bump_seed],
+  ]];
+  burn_from_issuance_v0(
+    ctx.accounts.burn_dc_ctx().with_signer(hotspot_config_seeds),
+    BurnFromIssuanceV0Args {
       amount: ctx.accounts.hotspot_config.dc_fee,
+      collection: ctx.accounts.hotspot_config.collection,
+      authority_bump: ctx.accounts.hotspot_config.bump_seed,
     },
   )?;
 
@@ -277,12 +278,6 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotV0Args) -> Result
     },
   )?;
 
-  let verify_signer_seeds: &[&[&[u8]]] = &[&[
-    b"hotspot_config",
-    ctx.accounts.collection.to_account_info().key.as_ref(),
-    &[ctx.accounts.hotspot_config.bump_seed],
-  ]];
-
   verify_sized_collection_item(
     CpiContext::new_with_signer(
       ctx.accounts.token_metadata_program.clone(),
@@ -298,7 +293,7 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotV0Args) -> Result
           .to_account_info()
           .clone(),
       },
-      verify_signer_seeds,
+      hotspot_config_seeds,
     ),
     VerifySizedCollectionItemArgs {
       collection_authority_record: None,

@@ -23,15 +23,22 @@ pub mod data_credits {
 
   pub fn mint_data_credits_v0(
     ctx: Context<MintDataCreditsV0>,
-    args: MintDataCreditsV0Args,
+    args: MintDataCreditsArgsV0,
   ) -> Result<()> {
     instructions::mint_data_credits_v0::handler(ctx, args)
   }
 
   pub fn burn_data_credits_v0(
     ctx: Context<BurnDataCreditsV0>,
-    args: BurnDataCreditsV0Args,
+    args: BurnDataCreditsArgsV0,
   ) -> Result<()> {
     instructions::burn_data_credits_v0::handler(ctx, args)
+  }
+  
+  pub fn burn_from_issuance_v0(
+    ctx: Context<BurnFromIssuanceV0>,
+    args: BurnFromIssuanceV0Args,
+  ) -> Result<()> {
+    instructions::burn_from_issuance_v0::handler(ctx, args)
   }
 }

@@ -12,13 +12,17 @@ export async function initTestDao(
   program: anchor.Program<HeliumSubDaos>,
   provider: anchor.AnchorProvider,
   epochRewards: number,
-  authority: PublicKey
+  authority: PublicKey,
+  mint?: PublicKey
 ): Promise<{
   mint: PublicKey;
   dao: PublicKey;
   treasury: PublicKey;
 }> {
-  const mint = await createMint(provider, 6, authority, authority);
+  if (!mint) {
+    mint = await createMint(provider, 6, authority, authority);
+  }
+
   const method = await program.methods
     .initializeDaoV0({
       authority: authority,
@@ -28,7 +32,10 @@ export async function initTestDao(
       mint,
     });
   const { dao, treasury } = await method.pubkeys();
-  await method.rpc();
+
+  if (!(await provider.connection.getAccountInfo(dao!))) {
+    await method.rpc();
+  }
 
   return { mint, dao: dao!, treasury: treasury! };
 }
@@ -36,18 +43,17 @@ export async function initTestDao(
 export async function initTestSubdao(
   program: anchor.Program<HeliumSubDaos>,
   provider: anchor.AnchorProvider,
-  authority: PublicKey,  
-  dao: PublicKey
+  authority: PublicKey,
+  dao: PublicKey,
+  collection: PublicKey,
 ): Promise<{
   mint: PublicKey;
   subDao: PublicKey;
-  collection: PublicKey;
   treasury: PublicKey;
 }> {
   const daoAcc = await program.account.daoV0.fetch(dao);
   const subDaoMint = await createMint(provider, 6, authority, authority);
   const treasury = await createAtaAndMint(provider, daoAcc.mint, 0);
-  const collection = await createMint(provider, 6, authority, authority);
   const method = await program.methods
     .initializeSubDaoV0({
       authority: authority,
@@ -62,5 +68,5 @@ export async function initTestSubdao(
   const { subDao } = await method.pubkeys();
   await method.rpc();
 
-  return { mint: subDaoMint, subDao: subDao!, collection, treasury };
+  return { mint: subDaoMint, subDao: subDao!, treasury };
 }

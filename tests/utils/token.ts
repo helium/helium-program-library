@@ -50,7 +50,7 @@ export async function mintTo(
 export async function createAtaAndMintInstructions(
   provider: anchor.AnchorProvider,
   mint: PublicKey,
-  amount: number,
+  amount: number | anchor.BN,
   to: PublicKey = provider.wallet.publicKey,
   authority: PublicKey = provider.wallet.publicKey,
   payer: PublicKey = provider.wallet.publicKey
@@ -62,7 +62,9 @@ export async function createAtaAndMintInstructions(
       createAssociatedTokenAccountInstruction(payer, ata, to, mint)
     );
   }
-  instructions.push(createMintToInstruction(mint, ata, authority, amount));
+  instructions.push(
+    createMintToInstruction(mint, ata, authority, BigInt(amount.toString()))
+  );
 
   return {
     instructions,
@@ -73,7 +75,7 @@ export async function createAtaAndMintInstructions(
 export async function createAtaAndMint(
   provider: anchor.AnchorProvider,
   mint: PublicKey,
-  amount: number,
+  amount: number | anchor.BN,
   to: PublicKey = provider.wallet.publicKey,
   authority: PublicKey = provider.wallet.publicKey,
   payer: PublicKey = provider.wallet.publicKey,

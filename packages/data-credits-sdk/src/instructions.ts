@@ -15,6 +15,8 @@ import { dataCreditsKey } from "./pdas";
 export interface IMintDataCreditsArgs {
   program: Program<DataCredits>;
   provider: AnchorProvider;
+  /** The data credits mint */
+  dcMint: PublicKey;
   /** Amount of HNT to burn */
   amount: BN | number;
   /** Address to send the DC to. **Default** this.wallet */
@@ -27,10 +29,11 @@ export async function mintDataCreditsInstructions({
   program,
   provider,
   amount,
+  dcMint,
   owner = provider.wallet.publicKey,
   recipient = provider.wallet.publicKey,
 }: IMintDataCreditsArgs) {
-  const [dataCredits] = dataCreditsKey()
+  const [dataCredits] = dataCreditsKey(dcMint)
   const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dataCredits!);
   if (!dataCreditsAcc) throw new Error("Data credits not available at the expected address.");
 
@@ -61,6 +64,8 @@ export interface IBurnDataCreditsArgs {
   provider: AnchorProvider;
   /** Amount of HNT to burn */
   amount: BN | number;
+  /** The data credits mint */
+  dcMint: PublicKey;
   /** The subdao that earns the rewards for burning this DC */
   subDao: PublicKey;
   /** Payer for this transaction, and holder of the DC to burn. **Default** this.wallet */
@@ -71,10 +76,11 @@ export async function burnDataCreditsInstructions({
   program,
   provider,
   amount,
+  dcMint,
   subDao,
   owner = provider.wallet.publicKey,
 }: IBurnDataCreditsArgs) {
-  const [dataCredits] = dataCreditsKey()
+  const [dataCredits] = dataCreditsKey(dcMint)
   const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dataCredits!);
   if (!dataCreditsAcc) throw new Error("Data credits not available at the expected address.")
   const dcMintAcc = await getMint(
@@ -85,14 +91,20 @@ export async function burnDataCreditsInstructions({
   const burner = await getAssociatedTokenAddress(dataCreditsAcc.dcMint, owner);
 
   const instructions: TransactionInstruction[] = [];
-  const method = program.methods.burnDataCreditsV0({amount: toBN(amount, dcMintAcc)}).accounts({
-    burner,
-    dcMint: dataCreditsAcc.dcMint,
-    //@ts-ignore
-    trackerAccounts: {
-      subDao,
-    },
-  })
+  const method = program.methods
+    .burnDataCreditsV0({ amount: toBN(amount, dcMintAcc) })
+    .accounts({
+      //@ts-ignore
+      burnAccounts: {
+        burner,
+        dataCredits,
+        dcMint,
+      },
+      //@ts-ignore
+      trackerAccounts: {
+        subDao,
+      },
+    });
 
   const {
     // @ts-ignore

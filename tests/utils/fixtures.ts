@@ -1,20 +1,14 @@
 import { toBN } from "@helium-foundation/spl-utils";
-import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import {
-  dataCreditsKey,
-  isInitialized
-} from "../../packages/data-credits-sdk/src";
+import { execSync } from "child_process";
 import { DataCredits } from "../../target/types/data_credits";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { HotspotIssuance } from "../../target/types/hotspot_issuance";
 import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
 import { createAtaAndMint, createMint } from "./token";
-import { execSync } from "child_process";
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =
@@ -31,54 +25,29 @@ export const initTestDataCredits = async (
   hntBal: number;
   dcBal: number;
 }> => {
-  const dcKey = dataCreditsKey()[0];
   const me = provider.wallet.publicKey;
   let hntMint;
   let hntBal = startingHntbal;
   let dcMint;
   let dcBal = 0;
 
-  if (await isInitialized(program)) {
-    // accounts for rerunning tests on same localnet
-    const dcAcc = await program.account.dataCreditsV0.fetch(dcKey);
-    hntMint = dcAcc.hntMint;
-    dcMint = dcAcc.dcMint;
+  hntMint = await createMint(provider, 8, me, me);
+  dcMint = await createMint(provider, 8, me, me);
 
-    if (
-      await provider.connection.getAccountInfo(
-        await getAssociatedTokenAddress(dcMint, me)
-      )
-    ) {
-      dcBal = (
-        await provider.connection.getTokenAccountBalance(
-          await getAssociatedTokenAddress(dcMint, me)
-        )
-      ).value.uiAmount!;
-    }
+  await createAtaAndMint(
+    provider,
+    hntMint,
+    toBN(startingHntbal, 8).toNumber(),
+    me
+  );
 
-    hntBal =
-      (
-        await provider.connection.getTokenAccountBalance(
-          await getAssociatedTokenAddress(hntMint, me)
-        )
-      ).value.uiAmount || 0;
-  } else {
-    hntMint = await createMint(provider, 8, me, me);
-    dcMint = await createMint(provider, 8, dcKey, dcKey);
+  const initDataCredits = await program.methods
+    .initializeDataCreditsV0({ authority: me })
+    .accounts({ hntMint, dcMint });
+  
+  const dcKey = (await initDataCredits.pubkeys()).dataCredits!;
 
-    await createAtaAndMint(
-      provider,
-      hntMint,
-      toBN(startingHntbal, 8).toNumber(),
-      me
-    );
-
-    const initDataCredits = await program.methods
-      .initializeDataCreditsV0({ authority: me })
-      .accounts({ hntMint, dcMint });
-
-    await initDataCredits.rpc();
-  }
+  await initDataCredits.rpc();
 
   return { dcKey, hntMint, hntBal, dcMint, dcBal };
 };
@@ -97,7 +66,7 @@ export const initTestHotspotConfig = async (
       name: "Helium Network Hotspots",
       symbol: random(), // symbol is unique would need to restart localnet everytime
       metadataUrl: DEFAULT_METADATA_URL,
-      dcFee: toBN(1, 8),
+      dcFee: toBN(4000000, 8),
       onboardingServer: onboardingServerKeypair.publicKey,
     })
 
@@ -182,15 +151,21 @@ export const initWorld = async (
   };
 }> => {
   const hotspotConfig = await initTestHotspotConfig(hsProgram, provider);
-
-  const dao = await initTestDao(hsdProgram, provider, 50, provider.wallet.publicKey);
+  const dataCredits = await initTestDataCredits(dcProgram, provider);
+  const dao = await initTestDao(
+    hsdProgram,
+    provider,
+    50,
+    provider.wallet.publicKey,
+    dataCredits.hntMint
+  );
   const subDao = await initTestSubdao(
     hsdProgram,
     provider,
+    provider.wallet.publicKey,
     dao.dao,
     hotspotConfig.collection
   );
-  const dataCredits = await initTestDataCredits(dcProgram, provider);
 
   const issuer = await initTestHotspotIssuer(
     hsProgram,

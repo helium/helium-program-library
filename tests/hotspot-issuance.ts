@@ -90,6 +90,7 @@ describe("hotspot-issuance", () => {
 
   describe("with issuer and data credits", () => {
     let subDao: PublicKey;
+    let dcMint: PublicKey;
     let makerKeypair: Keypair;
     let onboardingServerKeypair: Keypair;
     let hotspotIssuer: PublicKey;
@@ -104,11 +105,12 @@ describe("hotspot-issuance", () => {
       const ix = await mintDataCreditsInstructions({
         program: dcProgram,
         provider,
+        dcMint: dataCredits.dcMint,
         amount: 1,
       });
 
-      console.log(dataCredits.dcMint.toBase58());
-      console.log(dataCredits.dcKey.toBase58());
+      dcMint = dataCredits.dcMint;
+
       await execute(dcProgram, provider, ix);
 
       subDao = sub.subDao;
@@ -124,6 +126,7 @@ describe("hotspot-issuance", () => {
       const method = await hsProgram.methods
         .issueHotspotV0({ eccCompact: Buffer.from(ecc) })
         .accounts({
+          dcMint,
           hotspotIssuer,
           hotspotOwner,
           onboardingServer: onboardingServerKeypair.publicKey,

@@ -120,15 +120,12 @@ async function run() {
     metadataUrl: `${argv.bucket}/dc.json`,
   });
 
-  if (await isInitialized(dataCreditsProgram)) {
-    console.log("Initializing data credits program")
-    await dataCreditsProgram.methods
-      .initializeDataCreditsV0({
-        authority: provider.wallet.publicKey,
-      })
-      .accounts({ hntMint: hntKeypair.publicKey, dcMint: dcKeypair.publicKey })
-      .rpc();
-  }
+  await dataCreditsProgram.methods
+    .initializeDataCreditsV0({
+      authority: provider.wallet.publicKey,
+    })
+    .accounts({ hntMint: hntKeypair.publicKey, dcMint: dcKeypair.publicKey })
+    .rpc();
 
   const dao = (await daoKey(hntKeypair.publicKey))[0];
   if (!(await provider.connection.getAccountInfo(dao))) {

@@ -1,9 +1,9 @@
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 
-export function dataCreditsKey(programId = PROGRAM_ID): [PublicKey, number] {
+export function dataCreditsKey(dcMint: PublicKey, programId = PROGRAM_ID): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("dc", "utf-8")],
+    [Buffer.from("dc", "utf-8"), dcMint.toBuffer()],
     programId
   );
 }

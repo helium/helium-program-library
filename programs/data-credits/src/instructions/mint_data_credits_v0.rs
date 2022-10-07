@@ -6,18 +6,27 @@ use anchor_spl::{
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct MintDataCreditsV0Args {
+pub struct MintDataCreditsArgsV0 {
   amount: u64,
 }
 
 #[derive(Accounts)]
-#[instruction(args: MintDataCreditsV0Args)]
+#[instruction(args: MintDataCreditsArgsV0)]
 pub struct MintDataCreditsV0<'info> {
-  #[account(seeds=["dc".as_bytes()], bump=data_credits.data_credits_bump, has_one=hnt_mint, has_one=dc_mint)]
+  #[account(
+    seeds = [
+      "dc".as_bytes(),
+      dc_mint.key().as_ref(),
+    ], 
+    bump = data_credits.data_credits_bump, 
+    has_one = hnt_mint, 
+    has_one = dc_mint
+  )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
 
   // hnt tokens from this account are burned
-  #[account(mut,
+  #[account(
+    mut,
     constraint = burner.mint == hnt_mint.key(),
     constraint = burner.amount >= args.amount,
     has_one = owner
@@ -85,8 +94,12 @@ impl<'info> MintDataCreditsV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsV0Args) -> Result<()> {
-  let signer_seeds: &[&[&[u8]]] = &[&[b"dc", &[ctx.accounts.data_credits.data_credits_bump]]];
+pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> Result<()> {
+  let signer_seeds: &[&[&[u8]]] = &[&[
+    b"dc", 
+    ctx.accounts.dc_mint.to_account_info().key.as_ref(),
+    &[ctx.accounts.data_credits.data_credits_bump]
+  ]];
 
   // burn the hnt tokens
   token::burn(ctx.accounts.burn_ctx(), args.amount)?;

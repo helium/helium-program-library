@@ -5,7 +5,7 @@
       "path": "../idls"
     },
     {
-      "path": "../helium-sub-daos"
+      "path": "../helium-sub-daos-sdk"
     },
     {
       "path": "../spl-utils"

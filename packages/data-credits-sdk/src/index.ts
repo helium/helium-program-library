@@ -29,8 +29,3 @@ export async function init(
 
   return dataCredits;
 }
-
-export const isInitialized = async (program: Program<DataCredits>) =>
-  (await program.provider.connection.getAccountInfo(dataCreditsKey()[0]))
-    ? true
-    : false;
