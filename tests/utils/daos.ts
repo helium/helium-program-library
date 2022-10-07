@@ -13,6 +13,7 @@ export async function initTestDao(
   provider: anchor.AnchorProvider,
   epochRewards: number,
   authority: PublicKey,
+  dcMint?: PublicKey,
   mint?: PublicKey
 ): Promise<{
   mint: PublicKey;
@@ -23,6 +24,10 @@ export async function initTestDao(
     mint = await createMint(provider, 6, authority, authority);
   }
 
+  if (!dcMint) {
+    dcMint = await createMint(provider, 6, authority, authority);
+  }
+
   const method = await program.methods
     .initializeDaoV0({
       authority: authority,
@@ -30,6 +35,7 @@ export async function initTestDao(
     })
     .accounts({
       mint,
+      dcMint
     });
   const { dao, treasury } = await method.pubkeys();
 

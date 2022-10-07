@@ -65,6 +65,7 @@ pub struct InitializeHotspotConfigV0<'info> {
     bump,
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
+  pub dc_mint: Box<Account<'info, Mint>>,
 
   /// CHECK: Checked with constraints
   #[account(address = mpl_token_metadata::ID)]
@@ -152,6 +153,7 @@ pub fn handler(
   ctx.accounts.hotspot_config.set_inner(HotspotConfigV0 {
     dc_fee: args.dc_fee,
     collection: ctx.accounts.collection.key(),
+    dc_mint: ctx.accounts.dc_mint.key(),
     onboarding_server: args.onboarding_server,
     authority: args.onboarding_server,
     bump_seed: ctx.bumps["hotspot_config"],

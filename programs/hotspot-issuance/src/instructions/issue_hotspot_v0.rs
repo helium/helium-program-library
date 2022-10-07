@@ -60,7 +60,8 @@ pub struct IssueHotspotV0<'info> {
     seeds = ["hotspot_config".as_bytes(), collection.key().as_ref()],
     bump = hotspot_config.bump_seed,
     has_one = collection,
-    has_one = onboarding_server
+    has_one = onboarding_server,
+    has_one = dc_mint
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
   #[account(

@@ -4,6 +4,7 @@ use anchor_lang::prelude::*;
 #[derive(Default)]
 pub struct DaoV0 {
   pub mint: Pubkey,
+  pub dc_mint: Pubkey,
   pub authority: Pubkey,
   pub treasury: Pubkey,
   pub num_sub_daos: u32,

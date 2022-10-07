@@ -19,7 +19,8 @@ import { init as initHotspotIssuance } from "../packages/hotspot-issuance-sdk/sr
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { HotspotIssuance } from "../target/types/hotspot_issuance";
-import { ensureDCIdl, initTestHotspotConfig, initTestHotspotIssuer, initWorld } from "./utils/fixtures";
+import { DC_FEE, ensureDCIdl, initTestHotspotConfig, initTestHotspotIssuer, initWorld } from "./utils/fixtures";
+import { createAtaAndMint } from "./utils/token";
 
 describe("hotspot-issuance", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -65,7 +66,7 @@ describe("hotspot-issuance", () => {
       onboardingServerKeypair.publicKey.toBase58()
     );
     expect(account.collection.toBase58()).eq(collection.toBase58());
-    expect(account.dcFee.toString()).eq(toBN(1, 8).toString());
+    expect(account.dcFee.toString()).eq(toBN(DC_FEE, 8).toString());
     expect(account.onboardingServer.toBase58()).eq(
       onboardingServerKeypair.publicKey.toBase58()
     );
@@ -102,11 +103,12 @@ describe("hotspot-issuance", () => {
         hotspotConfig: hsConfig,
         issuer
        } = await initWorld(provider, hsProgram, hsdProgram, dcProgram);
+      await createAtaAndMint(provider, dataCredits.hntMint, 10000000000000000);
       const ix = await mintDataCreditsInstructions({
         program: dcProgram,
         provider,
         dcMint: dataCredits.dcMint,
-        amount: 1,
+        amount: DC_FEE,
       });
 
       dcMint = dataCredits.dcMint;
@@ -126,7 +128,6 @@ describe("hotspot-issuance", () => {
       const method = await hsProgram.methods
         .issueHotspotV0({ eccCompact: Buffer.from(ecc) })
         .accounts({
-          dcMint,
           hotspotIssuer,
           hotspotOwner,
           onboardingServer: onboardingServerKeypair.publicKey,

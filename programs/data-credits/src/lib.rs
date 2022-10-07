@@ -34,7 +34,7 @@ pub mod data_credits {
   ) -> Result<()> {
     instructions::burn_data_credits_v0::handler(ctx, args)
   }
-  
+
   pub fn burn_from_issuance_v0(
     ctx: Context<BurnFromIssuanceV0>,
     args: BurnFromIssuanceV0Args,

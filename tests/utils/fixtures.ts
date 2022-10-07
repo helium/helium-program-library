@@ -14,6 +14,8 @@ import { createAtaAndMint, createMint } from "./token";
 const DEFAULT_METADATA_URL =
   "https://c3zu2nc2m4x6zvqf5lofrtdbsa4niuh6drvzi7lq4n465ykbd3fa.arweave.net/FvNNNFpnL-zWBercWMxhkDjUUP4ca5R9cON57uFBHso/";
 
+export const DC_FEE = 5000000;
+
 export const initTestDataCredits = async (
   program: Program<DataCredits>,
   provider: anchor.AnchorProvider,
@@ -54,21 +56,34 @@ export const initTestDataCredits = async (
 
 export const initTestHotspotConfig = async (
   program: Program<HotspotIssuance>,
-  provider: anchor.AnchorProvider
+  provider: anchor.AnchorProvider,
+  dcMint?: PublicKey
 ): Promise<{
   collection: PublicKey;
   hotspotConfig: PublicKey;
   onboardingServerKeypair: Keypair;
 }> => {
+  if (!dcMint) {
+    dcMint = await createMint(
+      provider,
+      6,
+      provider.wallet.publicKey,
+      provider.wallet.publicKey
+    );
+  }
+
   const onboardingServerKeypair = Keypair.generate();
   const method = await program.methods
     .initializeHotspotConfigV0({
       name: "Helium Network Hotspots",
       symbol: random(), // symbol is unique would need to restart localnet everytime
       metadataUrl: DEFAULT_METADATA_URL,
-      dcFee: toBN(4000000, 8),
+      dcFee: toBN(DC_FEE, 8),
       onboardingServer: onboardingServerKeypair.publicKey,
     })
+    .accounts({
+      dcMint,
+    });
 
   const { collection, hotspotConfig } = await method.pubkeys();
   await method.rpc();
@@ -150,13 +165,18 @@ export const initWorld = async (
     makerKeypair: Keypair;
   };
 }> => {
-  const hotspotConfig = await initTestHotspotConfig(hsProgram, provider);
   const dataCredits = await initTestDataCredits(dcProgram, provider);
+  const hotspotConfig = await initTestHotspotConfig(
+    hsProgram,
+    provider,
+    dataCredits.dcMint
+  );
   const dao = await initTestDao(
     hsdProgram,
     provider,
     50,
     provider.wallet.publicKey,
+    dataCredits.dcMint,
     dataCredits.hntMint
   );
   const subDao = await initTestSubdao(

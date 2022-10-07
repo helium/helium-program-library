@@ -5,6 +5,7 @@ use anchor_lang::prelude::*;
 pub struct HotspotConfigV0 {
   pub dc_fee: u64,        // Data Credit burn amount required for collection item
   pub collection: Pubkey, // The metaplex collection to be issued
+  pub dc_mint: Pubkey,
   pub onboarding_server: Pubkey,
   pub authority: Pubkey,
 

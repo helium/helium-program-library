@@ -1,6 +1,9 @@
 use crate::state::DataCreditsV0;
 use anchor_lang::prelude::*;
-use anchor_spl::{token::{Burn, FreezeAccount, Mint, ThawAccount, Token, TokenAccount}, associated_token::AssociatedToken};
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token::{Burn, FreezeAccount, Mint, ThawAccount, Token, TokenAccount},
+};
 
 #[derive(Accounts)]
 pub struct BurnCommonV0<'info> {
@@ -8,7 +11,7 @@ pub struct BurnCommonV0<'info> {
     seeds=[
       "dc".as_bytes(),
       dc_mint.key().as_ref(),
-    ], 
+    ],
     bump = data_credits.data_credits_bump,
     has_one = dc_mint
   )]
@@ -42,10 +45,7 @@ impl<'info> BurnCommonV0<'info> {
       authority: self.owner.to_account_info(),
     };
 
-    CpiContext::new(
-      self.token_program.to_account_info(),
-      cpi_accounts
-    )
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 
   pub fn thaw_ctx(&self) -> CpiContext<'_, '_, '_, 'info, ThawAccount<'info>> {
@@ -54,10 +54,7 @@ impl<'info> BurnCommonV0<'info> {
       mint: self.dc_mint.to_account_info(),
       authority: self.data_credits.to_account_info(),
     };
-    CpiContext::new(
-      self.token_program.to_account_info(), 
-      cpi_accounts
-    )
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 
   pub fn freeze_ctx(&self) -> CpiContext<'_, '_, '_, 'info, FreezeAccount<'info>> {
@@ -66,9 +63,6 @@ impl<'info> BurnCommonV0<'info> {
       mint: self.dc_mint.to_account_info(),
       authority: self.data_credits.to_account_info(),
     };
-    CpiContext::new(
-      self.token_program.to_account_info(),
-      cpi_accounts,
-    )
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 }

@@ -136,6 +136,7 @@ async function run() {
         rewardPerEpoch: new anchor.BN(EPOCH_REWARDS),
       })
       .accounts({
+        dcMint: dcKeypair.publicKey,
         mint: hntKeypair.publicKey,
       })
       .rpc();

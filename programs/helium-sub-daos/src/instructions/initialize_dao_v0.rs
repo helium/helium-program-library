@@ -25,6 +25,7 @@ pub struct InitializeDaoV0<'info> {
     constraint = mint_authority.key() == mint.mint_authority.unwrap()
   )]
   pub mint: Box<Account<'info, Mint>>,
+  pub dc_mint: Box<Account<'info, Mint>>,
   pub mint_authority: Signer<'info>,
   #[account(
     init,
@@ -42,6 +43,7 @@ pub struct InitializeDaoV0<'info> {
 
 pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Result<()> {
   ctx.accounts.dao.set_inner(DaoV0 {
+    dc_mint: ctx.accounts.dc_mint.key(),
     mint: ctx.accounts.mint.key(),
     treasury: ctx.accounts.treasury.key(),
     authority: args.authority,

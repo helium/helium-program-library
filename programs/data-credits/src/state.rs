@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::*};
+use anchor_lang::prelude::*;
 
 #[account]
 #[derive(Default)]
@@ -10,4 +10,3 @@ pub struct DataCreditsV0 {
   pub account_payer: Pubkey,
   pub account_payer_bump: u8,
 }
-

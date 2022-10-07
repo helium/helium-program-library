@@ -86,6 +86,7 @@ describe("data-credits", () => {
           rewardPerEpoch: new BN(EPOCH_REWARDS),
         })
         .accounts({
+          dcMint,
           mint: hntMint,
         });
       dao = (await method.pubkeys()).dao!;

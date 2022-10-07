@@ -1,10 +1,10 @@
 use crate::errors::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
+use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::Mint;
 use anchor_spl::token::Token;
-use anchor_spl::token::{SetAuthority, set_authority};
-use anchor_spl::token::spl_token::instruction::AuthorityType;
+use anchor_spl::token::{set_authority, SetAuthority};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDataCreditsV0Args {
@@ -69,21 +69,23 @@ pub fn handler(
     CpiContext::new(
       ctx.accounts.token_program.to_account_info(),
       SetAuthority {
-      account_or_mint: ctx.accounts.dc_mint.to_account_info(),
-      current_authority: ctx.accounts.mint_authority.to_account_info(),
-    }), 
-    AuthorityType::MintTokens,  
-    dc_authority
+        account_or_mint: ctx.accounts.dc_mint.to_account_info(),
+        current_authority: ctx.accounts.mint_authority.to_account_info(),
+      },
+    ),
+    AuthorityType::MintTokens,
+    dc_authority,
   )?;
   set_authority(
     CpiContext::new(
       ctx.accounts.token_program.to_account_info(),
       SetAuthority {
-      account_or_mint: ctx.accounts.dc_mint.to_account_info(),
-      current_authority: ctx.accounts.mint_authority.to_account_info(),
-    }), 
-    AuthorityType::FreezeAccount,  
-    dc_authority
+        account_or_mint: ctx.accounts.dc_mint.to_account_info(),
+        current_authority: ctx.accounts.mint_authority.to_account_info(),
+      },
+    ),
+    AuthorityType::FreezeAccount,
+    dc_authority,
   )?;
   Ok(())
 }

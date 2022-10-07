@@ -13,7 +13,7 @@ import { init as issuerInit } from "../packages/hotspot-issuance-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HotspotIssuance } from "../target/types/hotspot_issuance";
 import { initTestDao, initTestSubdao } from "./utils/daos";
-import { ensureDCIdl, initWorld } from "./utils/fixtures";
+import { DC_FEE, ensureDCIdl, initWorld } from "./utils/fixtures";
 import {
   createAtaAndMint,
   createMint,
@@ -111,7 +111,7 @@ describe("helium-sub-daos", () => {
             provider,
             dcMint,
             program: dcProgram,
-            amount: toBN(4000000, 8),
+            amount: toBN(DC_FEE, 8),
           })
         ).instructions
       );
@@ -119,7 +119,6 @@ describe("helium-sub-daos", () => {
       const method = await issuerProgram.methods
         .issueHotspotV0({ eccCompact: Buffer.from(ecc) })
         .accounts({
-          dcMint,
           hotspotIssuer,
           onboardingServer: onboardingServerKeypair.publicKey,
           maker: makerKeypair.publicKey,
@@ -195,7 +194,7 @@ describe("helium-sub-daos", () => {
 
     it("calculates subdao rewards", async () => {
       await createHospot()
-      const { subDaoEpochInfo } = await burnDc(50000000);
+      const { subDaoEpochInfo } = await burnDc(400000);
       const epoch = (
         await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
       ).epoch;
@@ -219,6 +218,7 @@ describe("helium-sub-daos", () => {
       );
 
       expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
+      // 4 dc burned, activation fee of 50
       // sqrt(4) * sqrt(1 * 50) = 14.14213562373095 = 14_142_135_623_730
       const totalUtility = "14142135623730";
       expect(daoInfo.totalUtilityScore.toString()).to.eq(totalUtility);

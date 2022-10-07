@@ -1,6 +1,6 @@
-use crate::{state::*};
-use anchor_lang::prelude::*;
 use super::common::*;
+use crate::state::*;
+use anchor_lang::prelude::*;
 use anchor_spl::token::{self};
 use helium_sub_daos::{
   cpi::{accounts::TrackDcBurnV0, track_dc_burn_v0},
@@ -46,7 +46,7 @@ pub struct BurnDataCreditsArgsV0 {
 }
 
 #[derive(Accounts)]
-pub struct  BurnDataCreditsV0<'info> {
+pub struct BurnDataCreditsV0<'info> {
   pub tracker_accounts: TrackDcBurnV0Wrapper<'info>,
   pub burn_accounts: BurnCommonV0<'info>,
   pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
@@ -68,19 +68,44 @@ impl<'info> TrackDcBurnV0Wrapper<'info> {
 pub fn handler(ctx: Context<BurnDataCreditsV0>, args: BurnDataCreditsArgsV0) -> Result<()> {
   let signer_seeds: &[&[&[u8]]] = &[&[
     "dc".as_bytes(),
-    ctx.accounts.burn_accounts.dc_mint.to_account_info().key.as_ref(),
-    &[ctx.accounts.burn_accounts.data_credits.data_credits_bump]
+    ctx
+      .accounts
+      .burn_accounts
+      .dc_mint
+      .to_account_info()
+      .key
+      .as_ref(),
+    &[ctx.accounts.burn_accounts.data_credits.data_credits_bump],
   ]];
   // unfreeze the burner if necessary
   if ctx.accounts.burn_accounts.burner.is_frozen() {
-    token::thaw_account(ctx.accounts.burn_accounts.thaw_ctx().with_signer(signer_seeds))?;
+    token::thaw_account(
+      ctx
+        .accounts
+        .burn_accounts
+        .thaw_ctx()
+        .with_signer(signer_seeds),
+    )?;
   }
 
   // burn the dc tokens
-  token::burn(ctx.accounts.burn_accounts.burn_ctx().with_signer(signer_seeds), args.amount)?;
+  token::burn(
+    ctx
+      .accounts
+      .burn_accounts
+      .burn_ctx()
+      .with_signer(signer_seeds),
+    args.amount,
+  )?;
 
   // freeze the burner
-  token::freeze_account(ctx.accounts.burn_accounts.freeze_ctx().with_signer(signer_seeds))?;
+  token::freeze_account(
+    ctx
+      .accounts
+      .burn_accounts
+      .freeze_ctx()
+      .with_signer(signer_seeds),
+  )?;
 
   let payer_seeds: &[&[&[u8]]] = &[&[
     b"account_payer",

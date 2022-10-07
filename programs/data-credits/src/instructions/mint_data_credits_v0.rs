@@ -96,9 +96,9 @@ impl<'info> MintDataCreditsV0<'info> {
 
 pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> Result<()> {
   let signer_seeds: &[&[&[u8]]] = &[&[
-    b"dc", 
+    b"dc",
     ctx.accounts.dc_mint.to_account_info().key.as_ref(),
-    &[ctx.accounts.data_credits.data_credits_bump]
+    &[ctx.accounts.data_credits.data_credits_bump],
   ]];
 
   // burn the hnt tokens
