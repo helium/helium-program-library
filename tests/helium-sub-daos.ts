@@ -1,5 +1,4 @@
 import { HeliumSubDaos } from "@helium-foundation/idls/lib/types/helium_sub_daos";
-import { TestTracker } from "@helium-foundation/idls/lib/types/test_tracker";
 import { sendInstructions, toBN } from "@helium-foundation/spl-utils";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import * as anchor from "@project-serum/anchor";
@@ -37,7 +36,6 @@ describe("helium-sub-daos", () => {
   let dcProgram: Program<DataCredits>;
   let issuerProgram: Program<HotspotIssuance>;
 
-  anchor.workspace.TestTracker as Program<TestTracker>;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
 

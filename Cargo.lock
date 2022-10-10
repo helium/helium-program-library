@@ -1349,15 +1349,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test-tracker"
-version = "0.0.1"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "helium-sub-daos",
-]
-
-[[package]]
 name = "thiserror"
 version = "1.0.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"

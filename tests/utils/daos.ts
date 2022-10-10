@@ -1,12 +1,8 @@
-import { sendInstructions } from "@helium-foundation/spl-utils";
-import { AccountLayout } from "@solana/spl-token";
 import * as anchor from "@project-serum/anchor";
-import { BN, Program } from "@project-serum/anchor";
-import { SystemProgram, PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
-import { heliumSubDaosResolvers } from "../../packages/helium-sub-daos-sdk/src";
+import { BN } from "@project-serum/anchor";
+import { PublicKey } from "@solana/web3.js";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
-import { TestTracker } from "../../target/types/test_tracker";
-import { createAtaAndMint, createMint, mintTo } from "./token";
+import { createAtaAndMint, createMint } from "./token";
 
 export async function initTestDao(
   program: anchor.Program<HeliumSubDaos>,
