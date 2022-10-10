@@ -125,7 +125,7 @@ async function run() {
       authority: provider.wallet.publicKey,
     })
     .accounts({ hntMint: hntKeypair.publicKey, dcMint: dcKeypair.publicKey })
-    .rpc();
+    .rpc({ skipPreflight: true });
 
   const dao = (await daoKey(hntKeypair.publicKey))[0];
   if (!(await provider.connection.getAccountInfo(dao))) {
@@ -139,7 +139,7 @@ async function run() {
         dcMint: dcKeypair.publicKey,
         mint: hntKeypair.publicKey,
       })
-      .rpc();
+      .rpc({ skipPreflight: true });
   }
 
   const mobileSubdao = (await daoKey(hntKeypair.publicKey))[0];
@@ -315,7 +315,9 @@ export async function createAtaAndMint(
   mintTx.add(...instructions);
 
   try {
-    await provider.sendAndConfirm(mintTx, undefined, confirmOptions);
+    if (instructions.length > 0) {
+      await provider.sendAndConfirm(mintTx, undefined, confirmOptions);
+    }
   } catch (e: any) {
     console.log("Error", e, e.logs);
     if (e.logs) {

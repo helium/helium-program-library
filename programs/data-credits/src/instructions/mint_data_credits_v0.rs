@@ -17,9 +17,9 @@ pub struct MintDataCreditsV0<'info> {
     seeds = [
       "dc".as_bytes(),
       dc_mint.key().as_ref(),
-    ], 
-    bump = data_credits.data_credits_bump, 
-    has_one = hnt_mint, 
+    ],
+    bump = data_credits.data_credits_bump,
+    has_one = hnt_mint,
     has_one = dc_mint
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,

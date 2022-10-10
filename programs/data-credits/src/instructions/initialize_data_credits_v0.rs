@@ -2,9 +2,8 @@ use crate::errors::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
-use anchor_spl::token::Mint;
-use anchor_spl::token::Token;
 use anchor_spl::token::{set_authority, SetAuthority};
+use anchor_spl::token::{Mint, Token};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDataCreditsV0Args {
@@ -28,6 +27,7 @@ pub struct InitializeDataCreditsV0<'info> {
   pub dc_mint: Box<Account<'info, Mint>>,
 
   pub mint_authority: Signer<'info>,
+  pub freeze_authority: Signer<'info>,
 
   /// CHECK: Verified by cpi
   #[account(
@@ -81,7 +81,7 @@ pub fn handler(
       ctx.accounts.token_program.to_account_info(),
       SetAuthority {
         account_or_mint: ctx.accounts.dc_mint.to_account_info(),
-        current_authority: ctx.accounts.mint_authority.to_account_info(),
+        current_authority: ctx.accounts.freeze_authority.to_account_info(),
       },
     ),
     AuthorityType::FreezeAccount,

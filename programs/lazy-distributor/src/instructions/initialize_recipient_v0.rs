@@ -8,7 +8,7 @@ pub struct InitializeRecipientV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
-    seeds = ["lazy_distributor".as_bytes(), lazy_distributor.collection.as_ref(), lazy_distributor.rewards_mint.as_ref()],
+    seeds = ["lazy_distributor".as_bytes(), lazy_distributor.rewards_mint.as_ref()],
     bump = lazy_distributor.bump_seed,
   )]
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
@@ -25,9 +25,7 @@ pub struct InitializeRecipientV0<'info> {
     seeds = ["metadata".as_bytes(), mpl_token_metadata::ID.as_ref(), mint.key().as_ref()],
     seeds::program = mpl_token_metadata::ID,
     bump,
-    has_one = mint,
-    constraint = target_metadata.collection.as_ref().map(|v| v.verified).unwrap(),
-    constraint = target_metadata.collection.as_ref().map(|v| v.key == lazy_distributor.collection).unwrap(),
+    has_one = mint
   )]
   pub target_metadata: Box<Account<'info, Metadata>>,
   pub system_program: Program<'info, System>,

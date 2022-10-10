@@ -3,6 +3,27 @@
 A collection of solana programs used for Helium's Solana integration
 
 
+## Overall Design
+
+![Overall Design](./out/diagrams/architecture/architecture.png)
+
+![ERD](./out/diagrams/erd/erd.png)
+
+## Helium Sub Daos
+
+Helium Sub Daos manages the daos and rewards structure of the Helium ecosystem. Other programs in the ecosystem
+are expected to call out to helium sub daos to update rewardable actions, like issuing a new hotspot and burning
+data credits
+
+## Data Credits
+
+Data credits manages the soulbound helium data credits, and how they can be burned to do several actions on the network. It also manages reading from an oracle to allow burning HNT for data credits
+
+## Hotspot Issuance
+
+Hotspot issuance is responsible for issuing the various types of hotspots that Helium supports (wifi, iot, mobile, etc)
+
+
 ## Lazy Distributor
 
 The lazy distributor is an oracle-powered token distributor that distributes tokens to holders

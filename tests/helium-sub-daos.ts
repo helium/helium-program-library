@@ -3,7 +3,7 @@ import { TestTracker } from "@helium-foundation/idls/lib/types/test_tracker";
 import { sendInstructions, toBN } from "@helium-foundation/spl-utils";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import * as anchor from "@project-serum/anchor";
-import { BN, Program } from "@project-serum/anchor";
+import { Program } from "@project-serum/anchor";
 import { AccountLayout } from "@solana/spl-token";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { expect } from "chai";
@@ -15,10 +15,7 @@ import { HotspotIssuance } from "../target/types/hotspot_issuance";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import { DC_FEE, ensureDCIdl, initWorld } from "./utils/fixtures";
 import {
-  createAtaAndMint,
-  createMint,
-  createTestNft,
-  mintTo,
+  createAtaAndMint, createTestNft
 } from "./utils/token";
 
 const EPOCH_REWARDS = 100000000;
@@ -59,11 +56,10 @@ describe("helium-sub-daos", () => {
   });
 
   it("initializes a dao", async () => {
-    const { dao, treasury, mint } = await initTestDao(program, provider, EPOCH_REWARDS, provider.wallet.publicKey);
+    const { dao, mint } = await initTestDao(program, provider, EPOCH_REWARDS, provider.wallet.publicKey);
     const account = await program.account.daoV0.fetch(dao!);
     expect(account.authority.toBase58()).eq(me.toBase58());
     expect(account.mint.toBase58()).eq(mint.toBase58());
-    expect(account.treasury.toBase58()).eq(treasury!.toBase58());
   });
 
   it("initializes a subdao", async () => {
@@ -91,9 +87,6 @@ describe("helium-sub-daos", () => {
     let subDao: PublicKey;
     let hotspotIssuer: PublicKey;
     let treasury: PublicKey;
-    let daoTreasury: PublicKey;
-    let hntMint: PublicKey;
-    let mint: PublicKey;
     let dcMint: PublicKey;
     let onboardingServerKeypair: Keypair;
     let makerKeypair: Keypair;
@@ -131,6 +124,8 @@ describe("helium-sub-daos", () => {
       await method.rpc({
         skipPreflight: true
       });
+
+      return subDaoEpochInfo
     }
 
     async function burnDc(amount: number): Promise<{ subDaoEpochInfo: PublicKey }> {
@@ -164,15 +159,14 @@ describe("helium-sub-daos", () => {
       return ix.output
     }
 
-    before(async () => {
+    beforeEach(async () => {
       ({
         dataCredits: { dcMint },
         hotspotConfig: { onboardingServerKeypair },
-        subDao: { subDao, treasury, mint },
-        dao: { dao, treasury: daoTreasury, mint: hntMint },
+        subDao: { subDao, treasury },
+        dao: { dao },
         issuer: { makerKeypair, hotspotIssuer },
-      } = await initWorld(provider, issuerProgram, program, dcProgram));
-      await createAtaAndMint(provider, hntMint, toBN(500000000, 8));
+      } = await initWorld(provider, issuerProgram, program, dcProgram, EPOCH_REWARDS));
     });
 
     it("allows tracking hotspots", async () => {
@@ -181,6 +175,9 @@ describe("helium-sub-daos", () => {
         subDaoEpochInfo
       );
       expect(epochInfo.totalDevices.toNumber()).eq(1);
+
+      const subDaoAcct = await program.account.subDaoV0.fetch(subDao);
+      expect(subDaoAcct.totalDevices.toNumber()).eq(1);
     });
 
     it("allows tracking dc spend", async () => {
@@ -189,6 +186,7 @@ describe("helium-sub-daos", () => {
       const epochInfo = await program.account.subDaoEpochInfoV0.fetch(
         subDaoEpochInfo
       );
+      
       expect(epochInfo.dcBurned.toNumber()).eq(toBN(10, 8).toNumber());
     });
 
@@ -218,6 +216,7 @@ describe("helium-sub-daos", () => {
       );
 
       expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
+
       // 4 dc burned, activation fee of 50
       // sqrt(4) * sqrt(1 * 50) = 14.14213562373095 = 14_142_135_623_730
       const totalUtility = "14142135623730";
@@ -229,6 +228,8 @@ describe("helium-sub-daos", () => {
       let epoch: anchor.BN;
 
       beforeEach(async () => {
+        await createHospot();
+        const { subDaoEpochInfo } = await burnDc(400000);
         epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
           .epoch;
         await program.methods
@@ -239,11 +240,13 @@ describe("helium-sub-daos", () => {
             subDao,
             dao,
           })
-          .rpc();
+          .rpc({ skipPreflight: true });
       });
 
       it("issues rewards to subdaos", async () => {
-        await mintTo(provider, mint, EPOCH_REWARDS, daoTreasury);
+        const preBalance = AccountLayout.decode(
+          (await provider.connection.getAccountInfo(treasury))?.data!
+        ).amount;
         await sendInstructions(provider, [
           await program.methods
             .issueRewardsV0({
@@ -255,10 +258,10 @@ describe("helium-sub-daos", () => {
             .instruction(),
         ]);
 
-        const accountInfo = AccountLayout.decode(
+        const postBalance = AccountLayout.decode(
           (await provider.connection.getAccountInfo(treasury))?.data!
-        );
-        expect(accountInfo.amount.toString()).to.eq(EPOCH_REWARDS.toString());
+        ).amount;
+        expect((postBalance - preBalance).toString()).to.eq(EPOCH_REWARDS.toString());
       });
     });
   });

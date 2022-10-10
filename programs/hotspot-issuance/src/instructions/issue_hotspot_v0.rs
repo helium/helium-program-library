@@ -146,6 +146,7 @@ pub struct IssueHotspotV0<'info> {
   #[account(mut)]
   pub sub_dao_epoch_info: AccountInfo<'info>,
   /// CHECK: Verified by cpi
+  #[account(mut)]
   pub sub_dao: AccountInfo<'info>,
 
   /// CHECK: Verified by constraint  
@@ -207,7 +208,7 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotV0Args) -> Result
   let decoded = bs58::encode(args.ecc_compact.clone()).into_string();
   let animal_name: AnimalName = decoded
     .parse()
-    .map_err(|e| error!(ErrorCode::InvalidEccCompact))?;
+    .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
 
   let signer_seeds: &[&[&[u8]]] = &[&[
     b"hotspot_issuer",

@@ -18,14 +18,14 @@ export async function initTestDao(
 ): Promise<{
   mint: PublicKey;
   dao: PublicKey;
-  treasury: PublicKey;
 }> {
+  const me = provider.wallet.publicKey;
   if (!mint) {
-    mint = await createMint(provider, 6, authority, authority);
+    mint = await createMint(provider, 6, me, me);
   }
 
   if (!dcMint) {
-    dcMint = await createMint(provider, 6, authority, authority);
+    dcMint = await createMint(provider, 6, me, me);
   }
 
   const method = await program.methods
@@ -37,13 +37,13 @@ export async function initTestDao(
       mint,
       dcMint
     });
-  const { dao, treasury } = await method.pubkeys();
+  const { dao } = await method.pubkeys();
 
   if (!(await provider.connection.getAccountInfo(dao!))) {
-    await method.rpc();
+    await method.rpc({ skipPreflight: true });
   }
 
-  return { mint, dao: dao!, treasury: treasury! };
+  return { mint, dao: dao! };
 }
 
 export async function initTestSubdao(
@@ -72,7 +72,7 @@ export async function initTestSubdao(
       mint: daoAcc.mint,
     });
   const { subDao } = await method.pubkeys();
-  await method.rpc();
+  await method.rpc({ skipPreflight: true });
 
   return { mint: subDaoMint, subDao: subDao!, treasury };
 }

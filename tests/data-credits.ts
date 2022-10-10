@@ -91,7 +91,7 @@ describe("data-credits", () => {
         });
       dao = (await method.pubkeys()).dao!;
       if (!(await provider.connection.getAccountInfo(dao))) {
-        await method.rpc();
+        await method.rpc({ skipPreflight: true });
       }
 
       const collection = (await createTestNft(provider, me)).mintKey;

@@ -1,6 +1,8 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use anchor_spl::token::spl_token::instruction::AuthorityType;
+use anchor_spl::token::{set_authority, SetAuthority};
+use anchor_spl::token::{Mint, Token};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDaoArgsV0 {
@@ -21,36 +23,47 @@ pub struct InitializeDaoV0<'info> {
     bump,
   )]
   pub dao: Box<Account<'info, DaoV0>>,
-  #[account(
-    constraint = mint_authority.key() == mint.mint_authority.unwrap()
-  )]
+  #[account(mut)]
   pub mint: Box<Account<'info, Mint>>,
-  pub dc_mint: Box<Account<'info, Mint>>,
   pub mint_authority: Signer<'info>,
-  #[account(
-    init,
-    payer = payer,
-    seeds = ["dao_treasury".as_bytes(), dao.key().as_ref()],
-    bump,
-    token::mint = mint,
-    token::authority = dao,
-  )]
-  pub treasury: Box<Account<'info, TokenAccount>>,
+  pub freeze_authority: Signer<'info>,
+  pub dc_mint: Box<Account<'info, Mint>>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Result<()> {
+  set_authority(
+    CpiContext::new(
+      ctx.accounts.token_program.to_account_info(),
+      SetAuthority {
+        account_or_mint: ctx.accounts.mint.to_account_info(),
+        current_authority: ctx.accounts.mint_authority.to_account_info(),
+      },
+    ),
+    AuthorityType::MintTokens,
+    Some(ctx.accounts.dao.key()),
+  )?;
+  set_authority(
+    CpiContext::new(
+      ctx.accounts.token_program.to_account_info(),
+      SetAuthority {
+        account_or_mint: ctx.accounts.mint.to_account_info(),
+        current_authority: ctx.accounts.freeze_authority.to_account_info(),
+      },
+    ),
+    AuthorityType::FreezeAccount,
+    Some(ctx.accounts.dao.key()),
+  )?;
+
   ctx.accounts.dao.set_inner(DaoV0 {
     dc_mint: ctx.accounts.dc_mint.key(),
     mint: ctx.accounts.mint.key(),
-    treasury: ctx.accounts.treasury.key(),
     authority: args.authority,
     num_sub_daos: 0,
     reward_per_epoch: args.reward_per_epoch,
     bump_seed: ctx.bumps["dao"],
-    treasury_bump_seed: ctx.bumps["treasury"],
   });
 
   Ok(())

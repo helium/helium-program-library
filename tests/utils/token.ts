@@ -62,9 +62,13 @@ export async function createAtaAndMintInstructions(
       createAssociatedTokenAccountInstruction(payer, ata, to, mint)
     );
   }
-  instructions.push(
-    createMintToInstruction(mint, ata, authority, BigInt(amount.toString()))
-  );
+
+  if (amount != 0) {
+    instructions.push(
+      createMintToInstruction(mint, ata, authority, BigInt(amount.toString()))
+    );
+  }
+  
 
   return {
     instructions,
@@ -90,10 +94,12 @@ export async function createAtaAndMint(
     authority,
     payer
   );
-  mintTx.add(...instructions);
+  if (instructions.length > 0)
+    mintTx.add(...instructions);
 
   try {
-    await provider.sendAndConfirm(mintTx, undefined, confirmOptions);
+    if (instructions.length > 0)
+      await provider.sendAndConfirm(mintTx, undefined, confirmOptions);
   } catch (e: any) {
     console.log("Error", e, e.logs);
     if (e.logs) {

@@ -19,7 +19,7 @@ export const DC_FEE = 5000000;
 export const initTestDataCredits = async (
   program: Program<DataCredits>,
   provider: anchor.AnchorProvider,
-  startingHntbal: number = 100
+  startingHntbal: number = 10000000000,
 ): Promise<{
   dcKey: PublicKey;
   hntMint: PublicKey;
@@ -39,7 +39,7 @@ export const initTestDataCredits = async (
   await createAtaAndMint(
     provider,
     hntMint,
-    toBN(startingHntbal, 8).toNumber(),
+    toBN(startingHntbal, 8),
     me
   );
 
@@ -49,7 +49,7 @@ export const initTestDataCredits = async (
   
   const dcKey = (await initDataCredits.pubkeys()).dataCredits!;
 
-  await initDataCredits.rpc();
+  await initDataCredits.rpc({ skipPreflight: true });
 
   return { dcKey, hntMint, hntBal, dcMint, dcBal };
 };
@@ -86,7 +86,7 @@ export const initTestHotspotConfig = async (
     });
 
   const { collection, hotspotConfig } = await method.pubkeys();
-  await method.rpc();
+  await method.rpc({ skipPreflight: true });
 
   return {
     collection: collection!,
@@ -114,7 +114,7 @@ export const initTestHotspotIssuer = async (
     });
 
   const { hotspotIssuer } = await method.pubkeys();
-  await method.rpc();
+  await method.rpc({ skipPreflight: true });
 
   return {
     hotspotIssuer: hotspotIssuer!,
@@ -140,9 +140,10 @@ export const initWorld = async (
   provider: anchor.AnchorProvider,
   hsProgram: Program<HotspotIssuance>,
   hsdProgram: Program<HeliumSubDaos>,
-  dcProgram: Program<DataCredits>
+  dcProgram: Program<DataCredits>,
+  epochRewards?: number
 ): Promise<{
-  dao: { mint: PublicKey; dao: PublicKey; treasury: PublicKey };
+  dao: { mint: PublicKey; dao: PublicKey; };
   subDao: {
     mint: PublicKey;
     subDao: PublicKey;
@@ -174,7 +175,7 @@ export const initWorld = async (
   const dao = await initTestDao(
     hsdProgram,
     provider,
-    50,
+    epochRewards || 50,
     provider.wallet.publicKey,
     dataCredits.dcMint,
     dataCredits.hntMint

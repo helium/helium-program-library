@@ -1,0 +1,164 @@
+@startuml
+
+frame HeliumSubDaos {
+  entity Dao {
+    "dao", mint
+    --
+    mint // hnt
+    authority
+    reward per epoch
+    dc_mint
+  }
+
+  entity SubDao {
+    "subdao", mint
+    --
+    dao
+    mint
+    treasury
+    authority
+    hotspot_collection
+  }
+
+  entity DaoEpochInfo {
+    "sub_dao_epoch_info", sub_dao, epoch
+    --
+    dao
+    ...
+  }
+
+  entity SubDaoEpochInfo {
+    "sub_dao_epoch_info", sub_dao, epoch
+    --
+    sub_dao
+    ...
+  }
+}
+
+frame DataCredits {
+  entity DataCredits {
+    "data_credits", dc_mint
+    --
+    dc_mint
+    ...
+  }
+
+  entity InUseDataCredits {
+    "in_use_data_credits", data_credits, manager, owner
+    --
+    data_credits
+    manager
+    owner
+    account
+    ...
+  }
+}
+
+frame SplToken {
+  entity InUseDataCreditsTokenAccount {
+    "in_use_data_credit_account", in_use_data_credits
+    --
+    amount
+    owner // Will be manager
+  }
+
+  entity TreasuryTokenAccount {
+    ...
+  }
+}
+
+frame HotspotIssuance {
+  entity HotspotConfig {
+    "hotspot_config", collection
+    --
+    dc_fee
+    dc_mint
+    collection
+    authority
+    onboarding_server
+  }
+
+  entity HotspotIssuer {
+    "hotspot_issuer", hotspot_config, maker
+    --
+    hotspot_config
+    maker
+    authority
+    ...
+  }
+}
+
+frame LazyDistributor {
+  entity LazyDistributor {
+    "lazy_distributor", rewards_mint
+    --
+    oracle_configs
+    rewards_mint
+    ...
+  }
+
+  entity Recipient {
+    "recipient", lazy_distributor, mint
+    ---
+    lazy_distributor
+    mint // nft
+    total_rewards
+    current_rewards
+    ...
+  }
+}
+
+frame Metaplex {
+  entity Collection
+  entity RewardableNFT {
+    "metadata", metadata_program_id, mint
+    --
+    name
+    symbol
+    url
+    ...
+  }
+}
+
+
+frame TreasuryManagement {
+  entity TreasuryManagement {
+    "treasury_management", treasury
+    --
+    treasury
+    reserve_mint
+    supply_mint
+    authority
+    curve
+    ...
+  }
+}
+
+DataCredits  ||--o{ InUseDataCredits
+InUseDataCredits ||--|| InUseDataCreditsTokenAccount
+
+SubDao ||--|| TreasuryTokenAccount
+TreasuryTokenAccount ||--|| TreasuryManagement
+
+Dao ||--|| DataCredits : pda(dc_mint)
+
+
+SubDao ||-|| LazyDistributor : PDA(mint)
+
+SubDao ||-|| Collection
+
+
+Dao ||--o{ SubDao
+Dao ||--o{ DaoEpochInfo 
+SubDao ||--o{ SubDaoEpochInfo
+
+HotspotConfig ||--o{ HotspotIssuer
+HotspotConfig ||--|| Collection
+
+LazyDistributor ||--o{ Recipient
+
+Recipient }o--|| RewardableNFT
+
+RewardableNFT ||-|| Collection
+
+@enduml

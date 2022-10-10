@@ -3,11 +3,10 @@ import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
-import { init, lazyDistributorKey, recipientKey } from "../packages/lazy-distributor-sdk/src";
+import { init } from "../packages/lazy-distributor-sdk/src";
 import { PROGRAM_ID } from "../packages/lazy-distributor-sdk/src/constants";
 import { LazyDistributor } from "../target/types/lazy_distributor";
-import { createMint, createTestNft, mintTo } from "./utils/token";
-import { AuthorityType, createSetAuthorityInstruction } from "@solana/spl-token";
+import { createMint, createTestNft } from "./utils/token";
 
 describe("lazy-distributor", () => {
   // Configure the client to use the local cluster.
@@ -16,35 +15,21 @@ describe("lazy-distributor", () => {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
   let program: Program<LazyDistributor>;
-  let collectionMint: PublicKey;
   let rewardsMint: PublicKey;
-  let lazyDistributor: PublicKey
 
   beforeEach(async () => {
-    const { mintKey: collectionKey } = await createTestNft(provider, me);
     program = await init(
       provider,
       PROGRAM_ID,
       anchor.workspace.LazyDistributor.idl
     );
 
-    collectionMint = collectionKey;
     rewardsMint = await createMint(provider, 6, me, me);
-    await sendInstructions(provider, [
-      await createSetAuthorityInstruction(
-        rewardsMint,
-        me,
-        AuthorityType.MintTokens,
-        (await lazyDistributorKey(collectionMint, rewardsMint))[0]
-      ),
-    ]);
-    
   });
 
   it("initializes a lazy distributor", async () => {
     const method = await program.methods.initializeLazyDistributorV0({
       authority: me,
-      collection: collectionMint,
       oracles: [
         {
           oracle: me,
@@ -56,7 +41,7 @@ describe("lazy-distributor", () => {
     });
 
     const { lazyDistributor } = await method.pubkeys();
-    await method.rpc();
+    await method.rpc({ skipPreflight: true });
     const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(
       lazyDistributor!
     );
@@ -74,13 +59,12 @@ describe("lazy-distributor", () => {
     let lazyDistributor: PublicKey;
 
     beforeEach(async () => {
-      const { mintKey } = await createTestNft(provider, me, collectionMint);
+      const { mintKey } = await createTestNft(provider, me);
       mint = mintKey;
 
       const method = await program.methods
         .initializeLazyDistributorV0({
           authority: me,
-          collection: collectionMint,
           oracles: [
             {
               oracle: me,
@@ -91,7 +75,7 @@ describe("lazy-distributor", () => {
         .accounts({
           rewardsMint,
         });
-      await method.rpc();
+      await method.rpc({ skipPreflight: true });
       lazyDistributor = (await method.pubkeys()).lazyDistributor!;
     });
 
@@ -100,7 +84,7 @@ describe("lazy-distributor", () => {
         lazyDistributor,
         mint
       });
-      await method.rpc();
+      await method.rpc({ skipPreflight: true });
       const recipient = (await method.pubkeys()).recipient!;
       const recipientAcc = await program.account.recipientV0.fetch(recipient);
 
@@ -122,7 +106,7 @@ describe("lazy-distributor", () => {
            lazyDistributor,
            mint,
          });
-         await method.rpc();
+         await method.rpc({ skipPreflight: true });
         recipient = (await method.pubkeys()).recipient!;
       });
 
@@ -136,7 +120,7 @@ describe("lazy-distributor", () => {
             lazyDistributor,
             recipient,
           })
-          .rpc();
+          .rpc({ skipPreflight: true });
         const recipientAcc = await program.account.recipientV0.fetch(recipient);
         // @ts-ignore
         expect(recipientAcc?.currentRewards.length).to.eq(1);
@@ -155,11 +139,11 @@ describe("lazy-distributor", () => {
             lazyDistributor,
             recipient,
           })
-          .rpc();
+          .rpc({ skipPreflight: true });
         const method = await program.methods
           .distributeRewardsV0()
           .accounts({ recipient, lazyDistributor, rewardsMint });
-        await method.rpc();
+        await method.rpc({ skipPreflight: true });
         const destination = (await method.pubkeys()).destinationAccount!;
 
         const balance = await provider.connection.getTokenAccountBalance(
@@ -177,11 +161,11 @@ describe("lazy-distributor", () => {
             lazyDistributor,
             recipient,
           })
-          .rpc();
+          .rpc({ skipPreflight: true });
         await program.methods
           .distributeRewardsV0()
           .accounts({ recipient, lazyDistributor, rewardsMint })
-          .rpc();
+          .rpc({ skipPreflight: true });
         const balance2 = await provider.connection.getTokenAccountBalance(
           destination
         );
@@ -200,12 +184,11 @@ describe("lazy-distributor", () => {
     let recipient: PublicKey;
 
     beforeEach(async () => {
-      const { mintKey } = await createTestNft(provider, me, collectionMint);
+      const { mintKey } = await createTestNft(provider, me);
       mint = mintKey;
       const method = await program.methods
         .initializeLazyDistributorV0({
           authority: me,
-          collection: collectionMint,
           oracles: [
             {
               oracle: oracle1.publicKey,
@@ -226,13 +209,13 @@ describe("lazy-distributor", () => {
         });
 
       lazyDistributor = (await method.pubkeys()).lazyDistributor!;
-      await method.rpc();
+      await method.rpc({ skipPreflight: true });
 
       const method2 = await program.methods.initializeRecipientV0().accounts({
         lazyDistributor,
         mint,
       });
-      await method2.rpc();
+      await method2.rpc({ skipPreflight: true });
       recipient = (await method2.pubkeys()).recipient!;
     });
 

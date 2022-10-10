@@ -23,6 +23,7 @@ pub struct TrackAddedDeviceV0<'info> {
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
+  #[account(mut)]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
     seeds = ["hotspot_config".as_bytes(), sub_dao.hotspot_collection.as_ref()],

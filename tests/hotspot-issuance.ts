@@ -1,6 +1,5 @@
-import { execute, sendInstructions, toBN } from "@helium-foundation/spl-utils";
+import { execute, toBN } from "@helium-foundation/spl-utils";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
-import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
@@ -8,19 +7,16 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 import {
   init as initDataCredits,
-  mintDataCreditsInstructions,
-  PROGRAM_ID as DATA_CREDITS_PROGRAM_ID
+  mintDataCreditsInstructions
 } from "../packages/data-credits-sdk/src";
 import {
-  init as initHeliumSubDaos,
-  PROGRAM_ID as HELIUM_SUB_DAOS_PROGRAM_ID
+  init as initHeliumSubDaos
 } from "../packages/helium-sub-daos-sdk/src";
 import { init as initHotspotIssuance } from "../packages/hotspot-issuance-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { HotspotIssuance } from "../target/types/hotspot_issuance";
 import { DC_FEE, ensureDCIdl, initTestHotspotConfig, initTestHotspotIssuer, initWorld } from "./utils/fixtures";
-import { createAtaAndMint } from "./utils/token";
 
 describe("hotspot-issuance", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -91,7 +87,6 @@ describe("hotspot-issuance", () => {
 
   describe("with issuer and data credits", () => {
     let subDao: PublicKey;
-    let dcMint: PublicKey;
     let makerKeypair: Keypair;
     let onboardingServerKeypair: Keypair;
     let hotspotIssuer: PublicKey;
@@ -103,15 +98,12 @@ describe("hotspot-issuance", () => {
         hotspotConfig: hsConfig,
         issuer
        } = await initWorld(provider, hsProgram, hsdProgram, dcProgram);
-      await createAtaAndMint(provider, dataCredits.hntMint, 10000000000000000);
       const ix = await mintDataCreditsInstructions({
         program: dcProgram,
         provider,
         dcMint: dataCredits.dcMint,
         amount: DC_FEE,
       });
-
-      dcMint = dataCredits.dcMint;
 
       await execute(dcProgram, provider, ix);
 
@@ -137,7 +129,7 @@ describe("hotspot-issuance", () => {
         .signers([onboardingServerKeypair, makerKeypair]);
 
       const { hotspot } = await method.pubkeys();
-      await method.rpc();
+      await method.rpc({ skipPreflight: true });
 
       const ata = await getAssociatedTokenAddress(hotspot!, hotspotOwner);
       const ataBal = await provider.connection.getTokenAccountBalance(ata);
