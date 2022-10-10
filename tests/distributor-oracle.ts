@@ -36,6 +36,10 @@ describe('distributor-oracle', () => {
     oracleServer.start();
   });
 
+  after(function () {
+    oracleServer.close();
+  });
+
   beforeEach(async () => {
     
     const { mintKey: collectionKey } = await createTestNft(provider, me);

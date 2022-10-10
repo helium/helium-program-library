@@ -20,6 +20,7 @@ export class DatabaseMock implements Database {
 export class OracleServer {
   app: Application;
   port = 8080;
+  private server: any;
 
   constructor(
     public program: Program<LazyDistributor>, 
@@ -38,9 +39,13 @@ export class OracleServer {
   }
 
   public start() {
-    this.app.listen(this.port, () => {
+    this.server = this.app.listen(this.port, () => {
       console.log(`server started at http://localhost:${this.port}`);
     });
+  }
+
+  public close() {
+    this.server.close()
   }
 
   private addRoutes() {
