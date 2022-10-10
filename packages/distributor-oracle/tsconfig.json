@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.root.json",
+  "references": [
+    {
+      "path": "../spl-utils",
+    },
+    {
+      "path": "../lazy-distributor-sdk",
+    }
+  ],
+  // "compilerOptions": {
+  //   "module": "commonjs",
+  // }
+}

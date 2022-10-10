@@ -3,7 +3,7 @@
   "compilerOptions": {
     "lib": ["ES2021.String"],
     "target": "ESNext",
-    "module": "ESNext",
+    "module": "commonjs",
     "moduleResolution": "Node",
     "esModuleInterop": true,
     "isolatedModules": true,

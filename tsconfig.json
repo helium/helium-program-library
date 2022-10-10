@@ -2,7 +2,13 @@
   "extends": "./tsconfig.root.json",
   "references": [
     {
+      "path": "./packages/distributor-oracle"
+    },
+    {
       "path": "./packages/lazy-distributor-sdk"
+    },
+    {
+      "path": "./packages/data-credits-sdk"
     },
     {
       "path": "./packages/spl-utils"
