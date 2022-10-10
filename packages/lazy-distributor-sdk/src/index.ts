@@ -8,15 +8,15 @@ import { PROGRAM_ID } from "./constants";
 
 export async function init(
   provider: AnchorProvider,
-  lazyDistributorProgramId: PublicKey = PROGRAM_ID,
-  lazyDistributorIdl?: any
+  programId: PublicKey = PROGRAM_ID,
+  idl?: any
 ): Promise<Program<LazyDistributor>> {
-  if (!lazyDistributorIdl) {
-    lazyDistributorIdl = await Program.fetchIdl(lazyDistributorProgramId, provider);
+  if (!idl) {
+    idl = await Program.fetchIdl(programId, provider);
   }
   const lazyDistributor = new Program<LazyDistributor>(
-    lazyDistributorIdl as LazyDistributor,
-    lazyDistributorProgramId,
+    idl as LazyDistributor,
+    programId,
     provider,
     undefined,
     () => {

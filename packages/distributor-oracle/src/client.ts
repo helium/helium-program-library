@@ -1,11 +1,10 @@
-import { AnchorProvider, Program } from "@project-serum/anchor";
+import { AnchorProvider, Program, BN, BorshInstructionCoder } from "@project-serum/anchor";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { LazyDistributor } from "../../../target/types/lazy_distributor";
 import axios from 'axios';
-import { distributeRewardsInstructions, setCurrentRewardsInstructions } from "../../lazy-distributor-sdk/src";
 
 export type Reward = {
-  currentRewards: number,
+  currentRewards: number | string,
   oracleKey: PublicKey,
 }
 export async function getCurrentRewards(
@@ -34,27 +33,30 @@ export async function formTransaction(
   program: Program<LazyDistributor>, 
   provider: AnchorProvider,
   rewards: Reward[], 
-  recipient: PublicKey) {
-  const ixPromises = rewards.map((x) => {
-    return setCurrentRewardsInstructions({
-      program,
-      provider,
-      oracle: x.oracleKey,
-      amount: x.currentRewards,
-      recipient,
-    })
-  })
-  const setRewardInstructions = await Promise.all(ixPromises);
+  recipient: PublicKey,
+  lazyDistributor: PublicKey) {
+  const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(lazyDistributor);
+  const ixPromises = rewards.map((x, idx) => {
+    return program.methods
+      .setCurrentRewardsV0({
+        currentRewards: new BN(x.currentRewards),
+        oracleIndex: idx,
+      })
+      .accounts({
+        lazyDistributor,
+        recipient,
+        oracle: x.oracleKey
+      })
+      .instruction();
+  });
+  const ixs = await Promise.all(ixPromises);
   let tx = new Transaction();
-  tx.add(...setRewardInstructions.map((x) => {
-    return x.instructions[0]
-  }));
+  tx.add(...ixs);
 
-  const distributeIx = await distributeRewardsInstructions({
-    program,
-    provider,
-    recipient,
-  })
+  const distributeIx = await program.methods
+    .distributeRewardsV0()
+    .accounts({ recipient, lazyDistributor, rewardsMint: lazyDistributorAcc.rewardsMint })
+    .instruction();
 
   tx.recentBlockhash = (
     await provider.connection.getLatestBlockhash()
@@ -62,8 +64,9 @@ export async function formTransaction(
 
   tx.feePayer = provider.wallet.publicKey
 
-  tx.add(distributeIx.instructions[0]);
+  tx.add(distributeIx);
   tx = await provider.wallet.signTransaction(tx);
+
   return tx;
 }
 
