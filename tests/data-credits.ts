@@ -35,7 +35,6 @@ describe("data-credits", () => {
   let startDcBal = 0;
   let dcKey: PublicKey;
   before(async () => {
-    console.log(anchor.workspace.DataCredits.idl);
     program = await init(provider, PROGRAM_ID, anchor.workspace.DataCredits.idl);
     hsdProgram = await hsd.init(provider, hsd.PROGRAM_ID, anchor.workspace.HeliumSubDaos.idl);
     dcKey = dataCreditsKey()[0];

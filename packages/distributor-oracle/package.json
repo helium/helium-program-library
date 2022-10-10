@@ -28,7 +28,7 @@
     "clean": "npx shx mkdir -p lib && npx shx rm -rf lib",
     "package": "npx shx mkdir -p lib/cjs lib/esm",
     "prebuild": "npm run clean && npm run package",
-    "start:server": "ts-node src/server.ts"
+    "start:server": "ts-node src/server.ts serve"
   },
   "dependencies": {
     "@helium-foundation/spl-utils": "^0.0.1",

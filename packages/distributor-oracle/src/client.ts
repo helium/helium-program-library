@@ -30,7 +30,7 @@ export async function getCurrentRewards(
 }
 
 export async function formTransaction(
-  program: Program<LazyDistributor>, 
+  program: Program<LazyDistributor>,
   provider: AnchorProvider,
   rewards: Reward[], 
   recipient: PublicKey,
@@ -68,8 +68,4 @@ export async function formTransaction(
   tx = await provider.wallet.signTransaction(tx);
 
   return tx;
-}
-
-export function setAndDistributeRewards() {
-  console.log("hi");
 }

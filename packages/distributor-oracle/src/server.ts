@@ -2,46 +2,50 @@ import express, {Application, Request, Response} from 'express';
 import { PublicKey, Transaction, Keypair } from '@solana/web3.js'
 import bodyParser from 'body-parser'
 import { init, PROGRAM_ID } from '../../lazy-distributor-sdk/src';
-import { AnchorProvider, BorshInstructionCoder, Program } from '@project-serum/anchor';
+import { AnchorProvider, BorshInstructionCoder, Program, setProvider, getProvider } from '@project-serum/anchor';
 import { LazyDistributor } from '../../../target/types/lazy_distributor';
+import fs from 'fs';
 
- export class OracleServer {
+export interface Database {
+  getCurrentRewards: () => Promise<number>
+}
+
+export class DatabaseMock implements Database {
+  async getCurrentRewards() {
+    return 150000;
+  }
+}
+
+
+export class OracleServer {
   app: Application;
+  port = 8080;
 
   constructor(
     public program: Program<LazyDistributor>, 
-    private oracle: Keypair
+    private oracle: Keypair,
+    public db: Database,
   ) {
     this.initApp();
     this.addRoutes();
   }
 
-  static async init(provider: AnchorProvider, oracle: Keypair) {
-    const program = await init(provider);
-    return new OracleServer(program, oracle);
-  }
-
   private initApp() {
     const app = express();
-    const port = 8080;
-    
     app.use(bodyParser.json());
-  
-    app.listen( port, () => {
-      console.log(`server started at http://localhost:${port}`);
-    });
     this.app = app;
     this.addRoutes();
+  }
 
+  public start() {
+    this.app.listen(this.port, () => {
+      console.log(`server started at http://localhost:${this.port}`);
+    });
   }
 
   private addRoutes() {
     this.app.get("/", this.getCurrentRewardsHandler.bind(this));
     this.app.post("/", this.signTransactionHandler.bind(this));
-  }
-
-  private async getCurrentRewards() {
-    return 5;
   }
 
   private async getCurrentRewardsHandler(req: Request, res: Response) {
@@ -58,7 +62,7 @@ import { LazyDistributor } from '../../../target/types/lazy_distributor';
       return;
     }
 
-    const currentRewards = await this.getCurrentRewards();
+    const currentRewards = await this.db.getCurrentRewards();
   
     res.json({
       currentRewards,
@@ -94,7 +98,7 @@ import { LazyDistributor } from '../../../target/types/lazy_distributor';
       if (ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey)) {
         let decoded = (this.program.coder.instruction as BorshInstructionCoder).decode(ix.data);
 
-        const currentRewards = await this.getCurrentRewards();
+        const currentRewards = await this.db.getCurrentRewards();
         // @ts-ignore
         if (currentRewards != decoded.data.args.currentRewards.toNumber()) {
           res.status(400).json({error: "Invalid amount"});
@@ -115,3 +119,19 @@ import { LazyDistributor } from '../../../target/types/lazy_distributor';
     res.json({success: true, transaction: serialized})
   }
 }
+
+(async function() {
+  if (process.argv.length > 2 && process.argv[2] == "serve") {
+    // driver code for running server
+    setProvider(AnchorProvider.env());
+    const provider = getProvider() as AnchorProvider;
+    const oracleKeypair = Keypair.fromSecretKey(
+      new Uint8Array(
+        JSON.parse(fs.readFileSync((process.env.ORACLE_KEYPAIR_PATH || process.env.ANCHOR_WALLET)!).toString())
+      )
+    );
+    const program = await init(provider);
+    const server = new OracleServer(program, oracleKeypair, new DatabaseMock);
+    server.start();
+  }
+})()

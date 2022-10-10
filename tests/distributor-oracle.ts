@@ -1,6 +1,6 @@
 import chai, { assert } from 'chai';
 import chaiHttp from "chai-http";
-import { OracleServer } from '../packages/distributor-oracle/src/server';
+import { DatabaseMock, OracleServer } from '../packages/distributor-oracle/src/server';
 import * as client from '../packages/distributor-oracle/src/client';
 import { sendInstructions } from "../packages/spl-utils/src";
 import * as anchor from "@project-serum/anchor";
@@ -32,7 +32,8 @@ describe('distributor-oracle', () => {
   
   before(async () => {
     program = await init(provider, PROGRAM_ID, anchor.workspace.LazyDistributor.idl);
-    oracleServer = new OracleServer(program, oracle);
+    oracleServer = new OracleServer(program, oracle, new DatabaseMock);
+    oracleServer.start();
   });
 
   beforeEach(async () => {
@@ -90,7 +91,7 @@ describe('distributor-oracle', () => {
   it('should sign and execute properly formed transactions', async () => {
     const tx = await client.formTransaction(program, provider, [{
       oracleKey: oracle.publicKey,
-      currentRewards: 5,
+      currentRewards: await oracleServer.db.getCurrentRewards(),
     }], recipient, lazyDistributor)
     const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
 
@@ -109,7 +110,7 @@ describe('distributor-oracle', () => {
     );
 
     const recipientAcc = await program.account.recipientV0.fetch(recipient);
-    assert.equal(recipientAcc.totalRewards.toNumber(), 5)
+    assert.equal(recipientAcc.totalRewards.toNumber(), await oracleServer.db.getCurrentRewards())
   });
 
   describe('Transaction validation tests', () => {
@@ -145,7 +146,7 @@ describe('distributor-oracle', () => {
     it("doesn't sign if unauthorised instructions are included", async () => {
       const ix = await program.methods
         .setCurrentRewardsV0({
-          currentRewards: new BN(5),
+          currentRewards: new BN(await oracleServer.db.getCurrentRewards()),
           oracleIndex: 0,
         })
         .accounts({
@@ -181,7 +182,7 @@ describe('distributor-oracle', () => {
     it("doesn't sign if oracle is set as the fee payer", async () => {
       const ix = await program.methods
         .setCurrentRewardsV0({
-          currentRewards: new BN(5),
+          currentRewards: new BN(await oracleServer.db.getCurrentRewards()),
           oracleIndex: 0,
         })
         .accounts({
