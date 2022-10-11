@@ -95,7 +95,7 @@ pub fn handler(ctx: Context<UseDataCreditsV0>, args: UseDataCreditsArgsV0) -> Re
         mint: ctx.accounts.dc_mint.to_account_info(),
         authority: ctx.accounts.data_credits.to_account_info(),
       },
-      &signer_seeds,
+      signer_seeds,
     ))?;
   }
 
@@ -118,7 +118,7 @@ pub fn handler(ctx: Context<UseDataCreditsV0>, args: UseDataCreditsArgsV0) -> Re
       mint: ctx.accounts.dc_mint.to_account_info(),
       authority: ctx.accounts.data_credits.to_account_info(),
     },
-    &signer_seeds,
+    signer_seeds,
   ))?;
 
   Ok(())

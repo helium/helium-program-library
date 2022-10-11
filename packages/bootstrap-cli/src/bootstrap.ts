@@ -1,35 +1,28 @@
+import {
+  init as initDc
+} from "@helium-foundation/data-credits-sdk";
+import {
+  daoKey, init as initDao
+} from "@helium-foundation/helium-sub-daos-sdk";
+import {
+  init as initLazy
+} from "@helium-foundation/lazy-distributor-sdk";
 import { sendInstructions } from "@helium-foundation/spl-utils";
+import {
+  createCreateMetadataAccountV3Instruction, PROGRAM_ID as METADATA_PROGRAM_ID
+} from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
-import fetch from "node-fetch";
 import {
   createAssociatedTokenAccountInstruction,
   createInitializeMintInstruction, createMintToInstruction, getAssociatedTokenAddress, TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
 import {
-  init as initDc,
-  isInitialized,
-} from "@helium-foundation/data-credits-sdk";
-import {
-  init as initLazy,
-} from "@helium-foundation/lazy-distributor-sdk";
-import {
-  init as initDao,
-  daoKey
-} from "@helium-foundation/helium-sub-daos-sdk";
-import {
-  SystemProgram, Keypair,
-  PublicKey,
-  TransactionInstruction,
-  Transaction,
+  Keypair,
+  PublicKey, SystemProgram, Transaction, TransactionInstruction
 } from "@solana/web3.js";
-import {
-  createCreateMasterEditionV3Instruction,
-  createCreateMetadataAccountV3Instruction,
-  createVerifyCollectionInstruction,
-  PROGRAM_ID as METADATA_PROGRAM_ID,
-} from "@metaplex-foundation/mpl-token-metadata";
-import os from "os";
 import fs from "fs";
+import fetch from "node-fetch";
+import os from "os";
 import yargs from "yargs/yargs";
 
 const { hideBin } = require("yargs/helpers");
@@ -52,12 +45,12 @@ const yarg = yargs(hideBin(process.argv)).options({
   dcKeypair: {
     type: "string",
     describe: "Keypair of the Data Credit token",
-    default: "./dc.json",
+    default: "./keypairs/dc.json",
   },
   mobileKeypair: {
     type: "string",
     describe: "Keypair of the Mobile token",
-    default: "./mobile.json",
+    default: "./keypairs/mobile.json",
   },
   numHnt: {
     type: "number",
@@ -99,8 +92,8 @@ async function run() {
 
 
   const hntKeypair = await loadKeypair(argv.hntKeypair);
-  const dcKeypair = await loadKeypair(argv.hntKeypair);
-  const mobileKeypair = await loadKeypair(argv.hntKeypair);
+  const dcKeypair = await loadKeypair(argv.dcKeypair);
+  const mobileKeypair = await loadKeypair(argv.mobileKeypair);
   await createAndMint({
     provider,
     mintKeypair: hntKeypair,
