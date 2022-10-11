@@ -1,13 +1,14 @@
 import {
+  dataCreditsKey,
   init as initDc
 } from "@helium-foundation/data-credits-sdk";
 import {
-  daoKey, init as initDao
+  daoKey, init as initDao, subDaoKey
 } from "@helium-foundation/helium-sub-daos-sdk";
 import {
   init as initLazy
 } from "@helium-foundation/lazy-distributor-sdk";
-import { createAtaAndMintInstructions, createMintInstructions, sendInstructions } from "@helium-foundation/spl-utils";
+import { createAtaAndMintInstructions, createMintInstructions, createNft as createNft, sendInstructions } from "@helium-foundation/spl-utils";
 import {
   createCreateMetadataAccountV3Instruction, PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
@@ -110,12 +111,15 @@ async function run() {
     metadataUrl: `${argv.bucket}/dc.json`,
   });
 
-  await dataCreditsProgram.methods
-    .initializeDataCreditsV0({
-      authority: provider.wallet.publicKey,
-    })
-    .accounts({ hntMint: hntKeypair.publicKey, dcMint: dcKeypair.publicKey })
-    .rpc({ skipPreflight: true });
+  const dcKey = (await dataCreditsKey(dcKeypair.publicKey))[0];
+  if (!(await provider.connection.getAccountInfo(dcKey))) {
+    await dataCreditsProgram.methods
+      .initializeDataCreditsV0({
+        authority: provider.wallet.publicKey,
+      })
+      .accounts({ hntMint: hntKeypair.publicKey, dcMint: dcKeypair.publicKey })
+      .rpc({ skipPreflight: true });
+  }
 
   const dao = (await daoKey(hntKeypair.publicKey))[0];
   if (!(await provider.connection.getAccountInfo(dao))) {
@@ -132,9 +136,18 @@ async function run() {
       .rpc({ skipPreflight: true });
   }
 
-  const mobileSubdao = (await daoKey(hntKeypair.publicKey))[0];
+  const mobileSubdao = (await subDaoKey(mobileKeypair.publicKey))[0];
   if (!(await provider.connection.getAccountInfo(mobileSubdao))) {
     console.log("Initializing Mobile SubDAO");
+    const mobileHotspotCollection = await createNft(
+      provider,
+      provider.wallet.publicKey,
+      {
+        name: "Mobile Hotspot Collection",
+        symbol: "MOBILEHOT",
+        uri: `${argv.bucket}/mobile_collection.json`,
+      }
+    );
     await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
         authority: provider.wallet.publicKey,
@@ -142,7 +155,7 @@ async function run() {
       .accounts({
         dao,
         subDaoMint: mobileKeypair.publicKey,
-        hotspotCollection: hntKeypair.publicKey, // TODO: change this
+        hotspotCollection: mobileHotspotCollection.mintKey,
         treasury: await getAssociatedTokenAddress(
           mobileKeypair.publicKey,
           provider.wallet.publicKey
@@ -150,6 +163,8 @@ async function run() {
         mint: mobileKeypair.publicKey,
       });
   }
+
+  await lazyDistributorProgram.in
 }
 
 async function createAndMint({

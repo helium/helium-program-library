@@ -164,9 +164,10 @@ export async function createMint(
   return mintKeypair.publicKey;
 }
 
-export async function createTestNft(
+export async function createNft(
   provider: anchor.AnchorProvider,
   recipient: PublicKey,
+  data: any = {},
   collectionKey?: PublicKey,
   mintKeypair: Keypair = Keypair.generate(),
   holderKey: PublicKey = provider.wallet.publicKey
@@ -215,6 +216,7 @@ export async function createTestNft(
               ? { key: collectionKey, verified: false }
               : null,
             uses: null,
+            ...data,
           },
           isMutable: true,
           collectionDetails: null,

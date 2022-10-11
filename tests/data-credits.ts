@@ -15,7 +15,7 @@ import { DataCredits } from "../target/types/data_credits";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestSubdao } from "./utils/daos";
 import { ensureHSDIdl } from "./utils/fixtures";
-import { createAtaAndMint, createMint, createTestNft } from "@helium-foundation/spl-utils";
+import { createAtaAndMint, createMint, createNft } from "@helium-foundation/spl-utils";
 
 const EPOCH_REWARDS = 100000000;
 
@@ -131,7 +131,7 @@ describe("data-credits", () => {
         await method.rpc({ skipPreflight: true });
       }
 
-      const collection = (await createTestNft(provider, me)).mintKey;
+      const collection = (await createNft(provider, me)).mintKey;
       ({ subDao } = await initTestSubdao(hsdProgram, provider, me, dao, collection));
     });
     it("mints some data credits", async () => {

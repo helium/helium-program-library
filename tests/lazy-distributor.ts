@@ -6,7 +6,7 @@ import { expect } from "chai";
 import { init } from "../packages/lazy-distributor-sdk/src";
 import { PROGRAM_ID } from "../packages/lazy-distributor-sdk/src/constants";
 import { LazyDistributor } from "../target/types/lazy_distributor";
-import { createMint, createTestNft } from "@helium-foundation/spl-utils";
+import { createMint, createNft } from "@helium-foundation/spl-utils";
 
 describe("lazy-distributor", () => {
   // Configure the client to use the local cluster.
@@ -59,7 +59,7 @@ describe("lazy-distributor", () => {
     let lazyDistributor: PublicKey;
 
     beforeEach(async () => {
-      const { mintKey } = await createTestNft(provider, me);
+      const { mintKey } = await createNft(provider, me);
       mint = mintKey;
 
       const method = await program.methods
@@ -184,7 +184,7 @@ describe("lazy-distributor", () => {
     let recipient: PublicKey;
 
     beforeEach(async () => {
-      const { mintKey } = await createTestNft(provider, me);
+      const { mintKey } = await createNft(provider, me);
       mint = mintKey;
       const method = await program.methods
         .initializeLazyDistributorV0({

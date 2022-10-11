@@ -173,4 +173,6 @@ Recipient }o--|| RewardableNFT
 
 RewardableNFT ||-|| Collection
 
+HotspotStorage ||-|| RewardableNFT : pda(hotspot_mint)
+
 @enduml

@@ -19,7 +19,7 @@ import { HotspotIssuance } from "../target/types/hotspot_issuance";
 import { burnDataCredits } from "./data-credits";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import { DC_FEE, ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
-import { createTestNft } from "@helium-foundation/spl-utils";
+import { createNft } from "@helium-foundation/spl-utils";
 
 const EPOCH_REWARDS = 100000000;
 
@@ -67,7 +67,7 @@ describe("helium-sub-daos", () => {
 
   it("initializes a subdao", async () => {
     const { dao } = await initTestDao(program, provider, EPOCH_REWARDS, provider.wallet.publicKey);
-    const collection = (await createTestNft(provider, me)).mintKey;
+    const collection = (await createNft(provider, me)).mintKey;
     const { subDao, treasury, mint } = await initTestSubdao(
       program,
       provider,
