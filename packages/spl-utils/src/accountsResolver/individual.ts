@@ -44,7 +44,6 @@ async function resolveIndividualImpl({
     const subAccounts = (idlAccounts as IdlAccounts).accounts;
     for (let k = 0; k < subAccounts.length; k += 1) {
       const subAccount = subAccounts[k];
-      const subArgs = args[k];
 
       resolved += await resolveIndividualImpl({
         idlAccounts: subAccount,

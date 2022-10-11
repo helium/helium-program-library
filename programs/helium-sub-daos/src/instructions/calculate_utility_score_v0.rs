@@ -1,7 +1,11 @@
 use crate::{
-  current_epoch, error::ErrorCode, precise_number::{PreciseNumber, TWO_PREC, FOUR_PREC}, state::*, OrArithError,
+  current_epoch,
+  error::ErrorCode,
+  precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC},
+  state::*,
+  OrArithError,
 };
-use anchor_lang::{prelude::*, solana_program::log::sol_log_compute_units};
+use anchor_lang::prelude::*;
 
 const DEVICE_ACTIVATION_FEE: u128 = 50;
 
@@ -75,7 +79,6 @@ pub fn handler(
     .checked_div(&PreciseNumber::new(10000000000000_u128).or_arith_error()?) // DC has 8 decimals, plus 10^5 to get to dollars.
     .or_arith_error()?;
 
-  sol_log_compute_units();
   let total_devices = PreciseNumber::new(epoch_info.total_devices.into()).or_arith_error()?;
   let devices_with_fee = total_devices
     .checked_mul(
@@ -83,7 +86,6 @@ pub fn handler(
     )
     .or_arith_error()?;
 
-  sol_log_compute_units();
   // sqrt(x) = e^(ln(x)/2)
   // x^1/4 = e^(ln(x)/4))
   let one = PreciseNumber::one();
@@ -97,7 +99,7 @@ pub fn handler(
       .exp()
       .or_arith_error()?,
   );
-  sol_log_compute_units();
+
   let a = std::cmp::max(
     one,
     devices_with_fee
@@ -108,7 +110,7 @@ pub fn handler(
       .exp()
       .or_arith_error()?,
   );
-    sol_log_compute_units();
+
   let utility_score_prec = d.checked_mul(&a).or_arith_error()?;
   // Convert to u128 with 12 decimals of precision
   let utility_score = utility_score_prec

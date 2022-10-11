@@ -1,4 +1,6 @@
-use crate::{error::ErrorCode, precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
+use crate::{
+  error::ErrorCode, precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber,
+};
 use anchor_lang::prelude::*;
 use std::convert::TryInto;
 
