@@ -82,20 +82,19 @@ describe('distributor-oracle', () => {
     }).rpc()
   });
 
-  it('should provide the current rewards for a hotspot', (done) => {
-    chai.request(oracleServer.app)
+  it('should provide the current rewards for a hotspot', async () => {
+    const res = await chai.request(oracleServer.app)
       .get('/?mint=daoK94GYdvRjVxkSyTxNLxtAEYZohLJqmwad8pBK261')
-      .end((err, res) => {
-        assert.equal(res.status, 200);
-        assert.typeOf(res.body, 'object')
-        done();
-      });
+
+    assert.equal(res.status, 200);
+    assert.typeOf(res.body, 'object');
+    assert.equal(res.body.currentRewards, await oracleServer.db.getCurrentRewards(mint))
   });
 
   it('should sign and execute properly formed transactions', async () => {
     const tx = await client.formTransaction(program, provider, [{
       oracleKey: oracle.publicKey,
-      currentRewards: await oracleServer.db.getCurrentRewards(),
+      currentRewards: await oracleServer.db.getCurrentRewards(mint),
     }], recipient, lazyDistributor)
     const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
 
@@ -103,6 +102,7 @@ describe('distributor-oracle', () => {
       .post('/')
       .send({ transaction: serializedTx })
 
+    assert.hasAllKeys(res.body, ["transaction", "success"]);
     const signedTx = Transaction.from(res.body.transaction.data);
     await sendAndConfirmWithRetry(
       provider.connection,
@@ -114,14 +114,14 @@ describe('distributor-oracle', () => {
     );
 
     const recipientAcc = await program.account.recipientV0.fetch(recipient);
-    assert.equal(recipientAcc.totalRewards.toNumber(), await oracleServer.db.getCurrentRewards())
+    assert.equal(recipientAcc.totalRewards.toNumber(), await oracleServer.db.getCurrentRewards(mint))
   });
 
   describe('Transaction validation tests', () => {
     it("doesn't sign if setRewards value is incorrect", async () => {
       const ix = await program.methods
         .setCurrentRewardsV0({
-          currentRewards: new BN(100),
+          currentRewards: new BN(await oracleServer.db.getCurrentRewards(mint) + 1000),
           oracleIndex: 0,
         })
         .accounts({
@@ -150,7 +150,7 @@ describe('distributor-oracle', () => {
     it("doesn't sign if unauthorised instructions are included", async () => {
       const ix = await program.methods
         .setCurrentRewardsV0({
-          currentRewards: new BN(await oracleServer.db.getCurrentRewards()),
+          currentRewards: new BN(await oracleServer.db.getCurrentRewards(mint)),
           oracleIndex: 0,
         })
         .accounts({
@@ -186,7 +186,7 @@ describe('distributor-oracle', () => {
     it("doesn't sign if oracle is set as the fee payer", async () => {
       const ix = await program.methods
         .setCurrentRewardsV0({
-          currentRewards: new BN(await oracleServer.db.getCurrentRewards()),
+          currentRewards: new BN(await oracleServer.db.getCurrentRewards(mint)),
           oracleIndex: 0,
         })
         .accounts({

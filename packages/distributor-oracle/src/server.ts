@@ -1,5 +1,5 @@
 import express, {Application, Request, Response} from 'express';
-import { PublicKey, Transaction, Keypair } from '@solana/web3.js'
+import { PublicKey, Transaction, Keypair, TransactionInstruction } from '@solana/web3.js'
 import bodyParser from 'body-parser'
 import { init, PROGRAM_ID } from '../../lazy-distributor-sdk/src';
 import { AnchorProvider, BorshInstructionCoder, Program, setProvider, getProvider } from '@project-serum/anchor';
@@ -7,11 +7,11 @@ import { LazyDistributor } from '../../../target/types/lazy_distributor';
 import fs from 'fs';
 
 export interface Database {
-  getCurrentRewards: () => Promise<number>
+  getCurrentRewards: (mintKey: PublicKey) => Promise<number>
 }
 
 export class DatabaseMock implements Database {
-  async getCurrentRewards() {
+  async getCurrentRewards(mintKey: PublicKey) {
     return 150000;
   }
 }
@@ -67,7 +67,7 @@ export class OracleServer {
       return;
     }
 
-    const currentRewards = await this.db.getCurrentRewards();
+    const currentRewards = await this.db.getCurrentRewards(mint);
   
     res.json({
       currentRewards,
@@ -83,29 +83,34 @@ export class OracleServer {
     const tx = Transaction.from(req.body.transaction.data);
   
     // validate only interacts with LD program and only calls setCurrentRewards and distributeRewards
+    const setRewardIxs: TransactionInstruction[] = [];
     for (const ix of tx.instructions) {
       if (!ix.programId.equals(PROGRAM_ID)) {
-        res.status(400).json({error: "Invalid transaction"});
+        res.status(400).json({error: "Invalid instructions in transaction"});
         return;
       }
       let decoded = (this.program.coder.instruction as BorshInstructionCoder).decode(ix.data);
       if (!decoded || (decoded.name !== "setCurrentRewardsV0" && decoded.name !== "distributeRewardsV0")) {
-        res.status(400).json({error: "Invalid transaction"});
+        res.status(400).json({error: "Invalid instructions in transaction"});
+        return
       }
+      if (decoded.name === "setCurrentRewardsV0") setRewardIxs.push(ix);
     }
 
+    const setRewardsIx = this.program.idl.instructions.find(
+      (x) => x.name === "setCurrentRewardsV0")!
+    const oracleKeyIdx = setRewardsIx.accounts.findIndex(
+        (x) => x.name === "oracle")!;
+    const recipientIdx = setRewardsIx.accounts.findIndex((x) => x.name === "recipient")!;
     // validate setRewards value for this oracle is correct
-    for (const ix of tx.instructions) {
-      const oracleKeyIdx = this.program.idl.instructions.find(
-        (x) => x.name === "setCurrentRewardsV0")!.accounts.findIndex(
-          (x) => x.name === "oracle")!;
-      
+    for (const ix of setRewardIxs) {
       if (ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey)) {
         let decoded = (this.program.coder.instruction as BorshInstructionCoder).decode(ix.data);
+        const recipientAcc = await this.program.account.recipientV0.fetch(ix.keys[recipientIdx].pubkey);
 
-        const currentRewards = await this.db.getCurrentRewards();
+        const currentRewards = await this.db.getCurrentRewards(recipientAcc.mint);
         // @ts-ignore
-        if (currentRewards != decoded.data.args.currentRewards.toNumber()) {
+        if (decoded.data.args.currentRewards.toNumber() > currentRewards) {
           res.status(400).json({error: "Invalid amount"});
           return;
         }
@@ -114,7 +119,7 @@ export class OracleServer {
 
     // validate that this oracle is not the fee payer
     if (tx.feePayer?.equals(this.oracle.publicKey)) {
-      res.status(400).json({error: "Nice try"});
+      res.status(400).json({error: "Cannot set this oracle as the fee payer"});
       return;
     }
 

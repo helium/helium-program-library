@@ -12,18 +12,13 @@ export async function getCurrentRewards(
   lazyDistributor: PublicKey, 
   mint: PublicKey): Promise<Reward[]> {
   const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(lazyDistributor);
-  console.log(lazyDistributorAcc.oracles);
-  const promises: Promise<any>[] = [];
-  //@ts-ignore
-  for (const oracle of lazyDistributorAcc.oracles) {
-    promises.push(
-      axios.get(`${oracle.url}/?mint=${mint.toString()}`)
-    )
-  }
-  const results = await Promise.all(promises);
+
+  const results = await Promise.all(lazyDistributorAcc.oracles.map((x) => {
+    return axios.get(`${x.url}/?mint=${mint.toString()}`);
+  }));
   return results.map((x, idx) => {
     return {
-      currentRewards: x,
+      currentRewards: x.data.currentRewards,
       oracleKey: lazyDistributorAcc.oracles[idx].oracle,
     }
   })
