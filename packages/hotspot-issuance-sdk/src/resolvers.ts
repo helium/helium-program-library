@@ -26,17 +26,6 @@ export const hotspotIssuanceResolvers = combineResolvers(
     mint: "collection",
     owner: "hotspotConfig",
   }),
-  // DC
-  resolveIndividual(async ({ path, args }) => {
-    if (path[path.length - 1] === "hotspot") {
-      return (
-        await PublicKey.findProgramAddress(
-          [Buffer.from("hotspot", "utf-8"), args[args.length - 1].eccCompact],
-          PROGRAM_ID
-        )
-      )[0];
-    }
-  }),
   resolveIndividual(async ({ path, args }) => {
     if (path[path.length - 1] === "hotspot") {
       return (
