@@ -48,13 +48,10 @@ pub fn create_metadata_account_v3<'a, 'b, 'c, 'info>(
   ctx: CpiContext<'a, 'b, 'c, 'info, CreateMetadataAccount<'info>>,
   args: CreateMetadataAccountArgs,
 ) -> Result<()> {
-  let collection: Option<MplCollection> = match args.collection {
-    Some(c) => Some(MplCollection {
-      key: c.key,
-      verified: c.verified,
-    }),
-    None => None,
-  };
+  let collection: Option<MplCollection> = args.collection.map(|c| MplCollection {
+    key: c.key,
+    verified: c.verified,
+  });
 
   let collection_details: Option<MplCollectionDetails> = match args.collection_details {
     Some(cd) => match cd {
