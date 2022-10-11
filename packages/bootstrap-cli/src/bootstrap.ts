@@ -7,24 +7,21 @@ import {
 import {
   init as initLazy
 } from "@helium-foundation/lazy-distributor-sdk";
-import { sendInstructions } from "@helium-foundation/spl-utils";
+import { createAtaAndMintInstructions, createMintInstructions, sendInstructions } from "@helium-foundation/spl-utils";
 import {
   createCreateMetadataAccountV3Instruction, PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
-import {
-  createAssociatedTokenAccountInstruction,
-  createInitializeMintInstruction, createMintToInstruction, getAssociatedTokenAddress, TOKEN_PROGRAM_ID
-} from "@solana/spl-token";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
   Keypair,
-  PublicKey, SystemProgram, Transaction, TransactionInstruction
+  PublicKey
 } from "@solana/web3.js";
 import fs from "fs";
 import fetch from "node-fetch";
 import os from "os";
 import yargs from "yargs/yargs";
-
+;;
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
   wallet: {
