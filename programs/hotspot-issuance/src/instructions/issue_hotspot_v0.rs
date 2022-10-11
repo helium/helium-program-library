@@ -23,7 +23,6 @@ use helium_sub_daos::{
   cpi::{accounts::TrackAddedDeviceV0, track_added_device_v0},
   TrackAddedDeviceArgsV0,
 };
-use shared_utils::resize_to_fit;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHotspotArgsV0 {
@@ -36,7 +35,6 @@ pub struct IssueHotspotV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   pub dc_fee_payer: Signer<'info>,
-  pub onboarding_server: Signer<'info>,
   pub maker: Signer<'info>,
   /// CHECK: Hotspot nft sent here
   pub hotspot_owner: AccountInfo<'info>,
@@ -61,7 +59,6 @@ pub struct IssueHotspotV0<'info> {
     seeds = ["hotspot_config".as_bytes(), collection.key().as_ref()],
     bump = hotspot_config.bump_seed,
     has_one = collection,
-    has_one = onboarding_server,
     has_one = dc_mint
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
@@ -87,9 +84,9 @@ pub struct IssueHotspotV0<'info> {
   )]
   pub hotspot: Box<Account<'info, Mint>>,
   #[account(
-    init_if_needed,
+    init,
     payer = payer,
-    space = std::cmp::max(8 + std::mem::size_of::<HotspotStorageV0>(), storage.data.borrow_mut().len()),
+    space = 8 + 60 + std::mem::size_of::<HotspotStorageV0>(),
     seeds = [
       "storage".as_bytes(),
       hotspot.key().as_ref()
@@ -321,12 +318,6 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
 
     bump_seed: ctx.bumps["storage"],
   });
-
-  resize_to_fit(
-    &ctx.accounts.payer.to_account_info(),
-    &ctx.accounts.system_program.to_account_info(),
-    &ctx.accounts.storage,
-  )?;
 
   Ok(())
 }

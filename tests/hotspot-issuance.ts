@@ -3,7 +3,7 @@ import { Keypair as HeliumKeypair } from "@helium/crypto";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 import {
   init as initDataCredits
@@ -119,11 +119,13 @@ describe("hotspot-issuance", () => {
         .accounts({
           hotspotIssuer,
           hotspotOwner,
-          onboardingServer: onboardingServerKeypair.publicKey,
           maker: makerKeypair.publicKey,
           subDao,
         })
-        .signers([onboardingServerKeypair, makerKeypair]);
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 })
+        ])
+        .signers([makerKeypair]);
 
       const { hotspot } = await method.pubkeys();
       await method.rpc({ skipPreflight: true });

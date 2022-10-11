@@ -4,7 +4,12 @@ import { Keypair as HeliumKeypair } from "@helium/crypto";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { AccountLayout } from "@solana/spl-token";
-import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import {
+  ComputeBudgetProgram,
+  Keypair,
+  PublicKey,
+  SystemProgram,
+} from "@solana/web3.js";
 import { expect } from "chai";
 import { init as dcInit } from "../packages/data-credits-sdk/src";
 import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
@@ -105,12 +110,14 @@ describe("helium-sub-daos", () => {
         .issueHotspotV0({ eccCompact: Buffer.from(ecc) })
         .accounts({
           hotspotIssuer,
-          onboardingServer: onboardingServerKeypair.publicKey,
           maker: makerKeypair.publicKey,
           hotspotOwner,
           subDao,
         })
-        .signers([onboardingServerKeypair, makerKeypair]);
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+        ])
+        .signers([makerKeypair]);
 
       subDaoEpochInfo = (await method.pubkeys()).subDaoEpochInfo!;
       await method.rpc({
@@ -180,22 +187,27 @@ describe("helium-sub-daos", () => {
     });
 
     it("calculates subdao rewards", async () => {
-      await createHospot()
-      const { subDaoEpochInfo } = await burnDc(400000);
+      await createHospot();
+      const { subDaoEpochInfo } = await burnDc(1600000);
       const epoch = (
         await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
       ).epoch;
 
-      const { pubkeys, instruction: instruction2 } = await program.methods
+      const instr = await program.methods
         .calculateUtilityScoreV0({
           epoch,
         })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+        ])
         .accounts({
           subDao,
           dao,
-        })
-        .prepare();
-      await sendInstructions(provider, [instruction2], []);
+        });
+
+
+      const pubkeys = await instr.pubkeys();
+      await instr.rpc({ skipPreflight: true });
 
       const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
         subDaoEpochInfo
@@ -207,8 +219,8 @@ describe("helium-sub-daos", () => {
       expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
 
       // 4 dc burned, activation fee of 50
-      // sqrt(4) * sqrt(1 * 50) = 14.14213562373095 = 14_142_135_623_730
-      const totalUtility = "14142135623730";
+      // sqrt(1 * 50) * (16)^1/4 = 14.14213562373095 = 14_142_135_623_730
+      const totalUtility = "14142135623731";
       expect(daoInfo.totalUtilityScore.toString()).to.eq(totalUtility);
       expect(subDaoInfo.utilityScore!.toString()).to.eq(totalUtility);
     });
@@ -218,13 +230,16 @@ describe("helium-sub-daos", () => {
 
       beforeEach(async () => {
         await createHospot();
-        const { subDaoEpochInfo } = await burnDc(400000);
+        const { subDaoEpochInfo } = await burnDc(1600000);
         epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
           .epoch;
         await program.methods
           .calculateUtilityScoreV0({
             epoch,
           })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+          ])
           .accounts({
             subDao,
             dao,
