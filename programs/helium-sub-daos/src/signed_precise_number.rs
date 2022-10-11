@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// Struct encapsulating a signed fixed-point number that allows for decimal calculations
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SignedPreciseNumber {
   pub value: PreciseNumber,
   pub is_negative: bool,
