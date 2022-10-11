@@ -17,7 +17,7 @@
       "path": "./packages/data-credits-sdk"
     },
     {
-      "path": "./packages/bootstrap-cli"
+      "path": "./packages/helium-cli"
     }
   ]
 }

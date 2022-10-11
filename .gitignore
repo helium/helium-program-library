@@ -6,5 +6,5 @@ target
 node_modules
 test-ledger
 packages/*/lib
-packages/bootstrap-cli/keypairs/
+packages/helium-cli/keypairs/
 **/*.tsbuildinfo

@@ -1,5 +1,5 @@
 {
-  "name": "@helium-foundation/bootstrap-cli",
+  "name": "@helium-foundation/helium-cli",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"

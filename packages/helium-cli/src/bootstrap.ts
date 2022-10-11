@@ -50,6 +50,11 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Keypair of the Mobile token",
     default: "./keypairs/mobile.json",
   },
+  mobileHotspotCollectionKeypair: {
+    type: "string",
+    describe: "Keypair of the Mobile hotspot collection token",
+    default: "./keypairs/mobile-hotspot-collection.json",
+  },
   numHnt: {
     type: "number",
     describe:
@@ -92,6 +97,7 @@ async function run() {
   const hntKeypair = await loadKeypair(argv.hntKeypair);
   const dcKeypair = await loadKeypair(argv.dcKeypair);
   const mobileKeypair = await loadKeypair(argv.mobileKeypair);
+  const mobileHotspotCollectionKeypair = await loadKeypair(argv.mobileHotspotCollectionKeypair);
   await createAndMint({
     provider,
     mintKeypair: hntKeypair,
@@ -146,7 +152,9 @@ async function run() {
         name: "Mobile Hotspot Collection",
         symbol: "MOBILEHOT",
         uri: `${argv.bucket}/mobile_collection.json`,
-      }
+      },
+      undefined,
+      mobileHotspotCollectionKeypair
     );
     await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
@@ -163,8 +171,6 @@ async function run() {
         mint: mobileKeypair.publicKey,
       });
   }
-
-  await lazyDistributorProgram.in
 }
 
 async function createAndMint({
