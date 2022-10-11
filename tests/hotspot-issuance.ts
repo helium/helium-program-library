@@ -6,8 +6,7 @@ import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 import {
-  init as initDataCredits,
-  mintDataCreditsInstructions
+  init as initDataCredits
 } from "../packages/data-credits-sdk/src";
 import {
   init as initHeliumSubDaos
@@ -92,20 +91,18 @@ describe("hotspot-issuance", () => {
     let hotspotIssuer: PublicKey;
 
     before(async () => {
-      const { 
-        subDao: sub, 
+      const {
+        subDao: sub,
         dataCredits,
         hotspotConfig: hsConfig,
-        issuer
-       } = await initWorld(provider, hsProgram, hsdProgram, dcProgram);
-      const ix = await mintDataCreditsInstructions({
-        program: dcProgram,
-        provider,
-        dcMint: dataCredits.dcMint,
-        amount: DC_FEE,
-      });
-
-      await execute(dcProgram, provider, ix);
+        issuer,
+      } = await initWorld(provider, hsProgram, hsdProgram, dcProgram);
+      await dcProgram.methods
+        .mintDataCreditsV0({
+          amount: toBN(DC_FEE, 8),
+        })
+        .accounts({ dcMint: dataCredits.dcMint })
+        .rpc({ skipPreflight: true });
 
       subDao = sub.subDao;
       hotspotIssuer = issuer.hotspotIssuer;

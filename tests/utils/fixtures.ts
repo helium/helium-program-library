@@ -136,6 +136,20 @@ export async function ensureDCIdl(dcProgram: Program<DataCredits>) {
   }
 }
 
+export async function ensureHSDIdl(hsdProgram: Program<HeliumSubDaos>) {
+  try {
+    execSync(
+      `anchor idl init --filepath ${__dirname}/../../target/idl/helium_sub_daos.json ${hsdProgram.programId}`,
+      { stdio: "inherit" }
+    );
+  } catch {
+    execSync(
+      `anchor idl upgrade --filepath ${__dirname}/../../target/idl/helium_sub_daos.json ${hsdProgram.programId}`,
+      { stdio: "inherit" }
+    );
+  }
+}
+
 export const initWorld = async (
   provider: anchor.AnchorProvider,
   hsProgram: Program<HotspotIssuance>,

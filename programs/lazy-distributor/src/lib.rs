@@ -16,7 +16,7 @@ pub mod lazy_distributor {
 
   pub fn initialize_lazy_distributor_v0(
     ctx: Context<InitializeLazyDistributorV0>,
-    args: InitializeLazyDistributorV0Args,
+    args: InitializeLazyDistributorArgsV0,
   ) -> Result<()> {
     initialize_lazy_distributor_v0::handler(ctx, args)
   }
@@ -25,7 +25,7 @@ pub mod lazy_distributor {
     initialize_recipient_v0::handler(ctx)
   }
 
-  pub fn set_current_rewards_v0(ctx: Context<SetRewardsV0>, args: SetRewardsV0Args) -> Result<()> {
+  pub fn set_current_rewards_v0(ctx: Context<SetRewardsV0>, args: SetRewardsArgsV0) -> Result<()> {
     set_current_rewards_v0::handler(ctx, args)
   }
 

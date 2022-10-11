@@ -5,13 +5,13 @@ use anchor_spl::token::{set_authority, SetAuthority};
 use anchor_spl::token::{Mint, Token};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct InitializeLazyDistributorV0Args {
+pub struct InitializeLazyDistributorArgsV0 {
   pub oracles: Vec<OracleConfigV0>,
   pub authority: Pubkey,
 }
 
 #[derive(Accounts)]
-#[instruction(args: InitializeLazyDistributorV0Args)]
+#[instruction(args: InitializeLazyDistributorArgsV0)]
 pub struct InitializeLazyDistributorV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
@@ -34,7 +34,7 @@ pub struct InitializeLazyDistributorV0<'info> {
 
 pub fn handler(
   ctx: Context<InitializeLazyDistributorV0>,
-  args: InitializeLazyDistributorV0Args,
+  args: InitializeLazyDistributorArgsV0,
 ) -> Result<()> {
   set_authority(
     CpiContext::new(

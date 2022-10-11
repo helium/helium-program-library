@@ -6,16 +6,15 @@ import { Program } from "@project-serum/anchor";
 import { AccountLayout } from "@solana/spl-token";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { expect } from "chai";
-import { burnDataCreditsInstructions, init as dcInit, mintDataCreditsInstructions } from "../packages/data-credits-sdk/src";
+import { init as dcInit } from "../packages/data-credits-sdk/src";
 import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
 import { init as issuerInit } from "../packages/hotspot-issuance-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HotspotIssuance } from "../target/types/hotspot_issuance";
+import { burnDataCredits } from "./data-credits";
 import { initTestDao, initTestSubdao } from "./utils/daos";
-import { DC_FEE, ensureDCIdl, initWorld } from "./utils/fixtures";
-import {
-  createAtaAndMint, createTestNft
-} from "./utils/token";
+import { DC_FEE, ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
+import { createTestNft } from "./utils/token";
 
 const EPOCH_REWARDS = 100000000;
 
@@ -46,6 +45,7 @@ describe("helium-sub-daos", () => {
       anchor.workspace.DataCredits.idl
     );
     ensureDCIdl(dcProgram);
+    ensureHSDIdl(program);
     issuerProgram = await issuerInit(
       provider,
       anchor.workspace.HotspotIssuance.programId,
@@ -91,21 +91,15 @@ describe("helium-sub-daos", () => {
     let subDaoEpochInfo: PublicKey;
 
     async function createHospot() {
-      const ecc = await(await HeliumKeypair.makeRandom()).address
-        .publicKey;
+      const ecc = await (await HeliumKeypair.makeRandom()).address.publicKey;
       const hotspotOwner = Keypair.generate().publicKey;
 
-      await sendInstructions(
-        provider,
-        (
-          await mintDataCreditsInstructions({
-            provider,
-            dcMint,
-            program: dcProgram,
-            amount: toBN(DC_FEE, 8),
-          })
-        ).instructions
-      );
+      await dcProgram.methods
+        .mintDataCreditsV0({
+          amount: toBN(DC_FEE, 8),
+        })
+        .accounts({ dcMint })
+        .rpc({ skipPreflight: true });
 
       const method = await issuerProgram.methods
         .issueHotspotV0({ eccCompact: Buffer.from(ecc) })
@@ -120,29 +114,23 @@ describe("helium-sub-daos", () => {
 
       subDaoEpochInfo = (await method.pubkeys()).subDaoEpochInfo!;
       await method.rpc({
-        skipPreflight: true
+        skipPreflight: true,
       });
 
-      return subDaoEpochInfo
+      return subDaoEpochInfo;
     }
 
-    async function burnDc(amount: number): Promise<{ subDaoEpochInfo: PublicKey }> {
-      const ix = await burnDataCreditsInstructions({
-        program: dcProgram,
-        provider,
-        amount,
-        dcMint,
-        subDao,
-      });
+    async function burnDc(
+      amount: number
+    ): Promise<{ subDaoEpochInfo: PublicKey }> {
+      await dcProgram.methods
+        .mintDataCreditsV0({
+          amount: toBN(amount, 8),
+        })
+        .accounts({ dcMint })
+        .rpc({ skipPreflight: true });
+
       await sendInstructions(provider, [
-        ...(
-          await mintDataCreditsInstructions({
-            provider,
-            dcMint,
-            program: dcProgram,
-            amount: toBN(amount, 8),
-          })
-        ).instructions,
         SystemProgram.transfer({
           fromPubkey: me,
           toPubkey: PublicKey.findProgramAddressSync(
@@ -151,10 +139,13 @@ describe("helium-sub-daos", () => {
           )[0],
           lamports: 100000000,
         }),
-        ...ix.instructions,
       ]);
 
-      return ix.output
+      return burnDataCredits({
+        program: dcProgram,
+        subDao,
+        amount,
+      });
     }
 
     beforeEach(async () => {

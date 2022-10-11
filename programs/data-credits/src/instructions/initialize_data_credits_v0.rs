@@ -6,12 +6,12 @@ use anchor_spl::token::{set_authority, SetAuthority};
 use anchor_spl::token::{Mint, Token};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct InitializeDataCreditsV0Args {
+pub struct InitializeDataCreditsArgsV0 {
   authority: Pubkey,
 }
 
 #[derive(Accounts)]
-#[instruction(args: InitializeDataCreditsV0Args)]
+#[instruction(args: InitializeDataCreditsArgsV0)]
 pub struct InitializeDataCreditsV0<'info> {
   #[account(
     init, // prevents from reinit attack
@@ -46,7 +46,7 @@ pub struct InitializeDataCreditsV0<'info> {
 
 pub fn handler(
   ctx: Context<InitializeDataCreditsV0>,
-  args: InitializeDataCreditsV0Args,
+  args: InitializeDataCreditsArgsV0,
 ) -> Result<()> {
   ctx.accounts.data_credits.dc_mint = ctx.accounts.dc_mint.key();
   ctx.accounts.data_credits.hnt_mint = ctx.accounts.hnt_mint.key();

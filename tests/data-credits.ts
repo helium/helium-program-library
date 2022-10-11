@@ -7,16 +7,51 @@ import * as web3 from "@solana/web3.js";
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import { assert, expect } from "chai";
-import { accountPayerKey, burnDataCreditsInstructions, init, mintDataCreditsInstructions } from "../packages/data-credits-sdk/src";
+import { accountPayerKey, init } from "../packages/data-credits-sdk/src";
 import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
 import * as hsd from "../packages/helium-sub-daos-sdk/src";
 import { execute, toBN, toNumber } from "../packages/spl-utils/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestSubdao } from "./utils/daos";
+import { ensureHSDIdl } from "./utils/fixtures";
 import { createAtaAndMint, createMint, createTestNft } from "./utils/token";
 
 const EPOCH_REWARDS = 100000000;
+
+export async function burnDataCredits({
+  amount,
+  program,
+  subDao,
+}: {
+  program: Program<DataCredits>;
+  amount: number;
+  subDao: PublicKey;
+}): Promise<{ subDaoEpochInfo: PublicKey }> {
+  const useData = await program.methods
+    .useDataCreditsV0({
+      amount: toBN(amount, 8),
+    })
+    .accounts({
+      subDao,
+    });
+  const inUseDataCredits = (await useData.pubkeys()).inUseDataCredits!;
+  await useData.rpc({ skipPreflight: true });
+  const burn = await program.methods
+    .burnInUseDataCreditsV0({
+      amount: toBN(amount, 8),
+    })
+    .accounts({
+      inUseDataCredits,
+    });
+
+  await burn.rpc({ skipPreflight: true });
+
+  return {
+    subDaoEpochInfo: (await burn.pubkeys()).subDaoEpochInfo!
+  }
+}
+
 
 describe("data-credits", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -89,6 +124,8 @@ describe("data-credits", () => {
           dcMint,
           mint: hntMint,
         });
+      ensureHSDIdl(hsdProgram);
+
       dao = (await method.pubkeys()).dao!;
       if (!(await provider.connection.getAccountInfo(dao))) {
         await method.rpc({ skipPreflight: true });
@@ -98,13 +135,12 @@ describe("data-credits", () => {
       ({ subDao } = await initTestSubdao(hsdProgram, provider, me, dao, collection));
     });
     it("mints some data credits", async () => {
-      const ix = await mintDataCreditsInstructions({
-        program,
-        provider,
-        dcMint,
-        amount: 1,
-      });
-      await execute(program, provider, ix);
+      await program.methods
+        .mintDataCreditsV0({
+          amount: new BN(1 * 10 ** 8),
+        })
+        .accounts({ dcMint })
+        .rpc({ skipPreflight: true });
 
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
       const dcAtaAcc = await getAccount(provider.connection, dcAta);
@@ -123,14 +159,12 @@ describe("data-credits", () => {
         accountPayerKey()[0],
         web3.LAMPORTS_PER_SOL
       );
-      const ix = await burnDataCreditsInstructions({
+
+      const { subDaoEpochInfo } = await burnDataCredits({
         program,
-        provider,
-        dcMint,
-        amount: 1,
         subDao,
-      });
-      await execute(program, provider, ix);
+        amount: 1
+      })
 
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
       const dcAtaAcc = await getAccount(provider.connection, dcAta);
@@ -141,7 +175,7 @@ describe("data-credits", () => {
 
       // check that epoch info was tracked correctly
       const epochInfo = await hsdProgram.account.subDaoEpochInfoV0.fetch(
-        ix.output.subDaoEpochInfo
+        subDaoEpochInfo
       );
       const numBurned = toNumber(epochInfo.dcBurned as BN, dcDecimals);
       expect(numBurned).to.eq(1);

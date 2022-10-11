@@ -11,7 +11,7 @@ use anchor_spl::{
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct InitializeHotspotConfigV0Args {
+pub struct InitializeHotspotConfigArgsV0 {
   pub name: String,
   pub symbol: String,
   pub metadata_url: String,
@@ -20,7 +20,7 @@ pub struct InitializeHotspotConfigV0Args {
 }
 
 #[derive(Accounts)]
-#[instruction(args: InitializeHotspotConfigV0Args)]
+#[instruction(args: InitializeHotspotConfigArgsV0)]
 pub struct InitializeHotspotConfigV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
@@ -89,7 +89,7 @@ impl<'info> InitializeHotspotConfigV0<'info> {
 
 pub fn handler(
   ctx: Context<InitializeHotspotConfigV0>,
-  args: InitializeHotspotConfigV0Args,
+  args: InitializeHotspotConfigArgsV0,
 ) -> Result<()> {
   require!(args.name.len() <= 32, ErrorCode::InvalidStringLength);
   require!(args.symbol.len() <= 10, ErrorCode::InvalidStringLength);

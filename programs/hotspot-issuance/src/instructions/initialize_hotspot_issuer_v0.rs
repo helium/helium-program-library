@@ -2,13 +2,13 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct InitializeHotspotIssuerV0Args {
+pub struct InitializeHotspotIssuerArgsV0 {
   pub maker: Pubkey,
   pub authority: Pubkey,
 }
 
 #[derive(Accounts)]
-#[instruction(args: InitializeHotspotIssuerV0Args)]
+#[instruction(args: InitializeHotspotIssuerArgsV0)]
 pub struct InitializeHotspotIssuerV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
@@ -32,7 +32,7 @@ pub struct InitializeHotspotIssuerV0<'info> {
 
 pub fn handler(
   ctx: Context<InitializeHotspotIssuerV0>,
-  args: InitializeHotspotIssuerV0Args,
+  args: InitializeHotspotIssuerArgsV0,
 ) -> Result<()> {
   ctx.accounts.hotspot_issuer.set_inner(HotspotIssuerV0 {
     count: 0,

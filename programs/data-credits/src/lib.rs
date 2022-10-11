@@ -16,7 +16,7 @@ pub mod data_credits {
 
   pub fn initialize_data_credits_v0(
     ctx: Context<InitializeDataCreditsV0>,
-    args: InitializeDataCreditsV0Args,
+    args: InitializeDataCreditsArgsV0,
   ) -> Result<()> {
     instructions::initialize_data_credits_v0::handler(ctx, args)
   }
@@ -28,17 +28,24 @@ pub mod data_credits {
     instructions::mint_data_credits_v0::handler(ctx, args)
   }
 
-  pub fn burn_data_credits_v0(
-    ctx: Context<BurnDataCreditsV0>,
-    args: BurnDataCreditsArgsV0,
+  pub fn burn_in_use_data_credits_v0(
+    ctx: Context<BurnInUseDataCreditsV0>,
+    args: BurnInUseDataCreditsArgsV0,
   ) -> Result<()> {
-    instructions::burn_data_credits_v0::handler(ctx, args)
+    instructions::burn_in_use_data_credits_v0::handler(ctx, args)
   }
 
   pub fn burn_from_issuance_v0(
     ctx: Context<BurnFromIssuanceV0>,
-    args: BurnFromIssuanceV0Args,
+    args: BurnFromIssuanceArgsV0,
   ) -> Result<()> {
     instructions::burn_from_issuance_v0::handler(ctx, args)
+  }
+
+  pub fn use_data_credits_v0(
+    ctx: Context<UseDataCreditsV0>,
+    args: UseDataCreditsArgsV0,
+  ) -> Result<()> {
+    instructions::use_data_credits_v0::handler(ctx, args)
   }
 }

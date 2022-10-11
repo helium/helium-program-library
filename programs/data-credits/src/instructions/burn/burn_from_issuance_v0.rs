@@ -6,14 +6,14 @@ use std::str::FromStr;
 pub const ONBOARD_KEY: &str = "8DV471AvMNBCDTPoa2gzffrYFEJmDU56GDgTBv48RBZR";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct BurnFromIssuanceV0Args {
+pub struct BurnFromIssuanceArgsV0 {
   pub amount: u64,
   pub collection: Pubkey,
   pub authority_bump: u8,
 }
 
 #[derive(Accounts)]
-#[instruction(args: BurnFromIssuanceV0Args)]
+#[instruction(args: BurnFromIssuanceArgsV0)]
 pub struct BurnFromIssuanceV0<'info> {
   #[account(
     seeds = ["hotspot_config".as_bytes(), args.collection.as_ref()],
@@ -24,7 +24,7 @@ pub struct BurnFromIssuanceV0<'info> {
   pub burn_accounts: BurnCommonV0<'info>,
 }
 
-pub fn handler(ctx: Context<BurnFromIssuanceV0>, args: BurnFromIssuanceV0Args) -> Result<()> {
+pub fn handler(ctx: Context<BurnFromIssuanceV0>, args: BurnFromIssuanceArgsV0) -> Result<()> {
   let signer_seeds: &[&[&[u8]]] = &[&[
     "dc".as_bytes(),
     ctx

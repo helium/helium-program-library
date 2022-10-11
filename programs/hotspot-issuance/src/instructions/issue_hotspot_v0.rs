@@ -16,7 +16,7 @@ use data_credits::{
     accounts::{BurnCommonV0, BurnFromIssuanceV0},
     burn_from_issuance_v0,
   },
-  BurnFromIssuanceV0Args, DataCreditsV0,
+  BurnFromIssuanceArgsV0, DataCreditsV0,
 };
 use helium_sub_daos::{
   cpi::{accounts::TrackAddedDeviceV0, track_added_device_v0},
@@ -25,12 +25,12 @@ use helium_sub_daos::{
 use shared_utils::resize_to_fit;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct IssueHotspotV0Args {
+pub struct IssueHotspotArgsV0 {
   pub ecc_compact: Vec<u8>,
 }
 
 #[derive(Accounts)]
-#[instruction(args: IssueHotspotV0Args)]
+#[instruction(args: IssueHotspotArgsV0)]
 pub struct IssueHotspotV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
@@ -204,7 +204,7 @@ impl<'info> IssueHotspotV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotV0Args) -> Result<()> {
+pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result<()> {
   let decoded = bs58::encode(args.ecc_compact.clone()).into_string();
   let animal_name: AnimalName = decoded
     .parse()
@@ -224,7 +224,7 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotV0Args) -> Result
   ]];
   burn_from_issuance_v0(
     ctx.accounts.burn_dc_ctx().with_signer(hotspot_config_seeds),
-    BurnFromIssuanceV0Args {
+    BurnFromIssuanceArgsV0 {
       amount: ctx.accounts.hotspot_config.dc_fee,
       collection: ctx.accounts.hotspot_config.collection,
       authority_bump: ctx.accounts.hotspot_config.bump_seed,

@@ -44,9 +44,10 @@ frame DataCredits {
   }
 
   entity InUseDataCredits {
-    "in_use_data_credits", data_credits, manager, owner
+    "in_use_dc", sub_dao, owner
     --
     data_credits
+    sub_dao
     manager
     owner
     account
@@ -56,7 +57,7 @@ frame DataCredits {
 
 frame SplToken {
   entity InUseDataCreditsTokenAccount {
-    "in_use_data_credit_account", in_use_data_credits
+    "in_use_dc_account", in_use_data_credits
     --
     amount
     owner // Will be manager
@@ -136,6 +137,8 @@ frame TreasuryManagement {
 
 DataCredits  ||--o{ InUseDataCredits
 InUseDataCredits ||--|| InUseDataCreditsTokenAccount
+
+SubDao ||--o{ InUseDataCredits
 
 SubDao ||--|| TreasuryTokenAccount
 TreasuryTokenAccount ||--|| TreasuryManagement
