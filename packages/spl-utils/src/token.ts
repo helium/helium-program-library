@@ -68,7 +68,6 @@ export async function createAtaAndMintInstructions(
       createMintToInstruction(mint, ata, authority, BigInt(amount.toString()))
     );
   }
-  
 
   return {
     instructions,
@@ -94,8 +93,7 @@ export async function createAtaAndMint(
     authority,
     payer
   );
-  if (instructions.length > 0)
-    mintTx.add(...instructions);
+  if (instructions.length > 0) mintTx.add(...instructions);
 
   try {
     if (instructions.length > 0)

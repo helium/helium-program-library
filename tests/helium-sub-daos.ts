@@ -14,7 +14,7 @@ import { HotspotIssuance } from "../target/types/hotspot_issuance";
 import { burnDataCredits } from "./data-credits";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import { DC_FEE, ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
-import { createTestNft } from "./utils/token";
+import { createTestNft } from "@helium-foundation/spl-utils";
 
 const EPOCH_REWARDS = 100000000;
 

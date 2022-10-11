@@ -11,6 +11,7 @@ use anchor_spl::{
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
 use angry_purple_tiger::AnimalName;
+use data_credits::HeliumSubDaos;
 use data_credits::{
   cpi::{
     accounts::{BurnCommonV0, BurnFromIssuanceV0},
@@ -155,9 +156,7 @@ pub struct IssueHotspotV0<'info> {
   /// CHECK: Verified by constraint  
   #[account(address = data_credits::ID)]
   pub data_credits_program: AccountInfo<'info>,
-  /// CHECK: Verified by constraint  
-  #[account(address = helium_sub_daos::ID)]
-  pub helium_sub_daos_program: AccountInfo<'info>,
+  pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,

@@ -26,7 +26,7 @@ pub struct BurnInUseDataCreditsV0<'info> {
   #[account(
     mut,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(),  &current_epoch(clock.unix_timestamp).to_le_bytes()], // Break into 30m epochs
-    seeds::program = helium_sub_daos::ID,
+    seeds::program = helium_sub_daos_program.key(),
     bump
   )]
   pub sub_dao_epoch_info: AccountInfo<'info>,

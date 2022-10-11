@@ -130,7 +130,7 @@ async function run() {
       })
       .accounts({
         dcMint: dcKeypair.publicKey,
-        mint: hntKeypair.publicKey,
+        hntMint: hntKeypair.publicKey,
       })
       .rpc({ skipPreflight: true });
   }
@@ -238,88 +238,6 @@ run().catch((err) => {
   console.error(err);
   process.exit(1);
 }).then(() => process.exit());
-
-export async function createMintInstructions(
-  provider: anchor.AnchorProvider,
-  decimals: number,
-  mintAuthority: PublicKey,
-  freezeAuthority: PublicKey | null = null,
-  mintKeypair: Keypair = Keypair.generate()
-): Promise<TransactionInstruction[]> {
-  const mintKey = mintKeypair.publicKey;
-  return [
-    SystemProgram.createAccount({
-      fromPubkey: provider.wallet.publicKey,
-      newAccountPubkey: mintKey,
-      space: 82,
-      lamports: await provider.connection.getMinimumBalanceForRentExemption(82),
-      programId: TOKEN_PROGRAM_ID,
-    }),
-    await createInitializeMintInstruction(
-      mintKeypair.publicKey,
-      decimals,
-      mintAuthority,
-      freezeAuthority
-    ),
-  ];
-}
-
-export async function createAtaAndMintInstructions(
-  provider: anchor.AnchorProvider,
-  mint: PublicKey,
-  amount: number,
-  to: PublicKey = provider.wallet.publicKey,
-  authority: PublicKey = provider.wallet.publicKey,
-  payer: PublicKey = provider.wallet.publicKey
-): Promise<{ instructions: TransactionInstruction[]; ata: PublicKey }> {
-  const ata = await getAssociatedTokenAddress(mint, to);
-  const instructions: TransactionInstruction[] = [];
-  if (!(await provider.connection.getAccountInfo(ata))) {
-    instructions.push(
-      createAssociatedTokenAccountInstruction(payer, ata, to, mint)
-    );
-  }
-  instructions.push(createMintToInstruction(mint, ata, authority, amount));
-
-  return {
-    instructions,
-    ata,
-  };
-}
-
-export async function createAtaAndMint(
-  provider: anchor.AnchorProvider,
-  mint: PublicKey,
-  amount: number,
-  to: PublicKey = provider.wallet.publicKey,
-  authority: PublicKey = provider.wallet.publicKey,
-  payer: PublicKey = provider.wallet.publicKey,
-  confirmOptions: any = undefined
-): Promise<PublicKey> {
-  const mintTx = new Transaction();
-  const { instructions, ata } = await createAtaAndMintInstructions(
-    provider,
-    mint,
-    amount,
-    to,
-    authority,
-    payer
-  );
-  mintTx.add(...instructions);
-
-  try {
-    if (instructions.length > 0) {
-      await provider.sendAndConfirm(mintTx, undefined, confirmOptions);
-    }
-  } catch (e: any) {
-    console.log("Error", e, e.logs);
-    if (e.logs) {
-      console.error(e.logs.join("\n"));
-    }
-    throw e;
-  }
-  return ata;
-}
 
 function loadKeypair(keypair: string): Keypair {
   console.log(process.env.ANCHOR_PROVIDER_URL);

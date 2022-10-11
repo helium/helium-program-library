@@ -8,7 +8,7 @@ import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { HotspotIssuance } from "../../target/types/hotspot_issuance";
 import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
-import { createAtaAndMint, createMint } from "./token";
+import { createAtaAndMint, createMint } from "@helium-foundation/spl-utils";
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =

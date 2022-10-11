@@ -15,7 +15,7 @@ import { DataCredits } from "../target/types/data_credits";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestSubdao } from "./utils/daos";
 import { ensureHSDIdl } from "./utils/fixtures";
-import { createAtaAndMint, createMint, createTestNft } from "./utils/token";
+import { createAtaAndMint, createMint, createTestNft } from "@helium-foundation/spl-utils";
 
 const EPOCH_REWARDS = 100000000;
 
@@ -122,7 +122,7 @@ describe("data-credits", () => {
         })
         .accounts({
           dcMint,
-          mint: hntMint,
+          hntMint,
         });
       ensureHSDIdl(hsdProgram);
 

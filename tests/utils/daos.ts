@@ -2,7 +2,7 @@ import * as anchor from "@project-serum/anchor";
 import { BN } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
-import { createAtaAndMint, createMint } from "./token";
+import { createAtaAndMint, createMint } from "@helium-foundation/spl-utils";
 
 export async function initTestDao(
   program: anchor.Program<HeliumSubDaos>,
@@ -30,7 +30,7 @@ export async function initTestDao(
       rewardPerEpoch: new BN(epochRewards)
     })
     .accounts({
-      mint,
+      hntMint: mint,
       dcMint
     });
   const { dao } = await method.pubkeys();
@@ -39,7 +39,7 @@ export async function initTestDao(
     await method.rpc({ skipPreflight: true });
   }
 
-  return { mint, dao: dao! };
+  return { mint: mint!, dao: dao! };
 }
 
 export async function initTestSubdao(

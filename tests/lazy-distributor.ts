@@ -6,7 +6,7 @@ import { expect } from "chai";
 import { init } from "../packages/lazy-distributor-sdk/src";
 import { PROGRAM_ID } from "../packages/lazy-distributor-sdk/src/constants";
 import { LazyDistributor } from "../target/types/lazy_distributor";
-import { createMint, createTestNft } from "./utils/token";
+import { createMint, createTestNft } from "@helium-foundation/spl-utils";
 
 describe("lazy-distributor", () => {
   // Configure the client to use the local cluster.
