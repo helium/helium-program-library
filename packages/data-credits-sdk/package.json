@@ -30,7 +30,7 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@project-serum/anchor": "https://gitpkg.now.sh/coral-xyz/anchor/ts/packages/anchor",
+    "@project-serum/anchor": "0.24.2",
     "@solana/spl-token": "0.3.1",
     "@helium-foundation/helium-sub-daos-sdk": "^0.0.1",
     "@helium-foundation/spl-utils": "^0.0.1",
