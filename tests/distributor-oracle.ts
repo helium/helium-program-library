@@ -10,9 +10,8 @@ import {
 } from "@solana/web3.js";
 import { init, PROGRAM_ID, lazyDistributorKey, recipientKey } from "../packages/lazy-distributor-sdk/src";
 import { LazyDistributor } from "../target/types/lazy_distributor";
-import { createMint, createTestNft } from "./utils/token";
 import { AuthorityType, createSetAuthorityInstruction } from "@solana/spl-token";
-import { sendAndConfirmWithRetry } from '@helium-foundation/spl-utils';
+import { sendAndConfirmWithRetry, createMint, createTestNft  } from '@helium-foundation/spl-utils';
 
 
 chai.use(chaiHttp);

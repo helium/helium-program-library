@@ -13,9 +13,9 @@ export async function getCurrentRewards(
   mint: PublicKey): Promise<Reward[]> {
   const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(lazyDistributor);
 
-  const results = await Promise.all(lazyDistributorAcc.oracles.map((x) => {
-    return axios.get(`${x.url}/?mint=${mint.toString()}`);
-  }));
+  const results = await Promise.all(lazyDistributorAcc.oracles.map((x) => (
+    axios.get(`${x.url}/?mint=${mint.toString()}`)
+  )));
   return results.map((x, idx) => {
     return {
       currentRewards: x.data.currentRewards,
