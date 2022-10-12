@@ -9,3 +9,4 @@ export * from "./accountFetchCache";
 export * from "./anchorError";
 export * from "./executeRemoteTxn";
 export * from "./utils";
+export * from "./token";

@@ -46,7 +46,6 @@ pub struct DistributeRewardsV0<'info> {
 pub fn handler(ctx: Context<DistributeRewardsV0>) -> Result<()> {
   let seeds: &[&[&[u8]]] = &[&[
     b"lazy_distributor",
-    ctx.accounts.lazy_distributor.collection.as_ref(),
     ctx.accounts.lazy_distributor.rewards_mint.as_ref(),
     &[ctx.accounts.lazy_distributor.bump_seed],
   ]];

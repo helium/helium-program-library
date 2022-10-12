@@ -1,14 +1,24 @@
 import {
-  createCreateMasterEditionV3Instruction, createCreateMetadataAccountV3Instruction, createVerifyCollectionInstruction, PROGRAM_ID as METADATA_PROGRAM_ID
+  createCreateMasterEditionV3Instruction,
+  createCreateMetadataAccountV3Instruction,
+  createVerifyCollectionInstruction,
+  PROGRAM_ID as METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
 import {
-  createAssociatedTokenAccountInstruction, createInitializeMintInstruction,
-  createMintToInstruction, getAssociatedTokenAddress, TOKEN_PROGRAM_ID, 
+  createAssociatedTokenAccountInstruction,
+  createInitializeMintInstruction,
+  createMintToInstruction,
+  getAssociatedTokenAddress,
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import {
-  Keypair, PublicKey, SystemProgram,
-  Transaction, TransactionInstruction
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  TransactionInstruction,
+  ConfirmOptions,
 } from "@solana/web3.js";
 
 export async function mintTo(
@@ -40,7 +50,7 @@ export async function mintTo(
 export async function createAtaAndMintInstructions(
   provider: anchor.AnchorProvider,
   mint: PublicKey,
-  amount: number,
+  amount: number | anchor.BN,
   to: PublicKey = provider.wallet.publicKey,
   authority: PublicKey = provider.wallet.publicKey,
   payer: PublicKey = provider.wallet.publicKey
@@ -52,7 +62,12 @@ export async function createAtaAndMintInstructions(
       createAssociatedTokenAccountInstruction(payer, ata, to, mint)
     );
   }
-  instructions.push(createMintToInstruction(mint, ata, authority, amount));
+
+  if (amount != 0) {
+    instructions.push(
+      createMintToInstruction(mint, ata, authority, BigInt(amount.toString()))
+    );
+  }
 
   return {
     instructions,
@@ -63,11 +78,11 @@ export async function createAtaAndMintInstructions(
 export async function createAtaAndMint(
   provider: anchor.AnchorProvider,
   mint: PublicKey,
-  amount: number,
+  amount: number | anchor.BN,
   to: PublicKey = provider.wallet.publicKey,
   authority: PublicKey = provider.wallet.publicKey,
   payer: PublicKey = provider.wallet.publicKey,
-  confirmOptions: any = undefined
+  confirmOptions?: ConfirmOptions
 ): Promise<PublicKey> {
   const mintTx = new Transaction();
   const { instructions, ata } = await createAtaAndMintInstructions(
@@ -78,10 +93,11 @@ export async function createAtaAndMint(
     authority,
     payer
   );
-  mintTx.add(...instructions);
+  if (instructions.length > 0) mintTx.add(...instructions);
 
   try {
-    await provider.sendAndConfirm(mintTx, undefined, confirmOptions);
+    if (instructions.length > 0)
+      await provider.sendAndConfirm(mintTx, undefined, confirmOptions);
   } catch (e: any) {
     console.log("Error", e, e.logs);
     if (e.logs) {
@@ -135,7 +151,6 @@ export async function createMint(
     ))
   );
 
-  console.log("Creating mint");
   try {
     await provider.sendAndConfirm(tx, [mintKeypair]);
   } catch (e: any) {
@@ -149,9 +164,10 @@ export async function createMint(
   return mintKeypair.publicKey;
 }
 
-export async function createTestNft(
+export async function createNft(
   provider: anchor.AnchorProvider,
   recipient: PublicKey,
+  data: any = {},
   collectionKey?: PublicKey,
   mintKeypair: Keypair = Keypair.generate(),
   holderKey: PublicKey = provider.wallet.publicKey
@@ -200,6 +216,7 @@ export async function createTestNft(
               ? { key: collectionKey, verified: false }
               : null,
             uses: null,
+            ...data,
           },
           isMutable: true,
           collectionDetails: null,

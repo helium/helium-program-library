@@ -1,18 +1,16 @@
-import { HeliumSubDaos } from "../../../target/types/helium_sub_daos";
+import { HeliumSubDaos } from "@helium-foundation/idls/lib/types/helium_sub_daos";
+import { AnchorProvider, Idl, Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { AnchorProvider, Program } from "@project-serum/anchor";
 import { PROGRAM_ID } from "./constants";
 import { heliumSubDaosResolvers } from "./resolvers";
 
 export async function init(
-  provider: AnchorProvider, 
-  programId: PublicKey = PROGRAM_ID, 
-  idl?: any): Promise<Program<HeliumSubDaos>> {
+  provider: AnchorProvider,
+  programId: PublicKey = PROGRAM_ID,
+  idl?: Idl | null
+): Promise<Program<HeliumSubDaos>> {
   if (!idl) {
-    idl = await Program.fetchIdl(
-      programId,
-      provider
-    );
+    idl = await Program.fetchIdl(programId, provider);
   }
   const program = new Program<HeliumSubDaos>(
     idl as HeliumSubDaos,
@@ -23,7 +21,7 @@ export async function init(
       return heliumSubDaosResolvers;
     }
   ) as Program<HeliumSubDaos>;
-  
+
   return program;
 }
 

@@ -4,12 +4,11 @@ use anchor_lang::prelude::*;
 #[derive(Default)]
 pub struct DaoV0 {
   pub mint: Pubkey,
+  pub dc_mint: Pubkey,
   pub authority: Pubkey,
-  pub treasury: Pubkey,
   pub num_sub_daos: u32,
   pub reward_per_epoch: u64,
   pub bump_seed: u8,
-  pub treasury_bump_seed: u8,
 }
 
 #[account]

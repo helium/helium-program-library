@@ -196,6 +196,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "angry-purple-tiger"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49c749eb8b90a5c85a879ac35bba5374ba18ff41d609878d7d37dd2ac0122a3c"
+dependencies = [
+ "md5",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.62"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -518,9 +527,9 @@ checksum = "90e5c1c8368803113bf0c9584fc495a58b86dc8a29edbf8fe877d21d9507e797"
 
 [[package]]
 name = "env_logger"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b2cf0344971ee6c64c31be0d530793fba457d322dfec2810c453d0ef228f9c3"
+checksum = "c90bf5f19754d10198ccb95b70664fc925bd1fc090a0fd9a6ebc54acc8cd6272"
 dependencies = [
  "atty",
  "humantime",
@@ -595,6 +604,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "mpl-token-metadata",
+ "shared-utils",
  "uint",
 ]
 
@@ -632,6 +642,20 @@ dependencies = [
  "digest 0.9.0",
  "generic-array",
  "hmac",
+]
+
+[[package]]
+name = "hotspot-issuance"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "angry-purple-tiger",
+ "bs58 0.3.1",
+ "data-credits",
+ "helium-sub-daos",
+ "mpl-token-metadata",
+ "shared-utils",
 ]
 
 [[package]]
@@ -686,6 +710,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "mpl-token-metadata",
+ "shared-utils",
 ]
 
 [[package]]
@@ -768,6 +793,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "md5"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
+
+[[package]]
 name = "memchr"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -802,14 +833,13 @@ dependencies = [
 
 [[package]]
 name = "mpl-token-vault"
-version = "0.1.1"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36789b99869391fcc1041509729db1183d2abb0ffe62b165fadd9fffba391fde"
+checksum = "7ade4ef15bc06a6033076c4ff28cba9b42521df5ec61211d6f419415ace2746a"
 dependencies = [
  "borsh",
  "num-derive",
  "num-traits",
- "shank",
  "solana-program",
  "spl-token",
  "thiserror",
@@ -1150,6 +1180,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "shared-utils"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+]
+
+[[package]]
 name = "smallvec"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1266,9 +1304,9 @@ dependencies = [
 
 [[package]]
 name = "spl-token"
-version = "3.2.0"
+version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93bfdd5bd7c869cb565c7d7635c4fafe189b988a0bdef81063cd9585c6b8dc01"
+checksum = "0cc67166ef99d10c18cb5e9c208901e6d8255c6513bb1f877977eba48e6cc4fb"
 dependencies = [
  "arrayref",
  "num-derive",
@@ -1308,15 +1346,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bab24d30b911b2376f3a13cc2cd443142f0c81dda04c118693e35b3835757755"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "test-tracker"
-version = "0.0.1"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "helium-sub-daos",
 ]
 
 [[package]]

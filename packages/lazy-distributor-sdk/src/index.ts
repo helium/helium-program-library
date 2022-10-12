@@ -3,7 +3,7 @@ import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mp
 import { AnchorProvider, Program } from "@project-serum/anchor";
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import { LazyDistributor } from "../../../target/types/lazy_distributor";
+import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
 import { PROGRAM_ID } from "./constants";
 
 export async function init(
@@ -42,7 +42,8 @@ export const lazyDistributorResolvers = combineResolvers(
     }
   }),
   async ({ accounts, provider, idlIx }) => {
-    if (idlIx.name === "distributeRewardsV0" && (!accounts.recipientMintAccount || !accounts.destinationAccount)) {
+    let resolved = 0;
+    if (idlIx.name === "distributeRewardsV0" && (!accounts.recipientMintAccount || !accounts.destinationAccount || !accounts.owner)) {
       const recipient = accounts.recipient as PublicKey;
       const recipientAcc = await provider.connection.getAccountInfo(recipient);
       const recipientMint = new PublicKey(
@@ -57,12 +58,15 @@ export const lazyDistributorResolvers = combineResolvers(
       accounts.owner = recipientMintTokenAccount.owner;
       accounts.destinationAccount = destinationAccount;
       accounts.recipientMintAccount = recipientMintAccount;
+      resolved += 1;
     }
 
-    return accounts
+    return {
+      accounts,
+      resolved
+    }
   },
 );
-
 
 export * from "./constants";
 export * from "./pdas";

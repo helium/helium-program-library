@@ -5,6 +5,7 @@ declare_id!("daoK94GYdvRjVxkSyTxNLxtAEYZohLJqmwad8pBK261");
 pub mod error;
 pub mod instructions;
 pub mod precise_number;
+pub mod signed_precise_number;
 pub mod state;
 pub mod uint;
 pub mod utils;

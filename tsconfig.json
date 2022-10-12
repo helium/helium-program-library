@@ -2,10 +2,22 @@
   "extends": "./tsconfig.root.json",
   "references": [
     {
-      "path": "./packages/lazy-distributor-sdk"
+      "path": "./packages/idls"
     },
     {
       "path": "./packages/spl-utils"
+    },
+    {
+      "path": "./packages/lazy-distributor-sdk"
+    },
+    {
+      "path": "./packages/helium-sub-daos-sdk"
+    },
+    {
+      "path": "./packages/data-credits-sdk"
+    },
+    {
+      "path": "./packages/helium-cli"
     }
   ]
 }

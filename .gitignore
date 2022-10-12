@@ -6,3 +6,5 @@ target
 node_modules
 test-ledger
 packages/*/lib
+packages/helium-cli/keypairs/
+**/*.tsbuildinfo
