@@ -4,7 +4,7 @@ frame HeliumSubDaos {
   entity Dao {
     "dao", mint
     --
-    mint // hnt
+    hnt_mint // w/ circuit breaker
     authority
     reward per epoch
     dc_mint
@@ -68,6 +68,28 @@ frame SplToken {
   }
 }
 
+frame CircuitBreaker {
+  entity MintWindowedCircuitBreaker {
+    "mint_circuit_breaker", mint
+    --
+    mint
+    config
+    authority
+    last_aggregated_amount
+    ...
+  }
+
+  entity AccountWindowedCircuitBreaker {
+    "account_circuit_breaker", token_account
+    --
+    token_account
+    config
+    authority
+    last_aggregated_amount
+    ...
+  }
+}
+
 frame HotspotIssuance {
   entity HotspotConfig {
     "hotspot_config", collection
@@ -102,7 +124,7 @@ frame LazyDistributor {
     "lazy_distributor", rewards_mint
     --
     oracle_configs
-    rewards_mint
+    rewards_mint // w/ circuit breaker
     ...
   }
 
@@ -152,12 +174,13 @@ SubDao ||--o{ InUseDataCredits
 SubDao ||--|| TreasuryTokenAccount
 TreasuryTokenAccount ||--|| TreasuryManagement
 
-Dao ||--|| DataCredits : pda(dc_mint)
+TreasuryTokenAccount ||--|| AccountWindowedCircuitBreaker : pda(account)
 
-
-SubDao ||-|| LazyDistributor : PDA(mint)
+SubDao ||-|| LazyDistributor : pda(mint)
 
 SubDao ||-|| Collection
+
+TreasuryManagement ||--|| AccountWindowedCircuitBreaker : pda(treasury)
 
 
 Dao ||--o{ SubDao

@@ -8,6 +8,9 @@
       "path": "./packages/spl-utils"
     },
     {
+      "path": "./packages/circuit-breaker-sdk"
+    },
+    {
       "path": "./packages/lazy-distributor-sdk"
     },
     {
