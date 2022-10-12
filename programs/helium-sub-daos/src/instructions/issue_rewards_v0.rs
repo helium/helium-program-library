@@ -5,7 +5,7 @@ use crate::{
   OrArithError,
 };
 use anchor_lang::prelude::*;
-use anchor_spl::token::{transfer, Token, TokenAccount, Transfer};
+use anchor_spl::token::{mint_to, Mint, MintTo, Token, TokenAccount};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueRewardsArgsV0 {
@@ -15,6 +15,9 @@ pub struct IssueRewardsArgsV0 {
 #[derive(Accounts)]
 #[instruction(args: IssueRewardsArgsV0)]
 pub struct IssueRewardsV0<'info> {
+  #[account(
+    has_one = mint,
+  )]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
     has_one = dao,
@@ -36,12 +39,8 @@ pub struct IssueRewardsV0<'info> {
     constraint = !sub_dao_epoch_info.rewards_issued
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
-  #[account(
-    mut,
-    seeds = ["dao_treasury".as_bytes(), dao.key().as_ref()],
-    bump = dao.treasury_bump_seed,
-  )]
-  pub dao_treasury: Box<Account<'info, TokenAccount>>,
+  #[account(mut)]
+  pub mint: Box<Account<'info, Mint>>,
   #[account(mut)]
   pub treasury: Box<Account<'info, TokenAccount>>,
   pub system_program: Program<'info, System>,
@@ -82,11 +81,11 @@ pub fn handler(ctx: Context<IssueRewardsV0>, _args: IssueRewardsArgsV0) -> Resul
     ctx.accounts.dao.reward_per_epoch
   );
 
-  transfer(
+  mint_to(
     CpiContext::new_with_signer(
       ctx.accounts.token_program.to_account_info(),
-      Transfer {
-        from: ctx.accounts.dao_treasury.to_account_info(),
+      MintTo {
+        mint: ctx.accounts.mint.to_account_info(),
         to: ctx.accounts.treasury.to_account_info(),
         authority: ctx.accounts.dao.to_account_info(),
       },

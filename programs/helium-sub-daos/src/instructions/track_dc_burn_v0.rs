@@ -1,6 +1,7 @@
 use crate::state::*;
 use crate::utils::current_epoch;
 use anchor_lang::prelude::*;
+use anchor_spl::token::Mint;
 use std::str::FromStr;
 
 pub const DC_KEY: &str = "5BAQuzGE1z8CTcrSdfbfdBF2fdXrwb4iMcxDMrvhz8L8";
@@ -22,7 +23,15 @@ pub struct TrackDcBurnV0<'info> {
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
+  #[account(
+    has_one = dao
+  )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
+  #[account(
+    has_one = dc_mint,
+  )]
+  pub dao: Box<Account<'info, DaoV0>>,
+  pub dc_mint: Box<Account<'info, Mint>>,
 
   #[account(
     mut,

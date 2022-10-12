@@ -161,7 +161,7 @@ export async function execute<Output>(
   commitment?: Commitment
 ): Promise<Output & { txid?: string }> {
   const { instructions, signers, output } = command;
-  const errors = program.idl.errors?.reduce((acc, err) => {
+  const errors = program.idl.errors?.reduce((acc: any, err: any) => {
     acc.set(err.code, `${err.name}: ${err.msg}`);
     return acc;
   }, new Map<number, string>());
@@ -197,14 +197,14 @@ export async function executeBig<Output>(
       provider,
       instructions,
       signers,
-      payer || this.wallet.publicKey,
+      payer || provider.wallet.publicKey,
       finality,
-      errors,
+      errors
     );
     return {
       ...output,
       txids: Array.from(txids),
-    }
+    };
   }
 
   return output;
@@ -238,7 +238,6 @@ export const awaitTransactionSignatureConfirmation = async (
       reject({ timeout: true });
     }, timeout);
     try {
-      console.log("COMMIMENT", commitment);
       subId = connection.onSignature(
         txid,
         (result: any, context: any) => {
@@ -252,7 +251,6 @@ export const awaitTransactionSignatureConfirmation = async (
             console.log("Rejected via websocket", result.err);
             reject(status);
           } else {
-            console.log("Resolved via websocket", result);
             resolve(status);
           }
         },
@@ -272,7 +270,6 @@ export const awaitTransactionSignatureConfirmation = async (
           status = signatureStatuses && signatureStatuses.value[0];
           if (!done) {
             if (!status) {
-              console.log("REST null result for", txid, status);
             } else if (status.err) {
               console.log("REST error for", txid, status);
               done = true;
@@ -309,7 +306,6 @@ export const awaitTransactionSignatureConfirmation = async (
     connection.removeSignatureListener(subId);
   }
   done = true;
-  console.log("Returning status ", status);
   return status;
 };
 
@@ -379,7 +375,7 @@ export async function sendAndConfirmWithRetry(
 
     if (confirmation.err) {
       const tx = await connection.getTransaction(txid, {
-        commitment: "confirmed"
+        commitment: "confirmed",
       });
       console.error(tx?.meta?.logMessages?.join("\n"));
       console.error(confirmation.err);
@@ -394,9 +390,9 @@ export async function sendAndConfirmWithRetry(
     }
 
     const tx = await connection.getTransaction(txid, {
-      commitment: "confirmed"
+      commitment: "confirmed",
     });
-    if (tx && tx.meta.logMessages) {
+    if (tx && tx.meta && tx.meta.logMessages) {
       console.error(tx.meta.logMessages.join("\n"));
     }
 

@@ -1,53 +1,61 @@
-import { sendInstructions } from "@helium-foundation/spl-utils";
-import { AccountLayout } from "@solana/spl-token";
 import * as anchor from "@project-serum/anchor";
-import { BN, Program } from "@project-serum/anchor";
-import { SystemProgram, PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
-import { heliumSubDaosResolvers } from "../../packages/helium-sub-daos-sdk/src";
+import { BN } from "@project-serum/anchor";
+import { PublicKey } from "@solana/web3.js";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
-import { TestTracker } from "../../target/types/test_tracker";
-import { createAtaAndMint, createMint, mintTo } from "./token";
+import { createAtaAndMint, createMint } from "@helium-foundation/spl-utils";
 
 export async function initTestDao(
   program: anchor.Program<HeliumSubDaos>,
   provider: anchor.AnchorProvider,
   epochRewards: number,
-  authority: PublicKey
+  authority: PublicKey,
+  dcMint?: PublicKey,
+  mint?: PublicKey
 ): Promise<{
   mint: PublicKey;
   dao: PublicKey;
-  treasury: PublicKey;
 }> {
-  const mint = await createMint(provider, 6, authority, authority);
+  const me = provider.wallet.publicKey;
+  if (!mint) {
+    mint = await createMint(provider, 6, me, me);
+  }
+
+  if (!dcMint) {
+    dcMint = await createMint(provider, 6, me, me);
+  }
+
   const method = await program.methods
     .initializeDaoV0({
       authority: authority,
       rewardPerEpoch: new BN(epochRewards)
     })
     .accounts({
-      mint,
+      hntMint: mint,
+      dcMint
     });
-  const { dao, treasury } = await method.pubkeys();
-  await method.rpc();
+  const { dao } = await method.pubkeys();
 
-  return { mint, dao: dao!, treasury: treasury! };
+  if (!(await provider.connection.getAccountInfo(dao!))) {
+    await method.rpc({ skipPreflight: true });
+  }
+
+  return { mint: mint!, dao: dao! };
 }
 
 export async function initTestSubdao(
   program: anchor.Program<HeliumSubDaos>,
   provider: anchor.AnchorProvider,
-  authority: PublicKey,  
-  dao: PublicKey
+  authority: PublicKey,
+  dao: PublicKey,
+  collection: PublicKey,
 ): Promise<{
   mint: PublicKey;
   subDao: PublicKey;
-  collection: PublicKey;
   treasury: PublicKey;
 }> {
   const daoAcc = await program.account.daoV0.fetch(dao);
   const subDaoMint = await createMint(provider, 6, authority, authority);
   const treasury = await createAtaAndMint(provider, daoAcc.mint, 0);
-  const collection = await createMint(provider, 6, authority, authority);
   const method = await program.methods
     .initializeSubDaoV0({
       authority: authority,
@@ -60,7 +68,7 @@ export async function initTestSubdao(
       mint: daoAcc.mint,
     });
   const { subDao } = await method.pubkeys();
-  await method.rpc();
+  await method.rpc({ skipPreflight: true });
 
-  return { mint: subDaoMint, subDao: subDao!, collection, treasury };
+  return { mint: subDaoMint, subDao: subDao!, treasury };
 }

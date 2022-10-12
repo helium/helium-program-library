@@ -10,7 +10,8 @@
   ],
   "private": true,
   "dependencies": {
-    "@project-serum/anchor": "^0.24.2",
+    "@helium/crypto": "^4.6.2",
+    "@project-serum/anchor": "https://gitpkg.now.sh/coral-xyz/anchor/ts/packages/anchor",
     "lerna": "^5.5.4"
   },
   "devDependencies": {

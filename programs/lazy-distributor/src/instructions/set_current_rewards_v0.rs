@@ -1,15 +1,15 @@
 use crate::state::*;
-use crate::utils::resize_to_fit;
 use anchor_lang::prelude::*;
+use shared_utils::resize_to_fit;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct SetRewardsV0Args {
+pub struct SetRewardsArgsV0 {
   pub oracle_index: u16,
   pub current_rewards: u64,
 }
 
 #[derive(Accounts)]
-#[instruction(args: SetRewardsV0Args)]
+#[instruction(args: SetRewardsArgsV0)]
 pub struct SetRewardsV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
@@ -26,7 +26,7 @@ pub struct SetRewardsV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<SetRewardsV0>, args: SetRewardsV0Args) -> Result<()> {
+pub fn handler(ctx: Context<SetRewardsV0>, args: SetRewardsArgsV0) -> Result<()> {
   if ctx.accounts.recipient.current_config_version != ctx.accounts.lazy_distributor.version {
     ctx.accounts.recipient.current_config_version = ctx.accounts.lazy_distributor.version;
     ctx.accounts.recipient.current_rewards =

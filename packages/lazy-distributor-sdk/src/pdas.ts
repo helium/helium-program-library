@@ -3,12 +3,11 @@ import { PROGRAM_ID } from "./constants";
 
 
 export function lazyDistributorKey(
-  collection: PublicKey,
   mint: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("lazy_distributor", "utf-8"), collection.toBuffer(), mint.toBuffer()],
+    [Buffer.from("lazy_distributor", "utf-8"), mint.toBuffer()],
     programId
   );
 }

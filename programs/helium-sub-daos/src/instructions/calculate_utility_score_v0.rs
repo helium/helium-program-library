@@ -1,5 +1,9 @@
 use crate::{
-  current_epoch, error::ErrorCode, precise_number::PreciseNumber, state::*, OrArithError,
+  current_epoch,
+  error::ErrorCode,
+  precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC},
+  state::*,
+  OrArithError,
 };
 use anchor_lang::prelude::*;
 
@@ -68,7 +72,7 @@ pub fn handler(
   // utility score = V * D * A
   // V = max(1, veHNT_dnp). Not implemented yet
   // D = max(1, sqrt(DCs burned in USD)). 1 DC = $0.00001.
-  // A = max(1, sqrt(Total active device count * device activation fee)).
+  // A = max(1, fourth_root(Total active device count * device activation fee)).
   let epoch_info = &mut ctx.accounts.sub_dao_epoch_info;
   let dc_burned = PreciseNumber::new(epoch_info.dc_burned.into())
     .or_arith_error()?
@@ -81,11 +85,32 @@ pub fn handler(
       &PreciseNumber::new(DEVICE_ACTIVATION_FEE).or_arith_error()?, // TODO: Don't hardcode this
     )
     .or_arith_error()?;
-  let d = std::cmp::max(PreciseNumber::one(), dc_burned.sqrt().or_arith_error()?);
-  let a = std::cmp::max(
-    PreciseNumber::one(),
-    devices_with_fee.sqrt().or_arith_error()?,
+
+  // sqrt(x) = e^(ln(x)/2)
+  // x^1/4 = e^(ln(x)/4))
+  let one = PreciseNumber::one();
+  let d = std::cmp::max(
+    one.clone(),
+    dc_burned
+      .log()
+      .or_arith_error()?
+      .checked_div(&FOUR_PREC.clone().signed())
+      .or_arith_error()?
+      .exp()
+      .or_arith_error()?,
   );
+
+  let a = std::cmp::max(
+    one,
+    devices_with_fee
+      .log()
+      .or_arith_error()?
+      .checked_div(&TWO_PREC.clone().signed())
+      .or_arith_error()?
+      .exp()
+      .or_arith_error()?,
+  );
+
   let utility_score_prec = d.checked_mul(&a).or_arith_error()?;
   // Convert to u128 with 12 decimals of precision
   let utility_score = utility_score_prec

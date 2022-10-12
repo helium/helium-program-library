@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.esm.json",
+  "include": ["../../target/types"],
+  "compilerOptions": {
+    "rootDir": "../../target/types",
+    "outDir": "./lib/esm",
+    "declarationDir": "./lib/types",
+  }
+}

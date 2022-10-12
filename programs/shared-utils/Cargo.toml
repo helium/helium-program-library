@@ -1,12 +1,12 @@
 [package]
-name = "test-tracker"
+name = "shared-utils"
 version = "0.0.1"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "test_tracker"
+name = "shared_utils"
 
 [features]
 no-entrypoint = []
@@ -21,4 +21,3 @@ overflow-checks = true
 [dependencies]
 anchor-lang = { version = "0.24.2", features = ["init-if-needed"] }
 anchor-spl = "0.24.2"
-helium-sub-daos = { path = "../helium-sub-daos", features = ["cpi"] }

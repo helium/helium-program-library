@@ -1,6 +1,6 @@
 import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { subDaoEpochInfoKey } from "./pdas";
-import { combineResolvers, get } from "@helium-foundation/spl-utils"
+import { combineResolvers, get } from "@helium-foundation/spl-utils";
 import { resolveIndividual } from "@helium-foundation/spl-utils";
 import { PROGRAM_ID } from "./constants";
 
@@ -15,11 +15,7 @@ export const subDaoEpochInfoResolver = resolveIndividual(
         ...path.slice(0, path.length - 1),
         "subDao",
       ]) as PublicKey;
-      const [key] = await subDaoEpochInfoKey(
-        subDao,
-        unixTime,
-        PROGRAM_ID
-      );
+      const [key] = await subDaoEpochInfoKey(subDao, unixTime, PROGRAM_ID);
 
       return key;
     }
@@ -28,7 +24,7 @@ export const subDaoEpochInfoResolver = resolveIndividual(
 
 export const heliumSubDaosProgramResolver = resolveIndividual(
   async ({ path }) => {
-    if (path[path.length - 1] === "heliumSubDaos") {
+    if (path[path.length - 1] === "heliumSubDaos" || path[path.length - 1] === "heliumSubDaosProgram") {
       return PROGRAM_ID;
     }
   }

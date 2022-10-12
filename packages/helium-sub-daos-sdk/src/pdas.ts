@@ -14,3 +14,24 @@ export async function subDaoEpochInfoKey(
     programId
   );
 }
+
+
+export async function daoKey(
+  mint: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+): Promise<[PublicKey, number]> {
+  return await PublicKey.findProgramAddress(
+    [Buffer.from("dao", "utf-8"), mint.toBuffer()],
+    programId
+  );
+}
+
+export async function subDaoKey(
+  mint: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+): Promise<[PublicKey, number]> {
+  return await PublicKey.findProgramAddress(
+    [Buffer.from("sub_dao", "utf-8"), mint.toBuffer()],
+    programId
+  );
+}

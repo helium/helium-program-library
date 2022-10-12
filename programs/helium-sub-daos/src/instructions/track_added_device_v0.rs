@@ -3,11 +3,10 @@ use crate::utils::current_epoch;
 use anchor_lang::prelude::*;
 use std::str::FromStr;
 
-pub const ONBOARD_KEY: &str = "tes8BDewkpUpfqx7VDXUJzTFugjqHJugCEBP5sDrrCf";
+pub const ONBOARD_KEY: &str = "8DV471AvMNBCDTPoa2gzffrYFEJmDU56GDgTBv48RBZR";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TrackAddedDeviceArgsV0 {
-  pub collection: Pubkey,
   pub authority_bump: u8,
 }
 
@@ -24,9 +23,10 @@ pub struct TrackAddedDeviceV0<'info> {
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
+  #[account(mut)]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
-    seeds = ["hotspot_issuance".as_bytes(), args.collection.as_ref()],
+    seeds = ["hotspot_config".as_bytes(), sub_dao.hotspot_collection.as_ref()],
     seeds::program = Pubkey::from_str(ONBOARD_KEY).unwrap(),
     bump = args.authority_bump,
   )]
