@@ -8,6 +8,9 @@
       "path": "./packages/spl-utils"
     },
     {
+      "path": "./packages/distributor-oracle"
+    },
+    {
       "path": "./packages/lazy-distributor-sdk"
     },
     {

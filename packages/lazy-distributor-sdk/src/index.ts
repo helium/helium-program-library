@@ -1,6 +1,6 @@
 import { ataResolver, combineResolvers, resolveIndividual } from "@helium-foundation/spl-utils";
 import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
-import { AnchorProvider, Program } from "@project-serum/anchor";
+import { AnchorProvider, Program, Idl } from "@project-serum/anchor";
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
@@ -8,15 +8,15 @@ import { PROGRAM_ID } from "./constants";
 
 export async function init(
   provider: AnchorProvider,
-  lazyDistributorProgramId: PublicKey = PROGRAM_ID,
-  lazyDistributorIdl?: any
+  programId: PublicKey = PROGRAM_ID,
+  idl?: Idl | null,
 ): Promise<Program<LazyDistributor>> {
-  if (!lazyDistributorIdl) {
-    lazyDistributorIdl = await Program.fetchIdl(lazyDistributorProgramId, provider);
+  if (!idl) {
+    idl = await Program.fetchIdl(programId, provider);
   }
   const lazyDistributor = new Program<LazyDistributor>(
-    lazyDistributorIdl as LazyDistributor,
-    lazyDistributorProgramId,
+    idl as LazyDistributor,
+    programId,
     provider,
     undefined,
     () => {
