@@ -22,7 +22,18 @@ pub mod circuit_breaker {
     instructions::initialize_mint_windowed_breaker_v0::handler(ctx, args)
   }
 
+  pub fn initialize_account_windowed_breaker_v0(
+    ctx: Context<InitializeAccountWindowedBreakerV0>,
+    args: InitializeAccountWindowedBreakerArgsV0,
+  ) -> Result<()> {
+    instructions::initialize_account_windowed_breaker_v0::handler(ctx, args)
+  }
+
   pub fn mint_v0(ctx: Context<MintV0>, args: MintArgsV0) -> Result<()> {
     instructions::mint_v0::handler(ctx, args)
+  }
+
+  pub fn transfer_v0(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
+    instructions::transfer_v0::handler(ctx, args)
   }
 }

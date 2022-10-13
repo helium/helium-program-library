@@ -8,7 +8,7 @@ import {
 import {
   init as initLazy
 } from "@helium-foundation/lazy-distributor-sdk";
-import { createAtaAndMintInstructions, createMintInstructions, createNft as createNft, sendInstructions } from "@helium-foundation/spl-utils";
+import { createAtaAndMintInstructions, createMintInstructions, createNft as createNft, sendInstructions, toBN } from "@helium-foundation/spl-utils";
 import {
   createCreateMetadataAccountV3Instruction, PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
@@ -202,7 +202,7 @@ async function createAndMint({
           await createAtaAndMintInstructions(
             provider,
             mintKeypair.publicKey,
-            amount * 10 ** 8
+            toBN(amount, 8)
           )
         ).instructions,
       ],

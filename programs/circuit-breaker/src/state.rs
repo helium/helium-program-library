@@ -6,11 +6,25 @@ pub struct WindowV0 {
   pub last_unix_timestamp: i64,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub enum ThresholdType {
+  Percent,
+  Absolute,
+}
+
+impl Default for ThresholdType {
+  fn default() -> Self {
+    Self::Percent
+  }
+}
+
 #[derive(Default, AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct WindowedCircuitBreakerConfigV0 {
   pub window_size_seconds: u64,
-  // Denoted as amount / u32.MAX_VALUE
-  pub threshold_percent: u32,
+  pub threshold_type: ThresholdType,
+  // Percent: Denoted as amount / u64.MAX_VALUE
+  // Absolute: Denoted as amount
+  pub threshold: u64,
 }
 
 #[account]
