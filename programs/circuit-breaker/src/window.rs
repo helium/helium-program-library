@@ -49,7 +49,7 @@ pub fn enforce_window(
       get_new_aggregated_value(config, window, unix_timestamp)
         .ok_or_else(|| error!(ErrorCode::ArithmeticError))?,
     )
-    .ok_or_else(error!(|| ErrorCode::ArithmeticError))?;
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
 
   if new_aggregated_value > threshold {
     return Err(ErrorCode::CircuitBreakerTriggered.into());
