@@ -1,27 +1,23 @@
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 
-export function dataCreditsKey(dcMint: PublicKey, programId = PROGRAM_ID): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("dc", "utf-8"), dcMint.toBuffer()],
-    programId
-  );
-}
-
-export function tokenAuthorityKey(programId: PublicKey = PROGRAM_ID): [PublicKey, number] {
+export function mintWindowedBreakerKey(mint: PublicKey, programId: PublicKey = PROGRAM_ID): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [
-      Buffer.from("dc_token_auth", "utf-8"),
+      Buffer.from("mint_windowed_breaker", "utf-8"),
+      mint.toBuffer()
     ],
     programId
   );
 }
 
-export function accountPayerKey(
+export function accountWindowedBreakerKey(
+  account: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("account_payer", "utf-8")],
+    [Buffer.from("account_windowed_breaker", "utf-8"), account.toBuffer()],
     programId
-  )
+  );
 }
+
