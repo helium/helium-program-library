@@ -41,14 +41,15 @@ pub fn enforce_window(
   account_value: u64,
   unix_timestamp: i64,
 ) -> Result<WindowV0> {
-  let threshold = get_threshold(config, account_value).ok_or(error!(ErrorCode::ArithmeticError))?;
+  let threshold =
+    get_threshold(config, account_value).ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
 
   let new_aggregated_value = amount
     .checked_add(
       get_new_aggregated_value(config, window, unix_timestamp)
-        .ok_or(error!(ErrorCode::ArithmeticError))?,
+        .ok_or_else(|| error!(ErrorCode::ArithmeticError))?,
     )
-    .ok_or(error!(ErrorCode::ArithmeticError))?;
+    .ok_or_else(error!(|| ErrorCode::ArithmeticError))?;
 
   if new_aggregated_value > threshold {
     return Err(ErrorCode::CircuitBreakerTriggered.into());
