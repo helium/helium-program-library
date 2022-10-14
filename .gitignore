@@ -9,3 +9,4 @@ packages/*/lib
 packages/helium-cli/keypairs/
 **/*.tsbuildinfo
 .parcel-cache
+.vscode

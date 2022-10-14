@@ -5,14 +5,12 @@ import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Program } from "@project-serum/anchor";
 
 export function useTokenAccounts() {
-  console.log("tm1");
   const publicKey = usePublicKey();
   const connection = useConnection();
 
   const [tokenAccounts, setTokenAccounts] = useState<
     [any, any, any, any] | null
   >(null);
-  console.log("tm2");
   useEffect(() => {
     (async () => {
       setTokenAccounts(null);
@@ -20,7 +18,6 @@ export function useTokenAccounts() {
       setTokenAccounts(res);
     })();
   }, [publicKey, connection]);
-  console.log(tokenAccounts);
   return tokenAccounts;
 }
 

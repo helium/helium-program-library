@@ -6,7 +6,8 @@
   "scripts": {
     "build": "xnft build",
     "start": "xnft watch",
-    "dev": "xnft dev"
+    "dev": "xnft dev",
+    "setup": "ts-node -O \"{\\\"module\\\":\\\"commonjs\\\"}\" src/dev-env.ts"
   },
   "author": "",
   "license": "ISC",
