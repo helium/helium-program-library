@@ -9,6 +9,9 @@
     },
     {
       "path": "./packages/circuit-breaker-sdk"
+    }, 
+    {
+      "path": "./packages/distributor-oracle"
     },
     {
       "path": "./packages/lazy-distributor-sdk"
