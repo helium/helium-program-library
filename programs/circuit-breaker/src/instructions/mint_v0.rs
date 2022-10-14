@@ -5,7 +5,7 @@ use crate::{window::enforce_window, MintWindowedCircuitBreakerV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MintArgsV0 {
-  amount: u64,
+  pub amount: u64,
 }
 
 #[derive(Accounts)]
@@ -36,7 +36,7 @@ pub fn handler(ctx: Context<MintV0>, args: MintArgsV0) -> Result<()> {
     ctx.accounts.mint.supply,
     ctx.accounts.clock.unix_timestamp,
   )?;
-  
+
   mint_to(
     CpiContext::new_with_signer(
       ctx.accounts.token_program.to_account_info(),

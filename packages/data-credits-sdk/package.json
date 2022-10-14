@@ -35,6 +35,7 @@
     "@helium-foundation/helium-sub-daos-sdk": "^0.0.1",
     "@helium-foundation/spl-utils": "^0.0.1",
     "@helium-foundation/idls": "^0.0.1",
+    "@helium-foundation/circuit-breaker-sdk": "^0.0.1",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },

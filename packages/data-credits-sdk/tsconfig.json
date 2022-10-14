@@ -5,6 +5,9 @@
       "path": "../idls"
     },
     {
+      "path": "../circuit-breaker-sdk"
+    },
+    {
       "path": "../helium-sub-daos-sdk"
     },
     {

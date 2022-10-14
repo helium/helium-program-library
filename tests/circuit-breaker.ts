@@ -37,6 +37,7 @@ describe("circuit-breaker", () => {
     const method = await program.methods
       .initializeMintWindowedBreakerV0({
         authority: me,
+        mintAuthority: me,
         config: {
           windowSizeSeconds: new BN(10),
           thresholdType: ThresholdType.Percent as never,
@@ -63,6 +64,7 @@ describe("circuit-breaker", () => {
     const method = await program.methods
       .initializeAccountWindowedBreakerV0({
         authority: me,
+        owner: me,
         config: {
           windowSizeSeconds: new BN(10),
           thresholdType: ThresholdType.Percent as never,
@@ -94,6 +96,7 @@ describe("circuit-breaker", () => {
       const method = await program.methods
         .initializeMintWindowedBreakerV0({
           authority: me,
+          mintAuthority: me,
           config: {
             windowSizeSeconds: new BN(10),
             thresholdType: ThresholdType.Percent as never,
@@ -190,6 +193,7 @@ describe("circuit-breaker", () => {
       const method = await program.methods
         .initializeAccountWindowedBreakerV0({
           authority: me,
+          owner: accountHolder.publicKey,
           config: {
             windowSizeSeconds: new BN(10),
             thresholdType: ThresholdType.Percent as never,
@@ -220,7 +224,7 @@ describe("circuit-breaker", () => {
           owner: accountHolder.publicKey,
         });
       const circuitBreaker = (await method.pubkeys()).circuitBreaker!;
-      await method.rpc({ skipPreflight: true });
+      await method.rpc();
       const acct = await program.account.accountWindowedCircuitBreakerV0.fetch(
         circuitBreaker
       );

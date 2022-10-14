@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{
-  set_authority, spl_token::instruction::AuthorityType, Mint, SetAuthority, Token, TokenAccount,
+  set_authority, spl_token::instruction::AuthorityType, SetAuthority, Token, TokenAccount,
 };
 
 use crate::{AccountWindowedCircuitBreakerV0, WindowV0, WindowedCircuitBreakerConfigV0};
@@ -8,6 +8,7 @@ use crate::{AccountWindowedCircuitBreakerV0, WindowV0, WindowedCircuitBreakerCon
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeAccountWindowedBreakerArgsV0 {
   authority: Pubkey,
+  owner: Pubkey,
   config: WindowedCircuitBreakerConfigV0,
 }
 
@@ -46,7 +47,7 @@ pub fn handler(
     .set_inner(AccountWindowedCircuitBreakerV0 {
       token_account: ctx.accounts.token_account.key(),
       authority: args.authority,
-      owner: ctx.accounts.token_account.owner,
+      owner: args.owner,
       config: args.config,
       last_window: WindowV0 {
         last_aggregated_value: 0,

@@ -16,7 +16,9 @@ import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestSubdao } from "./utils/daos";
 import { ensureHSDIdl } from "./utils/fixtures";
 import { createAtaAndMint, createMint, createNft } from "@helium-foundation/spl-utils";
-
+import {
+  ThresholdType
+} from "../packages/circuit-breaker-sdk/src";
 const EPOCH_REWARDS = 100000000;
 
 export async function burnDataCredits({
@@ -95,7 +97,14 @@ describe("data-credits", () => {
       me
     );
     const method = await program.methods
-      .initializeDataCreditsV0({ authority: me })
+      .initializeDataCreditsV0({ 
+        authority: me,
+        config: {
+          windowSizeSeconds: new BN(60),
+          thresholdType: ThresholdType.Absolute as never,
+          threshold: new BN("10000000000000000000")
+        }
+      })
       .accounts({ hntMint, dcMint, payer: me });
     dcKey = (await method.pubkeys()).dataCredits!;
     await method.rpc({

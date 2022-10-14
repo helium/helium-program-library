@@ -1,11 +1,11 @@
 {
-  "name": "@helium-foundation/circuit-breaker",
+  "name": "@helium-foundation/circuit-breaker-sdk",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
   "version": "0.0.1",
-  "description": "Interface to the data-credits smart contract",
+  "description": "Interface to the circuit breaker smart contract",
   "repository": {
     "type": "git",
     "url": "https://github.com/HeliumFoundation/helium-program-libary"

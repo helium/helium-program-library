@@ -4,10 +4,19 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::{set_authority, SetAuthority};
 use anchor_spl::token::{Mint, Token};
+use crate::circuit_breaker::*;
+use circuit_breaker::{
+  cpi::{
+    accounts::InitializeMintWindowedBreakerV0,
+    initialize_mint_windowed_breaker_v0
+  },
+  InitializeMintWindowedBreakerArgsV0
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDataCreditsArgsV0 {
   authority: Pubkey,
+  config: WindowedCircuitBreakerConfigV0
 }
 
 #[derive(Accounts)]
@@ -23,6 +32,14 @@ pub struct InitializeDataCreditsV0<'info> {
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
 
   pub hnt_mint: Box<Account<'info, Mint>>,
+  /// CHECK: Initialized via cpi
+  #[account(
+    mut,
+    seeds = ["mint_windowed_breaker".as_bytes(), dc_mint.key().as_ref()],
+    seeds::program = circuit_breaker_program.key(),
+    bump
+  )]
+  pub circuit_breaker: AccountInfo<'info>,
   #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,
 
@@ -39,6 +56,7 @@ pub struct InitializeDataCreditsV0<'info> {
 
   #[account(mut)]
   pub payer: Signer<'info>,
+  pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
   pub rent: Sysvar<'info, Rent>,
@@ -64,18 +82,26 @@ pub fn handler(
     .ok_or(DataCreditsErrors::BumpNotAvailable)?;
 
   msg!("Claiming mint and freeze authority");
-  let dc_authority = Some(*ctx.accounts.data_credits.to_account_info().key);
-  set_authority(
+  initialize_mint_windowed_breaker_v0(
     CpiContext::new(
-      ctx.accounts.token_program.to_account_info(),
-      SetAuthority {
-        account_or_mint: ctx.accounts.dc_mint.to_account_info(),
-        current_authority: ctx.accounts.mint_authority.to_account_info(),
-      },
+      ctx.accounts.circuit_breaker_program.to_account_info(),
+      InitializeMintWindowedBreakerV0 {
+        payer: ctx.accounts.payer.to_account_info(),
+        circuit_breaker: ctx.accounts.circuit_breaker.to_account_info(),
+        mint: ctx.accounts.dc_mint.to_account_info(),
+        mint_authority: ctx.accounts.mint_authority.to_account_info(),
+        token_program: ctx.accounts.token_program.to_account_info(),
+        system_program: ctx.accounts.system_program.to_account_info(),
+        rent: ctx.accounts.rent.to_account_info(),
+      }
     ),
-    AuthorityType::MintTokens,
-    dc_authority,
+    InitializeMintWindowedBreakerArgsV0 {
+      authority: args.authority,
+      config: args.config.into(),
+      mint_authority: ctx.accounts.data_credits.key()
+    }
   )?;
+  let dc_authority = Some(*ctx.accounts.data_credits.to_account_info().key);
   set_authority(
     CpiContext::new(
       ctx.accounts.token_program.to_account_info(),

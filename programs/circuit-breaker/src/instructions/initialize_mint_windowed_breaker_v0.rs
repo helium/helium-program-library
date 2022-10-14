@@ -7,8 +7,9 @@ use crate::{MintWindowedCircuitBreakerV0, WindowV0, WindowedCircuitBreakerConfig
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeMintWindowedBreakerArgsV0 {
-  authority: Pubkey,
-  config: WindowedCircuitBreakerConfigV0,
+  pub authority: Pubkey,
+  pub mint_authority: Pubkey,
+  pub config: WindowedCircuitBreakerConfigV0,
 }
 
 #[derive(Accounts)]
@@ -30,7 +31,6 @@ pub struct InitializeMintWindowedBreakerV0<'info> {
   pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
   pub rent: Sysvar<'info, Rent>,
-  pub clock: Sysvar<'info, Clock>,
 }
 
 pub fn handler(
@@ -43,11 +43,11 @@ pub fn handler(
     .set_inner(MintWindowedCircuitBreakerV0 {
       mint: ctx.accounts.mint.key(),
       authority: args.authority,
-      mint_authority: ctx.accounts.mint.mint_authority.unwrap(),
+      mint_authority: args.mint_authority,
       config: args.config,
       last_window: WindowV0 {
         last_aggregated_value: 0,
-        last_unix_timestamp: ctx.accounts.clock.unix_timestamp,
+        last_unix_timestamp: 0,
       },
       bump_seed: ctx.bumps["circuit_breaker"],
     });
