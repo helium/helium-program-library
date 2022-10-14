@@ -1,10 +1,13 @@
-use crate::{DataCreditsV0, circuit_breaker::CircuitBreaker};
+use crate::{circuit_breaker::CircuitBreaker, DataCreditsV0};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Burn, FreezeAccount, Mint, ThawAccount, Token, TokenAccount},
 };
-use circuit_breaker::{cpi::{accounts::MintV0, mint_v0}, MintWindowedCircuitBreakerV0, MintArgsV0};
+use circuit_breaker::{
+  cpi::{accounts::MintV0, mint_v0},
+  MintArgsV0, MintWindowedCircuitBreakerV0,
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MintDataCreditsArgsV0 {
@@ -128,7 +131,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
   mint_v0(
     ctx.accounts.mint_ctx().with_signer(signer_seeds),
     MintArgsV0 {
-      amount: args.amount
+      amount: args.amount,
     },
   )?;
 

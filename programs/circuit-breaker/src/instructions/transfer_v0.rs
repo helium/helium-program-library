@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{transfer, Transfer, Token, TokenAccount};
+use anchor_spl::token::{transfer, Token, TokenAccount, Transfer};
 
 use crate::{window::enforce_window, AccountWindowedCircuitBreakerV0};
 
@@ -36,7 +36,7 @@ pub fn handler(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
     ctx.accounts.from.amount,
     ctx.accounts.clock.unix_timestamp,
   )?;
-  
+
   transfer(
     CpiContext::new_with_signer(
       ctx.accounts.token_program.to_account_info(),

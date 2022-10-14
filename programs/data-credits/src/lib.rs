@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 
+pub mod circuit_breaker;
 pub mod errors;
 pub mod instructions;
 pub mod state;
-pub mod circuit_breaker;
 
 pub use errors::*;
 pub use instructions::*;

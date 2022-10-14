@@ -1,22 +1,19 @@
+use crate::circuit_breaker::*;
 use crate::errors::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::{set_authority, SetAuthority};
 use anchor_spl::token::{Mint, Token};
-use crate::circuit_breaker::*;
 use circuit_breaker::{
-  cpi::{
-    accounts::InitializeMintWindowedBreakerV0,
-    initialize_mint_windowed_breaker_v0
-  },
-  InitializeMintWindowedBreakerArgsV0
+  cpi::{accounts::InitializeMintWindowedBreakerV0, initialize_mint_windowed_breaker_v0},
+  InitializeMintWindowedBreakerArgsV0,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDataCreditsArgsV0 {
   authority: Pubkey,
-  config: WindowedCircuitBreakerConfigV0
+  config: WindowedCircuitBreakerConfigV0,
 }
 
 #[derive(Accounts)]
@@ -93,13 +90,13 @@ pub fn handler(
         token_program: ctx.accounts.token_program.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
         rent: ctx.accounts.rent.to_account_info(),
-      }
+      },
     ),
     InitializeMintWindowedBreakerArgsV0 {
       authority: args.authority,
       config: args.config.into(),
-      mint_authority: ctx.accounts.data_credits.key()
-    }
+      mint_authority: ctx.accounts.data_credits.key(),
+    },
   )?;
   let dc_authority = Some(*ctx.accounts.data_credits.to_account_info().key);
   set_authority(

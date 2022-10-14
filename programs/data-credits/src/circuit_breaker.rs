@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 use circuit_breaker::{
-  ThresholdType as CBThresholdType,
-  WindowedCircuitBreakerConfigV0 as WindowConfig
+  ThresholdType as CBThresholdType, WindowedCircuitBreakerConfigV0 as WindowConfig,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -20,7 +19,7 @@ impl From<ThresholdType> for CBThresholdType {
   fn from(args: ThresholdType) -> Self {
     match args {
       ThresholdType::Absolute => CBThresholdType::Absolute,
-      ThresholdType::Percent => CBThresholdType::Percent
+      ThresholdType::Percent => CBThresholdType::Percent,
     }
   }
 }
@@ -48,7 +47,7 @@ impl From<WindowedCircuitBreakerConfigV0> for WindowConfig {
 pub struct CircuitBreaker;
 
 impl anchor_lang::Id for CircuitBreaker {
-    fn id() -> Pubkey {
-        circuit_breaker::ID
-    }
+  fn id() -> Pubkey {
+    circuit_breaker::ID
+  }
 }
