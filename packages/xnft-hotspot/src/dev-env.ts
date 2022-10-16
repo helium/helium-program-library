@@ -62,7 +62,7 @@ async function setupLocalhost() {
   const program = await ld.init(provider);
   const me = provider.wallet.publicKey;
 
-  const rewardsMint = await createMint(provider, 6, me, me);
+  const rewardsMint = await createMint(provider, 8, me, me);
 
   const lazyDistributor = await initLazyDistributor(program, me, rewardsMint);
 

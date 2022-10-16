@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
-import ReactXnft, { LocalStorage, usePublicKey, useConnection } from "react-xnft";
-import { PublicKey, Connection } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { Program } from "@project-serum/anchor";
+import ReactXnft, { usePublicKey, useConnection } from "react-xnft";
+import { PublicKey } from "@solana/web3.js";
+import { BN, Program } from "@project-serum/anchor";
+import { init } from "@helium-foundation/lazy-distributor-sdk";
+import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
+import { getMint } from "@solana/spl-token";
+import { toNumber } from "@helium-foundation/spl-utils";
 
 export function useTokenAccounts() {
   const publicKey = usePublicKey();
   const connection = useConnection();
 
   const [tokenAccounts, setTokenAccounts] = useState<
-    [any, any, any, any] | null
+    any[] | null
   >(null);
   useEffect(() => {
     (async () => {
@@ -21,9 +24,31 @@ export function useTokenAccounts() {
   return tokenAccounts;
 }
 
+export function useProgram() {
+  const [program, setProgram] = useState<Program<LazyDistributor> | null>(null);
+  useEffect(() => {
+    //@ts-ignore
+    init(window.xnft).then((prog) => setProgram(prog));
+  }, [])
+
+  return program;
+}
+
+export async function getPendingRewards(program: Program<LazyDistributor>, recipient: PublicKey) {
+  const recipientAcc = await program.account.recipientV0.fetch(recipient);
+  const lazyDistributor = await program.account.lazyDistributorV0.fetch(recipientAcc.lazyDistributor);
+  const rewardsMintAcc = await getMint(program.provider.connection, lazyDistributor.rewardsMint);
+  const sortedRewards = (recipientAcc.currentRewards as (BN | null)[]).sort((a, b) => (a?.toNumber() || 0) - (b?.toNumber() || 0));
+  const median = sortedRewards[Math.floor(sortedRewards.length / 2)];
+  if (!median) return 0;
+  const subbed =  median.sub(recipientAcc.totalRewards);
+  return toNumber(subbed, rewardsMintAcc.decimals);
+}
+
 async function fetchTokenAccounts(
   wallet: PublicKey,
 ): Promise<any> {
+  //@ts-ignore
   const resp = await window.xnft.connection.customSplTokenAccounts(wallet);
   const tokens = resp.nftMetadata
     .map((m) => m[1])
