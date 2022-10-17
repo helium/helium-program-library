@@ -38,11 +38,14 @@ export async function getPendingRewards(program: Program<LazyDistributor>, recip
   const recipientAcc = await program.account.recipientV0.fetch(recipient);
   const lazyDistributor = await program.account.lazyDistributorV0.fetch(recipientAcc.lazyDistributor);
   const rewardsMintAcc = await getMint(program.provider.connection, lazyDistributor.rewardsMint);
-  const sortedRewards = (recipientAcc.currentRewards as (BN | null)[]).sort((a, b) => (a?.toNumber() || 0) - (b?.toNumber() || 0));
-  const median = sortedRewards[Math.floor(sortedRewards.length / 2)];
-  if (!median) return 0;
+  const sortedRewards = (recipientAcc.currentRewards as (BN | null)[]).sort((a, b) => (a || new BN(0)).sub((b || new BN(0))).toNumber());
+  let median = sortedRewards[Math.floor(sortedRewards.length / 2)];
+  if (!median) median = new BN(0);
   const subbed =  median.sub(recipientAcc.totalRewards);
-  return toNumber(subbed, rewardsMintAcc.decimals);
+  return {
+    pendingRewards: Math.max(toNumber(subbed, rewardsMintAcc.decimals), 0),
+    rewardsMint: lazyDistributor.rewardsMint,
+  }
 }
 
 async function fetchTokenAccounts(

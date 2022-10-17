@@ -14,7 +14,7 @@ import * as anchor from "@project-serum/anchor";
 import { THEME } from "../utils/theme";
 import { init, recipientKey } from "@helium-foundation/lazy-distributor-sdk";
 
-export function DetailScreen({ nft, pendingRewards }) {
+export function DetailScreen({ nft, pendingRewards, symbol }) {
   const publicKey = usePublicKey();
   const connection = useConnection();
   
@@ -59,6 +59,9 @@ export function DetailScreen({ nft, pendingRewards }) {
         }}
         src={nft.tokenMetaUriData.image}
       />
+      <Text>
+        Pending rewards: {pendingRewards || '0'} {symbol || ''}
+      </Text>
       
       <Button
         style={{

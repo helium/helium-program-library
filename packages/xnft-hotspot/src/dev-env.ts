@@ -1,8 +1,12 @@
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction, Transaction, Keypair } from "@solana/web3.js";
 import * as ld from "@helium-foundation/lazy-distributor-sdk";
 import * as anchor from "@project-serum/anchor";
 import { createMint, createNft } from "@helium-foundation/spl-utils";
 import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
+import {
+  createCreateMetadataAccountV3Instruction,
+  PROGRAM_ID as MPL_PID,
+} from "@metaplex-foundation/mpl-token-metadata";
 
 async function initLazyDistributor(
   program: anchor.Program<LazyDistributor>, 
@@ -56,17 +60,54 @@ async function setRewards(
     .rpc({ skipPreflight: true });
 }
 
+async function createTokenMetadata(provider: anchor.AnchorProvider, mintKeypair: Keypair) {
+  const metadata = PublicKey.findProgramAddressSync([
+    Buffer.from("metadata", "utf-8"), MPL_PID.toBuffer(), mintKeypair.publicKey.toBuffer()
+    ],
+    MPL_PID
+  )[0];
+  const instruction = createCreateMetadataAccountV3Instruction(
+    {
+      metadata,
+      mint: mintKeypair.publicKey,
+      mintAuthority: provider.wallet.publicKey,
+      payer: provider.wallet.publicKey,
+      updateAuthority: provider.wallet.publicKey,
+    },
+    {
+      createMetadataAccountArgsV3: {
+        data: {
+          name: "Mobile",
+          symbol: "MOBILE",
+          uri: "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/mobile.json",
+          sellerFeeBasisPoints: 0,
+          creators: null,
+          collection: null,
+          uses: null
+        },
+        isMutable: true,
+        collectionDetails: null,
+      },
+    }
+  )
+  const tx = new Transaction().add(instruction);
+  provider.sendAndConfirm(tx);
+}
+
 async function setupLocalhost() {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
   const program = await ld.init(provider);
   const me = provider.wallet.publicKey;
 
-  const rewardsMint = await createMint(provider, 8, me, me);
+  const rwdMintKeypair = Keypair.generate();
+  console.log(rwdMintKeypair.publicKey.toString());
+  const rewardsMint = await createMint(provider, 8, me, me, rwdMintKeypair);
+  await createTokenMetadata(provider, rwdMintKeypair);
 
   const lazyDistributor = await initLazyDistributor(program, me, rewardsMint);
 
-  const { mintKey: hotspotMint } = await createNft(provider, me);
+  const { mintKey: hotspotMint } = await createNft(provider, me, {uri: 'https://shdw-drive.genesysgo.net/CYPATLeMUuCkqBuREw1gYdfckZitf2rjMH4EqfTCMPJJ/hotspot.json'});
   const recipient = await initRecipient(program, lazyDistributor!, hotspotMint);
 
   await setRewards(program, lazyDistributor!, recipient);
