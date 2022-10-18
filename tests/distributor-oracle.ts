@@ -11,7 +11,7 @@ import {
 import { init, PROGRAM_ID, lazyDistributorKey, recipientKey } from "../packages/lazy-distributor-sdk/src";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { AuthorityType, createSetAuthorityInstruction } from "@solana/spl-token";
-import { sendAndConfirmWithRetry, createMint, createTestNft  } from '@helium-foundation/spl-utils';
+import { sendAndConfirmWithRetry, createMint, createNft  } from '@helium-foundation/spl-utils';
 
 
 chai.use(chaiHttp);
@@ -40,45 +40,39 @@ describe('distributor-oracle', () => {
   });
 
   beforeEach(async () => {
-    
-    const { mintKey: collectionKey } = await createTestNft(provider, me);
+    const { mintKey: collectionKey } = await createNft(provider, me);
 
     collectionMint = collectionKey;
     rewardsMint = await createMint(provider, 6, me, me);
-
     // init LD
     lazyDistributor = lazyDistributorKey(collectionMint, rewardsMint)[0];
-    await sendInstructions(provider, [
-      createSetAuthorityInstruction(
-        rewardsMint,
-        me,
-        AuthorityType.MintTokens,
-        lazyDistributorKey(collectionMint, rewardsMint)[0]
-      ),
-    ]);
-    await program.methods.initializeLazyDistributorV0({
-      collection: collectionMint,
+
+    const method = await program.methods.initializeLazyDistributorV0({
+      authority: me,
       oracles: [
         {
           oracle: oracle.publicKey,
           url: "https://some-url/",
         },
       ],
-      authority: provider.wallet.publicKey,
     }).accounts({
-      lazyDistributor,
       rewardsMint
-    }).rpc();
+    });
 
+    const { lazyDistributor: ld } = await method.pubkeys();
+    lazyDistributor = ld!;
+    await method.rpc({ skipPreflight: true });
+    
     // init recipient
-    const { mintKey } = await createTestNft(provider, me, collectionMint);
+    const { mintKey } = await createNft(provider, me, collectionMint);
     mint = mintKey;
-    recipient = recipientKey(lazyDistributor, mint)[0];
-    await program.methods.initializeRecipientV0().accounts({
+    const method2 = program.methods.initializeRecipientV0().accounts({
       lazyDistributor,
-      recipient,
       mint,
-    }).rpc()
+    })
+    const { recipient: rc } = await method2.pubkeys();
+    recipient = rc!;
+    await method2.rpc({ skipPreflight: true })
   });
 
   it('should provide the current rewards for a hotspot', async () => {
