@@ -16,7 +16,7 @@ pub struct InitializeRecipientV0<'info> {
     init,
     payer = payer,
     space = 60 + std::mem::size_of::<RecipientV0>(),
-    seeds = ["recipient".as_bytes(), lazy_distributor.key().as_ref(), mint.key().as_ref()],
+    seeds = ["recipient".as_bytes(), mint.key().as_ref()],
     bump,
   )]
   pub recipient: Box<Account<'info, RecipientV0>>,

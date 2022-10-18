@@ -29,7 +29,7 @@ pub struct MintDataCreditsV0<'info> {
     mut,
     constraint = burner.mint == hnt_mint.key(),
     constraint = burner.amount >= args.amount,
-    has_one = owner
+    has_one = owner,
   )]
   pub burner: Box<Account<'info, TokenAccount>>,
   #[account(

@@ -27,11 +27,6 @@ export class OracleServer {
     private oracle: Keypair,
     public db: Database,
   ) {
-    this.initApp();
-    this.addRoutes();
-  }
-
-  private initApp() {
     const app = express();
     app.use(bodyParser.json());
     this.app = app;
