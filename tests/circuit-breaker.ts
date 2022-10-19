@@ -159,7 +159,7 @@ describe("circuit-breaker", () => {
             .rpc({ skipPreflight: true });
           throw new Error("should not get here");
         } catch (e: any) {
-          expect(e.toString()).to.eq("The circuit breaker was triggered");
+          expect(e.toString()).to.include("The circuit breaker was triggered");
         }
 
       // Wait til the window passes
