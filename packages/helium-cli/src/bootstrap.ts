@@ -8,7 +8,10 @@ import {
 import {
   init as initLazy
 } from "@helium-foundation/lazy-distributor-sdk";
-import { createAtaAndMintInstructions, createMintInstructions, createNft as createNft, sendInstructions } from "@helium-foundation/spl-utils";
+import {
+  ThresholdType
+} from "@helium-foundation/circuit-breaker-sdk";
+import { createAtaAndMintInstructions, createMintInstructions, createNft as createNft, sendInstructions, toBN } from "@helium-foundation/spl-utils";
 import {
   createCreateMetadataAccountV3Instruction, PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
@@ -18,6 +21,7 @@ import {
   Keypair,
   PublicKey
 } from "@solana/web3.js";
+import { BN } from "bn.js";
 import fs from "fs";
 import fetch from "node-fetch";
 import os from "os";
@@ -122,6 +126,11 @@ async function run() {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
         authority: provider.wallet.publicKey,
+        config: {
+          windowSizeSeconds: new BN(60),
+          thresholdType: ThresholdType.Absolute as never,
+          threshold: new BN("10000000000000000000"),
+        },
       })
       .accounts({ hntMint: hntKeypair.publicKey, dcMint: dcKeypair.publicKey })
       .rpc({ skipPreflight: true });
@@ -202,7 +211,7 @@ async function createAndMint({
           await createAtaAndMintInstructions(
             provider,
             mintKeypair.publicKey,
-            amount * 10 ** 8
+            toBN(amount, 8)
           )
         ).instructions,
       ],

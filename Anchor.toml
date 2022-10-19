@@ -6,13 +6,15 @@ lazy_distributor = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 helium_sub_daos = "daoK94GYdvRjVxkSyTxNLxtAEYZohLJqmwad8pBK261"
 data_credits = "5BAQuzGE1z8CTcrSdfbfdBF2fdXrwb4iMcxDMrvhz8L8"
 hotspot_issuance = "8DV471AvMNBCDTPoa2gzffrYFEJmDU56GDgTBv48RBZR"
+circuit_breaker = "circcmKGcSE61r768bFtD1GkG3x6qfEE1GD2PgwA6C3"
 
 [workspace]
 members = [
   "programs/lazy-distributor", 
   "programs/data-credits",
   "programs/helium-sub-daos",
-  "programs/hotspot-issuance"  
+  "programs/hotspot-issuance",
+  "programs/circuit-breaker"
 ]
 
 [registry]

@@ -1,12 +1,12 @@
 [package]
-name = "data-credits"
-version = "0.1.0"
+name = "circuit-breaker"
+version = "0.0.1"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "data_credits"
+name = "circuit_breaker"
 
 [features]
 no-entrypoint = []
@@ -19,7 +19,6 @@ default = []
 overflow-checks = true
 
 [dependencies]
-anchor-lang = { version="0.24.2", features = ["init-if-needed"] }
+anchor-lang = { version = "0.24.2", features = ["init-if-needed"] }
 anchor-spl = "0.24.2"
-helium-sub-daos = { path = "../helium-sub-daos", features = ["cpi"] }
-circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
+shared-utils = { path = "../shared-utils" }

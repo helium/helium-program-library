@@ -2,9 +2,11 @@ import { ataResolver, combineResolvers } from "@helium-foundation/spl-utils";
 import { heliumSubDaosResolvers } from "@helium-foundation/helium-sub-daos-sdk";
 import { resolveIndividual } from "@helium-foundation/spl-utils";
 import { AnchorProvider } from "@project-serum/anchor";
+import { circuitBreakerResolvers } from "@helium-foundation/circuit-breaker-sdk";
 
 export const dataCreditsResolvers = combineResolvers(
   heliumSubDaosResolvers,
+  circuitBreakerResolvers,
   ataResolver({
     instruction: "mintDataCreditsV0",
     account: "recipientTokenAccount",

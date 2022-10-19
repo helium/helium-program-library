@@ -21,6 +21,9 @@
     },
     {
       "path": "./packages/helium-cli"
-    }
+    },
+    {
+      "path": "./packages/circuit-breaker-sdk"
+    }, 
   ]
 }

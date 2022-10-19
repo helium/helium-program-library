@@ -9,6 +9,7 @@ import { HotspotIssuance } from "../../target/types/hotspot_issuance";
 import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
 import { createAtaAndMint, createMint } from "@helium-foundation/spl-utils";
+import { ThresholdType } from "../../packages/circuit-breaker-sdk/src"
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =
@@ -44,7 +45,14 @@ export const initTestDataCredits = async (
   );
 
   const initDataCredits = await program.methods
-    .initializeDataCreditsV0({ authority: me })
+    .initializeDataCreditsV0({
+      authority: me,
+      config: {
+        windowSizeSeconds: new anchor.BN(60),
+        thresholdType: ThresholdType.Absolute as never,
+        threshold: new anchor.BN("10000000000000000000"),
+      },
+    })
     .accounts({ hntMint, dcMint });
   
   const dcKey = (await initDataCredits.pubkeys()).dataCredits!;

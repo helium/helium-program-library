@@ -1,8 +1,12 @@
-use crate::DataCreditsV0;
+use crate::{circuit_breaker::CircuitBreaker, DataCreditsV0};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{self, Burn, FreezeAccount, Mint, MintTo, ThawAccount, Token, TokenAccount},
+  token::{self, Burn, FreezeAccount, Mint, ThawAccount, Token, TokenAccount},
+};
+use circuit_breaker::{
+  cpi::{accounts::MintV0, mint_v0},
+  MintArgsV0, MintWindowedCircuitBreakerV0,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -49,7 +53,17 @@ pub struct MintDataCreditsV0<'info> {
   pub hnt_mint: Box<Account<'info, Mint>>,
   #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,
+  /// CHECK: Verified by cpi
+  #[account(
+    mut,
+    seeds = ["mint_windowed_breaker".as_bytes(), dc_mint.key().as_ref()],
+    seeds::program = circuit_breaker_program.key(),
+    bump = circuit_breaker.bump_seed
+  )]
+  pub circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
+  pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub token_program: Program<'info, Token>,
+  pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
   pub system_program: Program<'info, System>,
   pub associated_token_program: Program<'info, AssociatedToken>,
@@ -75,13 +89,16 @@ impl<'info> MintDataCreditsV0<'info> {
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 
-  fn mint_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintTo<'info>> {
-    let cpi_accounts = MintTo {
+  fn mint_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
+    let cpi_accounts = MintV0 {
       mint: self.dc_mint.to_account_info(),
       to: self.recipient_token_account.to_account_info(),
-      authority: self.data_credits.to_account_info(),
+      mint_authority: self.data_credits.to_account_info(),
+      token_program: self.token_program.to_account_info(),
+      circuit_breaker: self.circuit_breaker.to_account_info(),
+      clock: self.clock.to_account_info(),
     };
-    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
   }
 
   fn freeze_ctx(&self) -> CpiContext<'_, '_, '_, 'info, FreezeAccount<'info>> {
@@ -111,12 +128,14 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
 
   // mint the new tokens to recipient
   // TODO needs to mint at an oracle provided rate to hnt
-  token::mint_to(
+  mint_v0(
     ctx.accounts.mint_ctx().with_signer(signer_seeds),
-    args.amount,
+    MintArgsV0 {
+      amount: args.amount,
+    },
   )?;
 
-  // freeze the recipient
   token::freeze_account(ctx.accounts.freeze_ctx().with_signer(signer_seeds))?;
+
   Ok(())
 }
