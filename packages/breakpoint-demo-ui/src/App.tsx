@@ -100,7 +100,7 @@ export const App = () => {
                   Simulate Network Usage
                 </Text>
                 <Text as="span" display="block" color="white" opacity="0.23">
-                  Select a Helium hotspot from below.
+                  Select a Helium hotspot from below
                 </Text>
               </Text>
             </Box>
