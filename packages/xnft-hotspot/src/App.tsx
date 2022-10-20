@@ -1,4 +1,5 @@
 import ReactXnft, { Text, View, Stack } from "react-xnft";
+import { Swap } from "./components/Swap";
 import { DetailScreen } from "./components/DetailScreen";
 import { GridScreen } from './components/Grid';
 //
@@ -23,6 +24,10 @@ export function App() {
               return {
                 title: route.props.nft.tokenMetaUriData.name,
               };
+            case "swap":
+              return {
+                title: "Swap"
+              }
             default:
               throw new Error("unknown route");
           }
@@ -36,6 +41,10 @@ export function App() {
         <Stack.Screen
           name={"detail"}
           component={(props: any) => <DetailScreen {...props} />}
+        />
+        <Stack.Screen
+          name={"swap"}
+          component={(props: any) => <Swap {...props} />}
         />
       </Stack.Navigator>
     </View>

@@ -1,12 +1,17 @@
 import { PublicKey, TransactionInstruction, Transaction, Keypair } from "@solana/web3.js";
 import * as ld from "@helium-foundation/lazy-distributor-sdk";
 import * as anchor from "@project-serum/anchor";
-import { createMint, createNft } from "@helium-foundation/spl-utils";
+import { createMint, createNft, createAtaAndMint, toBN } from "@helium-foundation/spl-utils";
 import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
 import {
   createCreateMetadataAccountV3Instruction,
   PROGRAM_ID as MPL_PID,
 } from "@metaplex-foundation/mpl-token-metadata";
+import fs from 'fs';
+import * as dc from "@helium-foundation/data-credits-sdk";
+import {
+  ThresholdType
+} from "@helium-foundation/circuit-breaker-sdk";
 
 async function initLazyDistributor(
   program: anchor.Program<LazyDistributor>, 
@@ -34,7 +39,7 @@ async function initRecipient(
   lazyDistributor: PublicKey, 
   hotspotMint: PublicKey
 ) {
-  const method = await program.methods.initializeRecipientV0().accounts({
+  const method = program.methods.initializeRecipientV0().accounts({
     lazyDistributor,
     mint: hotspotMint
   });
@@ -94,9 +99,51 @@ async function createTokenMetadata(provider: anchor.AnchorProvider, mintKeypair:
   provider.sendAndConfirm(tx);
 }
 
+async function initDc(provider: anchor.AnchorProvider) {
+  const me = provider.wallet.publicKey;
+  const dcMintKeypair = Keypair.fromSecretKey(
+    new Uint8Array(
+      JSON.parse(fs.readFileSync("/home/thornton/.config/solana/dc-mint.json").toString())
+    )
+  );
+  const program = await dc.init(provider);
+  const decimals = 8;
+  const hntMint = await createMint(provider, decimals, me, me);
+  const dcMint = await createMint(provider, decimals, me, me, dcMintKeypair);
+  console.log("dc mint key: ", dcMint.toString());
+  await createAtaAndMint(
+    provider,
+    hntMint,
+    toBN(100, decimals).toNumber(),
+    me
+  );
+  await createAtaAndMint(
+    provider,
+    dcMint,
+    toBN(100, decimals).toNumber(),
+    me
+  );
+  const method = program.methods
+    .initializeDataCreditsV0({ 
+      authority: me,
+      config: {
+        windowSizeSeconds: new anchor.BN(60),
+        thresholdType: ThresholdType.Absolute as never,
+        threshold: new anchor.BN("10000000000000000000")
+      }
+    })
+    .accounts({ hntMint, dcMint, payer: me });
+  await method.rpc({
+    skipPreflight: true
+  });
+}
+
 async function setupLocalhost() {
+  
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
+
+  /**Init LD */
   const program = await ld.init(provider);
   const me = provider.wallet.publicKey;
 
@@ -111,5 +158,8 @@ async function setupLocalhost() {
   const recipient = await initRecipient(program, lazyDistributor!, hotspotMint);
 
   await setRewards(program, lazyDistributor!, recipient);
+
+  /**Init DC */
+  await initDc(provider);
 }
 setupLocalhost();
