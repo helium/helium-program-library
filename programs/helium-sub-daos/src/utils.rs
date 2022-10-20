@@ -1,7 +1,7 @@
 use crate::error::ErrorCode;
 use anchor_lang::prelude::*;
 use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
-use std::{convert::TryInto};
+use std::convert::TryInto;
 
 pub trait OrArithError<T> {
   fn or_arith_error(self) -> Result<T>;

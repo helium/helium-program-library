@@ -81,9 +81,7 @@ pub struct InitializeSubDaoV0<'info> {
   pub circuit_breaker: AccountInfo<'info>,
   pub hotspot_collection: Box<Account<'info, Mint>>,
   /// CHECK: Checked via CPI
-  #[account(
-    mut,
-  )]
+  #[account(mut)]
   pub treasury: AccountInfo<'info>,
   /// CHECK: Checked via CPI
   #[account(
