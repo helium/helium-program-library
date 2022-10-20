@@ -3,12 +3,11 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::{set_authority, SetAuthority};
 use anchor_spl::token::{Mint, Token};
-use circuit_breaker::{ThresholdType, WindowedCircuitBreakerConfigV0};
 use circuit_breaker::{
-  CircuitBreaker,
   cpi::{accounts::InitializeMintWindowedBreakerV0, initialize_mint_windowed_breaker_v0},
-  InitializeMintWindowedBreakerArgsV0,
+  CircuitBreaker, InitializeMintWindowedBreakerArgsV0,
 };
+use circuit_breaker::{ThresholdType, WindowedCircuitBreakerConfigV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDaoArgsV0 {
@@ -67,10 +66,13 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
       authority: args.authority,
       config: WindowedCircuitBreakerConfigV0 {
         // No more than 5 epochs worth can be distributed. We should be distributing once per epoch so this
-        // should never get triggered. 
+        // should never get triggered.
         window_size_seconds: 5 * u64::try_from(EPOCH_LENGTH).unwrap(),
         threshold_type: ThresholdType::Absolute,
-        threshold: args.emission_schedule.get_emissions_at(ctx.accounts.clock.unix_timestamp).unwrap()
+        threshold: args
+          .emission_schedule
+          .get_emissions_at(ctx.accounts.clock.unix_timestamp)
+          .unwrap(),
       },
       mint_authority: ctx.accounts.dao.key(),
     },

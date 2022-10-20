@@ -1,7 +1,7 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{TokenAccount};
+use anchor_spl::token::TokenAccount;
 use anchor_spl::token::{Mint, Token};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -42,7 +42,6 @@ pub fn handler(
   ctx: Context<InitializeLazyDistributorV0>,
   args: InitializeLazyDistributorArgsV0,
 ) -> Result<()> {
-
   ctx.accounts.lazy_distributor.set_inner(LazyDistributorV0 {
     rewards_mint: ctx.accounts.rewards_mint.key(),
     rewards_escrow: ctx.accounts.rewards_escrow.key(),

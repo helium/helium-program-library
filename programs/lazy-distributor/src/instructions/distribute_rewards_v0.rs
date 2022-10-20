@@ -22,9 +22,7 @@ pub struct DistributeRewardsV0<'info> {
   )]
   pub recipient: Box<Account<'info, RecipientV0>>,
   pub rewards_mint: Box<Account<'info, Mint>>,
-  #[account(
-    mut
-  )]
+  #[account(mut)]
   pub rewards_escrow: Box<Account<'info, TokenAccount>>,
   #[account(
     constraint = recipient_mint_account.mint == recipient.mint,

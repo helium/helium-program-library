@@ -20,5 +20,6 @@ overflow-checks = true
 
 [dependencies]
 anchor-lang = { version = "0.24.2", features = ["init-if-needed"] }
+circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 anchor-spl = "0.24.2"
 shared-utils = { path = "../shared-utils" }

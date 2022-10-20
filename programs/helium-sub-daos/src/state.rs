@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct EmissionScheduleItem {
   pub start_unix_time: i64,
-  pub emissions_per_epoch: u64
+  pub emissions_per_epoch: u64,
 }
 
 pub trait GetEmissions {
@@ -16,11 +16,11 @@ impl GetEmissions for Vec<EmissionScheduleItem> {
     if self.is_empty() {
       return None;
     }
- 
+
     let mut ans: Option<u64> = None;
     let mut low: usize = 0;
     let mut high: usize = self.len() - 1;
- 
+
     while low <= high {
       let middle = (high + low) / 2;
       if let Some(current) = self.get(middle) {
@@ -28,7 +28,8 @@ impl GetEmissions for Vec<EmissionScheduleItem> {
         if current.start_unix_time < unix_time {
           ans = Some(current.emissions_per_epoch);
           low = middle + 1;
-        } else { // move left side
+        } else {
+          // move left side
           high = middle - 1;
         }
       } else {
@@ -82,9 +83,9 @@ pub struct SubDaoEpochInfoV0 {
 pub struct SubDaoV0 {
   pub dao: Pubkey,
   pub hotspot_collection: Pubkey, // The metaplex collection of hotspot NFTs
-  pub dnt_mint: Pubkey,               // The mint of the subdao token
+  pub dnt_mint: Pubkey,           // The mint of the subdao token
   pub treasury: Pubkey,           // The treasury for rewards
-  pub rewards_escrow: Pubkey, // The escrow account for DNT rewards
+  pub rewards_escrow: Pubkey,     // The escrow account for DNT rewards
   pub authority: Pubkey,
   pub total_devices: u64,
   pub emission_schedule: Vec<EmissionScheduleItem>,

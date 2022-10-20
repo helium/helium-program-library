@@ -1,19 +1,12 @@
-use crate::{
-  error::ErrorCode,
-  state::*,
-  OrArithError, TESTING, current_epoch,
-};
+use crate::{current_epoch, error::ErrorCode, state::*, OrArithError, TESTING};
 use circuit_breaker::{
-  CircuitBreaker,
   cpi::{accounts::MintV0, mint_v0},
-  MintArgsV0, MintWindowedCircuitBreakerV0,
+  CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
 
-use shared_utils::{
-  precise_number::{InnerUint, PreciseNumber},
-};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
+use shared_utils::precise_number::{InnerUint, PreciseNumber};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueRewardsArgsV0 {
@@ -85,7 +78,7 @@ fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
 
 pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<()> {
   let epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
-  
+
   if !TESTING && args.epoch >= epoch {
     return Err(error!(ErrorCode::EpochNotOver));
   }
@@ -98,9 +91,13 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   let percent_share = utility_score
     .checked_div(&total_utility_score)
     .or_arith_error()?;
-  let emissions = ctx.accounts.dao.emission_schedule.get_emissions_at(ctx.accounts.clock.unix_timestamp).unwrap();
-  let total_rewards =
-    PreciseNumber::new(emissions.into()).or_arith_error()?;
+  let emissions = ctx
+    .accounts
+    .dao
+    .emission_schedule
+    .get_emissions_at(ctx.accounts.clock.unix_timestamp)
+    .unwrap();
+  let total_rewards = PreciseNumber::new(emissions.into()).or_arith_error()?;
   let rewards_prec = percent_share.checked_mul(&total_rewards).or_arith_error()?;
   let rewards_amount: u64 = rewards_prec
     .floor() // Ensure we never overspend the defined rewards
@@ -112,7 +109,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
 
   mint_v0(
     CpiContext::new_with_signer(
-      ctx.accounts.circuit_breaker_program.to_account_info(), 
+      ctx.accounts.circuit_breaker_program.to_account_info(),
       MintV0 {
         mint: ctx.accounts.dnt_mint.to_account_info(),
         to: ctx.accounts.rewards_escrow.to_account_info(),
@@ -120,23 +117,26 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
         circuit_breaker: ctx.accounts.dnt_circuit_breaker.to_account_info(),
         token_program: ctx.accounts.token_program.to_account_info(),
         clock: ctx.accounts.clock.to_account_info(),
-      }, 
-      &[
-        &[
-          b"sub_dao",
-          ctx.accounts.dnt_mint.key().as_ref(),
-          &[ctx.accounts.sub_dao.bump_seed]
-        ]
-      ]
+      },
+      &[&[
+        b"sub_dao",
+        ctx.accounts.dnt_mint.key().as_ref(),
+        &[ctx.accounts.sub_dao.bump_seed],
+      ]],
     ),
     MintArgsV0 {
-      amount: ctx.accounts.sub_dao.emission_schedule.get_emissions_at(ctx.accounts.clock.unix_timestamp).unwrap()
-    }
+      amount: ctx
+        .accounts
+        .sub_dao
+        .emission_schedule
+        .get_emissions_at(ctx.accounts.clock.unix_timestamp)
+        .unwrap(),
+    },
   )?;
 
   mint_v0(
     CpiContext::new_with_signer(
-      ctx.accounts.circuit_breaker_program.to_account_info(), 
+      ctx.accounts.circuit_breaker_program.to_account_info(),
       MintV0 {
         mint: ctx.accounts.hnt_mint.to_account_info(),
         to: ctx.accounts.treasury.to_account_info(),
@@ -144,24 +144,22 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
         circuit_breaker: ctx.accounts.hnt_circuit_breaker.to_account_info(),
         token_program: ctx.accounts.token_program.to_account_info(),
         clock: ctx.accounts.clock.to_account_info(),
-      }, 
-      &[
-        &[
-          b"dao",
-          ctx.accounts.hnt_mint.key().as_ref(),
-          &[ctx.accounts.dao.bump_seed]
-        ]
-      ]
+      },
+      &[&[
+        b"dao",
+        ctx.accounts.hnt_mint.key().as_ref(),
+        &[ctx.accounts.dao.bump_seed],
+      ]],
     ),
     MintArgsV0 {
-      amount: rewards_amount
-    }
+      amount: rewards_amount,
+    },
   )?;
 
   ctx.accounts.dao_epoch_info.num_rewards_issued += 1;
   ctx.accounts.sub_dao_epoch_info.rewards_issued = true;
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
-  ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
+    ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 
   Ok(())
 }

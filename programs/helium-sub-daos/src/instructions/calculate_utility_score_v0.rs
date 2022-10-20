@@ -1,13 +1,6 @@
-use crate::{
-  current_epoch,
-  error::ErrorCode,
-  state::*,
-  OrArithError,
-};
-use shared_utils::{
-  precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC},
-};
+use crate::{current_epoch, error::ErrorCode, state::*, OrArithError};
 use anchor_lang::prelude::*;
+use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
 
 const DEVICE_ACTIVATION_FEE: u128 = 50;
 

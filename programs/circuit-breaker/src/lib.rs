@@ -11,7 +11,6 @@ pub use errors::*;
 pub use instructions::*;
 pub use state::*;
 
-
 #[derive(Clone)]
 pub struct CircuitBreaker;
 
@@ -20,7 +19,6 @@ impl anchor_lang::Id for CircuitBreaker {
     crate::id()
   }
 }
-
 
 #[program]
 pub mod circuit_breaker {

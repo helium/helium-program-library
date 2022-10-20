@@ -3,6 +3,8 @@ import { BN } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { createAtaAndMint, createMint } from "@helium-foundation/spl-utils";
+import { ThresholdType } from "@helium-foundation/circuit-breaker-sdk";
+import { toU128 } from "../../packages/treasury-management-sdk/src";
 
 export async function initTestDao(
   program: anchor.Program<HeliumSubDaos>,
@@ -62,7 +64,6 @@ export async function initTestSubdao(
 }> {
   const daoAcc = await program.account.daoV0.fetch(dao);
   const dntMint = await createMint(provider, 6, authority, authority);
-  const treasury = await createAtaAndMint(provider, daoAcc.hntMint, 0);
   const rewardsEscrow = await createAtaAndMint(provider, dntMint, 0, provider.wallet.publicKey)
   const method = await program.methods
     .initializeSubDaoV0({
@@ -73,17 +74,27 @@ export async function initTestSubdao(
           emissionsPerEpoch: new BN(epochRewards || 10),
         },
       ],
+      treasuryCurve: {
+        exponentialCurveV0: {
+          k: toU128(1),
+          c: toU128(1),
+        },
+      } as any,
+      treasuryWindowConfig: {
+        windowSizeSeconds: new anchor.BN(60),
+        thresholdType: ThresholdType.Absolute as never,
+        threshold: new anchor.BN("10000000000000000000"),
+      },
     })
     .accounts({
       dao,
       rewardsEscrow,
       dntMint,
       hotspotCollection: collection,
-      treasury,
       hntMint: daoAcc.hntMint,
     });
-  const { subDao } = await method.pubkeys();
+  const { subDao, treasury } = await method.pubkeys();
   await method.rpc({ skipPreflight: true });
 
-  return { mint: dntMint, subDao: subDao!, treasury, rewardsEscrow };
+  return { mint: dntMint, subDao: subDao!, treasury: treasury!, rewardsEscrow };
 }

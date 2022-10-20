@@ -1,7 +1,7 @@
 /// TODO: Anchor doesn't include things in the IDL unless they're in your crate. This sucks.
 use anchor_lang::prelude::*;
-use circuit_breaker::{
-  ThresholdType as CBThresholdType, WindowedCircuitBreakerConfigV0 as WindowConfig,
+use treasury_management::{
+  circuit_breaker::{ThresholdType as CBThresholdType, WindowedCircuitBreakerConfigV0 as WindowConfig},
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]

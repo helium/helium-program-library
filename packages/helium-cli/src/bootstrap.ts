@@ -9,6 +9,7 @@ import {
   init as initLazy
 } from "@helium-foundation/lazy-distributor-sdk";
 import {
+  thresholdPercent,
   ThresholdType
 } from "@helium-foundation/circuit-breaker-sdk";
 import { createAtaAndMint, createAtaAndMintInstructions, createMintInstructions, createNft as createNft, sendInstructions, toBN } from "@helium-foundation/spl-utils";
@@ -26,6 +27,7 @@ import fs from "fs";
 import fetch from "node-fetch";
 import os from "os";
 import yargs from "yargs/yargs";
+import { toU128 } from "@helium-foundation/treasury-management-sdk";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -178,16 +180,25 @@ async function run() {
             emissionsPerEpoch: new anchor.BN(EPOCH_REWARDS),
           },
         ],
+        // Linear curve
+        treasuryCurve: {
+          exponentialCurveV0: {
+            k: toU128(1),
+            c: toU128(1),
+          },
+        } as any,
+        // 20% in a day
+        treasuryWindowConfig: {
+          windowSizeSeconds: new anchor.BN(24 * 60 * 60),
+          thresholdType: ThresholdType.Percent as never,
+          threshold: thresholdPercent(20),
+        },
       })
       .accounts({
         dao,
         dntMint: mobileKeypair.publicKey,
         rewardsEscrow,
         hotspotCollection: mobileHotspotCollection.mintKey,
-        treasury: await getAssociatedTokenAddress(
-          mobileKeypair.publicKey,
-          provider.wallet.publicKey
-        ),
         hntMint: mobileKeypair.publicKey,
       });
   }

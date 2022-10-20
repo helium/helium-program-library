@@ -616,6 +616,7 @@ dependencies = [
  "circuit-breaker",
  "mpl-token-metadata",
  "shared-utils",
+ "treasury-management",
 ]
 
 [[package]]
@@ -1394,6 +1395,7 @@ version = "0.0.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "circuit-breaker",
  "shared-utils",
 ]
 

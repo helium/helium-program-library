@@ -1,11 +1,11 @@
 {
-  "name": "@helium-foundation/helium-sub-daos-sdk",
+  "name": "@helium-foundation/treasury-management-sdk",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
   "version": "0.0.1",
-  "description": "Interface to the helium-sub-daos smart contract",
+  "description": "Interface to the treasury-management smart contract",
   "repository": {
     "type": "git",
     "url": "https://github.com/HeliumFoundation/helium-program-libary"
@@ -31,8 +31,7 @@
   },
   "dependencies": {
     "@project-serum/anchor": "0.24.2",
-    "@helium-foundation/circuit-breaker-sdk": "^0.0.1",
-    "@helium-foundation/treasury-management-sdk": "^0.0.1",
+    "@solana/spl-token": "0.3.5",
     "@helium-foundation/spl-utils": "^0.0.1",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
