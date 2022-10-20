@@ -21,19 +21,19 @@ use treasury_management::{
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub enum Curve {
   // c^k
-  ExponentialCurveV0 { c: u128, k: u128 },
+  ExponentialCurveV0 { k: u128 },
 }
 
 impl Default for Curve {
   fn default() -> Self {
-    Curve::ExponentialCurveV0 { c: 1, k: 0 }
+    Curve::ExponentialCurveV0 { k: 1 }
   }
 }
 
 impl From<Curve> for TreasuryCurve {
   fn from(curve: Curve) -> Self {
     match curve {
-      Curve::ExponentialCurveV0 { c, k } => TreasuryCurve::ExponentialCurveV0 { c, k },
+      Curve::ExponentialCurveV0 { k } => TreasuryCurve::ExponentialCurveV0 { k },
     }
   }
 }

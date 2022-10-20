@@ -12,18 +12,6 @@ pub trait PricingCurve {
   ) -> Option<PreciseNumber>;
 }
 
-fn price_exp_initial(
-  c_prec: &PreciseNumber,
-  k_prec: &PreciseNumber,
-  amount: &PreciseNumber,
-) -> Option<PreciseNumber> {
-  // (c dS^(1 + pow/frac))/(1 + pow/frac)
-  let one_plus_k_prec = &ONE_PREC.checked_add(k_prec)?;
-  c_prec
-    .checked_mul(&amount.pow(one_plus_k_prec)?)?
-    .checked_div(one_plus_k_prec)
-}
-
 fn price_exp(
   k_prec: &PreciseNumber,
   amount: &PreciseNumber,
@@ -84,26 +72,12 @@ impl PricingCurve for Curve {
     sell: bool,
   ) -> Option<PreciseNumber> {
     if treasury_amount.eq(&ZERO_PREC) || target_supply.eq(&ZERO_PREC) {
-      match *self {
-        // (c dS^(1 + k))/(1 + k)
-        Curve::ExponentialCurveV0 { k, c } => {
-          let c_prec = to_prec(c);
-          let k_prec = to_prec(k);
-          price_exp_initial(&c_prec, &k_prec, amount)
-        }
-      }
+      None
     } else {
       match *self {
-        Curve::ExponentialCurveV0 { k, c } => {
-          if c != 0 {
-            let k_prec = to_prec(k);
-            price_exp(&k_prec, amount, treasury_amount, target_supply, sell)
-          } else {
-            // R dS / S
-            treasury_amount
-              .checked_mul(amount)?
-              .checked_div(target_supply)
-          }
+        Curve::ExponentialCurveV0 { k } => {
+          let k_prec = to_prec(k);
+          price_exp(&k_prec, amount, treasury_amount, target_supply, sell)
         }
       }
     }

@@ -2,13 +2,14 @@ use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub enum Curve {
-  // c^k
-  ExponentialCurveV0 { c: u128, k: u128 },
+  // Scale as x^k
+  ExponentialCurveV0 { k: u128 },
 }
 
 impl Default for Curve {
   fn default() -> Self {
-    Curve::ExponentialCurveV0 { c: 1, k: 0 }
+    // Default: Linear
+    Curve::ExponentialCurveV0 { k: 1 }
   }
 }
 

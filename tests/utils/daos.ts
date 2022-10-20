@@ -77,7 +77,6 @@ export async function initTestSubdao(
       treasuryCurve: {
         exponentialCurveV0: {
           k: toU128(1),
-          c: toU128(1),
         },
       } as any,
       treasuryWindowConfig: {

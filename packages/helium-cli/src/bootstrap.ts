@@ -184,7 +184,6 @@ async function run() {
         treasuryCurve: {
           exponentialCurveV0: {
             k: toU128(1),
-            c: toU128(1),
           },
         } as any,
         // 20% in a day

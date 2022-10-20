@@ -1,20 +1,19 @@
+import { createAtaAndMint, createMint } from "@helium-foundation/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import { Keypair, PublicKey, ComputeBudgetProgram } from "@solana/web3.js";
+import { AccountLayout, getAssociatedTokenAddress } from "@solana/spl-token";
+import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
+import { expect } from "chai";
+import {
+  ThresholdType
+} from "../packages/circuit-breaker-sdk/src";
 import {
   init,
   PROGRAM_ID,
   toU128
 } from "../packages/treasury-management-sdk/src";
-import {
-  thresholdPercent,
-  ThresholdType
-} from "../packages/circuit-breaker-sdk/src";
-import { expect } from "chai";
 import { TreasuryManagement } from "../target/types/treasury_management";
-import { createAtaAndMint, createMint, toBN } from "@helium-foundation/spl-utils";
-import { AccountLayout, getAssociatedTokenAddress } from "@solana/spl-token";
 
 describe("treasury-management", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -40,7 +39,6 @@ describe("treasury-management", () => {
         curve: {
           exponentialCurveV0: {
             k: toU128(2),
-            c: toU128(1),
           },
         } as any,
         freezeUnixTime: new BN(100000000000),
@@ -81,7 +79,6 @@ describe("treasury-management", () => {
           curve: {
             exponentialCurveV0: {
               k: toU128(2),
-              c: toU128(1),
             },
           } as any,
           freezeUnixTime: new BN(100000000000),
@@ -110,8 +107,7 @@ describe("treasury-management", () => {
           freezeUnixTime: new BN(10),
           curve: {
             exponentialCurveV0: {
-              k: toU128(0),
-              c: toU128(2),
+              k: toU128(5),
             },
           } as any,
         })
@@ -126,12 +122,8 @@ describe("treasury-management", () => {
       expect(treasuryManagementAcc.authority.toBase58()).to.eq(newAuth.publicKey.toBase58());
       expect(treasuryManagementAcc.freezeUnixTime.toNumber()).to.eq(10);
       // @ts-ignore
-      expect(treasuryManagementAcc.curve.exponentialCurveV0.c.toNumber()).to.eq(
-        2000000000000
-      );
-      // @ts-ignore
       expect(treasuryManagementAcc.curve.exponentialCurveV0.k.toNumber()).to.eq(
-        0
+        5000000000000
       );
     })
 
