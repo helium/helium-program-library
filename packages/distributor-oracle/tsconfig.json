@@ -2,13 +2,13 @@
   "extends": "../../tsconfig.root.json",
   "references": [
     {
-      "path": "../spl-utils",
+      "path": "../spl-utils"
     },
     {
-      "path": "../lazy-distributor-sdk",
+      "path": "../lazy-distributor-sdk"
     }
   ],
-  // "compilerOptions": {
-  //   "module": "commonjs",
-  // }
+  "compilerOptions": {
+    "module": "commonjs"
+  }
 }
