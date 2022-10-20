@@ -27,11 +27,16 @@ export async function initTestDao(
   const method = await program.methods
     .initializeDaoV0({
       authority: authority,
-      rewardPerEpoch: new BN(epochRewards)
+      emissionSchedule: [
+        {
+          startUnixTime: new anchor.BN(0),
+          emissionsPerEpoch: new BN(epochRewards),
+        },
+      ],
     })
     .accounts({
       hntMint: mint,
-      dcMint
+      dcMint,
     });
   const { dao } = await method.pubkeys();
 
@@ -48,27 +53,37 @@ export async function initTestSubdao(
   authority: PublicKey,
   dao: PublicKey,
   collection: PublicKey,
+  epochRewards?: number
 ): Promise<{
   mint: PublicKey;
   subDao: PublicKey;
   treasury: PublicKey;
+  rewardsEscrow: PublicKey;
 }> {
   const daoAcc = await program.account.daoV0.fetch(dao);
-  const subDaoMint = await createMint(provider, 6, authority, authority);
-  const treasury = await createAtaAndMint(provider, daoAcc.mint, 0);
+  const dntMint = await createMint(provider, 6, authority, authority);
+  const treasury = await createAtaAndMint(provider, daoAcc.hntMint, 0);
+  const rewardsEscrow = await createAtaAndMint(provider, dntMint, 0, provider.wallet.publicKey)
   const method = await program.methods
     .initializeSubDaoV0({
       authority: authority,
+      emissionSchedule: [
+        {
+          startUnixTime: new anchor.BN(0),
+          emissionsPerEpoch: new BN(epochRewards || 10),
+        },
+      ],
     })
     .accounts({
       dao,
-      subDaoMint,
+      rewardsEscrow,
+      dntMint,
       hotspotCollection: collection,
       treasury,
-      mint: daoAcc.mint,
+      hntMint: daoAcc.hntMint,
     });
   const { subDao } = await method.pubkeys();
   await method.rpc({ skipPreflight: true });
 
-  return { mint: subDaoMint, subDao: subDao!, treasury };
+  return { mint: dntMint, subDao: subDao!, treasury, rewardsEscrow };
 }

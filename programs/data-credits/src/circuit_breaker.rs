@@ -42,12 +42,3 @@ impl From<WindowedCircuitBreakerConfigV0> for WindowConfig {
     }
   }
 }
-
-#[derive(Clone)]
-pub struct CircuitBreaker;
-
-impl anchor_lang::Id for CircuitBreaker {
-  fn id() -> Pubkey {
-    circuit_breaker::ID
-  }
-}

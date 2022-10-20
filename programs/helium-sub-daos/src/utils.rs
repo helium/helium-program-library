@@ -1,6 +1,7 @@
 use crate::{
-  error::ErrorCode, precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber,
+  error::ErrorCode,
 };
+use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
 use anchor_lang::prelude::*;
 use std::convert::TryInto;
 
@@ -20,6 +21,8 @@ impl OrArithError<SignedPreciseNumber> for Option<SignedPreciseNumber> {
   }
 }
 
+pub const EPOCH_LENGTH: i64 = 30 * 60;
+
 pub fn current_epoch(unix_timestamp: i64) -> u64 {
-  (unix_timestamp / (30 * 60)).try_into().unwrap()
+  (unix_timestamp / (EPOCH_LENGTH)).try_into().unwrap()
 }

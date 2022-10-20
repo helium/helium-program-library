@@ -3,7 +3,7 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{self, Mint, MintTo, Token, TokenAccount},
+  token::{self, Mint, Token, TokenAccount, Transfer},
 };
 
 #[derive(Accounts)]
@@ -11,7 +11,8 @@ pub struct DistributeRewardsV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
-    has_one = rewards_mint
+    has_one = rewards_mint,
+    has_one = rewards_escrow
   )]
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
   #[account(
@@ -20,8 +21,11 @@ pub struct DistributeRewardsV0<'info> {
     constraint = recipient.current_rewards.iter().flatten().count() >= ((lazy_distributor.oracles.len() + 1) / 2)
   )]
   pub recipient: Box<Account<'info, RecipientV0>>,
-  #[account(mut)]
   pub rewards_mint: Box<Account<'info, Mint>>,
+  #[account(
+    mut
+  )]
+  pub rewards_escrow: Box<Account<'info, TokenAccount>>,
   #[account(
     constraint = recipient_mint_account.mint == recipient.mint,
     constraint = recipient_mint_account.amount > 0,
@@ -66,11 +70,11 @@ pub fn handler(ctx: Context<DistributeRewardsV0>) -> Result<()> {
     .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
   recipient.total_rewards = median;
 
-  token::mint_to(
+  token::transfer(
     CpiContext::new_with_signer(
       ctx.accounts.token_program.to_account_info().clone(),
-      MintTo {
-        mint: ctx.accounts.rewards_mint.to_account_info().clone(),
+      Transfer {
+        from: ctx.accounts.rewards_escrow.to_account_info().clone(),
         to: ctx.accounts.destination_account.to_account_info().clone(),
         authority: ctx.accounts.lazy_distributor.to_account_info().clone(),
       },

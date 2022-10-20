@@ -1,9 +1,11 @@
 use crate::{
   current_epoch,
   error::ErrorCode,
-  precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC},
   state::*,
   OrArithError,
+};
+use shared_utils::{
+  precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC},
 };
 use anchor_lang::prelude::*;
 
@@ -14,7 +16,7 @@ pub struct CalculateUtilityScoreArgsV0 {
   pub epoch: u64,
 }
 
-const TESTING: bool = std::option_env!("TESTING").is_some();
+pub const TESTING: bool = std::option_env!("TESTING").is_some();
 
 #[derive(Accounts)]
 #[instruction(args: CalculateUtilityScoreArgsV0)]

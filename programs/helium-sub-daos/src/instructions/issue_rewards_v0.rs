@@ -1,11 +1,19 @@
 use crate::{
   error::ErrorCode,
-  precise_number::{InnerUint, PreciseNumber},
   state::*,
-  OrArithError,
+  OrArithError, TESTING, current_epoch,
+};
+use circuit_breaker::{
+  CircuitBreaker,
+  cpi::{accounts::MintV0, mint_v0},
+  MintArgsV0, MintWindowedCircuitBreakerV0,
+};
+
+use shared_utils::{
+  precise_number::{InnerUint, PreciseNumber},
 };
 use anchor_lang::prelude::*;
-use anchor_spl::token::{mint_to, Mint, MintTo, Token, TokenAccount};
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueRewardsArgsV0 {
@@ -16,12 +24,14 @@ pub struct IssueRewardsArgsV0 {
 #[instruction(args: IssueRewardsArgsV0)]
 pub struct IssueRewardsV0<'info> {
   #[account(
-    has_one = mint,
+    has_one = hnt_mint,
   )]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
     has_one = dao,
-    has_one = treasury
+    has_one = treasury,
+    has_one = dnt_mint,
+    has_one = rewards_escrow
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
@@ -39,12 +49,32 @@ pub struct IssueRewardsV0<'info> {
     constraint = !sub_dao_epoch_info.rewards_issued
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
+  #[account(
+    mut,
+    seeds = ["mint_windowed_breaker".as_bytes(), hnt_mint.key().as_ref()],
+    seeds::program = circuit_breaker_program.key(),
+    bump = hnt_circuit_breaker.bump_seed
+  )]
+  pub hnt_circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
+  #[account(
+    mut,
+    seeds = ["mint_windowed_breaker".as_bytes(), dnt_mint.key().as_ref()],
+    seeds::program = circuit_breaker_program.key(),
+    bump = dnt_circuit_breaker.bump_seed
+  )]
+  pub dnt_circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
   #[account(mut)]
-  pub mint: Box<Account<'info, Mint>>,
+  pub hnt_mint: Box<Account<'info, Mint>>,
+  #[account(mut)]
+  pub dnt_mint: Box<Account<'info, Mint>>,
   #[account(mut)]
   pub treasury: Box<Account<'info, TokenAccount>>,
+  #[account(mut)]
+  pub rewards_escrow: Box<Account<'info, TokenAccount>>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
+  pub circuit_breaker_program: Program<'info, CircuitBreaker>,
+  pub clock: Sysvar<'info, Clock>,
 }
 
 fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
@@ -53,7 +83,13 @@ fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
   })
 }
 
-pub fn handler(ctx: Context<IssueRewardsV0>, _args: IssueRewardsArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<()> {
+  let epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
+  
+  if !TESTING && args.epoch >= epoch {
+    return Err(error!(ErrorCode::EpochNotOver));
+  }
+
   let utility_score = to_prec(ctx.accounts.sub_dao_epoch_info.utility_score)
     .ok_or_else(|| error!(ErrorCode::NoUtilityScore))?;
   let total_utility_score = to_prec(Some(ctx.accounts.dao_epoch_info.total_utility_score))
@@ -62,10 +98,11 @@ pub fn handler(ctx: Context<IssueRewardsV0>, _args: IssueRewardsArgsV0) -> Resul
   let percent_share = utility_score
     .checked_div(&total_utility_score)
     .or_arith_error()?;
+  let emissions = ctx.accounts.dao.emission_schedule.get_emissions_at(ctx.accounts.clock.unix_timestamp).unwrap();
   let total_rewards =
-    PreciseNumber::new(ctx.accounts.dao.reward_per_epoch.into()).or_arith_error()?;
+    PreciseNumber::new(emissions.into()).or_arith_error()?;
   let rewards_prec = percent_share.checked_mul(&total_rewards).or_arith_error()?;
-  let rewards_amount = rewards_prec
+  let rewards_amount: u64 = rewards_prec
     .floor() // Ensure we never overspend the defined rewards
     .or_arith_error()?
     .to_imprecise()
@@ -73,35 +110,58 @@ pub fn handler(ctx: Context<IssueRewardsV0>, _args: IssueRewardsArgsV0) -> Resul
     .try_into()
     .unwrap();
 
-  msg!(
-    "Rewards amount: {} {} {} {}",
-    rewards_amount,
-    ctx.accounts.sub_dao_epoch_info.utility_score.unwrap(),
-    ctx.accounts.dao_epoch_info.total_utility_score,
-    ctx.accounts.dao.reward_per_epoch
-  );
-
-  mint_to(
+  mint_v0(
     CpiContext::new_with_signer(
-      ctx.accounts.token_program.to_account_info(),
-      MintTo {
-        mint: ctx.accounts.mint.to_account_info(),
-        to: ctx.accounts.treasury.to_account_info(),
-        authority: ctx.accounts.dao.to_account_info(),
-      },
-      &[&[
-        b"dao",
-        ctx.accounts.dao.mint.as_ref(),
-        &[ctx.accounts.dao.bump_seed],
-      ]],
+      ctx.accounts.circuit_breaker_program.to_account_info(), 
+      MintV0 {
+        mint: ctx.accounts.dnt_mint.to_account_info(),
+        to: ctx.accounts.rewards_escrow.to_account_info(),
+        mint_authority: ctx.accounts.sub_dao.to_account_info(),
+        circuit_breaker: ctx.accounts.dnt_circuit_breaker.to_account_info(),
+        token_program: ctx.accounts.token_program.to_account_info(),
+        clock: ctx.accounts.clock.to_account_info(),
+      }, 
+      &[
+        &[
+          b"sub_dao",
+          ctx.accounts.dnt_mint.key().as_ref(),
+          &[ctx.accounts.sub_dao.bump_seed]
+        ]
+      ]
     ),
-    rewards_amount,
+    MintArgsV0 {
+      amount: ctx.accounts.sub_dao.emission_schedule.get_emissions_at(ctx.accounts.clock.unix_timestamp).unwrap()
+    }
+  )?;
+
+  mint_v0(
+    CpiContext::new_with_signer(
+      ctx.accounts.circuit_breaker_program.to_account_info(), 
+      MintV0 {
+        mint: ctx.accounts.hnt_mint.to_account_info(),
+        to: ctx.accounts.treasury.to_account_info(),
+        mint_authority: ctx.accounts.dao.to_account_info(),
+        circuit_breaker: ctx.accounts.hnt_circuit_breaker.to_account_info(),
+        token_program: ctx.accounts.token_program.to_account_info(),
+        clock: ctx.accounts.clock.to_account_info(),
+      }, 
+      &[
+        &[
+          b"dao",
+          ctx.accounts.hnt_mint.key().as_ref(),
+          &[ctx.accounts.dao.bump_seed]
+        ]
+      ]
+    ),
+    MintArgsV0 {
+      amount: rewards_amount
+    }
   )?;
 
   ctx.accounts.dao_epoch_info.num_rewards_issued += 1;
   ctx.accounts.sub_dao_epoch_info.rewards_issued = true;
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
-    ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
+  ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 
   Ok(())
 }

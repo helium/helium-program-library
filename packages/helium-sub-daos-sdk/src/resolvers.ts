@@ -3,6 +3,7 @@ import { subDaoEpochInfoKey } from "./pdas";
 import { combineResolvers, get } from "@helium-foundation/spl-utils";
 import { resolveIndividual } from "@helium-foundation/spl-utils";
 import { PROGRAM_ID } from "./constants";
+import { circuitBreakerResolvers } from "@helium-foundation/circuit-breaker-sdk";
 
 export const subDaoEpochInfoResolver = resolveIndividual(
   async ({ provider, path, accounts }) => {
@@ -31,6 +32,7 @@ export const heliumSubDaosProgramResolver = resolveIndividual(
 );
 
 export const heliumSubDaosResolvers = combineResolvers(
+  circuitBreakerResolvers,
   subDaoEpochInfoResolver,
-  heliumSubDaosProgramResolver
+  heliumSubDaosProgramResolver,
 );
