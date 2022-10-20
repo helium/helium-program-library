@@ -1,5 +1,5 @@
 {
-  "name": "breakpoint-demo-ui",
+  "name": "@helium-foundation/breakpoint-demo-ui",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
