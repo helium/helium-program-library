@@ -25,7 +25,7 @@ impl GetEmissions for Vec<EmissionScheduleItem> {
       let middle = (high + low) / 2;
       if let Some(current) = self.get(middle) {
         // Move to the right side if target time is greater
-        if current.start_unix_time < unix_time {
+        if current.start_unix_time <= unix_time {
           ans = Some(current.emissions_per_epoch);
           low = middle + 1;
         } else {
