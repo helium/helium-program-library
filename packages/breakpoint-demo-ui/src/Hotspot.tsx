@@ -49,6 +49,7 @@ export const Hotspot: React.FC<{
           flexDirection="column"
           justifyContent="center"
           alignItems="center"
+          w={32}
         >
           <Image src={hotspot} h={32} />
           {children}
