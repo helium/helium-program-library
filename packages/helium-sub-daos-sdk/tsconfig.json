@@ -8,6 +8,12 @@
       "path": "../spl-utils"
     },
     {
+      "path": "../circuit-breaker-sdk"
+    },
+    {
+      "path": "../treasury-management-sdk"
+    },
+    {
       "path": "./tsconfig.cjs.json"
     },
     {

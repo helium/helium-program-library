@@ -1,4 +1,4 @@
 npm-debug.log
-dist/
+lib/
 tmp/
 ./node_modules

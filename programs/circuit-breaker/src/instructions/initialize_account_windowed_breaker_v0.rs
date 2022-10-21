@@ -7,9 +7,9 @@ use crate::{AccountWindowedCircuitBreakerV0, WindowV0, WindowedCircuitBreakerCon
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeAccountWindowedBreakerArgsV0 {
-  authority: Pubkey,
-  owner: Pubkey,
-  config: WindowedCircuitBreakerConfigV0,
+  pub authority: Pubkey,
+  pub owner: Pubkey,
+  pub config: WindowedCircuitBreakerConfigV0,
 }
 
 #[derive(Accounts)]
@@ -34,7 +34,6 @@ pub struct InitializeAccountWindowedBreakerV0<'info> {
   pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
   pub rent: Sysvar<'info, Rent>,
-  pub clock: Sysvar<'info, Clock>,
 }
 
 pub fn handler(
@@ -51,7 +50,7 @@ pub fn handler(
       config: args.config,
       last_window: WindowV0 {
         last_aggregated_value: 0,
-        last_unix_timestamp: ctx.accounts.clock.unix_timestamp,
+        last_unix_timestamp: 0,
       },
       bump_seed: ctx.bumps["circuit_breaker"],
     });

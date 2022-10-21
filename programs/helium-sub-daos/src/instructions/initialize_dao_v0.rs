@@ -1,13 +1,18 @@
-use crate::state::*;
+use crate::{state::*, EPOCH_LENGTH};
 use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::{set_authority, SetAuthority};
 use anchor_spl::token::{Mint, Token};
+use circuit_breaker::{
+  cpi::{accounts::InitializeMintWindowedBreakerV0, initialize_mint_windowed_breaker_v0},
+  CircuitBreaker, InitializeMintWindowedBreakerArgsV0,
+};
+use circuit_breaker::{ThresholdType, WindowedCircuitBreakerConfigV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDaoArgsV0 {
   pub authority: Pubkey,
-  pub reward_per_epoch: u64,
+  pub emission_schedule: Vec<EmissionScheduleItem>,
 }
 
 #[derive(Accounts)]
@@ -18,7 +23,7 @@ pub struct InitializeDaoV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 8 + std::mem::size_of::<DaoV0>() + 60,
+    space = 60 + 8 + std::mem::size_of::<DaoV0>() + (std::mem::size_of::<EmissionScheduleItem>() * args.emission_schedule.len()),
     seeds = ["dao".as_bytes(), hnt_mint.key().as_ref()],
     bump,
   )]
@@ -27,23 +32,50 @@ pub struct InitializeDaoV0<'info> {
   pub hnt_mint: Box<Account<'info, Mint>>,
   pub hnt_mint_authority: Signer<'info>,
   pub hnt_freeze_authority: Signer<'info>,
+  /// CHECK: Verified by CPI
+  #[account(
+    mut,
+    seeds = ["mint_windowed_breaker".as_bytes(), hnt_mint.key().as_ref()],
+    seeds::program = circuit_breaker_program.key(),
+    bump
+  )]
+  pub hnt_circuit_breaker: AccountInfo<'info>,
   pub dc_mint: Box<Account<'info, Mint>>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
+  pub circuit_breaker_program: Program<'info, CircuitBreaker>,
+  pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Result<()> {
-  set_authority(
+  initialize_mint_windowed_breaker_v0(
     CpiContext::new(
-      ctx.accounts.token_program.to_account_info(),
-      SetAuthority {
-        account_or_mint: ctx.accounts.hnt_mint.to_account_info(),
-        current_authority: ctx.accounts.hnt_mint_authority.to_account_info(),
+      ctx.accounts.circuit_breaker_program.to_account_info(),
+      InitializeMintWindowedBreakerV0 {
+        payer: ctx.accounts.payer.to_account_info(),
+        circuit_breaker: ctx.accounts.hnt_circuit_breaker.to_account_info(),
+        mint: ctx.accounts.hnt_mint.to_account_info(),
+        mint_authority: ctx.accounts.hnt_mint_authority.to_account_info(),
+        token_program: ctx.accounts.token_program.to_account_info(),
+        system_program: ctx.accounts.system_program.to_account_info(),
+        rent: ctx.accounts.rent.to_account_info(),
       },
     ),
-    AuthorityType::MintTokens,
-    Some(ctx.accounts.dao.key()),
+    InitializeMintWindowedBreakerArgsV0 {
+      authority: args.authority,
+      config: WindowedCircuitBreakerConfigV0 {
+        // No more than 5 epochs worth can be distributed. We should be distributing once per epoch so this
+        // should never get triggered.
+        window_size_seconds: 5 * u64::try_from(EPOCH_LENGTH).unwrap(),
+        threshold_type: ThresholdType::Absolute,
+        threshold: args
+          .emission_schedule
+          .get_emissions_at(ctx.accounts.clock.unix_timestamp)
+          .unwrap(),
+      },
+      mint_authority: ctx.accounts.dao.key(),
+    },
   )?;
   set_authority(
     CpiContext::new(
@@ -59,10 +91,10 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
 
   ctx.accounts.dao.set_inner(DaoV0 {
     dc_mint: ctx.accounts.dc_mint.key(),
-    mint: ctx.accounts.hnt_mint.key(),
+    hnt_mint: ctx.accounts.hnt_mint.key(),
     authority: args.authority,
     num_sub_daos: 0,
-    reward_per_epoch: args.reward_per_epoch,
+    emission_schedule: args.emission_schedule,
     bump_seed: ctx.bumps["dao"],
   });
 

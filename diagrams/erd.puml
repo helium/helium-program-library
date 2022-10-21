@@ -16,6 +16,8 @@ frame HeliumSubDaos {
     dao
     mint
     treasury
+    schedule
+    rewards_escrow
     authority
     hotspot_collection
   }
@@ -125,6 +127,7 @@ frame LazyDistributor {
     --
     oracle_configs
     rewards_mint // w/ circuit breaker
+    rewards_escrow
     ...
   }
 
@@ -151,7 +154,6 @@ frame Metaplex {
   }
 }
 
-
 frame TreasuryManagement {
   entity TreasuryManagement {
     "treasury_management", treasury
@@ -176,7 +178,7 @@ TreasuryTokenAccount ||--|| TreasuryManagement
 
 TreasuryTokenAccount ||--|| AccountWindowedCircuitBreaker : pda(account)
 
-SubDao ||-|| LazyDistributor : pda(mint)
+SubDao ||-|| LazyDistributor : pda(rewards_escrow)
 
 SubDao ||-|| Collection
 

@@ -5,7 +5,7 @@ use crate::{window::enforce_window, AccountWindowedCircuitBreakerV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TransferArgsV0 {
-  amount: u64,
+  pub amount: u64,
 }
 
 #[derive(Accounts)]

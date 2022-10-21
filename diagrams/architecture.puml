@@ -10,20 +10,22 @@ frame Solana {
     Hotspot NFTs
   ]
   component lazy_distributor {
-    card dnt_mint
+    card rewards_escrow
   }
   component hotspot_issuer
   component data_credits
   component helium_sub_daos {
     card hnt_mint
+    card dnt_mint
   }
-  component token_bonding {
+  component treasury_management {
     card sub_dao_treasury
   }
 
   card user_wallet
 
-  dnt_mint --> user_wallet : DNT
+  dnt_mint --> rewards_escrow : DNT
+  rewards_escrow --> user_wallet : DNT
 
   hnt_mint --> sub_dao_treasury : Mint HNT
 
@@ -54,37 +56,18 @@ agent onboarding [
   Onboarding Server
 ]
 
-agent indexer [
-  Solana Indexer
-]
+hnt_mint <- crank  : issue rewards
+dnt_mint <- crank  : issue rewards
 
-agent wallet_api [
-  Wallet API
-]
-
-database postgres [
-  Postgres
-]
-
-oracles -> wallet_api : Pending Rewards
-
-crank -> hnt_mint : issue rewards
-
-maker -> onboarding : issue hotspot, assert location tx
+maker <- onboarding : issue hotspot, assert location tx
 
 maker --> hotspot_issuer : issue hotspot, assert location tx
 
-oracles <-> wallet : set and distribute rewards tx
+oracles --> wallet : set and distribute rewards tx
 
-wallet --> lazy_distributor : set and distribute rewards
+lazy_distributor <-- wallet  : set and distribute rewards
 
-Solana --> indexer : hotspots, locations, wallets, balances
-
-indexer -> postgres
-
-postgres -> wallet_api
-
-wallet_api --> wallet
+helium_sub_daos --> treasury_management : set_expiry
 
 
 @enduml

@@ -66,6 +66,12 @@ export const lazyDistributorResolvers = combineResolvers(
       resolved
     }
   },
+  ataResolver({
+    instruction: "initializeLazyDistributorV0",
+    account: "rewardsEscrow",
+    mint: "rewardsMint",
+    owner: "lazyDistributor"
+  })
 );
 
 export * from "./constants";

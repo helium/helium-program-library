@@ -2,12 +2,10 @@ use anchor_lang::prelude::*;
 
 declare_id!("daoK94GYdvRjVxkSyTxNLxtAEYZohLJqmwad8pBK261");
 
+pub mod circuit_breaker;
 pub mod error;
 pub mod instructions;
-pub mod precise_number;
-pub mod signed_precise_number;
 pub mod state;
-pub mod uint;
 pub mod utils;
 
 pub use instructions::*;
