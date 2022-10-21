@@ -12,7 +12,7 @@ runs:
       with:
         path: |
           ./node_modules/
-        key: solana-${{ runner.os }}-v0000-${{ env.NODE_VERSION }}-${{ hashFiles('./yarn.lock') }}
+        key: node-modules-${{ runner.os }}-v0000-${{ env.NODE_VERSION }}-${{ hashFiles('./yarn.lock') }}
     - run: yarn && ./node_modules/.bin/lerna bootstrap && cd .. && git clone https://github.com/coral-xyz/anchor.git && cd helium-program-library && ./build-anchor-ts.sh
       shell: bash
       if: steps.cache-typescript-node-modules.outputs.cache-hit != 'true'
