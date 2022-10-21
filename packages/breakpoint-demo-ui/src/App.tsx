@@ -1,4 +1,5 @@
 import React, { useCallback } from "react";
+import ky from "ky";
 import {
   ChakraProvider,
   Container,
@@ -9,7 +10,6 @@ import {
 } from "@chakra-ui/react";
 import { Logo } from "./Logo";
 import { Hotspot } from "./Hotspot";
-import { postData } from "./postData";
 
 const hotspotKeys: string[] = [
   process.env.REACT_APP_HOTSPOT_1 || "",
@@ -21,9 +21,8 @@ const hotspotKeys: string[] = [
 export const App = () => {
   const handleHotspotClick = useCallback(async (hotspot: string) => {
     console.log(hotspot);
-    await postData({
-      url: process.env.REACT_APP_ORACLE_URL || "",
-      data: { hotspot: hotspot },
+    await ky.post(process.env.REACT_APP_ORACLE_URL || "", {
+      json: { hotspotKey: hotspot },
     });
   }, []);
 
@@ -33,7 +32,7 @@ export const App = () => {
         ...theme,
       }}
     >
-      <Container maxW="container.2xl" bg="#1d1d1d" p="0" h="100vh">
+      <Container maxW="container.2xl" p="0" h="100%">
         <Flex
           w="full"
           p={4}
@@ -106,7 +105,7 @@ export const App = () => {
             </Box>
           </Flex>
         </Flex>
-        <Flex flexWrap="wrap" w="100vw" gap={8} justifyContent="center" pt={6}>
+        <Flex flexWrap="wrap" w="100vw" gap={4} justifyContent="center" pt={4}>
           {hotspotKeys.map((key, index) => (
             <Flex key={key} onClick={() => handleHotspotClick(key)}>
               <Hotspot>

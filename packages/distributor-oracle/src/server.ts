@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 import express, { Application, Request, Response } from "express";
+import cors from "cors";
 import {
   PublicKey,
   Transaction,
@@ -21,11 +22,30 @@ import fs from "fs";
 
 export interface Database {
   getCurrentRewards: (mintKey: PublicKey) => Promise<number>;
+  getCurrentHotspotRewards: (hotspotKey: PublicKey) => Promise<number>;
+  incrementHotspotRewards: (hotspotKey: PublicKey) => Promise<void>;
 }
 
 export class DatabaseMock implements Database {
+  inMemHash: { [key: string]: number };
+
+  constructor() {
+    this.inMemHash = {};
+  }
+
   async getCurrentRewards(mintKey: PublicKey) {
     return 150000;
+  }
+
+  async getCurrentHotspotRewards(hotspotKey: PublicKey) {
+    return this.inMemHash[hotspotKey.toBase58()] || 0;
+  }
+
+  async incrementHotspotRewards(hotspotKey: PublicKey) {
+    this.inMemHash = {
+      ...this.inMemHash,
+      [hotspotKey.toBase58()]: (this.inMemHash[hotspotKey.toBase58()] || 0) + 1,
+    };
   }
 }
 
@@ -40,6 +60,7 @@ export class OracleServer {
     public db: Database
   ) {
     const app = express();
+    app.use(cors());
     app.use(bodyParser.json());
     this.app = app;
     this.addRoutes();
@@ -58,6 +79,51 @@ export class OracleServer {
   private addRoutes() {
     this.app.get("/", this.getCurrentRewardsHandler.bind(this));
     this.app.post("/", this.signTransactionHandler.bind(this));
+    this.app.post("/hotspots", this.incrementHotspotRewardsHandler.bind(this));
+    this.app.get(
+      "/hotspots/:hotspotKey",
+      this.getHotspotRewardsHandler.bind(this)
+    );
+  }
+
+  private async incrementHotspotRewardsHandler(req: Request, res: Response) {
+    const hotspotStr = req.body.hotspotKey;
+    if (!hotspotStr) {
+      res.status(400).json({ error: "No hotspot key provided" });
+      return;
+    }
+    let hotspot: PublicKey;
+    try {
+      hotspot = new PublicKey(hotspotStr);
+    } catch (err) {
+      res.status(400).json({ error: "Invalid hotspot key" });
+      return;
+    }
+
+    await this.db.incrementHotspotRewards(hotspot);
+
+    res.json({ success: true });
+  }
+
+  private async getHotspotRewardsHandler(req: Request, res: Response) {
+    const hotspotStr = req.params.hotspotKey;
+    if (!hotspotStr) {
+      res.status(400).json({ error: "No hotspot key provided" });
+      return;
+    }
+    let hotspot: PublicKey;
+    try {
+      hotspot = new PublicKey(hotspotStr);
+    } catch (err) {
+      res.status(400).json({ error: "Invalid hotspot key" });
+      return;
+    }
+
+    const currentRewards = await this.db.getCurrentHotspotRewards(hotspot);
+
+    res.json({
+      currentRewards,
+    });
   }
 
   private async getCurrentRewardsHandler(req: Request, res: Response) {
@@ -154,6 +220,7 @@ export class OracleServer {
       requireAllSignatures: false,
       verifySignatures: false,
     });
+
     res.json({ success: true, transaction: serialized });
   }
 }
