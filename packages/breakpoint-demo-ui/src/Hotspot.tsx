@@ -21,7 +21,7 @@ export const Hotspot: React.FC<{
     <Stack w="full" alignItems="center" justifyContent="center">
       <Box
         as={Button}
-        p={2}
+        p={4}
         height="auto"
         bgColor={`${scheme}.${step1}`}
         color="white"
