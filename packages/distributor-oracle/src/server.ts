@@ -24,13 +24,29 @@ export interface Database {
   getCurrentRewards: (mintKey: PublicKey) => Promise<number>;
   getCurrentHotspotRewards: (hotspotKey: PublicKey) => Promise<number>;
   incrementHotspotRewards: (hotspotKey: PublicKey) => Promise<void>;
+  endEpoch: () => Promise<{
+    [key: string]: number;
+  }>;
 }
 
 export class DatabaseMock implements Database {
-  inMemHash: { [key: string]: number };
+  inMemHash: {
+    totalRewards: number;
+    lifetimeRewards: number;
+    rewardsByHotspot: {
+      [key: string]: {
+        totalRewards: number;
+        lifetimeRewards: number;
+      };
+    };
+  };
 
   constructor() {
-    this.inMemHash = {};
+    this.inMemHash = {
+      totalRewards: 0,
+      lifetimeRewards: 0,
+      rewardsByHotspot: {},
+    };
   }
 
   async getCurrentRewards(mintKey: PublicKey) {
@@ -38,14 +54,70 @@ export class DatabaseMock implements Database {
   }
 
   async getCurrentHotspotRewards(hotspotKey: PublicKey) {
-    return this.inMemHash[hotspotKey.toBase58()] || 0;
+    return (
+      this.inMemHash.rewardsByHotspot[hotspotKey.toBase58()]?.totalRewards -
+        this.inMemHash.rewardsByHotspot[hotspotKey.toBase58()]
+          ?.lifetimeRewards || 0
+    );
   }
 
   async incrementHotspotRewards(hotspotKey: PublicKey) {
     this.inMemHash = {
       ...this.inMemHash,
-      [hotspotKey.toBase58()]: (this.inMemHash[hotspotKey.toBase58()] || 0) + 1,
+      totalRewards: this.inMemHash.totalRewards + 1,
+      rewardsByHotspot: {
+        ...this.inMemHash.rewardsByHotspot,
+        [hotspotKey.toBase58()]: {
+          totalRewards:
+            (this.inMemHash.rewardsByHotspot[hotspotKey.toBase58()]
+              ?.totalRewards || 0) + 1,
+          lifetimeRewards:
+            this.inMemHash.rewardsByHotspot[hotspotKey.toBase58()]
+              ?.lifetimeRewards || 0,
+        },
+      },
     };
+  }
+
+  async endEpoch() {
+    const rewardablePercentageByHotspot: { [key: string]: number } = {};
+    const { totalRewards, lifetimeRewards, rewardsByHotspot } = this.inMemHash;
+    const rewardsDiff = totalRewards - lifetimeRewards;
+    const maxEpochRewards = +(process.env.EPOCH_MAX_REWARDS || 0);
+    const maxRewards =
+      rewardsDiff < maxEpochRewards ? rewardsDiff : maxEpochRewards;
+
+    if (maxRewards > 0) {
+      for (const [key, value] of Object.entries(rewardsByHotspot)) {
+        const totalRewardsDiff = totalRewards - lifetimeRewards;
+        const rewardsDiff = value.totalRewards - value.lifetimeRewards;
+        let awardedAmount;
+
+        if (totalRewardsDiff == 0 || rewardsDiff == 0) {
+          awardedAmount = 0;
+        } else {
+          awardedAmount = (rewardsDiff / totalRewardsDiff) * maxRewards;
+        }
+
+        rewardablePercentageByHotspot[key] = awardedAmount;
+
+        this.inMemHash = {
+          ...this.inMemHash,
+          lifetimeRewards: this.inMemHash.lifetimeRewards + awardedAmount,
+          rewardsByHotspot: {
+            ...this.inMemHash.rewardsByHotspot,
+            [key]: {
+              ...this.inMemHash.rewardsByHotspot[key],
+              lifetimeRewards:
+                this.inMemHash.rewardsByHotspot[key].lifetimeRewards +
+                awardedAmount,
+            },
+          },
+        };
+      }
+    }
+
+    return rewardablePercentageByHotspot;
   }
 }
 
@@ -84,6 +156,16 @@ export class OracleServer {
       "/hotspots/:hotspotKey",
       this.getHotspotRewardsHandler.bind(this)
     );
+    this.app.post("/endepoch", this.endEpochHandler.bind(this));
+  }
+
+  private async endEpochHandler(reg: Request, res: Response) {
+    const percentageOfRewardsByHotspot = await this.db.endEpoch();
+
+    res.json({
+      success: true,
+      distributionByHotspot: percentageOfRewardsByHotspot,
+    });
   }
 
   private async incrementHotspotRewardsHandler(req: Request, res: Response) {
