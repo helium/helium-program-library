@@ -83,8 +83,9 @@ jobs:
         id: cache-cargo-deps-builds
         with:
           path: |
-            ./deps/metaplex-program-library/target
             ./deps/solana-program-library/target
           key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('./deps/**/Cargo.lock') }}-deps
       - run: ~/.cargo/bin/anchor run build-deps
+        shell: bash
+        if: steps.cache-cargo-deps-builds.outputs.cache-hit != 'true'
       - run: TESTING=true ~/.cargo/bin/anchor test --provider.cluster localnet --provider.wallet ~/.config/solana/id.json

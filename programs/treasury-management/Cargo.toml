@@ -1,0 +1,25 @@
+[package]
+name = "treasury-management"
+version = "0.0.1"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "treasury_management"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[profile.release]
+overflow-checks = true
+
+[dependencies]
+anchor-lang = { version = "0.24.2", features = ["init-if-needed"] }
+circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
+anchor-spl = "0.24.2"
+shared-utils = { path = "../shared-utils" }

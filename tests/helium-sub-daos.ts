@@ -22,6 +22,7 @@ import { DC_FEE, ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
 import { createNft } from "@helium-foundation/spl-utils";
 
 const EPOCH_REWARDS = 100000000;
+const SUB_DAO_EPOCH_REWARDS = 10000000;
 
 describe("helium-sub-daos", () => {
   // Configure the client to use the local cluster.
@@ -62,7 +63,7 @@ describe("helium-sub-daos", () => {
     const { dao, mint } = await initTestDao(program, provider, EPOCH_REWARDS, provider.wallet.publicKey);
     const account = await program.account.daoV0.fetch(dao!);
     expect(account.authority.toBase58()).eq(me.toBase58());
-    expect(account.mint.toBase58()).eq(mint.toBase58());
+    expect(account.hntMint.toBase58()).eq(mint.toBase58());
   });
 
   it("initializes a subdao", async () => {
@@ -81,7 +82,7 @@ describe("helium-sub-daos", () => {
     expect(account.authority.toBase58()).eq(me.toBase58());
     expect(account.hotspotCollection.toBase58()).eq(collection.toBase58());
     expect(account.treasury.toBase58()).eq(treasury.toBase58());
-    expect(account.mint.toBase58()).eq(mint.toBase58());
+    expect(account.dntMint.toBase58()).eq(mint.toBase58());
     expect(account.totalDevices.toNumber()).eq(0);
   });
 
@@ -91,7 +92,7 @@ describe("helium-sub-daos", () => {
     let hotspotIssuer: PublicKey;
     let treasury: PublicKey;
     let dcMint: PublicKey;
-    let onboardingServerKeypair: Keypair;
+    let rewardsEscrow: PublicKey;
     let makerKeypair: Keypair;
     let subDaoEpochInfo: PublicKey;
 
@@ -158,11 +159,17 @@ describe("helium-sub-daos", () => {
     beforeEach(async () => {
       ({
         dataCredits: { dcMint },
-        hotspotConfig: { onboardingServerKeypair },
-        subDao: { subDao, treasury },
+        subDao: { subDao, treasury, rewardsEscrow },
         dao: { dao },
         issuer: { makerKeypair, hotspotIssuer },
-      } = await initWorld(provider, issuerProgram, program, dcProgram, EPOCH_REWARDS));
+      } = await initWorld(
+        provider,
+        issuerProgram,
+        program,
+        dcProgram,
+        EPOCH_REWARDS,
+        SUB_DAO_EPOCH_REWARDS
+      ));
     });
 
     it("allows tracking hotspots", async () => {
@@ -247,9 +254,12 @@ describe("helium-sub-daos", () => {
           .rpc({ skipPreflight: true });
       });
 
-      it("issues rewards to subdaos", async () => {
+      it("issues hnt rewards to subdaos and dnt to rewards escrow", async () => {
         const preBalance = AccountLayout.decode(
           (await provider.connection.getAccountInfo(treasury))?.data!
+        ).amount;
+        const preMobileBalance = AccountLayout.decode(
+          (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
         ).amount;
         await sendInstructions(provider, [
           await program.methods
@@ -265,7 +275,15 @@ describe("helium-sub-daos", () => {
         const postBalance = AccountLayout.decode(
           (await provider.connection.getAccountInfo(treasury))?.data!
         ).amount;
-        expect((postBalance - preBalance).toString()).to.eq(EPOCH_REWARDS.toString());
+        const postMobileBalance = AccountLayout.decode(
+          (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
+        ).amount;
+        expect((postBalance - preBalance).toString()).to.eq(
+          EPOCH_REWARDS.toString()
+        );
+        expect((postMobileBalance - preMobileBalance).toString()).to.eq(
+          SUB_DAO_EPOCH_REWARDS.toString()
+        );
       });
     });
   });

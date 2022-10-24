@@ -7,7 +7,7 @@ use anchor_spl::token::{set_authority, SetAuthority};
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::{
   cpi::{accounts::InitializeMintWindowedBreakerV0, initialize_mint_windowed_breaker_v0},
-  InitializeMintWindowedBreakerArgsV0,
+  CircuitBreaker, InitializeMintWindowedBreakerArgsV0,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]

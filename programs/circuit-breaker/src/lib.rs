@@ -11,6 +11,15 @@ pub use errors::*;
 pub use instructions::*;
 pub use state::*;
 
+#[derive(Clone)]
+pub struct CircuitBreaker;
+
+impl anchor_lang::Id for CircuitBreaker {
+  fn id() -> Pubkey {
+    crate::id()
+  }
+}
+
 #[program]
 pub mod circuit_breaker {
   use super::*;

@@ -1,11 +1,11 @@
-import { PublicKey, TransactionInstruction, Transaction, Keypair } from "@solana/web3.js";
+import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
 import * as ld from "@helium-foundation/lazy-distributor-sdk";
 import * as anchor from "@project-serum/anchor";
 import { createMint, createNft, createAtaAndMint, toBN } from "@helium-foundation/spl-utils";
 import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
 import {
   createCreateMetadataAccountV3Instruction,
-  PROGRAM_ID as MPL_PID,
+  PROGRAM_ID as MPL_PID
 } from "@metaplex-foundation/mpl-token-metadata";
 import fs from 'fs';
 import * as dc from "@helium-foundation/data-credits-sdk";
@@ -27,7 +27,7 @@ async function initLazyDistributor(
       },
     ],
   }).accounts({
-    rewardsMint
+    rewardsMint,
   });
   const { lazyDistributor } = await method.pubkeys();
   await method.rpc({ skipPreflight: true });

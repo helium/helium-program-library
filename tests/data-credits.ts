@@ -127,7 +127,12 @@ describe("data-credits", () => {
       const method = await hsdProgram.methods
         .initializeDaoV0({
           authority: me,
-          rewardPerEpoch: new BN(EPOCH_REWARDS),
+          emissionSchedule: [
+            {
+              startUnixTime: new anchor.BN(0),
+              emissionsPerEpoch: new BN(EPOCH_REWARDS),
+            },
+          ],
         })
         .accounts({
           dcMint,

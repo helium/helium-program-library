@@ -11,7 +11,7 @@ import {
 import { init, PROGRAM_ID, lazyDistributorKey, recipientKey } from "../packages/lazy-distributor-sdk/src";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { AuthorityType, createSetAuthorityInstruction } from "@solana/spl-token";
-import { sendAndConfirmWithRetry, createMint, createNft  } from '@helium-foundation/spl-utils';
+import { sendAndConfirmWithRetry, createMint, createNft, createAtaAndMint  } from '@helium-foundation/spl-utils';
 
 
 chai.use(chaiHttp);
@@ -44,8 +44,6 @@ describe('distributor-oracle', () => {
 
     collectionMint = collectionKey;
     rewardsMint = await createMint(provider, 6, me, me);
-    // init LD
-    lazyDistributor = lazyDistributorKey(collectionMint, rewardsMint)[0];
 
     const method = await program.methods.initializeLazyDistributorV0({
       authority: me,
@@ -56,10 +54,12 @@ describe('distributor-oracle', () => {
         },
       ],
     }).accounts({
-      rewardsMint
+      rewardsMint,
     });
 
+
     const { lazyDistributor: ld } = await method.pubkeys();
+    await createAtaAndMint(provider, rewardsMint, 1000000000000, ld);
     lazyDistributor = ld!;
     await method.rpc({ skipPreflight: true });
     
