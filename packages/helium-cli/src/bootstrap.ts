@@ -159,18 +159,25 @@ async function run() {
   const mobileSubdao = (await subDaoKey(mobileKeypair.publicKey))[0];
   if (!(await provider.connection.getAccountInfo(mobileSubdao))) {
     console.log("Initializing Mobile SubDAO");
-    const mobileHotspotCollection = await createNft(
-      provider,
-      provider.wallet.publicKey,
-      {
-        name: "Mobile Hotspot Collection",
-        symbol: "MOBILEHOT",
-        uri: `${argv.bucket}/mobile_collection.json`,
-      },
-      undefined,
-      mobileHotspotCollectionKeypair
-    );
-    const rewardsEscrow = await createAtaAndMint(provider, mobileKeypair.publicKey, 1);
+    const mobileHotspotCollection = mobileHotspotCollectionKeypair.publicKey
+    if (
+      !(await provider.connection.getAccountInfo(
+        mobileHotspotCollection
+      ))
+    ) {
+      await createNft(
+        provider,
+        provider.wallet.publicKey,
+        {
+          name: "Mobile Hotspot Collection",
+          symbol: "MOBILEHOT",
+          uri: `${argv.bucket}/mobile_collection.json`,
+        },
+        undefined,
+        mobileHotspotCollectionKeypair
+      );
+    }
+    const rewardsEscrow = await createAtaAndMint(provider, mobileKeypair.publicKey, 0);
     await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
         authority: provider.wallet.publicKey,
@@ -197,9 +204,10 @@ async function run() {
         dao,
         dntMint: mobileKeypair.publicKey,
         rewardsEscrow,
-        hotspotCollection: mobileHotspotCollection.mintKey,
-        hntMint: mobileKeypair.publicKey,
-      });
+        hotspotCollection: mobileHotspotCollection,
+        hntMint: hntKeypair.publicKey,
+      })
+      .rpc({ skipPreflight: true });
   }
 }
 

@@ -6,6 +6,7 @@ pub mod error;
 pub mod instructions;
 pub mod state;
 pub mod token_metadata;
+pub mod circuit_breaker;
 
 pub use instructions::*;
 pub use state::*;
