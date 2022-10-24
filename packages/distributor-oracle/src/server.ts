@@ -31,11 +31,11 @@ export interface Database {
 
 export class DatabaseMock implements Database {
   inMemHash: {
-    totalRewards: number;
+    totalClicks: number;
     lifetimeRewards: number;
-    rewardsByHotspot: {
+    byHotspot: {
       [key: string]: {
-        totalRewards: number;
+        totalClicks: number;
         lifetimeRewards: number;
       };
     };
@@ -43,9 +43,26 @@ export class DatabaseMock implements Database {
 
   constructor() {
     this.inMemHash = {
-      totalRewards: 0,
+      totalClicks: 489,
       lifetimeRewards: 0,
-      rewardsByHotspot: {},
+      byHotspot: {
+        "5me9zwTMg5VSd1o2hSfZ4gdwYy1zCKmUEWqJnPoyPqud": {
+          totalClicks: 126,
+          lifetimeRewards: 0,
+        },
+        "6a81VrpAHMrbsn5Z7G4auSiDaeTgNAHkxXkEAKTqHm2T": {
+          totalClicks: 57,
+          lifetimeRewards: 0,
+        },
+        H4ujggiBqQ2j3b3k3UEtrqZwx4ihVWLT7Sc6oWtU6srf: {
+          totalClicks: 73,
+          lifetimeRewards: 0,
+        },
+        JBpMp7hrjkjvAwprW8jsA9efKdxvaTTSh3YG2xpLGxUW: {
+          totalClicks: 233,
+          lifetimeRewards: 0,
+        },
+      },
     };
   }
 
@@ -55,25 +72,24 @@ export class DatabaseMock implements Database {
 
   async getCurrentHotspotRewards(hotspotKey: PublicKey) {
     return (
-      this.inMemHash.rewardsByHotspot[hotspotKey.toBase58()]?.totalRewards -
-        this.inMemHash.rewardsByHotspot[hotspotKey.toBase58()]
-          ?.lifetimeRewards || 0
+      this.inMemHash.byHotspot[hotspotKey.toBase58()]?.totalClicks -
+        this.inMemHash.byHotspot[hotspotKey.toBase58()]?.lifetimeRewards || 0
     );
   }
 
   async incrementHotspotRewards(hotspotKey: PublicKey) {
     this.inMemHash = {
       ...this.inMemHash,
-      totalRewards: this.inMemHash.totalRewards + 1,
-      rewardsByHotspot: {
-        ...this.inMemHash.rewardsByHotspot,
+      totalClicks: this.inMemHash.totalClicks + 1,
+      byHotspot: {
+        ...this.inMemHash.byHotspot,
         [hotspotKey.toBase58()]: {
-          totalRewards:
-            (this.inMemHash.rewardsByHotspot[hotspotKey.toBase58()]
-              ?.totalRewards || 0) + 1,
+          totalClicks:
+            (this.inMemHash.byHotspot[hotspotKey.toBase58()]?.totalClicks ||
+              0) + 1,
           lifetimeRewards:
-            this.inMemHash.rewardsByHotspot[hotspotKey.toBase58()]
-              ?.lifetimeRewards || 0,
+            this.inMemHash.byHotspot[hotspotKey.toBase58()]?.lifetimeRewards ||
+            0,
         },
       },
     };
@@ -81,36 +97,27 @@ export class DatabaseMock implements Database {
 
   async endEpoch() {
     const rewardablePercentageByHotspot: { [key: string]: number } = {};
-    const { totalRewards, lifetimeRewards, rewardsByHotspot } = this.inMemHash;
-    const rewardsDiff = totalRewards - lifetimeRewards;
+    const { totalClicks, lifetimeRewards, byHotspot } = this.inMemHash;
+    const clickRewardsDiff = totalClicks - lifetimeRewards;
     const maxEpochRewards = +(process.env.EPOCH_MAX_REWARDS || 0);
-    const maxRewards =
-      rewardsDiff < maxEpochRewards ? rewardsDiff : maxEpochRewards;
 
-    if (maxRewards > 0) {
-      for (const [key, value] of Object.entries(rewardsByHotspot)) {
-        const totalRewardsDiff = totalRewards - lifetimeRewards;
-        const rewardsDiff = value.totalRewards - value.lifetimeRewards;
-        let awardedAmount;
-
-        if (totalRewardsDiff == 0 || rewardsDiff == 0) {
-          awardedAmount = 0;
-        } else {
-          awardedAmount = (rewardsDiff / totalRewardsDiff) * maxRewards;
-        }
+    if (maxEpochRewards > 0) {
+      for (const [key, value] of Object.entries(byHotspot)) {
+        const diff = value.totalClicks - value.lifetimeRewards;
+        let awardedAmount =
+          diff <= 0 ? 0 : (diff / clickRewardsDiff) * maxEpochRewards;
 
         rewardablePercentageByHotspot[key] = awardedAmount;
 
         this.inMemHash = {
           ...this.inMemHash,
           lifetimeRewards: this.inMemHash.lifetimeRewards + awardedAmount,
-          rewardsByHotspot: {
-            ...this.inMemHash.rewardsByHotspot,
+          byHotspot: {
+            ...this.inMemHash.byHotspot,
             [key]: {
-              ...this.inMemHash.rewardsByHotspot[key],
+              ...this.inMemHash.byHotspot[key],
               lifetimeRewards:
-                this.inMemHash.rewardsByHotspot[key].lifetimeRewards +
-                awardedAmount,
+                this.inMemHash.byHotspot[key].lifetimeRewards + awardedAmount,
             },
           },
         };
