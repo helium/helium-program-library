@@ -8,13 +8,7 @@
       "path": "../idls"
     },
     {
-      "path": "../hotspot-issuance-sdk"
-    },
-    {
       "path": "../data-credits-sdk"
-    },
-    {
-      "path": "../treasury-management-sdk"
     },
     {
       "path": "../circuit-breaker-sdk"
@@ -24,6 +18,12 @@
     },
     {
       "path": "../lazy-distributor-sdk"
+    },
+    {
+      "path": "../hotspot-issuance-sdk"
+    },
+    {
+      "path": "../treasury-management-sdk"
     },
     {
       "path": "./tsconfig.cjs.json"

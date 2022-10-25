@@ -45,24 +45,7 @@ export class DatabaseMock implements Database {
     this.inMemHash = {
       totalClicks: 489,
       lifetimeRewards: 0,
-      byHotspot: {
-        "6dMCz9v7fX86FKk3717qfcEJTsuk4PkUfGeQQFgBTWxi": {
-          totalClicks: 126,
-          lifetimeRewards: 0,
-        },
-        AVz2HBnpou9JpfVU94owmG3MU83QgZ598jgu8Dc7C1sg: {
-          totalClicks: 57,
-          lifetimeRewards: 0,
-        },
-        "741ybk96nRLbbeNmgMUbm2Yrbffxonou6CQ9aXibrUdC": {
-          totalClicks: 73,
-          lifetimeRewards: 0,
-        },
-        "3kx9RaXSuBo76WnyUykxYUGBeZ8J5tqyis99EUxQCzqf": {
-          totalClicks: 233,
-          lifetimeRewards: 0,
-        },
-      },
+      byHotspot: {},
     };
   }
 

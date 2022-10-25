@@ -1,6 +1,10 @@
 import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { subDaoEpochInfoKey } from "./pdas";
-import { ataResolver, combineResolvers, get } from "@helium-foundation/spl-utils";
+import {
+  ataResolver,
+  combineResolvers,
+  get,
+} from "@helium-foundation/spl-utils";
 import { resolveIndividual } from "@helium-foundation/spl-utils";
 import { PROGRAM_ID } from "./constants";
 import { treasuryManagementResolvers } from "@helium-foundation/treasury-management-sdk";
@@ -25,7 +29,10 @@ export const subDaoEpochInfoResolver = resolveIndividual(
 
 export const heliumSubDaosProgramResolver = resolveIndividual(
   async ({ path }) => {
-    if (path[path.length - 1] === "heliumSubDaos" || path[path.length - 1] === "heliumSubDaosProgram") {
+    if (
+      path[path.length - 1] === "heliumSubDaos" ||
+      path[path.length - 1] === "heliumSubDaosProgram"
+    ) {
       return PROGRAM_ID;
     }
   }
@@ -39,6 +46,6 @@ export const heliumSubDaosResolvers = combineResolvers(
     instruction: "initializeSubDaoV0",
     account: "treasury",
     mint: "hntMint",
-    owner: "treasuryManagement"
+    owner: "treasuryManagement",
   })
 );

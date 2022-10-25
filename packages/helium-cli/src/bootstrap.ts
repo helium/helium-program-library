@@ -7,7 +7,12 @@ import {
   init as initDao,
   subDaoKey,
 } from "@helium-foundation/helium-sub-daos-sdk";
-import { init as initIssuance } from "@helium-foundation/hotspot-issuance-sdk";
+import {
+  init as initIssuance,
+  hotspotConfigKey,
+  hotspotCollectionKey,
+  hotspotIssuerKey,
+} from "@helium-foundation/hotspot-issuance-sdk";
 import { init as initLazy } from "@helium-foundation/lazy-distributor-sdk";
 import {
   thresholdPercent,
@@ -34,6 +39,14 @@ import fetch from "node-fetch";
 import os from "os";
 import yargs from "yargs/yargs";
 import { toU128 } from "@helium-foundation/treasury-management-sdk";
+import b58 from "bs58";
+
+const hotspotEccKeys = [
+  "6dMCz9v7fX86FKk3717qfcEJTsuk4PkUfGeQQFgBTWxi",
+  "AVz2HBnpou9JpfVU94owmG3MU83QgZ598jgu8Dc7C1sg",
+  "741ybk96nRLbbeNmgMUbm2Yrbffxonou6CQ9aXibrUdC",
+  "3kx9RaXSuBo76WnyUykxYUGBeZ8J5tqyis99EUxQCzqf",
+];
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -62,10 +75,15 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Keypair of the Mobile token",
     default: "./keypairs/mobile.json",
   },
-  mobileHotspotCollectionKeypair: {
+  onboardingServerKeypair: {
     type: "string",
-    describe: "Keypair of the Mobile hotspot collection token",
-    default: "./keypairs/mobile-hotspot-collection.json",
+    describe: "Keypair of the onboarding server",
+    default: "./keypairs/onboarding-server.json",
+  },
+  makerKeypair: {
+    type: "string",
+    describe: "Keypair of a maker",
+    default: "./keypairs/maker.json",
   },
   numHnt: {
     type: "number",
@@ -109,9 +127,10 @@ async function run() {
   const hntKeypair = await loadKeypair(argv.hntKeypair);
   const dcKeypair = await loadKeypair(argv.dcKeypair);
   const mobileKeypair = await loadKeypair(argv.mobileKeypair);
-  const mobileHotspotCollectionKeypair = await loadKeypair(
-    argv.mobileHotspotCollectionKeypair
+  const onboardingServerKeypair = await loadKeypair(
+    argv.onboardingServerKeypair
   );
+  const makerKeypair = await loadKeypair(argv.makerKeypair);
   await createAndMint({
     provider,
     mintKeypair: hntKeypair,
@@ -166,21 +185,46 @@ async function run() {
       .rpc({ skipPreflight: true });
   }
 
+  const hsCollectionKey = (await hotspotCollectionKey("MOBILEHOT"))[0];
+  if (!(await provider.connection.getAccountInfo(hsCollectionKey))) {
+    console.log("Initalizing `MOBILEHOT` collection and HotspotConfig");
+
+    await hotspotIssuanceProgram.methods
+      .initializeHotspotConfigV0({
+        name: "Mobile Hotspot Collection",
+        symbol: "MOBILEHOT",
+        metadataUrl: `${argv.bucket}/mobile_collection.json`,
+        dcFee: toBN(5, 0),
+        onboardingServer: onboardingServerKeypair.publicKey,
+      })
+      .accounts({ dcMint: dcKeypair.publicKey })
+      .rpc({ skipPreflight: true });
+  }
+
+  const hsConfigKey = (await hotspotConfigKey(hsCollectionKey))[0];
+  const hsIssuerKey = await hotspotIssuerKey(
+    hsConfigKey,
+    makerKeypair.publicKey
+  )[0];
+
+  if (!(await provider.connection.getAccountInfo(hsIssuerKey))) {
+    console.log("Initalizing HotspotIssuer");
+
+    await hotspotIssuanceProgram.methods
+      .initializeHotspotIssuerV0({
+        maker: makerKeypair.publicKey,
+        authority: provider.wallet.publicKey,
+      })
+      .accounts({
+        hotspotConfig: hsConfigKey,
+      })
+      .rpc({ skipPreflight: true });
+  }
+
   const mobileSubdao = (await subDaoKey(mobileKeypair.publicKey))[0];
   if (!(await provider.connection.getAccountInfo(mobileSubdao))) {
     console.log("Initializing Mobile SubDAO");
 
-    const mobileHotspotCollection = await createNft(
-      provider,
-      provider.wallet.publicKey,
-      {
-        name: "Mobile Hotspot Collection",
-        symbol: "MOBILEHOT",
-        uri: `${argv.bucket}/mobile_collection.json`,
-      },
-      undefined,
-      mobileHotspotCollectionKeypair
-    );
     const rewardsEscrow = await createAtaAndMint(
       provider,
       mobileKeypair.publicKey,
@@ -212,7 +256,7 @@ async function run() {
         dao,
         dntMint: mobileKeypair.publicKey,
         rewardsEscrow,
-        hotspotCollection: mobileHotspotCollection.mintKey,
+        hotspotCollection: hsCollectionKey,
         hntMint: mobileKeypair.publicKey,
       });
   }
