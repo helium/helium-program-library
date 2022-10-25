@@ -9,6 +9,12 @@ import { PublicKey } from "@solana/web3.js";
 import { circuitBreakerResolvers } from "@helium-foundation/circuit-breaker-sdk";
 
 export const lazyDistributorResolvers = combineResolvers(
+  ataResolver({
+    instruction: "initializeLazyDistributorV0",
+    account: "rewardsEscrow",
+    mint: "rewardsMint",
+    owner: "lazyDistributor",
+  }),
   circuitBreakerResolvers,
   resolveIndividual(async ({ path, accounts }) => {
     if (path[path.length - 1] === "targetMetadata") {
@@ -58,11 +64,5 @@ export const lazyDistributorResolvers = combineResolvers(
       accounts,
       resolved,
     };
-  },
-  ataResolver({
-    instruction: "initializeLazyDistributorV0",
-    account: "rewardsEscrow",
-    mint: "rewardsMint",
-    owner: "lazyDistributor",
-  })
+  }
 );

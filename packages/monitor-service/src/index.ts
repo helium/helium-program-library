@@ -52,12 +52,11 @@ async function run() {
     mobileTreasury,
     "mobile_treasury"
   );
-  // TODO: When bootstrap script creates this, uncomment
-  // await monitorAccountCircuitBreaker(
-  //   cbProgram,
-  //   mobileRewardsEscrow,
-  //   "mobile_rewards_escrow"
-  // );
+  await monitorAccountCircuitBreaker(
+    cbProgram,
+    mobileRewardsEscrow,
+    "mobile_rewards_escrow"
+  );
 
   server.listen({ port: 8080 }, (err, address) => {
     if (err) {

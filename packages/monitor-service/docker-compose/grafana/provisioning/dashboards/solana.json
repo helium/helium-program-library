@@ -22,55 +22,8 @@
       "datasource": null,
       "gridPos": {
         "h": 4,
-        "w": 5,
-        "x": 0,
-        "y": 0
-      },
-      "id": 10,
-      "interval": "",
-      "options": {
-        "colorMode": "value",
-        "fieldOptions": {
-          "calcs": ["lastNotNull"],
-          "defaults": {
-            "mappings": [],
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                }
-              ]
-            }
-          },
-          "overrides": [],
-          "values": false
-        },
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto"
-      },
-      "pluginVersion": "6.7.2",
-      "targets": [
-        {
-          "expr": "solana_mint_supply{name=\"mobile\"}",
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "Mobile Supply",
-      "type": "stat"
-    },
-    {
-      "datasource": null,
-      "gridPos": {
-        "h": 4,
         "w": 3,
-        "x": 5,
+        "x": 0,
         "y": 0
       },
       "id": 7,
@@ -121,7 +74,7 @@
       "gridPos": {
         "h": 4,
         "w": 3,
-        "x": 8,
+        "x": 3,
         "y": 0
       },
       "id": 12,
@@ -160,6 +113,53 @@
       "timeFrom": null,
       "timeShift": null,
       "title": "Mobile Rewards Escrow (MOBILE)",
+      "type": "stat"
+    },
+    {
+      "datasource": null,
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 6,
+        "y": 0
+      },
+      "id": 10,
+      "interval": "",
+      "options": {
+        "colorMode": "value",
+        "fieldOptions": {
+          "calcs": ["lastNotNull"],
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
+          },
+          "overrides": [],
+          "values": false
+        },
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "pluginVersion": "6.7.2",
+      "targets": [
+        {
+          "expr": "solana_mint_supply{name=\"mobile\"}",
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "Mobile Supply",
       "type": "stat"
     },
     {
@@ -265,7 +265,7 @@
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
-        "h": 7,
+        "h": 5,
         "w": 11,
         "x": 0,
         "y": 4
@@ -364,7 +364,7 @@
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
-        "h": 7,
+        "h": 6,
         "w": 7,
         "x": 11,
         "y": 4
@@ -463,7 +463,7 @@
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
-        "h": 7,
+        "h": 6,
         "w": 6,
         "x": 18,
         "y": 4
@@ -562,10 +562,109 @@
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
-        "h": 7,
+        "h": 5,
         "w": 11,
         "x": 0,
-        "y": 11
+        "y": 9
+      },
+      "hiddenSeries": false,
+      "id": 13,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 2,
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "alias": "level",
+          "fill": 2
+        }
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "solana_circuit_breaker_level{name=\"mobile_rewards_escrow\"}",
+          "interval": "",
+          "legendFormat": "level",
+          "refId": "A"
+        },
+        {
+          "expr": "solana_circuit_breaker_limit{name=\"mobile_rewards_escrow\"}",
+          "interval": "",
+          "legendFormat": "limit",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Mobile Escrow Breaker",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 11,
+        "x": 0,
+        "y": 14
       },
       "hiddenSeries": false,
       "id": 4,
@@ -683,5 +782,5 @@
   "variables": {
     "list": []
   },
-  "version": 3
+  "version": 5
 }

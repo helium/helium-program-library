@@ -6,7 +6,8 @@ import {
   daoKey, init as initDao, subDaoKey
 } from "@helium-foundation/helium-sub-daos-sdk";
 import {
-  init as initLazy
+  init as initLazy,
+  lazyDistributorKey,
 } from "@helium-foundation/lazy-distributor-sdk";
 import {
   thresholdPercent,
@@ -19,6 +20,7 @@ import {
 import * as anchor from "@project-serum/anchor";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
+  Connection,
   Keypair,
   PublicKey
 } from "@solana/web3.js";
@@ -28,6 +30,7 @@ import fetch from "node-fetch";
 import os from "os";
 import yargs from "yargs/yargs";
 import { toU128 } from "@helium-foundation/treasury-management-sdk";
+import { program } from "@project-serum/anchor/dist/cjs/spl/associated-token";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -85,25 +88,44 @@ const yarg = yargs(hideBin(process.argv)).options({
     default:
       "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib",
   },
+  oracleUrl: {
+    type: "string",
+    describe: "The oracle URL",
+    default: "http://localhost:8082"
+  },
+  oracleKey: {
+    type: "string",
+    describe: "the pubkey of the oracle"
+  }
 });
 
-const EPOCH_REWARDS = 100000000;
+const HNT_EPOCH_REWARDS = 100000000;
+const MOBILE_EPOCH_REWARDS = 100000000;
+async function exists(connection: Connection, account: PublicKey): Promise<boolean> {
+  return Boolean(await connection.getAccountInfo(account));
+}
+
 
 async function run() {
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
+
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const dataCreditsProgram = await initDc(provider);
   const lazyDistributorProgram = await initLazy(provider);
   const heliumSubDaosProgram = await initDao(provider);
 
-
   const hntKeypair = await loadKeypair(argv.hntKeypair);
   const dcKeypair = await loadKeypair(argv.dcKeypair);
   const mobileKeypair = await loadKeypair(argv.mobileKeypair);
   const mobileHotspotCollectionKeypair = await loadKeypair(argv.mobileHotspotCollectionKeypair);
+  const oracleKey = argv.oracleKey ? new PublicKey(argv.oracleKey) : provider.wallet.publicKey;
+  const oracleUrl = argv.oracleUrl;
+
+  const conn = provider.connection;
+
   await createAndMint({
     provider,
     mintKeypair: hntKeypair,
@@ -124,7 +146,7 @@ async function run() {
   });
 
   const dcKey = (await dataCreditsKey(dcKeypair.publicKey))[0];
-  if (!(await provider.connection.getAccountInfo(dcKey))) {
+  if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
         authority: provider.wallet.publicKey,
@@ -139,14 +161,14 @@ async function run() {
   }
 
   const dao = (await daoKey(hntKeypair.publicKey))[0];
-  if (!(await provider.connection.getAccountInfo(dao))) {
+  if (!(await exists(conn, dao))) {
     console.log("Initializing DAO");
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         authority: provider.wallet.publicKey,
         emissionSchedule: [{
           startUnixTime: new anchor.BN(0),
-          emissionsPerEpoch: new anchor.BN(EPOCH_REWARDS),
+          emissionsPerEpoch: new anchor.BN(HNT_EPOCH_REWARDS),
         }],
       })
       .accounts({
@@ -156,12 +178,39 @@ async function run() {
       .rpc({ skipPreflight: true });
   }
 
+  const [mobileLazyDist] = await lazyDistributorKey(mobileKeypair.publicKey);
+  const rewardsEscrow = await getAssociatedTokenAddress(mobileKeypair.publicKey, mobileLazyDist, true);
+  if (!(await exists(conn, mobileLazyDist))) {
+    console.log("Initializing mobile lazy distributor");
+    await lazyDistributorProgram.methods
+      .initializeLazyDistributorV0({
+        authority: provider.wallet.publicKey,
+        oracles: [
+          {
+            oracle: oracleKey,
+            url: oracleUrl,
+          },
+        ],
+        // 10 x epoch rewards in a 24 hour period
+        windowConfig: {
+          windowSizeSeconds: new anchor.BN(24 * 60 * 60),
+          thresholdType: ThresholdType.Absolute as never,
+          threshold: new anchor.BN(10 * MOBILE_EPOCH_REWARDS),
+        },
+      })
+      .accounts({
+        rewardsMint: mobileKeypair.publicKey,
+        rewardsEscrow
+      })
+      .rpc({ skipPreflight: true });
+  }
+
   const mobileSubdao = (await subDaoKey(mobileKeypair.publicKey))[0];
-  if (!(await provider.connection.getAccountInfo(mobileSubdao))) {
+  if (!(await exists(conn, mobileSubdao))) {
     console.log("Initializing Mobile SubDAO");
     const mobileHotspotCollection = mobileHotspotCollectionKeypair.publicKey
     if (
-      !(await provider.connection.getAccountInfo(
+      !(await exists(conn, 
         mobileHotspotCollection
       ))
     ) {
@@ -177,14 +226,14 @@ async function run() {
         mobileHotspotCollectionKeypair
       );
     }
-    const rewardsEscrow = await createAtaAndMint(provider, mobileKeypair.publicKey, 0);
+
     await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
         authority: provider.wallet.publicKey,
         emissionSchedule: [
           {
             startUnixTime: new anchor.BN(0),
-            emissionsPerEpoch: new anchor.BN(EPOCH_REWARDS),
+            emissionsPerEpoch: new anchor.BN(MOBILE_EPOCH_REWARDS),
           },
         ],
         // Linear curve
@@ -224,7 +273,7 @@ async function createAndMint({
 }): Promise<void> {
   const metadata = await fetch(metadataUrl).then((r) => r.json());
 
-  if (!(await provider.connection.getAccountInfo(mintKeypair.publicKey))) {
+  if (!(await exists(provider.connection, mintKeypair.publicKey))) {
     console.log(`${metadata.name} Mint not found, creating...`);
     await sendInstructions(
       provider,
@@ -253,7 +302,7 @@ async function createAndMint({
     METADATA_PROGRAM_ID
   ))[0];
 
-  if (!(await provider.connection.getAccountInfo(metadataAddress))) {
+  if (!(await exists(provider.connection, metadataAddress))) {
     console.log(`${metadata.name} Metadata not found, creating...`);
     await sendInstructions(provider, [
       await createCreateMetadataAccountV3Instruction(
