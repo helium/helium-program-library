@@ -1,26 +1,29 @@
 import {
   dataCreditsKey,
-  init as initDc
+  init as initDc,
 } from "@helium-foundation/data-credits-sdk";
 import {
-  daoKey, init as initDao, subDaoKey
+  daoKey,
+  init as initDao,
+  subDaoKey,
 } from "@helium-foundation/helium-sub-daos-sdk";
+import { init as initIssuance } from "@helium-foundation/hotspot-issuance-sdk";
+import { init as initLazy } from "@helium-foundation/lazy-distributor-sdk";
+import { ThresholdType } from "@helium-foundation/circuit-breaker-sdk";
 import {
-  init as initLazy
-} from "@helium-foundation/lazy-distributor-sdk";
+  createAtaAndMintInstructions,
+  createMintInstructions,
+  createNft as createNft,
+  sendInstructions,
+  toBN,
+} from "@helium-foundation/spl-utils";
 import {
-  ThresholdType
-} from "@helium-foundation/circuit-breaker-sdk";
-import { createAtaAndMintInstructions, createMintInstructions, createNft as createNft, sendInstructions, toBN } from "@helium-foundation/spl-utils";
-import {
-  createCreateMetadataAccountV3Instruction, PROGRAM_ID as METADATA_PROGRAM_ID
+  createCreateMetadataAccountV3Instruction,
+  PROGRAM_ID as METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
-import {
-  Keypair,
-  PublicKey
-} from "@solana/web3.js";
+import { Keypair, PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
 import fs from "fs";
 import fetch from "node-fetch";
@@ -96,12 +99,14 @@ async function run() {
   const dataCreditsProgram = await initDc(provider);
   const lazyDistributorProgram = await initLazy(provider);
   const heliumSubDaosProgram = await initDao(provider);
-
+  const hotspotIssuanceProgram = await initIssuance(provider);
 
   const hntKeypair = await loadKeypair(argv.hntKeypair);
   const dcKeypair = await loadKeypair(argv.dcKeypair);
   const mobileKeypair = await loadKeypair(argv.mobileKeypair);
-  const mobileHotspotCollectionKeypair = await loadKeypair(argv.mobileHotspotCollectionKeypair);
+  const mobileHotspotCollectionKeypair = await loadKeypair(
+    argv.mobileHotspotCollectionKeypair
+  );
   await createAndMint({
     provider,
     mintKeypair: hntKeypair,
@@ -154,6 +159,7 @@ async function run() {
   const mobileSubdao = (await subDaoKey(mobileKeypair.publicKey))[0];
   if (!(await provider.connection.getAccountInfo(mobileSubdao))) {
     console.log("Initializing Mobile SubDAO");
+
     const mobileHotspotCollection = await createNft(
       provider,
       provider.wallet.publicKey,
@@ -186,12 +192,12 @@ async function createAndMint({
   provider,
   mintKeypair,
   amount,
-  metadataUrl
+  metadataUrl,
 }: {
-  provider: anchor.AnchorProvider,
-  mintKeypair: Keypair,
-  amount: number,
-  metadataUrl: string
+  provider: anchor.AnchorProvider;
+  mintKeypair: Keypair;
+  amount: number;
+  metadataUrl: string;
 }): Promise<void> {
   const metadata = await fetch(metadataUrl).then((r) => r.json());
 
@@ -219,10 +225,16 @@ async function createAndMint({
     );
   }
 
-  const metadataAddress = (await PublicKey.findProgramAddress(
-    [Buffer.from("metadata", "utf-8"), METADATA_PROGRAM_ID.toBuffer(), mintKeypair.publicKey.toBuffer()],
-    METADATA_PROGRAM_ID
-  ))[0];
+  const metadataAddress = (
+    await PublicKey.findProgramAddress(
+      [
+        Buffer.from("metadata", "utf-8"),
+        METADATA_PROGRAM_ID.toBuffer(),
+        mintKeypair.publicKey.toBuffer(),
+      ],
+      METADATA_PROGRAM_ID
+    )
+  )[0];
 
   if (!(await provider.connection.getAccountInfo(metadataAddress))) {
     console.log(`${metadata.name} Metadata not found, creating...`);
@@ -261,10 +273,12 @@ async function createAndMint({
   }
 }
 
-run().catch((err) => {
-  console.error(err);
-  process.exit(1);
-}).then(() => process.exit());
+run()
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  })
+  .then(() => process.exit());
 
 function loadKeypair(keypair: string): Keypair {
   console.log(process.env.ANCHOR_PROVIDER_URL);
@@ -272,9 +286,6 @@ function loadKeypair(keypair: string): Keypair {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
 
   return Keypair.fromSecretKey(
-    new Uint8Array(
-      JSON.parse(fs.readFileSync(keypair).toString())
-    )
+    new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString()))
   );
 }
-

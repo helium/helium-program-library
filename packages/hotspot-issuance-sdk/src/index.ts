@@ -1,6 +1,6 @@
 import { AnchorProvider, Idl, Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { HotspotIssuance } from "../../../target/types/hotspot_issuance";
+import { HotspotIssuance } from "@helium-foundation/idls/lib/types/hotspot_issuance";
 import { PROGRAM_ID } from "./constants";
 import { hotspotIssuanceResolvers } from "./resolvers";
 export * from "./pdas";

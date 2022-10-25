@@ -5,7 +5,7 @@ import {
   resolveIndividual,
 } from "@helium-foundation/spl-utils";
 import { PROGRAM_ID } from "./constants";
-import { subDaoEpochInfoResolver } from "../../helium-sub-daos-sdk/src/index";
+import { subDaoEpochInfoResolver } from "@helium-foundation/helium-sub-daos-sdk";
 
 export const hotspotIssuanceResolvers = combineResolvers(
   resolveIndividual(async ({ path }) => {

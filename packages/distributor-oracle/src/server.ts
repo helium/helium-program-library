@@ -9,7 +9,6 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import bodyParser from "body-parser";
-import { init, PROGRAM_ID } from "../../lazy-distributor-sdk/src";
 import {
   AnchorProvider,
   BorshInstructionCoder,
@@ -17,13 +16,14 @@ import {
   setProvider,
   getProvider,
 } from "@project-serum/anchor";
-import { LazyDistributor } from "../../../target/types/lazy_distributor";
+import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
+import { init, PROGRAM_ID } from "@helium-foundation/lazy-distributor-sdk";
 import fs from "fs";
 
 export interface Database {
   getCurrentRewards: (mintKey: PublicKey) => Promise<number>;
-  getCurrentHotspotRewards: (hotspotKey: PublicKey) => Promise<number>;
-  incrementHotspotRewards: (hotspotKey: PublicKey) => Promise<void>;
+  getCurrentHotspotRewards: (hotspotKey: string) => Promise<number>;
+  incrementHotspotRewards: (hotspotKey: string) => Promise<void>;
   endEpoch: () => Promise<{
     [key: string]: number;
   }>;
@@ -46,19 +46,19 @@ export class DatabaseMock implements Database {
       totalClicks: 489,
       lifetimeRewards: 0,
       byHotspot: {
-        "5me9zwTMg5VSd1o2hSfZ4gdwYy1zCKmUEWqJnPoyPqud": {
+        "6dMCz9v7fX86FKk3717qfcEJTsuk4PkUfGeQQFgBTWxi": {
           totalClicks: 126,
           lifetimeRewards: 0,
         },
-        "6a81VrpAHMrbsn5Z7G4auSiDaeTgNAHkxXkEAKTqHm2T": {
+        AVz2HBnpou9JpfVU94owmG3MU83QgZ598jgu8Dc7C1sg: {
           totalClicks: 57,
           lifetimeRewards: 0,
         },
-        H4ujggiBqQ2j3b3k3UEtrqZwx4ihVWLT7Sc6oWtU6srf: {
+        "741ybk96nRLbbeNmgMUbm2Yrbffxonou6CQ9aXibrUdC": {
           totalClicks: 73,
           lifetimeRewards: 0,
         },
-        JBpMp7hrjkjvAwprW8jsA9efKdxvaTTSh3YG2xpLGxUW: {
+        "3kx9RaXSuBo76WnyUykxYUGBeZ8J5tqyis99EUxQCzqf": {
           totalClicks: 233,
           lifetimeRewards: 0,
         },
@@ -70,26 +70,24 @@ export class DatabaseMock implements Database {
     return 150000;
   }
 
-  async getCurrentHotspotRewards(hotspotKey: PublicKey) {
+  async getCurrentHotspotRewards(hotspotKey: string) {
     return (
-      this.inMemHash.byHotspot[hotspotKey.toBase58()]?.totalClicks -
-        this.inMemHash.byHotspot[hotspotKey.toBase58()]?.lifetimeRewards || 0
+      this.inMemHash.byHotspot[hotspotKey]?.totalClicks -
+        this.inMemHash.byHotspot[hotspotKey]?.lifetimeRewards || 0
     );
   }
 
-  async incrementHotspotRewards(hotspotKey: PublicKey) {
+  async incrementHotspotRewards(hotspotKey: string) {
     this.inMemHash = {
       ...this.inMemHash,
       totalClicks: this.inMemHash.totalClicks + 1,
       byHotspot: {
         ...this.inMemHash.byHotspot,
-        [hotspotKey.toBase58()]: {
+        [hotspotKey]: {
           totalClicks:
-            (this.inMemHash.byHotspot[hotspotKey.toBase58()]?.totalClicks ||
-              0) + 1,
+            (this.inMemHash.byHotspot[hotspotKey]?.totalClicks || 0) + 1,
           lifetimeRewards:
-            this.inMemHash.byHotspot[hotspotKey.toBase58()]?.lifetimeRewards ||
-            0,
+            this.inMemHash.byHotspot[hotspotKey]?.lifetimeRewards || 0,
         },
       },
     };
@@ -181,15 +179,8 @@ export class OracleServer {
       res.status(400).json({ error: "No hotspot key provided" });
       return;
     }
-    let hotspot: PublicKey;
-    try {
-      hotspot = new PublicKey(hotspotStr);
-    } catch (err) {
-      res.status(400).json({ error: "Invalid hotspot key" });
-      return;
-    }
 
-    await this.db.incrementHotspotRewards(hotspot);
+    await this.db.incrementHotspotRewards(hotspotStr);
 
     res.json({ success: true });
   }
@@ -200,15 +191,8 @@ export class OracleServer {
       res.status(400).json({ error: "No hotspot key provided" });
       return;
     }
-    let hotspot: PublicKey;
-    try {
-      hotspot = new PublicKey(hotspotStr);
-    } catch (err) {
-      res.status(400).json({ error: "Invalid hotspot key" });
-      return;
-    }
 
-    const currentRewards = await this.db.getCurrentHotspotRewards(hotspot);
+    const currentRewards = await this.db.getCurrentHotspotRewards(hotspotStr);
 
     res.json({
       currentRewards,

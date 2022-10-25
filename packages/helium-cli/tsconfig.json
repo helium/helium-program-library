@@ -8,6 +8,9 @@
       "path": "../idls"
     },
     {
+      "path": "../hotspot-issuance-sdk"
+    },
+    {
       "path": "../data-credits-sdk"
     },
     {

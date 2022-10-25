@@ -12,10 +12,10 @@ import { Logo } from "./Logo";
 import { Hotspot } from "./Hotspot";
 
 const hotspotKeys: string[] = [
-  process.env.REACT_APP_HOTSPOT_1 || "",
-  process.env.REACT_APP_HOTSPOT_2 || "",
-  process.env.REACT_APP_HOTSPOT_3 || "",
-  process.env.REACT_APP_HOTSPOT_4 || "",
+  "6dMCz9v7fX86FKk3717qfcEJTsuk4PkUfGeQQFgBTWxi",
+  "AVz2HBnpou9JpfVU94owmG3MU83QgZ598jgu8Dc7C1sg",
+  "741ybk96nRLbbeNmgMUbm2Yrbffxonou6CQ9aXibrUdC",
+  "3kx9RaXSuBo76WnyUykxYUGBeZ8J5tqyis99EUxQCzqf",
 ];
 
 export const App = () => {

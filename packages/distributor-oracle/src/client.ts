@@ -1,36 +1,49 @@
-import { AnchorProvider, Program, BN, BorshInstructionCoder } from "@project-serum/anchor";
+import {
+  AnchorProvider,
+  Program,
+  BN,
+  BorshInstructionCoder,
+} from "@project-serum/anchor";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import { LazyDistributor } from "../../../target/types/lazy_distributor";
-import axios from 'axios';
+import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
+import axios from "axios";
 
 export type Reward = {
-  currentRewards: number | string,
-  oracleKey: PublicKey,
-}
+  currentRewards: number | string;
+  oracleKey: PublicKey;
+};
 export async function getCurrentRewards(
-  program: Program<LazyDistributor>, 
-  lazyDistributor: PublicKey, 
-  mint: PublicKey): Promise<Reward[]> {
-  const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(lazyDistributor);
+  program: Program<LazyDistributor>,
+  lazyDistributor: PublicKey,
+  mint: PublicKey
+): Promise<Reward[]> {
+  const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(
+    lazyDistributor
+  );
 
-  const results = await Promise.all(lazyDistributorAcc.oracles.map((x) => (
-    axios.get(`${x.url}/?mint=${mint.toString()}`)
-  )));
+  const results = await Promise.all(
+    lazyDistributorAcc.oracles.map((x) =>
+      axios.get(`${x.url}/?mint=${mint.toString()}`)
+    )
+  );
   return results.map((x, idx) => {
     return {
       currentRewards: x.data.currentRewards,
       oracleKey: lazyDistributorAcc.oracles[idx].oracle,
-    }
-  })
+    };
+  });
 }
 
 export async function formTransaction(
   program: Program<LazyDistributor>,
   provider: AnchorProvider,
-  rewards: Reward[], 
+  rewards: Reward[],
   recipient: PublicKey,
-  lazyDistributor: PublicKey) {
-  const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(lazyDistributor);
+  lazyDistributor: PublicKey
+) {
+  const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(
+    lazyDistributor
+  );
   const ixPromises = rewards.map((x, idx) => {
     return program.methods
       .setCurrentRewardsV0({
@@ -40,7 +53,7 @@ export async function formTransaction(
       .accounts({
         lazyDistributor,
         recipient,
-        oracle: x.oracleKey
+        oracle: x.oracleKey,
       })
       .instruction();
   });
@@ -50,14 +63,18 @@ export async function formTransaction(
 
   const distributeIx = await program.methods
     .distributeRewardsV0()
-    .accounts({ recipient, lazyDistributor, rewardsMint: lazyDistributorAcc.rewardsMint })
+    .accounts({
+      recipient,
+      lazyDistributor,
+      rewardsMint: lazyDistributorAcc.rewardsMint,
+    })
     .instruction();
 
   tx.recentBlockhash = (
     await provider.connection.getLatestBlockhash()
   ).blockhash;
 
-  tx.feePayer = provider.wallet.publicKey
+  tx.feePayer = provider.wallet.publicKey;
 
   tx.add(distributeIx);
   tx = await provider.wallet.signTransaction(tx);
