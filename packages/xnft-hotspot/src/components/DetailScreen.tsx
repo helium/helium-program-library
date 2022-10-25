@@ -38,7 +38,7 @@ export function DetailScreen({ nft, pendingRewards, symbol }) {
     tx.recentBlockhash = blockhash;
 
     //@ts-ignore
-    await window.xnft.send(tx);
+    await window.xnft.solana.send(tx);
   };
   return (
     <View

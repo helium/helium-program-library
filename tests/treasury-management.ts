@@ -128,7 +128,7 @@ describe("treasury-management", () => {
     })
 
     it ("allows redemption", async () => {
-      // dR = ((R / S) ^ (1 + k))((S + dS) ^ (1 + k - S) ^ (1 + k));
+      // dR = (R / S^(1 + k)) ((S + dS)^(1 + k) - S^(1 + k))
       // 100 / (100 ^ (1 + 2)) ((100 - 50)^(1+2) - 100^(1 + 2))
       // 100 / 100^3 (50^3 - 100^3)
 

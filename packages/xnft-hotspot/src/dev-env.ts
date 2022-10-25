@@ -2,7 +2,6 @@ import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distribu
 import * as ld from "@helium-foundation/lazy-distributor-sdk";
 import * as anchor from "@project-serum/anchor";
 import { createMint, createNft, createAtaAndMint, toBN } from "@helium-foundation/spl-utils";
-import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
 import {
   createCreateMetadataAccountV3Instruction,
   PROGRAM_ID as MPL_PID
@@ -12,6 +11,56 @@ import * as dc from "@helium-foundation/data-credits-sdk";
 import {
   ThresholdType
 } from "@helium-foundation/circuit-breaker-sdk";
+import { PublicKey, Keypair, Transaction } from "@solana/web3.js";
+import { DC_MINT, MOBILE_MINT, HNT_MINT } from "@helium-foundation/spl-utils";
+import * as tm from "@helium-foundation/treasury-management-sdk";
+// import { IDL as TreasuryManagementIdl } from "@helium-foundation/idls/lib/esm/treasury_management";
+
+async function createMints(provider: anchor.AnchorProvider) {
+  const me = provider.wallet.publicKey;
+  const decimals = 8;
+
+  const hntMintKeypair = Keypair.fromSecretKey(
+    new Uint8Array(
+      JSON.parse(fs.readFileSync("../helium-cli/keypairs/hnt.json").toString())
+    )
+  );
+  await createMint(provider, decimals, me, me, hntMintKeypair);
+
+  const dcMintKeypair = Keypair.fromSecretKey(
+    new Uint8Array(
+      JSON.parse(fs.readFileSync("../helium-cli/keypairs/dc.json").toString())
+    )
+  );
+  await createMint(provider, decimals, me, me, dcMintKeypair);
+
+  const mobileMintKeypair = Keypair.fromSecretKey(
+    new Uint8Array(
+      JSON.parse(fs.readFileSync("../helium-cli/keypairs/mobile.json").toString())
+    )
+  );
+  await createMint(provider, decimals, me, me, mobileMintKeypair);
+
+  await createAtaAndMint(
+    provider,
+    HNT_MINT,
+    toBN(100, decimals).toNumber(),
+    me
+  );
+  await createAtaAndMint(
+    provider,
+    DC_MINT,
+    toBN(100, decimals).toNumber(),
+    me
+  );
+  await createAtaAndMint(
+    provider,
+    MOBILE_MINT,
+    toBN(100, decimals).toNumber(),
+    me
+  );
+
+}
 
 async function initLazyDistributor(
   program: anchor.Program<LazyDistributor>, 
@@ -101,28 +150,9 @@ async function createTokenMetadata(provider: anchor.AnchorProvider, mintKeypair:
 
 async function initDc(provider: anchor.AnchorProvider) {
   const me = provider.wallet.publicKey;
-  const dcMintKeypair = Keypair.fromSecretKey(
-    new Uint8Array(
-      JSON.parse(fs.readFileSync("/home/thornton/.config/solana/dc-mint.json").toString())
-    )
-  );
+  
   const program = await dc.init(provider);
-  const decimals = 8;
-  const hntMint = await createMint(provider, decimals, me, me);
-  const dcMint = await createMint(provider, decimals, me, me, dcMintKeypair);
-  console.log("dc mint key: ", dcMint.toString());
-  await createAtaAndMint(
-    provider,
-    hntMint,
-    toBN(100, decimals).toNumber(),
-    me
-  );
-  await createAtaAndMint(
-    provider,
-    dcMint,
-    toBN(100, decimals).toNumber(),
-    me
-  );
+  
   const method = program.methods
     .initializeDataCreditsV0({ 
       authority: me,
@@ -132,16 +162,48 @@ async function initDc(provider: anchor.AnchorProvider) {
         threshold: new anchor.BN("10000000000000000000")
       }
     })
-    .accounts({ hntMint, dcMint, payer: me });
+    .accounts({ hntMint: HNT_MINT, dcMint: DC_MINT, payer: me });
   await method.rpc({
     skipPreflight: true
   });
+}
+
+async function initTreasury(provider: anchor.AnchorProvider) {
+  const program = await tm.init(provider, tm.PROGRAM_ID);
+  const method = program.methods
+    .initializeTreasuryManagementV0({
+      authority: provider.wallet.publicKey,
+      curve: {
+        exponentialCurveV0: {
+          k: tm.toU128(2),
+        },
+      } as any,
+      freezeUnixTime: new anchor.BN(100000000000),
+      windowConfig: {
+        windowSizeSeconds: new anchor.BN(10),
+        thresholdType: ThresholdType.Absolute as never,
+        threshold: new anchor.BN(1000000000),
+      },
+    })
+    .accounts({
+      treasuryMint: HNT_MINT,
+      supplyMint: MOBILE_MINT,
+    });
+  await method.rpc();
+  await createAtaAndMint(
+    provider,
+    HNT_MINT,
+    toBN(500, 8).toNumber(),
+    (await method.pubkeys()).treasuryManagement
+  );
 }
 
 async function setupLocalhost() {
   
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
+
+  await createMints(provider);
 
   /**Init LD */
   const program = await ld.init(provider);
@@ -161,5 +223,8 @@ async function setupLocalhost() {
 
   /**Init DC */
   await initDc(provider);
+
+  /**Init Treasury */
+  await initTreasury(provider);
 }
 setupLocalhost();

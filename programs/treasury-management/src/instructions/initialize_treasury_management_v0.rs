@@ -30,7 +30,9 @@ pub struct InitializeTreasuryManagementV0<'info> {
     bump,
   )]
   pub treasury_management: Box<Account<'info, TreasuryManagementV0>>,
+  // HNT
   pub treasury_mint: Box<Account<'info, Mint>>,
+  // IOT, MOBILE, etc
   pub supply_mint: Box<Account<'info, Mint>>,
   /// CHECK: Verified by cpi to init
   #[account(

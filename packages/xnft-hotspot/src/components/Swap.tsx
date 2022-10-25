@@ -10,35 +10,103 @@ import {
   useConnection,
 } from "react-xnft";
 import { THEME } from "../utils/theme";
-import { PublicKey, Connection } from "@solana/web3.js";
-import { init } from "@helium-foundation/data-credits-sdk";
+import { PublicKey, Connection, ComputeBudgetProgram } from "@solana/web3.js";
+import { getMint, AccountLayout, getAssociatedTokenAddress } from "@solana/spl-token";
+import * as dc from "@helium-foundation/data-credits-sdk";
+import * as tm from "@helium-foundation/treasury-management-sdk";
+import { DC_MINT, MOBILE_MINT, toBN } from "@helium-foundation/spl-utils";
 import * as anchor from "@project-serum/anchor";
 
 type Token = {
   name: string;
+  // mint only required for treasury swaps
+  mint?: PublicKey;
   toTokens?: string[];
   icon: string;
 }
 
-const dcMint = new PublicKey("9gXkafdgJ9xD4xWrfTnxiY1KnNLYCRNMZgge2c1aKA6d"); // TODO change this to correct mint address
+type PriceCache = {
+  price: number,
+  lastCheckedTime: number,
+}
 
-async function mintDataCredits(connection: Connection, publicKey: PublicKey, amount: number) {
+// seconds
+const CACHE_INVALIDATION_TIME = 30;
+
+async function mintDataCredits(connection: Connection, wallet: PublicKey, amount: number) {
   //@ts-ignore
-  const stubProvider = new anchor.AnchorProvider(connection, {publicKey}, anchor.AnchorProvider.defaultOptions())
-  const program = await init(stubProvider);
+  const stubProvider = new anchor.AnchorProvider(connection, {publicKey: wallet}, anchor.AnchorProvider.defaultOptions())
+  const program = await dc.init(stubProvider);
 
   const tx = await program.methods
     .mintDataCreditsV0({
       amount: new anchor.BN(amount * 10 ** 8),
     })
-    .accounts({ dcMint })
+    .accounts({ dcMint: DC_MINT })
     .transaction();
-  const { blockhash } = await connection!.getLatestBlockhash("recent");
+  const { blockhash } = await connection.getLatestBlockhash("recent");
   tx.recentBlockhash = blockhash;
 
   //@ts-ignore
-  await window.xnft.send(tx);
+  await window.xnft.solana.send(tx);
 }
+
+async function treasurySwap(connection: Connection, wallet: PublicKey, amount: number, fromMint: PublicKey) {
+  //@ts-ignore
+  const stubProvider = new anchor.AnchorProvider(connection, {publicKey: wallet}, anchor.AnchorProvider.defaultOptions())
+  const program = await tm.init(stubProvider);
+  const fromMintAcc = await getMint(connection, fromMint);
+  
+  const treasuryManagement = tm.treasuryManagementKey(fromMint)[0];
+  const tx = await program.methods
+    .redeemV0({
+      amount: toBN(amount, fromMintAcc.decimals),
+      expectedOutputAmount: new anchor.BN(0),
+    })
+    .preInstructions([
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+    ])
+    .accounts({
+      treasuryManagement,
+    })
+    .transaction();
+
+  const { blockhash } = await connection.getLatestBlockhash("recent");
+  tx.recentBlockhash = blockhash;
+
+  //@ts-ignore
+  await window.xnft.solana.send(tx);
+}
+
+function round(value, decimals) {
+  //@ts-ignore
+  return Number(Math.round(value+'e'+decimals)+'e-'+decimals);
+}
+
+async function getTreasuryPrice(connection: Connection, wallet: PublicKey, fromMint: PublicKey): Promise<number> {
+  //@ts-ignore
+  const stubProvider = new anchor.AnchorProvider(connection, {publicKey: wallet}, anchor.AnchorProvider.defaultOptions())
+  const program = await tm.init(stubProvider);
+  
+  const treasuryManagement = tm.treasuryManagementKey(fromMint)[0];
+  const treasuryAcc = await program.account.treasuryManagementV0.fetch(treasuryManagement);
+  const fromMintAcc = await getMint(connection, fromMint);
+  const treasuryMintAcc = await getMint(connection, treasuryAcc.treasuryMint);
+  
+  // only works for basic exponential curves
+  // dR = (R / S^(1 + k)) ((S + dS)^(1 + k) - S^(1 + k))
+  const S = Number(fromMintAcc.supply / BigInt(Math.pow(10, fromMintAcc.decimals)));
+  const R = Number(AccountLayout.decode(
+    (
+      await connection.getAccountInfo(treasuryAcc.treasury)
+    )?.data!
+  ).amount / BigInt(Math.pow(10, treasuryMintAcc.decimals)));
+  //@ts-ignore
+  const k = (treasuryAcc.curve.exponentialCurveV0.k.toNumber() / Math.pow(10,12));
+  const dR = (R / Math.pow(S,k+1)) * (Math.pow((S - 1),k+1) - Math.pow(S,k+1));
+  return Math.abs(dR);
+}
+
 export function Swap() {
   const publicKey = usePublicKey();
   const connection = useConnection();
@@ -52,13 +120,20 @@ export function Swap() {
     {
       name: 'MOBILE',
       toTokens: ['HNT'],
-      icon: 'https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/mobile.png'
+      icon: 'https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/mobile.png',
+      mint: MOBILE_MINT,
+    },
+  ];
+  const bottomTokens: Token[] = [
+    {
+      name: 'DC',
+      icon: 'https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/dc.png',
+    },
+    {
+      name: 'HNT',
+      icon: 'https://s2.coinmarketcap.com/static/img/coins/64x64/5665.png'
     }
   ];
-  const bottomTokens: Token[] = [{
-    name: 'DC',
-    icon: 'https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/dc.png'
-  }];
 
   const [topSelected, setTopSelected] = useState<Token>(topTokens[0]);
   const [bottomSelected, setBottomSelected] = useState<Token>(bottomTokens[0]);
@@ -68,6 +143,9 @@ export function Swap() {
   const [topAmount, setTopAmount] = useState<number>(0);
   const [bottomAmount, setBottomAmount] = useState<number>(0);
   const [isDcMint, setIsDcMint] = useState<boolean>(true);
+
+  // maps trading pair to cached price
+  const [priceCache, setPriceCache] = useState<Record<string, PriceCache>>({})
   
   const parseAndSetTop = useCallback((newTop: number | string | undefined) => {
     let parsed: any = newTop!;
@@ -77,15 +155,45 @@ export function Swap() {
     setTopAmount(parsed);
   }, [])
 
+  const setTopSelectedWrapper = useCallback((newTop: Token) => {
+    if (newTop.toTokens?.length == 1) {
+      const bottom = bottomTokens.find((x) => x.name === newTop.toTokens![0])!;
+      setBottomSelected(bottom);
+    }
+    setTopSelected(newTop)
+  }, [])
+  
+  // update prices and amounts
   useEffect(() => {
+    if (!topSelected || !bottomSelected || !topAmount) return;
+    const symbol = `${topSelected.name}/${bottomSelected.name}`;
     if (isDcMint) {
       setBottomAmount(topAmount * dcRate);
-      return;
     } else {
-      setBottomAmount(0);
+      async function getTreasuryPricing() {
+        if (symbol in priceCache) {
+          // check if cache is invalid
+          if (priceCache[symbol].lastCheckedTime >= (new Date().getTime()/1000) - CACHE_INVALIDATION_TIME) {
+            setBottomAmount(round(priceCache[symbol].price * topAmount, 4));
+            return
+          }
+        }
+        const p = await getTreasuryPrice(connection, publicKey, topSelected.mint!);
+        const updated = {
+          ...priceCache
+        }
+        updated[symbol] = {
+          lastCheckedTime: new Date().getTime() / 1000,
+          price: p
+        }
+        setPriceCache(updated)
+        setBottomAmount(round(p * topAmount, 4));
+      }
+      getTreasuryPricing();
     }
   }, [topAmount, isDcMint, topSelected, bottomSelected]);
 
+  // update when token selected
   useEffect(() => {
     if (topSelected.toTokens?.includes(bottomSelected.name)) {
       setSwapAllowed(true);
@@ -94,16 +202,17 @@ export function Swap() {
     }
   }, [topSelected, bottomSelected])
 
+  // update isDcMint
   useEffect(() => {
     setIsDcMint(topSelected.name === "HNT" && bottomSelected.name === "DC");
   }, [topSelected, bottomSelected])
 
-
   const executeSwap = useCallback(() => {
     console.log("swapping");
     if (isDcMint) {
-      // mint DC by burning HNT
-      mintDataCredits(connection, publicKey, topAmount)
+      mintDataCredits(connection, publicKey, topAmount);
+    } else {
+      treasurySwap(connection, publicKey, topAmount, topSelected.mint!);
     }
   }, [isDcMint, topAmount, connection, publicKey])
 
@@ -124,7 +233,7 @@ export function Swap() {
         marginTop: '-25px',
         marginBottom: '50px',
       }}>
-        <TokenSelector tokens={topTokens} selected={topSelected} setSelected={setTopSelected}/>
+        <TokenSelector tokens={topTokens} selected={topSelected} setSelected={setTopSelectedWrapper}/>
         <TextField placeholder="Amount" 
           style={{
             marginLeft: '20px',

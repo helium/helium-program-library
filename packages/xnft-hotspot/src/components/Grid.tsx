@@ -59,7 +59,7 @@ function Grid({ tokenAccounts }: any) {
       tx.recentBlockhash = blockhash;
 
       //@ts-ignore
-      await window.xnft.send(tx);
+      await window.xnft.solana.send(tx);
     }
   };
 
@@ -156,7 +156,7 @@ function GridItem({ nft }) {
         MPL_PID
       )[0];
       //@ts-ignore
-      const acc = await window.xnft.connection.getAccountInfo(metadata);
+      const acc = await window.xnft.solana.connection.getAccountInfo(metadata);
       const meta = Metadata.fromAccountInfo(acc)[0];
       setSymbol(meta.data.symbol);
     })()
