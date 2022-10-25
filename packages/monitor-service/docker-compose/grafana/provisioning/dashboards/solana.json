@@ -46,7 +46,8 @@
                   "value": 80
                 }
               ]
-            }
+            },
+            "unit": "HNT"
           },
           "overrides": [],
           "values": false
@@ -66,7 +67,7 @@
       ],
       "timeFrom": null,
       "timeShift": null,
-      "title": "Mobile Treasury Balance (HNT)",
+      "title": "Mobile Treasury Balance",
       "type": "stat"
     },
     {
@@ -92,7 +93,8 @@
                   "value": null
                 }
               ]
-            }
+            },
+            "unit": "MOBILE"
           },
           "overrides": [],
           "values": false
@@ -112,7 +114,7 @@
       ],
       "timeFrom": null,
       "timeShift": null,
-      "title": "Mobile Rewards Escrow (MOBILE)",
+      "title": "Mobile Rewards Escrow",
       "type": "stat"
     },
     {
@@ -139,7 +141,8 @@
                   "value": null
                 }
               ]
-            }
+            },
+            "unit": "MOBILE"
           },
           "overrides": [],
           "values": false
@@ -186,7 +189,8 @@
                   "value": null
                 }
               ]
-            }
+            },
+            "unit": "HNT"
           },
           "overrides": [],
           "values": false
@@ -233,7 +237,8 @@
                   "value": null
                 }
               ]
-            }
+            },
+            "unit": "DC"
           },
           "overrides": [],
           "values": false
@@ -759,7 +764,7 @@
     "list": []
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {
@@ -782,5 +787,5 @@
   "variables": {
     "list": []
   },
-  "version": 5
+  "version": 7
 }
