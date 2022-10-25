@@ -9,8 +9,12 @@ import {
 } from "@helium-foundation/helium-sub-daos-sdk";
 import { init as initIssuance } from "@helium-foundation/hotspot-issuance-sdk";
 import { init as initLazy } from "@helium-foundation/lazy-distributor-sdk";
-import { ThresholdType } from "@helium-foundation/circuit-breaker-sdk";
 import {
+  thresholdPercent,
+  ThresholdType,
+} from "@helium-foundation/circuit-breaker-sdk";
+import {
+  createAtaAndMint,
   createAtaAndMintInstructions,
   createMintInstructions,
   createNft as createNft,
@@ -18,12 +22,8 @@ import {
   toBN,
 } from "@helium-foundation/spl-utils";
 import {
-  thresholdPercent,
-  ThresholdType
-} from "@helium-foundation/circuit-breaker-sdk";
-import { createAtaAndMint, createAtaAndMintInstructions, createMintInstructions, createNft as createNft, sendInstructions, toBN } from "@helium-foundation/spl-utils";
-import {
-  createCreateMetadataAccountV3Instruction, PROGRAM_ID as METADATA_PROGRAM_ID
+  createCreateMetadataAccountV3Instruction,
+  PROGRAM_ID as METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
@@ -152,10 +152,12 @@ async function run() {
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         authority: provider.wallet.publicKey,
-        emissionSchedule: [{
-          startUnixTime: new anchor.BN(0),
-          emissionsPerEpoch: new anchor.BN(EPOCH_REWARDS),
-        }],
+        emissionSchedule: [
+          {
+            startUnixTime: new anchor.BN(0),
+            emissionsPerEpoch: new anchor.BN(EPOCH_REWARDS),
+          },
+        ],
       })
       .accounts({
         dcMint: dcKeypair.publicKey,
@@ -179,7 +181,11 @@ async function run() {
       undefined,
       mobileHotspotCollectionKeypair
     );
-    const rewardsEscrow = await createAtaAndMint(provider, mobileKeypair.publicKey, 1);
+    const rewardsEscrow = await createAtaAndMint(
+      provider,
+      mobileKeypair.publicKey,
+      1
+    );
     await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
         authority: provider.wallet.publicKey,
