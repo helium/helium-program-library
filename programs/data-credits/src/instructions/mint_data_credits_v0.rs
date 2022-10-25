@@ -1,4 +1,4 @@
-use crate::{circuit_breaker::CircuitBreaker, DataCreditsV0};
+use crate::DataCreditsV0;
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
@@ -6,7 +6,7 @@ use anchor_spl::{
 };
 use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
-  MintArgsV0, MintWindowedCircuitBreakerV0,
+  CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]

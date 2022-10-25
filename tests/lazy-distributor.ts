@@ -1,4 +1,4 @@
-import { sendInstructions } from "@helium-foundation/spl-utils";
+import { createAtaAndMint, sendInstructions } from "@helium-foundation/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
@@ -76,7 +76,10 @@ describe("lazy-distributor", () => {
           rewardsMint,
         });
       await method.rpc({ skipPreflight: true });
-      lazyDistributor = (await method.pubkeys()).lazyDistributor!;
+      const pubkeys = await method.pubkeys();
+      lazyDistributor = pubkeys.lazyDistributor!;
+      await createAtaAndMint(provider, pubkeys.rewardsMint!, 1000000000000, pubkeys.lazyDistributor)
+
     });
 
     it("initializes a recipient", async () => {
@@ -209,7 +212,14 @@ describe("lazy-distributor", () => {
         });
 
       lazyDistributor = (await method.pubkeys()).lazyDistributor!;
+      const pubkeys = await method.pubkeys();
       await method.rpc({ skipPreflight: true });
+      await createAtaAndMint(
+        provider,
+        pubkeys.rewardsMint!,
+        1000000000000,
+        pubkeys.lazyDistributor
+      );
 
       const method2 = await program.methods.initializeRecipientV0().accounts({
         lazyDistributor,

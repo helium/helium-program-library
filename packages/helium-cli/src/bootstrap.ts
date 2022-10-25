@@ -18,8 +18,12 @@ import {
   toBN,
 } from "@helium-foundation/spl-utils";
 import {
-  createCreateMetadataAccountV3Instruction,
-  PROGRAM_ID as METADATA_PROGRAM_ID,
+  thresholdPercent,
+  ThresholdType
+} from "@helium-foundation/circuit-breaker-sdk";
+import { createAtaAndMint, createAtaAndMintInstructions, createMintInstructions, createNft as createNft, sendInstructions, toBN } from "@helium-foundation/spl-utils";
+import {
+  createCreateMetadataAccountV3Instruction, PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
@@ -29,6 +33,7 @@ import fs from "fs";
 import fetch from "node-fetch";
 import os from "os";
 import yargs from "yargs/yargs";
+import { toU128 } from "@helium-foundation/treasury-management-sdk";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -147,7 +152,10 @@ async function run() {
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         authority: provider.wallet.publicKey,
-        rewardPerEpoch: new anchor.BN(EPOCH_REWARDS),
+        emissionSchedule: [{
+          startUnixTime: new anchor.BN(0),
+          emissionsPerEpoch: new anchor.BN(EPOCH_REWARDS),
+        }],
       })
       .accounts({
         dcMint: dcKeypair.publicKey,
@@ -171,19 +179,35 @@ async function run() {
       undefined,
       mobileHotspotCollectionKeypair
     );
+    const rewardsEscrow = await createAtaAndMint(provider, mobileKeypair.publicKey, 1);
     await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
         authority: provider.wallet.publicKey,
+        emissionSchedule: [
+          {
+            startUnixTime: new anchor.BN(0),
+            emissionsPerEpoch: new anchor.BN(EPOCH_REWARDS),
+          },
+        ],
+        // Linear curve
+        treasuryCurve: {
+          exponentialCurveV0: {
+            k: toU128(1),
+          },
+        } as any,
+        // 20% in a day
+        treasuryWindowConfig: {
+          windowSizeSeconds: new anchor.BN(24 * 60 * 60),
+          thresholdType: ThresholdType.Percent as never,
+          threshold: thresholdPercent(20),
+        },
       })
       .accounts({
         dao,
-        subDaoMint: mobileKeypair.publicKey,
+        dntMint: mobileKeypair.publicKey,
+        rewardsEscrow,
         hotspotCollection: mobileHotspotCollection.mintKey,
-        treasury: await getAssociatedTokenAddress(
-          mobileKeypair.publicKey,
-          provider.wallet.publicKey
-        ),
-        mint: mobileKeypair.publicKey,
+        hntMint: mobileKeypair.publicKey,
       });
   }
 }

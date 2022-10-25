@@ -163,13 +163,15 @@ export const initWorld = async (
   hsProgram: Program<HotspotIssuance>,
   hsdProgram: Program<HeliumSubDaos>,
   dcProgram: Program<DataCredits>,
-  epochRewards?: number
+  epochRewards?: number,
+  subDaoEpochRewards?: number,
 ): Promise<{
-  dao: { mint: PublicKey; dao: PublicKey; };
+  dao: { mint: PublicKey; dao: PublicKey };
   subDao: {
     mint: PublicKey;
     subDao: PublicKey;
     treasury: PublicKey;
+    rewardsEscrow: PublicKey;
   };
   dataCredits: {
     dcKey: PublicKey;
@@ -207,7 +209,8 @@ export const initWorld = async (
     provider,
     provider.wallet.publicKey,
     dao.dao,
-    hotspotConfig.collection
+    hotspotConfig.collection,
+    subDaoEpochRewards
   );
 
   const issuer = await initTestHotspotIssuer(
@@ -221,6 +224,6 @@ export const initWorld = async (
     subDao,
     dataCredits,
     hotspotConfig,
-    issuer
+    issuer,
   };
 };

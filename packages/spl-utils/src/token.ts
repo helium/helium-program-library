@@ -55,7 +55,7 @@ export async function createAtaAndMintInstructions(
   authority: PublicKey = provider.wallet.publicKey,
   payer: PublicKey = provider.wallet.publicKey
 ): Promise<{ instructions: TransactionInstruction[]; ata: PublicKey }> {
-  const ata = await getAssociatedTokenAddress(mint, to);
+  const ata = await getAssociatedTokenAddress(mint, to, true);
   const instructions: TransactionInstruction[] = [];
   if (!(await provider.connection.getAccountInfo(ata))) {
     instructions.push(

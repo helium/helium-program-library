@@ -11,6 +11,9 @@
       "path": "./packages/distributor-oracle"
     },
     {
+      "path": "./packages/treasury-management-sdk"
+    },
+    {
       "path": "./packages/lazy-distributor-sdk"
     },
     {

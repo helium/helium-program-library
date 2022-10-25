@@ -14,6 +14,12 @@
       "path": "../data-credits-sdk"
     },
     {
+      "path": "../treasury-management-sdk"
+    },
+    {
+      "path": "../circuit-breaker-sdk"
+    },
+    {
       "path": "../helium-sub-daos-sdk"
     },
     {

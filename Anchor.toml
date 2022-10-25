@@ -7,6 +7,7 @@ helium_sub_daos = "daoK94GYdvRjVxkSyTxNLxtAEYZohLJqmwad8pBK261"
 data_credits = "5BAQuzGE1z8CTcrSdfbfdBF2fdXrwb4iMcxDMrvhz8L8"
 hotspot_issuance = "8DV471AvMNBCDTPoa2gzffrYFEJmDU56GDgTBv48RBZR"
 circuit_breaker = "circcmKGcSE61r768bFtD1GkG3x6qfEE1GD2PgwA6C3"
+treasury_management = "treaRzaa4b98D1NQMQdQXzBupbgWhyJ2e1pXhJzkTwU"
 
 [workspace]
 members = [
@@ -14,7 +15,8 @@ members = [
   "programs/data-credits",
   "programs/helium-sub-daos",
   "programs/hotspot-issuance",
-  "programs/circuit-breaker"
+  "programs/circuit-breaker",
+  "programs/treasury-management",
 ]
 
 [registry]
