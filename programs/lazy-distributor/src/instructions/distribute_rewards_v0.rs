@@ -5,7 +5,10 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
 };
-use circuit_breaker::{CircuitBreaker, cpi::{transfer_v0, accounts::TransferV0}, TransferArgsV0, AccountWindowedCircuitBreakerV0};
+use circuit_breaker::{
+  cpi::{accounts::TransferV0, transfer_v0},
+  AccountWindowedCircuitBreakerV0, CircuitBreaker, TransferArgsV0,
+};
 
 #[derive(Accounts)]
 pub struct DistributeRewardsV0<'info> {
@@ -91,9 +94,7 @@ pub fn handler(ctx: Context<DistributeRewardsV0>) -> Result<()> {
       },
       seeds,
     ),
-    TransferArgsV0 {
-      amount: to_dist
-    },
+    TransferArgsV0 { amount: to_dist },
   )?;
 
   Ok(())

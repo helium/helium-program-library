@@ -1,10 +1,13 @@
+use crate::circuit_breaker::WindowedCircuitBreakerConfigV0;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::TokenAccount;
 use anchor_spl::token::{Mint, Token};
-use crate::circuit_breaker::WindowedCircuitBreakerConfigV0;
-use circuit_breaker::{CircuitBreaker, InitializeAccountWindowedBreakerArgsV0, cpi::{initialize_account_windowed_breaker_v0, accounts::InitializeAccountWindowedBreakerV0}};
+use circuit_breaker::{
+  cpi::{accounts::InitializeAccountWindowedBreakerV0, initialize_account_windowed_breaker_v0},
+  CircuitBreaker, InitializeAccountWindowedBreakerArgsV0,
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeLazyDistributorArgsV0 {
@@ -69,8 +72,8 @@ pub fn handler(
       &[&[
         b"lazy_distributor",
         ctx.accounts.rewards_mint.key().as_ref(),
-        &[ctx.bumps["lazy_distributor"]]
-      ]]
+        &[ctx.bumps["lazy_distributor"]],
+      ]],
     ),
     InitializeAccountWindowedBreakerArgsV0 {
       authority: args.authority,

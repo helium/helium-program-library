@@ -133,10 +133,11 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
         // should never get triggered.
         window_size_seconds: u64::try_from(EPOCH_LENGTH).unwrap(),
         threshold_type: CBThresholdType::Absolute,
-        threshold: 5 * args
-          .emission_schedule
-          .get_emissions_at(ctx.accounts.clock.unix_timestamp)
-          .unwrap(),
+        threshold: 5
+          * args
+            .emission_schedule
+            .get_emissions_at(ctx.accounts.clock.unix_timestamp)
+            .unwrap(),
       },
       mint_authority: ctx.accounts.sub_dao.key(),
     },
