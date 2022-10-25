@@ -271,7 +271,7 @@ async function createAndMint({
   mintKeypair: Keypair,
   amount: number,
   metadataUrl: string,
-  decimals: number
+  decimals?: number
 }): Promise<void> {
   const metadata = await fetch(metadataUrl).then((r) => r.json());
 
