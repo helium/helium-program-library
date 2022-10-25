@@ -1,4 +1,8 @@
 import {
+  thresholdPercent,
+  ThresholdType
+} from "@helium-foundation/circuit-breaker-sdk";
+import {
   dataCreditsKey,
   init as initDc
 } from "@helium-foundation/data-credits-sdk";
@@ -7,13 +11,10 @@ import {
 } from "@helium-foundation/helium-sub-daos-sdk";
 import {
   init as initLazy,
-  lazyDistributorKey,
+  lazyDistributorKey
 } from "@helium-foundation/lazy-distributor-sdk";
-import {
-  thresholdPercent,
-  ThresholdType
-} from "@helium-foundation/circuit-breaker-sdk";
-import { createAtaAndMint, createAtaAndMintInstructions, createMintInstructions, createNft as createNft, sendInstructions, toBN } from "@helium-foundation/spl-utils";
+import { createAtaAndMintInstructions, createMintInstructions, createNft, sendInstructions, toBN } from "@helium-foundation/spl-utils";
+import { toU128 } from "@helium-foundation/treasury-management-sdk";
 import {
   createCreateMetadataAccountV3Instruction, PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
@@ -29,8 +30,6 @@ import fs from "fs";
 import fetch from "node-fetch";
 import os from "os";
 import yargs from "yargs/yargs";
-import { toU128 } from "@helium-foundation/treasury-management-sdk";
-import { program } from "@project-serum/anchor/dist/cjs/spl/associated-token";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -142,6 +141,7 @@ async function run() {
     provider,
     mintKeypair: dcKeypair,
     amount: argv.numDc,
+    decimals: 0,
     metadataUrl: `${argv.bucket}/dc.json`,
   });
 
@@ -264,12 +264,14 @@ async function createAndMint({
   provider,
   mintKeypair,
   amount,
-  metadataUrl
+  metadataUrl,
+  decimals = 8
 }: {
   provider: anchor.AnchorProvider,
   mintKeypair: Keypair,
   amount: number,
-  metadataUrl: string
+  metadataUrl: string,
+  decimals: number
 }): Promise<void> {
   const metadata = await fetch(metadataUrl).then((r) => r.json());
 
@@ -280,7 +282,7 @@ async function createAndMint({
       [
         ...(await createMintInstructions(
           provider,
-          8,
+          decimals,
           provider.wallet.publicKey,
           provider.wallet.publicKey,
           mintKeypair
@@ -289,7 +291,7 @@ async function createAndMint({
           await createAtaAndMintInstructions(
             provider,
             mintKeypair.publicKey,
-            toBN(amount, 8)
+            toBN(amount, decimals)
           )
         ).instructions,
       ],
