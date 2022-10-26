@@ -9,11 +9,20 @@ import {
   useConnection,
 } from "react-xnft";
 import { useState, useEffect } from "react";
-import { getPendingRewards, LAZY_KEY, useProgram, useTokenAccounts } from "../utils/index";
+import {
+  getPendingRewards,
+  LAZY_KEY,
+  useProgram,
+  useTokenAccounts,
+} from "../utils/index";
 import { THEME } from "../utils/theme";
 import * as anchor from "@project-serum/anchor";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import { init, lazyDistributorKey, recipientKey } from "@helium-foundation/lazy-distributor-sdk";
+import {
+  init,
+  lazyDistributorKey,
+  recipientKey,
+} from "@helium-foundation/lazy-distributor-sdk";
 import {
   PROGRAM_ID as MPL_PID,
   Metadata,
@@ -26,11 +35,7 @@ export function GridScreen() {
   if (tokenAccounts === null) {
     return <LoadingIndicator />;
   }
-  return (
-    <Grid
-      tokenAccounts={tokenAccounts}
-    />
-  );
+  return <Grid tokenAccounts={tokenAccounts} />;
 }
 
 function Grid({ tokenAccounts }: any) {
@@ -39,7 +44,11 @@ function Grid({ tokenAccounts }: any) {
 
   const claimAllRewards = async () => {
     //@ts-ignore
-    const stubProvider = new anchor.AnchorProvider(connection, {publicKey}, anchor.AnchorProvider.defaultOptions())
+    const stubProvider = new anchor.AnchorProvider(
+      connection,
+      { publicKey },
+      anchor.AnchorProvider.defaultOptions()
+    );
     const program = await init(stubProvider);
 
     for (const nft of tokenAccounts) {
@@ -72,13 +81,11 @@ function Grid({ tokenAccounts }: any) {
           marginTop: "8px",
           display: "flex",
           justifyContent: "space-around",
-          flexWrap: 'wrap',
+          flexWrap: "wrap",
         }}
       >
         {tokenAccounts.map((nft) => {
-          return (
-            <GridItem nft={nft} key={nft.metadata.mint}/>
-          );
+          return <GridItem nft={nft} key={nft.metadata.mint} />;
         })}
       </View>
       <Button
@@ -87,7 +94,7 @@ function Grid({ tokenAccounts }: any) {
           width: "100%",
           fontSize: "1em",
           backgroundColor: THEME.colors.stake,
-          color: '#000',
+          color: "#000",
         }}
         onClick={() => claimAllRewards()}
       >
@@ -99,7 +106,7 @@ function Grid({ tokenAccounts }: any) {
 
 function GridItem({ nft }) {
   const nav = useNavigation();
-  
+
   const program = useProgram();
 
   const [rewardsMint, setRewardsMint] = useState<PublicKey | null>(null);
@@ -111,25 +118,32 @@ function GridItem({ nft }) {
       const nftMint = new PublicKey(nft.metadata.mint);
 
       //@ts-ignore
-      const {pendingRewards: rewards, rewardsMint: rwdMint} = await getPendingRewards(program, nftMint);
+      const { pendingRewards: rewards, rewardsMint: rwdMint } =
+        await getPendingRewards(program, nftMint);
       setPendingRewards(rewards);
       setRewardsMint(rwdMint);
       if (interval) clearInterval(interval);
       const ivl = setInterval(async () => {
-        const {pendingRewards: newRewards} = await getPendingRewards(program, nftMint);
+        const { pendingRewards: newRewards } = await getPendingRewards(
+          program,
+          nftMint
+        );
         setPendingRewards(newRewards);
       }, 30000);
       setNewInterval(ivl);
     })();
     return () => clearInterval(interval);
-  }, [program, nft])
+  }, [program, nft]);
 
-  const [symbol, setSymbol] = useState<string>('');
+  const [symbol, setSymbol] = useState<string>("");
   useEffect(() => {
     if (!rewardsMint) return;
-    (async() => {
-      const metadata = PublicKey.findProgramAddressSync([
-        Buffer.from("metadata", "utf-8"), MPL_PID.toBuffer(), rewardsMint.toBuffer()
+    (async () => {
+      const metadata = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("metadata", "utf-8"),
+          MPL_PID.toBuffer(),
+          rewardsMint.toBuffer(),
         ],
         MPL_PID
       )[0];
@@ -137,8 +151,8 @@ function GridItem({ nft }) {
       const acc = await window.xnft.connection.getAccountInfo(metadata);
       const meta = Metadata.fromAccountInfo(acc)[0];
       setSymbol(meta.data.symbol);
-    })()
-  }, [rewardsMint])
+    })();
+  }, [rewardsMint]);
 
   const clickNft = () => {
     nav.push("detail", { nft, pendingRewards, symbol });
@@ -176,20 +190,19 @@ function GridItem({ nft }) {
         >
           {nft.tokenMetaUriData.name}
         </Text>
-        
       </View>
       <View>
-          <Text
-            style={{
-              fontSize: "12px",
-              lineHeight: "19.08px",
-            }}
-          >
-            {`Rewards: ${pendingRewards || '0'} ${symbol || ''}`}
-          </Text>
-        </View>
+        <Text
+          style={{
+            fontSize: "12px",
+            lineHeight: "19.08px",
+          }}
+        >
+          {`Rewards: ${pendingRewards || "0"} ${symbol || ""}`}
+        </Text>
+      </View>
     </View>
-  )
+  );
 }
 
 function LoadingIndicator() {
