@@ -1,20 +1,20 @@
 0 silly argv {
-0 silly argv   _: [ 'bootstrap' ],
-0 silly argv   lernaVersion: '4.0.0',
-0 silly argv   '$0': '/usr/local/bin/lerna'
+0 silly argv   _: [ 'run' ],
+0 silly argv   parallel: true,
+0 silly argv   lernaVersion: '5.5.4',
+0 silly argv   '$0': '/Users/nprince/source/helium/node_modules/.bin/lerna',
+0 silly argv   script: 'prebuild'
 0 silly argv }
-1 notice cli v4.0.0
+1 notice cli v5.5.4
 2 verbose rootPath /Users/nprince/source/helium
-3 error JSONError: Unexpected token "}" (0x7D) in JSON at position 1120 while parsing near "...\"bs58\": \"^4.0.1\",\n  },\n  \"devDependencie..." in packages/spl-utils/package.json
+3 error JSONError: Unexpected token "j" (0x6A) in JSON at position 0 while parsing near "j{\n  \"name\": \"@heliu..." in packages/distributor-oracle/package.json
 3 error
-3 error [0m [90m 36 |[39m     [32m"borsh"[39m[33m:[39m [32m"^0.7.0"[39m[33m,[39m[0m
-3 error [0m [90m 37 |[39m     [32m"bs58"[39m[33m:[39m [32m"^4.0.1"[39m[33m,[39m[0m
-3 error [0m[31m[1m>[22m[39m[90m 38 |[39m   }[33m,[39m[0m
-3 error [0m [90m    |[39m   [31m[1m^[22m[39m[0m
-3 error [0m [90m 39 |[39m   [32m"devDependencies"[39m[33m:[39m {[0m
-3 error [0m [90m 40 |[39m     [32m"ts-loader"[39m[33m:[39m [32m"^9.2.3"[39m[33m,[39m[0m
-3 error [0m [90m 41 |[39m     [32m"typescript"[39m[33m:[39m [32m"^4.3.4"[39m[0m
+3 error [0m[31m[1m>[22m[39m[90m 1 |[39m j{[0m
+3 error [0m [90m   |[39m [31m[1m^[22m[39m[0m
+3 error [0m [90m 2 |[39m   [32m"name"[39m[33m:[39m [32m"@helium-foundation/distributor-oracle"[39m[33m,[39m[0m
+3 error [0m [90m 3 |[39m   [32m"publishConfig"[39m[33m:[39m {[0m
+3 error [0m [90m 4 |[39m     [32m"access"[39m[33m:[39m [32m"public"[39m[33m,[39m[0m
 3 error
-3 error     at parseJson (/Users/nprince/.config/yarn/global/node_modules/parse-json/index.js:29:21)
-3 error     at parse (/Users/nprince/.config/yarn/global/node_modules/load-json-file/index.js:15:9)
-3 error     at module.exports (/Users/nprince/.config/yarn/global/node_modules/load-json-file/index.js:18:47)
+3 error     at parseJson (/Users/nprince/source/helium/node_modules/parse-json/index.js:29:21)
+3 error     at parse (/Users/nprince/source/helium/node_modules/load-json-file/index.js:15:9)
+3 error     at module.exports (/Users/nprince/source/helium/node_modules/load-json-file/index.js:18:47)

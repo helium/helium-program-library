@@ -14,6 +14,8 @@ import * as anchor from "@project-serum/anchor";
 import { THEME } from "../utils/theme";
 import { init, recipientKey } from "@helium-foundation/lazy-distributor-sdk";
 
+const LAZY_KEY = PublicKey.default;
+
 export function DetailScreen({ nft, pendingRewards, symbol }) {
   const publicKey = usePublicKey();
   const connection = useConnection();
@@ -23,7 +25,7 @@ export function DetailScreen({ nft, pendingRewards, symbol }) {
     const stubProvider = new anchor.AnchorProvider(connection, {publicKey}, anchor.AnchorProvider.defaultOptions())
     const program = await init(stubProvider);
     //@ts-ignore
-    const recipient = recipientKey(new PublicKey(nft.metadata.mint))[0];
+    const recipient = recipientKey(LAZY_KEY, new PublicKey(nft.metadata.mint))[0];
     const recipientAcc = await program.account.recipientV0.fetch(recipient);
     const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(recipientAcc.lazyDistributor);
     const tx = await program.methods

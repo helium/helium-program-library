@@ -84,27 +84,35 @@ pub fn handler(
   // sqrt(x) = e^(ln(x)/2)
   // x^1/4 = e^(ln(x)/4))
   let one = PreciseNumber::one();
-  let d = std::cmp::max(
-    one.clone(),
-    dc_burned
-      .log()
-      .or_arith_error()?
-      .checked_div(&FOUR_PREC.clone().signed())
-      .or_arith_error()?
-      .exp()
-      .or_arith_error()?,
-  );
-
-  let a = std::cmp::max(
-    one,
-    devices_with_fee
-      .log()
-      .or_arith_error()?
-      .checked_div(&TWO_PREC.clone().signed())
-      .or_arith_error()?
-      .exp()
-      .or_arith_error()?,
-  );
+  let d = if epoch_info.dc_burned > 0 {
+    std::cmp::max(
+      one.clone(),
+      dc_burned
+        .log()
+        .or_arith_error()?
+        .checked_div(&FOUR_PREC.clone().signed())
+        .or_arith_error()?
+        .exp()
+        .or_arith_error()?,
+    )
+  } else {
+    one.clone()
+  };
+  
+  let a = if epoch_info.total_devices > 0 {
+    std::cmp::max(
+      one,
+      devices_with_fee
+        .log()
+        .or_arith_error()?
+        .checked_div(&TWO_PREC.clone().signed())
+        .or_arith_error()?
+        .exp()
+        .or_arith_error()?,
+    )
+  } else {
+    one
+  };
 
   let utility_score_prec = d.checked_mul(&a).or_arith_error()?;
   // Convert to u128 with 12 decimals of precision

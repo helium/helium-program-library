@@ -19,6 +19,8 @@ import {
   Metadata,
 } from "@metaplex-foundation/mpl-token-metadata";
 
+const LAZY_KEY = PublicKey.default;
+
 export function GridScreen() {
   const tokenAccounts = useTokenAccounts();
 
@@ -43,7 +45,7 @@ function Grid({ tokenAccounts }: any) {
 
     for (const nft of tokenAccounts) {
       //@ts-ignore
-      const recipient = recipientKey(new PublicKey(nft.metadata.mint))[0];
+      const recipient = recipientKey(LAZY_KEY, new PublicKey(nft.metadata.mint))[0];
       const recipientAcc = await program.account.recipientV0.fetch(recipient);
       const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(recipientAcc.lazyDistributor);
       const tx = await program.methods
@@ -111,7 +113,7 @@ function GridItem({ nft }) {
       if (!program || !nft.metadata.mint) return null;
       const nftMint = new PublicKey(nft.metadata.mint);
       //@ts-ignore
-      const recipient = recipientKey(nftMint)[0];
+      const recipient = recipientKey(LAZY_KEY, nftMint)[0];
       const {pendingRewards: rewards, rewardsMint: rwdMint} = await getPendingRewards(program, recipient);
       setPendingRewards(rewards);
       setRewardsMint(rwdMint);

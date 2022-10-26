@@ -7,9 +7,12 @@ import {
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
 import axios from "axios";
+import { recipientKey } from "@helium-foundation/lazy-distributor-sdk";
+import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
+
 
 export type Reward = {
-  currentRewards: number | string;
+  currentRewards: string;
   oracleKey: PublicKey;
 };
 export async function getCurrentRewards(
@@ -23,7 +26,7 @@ export async function getCurrentRewards(
 
   const results = await Promise.all(
     lazyDistributorAcc.oracles.map((x) =>
-      axios.get(`${x.url}/?mint=${mint.toString()}`)
+      axios.get(`${x.url}?mint=${mint.toBase58()}`)
     )
   );
   return results.map((x, idx) => {
@@ -38,12 +41,10 @@ export async function formTransaction(
   program: Program<LazyDistributor>,
   provider: AnchorProvider,
   rewards: Reward[],
-  recipient: PublicKey,
+  hotspot: PublicKey,
   lazyDistributor: PublicKey
 ) {
-  const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(
-    lazyDistributor
-  );
+  const recipient = (await recipientKey(lazyDistributor, hotspot))[0]
   const ixPromises = rewards.map((x, idx) => {
     return program.methods
       .setCurrentRewardsV0({
@@ -59,14 +60,32 @@ export async function formTransaction(
   });
   const ixs = await Promise.all(ixPromises);
   let tx = new Transaction();
+  if (!await provider.connection.getAccountInfo(recipient)) {
+    const ix = await program.methods.initializeRecipientV0().accounts({
+      lazyDistributor,
+      mint: hotspot
+    }).instruction()
+    tx.add(ix);
+  }
   tx.add(...ixs);
+
+  const holders = await provider.connection.getTokenLargestAccounts(hotspot);
+  const mintAccount = holders.value[0].address;
+  const mintTokenAccount = await getAccount(provider.connection, mintAccount);
+  const rewardsMint = (await program.account.lazyDistributorV0.fetch(lazyDistributor)).rewardsMint;
 
   const distributeIx = await program.methods
     .distributeRewardsV0()
     .accounts({
       recipient,
       lazyDistributor,
-      rewardsMint: lazyDistributorAcc.rewardsMint,
+      recipientMintAccount: mintAccount,
+      owner: mintTokenAccount.owner,
+      rewardsMint,
+      destinationAccount: await getAssociatedTokenAddress(
+        rewardsMint,
+        mintTokenAccount.owner
+      )
     })
     .instruction();
 

@@ -43,7 +43,7 @@ export const hotspotKey = (
     programId
   );
 
-export const hotspotStorage = (
+export const hotspotStorageKey = (
   hotspot: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ) =>

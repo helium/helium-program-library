@@ -5,6 +5,7 @@ import { PROGRAM_ID } from "./constants";
 import { hotspotIssuanceResolvers } from "./resolvers";
 export * from "./pdas";
 export * from "./resolvers";
+export * from "./constants";
 
 export const init = async (
   provider: AnchorProvider,

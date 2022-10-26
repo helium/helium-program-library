@@ -8,6 +8,9 @@
       "path": "../idls"
     },
     {
+      "path": "../distributor-oracle"
+    },
+    {
       "path": "../data-credits-sdk"
     },
     {

@@ -78,11 +78,12 @@
         "x": 3,
         "y": 0
       },
-      "id": 12,
+      "id": 14,
+      "interval": "",
       "options": {
         "colorMode": "value",
         "fieldOptions": {
-          "calcs": ["mean"],
+          "calcs": ["lastNotNull"],
           "defaults": {
             "mappings": [],
             "thresholds": {
@@ -91,6 +92,10 @@
                 {
                   "color": "green",
                   "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
                 }
               ]
             },
@@ -787,5 +792,5 @@
   "variables": {
     "list": []
   },
-  "version": 7
+  "version": 9
 }

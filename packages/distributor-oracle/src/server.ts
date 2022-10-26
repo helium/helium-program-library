@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 import express, { Application, Request, Response } from "express";
+import Address from "@helium/address";
 // @ts-ignore
 import cors from "cors";
 import {
@@ -18,12 +19,13 @@ import {
   getProvider,
 } from "@project-serum/anchor";
 import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
+import { HotspotIssuance } from "@helium-foundation/idls/lib/types/hotspot_issuance";
+import { hotspotStorageKey, init as initHotspotIssuance } from "@helium-foundation/hotspot-issuance-sdk";
 import { init, PROGRAM_ID } from "@helium-foundation/lazy-distributor-sdk";
 import fs from "fs";
 
 export interface Database {
-  getCurrentRewards: (mintKey: PublicKey) => Promise<number>;
-  getCurrentHotspotRewards: (hotspotKey: string) => Promise<number>;
+  getCurrentRewards: (mint: PublicKey) => Promise<string>;
   incrementHotspotRewards: (hotspotKey: string) => Promise<void>;
   endEpoch: () => Promise<{
     [key: string]: number;
@@ -42,23 +44,21 @@ export class DatabaseMock implements Database {
     };
   };
 
-  constructor() {
+  constructor(readonly issuanceProgram: Program<HotspotIssuance>) {
     this.inMemHash = {
-      totalClicks: 489,
+      totalClicks: 0,
       lifetimeRewards: 0,
       byHotspot: {},
     };
   }
 
-  async getCurrentRewards(mintKey: PublicKey) {
-    return 150000;
-  }
-
-  async getCurrentHotspotRewards(hotspotKey: string) {
-    return (
-      this.inMemHash.byHotspot[hotspotKey]?.totalClicks -
-        this.inMemHash.byHotspot[hotspotKey]?.lifetimeRewards || 0
-    );
+  async getCurrentRewards(mint: PublicKey) {
+    const storage = await this.issuanceProgram.account.hotspotStorageV0.fetch((await hotspotStorageKey(mint))[0]);
+    const pubkey = new Address(0, 0, 0, storage.eccCompact).b58
+    return Math.floor(
+      (this.inMemHash.byHotspot[pubkey]?.lifetimeRewards || 0) *
+      Math.pow(10, 8)
+    ).toString();
   }
 
   async incrementHotspotRewards(hotspotKey: string) {
@@ -79,25 +79,25 @@ export class DatabaseMock implements Database {
 
   async endEpoch() {
     const rewardablePercentageByHotspot: { [key: string]: number } = {};
-    const { totalClicks, lifetimeRewards, byHotspot } = this.inMemHash;
-    const clickRewardsDiff = totalClicks - lifetimeRewards;
-    const maxEpochRewards = +(process.env.EPOCH_MAX_REWARDS || 0);
+    const { totalClicks, byHotspot } = this.inMemHash;
+    const clickRewardsDiff = totalClicks;
+    const maxEpochRewards = +(process.env.EPOCH_MAX_REWARDS || 50);
 
     if (maxEpochRewards > 0) {
       for (const [key, value] of Object.entries(byHotspot)) {
-        const diff = value.totalClicks - value.lifetimeRewards;
+        const diff = value.totalClicks;
         let awardedAmount =
           diff <= 0 ? 0 : (diff / clickRewardsDiff) * maxEpochRewards;
 
         rewardablePercentageByHotspot[key] = awardedAmount;
 
         this.inMemHash = {
-          ...this.inMemHash,
+          totalClicks: 0,
           lifetimeRewards: this.inMemHash.lifetimeRewards + awardedAmount,
           byHotspot: {
             ...this.inMemHash.byHotspot,
             [key]: {
-              ...this.inMemHash.byHotspot[key],
+              totalClicks: 0,
               lifetimeRewards:
                 this.inMemHash.byHotspot[key].lifetimeRewards + awardedAmount,
             },
@@ -117,6 +117,7 @@ export class OracleServer {
 
   constructor(
     public program: Program<LazyDistributor>,
+    public issuanceProgram: Program<HotspotIssuance>,
     private oracle: Keypair,
     public db: Database
   ) {
@@ -141,10 +142,6 @@ export class OracleServer {
     this.app.get("/", this.getCurrentRewardsHandler.bind(this));
     this.app.post("/", this.signTransactionHandler.bind(this));
     this.app.post("/hotspots", this.incrementHotspotRewardsHandler.bind(this));
-    this.app.get(
-      "/hotspots/:hotspotKey",
-      this.getHotspotRewardsHandler.bind(this)
-    );
     this.app.post("/endepoch", this.endEpochHandler.bind(this));
   }
 
@@ -169,31 +166,17 @@ export class OracleServer {
     res.json({ success: true });
   }
 
-  private async getHotspotRewardsHandler(req: Request, res: Response) {
-    const hotspotStr = req.params.hotspotKey;
-    if (!hotspotStr) {
-      res.status(400).json({ error: "No hotspot key provided" });
-      return;
-    }
-
-    const currentRewards = await this.db.getCurrentHotspotRewards(hotspotStr);
-
-    res.json({
-      currentRewards,
-    });
-  }
-
   private async getCurrentRewardsHandler(req: Request, res: Response) {
     const mintStr = req.query.mint;
     if (!mintStr) {
-      res.status(400).json({ error: "No mint key provided" });
+      res.status(400).json({error: "No mint key provided"});
       return;
     }
     let mint: PublicKey;
     try {
       mint = new PublicKey(mintStr);
-    } catch (err) {
-      res.status(400).json({ error: "Invalid mint key" });
+    } catch(err) {
+      res.status(400).json({error: "Invalid mint key"});
       return;
     }
 
@@ -225,7 +208,8 @@ export class OracleServer {
       if (
         !decoded ||
         (decoded.name !== "setCurrentRewardsV0" &&
-          decoded.name !== "distributeRewardsV0")
+          decoded.name !== "distributeRewardsV0" &&
+          decoded.name !== "initializeRecipientV0")
       ) {
         res.status(400).json({ error: "Invalid instructions in transaction" });
         return;
@@ -299,7 +283,8 @@ export class OracleServer {
       )
     );
     const program = await init(provider);
-    const server = new OracleServer(program, oracleKeypair, new DatabaseMock());
+    const hotspotIssuanceProgram = await initHotspotIssuance(provider);
+    const server = new OracleServer(program, hotspotIssuanceProgram, oracleKeypair, new DatabaseMock(hotspotIssuanceProgram));
     server.start();
   }
 })();

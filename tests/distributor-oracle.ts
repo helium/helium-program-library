@@ -96,7 +96,7 @@ describe('distributor-oracle', () => {
     const tx = await client.formTransaction(program, provider, [{
       oracleKey: oracle.publicKey,
       currentRewards: await oracleServer.db.getCurrentRewards(mint),
-    }], recipient, lazyDistributor)
+    }], mint, lazyDistributor)
     const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
 
     const res = await chai.request(oracleServer.app)

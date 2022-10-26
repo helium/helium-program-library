@@ -126,3 +126,53 @@ The client should:
   * Form instructions to set rewards from all oracles using their specified rewards amount
   * Submit a sign transaction request to all oracles sequentially
   * Submit the signed transaction to Solana
+
+
+## Local Setup
+
+1. Start localnet
+
+```
+$: anchor localnet
+```
+
+2. Start watcher
+
+```
+$: yarn watch
+```
+
+3. Bootstrap localnet
+
+```
+$: ./bootstrap-localnet
+```
+
+4. Start monitor
+
+```
+$: cd packages/monitor-service && yarn dev
+$: cd packages/monitor-service/docker-compose && docker-compose up -d
+```
+
+5. Start breakpoint demo ui
+
+```
+$: cd packages/breakpoint-demo-ui && yarn start
+```
+
+6. Start oracle server
+
+```
+$: cd packages/distributor-oracle && yarn start
+```
+
+7. Start xNFT
+
+```
+$: cd packages/xnft-hotspot && yarn dev
+```
+
+Important urls:
+  * localhost:3000 // demo ui
+  * localhost:3001 // grafana

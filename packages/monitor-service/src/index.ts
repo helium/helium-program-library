@@ -58,7 +58,7 @@ async function run() {
     "mobile_rewards_escrow"
   );
 
-  server.listen({ port: 8080 }, (err, address) => {
+  server.listen({ port: 8082 }, (err, address) => {
     if (err) {
       console.error(err);
       process.exit(1);

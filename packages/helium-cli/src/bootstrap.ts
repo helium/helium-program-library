@@ -107,7 +107,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   oracleUrl: {
     type: "string",
     describe: "The oracle URL",
-    default: "http://localhost:8082",
+    default: "http://localhost:8080",
   },
   oracleKey: {
     type: "string",
@@ -115,8 +115,8 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
 });
 
-const HNT_EPOCH_REWARDS = 100000000;
-const MOBILE_EPOCH_REWARDS = 100000000;
+const HNT_EPOCH_REWARDS = 10000000000;
+const MOBILE_EPOCH_REWARDS = 5000000000;
 async function exists(connection: Connection, account: PublicKey): Promise<boolean> {
   return Boolean(await connection.getAccountInfo(account));
 }
@@ -174,7 +174,7 @@ async function run() {
         config: {
           windowSizeSeconds: new BN(60),
           thresholdType: ThresholdType.Absolute as never,
-          threshold: new BN("10000000000000000000"),
+          threshold: new BN("1000000"),
         },
       })
       .accounts({ hntMint: hntKeypair.publicKey, dcMint: dcKeypair.publicKey })
@@ -417,7 +417,7 @@ run()
   })
   .then(() => process.exit());
 
-function loadKeypair(keypair: string): Keypair {
+export function loadKeypair(keypair: string): Keypair {
   console.log(process.env.ANCHOR_PROVIDER_URL);
   anchor.setProvider(anchor.AnchorProvider.env());
   const provider = anchor.getProvider() as anchor.AnchorProvider;
