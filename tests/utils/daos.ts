@@ -61,6 +61,7 @@ export async function initTestSubdao(
   subDao: PublicKey;
   treasury: PublicKey;
   rewardsEscrow: PublicKey;
+  treasuryCircuitBreaker: PublicKey;
 }> {
   const daoAcc = await program.account.daoV0.fetch(dao);
   const dntMint = await createMint(provider, 6, authority, authority);
@@ -92,8 +93,14 @@ export async function initTestSubdao(
       hotspotCollection: collection,
       hntMint: daoAcc.hntMint,
     });
-  const { subDao, treasury } = await method.pubkeys();
+  const { subDao, treasury, treasuryCircuitBreaker } = await method.pubkeys();
   await method.rpc({ skipPreflight: true });
 
-  return { mint: dntMint, subDao: subDao!, treasury: treasury!, rewardsEscrow };
+  return {
+    treasuryCircuitBreaker: treasuryCircuitBreaker!,
+    mint: dntMint,
+    subDao: subDao!,
+    treasury: treasury!,
+    rewardsEscrow,
+  };
 }

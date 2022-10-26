@@ -7,6 +7,7 @@ import { init } from "../packages/lazy-distributor-sdk/src";
 import { PROGRAM_ID } from "../packages/lazy-distributor-sdk/src/constants";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { createMint, createNft } from "@helium-foundation/spl-utils";
+import { ThresholdType } from "@helium-foundation/circuit-breaker-sdk";
 
 describe("lazy-distributor", () => {
   // Configure the client to use the local cluster.
@@ -28,17 +29,24 @@ describe("lazy-distributor", () => {
   });
 
   it("initializes a lazy distributor", async () => {
-    const method = await program.methods.initializeLazyDistributorV0({
-      authority: me,
-      oracles: [
-        {
-          oracle: me,
-          url: "https://some-url/",
+    const method = await program.methods
+      .initializeLazyDistributorV0({
+        authority: me,
+        oracles: [
+          {
+            oracle: me,
+            url: "https://some-url/",
+          },
+        ],
+        windowConfig: {
+          windowSizeSeconds: new anchor.BN(10),
+          thresholdType: ThresholdType.Absolute as never,
+          threshold: new anchor.BN(1000000000),
         },
-      ],
-    }).accounts({
-      rewardsMint
-    });
+      })
+      .accounts({
+        rewardsMint,
+      });
 
     const { lazyDistributor } = await method.pubkeys();
     await method.rpc({ skipPreflight: true });
@@ -71,6 +79,11 @@ describe("lazy-distributor", () => {
               url: "https://some-url/",
             },
           ],
+          windowConfig: {
+            windowSizeSeconds: new anchor.BN(10),
+            thresholdType: ThresholdType.Absolute as never,
+            threshold: new anchor.BN(1000000000),
+          },
         })
         .accounts({
           rewardsMint,
@@ -206,6 +219,11 @@ describe("lazy-distributor", () => {
               url: "https://some-url/",
             },
           ],
+          windowConfig: {
+            windowSizeSeconds: new anchor.BN(10),
+            thresholdType: ThresholdType.Absolute as never,
+            threshold: new anchor.BN(1000000000),
+          },
         })
         .accounts({
           rewardsMint,

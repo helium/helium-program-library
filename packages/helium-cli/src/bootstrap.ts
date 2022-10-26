@@ -1,45 +1,34 @@
 import {
+  thresholdPercent,
+  ThresholdType
+} from "@helium-foundation/circuit-breaker-sdk";
+import {
   dataCreditsKey,
-  init as initDc,
+  init as initDc
 } from "@helium-foundation/data-credits-sdk";
 import {
   daoKey,
   init as initDao,
-  subDaoKey,
+  subDaoKey
 } from "@helium-foundation/helium-sub-daos-sdk";
 import {
-  init as initIssuance,
-  hotspotConfigKey,
-  hotspotCollectionKey,
-  hotspotIssuerKey,
+  hotspotCollectionKey, hotspotConfigKey, hotspotIssuerKey, init as initIssuance
 } from "@helium-foundation/hotspot-issuance-sdk";
-import { init as initLazy } from "@helium-foundation/lazy-distributor-sdk";
-import {
-  thresholdPercent,
-  ThresholdType,
-} from "@helium-foundation/circuit-breaker-sdk";
-import {
-  createAtaAndMint,
-  createAtaAndMintInstructions,
-  createMintInstructions,
-  createNft as createNft,
-  sendInstructions,
-  toBN,
-} from "@helium-foundation/spl-utils";
+import { lazyDistributorKey, init as initLazy } from "@helium-foundation/lazy-distributor-sdk";
+import { createAtaAndMintInstructions, createMintInstructions, createNft, sendInstructions, toBN } from "@helium-foundation/spl-utils";
+import { toU128 } from "@helium-foundation/treasury-management-sdk";
 import {
   createCreateMetadataAccountV3Instruction,
-  PROGRAM_ID as METADATA_PROGRAM_ID,
+  PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
 import fs from "fs";
 import fetch from "node-fetch";
 import os from "os";
 import yargs from "yargs/yargs";
-import { toU128 } from "@helium-foundation/treasury-management-sdk";
-import b58 from "bs58";
 
 const hotspotEccKeys = [
   "6dMCz9v7fX86FKk3717qfcEJTsuk4PkUfGeQQFgBTWxi",
@@ -78,12 +67,17 @@ const yarg = yargs(hideBin(process.argv)).options({
   onboardingServerKeypair: {
     type: "string",
     describe: "Keypair of the onboarding server",
-    default: "./keypairs/onboarding-server.json",
+    default: `${os.homedir()}/.config/solana/id.json`,
   },
   makerKeypair: {
     type: "string",
     describe: "Keypair of a maker",
-    default: "./keypairs/maker.json",
+    default: `${os.homedir()}/.config/solana/id.json`,
+  },
+  mobileHotspotCollectionKeypair: {
+    type: "string",
+    describe: "Keypair of a maker",
+    default: "./keypairs/mobile-hotspot.json",
   },
   numHnt: {
     type: "number",
@@ -109,15 +103,30 @@ const yarg = yargs(hideBin(process.argv)).options({
     default:
       "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib",
   },
+  oracleUrl: {
+    type: "string",
+    describe: "The oracle URL",
+    default: "http://localhost:8082",
+  },
+  oracleKey: {
+    type: "string",
+    describe: "the pubkey of the oracle",
+  },
 });
 
-const EPOCH_REWARDS = 100000000;
+const HNT_EPOCH_REWARDS = 100000000;
+const MOBILE_EPOCH_REWARDS = 100000000;
+async function exists(connection: Connection, account: PublicKey): Promise<boolean> {
+  return Boolean(await connection.getAccountInfo(account));
+}
+
 
 async function run() {
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
+
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const dataCreditsProgram = await initDc(provider);
   const lazyDistributorProgram = await initLazy(provider);
@@ -131,6 +140,12 @@ async function run() {
     argv.onboardingServerKeypair
   );
   const makerKeypair = await loadKeypair(argv.makerKeypair);
+  const mobileHotspotCollectionKeypair = await loadKeypair(argv.mobileHotspotCollectionKeypair);
+  const oracleKey = argv.oracleKey ? new PublicKey(argv.oracleKey) : provider.wallet.publicKey;
+  const oracleUrl = argv.oracleUrl;
+
+  const conn = provider.connection;
+
   await createAndMint({
     provider,
     mintKeypair: hntKeypair,
@@ -147,11 +162,12 @@ async function run() {
     provider,
     mintKeypair: dcKeypair,
     amount: argv.numDc,
+    decimals: 0,
     metadataUrl: `${argv.bucket}/dc.json`,
   });
 
   const dcKey = (await dataCreditsKey(dcKeypair.publicKey))[0];
-  if (!(await provider.connection.getAccountInfo(dcKey))) {
+  if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
         authority: provider.wallet.publicKey,
@@ -166,17 +182,15 @@ async function run() {
   }
 
   const dao = (await daoKey(hntKeypair.publicKey))[0];
-  if (!(await provider.connection.getAccountInfo(dao))) {
+  if (!(await exists(conn, dao))) {
     console.log("Initializing DAO");
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         authority: provider.wallet.publicKey,
-        emissionSchedule: [
-          {
-            startUnixTime: new anchor.BN(0),
-            emissionsPerEpoch: new anchor.BN(EPOCH_REWARDS),
-          },
-        ],
+        emissionSchedule: [{
+          startUnixTime: new anchor.BN(0),
+          emissionsPerEpoch: new anchor.BN(HNT_EPOCH_REWARDS),
+        }],
       })
       .accounts({
         dcMint: dcKeypair.publicKey,
@@ -219,24 +233,70 @@ async function run() {
         hotspotConfig: hsConfigKey,
       })
       .rpc({ skipPreflight: true });
+
+    // await Promise.all(hotspotEccKeys.map(async (eccKey) => {
+    //   await hotspotIssuanceProgram.methods.issueHotspotV0({
+    //     eccCompact: Buffer.from(Address.fromBS58(accKey).publicKey)
+    //   })
+    // }));
+  }
+  
+  const [mobileLazyDist] = await lazyDistributorKey(mobileKeypair.publicKey);
+  const rewardsEscrow = await getAssociatedTokenAddress(mobileKeypair.publicKey, mobileLazyDist, true);
+  if (!(await exists(conn, mobileLazyDist))) {
+    console.log("Initializing mobile lazy distributor");
+    await lazyDistributorProgram.methods
+      .initializeLazyDistributorV0({
+        authority: provider.wallet.publicKey,
+        oracles: [
+          {
+            oracle: oracleKey,
+            url: oracleUrl,
+          },
+        ],
+        // 10 x epoch rewards in a 24 hour period
+        windowConfig: {
+          windowSizeSeconds: new anchor.BN(24 * 60 * 60),
+          thresholdType: ThresholdType.Absolute as never,
+          threshold: new anchor.BN(10 * MOBILE_EPOCH_REWARDS),
+        },
+      })
+      .accounts({
+        rewardsMint: mobileKeypair.publicKey,
+        rewardsEscrow
+      })
+      .rpc({ skipPreflight: true });
   }
 
   const mobileSubdao = (await subDaoKey(mobileKeypair.publicKey))[0];
-  if (!(await provider.connection.getAccountInfo(mobileSubdao))) {
+  if (!(await exists(conn, mobileSubdao))) {
     console.log("Initializing Mobile SubDAO");
+    const mobileHotspotCollection = mobileHotspotCollectionKeypair.publicKey
+    if (
+      !(await exists(conn, 
+        mobileHotspotCollection
+      ))
+    ) {
+      await createNft(
+        provider,
+        provider.wallet.publicKey,
+        {
+          name: "Mobile Hotspot Collection",
+          symbol: "MOBILEHOT",
+          uri: `${argv.bucket}/mobile_collection.json`,
+        },
+        undefined,
+        mobileHotspotCollectionKeypair
+      );
+    }
 
-    const rewardsEscrow = await createAtaAndMint(
-      provider,
-      mobileKeypair.publicKey,
-      1
-    );
     await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
         authority: provider.wallet.publicKey,
         emissionSchedule: [
           {
             startUnixTime: new anchor.BN(0),
-            emissionsPerEpoch: new anchor.BN(EPOCH_REWARDS),
+            emissionsPerEpoch: new anchor.BN(MOBILE_EPOCH_REWARDS),
           },
         ],
         // Linear curve
@@ -256,9 +316,10 @@ async function run() {
         dao,
         dntMint: mobileKeypair.publicKey,
         rewardsEscrow,
-        hotspotCollection: hsCollectionKey,
-        hntMint: mobileKeypair.publicKey,
-      });
+        hotspotCollection: mobileHotspotCollection,
+        hntMint: hntKeypair.publicKey,
+      })
+      .rpc({ skipPreflight: true });
   }
 }
 
@@ -267,22 +328,24 @@ async function createAndMint({
   mintKeypair,
   amount,
   metadataUrl,
+  decimals = 8
 }: {
-  provider: anchor.AnchorProvider;
-  mintKeypair: Keypair;
-  amount: number;
-  metadataUrl: string;
+  provider: anchor.AnchorProvider,
+  mintKeypair: Keypair,
+  amount: number,
+  metadataUrl: string,
+  decimals?: number
 }): Promise<void> {
   const metadata = await fetch(metadataUrl).then((r) => r.json());
 
-  if (!(await provider.connection.getAccountInfo(mintKeypair.publicKey))) {
+  if (!(await exists(provider.connection, mintKeypair.publicKey))) {
     console.log(`${metadata.name} Mint not found, creating...`);
     await sendInstructions(
       provider,
       [
         ...(await createMintInstructions(
           provider,
-          8,
+          decimals,
           provider.wallet.publicKey,
           provider.wallet.publicKey,
           mintKeypair
@@ -291,7 +354,7 @@ async function createAndMint({
           await createAtaAndMintInstructions(
             provider,
             mintKeypair.publicKey,
-            toBN(amount, 8)
+            toBN(amount, decimals)
           )
         ).instructions,
       ],
@@ -310,7 +373,7 @@ async function createAndMint({
     )
   )[0];
 
-  if (!(await provider.connection.getAccountInfo(metadataAddress))) {
+  if (!(await exists(provider.connection, metadataAddress))) {
     console.log(`${metadata.name} Metadata not found, creating...`);
     await sendInstructions(provider, [
       await createCreateMetadataAccountV3Instruction(
