@@ -12,10 +12,10 @@ import { Logo } from "./Logo";
 import { Hotspot } from "./Hotspot";
 
 const hotspotKeys: string[] = [
-  "6dMCz9v7fX86FKk3717qfcEJTsuk4PkUfGeQQFgBTWxi",
-  "AVz2HBnpou9JpfVU94owmG3MU83QgZ598jgu8Dc7C1sg",
-  "741ybk96nRLbbeNmgMUbm2Yrbffxonou6CQ9aXibrUdC",
-  "3kx9RaXSuBo76WnyUykxYUGBeZ8J5tqyis99EUxQCzqf",
+  "112UE9mbEB4NWHgdutev5PXTszp1V8HwBptwNMDQVc6fAyu34Tz4",
+  "11bNfVbDL8Tp2T6jsEevRzBG5QuJpHVUz1Z21ACDcD4wW6RbVAZ",
+  "11wsqKcoXGesnSbEwKTY8QkoqdFsG7oafcyPn8jBnzRK4sfCSw8",
+  "11t1Yvm7QbyVnmqdCUpfA8XUiGVbpHPVnaNtR25gb8p2d4Dzjxi",
 ];
 
 export const App = () => {

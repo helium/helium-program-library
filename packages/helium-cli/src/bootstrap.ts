@@ -2,6 +2,7 @@ import {
   thresholdPercent,
   ThresholdType
 } from "@helium-foundation/circuit-breaker-sdk";
+import Address from "@helium/address";
 import {
   dataCreditsKey,
   init as initDc
@@ -23,7 +24,12 @@ import {
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
-import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  ComputeBudgetProgram,
+} from "@solana/web3.js";
 import { BN } from "bn.js";
 import fs from "fs";
 import fetch from "node-fetch";
@@ -31,10 +37,10 @@ import os from "os";
 import yargs from "yargs/yargs";
 
 const hotspotEccKeys = [
-  "6dMCz9v7fX86FKk3717qfcEJTsuk4PkUfGeQQFgBTWxi",
-  "AVz2HBnpou9JpfVU94owmG3MU83QgZ598jgu8Dc7C1sg",
-  "741ybk96nRLbbeNmgMUbm2Yrbffxonou6CQ9aXibrUdC",
-  "3kx9RaXSuBo76WnyUykxYUGBeZ8J5tqyis99EUxQCzqf",
+  "112UE9mbEB4NWHgdutev5PXTszp1V8HwBptwNMDQVc6fAyu34Tz4",
+  "11bNfVbDL8Tp2T6jsEevRzBG5QuJpHVUz1Z21ACDcD4wW6RbVAZ",
+  "11wsqKcoXGesnSbEwKTY8QkoqdFsG7oafcyPn8jBnzRK4sfCSw8",
+  "11t1Yvm7QbyVnmqdCUpfA8XUiGVbpHPVnaNtR25gb8p2d4Dzjxi",
 ];
 
 const { hideBin } = require("yargs/helpers");
@@ -73,11 +79,6 @@ const yarg = yargs(hideBin(process.argv)).options({
     type: "string",
     describe: "Keypair of a maker",
     default: `${os.homedir()}/.config/solana/id.json`,
-  },
-  mobileHotspotCollectionKeypair: {
-    type: "string",
-    describe: "Keypair of a maker",
-    default: "./keypairs/mobile-hotspot.json",
   },
   numHnt: {
     type: "number",
@@ -140,7 +141,6 @@ async function run() {
     argv.onboardingServerKeypair
   );
   const makerKeypair = await loadKeypair(argv.makerKeypair);
-  const mobileHotspotCollectionKeypair = await loadKeypair(argv.mobileHotspotCollectionKeypair);
   const oracleKey = argv.oracleKey ? new PublicKey(argv.oracleKey) : provider.wallet.publicKey;
   const oracleUrl = argv.oracleUrl;
 
@@ -199,8 +199,8 @@ async function run() {
       .rpc({ skipPreflight: true });
   }
 
-  const hsCollectionKey = (await hotspotCollectionKey("MOBILEHOT"))[0];
-  if (!(await provider.connection.getAccountInfo(hsCollectionKey))) {
+  const mobileHotspotCollection = (await hotspotCollectionKey("MOBILEHOT"))[0];
+  if (!(await provider.connection.getAccountInfo(mobileHotspotCollection))) {
     console.log("Initalizing `MOBILEHOT` collection and HotspotConfig");
 
     await hotspotIssuanceProgram.methods
@@ -215,13 +215,13 @@ async function run() {
       .rpc({ skipPreflight: true });
   }
 
-  const hsConfigKey = (await hotspotConfigKey(hsCollectionKey))[0];
+  const hsConfigKey = (await hotspotConfigKey(mobileHotspotCollection))[0];
   const hsIssuerKey = await hotspotIssuerKey(
     hsConfigKey,
     makerKeypair.publicKey
   )[0];
 
-  if (!(await provider.connection.getAccountInfo(hsIssuerKey))) {
+  if (!(await exists(conn, hsIssuerKey))) {
     console.log("Initalizing HotspotIssuer");
 
     await hotspotIssuanceProgram.methods
@@ -233,12 +233,6 @@ async function run() {
         hotspotConfig: hsConfigKey,
       })
       .rpc({ skipPreflight: true });
-
-    // await Promise.all(hotspotEccKeys.map(async (eccKey) => {
-    //   await hotspotIssuanceProgram.methods.issueHotspotV0({
-    //     eccCompact: Buffer.from(Address.fromBS58(accKey).publicKey)
-    //   })
-    // }));
   }
   
   const [mobileLazyDist] = await lazyDistributorKey(mobileKeypair.publicKey);
@@ -271,25 +265,6 @@ async function run() {
   const mobileSubdao = (await subDaoKey(mobileKeypair.publicKey))[0];
   if (!(await exists(conn, mobileSubdao))) {
     console.log("Initializing Mobile SubDAO");
-    const mobileHotspotCollection = mobileHotspotCollectionKeypair.publicKey
-    if (
-      !(await exists(conn, 
-        mobileHotspotCollection
-      ))
-    ) {
-      await createNft(
-        provider,
-        provider.wallet.publicKey,
-        {
-          name: "Mobile Hotspot Collection",
-          symbol: "MOBILEHOT",
-          uri: `${argv.bucket}/mobile_collection.json`,
-        },
-        undefined,
-        mobileHotspotCollectionKeypair
-      );
-    }
-
     await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
         authority: provider.wallet.publicKey,
@@ -321,6 +296,31 @@ async function run() {
       })
       .rpc({ skipPreflight: true });
   }
+
+
+  await Promise.all(
+    hotspotEccKeys.map(async (eccKey, index) => {
+      const create = await hotspotIssuanceProgram.methods
+        .issueHotspotV0({
+          eccCompact: Buffer.from(Address.fromB58(eccKey).publicKey),
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+        ])
+        .accounts({
+          hotspotIssuer: hsIssuerKey,
+          hotspotOwner: provider.wallet.publicKey,
+          maker: makerKeypair.publicKey,
+          subDao: mobileSubdao,
+        })
+        .signers([makerKeypair]);
+      const key = (await create.pubkeys()).hotspot!;
+      if (!(await exists(conn, key))) {
+        console.log("Creating hotspot", index);
+        await create.rpc({ skipPreflight: true });
+      }
+    })
+  );
 }
 
 async function createAndMint({

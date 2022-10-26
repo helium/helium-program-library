@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 import express, { Application, Request, Response } from "express";
+// @ts-ignore
 import cors from "cors";
 import {
   PublicKey,

@@ -177,6 +177,7 @@ export async function execute<Output>(
     return { txid, ...output };
   }
 
+  // @ts-ignore
   return output;
 }
 
@@ -207,6 +208,7 @@ export async function executeBig<Output>(
     };
   }
 
+  // @ts-ignore
   return output;
 }
 
