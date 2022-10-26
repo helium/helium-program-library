@@ -13,8 +13,8 @@ import { PublicKey, Transaction } from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
 import { THEME } from "../utils/theme";
 import { init, recipientKey } from "@helium-foundation/lazy-distributor-sdk";
-
-const LAZY_KEY = PublicKey.default;
+import * as client from "@helium-foundation/distributor-oracle";
+import { LAZY_KEY } from "../utils";
 
 export function DetailScreen({ nft, pendingRewards, symbol }) {
   const publicKey = usePublicKey();
@@ -24,24 +24,23 @@ export function DetailScreen({ nft, pendingRewards, symbol }) {
     //@ts-ignore
     const stubProvider = new anchor.AnchorProvider(connection, {publicKey}, anchor.AnchorProvider.defaultOptions())
     const program = await init(stubProvider);
-    //@ts-ignore
-    const recipient = recipientKey(LAZY_KEY, new PublicKey(nft.metadata.mint))[0];
-    const recipientAcc = await program.account.recipientV0.fetch(recipient);
-    const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(recipientAcc.lazyDistributor);
-    const tx = await program.methods
-      .distributeRewardsV0()
-      .accounts({ 
-        recipient, 
-        lazyDistributor: recipientAcc.lazyDistributor, 
-        rewardsMint: lazyDistributorAcc.rewardsMint 
-      })
-      .transaction();
-    const { blockhash } = await connection!.getLatestBlockhash("recent");
-    tx.recentBlockhash = blockhash;
+    const rewards = await client.getCurrentRewards(
+      program,
+      LAZY_KEY,
+      nft.metadata.mint
+    );
+    const tx = await client.formTransaction(
+      program,
+      stubProvider,
+      rewards,
+      nft.metadata.mint,
+      LAZY_KEY
+    );
 
     //@ts-ignore
     await window.xnft.send(tx);
   };
+
   return (
     <View
       style={{

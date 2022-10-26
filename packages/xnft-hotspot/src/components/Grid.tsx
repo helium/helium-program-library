@@ -9,17 +9,16 @@ import {
   useConnection,
 } from "react-xnft";
 import { useState, useEffect } from "react";
-import { getPendingRewards, useProgram, useTokenAccounts } from "../utils/index";
+import { getPendingRewards, LAZY_KEY, useProgram, useTokenAccounts } from "../utils/index";
 import { THEME } from "../utils/theme";
 import * as anchor from "@project-serum/anchor";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import { init, recipientKey } from "@helium-foundation/lazy-distributor-sdk";
+import { init, lazyDistributorKey, recipientKey } from "@helium-foundation/lazy-distributor-sdk";
 import {
   PROGRAM_ID as MPL_PID,
   Metadata,
 } from "@metaplex-foundation/mpl-token-metadata";
-
-const LAZY_KEY = PublicKey.default;
+import * as client from "@helium-foundation/distributor-oracle";
 
 export function GridScreen() {
   const tokenAccounts = useTokenAccounts();
@@ -44,20 +43,18 @@ function Grid({ tokenAccounts }: any) {
     const program = await init(stubProvider);
 
     for (const nft of tokenAccounts) {
-      //@ts-ignore
-      const recipient = recipientKey(LAZY_KEY, new PublicKey(nft.metadata.mint))[0];
-      const recipientAcc = await program.account.recipientV0.fetch(recipient);
-      const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(recipientAcc.lazyDistributor);
-      const tx = await program.methods
-        .distributeRewardsV0()
-        .accounts({ 
-          recipient, 
-          lazyDistributor: recipientAcc.lazyDistributor, 
-          rewardsMint: lazyDistributorAcc.rewardsMint 
-        })
-        .transaction();
-      const { blockhash } = await connection!.getLatestBlockhash("recent");
-      tx.recentBlockhash = blockhash;
+      const rewards = await client.getCurrentRewards(
+        program,
+        LAZY_KEY,
+        nft.metadata.mint
+      );
+      const tx = await client.formTransaction(
+        program,
+        stubProvider,
+        rewards,
+        nft.metadata.mint,
+        LAZY_KEY
+      );
 
       //@ts-ignore
       await window.xnft.send(tx);
@@ -112,14 +109,14 @@ function GridItem({ nft }) {
     (async () => {
       if (!program || !nft.metadata.mint) return null;
       const nftMint = new PublicKey(nft.metadata.mint);
+
       //@ts-ignore
-      const recipient = recipientKey(LAZY_KEY, nftMint)[0];
-      const {pendingRewards: rewards, rewardsMint: rwdMint} = await getPendingRewards(program, recipient);
+      const {pendingRewards: rewards, rewardsMint: rwdMint} = await getPendingRewards(program, nftMint);
       setPendingRewards(rewards);
       setRewardsMint(rwdMint);
       if (interval) clearInterval(interval);
       const ivl = setInterval(async () => {
-        const {pendingRewards: newRewards} = await getPendingRewards(program, recipient);
+        const {pendingRewards: newRewards} = await getPendingRewards(program, nftMint);
         setPendingRewards(newRewards);
       }, 30000);
       setNewInterval(ivl);
