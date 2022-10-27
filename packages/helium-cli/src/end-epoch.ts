@@ -61,7 +61,7 @@ async function run() {
     .accounts({
       subDao: mobileSubdao,
     })
-    .rpc();
+    .rpc({ skipPreflight: true });
   await heliumSubDaosProgram.methods
     .issueRewardsV0({
       epoch,
@@ -69,7 +69,7 @@ async function run() {
     .accounts({
       subDao: mobileSubdao,
     })
-    .rpc();
+    .rpc({ skipPreflight: true });
 
   await axios.post("http://localhost:8080/endepoch")
 }
