@@ -16,7 +16,7 @@ import {
   hotspotCollectionKey, hotspotConfigKey, hotspotIssuerKey, init as initIssuance
 } from "@helium-foundation/hotspot-issuance-sdk";
 import { lazyDistributorKey, init as initLazy } from "@helium-foundation/lazy-distributor-sdk";
-import { createAtaAndMintInstructions, createMintInstructions, createNft, sendInstructions, toBN } from "@helium-foundation/spl-utils";
+import { createAtaAndMintInstructions, createAtaAndMint, createMintInstructions, createNft, sendInstructions, toBN } from "@helium-foundation/spl-utils";
 import { toU128 } from "@helium-foundation/treasury-management-sdk";
 import {
   createCreateMetadataAccountV3Instruction,
@@ -260,6 +260,12 @@ async function run() {
   
   const [mobileLazyDist] = await lazyDistributorKey(mobileKeypair.publicKey);
   const rewardsEscrow = await getAssociatedTokenAddress(mobileKeypair.publicKey, mobileLazyDist, true);
+  await createAtaAndMint(
+    provider,
+    mobileKeypair.publicKey,
+    toBN(500, 8).toNumber(),
+    mobileLazyDist
+  );
   if (!(await exists(conn, mobileLazyDist))) {
     console.log("Initializing mobile lazy distributor");
     await lazyDistributorProgram.methods
