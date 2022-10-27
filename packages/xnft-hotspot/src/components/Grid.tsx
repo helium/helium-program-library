@@ -26,6 +26,7 @@ import {
   Metadata,
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as client from "@helium-foundation/distributor-oracle";
+import ky from 'ky';
 
 export function GridScreen() {
   const tokenAccounts = useTokenAccounts();
@@ -54,18 +55,28 @@ function Grid({ tokenAccounts }: any) {
       const rewards = await client.getCurrentRewards(
         program,
         LAZY_KEY,
-        nft.metadata.mint
+        new PublicKey(nft.metadata.mint),
       );
       const tx = await client.formTransaction(
         program,
-        stubProvider,
+        //@ts-ignore
+        window.xnft.solana,
         rewards,
-        nft.metadata.mint,
-        LAZY_KEY
+        new PublicKey(nft.metadata.mint),
+        LAZY_KEY,
+        publicKey,
       );
 
+      const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
+
+      const res = await ky.post("http://localhost:8080/", {
+        json: { transaction: serializedTx },
+      })
+      
+      const json = (await res.json() as any);
+      const signedTx = Transaction.from(json!.transaction!.data);
       //@ts-ignore
-      await window.xnft.solana.send(tx);
+      await window.xnft.solana.send(signedTx, [], {skipPreflight: true}); 
     }
   };
 
