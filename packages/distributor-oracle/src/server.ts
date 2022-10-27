@@ -53,12 +53,19 @@ export class DatabaseMock implements Database {
   }
 
   async getCurrentRewards(mint: PublicKey) {
-    const storage = await this.issuanceProgram.account.hotspotStorageV0.fetch((await hotspotStorageKey(mint))[0]);
-    const pubkey = new Address(0, 0, 0, storage.eccCompact).b58
-    return Math.floor(
-      (this.inMemHash.byHotspot[pubkey]?.lifetimeRewards || 0) *
-      Math.pow(10, 8)
-    ).toString();
+    const storageKey = hotspotStorageKey(mint)[0];
+    try {
+      const storage = await this.issuanceProgram.account.hotspotStorageV0.fetch(storageKey);
+      const pubkey = new Address(0, 0, 0, storage.eccCompact).b58;
+      return Math.floor(
+        (this.inMemHash.byHotspot[pubkey]?.lifetimeRewards || 0) *
+        Math.pow(10, 8)
+      ).toString();
+    } catch(err) {
+      console.error("Mint with error: ", mint.toString());
+      console.error(err);
+      return '0';
+    }
   }
 
   async incrementHotspotRewards(hotspotKey: string) {
@@ -71,7 +78,7 @@ export class DatabaseMock implements Database {
           totalClicks:
             (this.inMemHash.byHotspot[hotspotKey]?.totalClicks || 0) + 1,
           lifetimeRewards:
-            this.inMemHash.byHotspot[hotspotKey]?.lifetimeRewards || 0,
+            (this.inMemHash.byHotspot[hotspotKey]?.lifetimeRewards || 0) + 1,
         },
       },
     };

@@ -115,7 +115,7 @@ describe("hotspot-issuance", () => {
       const hotspotOwner = Keypair.generate().publicKey;
 
       const method = await hsProgram.methods
-        .issueHotspotV0({ eccCompact: Buffer.from(ecc) })
+        .issueHotspotV0({ eccCompact: Buffer.from(ecc), uri: '' })
         .accounts({
           hotspotIssuer,
           hotspotOwner,

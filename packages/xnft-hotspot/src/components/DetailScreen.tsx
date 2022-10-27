@@ -15,6 +15,7 @@ import { THEME } from "../utils/theme";
 import { init, recipientKey } from "@helium-foundation/lazy-distributor-sdk";
 import * as client from "@helium-foundation/distributor-oracle";
 import { LAZY_KEY } from "../utils";
+import ky from 'ky';
 
 export function DetailScreen({ nft, pendingRewards, symbol }) {
   const publicKey = usePublicKey();
@@ -27,18 +28,29 @@ export function DetailScreen({ nft, pendingRewards, symbol }) {
     const rewards = await client.getCurrentRewards(
       program,
       LAZY_KEY,
-      nft.metadata.mint
+      new PublicKey(nft.metadata.mint),
     );
     const tx = await client.formTransaction(
       program,
-      stubProvider,
+      //@ts-ignore
+      window.xnft.solana,
       rewards,
-      nft.metadata.mint,
-      LAZY_KEY
+      new PublicKey(nft.metadata.mint),
+      LAZY_KEY,
+      publicKey,
     );
 
+    const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
+
+    const res = await ky.post("http://localhost:8080/", {
+      json: { transaction: serializedTx },
+    })
+    
+    const json = (await res.json() as any);
+    const signedTx = Transaction.from(json!.transaction!.data);
+
     //@ts-ignore
-    await window.xnft.send(tx);
+    await window.xnft.solana.send(signedTx, [], {skipPreflight: true});
   };
 
   return (

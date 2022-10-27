@@ -21,7 +21,8 @@ const hotspotKeys: string[] = [
 export const App = () => {
   const handleHotspotClick = useCallback(async (hotspot: string) => {
     console.log(hotspot);
-    await ky.post(process.env.REACT_APP_ORACLE_URL || "", {
+    console.log("sending request to: ", process.env.REACT_APP_ORACLE_URL);
+    await ky.post(process.env.REACT_APP_ORACLE_URL || "http://localhost:8080/hotspots", {
       json: { hotspotKey: hotspot },
     });
   }, []);

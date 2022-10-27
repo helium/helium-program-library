@@ -20,8 +20,6 @@ import * as anchor from "@project-serum/anchor";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import {
   init,
-  lazyDistributorKey,
-  recipientKey,
 } from "@helium-foundation/lazy-distributor-sdk";
 import {
   PROGRAM_ID as MPL_PID,
@@ -46,6 +44,7 @@ function Grid({ tokenAccounts }: any) {
     //@ts-ignore
     const stubProvider = new anchor.AnchorProvider(
       connection,
+      //@ts-ignore
       { publicKey },
       anchor.AnchorProvider.defaultOptions()
     );

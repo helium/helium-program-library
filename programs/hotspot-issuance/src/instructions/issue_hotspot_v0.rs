@@ -27,6 +27,7 @@ use helium_sub_daos::{
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHotspotArgsV0 {
   pub ecc_compact: Vec<u8>,
+  pub uri: String,
 }
 
 #[derive(Accounts)]
@@ -241,18 +242,18 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
         system_program: ctx.accounts.system_program.to_account_info().clone(),
         rent: ctx.accounts.rent.to_account_info().clone(),
       },
-      signer_seeds
+      signer_seeds,
     ),
     CreateMetadataAccountArgs {
       name: animal_name.to_string(),
       symbol: String::from("HOTSPOT"),
-      uri: String::from("https://c3zu2nc2m4x6zvqf5lofrtdbsa4niuh6drvzi7lq4n465ykbd3fa.arweave.net/FvNNNFpnL-zWBercWMxhkDjUUP4ca5R9cON57uFBHso/"),
+      uri: args.uri,
       collection: Some(Collection {
         key: ctx.accounts.collection.key(),
-        verified: false
+        verified: false,
       }),
-      collection_details: None
-    }
+      collection_details: None,
+    },
   )?;
 
   create_master_edition_v3(

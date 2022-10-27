@@ -55,7 +55,6 @@ export async function getPendingRewards(
     recipient
   );
   const oracleRewards = await client.getCurrentRewards(program, LAZY_KEY, mint);
-
   const rewardsMintAcc = await getMint(
     program.provider.connection,
     lazyDistributor.rewardsMint
@@ -73,7 +72,7 @@ export async function getPendingRewards(
   );
   if (!median) median = new BN(0);
 
-  const subbed = median.sub(oracleMedian);
+  const subbed = oracleMedian.sub(median);
   return {
     pendingRewards: Math.max(toNumber(subbed, rewardsMintAcc.decimals), 0),
     rewardsMint: lazyDistributor.rewardsMint,
@@ -83,8 +82,7 @@ export async function getPendingRewards(
 async function fetchTokenAccounts(wallet: PublicKey): Promise<any> {
   //@ts-ignore
   const resp = await window.xnft.solana.connection.customSplTokenAccounts(wallet);
-  const tokens = resp.nftMetadata.map((m) => m[1]);
-  // TODO uncomment this filter with hotspot names
-  // .filter((t) => t.tokenMetaUriData.name.startsWith("Hotspot"));
+  const tokens = resp.nftMetadata.map((m) => m[1])
+    .filter((t) => t.metadata.data.symbol == "HOTSPOT");
   return tokens;
 }

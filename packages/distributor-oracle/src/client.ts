@@ -2,14 +2,12 @@ import {
   AnchorProvider,
   Program,
   BN,
-  BorshInstructionCoder,
 } from "@project-serum/anchor";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
 import axios from "axios";
 import { recipientKey } from "@helium-foundation/lazy-distributor-sdk";
-import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
-
+import { getAccount } from "@solana/spl-token";
 
 export type Reward = {
   currentRewards: string;
@@ -42,7 +40,8 @@ export async function formTransaction(
   provider: AnchorProvider,
   rewards: Reward[],
   hotspot: PublicKey,
-  lazyDistributor: PublicKey
+  lazyDistributor: PublicKey,
+  wallet?: PublicKey,
 ) {
   const recipient = (await recipientKey(lazyDistributor, hotspot))[0]
   const ixPromises = rewards.map((x, idx) => {
@@ -79,24 +78,21 @@ export async function formTransaction(
     .accounts({
       recipient,
       lazyDistributor,
-      recipientMintAccount: mintAccount,
-      owner: mintTokenAccount.owner,
       rewardsMint,
-      destinationAccount: await getAssociatedTokenAddress(
-        rewardsMint,
-        mintTokenAccount.owner
-      )
     })
     .instruction();
-
+  
   tx.recentBlockhash = (
     await provider.connection.getLatestBlockhash()
   ).blockhash;
 
-  tx.feePayer = provider.wallet.publicKey;
+  tx.feePayer = wallet ? wallet : provider.wallet.publicKey;
 
   tx.add(distributeIx);
-  tx = await provider.wallet.signTransaction(tx);
-
-  return tx;
+  //@ts-ignore
+  if (provider.signTransaction) {
+    //@ts-ignore
+    return await provider.signTransaction(tx);
+  }
+  return await provider.wallet.signTransaction(tx);
 }

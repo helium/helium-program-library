@@ -36,12 +36,33 @@ import fetch from "node-fetch";
 import os from "os";
 import yargs from "yargs/yargs";
 
-const hotspotEccKeys = [
-  "112UE9mbEB4NWHgdutev5PXTszp1V8HwBptwNMDQVc6fAyu34Tz4",
-  "11bNfVbDL8Tp2T6jsEevRzBG5QuJpHVUz1Z21ACDcD4wW6RbVAZ",
-  "11wsqKcoXGesnSbEwKTY8QkoqdFsG7oafcyPn8jBnzRK4sfCSw8",
-  "11t1Yvm7QbyVnmqdCUpfA8XUiGVbpHPVnaNtR25gb8p2d4Dzjxi",
-];
+
+const tempUri = "https://c3zu2nc2m4x6zvqf5lofrtdbsa4niuh6drvzi7lq4n465ykbd3fa.arweave.net/FvNNNFpnL-zWBercWMxhkDjUUP4ca5R9cON57uFBHso/";
+
+type Hotspot = {
+  eccKey: string;
+  uri: string;
+  mint?: PublicKey;
+}
+
+const hardcodeHotspots: Hotspot[] = [
+  {
+    eccKey: "112UE9mbEB4NWHgdutev5PXTszp1V8HwBptwNMDQVc6fAyu34Tz4",
+    uri: tempUri,
+  },
+  {
+    eccKey: "11bNfVbDL8Tp2T6jsEevRzBG5QuJpHVUz1Z21ACDcD4wW6RbVAZ",
+    uri: tempUri,
+  },
+  {
+    eccKey: "11wsqKcoXGesnSbEwKTY8QkoqdFsG7oafcyPn8jBnzRK4sfCSw8",
+    uri: tempUri,
+  },
+  {
+    eccKey: "11t1Yvm7QbyVnmqdCUpfA8XUiGVbpHPVnaNtR25gb8p2d4Dzjxi",
+    uri: tempUri,
+  },
+]
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -109,9 +130,10 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "The oracle URL",
     default: "http://localhost:8080",
   },
-  oracleKey: {
+  oracleKeypair: {
     type: "string",
-    describe: "the pubkey of the oracle",
+    describe: "Keypair of the oracle",
+    default: "./keypairs/oracle.json",
   },
 });
 
@@ -141,7 +163,8 @@ async function run() {
     argv.onboardingServerKeypair
   );
   const makerKeypair = await loadKeypair(argv.makerKeypair);
-  const oracleKey = argv.oracleKey ? new PublicKey(argv.oracleKey) : provider.wallet.publicKey;
+  const oracleKeypair = loadKeypair(argv.oracleKeypair);
+  const oracleKey = oracleKeypair.publicKey;
   const oracleUrl = argv.oracleUrl;
 
   const conn = provider.connection;
@@ -299,10 +322,11 @@ async function run() {
 
 
   await Promise.all(
-    hotspotEccKeys.map(async (eccKey, index) => {
+    hardcodeHotspots.map(async (hotspot, index) => {
       const create = await hotspotIssuanceProgram.methods
         .issueHotspotV0({
-          eccCompact: Buffer.from(Address.fromB58(eccKey).publicKey),
+          eccCompact: Buffer.from(Address.fromB58(hotspot.eccKey).publicKey),
+          uri: hotspot.uri,
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
@@ -318,9 +342,20 @@ async function run() {
       if (!(await exists(conn, key))) {
         console.log("Creating hotspot", index);
         await create.rpc({ skipPreflight: true });
+        hardcodeHotspots[index].mint = (await create.pubkeys()).hotspot;
       }
     })
   );
+
+  await Promise.all(
+    hardcodeHotspots.map(async (hotspot) => {
+      const method = await lazyDistributorProgram.methods.initializeRecipientV0().accounts({
+        lazyDistributor: mobileLazyDist,
+        mint: hotspot.mint!
+      });
+      await method.rpc({ skipPreflight: true });
+    })
+  )
 }
 
 async function createAndMint({
