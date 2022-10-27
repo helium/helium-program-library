@@ -51,17 +51,22 @@ export async function getPendingRewards(
   );
 
   const [recipient] = recipientKey(LAZY_KEY, mint);
+
   const maybeRecipient = await program.account.recipientV0.fetchNullable(
     recipient
   );
+
   const oracleRewards = await client.getCurrentRewards(program, LAZY_KEY, mint);
+
   const rewardsMintAcc = await getMint(
     program.provider.connection,
     lazyDistributor.rewardsMint
   );
+
   const sortedRewards = (
     (maybeRecipient?.currentRewards as (BN | null)[]) || []
   ).sort((a, b) => (a || new BN(0)).sub(b || new BN(0)).toNumber());
+
   const sortedOracleRewards = oracleRewards
     .map((rew) => rew.currentRewards)
     .sort((a, b) => new BN(a).sub(new BN(b)).toNumber());
@@ -70,9 +75,11 @@ export async function getPendingRewards(
   let oracleMedian = new BN(
     sortedOracleRewards[Math.floor(sortedOracleRewards.length / 2)]
   );
+
   if (!median) median = new BN(0);
 
   const subbed = oracleMedian.sub(median);
+
   return {
     pendingRewards: Math.max(toNumber(subbed, rewardsMintAcc.decimals), 0),
     rewardsMint: lazyDistributor.rewardsMint,
@@ -81,8 +88,11 @@ export async function getPendingRewards(
 
 async function fetchTokenAccounts(wallet: PublicKey): Promise<any> {
   //@ts-ignore
-  const resp = await window.xnft.solana.connection.customSplTokenAccounts(wallet);
-  const tokens = resp.nftMetadata.map((m) => m[1])
+  const resp = await window.xnft.solana.connection.customSplTokenAccounts(
+    wallet
+  );
+  const tokens = resp.nftMetadata
+    .map((m) => m[1])
     .filter((t) => t.metadata.data.symbol == "HOTSPOT");
   return tokens;
 }

@@ -1,6 +1,7 @@
+import React from "react";
 import ReactXnft, { Text, View, Stack } from "react-xnft";
 import { DetailScreen } from "./components/DetailScreen";
-import { GridScreen } from './components/Grid';
+import { GridScreen } from "./components/Grid";
 //
 // On connection to the host environment, warm the cache.
 //

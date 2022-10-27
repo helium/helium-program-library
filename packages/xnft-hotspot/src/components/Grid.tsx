@@ -1,3 +1,4 @@
+import React from "react";
 import {
   useNavigation,
   View,
@@ -18,15 +19,13 @@ import {
 import { THEME } from "../utils/theme";
 import * as anchor from "@project-serum/anchor";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import {
-  init,
-} from "@helium-foundation/lazy-distributor-sdk";
+import { init } from "@helium-foundation/lazy-distributor-sdk";
 import {
   PROGRAM_ID as MPL_PID,
   Metadata,
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as client from "@helium-foundation/distributor-oracle";
-import ky from 'ky';
+import ky from "ky";
 
 export function GridScreen() {
   const tokenAccounts = useTokenAccounts();
@@ -55,7 +54,7 @@ function Grid({ tokenAccounts }: any) {
       const rewards = await client.getCurrentRewards(
         program,
         LAZY_KEY,
-        new PublicKey(nft.metadata.mint),
+        new PublicKey(nft.metadata.mint)
       );
       const tx = await client.formTransaction(
         program,
@@ -64,19 +63,22 @@ function Grid({ tokenAccounts }: any) {
         rewards,
         new PublicKey(nft.metadata.mint),
         LAZY_KEY,
-        publicKey,
+        publicKey
       );
 
-      const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
+      const serializedTx = tx.serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      });
 
       const res = await ky.post("http://localhost:8080/", {
         json: { transaction: serializedTx },
-      })
-      
-      const json = (await res.json() as any);
+      });
+
+      const json = (await res.json()) as any;
       const signedTx = Transaction.from(json!.transaction!.data);
       //@ts-ignore
-      await window.xnft.solana.send(signedTx, [], {skipPreflight: true}); 
+      await window.xnft.solana.send(signedTx, [], { skipPreflight: true });
     }
   };
 
@@ -115,13 +117,13 @@ function Grid({ tokenAccounts }: any) {
 }
 
 function GridItem({ nft }) {
-  const nav = useNavigation();
-
-  const program = useProgram();
-
+  const [symbol, setSymbol] = useState<string>("");
   const [rewardsMint, setRewardsMint] = useState<PublicKey | null>(null);
   const [pendingRewards, setPendingRewards] = useState<number | null>(null);
   const [interval, setNewInterval] = useState<any>(null);
+  const nav = useNavigation();
+  const program = useProgram();
+
   useEffect(() => {
     (async () => {
       if (!program || !nft.metadata.mint) return null;
@@ -130,9 +132,12 @@ function GridItem({ nft }) {
       //@ts-ignore
       const { pendingRewards: rewards, rewardsMint: rwdMint } =
         await getPendingRewards(program, nftMint);
+
       setPendingRewards(rewards);
       setRewardsMint(rwdMint);
+
       if (interval) clearInterval(interval);
+
       const ivl = setInterval(async () => {
         const { pendingRewards: newRewards } = await getPendingRewards(
           program,
@@ -140,12 +145,13 @@ function GridItem({ nft }) {
         );
         setPendingRewards(newRewards);
       }, 30000);
+
       setNewInterval(ivl);
     })();
+
     return () => clearInterval(interval);
   }, [program, nft]);
 
-  const [symbol, setSymbol] = useState<string>("");
   useEffect(() => {
     if (!rewardsMint) return;
     (async () => {
@@ -167,6 +173,7 @@ function GridItem({ nft }) {
   const clickNft = () => {
     nav.push("detail", { nft, pendingRewards, symbol });
   };
+
   return (
     <View>
       <Button

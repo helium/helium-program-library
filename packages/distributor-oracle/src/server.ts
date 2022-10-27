@@ -20,7 +20,10 @@ import {
 } from "@project-serum/anchor";
 import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
 import { HotspotIssuance } from "@helium-foundation/idls/lib/types/hotspot_issuance";
-import { hotspotStorageKey, init as initHotspotIssuance } from "@helium-foundation/hotspot-issuance-sdk";
+import {
+  hotspotStorageKey,
+  init as initHotspotIssuance,
+} from "@helium-foundation/hotspot-issuance-sdk";
 import { init, PROGRAM_ID } from "@helium-foundation/lazy-distributor-sdk";
 import fs from "fs";
 
@@ -55,16 +58,18 @@ export class DatabaseMock implements Database {
   async getCurrentRewards(mint: PublicKey) {
     const storageKey = hotspotStorageKey(mint)[0];
     try {
-      const storage = await this.issuanceProgram.account.hotspotStorageV0.fetch(storageKey);
+      const storage = await this.issuanceProgram.account.hotspotStorageV0.fetch(
+        storageKey
+      );
       const pubkey = new Address(0, 0, 0, storage.eccCompact).b58;
       return Math.floor(
         (this.inMemHash.byHotspot[pubkey]?.lifetimeRewards || 0) *
-        Math.pow(10, 8)
+          Math.pow(10, 8)
       ).toString();
-    } catch(err) {
+    } catch (err) {
       console.error("Mint with error: ", mint.toString());
       console.error(err);
-      return '0';
+      return "0";
     }
   }
 
@@ -78,7 +83,7 @@ export class DatabaseMock implements Database {
           totalClicks:
             (this.inMemHash.byHotspot[hotspotKey]?.totalClicks || 0) + 1,
           lifetimeRewards:
-            (this.inMemHash.byHotspot[hotspotKey]?.lifetimeRewards || 0) + 1,
+            this.inMemHash.byHotspot[hotspotKey]?.lifetimeRewards || 0,
         },
       },
     };
@@ -176,14 +181,14 @@ export class OracleServer {
   private async getCurrentRewardsHandler(req: Request, res: Response) {
     const mintStr = req.query.mint;
     if (!mintStr) {
-      res.status(400).json({error: "No mint key provided"});
+      res.status(400).json({ error: "No mint key provided" });
       return;
     }
     let mint: PublicKey;
     try {
       mint = new PublicKey(mintStr);
-    } catch(err) {
-      res.status(400).json({error: "Invalid mint key"});
+    } catch (err) {
+      res.status(400).json({ error: "Invalid mint key" });
       return;
     }
 
@@ -291,7 +296,12 @@ export class OracleServer {
     );
     const program = await init(provider);
     const hotspotIssuanceProgram = await initHotspotIssuance(provider);
-    const server = new OracleServer(program, hotspotIssuanceProgram, oracleKeypair, new DatabaseMock(hotspotIssuanceProgram));
+    const server = new OracleServer(
+      program,
+      hotspotIssuanceProgram,
+      oracleKeypair,
+      new DatabaseMock(hotspotIssuanceProgram)
+    );
     server.start();
   }
 })();

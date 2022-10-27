@@ -1,3 +1,4 @@
+import React from "react";
 import {
   usePublicKey,
   useConnection,
@@ -15,20 +16,24 @@ import { THEME } from "../utils/theme";
 import { init, recipientKey } from "@helium-foundation/lazy-distributor-sdk";
 import * as client from "@helium-foundation/distributor-oracle";
 import { LAZY_KEY } from "../utils";
-import ky from 'ky';
+import ky from "ky";
 
 export function DetailScreen({ nft, pendingRewards, symbol }) {
   const publicKey = usePublicKey();
   const connection = useConnection();
-  
+
   const claimRewards = async () => {
     //@ts-ignore
-    const stubProvider = new anchor.AnchorProvider(connection, {publicKey}, anchor.AnchorProvider.defaultOptions())
+    const stubProvider = new anchor.AnchorProvider(
+      connection,
+      { publicKey },
+      anchor.AnchorProvider.defaultOptions()
+    );
     const program = await init(stubProvider);
     const rewards = await client.getCurrentRewards(
       program,
       LAZY_KEY,
-      new PublicKey(nft.metadata.mint),
+      new PublicKey(nft.metadata.mint)
     );
     const tx = await client.formTransaction(
       program,
@@ -37,20 +42,23 @@ export function DetailScreen({ nft, pendingRewards, symbol }) {
       rewards,
       new PublicKey(nft.metadata.mint),
       LAZY_KEY,
-      publicKey,
+      publicKey
     );
 
-    const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
+    const serializedTx = tx.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    });
 
     const res = await ky.post("http://localhost:8080/", {
       json: { transaction: serializedTx },
-    })
-    
-    const json = (await res.json() as any);
+    });
+
+    const json = (await res.json()) as any;
     const signedTx = Transaction.from(json!.transaction!.data);
 
     //@ts-ignore
-    await window.xnft.solana.send(signedTx, [], {skipPreflight: true});
+    await window.xnft.solana.send(signedTx, [], { skipPreflight: true });
   };
 
   return (
@@ -73,16 +81,16 @@ export function DetailScreen({ nft, pendingRewards, symbol }) {
         src={nft.tokenMetaUriData.image}
       />
       <Text>
-        Pending rewards: {pendingRewards || '0'} {symbol || ''}
+        Pending rewards: {pendingRewards || "0"} {symbol || ""}
       </Text>
-      
+
       <Button
         style={{
           height: "48px",
           width: "100%",
           fontSize: "1em",
           backgroundColor: THEME.colors.stake,
-          color: '#000',
+          color: "#000",
         }}
         onClick={() => claimRewards()}
       >
@@ -110,7 +118,6 @@ export function DetailScreen({ nft, pendingRewards, symbol }) {
     </View>
   );
 }
-
 
 function DetailsScreen({ nft }) {
   return (
