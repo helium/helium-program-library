@@ -36,7 +36,7 @@ export function useProgram() {
   const [program, setProgram] = useState<Program<LazyDistributor> | null>(null);
   useEffect(() => {
     //@ts-ignore
-    init(window.xnft).then((prog) => setProgram(prog));
+    init(window.xnft.solana).then((prog) => setProgram(prog));
   }, []);
 
   return program;
@@ -82,7 +82,7 @@ export async function getPendingRewards(
 
 async function fetchTokenAccounts(wallet: PublicKey): Promise<any> {
   //@ts-ignore
-  const resp = await window.xnft.connection.customSplTokenAccounts(wallet);
+  const resp = await window.xnft.solana.connection.customSplTokenAccounts(wallet);
   const tokens = resp.nftMetadata.map((m) => m[1]);
   // TODO uncomment this filter with hotspot names
   // .filter((t) => t.tokenMetaUriData.name.startsWith("Hotspot"));
