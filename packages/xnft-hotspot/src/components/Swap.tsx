@@ -282,7 +282,7 @@ export function Swap() {
           height: "48px",
           width: "50%",
           fontSize: "1em",
-          backgroundColor: THEME.colors.stake,
+          backgroundColor: THEME.colors.green[400],
           opacity: swapAllowed ? '1' : '0.5',
           color: '#000',
         }}

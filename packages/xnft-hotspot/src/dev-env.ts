@@ -1,16 +1,19 @@
 import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
 import * as ld from "@helium-foundation/lazy-distributor-sdk";
 import * as anchor from "@project-serum/anchor";
-import { createMint, createNft, createAtaAndMint, toBN } from "@helium-foundation/spl-utils";
+import {
+  createMint,
+  createNft,
+  createAtaAndMint,
+  toBN,
+} from "@helium-foundation/spl-utils";
 import {
   createCreateMetadataAccountV3Instruction,
-  PROGRAM_ID as MPL_PID
+  PROGRAM_ID as MPL_PID,
 } from "@metaplex-foundation/mpl-token-metadata";
-import fs from 'fs';
+import fs from "fs";
 import * as dc from "@helium-foundation/data-credits-sdk";
-import {
-  ThresholdType
-} from "@helium-foundation/circuit-breaker-sdk";
+import { ThresholdType } from "@helium-foundation/circuit-breaker-sdk";
 import { PublicKey, Keypair, Transaction } from "@solana/web3.js";
 import { DC_MINT, MOBILE_MINT, HNT_MINT } from "@helium-foundation/spl-utils";
 import * as tm from "@helium-foundation/treasury-management-sdk";
@@ -36,7 +39,9 @@ async function createMints(provider: anchor.AnchorProvider) {
 
   const mobileMintKeypair = Keypair.fromSecretKey(
     new Uint8Array(
-      JSON.parse(fs.readFileSync("../helium-cli/keypairs/mobile.json").toString())
+      JSON.parse(
+        fs.readFileSync("../helium-cli/keypairs/mobile.json").toString()
+      )
     )
   );
   await createMint(provider, decimals, me, me, mobileMintKeypair);
@@ -47,50 +52,46 @@ async function createMints(provider: anchor.AnchorProvider) {
     toBN(100, decimals).toNumber(),
     me
   );
-  await createAtaAndMint(
-    provider,
-    DC_MINT,
-    toBN(100, decimals).toNumber(),
-    me
-  );
+  await createAtaAndMint(provider, DC_MINT, toBN(100, decimals).toNumber(), me);
   await createAtaAndMint(
     provider,
     MOBILE_MINT,
     toBN(100, decimals).toNumber(),
     me
   );
-
 }
 
 async function initLazyDistributor(
-  program: anchor.Program<LazyDistributor>, 
-  me: PublicKey, 
+  program: anchor.Program<LazyDistributor>,
+  me: PublicKey,
   rewardsMint: PublicKey
 ) {
-  const method = program.methods.initializeLazyDistributorV0({
-    authority: me,
-    oracles: [
-      {
-        oracle: me,
-        url: "https://some-url/",
-      },
-    ],
-  }).accounts({
-    rewardsMint,
-  });
+  const method = program.methods
+    .initializeLazyDistributorV0({
+      authority: me,
+      oracles: [
+        {
+          oracle: me,
+          url: "https://some-url/",
+        },
+      ],
+    })
+    .accounts({
+      rewardsMint,
+    });
   const { lazyDistributor } = await method.pubkeys();
   await method.rpc({ skipPreflight: true });
   return lazyDistributor;
 }
 
 async function initRecipient(
-  program: anchor.Program<LazyDistributor>, 
-  lazyDistributor: PublicKey, 
+  program: anchor.Program<LazyDistributor>,
+  lazyDistributor: PublicKey,
   hotspotMint: PublicKey
 ) {
   const method = program.methods.initializeRecipientV0().accounts({
     lazyDistributor,
-    mint: hotspotMint
+    mint: hotspotMint,
   });
   await method.rpc({ skipPreflight: true });
   const recipient = (await method.pubkeys()).recipient!;
@@ -98,9 +99,9 @@ async function initRecipient(
 }
 
 async function setRewards(
-  program: anchor.Program<LazyDistributor>, 
-  lazyDistributor: PublicKey, 
-  recipient: PublicKey,
+  program: anchor.Program<LazyDistributor>,
+  lazyDistributor: PublicKey,
+  recipient: PublicKey
 ) {
   await program.methods
     .setCurrentRewardsV0({
@@ -114,9 +115,15 @@ async function setRewards(
     .rpc({ skipPreflight: true });
 }
 
-async function createTokenMetadata(provider: anchor.AnchorProvider, mintKeypair: Keypair) {
-  const metadata = PublicKey.findProgramAddressSync([
-    Buffer.from("metadata", "utf-8"), MPL_PID.toBuffer(), mintKeypair.publicKey.toBuffer()
+async function createTokenMetadata(
+  provider: anchor.AnchorProvider,
+  mintKeypair: Keypair
+) {
+  const metadata = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("metadata", "utf-8"),
+      MPL_PID.toBuffer(),
+      mintKeypair.publicKey.toBuffer(),
     ],
     MPL_PID
   )[0];
@@ -137,34 +144,34 @@ async function createTokenMetadata(provider: anchor.AnchorProvider, mintKeypair:
           sellerFeeBasisPoints: 0,
           creators: null,
           collection: null,
-          uses: null
+          uses: null,
         },
         isMutable: true,
         collectionDetails: null,
       },
     }
-  )
+  );
   const tx = new Transaction().add(instruction);
   provider.sendAndConfirm(tx);
 }
 
 async function initDc(provider: anchor.AnchorProvider) {
   const me = provider.wallet.publicKey;
-  
+
   const program = await dc.init(provider);
-  
+
   const method = program.methods
-    .initializeDataCreditsV0({ 
+    .initializeDataCreditsV0({
       authority: me,
       config: {
         windowSizeSeconds: new anchor.BN(60),
         thresholdType: ThresholdType.Absolute as never,
-        threshold: new anchor.BN("10000000000000000000")
-      }
+        threshold: new anchor.BN("10000000000000000000"),
+      },
     })
     .accounts({ hntMint: HNT_MINT, dcMint: DC_MINT, payer: me });
   await method.rpc({
-    skipPreflight: true
+    skipPreflight: true,
   });
 }
 
@@ -194,12 +201,13 @@ async function initTreasury(provider: anchor.AnchorProvider) {
     provider,
     HNT_MINT,
     toBN(500, 8).toNumber(),
-    (await method.pubkeys()).treasuryManagement
+    (
+      await method.pubkeys()
+    ).treasuryManagement
   );
 }
 
 async function setupLocalhost() {
-  
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
@@ -216,7 +224,9 @@ async function setupLocalhost() {
 
   const lazyDistributor = await initLazyDistributor(program, me, rewardsMint);
 
-  const { mintKey: hotspotMint } = await createNft(provider, me, {uri: 'https://shdw-drive.genesysgo.net/CYPATLeMUuCkqBuREw1gYdfckZitf2rjMH4EqfTCMPJJ/hotspot.json'});
+  const { mintKey: hotspotMint } = await createNft(provider, me, {
+    uri: "https://shdw-drive.genesysgo.net/CYPATLeMUuCkqBuREw1gYdfckZitf2rjMH4EqfTCMPJJ/hotspot.json",
+  });
   const recipient = await initRecipient(program, lazyDistributor!, hotspotMint);
 
   await setRewards(program, lazyDistributor!, recipient);

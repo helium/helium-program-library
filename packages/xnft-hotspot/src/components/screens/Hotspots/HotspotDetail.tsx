@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { FC, useState } from "react";
 import {
   usePublicKey,
   useConnection,
@@ -6,29 +6,36 @@ import {
   Image,
   Text,
   Button,
-  Tab,
-  List,
   Loading,
-  ListItem,
 } from "react-xnft";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
-import { THEME } from "../utils/theme";
-import { init, recipientKey } from "@helium-foundation/lazy-distributor-sdk";
+import { init } from "@helium-foundation/lazy-distributor-sdk";
 import * as client from "@helium-foundation/distributor-oracle";
-import { LAZY_KEY } from "../utils";
 import ky from "ky";
-import { useNotification } from "../contexts/notification";
+import { THEME } from "../../../utils/theme";
+import { LAZY_KEY } from "../../../utils";
+import { useNotification } from "../../../contexts/notification";
 
-export function DetailScreen({ nft, pendingRewards, symbol }) {
+interface HotspotDetailScreenProps {
+  nft: any; // TODO: actually type this
+  pendingRewards: any; // TODO: actually type this
+  symbol: string;
+}
+
+export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
+  nft,
+  pendingRewards,
+  symbol,
+}) => {
   const publicKey = usePublicKey();
   const connection = useConnection();
 
   const [txLoading, setLoading] = useState<boolean>(false);
-  const {setMessage} = useNotification();
+  const { setMessage } = useNotification();
 
   const claimRewards = async () => {
-    if (txLoading) return
+    if (txLoading) return;
     setLoading(true);
     try {
       const stubProvider = new anchor.AnchorProvider(
@@ -103,14 +110,19 @@ export function DetailScreen({ nft, pendingRewards, symbol }) {
           height: "48px",
           width: "100%",
           fontSize: "1em",
-          backgroundColor: THEME.colors.stake,
+          backgroundColor: THEME.colors.green[400],
           color: "#000",
         }}
         onClick={() => claimRewards()}
       >
-        Claim rewards {txLoading && (
+        Claim rewards{" "}
+        {txLoading && (
           <Loading
-            style={{ display: "block", marginLeft: "auto", marginRight: "auto" }}
+            style={{
+              display: "block",
+              marginLeft: "auto",
+              marginRight: "auto",
+            }}
           />
         )}
       </Button>
@@ -129,7 +141,6 @@ export function DetailScreen({ nft, pendingRewards, symbol }) {
       >
         {nft.tokenMetaUriData.description}
       </Text>
-
     </View>
   );
-}
+};
