@@ -37,6 +37,7 @@ export function GridScreen() {
 }
 
 function Grid({ tokenAccounts }: any) {
+  const nav = useNavigation();
   const publicKey = usePublicKey();
   const connection = useConnection();
 
@@ -82,6 +83,10 @@ function Grid({ tokenAccounts }: any) {
     }
   };
 
+  const clickSwap = () => {
+    nav.push("swap", {});
+  };
+
   return (
     <View
       style={{
@@ -103,7 +108,8 @@ function Grid({ tokenAccounts }: any) {
       <Button
         style={{
           height: "48px",
-          width: "100%",
+          width: "80%",
+          marginLeft: '10%',
           fontSize: "1em",
           backgroundColor: THEME.colors.stake,
           color: "#000",
@@ -111,6 +117,21 @@ function Grid({ tokenAccounts }: any) {
         onClick={() => claimAllRewards()}
       >
         Claim all rewards
+      </Button>
+
+      <Button
+        style={{
+          marginTop: '20px',
+          height: "48px",
+          width: "80%",
+          marginLeft: "10%",
+          fontSize: "1em",
+          backgroundColor: THEME.colors.stake,
+          color: '#000',
+        }}
+        onClick={() => clickSwap()}
+      >
+        Swap
       </Button>
     </View>
   );

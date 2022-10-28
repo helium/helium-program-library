@@ -1,5 +1,6 @@
 import React from "react";
 import ReactXnft, { Text, View, Stack } from "react-xnft";
+import { Swap } from "./components/Swap";
 import { DetailScreen } from "./components/DetailScreen";
 import { GridScreen } from "./components/Grid";
 import { Notification } from "./components/Notification";

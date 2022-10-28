@@ -8,15 +8,6 @@ export function dataCreditsKey(dcMint: PublicKey, programId = PROGRAM_ID): [Publ
   );
 }
 
-export function tokenAuthorityKey(programId: PublicKey = PROGRAM_ID): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("dc_token_auth", "utf-8"),
-    ],
-    programId
-  );
-}
-
 export function accountPayerKey(
   programId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
