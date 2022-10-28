@@ -13,7 +13,10 @@ export const THEME = {
     textSecondary: "rgba(255, 255, 255, 0.8)",
     attributeTitle: "#99A4B4",
     attributeBackground: "#292C33",
-    text: "#333333",
+    text: {
+      light: "#333333",
+      dark: "#ffffff",
+    },
     black: "#333333",
     white: "#ffffff",
     blackAlpha: {

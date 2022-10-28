@@ -6,6 +6,7 @@ type GlobalValues = "inherit" | "initial" | "revert" | "revert-layer" | "unset";
 export interface FlexProps {
   display?: "flex" | "block";
   positon?: "relative" | "absolute";
+  color?: string;
   flexDirection?: "row" | "row-reverse" | "column" | "column-reverse";
   flexGrow?: number;
   flexBasis?:
@@ -106,6 +107,7 @@ export const Flex: FC<FlexProps> = (props) => {
     <View
       style={{
         display: props.display ? props.display : "flex",
+        color: props.color ? props.color : "initial",
         position: props.positon ? props.positon : "relative",
         justifyContent: props.justifyContent || "flex-start",
         flexDirection: props.flexDirection || "row",

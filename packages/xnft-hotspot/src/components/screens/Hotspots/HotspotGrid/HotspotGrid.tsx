@@ -1,11 +1,5 @@
-import React, { FC } from "react";
-import {
-  Stack,
-  Button,
-  useNavigation,
-  usePublicKey,
-  useConnection,
-} from "react-xnft";
+import React, { FC, useEffect } from "react";
+import { Button, useNavigation, usePublicKey, useConnection } from "react-xnft";
 import * as anchor from "@project-serum/anchor";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { init } from "@helium-foundation/lazy-distributor-sdk";
@@ -15,10 +9,12 @@ import { HotspotGridItem } from "./HotspotGridItem";
 import { LAZY_KEY, useTokenAccounts } from "../../../../utils/index";
 import { THEME } from "../../../../utils/theme";
 import { Flex, LoadingIndicator } from "../../../common";
+import { useTitleColor } from "../../../../utils/hooks";
 
 interface HotspotGridScreenProps {}
 
 export const HotspotGridScreen: FC<HotspotGridScreenProps> = () => {
+  useTitleColor();
   const tokenAccounts = useTokenAccounts();
   const nav = useNavigation();
   const publicKey = usePublicKey();

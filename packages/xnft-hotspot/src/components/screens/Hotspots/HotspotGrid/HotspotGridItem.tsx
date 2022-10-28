@@ -91,9 +91,11 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
         <Flex mb={1}>
           <Text
             style={{
+              textAlign: "center",
               position: "absolute",
               bottom: "4px",
               left: "4px",
+              width: "60%",
               background: THEME.colors.gray[700],
               padding: "2px 4px",
               borderRadius: "4px",
@@ -101,7 +103,10 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
               fontWeight: 600,
               lineHeight: "normal",
               color: THEME.colors.white,
-              margin: "0px",
+              margin: 0,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
             {nft.tokenMetaUriData.name}
@@ -121,11 +126,11 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
               fontSize: "14px",
               fontWeight: 600,
               lineHeight: "normal",
+              margin: 0,
               color: useColorMode({
                 light: THEME.colors.gray[700],
                 dark: THEME.colors.gray[400],
               }),
-              margin: "0px",
             }}
           >
             Rewards:&nbsp;
@@ -134,11 +139,11 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
             style={{
               fontSize: "12px",
               lineHeight: "normal",
+              margin: 0,
               color: useColorMode({
                 light: THEME.colors.gray[600],
                 dark: THEME.colors.gray[500],
               }),
-              margin: "0px",
             }}
           >
             {`${pendingRewards || "0"} ${symbol || ""}`}

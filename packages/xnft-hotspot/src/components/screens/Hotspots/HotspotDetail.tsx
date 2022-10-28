@@ -2,7 +2,6 @@ import React, { FC, useState } from "react";
 import {
   usePublicKey,
   useConnection,
-  View,
   Image,
   Text,
   Button,
@@ -16,6 +15,8 @@ import ky from "ky";
 import { THEME } from "../../../utils/theme";
 import { LAZY_KEY } from "../../../utils";
 import { useNotification } from "../../../contexts/notification";
+import { useColorMode, useTitleColor } from "../../../utils/hooks";
+import { Flex } from "../../common";
 
 interface HotspotDetailScreenProps {
   nft: any; // TODO: actually type this
@@ -28,11 +29,12 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
   pendingRewards,
   symbol,
 }) => {
+  useTitleColor();
   const publicKey = usePublicKey();
   const connection = useConnection();
-
   const [txLoading, setLoading] = useState<boolean>(false);
   const { setMessage } = useNotification();
+  const hasRewards = pendingRewards && pendingRewards > 0;
 
   const claimRewards = async () => {
     if (txLoading) return;
@@ -83,64 +85,126 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
   };
 
   return (
-    <View
-      style={{
-        marginRight: "20px",
-        marginLeft: "20px",
-      }}
-    >
-      <Image
-        style={{
-          marginBottom: "24px",
-          display: "block",
-          borderRadius: "6px",
-          width: "335px",
-          height: "335px",
-          marginLeft: "auto",
-          marginRight: "auto",
-        }}
-        src={nft.tokenMetaUriData.image}
-      />
-      <Text>
-        Pending rewards: {pendingRewards || "0"} {symbol || ""}
-      </Text>
+    <Flex flexDirection="column">
+      <Flex
+        padding="12px"
+        borderRadius="6px"
+        background={useColorMode(THEME.colors.backgroundAccent)}
+      >
+        <Image
+          src={nft.tokenMetaUriData.image}
+          style={{
+            borderRadius: "6px",
+            width: "100%",
+          }}
+        />
+      </Flex>
 
-      <Button
-        style={{
-          height: "48px",
-          width: "100%",
-          fontSize: "1em",
-          backgroundColor: THEME.colors.green[400],
-          color: "#000",
-        }}
-        onClick={() => claimRewards()}
-      >
-        Claim rewards{" "}
-        {txLoading && (
-          <Loading
+      <Flex flexDirection="column" px={1} py={1}>
+        <Text
+          style={{
+            fontSize: "20px",
+            fontWeight: 600,
+            lineHeight: "normal",
+            margin: 0,
+            color: useColorMode({
+              light: THEME.colors.gray[700],
+              dark: THEME.colors.gray[400],
+            }),
+          }}
+        >
+          {nft.tokenMetaUriData.name}
+        </Text>
+        <Flex alignItems="center">
+          <Text
             style={{
-              display: "block",
-              marginLeft: "auto",
-              marginRight: "auto",
+              fontSize: "16px",
+              fontWeight: 600,
+              lineHeight: "normal",
+              margin: 0,
+              color: useColorMode({
+                light: THEME.colors.gray[700],
+                dark: THEME.colors.gray[400],
+              }),
             }}
-          />
-        )}
-      </Button>
-      <Text
-        style={{
-          color: THEME.colors.textSecondary,
-        }}
-      >
-        Description
-      </Text>
-      <Text
-        style={{
-          color: THEME.colors.text,
-          marginBottom: "10px",
-        }}
-      >
-        {nft.tokenMetaUriData.description}
-      </Text>
-    </View>
+          >
+            Pending rewards:&nbsp;
+          </Text>
+          <Text
+            style={{
+              fontSize: "14px",
+              lineHeight: "normal",
+              margin: 0,
+              color: useColorMode({
+                light: THEME.colors.gray[600],
+                dark: THEME.colors.gray[500],
+              }),
+            }}
+          >
+            {pendingRewards || "0"} {symbol || ""}
+          </Text>
+        </Flex>
+
+        <Flex alignItems="center">
+          <Text
+            style={{
+              fontSize: "16px",
+              fontWeight: 600,
+              lineHeight: "normal",
+              margin: 0,
+              color: useColorMode({
+                light: THEME.colors.gray[700],
+                dark: THEME.colors.gray[400],
+              }),
+            }}
+          >
+            Description:&nbsp;
+          </Text>
+          <Text
+            style={{
+              fontSize: "14px",
+              lineHeight: "normal",
+              margin: 0,
+              color: useColorMode({
+                light: THEME.colors.gray[600],
+                dark: THEME.colors.gray[500],
+              }),
+            }}
+          >
+            {nft.tokenMetaUriData.description}
+          </Text>
+        </Flex>
+      </Flex>
+
+      <Flex flexDirection="row" py={1} mt={1}>
+        <Button
+          style={{
+            height: "48px",
+            width: "100%",
+            fontSize: "1em",
+            fontWeight: 600,
+            backgroundColor: hasRewards
+              ? THEME.colors.green[400]
+              : THEME.colors.green[200],
+            color: THEME.colors.white,
+            border: "none",
+            borderRadius: "6px",
+            marginBottom: "8px",
+          }}
+          onClick={hasRewards ? () => claimRewards() : () => {}}
+        >
+          {hasRewards ? `Claim rewards` : `No rewards to claim`}
+          {txLoading && (
+            <Loading
+              style={{
+                display: "block",
+                marginLeft: "auto",
+                marginRight: "auto",
+              }}
+            />
+          )}
+        </Button>
+      </Flex>
+    </Flex>
   );
 };

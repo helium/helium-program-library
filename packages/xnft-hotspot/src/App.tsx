@@ -18,19 +18,22 @@ ReactXnft.events.on("connect", () => {
 
 export const App = () => {
   const metadata = useMetadata();
+  const bgColor = useColorMode(THEME.colors.background);
+  const bgAccentColor = useColorMode(THEME.colors.backgroundAccent);
+  const textColor = useColorMode(THEME.colors.text);
 
   return (
     <Flex
       flexDirection="column"
       height="100%"
       width="100%"
-      background={useColorMode(THEME.colors.background)}
+      background={bgColor}
     >
       <NotificationProvider>
         <Notification></Notification>
         <Tab.Navigator
           style={{
-            background: useColorMode(THEME.colors.backgroundAccent),
+            background: bgAccentColor,
             borderTop: "none",
           }}
           options={({ route }) => {
@@ -38,7 +41,7 @@ export const App = () => {
               tabBarActiveTintColor: "none",
               tabBarInactiveTintColor: "none",
               tabBarStyle: {
-                backgroundColor: useColorMode(THEME.colors.backgroundAccent),
+                backgroundColor: bgAccentColor,
                 border: "none",
               },
               tabBarIcon: ({ focused }) => {

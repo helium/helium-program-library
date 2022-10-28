@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useMetadata } from "react-xnft";
+import { useMetadata, useNavigation } from "react-xnft";
+import { THEME } from "./theme";
 
 export const useColorMode = ({
   light,
@@ -18,4 +19,15 @@ export const useColorMode = ({
   }, [metadata, setValue]);
 
   return value;
+};
+
+export const useTitleColor = () => {
+  const nav = useNavigation();
+  const textColor = useColorMode(THEME.colors.text);
+
+  useEffect(() => {
+    nav.setTitleStyle({
+      color: textColor,
+    });
+  }, [nav]);
 };
