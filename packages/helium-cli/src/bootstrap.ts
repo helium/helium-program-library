@@ -260,12 +260,6 @@ async function run() {
   
   const [mobileLazyDist] = await lazyDistributorKey(mobileKeypair.publicKey);
   const rewardsEscrow = await getAssociatedTokenAddress(mobileKeypair.publicKey, mobileLazyDist, true);
-  await createAtaAndMint(
-    provider,
-    mobileKeypair.publicKey,
-    toBN(500, 8).toNumber(),
-    mobileLazyDist
-  );
   if (!(await exists(conn, mobileLazyDist))) {
     console.log("Initializing mobile lazy distributor");
     await lazyDistributorProgram.methods

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   usePublicKey,
   useConnection,
@@ -8,6 +8,7 @@ import {
   Button,
   Tab,
   List,
+  Loading,
   ListItem,
 } from "react-xnft";
 import { PublicKey, Transaction } from "@solana/web3.js";
@@ -17,48 +18,61 @@ import { init, recipientKey } from "@helium-foundation/lazy-distributor-sdk";
 import * as client from "@helium-foundation/distributor-oracle";
 import { LAZY_KEY } from "../utils";
 import ky from "ky";
+import { useNotification } from "../contexts/notification";
 
 export function DetailScreen({ nft, pendingRewards, symbol }) {
   const publicKey = usePublicKey();
   const connection = useConnection();
 
+  const [txLoading, setLoading] = useState<boolean>(false);
+  const {setMessage} = useNotification();
+
   const claimRewards = async () => {
-    //@ts-ignore
-    const stubProvider = new anchor.AnchorProvider(
-      connection,
-      { publicKey },
-      anchor.AnchorProvider.defaultOptions()
-    );
-    const program = await init(stubProvider);
-    const rewards = await client.getCurrentRewards(
-      program,
-      LAZY_KEY,
-      new PublicKey(nft.metadata.mint)
-    );
-    const tx = await client.formTransaction(
-      program,
+    if (txLoading) return
+    setLoading(true);
+    try {
+      const stubProvider = new anchor.AnchorProvider(
+        connection,
+        //@ts-ignore
+        { publicKey },
+        anchor.AnchorProvider.defaultOptions()
+      );
+      const program = await init(stubProvider);
+      const rewards = await client.getCurrentRewards(
+        program,
+        LAZY_KEY,
+        new PublicKey(nft.metadata.mint)
+      );
+      const tx = await client.formTransaction(
+        program,
+        //@ts-ignore
+        window.xnft.solana,
+        rewards,
+        new PublicKey(nft.metadata.mint),
+        LAZY_KEY,
+        publicKey
+      );
+
+      const serializedTx = tx.serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      });
+
+      const res = await ky.post("http://localhost:8080/", {
+        json: { transaction: serializedTx },
+      });
+
+      const json = (await res.json()) as any;
+      const signedTx = Transaction.from(json!.transaction!.data);
+
       //@ts-ignore
-      window.xnft.solana,
-      rewards,
-      new PublicKey(nft.metadata.mint),
-      LAZY_KEY,
-      publicKey
-    );
-
-    const serializedTx = tx.serialize({
-      requireAllSignatures: false,
-      verifySignatures: false,
-    });
-
-    const res = await ky.post("http://localhost:8080/", {
-      json: { transaction: serializedTx },
-    });
-
-    const json = (await res.json()) as any;
-    const signedTx = Transaction.from(json!.transaction!.data);
-
-    //@ts-ignore
-    await window.xnft.solana.send(signedTx, [], { skipPreflight: true });
+      await window.xnft.solana.send(signedTx, [], { skipPreflight: true });
+      setLoading(false);
+      setMessage("Transaction confirmed", "success");
+    } catch (err) {
+      setLoading(false);
+      setMessage(`Transaction failed: ${err.message}`, "error");
+    }
   };
 
   return (
@@ -94,7 +108,11 @@ export function DetailScreen({ nft, pendingRewards, symbol }) {
         }}
         onClick={() => claimRewards()}
       >
-        Claim rewards
+        Claim rewards {txLoading && (
+          <Loading
+            style={{ display: "block", marginLeft: "auto", marginRight: "auto" }}
+          />
+        )}
       </Button>
       <Text
         style={{
@@ -112,82 +130,6 @@ export function DetailScreen({ nft, pendingRewards, symbol }) {
         {nft.tokenMetaUriData.description}
       </Text>
 
-      <View>
-        <DetailsScreen nft={nft} />
-      </View>
     </View>
-  );
-}
-
-function DetailsScreen({ nft }) {
-  return (
-    <View
-      style={{
-        marginTop: "12px",
-        minHeight: "281px",
-      }}
-    >
-      <List
-        style={{
-          backgroundColor: THEME.colors.attributeBackground,
-        }}
-      >
-        <DetailListItem
-          title={"Mint address"}
-          value={nft.metadata.mint.toString()}
-        />
-        <DetailListItem
-          title={"Token address"}
-          value={nft.publicKey.toString()}
-        />
-        <DetailListItem
-          title={"Metadata address"}
-          value={nft.metadataAddress.toString()}
-        />
-        <DetailListItem
-          title={"Update authority"}
-          value={nft.metadata.updateAuthority.toString()}
-        />
-      </List>
-    </View>
-  );
-}
-
-function DetailListItem({ title, value }) {
-  return (
-    <ListItem
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        width: "100%",
-        padding: "12px",
-      }}
-    >
-      <Text
-        style={{
-          color: THEME.colors.text,
-          fontSize: "14px",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-        }}
-      >
-        {title}
-      </Text>
-      <Text
-        style={{
-          color: THEME.colors.textSecondary,
-          fontSize: "14px",
-          flexDirection: "column",
-          justifyContent: "center",
-          textOverflow: "ellipsis",
-          width: "138px",
-          overflow: "hidden",
-          display: "block",
-        }}
-      >
-        {value}
-      </Text>
-    </ListItem>
   );
 }

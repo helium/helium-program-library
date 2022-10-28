@@ -123,6 +123,7 @@ function GridItem({ nft }) {
   const [interval, setNewInterval] = useState<any>(null);
   const nav = useNavigation();
   const program = useProgram();
+  const connection = useConnection();
 
   useEffect(() => {
     (async () => {
@@ -153,7 +154,7 @@ function GridItem({ nft }) {
   }, [program, nft]);
 
   useEffect(() => {
-    if (!rewardsMint) return;
+    if (!rewardsMint || !connection) return;
     (async () => {
       const metadata = PublicKey.findProgramAddressSync(
         [
@@ -164,11 +165,11 @@ function GridItem({ nft }) {
         MPL_PID
       )[0];
       //@ts-ignore
-      const acc = await window.xnft.solana.connection.getAccountInfo(metadata);
-      const meta = Metadata.fromAccountInfo(acc)[0];
+      const acc = await connection.getAccountInfo(metadata);
+      const meta = Metadata.fromAccountInfo(acc!)[0];
       setSymbol(meta.data.symbol);
     })();
-  }, [rewardsMint]);
+  }, [rewardsMint, connection]);
 
   const clickNft = () => {
     nav.push("detail", { nft, pendingRewards, symbol });
@@ -203,6 +204,7 @@ function GridItem({ nft }) {
           style={{
             fontSize: "12px",
             lineHeight: "19.08px",
+            color: 'white',
           }}
         >
           {nft.tokenMetaUriData.name}
@@ -213,6 +215,7 @@ function GridItem({ nft }) {
           style={{
             fontSize: "12px",
             lineHeight: "19.08px",
+            color: 'white',
           }}
         >
           {`Rewards: ${pendingRewards || "0"} ${symbol || ""}`}
