@@ -29,11 +29,14 @@ export function App() {
                 return {
                   title: route.props.nft.tokenMetaUriData.name,
                 };
+              case "swap":
+                return {
+                  title: "Swap",
+                };
               default:
                 throw new Error("unknown route");
             }
           }}
-          style={{}}
         >
 
           <Stack.Screen
@@ -43,6 +46,10 @@ export function App() {
           <Stack.Screen
             name={"detail"}
             component={(props: any) => <DetailScreen {...props} />}
+          />
+          <Stack.Screen
+            name={"swap"}
+            component={(props: any) => <Swap {...props} />}
           />
         </Stack.Navigator>
       </NotificationProvider>
