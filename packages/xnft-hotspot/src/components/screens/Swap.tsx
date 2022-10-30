@@ -6,21 +6,23 @@ import {
   Text,
   Button,
   TextField,
+  Svg,
+  Path,
   usePublicKey,
   useConnection,
 } from "react-xnft";
-import { THEME } from "../utils/theme";
+import { THEME } from "../../utils/theme";
 import { PublicKey, Connection, ComputeBudgetProgram } from "@solana/web3.js";
-import { getMint, AccountLayout, getAssociatedTokenAddress } from "@solana/spl-token";
+import { getMint, AccountLayout, getAssociatedTokenAddress, getAccount } from "@solana/spl-token";
 import * as dc from "@helium-foundation/data-credits-sdk";
 import * as tm from "@helium-foundation/treasury-management-sdk";
-import { DC_MINT, MOBILE_MINT, toBN } from "@helium-foundation/spl-utils";
+import { DC_MINT, MOBILE_MINT, HNT_MINT, toBN, toNumber } from "@helium-foundation/spl-utils";
 import * as anchor from "@project-serum/anchor";
+import { SwapIcon } from "../../utils/icons";
 
 type Token = {
   name: string;
-  // mint only required for treasury swaps
-  mint?: PublicKey;
+  mint: PublicKey;
   toTokens?: string[];
   icon: string;
 }
@@ -103,6 +105,7 @@ async function getTreasuryPrice(connection: Connection, wallet: PublicKey, fromM
   ).amount / BigInt(Math.pow(10, treasuryMintAcc.decimals)));
   //@ts-ignore
   const k = (treasuryAcc.curve.exponentialCurveV0.k.toNumber() / Math.pow(10,12));
+  console.log("tm3", S, R, k);
   const dR = (R / Math.pow(S,k+1)) * (Math.pow((S - 1),k+1) - Math.pow(S,k+1));
   return Math.abs(dR);
 }
@@ -115,7 +118,8 @@ export function Swap() {
     {
       name: 'HNT',
       toTokens: ['DC'],
-      icon: 'https://s2.coinmarketcap.com/static/img/coins/64x64/5665.png'
+      icon: 'https://s2.coinmarketcap.com/static/img/coins/64x64/5665.png',
+      mint: HNT_MINT,
     },
     {
       name: 'MOBILE',
@@ -128,10 +132,12 @@ export function Swap() {
     {
       name: 'DC',
       icon: 'https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/dc.png',
+      mint: DC_MINT,
     },
     {
       name: 'HNT',
-      icon: 'https://s2.coinmarketcap.com/static/img/coins/64x64/5665.png'
+      icon: 'https://s2.coinmarketcap.com/static/img/coins/64x64/5665.png',
+      mint: HNT_MINT,
     }
   ];
 
@@ -178,6 +184,7 @@ export function Swap() {
             return
           }
         }
+        console.log("tm1");
         const p = await getTreasuryPrice(connection, publicKey, topSelected.mint!);
         const updated = {
           ...priceCache
@@ -186,6 +193,7 @@ export function Swap() {
           lastCheckedTime: new Date().getTime() / 1000,
           price: p
         }
+        console.log("tm2", p);
         setPriceCache(updated)
         setBottomAmount(round(p * topAmount, 4));
       }
@@ -207,6 +215,19 @@ export function Swap() {
     setIsDcMint(topSelected.name === "HNT" && bottomSelected.name === "DC");
   }, [topSelected, bottomSelected])
 
+  const [balance, setBalance] = useState<number>(0);
+  // update max balance
+  useEffect(() => {
+    async function loadBal() {
+      const ata = await getAssociatedTokenAddress(topSelected.mint, publicKey);
+      const acc = await getAccount(connection, ata);
+      const mint = await getMint(connection, topSelected.mint);
+      const bal = toNumber(new anchor.BN(acc.amount.toString()), mint);
+      setBalance(bal);
+    }
+    loadBal();
+  }, [topSelected])
+
   const executeSwap = useCallback(() => {
     console.log("swapping");
     if (isDcMint) {
@@ -224,57 +245,103 @@ export function Swap() {
       flexDirection: 'column',
       justifyContent: 'center',
       alignItems: 'center',
-
     }}>
       <View style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: '-25px',
-        marginBottom: '50px',
+        width: '85%'
       }}>
-        <TokenSelector tokens={topTokens} selected={topSelected} setSelected={setTopSelectedWrapper}/>
-        <TextField placeholder="Amount" 
-          style={{
-            marginLeft: '20px',
-            width: '30%',
-          }}
-          onChange={(e) => parseAndSetTop(e.target.value)}
-        />
-      </View>
-      <Image 
-        style={{
-          borderRadius: "6px",
-          width: "50px",
-          height: "50px",
-          opacity: swapAllowed ? '1' : '0.5',
-        }}
-        src="https://shdw-drive.genesysgo.net/CYPATLeMUuCkqBuREw1gYdfckZitf2rjMH4EqfTCMPJJ/transparent-down-arrow.png"
-      />
-      <View style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: '50px',
-        marginBottom: '30px',
-        width: '100%',
-      }}>
-        <TokenSelector tokens={bottomTokens} selected={bottomSelected} setSelected={setBottomSelected}/>
-        
         <View style={{
-          marginLeft: '20px',
-          borderRadius: '12px',
-          background: '#fff',
-          width: '30%',
-          opacity: '0.65',
+          display: 'flex',
+          justifyContent: 'space-between',
+          width: '100%',
+          marginBottom: '5px',
         }}>
-          <Text style={{
-            padding: '16.5px 14px',
-            color: '#4E5768',
-            textAlign: 'left',
-          }}>{ bottomAmount }</Text>
+          <Text style={{ color: 'black' }}>Sending</Text>
+          <View onClick={() => setTopAmount(balance)}><Text style={{ fontSize: '0.8em', cursor: 'pointer' }} >Max: {balance} {topSelected.name}</Text></View>
         </View>
+        <View style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginBottom: '50px',
+          width: '100%',
+        }}>
+          <TextField
+            tw="block p-4 pl-4 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+            placeholder="Amount"
+            value={isNaN(topAmount) ? '' : topAmount}
+            onChange={(e) => parseAndSetTop(e.target.value)}
+          />
+          <TokenSelector 
+            tw="flex text-white absolute right-10 top-25 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" 
+            tokens={topTokens} selected={topSelected} setSelected={setTopSelectedWrapper}/>
+        </View>
+      </View>
+
+      <View style={{
+        height: '0px',
+        borderBottom: '2px solid #E2E8F0',
+        fontSize: '14px',
+        fontWeight: '400',
+        lineHeight: '0.1em',
+        color: 'white',
+        width: '100%',
+        textAlign: 'center',
+        margin: '35px 0px 20px,',
         
+      }}>
+        <View style={{
+          background: 'white',
+          border: '1px solid #E2E8F0',
+          borderRadius: '50%',
+          position: 'absolute',
+          top: '192px',
+          left: '30px',
+
+        }}>
+          <Svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="40px" tw="p-1.5">
+            <Path
+              fill="#718096"
+              d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3 5 6.99h3V14h2V6.99h3L9 3z"
+            />
+          </Svg>
+        </View>
+      </View>
+      
+      <View style={{
+        width: '85%',
+        marginTop: '50px',
+      }}>
+        <View style={{
+          width: '85%',
+          marginBottom: '5px',
+        }}>
+          <Text style={{ color: 'black', textAlign: 'left' }}>Receiving</Text>
+        </View>
+        <View style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginBottom: '30px',
+          width: '100%',
+        }}>
+          
+          <View style={{
+            borderRadius: '12px',
+            width: '100%',
+            opacity: '0.65',
+          }}
+            tw="border-solid border border-gray-400 bg-gray-50"
+          >
+            <Text style={{
+              padding: '16.5px 14px',
+              color: '#4E5768',
+              textAlign: 'left',
+            }}>{ bottomAmount }</Text>
+          </View>
+          <TokenSelector
+            tw="flex text-white absolute right-10 top-25 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" 
+            tokens={bottomTokens} selected={bottomSelected} setSelected={setBottomSelected}/>
+        </View> 
       </View>
 
       <Button  
@@ -298,32 +365,44 @@ export function Swap() {
   );
 }
 
-function TokenSelector({ tokens, selected, setSelected }) {
+function TokenSelector({ tokens, selected, setSelected, tw }) {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   return (
-    <View>
+    <View tw={tw}>
       <View onClick={() => setIsOpen(!isOpen) } style={{
         color: '#fff',
         cursor: 'pointer',
+        display: 'flex',
       }}>
         <TokenDisplay token={selected} />
-        
+        <Svg
+          tw="black w-4 h-4 ml-2 mb-2 self-center"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+        >
+          <Path d="M19 9l-7 7-7-7" />
+        </Svg>
       </View>
       {isOpen && (
           <View style={{
-            borderRadius: '10px',
+            borderRadius: '4px',
             position: 'absolute',
-            marginTop: '20px',
-            backgroundColor: '#19243b',
+            marginTop: '40px',
             cursor: 'pointer',
             zIndex: '10',
-          }}>
+            webkitBoxShadow: "0 3px 7px rgba(0, 0, 0, 0.3)",
+            boxShadow: "0 3px 7px rgba(0, 0, 0, 0.3)",
+          }}
+            tw="bg-gray-100"
+          >
             {tokens.map((token: Token) => {
               return (
                 <View onClick={() => {setSelected(token); setIsOpen(!isOpen)}} style={{
                   cursor: 'pointer',
                   padding: '10px',
-                }}>
+                }}
+                  tw="hover:bg-gray-200"
+                >
                   <TokenDisplay token={token} />
                 </View>
               )

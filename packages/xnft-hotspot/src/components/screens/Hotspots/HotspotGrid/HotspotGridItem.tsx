@@ -85,6 +85,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
         background: useColorMode(THEME.colors.backgroundAccent),
         borderRadius: "6px",
         padding: "12px",
+        cursor: 'pointer',
       }}
     >
       <Flex flexDirection="column" padding="0px">

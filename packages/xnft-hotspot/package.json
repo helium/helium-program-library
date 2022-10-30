@@ -12,7 +12,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@coral-xyz/xnft-cli": "0.2.0-latest.171",
+    "@coral-xyz/xnft-cli": "0.2.0-latest.313",
     "@esbuild-plugins/node-globals-polyfill": "^0.1.1",
     "esbuild": "^0.15.12"
   },
@@ -27,6 +27,6 @@
     "bn.js": "^5.2.0",
     "ky": "^0.31.4",
     "react": "^17.0.2",
-    "react-xnft": "0.2.0-latest.171"
+    "react-xnft": "0.2.0-latest.313"
   }
 }
