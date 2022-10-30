@@ -62,8 +62,8 @@ export const App = () => {
             };
           }}
         >
-          <Tab.Screen name="swap" component={() => <Swap />} />
           <Tab.Screen name="hotspots" component={() => <HotspotsScreen />} />
+          <Tab.Screen name="swap" component={() => <Swap />} />
         </Tab.Navigator>
       </NotificationProvider>
     </Flex>
