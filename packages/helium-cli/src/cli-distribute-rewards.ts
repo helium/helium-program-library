@@ -70,13 +70,13 @@ async function run() {
   );
   console.log(rewards);
 
-  const tx = await client.formTransaction(
-    lazyDistributorProgram,
+  const tx = await client.formTransaction({
+    program: lazyDistributorProgram,
     provider,
     rewards,
     hotspot,
     lazyDistributor
-  );
+  });
   await sendAndConfirmWithRetry(
     provider.connection,
     tx.serialize(),

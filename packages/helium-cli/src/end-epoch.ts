@@ -28,6 +28,11 @@ const yarg = yargs(hideBin(process.argv)).options({
     default: "http://127.0.0.1:8899",
     describe: "The solana url",
   },
+  oracleUrl: {
+    alias: "o",
+    default: "http://localhost:8080",
+    describe: "The oracle url",
+  },
   mobileKeypair: {
     type: "string",
     describe: "Keypair of the Mobile token",
@@ -71,7 +76,7 @@ async function run() {
     })
     .rpc({ skipPreflight: true });
 
-  await axios.post("http://localhost:8080/endepoch")
+  await axios.post(`${argv.oracleUrl}/endepoch`)
 }
 
 run()

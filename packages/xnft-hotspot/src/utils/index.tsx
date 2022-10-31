@@ -13,8 +13,11 @@ import BN from "bn.js";
 import { useEffect, useState } from "react";
 import { useConnection, usePublicKey } from "react-xnft";
 
+export const MOBILE_MINT = new PublicKey(
+  "CKuwd2oB8be14g9Y94NuM87nZZzq9HXDBeEe6N3QXZdN"
+);
 export const LAZY_KEY = lazyDistributorKey(
-  new PublicKey("mob1r1x3raXXoH42RZwxTxgbAuKkBQzTAQqSjkUdZbd")
+  MOBILE_MINT
 )[0];
 
 export function useTokenAccounts() {
