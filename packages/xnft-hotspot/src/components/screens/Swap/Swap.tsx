@@ -11,7 +11,6 @@ import {
   usePublicKey,
   useConnection,
 } from "react-xnft";
-import { THEME } from "../../utils/theme";
 import { PublicKey, Connection, ComputeBudgetProgram } from "@solana/web3.js";
 import {
   getMint,
@@ -29,7 +28,9 @@ import {
   toNumber,
 } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
-import { SwapIcon } from "../../utils/icons";
+import classnames from "classnames";
+import { THEME } from "../../../utils/theme";
+import { useTitleColor } from "../../../utils/hooks";
 
 type Token = {
   name: string;
@@ -153,6 +154,7 @@ async function getTreasuryPrice(
 }
 
 export function Swap() {
+  useTitleColor();
   const publicKey = usePublicKey();
   const connection = useConnection();
   const dcRate = 1; //TODO this needs to be fetched from an oracle
@@ -287,54 +289,31 @@ export function Swap() {
   }, [isDcMint, topAmount, connection, publicKey]);
 
   return (
-    <View
-      tw="flex flex-col"
-      style={{
-        textAlign: "center",
-        display: "flex",
-        height: "100%",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <View
-        style={{
-          width: "85%",
-        }}
-      >
-        <View
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            width: "100%",
-            marginBottom: "5px",
-          }}
-        >
-          <Text style={{ color: "black" }}>Sending</Text>
-          <View onClick={() => setTopAmount(balance)}>
-            <Text style={{ fontSize: "0.8em", cursor: "pointer" }}>
-              Max: {balance} {topSelected.name}
+    <View tw="relative h-full text-center pt-5">
+      <View tw="w-full px-5 mb-10">
+        <View tw="flex w-full mb-1 justify-between items-baseline">
+          <Text tw="text-zinc-900 dark:text-zinc-400">Burning</Text>
+          <View
+            tw="flex justify-baseline"
+            onClick={() => setTopAmount(balance)}
+          >
+            <Text tw="text-xs text-zinc-900 dark:text-zinc-400 cursor-pointer">
+              Max:&nbsp;
+            </Text>
+            <Text tw="text-xs font-bold text-zinc-800 dark:text-zinc-300 cursor-pointer">
+              {balance}
             </Text>
           </View>
         </View>
-        <View
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            marginBottom: "50px",
-            width: "100%",
-          }}
-        >
+        <View tw="flex flex-row relative justify-center items-center mb-12 w-full">
           <TextField
-            tw="block p-4 pl-4 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+            tw="block p-3 w-full text-lg text-gray-900 bg-gray-50 rounded-lg hover:border-blue-500 focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-900/[.8] dark:border-zinc-800 dark:placeholder-zinc-400 dark:text-white"
             placeholder="Amount"
             value={isNaN(topAmount) ? "" : topAmount}
             onChange={(e) => parseAndSetTop(e.target.value)}
           />
           <TokenSelector
-            tw="flex text-white absolute right-10 top-25 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+            tw="flex text-white absolute right-0 top-25 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-r-lg text-sm px-4 py-2 dark:hover:bg-zinc-900 dark:focus:ring-blue-800"
             tokens={topTokens}
             selected={topSelected}
             setSelected={setTopSelectedWrapper}
@@ -342,86 +321,16 @@ export function Swap() {
         </View>
       </View>
 
-      <View
-        style={{
-          height: "0px",
-          borderBottom: "2px solid #E2E8F0",
-          fontSize: "14px",
-          fontWeight: "400",
-          lineHeight: "0.1em",
-          color: "white",
-          width: "100%",
-          textAlign: "center",
-          margin: "35px 0px 20px,",
-        }}
-      >
-        <View
-          style={{
-            background: "white",
-            border: "1px solid #E2E8F0",
-            borderRadius: "50%",
-            position: "absolute",
-            top: "192px",
-            left: "30px",
-          }}
-        >
-          <Svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            width="40px"
-            tw="p-1.5"
-          >
-            <Path
-              fill="#718096"
-              d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3 5 6.99h3V14h2V6.99h3L9 3z"
-            />
-          </Svg>
-        </View>
-      </View>
+      <View tw="border-b-2 block w-full h-2 border-zinc-900 dark:border-zinc-900/[.5]"></View>
 
-      <View
-        style={{
-          width: "85%",
-          marginTop: "50px",
-        }}
-      >
-        <View
-          style={{
-            width: "85%",
-            marginBottom: "5px",
-          }}
-        >
-          <Text style={{ color: "black", textAlign: "left" }}>Receiving</Text>
+      <View tw="w-full mt-10 px-5">
+        <View tw="flex w-full mb-1 justify-between items-baseline">
+          <Text tw="text-zinc-900 dark:text-zinc-400">Receiving</Text>
         </View>
-        <View
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            marginBottom: "30px",
-            width: "100%",
-          }}
-        >
-          <View
-            style={{
-              borderRadius: "12px",
-              width: "100%",
-              opacity: "0.65",
-            }}
-            tw="border-solid border border-gray-400 bg-gray-50"
-          >
-            <Text
-              style={{
-                padding: "16.5px 14px",
-                color: "#4E5768",
-                textAlign: "left",
-              }}
-            >
-              {bottomAmount}
-            </Text>
-          </View>
+        <View tw="flex justify-between p-3 relative items-center w-full rounded-lg bg-gray-50/[.8] dark:bg-zinc-900/[.4] ">
+          <Text tw="text-lg text-gray-900 dark:text-white">{bottomAmount}</Text>
           <TokenSelector
-            tw="flex text-white absolute right-10 top-25 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+            tw="flex text-white absolute right-0 top-25 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-r-lg text-sm px-4 py-2 dark:hover:bg-zinc-900 dark:focus:ring-blue-800"
             tokens={bottomTokens}
             selected={bottomSelected}
             setSelected={setBottomSelected}
@@ -429,27 +338,21 @@ export function Swap() {
         </View>
       </View>
 
-      <Button
-        style={{
-          height: "48px",
-          width: "50%",
-          fontSize: "1em",
-          backgroundColor: THEME.colors.green[400],
-          opacity: swapAllowed ? "1" : "0.5",
-          color: "#000",
-        }}
-        onClick={executeSwap}
-      >
-        {swapAllowed ? "Swap" : "Invalid swap"}
-      </Button>
-      <Text
-        style={{
-          fontSize: "0.7em",
-          marginTop: "15px",
-        }}
-      >
-        Note: Trades completed using this tool are only one way.
-      </Text>
+      <View tw="flex flex-col w-full p-5 absolute bottom-0">
+        <Text tw="text-xs mb-2">
+          Note: Trades completed using this tool are only one way.
+        </Text>
+        <Button
+          tw={classnames([
+            "h-12 w-full text-white font-bold text-md border-0 rounded-md",
+            ...[swapAllowed && ["bg-green-600", "hover:bg-green-700"]],
+            ...[!swapAllowed && "bg-green-600/[0.5]"],
+          ])}
+          onClick={executeSwap}
+        >
+          {swapAllowed ? "Burn" : "Invalid burn"}
+        </Button>
+      </View>
     </View>
   );
 }
@@ -486,7 +389,7 @@ function TokenSelector({ tokens, selected, setSelected, tw }) {
             webkitBoxShadow: "0 3px 7px rgba(0, 0, 0, 0.3)",
             boxShadow: "0 3px 7px rgba(0, 0, 0, 0.3)",
           }}
-          tw="bg-gray-100"
+          tw="bg-gray-100 dark:bg-zinc-900"
         >
           {tokens.map((token: Token) => {
             return (
@@ -499,7 +402,7 @@ function TokenSelector({ tokens, selected, setSelected, tw }) {
                   cursor: "pointer",
                   padding: "10px",
                 }}
-                tw="hover:bg-gray-200"
+                tw="hover:bg-gray-200 dark:hover:bg-zinc-800"
               >
                 <TokenDisplay token={token} />
               </View>
