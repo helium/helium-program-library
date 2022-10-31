@@ -90,23 +90,23 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
         <Image tw="rounded-md w-full" src={nft.tokenMetaUriData.image} />
       </View>
       <View tw="flex flex-col p-1">
-        <Text tw="text-lg font-bold !m-0 text-color-zinc-700 dark:text-color-zinc-400">
+        <Text tw="text-lg font-bold !m-0 text-zinc-700 dark:text-zinc-200">
           {nft.tokenMetaUriData.name}
         </Text>
         <View tw="flex flex-row items-baseline">
-          <Text tw="text-md font-bold !m-0 text-color-zinc-700 dark:text-color-zinc-400">
+          <Text tw="text-md font-bold !m-0 text-zinc-700 dark:text-zinc-400">
             Pending rewards:&nbsp;
           </Text>
-          <Text tw="text-sm !m-0 text-color-zinc-700 dark:text-color-zinc-400">
+          <Text tw="text-sm !m-0 text-zinc-700 dark:text-zinc-200">
             {pendingRewards || "0"} {symbol || ""}
           </Text>
         </View>
 
         <View tw="flex flex-row items-baseline">
-          <Text tw="text-md font-bold !m-0 text-color-zinc-700 dark:text-color-zinc-400">
+          <Text tw="text-md font-bold !m-0 text-zinc-700 dark:text-zinc-400">
             Description:&nbsp;
           </Text>
-          <Text tw="text-sm !m-0 text-color-zinc-700 dark:text-color-zinc-400">
+          <Text tw="text-sm !m-0 text-zinc-700 dark:text-zinc-200">
             {nft.tokenMetaUriData.description}
           </Text>
         </View>
@@ -116,8 +116,8 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
         <Button
           tw={classnames([
             "h-12 w-full text-white font-bold text-md border-0 rounded-md",
-            ...[hasRewards && ["bg-green-500", "hover:bg-green-600"]],
-            ...[!hasRewards && "bg-green-500/[0.5]"],
+            ...[hasRewards && ["bg-green-600", "hover:bg-green-700"]],
+            ...[!hasRewards && "bg-green-600/[0.5]"],
           ])}
           onClick={hasRewards ? () => claimRewards() : () => {}}
         >

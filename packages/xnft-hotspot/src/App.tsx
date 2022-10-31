@@ -1,9 +1,8 @@
 import React from "react";
 import ReactXnft, { View, Tab, useMetadata } from "react-xnft";
-import { Flex } from "./components/common";
 import { HotspotIcon, SwapIcon } from "./utils/icons";
 import { HotspotsScreen } from "./components/screens/Hotspots";
-import { Swap } from "./components/screens/Swap";
+import { SwapScreen } from "./components/screens/Swap";
 import { Notification } from "./components/Notification";
 import { NotificationProvider } from "./contexts/notification";
 import { THEME } from "./utils/theme";
@@ -56,7 +55,7 @@ export const App = () => {
           }}
         >
           <Tab.Screen name="hotspots" component={() => <HotspotsScreen />} />
-          <Tab.Screen name="swap" component={() => <Swap />} />
+          <Tab.Screen name="swap" component={() => <SwapScreen />} />
         </Tab.Navigator>
       </NotificationProvider>
     </View>
