@@ -23,13 +23,15 @@ export async function getCurrentRewards(
   );
 
   const results = await Promise.all(
-    lazyDistributorAcc.oracles.map((x) =>
+    // @ts-ignore
+    lazyDistributorAcc.oracles.map((x: any) =>
       axios.get(`${x.url}?mint=${mint.toBase58()}`)
     )
   );
-  return results.map((x, idx) => {
+  return results.map((x: any, idx: number) => {
     return {
       currentRewards: x.data.currentRewards,
+      // @ts-ignore
       oracleKey: lazyDistributorAcc.oracles[idx].oracle,
     };
   });

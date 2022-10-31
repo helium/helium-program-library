@@ -33,6 +33,7 @@ export interface Database {
   endEpoch: () => Promise<{
     [key: string]: number;
   }>;
+  reset: () => void
 }
 
 export class DatabaseMock implements Database {
@@ -54,6 +55,13 @@ export class DatabaseMock implements Database {
       byHotspot: {},
     };
   }
+  reset() {
+    this.inMemHash = {
+      totalClicks: 0,
+      lifetimeRewards: 0,
+      byHotspot: {},
+    }
+  };
 
   async getCurrentRewards(mint: PublicKey) {
     const storageKey = hotspotStorageKey(mint)[0];
@@ -61,6 +69,7 @@ export class DatabaseMock implements Database {
       const storage = await this.issuanceProgram.account.hotspotStorageV0.fetch(
         storageKey
       );
+      // @ts-ignore
       const pubkey = new Address(0, 0, 0, storage.eccCompact).b58;
       return Math.floor(
         (this.inMemHash.byHotspot[pubkey]?.lifetimeRewards || 0) *
@@ -140,8 +149,8 @@ export class OracleServer {
   }
 
   public start() {
-    this.server = this.app.listen(this.port, () => {
-      console.log(`server started at http://localhost:${this.port}`);
+    this.server = this.app.listen(this.port, "0.0.0.0", () => {
+      console.log(`server started at http://0.0.0.0:${this.port}`);
     });
   }
 
@@ -151,9 +160,16 @@ export class OracleServer {
 
   private addRoutes() {
     this.app.get("/", this.getCurrentRewardsHandler.bind(this));
+    this.app.get("/health", (req: Request, res: Response) =>
+      res.json({ ok: true })
+    );
     this.app.post("/", this.signTransactionHandler.bind(this));
     this.app.post("/hotspots", this.incrementHotspotRewardsHandler.bind(this));
     this.app.post("/endepoch", this.endEpochHandler.bind(this));
+    this.app.get("/reset", (req: Request, res: Response) => {
+      this.db.reset()
+      res.json({ ok: true })
+    });
   }
 
   private async endEpochHandler(reg: Request, res: Response) {

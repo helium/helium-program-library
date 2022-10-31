@@ -3,7 +3,8 @@
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
-  },
+  }, 
+ "license": "Apache-2.0",
   "version": "0.0.2",
   "description": "Interface to the data-credits smart contract",
   "repository": {
@@ -47,6 +48,5 @@
     "yarn": "^1.22.18"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "author": ""
 }

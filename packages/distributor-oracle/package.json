@@ -4,6 +4,7 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
+  "license": "Apache-2.0",
   "version": "0.0.2",
   "description": "Oracle server for the lazy distributor",
   "repository": {
@@ -28,6 +29,7 @@
     "clean": "npx shx mkdir -p lib && npx shx rm -rf lib",
     "package": "npx shx mkdir -p lib/cjs lib/esm",
     "prebuild": "npm run clean && npm run package",
+    "build": "tsc -p tsconfig.json",
     "dev": "npx nodemon src/server.ts serve",
     "start": "node lib/cjs/server.js serve"
   },
