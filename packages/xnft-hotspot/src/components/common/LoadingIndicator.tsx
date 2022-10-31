@@ -1,13 +1,12 @@
-import { FC } from "react";
-import { Loading } from "react-xnft";
-import { Flex } from "./layout/Flex";
+import React, { FC } from "react";
+import { View, Loading } from "react-xnft";
 
 export interface LoadingIndicatorProps {}
 
 export const LoadingIndicator: FC<LoadingIndicatorProps> = () => (
-  <Flex container flexDirection="column" justifyContent="center" height="100%">
+  <View tw="flex flex-col justify-center h-full w-full">
     <Loading
       style={{ display: "block", marginLeft: "auto", marginRight: "auto" }}
     />
-  </Flex>
+  </View>
 );

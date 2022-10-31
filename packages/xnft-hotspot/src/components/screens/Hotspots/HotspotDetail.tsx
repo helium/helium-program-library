@@ -1,22 +1,22 @@
 import React, { FC, useState } from "react";
 import {
-  usePublicKey,
-  useConnection,
+  View,
   Image,
   Text,
   Button,
   Loading,
+  usePublicKey,
+  useConnection,
 } from "react-xnft";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
 import { init } from "@helium/lazy-distributor-sdk";
 import * as client from "@helium/distributor-oracle";
 import ky from "ky";
-import { THEME } from "../../../utils/theme";
+import classnames from "classnames";
 import { LAZY_KEY } from "../../../utils";
 import { useNotification } from "../../../contexts/notification";
-import { useColorMode, useTitleColor } from "../../../utils/hooks";
-import { Flex } from "../../common";
+import { useTitleColor } from "../../../utils/hooks";
 
 interface HotspotDetailScreenProps {
   nft: any; // TODO: actually type this
@@ -85,112 +85,40 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
   };
 
   return (
-    <Flex flexDirection="column">
-      <Flex
-        padding="12px"
-        borderRadius="6px"
-        background={useColorMode(THEME.colors.backgroundAccent)}
-      >
-        <Image
-          src={nft.tokenMetaUriData.image}
-          style={{
-            borderRadius: "6px",
-            width: "100%",
-          }}
-        />
-      </Flex>
-
-      <Flex flexDirection="column" px={1} py={1}>
-        <Text
-          style={{
-            fontSize: "20px",
-            fontWeight: 600,
-            lineHeight: "normal",
-            margin: 0,
-            color: useColorMode({
-              light: THEME.colors.gray[700],
-              dark: THEME.colors.gray[400],
-            }),
-          }}
-        >
+    <View tw="flex flex-col px-5">
+      <View tw="flex flex-row p-3 rounded-md bg-zinc-200 dark:bg-zinc-900 mb-5">
+        <Image tw="rounded-md w-full" src={nft.tokenMetaUriData.image} />
+      </View>
+      <View tw="flex flex-col p-1">
+        <Text tw="text-lg font-bold !m-0 text-color-zinc-700 dark:text-color-zinc-400">
           {nft.tokenMetaUriData.name}
         </Text>
-        <Flex alignItems="center">
-          <Text
-            style={{
-              fontSize: "16px",
-              fontWeight: 600,
-              lineHeight: "normal",
-              margin: 0,
-              color: useColorMode({
-                light: THEME.colors.gray[700],
-                dark: THEME.colors.gray[400],
-              }),
-            }}
-          >
+        <View tw="flex flex-row items-baseline">
+          <Text tw="text-md font-bold !m-0 text-color-zinc-700 dark:text-color-zinc-400">
             Pending rewards:&nbsp;
           </Text>
-          <Text
-            style={{
-              fontSize: "14px",
-              lineHeight: "normal",
-              margin: 0,
-              color: useColorMode({
-                light: THEME.colors.gray[600],
-                dark: THEME.colors.gray[500],
-              }),
-            }}
-          >
+          <Text tw="text-sm !m-0 text-color-zinc-700 dark:text-color-zinc-400">
             {pendingRewards || "0"} {symbol || ""}
           </Text>
-        </Flex>
+        </View>
 
-        <Flex alignItems="center">
-          <Text
-            style={{
-              fontSize: "16px",
-              fontWeight: 600,
-              lineHeight: "normal",
-              margin: 0,
-              color: useColorMode({
-                light: THEME.colors.gray[700],
-                dark: THEME.colors.gray[400],
-              }),
-            }}
-          >
+        <View tw="flex flex-row items-baseline">
+          <Text tw="text-md font-bold !m-0 text-color-zinc-700 dark:text-color-zinc-400">
             Description:&nbsp;
           </Text>
-          <Text
-            style={{
-              fontSize: "14px",
-              lineHeight: "normal",
-              margin: 0,
-              color: useColorMode({
-                light: THEME.colors.gray[600],
-                dark: THEME.colors.gray[500],
-              }),
-            }}
-          >
+          <Text tw="text-sm !m-0 text-color-zinc-700 dark:text-color-zinc-400">
             {nft.tokenMetaUriData.description}
           </Text>
-        </Flex>
-      </Flex>
+        </View>
+      </View>
 
-      <Flex flexDirection="row" py={1} mt={1}>
+      <View tw="flex flex-row mt-5 mb-5">
         <Button
-          style={{
-            height: "48px",
-            width: "100%",
-            fontSize: "1em",
-            fontWeight: 600,
-            backgroundColor: hasRewards
-              ? THEME.colors.green[400]
-              : THEME.colors.green[200],
-            color: THEME.colors.white,
-            border: "none",
-            borderRadius: "6px",
-            marginBottom: "8px",
-          }}
+          tw={classnames([
+            "h-12 w-full text-white font-bold text-md border-0 rounded-md",
+            ...[hasRewards && ["bg-green-500", "hover:bg-green-600"]],
+            ...[!hasRewards && "bg-green-500/[0.5]"],
+          ])}
           onClick={hasRewards ? () => claimRewards() : () => {}}
         >
           {hasRewards ? `Claim rewards` : `No rewards to claim`}
@@ -204,7 +132,7 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
             />
           )}
         </Button>
-      </Flex>
-    </Flex>
+      </View>
+    </View>
   );
 };
