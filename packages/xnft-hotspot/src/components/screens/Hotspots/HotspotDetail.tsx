@@ -1,4 +1,4 @@
-import { FC, useState } from "react";
+import React, { FC, useState } from "react";
 import {
   View,
   Image,
@@ -86,28 +86,27 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
 
   return (
     <View tw="flex flex-col px-5">
-      <View tw="flex rounded-md p-4 mb-2 bg-zinc-300 dark:bg-zinc-900">
-        <Image tw="w-full rounded-md" src={nft.tokenMetaUriData.image} />
+      <View tw="flex flex-row p-3 rounded-md bg-zinc-200 dark:bg-zinc-900 mb-5">
+        <Image tw="rounded-md w-full" src={nft.tokenMetaUriData.image} />
       </View>
-
-      <View tw="flex flex-col px-1">
-        <Text tw="text-lg font-bold !m-0 text-zinc-900 dark:text-zinc-200">
+      <View tw="flex flex-col p-1">
+        <Text tw="text-lg font-bold !m-0 text-color-zinc-700 dark:text-color-zinc-400">
           {nft.tokenMetaUriData.name}
         </Text>
-        <View tw="flex flex-row items-center">
-          <Text tw="text-md font-bold !m-0 text-zinc-900 dark:text-zinc-200">
+        <View tw="flex flex-row items-baseline">
+          <Text tw="text-md font-bold !m-0 text-color-zinc-700 dark:text-color-zinc-400">
             Pending rewards:&nbsp;
           </Text>
-          <Text tw="text-sm !m-0 text-zinc-600 dark:text-zinc-400">
+          <Text tw="text-sm !m-0 text-color-zinc-700 dark:text-color-zinc-400">
             {pendingRewards || "0"} {symbol || ""}
           </Text>
         </View>
 
-        <View tw="flex flex-row items-center">
-          <Text tw="text-md font-bold !m-0 text-zinc-900 dark:text-zinc-200">
+        <View tw="flex flex-row items-baseline">
+          <Text tw="text-md font-bold !m-0 text-color-zinc-700 dark:text-color-zinc-400">
             Description:&nbsp;
           </Text>
-          <Text tw="text-sm !m-0 text-zinc-600 dark:text-zinc-400">
+          <Text tw="text-sm !m-0 text-color-zinc-700 dark:text-color-zinc-400">
             {nft.tokenMetaUriData.description}
           </Text>
         </View>
@@ -115,12 +114,11 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
 
       <View tw="flex flex-row mt-5 mb-5">
         <Button
-          tw={classnames(
+          tw={classnames([
             "h-12 w-full text-white font-bold text-md border-0 rounded-md",
-            { "bg-green-500": hasRewards },
-            { "bg-green-500/[0.5]": !hasRewards },
-            { "hover:bg-green-600": hasRewards }
-          )}
+            ...[hasRewards && ["bg-green-500", "hover:bg-green-600"]],
+            ...[!hasRewards && "bg-green-500/[0.5]"],
+          ])}
           onClick={hasRewards ? () => claimRewards() : () => {}}
         >
           {hasRewards ? `Claim rewards` : `No rewards to claim`}
