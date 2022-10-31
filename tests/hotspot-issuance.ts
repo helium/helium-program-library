@@ -18,7 +18,7 @@ import { HotspotIssuance } from "../target/types/hotspot_issuance";
 import { DC_FEE, ensureDCIdl, initTestHotspotConfig, initTestHotspotIssuer, initWorld } from "./utils/fixtures";
 
 describe("hotspot-issuance", () => {
-  anchor.setProvider(anchor.AnchorProvider.local("https://api.devnet.solana.com"));
+  anchor.setProvider(anchor.AnchorProvider.local("https://127.0.0.1:8899"));
 
   let dcProgram: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
