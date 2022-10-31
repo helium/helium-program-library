@@ -1,5 +1,5 @@
-import React, { FC, useEffect } from "react";
-import { Button, useNavigation, usePublicKey, useConnection } from "react-xnft";
+import React, { FC } from "react";
+import { View, Button, usePublicKey, useConnection } from "react-xnft";
 import * as anchor from "@project-serum/anchor";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { init } from "@helium/lazy-distributor-sdk";
@@ -7,8 +7,7 @@ import * as client from "@helium/distributor-oracle";
 import ky from "ky";
 import { HotspotGridItem } from "./HotspotGridItem";
 import { LAZY_KEY, useTokenAccounts } from "../../../../utils/index";
-import { THEME } from "../../../../utils/theme";
-import { Flex, LoadingIndicator } from "../../../common";
+import { LoadingIndicator } from "../../../common";
 import { useTitleColor } from "../../../../utils/hooks";
 
 interface HotspotGridScreenProps {}
@@ -16,7 +15,6 @@ interface HotspotGridScreenProps {}
 export const HotspotGridScreen: FC<HotspotGridScreenProps> = () => {
   useTitleColor();
   const tokenAccounts = useTokenAccounts();
-  const nav = useNavigation();
   const publicKey = usePublicKey();
   const connection = useConnection();
 
@@ -64,34 +62,21 @@ export const HotspotGridScreen: FC<HotspotGridScreenProps> = () => {
     }
   };
 
-  const clickSwap = () => {
-    nav.push("swap", {});
-  };
-
   return (
-    <Flex flexDirection="column">
-      <Flex flexWrap="wrap" gap={1} justifyContent="center" mb={2}>
+    <View tw="flex flex-col">
+      <View tw="flex flex-row flex-wrap justify-between px-5 mb-5">
         {tokenAccounts.map((nft) => (
           <HotspotGridItem key={nft.metadata.mint} nft={nft} />
         ))}
-      </Flex>
-      <Flex justifyContent="center" width="100%" mb={2} py={1}>
+      </View>
+      <View tw="flex w-full justify-center sticky bottom-0 px-5 mb-5 bg-green-400 dark:bg-zinc-800">
         <Button
-          style={{
-            height: "48px",
-            width: "100%",
-            fontSize: "1em",
-            fontWeight: 600,
-            backgroundColor: THEME.colors.green[400],
-            color: THEME.colors.white,
-            border: "none",
-            borderRadius: "6px",
-          }}
+          tw="h-12 w-full text-white font-bold text-md border-0 rounded-md bg-green-500 hover:bg-green-600"
           onClick={() => claimAllRewards()}
         >
           Claim all rewards
         </Button>
-      </Flex>
-    </Flex>
+      </View>
+    </View>
   );
 };

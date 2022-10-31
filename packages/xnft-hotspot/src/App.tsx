@@ -1,5 +1,5 @@
 import React from "react";
-import ReactXnft, { Tab, useMetadata } from "react-xnft";
+import ReactXnft, { View, Tab, useMetadata } from "react-xnft";
 import { Flex } from "./components/common";
 import { HotspotIcon, SwapIcon } from "./utils/icons";
 import { HotspotsScreen } from "./components/screens/Hotspots";
@@ -18,17 +18,10 @@ ReactXnft.events.on("connect", () => {
 
 export const App = () => {
   const metadata = useMetadata();
-  const bgColor = useColorMode(THEME.colors.background);
   const bgAccentColor = useColorMode(THEME.colors.backgroundAccent);
-  const textColor = useColorMode(THEME.colors.text);
 
   return (
-    <Flex
-      flexDirection="column"
-      height="100%"
-      width="100%"
-      background={bgColor}
-    >
+    <View tw="flex flex-col h-full w-full bg-white dark:bg-zinc-800">
       <NotificationProvider>
         <Notification></Notification>
         <Tab.Navigator
@@ -66,6 +59,6 @@ export const App = () => {
           <Tab.Screen name="swap" component={() => <Swap />} />
         </Tab.Navigator>
       </NotificationProvider>
-    </Flex>
+    </View>
   );
 };
