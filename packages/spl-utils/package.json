@@ -1,5 +1,5 @@
 {
-  "name": "@helium-foundation/spl-utils",
+  "name": "@helium/spl-utils",
   "version": "0.0.1",
   "description": "Utils shared across spl suite",
   "publishConfig": {

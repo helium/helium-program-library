@@ -17,10 +17,10 @@
     "esbuild": "^0.15.12"
   },
   "dependencies": {
-    "@helium-foundation/distributor-oracle": "^0.0.1",
-    "@helium-foundation/idls": "^0.0.1",
-    "@helium-foundation/lazy-distributor-sdk": "^0.0.1",
-    "@helium-foundation/spl-utils": "^0.0.1",
+    "@helium/distributor-oracle": "^0.0.1",
+    "@helium/idls": "^0.0.1",
+    "@helium/lazy-distributor-sdk": "^0.0.1",
+    "@helium/spl-utils": "^0.0.1",
     "@project-serum/anchor": "^0.25.0",
     "@solana/spl-token": "^0.3.5",
     "assert": "^2.0.0",

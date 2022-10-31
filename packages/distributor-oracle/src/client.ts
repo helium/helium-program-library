@@ -4,9 +4,9 @@ import {
   BN,
 } from "@project-serum/anchor";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
+import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import axios from "axios";
-import { recipientKey } from "@helium-foundation/lazy-distributor-sdk";
+import { recipientKey } from "@helium/lazy-distributor-sdk";
 import { getAccount } from "@solana/spl-token";
 
 export type Reward = {

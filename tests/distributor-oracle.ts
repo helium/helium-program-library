@@ -11,8 +11,8 @@ import {
 import { init, PROGRAM_ID, lazyDistributorKey, recipientKey } from "../packages/lazy-distributor-sdk/src";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { AuthorityType, createSetAuthorityInstruction } from "@solana/spl-token";
-import { sendAndConfirmWithRetry, createMint, createNft, createAtaAndMint  } from '@helium-foundation/spl-utils';
-import { ThresholdType } from '@helium-foundation/circuit-breaker-sdk';
+import { sendAndConfirmWithRetry, createMint, createNft, createAtaAndMint  } from '@helium/spl-utils';
+import { ThresholdType } from '@helium/circuit-breaker-sdk';
 
 
 chai.use(chaiHttp);

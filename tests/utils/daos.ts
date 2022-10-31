@@ -2,8 +2,8 @@ import * as anchor from "@project-serum/anchor";
 import { BN } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
-import { createAtaAndMint, createMint } from "@helium-foundation/spl-utils";
-import { ThresholdType } from "@helium-foundation/circuit-breaker-sdk";
+import { createAtaAndMint, createMint } from "@helium/spl-utils";
+import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { toU128 } from "../../packages/treasury-management-sdk/src";
 
 export async function initTestDao(

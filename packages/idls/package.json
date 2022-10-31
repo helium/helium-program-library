@@ -1,5 +1,5 @@
 {
-  "name": "@helium-foundation/idls",
+  "name": "@helium/idls",
   "version": "0.0.1",
   "description": "Exported idls",
   "publishConfig": {

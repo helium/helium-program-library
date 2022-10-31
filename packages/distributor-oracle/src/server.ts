@@ -18,13 +18,13 @@ import {
   setProvider,
   getProvider,
 } from "@project-serum/anchor";
-import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
-import { HotspotIssuance } from "@helium-foundation/idls/lib/types/hotspot_issuance";
+import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
+import { HotspotIssuance } from "@helium/idls/lib/types/hotspot_issuance";
 import {
   hotspotStorageKey,
   init as initHotspotIssuance,
-} from "@helium-foundation/hotspot-issuance-sdk";
-import { init, PROGRAM_ID } from "@helium-foundation/lazy-distributor-sdk";
+} from "@helium/hotspot-issuance-sdk";
+import { init, PROGRAM_ID } from "@helium/lazy-distributor-sdk";
 import fs from "fs";
 
 export interface Database {

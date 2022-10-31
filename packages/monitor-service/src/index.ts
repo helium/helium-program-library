@@ -1,9 +1,9 @@
 import {
   init as cbInit
-} from "@helium-foundation/circuit-breaker-sdk";
-import { daoKey, init as hsdInit, subDaoKey } from "@helium-foundation/helium-sub-daos-sdk";
-import { CircuitBreaker } from "@helium-foundation/idls/lib/types/circuit_breaker";
-import { HeliumSubDaos } from "@helium-foundation/idls/lib/types/helium_sub_daos";
+} from "@helium/circuit-breaker-sdk";
+import { daoKey, init as hsdInit, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
+import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
 import * as anchor from "@project-serum/anchor";
 import fastify from "fastify";
 import { HNT_MINT, MOBILE_MINT } from "./env";

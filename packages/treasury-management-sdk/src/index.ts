@@ -1,6 +1,6 @@
 import { AnchorProvider, Idl, Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { TreasuryManagement } from "@helium-foundation/idls/lib/types/treasury_management";
+import { TreasuryManagement } from "@helium/idls/lib/types/treasury_management";
 import { PROGRAM_ID } from "./constants";
 import { treasuryManagementResolvers } from "./resolvers";
 import BN from "bn.js";

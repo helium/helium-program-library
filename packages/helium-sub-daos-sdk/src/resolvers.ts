@@ -4,10 +4,10 @@ import {
   ataResolver,
   combineResolvers,
   get,
-} from "@helium-foundation/spl-utils";
-import { resolveIndividual } from "@helium-foundation/spl-utils";
+} from "@helium/spl-utils";
+import { resolveIndividual } from "@helium/spl-utils";
 import { PROGRAM_ID } from "./constants";
-import { treasuryManagementResolvers } from "@helium-foundation/treasury-management-sdk";
+import { treasuryManagementResolvers } from "@helium/treasury-management-sdk";
 
 export const subDaoEpochInfoResolver = resolveIndividual(
   async ({ provider, path, accounts }) => {

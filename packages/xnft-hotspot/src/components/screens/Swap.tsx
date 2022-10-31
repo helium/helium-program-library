@@ -14,9 +14,9 @@ import {
 import { THEME } from "../../utils/theme";
 import { PublicKey, Connection, ComputeBudgetProgram } from "@solana/web3.js";
 import { getMint, AccountLayout, getAssociatedTokenAddress, getAccount } from "@solana/spl-token";
-import * as dc from "@helium-foundation/data-credits-sdk";
-import * as tm from "@helium-foundation/treasury-management-sdk";
-import { DC_MINT, MOBILE_MINT, HNT_MINT, toBN, toNumber } from "@helium-foundation/spl-utils";
+import * as dc from "@helium/data-credits-sdk";
+import * as tm from "@helium/treasury-management-sdk";
+import { DC_MINT, MOBILE_MINT, HNT_MINT, toBN, toNumber } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { SwapIcon } from "../../utils/icons";
 

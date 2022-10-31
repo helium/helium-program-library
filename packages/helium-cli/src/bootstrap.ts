@@ -1,23 +1,23 @@
 import {
   thresholdPercent,
   ThresholdType
-} from "@helium-foundation/circuit-breaker-sdk";
+} from "@helium/circuit-breaker-sdk";
 import Address from "@helium/address";
 import {
   dataCreditsKey,
   init as initDc
-} from "@helium-foundation/data-credits-sdk";
+} from "@helium/data-credits-sdk";
 import {
   daoKey,
   init as initDao,
   subDaoKey
-} from "@helium-foundation/helium-sub-daos-sdk";
+} from "@helium/helium-sub-daos-sdk";
 import {
   hotspotCollectionKey, hotspotConfigKey, hotspotIssuerKey, init as initIssuance
-} from "@helium-foundation/hotspot-issuance-sdk";
-import { lazyDistributorKey, init as initLazy } from "@helium-foundation/lazy-distributor-sdk";
-import { createAtaAndMintInstructions, createAtaAndMint, createMintInstructions, createNft, sendInstructions, toBN } from "@helium-foundation/spl-utils";
-import { toU128 } from "@helium-foundation/treasury-management-sdk";
+} from "@helium/hotspot-issuance-sdk";
+import { lazyDistributorKey, init as initLazy } from "@helium/lazy-distributor-sdk";
+import { createAtaAndMintInstructions, createAtaAndMint, createMintInstructions, createNft, sendInstructions, toBN } from "@helium/spl-utils";
+import { toU128 } from "@helium/treasury-management-sdk";
 import {
   createCreateMetadataAccountV3Instruction,
   PROGRAM_ID as METADATA_PROGRAM_ID

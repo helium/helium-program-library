@@ -1,11 +1,11 @@
-import * as client from "@helium-foundation/distributor-oracle";
-import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
+import * as client from "@helium/distributor-oracle";
+import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import {
   init,
   lazyDistributorKey,
-} from "@helium-foundation/lazy-distributor-sdk";
-import { recipientKey } from "@helium-foundation/lazy-distributor-sdk/src";
-import { toNumber } from "@helium-foundation/spl-utils";
+} from "@helium/lazy-distributor-sdk";
+import { recipientKey } from "@helium/lazy-distributor-sdk/src";
+import { toNumber } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
 import { getMint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";

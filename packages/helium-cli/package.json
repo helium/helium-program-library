@@ -1,5 +1,5 @@
 {
-  "name": "@helium-foundation/helium-cli",
+  "name": "@helium/helium-cli",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -30,14 +30,14 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@helium-foundation/hotspot-issuance-sdk": "^0.0.1",
-    "@helium-foundation/circuit-breaker-sdk": "^0.0.1",
-    "@helium-foundation/data-credits-sdk": "^0.0.1",
-    "@helium-foundation/helium-sub-daos-sdk": "^0.0.1",
-    "@helium-foundation/lazy-distributor-sdk": "^0.0.1",
-    "@helium-foundation/treasury-management-sdk": "^0.0.1",
-    "@helium-foundation/spl-utils": "^0.0.1",
-    "@helium-foundation/distributor-oracle": "^0.0.1",
+    "@helium/hotspot-issuance-sdk": "^0.0.1",
+    "@helium/circuit-breaker-sdk": "^0.0.1",
+    "@helium/data-credits-sdk": "^0.0.1",
+    "@helium/helium-sub-daos-sdk": "^0.0.1",
+    "@helium/lazy-distributor-sdk": "^0.0.1",
+    "@helium/treasury-management-sdk": "^0.0.1",
+    "@helium/spl-utils": "^0.0.1",
+    "@helium/distributor-oracle": "^0.0.1",
     "axios": "^1.1.3",
     "@helium/crypto": "^4.6.2",
     "@helium/address": "^4.6.2",

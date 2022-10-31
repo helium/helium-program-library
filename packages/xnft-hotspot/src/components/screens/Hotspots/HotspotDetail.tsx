@@ -9,8 +9,8 @@ import {
 } from "react-xnft";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
-import { init } from "@helium-foundation/lazy-distributor-sdk";
-import * as client from "@helium-foundation/distributor-oracle";
+import { init } from "@helium/lazy-distributor-sdk";
+import * as client from "@helium/distributor-oracle";
 import ky from "ky";
 import { THEME } from "../../../utils/theme";
 import { LAZY_KEY } from "../../../utils";

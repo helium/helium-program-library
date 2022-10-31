@@ -1,4 +1,4 @@
-import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
+import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { AnchorProvider, Idl, Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";

@@ -1,5 +1,5 @@
-import { CircuitBreaker } from "@helium-foundation/idls/lib/types/circuit_breaker";
-import { createAtaAndMint, createMint } from "@helium-foundation/spl-utils";
+import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
+import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import {

@@ -1,4 +1,4 @@
-import { toNumber } from "@helium-foundation/spl-utils";
+import { toNumber } from "@helium/spl-utils";
 import {
   MintLayout
 } from "@solana/spl-token";

@@ -11,7 +11,7 @@
 3 error
 3 error [0m[31m[1m>[22m[39m[90m 1 |[39m j{[0m
 3 error [0m [90m   |[39m [31m[1m^[22m[39m[0m
-3 error [0m [90m 2 |[39m   [32m"name"[39m[33m:[39m [32m"@helium-foundation/distributor-oracle"[39m[33m,[39m[0m
+3 error [0m [90m 2 |[39m   [32m"name"[39m[33m:[39m [32m"@helium/distributor-oracle"[39m[33m,[39m[0m
 3 error [0m [90m 3 |[39m   [32m"publishConfig"[39m[33m:[39m {[0m
 3 error [0m [90m 4 |[39m     [32m"access"[39m[33m:[39m [32m"public"[39m[33m,[39m[0m
 3 error

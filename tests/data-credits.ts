@@ -15,7 +15,7 @@ import { DataCredits } from "../target/types/data_credits";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestSubdao } from "./utils/daos";
 import { ensureHSDIdl } from "./utils/fixtures";
-import { createAtaAndMint, createMint, createNft } from "@helium-foundation/spl-utils";
+import { createAtaAndMint, createMint, createNft } from "@helium/spl-utils";
 import {
   ThresholdType
 } from "../packages/circuit-breaker-sdk/src";

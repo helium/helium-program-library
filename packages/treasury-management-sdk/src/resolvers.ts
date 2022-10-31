@@ -3,9 +3,9 @@ import {
   ataResolver,
   combineResolvers,
   resolveIndividual,
-} from "@helium-foundation/spl-utils";
+} from "@helium/spl-utils";
 import { PROGRAM_ID } from "./constants";
-import { circuitBreakerResolvers } from "@helium-foundation/circuit-breaker-sdk";
+import { circuitBreakerResolvers } from "@helium/circuit-breaker-sdk";
 
 export const treasuryManagementResolvers = combineResolvers(
   circuitBreakerResolvers,

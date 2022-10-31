@@ -1,17 +1,17 @@
-import * as client from "@helium-foundation/distributor-oracle";
-import { getCurrentRewards } from "@helium-foundation/distributor-oracle";
+import * as client from "@helium/distributor-oracle";
+import { getCurrentRewards } from "@helium/distributor-oracle";
 import {
   init as initDao,
   subDaoKey
-} from "@helium-foundation/helium-sub-daos-sdk";
+} from "@helium/helium-sub-daos-sdk";
 import {
   PROGRAM_ID
-} from "@helium-foundation/hotspot-issuance-sdk";
+} from "@helium/hotspot-issuance-sdk";
 import {
   init as initLazy,
   lazyDistributorKey
-} from "@helium-foundation/lazy-distributor-sdk";
-import { sendAndConfirmWithRetry } from "@helium-foundation/spl-utils";
+} from "@helium/lazy-distributor-sdk";
+import { sendAndConfirmWithRetry } from "@helium/spl-utils";
 import Address from "@helium/address";
 import * as anchor from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";

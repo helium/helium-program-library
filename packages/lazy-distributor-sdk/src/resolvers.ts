@@ -2,11 +2,11 @@ import {
   ataResolver,
   combineResolvers,
   resolveIndividual
-} from "@helium-foundation/spl-utils";
+} from "@helium/spl-utils";
 import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import { circuitBreakerResolvers } from "@helium-foundation/circuit-breaker-sdk";
+import { circuitBreakerResolvers } from "@helium/circuit-breaker-sdk";
 
 export const lazyDistributorResolvers = combineResolvers(
   ataResolver({

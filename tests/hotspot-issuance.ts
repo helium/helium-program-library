@@ -1,4 +1,4 @@
-import { execute, toBN } from "@helium-foundation/spl-utils";
+import { execute, toBN } from "@helium/spl-utils";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";

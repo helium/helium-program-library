@@ -1,4 +1,4 @@
-import { createAtaAndMint, createMint } from "@helium-foundation/spl-utils";
+import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { AccountLayout, getAssociatedTokenAddress } from "@solana/spl-token";

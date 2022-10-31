@@ -1,23 +1,23 @@
-import { LazyDistributor } from "@helium-foundation/idls/lib/types/lazy_distributor";
-import * as ld from "@helium-foundation/lazy-distributor-sdk";
+import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
+import * as ld from "@helium/lazy-distributor-sdk";
 import * as anchor from "@project-serum/anchor";
 import {
   createMint,
   createNft,
   createAtaAndMint,
   toBN,
-} from "@helium-foundation/spl-utils";
+} from "@helium/spl-utils";
 import {
   createCreateMetadataAccountV3Instruction,
   PROGRAM_ID as MPL_PID,
 } from "@metaplex-foundation/mpl-token-metadata";
 import fs from "fs";
-import * as dc from "@helium-foundation/data-credits-sdk";
-import { ThresholdType } from "@helium-foundation/circuit-breaker-sdk";
+import * as dc from "@helium/data-credits-sdk";
+import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { PublicKey, Keypair, Transaction } from "@solana/web3.js";
-import { DC_MINT, MOBILE_MINT, HNT_MINT } from "@helium-foundation/spl-utils";
-import * as tm from "@helium-foundation/treasury-management-sdk";
-// import { IDL as TreasuryManagementIdl } from "@helium-foundation/idls/lib/esm/treasury_management";
+import { DC_MINT, MOBILE_MINT, HNT_MINT } from "@helium/spl-utils";
+import * as tm from "@helium/treasury-management-sdk";
+// import { IDL as TreasuryManagementIdl } from "@helium/idls/lib/esm/treasury_management";
 
 async function createMints(provider: anchor.AnchorProvider) {
   const me = provider.wallet.publicKey;
