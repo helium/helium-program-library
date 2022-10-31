@@ -52,7 +52,7 @@ pub fn handler(
     return Err(error!(ErrorCode::EpochNotOver));
   }
 
-  if ctx.accounts.sub_dao_epoch_info.utility_score.is_some() {
+  if !TESTING && ctx.accounts.sub_dao_epoch_info.utility_score.is_some() {
     return Err(error!(ErrorCode::UtilityScoreAlreadyCalculated));
   }
 

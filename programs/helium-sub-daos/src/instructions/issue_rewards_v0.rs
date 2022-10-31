@@ -39,7 +39,7 @@ pub struct IssueRewardsV0<'info> {
     has_one = sub_dao,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump = sub_dao_epoch_info.bump_seed,
-    constraint = !sub_dao_epoch_info.rewards_issued
+    constraint = TESTING || !sub_dao_epoch_info.rewards_issued
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   #[account(

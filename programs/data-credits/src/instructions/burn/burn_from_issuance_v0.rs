@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self};
 use std::str::FromStr;
 
-pub const ONBOARD_KEY: &str = "8DV471AvMNBCDTPoa2gzffrYFEJmDU56GDgTBv48RBZR";
+pub const ONBOARD_KEY: &str = "isswTaVr3jpPq4ETgnCu76WQA9XPxPGVANeKzivHefg";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct BurnFromIssuanceArgsV0 {

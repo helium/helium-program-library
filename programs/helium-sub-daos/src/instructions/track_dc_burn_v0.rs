@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use std::str::FromStr;
 
-pub const DC_KEY: &str = "5BAQuzGE1z8CTcrSdfbfdBF2fdXrwb4iMcxDMrvhz8L8";
+pub const DC_KEY: &str = "credacwrBVewZAgCwNgowCSMbCiepuesprUWPBeLTSg";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TrackDcBurnArgsV0 {
