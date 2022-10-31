@@ -1,6 +1,6 @@
 import * as anchor from "@project-serum/anchor";
 import { BN } from "@project-serum/anchor";
-import { PublicKey } from "@solana/web3.js";
+import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
@@ -86,6 +86,9 @@ export async function initTestSubdao(
         threshold: new anchor.BN("10000000000000000000"),
       },
     })
+    .preInstructions([
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+    ])
     .accounts({
       dao,
       rewardsEscrow,

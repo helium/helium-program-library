@@ -268,11 +268,6 @@ describe("helium-sub-daos", () => {
       });
 
       it("issues hnt rewards to subdaos and dnt to rewards escrow", async () => {
-        console.log(
-          "HNT",
-          (await program.account.daoV0.fetch(dao)).hntMint.toBase58(),
-          (await program.account.subDaoV0.fetch(subDao)).dntMint.toBase58()
-        );
         const preBalance = AccountLayout.decode(
           (await provider.connection.getAccountInfo(treasury))?.data!
         ).amount;
