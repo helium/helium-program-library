@@ -1,4 +1,4 @@
-import { AccountFetchCache } from "@helium-foundation/spl-utils";
+import { AccountFetchCache } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { SOLANA_URL } from "./env";
 

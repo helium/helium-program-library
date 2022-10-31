@@ -7,7 +7,7 @@ export async function subDaoEpochInfoKey(
   programId: PublicKey = PROGRAM_ID
 ): Promise<[PublicKey, number]> {
   let bU64 = Buffer.alloc(8);
-  const epoch = Math.floor(unixTime / (30 * 60));
+  const epoch = Math.floor(unixTime / (24 * 60 * 60));
   bU64.writeBigUInt64LE(BigInt(epoch));
   return await PublicKey.findProgramAddress(
     [Buffer.from("sub_dao_epoch_info", "utf-8"), subDao.toBuffer(), bU64],

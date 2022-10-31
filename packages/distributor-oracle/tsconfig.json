@@ -2,13 +2,28 @@
   "extends": "../../tsconfig.root.json",
   "references": [
     {
-      "path": "../spl-utils",
+      "path": "../idls"
     },
     {
-      "path": "../lazy-distributor-sdk",
+      "path": "../spl-utils"
+    },
+    {
+      "path": "../hotspot-issuance-sdk"
+    },
+    {
+      "path": "../lazy-distributor-sdk"
+    },
+    {
+      "path": "./tsconfig.cjs.json"
+    },
+    {
+      "path": "./tsconfig.esm.json"
     }
   ],
-  // "compilerOptions": {
-  //   "module": "commonjs",
-  // }
+  "ts-node": {
+    // these options are overrides used only by ts-node
+    "compilerOptions": {
+      "module": "commonjs"
+    }
+  }
 }

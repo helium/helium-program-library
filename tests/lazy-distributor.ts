@@ -1,4 +1,4 @@
-import { createAtaAndMint, sendInstructions } from "@helium-foundation/spl-utils";
+import { createAtaAndMint, sendInstructions } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
@@ -6,8 +6,8 @@ import { expect } from "chai";
 import { init } from "../packages/lazy-distributor-sdk/src";
 import { PROGRAM_ID } from "../packages/lazy-distributor-sdk/src/constants";
 import { LazyDistributor } from "../target/types/lazy_distributor";
-import { createMint, createNft } from "@helium-foundation/spl-utils";
-import { ThresholdType } from "@helium-foundation/circuit-breaker-sdk";
+import { createMint, createNft } from "@helium/spl-utils";
+import { ThresholdType } from "@helium/circuit-breaker-sdk";
 
 describe("lazy-distributor", () => {
   // Configure the client to use the local cluster.

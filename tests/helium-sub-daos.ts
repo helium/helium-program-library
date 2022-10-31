@@ -1,5 +1,5 @@
-import { HeliumSubDaos } from "@helium-foundation/idls/lib/types/helium_sub_daos";
-import { sendInstructions, toBN } from "@helium-foundation/spl-utils";
+import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
+import { sendInstructions, toBN } from "@helium/spl-utils";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
@@ -19,9 +19,9 @@ import { HotspotIssuance } from "../target/types/hotspot_issuance";
 import { burnDataCredits } from "./data-credits";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import { DC_FEE, ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
-import { createNft } from "@helium-foundation/spl-utils";
-import { init as cbInit } from "@helium-foundation/circuit-breaker-sdk";
-import { CircuitBreaker } from "@helium-foundation/idls/lib/types/circuit_breaker";
+import { createNft } from "@helium/spl-utils";
+import { init as cbInit } from "@helium/circuit-breaker-sdk";
+import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 
 const EPOCH_REWARDS = 100000000;
 const SUB_DAO_EPOCH_REWARDS = 10000000;
@@ -121,7 +121,7 @@ describe("helium-sub-daos", () => {
         .rpc({ skipPreflight: true });
 
       const method = await issuerProgram.methods
-        .issueHotspotV0({ eccCompact: Buffer.from(ecc) })
+        .issueHotspotV0({ eccCompact: Buffer.from(ecc), uri: '' })
         .accounts({
           hotspotIssuer,
           maker: makerKeypair.publicKey,

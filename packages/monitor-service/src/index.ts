@@ -1,9 +1,9 @@
 import {
   init as cbInit
-} from "@helium-foundation/circuit-breaker-sdk";
-import { daoKey, init as hsdInit, subDaoKey } from "@helium-foundation/helium-sub-daos-sdk";
-import { CircuitBreaker } from "@helium-foundation/idls/lib/types/circuit_breaker";
-import { HeliumSubDaos } from "@helium-foundation/idls/lib/types/helium_sub_daos";
+} from "@helium/circuit-breaker-sdk";
+import { daoKey, init as hsdInit, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
+import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
 import * as anchor from "@project-serum/anchor";
 import fastify from "fastify";
 import { HNT_MINT, MOBILE_MINT } from "./env";
@@ -58,7 +58,7 @@ async function run() {
     "mobile_rewards_escrow"
   );
 
-  server.listen({ port: 8080 }, (err, address) => {
+  server.listen({ port: 8082, host: "0.0.0.0" }, (err, address) => {
     if (err) {
       console.error(err);
       process.exit(1);

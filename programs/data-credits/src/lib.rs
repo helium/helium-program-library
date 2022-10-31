@@ -9,7 +9,7 @@ pub use errors::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("5BAQuzGE1z8CTcrSdfbfdBF2fdXrwb4iMcxDMrvhz8L8");
+declare_id!("credacwrBVewZAgCwNgowCSMbCiepuesprUWPBeLTSg");
 
 #[program]
 pub mod data_credits {

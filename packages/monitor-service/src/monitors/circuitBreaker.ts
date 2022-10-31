@@ -1,9 +1,9 @@
 import {
   accountWindowedBreakerKey,
   mintWindowedBreakerKey
-} from "@helium-foundation/circuit-breaker-sdk";
-import { CircuitBreaker } from "@helium-foundation/idls/lib/types/circuit_breaker";
-import { toNumber } from "@helium-foundation/spl-utils";
+} from "@helium/circuit-breaker-sdk";
+import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
+import { toNumber } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
 import {
   getAccount,

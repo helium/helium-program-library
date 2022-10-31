@@ -1,11 +1,12 @@
 {
-  "name": "@helium-foundation/spl-utils",
-  "version": "0.0.1",
+  "name": "@helium/spl-utils",
+  "version": "0.0.2",
   "description": "Utils shared across spl suite",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
-  },
+  }, 
+ "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/StrataFoundation/strata"

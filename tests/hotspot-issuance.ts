@@ -1,4 +1,4 @@
-import { execute, toBN } from "@helium-foundation/spl-utils";
+import { execute, toBN } from "@helium/spl-utils";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
@@ -115,7 +115,7 @@ describe("hotspot-issuance", () => {
       const hotspotOwner = Keypair.generate().publicKey;
 
       const method = await hsProgram.methods
-        .issueHotspotV0({ eccCompact: Buffer.from(ecc) })
+        .issueHotspotV0({ eccCompact: Buffer.from(ecc), uri: '' })
         .accounts({
           hotspotIssuer,
           hotspotOwner,

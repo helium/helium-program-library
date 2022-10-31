@@ -1,4 +1,4 @@
-import { toBN } from "@helium-foundation/spl-utils";
+import { toBN } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
@@ -8,7 +8,7 @@ import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { HotspotIssuance } from "../../target/types/hotspot_issuance";
 import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
-import { createAtaAndMint, createMint } from "@helium-foundation/spl-utils";
+import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import { ThresholdType } from "../../packages/circuit-breaker-sdk/src"
 
 // TODO: replace this with helium default uri once uploaded

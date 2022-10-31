@@ -343,7 +343,8 @@ const DEFAULT_TIMEOUT = 3 * 60 * 1000; // 3 minutes
     If it doesn’t happen within that timeframe, your transaction is dropped and you’ll need 
     to send the transaction again. You can get the transaction signature and periodically 
     Ping the network for that transaction signature. If you never get anything back, 
-    that means it’s definitely been dropped. If you do get a response back, you can keep pinging 
+    that means it’s definitely been dropped. If you do get a response back, you can keep pingindg 
+    that means it’s definitely been dropped. If you do get a response back, you can keep pingindg 
     until it’s gone to a confirmed status to move on.
   */
 export async function sendAndConfirmWithRetry(

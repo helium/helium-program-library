@@ -7,7 +7,7 @@ import BN from "bn.js";
 
 export async function getUnixTimestamp(): Promise<bigint> {
   const clock = await provider.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
-  const unixTime = clock.data.readBigInt64LE(8 * 4);
+  const unixTime = clock!.data.readBigInt64LE(8 * 4);
   return unixTime;
 }
 

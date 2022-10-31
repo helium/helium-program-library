@@ -1,4 +1,4 @@
-import { createAtaAndMint, createMint } from "@helium-foundation/spl-utils";
+import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { AccountLayout, getAssociatedTokenAddress } from "@solana/spl-token";
@@ -128,7 +128,7 @@ describe("treasury-management", () => {
     })
 
     it ("allows redemption", async () => {
-      // dR = ((R / S) ^ (1 + k))((S + dS) ^ (1 + k - S) ^ (1 + k));
+      // dR = (R / S^(1 + k)) ((S + dS)^(1 + k) - S^(1 + k))
       // 100 / (100 ^ (1 + 2)) ((100 - 50)^(1+2) - 100^(1 + 2))
       // 100 / 100^3 (50^3 - 100^3)
 
