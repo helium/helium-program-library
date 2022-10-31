@@ -1,5 +1,6 @@
 {
   "name": "@helium/helium-cli",
+  "private": true,
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
