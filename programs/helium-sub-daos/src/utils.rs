@@ -19,7 +19,7 @@ impl OrArithError<SignedPreciseNumber> for Option<SignedPreciseNumber> {
   }
 }
 
-pub const EPOCH_LENGTH: i64 = 30 * 60;
+pub const EPOCH_LENGTH: i64 = 24 * 60 * 60;
 
 pub fn current_epoch(unix_timestamp: i64) -> u64 {
   (unix_timestamp / (EPOCH_LENGTH)).try_into().unwrap()

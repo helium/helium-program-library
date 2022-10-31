@@ -39,6 +39,7 @@ pub struct IssueHotspotV0<'info> {
   pub maker: Signer<'info>,
   /// CHECK: Hotspot nft sent here
   pub hotspot_owner: AccountInfo<'info>,
+  #[account(mut)]
   pub collection: Box<Account<'info, Mint>>,
   /// CHECK: Handled by cpi
   #[account(
