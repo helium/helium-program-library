@@ -69,12 +69,7 @@ export const HotspotGridScreen: FC<HotspotGridScreenProps> = () => {
           <HotspotGridItem key={nft.metadata.mint} nft={nft} />
         ))}
       </View>
-      <View tw="flex flex-row flex-wrap justify-between px-5 mb-5">
-        {tokenAccounts.map((nft) => (
-          <HotspotGridItem key={nft.metadata.mint} nft={nft} />
-        ))}
-      </View>
-      <View tw="flex w-full justify-center sticky bottom-0 p-5 dark:bg-zinc-800 bg-white">
+      <View tw="flex w-full justify-center sticky bottom-0 p-5 bg-white dark:bg-zinc-800">
         <Button
           tw="h-12 w-full text-white font-bold text-md border-0 rounded-md bg-green-500 hover:bg-green-600"
           onClick={() => claimAllRewards()}
