@@ -98,7 +98,7 @@ pub fn handler(
   } else {
     one.clone()
   };
-  
+
   let a = if epoch_info.total_devices > 0 {
     std::cmp::max(
       one,
