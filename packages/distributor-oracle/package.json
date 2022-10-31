@@ -32,11 +32,11 @@
     "start": "node lib/cjs/server.js serve"
   },
   "dependencies": {
+    "@helium/address": "^4.6.2",
     "@helium/hotspot-issuance-sdk": "^0.0.1",
     "@helium/idls": "^0.0.1",
     "@helium/lazy-distributor-sdk": "^0.0.1",
     "@helium/spl-utils": "^0.0.1",
-    "@helium/address": "^4.6.2",
     "@project-serum/anchor": "^0.24.2",
     "axios": "^0.27.2",
     "bn.js": "^5.2.0",
