@@ -5,10 +5,13 @@
       "path": "../idls"
     },
     {
-      "path": "../spl-utils"
+      "path": "../circuit-breaker-sdk"
     },
     {
-      "path": "../circuit-breaker-sdk"
+      "path": "../helium-sub-daos-sdk"
+    },
+    {
+      "path": "../spl-utils"
     },
     {
       "path": "./tsconfig.cjs.json"

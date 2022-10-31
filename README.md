@@ -5,7 +5,53 @@ A collection of solana programs used for Helium's Solana integration
 
 ## Overall Design
 
-![Overall Design](./out/diagrams/architecture/architecture.png)
+
+```mermaid
+flowchart TD
+  maker[Maker App]
+  onboarding[Onboarding Server]
+  crank(((Rewards Crank)))
+  hnt_price_oracle[[HNT Price Oracle]]
+  oracles[[DNT Rewards Oracle]]
+  wallet_app[Wallet App]
+
+  oracles --set and distribute rewards tx--> wallet_app
+  wallet_app --> lazy_distributor
+  subgraph Solana
+    manager[Hotspot Manager]
+    data_credits[Data Credits]
+    dnt_rewards_escrow{{DNT Escrow}}
+    hotspots{{Hotspot NFTs}}
+    helium_sub_daos[Helium Sub Daos]
+    lazy_distributor[Lazy Distributor]
+    treasury_management[Treasury Management]
+    user_wallet{{Hotspot Owner Wallet}}
+    treasury{{SubDAO Treasury}}
+  end
+
+  data_credits --DC Burned--> helium_sub_daos
+  
+  onboarding --issue hotspot, assert location txs--> maker
+  maker --issue hotspot, assert location--> manager
+
+  hnt_price_oracle --HNT Price--> data_credits
+  dnt_rewards_escrow --> lazy_distributor
+  
+  manager --Burn DC--> data_credits
+  manager --Create--> hotspots
+  manager --Device Count--> helium_sub_daos
+
+
+  crank --issue rewards--> helium_sub_daos
+  helium_sub_daos --DNT--> dnt_rewards_escrow
+  helium_sub_daos --set expiry--> treasury_management
+  helium_sub_daos --mint_hnt--> treasury
+  treasury -->  treasury_management
+
+  hotspots --> lazy_distributor
+  lazy_distributor --DNT--> user_wallet
+
+```
 
 ![ERD](./out/diagrams/erd/erd.png)
 

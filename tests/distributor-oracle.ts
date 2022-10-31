@@ -12,6 +12,7 @@ import { init, PROGRAM_ID, lazyDistributorKey, recipientKey } from "../packages/
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { AuthorityType, createSetAuthorityInstruction } from "@solana/spl-token";
 import { sendAndConfirmWithRetry, createMint, createNft, createAtaAndMint  } from '@helium-foundation/spl-utils';
+import { ThresholdType } from '@helium-foundation/circuit-breaker-sdk';
 
 
 chai.use(chaiHttp);
@@ -45,17 +46,24 @@ describe('distributor-oracle', () => {
     collectionMint = collectionKey;
     rewardsMint = await createMint(provider, 6, me, me);
 
-    const method = await program.methods.initializeLazyDistributorV0({
-      authority: me,
-      oracles: [
-        {
-          oracle: oracle.publicKey,
-          url: "https://some-url/",
+    const method = await program.methods
+      .initializeLazyDistributorV0({
+        authority: me,
+        oracles: [
+          {
+            oracle: oracle.publicKey,
+            url: "https://some-url/",
+          },
+        ],
+        windowConfig: {
+          windowSizeSeconds: new BN(10),
+          thresholdType: ThresholdType.Absolute as never,
+          threshold: new BN(1000000000),
         },
-      ],
-    }).accounts({
-      rewardsMint,
-    });
+      })
+      .accounts({
+        rewardsMint,
+      });
 
 
     const { lazyDistributor: ld } = await method.pubkeys();

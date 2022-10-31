@@ -131,12 +131,13 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
       config: CBWindowedCircuitBreakerConfigV0 {
         // No more than 5 epochs worth can be distributed. We should be distributing once per epoch so this
         // should never get triggered.
-        window_size_seconds: 5 * u64::try_from(EPOCH_LENGTH).unwrap(),
+        window_size_seconds: u64::try_from(EPOCH_LENGTH).unwrap(),
         threshold_type: CBThresholdType::Absolute,
-        threshold: args
-          .emission_schedule
-          .get_emissions_at(ctx.accounts.clock.unix_timestamp)
-          .unwrap(),
+        threshold: 5
+          * args
+            .emission_schedule
+            .get_emissions_at(ctx.accounts.clock.unix_timestamp)
+            .unwrap(),
       },
       mint_authority: ctx.accounts.sub_dao.key(),
     },

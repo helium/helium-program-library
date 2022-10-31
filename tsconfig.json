@@ -11,6 +11,9 @@
       "path": "./packages/distributor-oracle"
     },
     {
+      "path": "./packages/monitor-service"
+    },
+    {
       "path": "./packages/treasury-management-sdk"
     },
     {

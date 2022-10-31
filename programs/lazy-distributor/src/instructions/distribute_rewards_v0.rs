@@ -3,7 +3,11 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{self, Mint, Token, TokenAccount, Transfer},
+  token::{Mint, Token, TokenAccount},
+};
+use circuit_breaker::{
+  cpi::{accounts::TransferV0, transfer_v0},
+  AccountWindowedCircuitBreakerV0, CircuitBreaker, TransferArgsV0,
 };
 
 #[derive(Accounts)]
@@ -25,6 +29,13 @@ pub struct DistributeRewardsV0<'info> {
   #[account(mut)]
   pub rewards_escrow: Box<Account<'info, TokenAccount>>,
   #[account(
+    mut,
+    seeds = ["account_windowed_breaker".as_bytes(), rewards_escrow.key().as_ref()],
+    seeds::program = circuit_breaker_program.key(),
+    bump = circuit_breaker.bump_seed
+  )]
+  pub circuit_breaker: Box<Account<'info, AccountWindowedCircuitBreakerV0>>,
+  #[account(
     constraint = recipient_mint_account.mint == recipient.mint,
     constraint = recipient_mint_account.amount > 0,
     has_one = owner
@@ -40,9 +51,11 @@ pub struct DistributeRewardsV0<'info> {
   )]
   pub destination_account: Box<Account<'info, TokenAccount>>,
   pub associated_token_program: Program<'info, AssociatedToken>,
+  pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub rent: Sysvar<'info, Rent>,
+  pub clock: Sysvar<'info, Clock>,
 }
 
 pub fn handler(ctx: Context<DistributeRewardsV0>) -> Result<()> {
@@ -68,17 +81,20 @@ pub fn handler(ctx: Context<DistributeRewardsV0>) -> Result<()> {
     .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
   recipient.total_rewards = median;
 
-  token::transfer(
+  transfer_v0(
     CpiContext::new_with_signer(
       ctx.accounts.token_program.to_account_info().clone(),
-      Transfer {
+      TransferV0 {
         from: ctx.accounts.rewards_escrow.to_account_info().clone(),
         to: ctx.accounts.destination_account.to_account_info().clone(),
-        authority: ctx.accounts.lazy_distributor.to_account_info().clone(),
+        owner: ctx.accounts.lazy_distributor.to_account_info().clone(),
+        circuit_breaker: ctx.accounts.circuit_breaker.to_account_info().clone(),
+        token_program: ctx.accounts.token_program.to_account_info().clone(),
+        clock: ctx.accounts.clock.to_account_info().clone(),
       },
       seeds,
     ),
-    to_dist,
+    TransferArgsV0 { amount: to_dist },
   )?;
 
   Ok(())

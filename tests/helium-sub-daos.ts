@@ -20,6 +20,8 @@ import { burnDataCredits } from "./data-credits";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import { DC_FEE, ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
 import { createNft } from "@helium-foundation/spl-utils";
+import { init as cbInit } from "@helium-foundation/circuit-breaker-sdk";
+import { CircuitBreaker } from "@helium-foundation/idls/lib/types/circuit_breaker";
 
 const EPOCH_REWARDS = 100000000;
 const SUB_DAO_EPOCH_REWARDS = 10000000;
@@ -40,6 +42,7 @@ describe("helium-sub-daos", () => {
 
   let dcProgram: Program<DataCredits>;
   let issuerProgram: Program<HotspotIssuance>;
+  let cbProgram: Program<CircuitBreaker>;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -49,6 +52,11 @@ describe("helium-sub-daos", () => {
       provider,
       anchor.workspace.DataCredits.programId,
       anchor.workspace.DataCredits.idl
+    );
+    cbProgram = await cbInit(
+      provider,
+      anchor.workspace.CircuitBreaker.programId,
+      anchor.workspace.CircuitBreaker.idl
     );
     ensureDCIdl(dcProgram);
     ensureHSDIdl(program);
@@ -69,15 +77,20 @@ describe("helium-sub-daos", () => {
   it("initializes a subdao", async () => {
     const { dao } = await initTestDao(program, provider, EPOCH_REWARDS, provider.wallet.publicKey);
     const collection = (await createNft(provider, me)).mintKey;
-    const { subDao, treasury, mint } = await initTestSubdao(
-      program,
-      provider,
-      provider.wallet.publicKey,
-      dao,
-      collection
-    );
+    const { subDao, treasury, mint, treasuryCircuitBreaker } =
+      await initTestSubdao(
+        program,
+        provider,
+        provider.wallet.publicKey,
+        dao,
+        collection
+      );
 
     const account = await program.account.subDaoV0.fetch(subDao!);
+    const breaker = await cbProgram.account.accountWindowedCircuitBreakerV0.fetch(treasuryCircuitBreaker);
+
+    // @ts-ignore
+    expect(Boolean(breaker.config.thresholdType.absolute)).to.be.true;
 
     expect(account.authority.toBase58()).eq(me.toBase58());
     expect(account.hotspotCollection.toBase58()).eq(collection.toBase58());

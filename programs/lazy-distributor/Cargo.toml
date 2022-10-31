@@ -22,4 +22,5 @@ overflow-checks = true
 anchor-lang = { version = "0.24.2", features = ["init-if-needed"] }
 anchor-spl = "0.24.2"
 mpl-token-metadata = { version = "1.3.4", features = ["no-entrypoint"] }
+circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 shared-utils = { path = "../shared-utils" }
