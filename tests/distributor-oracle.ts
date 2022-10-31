@@ -8,8 +8,17 @@ import { Program, BN } from "@project-serum/anchor";
 import {
   Keypair, PublicKey, Transaction, SystemProgram
 } from "@solana/web3.js";
-import { init, PROGRAM_ID, lazyDistributorKey, recipientKey } from "../packages/lazy-distributor-sdk/src";
+import {
+  init,
+  PROGRAM_ID,
+  lazyDistributorKey,
+  recipientKey,
+} from "../packages/lazy-distributor-sdk/src";
+import {
+  init as initIss
+} from "../packages/hotspot-issuance-sdk/src";
 import { LazyDistributor } from "../target/types/lazy_distributor";
+import { HotspotIssuance } from "../target/types/hotspot_issuance";
 import { AuthorityType, createSetAuthorityInstruction } from "@solana/spl-token";
 import { sendAndConfirmWithRetry, createMint, createNft, createAtaAndMint  } from '@helium/spl-utils';
 import { ThresholdType } from '@helium/circuit-breaker-sdk';
@@ -20,6 +29,7 @@ chai.use(chaiHttp);
 describe('distributor-oracle', () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
   let program: Program<LazyDistributor>;
+  let issuanceProgram: Program<HotspotIssuance>;
   let oracleServer: OracleServer;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -31,8 +41,17 @@ describe('distributor-oracle', () => {
   let mint: PublicKey;
   
   before(async () => {
-    program = await init(provider, PROGRAM_ID, anchor.workspace.LazyDistributor.idl);
-    oracleServer = new OracleServer(program, oracle, new DatabaseMock);
+    program = await init(
+      provider,
+      PROGRAM_ID,
+      anchor.workspace.LazyDistributor.idl
+    );
+    issuanceProgram = await initIss(
+      provider,
+      PROGRAM_ID,
+      anchor.workspace.HotspotIssuance.idl
+    );
+    oracleServer = new OracleServer(program, oracle, new DatabaseMock(issuanceProgram));
     oracleServer.start();
   });
 
@@ -59,7 +78,7 @@ describe('distributor-oracle', () => {
           windowSizeSeconds: new BN(10),
           thresholdType: ThresholdType.Absolute as never,
           threshold: new BN(1000000000),
-        },
+        } as never,
       })
       .accounts({
         rewardsMint,
@@ -115,7 +134,7 @@ describe('distributor-oracle', () => {
     );
 
     const recipientAcc = await program.account.recipientV0.fetch(recipient);
-    assert.equal(recipientAcc.totalRewards.toNumber(), await oracleServer.db.getCurrentRewards(mint))
+    assert.equal(recipientAcc.totalRewards.toNumber(), Number(await oracleServer.db.getCurrentRewards(mint)))
   });
 
   describe('Transaction validation tests', () => {

@@ -129,7 +129,6 @@ export class OracleServer {
 
   constructor(
     public program: Program<LazyDistributor>,
-    public issuanceProgram: Program<HotspotIssuance>,
     private oracle: Keypair,
     public db: Database
   ) {
@@ -298,7 +297,6 @@ export class OracleServer {
     const hotspotIssuanceProgram = await initHotspotIssuance(provider);
     const server = new OracleServer(
       program,
-      hotspotIssuanceProgram,
       oracleKeypair,
       new DatabaseMock(hotspotIssuanceProgram)
     );
