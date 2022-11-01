@@ -12,6 +12,7 @@ import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import { useEffect, useState } from "react";
 import { useConnection, usePublicKey } from "react-xnft";
+import { Recipient } from "../hooks/useRecipient";
 
 export const LAZY_KEY = lazyDistributorKey(
   MOBILE_MINT
@@ -36,7 +37,7 @@ export function useProgram() {
   const [program, setProgram] = useState<Program<LazyDistributor> | null>(null);
   useEffect(() => {
     //@ts-ignore
-    init(window.xnft.solana).then((prog) => setProgram(prog));
+    init(window.xnft.solana).then((prog) => setProgram(prog)).catch(console.error);
   }, []);
 
   return program;
@@ -44,16 +45,13 @@ export function useProgram() {
 
 export async function getPendingRewards(
   program: Program<LazyDistributor>,
-  mint: PublicKey
+  mint: PublicKey,
+  maybeRecipient: Recipient | undefined
 ) {
+  // @ts-ignore
+  // console.log("hey", maybeRecipient?.totalRewards.toNumber(), maybeRecipient?.currentRewards.map(curr => curr?.toNumber()));
   const lazyDistributor = await program.account.lazyDistributorV0.fetch(
     LAZY_KEY
-  );
-
-  const [recipient] = recipientKey(LAZY_KEY, mint);
-
-  const maybeRecipient = await program.account.recipientV0.fetchNullable(
-    recipient
   );
 
   const oracleRewards = await client.getCurrentRewards(program, LAZY_KEY, mint);
@@ -63,22 +61,16 @@ export async function getPendingRewards(
     lazyDistributor.rewardsMint
   );
 
-  const sortedRewards = (
-    (maybeRecipient?.currentRewards as (BN | null)[]) || []
-  ).sort((a, b) => (a || new BN(0)).sub(b || new BN(0)).toNumber());
-
   const sortedOracleRewards = oracleRewards
     .map((rew) => rew.currentRewards)
     .sort((a, b) => new BN(a).sub(new BN(b)).toNumber());
 
-  let median = sortedRewards[Math.floor(sortedRewards.length / 2)];
   let oracleMedian = new BN(
     sortedOracleRewards[Math.floor(sortedOracleRewards.length / 2)]
   );
 
-  if (!median) median = new BN(0);
 
-  const subbed = oracleMedian.sub(median);
+  const subbed = oracleMedian.sub(maybeRecipient?.totalRewards || new BN(0));
 
   return {
     pendingRewards: Math.max(toNumber(subbed, rewardsMintAcc.decimals), 0),

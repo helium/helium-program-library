@@ -112,10 +112,11 @@ describe('distributor-oracle', () => {
   });
 
   it('should sign and execute properly formed transactions', async () => {
-    const tx = await client.formTransaction({program, provider, rewards: [{
+    const unsigned = await client.formTransaction({program, provider, rewards: [{
       oracleKey: oracle.publicKey,
       currentRewards: await oracleServer.db.getCurrentRewards(mint),
     }], hotspot: mint, lazyDistributor, skipOracleSign: true})
+    const tx = await provider.wallet.signTransaction(unsigned);
     const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
 
     const res = await chai.request(oracleServer.app)

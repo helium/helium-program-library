@@ -74,13 +74,17 @@ export async function formTransaction({
   const ixs = await Promise.all(ixPromises);
   let tx = new Transaction();
 
+  const recipientMintAccount = (await provider.connection.getTokenLargestAccounts(hotspot)).value[0].address;
+  const hotspotAccount = await getAccount(provider.connection, recipientMintAccount);
+  const destinationAccount = await getAssociatedTokenAddress(rewardsMint, hotspotAccount.owner, true);
+
   if (!await provider.connection.getAccountInfo(recipient)) {
-    const initRecipientTx = await program.methods.initializeRecipientV0().accounts({
+    const initRecipientIx = await program.methods.initializeRecipientV0().accounts({
       lazyDistributor,
       mint: hotspot,
-    }).transaction();
+    }).instruction();
     
-    await provider.sendAndConfirm(initRecipientTx, [], { commitment: "finalized" })
+    tx.add(initRecipientIx);
   }
   tx.add(...ixs);
 
@@ -90,6 +94,9 @@ export async function formTransaction({
       recipient,
       lazyDistributor,
       rewardsMint,
+      owner: hotspotAccount.owner,
+      destinationAccount,
+      recipientMintAccount
     })
     .instruction();
   
@@ -100,6 +107,7 @@ export async function formTransaction({
   tx.feePayer = wallet ? wallet : provider.wallet.publicKey;
 
   tx.add(distributeIx);
+  // @ts-ignore
   const oracleUrls = lazyDistributorAcc.oracles.map((x: any) => x.url);
 
   let serTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false })
@@ -116,12 +124,7 @@ export async function formTransaction({
   // Ensure the oracle didn't pull a fast one
   assertSameIxns(finalTx.instructions, tx.instructions);
 
-  //@ts-ignore
-  if (provider.signTransaction) {
-    //@ts-ignore
-    return await provider.signTransaction(finalTx);
-  }
-  return await provider.wallet.signTransaction(finalTx);
+  return finalTx;
 }
 
 function assertSameIxns(instructions: TransactionInstruction[], instructions1: TransactionInstruction[]) {

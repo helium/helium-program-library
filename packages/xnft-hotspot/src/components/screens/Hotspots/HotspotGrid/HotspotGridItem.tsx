@@ -1,82 +1,31 @@
-import React, { FC, useState, useEffect } from "react";
+import { MOBILE_MINT } from "@helium/spl-utils";
+import { PublicKey } from "@solana/web3.js";
+import React, { FC, useMemo } from "react";
 import {
-  View,
   Button,
   Image,
   Text,
-  useNavigation,
-  useConnection,
+  useNavigation, View
 } from "react-xnft";
-import { getPendingRewards, useProgram } from "../../../../utils/index";
-import { PublicKey } from "@solana/web3.js";
-import {
-  PROGRAM_ID as MPL_PID,
-  Metadata,
-} from "@metaplex-foundation/mpl-token-metadata";
-import { THEME } from "../../../../utils/theme";
-import { useColorMode } from "../../../../utils/hooks";
+import { useMetaplexMetadata } from "../../../../hooks/useMetaplexMetadata";
+import { usePendingRewards } from "../../../../hooks/usePendingRewards";
 
 interface HotspotGridItemProps {
   nft: any; // TODO: actually type this
 }
 
 export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
-  const [symbol, setSymbol] = useState<string>("");
-  const [rewardsMint, setRewardsMint] = useState<PublicKey | null>(null);
-  const [pendingRewards, setPendingRewards] = useState<number | null>(null);
-  const [interval, setNewInterval] = useState<any>(null);
+  const mint = useMemo(
+    () => new PublicKey(nft.metadata.mint),
+    [nft.metadata.mint]
+  );
   const nav = useNavigation();
-  const program = useProgram();
-  const connection = useConnection();
-
-  useEffect(() => {
-    (async () => {")
-      if (!program || !nft.metadata.mint) return null;
-      const nftMint = new PublicKey(nft.metadata.mint);
-
-      //@ts-ignore
-      const { pendingRewards: rewards, rewardsMint: rwdMint } =
-        await getPendingRewards(program, nftMint);
-
-      setPendingRewards(rewards);
-      setRewardsMint(rwdMint);
-
-      if (interval) clearInterval(interval);
-
-      const ivl = setInterval(async () => {
-        const { pendingRewards: newRewards } = await getPendingRewards(
-          program,
-          nftMint
-        );
-        setPendingRewards(newRewards);
-      }, 30000);
-
-      setNewInterval(ivl);
-    })();
-
-    return () => clearInterval(interval);
-  }, [program, nft.metadata.mint]);
-
-  useEffect(() => {
-    if (!rewardsMint || !connection) return;
-    (async () => {
-      const metadata = PublicKey.findProgramAddressSync(
-        [
-          Buffer.from("metadata", "utf-8"),
-          MPL_PID.toBuffer(),
-          rewardsMint.toBuffer(),
-        ],
-        MPL_PID
-      )[0];
-      //@ts-ignore
-      const acc = await connection.getAccountInfo(metadata);
-      const meta = Metadata.fromAccountInfo(acc!)[0];
-      setSymbol(meta.data.symbol);
-    })();
-  }, [rewardsMint?.toBase58(), connection]);
+  const { info: metadata } = useMetaplexMetadata(MOBILE_MINT);
+  const symbol = metadata?.data.symbol;
+  const pendingRewards = usePendingRewards(mint)
 
   const clickNft = () => {
-    nav.push("detail", { nft, pendingRewards, symbol });
+    nav.push("detail", { nft, symbol });
   };
 
   return (
@@ -109,7 +58,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
             Rewards:&nbsp;
           </Text>
           <Text tw="text-xs !m-0 text-gray-600 dark:text-gray-500">
-            {`${pendingRewards || "0"} ${symbol || ""}`}
+            {`${pendingRewards == null ? "..." : pendingRewards} ${symbol || ""}`}
           </Text>
         </View>
       </View>

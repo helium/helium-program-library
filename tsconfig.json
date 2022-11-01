@@ -8,6 +8,9 @@
       "path": "./packages/spl-utils"
     },
     {
+      "path": "./packages/helium-react-hooks"
+    },
+    {
       "path": "./packages/distributor-oracle"
     },
     {
