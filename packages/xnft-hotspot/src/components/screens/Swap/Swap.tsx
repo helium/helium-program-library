@@ -295,7 +295,12 @@ export function Swap() {
         if (isDcMint) {
           await mintDataCredits(connection, publicKey, topAmount);
         } else {
-          await treasurySwap(connection, publicKey, topAmount, topSelected.mint!);
+          await treasurySwap(
+            connection,
+            publicKey,
+            topAmount,
+            topSelected.mint!
+          );
         }
         setLoading(false);
         setMessage("Transaction confirmed", "success");
@@ -326,7 +331,7 @@ export function Swap() {
         </View>
         <View tw="flex flex-row relative justify-center items-center mb-12 w-full">
           <TextField
-            tw="block p-3 w-full text-lg text-gray-900 bg-gray-50 rounded-lg hover:border-blue-500 focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-900/[.8] dark:border-zinc-800 dark:placeholder-zinc-400 dark:text-white"
+            tw="block p-3 w-full text-lg text-gray-900 bg-gray-200 rounded-lg hover:border-blue-500 focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-900/[.8] dark:border-zinc-800 dark:placeholder-zinc-400 dark:text-white"
             placeholder="Amount"
             value={rawTopAmount}
             onChange={(e) => parseAndSetTop(e.target.value)}
@@ -346,7 +351,7 @@ export function Swap() {
         <View tw="flex w-full mb-1 justify-between items-baseline">
           <Text tw="text-zinc-900 dark:text-zinc-400">Receiving</Text>
         </View>
-        <View tw="flex justify-between p-3 relative items-center w-full rounded-lg bg-gray-50/[.8] dark:bg-zinc-900/[.4] ">
+        <View tw="flex justify-between p-3 relative items-center w-full rounded-lg bg-gray-200/[.4] dark:bg-zinc-900/[.4] ">
           <Text tw="text-lg text-gray-900 dark:text-white">{bottomAmount}</Text>
           <TokenSelector
             tw="flex text-white absolute right-0 top-25 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-r-lg text-sm px-4 py-2 dark:hover:bg-zinc-900 dark:focus:ring-blue-800"
@@ -361,19 +366,23 @@ export function Swap() {
           Note: Trades completed using this tool are only one way.
         </Text>
         <Button
-          tw={classnames([
-            "h-12 w-full text-white font-bold text-md border-0 rounded-md flex justify-center items-center",
-            ...[(swapAllowed && !txLoading) && ["bg-green-600", "hover:bg-green-700"]],
-            ...[!(swapAllowed && !txLoading) && "bg-green-600/[0.5]"],
-          ])}
+          tw={classnames(
+            "h-12 w-full border-0 rounded-md flex justify-center items-center",
+            [
+              ,
+              ...[
+                swapAllowed &&
+                  !txLoading && ["bg-green-600", "hover:bg-green-700"],
+              ],
+              ...[!(swapAllowed && !txLoading) && "bg-green-600/[0.5]"],
+            ]
+          )}
           onClick={executeSwap}
         >
-          <Text tw="inline">
+          <Text tw="text-white font-bold text-md">
             {swapAllowed ? "Burn" : "Invalid burn"}
           </Text>
-          {txLoading && (
-            <Loading style={{ marginLeft: '5px'}}/>
-          )}
+          {txLoading && <Loading style={{ marginLeft: "5px" }} />}
         </Button>
       </View>
     </View>
