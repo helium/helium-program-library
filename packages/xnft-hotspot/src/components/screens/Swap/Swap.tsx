@@ -304,8 +304,7 @@ export function Swap() {
         setMessage(`Transaction failed: ${err.message}`, "error");
       }
     }
-    setLoading(true);
-    // swap();
+    swap();
   }, [isDcMint, topAmount, connection, publicKey, txLoading]);
 
   return (

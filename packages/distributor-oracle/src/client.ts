@@ -54,7 +54,7 @@ export async function formTransaction({
   wallet?: PublicKey,
   skipOracleSign?: boolean
 }) {
-  const recipient = (await recipientKey(lazyDistributor, hotspot))[0]
+  const recipient = recipientKey(lazyDistributor, hotspot)[0]
   const ixPromises = rewards.map((x, idx) => {
     return program.methods
       .setCurrentRewardsV0({
@@ -79,9 +79,6 @@ export async function formTransaction({
   }
   tx.add(...ixs);
 
-  const holders = await provider.connection.getTokenLargestAccounts(hotspot);
-  const mintAccount = holders.value[0].address;
-  const mintTokenAccount = await getAccount(provider.connection, mintAccount);
   const lazyDistributorAcc = (await program.account.lazyDistributorV0.fetch(lazyDistributor))!;
   const rewardsMint = lazyDistributorAcc.rewardsMint!;
 
@@ -93,7 +90,6 @@ export async function formTransaction({
       rewardsMint,
     })
     .instruction();
-  
   tx.recentBlockhash = (
     await provider.connection.getLatestBlockhash()
   ).blockhash;
@@ -101,19 +97,15 @@ export async function formTransaction({
   tx.feePayer = wallet ? wallet : provider.wallet.publicKey;
 
   tx.add(distributeIx);
-
   const oracleUrls = lazyDistributorAcc.oracles.map((x: any) => x.url);
 
   let serTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false })
   if (!skipOracleSign) {
-    for (const oracle in oracleUrls) {
-      const res = await axios.post(`${oracleUrls[oracle]}`, {
-        body: {
-          transaction: serTx,
-        },
+    for (const oracle of oracleUrls) {
+      const res = await axios.post(`${oracle}`, {
+        transaction: serTx,
       });
-      const json = await res.data.json();
-      serTx = Buffer.from(json.transaction!.data);
+      serTx = Buffer.from(res.data.transaction);
     }
   }
   
@@ -139,7 +131,7 @@ function assertSameIxns(instructions: TransactionInstruction[], instructions1: T
     if (instruction.programId.toBase58() !== instruction1.programId.toBase58()) {
       throw new Error("Program id mismatch");
     }
-    if (instruction.data.equals(instruction1.data)) {
+    if (!instruction.data.equals(instruction1.data)) {
       throw new Error("Instruction data mismatch");
     }
 
@@ -151,12 +143,6 @@ function assertSameIxns(instructions: TransactionInstruction[], instructions1: T
       const key1 = instruction1.keys[idx];
       if (key.pubkey.toBase58() !== key1.pubkey.toBase58()) {
         throw new Error("Key mismatch");
-      }
-      if (key.isSigner !== key1.isSigner) {
-        throw new Error("Key signer mismatch");
-      }
-      if (key.isWritable !== key1.isWritable) {
-        throw new Error("Key writable mismatch");
       }
     });
   })

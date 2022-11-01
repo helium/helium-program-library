@@ -59,7 +59,7 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
         rewards,
         hotspot: new PublicKey(nft.metadata.mint),
         lazyDistributor: LAZY_KEY,
-        wallet: publicKey
+        wallet: publicKey,
       });
 
       //@ts-ignore
@@ -69,6 +69,7 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
     } catch (err) {
       setLoading(false);
       setMessage(`Transaction failed: ${err.message}`, "error");
+      console.error(err);
     }
   };
 

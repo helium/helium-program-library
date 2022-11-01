@@ -5,7 +5,7 @@ import {
   lazyDistributorKey,
 } from "@helium/lazy-distributor-sdk";
 import { recipientKey } from "@helium/lazy-distributor-sdk/src";
-import { toNumber } from "@helium/spl-utils";
+import { toNumber, MOBILE_MINT } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
 import { getMint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
@@ -13,9 +13,6 @@ import BN from "bn.js";
 import { useEffect, useState } from "react";
 import { useConnection, usePublicKey } from "react-xnft";
 
-export const MOBILE_MINT = new PublicKey(
-  "CKuwd2oB8be14g9Y94NuM87nZZzq9HXDBeEe6N3QXZdN"
-);
 export const LAZY_KEY = lazyDistributorKey(
   MOBILE_MINT
 )[0];
