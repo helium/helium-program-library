@@ -68,7 +68,6 @@ async function run() {
     lazyDistributor,
     hotspot
   );
-  console.log(rewards);
 
   const tx = await client.formTransaction({
     program: lazyDistributorProgram,
@@ -77,9 +76,10 @@ async function run() {
     hotspot,
     lazyDistributor,
   });
+  const signed = await provider.wallet.signTransaction(tx);
   await sendAndConfirmWithRetry(
     provider.connection,
-    tx.serialize(),
+    signed.serialize(),
     { skipPreflight: true },
     "confirmed"
   );

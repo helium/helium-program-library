@@ -1,32 +1,24 @@
-import React, { FC, useState } from "react";
-import {
-  View,
-  Image,
-  Text,
-  Button,
-  Loading,
-  usePublicKey,
-  useConnection,
-} from "react-xnft";
-import { PublicKey, Transaction } from "@solana/web3.js";
-import * as anchor from "@project-serum/anchor";
-import { init } from "@helium/lazy-distributor-sdk";
 import * as client from "@helium/distributor-oracle";
-import ky from "ky";
+import { init } from "@helium/lazy-distributor-sdk";
+import * as anchor from "@project-serum/anchor";
+import { PublicKey } from "@solana/web3.js";
 import classnames from "classnames";
-import { LAZY_KEY } from "../../../utils";
+import React, { FC, useMemo, useState } from "react";
+import {
+  Button, Image, Loading, Text, useConnection, usePublicKey, View
+} from "react-xnft";
 import { useNotification } from "../../../contexts/notification";
+import { usePendingRewards } from "../../../hooks/usePendingRewards";
+import { LAZY_KEY } from "../../../utils";
 import { useTitleColor } from "../../../utils/hooks";
 
 interface HotspotDetailScreenProps {
   nft: any; // TODO: actually type this
-  pendingRewards: any; // TODO: actually type this
   symbol: string;
 }
 
 export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
   nft,
-  pendingRewards,
   symbol,
 }) => {
   useTitleColor();
@@ -34,6 +26,12 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
   const connection = useConnection();
   const [txLoading, setLoading] = useState<boolean>(false);
   const { setMessage } = useNotification();
+  const mint = useMemo(
+    () => new PublicKey(nft.metadata.mint),
+    [nft.metadata.mint]
+  );
+
+  const pendingRewards = usePendingRewards(mint);
   const hasRewards = pendingRewards && pendingRewards > 0;
 
   const claimRewards = async () => {
@@ -63,7 +61,14 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
       });
 
       //@ts-ignore
-      await window.xnft.solana.send(tx, [], { skipPreflight: true });
+      const signed = await window.xnft.solana.signTransaction(tx);
+      const sig = await connection.sendRawTransaction(
+        // xNFT background connection just sucks and doesn't actually like buffer.
+        // @ts-ignore
+        Array.from(signed.serialize()),
+        { skipPreflight: true }
+      );
+      await connection.confirmTransaction(sig, "confirmed");
       setLoading(false);
       setMessage("Transaction confirmed", "success");
     } catch (err) {
