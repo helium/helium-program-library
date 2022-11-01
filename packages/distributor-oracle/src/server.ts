@@ -220,18 +220,6 @@ export class OracleServer {
       res.status(400).json({ error: "No transaction field" });
       return;
     }
-    const hotspotStr = req.body.hotspot;
-    if (!hotspotStr) {
-      res.status(400).json({ error: "No hotspot key provided" });
-      return;
-    }
-    let hotspot: PublicKey;
-    try {
-      hotspot = new PublicKey(hotspotStr);
-    } catch (err) {
-      res.status(400).json({ error: "Invalid hotspot key" });
-      return;
-    }
 
     const tx = Transaction.from(req.body.transaction.data);
 
@@ -276,17 +264,12 @@ export class OracleServer {
           this.program.coder.instruction as BorshInstructionCoder
         ).decode(ix.data);
 
-        // check that the hotspot mint is valid
-        const holders = await this.program.provider.connection.getTokenLargestAccounts(hotspot);
-        const ata = holders.value[0].address;
-        const ataAcc = await getAccount(this.program.provider.connection, ata);
-        if (!ataAcc.owner.equals(ix.keys[payerKeyIdx].pubkey)) {
-          res.status(400).json({ error: "The payer of the transaction must be the owner of the hotspot" });
-          return;
-        }
+        const recipientAcc = await this.program.account.recipientV0.fetch(
+          ix.keys[recipientIdx].pubkey
+        );
 
         const currentRewards = await this.db.getCurrentRewards(
-          hotspot
+          recipientAcc.mint,
         );
         // @ts-ignore
         if (decoded.data.args.currentRewards.toNumber() > currentRewards) {

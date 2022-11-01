@@ -73,31 +73,24 @@ export async function formTransaction({
   });
   const ixs = await Promise.all(ixPromises);
   let tx = new Transaction();
-  let distributeAccounts: any = {
-    recipient,
-    lazyDistributor,
-    rewardsMint,
-  }
 
   if (!await provider.connection.getAccountInfo(recipient)) {
-    const method = program.methods.initializeRecipientV0().accounts({
+    const initRecipientTx = await program.methods.initializeRecipientV0().accounts({
       lazyDistributor,
-      mint: hotspot
-    });
-    tx.add(await method.instruction());
-    const keys = await method.pubkeys();
-    distributeAccounts = {
-      ...distributeAccounts,
-      recipientMintAccount: await getAssociatedTokenAddress(keys.mint, wallet),
-      destinationAccount: await getAssociatedTokenAddress(lazyDistributorAcc.rewardsMint, wallet),
-      owner: wallet,
-    }
+      mint: hotspot,
+    }).transaction();
+    
+    await provider.sendAndConfirm(initRecipientTx, [], { commitment: "finalized" })
   }
   tx.add(...ixs);
 
   const distributeIx = await program.methods
     .distributeRewardsV0()
-    .accounts(distributeAccounts)
+    .accounts({
+      recipient,
+      lazyDistributor,
+      rewardsMint,
+    })
     .instruction();
   
   tx.recentBlockhash = (
@@ -114,7 +107,6 @@ export async function formTransaction({
     for (const oracle of oracleUrls) {
       const res = await axios.post(`${oracle}`, {
         transaction: serTx,
-        hotspot,
       });
       serTx = Buffer.from(res.data.transaction);
     }
