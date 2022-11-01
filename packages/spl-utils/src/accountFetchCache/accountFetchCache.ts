@@ -213,11 +213,8 @@ export class AccountFetchCache {
     this.currentBatch = new Set(); // Erase current batch from state, so we can fetch multiple at a time
     try {
       console.log(`Batching account fetch of ${currentBatch.size}`);
-      const { keys, array } = await getMultipleAccounts(
-        this.connection,
-        Array.from(currentBatch),
-        this.commitment
-      );
+      const keys = Array.from(currentBatch);
+      const array = await this.connection.getMultipleAccountsInfo(keys.map(b => new PublicKey(b)), this.commitment)
       keys.forEach((key, index) => {
         const callback = this.pendingCallbacks.get(key);
         callback && callback(array[index], null);
@@ -387,16 +384,43 @@ export class AccountFetchCache {
     if (exists && !isStatic) {
       // Only websocket watch accounts that exist
       // Don't recreate listeners
-      if (!this.accountChangeListeners.has(address)) {
-        this.accountChangeListeners.set(
-          address,
-          this.connection.onAccountChange(
-            id,
-            (account) => this.onAccountChange(id, undefined, account),
-            this.commitment
-          )
-        );
-      }
+      // xNFT doesn't support onAccountChange, so we have to make a new usable connection.
+        if (!this.accountChangeListeners.has(address)) {
+          try {
+            this.accountChangeListeners.set(
+              address,
+              this.connection.onAccountChange(
+                id,
+                (account) => this.onAccountChange(id, undefined, account),
+                this.commitment
+              )
+            );
+          } catch (e: any) {
+            if (e.toString().includes("not implemented")) {
+              // @ts-ignore
+              this.usableConnection =
+                // @ts-ignore
+                this.usableConnection ||
+                new Connection(
+                  // @ts-ignore
+                  this.connection._rpcEndpoint,
+                  this.commitment
+                );
+              this.accountChangeListeners.set(
+                address,
+                // @ts-ignore
+                this.usableConnection.onAccountChange(
+                  id,
+                  (account) => this.onAccountChange(id, undefined, account),
+                  this.commitment
+                )
+              );
+            } else {
+              console.error(e)
+              throw e
+            }
+          }
+        }
     } else if (!exists) {
       // Poll accounts that don't exist
       this.missingAccounts.set(

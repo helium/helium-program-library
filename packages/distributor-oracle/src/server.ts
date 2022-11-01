@@ -225,6 +225,19 @@ export class OracleServer {
 
     // validate only interacts with LD program and only calls setCurrentRewards and distributeRewards
     const setRewardIxs: TransactionInstruction[] = [];
+    let recipientToLazyDistToMint: Record<string, Record<string, PublicKey>> = {};
+    const initRecipientTx = this.program.idl.instructions.find(
+      (x) => x.name === "initializeRecipientV0"
+    )!;
+    const lazyDistributorIdxInitRecipient = initRecipientTx.accounts.findIndex(
+      (x) => x.name === "lazyDistributor"
+    )!;
+    const mintIdx = initRecipientTx.accounts.findIndex(
+      (x) => x.name === "mint"
+    )!
+    const recipientIdxInitRecipient = initRecipientTx.accounts.findIndex(
+      (x) => x.name === "recipient"
+    )!
     for (const ix of tx.instructions) {
       if (!ix.programId.equals(PROGRAM_ID)) {
         res.status(400).json({ error: "Invalid instructions in transaction" });
@@ -243,6 +256,13 @@ export class OracleServer {
         return;
       }
       if (decoded.name === "setCurrentRewardsV0") setRewardIxs.push(ix);
+      
+      if (decoded.name === "initializeRecipientV0") {
+        const recipient = ix.keys[recipientIdxInitRecipient].pubkey.toBase58()
+        recipientToLazyDistToMint[recipient] ||= {};
+        const lazyDist = ix.keys[lazyDistributorIdxInitRecipient].pubkey.toBase58()
+        recipientToLazyDistToMint[recipient][lazyDist] = ix.keys[mintIdx].pubkey;
+      }
     }
 
     const setRewardsIx = this.program.idl.instructions.find(
@@ -254,6 +274,9 @@ export class OracleServer {
     const oracleKeyIdx = setRewardsIx.accounts.findIndex(
       (x) => x.name === "oracle"
     )!;
+    const lazyDistIdx = setRewardsIx.accounts.findIndex(
+      (x) => x.name === "lazyDistributor"
+    )!;
     const recipientIdx = setRewardsIx.accounts.findIndex(
       (x) => x.name === "recipient"
     )!;
@@ -264,12 +287,16 @@ export class OracleServer {
           this.program.coder.instruction as BorshInstructionCoder
         ).decode(ix.data);
 
-        const recipientAcc = await this.program.account.recipientV0.fetch(
-          ix.keys[recipientIdx].pubkey
-        );
+        const recipient = ix.keys[recipientIdx].pubkey;
+        const lazyDist = ix.keys[lazyDistIdx].pubkey;
+        let mint = (recipientToLazyDistToMint[recipient.toBase58()] || {})[lazyDist.toBase58()];
+        if (!mint) {
+          const recipientAcc = await this.program.account.recipientV0.fetch(recipient);
+          mint = recipientAcc.mint;
+        }
 
         const currentRewards = await this.db.getCurrentRewards(
-          recipientAcc.mint,
+          mint,
         );
         // @ts-ignore
         if (decoded.data.args.currentRewards.toNumber() > currentRewards) {
