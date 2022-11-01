@@ -92,10 +92,12 @@ export const HotspotGridScreen: FC<HotspotGridScreenProps> = () => {
       </View>
       <View tw="flex w-full justify-center sticky bottom-0 p-5 bg-white dark:bg-zinc-800">
         <Button
-          tw="h-12 w-full text-white font-bold text-md border-0 rounded-md bg-green-600 hover:bg-green-700"
+          tw="h-12 w-full border-0 rounded-md bg-green-600 hover:bg-green-700"
           onClick={() => execute()}
         >
-          <Text tw="inline">Claim all rewards</Text>
+          <Text tw="inline text-white font-bold text-md ">
+            Claim all rewards
+          </Text>
           {loading && <Loading style={{ marginLeft: "5px" }} />}
         </Button>
       </View>
