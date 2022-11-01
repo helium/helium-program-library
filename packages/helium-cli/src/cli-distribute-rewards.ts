@@ -75,7 +75,7 @@ async function run() {
     provider,
     rewards,
     hotspot,
-    lazyDistributor
+    lazyDistributor,
   });
   await sendAndConfirmWithRetry(
     provider.connection,

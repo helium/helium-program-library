@@ -52,7 +52,7 @@ export async function formTransaction({
   hotspot: PublicKey,
   lazyDistributor: PublicKey,
   wallet?: PublicKey,
-  skipOracleSign: boolean
+  skipOracleSign?: boolean
 }) {
   const recipient = (await recipientKey(lazyDistributor, hotspot))[0]
   const ixPromises = rewards.map((x, idx) => {

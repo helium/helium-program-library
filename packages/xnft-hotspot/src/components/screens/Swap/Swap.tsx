@@ -8,6 +8,7 @@ import {
   TextField,
   Svg,
   Path,
+  Loading,
   usePublicKey,
   useConnection,
 } from "react-xnft";
@@ -31,6 +32,7 @@ import * as anchor from "@project-serum/anchor";
 import classnames from "classnames";
 import { THEME } from "../../../utils/theme";
 import { useTitleColor } from "../../../utils/hooks";
+import { useNotification } from "../../../contexts/notification";
 
 type Token = {
   name: string;
@@ -52,9 +54,9 @@ async function mintDataCredits(
   wallet: PublicKey,
   amount: number
 ) {
-  //@ts-ignore
   const stubProvider = new anchor.AnchorProvider(
     connection,
+    //@ts-ignore
     { publicKey: wallet },
     anchor.AnchorProvider.defaultOptions()
   );
@@ -79,9 +81,9 @@ async function treasurySwap(
   amount: number,
   fromMint: PublicKey
 ) {
-  //@ts-ignore
   const stubProvider = new anchor.AnchorProvider(
     connection,
+    //@ts-ignore
     { publicKey: wallet },
     anchor.AnchorProvider.defaultOptions()
   );
@@ -191,8 +193,12 @@ export function Swap() {
   const [swapAllowed, setSwapAllowed] = useState<boolean>(true);
 
   const [topAmount, setTopAmount] = useState<number>(0);
+  const [rawTopAmount, setRawTopAmount] = useState<string>("");
   const [bottomAmount, setBottomAmount] = useState<number>(0);
   const [isDcMint, setIsDcMint] = useState<boolean>(true);
+
+  const [txLoading, setLoading] = useState<boolean>(false);
+  const { setMessage } = useNotification();
 
   // maps trading pair to cached price
   const [priceCache, setPriceCache] = useState<Record<string, PriceCache>>({});
@@ -200,6 +206,7 @@ export function Swap() {
   const parseAndSetTop = useCallback((newTop: number | string | undefined) => {
     let parsed: any = newTop!;
     if (typeof newTop === "string") {
+      setRawTopAmount(newTop);
       parsed = parseFloat(newTop);
     }
     setTopAmount(parsed);
@@ -280,13 +287,26 @@ export function Swap() {
   }, [topSelected]);
 
   const executeSwap = useCallback(() => {
-    console.log("swapping");
-    if (isDcMint) {
-      mintDataCredits(connection, publicKey, topAmount);
-    } else {
-      treasurySwap(connection, publicKey, topAmount, topSelected.mint!);
+    if (txLoading) return;
+    async function swap() {
+      setLoading(true);
+      console.log("swapping");
+      try {
+        if (isDcMint) {
+          await mintDataCredits(connection, publicKey, topAmount);
+        } else {
+          await treasurySwap(connection, publicKey, topAmount, topSelected.mint!);
+        }
+        setLoading(false);
+        setMessage("Transaction confirmed", "success");
+      } catch (err) {
+        setLoading(false);
+        setMessage(`Transaction failed: ${err.message}`, "error");
+      }
     }
-  }, [isDcMint, topAmount, connection, publicKey]);
+    setLoading(true);
+    // swap();
+  }, [isDcMint, topAmount, connection, publicKey, txLoading]);
 
   return (
     <View tw="relative h-full text-center pt-5">
@@ -295,7 +315,7 @@ export function Swap() {
           <Text tw="text-zinc-900 dark:text-zinc-400">Burning</Text>
           <View
             tw="flex justify-baseline"
-            onClick={() => setTopAmount(balance)}
+            onClick={() => parseAndSetTop(`${balance}`)}
           >
             <Text tw="text-xs text-zinc-900 dark:text-zinc-400 cursor-pointer">
               Max:&nbsp;
@@ -309,7 +329,7 @@ export function Swap() {
           <TextField
             tw="block p-3 w-full text-lg text-gray-900 bg-gray-50 rounded-lg hover:border-blue-500 focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-900/[.8] dark:border-zinc-800 dark:placeholder-zinc-400 dark:text-white"
             placeholder="Amount"
-            value={isNaN(topAmount) ? "" : topAmount}
+            value={rawTopAmount}
             onChange={(e) => parseAndSetTop(e.target.value)}
           />
           <TokenSelector
@@ -337,20 +357,24 @@ export function Swap() {
           />
         </View>
       </View>
-
       <View tw="flex flex-col w-full p-5 absolute bottom-0">
         <Text tw="text-xs mb-2">
           Note: Trades completed using this tool are only one way.
         </Text>
         <Button
           tw={classnames([
-            "h-12 w-full text-white font-bold text-md border-0 rounded-md",
-            ...[swapAllowed && ["bg-green-600", "hover:bg-green-700"]],
-            ...[!swapAllowed && "bg-green-600/[0.5]"],
+            "h-12 w-full text-white font-bold text-md border-0 rounded-md flex justify-center items-center",
+            ...[(swapAllowed && !txLoading) && ["bg-green-600", "hover:bg-green-700"]],
+            ...[!(swapAllowed && !txLoading) && "bg-green-600/[0.5]"],
           ])}
           onClick={executeSwap}
         >
-          {swapAllowed ? "Burn" : "Invalid burn"}
+          <Text tw="inline">
+            {swapAllowed ? "Burn" : "Invalid burn"}
+          </Text>
+          {txLoading && (
+            <Loading style={{ marginLeft: '5px'}}/>
+          )}
         </Button>
       </View>
     </View>

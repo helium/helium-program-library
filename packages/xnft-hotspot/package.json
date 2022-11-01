@@ -12,7 +12,7 @@
   },
   "author": "",
   "devDependencies": {
-    "@coral-xyz/xnft-cli": "0.2.0-latest.313",
+    "@coral-xyz/xnft-cli": "0.2.0-latest.338",
     "@esbuild-plugins/node-globals-polyfill": "^0.1.1",
     "esbuild": "^0.15.12"
   },
@@ -28,6 +28,6 @@
     "classnames": "^2.3.2",
     "ky": "^0.31.4",
     "react": "^17.0.2",
-    "react-xnft": "0.2.0-latest.313"
+    "react-xnft": "0.2.0-latest.338"
   }
 }

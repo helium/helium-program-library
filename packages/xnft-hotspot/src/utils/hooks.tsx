@@ -26,7 +26,6 @@ export const useTitleColor = () => {
 
   useEffect(() => {
     if (!metadata || !nav) return;
-
     nav.setTitleStyle({
       color: metadata.isDarkMode ? "#ffffff" : "#333333",
     });
