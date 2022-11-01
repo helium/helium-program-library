@@ -1,36 +1,25 @@
-import * as client from "@helium/distributor-oracle";
-import { init } from "@helium/lazy-distributor-sdk";
-import * as anchor from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { MOBILE_MINT } from "@helium/spl-utils";
-import React, { FC, useMemo, useState } from "react";
+import React, { FC, useMemo } from "react";
 import {
   Button,
   Image,
   Text,
-  useConnection,
-  usePublicKey,
   useNavigation,
   View,
   Svg,
   Path,
-  Circle,
 } from "react-xnft";
 import classnames from "classnames";
-import { useNotification } from "../../../../contexts/notification";
 import { useMetaplexMetadata } from "../../../../hooks/useMetaplexMetadata";
 import { usePendingRewards } from "../../../../hooks/usePendingRewards";
-import { LAZY_KEY } from "../../../../utils";
+import { useClaimRewards } from "../../../../utils/hooks";
 
 interface HotspotGridItemProps {
   nft: any; // TODO: actually type this
 }
 
 export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
-  const publicKey = usePublicKey();
-  const connection = useConnection();
-  const [txLoading, setLoading] = useState<boolean>(false);
-  const { setMessage } = useNotification();
   const mint = useMemo(
     () => new PublicKey(nft.metadata.mint),
     [nft.metadata.mint]
@@ -39,51 +28,8 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
   const { info: metadata } = useMetaplexMetadata(MOBILE_MINT);
   const symbol = metadata?.data.symbol;
   const pendingRewards = usePendingRewards(mint);
+  const { claimRewards, loading } = useClaimRewards(nft);
   const hasRewards = pendingRewards && pendingRewards > 0;
-
-  const claimRewards = async () => {
-    if (txLoading) return;
-    setLoading(true);
-    try {
-      const stubProvider = new anchor.AnchorProvider(
-        connection,
-        //@ts-ignore
-        { publicKey },
-        anchor.AnchorProvider.defaultOptions()
-      );
-      const program = await init(stubProvider);
-      const rewards = await client.getCurrentRewards(
-        program,
-        LAZY_KEY,
-        new PublicKey(nft.metadata.mint)
-      );
-      const tx = await client.formTransaction({
-        program,
-        //@ts-ignore
-        provider: window.xnft.solana,
-        rewards,
-        hotspot: new PublicKey(nft.metadata.mint),
-        lazyDistributor: LAZY_KEY,
-        wallet: publicKey,
-      });
-
-      //@ts-ignore
-      const signed = await window.xnft.solana.signTransaction(tx);
-      const sig = await connection.sendRawTransaction(
-        // xNFT background connection just sucks and doesn't actually like buffer.
-        // @ts-ignore
-        Array.from(signed.serialize()),
-        { skipPreflight: true }
-      );
-      await connection.confirmTransaction(sig, "confirmed");
-      setLoading(false);
-      setMessage("Transaction confirmed", "success");
-    } catch (err) {
-      setLoading(false);
-      setMessage(`Transaction failed: ${err.message}`, "error");
-      console.error(err);
-    }
-  };
 
   const clickNft = () => {
     nav.push("detail", { nft, symbol });
@@ -109,11 +55,11 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
               <Button
                 tw={classnames(
                   "!px-5 !py-0.5 border-0 rounded-sm bg-green-600",
-                  { "hover:bg-green-700": hasRewards && !txLoading },
-                  { "opacity-50": !hasRewards || txLoading }
+                  { "hover:bg-green-700": hasRewards && !loading },
+                  { "opacity-50": !hasRewards || loading }
                 )}
                 onClick={
-                  hasRewards && !txLoading
+                  hasRewards && !loading
                     ? (e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -122,7 +68,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
                     : () => {}
                 }
               >
-                {txLoading && (
+                {loading && (
                   <Svg
                     tw="inline mr-2 w-4 h-4 text-white/[.5] animate-spin fill-white"
                     viewBox="0 0 100 101"
@@ -140,7 +86,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
                   </Svg>
                 )}
                 <Text tw="inline text-white font-bold text-xs">
-                  {txLoading ? `Claiming...` : `Claim`}
+                  {loading ? `Claiming...` : `Claim`}
                 </Text>
               </Button>
             </View>
