@@ -6,8 +6,6 @@ import { THEME } from "../../../utils/theme";
 import { useColorMode } from "../../../utils/hooks";
 
 export const HotspotsScreen = () => {
-  const textColor = useColorMode(THEME.colors.text);
-
   return (
     <Stack.Navigator
       initialRoute={{ name: "grid" }}

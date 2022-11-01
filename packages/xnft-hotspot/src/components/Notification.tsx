@@ -17,9 +17,6 @@ import { useEffect } from "react";
 export function Notification() {
   const { message, type } = useNotification();
   const color = type == 'error' ? THEME.colors.error : type == 'success' ? THEME.colors.success : THEME.colors.info
-  useEffect(() => {
-    console.log("logging msg", message);
-  }, [message])
   return (
     <View>
       {message && type && (
@@ -36,6 +33,8 @@ export function Notification() {
         }}>
           <Text style={{
             textAlign: 'center',
+            color: 'white',
+            padding: '10px',
           }}>{message}</Text>
         </View>
       )}

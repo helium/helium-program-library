@@ -22,14 +22,13 @@ export const useColorMode = ({
 
 export const useTitleColor = () => {
   const nav = useNavigation();
-  const textColor = useColorMode({
-    light: "#333333",
-    dark: "#ffffff",
-  });
+  const metadata = useMetadata();
 
   useEffect(() => {
+    if (!metadata || !nav) return;
+
     nav.setTitleStyle({
-      color: textColor,
+      color: metadata.isDarkMode ? "#ffffff" : "#333333",
     });
-  }, [nav]);
+  }, [metadata.isDarkMode]);
 };
