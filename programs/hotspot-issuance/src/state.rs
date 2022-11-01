@@ -13,7 +13,6 @@ pub struct HotspotConfigV0 {
 
   pub bump_seed: u8,
   pub collection_bump_seed: u8,
-
 }
 
 #[account]

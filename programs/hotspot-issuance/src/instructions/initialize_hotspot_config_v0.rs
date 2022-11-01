@@ -35,13 +35,13 @@ pub struct InitializeHotspotConfigV0<'info> {
     bump
   )]
   pub collection: Box<Account<'info, Mint>>,
-  
+
   #[account(
     has_one = authority
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   pub authority: Signer<'info>,
-  
+
   /// CHECK: Handled by cpi
   #[account(
     mut,

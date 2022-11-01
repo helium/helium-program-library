@@ -303,10 +303,13 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
   )?;
 
   track_added_device_v0(
-    ctx.accounts.add_device_ctx().with_signer(hotspot_config_seeds),
+    ctx
+      .accounts
+      .add_device_ctx()
+      .with_signer(hotspot_config_seeds),
     TrackAddedDeviceArgsV0 {
       authority_bump: ctx.accounts.hotspot_config.bump_seed,
-      symbol: ctx.accounts.hotspot_config.symbol.clone()
+      symbol: ctx.accounts.hotspot_config.symbol.clone(),
     },
   )?;
 

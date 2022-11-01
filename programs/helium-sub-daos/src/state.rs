@@ -82,9 +82,9 @@ pub struct SubDaoEpochInfoV0 {
 #[derive(Default)]
 pub struct SubDaoV0 {
   pub dao: Pubkey,
-  pub dnt_mint: Pubkey,           // The mint of the subdao token
-  pub treasury: Pubkey,           // The treasury for rewards
-  pub rewards_escrow: Pubkey,     // The escrow account for DNT rewards
+  pub dnt_mint: Pubkey,       // The mint of the subdao token
+  pub treasury: Pubkey,       // The treasury for rewards
+  pub rewards_escrow: Pubkey, // The escrow account for DNT rewards
   pub authority: Pubkey,
   pub total_devices: u64,
   pub emission_schedule: Vec<EmissionScheduleItem>,
