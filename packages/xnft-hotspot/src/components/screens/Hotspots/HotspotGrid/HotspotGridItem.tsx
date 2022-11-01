@@ -102,7 +102,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
         />
         <View tw="flex flex-col gap-2 grow h-full justify-center">
           <View tw="flex flex-row justify-between items-center">
-            <Text tw="text-left w-20 truncate text-sm font-bold text-zinc-900 dark:text-white !m-0">
+            <Text tw="text-left w-20 truncate text-md font-bold text-zinc-900 dark:text-white !m-0">
               {nft.tokenMetaUriData.name}
             </Text>
             <View tw="flex justify-end">
