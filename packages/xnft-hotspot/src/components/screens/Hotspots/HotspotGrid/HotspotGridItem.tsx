@@ -30,7 +30,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
   const connection = useConnection();
 
   useEffect(() => {
-    (async () => {")
+    (async () => {
       if (!program || !nft.metadata.mint) return null;
       const nftMint = new PublicKey(nft.metadata.mint);
 
@@ -105,7 +105,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
           />
         </View>
         <View tw="flex flex-row items-baseline mt-1">
-          <Text tw="text-md font-bold !m-0 text-white dark:text-zinc-600">
+          <Text tw="text-md font-bold !m-0 text-gray-500 dark:text-zinc-600">
             Rewards:&nbsp;
           </Text>
           <Text tw="text-xs !m-0 text-gray-600 dark:text-gray-500">

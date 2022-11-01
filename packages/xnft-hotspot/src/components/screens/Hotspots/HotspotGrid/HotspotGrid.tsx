@@ -43,7 +43,7 @@ export const HotspotGridScreen: FC<HotspotGridScreenProps> = () => {
         rewards,
         hotspot: new PublicKey(nft.metadata.mint),
         lazyDistributor: LAZY_KEY,
-        wallet: publicKey
+        wallet: publicKey,
       });
 
       //@ts-ignore
