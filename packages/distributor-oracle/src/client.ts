@@ -3,7 +3,7 @@ import {
   Program,
   BN,
 } from "@project-serum/anchor";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { TransactionInstruction, PublicKey, Transaction } from "@solana/web3.js";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import axios from "axios";
 import { recipientKey } from "@helium/lazy-distributor-sdk";
@@ -37,14 +37,23 @@ export async function getCurrentRewards(
   });
 }
 
-export async function formTransaction(
+export async function formTransaction({
+  program,
+  provider,
+  rewards,
+  hotspot,
+  lazyDistributor,
+  wallet,
+  skipOracleSign = false
+}: {
   program: Program<LazyDistributor>,
   provider: AnchorProvider,
   rewards: Reward[],
   hotspot: PublicKey,
   lazyDistributor: PublicKey,
   wallet?: PublicKey,
-) {
+  skipOracleSign: boolean
+}) {
   const recipient = (await recipientKey(lazyDistributor, hotspot))[0]
   const ixPromises = rewards.map((x, idx) => {
     return program.methods
@@ -73,7 +82,8 @@ export async function formTransaction(
   const holders = await provider.connection.getTokenLargestAccounts(hotspot);
   const mintAccount = holders.value[0].address;
   const mintTokenAccount = await getAccount(provider.connection, mintAccount);
-  const rewardsMint = (await program.account.lazyDistributorV0.fetch(lazyDistributor)).rewardsMint;
+  const lazyDistributorAcc = (await program.account.lazyDistributorV0.fetch(lazyDistributor))!;
+  const rewardsMint = lazyDistributorAcc.rewardsMint!;
 
   const distributeIx = await program.methods
     .distributeRewardsV0()
@@ -91,10 +101,64 @@ export async function formTransaction(
   tx.feePayer = wallet ? wallet : provider.wallet.publicKey;
 
   tx.add(distributeIx);
+
+  const oracleUrls = lazyDistributorAcc.oracles.map((x: any) => x.url);
+
+  let serTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false })
+  if (!skipOracleSign) {
+    for (const oracle in oracleUrls) {
+      const res = await axios.post(`${oracleUrls[oracle]}`, {
+        body: {
+          transaction: serTx,
+        },
+      });
+      const json = await res.data.json();
+      serTx = Buffer.from(json.transaction!.data);
+    }
+  }
+  
+  const finalTx = Transaction.from(serTx);
+  // Ensure the oracle didn't pull a fast one
+  assertSameIxns(finalTx.instructions, tx.instructions);
+
   //@ts-ignore
   if (provider.signTransaction) {
     //@ts-ignore
-    return await provider.signTransaction(tx);
+    return await provider.signTransaction(finalTx);
   }
-  return await provider.wallet.signTransaction(tx);
+  return await provider.wallet.signTransaction(finalTx);
 }
+
+function assertSameIxns(instructions: TransactionInstruction[], instructions1: TransactionInstruction[]) {
+  if (instructions.length !== instructions1.length) {
+    throw new Error("Extra instructions added by oracle");
+  }
+
+  instructions.forEach((instruction, idx) => {
+    const instruction1 = instructions1[idx];
+    if (instruction.programId.toBase58() !== instruction1.programId.toBase58()) {
+      throw new Error("Program id mismatch");
+    }
+    if (instruction.data.equals(instruction1.data)) {
+      throw new Error("Instruction data mismatch");
+    }
+
+    if (instruction.keys.length !== instruction1.keys.length) {
+      throw new Error("Key length mismatch");
+    }
+
+    instruction.keys.forEach((key, idx) => {
+      const key1 = instruction1.keys[idx];
+      if (key.pubkey.toBase58() !== key1.pubkey.toBase58()) {
+        throw new Error("Key mismatch");
+      }
+      if (key.isSigner !== key1.isSigner) {
+        throw new Error("Key signer mismatch");
+      }
+      if (key.isWritable !== key1.isWritable) {
+        throw new Error("Key writable mismatch");
+      }
+    });
+  })
+}
+

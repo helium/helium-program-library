@@ -52,30 +52,18 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
         LAZY_KEY,
         new PublicKey(nft.metadata.mint)
       );
-      const tx = await client.formTransaction(
+      const tx = await client.formTransaction({
         program,
         //@ts-ignore
-        window.xnft.solana,
+        provider: window.xnft.solana,
         rewards,
-        new PublicKey(nft.metadata.mint),
-        LAZY_KEY,
-        publicKey
-      );
-
-      const serializedTx = tx.serialize({
-        requireAllSignatures: false,
-        verifySignatures: false,
+        hotspot: new PublicKey(nft.metadata.mint),
+        lazyDistributor: LAZY_KEY,
+        wallet: publicKey
       });
-
-      const res = await ky.post("http://localhost:8080/", {
-        json: { transaction: serializedTx },
-      });
-
-      const json = (await res.json()) as any;
-      const signedTx = Transaction.from(json!.transaction!.data);
 
       //@ts-ignore
-      await window.xnft.solana.send(signedTx, [], { skipPreflight: true });
+      await window.xnft.solana.send(tx, [], { skipPreflight: true });
       setLoading(false);
       setMessage("Transaction confirmed", "success");
     } catch (err) {

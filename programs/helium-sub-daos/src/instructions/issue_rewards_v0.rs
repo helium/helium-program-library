@@ -29,7 +29,7 @@ pub struct IssueRewardsV0<'info> {
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
     has_one = dao,
-    constraint = dao_epoch_info.num_utility_scores_calculated == dao.num_sub_daos @ ErrorCode::MissingUtilityScores,
+    constraint = dao_epoch_info.num_utility_scores_calculated >= dao.num_sub_daos @ ErrorCode::MissingUtilityScores,
     seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump = dao_epoch_info.bump_seed,
     constraint = !dao_epoch_info.done_issuing_rewards

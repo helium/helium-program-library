@@ -30,7 +30,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
   const connection = useConnection();
 
   useEffect(() => {
-    (async () => {
+    (async () => {")
       if (!program || !nft.metadata.mint) return null;
       const nftMint = new PublicKey(nft.metadata.mint);
 
@@ -55,7 +55,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
     })();
 
     return () => clearInterval(interval);
-  }, [program, nft]);
+  }, [program, nft.metadata.mint]);
 
   useEffect(() => {
     if (!rewardsMint || !connection) return;
@@ -73,7 +73,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
       const meta = Metadata.fromAccountInfo(acc!)[0];
       setSymbol(meta.data.symbol);
     })();
-  }, [rewardsMint, connection]);
+  }, [rewardsMint?.toBase58(), connection]);
 
   const clickNft = () => {
     nav.push("detail", { nft, pendingRewards, symbol });

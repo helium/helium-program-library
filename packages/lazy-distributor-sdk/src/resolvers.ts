@@ -16,8 +16,11 @@ export const lazyDistributorResolvers = combineResolvers(
     owner: "lazyDistributor",
   }),
   circuitBreakerResolvers,
-  resolveIndividual(async ({ path, accounts }) => {
+  resolveIndividual(async ({ path, accounts, idlIx }) => {
     if (path[path.length - 1] === "targetMetadata") {
+      if (!accounts.mint) {
+        console.log(path, accounts, idlIx);
+      }
       return (
         await PublicKey.findProgramAddress(
           [

@@ -105,19 +105,19 @@ const yarg = yargs(hideBin(process.argv)).options({
     type: "number",
     describe:
       "Number of HNT tokens to pre mint before assigning authority to lazy distributor",
-    default: 100000,
+    default: 0,
   },
   numDc: {
     type: "number",
     describe:
       "Number of DC tokens to pre mint before assigning authority to lazy distributor",
-    default: 100000,
+    default: 1000,
   },
   numMobile: {
     type: "number",
     describe:
       "Number of MOBILE tokens to pre mint before assigning authority to lazy distributor",
-    default: 100000,
+    default: 0,
   },
   bucket: {
     type: "string",
@@ -126,6 +126,7 @@ const yarg = yargs(hideBin(process.argv)).options({
       "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib",
   },
   oracleUrl: {
+    alias: "o",
     type: "string",
     describe: "The oracle URL",
     default: "http://localhost:8080",
@@ -166,6 +167,10 @@ async function run() {
   const oracleKeypair = loadKeypair(argv.oracleKeypair);
   const oracleKey = oracleKeypair.publicKey;
   const oracleUrl = argv.oracleUrl;
+
+  console.log("HNT", hntKeypair.publicKey.toBase58());
+  console.log("MOBILE", mobileKeypair.publicKey.toBase58());
+  console.log("DC", dcKeypair.publicKey.toBase58());
 
   const conn = provider.connection;
 
@@ -342,20 +347,9 @@ async function run() {
       if (!(await exists(conn, key))) {
         console.log("Creating hotspot", index);
         await create.rpc({ skipPreflight: true });
-        hardcodeHotspots[index].mint = (await create.pubkeys()).hotspot;
       }
     })
   );
-
-  await Promise.all(
-    hardcodeHotspots.map(async (hotspot) => {
-      const method = await lazyDistributorProgram.methods.initializeRecipientV0().accounts({
-        lazyDistributor: mobileLazyDist,
-        mint: hotspot.mint!
-      });
-      await method.rpc({ skipPreflight: true });
-    })
-  )
 }
 
 async function createAndMint({

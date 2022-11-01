@@ -71,7 +71,7 @@ describe('distributor-oracle', () => {
         oracles: [
           {
             oracle: oracle.publicKey,
-            url: "https://some-url/",
+            url: "http://localhost:8080",
           },
         ],
         windowConfig: {
@@ -112,10 +112,10 @@ describe('distributor-oracle', () => {
   });
 
   it('should sign and execute properly formed transactions', async () => {
-    const tx = await client.formTransaction(program, provider, [{
+    const tx = await client.formTransaction({program, provider, rewards: [{
       oracleKey: oracle.publicKey,
       currentRewards: await oracleServer.db.getCurrentRewards(mint),
-    }], mint, lazyDistributor)
+    }], hotspot: mint, lazyDistributor})
     const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
 
     const res = await chai.request(oracleServer.app)
