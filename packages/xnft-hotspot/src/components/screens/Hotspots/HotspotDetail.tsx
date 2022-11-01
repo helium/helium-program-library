@@ -1,16 +1,9 @@
-import * as client from "@helium/distributor-oracle";
-import { init } from "@helium/lazy-distributor-sdk";
-import * as anchor from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import classnames from "classnames";
-import React, { FC, useMemo, useState } from "react";
-import {
-  Button, Image, Loading, Text, useConnection, usePublicKey, View
-} from "react-xnft";
-import { useNotification } from "../../../contexts/notification";
+import React, { FC, useMemo } from "react";
+import { Button, Image, Loading, Text, View } from "react-xnft";
 import { usePendingRewards } from "../../../hooks/usePendingRewards";
-import { LAZY_KEY } from "../../../utils";
-import { useTitleColor } from "../../../utils/hooks";
+import { useClaimRewards, useTitleColor } from "../../../utils/hooks";
 
 interface HotspotDetailScreenProps {
   nft: any; // TODO: actually type this
@@ -22,10 +15,7 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
   symbol,
 }) => {
   useTitleColor();
-  const publicKey = usePublicKey();
-  const connection = useConnection();
-  const [txLoading, setLoading] = useState<boolean>(false);
-  const { setMessage } = useNotification();
+  const { claimRewards, loading } = useClaimRewards(nft);
   const mint = useMemo(
     () => new PublicKey(nft.metadata.mint),
     [nft.metadata.mint]
@@ -33,50 +23,6 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
 
   const pendingRewards = usePendingRewards(mint);
   const hasRewards = pendingRewards && pendingRewards > 0;
-
-  const claimRewards = async () => {
-    if (txLoading) return;
-    setLoading(true);
-    try {
-      const stubProvider = new anchor.AnchorProvider(
-        connection,
-        //@ts-ignore
-        { publicKey },
-        anchor.AnchorProvider.defaultOptions()
-      );
-      const program = await init(stubProvider);
-      const rewards = await client.getCurrentRewards(
-        program,
-        LAZY_KEY,
-        new PublicKey(nft.metadata.mint)
-      );
-      const tx = await client.formTransaction({
-        program,
-        //@ts-ignore
-        provider: window.xnft.solana,
-        rewards,
-        hotspot: new PublicKey(nft.metadata.mint),
-        lazyDistributor: LAZY_KEY,
-        wallet: publicKey,
-      });
-
-      //@ts-ignore
-      const signed = await window.xnft.solana.signTransaction(tx);
-      const sig = await connection.sendRawTransaction(
-        // xNFT background connection just sucks and doesn't actually like buffer.
-        // @ts-ignore
-        Array.from(signed.serialize()),
-        { skipPreflight: true }
-      );
-      await connection.confirmTransaction(sig, "confirmed");
-      setLoading(false);
-      setMessage("Transaction confirmed", "success");
-    } catch (err) {
-      setLoading(false);
-      setMessage(`Transaction failed: ${err.message}`, "error");
-      console.error(err);
-    }
-  };
 
   return (
     <View tw="flex flex-col px-5">
@@ -108,19 +54,17 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
 
       <View tw="flex flex-row mt-5 mb-5">
         <Button
-          tw={classnames([
-            "h-12 w-full text-white font-bold text-md border-0 rounded-md flex justify-center items-center",
-            ...[hasRewards && ["bg-green-600", "hover:bg-green-700"]],
-            ...[!hasRewards && "bg-green-600/[0.5]"],
-          ])}
+          tw={classnames(
+            "h-12 w-full border-0 rounded-md flex justify-center items-center bg-green-600",
+            { "hover:bg-green-700": hasRewards },
+            { "opacity-50": !hasRewards }
+          )}
           onClick={hasRewards ? () => claimRewards() : () => {}}
         >
-          <Text tw="inline">
+          <Text tw="inline text-white text-md font-bold">
             {hasRewards ? `Claim rewards` : `No rewards to claim`}
           </Text>
-          {txLoading && (
-            <Loading style={{ marginLeft: '5px'}}/>
-          )}
+          {loading && <Loading style={{ marginLeft: "5px" }} />}
         </Button>
       </View>
     </View>
