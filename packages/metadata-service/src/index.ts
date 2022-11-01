@@ -20,8 +20,8 @@ function removeNullBytes(str: string): string {
     .filter((char) => char.codePointAt(0))
     .join("");
 }
-const [subDao] = subDaoKey(new PublicKey(process.env.DNT_MINT))
-const [collection] = hotspotCollectionKey(subDao, process.env.COLLECTION_SYMBOL);
+const [subDao] = subDaoKey(new PublicKey(process.env.DNT_MINT!))
+const [collection] = hotspotCollectionKey(subDao, process.env.COLLECTION_SYMBOL!);
 
 server.get<{ Params: { eccCompact: string } }>("/:eccCompact", async (request, reply) => {
   const { eccCompact } = request.params;
