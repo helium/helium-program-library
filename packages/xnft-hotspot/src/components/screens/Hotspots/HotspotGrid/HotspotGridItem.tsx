@@ -54,7 +54,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
             <View tw="flex justify-end">
               <Button
                 tw={classnames(
-                  "!px-5 !py-0.5 border-0 rounded-sm bg-green-600",
+                  "!px-5 !py-0 border-0 rounded-sm bg-green-600",
                   { "hover:bg-green-700": hasRewards && !loading },
                   { "opacity-50": !hasRewards || loading }
                 )}
@@ -85,7 +85,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
                     />
                   </Svg>
                 )}
-                <Text tw="inline text-white font-bold text-xs">
+                <Text tw="inline text-white font-bold text-xs leading-6">
                   {loading ? `Claiming...` : `Claim`}
                 </Text>
               </Button>
