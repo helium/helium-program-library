@@ -7,7 +7,7 @@ import { TransactionInstruction, PublicKey, Transaction } from "@solana/web3.js"
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import axios from "axios";
 import { recipientKey } from "@helium/lazy-distributor-sdk";
-import { getAccount } from "@solana/spl-token";
+import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 
 export type Reward = {
   currentRewards: string;
@@ -43,7 +43,7 @@ export async function formTransaction({
   rewards,
   hotspot,
   lazyDistributor,
-  wallet,
+  wallet = provider.wallet.publicKey,
   skipOracleSign = false
 }: {
   program: Program<LazyDistributor>,
@@ -54,7 +54,10 @@ export async function formTransaction({
   wallet?: PublicKey,
   skipOracleSign?: boolean
 }) {
-  const recipient = recipientKey(lazyDistributor, hotspot)[0]
+  const recipient = recipientKey(lazyDistributor, hotspot)[0];
+  const lazyDistributorAcc = (await program.account.lazyDistributorV0.fetch(lazyDistributor))!;
+  const rewardsMint = lazyDistributorAcc.rewardsMint!;
+
   const ixPromises = rewards.map((x, idx) => {
     return program.methods
       .setCurrentRewardsV0({
@@ -70,26 +73,33 @@ export async function formTransaction({
   });
   const ixs = await Promise.all(ixPromises);
   let tx = new Transaction();
+  let distributeAccounts: any = {
+    recipient,
+    lazyDistributor,
+    rewardsMint,
+  }
+
   if (!await provider.connection.getAccountInfo(recipient)) {
-    const ix = await program.methods.initializeRecipientV0().accounts({
+    const method = program.methods.initializeRecipientV0().accounts({
       lazyDistributor,
       mint: hotspot
-    }).instruction()
-    tx.add(ix);
+    });
+    tx.add(await method.instruction());
+    const keys = await method.pubkeys();
+    distributeAccounts = {
+      ...distributeAccounts,
+      recipientMintAccount: await getAssociatedTokenAddress(keys.mint, wallet),
+      destinationAccount: await getAssociatedTokenAddress(lazyDistributorAcc.rewardsMint, wallet),
+      owner: wallet,
+    }
   }
   tx.add(...ixs);
 
-  const lazyDistributorAcc = (await program.account.lazyDistributorV0.fetch(lazyDistributor))!;
-  const rewardsMint = lazyDistributorAcc.rewardsMint!;
-
   const distributeIx = await program.methods
     .distributeRewardsV0()
-    .accounts({
-      recipient,
-      lazyDistributor,
-      rewardsMint,
-    })
+    .accounts(distributeAccounts)
     .instruction();
+  
   tx.recentBlockhash = (
     await provider.connection.getLatestBlockhash()
   ).blockhash;
@@ -104,6 +114,7 @@ export async function formTransaction({
     for (const oracle of oracleUrls) {
       const res = await axios.post(`${oracle}`, {
         transaction: serTx,
+        hotspot,
       });
       serTx = Buffer.from(res.data.transaction);
     }

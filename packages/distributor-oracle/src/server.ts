@@ -26,6 +26,7 @@ import {
 } from "@helium/hotspot-issuance-sdk";
 import { init, PROGRAM_ID } from "@helium/lazy-distributor-sdk";
 import fs from "fs";
+import { getAccount } from "@solana/spl-token";
 
 export interface Database {
   getCurrentRewards: (mint: PublicKey) => Promise<string>;
@@ -219,6 +220,18 @@ export class OracleServer {
       res.status(400).json({ error: "No transaction field" });
       return;
     }
+    const hotspotStr = req.body.hotspot;
+    if (!hotspotStr) {
+      res.status(400).json({ error: "No hotspot key provided" });
+      return;
+    }
+    let hotspot: PublicKey;
+    try {
+      hotspot = new PublicKey(hotspotStr);
+    } catch (err) {
+      res.status(400).json({ error: "Invalid hotspot key" });
+      return;
+    }
 
     const tx = Transaction.from(req.body.transaction.data);
 
@@ -247,6 +260,9 @@ export class OracleServer {
     const setRewardsIx = this.program.idl.instructions.find(
       (x) => x.name === "setCurrentRewardsV0"
     )!;
+    const payerKeyIdx = setRewardsIx.accounts.findIndex(
+      (x) => x.name === "payer"
+    )!;
     const oracleKeyIdx = setRewardsIx.accounts.findIndex(
       (x) => x.name === "oracle"
     )!;
@@ -259,12 +275,18 @@ export class OracleServer {
         let decoded = (
           this.program.coder.instruction as BorshInstructionCoder
         ).decode(ix.data);
-        const recipientAcc = await this.program.account.recipientV0.fetch(
-          ix.keys[recipientIdx].pubkey
-        );
+
+        // check that the hotspot mint is valid
+        const holders = await this.program.provider.connection.getTokenLargestAccounts(hotspot);
+        const ata = holders.value[0].address;
+        const ataAcc = await getAccount(this.program.provider.connection, ata);
+        if (!ataAcc.owner.equals(ix.keys[payerKeyIdx].pubkey)) {
+          res.status(400).json({ error: "The payer of the transaction must be the owner of the hotspot" });
+          return;
+        }
 
         const currentRewards = await this.db.getCurrentRewards(
-          recipientAcc.mint
+          hotspot
         );
         // @ts-ignore
         if (decoded.data.args.currentRewards.toNumber() > currentRewards) {
