@@ -1,3 +1,4 @@
+import { numberWithCommas } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import classnames from "classnames";
 import React, { FC, useMemo } from "react";
@@ -38,7 +39,7 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
             Pending rewards:&nbsp;
           </Text>
           <Text tw="text-sm !m-0 text-zinc-700 dark:text-zinc-200">
-            {pendingRewards || "0"} {symbol || ""}
+            {pendingRewards == null ? "..." : numberWithCommas(pendingRewards, 8)} {symbol || ""}
           </Text>
         </View>
 

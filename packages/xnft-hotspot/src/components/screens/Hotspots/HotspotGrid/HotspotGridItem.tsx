@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { MOBILE_MINT } from "@helium/spl-utils";
+import { MOBILE_MINT, numberWithCommas } from "@helium/spl-utils";
 import React, { FC, useMemo } from "react";
 import {
   Button,
@@ -30,6 +30,14 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
   const pendingRewards = usePendingRewards(mint);
   const { claimRewards, loading } = useClaimRewards(nft);
   const hasRewards = pendingRewards && pendingRewards > 0;
+  const buttonClass = useMemo(() =>
+    classnames(
+      "!px-5 !py-0 border-0 rounded-sm bg-green-600",
+      { "hover:bg-green-700": hasRewards && !loading },
+      { "opacity-50": !hasRewards || loading }
+    ),
+    [hasRewards, loading]
+  );
 
   const clickNft = () => {
     nav.push("detail", { nft, symbol });
@@ -53,11 +61,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
             </Text>
             <View tw="flex justify-end">
               <Button
-                tw={classnames(
-                  "!px-5 !py-0 border-0 rounded-sm bg-green-600",
-                  { "hover:bg-green-700": hasRewards && !loading },
-                  { "opacity-50": !hasRewards || loading }
-                )}
+                tw={buttonClass}
                 onClick={
                   hasRewards && !loading
                     ? (e) => {
@@ -96,7 +100,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
               Pending Rewards:&nbsp;
             </Text>
             <Text tw="text-sm !m-0 text-gray-600 dark:text-gray-500">
-              {`${pendingRewards == null ? "..." : pendingRewards} ${
+              {`${pendingRewards == null ? "..." : numberWithCommas(pendingRewards, 4)} ${
                 symbol || ""
               }`}
             </Text>
