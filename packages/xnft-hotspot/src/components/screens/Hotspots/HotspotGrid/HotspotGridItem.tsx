@@ -13,8 +13,7 @@ import {
   PROGRAM_ID as MPL_PID,
   Metadata,
 } from "@metaplex-foundation/mpl-token-metadata";
-import { THEME } from "../../../../utils/theme";
-import { useColorMode } from "../../../../utils/hooks";
+import classnames from "classnames";
 
 interface HotspotGridItemProps {
   nft: any; // TODO: actually type this
@@ -28,6 +27,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
   const nav = useNavigation();
   const program = useProgram();
   const connection = useConnection();
+  const hasRewards = pendingRewards && pendingRewards > 0;
 
   useEffect(() => {
     (async () => {
@@ -84,33 +84,46 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
       tw="flex flex-col w-auto border-0 !p-3 mb-2 rounded-md bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-400 dark:hover:bg-zinc-900/[0.6]"
       onClick={() => clickNft()}
     >
-      <View tw="flex flex-col">
-        <View tw="flex flex-row relative mb-2">
-          <Text
-            tw="text-center absolute bottom-1 left-1 w-3/5 bg-zinc-700 !px-0.5 !py-1 rounded-md text-sm font-bold text-white !m-0"
-            style={{
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {nft.tokenMetaUriData.name}
-          </Text>
-          <Image
-            tw="rounded-md"
-            src={nft.tokenMetaUriData.image}
-            style={{
-              width: "140px",
-            }}
-          />
-        </View>
-        <View tw="flex flex-row items-baseline mt-1">
-          <Text tw="text-md font-bold !m-0 text-gray-500 dark:text-zinc-600">
-            Rewards:&nbsp;
-          </Text>
-          <Text tw="text-xs !m-0 text-gray-600 dark:text-gray-500">
-            {`${pendingRewards || "0"} ${symbol || ""}`}
-          </Text>
+      <View tw="flex w-full gap-x-3 justify-center items-center">
+        <Image
+          tw="rounded-md"
+          src={nft.tokenMetaUriData.image}
+          style={{ width: "60px" }}
+        />
+        <View tw="flex flex-col gap-2 grow h-full justify-center">
+          <View tw="flex flex-row justify-between items-center">
+            <Text tw="text-left w-20 truncate text-sm font-bold text-white !m-0">
+              {nft.tokenMetaUriData.name}
+            </Text>
+            <View tw="flex justify-end">
+              <Button
+                tw={classnames([
+                  "!px-4 !py-1 text-white font-bold text-xs border-0 rounded-sm",
+                  ...[hasRewards && ["bg-green-600", "hover:bg-green-700"]],
+                  ...[!hasRewards && "bg-green-600/[0.5]"],
+                ])}
+                onClick={
+                  hasRewards
+                    ? (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log("claim");
+                      }
+                    : () => {}
+                }
+              >
+                {hasRewards ? `Claim` : `No Rewards`}
+              </Button>
+            </View>
+          </View>
+          <View tw="flex flex-row justify-between items-center">
+            <Text tw="text-sm font-bold !m-0 text-gray-500 dark:text-zinc-600">
+              Pending Rewards:&nbsp;
+            </Text>
+            <Text tw="text-sm !m-0 text-gray-600 dark:text-gray-500">
+              {`${pendingRewards || "0"} ${symbol || ""}`}
+            </Text>
+          </View>
         </View>
       </View>
     </Button>

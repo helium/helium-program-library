@@ -53,7 +53,7 @@ export const HotspotGridScreen: FC<HotspotGridScreenProps> = () => {
 
   return (
     <View tw="flex flex-col">
-      <View tw="flex flex-row flex-wrap justify-between px-5 mb-5">
+      <View tw="flex flex-col px-5 mb-5">
         {tokenAccounts.map((nft) => (
           <HotspotGridItem key={nft.metadata.mint} nft={nft} />
         ))}
