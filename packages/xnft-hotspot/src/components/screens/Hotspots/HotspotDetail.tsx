@@ -5,7 +5,13 @@ import { PublicKey } from "@solana/web3.js";
 import classnames from "classnames";
 import React, { FC, useMemo, useState } from "react";
 import {
-  Button, Image, Loading, Text, useConnection, usePublicKey, View
+  Button,
+  Image,
+  Loading,
+  Text,
+  useConnection,
+  usePublicKey,
+  View,
 } from "react-xnft";
 import { useNotification } from "../../../contexts/notification";
 import { usePendingRewards } from "../../../hooks/usePendingRewards";
