@@ -37,8 +37,6 @@ import os from "os";
 import yargs from "yargs/yargs";
 
 
-const tempUri = "https://c3zu2nc2m4x6zvqf5lofrtdbsa4niuh6drvzi7lq4n465ykbd3fa.arweave.net/FvNNNFpnL-zWBercWMxhkDjUUP4ca5R9cON57uFBHso/";
-
 type Hotspot = {
   eccKey: string;
   uri: string;
@@ -48,21 +46,21 @@ type Hotspot = {
 const hardcodeHotspots: Hotspot[] = [
   {
     eccKey: "112UE9mbEB4NWHgdutev5PXTszp1V8HwBptwNMDQVc6fAyu34Tz4",
-    uri: tempUri,
+    uri: "https://mobile-metadata.test-helium.com/112UE9mbEB4NWHgdutev5PXTszp1V8HwBptwNMDQVc6fAyu34Tz4",
   },
   {
     eccKey: "11bNfVbDL8Tp2T6jsEevRzBG5QuJpHVUz1Z21ACDcD4wW6RbVAZ",
-    uri: tempUri,
+    uri: "https://mobile-metadata.test-helium.com/11bNfVbDL8Tp2T6jsEevRzBG5QuJpHVUz1Z21ACDcD4wW6RbVAZ",
   },
   {
     eccKey: "11wsqKcoXGesnSbEwKTY8QkoqdFsG7oafcyPn8jBnzRK4sfCSw8",
-    uri: tempUri,
+    uri: "https://mobile-metadata.test-helium.com/11wsqKcoXGesnSbEwKTY8QkoqdFsG7oafcyPn8jBnzRK4sfCSw8",
   },
   {
     eccKey: "11t1Yvm7QbyVnmqdCUpfA8XUiGVbpHPVnaNtR25gb8p2d4Dzjxi",
-    uri: tempUri,
+    uri: "https://mobile-metadata.test-helium.com/11t1Yvm7QbyVnmqdCUpfA8XUiGVbpHPVnaNtR25gb8p2d4Dzjxi",
   },
-]
+];
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({

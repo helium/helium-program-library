@@ -35,11 +35,11 @@ export const hotspotIssuerKey = (
   );
 
 export const hotspotKey = (
-  eccCompact: string,
+  eccCompact: Buffer,
   programId: PublicKey = PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
-    [Buffer.from("hotspot", "utf-8"), Buffer.from(eccCompact, "utf-8")],
+    [Buffer.from("hotspot", "utf-8"), eccCompact],
     programId
   );
 
