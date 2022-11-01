@@ -411,6 +411,7 @@ export class AccountFetchCache {
                 // @ts-ignore
                 this.usableConnection.onAccountChange(
                   id,
+                  // @ts-ignore
                   (account) => this.onAccountChange(id, undefined, account),
                   this.commitment
                 )

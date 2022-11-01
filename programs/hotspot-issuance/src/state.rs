@@ -8,9 +8,12 @@ pub struct HotspotConfigV0 {
   pub dc_mint: Pubkey,
   pub onboarding_server: Pubkey,
   pub authority: Pubkey,
+  pub symbol: String,
+  pub sub_dao: Pubkey,
 
   pub bump_seed: u8,
   pub collection_bump_seed: u8,
+
 }
 
 #[account]

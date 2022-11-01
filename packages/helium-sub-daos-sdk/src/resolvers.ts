@@ -20,9 +20,11 @@ export const subDaoEpochInfoResolver = resolveIndividual(
         ...path.slice(0, path.length - 1),
         "subDao",
       ]) as PublicKey;
-      const [key] = await subDaoEpochInfoKey(subDao, unixTime, PROGRAM_ID);
+      if (subDao) {
+        const [key] = await subDaoEpochInfoKey(subDao, unixTime, PROGRAM_ID);
 
-      return key;
+        return key;
+      }
     }
   }
 );

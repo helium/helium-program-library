@@ -82,7 +82,6 @@ pub struct SubDaoEpochInfoV0 {
 #[derive(Default)]
 pub struct SubDaoV0 {
   pub dao: Pubkey,
-  pub hotspot_collection: Pubkey, // The metaplex collection of hotspot NFTs
   pub dnt_mint: Pubkey,           // The mint of the subdao token
   pub treasury: Pubkey,           // The treasury for rewards
   pub rewards_escrow: Pubkey,     // The escrow account for DNT rewards

@@ -8,6 +8,7 @@ pub const ONBOARD_KEY: &str = "isswTaVr3jpPq4ETgnCu76WQA9XPxPGVANeKzivHefg";
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TrackAddedDeviceArgsV0 {
   pub authority_bump: u8,
+  pub symbol: String,
 }
 
 #[derive(Accounts)]
@@ -26,7 +27,7 @@ pub struct TrackAddedDeviceV0<'info> {
   #[account(mut)]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
-    seeds = ["hotspot_config".as_bytes(), sub_dao.hotspot_collection.as_ref()],
+    seeds = ["hotspot_config".as_bytes(), sub_dao.key().as_ref(), args.symbol.as_bytes()],
     seeds::program = Pubkey::from_str(ONBOARD_KEY).unwrap(),
     bump = args.authority_bump,
   )]

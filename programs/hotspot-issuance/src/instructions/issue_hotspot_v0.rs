@@ -58,10 +58,9 @@ pub struct IssueHotspotV0<'info> {
   )]
   pub collection_master_edition: UncheckedAccount<'info>,
   #[account(
-    seeds = ["hotspot_config".as_bytes(), collection.key().as_ref()],
-    bump = hotspot_config.bump_seed,
     has_one = collection,
-    has_one = dc_mint
+    has_one = dc_mint,
+    has_one = sub_dao
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
   #[account(
@@ -80,6 +79,7 @@ pub struct IssueHotspotV0<'info> {
     mint::freeze_authority = hotspot_issuer,
     seeds = [
       "hotspot".as_bytes(),
+      collection.key().as_ref(),
       &args.ecc_compact,
     ],
     bump
@@ -217,14 +217,16 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
 
   let hotspot_config_seeds: &[&[&[u8]]] = &[&[
     b"hotspot_config",
-    ctx.accounts.collection.to_account_info().key.as_ref(),
+    ctx.accounts.hotspot_config.sub_dao.as_ref(),
+    ctx.accounts.hotspot_config.symbol.as_bytes(),
     &[ctx.accounts.hotspot_config.bump_seed],
   ]];
   burn_from_issuance_v0(
     ctx.accounts.burn_dc_ctx().with_signer(hotspot_config_seeds),
     BurnFromIssuanceArgsV0 {
       amount: ctx.accounts.hotspot_config.dc_fee,
-      collection: ctx.accounts.hotspot_config.collection,
+      symbol: ctx.accounts.hotspot_config.symbol.clone(),
+      sub_dao: ctx.accounts.hotspot_config.sub_dao,
       authority_bump: ctx.accounts.hotspot_config.bump_seed,
     },
   )?;
@@ -301,13 +303,10 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
   )?;
 
   track_added_device_v0(
-    ctx.accounts.add_device_ctx().with_signer(&[&[
-      b"hotspot_config",
-      ctx.accounts.collection.key().as_ref(),
-      &[ctx.accounts.hotspot_config.bump_seed],
-    ]]),
+    ctx.accounts.add_device_ctx().with_signer(hotspot_config_seeds),
     TrackAddedDeviceArgsV0 {
       authority_bump: ctx.accounts.hotspot_config.bump_seed,
+      symbol: ctx.accounts.hotspot_config.symbol.clone()
     },
   )?;
 

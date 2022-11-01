@@ -94,8 +94,10 @@ frame CircuitBreaker {
 
 frame HotspotIssuance {
   entity HotspotConfig {
-    "hotspot_config", collection
+    "hotspot_config", sub_dao, symbol
     --
+    sub_dao
+    symbol
     dc_fee
     dc_mint
     collection
@@ -143,7 +145,10 @@ frame LazyDistributor {
 }
 
 frame Metaplex {
-  entity Collection
+  entity Collection {
+    "hotspot", sub_dao, symbol
+  }
+
   entity RewardableNFT {
     "metadata", metadata_program_id, mint
     --

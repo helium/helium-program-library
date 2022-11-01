@@ -11,11 +11,12 @@ import {
 import {
   init as initHeliumSubDaos
 } from "../packages/helium-sub-daos-sdk/src";
-import { init as initHotspotIssuance } from "../packages/hotspot-issuance-sdk/src";
+import { hotspotCollectionKey, hotspotKey, init as initHotspotIssuance } from "../packages/hotspot-issuance-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { HotspotIssuance } from "../target/types/hotspot_issuance";
 import { DC_FEE, ensureDCIdl, initTestHotspotConfig, initTestHotspotIssuer, initWorld } from "./utils/fixtures";
+import { initTestDao, initTestSubdao } from "./utils/daos";
 
 describe("hotspot-issuance", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -26,6 +27,8 @@ describe("hotspot-issuance", () => {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
+
+  let subDao: PublicKey;
 
   before(async () => {
     dcProgram = await initDataCredits(
@@ -47,11 +50,24 @@ describe("hotspot-issuance", () => {
       anchor.workspace.HotspotIssuance.programId,
       anchor.workspace.HotspotIssuance.idl
     );
+
+    const dao = await initTestDao(
+      hsdProgram,
+      provider,
+      100,
+      me
+    );
+    ({ subDao } = await initTestSubdao(
+      hsdProgram,
+      provider,
+      me,
+      dao.dao
+    ))
   });
 
   it("initializes a hotspot config", async () => {
     const { hotspotConfig, collection, onboardingServerKeypair } =
-      await initTestHotspotConfig(hsProgram, provider);
+      await initTestHotspotConfig(hsProgram, provider, subDao);
 
     const account = await hsProgram.account.hotspotConfigV0.fetch(
       hotspotConfig
@@ -68,7 +84,11 @@ describe("hotspot-issuance", () => {
   });
 
   it("initializes a hotspot issuer", async () => {
-    const { hotspotConfig } = await initTestHotspotConfig(hsProgram, provider);
+    const { hotspotConfig } = await initTestHotspotConfig(
+      hsProgram,
+      provider,
+      subDao
+    );
     const { hotspotIssuer, makerKeypair } = await initTestHotspotIssuer(
       hsProgram,
       provider,
@@ -85,14 +105,12 @@ describe("hotspot-issuance", () => {
   });
 
   describe("with issuer and data credits", () => {
-    let subDao: PublicKey;
     let makerKeypair: Keypair;
     let onboardingServerKeypair: Keypair;
     let hotspotIssuer: PublicKey;
 
     before(async () => {
       const {
-        subDao: sub,
         dataCredits,
         hotspotConfig: hsConfig,
         issuer,
@@ -104,7 +122,6 @@ describe("hotspot-issuance", () => {
         .accounts({ dcMint: dataCredits.dcMint })
         .rpc({ skipPreflight: true });
 
-      subDao = sub.subDao;
       hotspotIssuer = issuer.hotspotIssuer;
       makerKeypair = issuer.makerKeypair;
       ({ onboardingServerKeypair } = hsConfig);
@@ -113,6 +130,11 @@ describe("hotspot-issuance", () => {
     it("issues a hotspot", async () => {
       const ecc = await (await HeliumKeypair.makeRandom()).address.publicKey;
       const hotspotOwner = Keypair.generate().publicKey;
+      const issuer = await hsProgram.account.hotspotIssuerV0.fetch(hotspotIssuer);
+      const config = await hsProgram.account.hotspotConfigV0.fetch(issuer.hotspotConfig);
+
+      const [keyShouldBe] = hotspotKey(config.collection, Buffer.from(ecc));
+      console.log("Key sshould be", keyShouldBe.toBase58());
 
       const method = await hsProgram.methods
         .issueHotspotV0({ eccCompact: Buffer.from(ecc), uri: '' })
@@ -120,7 +142,6 @@ describe("hotspot-issuance", () => {
           hotspotIssuer,
           hotspotOwner,
           maker: makerKeypair.publicKey,
-          subDao,
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 })

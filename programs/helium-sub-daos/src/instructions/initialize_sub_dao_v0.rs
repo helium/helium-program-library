@@ -79,7 +79,6 @@ pub struct InitializeSubDaoV0<'info> {
     bump
   )]
   pub circuit_breaker: AccountInfo<'info>,
-  pub hotspot_collection: Box<Account<'info, Mint>>,
   /// CHECK: Checked via CPI
   #[account(mut)]
   pub treasury: AccountInfo<'info>,
@@ -183,7 +182,6 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
   ctx.accounts.dao.num_sub_daos += 1;
   ctx.accounts.sub_dao.set_inner(SubDaoV0 {
     dao: ctx.accounts.dao.key(),
-    hotspot_collection: ctx.accounts.hotspot_collection.key(),
     dnt_mint: ctx.accounts.dnt_mint.key(),
     treasury: ctx.accounts.treasury.key(),
     rewards_escrow: ctx.accounts.rewards_escrow.key(),

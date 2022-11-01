@@ -54,7 +54,6 @@ export async function initTestSubdao(
   provider: anchor.AnchorProvider,
   authority: PublicKey,
   dao: PublicKey,
-  collection: PublicKey,
   epochRewards?: number
 ): Promise<{
   mint: PublicKey;
@@ -93,7 +92,6 @@ export async function initTestSubdao(
       dao,
       rewardsEscrow,
       dntMint,
-      hotspotCollection: collection,
       hntMint: daoAcc.hntMint,
     });
   const { subDao, treasury, treasuryCircuitBreaker } = await method.pubkeys();

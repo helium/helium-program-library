@@ -8,7 +8,8 @@ pub const ONBOARD_KEY: &str = "isswTaVr3jpPq4ETgnCu76WQA9XPxPGVANeKzivHefg";
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct BurnFromIssuanceArgsV0 {
   pub amount: u64,
-  pub collection: Pubkey,
+  pub sub_dao: Pubkey,
+  pub symbol: String,
   pub authority_bump: u8,
 }
 
@@ -16,7 +17,7 @@ pub struct BurnFromIssuanceArgsV0 {
 #[instruction(args: BurnFromIssuanceArgsV0)]
 pub struct BurnFromIssuanceV0<'info> {
   #[account(
-    seeds = ["hotspot_config".as_bytes(), args.collection.as_ref()],
+    seeds = ["hotspot_config".as_bytes(), args.sub_dao.as_ref(), args.symbol.as_bytes()],
     seeds::program = Pubkey::from_str(ONBOARD_KEY).unwrap(),
     bump = args.authority_bump,
   )]

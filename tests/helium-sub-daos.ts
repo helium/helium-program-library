@@ -76,14 +76,12 @@ describe("helium-sub-daos", () => {
 
   it("initializes a subdao", async () => {
     const { dao } = await initTestDao(program, provider, EPOCH_REWARDS, provider.wallet.publicKey);
-    const collection = (await createNft(provider, me)).mintKey;
     const { subDao, treasury, mint, treasuryCircuitBreaker } =
       await initTestSubdao(
         program,
         provider,
         provider.wallet.publicKey,
         dao,
-        collection
       );
 
     const account = await program.account.subDaoV0.fetch(subDao!);
@@ -93,7 +91,6 @@ describe("helium-sub-daos", () => {
     expect(Boolean(breaker.config.thresholdType.absolute)).to.be.true;
 
     expect(account.authority.toBase58()).eq(me.toBase58());
-    expect(account.hotspotCollection.toBase58()).eq(collection.toBase58());
     expect(account.treasury.toBase58()).eq(treasury.toBase58());
     expect(account.dntMint.toBase58()).eq(mint.toBase58());
     expect(account.totalDevices.toNumber()).eq(0);
@@ -126,7 +123,6 @@ describe("helium-sub-daos", () => {
           hotspotIssuer,
           maker: makerKeypair.publicKey,
           hotspotOwner,
-          subDao,
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
