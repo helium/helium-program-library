@@ -43,60 +43,61 @@ export const useTitleColor = () => {
   }, [metadata.isDarkMode]);
 };
 
-export const useClaimRewards = (nft) => {
+// TODO: type nft
+export const useClaimRewards = (nft: any) => {
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<Error | null>(null);
   const publicKey = usePublicKey();
   const connection = useConnection();
   const { setMessage } = useNotification();
 
   const claimRewards = useCallback(async () => {
-    if (loading) return;
-    setLoading(true);
-    try {
-      const stubProvider = new anchor.AnchorProvider(
-        connection,
-        //@ts-ignore
-        { publicKey },
-        anchor.AnchorProvider.defaultOptions()
-      );
-      const program = await init(stubProvider);
-      const rewards = await client.getCurrentRewards(
-        program,
-        LAZY_KEY,
-        new PublicKey(nft.metadata.mint)
-      );
-      const tx = await client.formTransaction({
-        program,
-        //@ts-ignore
-        provider: window.xnft.solana,
-        rewards,
-        hotspot: new PublicKey(nft.metadata.mint),
-        lazyDistributor: LAZY_KEY,
-        wallet: publicKey,
-      });
+    if (nft) {
+      if (loading) return;
+      setLoading(true);
+      try {
+        const stubProvider = new anchor.AnchorProvider(
+          connection,
+          //@ts-ignore
+          { publicKey },
+          anchor.AnchorProvider.defaultOptions()
+        );
+        const program = await init(stubProvider);
+        const rewards = await client.getCurrentRewards(
+          program,
+          LAZY_KEY,
+          new PublicKey(nft.metadata.mint)
+        );
+        const tx = await client.formTransaction({
+          program,
+          //@ts-ignore
+          provider: window.xnft.solana,
+          rewards,
+          hotspot: new PublicKey(nft.metadata.mint),
+          lazyDistributor: LAZY_KEY,
+          wallet: publicKey,
+        });
 
-      //@ts-ignore
-      const signed = await window.xnft.solana.signTransaction(tx);
-      const sig = await connection.sendRawTransaction(
-        // xNFT background connection just sucks and doesn't actually like buffer.
-        // @ts-ignore
-        Array.from(signed.serialize()),
-        { skipPreflight: true }
-      );
-      await connection.confirmTransaction(sig, "confirmed");
-      setLoading(false);
-      setMessage("Transaction confirmed", "success");
-    } catch (err) {
-      setLoading(false);
-      setMessage(`Transaction failed: ${err.message}`, "error");
-      console.error(err);
+        //@ts-ignore
+        const signed = await window.xnft.solana.signTransaction(tx);
+        const sig = await connection.sendRawTransaction(
+          // xNFT background connection just sucks and doesn't actually like buffer.
+          // @ts-ignore
+          Array.from(signed.serialize()),
+          { skipPreflight: true }
+        );
+        await connection.confirmTransaction(sig, "confirmed");
+        setLoading(false);
+        setMessage("Transaction confirmed", "success");
+      } catch (err) {
+        setLoading(false);
+        setMessage(`Transaction failed: ${err.message}`, "error");
+        console.error(err);
+      }
     }
   }, [nft]);
 
   return {
     claimRewards,
     loading,
-    error,
   };
 };

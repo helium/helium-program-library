@@ -23,6 +23,7 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
 
   const pendingRewards = usePendingRewards(mint);
   const hasRewards = pendingRewards && pendingRewards > 0;
+
   return (
     <View tw="flex flex-col px-5">
       <View tw="flex flex-row p-3 rounded-md bg-zinc-200 dark:bg-zinc-900 mb-5">
