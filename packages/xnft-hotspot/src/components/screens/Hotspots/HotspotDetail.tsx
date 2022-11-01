@@ -103,19 +103,17 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
 
       <View tw="flex flex-row mt-5 mb-5">
         <Button
-          tw={classnames([
-            "h-12 w-full text-white font-bold text-md border-0 rounded-md flex justify-center items-center",
-            ...[hasRewards && ["bg-green-600", "hover:bg-green-700"]],
-            ...[!hasRewards && "bg-green-600/[0.5]"],
-          ])}
+          tw={classnames(
+            "h-12 w-full border-0 rounded-md flex justify-center items-center bg-green-600",
+            { "hover:bg-green-700": hasRewards },
+            { "opacity-50": !hasRewards }
+          )}
           onClick={hasRewards ? () => claimRewards() : () => {}}
         >
-          <Text tw="inline">
+          <Text tw="inline text-white text-md font-bold">
             {hasRewards ? `Claim rewards` : `No rewards to claim`}
           </Text>
-          {txLoading && (
-            <Loading style={{ marginLeft: '5px'}}/>
-          )}
+          {txLoading && <Loading style={{ marginLeft: "5px" }} />}
         </Button>
       </View>
     </View>

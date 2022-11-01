@@ -81,7 +81,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
 
   return (
     <Button
-      tw="flex flex-col w-auto border-0 !p-3 mb-2 rounded-md bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-400 dark:hover:bg-zinc-900/[0.6]"
+      tw="flex flex-col w-auto border-0 !p-3 mb-2 rounded-md bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-900/[0.6]"
       onClick={() => clickNft()}
     >
       <View tw="flex w-full gap-x-3 justify-center items-center">
@@ -92,16 +92,16 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
         />
         <View tw="flex flex-col gap-2 grow h-full justify-center">
           <View tw="flex flex-row justify-between items-center">
-            <Text tw="text-left w-20 truncate text-sm font-bold text-white !m-0">
+            <Text tw="text-left w-20 truncate text-sm font-bold text-zinc-900 dark:text-white !m-0">
               {nft.tokenMetaUriData.name}
             </Text>
             <View tw="flex justify-end">
               <Button
-                tw={classnames([
-                  "!px-4 !py-1 text-white font-bold text-xs border-0 rounded-sm",
-                  ...[hasRewards && ["bg-green-600", "hover:bg-green-700"]],
-                  ...[!hasRewards && "bg-green-600/[0.5]"],
-                ])}
+                tw={classnames(
+                  "!px-4 !py-1 text-white font-bold text-xs border-0 rounded-sm bg-green-600",
+                  { "hover:bg-green-700": hasRewards },
+                  { "opacity-50": !hasRewards }
+                )}
                 onClick={
                   hasRewards
                     ? (e) => {
@@ -112,7 +112,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
                     : () => {}
                 }
               >
-                {hasRewards ? `Claim` : `No Rewards`}
+                Claim
               </Button>
             </View>
           </View>
