@@ -126,10 +126,13 @@ pub fn handler(
 
   // Store utility scores
   epoch_info.utility_score = Some(utility_score);
-  
+
   // Only increment utility scores when either (a) in prod or (b) testing and we haven't already over-calculated utility scores.
   // TODO: We can remove this after breakpoint demo
-  if !TESTING || (TESTING && ctx.accounts.dao_epoch_info.num_utility_scores_calculated <= ctx.accounts.dao.num_sub_daos) {
+  if !TESTING
+    || (TESTING
+      && ctx.accounts.dao_epoch_info.num_utility_scores_calculated <= ctx.accounts.dao.num_sub_daos)
+  {
     ctx.accounts.dao_epoch_info.num_utility_scores_calculated += 1;
     ctx.accounts.dao_epoch_info.total_utility_score = ctx
       .accounts

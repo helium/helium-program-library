@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { useMemo, useState } from "react";
-import { useInterval } from "./useInterval";
+import { useInterval } from "@helium/helium-react-hooks";
 import {
   getPendingRewards,
   LAZY_KEY,
