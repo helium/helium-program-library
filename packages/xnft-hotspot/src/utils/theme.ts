@@ -5,7 +5,7 @@ export const THEME = {
       dark: "#1d1d1d",
     },
     backgroundAccent: {
-      light: "#F0F0F2",
+      light: "rgb(228 228 231)",
       dark: "#171717",
     },
     activeTab: "#333333",

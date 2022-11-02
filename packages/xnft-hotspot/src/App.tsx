@@ -22,7 +22,11 @@ export const App = () => {
   const connection = useConnection();
 
   return (
-    <AccountProvider extendConnection={false} commitment="confirmed" connection={connection}>
+    <AccountProvider
+      extendConnection={false}
+      commitment="confirmed"
+      connection={connection}
+    >
       <View tw="flex flex-col h-full w-full bg-white dark:bg-zinc-800">
         <NotificationProvider>
           <Notification></Notification>

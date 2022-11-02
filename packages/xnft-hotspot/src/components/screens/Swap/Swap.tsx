@@ -30,8 +30,7 @@ import {
 } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import classnames from "classnames";
-import { THEME } from "../../../utils/theme";
-import { useTitleColor } from "../../../utils/hooks";
+import { useStyledTitle } from "../../../utils/hooks";
 import { useNotification } from "../../../contexts/notification";
 
 type Token = {
@@ -156,7 +155,7 @@ async function getTreasuryPrice(
 }
 
 export function Swap() {
-  useTitleColor();
+  useStyledTitle();
   const publicKey = usePublicKey();
   const connection = useConnection();
   const dcRate = 1; //TODO this needs to be fetched from an oracle
