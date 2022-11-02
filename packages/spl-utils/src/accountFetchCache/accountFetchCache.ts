@@ -212,7 +212,7 @@ export class AccountFetchCache {
     const currentBatch = this.currentBatch;
     this.currentBatch = new Set(); // Erase current batch from state, so we can fetch multiple at a time
     try {
-      console.log(`Batching account fetch of ${currentBatch.size}`);
+      console.log("accountFetchCache", `Batching account fetch of ${currentBatch.size}`);
       const keys = Array.from(currentBatch);
       const array = await this.connection.getMultipleAccountsInfo(keys.map(b => new PublicKey(b)), this.commitment)
       keys.forEach((key, index) => {
@@ -366,9 +366,14 @@ export class AccountFetchCache {
     parser: AccountParser<T> | undefined,
     account: AccountInfo<Buffer>
   ) {
-    const parsed = this.getParsed(key, account, parser);
-    const address = key.toBase58();
-    this.updateCache(address, parsed || null);
+    try {
+      const parsed = this.getParsed(key, account, parser);
+      const address = key.toBase58();
+      console.log("accountFetchCache", `Received account change ${key}`, parsed);
+      this.updateCache(address, parsed || null);
+    } catch (e: any) {
+      console.error("accountFetchCache", "Failed to update account", e)
+    }
   }
 
   watch<T>(

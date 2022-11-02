@@ -198,7 +198,7 @@ async function run() {
       .initializeDataCreditsV0({
         authority: provider.wallet.publicKey,
         config: {
-          windowSizeSeconds: new BN(60),
+          windowSizeSeconds: new BN(60 * 60),
           thresholdType: ThresholdType.Absolute as never,
           threshold: new BN("1000000000000"),
         },
