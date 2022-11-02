@@ -61,7 +61,7 @@ export const HotspotListScreen: FC<HotspotListScreenProps> = () => {
           tx.serialize(),
           { skipPreflight: true },
           "confirmed"
-        )
+        );
       })
     );
     setMessage("Claimed all rewards!", "success");
@@ -78,7 +78,7 @@ export const HotspotListScreen: FC<HotspotListScreenProps> = () => {
   if (!tokenAccounts) return <LoadingIndicator />;
 
   return (
-    <View tw="flex flex-col pt-5">
+    <View tw="flex flex-col pt-5 justify-between h-full">
       <View tw="flex flex-col px-5 gap-2">
         {tokenAccounts.map((nft) => (
           <HotspotListItem key={nft.mint} nft={nft} />
