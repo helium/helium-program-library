@@ -3,6 +3,7 @@ import { PublicKey } from "@solana/web3.js";
 import classnames from "classnames";
 import React, { FC, useMemo } from "react";
 import { Button, Image, Loading, Text, View } from "react-xnft";
+import { useFetchedCachedJson } from "../../../hooks/useFetchedJson";
 import { usePendingRewards } from "../../../hooks/usePendingRewards";
 import { useClaimRewards, useTitleColor } from "../../../utils/hooks";
 
@@ -18,21 +19,22 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
   useTitleColor();
   const { claimRewards, loading } = useClaimRewards(nft);
   const mint = useMemo(
-    () => new PublicKey(nft.metadata.mint),
-    [nft.metadata.mint]
+    () => new PublicKey(nft.mint),
+    [nft.mint]
   );
 
   const pendingRewards = usePendingRewards(mint);
   const hasRewards = pendingRewards && pendingRewards > 0;
+  const { result: tokenMetaUriData } = useFetchedCachedJson(nft.data.uri);
 
   return (
     <View tw="flex flex-col px-5">
       <View tw="flex flex-row p-3 rounded-md bg-zinc-200 dark:bg-zinc-900 mb-5">
-        <Image tw="rounded-md w-full" src={nft.tokenMetaUriData.image} />
+        <Image tw="rounded-md w-full" src={tokenMetaUriData?.image} />
       </View>
       <View tw="flex flex-col p-1">
         <Text tw="text-lg font-bold !m-0 text-zinc-700 dark:text-zinc-200">
-          {nft.tokenMetaUriData.name}
+          {nft.data.name}
         </Text>
         <View tw="flex flex-row items-baseline">
           <Text tw="text-md font-bold !m-0 text-zinc-700 dark:text-zinc-400">
@@ -48,7 +50,7 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
             Description:&nbsp;
           </Text>
           <Text tw="text-sm !m-0 text-zinc-700 dark:text-zinc-200">
-            {nft.tokenMetaUriData.description}
+            {tokenMetaUriData?.description}
           </Text>
         </View>
       </View>

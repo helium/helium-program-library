@@ -7,9 +7,14 @@ import {
 import { PublicKey } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { provider } from "./solana";
+import cors from "@fastify/cors";
 
-const server: FastifyInstance = Fastify({});
-
+const server: FastifyInstance = Fastify({
+  logger: true
+});
+server.register(cors, {
+  origin: "*"
+});
 server.get("/health", async () => {
   return { ok: true };
 })

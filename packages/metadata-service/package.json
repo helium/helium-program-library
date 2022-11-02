@@ -32,6 +32,7 @@
     "dev": "npx ts-node --project tsconfig.cjs.json src/index.ts"
   },
   "dependencies": {
+    "@fastify/cors": "^8.1.1",
     "@helium/address": "^4.6.2",
     "@helium/helium-sub-daos-sdk": "^0.0.4",
     "@helium/hotspot-issuance-sdk": "^0.0.4",

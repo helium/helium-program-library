@@ -72,7 +72,7 @@ async function mintDataCredits(
   tx.recentBlockhash = blockhash;
 
   //@ts-ignore
-  await window.xnft.solana.send(tx);
+  await window.xnft.solana.sendAndConfirm(tx);
 }
 
 async function treasurySwap(
@@ -108,7 +108,7 @@ async function treasurySwap(
   tx.recentBlockhash = blockhash;
 
   //@ts-ignore
-  await window.xnft.solana.send(tx);
+  await window.xnft.solana.sendAndConfirm(tx, [], { skipPreflight: true });
 }
 
 function round(value, decimals) {

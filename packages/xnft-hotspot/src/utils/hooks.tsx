@@ -2,7 +2,7 @@ import * as client from "@helium/distributor-oracle";
 import { init } from "@helium/lazy-distributor-sdk";
 import * as anchor from "@project-serum/anchor";
 import { useCallback, useEffect, useState } from "react";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Connection } from "@solana/web3.js";
 import {
   useConnection,
   useMetadata,
@@ -10,7 +10,9 @@ import {
   usePublicKey,
 } from "react-xnft";
 import { useNotification } from "../contexts/notification";
-import { LAZY_KEY } from "../utils";
+import { LAZY_KEY, useProgram } from "../utils";
+import { useAsyncCallback } from "react-async-hook";
+import { ProgramError, sendAndConfirmWithRetry } from "@helium/spl-utils";
 
 export const useColorMode = ({
   light,
@@ -45,59 +47,50 @@ export const useTitleColor = () => {
 
 // TODO: type nft
 export const useClaimRewards = (nft: any) => {
-  const [loading, setLoading] = useState<boolean>(false);
   const publicKey = usePublicKey();
   const connection = useConnection();
+  const program = useProgram();
   const { setMessage } = useNotification();
-
-  const claimRewards = useCallback(async () => {
-    if (nft) {
+  const { error, execute, loading } = useAsyncCallback(async () => {
+    if (nft && program) {
       if (loading) return;
-      setLoading(true);
-      try {
-        const stubProvider = new anchor.AnchorProvider(
-          connection,
-          //@ts-ignore
-          { publicKey },
-          anchor.AnchorProvider.defaultOptions()
-        );
-        const program = await init(stubProvider);
-        const rewards = await client.getCurrentRewards(
-          program,
-          LAZY_KEY,
-          new PublicKey(nft.metadata.mint)
-        );
-        const tx = await client.formTransaction({
-          program,
-          //@ts-ignore
-          provider: window.xnft.solana,
-          rewards,
-          hotspot: new PublicKey(nft.metadata.mint),
-          lazyDistributor: LAZY_KEY,
-          wallet: publicKey,
-        });
-
+      const stubProvider = new anchor.AnchorProvider(
+        connection,
         //@ts-ignore
-        const signed = await window.xnft.solana.signTransaction(tx);
-        const sig = await connection.sendRawTransaction(
-          // xNFT background connection just sucks and doesn't actually like buffer.
-          // @ts-ignore
-          Array.from(signed.serialize()),
-          { skipPreflight: true }
-        );
-        await connection.confirmTransaction(sig, "confirmed");
-        setLoading(false);
-        setMessage("Transaction confirmed", "success");
-      } catch (err) {
-        setLoading(false);
-        setMessage(`Transaction failed: ${err.message}`, "error");
-        console.error(err);
-      }
+        { publicKey },
+        anchor.AnchorProvider.defaultOptions()
+      );
+      const program = await init(stubProvider)
+      const rewards = await client.getCurrentRewards(
+        program,
+        LAZY_KEY,
+        new PublicKey(nft.mint)
+      );
+      const tx = await client.formTransaction({
+        program,
+        //@ts-ignore
+        provider: window.xnft.solana,
+        rewards,
+        hotspot: new PublicKey(nft.mint),
+        lazyDistributor: LAZY_KEY,
+        wallet: publicKey,
+      });
+
+      //@ts-ignore
+      await window.xnft.solana.sendAndConfirm(tx);
+      setMessage("Transaction confirmed", "success");
     }
-  }, [nft]);
+  });
+
+  useEffect(() => {
+    if (error) {
+      console.error(error);
+      setMessage(`Transaction failed: ${error.message}`, "error");
+    }
+  }, [error])
 
   return {
-    claimRewards,
+    claimRewards: execute,
     loading,
   };
 };

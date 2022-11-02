@@ -14,6 +14,7 @@ import classnames from "classnames";
 import { useMetaplexMetadata } from "../../../../hooks/useMetaplexMetadata";
 import { usePendingRewards } from "../../../../hooks/usePendingRewards";
 import { useClaimRewards } from "../../../../utils/hooks";
+import { useFetchedCachedJson } from "../../../../hooks/useFetchedJson";
 
 interface HotspotGridItemProps {
   nft: any; // TODO: actually type this
@@ -21,9 +22,10 @@ interface HotspotGridItemProps {
 
 export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
   const mint = useMemo(
-    () => new PublicKey(nft.metadata.mint),
-    [nft.metadata.mint]
+    () => new PublicKey(nft.mint),
+    [nft.mint]
   );
+  const { result: tokenMetaUriData } = useFetchedCachedJson(nft.data.uri);
   const nav = useNavigation();
   const { info: metadata } = useMetaplexMetadata(MOBILE_MINT);
   const symbol = metadata?.data.symbol;
@@ -34,7 +36,7 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
     classnames(
       "!px-5 !py-0 border-0 rounded-sm bg-green-600",
       { "hover:bg-green-700": hasRewards && !loading },
-      { "opacity-50": !hasRewards || loading }
+      { "opacity-50": pendingRewards != null && !hasRewards || loading }
     ),
     [hasRewards, loading]
   );
@@ -51,13 +53,13 @@ export const HotspotGridItem: FC<HotspotGridItemProps> = ({ nft }) => {
       <View tw="flex w-full gap-x-3 justify-center items-center">
         <Image
           tw="rounded-md"
-          src={nft.tokenMetaUriData.image}
+          src={tokenMetaUriData?.image}
           style={{ width: "60px" }}
         />
         <View tw="flex flex-col gap-2 grow h-full justify-center">
           <View tw="flex flex-row justify-between items-center">
             <Text tw="text-left w-20 truncate text-md font-bold text-zinc-900 dark:text-white !m-0">
-              {nft.tokenMetaUriData.name}
+              {nft.data.name}
             </Text>
             <View tw="flex justify-end">
               <Button

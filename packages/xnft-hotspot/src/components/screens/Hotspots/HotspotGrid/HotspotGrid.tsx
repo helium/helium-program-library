@@ -8,7 +8,7 @@ import {
   Loading,
 } from "react-xnft";
 import * as anchor from "@project-serum/anchor";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import { init } from "@helium/lazy-distributor-sdk";
 import * as client from "@helium/distributor-oracle";
 import { HotspotGridItem } from "./HotspotGridItem";
@@ -17,6 +17,7 @@ import { LoadingIndicator } from "../../../common";
 import { useTitleColor } from "../../../../utils/hooks";
 import { useAsyncCallback } from "react-async-hook";
 import { useNotification } from "../../../../contexts/notification";
+import { sendAndConfirmWithRetry } from "@helium/spl-utils";
 
 interface HotspotGridScreenProps {}
 
@@ -42,14 +43,14 @@ export const HotspotGridScreen: FC<HotspotGridScreenProps> = () => {
         const rewards = await client.getCurrentRewards(
           program,
           LAZY_KEY,
-          new PublicKey(nft.metadata.mint)
+          new PublicKey(nft.mint)
         );
         return await client.formTransaction({
           program,
           //@ts-ignore
           provider: window.xnft.solana,
           rewards,
-          hotspot: new PublicKey(nft.metadata.mint),
+          hotspot: new PublicKey(nft.mint),
           lazyDistributor: LAZY_KEY,
           wallet: publicKey,
         });
@@ -61,13 +62,13 @@ export const HotspotGridScreen: FC<HotspotGridScreenProps> = () => {
     });
     await Promise.all(
       signed.map(async (tx: Transaction) => {
-        const sig = await connection.sendRawTransaction(
-          // xNFT background connection just sucks and doesn't actually like buffer.
+        await sendAndConfirmWithRetry(
           // @ts-ignore
-          Array.from(tx.serialize()),
-          { skipPreflight: true }
-        );
-        await connection.confirmTransaction(sig, "confirmed");
+          new Connection(connection._rpcEndpoint),
+          tx.serialize(),
+          { skipPreflight: true },
+          "confirmed"
+        )
       })
     );
     setMessage("Claimed all rewards!", "success");
@@ -87,7 +88,7 @@ export const HotspotGridScreen: FC<HotspotGridScreenProps> = () => {
     <View tw="flex flex-col">
       <View tw="flex flex-col px-5 mb-5">
         {tokenAccounts.map((nft) => (
-          <HotspotGridItem key={nft.metadata.mint} nft={nft} />
+          <HotspotGridItem key={nft.mint} nft={nft} />
         ))}
       </View>
       <View tw="flex w-full justify-center sticky bottom-0 p-5 bg-white dark:bg-zinc-800">
