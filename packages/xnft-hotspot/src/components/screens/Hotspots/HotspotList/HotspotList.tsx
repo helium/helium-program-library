@@ -1,27 +1,20 @@
 import React, { FC, useEffect } from "react";
-import {
-  Text,
-  View,
-  Button,
-  usePublicKey,
-  useConnection,
-  Loading,
-} from "react-xnft";
+import { Text, View, Button, usePublicKey, useConnection } from "react-xnft";
 import * as anchor from "@project-serum/anchor";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { init } from "@helium/lazy-distributor-sdk";
 import * as client from "@helium/distributor-oracle";
-import { HotspotGridItem } from "./HotspotGridItem";
+import { HotspotListItem } from "./HotspotListItem";
 import { LAZY_KEY, useTokenAccounts } from "../../../../utils/index";
-import { LoadingIndicator } from "../../../common";
-import { useTitleColor } from "../../../../utils/hooks";
+import { LoadingIndicator, SvgSpinner } from "../../../common";
+import { useStyledTitle } from "../../../../utils/hooks";
 import { useAsyncCallback } from "react-async-hook";
 import { useNotification } from "../../../../contexts/notification";
 
-interface HotspotGridScreenProps {}
+interface HotspotListScreenProps {}
 
-export const HotspotGridScreen: FC<HotspotGridScreenProps> = () => {
-  useTitleColor();
+export const HotspotListScreen: FC<HotspotListScreenProps> = () => {
+  useStyledTitle(true);
   const tokenAccounts = useTokenAccounts();
   const publicKey = usePublicKey();
   const connection = useConnection();
@@ -84,21 +77,26 @@ export const HotspotGridScreen: FC<HotspotGridScreenProps> = () => {
   if (!tokenAccounts) return <LoadingIndicator />;
 
   return (
-    <View tw="flex flex-col">
-      <View tw="flex flex-col px-5 mb-5">
+    <View tw="flex flex-col pt-5">
+      <View tw="flex flex-col px-5 gap-2">
         {tokenAccounts.map((nft) => (
-          <HotspotGridItem key={nft.metadata.mint} nft={nft} />
+          <HotspotListItem key={nft.metadata.mint} nft={nft} />
+        ))}
+        {tokenAccounts.map((nft) => (
+          <HotspotListItem key={nft.metadata.mint} nft={nft} />
         ))}
       </View>
-      <View tw="flex w-full justify-center sticky bottom-0 p-5 bg-white dark:bg-zinc-800">
+      <View tw="flex w-full justify-center sticky bottom-0 p-5 bg-gradient-to-b from-white/[.0] to-zinc-200/[.5] dark:to-zinc-900/[.5]">
         <Button
-          tw="h-12 w-full border-0 rounded-md bg-green-600 hover:bg-green-700"
+          tw="h-12 w-full border-0 rounded-md bg-green-600 hover:bg-green-700/[.9]"
           onClick={() => execute()}
         >
+          {loading && (
+            <SvgSpinner tw="inline mr-2 w-6 h-6 text-white/[.5] animate-spin fill-white" />
+          )}
           <Text tw="inline text-white font-bold text-md ">
-            Claim all rewards
+            {loading ? "Claiming..." : "Claim all rewards"}
           </Text>
-          {loading && <Loading style={{ marginLeft: "5px" }} />}
         </Button>
       </View>
     </View>

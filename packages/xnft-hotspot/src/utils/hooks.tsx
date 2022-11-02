@@ -11,6 +11,8 @@ import {
 } from "react-xnft";
 import { useNotification } from "../contexts/notification";
 import { LAZY_KEY } from "../utils";
+import { THEME } from "../utils/theme";
+import { base64LightLogo, base64DarkLogo } from "../constants";
 
 export const useColorMode = ({
   light,
@@ -31,16 +33,38 @@ export const useColorMode = ({
   return value;
 };
 
-export const useTitleColor = () => {
+export const useStyledTitle = (showLogo = false) => {
   const nav = useNavigation();
   const metadata = useMetadata();
+  const bgAccentColor = useColorMode(THEME.colors.backgroundAccent);
 
   useEffect(() => {
     if (!metadata || !nav) return;
+
     nav.setTitleStyle({
       color: metadata.isDarkMode ? "#ffffff" : "#333333",
     });
-  }, [metadata.isDarkMode]);
+
+    if (showLogo) {
+      nav.setStyle({
+        backgroundImage: metadata.isDarkMode
+          ? `url(${base64LightLogo})`
+          : `url(${base64DarkLogo})`,
+        backgroundSize: "30px",
+        backgroundPosition: "20px 14px",
+        backgroundRepeat: "no-repeat",
+        backgroundColor: "rgba(0, 0, 0, 0.1)",
+      });
+    } else {
+      nav.setStyle({
+        backgroundImage: "none",
+        backgroundSize: "none",
+        backgroundPosition: "none",
+        backgroundRepeat: "none",
+        backgroundColor: "transparent",
+      });
+    }
+  }, [metadata.isDarkMode, bgAccentColor]);
 };
 
 // TODO: type nft
