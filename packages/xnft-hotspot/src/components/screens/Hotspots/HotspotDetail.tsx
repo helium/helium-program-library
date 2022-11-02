@@ -1,3 +1,4 @@
+import { numberWithCommas } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import classnames from "classnames";
 import React, { FC, useMemo } from "react";
@@ -18,10 +19,7 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
 }) => {
   useStyledTitle(false);
   const { claimRewards, loading } = useClaimRewards(nft);
-  const mint = useMemo(
-    () => new PublicKey(nft.mint),
-    [nft.mint]
-  );
+  const mint = useMemo(() => new PublicKey(nft.mint), [nft.mint]);
 
   const pendingRewards = usePendingRewards(mint);
   const hasRewards = pendingRewards && pendingRewards > 0;
@@ -31,10 +29,10 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
     <View tw="flex flex-col">
       <View tw="flex flex-col px-5 mb-2 gap-5">
         <Text tw="text-lg text-center font-bold !m-0 text-zinc-700 dark:text-zinc-500">
-          {tokenMetaUriData.name}
+          {tokenMetaUriData?.name}
         </Text>
         <View tw="flex flex-row p-1 rounded-lg bg-zinc-200 dark:bg-zinc-900">
-          <Image tw="rounded-md w-full" src={tokenMetaUriData.image} />
+          <Image tw="rounded-md w-full" src={tokenMetaUriData?.image} />
         </View>
         <View tw="flex flex-col p-1">
           <Text tw="text-lg pb-2 mb-2 border-b border-zinc-700 w-full text-zinc-700 dark:text-zinc-200">
@@ -47,7 +45,11 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
                 Pending rewards:&nbsp;
               </Text>
               <Text tw="text-xs px-3 py-1 !m-0 text-zinc-700 dark:text-zinc-400 rounded-md bg-zinc-200 dark:bg-zinc-900">
-                {pendingRewards || "0"} {symbol || "MOBILE"}
+                {`${
+                  pendingRewards == null
+                    ? "..."
+                    : numberWithCommas(pendingRewards, 4)
+                } ${symbol || ""}`}
               </Text>
             </View>
 
@@ -56,7 +58,7 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
                 Description:&nbsp;
               </Text>
               <Text tw="text-xs px-3 py-1 !m-0 text-zinc-700 dark:text-zinc-400 rounded-md bg-zinc-200 dark:bg-zinc-900">
-                {tokenMetaUriData.description}
+                {tokenMetaUriData?.description}
               </Text>
             </View>
           </View>
