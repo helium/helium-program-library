@@ -85,7 +85,14 @@ async function fetchTokenAccounts(wallet: PublicKey): Promise<any> {
   const tokens = resp.tokenMetadata
     .map((m) => m?.account)
     .filter(truthy)
-    .filter((t) => t.data.symbol == "HOTSPOT");
+    .filter((t) => removeNullBytes(t.data.symbol) == "HOTSPOT");
 
     return tokens;
+}
+
+function removeNullBytes(str: string): string {
+  return str
+    .split("")
+    .filter((char) => char.codePointAt(0))
+    .join("");
 }

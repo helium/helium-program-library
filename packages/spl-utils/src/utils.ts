@@ -5,22 +5,22 @@ export type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T;
 
 export const truthy = <T>(value: T): value is Truthy<T> => !!value;
 
-export function toNumber(numberOrBn: BN | number, mintOrDecimals: Mint | number): number {
-  if (BN.isBN(numberOrBn)) {
+export function toNumber(numberOrBn: bigint | BN | number, mintOrDecimals: Mint | number): number {
+  if (BN.isBN(numberOrBn) || typeof numberOrBn == "bigint") {
     return amountAsNum(numberOrBn, mintOrDecimals);
   } else {
     return numberOrBn;
   }
 }
 
-export function amountAsNum(amount: BN, mintOrDecimals: Mint | number): number {
+export function amountAsNum(amount: BN | bigint, mintOrDecimals: Mint | number): number {
   const decimals: number =
     typeof mintOrDecimals === "number"
       ? mintOrDecimals
       : (mintOrDecimals as Mint).decimals;
   const factor = new BN(Math.pow(10, decimals).toString());
-  const decimal = amount.mod(factor).toNumber() / factor.toNumber();
-  return amount.div(factor).toNumber() + decimal;
+  const decimal = new BN(amount.toString()).mod(factor).toNumber() / factor.toNumber();
+  return new BN(amount.toString()).div(factor).toNumber() + decimal;
 }
 
 export function toBN(
@@ -58,6 +58,9 @@ export function roundToDecimals(num: number, decimals: number): number {
   return Math.trunc(num * Math.pow(10, decimals)) / Math.pow(10, decimals);
 }
 
+export function humanReadableBigint(bigint: bigint, decimals: number, round: number = decimals): string {
+  return numberWithCommas(roundToDecimals(toNumber(bigint, decimals), round));
+}
 
 export function humanReadable(bn: BN, mint: Mint): string {
   return numberWithCommas(

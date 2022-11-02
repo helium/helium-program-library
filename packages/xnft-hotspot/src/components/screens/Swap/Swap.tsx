@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useCallback, useEffect, useState } from "react";
 import {
   View,
@@ -27,12 +27,16 @@ import {
   HNT_MINT,
   toBN,
   toNumber,
+  humanReadableBigint,
+  amountAsNum,
 } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import classnames from "classnames";
 import { THEME } from "../../../utils/theme";
 import { useTitleColor } from "../../../utils/hooks";
+import { useTreasuryManagement } from "../../../hooks/useTreasuryManagement";
 import { useNotification } from "../../../contexts/notification";
+import { useMint, useOwnedAmount } from "@helium/helium-react-hooks";
 
 type Token = {
   name: string;
@@ -64,7 +68,7 @@ async function mintDataCredits(
 
   const tx = await program.methods
     .mintDataCreditsV0({
-      amount: new anchor.BN(amount * 10 ** 8),
+      amount: new anchor.BN(amount),
     })
     .accounts({ dcMint: DC_MINT })
     .transaction();
@@ -116,43 +120,54 @@ function round(value, decimals) {
   return Number(Math.round(value + "e" + decimals) + "e-" + decimals);
 }
 
-async function getTreasuryPrice(
-  connection: Connection,
-  wallet: PublicKey,
-  fromMint: PublicKey
-): Promise<number> {
-  //@ts-ignore
-  const stubProvider = new anchor.AnchorProvider(
-    connection,
-    { publicKey: wallet },
-    anchor.AnchorProvider.defaultOptions()
+export function useTreasuryPrice(
+  fromMint: PublicKey,
+  amount: number
+): { loading: boolean; price: number | undefined } {
+  const treasuryManagementKey = useMemo(
+    () => tm.treasuryManagementKey(fromMint)[0],
+    [fromMint.toBase58()]
   );
-  const program = await tm.init(stubProvider);
+  const { info: treasuryAcc, loading: loadingTreasuryManagement } = useTreasuryManagement(treasuryManagementKey);
+  const { info: fromMintAcc, loading: loadingFromMint } = useMint(fromMint);
+  const { info: treasuryMintAcc, loading: loadingTreasuryMint } = useMint(treasuryAcc?.treasuryMint);
+  const { amount: r, decimals: rDecimals, loading: loadingR } = useOwnedAmount(treasuryManagementKey, treasuryAcc?.treasuryMint)
 
-  const treasuryManagement = tm.treasuryManagementKey(fromMint)[0];
-  const treasuryAcc = await program.account.treasuryManagementV0.fetch(
-    treasuryManagement
-  );
-  const fromMintAcc = await getMint(connection, fromMint);
-  const treasuryMintAcc = await getMint(connection, treasuryAcc.treasuryMint);
+  const price = useMemo(() => {
+    if (
+      fromMintAcc &&
+      treasuryMintAcc &&
+      treasuryAcc &&
+      typeof r !== "undefined"
+    ) {
+      // only works for basic exponential curves
+      // dR = (R / S^(1 + k)) ((S + dS)^(1 + k) - S^(1 + k))
+      const S = Number(
+        fromMintAcc.info.supply /
+          BigInt(Math.pow(10, fromMintAcc.info.decimals))
+      );
+      const R = amountAsNum(r, rDecimals);
+      const k =
+        //@ts-ignore
+        treasuryAcc.curve.exponentialCurveV0.k.toNumber() / Math.pow(10, 12);
+      console.log("tm3", S, R, k);
+      const dR =
+        (R / Math.pow(S, k + 1)) *
+        (Math.pow(S - amount, k + 1) - Math.pow(S, k + 1));
+      return Math.abs(dR);
+    }
+  }, [
+    r,
+    fromMintAcc?.info.supply,
+    fromMintAcc?.info.decimals,
+    treasuryMintAcc?.info.supply,
+    treasuryMintAcc?.info.decimals,
+    treasuryAcc?.curve,
+    amount
+  ]);
 
-  // only works for basic exponential curves
-  // dR = (R / S^(1 + k)) ((S + dS)^(1 + k) - S^(1 + k))
-  const S = Number(
-    fromMintAcc.supply / BigInt(Math.pow(10, fromMintAcc.decimals))
-  );
-  const R = Number(
-    AccountLayout.decode(
-      (await connection.getAccountInfo(treasuryAcc.treasury))?.data!
-    ).amount / BigInt(Math.pow(10, treasuryMintAcc.decimals))
-  );
-  //@ts-ignore
-  const k =
-    treasuryAcc.curve.exponentialCurveV0.k.toNumber() / Math.pow(10, 12);
-  console.log("tm3", S, R, k);
-  const dR =
-    (R / Math.pow(S, k + 1)) * (Math.pow(S - 1, k + 1) - Math.pow(S, k + 1));
-  return Math.abs(dR);
+  const loading = loadingTreasuryManagement || loadingFromMint || loadingTreasuryMint || loadingR
+  return { price, loading }
 }
 
 export function Swap() {
@@ -194,14 +209,12 @@ export function Swap() {
 
   const [topAmount, setTopAmount] = useState<number>(0);
   const [rawTopAmount, setRawTopAmount] = useState<string>("");
-  const [bottomAmount, setBottomAmount] = useState<number>(0);
+  const { price: price, loading: loadingPrice } = useTreasuryPrice(topSelected.mint, topAmount);
   const [isDcMint, setIsDcMint] = useState<boolean>(true);
+  const bottomAmount = useMemo(() => isDcMint ? topAmount * Math.pow(10, 8) : price, [price, isDcMint, topAmount])
 
   const [txLoading, setLoading] = useState<boolean>(false);
   const { setMessage } = useNotification();
-
-  // maps trading pair to cached price
-  const [priceCache, setPriceCache] = useState<Record<string, PriceCache>>({});
 
   const parseAndSetTop = useCallback((newTop: number | string | undefined) => {
     let parsed: any = newTop!;
@@ -220,45 +233,6 @@ export function Swap() {
     setTopSelected(newTop);
   }, []);
 
-  // update prices and amounts
-  useEffect(() => {
-    if (!topSelected || !bottomSelected || !topAmount) return;
-    const symbol = `${topSelected.name}/${bottomSelected.name}`;
-    if (isDcMint) {
-      setBottomAmount(topAmount * dcRate);
-    } else {
-      async function getTreasuryPricing() {
-        if (symbol in priceCache) {
-          // check if cache is invalid
-          if (
-            priceCache[symbol].lastCheckedTime >=
-            new Date().getTime() / 1000 - CACHE_INVALIDATION_TIME
-          ) {
-            setBottomAmount(round(priceCache[symbol].price * topAmount, 4));
-            return;
-          }
-        }
-        console.log("tm1");
-        const p = await getTreasuryPrice(
-          connection,
-          publicKey,
-          topSelected.mint!
-        );
-        const updated = {
-          ...priceCache,
-        };
-        updated[symbol] = {
-          lastCheckedTime: new Date().getTime() / 1000,
-          price: p,
-        };
-        console.log("tm2", p);
-        setPriceCache(updated);
-        setBottomAmount(round(p * topAmount, 4));
-      }
-      getTreasuryPricing();
-    }
-  }, [topAmount, isDcMint, topSelected, bottomSelected]);
-
   // update when token selected
   useEffect(() => {
     if (topSelected.toTokens?.includes(bottomSelected.name)) {
@@ -273,18 +247,7 @@ export function Swap() {
     setIsDcMint(topSelected.name === "HNT" && bottomSelected.name === "DC");
   }, [topSelected, bottomSelected]);
 
-  const [balance, setBalance] = useState<number>(0);
-  // update max balance
-  useEffect(() => {
-    async function loadBal() {
-      const ata = await getAssociatedTokenAddress(topSelected.mint, publicKey);
-      const acc = await getAccount(connection, ata);
-      const mint = await getMint(connection, topSelected.mint);
-      const bal = toNumber(new anchor.BN(acc.amount.toString()), mint);
-      setBalance(bal);
-    }
-    loadBal();
-  }, [topSelected]);
+  const { amount: balance, decimals: balanceDecimals, loading: loadingBalance } = useOwnedAmount(publicKey, topSelected.mint);
 
   const executeSwap = useCallback(() => {
     if (txLoading) return;
@@ -293,7 +256,7 @@ export function Swap() {
       console.log("swapping");
       try {
         if (isDcMint) {
-          await mintDataCredits(connection, publicKey, topAmount);
+          await mintDataCredits(connection, publicKey, topAmount * Math.pow(10, 8));
         } else {
           await treasurySwap(
             connection,
@@ -319,13 +282,21 @@ export function Swap() {
           <Text tw="text-zinc-900 dark:text-zinc-400">Burning</Text>
           <View
             tw="flex justify-baseline"
-            onClick={() => parseAndSetTop(`${balance}`)}
+            onClick={() =>
+              parseAndSetTop(
+                `${humanReadableBigint(
+                  balance,
+                  balanceDecimals,
+                  balanceDecimals
+                )}`
+              )
+            }
           >
             <Text tw="text-xs text-zinc-900 dark:text-zinc-400 cursor-pointer">
               Max:&nbsp;
             </Text>
             <Text tw="text-xs font-bold text-zinc-800 dark:text-zinc-300 cursor-pointer">
-              {balance}
+              {loadingBalance ? "..." : humanReadableBigint(balance, balanceDecimals, 4)}
             </Text>
           </View>
         </View>
@@ -352,7 +323,7 @@ export function Swap() {
           <Text tw="text-zinc-900 dark:text-zinc-400">Receiving</Text>
         </View>
         <View tw="flex justify-between p-3 relative items-center w-full rounded-lg bg-gray-200/[.4] dark:bg-zinc-900/[.4] ">
-          <Text tw="text-lg text-gray-900 dark:text-white">{bottomAmount}</Text>
+          <Text tw="text-lg text-gray-900 dark:text-white">{bottomAmount || "0"}</Text>
           <TokenSelector
             tw="flex text-white absolute right-0 top-25 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-r-lg text-sm px-4 py-2 dark:hover:bg-zinc-900 dark:focus:ring-blue-800"
             tokens={bottomTokens}
@@ -374,7 +345,10 @@ export function Swap() {
                 swapAllowed &&
                   !txLoading && ["bg-green-600", "hover:bg-green-700"],
               ],
-              ...[!(swapAllowed && !txLoading) && "bg-green-600/[0.5]"],
+              ...[
+                !(swapAllowed && !txLoading && !loadingPrice) &&
+                  "bg-green-600/[0.5]",
+              ],
             ]
           )}
           onClick={executeSwap}

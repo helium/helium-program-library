@@ -438,7 +438,14 @@ export class AccountFetchCache {
         const subscriptionId = this.accountChangeListeners.get(address);
         if (subscriptionId) {
           this.accountChangeListeners.delete(address);
-          this.connection.removeAccountChangeListener(subscriptionId);
+          try {
+            this.connection.removeAccountChangeListener(subscriptionId);
+          } catch (e: any) {
+            if (e.toString().includes("not implemented")) {
+              // @ts-ignore
+              this.usableConnection.removeAccountChangeListener(subscriptionId);
+            }
+          }
         }
         this.missingAccounts.delete(address);
       }

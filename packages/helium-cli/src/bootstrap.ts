@@ -200,7 +200,7 @@ async function run() {
         config: {
           windowSizeSeconds: new BN(60),
           thresholdType: ThresholdType.Absolute as never,
-          threshold: new BN("1000000"),
+          threshold: new BN("1000000000000"),
         },
       })
       .accounts({ hntMint: hntKeypair.publicKey, dcMint: dcKeypair.publicKey })
