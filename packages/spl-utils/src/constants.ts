@@ -1,9 +1,9 @@
 import { PublicKey } from "@solana/web3.js";
 
-export const DC_MINT = new PublicKey("4R2prERdggRzHw9boXqmbff1fzjzXW5aX7pNtjMdYNrr");
+export const DC_MINT = new PublicKey("6YLxsKozpj9s87rsr7Z4MBB8URBqZxq9K9xtqPKp43de");
 
-export const HNT_MINT = new PublicKey("CD9XaohcmnM3Xc95VvK5w1jm5ZuQ6wovy4uAYQ39jS2S");
+export const HNT_MINT = new PublicKey("7NaJ3tctzZ7c1SLCWL59m5Ku7E3qVH1KkF2DNiBtxCTk");
 
 export const MOBILE_MINT = new PublicKey(
-  "FPKgDamvsNjfmYqjUwkFREXeKGoLFmD4NcQ68kRtSxrs"
+  "5DDtiXxeDq6kTt6XtUXM8oZ7A2xnBed8SRSTQzhYS4Qs"
 );

@@ -1,5 +1,5 @@
 use crate::circuit_breaker::*;
-use crate::{next_epoch_ts, state::*, EPOCH_LENGTH};
+use crate::{state::*, EPOCH_LENGTH};
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
@@ -174,7 +174,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     InitializeTreasuryManagementArgsV0 {
       authority: ctx.accounts.sub_dao.key(),
       curve: args.treasury_curve.into(),
-      freeze_unix_time: i64::try_from(next_epoch_ts(ctx.accounts.clock.unix_timestamp)).unwrap(),
+      freeze_unix_time: i64::MAX,
       window_config: args.treasury_window_config.into(),
     },
   )?;
