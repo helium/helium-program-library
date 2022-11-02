@@ -5,7 +5,7 @@ import {
   lazyDistributorKey,
 } from "@helium/lazy-distributor-sdk";
 import { recipientKey } from "@helium/lazy-distributor-sdk/src";
-import { toNumber, MOBILE_MINT } from "@helium/spl-utils";
+import { toNumber, MOBILE_MINT, truthy } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
 import { getMint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
@@ -49,7 +49,6 @@ export async function getPendingRewards(
   maybeRecipient: Recipient | undefined
 ) {
   // @ts-ignore
-  // console.log("hey", maybeRecipient?.totalRewards.toNumber(), maybeRecipient?.currentRewards.map(curr => curr?.toNumber()));
   const lazyDistributor = await program.account.lazyDistributorV0.fetch(
     LAZY_KEY
   );
@@ -83,8 +82,19 @@ async function fetchTokenAccounts(wallet: PublicKey): Promise<any> {
   const resp = await window.xnft.solana.connection.customSplTokenAccounts(
     wallet
   );
-  const tokens = resp.nftMetadata
-    .map((m) => m[1])
-    .filter((t) => t.metadata.data.symbol == "HOTSPOT");
-  return tokens;
+  const tokens = resp.tokenMetadata
+    .map((m) => m?.account)
+    .filter(truthy)
+    .filter((t) => removeNullBytes(t.data.symbol) == "HOTSPOT");
+
+    console.log("tokens", tokens);
+
+    return tokens;
+}
+
+function removeNullBytes(str: string): string {
+  return str
+    .split("")
+    .filter((char) => char.codePointAt(0))
+    .join("");
 }

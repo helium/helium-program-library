@@ -6,6 +6,7 @@ import {
 } from "@helium/spl-utils";
 import { PROGRAM_ID } from "./constants";
 import { subDaoEpochInfoResolver } from "@helium/helium-sub-daos-sdk";
+import { hotspotKey } from "./pdas";
 
 export const hotspotIssuanceResolvers = combineResolvers(
   resolveIndividual(async ({ path }) => {
@@ -26,13 +27,10 @@ export const hotspotIssuanceResolvers = combineResolvers(
     mint: "collection",
     owner: "hotspotConfig",
   }),
-  resolveIndividual(async ({ path, args }) => {
-    if (path[path.length - 1] === "hotspot") {
+  resolveIndividual(async ({ path, args, accounts }) => {
+    if (path[path.length - 1] === "hotspot" && accounts.collection) {
       return (
-        await PublicKey.findProgramAddress(
-          [Buffer.from("hotspot", "utf-8"), args[args.length - 1].eccCompact],
-          PROGRAM_ID
-        )
+        hotspotKey(accounts.collection as PublicKey, args[args.length - 1].eccCompact)
       )[0];
     }
   }),

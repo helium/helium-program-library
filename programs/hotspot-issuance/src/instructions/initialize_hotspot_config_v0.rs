@@ -9,6 +9,7 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
+use helium_sub_daos::SubDaoV0;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeHotspotConfigArgsV0 {
@@ -30,10 +31,17 @@ pub struct InitializeHotspotConfigV0<'info> {
     mint::decimals = 0,
     mint::authority = hotspot_config,
     mint::freeze_authority = hotspot_config,
-    seeds = ["collection".as_bytes(), args.symbol.as_bytes()],
+    seeds = ["collection".as_bytes(), sub_dao.key().as_ref(), args.symbol.as_bytes()],
     bump
   )]
   pub collection: Box<Account<'info, Mint>>,
+
+  #[account(
+    has_one = authority
+  )]
+  pub sub_dao: Box<Account<'info, SubDaoV0>>,
+  pub authority: Signer<'info>,
+
   /// CHECK: Handled by cpi
   #[account(
     mut,
@@ -61,7 +69,7 @@ pub struct InitializeHotspotConfigV0<'info> {
     init,
     payer = payer,
     space = 60 + std::mem::size_of::<HotspotConfigV0>(),
-    seeds = ["hotspot_config".as_bytes(), collection.key().as_ref()],
+    seeds = ["hotspot_config".as_bytes(), sub_dao.key().as_ref(), args.symbol.as_bytes()],
     bump,
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
@@ -100,7 +108,8 @@ pub fn handler(
 
   let signer_seeds: &[&[&[u8]]] = &[&[
     b"hotspot_config",
-    ctx.accounts.collection.to_account_info().key.as_ref(),
+    ctx.accounts.sub_dao.to_account_info().key.as_ref(),
+    args.symbol.as_bytes(),
     &[ctx.bumps["hotspot_config"]],
   ]];
 
@@ -122,7 +131,7 @@ pub fn handler(
     ),
     CreateMetadataAccountArgs {
       name: args.name,
-      symbol: args.symbol,
+      symbol: args.symbol.clone(),
       uri: args.metadata_url,
       collection: None,
       collection_details: Some(CollectionDetails::V1 { size: 0 }),
@@ -152,6 +161,8 @@ pub fn handler(
 
   ctx.accounts.hotspot_config.set_inner(HotspotConfigV0 {
     dc_fee: args.dc_fee,
+    sub_dao: ctx.accounts.sub_dao.key(),
+    symbol: args.symbol.clone(),
     collection: ctx.accounts.collection.key(),
     dc_mint: ctx.accounts.dc_mint.key(),
     onboarding_server: args.onboarding_server,

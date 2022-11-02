@@ -2,9 +2,10 @@ import { PublicKey } from "@solana/web3.js";
 import classnames from "classnames";
 import React, { FC, useMemo } from "react";
 import { Button, Image, Text, View } from "react-xnft";
+import { SvgSpinner } from "../../../components/common";
+import { useFetchedCachedJson } from "../../../hooks/useFetchedJson";
 import { usePendingRewards } from "../../../hooks/usePendingRewards";
 import { useClaimRewards, useStyledTitle } from "../../../utils/hooks";
-import { SvgSpinner } from "../../../components/common";
 
 interface HotspotDetailScreenProps {
   nft: any; // TODO: actually type this
@@ -18,21 +19,22 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
   useStyledTitle(false);
   const { claimRewards, loading } = useClaimRewards(nft);
   const mint = useMemo(
-    () => new PublicKey(nft.metadata.mint),
-    [nft.metadata.mint]
+    () => new PublicKey(nft.mint),
+    [nft.mint]
   );
 
   const pendingRewards = usePendingRewards(mint);
   const hasRewards = pendingRewards && pendingRewards > 0;
+  const { result: tokenMetaUriData } = useFetchedCachedJson(nft.data.uri);
 
   return (
     <View tw="flex flex-col">
       <View tw="flex flex-col px-5 mb-2 gap-5">
         <Text tw="text-lg text-center font-bold !m-0 text-zinc-700 dark:text-zinc-500">
-          {nft.tokenMetaUriData.name}
+          {tokenMetaUriData.name}
         </Text>
         <View tw="flex flex-row p-1 rounded-lg bg-zinc-200 dark:bg-zinc-900">
-          <Image tw="rounded-md w-full" src={nft.tokenMetaUriData.image} />
+          <Image tw="rounded-md w-full" src={tokenMetaUriData.image} />
         </View>
         <View tw="flex flex-col p-1">
           <Text tw="text-lg pb-2 mb-2 border-b border-zinc-700 w-full text-zinc-700 dark:text-zinc-200">
@@ -54,7 +56,7 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
                 Description:&nbsp;
               </Text>
               <Text tw="text-xs px-3 py-1 !m-0 text-zinc-700 dark:text-zinc-400 rounded-md bg-zinc-200 dark:bg-zinc-900">
-                {nft.tokenMetaUriData.description}
+                {tokenMetaUriData.description}
               </Text>
             </View>
           </View>

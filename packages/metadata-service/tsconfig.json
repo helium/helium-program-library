@@ -5,6 +5,9 @@
       "path": "../hotspot-issuance-sdk"
     },
     {
+      "path": "../helium-sub-daos-sdk"
+    },
+    {
       "path": "./tsconfig.cjs.json"
     },
     {

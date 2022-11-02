@@ -145,8 +145,7 @@ describe("data-credits", () => {
         await method.rpc({ skipPreflight: true });
       }
 
-      const collection = (await createNft(provider, me)).mintKey;
-      ({ subDao } = await initTestSubdao(hsdProgram, provider, me, dao, collection));
+      ({ subDao } = await initTestSubdao(hsdProgram, provider, me, dao));
     });
     it("mints some data credits", async () => {
       await program.methods

@@ -198,9 +198,9 @@ async function run() {
       .initializeDataCreditsV0({
         authority: provider.wallet.publicKey,
         config: {
-          windowSizeSeconds: new BN(60),
+          windowSizeSeconds: new BN(60 * 60),
           thresholdType: ThresholdType.Absolute as never,
-          threshold: new BN("1000000"),
+          threshold: new BN("1000000000000"),
         },
       })
       .accounts({ hntMint: hntKeypair.publicKey, dcMint: dcKeypair.publicKey })
@@ -225,44 +225,13 @@ async function run() {
       .rpc({ skipPreflight: true });
   }
 
-  const mobileHotspotCollection = (await hotspotCollectionKey("MOBILEHOT"))[0];
-  if (!(await provider.connection.getAccountInfo(mobileHotspotCollection))) {
-    console.log("Initalizing `MOBILEHOT` collection and HotspotConfig");
-
-    await hotspotIssuanceProgram.methods
-      .initializeHotspotConfigV0({
-        name: "Mobile Hotspot Collection",
-        symbol: "MOBILEHOT",
-        metadataUrl: `${argv.bucket}/mobile_collection.json`,
-        dcFee: toBN(5, 0),
-        onboardingServer: onboardingServerKeypair.publicKey,
-      })
-      .accounts({ dcMint: dcKeypair.publicKey })
-      .rpc({ skipPreflight: true });
-  }
-
-  const hsConfigKey = (await hotspotConfigKey(mobileHotspotCollection))[0];
-  const hsIssuerKey = await hotspotIssuerKey(
-    hsConfigKey,
-    makerKeypair.publicKey
-  )[0];
-
-  if (!(await exists(conn, hsIssuerKey))) {
-    console.log("Initalizing HotspotIssuer");
-
-    await hotspotIssuanceProgram.methods
-      .initializeHotspotIssuerV0({
-        maker: makerKeypair.publicKey,
-        authority: provider.wallet.publicKey,
-      })
-      .accounts({
-        hotspotConfig: hsConfigKey,
-      })
-      .rpc({ skipPreflight: true });
-  }
-  
+  const mobileSubdao = (await subDaoKey(mobileKeypair.publicKey))[0];
   const [mobileLazyDist] = await lazyDistributorKey(mobileKeypair.publicKey);
-  const rewardsEscrow = await getAssociatedTokenAddress(mobileKeypair.publicKey, mobileLazyDist, true);
+  const rewardsEscrow = await getAssociatedTokenAddress(
+    mobileKeypair.publicKey,
+    mobileLazyDist,
+    true
+  );
   if (!(await exists(conn, mobileLazyDist))) {
     console.log("Initializing mobile lazy distributor");
     await lazyDistributorProgram.methods
@@ -283,12 +252,12 @@ async function run() {
       })
       .accounts({
         rewardsMint: mobileKeypair.publicKey,
-        rewardsEscrow
+        rewardsEscrow,
       })
       .rpc({ skipPreflight: true });
   }
 
-  const mobileSubdao = (await subDaoKey(mobileKeypair.publicKey))[0];
+
   if (!(await exists(conn, mobileSubdao))) {
     console.log("Initializing Mobile SubDAO");
     await heliumSubDaosProgram.methods
@@ -317,13 +286,46 @@ async function run() {
         dao,
         dntMint: mobileKeypair.publicKey,
         rewardsEscrow,
-        hotspotCollection: mobileHotspotCollection,
         hntMint: hntKeypair.publicKey,
       })
       .rpc({ skipPreflight: true });
   }
 
+  const hsConfigKey = (await hotspotConfigKey(mobileSubdao, "MOBILE"))[0];
+  if (!(await provider.connection.getAccountInfo(hsConfigKey))) {
+    console.log("Initalizing `MOBILE` HotspotConfig");
 
+    await hotspotIssuanceProgram.methods
+      .initializeHotspotConfigV0({
+        name: "Mobile Hotspot Collection",
+        symbol: "MOBILE",
+        metadataUrl: `${argv.bucket}/mobile_collection.json`,
+        dcFee: toBN(5, 0),
+        onboardingServer: onboardingServerKeypair.publicKey,
+      })
+      .accounts({ dcMint: dcKeypair.publicKey, subDao: mobileSubdao })
+      .rpc({ skipPreflight: true });
+  }
+
+  const hsIssuerKey = await hotspotIssuerKey(
+    hsConfigKey,
+    makerKeypair.publicKey
+  )[0];
+
+  if (!(await exists(conn, hsIssuerKey))) {
+    console.log("Initalizing HotspotIssuer");
+
+    await hotspotIssuanceProgram.methods
+      .initializeHotspotIssuerV0({
+        maker: makerKeypair.publicKey,
+        authority: provider.wallet.publicKey,
+      })
+      .accounts({
+        hotspotConfig: hsConfigKey,
+      })
+      .rpc({ skipPreflight: true });
+  }
+  
   await Promise.all(
     hardcodeHotspots.map(async (hotspot, index) => {
       const create = await hotspotIssuanceProgram.methods
@@ -338,7 +340,6 @@ async function run() {
           hotspotIssuer: hsIssuerKey,
           hotspotOwner: provider.wallet.publicKey,
           maker: makerKeypair.publicKey,
-          subDao: mobileSubdao,
         })
         .signers([makerKeypair]);
       const key = (await create.pubkeys()).hotspot!;

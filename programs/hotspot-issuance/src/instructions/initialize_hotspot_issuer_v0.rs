@@ -13,7 +13,7 @@ pub struct InitializeHotspotIssuerV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
-    seeds=["hotspot_config".as_bytes(), hotspot_config.collection.key().as_ref()],
+    seeds=["hotspot_config".as_bytes(), hotspot_config.sub_dao.as_ref(), hotspot_config.symbol.as_bytes()],
     bump=hotspot_config.bump_seed
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,

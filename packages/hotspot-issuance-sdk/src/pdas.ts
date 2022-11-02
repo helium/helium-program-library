@@ -3,20 +3,26 @@ import { PROGRAM_ID } from "./constants";
 import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 
 export const hotspotConfigKey = (
-  collection: PublicKey,
+  subDao: PublicKey,
+  symbol: string,
   programId: PublicKey = PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
-    [Buffer.from("hotspot_config", "utf-8"), collection.toBuffer()],
+    [
+      Buffer.from("hotspot_config", "utf-8"),
+      subDao.toBuffer(),
+      Buffer.from(symbol, "utf-8"),
+    ],
     programId
   );
 
 export const hotspotCollectionKey = (
+  subDao: PublicKey,
   symbol: string,
   programId: PublicKey = PROGRAM_ID
 ) =>
-  PublicKey.findProgramAddress(
-    [Buffer.from("collection", "utf-8"), Buffer.from(symbol, "utf-8")],
+  PublicKey.findProgramAddressSync(
+    [Buffer.from("collection", "utf-8"), subDao.toBuffer(), Buffer.from(symbol, "utf-8")],
     programId
   );
 
@@ -35,11 +41,12 @@ export const hotspotIssuerKey = (
   );
 
 export const hotspotKey = (
+  collection: PublicKey,
   eccCompact: Buffer,
   programId: PublicKey = PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
-    [Buffer.from("hotspot", "utf-8"), eccCompact],
+    [Buffer.from("hotspot", "utf-8"), collection.toBuffer(), eccCompact],
     programId
   );
 

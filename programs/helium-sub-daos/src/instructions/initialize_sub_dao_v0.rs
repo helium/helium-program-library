@@ -1,5 +1,5 @@
 use crate::circuit_breaker::*;
-use crate::{next_epoch_ts, state::*, EPOCH_LENGTH};
+use crate::{state::*, EPOCH_LENGTH};
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
@@ -79,7 +79,6 @@ pub struct InitializeSubDaoV0<'info> {
     bump
   )]
   pub circuit_breaker: AccountInfo<'info>,
-  pub hotspot_collection: Box<Account<'info, Mint>>,
   /// CHECK: Checked via CPI
   #[account(mut)]
   pub treasury: AccountInfo<'info>,
@@ -175,7 +174,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     InitializeTreasuryManagementArgsV0 {
       authority: ctx.accounts.sub_dao.key(),
       curve: args.treasury_curve.into(),
-      freeze_unix_time: i64::try_from(next_epoch_ts(ctx.accounts.clock.unix_timestamp)).unwrap(),
+      freeze_unix_time: i64::MAX,
       window_config: args.treasury_window_config.into(),
     },
   )?;
@@ -183,7 +182,6 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
   ctx.accounts.dao.num_sub_daos += 1;
   ctx.accounts.sub_dao.set_inner(SubDaoV0 {
     dao: ctx.accounts.dao.key(),
-    hotspot_collection: ctx.accounts.hotspot_collection.key(),
     dnt_mint: ctx.accounts.dnt_mint.key(),
     treasury: ctx.accounts.treasury.key(),
     rewards_escrow: ctx.accounts.rewards_escrow.key(),

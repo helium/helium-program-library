@@ -1,14 +1,20 @@
 import Address from "@helium/address";
-import { hotspotKey } from "@helium/hotspot-issuance-sdk";
+import { hotspotCollectionKey, hotspotKey } from "@helium/hotspot-issuance-sdk";
+import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import {
   Metadata, PROGRAM_ID as MPL_PID
 } from "@metaplex-foundation/mpl-token-metadata";
 import { PublicKey } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { provider } from "./solana";
+import cors from "@fastify/cors";
 
-const server: FastifyInstance = Fastify({});
-
+const server: FastifyInstance = Fastify({
+  logger: true
+});
+server.register(cors, {
+  origin: "*"
+});
 server.get("/health", async () => {
   return { ok: true };
 })
@@ -19,11 +25,13 @@ function removeNullBytes(str: string): string {
     .filter((char) => char.codePointAt(0))
     .join("");
 }
+const [subDao] = subDaoKey(new PublicKey(process.env.DNT_MINT!))
+const [collection] = hotspotCollectionKey(subDao, process.env.COLLECTION_SYMBOL!);
 
 server.get<{ Params: { eccCompact: string } }>("/:eccCompact", async (request, reply) => {
   const { eccCompact } = request.params;
   const bufferCompact = Buffer.from(Address.fromB58(eccCompact).publicKey)
-  const [mint] = await hotspotKey(bufferCompact);
+  const [mint] = await hotspotKey(collection, bufferCompact);
   const metadataKey = PublicKey.findProgramAddressSync(
     [Buffer.from("metadata", "utf-8"), MPL_PID.toBuffer(), mint.toBuffer()],
     MPL_PID

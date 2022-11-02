@@ -65,6 +65,7 @@ export const initTestDataCredits = async (
 export const initTestHotspotConfig = async (
   program: Program<HotspotIssuance>,
   provider: anchor.AnchorProvider,
+  subDao: PublicKey,
   dcMint?: PublicKey
 ): Promise<{
   collection: PublicKey;
@@ -91,6 +92,7 @@ export const initTestHotspotConfig = async (
     })
     .accounts({
       dcMint,
+      subDao
     });
 
   const { collection, hotspotConfig } = await method.pubkeys();
@@ -106,7 +108,7 @@ export const initTestHotspotConfig = async (
 export const initTestHotspotIssuer = async (
   program: Program<HotspotIssuance>,
   provider: anchor.AnchorProvider,
-  hotspotConfig: PublicKey
+  hotspotConfig: PublicKey,
 ): Promise<{
   hotspotIssuer: PublicKey;
   makerKeypair: Keypair;
@@ -191,11 +193,7 @@ export const initWorld = async (
   };
 }> => {
   const dataCredits = await initTestDataCredits(dcProgram, provider);
-  const hotspotConfig = await initTestHotspotConfig(
-    hsProgram,
-    provider,
-    dataCredits.dcMint
-  );
+
   const dao = await initTestDao(
     hsdProgram,
     provider,
@@ -209,14 +207,20 @@ export const initWorld = async (
     provider,
     provider.wallet.publicKey,
     dao.dao,
-    hotspotConfig.collection,
     subDaoEpochRewards
+  );
+
+  const hotspotConfig = await initTestHotspotConfig(
+    hsProgram,
+    provider,
+    subDao.subDao,
+    dataCredits.dcMint
   );
 
   const issuer = await initTestHotspotIssuer(
     hsProgram,
     provider,
-    hotspotConfig.hotspotConfig
+    hotspotConfig.hotspotConfig,
   );
 
   return {

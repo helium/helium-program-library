@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { MOBILE_MINT } from "@helium/spl-utils";
+import { MOBILE_MINT, numberWithCommas } from "@helium/spl-utils";
 import React, { FC, useMemo } from "react";
 import {
   Button,
@@ -14,6 +14,7 @@ import classnames from "classnames";
 import { useMetaplexMetadata } from "../../../../hooks/useMetaplexMetadata";
 import { usePendingRewards } from "../../../../hooks/usePendingRewards";
 import { useClaimRewards } from "../../../../utils/hooks";
+import { useFetchedCachedJson } from "../../../../hooks/useFetchedJson";
 import { SvgSpinner } from "../../../common";
 
 interface HotspotListItemProps {
@@ -22,9 +23,10 @@ interface HotspotListItemProps {
 
 export const HotspotListItem: FC<HotspotListItemProps> = ({ nft }) => {
   const mint = useMemo(
-    () => new PublicKey(nft.metadata.mint),
-    [nft.metadata.mint]
+    () => new PublicKey(nft.mint),
+    [nft.mint]
   );
+  const { result: tokenMetaUriData } = useFetchedCachedJson(nft.data.uri);
   const nav = useNavigation();
   const { info: metadata } = useMetaplexMetadata(MOBILE_MINT);
   const symbol = metadata?.data.symbol;
@@ -44,13 +46,13 @@ export const HotspotListItem: FC<HotspotListItemProps> = ({ nft }) => {
       <View tw="flex w-full gap-x-3 justify-center items-center">
         <Image
           tw="rounded-md"
-          src={nft.tokenMetaUriData.image}
+          src={tokenMetaUriData?.image}
           style={{ width: "60px" }}
         />
         <View tw="flex flex-col gap-2 grow justify-center">
           <View tw="flex flex-row justify-between items-center">
             <Text tw="text-left w-20 truncate text-md font-bold text-zinc-900 dark:text-white !m-0">
-              {nft.tokenMetaUriData.name}
+              {nft.data.name}
             </Text>
             <View tw="flex justify-end">
               <Button
@@ -81,7 +83,7 @@ export const HotspotListItem: FC<HotspotListItemProps> = ({ nft }) => {
               Pending Rewards:&nbsp;
             </Text>
             <Text tw="text-sm !m-0 text-gray-600 dark:text-gray-500">
-              {`${pendingRewards == null ? "0" : pendingRewards} ${
+              {`${pendingRewards == null ? "..." : numberWithCommas(pendingRewards, 4)} ${
                 symbol || ""
               }`}
             </Text>
