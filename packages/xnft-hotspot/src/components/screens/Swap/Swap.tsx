@@ -8,7 +8,6 @@ import {
   TextField,
   Svg,
   Path,
-  Loading,
   usePublicKey,
   useConnection,
 } from "react-xnft";
@@ -36,6 +35,7 @@ import { useStyledTitle } from "../../../utils/hooks";
 import { useNotification } from "../../../contexts/notification";
 import { useTreasuryManagement } from "../../../hooks/useTreasuryManagement";
 import { useMint, useOwnedAmount } from "@helium/helium-react-hooks";
+import { SvgSpinner } from "../../common";
 
 type Token = {
   name: string;
@@ -127,10 +127,17 @@ export function useTreasuryPrice(
     () => tm.treasuryManagementKey(fromMint)[0],
     [fromMint.toBase58()]
   );
-  const { info: treasuryAcc, loading: loadingTreasuryManagement } = useTreasuryManagement(treasuryManagementKey);
+  const { info: treasuryAcc, loading: loadingTreasuryManagement } =
+    useTreasuryManagement(treasuryManagementKey);
   const { info: fromMintAcc, loading: loadingFromMint } = useMint(fromMint);
-  const { info: treasuryMintAcc, loading: loadingTreasuryMint } = useMint(treasuryAcc?.treasuryMint);
-  const { amount: r, decimals: rDecimals, loading: loadingR } = useOwnedAmount(treasuryManagementKey, treasuryAcc?.treasuryMint)
+  const { info: treasuryMintAcc, loading: loadingTreasuryMint } = useMint(
+    treasuryAcc?.treasuryMint
+  );
+  const {
+    amount: r,
+    decimals: rDecimals,
+    loading: loadingR,
+  } = useOwnedAmount(treasuryManagementKey, treasuryAcc?.treasuryMint);
 
   const price = useMemo(() => {
     if (
@@ -162,11 +169,15 @@ export function useTreasuryPrice(
     treasuryMintAcc?.info.supply,
     treasuryMintAcc?.info.decimals,
     treasuryAcc?.curve,
-    amount
+    amount,
   ]);
 
-  const loading = loadingTreasuryManagement || loadingFromMint || loadingTreasuryMint || loadingR
-  return { price, loading }
+  const loading =
+    loadingTreasuryManagement ||
+    loadingFromMint ||
+    loadingTreasuryMint ||
+    loadingR;
+  return { price, loading };
 }
 
 export function Swap() {
@@ -208,9 +219,15 @@ export function Swap() {
 
   const [topAmount, setTopAmount] = useState<number>(0);
   const [rawTopAmount, setRawTopAmount] = useState<string>("");
-  const { price: price, loading: loadingPrice } = useTreasuryPrice(topSelected.mint, topAmount);
+  const { price: price, loading: loadingPrice } = useTreasuryPrice(
+    topSelected.mint,
+    topAmount
+  );
   const [isDcMint, setIsDcMint] = useState<boolean>(true);
-  const bottomAmount = useMemo(() => isDcMint ? topAmount * Math.pow(10, 8) : price, [price, isDcMint, topAmount])
+  const bottomAmount = useMemo(
+    () => (isDcMint ? topAmount * Math.pow(10, 8) : price),
+    [price, isDcMint, topAmount]
+  );
 
   const [txLoading, setLoading] = useState<boolean>(false);
   const { setMessage } = useNotification();
@@ -246,7 +263,11 @@ export function Swap() {
     setIsDcMint(topSelected.name === "HNT" && bottomSelected.name === "DC");
   }, [topSelected, bottomSelected]);
 
-  const { amount: balance, decimals: balanceDecimals, loading: loadingBalance } = useOwnedAmount(publicKey, topSelected.mint);
+  const {
+    amount: balance,
+    decimals: balanceDecimals,
+    loading: loadingBalance,
+  } = useOwnedAmount(publicKey, topSelected.mint);
 
   const executeSwap = useCallback(() => {
     if (txLoading) return;
@@ -255,7 +276,11 @@ export function Swap() {
       console.log("swapping");
       try {
         if (isDcMint) {
-          await mintDataCredits(connection, publicKey, topAmount * Math.pow(10, 8));
+          await mintDataCredits(
+            connection,
+            publicKey,
+            topAmount * Math.pow(10, 8)
+          );
         } else {
           await treasurySwap(
             connection,
@@ -295,7 +320,9 @@ export function Swap() {
               Max:&nbsp;
             </Text>
             <Text tw="text-xs font-bold text-zinc-800 dark:text-zinc-300 cursor-pointer">
-              {loadingBalance ? "..." : humanReadableBigint(balance, balanceDecimals, 4)}
+              {loadingBalance
+                ? "..."
+                : humanReadableBigint(balance, balanceDecimals, 4)}
             </Text>
           </View>
         </View>
@@ -322,7 +349,9 @@ export function Swap() {
           <Text tw="text-zinc-900 dark:text-zinc-400">Receiving</Text>
         </View>
         <View tw="flex justify-between p-3 relative items-center w-full rounded-lg bg-gray-200/[.4] dark:bg-zinc-900/[.4] ">
-          <Text tw="text-lg text-gray-900 dark:text-white">{bottomAmount || "0"}</Text>
+          <Text tw="text-lg text-gray-900 dark:text-white">
+            {bottomAmount || "0"}
+          </Text>
           <TokenSelector
             tw="flex text-white absolute right-0 top-25 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-r-lg text-sm px-4 py-2 dark:hover:bg-zinc-900 dark:focus:ring-blue-800"
             tokens={bottomTokens}
@@ -352,10 +381,12 @@ export function Swap() {
           )}
           onClick={executeSwap}
         >
-          <Text tw="text-white font-bold text-md">
-            {swapAllowed ? "Burn" : "Invalid burn"}
+          {txLoading && (
+            <SvgSpinner tw="inline mr-2 w-6 h-6 text-white/[.5] animate-spin fill-white" />
+          )}
+          <Text tw="inline text-white font-bold text-md">
+            {swapAllowed ? !txLoading ? `Burn` : `Burning...` : `Invalid burn`}
           </Text>
-          {txLoading && <Loading style={{ marginLeft: "5px" }} />}
         </Button>
       </View>
     </View>
