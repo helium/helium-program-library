@@ -1,18 +1,19 @@
 import * as client from "@helium/distributor-oracle";
 import { init } from "@helium/lazy-distributor-sdk";
 import * as anchor from "@project-serum/anchor";
-import { useCallback, useEffect, useState } from "react";
-import { PublicKey, Connection } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
+import { useEffect, useState } from "react";
+import { useAsyncCallback } from "react-async-hook";
 import {
   useConnection,
   useMetadata,
   useNavigation,
-  usePublicKey,
+  usePublicKey
 } from "react-xnft";
+import { base64DarkLogo, base64LightLogo } from "../constants";
 import { useNotification } from "../contexts/notification";
 import { LAZY_KEY, useProgram } from "../utils";
-import { useAsyncCallback } from "react-async-hook";
-import { ProgramError, sendAndConfirmWithRetry } from "@helium/spl-utils";
+import { THEME } from "../utils/theme";
 
 export const useColorMode = ({
   light,
@@ -33,16 +34,38 @@ export const useColorMode = ({
   return value;
 };
 
-export const useTitleColor = () => {
+export const useStyledTitle = (showLogo = false) => {
   const nav = useNavigation();
   const metadata = useMetadata();
+  const bgAccentColor = useColorMode(THEME.colors.backgroundAccent);
 
   useEffect(() => {
     if (!metadata || !nav) return;
+
     nav.setTitleStyle({
       color: metadata.isDarkMode ? "#ffffff" : "#333333",
     });
-  }, [metadata.isDarkMode]);
+
+    if (showLogo) {
+      nav.setStyle({
+        backgroundImage: metadata.isDarkMode
+          ? `url(${base64LightLogo})`
+          : `url(${base64DarkLogo})`,
+        backgroundSize: "30px",
+        backgroundPosition: "20px 14px",
+        backgroundRepeat: "no-repeat",
+        backgroundColor: "rgba(0, 0, 0, 0.1)",
+      });
+    } else {
+      nav.setStyle({
+        backgroundImage: "none",
+        backgroundSize: "none",
+        backgroundPosition: "none",
+        backgroundRepeat: "none",
+        backgroundColor: "transparent",
+      });
+    }
+  }, [metadata.isDarkMode, bgAccentColor]);
 };
 
 // TODO: type nft

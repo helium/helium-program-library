@@ -32,10 +32,9 @@ import {
 } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import classnames from "classnames";
-import { THEME } from "../../../utils/theme";
-import { useTitleColor } from "../../../utils/hooks";
-import { useTreasuryManagement } from "../../../hooks/useTreasuryManagement";
+import { useStyledTitle } from "../../../utils/hooks";
 import { useNotification } from "../../../contexts/notification";
+import { useTreasuryManagement } from "../../../hooks/useTreasuryManagement";
 import { useMint, useOwnedAmount } from "@helium/helium-react-hooks";
 
 type Token = {
@@ -171,7 +170,7 @@ export function useTreasuryPrice(
 }
 
 export function Swap() {
-  useTitleColor();
+  useStyledTitle();
   const publicKey = usePublicKey();
   const connection = useConnection();
   const dcRate = 1; //TODO this needs to be fetched from an oracle

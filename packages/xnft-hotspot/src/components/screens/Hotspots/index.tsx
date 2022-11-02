@@ -1,23 +1,21 @@
 import React from "react";
 import { Stack } from "react-xnft";
-import { HotspotGridScreen } from "./HotspotGrid/HotspotGrid";
+import { HotspotListScreen } from "./HotspotList/HotspotList";
 import { HotspotDetailScreen } from "./HotspotDetail";
-import { THEME } from "../../../utils/theme";
-import { useColorMode } from "../../../utils/hooks";
 
 export const HotspotsScreen = () => {
   return (
     <Stack.Navigator
-      initialRoute={{ name: "grid" }}
+      initialRoute={{ name: "list" }}
       options={({ route }) => {
         switch (route.name) {
-          case "grid":
+          case "list":
             return {
-              title: "My Hotspots",
+              title: "Hotspots",
             };
           case "detail":
             return {
-              title: "My Details",
+              title: "Hotspot",
             };
           default:
             throw new Error("unknown route");
@@ -26,8 +24,8 @@ export const HotspotsScreen = () => {
       style={{}}
     >
       <Stack.Screen
-        name={"grid"}
-        component={(props: any) => <HotspotGridScreen {...props} />}
+        name={"list"}
+        component={(props: any) => <HotspotListScreen {...props} />}
       />
       <Stack.Screen
         name={"detail"}
