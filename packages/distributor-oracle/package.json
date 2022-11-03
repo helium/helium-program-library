@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "@helium/address": "^4.6.2",
-    "@helium/hotspot-issuance-sdk": "^0.0.4",
+    "@helium/helium-entity-manager-sdk": "^0.0.4",
     "@helium/idls": "^0.0.4",
     "@helium/lazy-distributor-sdk": "^0.0.4",
     "@helium/spl-utils": "^0.0.4",

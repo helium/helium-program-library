@@ -1,12 +1,12 @@
 [package]
-name = "hotspot-issuance"
+name = "helium-entity-manager"
 version = "0.0.1"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "hotspot_issuance"
+name = "helium_entity_manager"
 
 [features]
 no-entrypoint = []

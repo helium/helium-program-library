@@ -4,7 +4,7 @@ import {
   init,
   lazyDistributorKey,
 } from "@helium/lazy-distributor-sdk";
-import { recipientKey } from "@helium/lazy-distributor-sdk/src";
+import { recipientKey } from "@helium/lazy-distributor-sdk";
 import { toNumber, MOBILE_MINT, truthy } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
 import { getMint } from "@solana/spl-token";

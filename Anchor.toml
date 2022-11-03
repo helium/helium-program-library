@@ -5,7 +5,7 @@ seeds = true
 lazy_distributor = "1azyvMnX9ptJgr8y18mhAJFQSHfFGjyGtPQ4Lnn99kj"
 helium_sub_daos = "hdaojPkgSD8bciDc1w2Z4kXFFibCXngJiw2GRpEL7Wf"
 data_credits = "credacwrBVewZAgCwNgowCSMbCiepuesprUWPBeLTSg"
-hotspot_issuance = "isswTaVr3jpPq4ETgnCu76WQA9XPxPGVANeKzivHefg"
+helium_entity_manager = "hemABtqNUst4MmqsVcuN217ZzBspENbGt9uueSe5jts"
 circuit_breaker = "circcmKGcSE61r768bFtD1GkG3x6qfEE1GD2PgwA6C3"
 treasury_management = "treaRzaa4b98D1NQMQdQXzBupbgWhyJ2e1pXhJzkTwU"
 
@@ -14,7 +14,7 @@ members = [
   "programs/lazy-distributor", 
   "programs/data-credits",
   "programs/helium-sub-daos",
-  "programs/hotspot-issuance",
+  "programs/helium-entity-manager",
   "programs/circuit-breaker",
   "programs/treasury-management",
 ]

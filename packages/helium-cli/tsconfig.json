@@ -23,7 +23,7 @@
       "path": "../lazy-distributor-sdk"
     },
     {
-      "path": "../hotspot-issuance-sdk"
+      "path": "../helium-entity-manager-sdk"
     },
     {
       "path": "../treasury-management-sdk"

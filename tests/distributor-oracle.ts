@@ -16,9 +16,9 @@ import {
 } from "../packages/lazy-distributor-sdk/src";
 import {
   init as initIss
-} from "../packages/hotspot-issuance-sdk/src";
+} from "../packages/helium-entity-manager-sdk/src";
 import { LazyDistributor } from "../target/types/lazy_distributor";
-import { HotspotIssuance } from "../target/types/hotspot_issuance";
+import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { AuthorityType, createSetAuthorityInstruction } from "@solana/spl-token";
 import { sendAndConfirmWithRetry, createMint, createNft, createAtaAndMint  } from '@helium/spl-utils';
 import { ThresholdType } from '@helium/circuit-breaker-sdk';
@@ -29,7 +29,7 @@ chai.use(chaiHttp);
 describe('distributor-oracle', () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
   let program: Program<LazyDistributor>;
-  let issuanceProgram: Program<HotspotIssuance>;
+  let issuanceProgram: Program<HeliumEntityManager>;
   let oracleServer: OracleServer;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -49,7 +49,7 @@ describe('distributor-oracle', () => {
     issuanceProgram = await initIss(
       provider,
       PROGRAM_ID,
-      anchor.workspace.HotspotIssuance.idl
+      anchor.workspace.HeliumEntityManager.idl
     );
     oracleServer = new OracleServer(program, oracle, new DatabaseMock(issuanceProgram));
     oracleServer.start();

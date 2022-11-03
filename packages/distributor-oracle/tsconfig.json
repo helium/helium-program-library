@@ -8,7 +8,7 @@
       "path": "../spl-utils"
     },
     {
-      "path": "../hotspot-issuance-sdk"
+      "path": "../helium-entity-manager-sdk"
     },
     {
       "path": "../lazy-distributor-sdk"

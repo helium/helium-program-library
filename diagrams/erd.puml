@@ -92,7 +92,7 @@ frame CircuitBreaker {
   }
 }
 
-frame HotspotIssuance {
+frame HeliumEntityManager {
   entity HotspotConfig {
     "hotspot_config", sub_dao, symbol
     --

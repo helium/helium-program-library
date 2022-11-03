@@ -38,7 +38,7 @@
     "@helium/data-credits-sdk": "^0.0.4",
     "@helium/distributor-oracle": "^0.0.4",
     "@helium/helium-sub-daos-sdk": "^0.0.4",
-    "@helium/hotspot-issuance-sdk": "^0.0.4",
+    "@helium/helium-entity-manager-sdk": "^0.0.4",
     "@helium/lazy-distributor-sdk": "^0.0.4",
     "@helium/spl-utils": "^0.0.4",
     "@helium/treasury-management-sdk": "^0.0.4",

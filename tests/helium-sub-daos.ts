@@ -13,9 +13,9 @@ import {
 import { expect } from "chai";
 import { init as dcInit } from "../packages/data-credits-sdk/src";
 import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
-import { init as issuerInit } from "../packages/hotspot-issuance-sdk/src";
+import { init as issuerInit } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
-import { HotspotIssuance } from "../target/types/hotspot_issuance";
+import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { burnDataCredits } from "./data-credits";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import { DC_FEE, ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
@@ -41,7 +41,7 @@ describe("helium-sub-daos", () => {
   );
 
   let dcProgram: Program<DataCredits>;
-  let issuerProgram: Program<HotspotIssuance>;
+  let hemProgram: Program<HeliumEntityManager>;
   let cbProgram: Program<CircuitBreaker>;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
@@ -60,10 +60,10 @@ describe("helium-sub-daos", () => {
     );
     ensureDCIdl(dcProgram);
     ensureHSDIdl(program);
-    issuerProgram = await issuerInit(
+    hemProgram = await issuerInit(
       provider,
-      anchor.workspace.HotspotIssuance.programId,
-      anchor.workspace.HotspotIssuance.idl
+      anchor.workspace.HeliumEntityManager.programId,
+      anchor.workspace.HeliumEntityManager.idl
     );
   });
 
@@ -117,7 +117,7 @@ describe("helium-sub-daos", () => {
         .accounts({ dcMint })
         .rpc({ skipPreflight: true });
 
-      const method = await issuerProgram.methods
+      const method = await hemProgram.methods
         .issueHotspotV0({ eccCompact: Buffer.from(ecc), uri: '' })
         .accounts({
           hotspotIssuer,
@@ -173,7 +173,7 @@ describe("helium-sub-daos", () => {
         issuer: { makerKeypair, hotspotIssuer },
       } = await initWorld(
         provider,
-        issuerProgram,
+        hemProgram,
         program,
         dcProgram,
         EPOCH_REWARDS,

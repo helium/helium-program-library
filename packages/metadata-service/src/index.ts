@@ -1,5 +1,5 @@
 import Address from "@helium/address";
-import { hotspotCollectionKey, hotspotKey } from "@helium/hotspot-issuance-sdk";
+import { hotspotCollectionKey, hotspotKey } from "@helium/helium-entity-manager-sdk";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import {
   Metadata, PROGRAM_ID as MPL_PID

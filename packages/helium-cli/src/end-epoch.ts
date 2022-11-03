@@ -12,7 +12,7 @@ import yargs from "yargs/yargs";
 import { loadKeypair } from "./bootstrap";
 import * as client from "@helium/distributor-oracle";
 import Address from "@helium/address";
-import { PROGRAM_ID, hotspotKey } from "@helium/hotspot-issuance-sdk";
+import { PROGRAM_ID, hotspotKey } from "@helium/helium-entity-manager-sdk";
 import { sendAndConfirmWithRetry } from "@helium/spl-utils";
 import { getCurrentRewards } from "@helium/distributor-oracle";
 

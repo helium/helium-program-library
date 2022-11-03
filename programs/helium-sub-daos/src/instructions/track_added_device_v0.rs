@@ -3,7 +3,7 @@ use crate::utils::current_epoch;
 use anchor_lang::prelude::*;
 use std::str::FromStr;
 
-pub const ONBOARD_KEY: &str = "isswTaVr3jpPq4ETgnCu76WQA9XPxPGVANeKzivHefg";
+pub const ONBOARD_KEY: &str = "hemABtqNUst4MmqsVcuN217ZzBspENbGt9uueSe5jts";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TrackAddedDeviceArgsV0 {
