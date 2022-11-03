@@ -22,10 +22,7 @@ interface HotspotListItemProps {
 }
 
 export const HotspotListItem: FC<HotspotListItemProps> = ({ nft }) => {
-  const mint = useMemo(
-    () => new PublicKey(nft.mint),
-    [nft.mint]
-  );
+  const mint = useMemo(() => new PublicKey(nft.mint), [nft.mint]);
   const { result: tokenMetaUriData } = useFetchedCachedJson(nft.data.uri);
   const nav = useNavigation();
   const { info: metadata } = useMetaplexMetadata(MOBILE_MINT);
@@ -59,7 +56,7 @@ export const HotspotListItem: FC<HotspotListItemProps> = ({ nft }) => {
                 tw={classnames(
                   "!px-2 !py-0 border-0 rounded-md bg-green-600",
                   { "hover:bg-green-700": hasRewards && !loading },
-                  { "opacity-50": !hasRewards || loading }
+                  { "opacity-50 cursor-not-allowed": !hasRewards || loading }
                 )}
                 onClick={
                   hasRewards && !loading
@@ -83,9 +80,11 @@ export const HotspotListItem: FC<HotspotListItemProps> = ({ nft }) => {
               Pending Rewards:&nbsp;
             </Text>
             <Text tw="text-sm !m-0 text-gray-600 dark:text-gray-500">
-              {`${pendingRewards == null ? "..." : numberWithCommas(pendingRewards, 4)} ${
-                symbol || ""
-              }`}
+              {`${
+                pendingRewards == null
+                  ? "..."
+                  : numberWithCommas(pendingRewards, 4)
+              } ${symbol || ""}`}
             </Text>
           </View>
         </View>

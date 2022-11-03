@@ -69,7 +69,7 @@ export const HotspotDetailScreen: FC<HotspotDetailScreenProps> = ({
           tw={classnames(
             "h-12 w-full border-0 rounded-lg flex justify-center items-center bg-green-600",
             { "hover:bg-green-700/[.9]": hasRewards },
-            { "bg-green-900": !hasRewards }
+            { "bg-green-900 cursor-not-allowed": !hasRewards }
           )}
           onClick={hasRewards ? () => claimRewards() : () => {}}
         >
