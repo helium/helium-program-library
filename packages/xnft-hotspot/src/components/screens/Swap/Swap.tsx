@@ -366,18 +366,18 @@ export function Swap() {
         </Text>
         <Button
           tw={classnames(
-            "h-12 w-full border-0 rounded-md flex justify-center items-center",
-            [
-              ,
-              ...[
+            "h-12 w-full border-0 rounded-md flex justify-center items-center bg-green-600",
+            {
+              "hover:bg-green-700/[.9]":
+                swapAllowed && !txLoading && !loadingPrice,
+            },
+            {
+              "bg-green-900 cursor-not-allowed": !(
                 swapAllowed &&
-                  !txLoading && ["bg-green-600", "hover:bg-green-700"],
-              ],
-              ...[
-                !(swapAllowed && !txLoading && !loadingPrice) &&
-                  "bg-green-600/[0.5]",
-              ],
-            ]
+                !txLoading &&
+                !loadingPrice
+              ),
+            }
           )}
           onClick={executeSwap}
         >
@@ -385,7 +385,11 @@ export function Swap() {
             <SvgSpinner tw="inline mr-2 w-6 h-6 text-white/[.5] animate-spin fill-white" />
           )}
           <Text tw="inline text-white font-bold text-md">
-            {swapAllowed ? !txLoading ? `Burn` : `Burning...` : `Invalid burn`}
+            {swapAllowed
+              ? !txLoading
+                ? `Burn`
+                : `Burning...`
+              : `Invalid burn`}
           </Text>
         </Button>
       </View>
