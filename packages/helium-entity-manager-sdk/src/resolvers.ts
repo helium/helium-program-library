@@ -8,7 +8,7 @@ import { PROGRAM_ID } from "./constants";
 import { subDaoEpochInfoResolver } from "@helium/helium-sub-daos-sdk";
 import { hotspotKey } from "./pdas";
 
-export const hotspotIssuanceResolvers = combineResolvers(
+export const heliumEntityManagerResolvers = combineResolvers(
   resolveIndividual(async ({ path }) => {
     switch (path[path.length - 1]) {
       case "dataCreditsProgram":
