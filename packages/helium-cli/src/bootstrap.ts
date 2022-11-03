@@ -13,7 +13,7 @@ import {
   subDaoKey
 } from "@helium/helium-sub-daos-sdk";
 import {
-  hotspotCollectionKey, hotspotConfigKey, hotspotIssuerKey, init as initIssuance
+  hotspotCollectionKey, hotspotConfigKey, hotspotIssuerKey, init as initHem
 } from "@helium/helium-entity-manager-sdk";
 import { lazyDistributorKey, init as initLazy } from "@helium/lazy-distributor-sdk";
 import { createAtaAndMintInstructions, createAtaAndMint, createMintInstructions, createNft, sendInstructions, toBN } from "@helium/spl-utils";
@@ -153,7 +153,7 @@ async function run() {
   const dataCreditsProgram = await initDc(provider);
   const lazyDistributorProgram = await initLazy(provider);
   const heliumSubDaosProgram = await initDao(provider);
-  const hemProgram = await initIssuance(provider);
+  const hemProgram = await initHem(provider);
 
   const hntKeypair = await loadKeypair(argv.hntKeypair);
   const dcKeypair = await loadKeypair(argv.dcKeypair);
