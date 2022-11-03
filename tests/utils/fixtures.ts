@@ -5,7 +5,7 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 import { execSync } from "child_process";
 import { DataCredits } from "../../target/types/data_credits";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
-import { HotspotIssuance } from "../../target/types/hotspot_issuance";
+import { HeliumEntityManager } from "../../target/types/helium_entity_manager";
 import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
 import { createAtaAndMint, createMint } from "@helium/spl-utils";
@@ -63,7 +63,7 @@ export const initTestDataCredits = async (
 };
 
 export const initTestHotspotConfig = async (
-  program: Program<HotspotIssuance>,
+  program: Program<HeliumEntityManager>,
   provider: anchor.AnchorProvider,
   subDao: PublicKey,
   dcMint?: PublicKey
@@ -106,7 +106,7 @@ export const initTestHotspotConfig = async (
 };
 
 export const initTestHotspotIssuer = async (
-  program: Program<HotspotIssuance>,
+  program: Program<HeliumEntityManager>,
   provider: anchor.AnchorProvider,
   hotspotConfig: PublicKey,
 ): Promise<{
@@ -162,7 +162,7 @@ export async function ensureHSDIdl(hsdProgram: Program<HeliumSubDaos>) {
 
 export const initWorld = async (
   provider: anchor.AnchorProvider,
-  hsProgram: Program<HotspotIssuance>,
+  hsProgram: Program<HeliumEntityManager>,
   hsdProgram: Program<HeliumSubDaos>,
   dcProgram: Program<DataCredits>,
   epochRewards?: number,

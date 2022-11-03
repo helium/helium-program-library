@@ -19,11 +19,11 @@ import {
   getProvider,
 } from "@project-serum/anchor";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { HotspotIssuance } from "@helium/idls/lib/types/hotspot_issuance";
+import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import {
   hotspotStorageKey,
-  init as initHotspotIssuance,
-} from "@helium/hotspot-issuance-sdk";
+  init as initHeliumEntityManager,
+} from "@helium/helium-entity-manager-sdk";
 import { init, PROGRAM_ID } from "@helium/lazy-distributor-sdk";
 import fs from "fs";
 import { getAccount } from "@solana/spl-token";
@@ -49,7 +49,7 @@ export class DatabaseMock implements Database {
     };
   };
 
-  constructor(readonly issuanceProgram: Program<HotspotIssuance>) {
+  constructor(readonly issuanceProgram: Program<HeliumEntityManager>) {
     this.inMemHash = {
       totalClicks: 0,
       lifetimeRewards: 0,
@@ -342,7 +342,7 @@ export class OracleServer {
       )
     );
     const program = await init(provider);
-    const hotspotIssuanceProgram = await initHotspotIssuance(provider);
+    const hotspotIssuanceProgram = await initHeliumEntityManager(provider);
     const server = new OracleServer(
       program,
       oracleKeypair,

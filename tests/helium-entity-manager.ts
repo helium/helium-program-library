@@ -7,23 +7,23 @@ import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 import {
   init as initDataCredits
-} from "../packages/data-credits-sdk/src";
+} from "@helium/data-credits-sdk";
 import {
   init as initHeliumSubDaos
-} from "../packages/helium-sub-daos-sdk/src";
-import { hotspotCollectionKey, hotspotKey, init as initHotspotIssuance } from "../packages/hotspot-issuance-sdk/src";
+} from "@helium/helium-sub-daos-sdk";
+import { hotspotCollectionKey, hotspotKey, init as initHeliumEntityManager } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
-import { HotspotIssuance } from "../target/types/hotspot_issuance";
+import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { DC_FEE, ensureDCIdl, initTestHotspotConfig, initTestHotspotIssuer, initWorld } from "./utils/fixtures";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 
-describe("hotspot-issuance", () => {
+describe("helium-entity-manager", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
   let dcProgram: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
-  let hsProgram: Program<HotspotIssuance>;
+  let hsProgram: Program<HeliumEntityManager>;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -45,10 +45,10 @@ describe("hotspot-issuance", () => {
       anchor.workspace.HeliumSubDaos.idl
     );
 
-    hsProgram = await initHotspotIssuance(
+    hsProgram = await initHeliumEntityManager(
       provider,
-      anchor.workspace.HotspotIssuance.programId,
-      anchor.workspace.HotspotIssuance.idl
+      anchor.workspace.HeliumEntityManager.programId,
+      anchor.workspace.HeliumEntityManager.idl
     );
 
     const dao = await initTestDao(

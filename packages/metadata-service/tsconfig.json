@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.root.json",
   "references": [
     {
-      "path": "../hotspot-issuance-sdk"
+      "path": "../helium-entity-manager-sdk"
     },
     {
       "path": "../helium-sub-daos-sdk"

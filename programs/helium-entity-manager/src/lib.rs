@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("isswTaVr3jpPq4ETgnCu76WQA9XPxPGVANeKzivHefg");
+declare_id!("hemABtqNUst4MmqsVcuN217ZzBspENbGt9uueSe5jts");
 
 pub mod error;
 pub mod instructions;
@@ -11,7 +11,7 @@ pub use instructions::*;
 pub use state::*;
 
 #[program]
-pub mod hotspot_issuance {
+pub mod helium_entity_manager {
   use super::*;
 
   pub fn initialize_hotspot_config_v0(

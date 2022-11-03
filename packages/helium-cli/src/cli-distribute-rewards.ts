@@ -6,7 +6,7 @@ import {
 } from "@helium/helium-sub-daos-sdk";
 import {
   PROGRAM_ID
-} from "@helium/hotspot-issuance-sdk";
+} from "@helium/helium-entity-manager-sdk";
 import {
   init as initLazy,
   lazyDistributorKey

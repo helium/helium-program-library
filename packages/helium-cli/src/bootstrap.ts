@@ -14,7 +14,7 @@ import {
 } from "@helium/helium-sub-daos-sdk";
 import {
   hotspotCollectionKey, hotspotConfigKey, hotspotIssuerKey, init as initIssuance
-} from "@helium/hotspot-issuance-sdk";
+} from "@helium/helium-entity-manager-sdk";
 import { lazyDistributorKey, init as initLazy } from "@helium/lazy-distributor-sdk";
 import { createAtaAndMintInstructions, createAtaAndMint, createMintInstructions, createNft, sendInstructions, toBN } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";

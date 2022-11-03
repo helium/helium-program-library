@@ -65,9 +65,9 @@ data credits
 
 Data credits manages the soulbound helium data credits, and how they can be burned to do several actions on the network. It also manages reading from an oracle to allow burning HNT for data credits
 
-## Hotspot Issuance
+## Helium Entity Manager
 
-Hotspot issuance is responsible for issuing the various types of hotspots that Helium supports (wifi, iot, mobile, etc)
+Helium Entity Manager is responsible for issuing the various types of hotspots and rewardable entities that Helium supports (wifi, iot, mobile hotspots, mobile mappers, etc)
 
 
 ## Lazy Distributor

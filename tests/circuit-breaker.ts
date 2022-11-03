@@ -14,7 +14,7 @@ import {
   PROGRAM_ID,
   thresholdPercent,
   ThresholdType
-} from "../packages/circuit-breaker-sdk/src";
+} from "../packages/circuit-breaker-sdk";
 
 
 describe("circuit-breaker", () => {
