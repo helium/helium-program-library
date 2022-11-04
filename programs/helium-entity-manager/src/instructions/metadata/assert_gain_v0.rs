@@ -1,3 +1,4 @@
+use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
@@ -10,15 +11,9 @@ pub struct AssertGainArgsV0 {
 #[derive(Accounts)]
 #[instruction(args: AssertGainArgsV0)]
 pub struct AssertGainV0<'info> {
-  #[account(
-    seeds = [
-      "hotspot".as_bytes(),
-      &storage.ecc_compact,
-    ],
-    bump
-  )]
   pub hotspot: Box<Account<'info, Mint>>,
   #[account(
+    mut,
     seeds = [
       "storage".as_bytes(),
       hotspot.key().as_ref()
@@ -30,9 +25,16 @@ pub struct AssertGainV0<'info> {
   #[account(
     associated_token::mint = hotspot,
     associated_token::authority = hotspot_owner,
-    constraint = owner_ata.amount == 1,
+    constraint = owner_hotspot_ata.amount == 1,
   )]
-  pub owner_ata: Box<Account<'info, TokenAccount>>,
+  pub owner_hotspot_ata: Box<Account<'info, TokenAccount>>,
+
+  #[account(
+    seeds = ["hotspot_config".as_bytes(), hotspot_config.sub_dao.as_ref(), hotspot_config.symbol.as_bytes()],
+    bump,
+    constraint = args.gain <= hotspot_config.max_gain && args.gain >= hotspot_config.min_gain @ ErrorCode::InvalidGain
+  )]
+  pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
 }
 
 pub fn handler(ctx: Context<AssertGainV0>, args: AssertGainArgsV0) -> Result<()> {

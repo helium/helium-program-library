@@ -12,8 +12,8 @@ pub struct HotspotConfigV0 {
   pub sub_dao: Pubkey,
   pub min_gain: i32,
   pub max_gain: i32,
-  pub full_location_staking_fee: u32,
-  pub dataonly_location_staking_fee: u32,
+  pub full_location_staking_fee: u64,
+  pub dataonly_location_staking_fee: u64,
 
   pub bump_seed: u8,
   pub collection_bump_seed: u8,

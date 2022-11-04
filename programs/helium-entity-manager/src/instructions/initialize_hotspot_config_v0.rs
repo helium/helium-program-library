@@ -20,8 +20,8 @@ pub struct InitializeHotspotConfigArgsV0 {
   pub onboarding_server: Pubkey,
   pub min_gain: i32,
   pub max_gain: i32,
-  pub full_location_staking_fee: u32,
-  pub dataonly_location_staking_fee: u32,
+  pub full_location_staking_fee: u64,
+  pub dataonly_location_staking_fee: u64,
 }
 
 #[derive(Accounts)]

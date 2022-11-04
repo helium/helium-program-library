@@ -19,4 +19,7 @@ pub enum ErrorCode {
 
   #[msg("Invalid hotspot collection")]
   InvalidHotspotCollection,
+
+  #[msg("Gain outside valid range")]
+  InvalidGain,
 }

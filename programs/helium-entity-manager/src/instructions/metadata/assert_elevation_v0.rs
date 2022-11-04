@@ -10,15 +10,9 @@ pub struct AssertElevationArgsV0 {
 #[derive(Accounts)]
 #[instruction(args: AssertElevationArgsV0)]
 pub struct AssertElevationV0<'info> {
-  #[account(
-    seeds = [
-      "hotspot".as_bytes(),
-      &storage.ecc_compact,
-    ],
-    bump
-  )]
   pub hotspot: Box<Account<'info, Mint>>,
   #[account(
+    mut,
     seeds = [
       "storage".as_bytes(),
       hotspot.key().as_ref()
@@ -30,9 +24,9 @@ pub struct AssertElevationV0<'info> {
   #[account(
     associated_token::mint = hotspot,
     associated_token::authority = hotspot_owner,
-    constraint = owner_ata.amount == 1,
+    constraint = owner_hotspot_ata.amount == 1,
   )]
-  pub owner_ata: Box<Account<'info, TokenAccount>>,
+  pub owner_hotspot_ata: Box<Account<'info, TokenAccount>>,
 }
 
 pub fn handler(ctx: Context<AssertElevationV0>, args: AssertElevationArgsV0) -> Result<()> {

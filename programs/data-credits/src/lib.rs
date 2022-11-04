@@ -43,6 +43,13 @@ pub mod data_credits {
     instructions::burn_from_issuance_v0::handler(ctx, args)
   }
 
+  pub fn burn_without_tracking_v0(
+    ctx: Context<BurnWithoutTrackingV0>,
+    args: BurnWithoutTrackingArgsV0,
+  ) -> Result<()> {
+    instructions::burn_without_tracking_v0::handler(ctx, args)
+  }
+
   pub fn use_data_credits_v0(
     ctx: Context<UseDataCreditsV0>,
     args: UseDataCreditsArgsV0,

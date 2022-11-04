@@ -4,7 +4,7 @@ import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
-import { expect } from "chai";
+import { assert, expect } from "chai";
 import {
   init as initDataCredits
 } from "@helium/data-credits-sdk";
@@ -106,8 +106,10 @@ describe("helium-entity-manager", () => {
 
   describe("with issuer and data credits", () => {
     let makerKeypair: Keypair;
-    let onboardingServerKeypair: Keypair;
     let hotspotIssuer: PublicKey;
+    let hotspotConfig: PublicKey;
+    let startDcBal = DC_FEE * 10;
+    let dcMint: PublicKey;
 
     before(async () => {
       const {
@@ -117,27 +119,23 @@ describe("helium-entity-manager", () => {
       } = await initWorld(provider, hsProgram, hsdProgram, dcProgram);
       await dcProgram.methods
         .mintDataCreditsV0({
-          amount: toBN(DC_FEE, 8),
+          amount: toBN(DC_FEE*3, 8),
         })
         .accounts({ dcMint: dataCredits.dcMint })
         .rpc({ skipPreflight: true });
 
       hotspotIssuer = issuer.hotspotIssuer;
       makerKeypair = issuer.makerKeypair;
-      ({ onboardingServerKeypair } = hsConfig);
+      hotspotConfig = hsConfig.hotspotConfig;
+      dcMint = dataCredits.dcMint;
     });
 
     it("issues a hotspot", async () => {
-      const ecc = await (await HeliumKeypair.makeRandom()).address.publicKey;
+      const ecc = (await HeliumKeypair.makeRandom()).address.publicKey;
       const hotspotOwner = Keypair.generate().publicKey;
-      const issuer = await hsProgram.account.hotspotIssuerV0.fetch(hotspotIssuer);
-      const config = await hsProgram.account.hotspotConfigV0.fetch(issuer.hotspotConfig);
 
-      const [keyShouldBe] = hotspotKey(config.collection, Buffer.from(ecc));
-      console.log("Key sshould be", keyShouldBe.toBase58());
-
-      const method = await hsProgram.methods
-        .issueHotspotV0({ eccCompact: Buffer.from(ecc), uri: '' })
+      const method = hsProgram.methods
+        .issueHotspotV0({ eccCompact: Buffer.from(ecc), uri: '', isFullHotspot: true })
         .accounts({
           hotspotIssuer,
           hotspotOwner,
@@ -149,7 +147,7 @@ describe("helium-entity-manager", () => {
         .signers([makerKeypair]);
 
       const { hotspot } = await method.pubkeys();
-      await method.rpc({ skipPreflight: true });
+      await method.rpc();
 
       const ata = await getAssociatedTokenAddress(hotspot!, hotspotOwner);
       const ataBal = await provider.connection.getTokenAccountBalance(ata);
@@ -160,5 +158,121 @@ describe("helium-entity-manager", () => {
       expect(ataBal.value.uiAmount).eq(1);
       expect(issuerAccount.count.toNumber()).eq(1);
     });
+
+    describe("with hotspot", () => {
+      let hotspot: PublicKey;
+      let hotspotOwner: Keypair;
+      before(async () => {
+        const ecc = (await HeliumKeypair.makeRandom()).address.publicKey;
+        hotspotOwner = Keypair.generate();
+  
+        const method = hsProgram.methods
+          .issueHotspotV0({ eccCompact: Buffer.from(ecc), uri: '', isFullHotspot: true })
+          .accounts({
+            hotspotIssuer,
+            hotspotOwner: hotspotOwner.publicKey,
+            maker: makerKeypair.publicKey,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 })
+          ])
+          .signers([makerKeypair]);
+  
+        const { hotspot: hsp } = await method.pubkeys();
+        hotspot = hsp!;
+
+        await method.rpc({ skipPreflight: true });
+
+        await dcProgram.methods
+          .mintDataCreditsV0({
+            amount: toBN(startDcBal, 8),
+          })
+          .accounts({ dcMint, recipient: hotspotOwner.publicKey })
+          .rpc();
+      });
+
+      it("changes the metadata", async() => {
+        const location = 'abc';
+        const method = hsProgram.methods.changeMetadataV0({
+          location,
+          elevation: null,
+          gain: null,
+        }).accounts({
+          hotspot,
+          hotspotOwner: hotspotOwner.publicKey,
+        }).signers([hotspotOwner]);
+        const { storage } = await method.pubkeys();
+        await method.rpc();
+
+        const storageAcc = await hsProgram.account.hotspotStorageV0.fetch(storage!);
+        console.log(storageAcc);
+        assert.isFalse(storageAcc.elevationAsserted);
+        assert.isFalse(storageAcc.gainAsserted);
+        assert.isFalse(storageAcc.locationAsserted);
+        assert.equal(storageAcc.location, location);
+        assert.equal(storageAcc.elevation, null);
+        assert.equal(storageAcc.gain, null);
+      });
+
+      it("asserts location", async() => {
+        const dcAta = await getAssociatedTokenAddress(dcMint!, hotspotOwner.publicKey);
+        const beforeBal = await provider.connection.getTokenAccountBalance(dcAta);
+
+        const location = 'abcdef';
+        const method = hsProgram.methods.assertLocationV0({
+          location,
+        }).accounts({
+          hotspot,
+          hotspotOwner: hotspotOwner.publicKey,
+          hotspotConfig,
+          dcMint,
+        }).signers([hotspotOwner]);
+        const { storage } = await method.pubkeys();
+        await method.rpc();
+
+        const storageAcc = await hsProgram.account.hotspotStorageV0.fetch(storage!);
+
+        const afterBal = await provider.connection.getTokenAccountBalance(dcAta);
+        assert.isTrue(storageAcc.locationAsserted);
+        assert.equal(storageAcc.location, location);
+        assert.equal(beforeBal.value.uiAmount! - afterBal.value.uiAmount!, 1000000);
+      });
+
+      it("asserts elevation", async() => {
+        const elevation = 110;
+        const method = hsProgram.methods.assertElevationV0({
+          elevation,
+        }).accounts({
+          hotspot,
+          hotspotOwner: hotspotOwner.publicKey,
+        }).signers([hotspotOwner]);
+        const { storage } = await method.pubkeys();
+        await method.rpc();
+
+        const storageAcc = await hsProgram.account.hotspotStorageV0.fetch(storage!);
+
+        assert.isTrue(storageAcc.elevationAsserted);
+        assert.equal(storageAcc.elevation, elevation);
+      });
+
+      it("asserts gain", async() => {
+        const gain = 140;
+        const method = hsProgram.methods.assertGainV0({
+          gain,
+        }).accounts({
+          hotspot,
+          hotspotOwner: hotspotOwner.publicKey,
+          hotspotConfig,
+        }).signers([hotspotOwner]);
+        const { storage } = await method.pubkeys();
+        await method.rpc();
+
+        const storageAcc = await hsProgram.account.hotspotStorageV0.fetch(storage!);
+
+        assert.isTrue(storageAcc.gainAsserted);
+        assert.equal(storageAcc.gain, gain);
+      });
+    });
+
   });
 });
