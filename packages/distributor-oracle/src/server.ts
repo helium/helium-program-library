@@ -342,11 +342,11 @@ export class OracleServer {
       )
     );
     const program = await init(provider);
-    const hotspotIssuanceProgram = await initHeliumEntityManager(provider);
+    const hemProgram = await initHeliumEntityManager(provider);
     const server = new OracleServer(
       program,
       oracleKeypair,
-      new DatabaseMock(hotspotIssuanceProgram)
+      new DatabaseMock(hemProgram)
     );
     server.start();
   }

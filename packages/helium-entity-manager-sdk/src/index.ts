@@ -2,7 +2,7 @@ import { AnchorProvider, Idl, Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { PROGRAM_ID } from "./constants";
-import { hotspotIssuanceResolvers } from "./resolvers";
+import { heliumEntityManagerResolvers } from "./resolvers";
 export * from "./pdas";
 export * from "./resolvers";
 export * from "./constants";
@@ -16,13 +16,13 @@ export const init = async (
     idl = await Program.fetchIdl(programId, provider);
   }
 
-  const hotspotIssuance = new Program<HeliumEntityManager>(
+  const heliumEntityManager = new Program<HeliumEntityManager>(
     idl as HeliumEntityManager,
     programId,
     provider,
     undefined,
-    () => hotspotIssuanceResolvers
+    () => heliumEntityManagerResolvers
   ) as Program<HeliumEntityManager>;
 
-  return hotspotIssuance;
+  return heliumEntityManager;
 };
