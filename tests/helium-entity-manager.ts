@@ -4,7 +4,8 @@ import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
-import { assert, expect } from "chai";
+import chai from "chai";
+const {assert, expect} = chai;
 import {
   init as initDataCredits
 } from "@helium/data-credits-sdk";
@@ -17,7 +18,8 @@ import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { DC_FEE, ensureDCIdl, initTestHotspotConfig, initTestHotspotIssuer, initWorld } from "./utils/fixtures";
 import { initTestDao, initTestSubdao } from "./utils/daos";
-
+import chaiAsPromised from 'chai-as-promised';
+chai.use(chaiAsPromised);
 describe("helium-entity-manager", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
@@ -205,7 +207,6 @@ describe("helium-entity-manager", () => {
         await method.rpc();
 
         const storageAcc = await hsProgram.account.hotspotStorageV0.fetch(storage!);
-        console.log(storageAcc);
         assert.isFalse(storageAcc.elevationAsserted);
         assert.isFalse(storageAcc.gainAsserted);
         assert.isFalse(storageAcc.locationAsserted);
@@ -271,6 +272,28 @@ describe("helium-entity-manager", () => {
 
         assert.isTrue(storageAcc.gainAsserted);
         assert.equal(storageAcc.gain, gain);
+      });
+
+      it("doesn't assert gain outside range", async() => {
+        const method = hsProgram.methods.assertGainV0({
+          gain: 1,
+        }).accounts({
+          hotspot,
+          hotspotOwner: hotspotOwner.publicKey,
+          hotspotConfig,
+        }).signers([hotspotOwner]);
+
+        expect(method.rpc()).to.be.rejected;
+
+        const method2 = hsProgram.methods.assertGainV0({
+          gain: 1000,
+        }).accounts({
+          hotspot,
+          hotspotOwner: hotspotOwner.publicKey,
+          hotspotConfig,
+        }).signers([hotspotOwner]);
+
+        expect(method2.rpc()).to.be.rejected
       });
     });
 
