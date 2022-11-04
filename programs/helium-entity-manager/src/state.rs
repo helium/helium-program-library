@@ -10,6 +10,10 @@ pub struct HotspotConfigV0 {
   pub authority: Pubkey,
   pub symbol: String,
   pub sub_dao: Pubkey,
+  pub min_gain: i32,
+  pub max_gain: i32,
+  pub full_location_staking_fee: u32,
+  pub dataonly_location_staking_fee: u32,
 
   pub bump_seed: u8,
   pub collection_bump_seed: u8,
@@ -30,8 +34,15 @@ pub struct HotspotIssuerV0 {
 #[derive(Default)]
 pub struct HotspotStorageV0 {
   pub ecc_compact: Vec<u8>,
-  pub location: Option<String>,
   pub authority: Pubkey,
 
   pub bump_seed: u8,
+
+  pub location: Option<String>,
+  pub elevation: Option<i32>,
+  pub gain: Option<i32>,
+  pub location_asserted: bool,
+  pub elevation_asserted: bool,
+  pub gain_asserted: bool,
+  pub is_full_hotspot: bool,
 }
