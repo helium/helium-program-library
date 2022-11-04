@@ -9,7 +9,7 @@ import { subDaoEpochInfoResolver } from "@helium/helium-sub-daos-sdk";
 import { hotspotKey } from "./pdas";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 
-export const hotspotIssuanceResolvers = combineResolvers(
+export const heliumEntityManagerResolvers = combineResolvers(
   heliumCommonResolver,
   ataResolver({
     instruction: "initializeHotspotConfigV0",

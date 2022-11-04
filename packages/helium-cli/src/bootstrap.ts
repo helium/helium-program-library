@@ -13,7 +13,7 @@ import {
   subDaoKey
 } from "@helium/helium-sub-daos-sdk";
 import {
-  hotspotCollectionKey, hotspotConfigKey, hotspotIssuerKey, init as initIssuance
+  hotspotCollectionKey, hotspotConfigKey, hotspotIssuerKey, init as initHem
 } from "@helium/helium-entity-manager-sdk";
 import { lazyDistributorKey, init as initLazy } from "@helium/lazy-distributor-sdk";
 import { createAtaAndMintInstructions, createAtaAndMint, createMintInstructions, createNft, sendInstructions, toBN } from "@helium/spl-utils";
@@ -153,7 +153,7 @@ async function run() {
   const dataCreditsProgram = await initDc(provider);
   const lazyDistributorProgram = await initLazy(provider);
   const heliumSubDaosProgram = await initDao(provider);
-  const hotspotIssuanceProgram = await initIssuance(provider);
+  const hemProgram = await initHem(provider);
 
   const hntKeypair = await loadKeypair(argv.hntKeypair);
   const dcKeypair = await loadKeypair(argv.dcKeypair);
@@ -294,7 +294,7 @@ async function run() {
   if (!(await provider.connection.getAccountInfo(hsConfigKey))) {
     console.log("Initalizing `MOBILE` HotspotConfig");
 
-    await hotspotIssuanceProgram.methods
+    await hemProgram.methods
       .initializeHotspotConfigV0({
         name: "Mobile Hotspot Collection",
         symbol: "MOBILE",
@@ -318,7 +318,7 @@ async function run() {
   if (!(await exists(conn, hsIssuerKey))) {
     console.log("Initalizing HotspotIssuer");
 
-    await hotspotIssuanceProgram.methods
+    await hemProgram.methods
       .initializeHotspotIssuerV0({
         maker: makerKeypair.publicKey,
         authority: provider.wallet.publicKey,
@@ -331,7 +331,7 @@ async function run() {
   
   await Promise.all(
     hardcodeHotspots.map(async (hotspot, index) => {
-      const create = await hotspotIssuanceProgram.methods
+      const create = await hemProgram.methods
         .issueHotspotV0({
           eccCompact: Buffer.from(Address.fromB58(hotspot.eccKey).publicKey),
           uri: hotspot.uri,
