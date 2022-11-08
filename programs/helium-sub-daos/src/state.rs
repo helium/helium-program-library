@@ -83,7 +83,7 @@ pub struct SubDaoEpochInfoV0 {
 pub struct SubDaoV0 {
   pub dao: Pubkey,
   pub dnt_mint: Pubkey,       // The mint of the subdao token
-  pub treasury: Pubkey,       // The treasury for rewards
+  pub treasury: Pubkey,       // The treasury of HNT
   pub rewards_escrow: Pubkey, // The escrow account for DNT rewards
   pub authority: Pubkey,
   pub total_devices: u64,

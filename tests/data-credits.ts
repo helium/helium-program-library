@@ -39,7 +39,7 @@ export async function burnDataCredits({
     });
   const inUseDataCredits = (await useData.pubkeys()).inUseDataCredits!;
   await useData.rpc({ skipPreflight: true });
-  const burn = await program.methods
+  const burn = program.methods
     .burnInUseDataCreditsV0({
       amount: toBN(amount, 8),
     })
