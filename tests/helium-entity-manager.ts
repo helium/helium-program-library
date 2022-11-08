@@ -4,7 +4,7 @@ import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
-import { expect } from "chai";
+import { assert, expect } from "chai";
 import {
   init as initDataCredits
 } from "@helium/data-credits-sdk";
@@ -160,5 +160,36 @@ describe("helium-entity-manager", () => {
       expect(ataBal.value.uiAmount).eq(1);
       expect(issuerAccount.count.toNumber()).eq(1);
     });
+
+    it("updates hotspot config", async() => {
+      const { hotspotConfig, onboardingServerKeypair } =
+        await initTestHotspotConfig(hsProgram, provider, subDao);
+      
+      await hsProgram.methods.updateHotspotConfigV0({
+        newAuthority: PublicKey.default,
+        dcFee: null,
+        onboardingServer: PublicKey.default,
+      }).accounts({
+        hotspotConfig,
+        authority: onboardingServerKeypair.publicKey,
+      }).signers([onboardingServerKeypair]).rpc();
+
+      const acc = await hsProgram.account.hotspotConfigV0.fetch(hotspotConfig);
+      assert.isTrue(PublicKey.default.equals(acc.authority));
+      assert.isTrue(PublicKey.default.equals(acc.onboardingServer));
+    });
+
+    it("updates hotspot issuer", async() => {
+      await hsProgram.methods.updateHotspotIssuerV0({
+        maker: PublicKey.default,
+        authority: PublicKey.default,
+      }).accounts({
+        hotspotIssuer,
+      }).rpc();
+
+      const acc = await hsProgram.account.hotspotIssuerV0.fetch(hotspotIssuer);
+      assert.isTrue(PublicKey.default.equals(acc.authority));
+      assert.isTrue(PublicKey.default.equals(acc.maker));
+    })
   });
 });

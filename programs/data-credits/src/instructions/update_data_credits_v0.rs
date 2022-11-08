@@ -11,6 +11,7 @@ pub struct UpdateDataCreditsArgsV0 {
 #[instruction(args: UpdateDataCreditsArgsV0)]
 pub struct UpdateDataCreditsV0<'info> {
   #[account(
+    mut,
     seeds = ["dc".as_bytes(), dc_mint.key().as_ref()],
     bump,
     has_one = authority,

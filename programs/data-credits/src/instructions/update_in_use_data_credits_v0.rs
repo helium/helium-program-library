@@ -1,6 +1,5 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateInUseDataCreditsArgsV0 {
@@ -11,10 +10,10 @@ pub struct UpdateInUseDataCreditsArgsV0 {
 #[instruction(args: UpdateInUseDataCreditsArgsV0)]
 pub struct UpdateInUseDataCreditsV0<'info> {
   #[account(
+    mut,
     has_one = owner,
   )]
   pub in_use_data_credits: Box<Account<'info, InUseDataCreditsV0>>,
-  pub dc_mint: Box<Account<'info, Mint>>,
   pub owner: Signer<'info>,
 }
 

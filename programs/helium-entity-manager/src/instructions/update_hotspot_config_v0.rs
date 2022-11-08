@@ -13,6 +13,7 @@ pub struct UpdateHotspotConfigArgsV0 {
 pub struct UpdateHotspotConfigV0<'info> {
   pub authority: Signer<'info>,
   #[account(
+    mut,
     has_one = authority,
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,

@@ -7,7 +7,7 @@ import * as web3 from "@solana/web3.js";
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import { assert, expect } from "chai";
-import { accountPayerKey, init } from "../packages/data-credits-sdk/src";
+import { accountPayerKey, dataCreditsKey, init } from "../packages/data-credits-sdk/src";
 import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
 import * as hsd from "../packages/helium-sub-daos-sdk/src";
 import { execute, toBN, toNumber } from "../packages/spl-utils/src";
@@ -64,7 +64,7 @@ describe("data-credits", () => {
   let hntMint: PublicKey;
   let dcMint: PublicKey;
   let startHntBal = 10000;
-  let startDcBal = 1;
+  let startDcBal = 2;
   let hntDecimals = 8;
   let dcDecimals = 8;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
@@ -192,6 +192,40 @@ describe("data-credits", () => {
       );
       const numBurned = toNumber(epochInfo.dcBurned as BN, dcDecimals);
       expect(numBurned).to.eq(1);
+    });
+
+    it("updates data credits", async() => {
+      await program.methods.updateDataCreditsV0({
+        newAuthority: PublicKey.default,
+      }).accounts({
+        dcMint,
+      }).rpc();
+
+      const dc = dataCreditsKey(dcMint)[0];
+      const dcAcc = await program.account.dataCreditsV0.fetch(dc);
+
+      assert.isTrue(PublicKey.default.equals(dcAcc.authority));
+    });
+
+    it("updates in use data credits", async() => {
+      const { subDao: freshSubDao } = await initTestSubdao(hsdProgram, provider, me, dao);
+      const useData = await program.methods
+        .useDataCreditsV0({
+          amount: toBN(1, 8),
+        })
+        .accounts({
+          subDao: freshSubDao,
+        });
+      const inUseDataCredits = (await useData.pubkeys()).inUseDataCredits!;
+      await useData.rpc();
+      await program.methods.updateInUseDataCreditsV0({
+        newOwner: PublicKey.default,
+      }).accounts({
+        inUseDataCredits,
+      }).rpc();
+
+      const dcAcc = await program.account.inUseDataCreditsV0.fetch(inUseDataCredits);
+      assert.isTrue(PublicKey.default.equals(dcAcc.owner));
     });
   });
 });

@@ -5,7 +5,7 @@ use crate::{MintWindowedCircuitBreakerV0, WindowedCircuitBreakerConfigV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateMintWindowedBreakerArgsV0 {
-  pub authority: Option<Pubkey>,
+  pub new_authority: Option<Pubkey>,
   pub config: Option<WindowedCircuitBreakerConfigV0>,
 }
 
@@ -13,6 +13,7 @@ pub struct UpdateMintWindowedBreakerArgsV0 {
 pub struct UpdateMintWindowedBreakerV0<'info> {
   pub authority: Signer<'info>,
   #[account(
+    mut,
     seeds = ["mint_windowed_breaker".as_bytes(), mint.key().as_ref()],
     bump,
     has_one = authority,
@@ -26,8 +27,8 @@ pub fn handler(
   args: UpdateMintWindowedBreakerArgsV0,
 ) -> Result<()> {
   let circuit_breaker = &mut ctx.accounts.circuit_breaker;
-  if args.authority.is_some() {
-    circuit_breaker.authority = args.authority.unwrap();
+  if args.new_authority.is_some() {
+    circuit_breaker.authority = args.new_authority.unwrap();
   }
   if args.config.is_some() {
     circuit_breaker.config = args.config.unwrap();

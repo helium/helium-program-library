@@ -2,7 +2,7 @@ import { createAtaAndMint, sendInstructions } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { expect } from "chai";
+import { assert, expect } from "chai";
 import { init } from "../packages/lazy-distributor-sdk/src";
 import { PROGRAM_ID } from "../packages/lazy-distributor-sdk/src/constants";
 import { LazyDistributor } from "../target/types/lazy_distributor";
@@ -188,6 +188,26 @@ describe("lazy-distributor", () => {
         expect(balance2.value.uiAmount).to.eq(5);
       });
     });
+
+    it("updates lazy distributor", async() => {
+      await program.methods.updateLazyDistributorV0({
+        authority: PublicKey.default,
+        oracles: [
+          {
+            oracle: PublicKey.default,
+            url: "https://some-other-url",
+          }
+        ]
+      }).accounts({
+        rewardsMint
+      }).rpc()
+
+      const ld = await program.account.lazyDistributorV0.fetch(lazyDistributor);
+      assert.isTrue(PublicKey.default.equals(ld.authority));
+      assert.isTrue(ld.oracles.length == 1);
+      assert.equal(ld.oracles[0].url, "https://some-other-url");
+      assert.isTrue(PublicKey.default.equals(ld.oracles[0].oracle));
+    })
   });
 
   describe("multiple oracles", () => {

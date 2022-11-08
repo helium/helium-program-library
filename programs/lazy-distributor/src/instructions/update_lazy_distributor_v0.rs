@@ -12,6 +12,7 @@ pub struct UpdateLazyDistributorArgsV0 {
 #[instruction(args: UpdateLazyDistributorArgsV0)]
 pub struct UpdateLazyDistributorV0<'info> {
   #[account(
+    mut,
     seeds = ["lazy_distributor".as_bytes(), rewards_mint.key().as_ref()],
     bump,
     has_one = authority,

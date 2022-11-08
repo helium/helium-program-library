@@ -11,13 +11,7 @@ pub struct UpdateHotspotIssuerArgsV0 {
 #[instruction(args: UpdateHotspotIssuerArgsV0)]
 pub struct UpdateHotspotIssuerV0<'info> {
   #[account(
-    seeds=["hotspot_config".as_bytes(), hotspot_config.sub_dao.as_ref(), hotspot_config.symbol.as_bytes()],
-    bump=hotspot_config.bump_seed
-  )]
-  pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
-  #[account(
-    seeds = ["hotspot_issuer".as_bytes(), hotspot_config.key().as_ref(), hotspot_issuer.maker.as_ref()],
-    bump,
+    mut,
     has_one = authority,
   )]
   pub hotspot_issuer: Box<Account<'info, HotspotIssuerV0>>,

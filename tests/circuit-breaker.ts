@@ -8,9 +8,11 @@ import {
 } from "@solana/spl-token";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
-import { expect } from "chai";
+import { assert, expect } from "chai";
 import {
+  accountWindowedBreakerKey,
   init,
+  mintWindowedBreakerKey,
   PROGRAM_ID,
   thresholdPercent,
   ThresholdType
@@ -93,7 +95,7 @@ describe("circuit-breaker", () => {
 
     beforeEach(async () => {
       mint = await createMint(provider, 8, me, me);
-      const method = await program.methods
+      const method = program.methods
         .initializeMintWindowedBreakerV0({
           authority: me,
           mintAuthority: me,
@@ -173,6 +175,25 @@ describe("circuit-breaker", () => {
           to: dest,
         })
         .rpc({ skipPreflight: true });
+    });
+
+    it("updates the breaker", async () => {
+      await program.methods.updateMintWindowedBreakerV0({
+        newAuthority: PublicKey.default,
+        config: {
+          windowSizeSeconds: new BN(11),
+          thresholdType: ThresholdType.Percent as never,
+          threshold: thresholdPercent(50),
+        }
+      }).accounts({
+        mint,
+      }).rpc();
+
+      const cb = mintWindowedBreakerKey(mint)[0];
+      const cbAcc = await program.account.mintWindowedCircuitBreakerV0.fetch(cb);
+
+      assert.isTrue(PublicKey.default.equals(cbAcc.authority));
+      assert.equal(cbAcc.config.windowSizeSeconds.toNumber(), 11);
     });
   });
 
@@ -285,6 +306,24 @@ describe("circuit-breaker", () => {
           owner: accountHolder.publicKey,
         })
         .rpc();
+    });
+
+    it("updates the breaker", async () => {
+      await program.methods.updateAccountWindowedBreakerV0({
+        newAuthority: PublicKey.default,
+        config: {
+          windowSizeSeconds: new BN(11),
+          thresholdType: ThresholdType.Percent as never,
+          threshold: thresholdPercent(50),
+        }
+      }).accounts({
+        tokenAccount,
+      }).rpc();
+      const cb = accountWindowedBreakerKey(tokenAccount)[0];
+      const cbAcc = await program.account.accountWindowedCircuitBreakerV0.fetch(cb);
+
+      assert.isTrue(PublicKey.default.equals(cbAcc.authority));
+      assert.equal(cbAcc.config.windowSizeSeconds.toNumber(), 11);
     });
   });
 });
