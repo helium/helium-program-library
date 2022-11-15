@@ -40,34 +40,24 @@ export const hotspotIssuerKey = (
     programId
   );
 
-export const hotspotKey = (
-  collection: PublicKey,
+export const hotspotStorageKey = (
   eccCompact: Buffer,
   programId: PublicKey = PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
-    [Buffer.from("hotspot", "utf-8"), collection.toBuffer(), eccCompact],
-    programId
-  );
-
-export const hotspotStorageKey = (
-  hotspot: PublicKey,
-  programId: PublicKey = PROGRAM_ID
-) =>
-  PublicKey.findProgramAddressSync(
-    [Buffer.from("storage", "utf-8"), hotspot.toBuffer()],
+    [Buffer.from("storage", "utf-8"), eccCompact],
     programId
   );
 
 export const collectionMetadataKey = (
   collection: PublicKey,
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = TOKEN_METADATA_PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
     [
       Buffer.from("metadata", "utf-8"),
-      TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+      programId.toBuffer(),
       collection.toBuffer(),
     ],
-    TOKEN_METADATA_PROGRAM_ID
+    programId
   );

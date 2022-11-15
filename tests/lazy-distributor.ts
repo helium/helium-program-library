@@ -1,13 +1,20 @@
-import { createAtaAndMint, sendInstructions } from "@helium/spl-utils";
+import { ThresholdType } from "@helium/circuit-breaker-sdk";
+import {
+  Asset, createAtaAndMint, createMint, createNft, sendInstructions
+} from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
-import { init } from "../packages/lazy-distributor-sdk/src";
+import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
+import {
+  distributeCompressionRewards,
+  init,
+  initializeCompressionRecipient
+} from "../packages/lazy-distributor-sdk/src";
 import { PROGRAM_ID } from "../packages/lazy-distributor-sdk/src/constants";
 import { LazyDistributor } from "../target/types/lazy_distributor";
-import { createMint, createNft } from "@helium/spl-utils";
-import { ThresholdType } from "@helium/circuit-breaker-sdk";
+import { createCompressionNft } from "./utils/compression";
 
 describe("lazy-distributor", () => {
   // Configure the client to use the local cluster.
@@ -65,10 +72,19 @@ describe("lazy-distributor", () => {
   describe("with lazy distributor", () => {
     let mint: PublicKey;
     let lazyDistributor: PublicKey;
+    let asset: PublicKey;
+    let merkle = Keypair.generate();
+    let merkleTree: MerkleTree;
 
     beforeEach(async () => {
       const { mintKey } = await createNft(provider, me);
       mint = mintKey;
+
+      ({ asset, merkleTree } = await createCompressionNft({
+        provider,
+        recipient: me,
+        merkle,
+      }));
 
       const method = await program.methods
         .initializeLazyDistributorV0({
@@ -91,20 +107,24 @@ describe("lazy-distributor", () => {
       await method.rpc({ skipPreflight: true });
       const pubkeys = await method.pubkeys();
       lazyDistributor = pubkeys.lazyDistributor!;
-      await createAtaAndMint(provider, pubkeys.rewardsMint!, 1000000000000, pubkeys.lazyDistributor)
-
+      await createAtaAndMint(
+        provider,
+        pubkeys.rewardsMint!,
+        1000000000000,
+        pubkeys.lazyDistributor
+      );
     });
 
     it("initializes a recipient", async () => {
       const method = await program.methods.initializeRecipientV0().accounts({
         lazyDistributor,
-        mint
+        mint,
       });
       await method.rpc({ skipPreflight: true });
       const recipient = (await method.pubkeys()).recipient!;
       const recipientAcc = await program.account.recipientV0.fetch(recipient);
 
-      expect(recipientAcc?.mint.toBase58()).to.eq(mint.toBase58());
+      expect(recipientAcc?.asset.toBase58()).to.eq(mint.toBase58());
       expect(recipientAcc?.lazyDistributor.toBase58()).to.eq(
         lazyDistributor.toBase58()
       );
@@ -115,14 +135,57 @@ describe("lazy-distributor", () => {
       expect(recipientAcc?.totalRewards.toNumber()).to.eq(0);
     });
 
-    describe("with recipient", () => {
+    it("initializes a recipient from compression", async () => {
+      const proof = merkleTree.getProof(0);
+      const method = await initializeCompressionRecipient({
+        program,
+        assetId: asset,
+        lazyDistributor,
+        getAssetProofFn: async () => {
+          return {
+            root: new PublicKey(proof.root),
+            proof: proof.proof.map((p) => new PublicKey(p)),
+            nodeIndex: 0,
+            leaf: new PublicKey(proof.leaf),
+            treeId: merkle.publicKey,
+          };
+        },
+      });
+      await method.rpc({ skipPreflight: true });
+      const recipient = (await method.pubkeys()).recipient!;
+      const recipientAcc = await program.account.recipientV0.fetch(recipient);
+
+      expect(recipientAcc?.asset.toBase58()).to.eq(asset.toBase58());
+      expect(recipientAcc?.lazyDistributor.toBase58()).to.eq(
+        lazyDistributor.toBase58()
+      );
+      // @ts-ignore
+      expect(recipientAcc?.currentRewards[0]).to.be.null;
+      // @ts-ignore
+      expect(recipientAcc?.currentRewards.length).to.eq(1);
+      expect(recipientAcc?.totalRewards.toNumber()).to.eq(0);
+    });
+
+    describe("with compression recipient", () => {
       let recipient: PublicKey;
       beforeEach(async () => {
-         const method = await program.methods.initializeRecipientV0().accounts({
-           lazyDistributor,
-           mint,
-         });
-         await method.rpc({ skipPreflight: true });
+        const proof = merkleTree.getProof(0);
+        const method = await initializeCompressionRecipient({
+          program,
+          assetId: asset,
+          lazyDistributor,
+          getAssetProofFn: async () => {
+            return {
+              root: new PublicKey(proof.root),
+              proof: proof.proof.map((p) => new PublicKey(p)),
+              nodeIndex: 0,
+              leaf: new PublicKey(proof.leaf),
+              treeId: merkle.publicKey,
+            };
+          },
+        });
+        await method.rpc({ skipPreflight: true });
+
         recipient = (await method.pubkeys()).recipient!;
       });
 
@@ -156,11 +219,110 @@ describe("lazy-distributor", () => {
             recipient,
           })
           .rpc({ skipPreflight: true });
-        const method = await program.methods
-          .distributeRewardsV0()
-          .accounts({ recipient, lazyDistributor, rewardsMint });
+
+        const proof = merkleTree.getProof(0);
+        const getAssetFn = async () => ({ ownership: { owner: me } } as Asset);
+        const getAssetProofFn = async () => {
+          return {
+            root: new PublicKey(proof.root),
+            proof: proof.proof.map((p) => new PublicKey(p)),
+            nodeIndex: 0,
+            leaf: new PublicKey(proof.leaf),
+            treeId: merkle.publicKey,
+          };
+        };
+        const method = await distributeCompressionRewards({
+          program,
+          assetId: asset,
+          lazyDistributor,
+          getAssetFn,
+          getAssetProofFn,
+        });
+
         await method.rpc({ skipPreflight: true });
-        const destination = (await method.pubkeys()).destinationAccount!;
+        const destination = (await method.pubkeys()).common!
+          .destinationAccount!;
+
+        const balance = await provider.connection.getTokenAccountBalance(
+          destination
+        );
+        expect(balance.value.uiAmount).to.eq(5);
+
+        // ensure dist same amount does nothing
+        await program.methods
+          .setCurrentRewardsV0({
+            currentRewards: new anchor.BN("5000000"),
+            oracleIndex: 0,
+          })
+          .accounts({
+            lazyDistributor,
+            recipient,
+          })
+          .rpc({ skipPreflight: true });
+        await (
+          await distributeCompressionRewards({
+            program,
+            assetId: asset,
+            lazyDistributor,
+            getAssetFn,
+            getAssetProofFn,
+          })
+        ).rpc({ skipPreflight: true });
+        const balance2 = await provider.connection.getTokenAccountBalance(
+          destination
+        );
+        expect(balance2.value.uiAmount).to.eq(5);
+      });
+    });
+
+    describe("with recipient", () => {
+      let recipient: PublicKey;
+      beforeEach(async () => {
+        const method = await program.methods.initializeRecipientV0().accounts({
+          lazyDistributor,
+          mint,
+        });
+        await method.rpc({ skipPreflight: true });
+
+        recipient = (await method.pubkeys()).recipient!;
+      });
+
+      it("allows the oracle to set current rewards", async () => {
+        await program.methods
+          .setCurrentRewardsV0({
+            currentRewards: new anchor.BN("5000000"),
+            oracleIndex: 0,
+          })
+          .accounts({
+            lazyDistributor,
+            recipient,
+          })
+          .rpc({ skipPreflight: true });
+        const recipientAcc = await program.account.recipientV0.fetch(recipient);
+        // @ts-ignore
+        expect(recipientAcc?.currentRewards.length).to.eq(1);
+
+        // @ts-ignore
+        expect(recipientAcc?.currentRewards[0].toNumber()).to.eq(5000000);
+      });
+
+      it("allows distributing current rewards", async () => {
+        await program.methods
+          .setCurrentRewardsV0({
+            currentRewards: new anchor.BN("5000000"),
+            oracleIndex: 0,
+          })
+          .accounts({
+            lazyDistributor,
+            recipient,
+          })
+          .rpc({ skipPreflight: true });
+        const method = await program.methods.distributeRewardsV0().accounts({
+          common: { recipient, lazyDistributor, rewardsMint },
+        });
+        await method.rpc({ skipPreflight: true });
+        // @ts-ignore
+        const destination = (await method.pubkeys()).common.destinationAccount!;
 
         const balance = await provider.connection.getTokenAccountBalance(
           destination
@@ -180,7 +342,9 @@ describe("lazy-distributor", () => {
           .rpc({ skipPreflight: true });
         await program.methods
           .distributeRewardsV0()
-          .accounts({ recipient, lazyDistributor, rewardsMint })
+          .accounts({
+            common: { recipient, lazyDistributor, rewardsMint },
+          })
           .rpc({ skipPreflight: true });
         const balance2 = await provider.connection.getTokenAccountBalance(
           destination
@@ -268,10 +432,16 @@ describe("lazy-distributor", () => {
       ).flat();
 
       // Distribute rewards
-      const { instruction: distributeInstruction, pubkeys: { destinationAccount: destination } } = await program.methods
+      const {
+        instruction: distributeInstruction,
+        pubkeys: { common },
+      } = await program.methods
         .distributeRewardsV0()
-        .accounts({ recipient, lazyDistributor, rewardsMint })
+        .accounts({
+          common: { recipient, lazyDistributor, rewardsMint },
+        })
         .prepare();
+      const destination = common?.destinationAccount;
 
       // Run the full set oracle pricing, distribute rewards, all at once
       await sendInstructions(

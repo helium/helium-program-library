@@ -1,5 +1,5 @@
 use crate::error::ErrorCode;
-use crate::state::*;
+use crate::{LazyDistributorV0, RecipientV0};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
@@ -11,7 +11,7 @@ use circuit_breaker::{
 };
 
 #[derive(Accounts)]
-pub struct DistributeRewardsV0<'info> {
+pub struct DistributeRewardsCommonV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
@@ -35,12 +35,6 @@ pub struct DistributeRewardsV0<'info> {
     bump = circuit_breaker.bump_seed
   )]
   pub circuit_breaker: Box<Account<'info, AccountWindowedCircuitBreakerV0>>,
-  #[account(
-    constraint = recipient_mint_account.mint == recipient.mint,
-    constraint = recipient_mint_account.amount > 0,
-    has_one = owner
-  )]
-  pub recipient_mint_account: Box<Account<'info, TokenAccount>>,
   /// CHECK: Just required for ATA
   pub owner: AccountInfo<'info>,
   #[account(
@@ -58,13 +52,13 @@ pub struct DistributeRewardsV0<'info> {
   pub clock: Sysvar<'info, Clock>,
 }
 
-pub fn handler(ctx: Context<DistributeRewardsV0>) -> Result<()> {
+pub fn distribute_impl<'info>(ctx: &mut DistributeRewardsCommonV0<'info>) -> Result<()> {
   let seeds: &[&[&[u8]]] = &[&[
     b"lazy_distributor",
-    ctx.accounts.lazy_distributor.rewards_mint.as_ref(),
-    &[ctx.accounts.lazy_distributor.bump_seed],
+    ctx.lazy_distributor.rewards_mint.as_ref(),
+    &[ctx.lazy_distributor.bump_seed],
   ]];
-  let recipient = &mut ctx.accounts.recipient;
+  let recipient = &mut ctx.recipient;
   let mut filtered: Vec<u64> = recipient
     .current_rewards
     .clone()
@@ -75,7 +69,7 @@ pub fn handler(ctx: Context<DistributeRewardsV0>) -> Result<()> {
   let median_idx = filtered.len() / 2;
   let median = filtered[median_idx];
 
-  recipient.current_rewards = vec![None; ctx.accounts.lazy_distributor.oracles.len()];
+  recipient.current_rewards = vec![None; ctx.lazy_distributor.oracles.len()];
   let to_dist = median
     .checked_sub(recipient.total_rewards)
     .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
@@ -83,14 +77,14 @@ pub fn handler(ctx: Context<DistributeRewardsV0>) -> Result<()> {
 
   transfer_v0(
     CpiContext::new_with_signer(
-      ctx.accounts.token_program.to_account_info().clone(),
+      ctx.token_program.to_account_info().clone(),
       TransferV0 {
-        from: ctx.accounts.rewards_escrow.to_account_info().clone(),
-        to: ctx.accounts.destination_account.to_account_info().clone(),
-        owner: ctx.accounts.lazy_distributor.to_account_info().clone(),
-        circuit_breaker: ctx.accounts.circuit_breaker.to_account_info().clone(),
-        token_program: ctx.accounts.token_program.to_account_info().clone(),
-        clock: ctx.accounts.clock.to_account_info().clone(),
+        from: ctx.rewards_escrow.to_account_info().clone(),
+        to: ctx.destination_account.to_account_info().clone(),
+        owner: ctx.lazy_distributor.to_account_info().clone(),
+        circuit_breaker: ctx.circuit_breaker.to_account_info().clone(),
+        token_program: ctx.token_program.to_account_info().clone(),
+        clock: ctx.clock.to_account_info().clone(),
       },
       seeds,
     ),

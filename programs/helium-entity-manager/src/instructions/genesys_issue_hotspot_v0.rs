@@ -1,19 +1,9 @@
 use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::{
-  associated_token::AssociatedToken,
-  token::{Mint, Token, TokenAccount},
-};
+use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
 use data_credits::HeliumSubDaos;
-use data_credits::{
-  cpi::{
-    accounts::{BurnCommonV0, BurnFromIssuanceV0},
-    burn_from_issuance_v0,
-  },
-  BurnFromIssuanceArgsV0, DataCreditsV0,
-};
 use helium_sub_daos::{
   cpi::{accounts::TrackAddedDeviceV0, track_added_device_v0},
   TrackAddedDeviceArgsV0,
@@ -30,17 +20,16 @@ use mpl_bubblegum::{
 use spl_account_compression::{program::SplAccountCompression, Wrapper};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct IssueHotspotArgsV0 {
+pub struct GenesysIssueHotspotArgsV0 {
   pub ecc_compact: Vec<u8>,
   pub uri: String,
 }
 
 #[derive(Accounts)]
-#[instruction(args: IssueHotspotArgsV0)]
-pub struct IssueHotspotV0<'info> {
+#[instruction(args: GenesysIssueHotspotArgsV0)]
+pub struct GenesysIssueHotspotV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub dc_fee_payer: Signer<'info>,
   pub maker: Signer<'info>,
   /// CHECK: Hotspot nft sent here
   pub hotspot_owner: AccountInfo<'info>,
@@ -64,7 +53,6 @@ pub struct IssueHotspotV0<'info> {
   pub collection_master_edition: UncheckedAccount<'info>,
   #[account(
     has_one = collection,
-    has_one = dc_mint,
     has_one = sub_dao,
     has_one = merkle_tree
   )]
@@ -108,28 +96,6 @@ pub struct IssueHotspotV0<'info> {
   /// CHECK: Used in cpi
   pub bubblegum_signer: UncheckedAccount<'info>,
 
-  /// CHECK: Verified by cpi  
-  #[account(
-    seeds=[
-      "dc".as_bytes(),
-      dc_mint.key().as_ref()
-    ],
-    seeds::program = data_credits_program.key(),
-    bump,
-    has_one = dc_mint
-  )]
-  pub dc: Box<Account<'info, DataCreditsV0>>,
-  #[account(mut)]
-  /// CHECK: Verified by cpi
-  pub dc_mint: AccountInfo<'info>,
-  #[account(
-    init_if_needed,
-    payer = payer,
-    associated_token::mint = dc_mint,
-    associated_token::authority = dc_fee_payer,
-  )]
-  pub dc_burner: Box<Account<'info, TokenAccount>>,
-
   /// CHECK: Verified by cpi    
   #[account(mut)]
   pub sub_dao_epoch_info: AccountInfo<'info>,
@@ -140,21 +106,16 @@ pub struct IssueHotspotV0<'info> {
   /// CHECK: Verified by constraint  
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
-  /// CHECK: Verified by constraint  
-  #[account(address = data_credits::ID)]
-  pub data_credits_program: AccountInfo<'info>,
   pub log_wrapper: Program<'info, Wrapper>,
   pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
   pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
-  pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
-  pub token_program: Program<'info, Token>,
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
 }
 
-impl<'info> IssueHotspotV0<'info> {
+impl<'info> GenesysIssueHotspotV0<'info> {
   fn mint_to_collection_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintToCollectionV1<'info>> {
     let cpi_accounts = MintToCollectionV1 {
       tree_authority: self.tree_authority.to_account_info(),
@@ -176,22 +137,6 @@ impl<'info> IssueHotspotV0<'info> {
     };
     CpiContext::new(self.bubblegum_program.to_account_info(), cpi_accounts)
   }
-  fn burn_dc_ctx(&self) -> CpiContext<'_, '_, '_, 'info, BurnFromIssuanceV0<'info>> {
-    let cpi_accounts = BurnFromIssuanceV0 {
-      burn_accounts: BurnCommonV0 {
-        data_credits: self.dc.to_account_info(),
-        burner: self.dc_burner.to_account_info(),
-        owner: self.dc_fee_payer.to_account_info(),
-        dc_mint: self.dc_mint.to_account_info(),
-        token_program: self.token_program.to_account_info(),
-        associated_token_program: self.associated_token_program.to_account_info(),
-        rent: self.rent.to_account_info(),
-        system_program: self.system_program.to_account_info(),
-      },
-      authority: self.hotspot_config.to_account_info(),
-    };
-    CpiContext::new(self.data_credits_program.to_account_info(), cpi_accounts)
-  }
   fn add_device_ctx(&self) -> CpiContext<'_, '_, '_, 'info, TrackAddedDeviceV0<'info>> {
     let cpi_accounts = TrackAddedDeviceV0 {
       payer: self.payer.to_account_info(),
@@ -206,7 +151,7 @@ impl<'info> IssueHotspotV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<GenesysIssueHotspotV0>, args: GenesysIssueHotspotArgsV0) -> Result<()> {
   let decoded = bs58::encode(args.ecc_compact.clone()).into_string();
   let animal_name: AnimalName = decoded
     .parse()
@@ -218,15 +163,6 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
     ctx.accounts.hotspot_config.symbol.as_bytes(),
     &[ctx.accounts.hotspot_config.bump_seed],
   ]];
-  burn_from_issuance_v0(
-    ctx.accounts.burn_dc_ctx().with_signer(hotspot_config_seeds),
-    BurnFromIssuanceArgsV0 {
-      amount: ctx.accounts.hotspot_config.dc_fee,
-      symbol: ctx.accounts.hotspot_config.symbol.clone(),
-      sub_dao: ctx.accounts.hotspot_config.sub_dao,
-      authority_bump: ctx.accounts.hotspot_config.bump_seed,
-    },
-  )?;
 
   let metadata = MetadataArgs {
     name: animal_name.to_string(),

@@ -10,6 +10,11 @@ use anchor_spl::{
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
 use helium_sub_daos::SubDaoV0;
+use mpl_bubblegum::{
+  cpi::{accounts::CreateTree, create_tree},
+  program::Bubblegum,
+};
+use spl_account_compression::{program::SplAccountCompression, Wrapper};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeHotspotConfigArgsV0 {
@@ -75,11 +80,27 @@ pub struct InitializeHotspotConfigV0<'info> {
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
   pub dc_mint: Box<Account<'info, Mint>>,
 
+  #[account(
+    mut,
+    seeds = [merkle_tree.key().as_ref()],
+    bump,
+    seeds::program = bubblegum_program.key()
+  )]
+  /// CHECK: Checked by cpi
+  pub tree_authority: AccountInfo<'info>,
+
+  /// CHECK: Checked by cpi
+  #[account(mut)]
+  pub merkle_tree: Signer<'info>,
+
   /// CHECK: Checked with constraints
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
+  pub log_wrapper: Program<'info, Wrapper>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
+  pub bubblegum_program: Program<'info, Bubblegum>,
+  pub compression_program: Program<'info, SplAccountCompression>,
   pub token_program: Program<'info, Token>,
   pub rent: Sysvar<'info, Rent>,
 }
@@ -159,6 +180,25 @@ pub fn handler(
     },
   )?;
 
+  create_tree(
+    CpiContext::new_with_signer(
+      ctx.accounts.bubblegum_program.to_account_info().clone(),
+      CreateTree {
+        tree_authority: ctx.accounts.tree_authority.to_account_info().clone(),
+        merkle_tree: ctx.accounts.merkle_tree.to_account_info().clone(),
+        payer: ctx.accounts.payer.to_account_info().clone(),
+        tree_creator: ctx.accounts.hotspot_config.to_account_info().clone(),
+        log_wrapper: ctx.accounts.log_wrapper.to_account_info().clone(),
+        compression_program: ctx.accounts.compression_program.to_account_info().clone(),
+        system_program: ctx.accounts.system_program.to_account_info().clone(),
+      },
+      signer_seeds,
+    ),
+    26,
+    1024,
+    None,
+  )?;
+
   ctx.accounts.hotspot_config.set_inner(HotspotConfigV0 {
     dc_fee: args.dc_fee,
     sub_dao: ctx.accounts.sub_dao.key(),
@@ -169,6 +209,7 @@ pub fn handler(
     authority: args.onboarding_server,
     bump_seed: ctx.bumps["hotspot_config"],
     collection_bump_seed: ctx.bumps["collection"],
+    merkle_tree: ctx.accounts.merkle_tree.key(),
   });
 
   Ok(())

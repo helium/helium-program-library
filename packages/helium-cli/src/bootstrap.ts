@@ -29,12 +29,14 @@ import {
   Keypair,
   PublicKey,
   ComputeBudgetProgram,
+  SystemProgram,
 } from "@solana/web3.js";
 import { BN } from "bn.js";
 import fs from "fs";
 import fetch from "node-fetch";
 import os from "os";
 import yargs from "yargs/yargs";
+import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
 
 
 type Hotspot = {
@@ -295,6 +297,9 @@ async function run() {
   if (!(await provider.connection.getAccountInfo(hsConfigKey))) {
     console.log("Initalizing `MOBILE` HotspotConfig");
 
+    const merkle = Keypair.generate()
+    const space = getConcurrentMerkleTreeAccountSize(26, 1024);
+
     await hemProgram.methods
       .initializeHotspotConfigV0({
         name: "Mobile Hotspot Collection",
@@ -303,7 +308,23 @@ async function run() {
         dcFee: toBN(5, 0),
         onboardingServer: onboardingServerKeypair.publicKey,
       })
-      .accounts({ dcMint: dcKeypair.publicKey, subDao: mobileSubdao })
+      .preInstructions([
+        SystemProgram.createAccount({
+          fromPubkey: provider.wallet.publicKey,
+          newAccountPubkey: merkle.publicKey,
+          lamports: await provider.connection.getMinimumBalanceForRentExemption(
+            space
+          ),
+          space: space,
+          programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+        }),
+      ])
+      .accounts({
+        merkleTree: merkle.publicKey,
+        dcMint: dcKeypair.publicKey,
+        subDao: mobileSubdao,
+      })
+      .signers([merkle])
       .rpc({ skipPreflight: true });
   }
 
@@ -342,7 +363,7 @@ async function run() {
           maker: makerKeypair.publicKey,
         })
         .signers([makerKeypair]);
-      const key = (await create.pubkeys()).hotspot!;
+      const key = (await create.pubkeys()).storage!;
       if (!(await exists(conn, key))) {
         console.log("Creating hotspot", index);
         await create.rpc({ skipPreflight: true });

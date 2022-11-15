@@ -10,6 +10,7 @@ pub struct HotspotConfigV0 {
   pub authority: Pubkey,
   pub symbol: String,
   pub sub_dao: Pubkey,
+  pub merkle_tree: Pubkey,
 
   pub bump_seed: u8,
   pub collection_bump_seed: u8,
@@ -31,7 +32,6 @@ pub struct HotspotIssuerV0 {
 pub struct HotspotStorageV0 {
   pub ecc_compact: Vec<u8>,
   pub location: Option<String>,
-  pub authority: Pubkey,
 
   pub bump_seed: u8,
 }

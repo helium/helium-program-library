@@ -1,22 +1,25 @@
-import { execute, toBN } from "@helium/spl-utils";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
-import * as anchor from "@project-serum/anchor";
-import { Program } from "@project-serum/anchor";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
-import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
-import { expect } from "chai";
 import {
   init as initDataCredits
 } from "@helium/data-credits-sdk";
 import {
   init as initHeliumSubDaos
 } from "@helium/helium-sub-daos-sdk";
-import { hotspotCollectionKey, hotspotKey, init as initHeliumEntityManager } from "../packages/helium-entity-manager-sdk/src";
+import { toBN } from "@helium/spl-utils";
+import * as anchor from "@project-serum/anchor";
+import { Program } from "@project-serum/anchor";
+import {
+  ComputeBudgetProgram,
+  Keypair,
+  PublicKey
+} from "@solana/web3.js";
+import { expect } from "chai";
+import { init as initHeliumEntityManager } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
-import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
-import { DC_FEE, ensureDCIdl, initTestHotspotConfig, initTestHotspotIssuer, initWorld } from "./utils/fixtures";
+import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestDao, initTestSubdao } from "./utils/daos";
+import { DC_FEE, ensureDCIdl, initTestHotspotConfig, initTestHotspotIssuer, initWorld } from "./utils/fixtures";
 
 describe("helium-entity-manager", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -130,35 +133,27 @@ describe("helium-entity-manager", () => {
     it("issues a hotspot", async () => {
       const ecc = await (await HeliumKeypair.makeRandom()).address.publicKey;
       const hotspotOwner = Keypair.generate().publicKey;
-      const issuer = await hsProgram.account.hotspotIssuerV0.fetch(hotspotIssuer);
-      const config = await hsProgram.account.hotspotConfigV0.fetch(issuer.hotspotConfig);
-
-      const [keyShouldBe] = hotspotKey(config.collection, Buffer.from(ecc));
-      console.log("Key sshould be", keyShouldBe.toBase58());
 
       const method = await hsProgram.methods
-        .issueHotspotV0({ eccCompact: Buffer.from(ecc), uri: '' })
+        .issueHotspotV0({ eccCompact: Buffer.from(ecc), uri: "" })
         .accounts({
           hotspotIssuer,
           hotspotOwner,
           maker: makerKeypair.publicKey,
         })
         .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 })
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ])
         .signers([makerKeypair]);
 
-      const { hotspot } = await method.pubkeys();
-      await method.rpc({ skipPreflight: true });
+      await method.rpc();
 
-      const ata = await getAssociatedTokenAddress(hotspot!, hotspotOwner);
-      const ataBal = await provider.connection.getTokenAccountBalance(ata);
       const issuerAccount = await hsProgram.account.hotspotIssuerV0.fetch(
         hotspotIssuer
       );
 
-      expect(ataBal.value.uiAmount).eq(1);
       expect(issuerAccount.count.toNumber()).eq(1);
     });
   });
 });
+

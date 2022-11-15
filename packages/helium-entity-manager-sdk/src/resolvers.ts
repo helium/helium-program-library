@@ -1,12 +1,11 @@
-import { PublicKey } from "@solana/web3.js";
+import { subDaoEpochInfoResolver } from "@helium/helium-sub-daos-sdk";
 import {
   ataResolver,
   combineResolvers,
-  resolveIndividual,
+  resolveIndividual
 } from "@helium/spl-utils";
-import { PROGRAM_ID } from "./constants";
-import { subDaoEpochInfoResolver } from "@helium/helium-sub-daos-sdk";
-import { hotspotKey } from "./pdas";
+import { PublicKey } from "@solana/web3.js";
+import { hotspotStorageKey } from "./pdas";
 
 export const heliumEntityManagerResolvers = combineResolvers(
   resolveIndividual(async ({ path }) => {
@@ -17,6 +16,12 @@ export const heliumEntityManagerResolvers = combineResolvers(
         return new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
       case "heliumSubDaosProgram":
         return new PublicKey("hdaojPkgSD8bciDc1w2Z4kXFFibCXngJiw2GRpEL7Wf");
+      case "bubblegumProgram":
+        return new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY");
+      case "compressionProgram":
+        return new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK");
+      case "logWrapper":
+        return new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
       default:
         return;
     }
@@ -27,11 +32,14 @@ export const heliumEntityManagerResolvers = combineResolvers(
     mint: "collection",
     owner: "hotspotConfig",
   }),
-  resolveIndividual(async ({ path, args, accounts }) => {
-    if (path[path.length - 1] === "hotspot" && accounts.collection) {
-      return (
-        hotspotKey(accounts.collection as PublicKey, args[args.length - 1].eccCompact)
+  resolveIndividual(async ({ path, args, provider }) => {
+    if (path[path.length - 1] === "storage") {
+      return hotspotStorageKey(
+        args[args.length - 1].eccCompact
       )[0];
+    } else if (path[path.length - 1] === "recipient") {
+      // @ts-ignore
+      return provider.wallet?.publicKey;
     }
   }),
   ataResolver({

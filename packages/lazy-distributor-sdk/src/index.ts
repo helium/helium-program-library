@@ -4,6 +4,9 @@ import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { lazyDistributorResolvers } from "./resolvers";
 
+export { distributeCompressionRewards } from "./functions/distributeCompressionRewards";
+export { initializeCompressionRecipient } from "./functions/initializeCompressionRecipient";
+
 export async function init(
   provider: AnchorProvider,
   programId: PublicKey = PROGRAM_ID,
