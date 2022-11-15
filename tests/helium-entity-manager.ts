@@ -74,7 +74,7 @@ describe("helium-entity-manager", () => {
     );
 
     expect(account.authority.toBase58()).eq(
-      onboardingServerKeypair.publicKey.toBase58()
+      provider.wallet.publicKey.toBase58()
     );
     expect(account.collection.toBase58()).eq(collection.toBase58());
     expect(account.dcFee.toString()).eq(toBN(DC_FEE, 8).toString());
@@ -171,8 +171,7 @@ describe("helium-entity-manager", () => {
         onboardingServer: PublicKey.default,
       }).accounts({
         hotspotConfig,
-        authority: onboardingServerKeypair.publicKey,
-      }).signers([onboardingServerKeypair]).rpc();
+      }).rpc();
 
       const acc = await hsProgram.account.hotspotConfigV0.fetch(hotspotConfig);
       assert.isTrue(PublicKey.default.equals(acc.authority));

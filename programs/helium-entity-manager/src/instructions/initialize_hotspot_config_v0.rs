@@ -166,7 +166,7 @@ pub fn handler(
     collection: ctx.accounts.collection.key(),
     dc_mint: ctx.accounts.dc_mint.key(),
     onboarding_server: args.onboarding_server,
-    authority: args.onboarding_server,
+    authority: ctx.accounts.authority.key(),
     bump_seed: ctx.bumps["hotspot_config"],
     collection_bump_seed: ctx.bumps["collection"],
   });
