@@ -30,7 +30,12 @@ wallet = "~/.config/solana/id.json"
 test = "yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 tests/**/*.ts"
 build-deps = "anchor run build-metadata"
 build-metadata = "cd deps/metaplex-program-library/token-metadata/program && pwd && cargo build-bpf && cd ../../../../"
+build-vsr = "pushd deps/helium-voter-stake-registry && pwd && anchor build && popd"
 
 [[test.genesis]]
 address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 program = "./deps/metaplex-program-library/token-metadata/target/deploy/mpl_token_metadata.so"
+
+[[test.genesis]]
+address = "vsrZ1Nfkxmt1hVaB7ftvcj7XpRoQ1YtCgPLajeaV6Uj"
+program = "deps/helium-voter-stake-registry/target/deploy/voter_stake_registry.so"
