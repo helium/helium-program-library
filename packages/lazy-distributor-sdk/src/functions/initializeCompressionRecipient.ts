@@ -17,9 +17,11 @@ export async function initializeCompressionRecipient({
   assetId: PublicKey;
   lazyDistributor: PublicKey;
   owner?: PublicKey;
-  getAssetProofFn?: (assetId: PublicKey) => Promise<AssetProof | undefined>;
+  getAssetProofFn?: (url: string, assetId: PublicKey) => Promise<AssetProof | undefined>;
 }) {
-  const asset = await getAssetProofFn(assetId);
+  // @ts-ignore
+  const endpoint = program.provider.connection._rpcEndpoint;
+  const asset = await getAssetProofFn(endpoint, assetId);
   if (!asset) {
     throw new Error("No asset with ID " + assetId.toBase58());
   }

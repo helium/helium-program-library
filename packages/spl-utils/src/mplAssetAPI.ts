@@ -26,9 +26,9 @@ export type Asset = {
   }
 }
 
-export async function getAsset(assetId: PublicKey): Promise<Asset | undefined> {
+export async function getAsset(url: string, assetId: PublicKey): Promise<Asset | undefined> {
   try {
-    const response = await axios.post("get_asset", {
+    const response = await axios.post(url + "/get_asset", {
       jsonrpc: "2.0",
       method: "get_asset",
       id: "rpd-op-123",
@@ -59,10 +59,11 @@ export async function getAsset(assetId: PublicKey): Promise<Asset | undefined> {
 }
 
 export async function getAssetProof(
+  url: string,
   assetId: PublicKey
 ): Promise<AssetProof | undefined> {
   try {
-    const response = await axios.post("get_asset", {
+    const response = await axios.post(url + "/get_asset_proof", {
       jsonrpc: "2.0",
       method: "get_asset",
       id: "rpd-op-123",

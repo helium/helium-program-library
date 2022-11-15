@@ -46,7 +46,7 @@ export class DatabaseMock implements Database {
 
   constructor(
     readonly issuanceProgram: Program<HeliumEntityManager>,
-    readonly getAssetFn: (asset: PublicKey) => Promise<Asset | undefined> = getAsset
+    readonly getAssetFn: (url: string, asset: PublicKey) => Promise<Asset | undefined> = getAsset
   ) {
     this.inMemHash = {
       totalClicks: 0,
@@ -63,7 +63,8 @@ export class DatabaseMock implements Database {
   };
 
   async getCurrentRewards(assetId: PublicKey) {
-    const asset = await this.getAssetFn(assetId);
+    // @ts-ignore
+    const asset = await this.getAssetFn(this.issuanceProgram.provider.connection._rpcEndpoint, assetId);
     if (!asset) {
       console.error("No asset found", assetId.toBase58())
       return "0"

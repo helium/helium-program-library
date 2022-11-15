@@ -14,14 +14,16 @@ export async function distributeCompressionRewards<IDL extends Idl>({
   assetId: PublicKey;
   lazyDistributor: PublicKey;
   owner?: PublicKey;
-  getAssetFn?: (assetId: PublicKey) => Promise<Asset | undefined>;
-  getAssetProofFn?: (assetId: PublicKey) => Promise<AssetProof | undefined>;
+  getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
+  getAssetProofFn?: (url: string, assetId: PublicKey) => Promise<AssetProof | undefined>;
 }) {
-  const asset = await getAssetFn(assetId);
+  // @ts-ignore
+  const endpoint = program.provider.connection._rpcEndpoint;
+  const asset = await getAssetFn(endpoint, assetId);
   if (!asset) {
     throw new Error("No asset with ID " + assetId.toBase58());
   }
-  const assetProof = await getAssetProofFn(assetId);
+  const assetProof = await getAssetProofFn(endpoint, assetId);
   if (!assetProof) {
     throw new Error("No asset proof with ID " + assetId.toBase58());
   }

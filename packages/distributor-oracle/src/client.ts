@@ -58,10 +58,11 @@ export async function formTransaction({
   lazyDistributor: PublicKey;
   wallet?: PublicKey;
   skipOracleSign?: boolean;
-  getAssetFn?: (assetId: PublicKey) => Promise<Asset | undefined>;
-  getAssetProofFn?: (assetId: PublicKey) => Promise<AssetProof | undefined>;
+  getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
+  getAssetProofFn?: (url: string, assetId: PublicKey) => Promise<AssetProof | undefined>;
 }) {
-  const asset = await getAssetFn(hotspot);
+  // @ts-ignore
+  const asset = await getAssetFn(provider.connection._rpcEndpoint, hotspot);
   if (!asset) {
     throw new Error("No asset with ID " + hotspot.toBase58());
   }
