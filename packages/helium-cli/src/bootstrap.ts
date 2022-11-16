@@ -1,42 +1,38 @@
+import Address from "@helium/address";
 import {
   thresholdPercent,
   ThresholdType
 } from "@helium/circuit-breaker-sdk";
-import Address from "@helium/address";
 import {
   dataCreditsKey,
   init as initDc
 } from "@helium/data-credits-sdk";
+import { hotspotConfigKey, hotspotIssuerKey, init as initHem } from "@helium/helium-entity-manager-sdk";
 import {
   daoKey,
   init as initDao,
   subDaoKey
 } from "@helium/helium-sub-daos-sdk";
-import {
-  hotspotCollectionKey, hotspotConfigKey, hotspotIssuerKey, init as initHem
-} from "@helium/helium-entity-manager-sdk";
-import { lazyDistributorKey, init as initLazy } from "@helium/lazy-distributor-sdk";
-import { createAtaAndMintInstructions, createAtaAndMint, createMintInstructions, createNft, sendInstructions, toBN } from "@helium/spl-utils";
+import { init as initLazy, lazyDistributorKey } from "@helium/lazy-distributor-sdk";
+import { createAtaAndMintInstructions, createMintInstructions, sendInstructions, toBN } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";
 import {
   createCreateMetadataAccountV3Instruction,
   PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
+import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
-  Connection,
+  ComputeBudgetProgram, Connection,
   Keypair,
-  PublicKey,
-  ComputeBudgetProgram,
-  SystemProgram,
+  PublicKey, SystemProgram
 } from "@solana/web3.js";
 import { BN } from "bn.js";
 import fs from "fs";
 import fetch from "node-fetch";
 import os from "os";
 import yargs from "yargs/yargs";
-import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
 
 
 type Hotspot = {
@@ -352,7 +348,6 @@ async function run() {
       const create = await hemProgram.methods
         .issueHotspotV0({
           eccCompact: Buffer.from(Address.fromB58(hotspot.eccKey).publicKey),
-          uri: hotspot.uri,
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),

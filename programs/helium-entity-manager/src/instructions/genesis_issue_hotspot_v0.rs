@@ -1,18 +1,10 @@
 use crate::error::ErrorCode;
 use crate::state::*;
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*};
 use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
-use data_credits::HeliumSubDaos;
-use helium_sub_daos::{
-  cpi::{accounts::TrackAddedDeviceV0, track_added_device_v0},
-  TrackAddedDeviceArgsV0,
-};
 use mpl_bubblegum::state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion};
-use mpl_bubblegum::state::{
-  metaplex_adapter::{Creator, TokenStandard},
-  TreeConfig,
-};
+use mpl_bubblegum::state::metaplex_adapter::{TokenStandard};
 use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
   program::Bubblegum,
@@ -20,54 +12,34 @@ use mpl_bubblegum::{
 use spl_account_compression::{program::SplAccountCompression, Wrapper};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct GenesysIssueHotspotArgsV0 {
+pub struct GenesisIssueHotspotArgsV0 {
   pub ecc_compact: Vec<u8>,
-  pub uri: String,
 }
 
 #[derive(Accounts)]
-#[instruction(args: GenesysIssueHotspotArgsV0)]
-pub struct GenesysIssueHotspotV0<'info> {
-  #[account(mut)]
-  pub payer: Signer<'info>,
-  pub maker: Signer<'info>,
-  /// CHECK: Hotspot nft sent here
-  pub hotspot_owner: AccountInfo<'info>,
-  #[account(mut)]
+#[instruction(args: GenesisIssueHotspotArgsV0)]
+pub struct GenesisIssueHotspotV0<'info> {
+  #[account(
+    mut,
+    seeds = [b"lazy_signer", b"helium"],
+    seeds::program = lazy_transactions::ID,
+    bump,
+  )]
+  pub lazy_signer: Signer<'info>,
   pub collection: Box<Account<'info, Mint>>,
   /// CHECK: Handled by cpi
-  #[account(
-    mut,
-    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), collection.key().as_ref()],
-    seeds::program = token_metadata_program.key(),
-    bump,
-  )]
+  #[account(mut)]
   pub collection_metadata: UncheckedAccount<'info>,
-  /// CHECK: Handled By cpi account
-  #[account(
-    mut,
-    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), collection.key().as_ref(), "edition".as_bytes()],
-    seeds::program = token_metadata_program.key(),
-    bump,
-  )]
+  /// CHECK: Handled by cpi
   pub collection_master_edition: UncheckedAccount<'info>,
   #[account(
     has_one = collection,
-    has_one = sub_dao,
     has_one = merkle_tree
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
   #[account(
-    mut,
-    seeds = ["hotspot_issuer".as_bytes(), hotspot_config.key().as_ref(), maker.key().as_ref()],
-    bump = hotspot_issuer.bump_seed,
-    has_one = hotspot_config,
-    has_one = maker,
-  )]
-  pub hotspot_issuer: Box<Account<'info, HotspotIssuerV0>>,
-  #[account(
     init,
-    payer = payer,
+    payer = lazy_signer,
     space = 8 + 60 + std::mem::size_of::<HotspotStorageV0>(),
     seeds = [
       "storage".as_bytes(),
@@ -76,13 +48,9 @@ pub struct GenesysIssueHotspotV0<'info> {
     bump
   )]
   pub storage: Box<Account<'info, HotspotStorageV0>>,
-  #[account(
-      mut,
-      seeds = [merkle_tree.key().as_ref()],
-      seeds::program = bubblegum_program.key(),
-      bump,
-  )]
-  pub tree_authority: Box<Account<'info, TreeConfig>>,
+  /// CHECK: Handled by cpi
+  #[account(mut)]
+  pub tree_authority: AccountInfo<'info>,
   /// CHECK: Used in cpi
   pub recipient: AccountInfo<'info>,
   /// CHECK: Used in cpi
@@ -96,33 +64,24 @@ pub struct GenesysIssueHotspotV0<'info> {
   /// CHECK: Used in cpi
   pub bubblegum_signer: UncheckedAccount<'info>,
 
-  /// CHECK: Verified by cpi    
-  #[account(mut)]
-  pub sub_dao_epoch_info: AccountInfo<'info>,
-  /// CHECK: Verified by cpi
-  #[account(mut)]
-  pub sub_dao: AccountInfo<'info>,
-
   /// CHECK: Verified by constraint  
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
   pub log_wrapper: Program<'info, Wrapper>,
   pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
-  pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
   pub system_program: Program<'info, System>,
-  pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
 }
 
-impl<'info> GenesysIssueHotspotV0<'info> {
+impl<'info> GenesisIssueHotspotV0<'info> {
   fn mint_to_collection_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintToCollectionV1<'info>> {
     let cpi_accounts = MintToCollectionV1 {
       tree_authority: self.tree_authority.to_account_info(),
       leaf_delegate: self.recipient.to_account_info(),
       leaf_owner: self.recipient.to_account_info(),
       merkle_tree: self.merkle_tree.to_account_info(),
-      payer: self.payer.to_account_info(),
+      payer: self.lazy_signer.to_account_info(),
       tree_delegate: self.hotspot_config.to_account_info(),
       log_wrapper: self.log_wrapper.to_account_info(),
       compression_program: self.compression_program.to_account_info(),
@@ -137,21 +96,9 @@ impl<'info> GenesysIssueHotspotV0<'info> {
     };
     CpiContext::new(self.bubblegum_program.to_account_info(), cpi_accounts)
   }
-  fn add_device_ctx(&self) -> CpiContext<'_, '_, '_, 'info, TrackAddedDeviceV0<'info>> {
-    let cpi_accounts = TrackAddedDeviceV0 {
-      payer: self.payer.to_account_info(),
-      sub_dao_epoch_info: self.sub_dao_epoch_info.to_account_info(),
-      sub_dao: self.sub_dao.to_account_info(),
-      authority: self.hotspot_config.to_account_info(),
-      system_program: self.system_program.to_account_info(),
-      clock: self.clock.to_account_info(),
-      rent: self.rent.to_account_info(),
-    };
-    CpiContext::new(self.helium_sub_daos_program.to_account_info(), cpi_accounts)
-  }
 }
 
-pub fn handler(ctx: Context<GenesysIssueHotspotV0>, args: GenesysIssueHotspotArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArgsV0) -> Result<()> {
   let decoded = bs58::encode(args.ecc_compact.clone()).into_string();
   let animal_name: AnimalName = decoded
     .parse()
@@ -167,7 +114,7 @@ pub fn handler(ctx: Context<GenesysIssueHotspotV0>, args: GenesysIssueHotspotArg
   let metadata = MetadataArgs {
     name: animal_name.to_string(),
     symbol: String::from("HOTSPOT"),
-    uri: args.uri,
+    uri: format!("https://mobile-metadata.test-helium.com/{}", decoded),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
@@ -178,11 +125,7 @@ pub fn handler(ctx: Context<GenesysIssueHotspotV0>, args: GenesysIssueHotspotArg
     token_standard: Some(TokenStandard::NonFungible),
     uses: None,
     token_program_version: TokenProgramVersion::Original,
-    creators: vec![Creator {
-      address: ctx.accounts.hotspot_config.key(),
-      verified: false,
-      share: 100,
-    }],
+    creators: vec![],
     seller_fee_basis_points: 0,
   };
   mint_to_collection_v1(
@@ -192,19 +135,6 @@ pub fn handler(ctx: Context<GenesysIssueHotspotV0>, args: GenesysIssueHotspotArg
       .with_signer(hotspot_config_seeds),
     metadata.clone(),
   )?;
-
-  track_added_device_v0(
-    ctx
-      .accounts
-      .add_device_ctx()
-      .with_signer(hotspot_config_seeds),
-    TrackAddedDeviceArgsV0 {
-      authority_bump: ctx.accounts.hotspot_config.bump_seed,
-      symbol: ctx.accounts.hotspot_config.symbol.clone(),
-    },
-  )?;
-
-  ctx.accounts.hotspot_issuer.count += 1;
 
   ctx.accounts.storage.set_inner(HotspotStorageV0 {
     ecc_compact: args.ecc_compact,

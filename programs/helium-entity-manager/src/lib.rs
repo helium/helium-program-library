@@ -32,10 +32,10 @@ pub mod helium_entity_manager {
     issue_hotspot_v0::handler(ctx, args)
   }
 
-  pub fn genesys_issue_hotspot_v0(
-    ctx: Context<GenesysIssueHotspotV0>,
-    args: GenesysIssueHotspotArgsV0,
+  pub fn genesis_issue_hotspot_v0(
+    ctx: Context<GenesisIssueHotspotV0>,
+    args: GenesisIssueHotspotArgsV0,
   ) -> Result<()> {
-    genesys_issue_hotspot_v0::handler(ctx, args)
+    genesis_issue_hotspot_v0::handler(ctx, args)
   }
 }

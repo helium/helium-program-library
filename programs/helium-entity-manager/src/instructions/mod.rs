@@ -1,9 +1,9 @@
-pub mod genesys_issue_hotspot_v0;
+pub mod genesis_issue_hotspot_v0;
 pub mod initialize_hotspot_config_v0;
 pub mod initialize_hotspot_issuer_v0;
 pub mod issue_hotspot_v0;
 
-pub use genesys_issue_hotspot_v0::*;
+pub use genesis_issue_hotspot_v0::*;
 pub use initialize_hotspot_config_v0::*;
 pub use initialize_hotspot_issuer_v0::*;
 pub use issue_hotspot_v0::*;

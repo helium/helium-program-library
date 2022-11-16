@@ -32,7 +32,6 @@ use spl_account_compression::{program::SplAccountCompression, Wrapper};
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHotspotArgsV0 {
   pub ecc_compact: Vec<u8>,
-  pub uri: String,
 }
 
 #[derive(Accounts)]
@@ -42,9 +41,6 @@ pub struct IssueHotspotV0<'info> {
   pub payer: Signer<'info>,
   pub dc_fee_payer: Signer<'info>,
   pub maker: Signer<'info>,
-  /// CHECK: Hotspot nft sent here
-  pub hotspot_owner: AccountInfo<'info>,
-  #[account(mut)]
   pub collection: Box<Account<'info, Mint>>,
   /// CHECK: Handled by cpi
   #[account(
@@ -56,7 +52,6 @@ pub struct IssueHotspotV0<'info> {
   pub collection_metadata: UncheckedAccount<'info>,
   /// CHECK: Handled By cpi account
   #[account(
-    mut,
     seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), collection.key().as_ref(), "edition".as_bytes()],
     seeds::program = token_metadata_program.key(),
     bump,
@@ -231,7 +226,7 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
   let metadata = MetadataArgs {
     name: animal_name.to_string(),
     symbol: String::from("HOTSPOT"),
-    uri: args.uri,
+    uri: format!("https://mobile-metadata.test-helium.com/{}", decoded),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
@@ -242,11 +237,7 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
     token_standard: Some(TokenStandard::NonFungible),
     uses: None,
     token_program_version: TokenProgramVersion::Original,
-    creators: vec![Creator {
-      address: ctx.accounts.hotspot_config.key(),
-      verified: false,
-      share: 100,
-    }],
+    creators: vec![],
     seller_fee_basis_points: 0,
   };
   mint_to_collection_v1(
