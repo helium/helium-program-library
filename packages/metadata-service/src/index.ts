@@ -1,5 +1,8 @@
 import Address from "@helium/address";
-import { hotspotCollectionKey, hotspotKey } from "@helium/helium-entity-manager-sdk";
+import {
+  hotspotCollectionKey,
+  hotspotStorageKey,
+} from "@helium/helium-entity-manager-sdk";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import {
   Metadata, PROGRAM_ID as MPL_PID
@@ -31,7 +34,7 @@ const [collection] = hotspotCollectionKey(subDao, process.env.COLLECTION_SYMBOL!
 server.get<{ Params: { eccCompact: string } }>("/:eccCompact", async (request, reply) => {
   const { eccCompact } = request.params;
   const bufferCompact = Buffer.from(Address.fromB58(eccCompact).publicKey)
-  const [mint] = await hotspotKey(collection, bufferCompact);
+  const [storage] = await hotspotStorageKey(bufferCompact);
   const metadataKey = PublicKey.findProgramAddressSync(
     [Buffer.from("metadata", "utf-8"), MPL_PID.toBuffer(), mint.toBuffer()],
     MPL_PID

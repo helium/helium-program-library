@@ -226,7 +226,7 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
   let metadata = MetadataArgs {
     name: animal_name.to_string(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("https://mobile-metadata.test-helium.com/{}", decoded),
+    uri: format!("https://mobile-metadata.test-helium.com/11{}", decoded),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
