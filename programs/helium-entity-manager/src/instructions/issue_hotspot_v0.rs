@@ -254,7 +254,7 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
       .accounts
       .mint_to_collection_ctx()
       .with_signer(hotspot_config_seeds),
-    metadata.clone(),
+    metadata,
   )?;
 
   track_added_device_v0(
