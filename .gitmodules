@@ -1,9 +1,6 @@
 [submodule "deps/metaplex-program-library"]
 	path = deps/metaplex-program-library
 	url = https://github.com/metaplex-foundation/metaplex-program-library.git
-[submodule "programs/helium-entity-manager/deps/solana-program-library"]
-	path = programs/helium-entity-manager/deps/solana-program-library
-	url = git@github.com:solana-labs/solana-program-library.git
 [submodule "deps/solana-program-library"]
 	path = deps/solana-program-library
 	url = git@github.com:solana-labs/solana-program-library.git
