@@ -178,6 +178,8 @@ describe("circuit-breaker", () => {
     });
 
     it("updates the breaker", async () => {
+      const cb = mintWindowedBreakerKey(mint)[0];
+
       await program.methods.updateMintWindowedBreakerV0({
         newAuthority: PublicKey.default,
         config: {
@@ -186,10 +188,9 @@ describe("circuit-breaker", () => {
           threshold: thresholdPercent(50),
         }
       }).accounts({
-        mint,
+        circuitBreaker: cb,
       }).rpc();
 
-      const cb = mintWindowedBreakerKey(mint)[0];
       const cbAcc = await program.account.mintWindowedCircuitBreakerV0.fetch(cb);
 
       assert.isTrue(PublicKey.default.equals(cbAcc.authority));
@@ -309,6 +310,7 @@ describe("circuit-breaker", () => {
     });
 
     it("updates the breaker", async () => {
+      const cb = accountWindowedBreakerKey(tokenAccount)[0];
       await program.methods.updateAccountWindowedBreakerV0({
         newAuthority: PublicKey.default,
         config: {
@@ -317,9 +319,9 @@ describe("circuit-breaker", () => {
           threshold: thresholdPercent(50),
         }
       }).accounts({
-        tokenAccount,
+        circuitBreaker: cb,
       }).rpc();
-      const cb = accountWindowedBreakerKey(tokenAccount)[0];
+      
       const cbAcc = await program.account.accountWindowedCircuitBreakerV0.fetch(cb);
 
       assert.isTrue(PublicKey.default.equals(cbAcc.authority));

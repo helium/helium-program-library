@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
 
 use crate::{MintWindowedCircuitBreakerV0, WindowedCircuitBreakerConfigV0};
 
@@ -14,12 +13,11 @@ pub struct UpdateMintWindowedBreakerV0<'info> {
   pub authority: Signer<'info>,
   #[account(
     mut,
-    seeds = ["mint_windowed_breaker".as_bytes(), mint.key().as_ref()],
+    seeds = ["mint_windowed_breaker".as_bytes(), circuit_breaker.mint.key().as_ref()],
     bump,
     has_one = authority,
   )]
   pub circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
-  pub mint: Box<Account<'info, Mint>>,
 }
 
 pub fn handler(

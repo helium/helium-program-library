@@ -206,26 +206,5 @@ describe("data-credits", () => {
 
       assert.isTrue(PublicKey.default.equals(dcAcc.authority));
     });
-
-    it("updates in use data credits", async() => {
-      const { subDao: freshSubDao } = await initTestSubdao(hsdProgram, provider, me, dao);
-      const useData = await program.methods
-        .useDataCreditsV0({
-          amount: toBN(1, 8),
-        })
-        .accounts({
-          subDao: freshSubDao,
-        });
-      const inUseDataCredits = (await useData.pubkeys()).inUseDataCredits!;
-      await useData.rpc();
-      await program.methods.updateInUseDataCreditsV0({
-        newOwner: PublicKey.default,
-      }).accounts({
-        inUseDataCredits,
-      }).rpc();
-
-      const dcAcc = await program.account.inUseDataCreditsV0.fetch(inUseDataCredits);
-      assert.isTrue(PublicKey.default.equals(dcAcc.owner));
-    });
   });
 });
