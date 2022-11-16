@@ -52,7 +52,7 @@ pub struct DistributeRewardsCommonV0<'info> {
   pub clock: Sysvar<'info, Clock>,
 }
 
-pub fn distribute_impl<'info>(ctx: &mut DistributeRewardsCommonV0<'info>) -> Result<()> {
+pub fn distribute_impl(ctx: &mut DistributeRewardsCommonV0) -> Result<()> {
   let seeds: &[&[&[u8]]] = &[&[
     b"lazy_distributor",
     ctx.lazy_distributor.rewards_mint.as_ref(),
