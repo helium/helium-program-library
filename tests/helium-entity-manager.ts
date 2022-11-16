@@ -135,7 +135,7 @@ describe("helium-entity-manager", () => {
       const hotspotOwner = Keypair.generate().publicKey;
 
       const method = await hsProgram.methods
-        .issueHotspotV0({ eccCompact: Buffer.from(ecc), uri: "" })
+        .issueHotspotV0({ eccCompact: Buffer.from(ecc) })
         .accounts({
           hotspotIssuer,
           hotspotOwner,

@@ -352,7 +352,6 @@ async function run() {
       const create = await hemProgram.methods
         .issueHotspotV0({
           eccCompact: Buffer.from(Address.fromB58(hotspot.eccKey).publicKey),
-          uri: hotspot.uri,
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),

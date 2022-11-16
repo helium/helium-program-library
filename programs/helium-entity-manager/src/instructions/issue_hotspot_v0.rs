@@ -32,7 +32,6 @@ use spl_account_compression::{program::SplAccountCompression, Wrapper};
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHotspotArgsV0 {
   pub ecc_compact: Vec<u8>,
-  pub uri: String,
 }
 
 #[derive(Accounts)]
@@ -231,7 +230,7 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
   let metadata = MetadataArgs {
     name: animal_name.to_string(),
     symbol: String::from("HOTSPOT"),
-    uri: args.uri,
+    uri: format!("https://mobile-metadata.test-helium.com/11{}", decoded),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
