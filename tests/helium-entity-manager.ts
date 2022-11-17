@@ -204,6 +204,8 @@ describe("helium-entity-manager", () => {
         }).accounts({
           hotspot,
           hotspotOwner: hotspotOwner.publicKey,
+          hotspotConfig,
+          dcMint,
         }).signers([hotspotOwner]);
         const { storage } = await method.pubkeys();
         await method.rpc();
