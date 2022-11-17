@@ -38,22 +38,4 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     change_metadata_v0::handler(ctx, args)
   }
-
-  pub fn assert_elevation_v0(
-    ctx: Context<AssertElevationV0>,
-    args: AssertElevationArgsV0,
-  ) -> Result<()> {
-    assert_elevation_v0::handler(ctx, args)
-  }
-
-  pub fn assert_gain_v0(ctx: Context<AssertGainV0>, args: AssertGainArgsV0) -> Result<()> {
-    assert_gain_v0::handler(ctx, args)
-  }
-
-  pub fn assert_location_v0(
-    ctx: Context<AssertLocationV0>,
-    args: AssertLocationArgsV0,
-  ) -> Result<()> {
-    assert_location_v0::handler(ctx, args)
-  }
 }

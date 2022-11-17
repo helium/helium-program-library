@@ -321,9 +321,6 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
     location: None,
     elevation: None,
     gain: None,
-    location_asserted: false,
-    elevation_asserted: false,
-    gain_asserted: false,
     authority: ctx.accounts.hotspot.key(),
     is_full_hotspot: args.is_full_hotspot,
 

@@ -15,17 +15,19 @@ use data_credits::{
 use mpl_token_metadata::state::{Metadata, TokenMetadataAccount};
 use std::str::FromStr;
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct AssertLocationArgsV0 {
-  pub location: String,
-}
-
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
 const DC_MINT: &str = "8po3rj3xE1wo5y38zW8gH2ZoTZzqowMAuD1ugBpUKj32";
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct ChangeMetadataArgsV0 {
+  pub location: Option<String>,
+  pub elevation: Option<i32>,
+  pub gain: Option<i32>,
+}
+
 #[derive(Accounts)]
-#[instruction(args: AssertLocationArgsV0)]
-pub struct AssertLocationV0<'info> {
+#[instruction(args: ChangeMetadataArgsV0)]
+pub struct ChangeMetadataV0<'info> {
   pub hotspot: Box<Account<'info, Mint>>,
   #[account(
     mut,
@@ -63,6 +65,7 @@ pub struct AssertLocationV0<'info> {
   #[account(
     seeds = ["hotspot_config".as_bytes(), hotspot_config.sub_dao.as_ref(), hotspot_config.symbol.as_bytes()],
     bump,
+    constraint = args.gain.is_none() || (args.gain.unwrap() <= hotspot_config.max_gain && args.gain.unwrap() >= hotspot_config.min_gain) @ ErrorCode::InvalidGain
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
 
@@ -95,7 +98,7 @@ pub struct AssertLocationV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-impl<'info> AssertLocationV0<'info> {
+impl<'info> ChangeMetadataV0<'info> {
   pub fn burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, BurnWithoutTrackingV0<'info>> {
     let cpi_accounts = BurnWithoutTrackingV0 {
       burn_accounts: BurnCommonV0 {
@@ -114,7 +117,7 @@ impl<'info> AssertLocationV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<AssertLocationV0>, args: AssertLocationArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<ChangeMetadataV0>, args: ChangeMetadataArgsV0) -> Result<()> {
   let metadata: Metadata =
     Metadata::from_account_info(&ctx.accounts.hotspot_metadata.to_account_info())?;
   require!(
@@ -122,19 +125,24 @@ pub fn handler(ctx: Context<AssertLocationV0>, args: AssertLocationArgsV0) -> Re
     ErrorCode::InvalidHotspotCollection
   );
 
-  let mut dc_fee: u64 = ctx.accounts.hotspot_config.dataonly_location_staking_fee;
-  if ctx.accounts.storage.is_full_hotspot {
-    dc_fee = ctx.accounts.hotspot_config.full_location_staking_fee;
+  if args.location.is_some() {
+    let mut dc_fee: u64 = ctx.accounts.hotspot_config.dataonly_location_staking_fee;
+    if ctx.accounts.storage.is_full_hotspot {
+      dc_fee = ctx.accounts.hotspot_config.full_location_staking_fee;
+    }
+
+    // burn the dc tokens
+    burn_without_tracking_v0(
+      ctx.accounts.burn_ctx(),
+      BurnWithoutTrackingArgsV0 { amount: dc_fee },
+    )?;
+    ctx.accounts.storage.location = args.location;
   }
-
-  // burn the dc tokens
-  burn_without_tracking_v0(
-    ctx.accounts.burn_ctx(),
-    BurnWithoutTrackingArgsV0 { amount: dc_fee },
-  )?;
-
-  let storage = &mut ctx.accounts.storage;
-  storage.location = Some(args.location);
-  storage.location_asserted = true;
+  if args.elevation.is_some() {
+    ctx.accounts.storage.elevation = args.elevation;
+  }
+  if args.gain.is_some() {
+    ctx.accounts.storage.gain = args.gain;
+  }
   Ok(())
 }

@@ -42,7 +42,7 @@ export const heliumEntityManagerResolvers = combineResolvers(
     owner: "dcFeePayer",
   }),
   ataResolver({
-    instruction: "assertLocationV0",
+    instruction: "changeMetadataV0",
     account: "ownerDcAta",
     mint: "dcMint",
     owner: "hotspotOwner",

@@ -195,102 +195,44 @@ describe("helium-entity-manager", () => {
 
       it("changes the metadata", async() => {
         const location = 'abc';
+        const elevation = 100;
+        const gain = 100;
         const method = hsProgram.methods.changeMetadataV0({
           location,
-          elevation: null,
-          gain: null,
-        }).accounts({
-          hotspot,
-          hotspotOwner: hotspotOwner.publicKey,
-        }).signers([hotspotOwner]);
-        const { storage } = await method.pubkeys();
-        await method.rpc();
-
-        const storageAcc = await hsProgram.account.hotspotStorageV0.fetch(storage!);
-        assert.isFalse(storageAcc.elevationAsserted);
-        assert.isFalse(storageAcc.gainAsserted);
-        assert.isFalse(storageAcc.locationAsserted);
-        assert.equal(storageAcc.location, location);
-        assert.equal(storageAcc.elevation, null);
-        assert.equal(storageAcc.gain, null);
-      });
-
-      it("asserts location", async() => {
-        const dcAta = await getAssociatedTokenAddress(dcMint!, hotspotOwner.publicKey);
-        const beforeBal = await provider.connection.getTokenAccountBalance(dcAta);
-
-        const location = 'abcdef';
-        const method = hsProgram.methods.assertLocationV0({
-          location,
-        }).accounts({
-          hotspot,
-          hotspotOwner: hotspotOwner.publicKey,
-          hotspotConfig,
-          dcMint,
-        }).signers([hotspotOwner]);
-        const { storage } = await method.pubkeys();
-        await method.rpc();
-
-        const storageAcc = await hsProgram.account.hotspotStorageV0.fetch(storage!);
-
-        const afterBal = await provider.connection.getTokenAccountBalance(dcAta);
-        assert.isTrue(storageAcc.locationAsserted);
-        assert.equal(storageAcc.location, location);
-        assert.equal(beforeBal.value.uiAmount! - afterBal.value.uiAmount!, 1000000);
-      });
-
-      it("asserts elevation", async() => {
-        const elevation = 110;
-        const method = hsProgram.methods.assertElevationV0({
           elevation,
-        }).accounts({
-          hotspot,
-          hotspotOwner: hotspotOwner.publicKey,
-        }).signers([hotspotOwner]);
-        const { storage } = await method.pubkeys();
-        await method.rpc();
-
-        const storageAcc = await hsProgram.account.hotspotStorageV0.fetch(storage!);
-
-        assert.isTrue(storageAcc.elevationAsserted);
-        assert.equal(storageAcc.elevation, elevation);
-      });
-
-      it("asserts gain", async() => {
-        const gain = 140;
-        const method = hsProgram.methods.assertGainV0({
           gain,
         }).accounts({
           hotspot,
           hotspotOwner: hotspotOwner.publicKey,
-          hotspotConfig,
         }).signers([hotspotOwner]);
         const { storage } = await method.pubkeys();
         await method.rpc();
 
         const storageAcc = await hsProgram.account.hotspotStorageV0.fetch(storage!);
-
-        assert.isTrue(storageAcc.gainAsserted);
+        assert.equal(storageAcc.location, location);
+        assert.equal(storageAcc.elevation, elevation);
         assert.equal(storageAcc.gain, gain);
       });
 
       it("doesn't assert gain outside range", async() => {
-        const method = hsProgram.methods.assertGainV0({
+        const method = hsProgram.methods.changeMetadataV0({
+          location: null,
+          elevation: null,
           gain: 1,
         }).accounts({
           hotspot,
           hotspotOwner: hotspotOwner.publicKey,
-          hotspotConfig,
         }).signers([hotspotOwner]);
 
         expect(method.rpc()).to.be.rejected;
 
-        const method2 = hsProgram.methods.assertGainV0({
+        const method2 = hsProgram.methods.changeMetadataV0({
+          location: null,
+          elevation: null,
           gain: 1000,
         }).accounts({
           hotspot,
           hotspotOwner: hotspotOwner.publicKey,
-          hotspotConfig,
         }).signers([hotspotOwner]);
 
         expect(method2.rpc()).to.be.rejected

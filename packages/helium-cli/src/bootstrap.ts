@@ -188,6 +188,7 @@ async function run() {
     provider,
     mintKeypair: dcKeypair,
     amount: argv.numDc,
+    decimals: 0,
     metadataUrl: `${argv.bucket}/dc.json`,
   });
 

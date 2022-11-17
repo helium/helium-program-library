@@ -41,8 +41,5 @@ pub struct HotspotStorageV0 {
   pub location: Option<String>,
   pub elevation: Option<i32>,
   pub gain: Option<i32>,
-  pub location_asserted: bool,
-  pub elevation_asserted: bool,
-  pub gain_asserted: bool,
   pub is_full_hotspot: bool,
 }
