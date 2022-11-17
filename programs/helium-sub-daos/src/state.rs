@@ -98,9 +98,10 @@ pub struct SubDaoEpochInfoV0 {
 #[derive(Default)]
 pub struct SubDaoV0 {
   pub dao: Pubkey,
-  pub dnt_mint: Pubkey,       // The mint of the subdao token
-  pub treasury: Pubkey,       // The treasury of HNT
-  pub rewards_escrow: Pubkey, // The escrow account for DNT rewards
+  pub dnt_mint: Pubkey,       // Mint of the subdao token
+  pub treasury: Pubkey,       // Treasury of HNT
+  pub rewards_escrow: Pubkey, // Escrow account for DNT rewards
+  pub staker_pool: Pubkey,    // Pool of DNT tokens which veHNT stakers can claim from
   pub vehnt_staked: u64,
   pub vehnt_last_calculated_ts: i64,
   pub vehnt_fall_rate: u64,

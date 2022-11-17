@@ -1,4 +1,4 @@
-use crate::{current_epoch, error::ErrorCode, state::*, OrArithError};
+use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError};
 use anchor_lang::prelude::*;
 use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
 
@@ -69,6 +69,8 @@ pub fn handler(
   // D = max(1, sqrt(DCs burned in USD)). 1 DC = $0.00001.
   // A = max(1, fourth_root(Total active device count * device activation fee)).
   let epoch_info = &mut ctx.accounts.sub_dao_epoch_info;
+  let sub_dao = &mut ctx.accounts.sub_dao;
+  update_subdao_vehnt(sub_dao, ctx.accounts.clock.unix_timestamp);
   let dc_burned = PreciseNumber::new(epoch_info.dc_burned.into())
     .or_arith_error()?
     .checked_div(&PreciseNumber::new(10000000000000_u128).or_arith_error()?) // DC has 8 decimals, plus 10^5 to get to dollars.
@@ -99,6 +101,11 @@ pub fn handler(
     one.clone()
   };
 
+  let v = std::cmp::max(
+    one.clone(),
+    PreciseNumber::new(sub_dao.vehnt_staked.into()).or_arith_error()?,
+  );
+
   let a = if epoch_info.total_devices > 0 {
     std::cmp::max(
       one,
@@ -114,7 +121,11 @@ pub fn handler(
     one
   };
 
-  let utility_score_prec = d.checked_mul(&a).or_arith_error()?;
+  let utility_score_prec = d
+    .checked_mul(&a)
+    .or_arith_error()?
+    .checked_mul(&v)
+    .or_arith_error()?;
   // Convert to u128 with 12 decimals of precision
   let utility_score = utility_score_prec
     .checked_mul(
