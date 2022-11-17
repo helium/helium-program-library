@@ -67,11 +67,27 @@ pub struct DaoEpochInfoV0 {
 
 #[account]
 #[derive(Default)]
+pub struct Staker {
+  pub positions: Vec<StakePosition>,
+}
+
+#[account]
+#[derive(Default)]
+pub struct StakePosition {
+  pub hnt_amount: u64,
+  pub deposit_entry_idx: u8, // the deposit_entry in vsr that this position is drawing from
+  pub sub_dao: Pubkey,       // the subdao the vehnt is staked to
+  pub last_claimed_epoch: u64, // the epoch number that the dnt rewards were last claimed at
+}
+
+#[account]
+#[derive(Default)]
 pub struct SubDaoEpochInfoV0 {
   pub epoch: u64,
   pub sub_dao: Pubkey,
   pub total_devices: u64,
   pub dc_burned: u64,
+  pub total_vehnt: u64,
   /// Precise number with 12 decimals
   pub utility_score: Option<u128>,
   pub rewards_issued: bool,
@@ -83,8 +99,11 @@ pub struct SubDaoEpochInfoV0 {
 pub struct SubDaoV0 {
   pub dao: Pubkey,
   pub dnt_mint: Pubkey,       // The mint of the subdao token
-  pub treasury: Pubkey,       // The treasury for rewards
+  pub treasury: Pubkey,       // The treasury of HNT
   pub rewards_escrow: Pubkey, // The escrow account for DNT rewards
+  pub vehnt_staked: u64,
+  pub vehnt_last_calculated_ts: i64,
+  pub vehnt_fall_rate: u64,
   pub authority: Pubkey,
   pub total_devices: u64,
   pub emission_schedule: Vec<EmissionScheduleItem>,

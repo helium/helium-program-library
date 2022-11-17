@@ -22,6 +22,7 @@ overflow-checks = true
 anchor-lang = { version = "0.24.2", features = ["init-if-needed"] }
 anchor-spl = "0.24.2"
 mpl-token-metadata = { version = "1.3.4", features = ["no-entrypoint"] }
+voter-stake-registry = { git = "https://github.com/helium/voter-stake-registry", branch = "feature/minimum-lockup" }
 shared-utils = { path = "../shared-utils" }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }

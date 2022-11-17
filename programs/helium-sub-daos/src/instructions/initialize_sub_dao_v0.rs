@@ -189,6 +189,9 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     emission_schedule: args.emission_schedule,
     bump_seed: ctx.bumps["sub_dao"],
     total_devices: 0,
+    vehnt_staked: 0,
+    vehnt_last_calculated_ts: ctx.accounts.clock.unix_timestamp,
+    vehnt_fall_rate: 0,
   });
 
   resize_to_fit(

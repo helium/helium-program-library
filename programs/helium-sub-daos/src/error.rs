@@ -19,4 +19,7 @@ pub enum ErrorCode {
 
   #[msg("The subdao does not have a utility score")]
   NoUtilityScore,
+
+  #[msg("Not enough veHNT")]
+  NotEnoughVeHnt,
 }

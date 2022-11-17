@@ -631,6 +631,7 @@ dependencies = [
  "mpl-token-metadata",
  "shared-utils",
  "treasury-management",
+ "voter-stake-registry",
 ]
 
 [[package]]
@@ -1316,6 +1317,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "spl-governance"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c13bfa6d1b1e922fe0dca06ec53a43fd56706906586fe8d0154f420c78af5aa"
+dependencies = [
+ "arrayref",
+ "bincode",
+ "borsh",
+ "num-derive",
+ "num-traits",
+ "serde",
+ "serde_derive",
+ "solana-program",
+ "spl-governance-addin-api",
+ "spl-governance-tools",
+ "spl-token",
+ "thiserror",
+]
+
+[[package]]
+name = "spl-governance-addin-api"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9451f56e707e635a40a285965e1927733c956a0049a08f4b6c80215445aba7f1"
+dependencies = [
+ "borsh",
+ "solana-program",
+ "spl-governance-tools",
+]
+
+[[package]]
+name = "spl-governance-tools"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a206f0837415046d919f3075d6b3af9bd3f1f707c887898c335a6210b194627"
+dependencies = [
+ "arrayref",
+ "bincode",
+ "borsh",
+ "num-derive",
+ "num-traits",
+ "serde",
+ "serde_derive",
+ "solana-program",
+ "spl-token",
+ "thiserror",
+]
+
+[[package]]
 name = "spl-token"
 version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1435,6 +1485,20 @@ name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
+
+[[package]]
+name = "voter-stake-registry"
+version = "0.2.4"
+source = "git+https://github.com/helium/voter-stake-registry?branch=feature/minimum-lockup#9db613a2a212bda531b16a237a1ad84abd4ea81c"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "solana-program",
+ "spl-governance",
+ "spl-governance-addin-api",
+ "static_assertions",
+]
 
 [[package]]
 name = "wasi"

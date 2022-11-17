@@ -1,4 +1,4 @@
-use crate::error::ErrorCode;
+use crate::{error::ErrorCode, state::*};
 use anchor_lang::prelude::*;
 use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
 use std::convert::TryInto;
@@ -27,4 +27,18 @@ pub fn current_epoch(unix_timestamp: i64) -> u64 {
 
 pub fn next_epoch_ts(unix_timestamp: i64) -> u64 {
   (current_epoch(unix_timestamp) + 1) * u64::try_from(EPOCH_LENGTH).unwrap()
+}
+
+pub fn update_subdao_vehnt(sub_dao: &mut SubDaoV0, curr_ts: i64) {
+  sub_dao.vehnt_staked = sub_dao
+    .vehnt_staked
+    .checked_sub(
+      u64::try_from(
+        (curr_ts - sub_dao.vehnt_last_calculated_ts)
+          * i64::try_from(sub_dao.vehnt_fall_rate).unwrap(),
+      )
+      .unwrap(),
+    )
+    .unwrap();
+  sub_dao.vehnt_last_calculated_ts = curr_ts;
 }
