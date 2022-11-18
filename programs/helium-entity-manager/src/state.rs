@@ -38,7 +38,7 @@ pub struct HotspotStorageV0 {
 
   pub bump_seed: u8,
 
-  pub location: Option<String>,
+  pub location: Option<u64>,
   pub elevation: Option<i32>,
   pub gain: Option<i32>,
   pub is_full_hotspot: bool,

@@ -19,6 +19,7 @@ import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { DC_FEE, ensureDCIdl, initTestHotspotConfig, initTestHotspotIssuer, initWorld } from "./utils/fixtures";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import chaiAsPromised from 'chai-as-promised';
+import { BN } from "bn.js";
 chai.use(chaiAsPromised);
 describe("helium-entity-manager", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -194,7 +195,7 @@ describe("helium-entity-manager", () => {
       });
 
       it("changes the metadata", async() => {
-        const location = 'abc';
+        const location = new BN(1000);
         const elevation = 100;
         const gain = 100;
         const method = hsProgram.methods.changeMetadataV0({
@@ -211,7 +212,7 @@ describe("helium-entity-manager", () => {
         await method.rpc();
 
         const storageAcc = await hsProgram.account.hotspotStorageV0.fetch(storage!);
-        assert.equal(storageAcc.location, location);
+        assert.equal(storageAcc.location.toNumber(), location.toNumber());
         assert.equal(storageAcc.elevation, elevation);
         assert.equal(storageAcc.gain, gain);
       });

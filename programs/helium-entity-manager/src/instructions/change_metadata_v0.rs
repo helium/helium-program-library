@@ -20,7 +20,7 @@ const DC_MINT: &str = "8po3rj3xE1wo5y38zW8gH2ZoTZzqowMAuD1ugBpUKj32";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ChangeMetadataArgsV0 {
-  pub location: Option<String>,
+  pub location: Option<u64>,
   pub elevation: Option<i32>,
   pub gain: Option<i32>,
 }
