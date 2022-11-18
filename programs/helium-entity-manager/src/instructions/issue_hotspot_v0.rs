@@ -28,6 +28,7 @@ use helium_sub_daos::{
 pub struct IssueHotspotArgsV0 {
   pub ecc_compact: Vec<u8>,
   pub uri: String,
+  pub is_full_hotspot: bool,
 }
 
 #[derive(Accounts)]
@@ -318,7 +319,10 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
   ctx.accounts.storage.set_inner(HotspotStorageV0 {
     ecc_compact: args.ecc_compact,
     location: None,
+    elevation: None,
+    gain: None,
     authority: ctx.accounts.hotspot.key(),
+    is_full_hotspot: args.is_full_hotspot,
 
     bump_seed: ctx.bumps["storage"],
   });

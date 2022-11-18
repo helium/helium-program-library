@@ -89,6 +89,10 @@ export const initTestHotspotConfig = async (
       metadataUrl: DEFAULT_METADATA_URL,
       dcFee: toBN(DC_FEE, 8),
       onboardingServer: onboardingServerKeypair.publicKey,
+      minGain: 10,
+      maxGain: 150,
+      fullLocationStakingFee: toBN(1000000, 8),
+      dataonlyLocationStakingFee: toBN(500000, 8),
     })
     .accounts({
       dcMint,
