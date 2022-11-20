@@ -1,10 +1,6 @@
-use crate::{merkle_proof::verify, state::*};
 use crate::error::ErrorCode;
-use anchor_lang::{
-  prelude::*,
-  solana_program,
-  solana_program::{instruction::Instruction},
-};
+use crate::{merkle_proof::verify, state::*};
+use anchor_lang::{prelude::*, solana_program, solana_program::instruction::Instruction};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CompiledInstruction {
@@ -58,13 +54,13 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
     .instructions
     .iter()
     .map(|i| {
-      i.try_to_vec().map_err(|_| error!(ErrorCode::InstructionSerializeFailed))
+      i.try_to_vec()
+        .map_err(|_| error!(ErrorCode::InstructionSerializeFailed))
     })
     .collect::<Result<Vec<Vec<u8>>>>()
     .unwrap();
 
-  let all_vecs = [accts, ixs, vec![args.index.to_le_bytes().to_vec()]]
-    .concat();
+  let all_vecs = [accts, ixs, vec![args.index.to_le_bytes().to_vec()]].concat();
   let to_hash: &[&[u8]] = &all_vecs
     .iter()
     .map(|v| v.as_slice())
@@ -72,7 +68,12 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
 
   let hash = solana_program::keccak::hashv(to_hash).0;
 
-  if !verify(args.proof, ctx.accounts.lazy_transactions.root, hash, args.index) {
+  if !verify(
+    args.proof,
+    ctx.accounts.lazy_transactions.root,
+    hash,
+    args.index,
+  ) {
     return Err(error!(ErrorCode::InvalidData));
   };
 

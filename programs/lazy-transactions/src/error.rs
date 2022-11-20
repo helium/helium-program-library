@@ -6,5 +6,5 @@ pub enum ErrorCode {
   InvalidData,
 
   #[msg("Failed to serialize instruction")]
-  InstructionSerializeFailed
+  InstructionSerializeFailed,
 }

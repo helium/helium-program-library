@@ -1,15 +1,15 @@
 use crate::error::ErrorCode;
 use crate::state::*;
-use anchor_lang::{prelude::*};
+use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
+use mpl_bubblegum::state::metaplex_adapter::TokenStandard;
 use mpl_bubblegum::state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion};
-use mpl_bubblegum::state::metaplex_adapter::{TokenStandard};
 use mpl_bubblegum::utils::get_asset_id;
 use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
   program::Bubblegum,
-  state::TreeConfig
+  state::TreeConfig,
 };
 use spl_account_compression::{program::SplAccountCompression, Wrapper};
 
@@ -101,7 +101,10 @@ impl<'info> GenesisIssueHotspotV0<'info> {
 }
 
 pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArgsV0) -> Result<()> {
-  let asset_id = get_asset_id(&ctx.accounts.merkle_tree.key(), ctx.accounts.tree_authority.num_minted);
+  let asset_id = get_asset_id(
+    &ctx.accounts.merkle_tree.key(),
+    ctx.accounts.tree_authority.num_minted,
+  );
   let decoded = bs58::encode(args.ecc_compact.clone()).into_string();
   let animal_name: AnimalName = decoded
     .parse()
