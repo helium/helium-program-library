@@ -7,6 +7,7 @@ import { MerkleTree } from "./merkleTree";
 import { keccak_256 } from 'js-sha3';
 
 export * from "./pdas";
+export * from "./constants";
 
 type CompiledInstruction = IdlTypes<LazyTransactions>["CompiledInstruction"];
 
@@ -26,7 +27,6 @@ export async function init(
   return lazyTransactions;
 }
 
-export * from "./constants";
 
 export function getAccounts(
   lazySigner: PublicKey,
@@ -62,15 +62,15 @@ export function getCompiledInstructions(
   accounts: AccountMeta[],
   instructions: TransactionInstruction[],
 ): CompiledInstruction[] {
-  const accountsByKey = accounts.reduce((acc, account, index) => {
+  const accountIndicesByKey = accounts.reduce((acc, account, index) => {
     acc[account.pubkey.toBase58()] = index;
 
     return acc;
   }, {} as Record<string, number>);
   return instructions.map(instruction => {
     return {
-      programIdIndex: accountsByKey[instruction.programId.toBase58()],
-      accounts: Buffer.from(instruction.keys.map(key => accountsByKey[key.pubkey.toBase58()])),
+      programIdIndex: accountIndicesByKey[instruction.programId.toBase58()],
+      accounts: Buffer.from(instruction.keys.map(key => accountIndicesByKey[key.pubkey.toBase58()])),
       data: instruction.data
     }
   })
@@ -100,7 +100,7 @@ const CompiledInstructionDef: any = {
 };
 const layout = IdlCoder.typeDefLayout(CompiledInstructionDef);
 function serialize(ct: CompiledInstruction): Buffer {
-  const ixBuffer = Buffer.alloc(1000); // TODO: use a tighter buffer.
+  const ixBuffer = Buffer.alloc(1000); // TODO: (originally from anchor) use a tighter buffer.
   const len = layout.encode(ct, ixBuffer);
   return ixBuffer.slice(0, len);
 }

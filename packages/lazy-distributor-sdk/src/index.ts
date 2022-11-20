@@ -7,6 +7,10 @@ import { lazyDistributorResolvers } from "./resolvers";
 export { distributeCompressionRewards } from "./functions/distributeCompressionRewards";
 export { initializeCompressionRecipient } from "./functions/initializeCompressionRecipient";
 
+export * from "./constants";
+export * from "./pdas";
+export * from "./resolvers";
+
 export async function init(
   provider: AnchorProvider,
   programId: PublicKey = PROGRAM_ID,
@@ -26,7 +30,3 @@ export async function init(
   ) as Program<LazyDistributor>;
   return lazyDistributor;
 }
-
-export * from "./constants";
-export * from "./pdas";
-export * from "./resolvers";
