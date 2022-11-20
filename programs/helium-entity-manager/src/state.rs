@@ -30,6 +30,7 @@ pub struct HotspotIssuerV0 {
 #[account]
 #[derive(Default)]
 pub struct HotspotStorageV0 {
+  pub asset: Pubkey,
   pub ecc_compact: Vec<u8>,
   pub location: Option<String>,
 

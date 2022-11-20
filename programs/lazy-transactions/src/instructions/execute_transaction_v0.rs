@@ -72,7 +72,7 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
 
   let hash = solana_program::keccak::hashv(to_hash).0;
 
-  if !verify(args.proof, ctx.accounts.lazy_transactions.root, hash) {
+  if !verify(args.proof, ctx.accounts.lazy_transactions.root, hash, args.index) {
     return Err(error!(ErrorCode::InvalidData));
   };
 

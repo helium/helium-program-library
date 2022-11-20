@@ -18,7 +18,7 @@ use helium_sub_daos::{
   cpi::{accounts::TrackAddedDeviceV0, track_added_device_v0},
   TrackAddedDeviceArgsV0,
 };
-use mpl_bubblegum::state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion};
+use mpl_bubblegum::{state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion}, utils::get_asset_id};
 use mpl_bubblegum::state::{
   metaplex_adapter::{Creator, TokenStandard},
   TreeConfig,
@@ -202,6 +202,8 @@ impl<'info> IssueHotspotV0<'info> {
 }
 
 pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result<()> {
+  let asset_id = get_asset_id(&ctx.accounts.merkle_tree.key(), ctx.accounts.tree_authority.num_minted);
+  
   let decoded = bs58::encode(args.ecc_compact.clone()).into_string();
   let animal_name: AnimalName = decoded
     .parse()
@@ -262,6 +264,7 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
   ctx.accounts.hotspot_issuer.count += 1;
 
   ctx.accounts.storage.set_inner(HotspotStorageV0 {
+    asset: asset_id,
     ecc_compact: args.ecc_compact,
     location: None,
     bump_seed: ctx.bumps["storage"],

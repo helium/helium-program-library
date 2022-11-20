@@ -1,5 +1,5 @@
 {
-  "name": "@helium/metadata-service",
+  "name": "@helium/migration-service",
   "private": true,
   "publishConfig": {
     "access": "public",
@@ -7,7 +7,7 @@
   },
   "license": "Apache-2.0",
   "version": "0.0.5",
-  "description": "Mint metadata of hotspots",
+  "description": "Migration of state from helium",
   "repository": {
     "type": "git",
     "url": "https://github.com/HeliumFoundation/helium-program-libary"
@@ -34,13 +34,19 @@
   "dependencies": {
     "@fastify/cors": "^8.1.1",
     "@helium/address": "^4.6.2",
+    "@helium/circuit-breaker-sdk": "^0.0.5",
+    "@helium/crypto": "^4.6.2",
+    "@helium/data-credits-sdk": "^0.0.5",
+    "@helium/distributor-oracle": "^0.0.5",
     "@helium/helium-entity-manager-sdk": "^0.0.5",
     "@helium/helium-sub-daos-sdk": "^0.0.5",
+    "@helium/lazy-distributor-sdk": "^0.0.5",
+    "@helium/spl-utils": "^0.0.5",
+    "@helium/treasury-management-sdk": "^0.0.5",
     "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
     "@project-serum/anchor": "0.24.2",
     "@solana/spl-token": "0.3.5",
-    "@solana/web3.js": "^1.43.4",
-    "angry-purple-tiger": "^1.0.5",
+    "@solana/web3.js": "^1.66.2",
     "axios": "^1.1.3",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1",

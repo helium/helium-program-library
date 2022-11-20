@@ -65,6 +65,7 @@ describe("lazy-transactions", () => {
     // Execute instructions via lazy transactions
     const { merkleTree, compiledTransactions } = compile(lazySigner, [
       instructions,
+      instructions
     ]);
     await program.methods
       .initializeLazyTransactionsV0({
@@ -105,7 +106,7 @@ describe("lazy-transactions", () => {
       })
       .accounts({ lazyTransactions })
       .remainingAccounts(compiledTransactions[0].accounts)
-      .rpc({ skipPreflight: true });
+      .rpc();
 
     /// Ensure we fail executing the same tx twice
     try {

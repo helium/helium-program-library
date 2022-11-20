@@ -1,16 +1,6 @@
-import Address from "@helium/address";
-import {
-  hotspotCollectionKey,
-  hotspotStorageKey,
-} from "@helium/helium-entity-manager-sdk";
-import { subDaoKey } from "@helium/helium-sub-daos-sdk";
-import {
-  Metadata, PROGRAM_ID as MPL_PID
-} from "@metaplex-foundation/mpl-token-metadata";
-import { PublicKey } from "@solana/web3.js";
-import Fastify, { FastifyInstance } from "fastify";
-import { provider } from "./solana";
 import cors from "@fastify/cors";
+import animalHash from "angry-purple-tiger";
+import Fastify, { FastifyInstance } from "fastify";
 
 const server: FastifyInstance = Fastify({
   logger: true
@@ -22,27 +12,15 @@ server.get("/health", async () => {
   return { ok: true };
 })
 
-function removeNullBytes(str: string): string {
-  return str
-    .split("")
-    .filter((char) => char.codePointAt(0))
-    .join("");
-}
-const [subDao] = subDaoKey(new PublicKey(process.env.DNT_MINT!))
-const [collection] = hotspotCollectionKey(subDao, process.env.COLLECTION_SYMBOL!);
-
 server.get<{ Params: { eccCompact: string } }>("/:eccCompact", async (request, reply) => {
   const { eccCompact } = request.params;
-  const bufferCompact = Buffer.from(Address.fromB58(eccCompact).publicKey)
-  const [storage] = await hotspotStorageKey(bufferCompact);
-  const metadataKey = PublicKey.findProgramAddressSync(
-    [Buffer.from("metadata", "utf-8"), MPL_PID.toBuffer(), mint.toBuffer()],
-    MPL_PID
-  )[0];
-  const metadata = await Metadata.fromAccountAddress(provider.connection, metadataKey);
+  // const bufferCompact = Buffer.from(Address.fromB58(eccCompact).publicKey)
+  // const [storage] = await hotspotStorageKey(bufferCompact);
+  // const assetId = new PublicKey((await provider.connection.getAccountInfo(storage)).data.subarray(8, 8 + 32));
+  const digest = animalHash(eccCompact);
 
   return {
-    name: removeNullBytes(metadata.data.name),
+    name: digest,
     description: "A hotspot NFT on Helium",
     image:
       "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/hotspot.png",

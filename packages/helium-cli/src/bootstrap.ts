@@ -464,7 +464,6 @@ run()
 export function loadKeypair(keypair: string): Keypair {
   console.log(process.env.ANCHOR_PROVIDER_URL);
   anchor.setProvider(anchor.AnchorProvider.env());
-  const provider = anchor.getProvider() as anchor.AnchorProvider;
 
   return Keypair.fromSecretKey(
     new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString()))

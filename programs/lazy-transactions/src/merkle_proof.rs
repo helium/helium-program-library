@@ -1,23 +1,28 @@
 use anchor_lang::{solana_program};
+use solana_program::keccak::hashv;
 
-/// These functions deal with verification of Merkle trees (hash trees).
-/// Direct port of https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.4.0/contracts/cryptography/MerkleProof.sol
+pub type Node = [u8; 32];
 
-/// Returns true if a `leaf` can be proved to be a part of a Merkle tree
-/// defined by `root`. For this, a `proof` must be provided, containing
-/// sibling hashes on the branch from the leaf to the root of the tree. Each
-/// pair of leaves and each pair of pre-images are assumed to be sorted.
-pub fn verify(proof: Vec<[u8; 32]>, root: [u8; 32], leaf: [u8; 32]) -> bool {
-  let mut computed_hash = leaf;
-  for proof_element in proof.into_iter() {
-    if computed_hash <= proof_element {
-      // Hash(current computed hash + current element of the proof)
-      computed_hash = solana_program::keccak::hashv(&[&[0x01], &computed_hash, &proof_element]).0;
-    } else {
-      // Hash(current element of the proof + current computed hash)
-      computed_hash = solana_program::keccak::hashv(&[&[0x01], &proof_element, &computed_hash]).0;
+/// Recomputes root of the Merkle tree from Node & proof
+pub fn recompute(leaf: Node, proof: &[Node], index: u32) -> Node {
+    let mut current_node = leaf;
+    for (depth, sibling) in proof.iter().enumerate() {
+        hash_to_parent(&mut current_node, sibling, index >> depth & 1 == 0);
     }
-  }
-  // Check if the computed hash (root) is equal to the provided root
-  computed_hash == root
+    current_node
+}
+
+/// Computes the parent node of `node` and `sibling` and copies the result into `node`
+#[inline(always)]
+pub fn hash_to_parent(node: &mut Node, sibling: &Node, is_left: bool) {
+    let parent = if is_left {
+        hashv(&[node, sibling])
+    } else {
+        hashv(&[sibling, node])
+    };
+    node.copy_from_slice(parent.as_ref())
+}
+
+pub fn verify(proof: Vec<[u8; 32]>, root: [u8; 32], leaf: [u8; 32], index: u32) -> bool {
+  recompute(leaf, &proof, index) == root
 }

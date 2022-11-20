@@ -5,9 +5,11 @@ use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
 use mpl_bubblegum::state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion};
 use mpl_bubblegum::state::metaplex_adapter::{TokenStandard};
+use mpl_bubblegum::utils::get_asset_id;
 use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
   program::Bubblegum,
+  state::TreeConfig
 };
 use spl_account_compression::{program::SplAccountCompression, Wrapper};
 
@@ -50,7 +52,7 @@ pub struct GenesisIssueHotspotV0<'info> {
   pub storage: Box<Account<'info, HotspotStorageV0>>,
   /// CHECK: Handled by cpi
   #[account(mut)]
-  pub tree_authority: AccountInfo<'info>,
+  pub tree_authority: Account<'info, TreeConfig>,
   /// CHECK: Used in cpi
   pub recipient: AccountInfo<'info>,
   /// CHECK: Used in cpi
@@ -99,6 +101,7 @@ impl<'info> GenesisIssueHotspotV0<'info> {
 }
 
 pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArgsV0) -> Result<()> {
+  let asset_id = get_asset_id(&ctx.accounts.merkle_tree.key(), ctx.accounts.tree_authority.num_minted);
   let decoded = bs58::encode(args.ecc_compact.clone()).into_string();
   let animal_name: AnimalName = decoded
     .parse()
@@ -137,6 +140,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
   )?;
 
   ctx.accounts.storage.set_inner(HotspotStorageV0 {
+    asset: asset_id,
     ecc_compact: args.ecc_compact,
     location: None,
     bump_seed: ctx.bumps["storage"],
