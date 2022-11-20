@@ -19,7 +19,7 @@ use helium_sub_daos::{
   TrackAddedDeviceArgsV0,
 };
 use mpl_bubblegum::state::{
-  metaplex_adapter::{Creator, TokenStandard},
+  metaplex_adapter::{TokenStandard},
   TreeConfig,
 };
 use mpl_bubblegum::{
@@ -35,6 +35,7 @@ use spl_account_compression::{program::SplAccountCompression, Wrapper};
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHotspotArgsV0 {
   pub ecc_compact: Vec<u8>,
+  pub is_full_hotspot: bool,
 }
 
 #[derive(Accounts)]
@@ -273,6 +274,9 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
     asset: asset_id,
     ecc_compact: args.ecc_compact,
     location: None,
+    elevation: None,
+    gain: None,
+    is_full_hotspot: args.is_full_hotspot,
     bump_seed: ctx.bumps["storage"],
   });
 

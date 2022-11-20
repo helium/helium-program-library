@@ -8,18 +8,20 @@ import {
 import { toBN } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import {
-  ComputeBudgetProgram,
-  Keypair,
-  PublicKey
-} from "@solana/web3.js";
-import { expect } from "chai";
-import { init as initHeliumEntityManager } from "../packages/helium-entity-manager-sdk/src";
+import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
+import chai from "chai";
+import { hotspotStorageKey, init as initHeliumEntityManager } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import { DC_FEE, ensureDCIdl, initTestHotspotConfig, initTestHotspotIssuer, initWorld } from "./utils/fixtures";
+const {expect} = chai;
+
+import { BN } from "bn.js";
+import chaiAsPromised from 'chai-as-promised';
+
+chai.use(chaiAsPromised);
 
 describe("helium-entity-manager", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -109,8 +111,10 @@ describe("helium-entity-manager", () => {
 
   describe("with issuer and data credits", () => {
     let makerKeypair: Keypair;
-    let onboardingServerKeypair: Keypair;
     let hotspotIssuer: PublicKey;
+    let hotspotConfig: PublicKey;
+    let startDcBal = DC_FEE * 10;
+    let dcMint: PublicKey;
 
     before(async () => {
       const {
@@ -120,22 +124,23 @@ describe("helium-entity-manager", () => {
       } = await initWorld(provider, hsProgram, hsdProgram, dcProgram);
       await dcProgram.methods
         .mintDataCreditsV0({
-          amount: toBN(DC_FEE, 8),
+          amount: toBN(DC_FEE*3, 8),
         })
         .accounts({ dcMint: dataCredits.dcMint })
         .rpc({ skipPreflight: true });
 
       hotspotIssuer = issuer.hotspotIssuer;
       makerKeypair = issuer.makerKeypair;
-      ({ onboardingServerKeypair } = hsConfig);
+      hotspotConfig = hsConfig.hotspotConfig;
+      dcMint = dataCredits.dcMint;
     });
 
     it("issues a hotspot", async () => {
-      const ecc = await (await HeliumKeypair.makeRandom()).address.publicKey;
+      const ecc = (await HeliumKeypair.makeRandom()).address.publicKey;
       const hotspotOwner = Keypair.generate().publicKey;
 
-      const method = await hsProgram.methods
-        .issueHotspotV0({ eccCompact: Buffer.from(ecc) })
+      const method = hsProgram.methods
+        .issueHotspotV0({ eccCompact: Buffer.from(ecc), isFullHotspot: true })
         .accounts({
           hotspotIssuer,
           hotspotOwner,
@@ -154,6 +159,95 @@ describe("helium-entity-manager", () => {
 
       expect(issuerAccount.count.toNumber()).eq(1);
     });
+
+    describe("with hotspot", () => {
+      let hotspot: PublicKey;
+      let storage: PublicKey;
+      let hotspotOwner: Keypair;
+      before(async () => {
+        const ecc = (await HeliumKeypair.makeRandom()).address.publicKey;
+        hotspotOwner = Keypair.generate();
+  
+        const method = hsProgram.methods
+          .issueHotspotV0({ eccCompact: Buffer.from(ecc), isFullHotspot: true })
+          .accounts({
+            hotspotIssuer,
+            hotspotOwner: hotspotOwner.publicKey,
+            maker: makerKeypair.publicKey,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 })
+          ])
+          .signers([makerKeypair]);
+
+        const storage = (await method.pubkeys()).storage!;
+
+        await method.rpc({ skipPreflight: true });
+
+        await dcProgram.methods
+          .mintDataCreditsV0({
+            amount: toBN(startDcBal, 8),
+          })
+          .accounts({ dcMint, recipient: hotspotOwner.publicKey })
+          .rpc();
+      });
+
+      it("changes the metadata", async() => {
+        const location = new BN(1000);
+        const elevation = 100;
+        const gain = 100;
+        const method = hsProgram.methods
+          .changeMetadataV0({
+            location,
+            elevation,
+            gain,
+          })
+          .accounts({
+            hotspot,
+            storage,
+            hotspotOwner: hotspotOwner.publicKey,
+          })
+          .signers([hotspotOwner]);
+        await method.rpc();
+
+        const storageAcc = await hsProgram.account.hotspotStorageV0.fetch(storage!);
+        expect(storageAcc.location?.toNumber()).to.eq(location.toNumber());
+        expect(storageAcc.elevation).to.eq(elevation);
+        expect(storageAcc.gain).to.eq(gain);
+      });
+
+      it("doesn't assert gain outside range", async() => {
+        const method = hsProgram.methods
+          .changeMetadataV0({
+            location: null,
+            elevation: null,
+            gain: 1,
+          })
+          .accounts({
+            hotspot,
+            storage,
+            hotspotOwner: hotspotOwner.publicKey,
+          })
+          .signers([hotspotOwner]);
+
+        // @ts-ignore
+        expect(method.rpc()).to.be.rejected;
+
+        const method2 = hsProgram.methods
+          .changeMetadataV0({
+            location: null,
+            elevation: null,
+            gain: 1000,
+          })
+          .accounts({
+            hotspot,
+            hotspotOwner: hotspotOwner.publicKey,
+          })
+          .signers([hotspotOwner]);
+
+        // @ts-ignore
+        expect(method2.rpc()).to.be.rejected;
+      });
+    });
   });
 });
-

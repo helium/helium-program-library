@@ -147,6 +147,10 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     ecc_compact: args.ecc_compact,
     location: None,
     bump_seed: ctx.bumps["storage"],
+    /// TODO: Fill these out
+    elevation: None,
+    gain: None,
+    is_full_hotspot: true,
   });
 
   Ok(())

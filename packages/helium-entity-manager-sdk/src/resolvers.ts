@@ -2,30 +2,15 @@ import { subDaoEpochInfoResolver } from "@helium/helium-sub-daos-sdk";
 import {
   ataResolver,
   combineResolvers,
-  resolveIndividual
+  heliumCommonResolver,
+  resolveIndividual,
 } from "@helium/spl-utils";
-import { PublicKey } from "@solana/web3.js";
 import { hotspotStorageKey } from "./pdas";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { PublicKey } from "@solana/web3.js";
 
 export const heliumEntityManagerResolvers = combineResolvers(
-  resolveIndividual(async ({ path }) => {
-    switch (path[path.length - 1]) {
-      case "dataCreditsProgram":
-        return new PublicKey("credacwrBVewZAgCwNgowCSMbCiepuesprUWPBeLTSg");
-      case "tokenMetadataProgram":
-        return new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-      case "heliumSubDaosProgram":
-        return new PublicKey("hdaojPkgSD8bciDc1w2Z4kXFFibCXngJiw2GRpEL7Wf");
-      case "bubblegumProgram":
-        return new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY");
-      case "compressionProgram":
-        return new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK");
-      case "logWrapper":
-        return new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
-      default:
-        return;
-    }
-  }),
+  heliumCommonResolver,
   ataResolver({
     instruction: "initializeHotspotConfigV0",
     account: "tokenAccount",
@@ -33,13 +18,19 @@ export const heliumEntityManagerResolvers = combineResolvers(
     owner: "hotspotConfig",
   }),
   resolveIndividual(async ({ path, args, provider }) => {
-    if (path[path.length - 1] === "storage") {
-      return hotspotStorageKey(
-        args[args.length - 1].eccCompact
-      )[0];
+    if (
+      path[path.length - 1] === "storage" &&
+      args[args.length - 1].eccCompact
+    ) {
+      return hotspotStorageKey(args[args.length - 1].eccCompact)[0];
     } else if (path[path.length - 1] === "recipient") {
       // @ts-ignore
       return provider.wallet?.publicKey;
+    }
+  }),
+  resolveIndividual(async ({ path, accounts }) => {
+    if (path[path.length - 1] === "ownerHotspotAta" && (accounts.owner || accounts.hotspotOwner) && accounts.hotspot) {
+      return getAssociatedTokenAddress(accounts.hotspot as PublicKey, (accounts.owner || accounts.hotspotOwner) as PublicKey)
     }
   }),
   ataResolver({
@@ -53,6 +44,12 @@ export const heliumEntityManagerResolvers = combineResolvers(
     account: "dcBurner",
     mint: "dcMint",
     owner: "dcFeePayer",
+  }),
+  ataResolver({
+    instruction: "changeMetadataV0",
+    account: "ownerDcAta",
+    mint: "dcMint",
+    owner: "hotspotOwner",
   }),
   subDaoEpochInfoResolver
 );

@@ -38,4 +38,11 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     genesis_issue_hotspot_v0::handler(ctx, args)
   }
+
+  pub fn change_metadata_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, ChangeMetadataV0<'info>>,
+    args: ChangeMetadataArgsV0,
+  ) -> Result<()> {
+    change_metadata_v0::handler(ctx, args)
+  }
 }

@@ -23,6 +23,10 @@ pub struct InitializeHotspotConfigArgsV0 {
   pub metadata_url: String,
   pub dc_fee: u64,
   pub onboarding_server: Pubkey,
+  pub min_gain: i32,
+  pub max_gain: i32,
+  pub full_location_staking_fee: u64,
+  pub dataonly_location_staking_fee: u64,
 }
 
 #[derive(Accounts)]
@@ -210,6 +214,10 @@ pub fn handler(
     bump_seed: ctx.bumps["hotspot_config"],
     collection_bump_seed: ctx.bumps["collection"],
     merkle_tree: ctx.accounts.merkle_tree.key(),
+    min_gain: args.min_gain,
+    max_gain: args.max_gain,
+    full_location_staking_fee: args.full_location_staking_fee,
+    dataonly_location_staking_fee: args.dataonly_location_staking_fee,
   });
 
   Ok(())

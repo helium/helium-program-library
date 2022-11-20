@@ -118,7 +118,7 @@ describe("helium-sub-daos", () => {
         .rpc({ skipPreflight: true });
 
       const method = await hemProgram.methods
-        .issueHotspotV0({ eccCompact: Buffer.from(ecc) })
+        .issueHotspotV0({ eccCompact: Buffer.from(ecc), isFullHotspot: true })
         .accounts({
           hotspotIssuer,
           maker: makerKeypair.publicKey,

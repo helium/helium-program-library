@@ -19,11 +19,11 @@ export async function initTestDao(
 }> {
   const me = provider.wallet.publicKey;
   if (!mint) {
-    mint = await createMint(provider, 6, me, me);
+    mint = await createMint(provider, 8, me, me);
   }
 
   if (!dcMint) {
-    dcMint = await createMint(provider, 6, me, me);
+    dcMint = await createMint(provider, 8, me, me);
   }
 
   const method = await program.methods
