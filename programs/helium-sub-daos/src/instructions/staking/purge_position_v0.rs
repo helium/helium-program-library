@@ -21,12 +21,6 @@ pub struct PurgePositionV0<'info> {
   pub registrar: AccountLoader<'info, Registrar>,
 
   #[account(
-    init_if_needed,
-    space = 60 + 8 + std::mem::size_of::<Staker>(),
-    payer = voter_authority
-  )]
-  pub staker: Box<Account<'info, Staker>>,
-  #[account(
     mut,
     seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &[stake_position.deposit_entry_idx]],
     bump,

@@ -29,12 +29,6 @@ pub struct ClaimRewardsV0<'info> {
   pub registrar: AccountLoader<'info, Registrar>,
 
   #[account(
-    init_if_needed,
-    space = 60 + 8 + std::mem::size_of::<Staker>(),
-    payer = voter_authority
-  )]
-  pub staker: Box<Account<'info, Staker>>,
-  #[account(
     init,
     space = 60 + 8 + std::mem::size_of::<StakePosition>(),
     payer = voter_authority,

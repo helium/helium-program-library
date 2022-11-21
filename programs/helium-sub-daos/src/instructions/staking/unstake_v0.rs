@@ -22,11 +22,7 @@ pub struct UnstakeV0<'info> {
   pub voter_authority: Signer<'info>,
   pub registrar: AccountLoader<'info, Registrar>,
 
-  #[account(
-    init_if_needed,
-    space = 60 + 8 + std::mem::size_of::<Staker>(),
-    payer = voter_authority
-  )]
+  #[account(mut)]
   pub staker: Box<Account<'info, Staker>>,
   #[account(
     mut,
