@@ -1,4 +1,3 @@
-import Address from "@helium/address";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { init as initDc } from "@helium/data-credits-sdk";
 import {
@@ -12,9 +11,9 @@ import {
 } from "@helium/helium-sub-daos-sdk";
 import { init as initLazy } from "@helium/lazy-distributor-sdk";
 import { lazySignerKey } from "@helium/lazy-transactions-sdk";
-import { AccountFetchCache, chunks, sendInstructions } from "@helium/spl-utils";
+import { AccountFetchCache, chunks } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
-import { AddressLookupTableProgram, PublicKey } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import fs from "fs";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -49,6 +48,8 @@ const yarg = yargs(hideBin(process.argv)).options({
   }
 });
 
+// TODO: This is just an example generating txs. We need to actually read from the state
+// dump
 async function run() {
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -73,7 +74,6 @@ async function run() {
   const hnt = new PublicKey(argv.hnt);
 
   const dao = await heliumSubDaosProgram.account.daoV0.fetch(daoKey(hnt)[0])!;
-  const dc = dao.dcMint;
 
   const mobileSubdao = (await subDaoKey(mobile))[0];
   const hsConfigKey = (await hotspotConfigKey(mobileSubdao, "MOBILE"))[0];
@@ -100,6 +100,10 @@ async function run() {
       const create = await hemProgram.methods
         .genesisIssueHotspotV0({
           hotspotKey: hotspot,
+          location: null,
+          gain: null,
+          elevation: null,
+          isFullHotspot: true,
         })
         .accounts({
           collection: pubkeys.collection,
@@ -124,35 +128,12 @@ async function run() {
   );
 
   const output = {
-    transactions: chunks(ix, 3),
+    transactions: chunks(ix, 2),
     byWallet: {
       "devQQGx2b2eN9X2T2dDejuLtdRQWxJtuJ6cfaNqqGbY": [0]
     }
   };
   fs.writeFileSync(argv.out, JSON.stringify(output, null, 2));
-
-  // const lookupTable = (
-  //   await provider.connection.getAddressLookupTable(lut, {
-  //     commitment: "processed",
-  //   })
-  // ).value;
-  // await sleep(5000);
-  // const message = new TransactionMessage({
-  //   payerKey: provider.wallet.publicKey,
-  //   recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash,
-  //   instructions: [
-  //     ComputeBudgetProgram.setComputeUnitLimit({ units: 1200000 }),
-  //     ...ix,
-  //   ],
-  // }).compileToV0Message([lookupTable]);
-  // const transactionWithLookupTable = new VersionedTransaction(message);
-  // transactionWithLookupTable.sign([wallet, makerKeypair]);
-
-  // const txid = await provider.connection.sendRawTransaction(
-  //   transactionWithLookupTable.serialize()
-  // );
-  // console.log("Sending", txid);
-  // await provider.connection.confirmTransaction(txid, "processed");
 }
 
 run()

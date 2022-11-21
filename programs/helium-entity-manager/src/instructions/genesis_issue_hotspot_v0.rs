@@ -17,6 +17,10 @@ use spl_account_compression::{program::SplAccountCompression, Wrapper};
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct GenesisIssueHotspotArgsV0 {
   pub hotspot_key: String,
+  pub location: Option<u64>,
+  pub elevation: Option<i32>,
+  pub gain: Option<i32>,
+  pub is_full_hotspot: bool,
 }
 
 #[derive(Accounts)]
@@ -149,12 +153,11 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
   ctx.accounts.storage.set_inner(HotspotStorageV0 {
     asset: asset_id,
     hotspot_key: args.hotspot_key,
-    location: None,
+    location: args.location,
     bump_seed: ctx.bumps["storage"],
-    /// TODO: Fill these out
-    elevation: None,
-    gain: None,
-    is_full_hotspot: true,
+    elevation: args.elevation,
+    gain: args.gain,
+    is_full_hotspot: args.is_full_hotspot,
   });
 
   Ok(())
