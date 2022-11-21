@@ -97,6 +97,8 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
       deposit_entry_idx: args.deposit_entry_idx,
       sub_dao: ctx.accounts.sub_dao.key(),
       last_claimed_epoch: curr_epoch,
+      fall_rate,
+      purged: false,
     });
     // TODO add stakeposition to staker
   }

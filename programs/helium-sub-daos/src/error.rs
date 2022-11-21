@@ -22,4 +22,10 @@ pub enum ErrorCode {
 
   #[msg("Not enough veHNT")]
   NotEnoughVeHnt,
+
+  #[msg("Lockup hasn't expired yet")]
+  LockupNotExpired,
+
+  #[msg("This staking position has already been purged")]
+  PositionAlreadyPurged,
 }

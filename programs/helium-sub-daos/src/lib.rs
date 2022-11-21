@@ -48,4 +48,12 @@ pub mod helium_sub_daos {
   pub fn issue_rewards_v0(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<()> {
     issue_rewards_v0::handler(ctx, args)
   }
+
+  pub fn claim_rewards_v0(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result<()> {
+    claim_rewards_v0::handler(ctx, args)
+  }
+
+  pub fn purge_position_v0(ctx: Context<PurgePositionV0>, args: PurgePositionArgsV0) -> Result<()> {
+    purge_position_v0::handler(ctx, args)
+  }
 }

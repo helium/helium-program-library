@@ -53,7 +53,7 @@ pub struct UnstakeV0<'info> {
 }
 
 pub fn handler(ctx: Context<UnstakeV0>, args: UnstakeArgsV0) -> Result<()> {
-  // TODO currently this will unstake the whole amount, add ability to partially unstake
+  // TODO currently this will unstake the whole amount, add ability to partially unstake and reduce fallrate of position
 
   // load the vehnt information
   let voter = ctx.accounts.vsr_voter.load()?;
