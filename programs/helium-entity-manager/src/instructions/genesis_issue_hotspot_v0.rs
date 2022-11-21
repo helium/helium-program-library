@@ -1,6 +1,7 @@
 use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::hash::hash;
 use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
 use mpl_bubblegum::state::metaplex_adapter::TokenStandard;
@@ -12,7 +13,6 @@ use mpl_bubblegum::{
   state::TreeConfig,
 };
 use spl_account_compression::{program::SplAccountCompression, Wrapper};
-use anchor_lang::solana_program::hash::hash;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct GenesisIssueHotspotArgsV0 {
@@ -106,7 +106,8 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,
   );
-  let animal_name: AnimalName = args.hotspot_key
+  let animal_name: AnimalName = args
+    .hotspot_key
     .parse()
     .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
 
@@ -120,7 +121,10 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
   let metadata = MetadataArgs {
     name: animal_name.to_string(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("https://mobile-metadata.test-helium.com/{}", args.hotspot_key),
+    uri: format!(
+      "https://mobile-metadata.test-helium.com/{}",
+      args.hotspot_key
+    ),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi

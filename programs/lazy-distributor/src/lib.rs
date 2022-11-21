@@ -49,4 +49,11 @@ pub mod lazy_distributor {
   ) -> Result<()> {
     distribute_compression_rewards_v0::handler(ctx, args)
   }
+
+  pub fn update_lazy_distributor_v0(
+    ctx: Context<UpdateLazyDistributorV0>,
+    args: UpdateLazyDistributorArgsV0,
+  ) -> Result<()> {
+    update_lazy_distributor_v0::handler(ctx, args)
+  }
 }

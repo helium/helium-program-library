@@ -148,4 +148,3 @@ pub struct MetadataArgs {
   pub token_program_version: TokenProgramVersion,
   pub creators: Vec<Creator>,
 }
-

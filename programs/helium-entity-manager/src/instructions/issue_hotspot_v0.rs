@@ -1,6 +1,7 @@
 use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::hash::hash;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
@@ -18,10 +19,7 @@ use helium_sub_daos::{
   cpi::{accounts::TrackAddedDeviceV0, track_added_device_v0},
   TrackAddedDeviceArgsV0,
 };
-use mpl_bubblegum::state::{
-  metaplex_adapter::{TokenStandard},
-  TreeConfig,
-};
+use mpl_bubblegum::state::{metaplex_adapter::TokenStandard, TreeConfig};
 use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
   program::Bubblegum,
@@ -31,7 +29,6 @@ use mpl_bubblegum::{
   utils::get_asset_id,
 };
 use spl_account_compression::{program::SplAccountCompression, Wrapper};
-use anchor_lang::solana_program::hash::hash;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHotspotArgsV0 {
@@ -212,7 +209,8 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
     ctx.accounts.tree_authority.num_minted,
   );
 
-  let animal_name: AnimalName = args.hotspot_key
+  let animal_name: AnimalName = args
+    .hotspot_key
     .parse()
     .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
 
@@ -235,7 +233,10 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
   let metadata = MetadataArgs {
     name: animal_name.to_string(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("https://mobile-metadata.test-helium.com/{}", args.hotspot_key),
+    uri: format!(
+      "https://mobile-metadata.test-helium.com/{}",
+      args.hotspot_key
+    ),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi

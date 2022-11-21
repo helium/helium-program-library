@@ -1,8 +1,8 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
 use mpl_bubblegum::{program::Bubblegum, state::TreeConfig, utils::get_asset_id};
-use spl_account_compression::program::SplAccountCompression;
 use shared_utils::*;
+use spl_account_compression::program::SplAccountCompression;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeCompressionRecipientArgsV0 {

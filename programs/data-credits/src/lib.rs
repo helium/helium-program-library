@@ -56,4 +56,11 @@ pub mod data_credits {
   ) -> Result<()> {
     instructions::use_data_credits_v0::handler(ctx, args)
   }
+
+  pub fn update_data_credits_v0(
+    ctx: Context<UpdateDataCreditsV0>,
+    args: UpdateDataCreditsArgsV0,
+  ) -> Result<()> {
+    instructions::update_data_credits_v0::handler(ctx, args)
+  }
 }

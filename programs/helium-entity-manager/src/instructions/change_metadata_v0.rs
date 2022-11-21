@@ -5,10 +5,6 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
 };
-use mpl_bubblegum::utils::get_asset_id;
-use mpl_bubblegum::{program::Bubblegum, state::TreeConfig};
-use spl_account_compression::program::SplAccountCompression;
-use shared_utils::*;
 use data_credits::{
   cpi::{
     accounts::{BurnCommonV0, BurnWithoutTrackingV0},
@@ -16,6 +12,10 @@ use data_credits::{
   },
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
+use mpl_bubblegum::utils::get_asset_id;
+use mpl_bubblegum::{program::Bubblegum, state::TreeConfig};
+use shared_utils::*;
+use spl_account_compression::program::SplAccountCompression;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ChangeMetadataArgsV0 {
@@ -37,7 +37,7 @@ pub struct ChangeMetadataV0<'info> {
   pub storage: Box<Account<'info, HotspotStorageV0>>,
   #[account(mut)]
   pub hotspot_owner: Signer<'info>,
-   /// CHECK: THe merkle tree
+  /// CHECK: THe merkle tree
   pub merkle_tree: UncheckedAccount<'info>,
   #[account(
         seeds = [merkle_tree.key().as_ref()],
@@ -51,7 +51,7 @@ pub struct ChangeMetadataV0<'info> {
     associated_token::authority = hotspot_owner,
   )]
   pub owner_dc_ata: Box<Account<'info, TokenAccount>>,
-  
+
   #[account(
     has_one = dc_mint,
     has_one = merkle_tree,
@@ -59,9 +59,7 @@ pub struct ChangeMetadataV0<'info> {
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
 
-  #[account(
-    mut,
-  )]
+  #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,
 
   #[account(
@@ -106,8 +104,8 @@ impl<'info> ChangeMetadataV0<'info> {
 }
 
 pub fn handler<'info>(
-  ctx: Context<'_, '_, '_, 'info, ChangeMetadataV0<'info>>, 
-  args: ChangeMetadataArgsV0
+  ctx: Context<'_, '_, '_, 'info, ChangeMetadataV0<'info>>,
+  args: ChangeMetadataArgsV0,
 ) -> Result<()> {
   verify_compressed_nft(VerifyCompressedNftArgs {
     hash: args.hash,
