@@ -45,4 +45,18 @@ pub mod circuit_breaker {
   pub fn transfer_v0(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
     instructions::transfer_v0::handler(ctx, args)
   }
+
+  pub fn update_account_windowed_breaker_v0(
+    ctx: Context<UpdateAccountWindowedBreakerV0>,
+    args: UpdateAccountWindowedBreakerArgsV0,
+  ) -> Result<()> {
+    instructions::update_account_windowed_breaker_v0::handler(ctx, args)
+  }
+
+  pub fn update_mint_windowed_breaker_v0(
+    ctx: Context<UpdateMintWindowedBreakerV0>,
+    args: UpdateMintWindowedBreakerArgsV0,
+  ) -> Result<()> {
+    instructions::update_mint_windowed_breaker_v0::handler(ctx, args)
+  }
 }

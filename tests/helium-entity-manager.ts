@@ -77,7 +77,7 @@ describe("helium-entity-manager", () => {
     );
 
     expect(account.authority.toBase58()).eq(
-      onboardingServerKeypair.publicKey.toBase58()
+      provider.wallet.publicKey.toBase58()
     );
     expect(account.collection.toBase58()).eq(collection.toBase58());
     expect(account.dcFee.toString()).eq(toBN(DC_FEE, 8).toString());
@@ -162,13 +162,31 @@ describe("helium-entity-manager", () => {
       expect(issuerAccount.count.toNumber()).eq(1);
     });
 
+    it("updates hotspot config", async() => {
+      const { hotspotConfig, onboardingServerKeypair } =
+        await initTestHotspotConfig(hsProgram, provider, subDao);
+      
+      await hsProgram.methods.updateHotspotConfigV0({
+        newAuthority: PublicKey.default,
+        dcFee: null,
+        onboardingServer: PublicKey.default,
+      }).accounts({
+        hotspotConfig,
+      }).rpc();
+
+      const acc = await hsProgram.account.hotspotConfigV0.fetch(hotspotConfig);
+      assert.isTrue(PublicKey.default.equals(acc.authority));
+      assert.isTrue(PublicKey.default.equals(acc.onboardingServer));
+    });
+
+    
     describe("with hotspot", () => {
       let hotspot: PublicKey;
       let hotspotOwner: Keypair;
       before(async () => {
         const ecc = (await HeliumKeypair.makeRandom()).address.publicKey;
         hotspotOwner = Keypair.generate();
-  
+        
         const method = hsProgram.methods
           .issueHotspotV0({ eccCompact: Buffer.from(ecc), uri: '', isFullHotspot: true })
           .accounts({
@@ -184,7 +202,7 @@ describe("helium-entity-manager", () => {
         const { hotspot: hsp } = await method.pubkeys();
         hotspot = hsp!;
 
-        await method.rpc({ skipPreflight: true });
+        await method.rpc();
 
         await dcProgram.methods
           .mintDataCreditsV0({
@@ -193,6 +211,19 @@ describe("helium-entity-manager", () => {
           .accounts({ dcMint, recipient: hotspotOwner.publicKey })
           .rpc();
       });
+
+      it("updates hotspot issuer", async() => {
+        await hsProgram.methods.updateHotspotIssuerV0({
+          maker: PublicKey.default,
+          authority: PublicKey.default,
+        }).accounts({
+          hotspotIssuer,
+        }).rpc();
+  
+        const acc = await hsProgram.account.hotspotIssuerV0.fetch(hotspotIssuer);
+        assert.isTrue(PublicKey.default.equals(acc.authority));
+        assert.isTrue(PublicKey.default.equals(acc.maker));
+      })
 
       it("changes the metadata", async() => {
         const location = new BN(1000);
@@ -241,6 +272,5 @@ describe("helium-entity-manager", () => {
         expect(method2.rpc()).to.be.rejected
       });
     });
-
   });
 });
