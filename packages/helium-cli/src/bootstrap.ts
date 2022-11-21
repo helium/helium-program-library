@@ -351,8 +351,7 @@ async function run() {
     hardcodeHotspots.map(async (hotspot, index) => {
       const create = await hemProgram.methods
         .issueHotspotV0({
-          eccCompact: Buffer.from(Address.fromB58(hotspot.eccKey).publicKey),
-          uri: hotspot.uri,
+          hotspotKey: hotspot.eccKey,
           isFullHotspot: true,
         })
         .preInstructions([

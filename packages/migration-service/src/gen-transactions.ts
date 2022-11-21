@@ -86,11 +86,8 @@ async function run() {
   );
   const pubkeys = await hemProgram.methods
     .issueHotspotV0({
-      eccCompact: Buffer.from(
-        await (
-          await HeliumKeypair.makeRandom()
-        ).publicKey
-      ),
+      hotspotKey: (await HeliumKeypair.makeRandom()).address.b58,
+      isFullHotspot: true
     })
     .accounts({
       hotspotOwner: provider.wallet.publicKey,
@@ -102,7 +99,7 @@ async function run() {
     hotspots.map(async (hotspot, index) => {
       const create = await hemProgram.methods
         .genesisIssueHotspotV0({
-          eccCompact: Buffer.from(Address.fromB58(hotspot).publicKey),
+          hotspotKey: hotspot,
         })
         .accounts({
           collection: pubkeys.collection,

@@ -5,6 +5,7 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
 };
+use mpl_bubblegum::utils::get_asset_id;
 use mpl_bubblegum::{program::Bubblegum, state::TreeConfig};
 use spl_account_compression::program::SplAccountCompression;
 use shared_utils::*;
@@ -29,9 +30,9 @@ pub struct ChangeMetadataArgsV0 {
 #[derive(Accounts)]
 #[instruction(args: ChangeMetadataArgsV0)]
 pub struct ChangeMetadataV0<'info> {
-  pub hotspot: Box<Account<'info, Mint>>,
   #[account(
-    mut
+    mut,
+    constraint = storage.asset == get_asset_id(&merkle_tree.key(), u64::try_from(args.index).unwrap())
   )]
   pub storage: Box<Account<'info, HotspotStorageV0>>,
   #[account(mut)]
@@ -52,8 +53,6 @@ pub struct ChangeMetadataV0<'info> {
   pub owner_dc_ata: Box<Account<'info, TokenAccount>>,
   
   #[account(
-    seeds = ["hotspot_config".as_bytes(), hotspot_config.sub_dao.as_ref(), hotspot_config.symbol.as_bytes()],
-    bump,
     has_one = dc_mint,
     has_one = merkle_tree,
     constraint = args.gain.is_none() || (args.gain.unwrap() <= hotspot_config.max_gain && args.gain.unwrap() >= hotspot_config.min_gain) @ ErrorCode::InvalidGain

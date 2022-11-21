@@ -84,7 +84,8 @@ export const initTestHotspotConfig = async (
 
   const onboardingServerKeypair = Keypair.generate();
   const merkle = Keypair.generate();
-  const space = getConcurrentMerkleTreeAccountSize(26, 1024);
+  // Testing -- small tree
+  const space = getConcurrentMerkleTreeAccountSize(3, 8);
   const method = await program.methods
     .initializeHotspotConfigV0({
       name: "Helium Network Hotspots",

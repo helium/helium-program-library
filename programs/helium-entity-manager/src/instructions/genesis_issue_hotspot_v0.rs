@@ -12,10 +12,11 @@ use mpl_bubblegum::{
   state::TreeConfig,
 };
 use spl_account_compression::{program::SplAccountCompression, Wrapper};
+use anchor_lang::solana_program::hash::hash;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct GenesisIssueHotspotArgsV0 {
-  pub ecc_compact: Vec<u8>,
+  pub hotspot_key: String,
 }
 
 #[derive(Accounts)]
@@ -45,7 +46,7 @@ pub struct GenesisIssueHotspotV0<'info> {
     space = 8 + 60 + std::mem::size_of::<HotspotStorageV0>(),
     seeds = [
       "storage".as_bytes(),
-      &args.ecc_compact
+      &hash(args.hotspot_key.as_bytes()).to_bytes()
     ],
     bump
   )]
@@ -105,8 +106,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,
   );
-  let decoded = bs58::encode(args.ecc_compact.clone()).into_string();
-  let animal_name: AnimalName = decoded
+  let animal_name: AnimalName = args.hotspot_key
     .parse()
     .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
 
@@ -120,7 +120,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
   let metadata = MetadataArgs {
     name: animal_name.to_string(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("https://mobile-metadata.test-helium.com/{}", decoded),
+    uri: format!("https://mobile-metadata.test-helium.com/{}", args.hotspot_key),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
@@ -144,7 +144,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
 
   ctx.accounts.storage.set_inner(HotspotStorageV0 {
     asset: asset_id,
-    ecc_compact: args.ecc_compact,
+    hotspot_key: args.hotspot_key,
     location: None,
     bump_seed: ctx.bumps["storage"],
     /// TODO: Fill these out

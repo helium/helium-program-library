@@ -107,7 +107,7 @@ describe("helium-sub-daos", () => {
     let subDaoEpochInfo: PublicKey;
 
     async function createHospot() {
-      const ecc = await (await HeliumKeypair.makeRandom()).address.publicKey;
+      const ecc = await (await HeliumKeypair.makeRandom()).address.b58;
       const hotspotOwner = Keypair.generate().publicKey;
 
       await dcProgram.methods
@@ -118,7 +118,7 @@ describe("helium-sub-daos", () => {
         .rpc({ skipPreflight: true });
 
       const method = await hemProgram.methods
-        .issueHotspotV0({ eccCompact: Buffer.from(ecc), isFullHotspot: true })
+        .issueHotspotV0({ hotspotKey: ecc, isFullHotspot: true })
         .accounts({
           hotspotIssuer,
           maker: makerKeypair.publicKey,

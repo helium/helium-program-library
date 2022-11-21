@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
+import crypto from "crypto";
 
 export const hotspotConfigKey = (
   subDao: PublicKey,
@@ -41,13 +42,20 @@ export const hotspotIssuerKey = (
   );
 
 export const hotspotStorageKey = (
-  eccCompact: Buffer,
+  hotspotKey: string,
   programId: PublicKey = PROGRAM_ID
-) =>
-  PublicKey.findProgramAddressSync(
-    [Buffer.from("storage", "utf-8"), eccCompact],
+) => {
+  let hexString = crypto
+    .createHash("sha256")
+    .update(hotspotKey, "utf-8")
+    .digest("hex");
+  let seed = Uint8Array.from(Buffer.from(hexString, "hex"));
+
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("storage", "utf-8"), seed],
     programId
   );
+};
 
 export const collectionMetadataKey = (
   collection: PublicKey,

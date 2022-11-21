@@ -29,6 +29,8 @@ pub struct InitializeHotspotConfigArgsV0 {
   pub dataonly_location_staking_fee: u64,
 }
 
+pub const TESTING: bool = std::option_env!("TESTING").is_some();
+
 #[derive(Accounts)]
 #[instruction(args: InitializeHotspotConfigArgsV0)]
 pub struct InitializeHotspotConfigV0<'info> {
@@ -198,8 +200,8 @@ pub fn handler(
       },
       signer_seeds,
     ),
-    26,
-    1024,
+    if TESTING { 3 } else { 26 },
+    if TESTING { 8 } else { 1024 },
     None,
   )?;
 
