@@ -28,7 +28,7 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 tests/**/*.ts"
-build-deps = "anchor run build-metadata"
+build-deps = "anchor run build-metadata && anchor run build-vsr"
 build-metadata = "cd deps/metaplex-program-library/token-metadata/program && pwd && cargo build-bpf && cd ../../../../"
 build-vsr = "pushd deps/helium-voter-stake-registry && pwd && anchor build && popd"
 

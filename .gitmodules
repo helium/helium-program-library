@@ -4,3 +4,4 @@
 [submodule "deps/helium-voter-stake-registry"]
 	path = deps/helium-voter-stake-registry
 	url = https://github.com/helium/voter-stake-registry
+	branch = feature/minimum-lockup
