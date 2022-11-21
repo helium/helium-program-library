@@ -302,6 +302,10 @@ async function run() {
         metadataUrl: `${argv.bucket}/mobile_collection.json`,
         dcFee: toBN(5, 0),
         onboardingServer: onboardingServerKeypair.publicKey,
+        minGain: 10,
+        maxGain: 150,
+        fullLocationStakingFee: toBN(1000000, 8),
+        dataonlyLocationStakingFee: toBN(500000, 8),
       })
       .accounts({ dcMint: dcKeypair.publicKey, subDao: mobileSubdao })
       .rpc({ skipPreflight: true });
@@ -332,6 +336,7 @@ async function run() {
         .issueHotspotV0({
           eccCompact: Buffer.from(Address.fromB58(hotspot.eccKey).publicKey),
           uri: hotspot.uri,
+          isFullHotspot: true,
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
@@ -353,13 +358,13 @@ async function run() {
 
 async function createAndMint({
   provider,
-  mintKeypair,
+  mintKeypair = Keypair.generate(),
   amount,
   metadataUrl,
   decimals = 8
 }: {
   provider: anchor.AnchorProvider,
-  mintKeypair: Keypair,
+  mintKeypair?: Keypair,
   amount: number,
   metadataUrl: string,
   decimals?: number

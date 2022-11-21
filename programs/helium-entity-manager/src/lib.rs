@@ -44,5 +44,11 @@ pub mod helium_entity_manager {
     args: UpdateHotspotIssuerArgsV0,
   ) -> Result<()> {
     update_hotspot_issuer_v0::handler(ctx, args)
+
+  pub fn change_metadata_v0(
+    ctx: Context<ChangeMetadataV0>,
+    args: ChangeMetadataArgsV0,
+  ) -> Result<()> {
+    change_metadata_v0::handler(ctx, args)
   }
 }

@@ -2,25 +2,15 @@ import { PublicKey } from "@solana/web3.js";
 import {
   ataResolver,
   combineResolvers,
+  heliumCommonResolver,
   resolveIndividual,
 } from "@helium/spl-utils";
-import { PROGRAM_ID } from "./constants";
 import { subDaoEpochInfoResolver } from "@helium/helium-sub-daos-sdk";
 import { hotspotKey } from "./pdas";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 
 export const heliumEntityManagerResolvers = combineResolvers(
-  resolveIndividual(async ({ path }) => {
-    switch (path[path.length - 1]) {
-      case "dataCreditsProgram":
-        return new PublicKey("credacwrBVewZAgCwNgowCSMbCiepuesprUWPBeLTSg");
-      case "tokenMetadataProgram":
-        return new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-      case "heliumSubDaosProgram":
-        return new PublicKey("hdaojPkgSD8bciDc1w2Z4kXFFibCXngJiw2GRpEL7Wf");
-      default:
-        return;
-    }
-  }),
+  heliumCommonResolver,
   ataResolver({
     instruction: "initializeHotspotConfigV0",
     account: "tokenAccount",
@@ -34,6 +24,11 @@ export const heliumEntityManagerResolvers = combineResolvers(
       )[0];
     }
   }),
+  resolveIndividual(async ({ path, accounts }) => {
+    if (path[path.length - 1] === "ownerHotspotAta" && (accounts.owner || accounts.hotspotOwner) && accounts.hotspot) {
+      return getAssociatedTokenAddress(accounts.hotspot as PublicKey, (accounts.owner || accounts.hotspotOwner) as PublicKey)
+    }
+  }),
   ataResolver({
     instruction: "issueHotspotV0",
     account: "recipientTokenAccount",
@@ -45,6 +40,12 @@ export const heliumEntityManagerResolvers = combineResolvers(
     account: "dcBurner",
     mint: "dcMint",
     owner: "dcFeePayer",
+  }),
+  ataResolver({
+    instruction: "changeMetadataV0",
+    account: "ownerDcAta",
+    mint: "dcMint",
+    owner: "hotspotOwner",
   }),
   subDaoEpochInfoResolver
 );
