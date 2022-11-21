@@ -5,8 +5,11 @@ use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::{set_authority, Mint, SetAuthority, Token, TokenAccount};
 use circuit_breaker::{
-  cpi::{accounts::InitializeMintWindowedBreakerV0, initialize_mint_windowed_breaker_v0},
-  CircuitBreaker, InitializeMintWindowedBreakerArgsV0,
+  cpi::{
+    accounts::InitializeAccountWindowedBreakerV0, accounts::InitializeMintWindowedBreakerV0,
+    initialize_account_windowed_breaker_v0, initialize_mint_windowed_breaker_v0,
+  },
+  CircuitBreaker, InitializeAccountWindowedBreakerArgsV0, InitializeMintWindowedBreakerArgsV0,
 };
 use circuit_breaker::{
   ThresholdType as CBThresholdType,
@@ -102,6 +105,23 @@ pub struct InitializeSubDaoV0<'info> {
     constraint = rewards_escrow.mint == dnt_mint.key()
   )]
   pub rewards_escrow: Box<Account<'info, TokenAccount>>,
+
+  /// CHECK: Initialized via cpi
+  #[account(
+    mut,
+    seeds = ["account_windowed_breaker".as_bytes(), dnt_mint.key().as_ref()],
+    seeds::program = circuit_breaker_program.key(),
+    bump
+  )]
+  pub staker_pool_circuit_breaker: AccountInfo<'info>,
+  #[account(
+    init,
+    payer = payer,
+    associated_token::mint = dnt_mint,
+    associated_token::authority = sub_dao,
+  )]
+  pub staker_pool: Box<Account<'info, TokenAccount>>,
+
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub treasury_management_program: Program<'info, TreasuryManagement>,
@@ -111,20 +131,41 @@ pub struct InitializeSubDaoV0<'info> {
   pub rent: Sysvar<'info, Rent>,
 }
 
+impl<'info> InitializeSubDaoV0<'info> {
+  fn initialize_staker_pool_breaker_ctx(
+    &self,
+  ) -> CpiContext<'_, '_, '_, 'info, InitializeAccountWindowedBreakerV0<'info>> {
+    let cpi_accounts = InitializeAccountWindowedBreakerV0 {
+      payer: self.payer.to_account_info(),
+      circuit_breaker: self.staker_pool_circuit_breaker.to_account_info(),
+      token_account: self.staker_pool.to_account_info(),
+      owner: self.sub_dao.to_account_info(),
+      token_program: self.token_program.to_account_info(),
+      system_program: self.system_program.to_account_info(),
+      rent: self.rent.to_account_info(),
+    };
+    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
+  }
+
+  fn initialize_dnt_mint_breaker_ctx(
+    &self,
+  ) -> CpiContext<'_, '_, '_, 'info, InitializeMintWindowedBreakerV0<'info>> {
+    let cpi_accounts = InitializeMintWindowedBreakerV0 {
+      payer: self.payer.to_account_info(),
+      circuit_breaker: self.circuit_breaker.to_account_info(),
+      mint: self.dnt_mint.to_account_info(),
+      mint_authority: self.dnt_mint_authority.to_account_info(),
+      token_program: self.token_program.to_account_info(),
+      system_program: self.system_program.to_account_info(),
+      rent: self.rent.to_account_info(),
+    };
+    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
+  }
+}
+
 pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -> Result<()> {
   initialize_mint_windowed_breaker_v0(
-    CpiContext::new(
-      ctx.accounts.circuit_breaker_program.to_account_info(),
-      InitializeMintWindowedBreakerV0 {
-        payer: ctx.accounts.payer.to_account_info(),
-        circuit_breaker: ctx.accounts.circuit_breaker.to_account_info(),
-        mint: ctx.accounts.dnt_mint.to_account_info(),
-        mint_authority: ctx.accounts.dnt_mint_authority.to_account_info(),
-        token_program: ctx.accounts.token_program.to_account_info(),
-        system_program: ctx.accounts.system_program.to_account_info(),
-        rent: ctx.accounts.rent.to_account_info(),
-      },
-    ),
+    ctx.accounts.initialize_dnt_mint_breaker_ctx(),
     InitializeMintWindowedBreakerArgsV0 {
       authority: args.authority,
       config: CBWindowedCircuitBreakerConfigV0 {
@@ -139,6 +180,20 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
             .unwrap(),
       },
       mint_authority: ctx.accounts.sub_dao.key(),
+    },
+  )?;
+
+  initialize_account_windowed_breaker_v0(
+    ctx.accounts.initialize_staker_pool_breaker_ctx(),
+    InitializeAccountWindowedBreakerArgsV0 {
+      authority: args.authority,
+      config: CBWindowedCircuitBreakerConfigV0 {
+        // Only allow distributing 20% of the total staker pool per epoch.
+        window_size_seconds: u64::try_from(EPOCH_LENGTH).unwrap(),
+        threshold_type: CBThresholdType::Percent,
+        threshold: u64::MAX.checked_mul(20).unwrap().checked_div(100).unwrap(),
+      },
+      owner: ctx.accounts.sub_dao.key(),
     },
   )?;
 
@@ -192,6 +247,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     vehnt_staked: 0,
     vehnt_last_calculated_ts: ctx.accounts.clock.unix_timestamp,
     vehnt_fall_rate: 0,
+    staker_pool: ctx.accounts.staker_pool.key(),
   });
 
   resize_to_fit(

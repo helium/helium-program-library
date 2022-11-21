@@ -54,6 +54,7 @@ pub struct UnstakeV0<'info> {
 
 pub fn handler(ctx: Context<UnstakeV0>, args: UnstakeArgsV0) -> Result<()> {
   // TODO currently this will unstake the whole amount, add ability to partially unstake
+
   // load the vehnt information
   let voter = ctx.accounts.vsr_voter.load()?;
   let registrar = &ctx.accounts.registrar.load()?;
@@ -63,6 +64,11 @@ pub fn handler(ctx: Context<UnstakeV0>, args: UnstakeArgsV0) -> Result<()> {
   let available_vehnt = d_entry.voting_power(voting_mint_config, curr_ts)?;
   let future_vehnt = d_entry.voting_power(voting_mint_config, curr_ts + 1)?;
   let fall_rate = available_vehnt.checked_sub(future_vehnt).unwrap();
+
+  // don't allow unstake without claiming available rewards
+  let curr_epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
+  assert!(ctx.accounts.stake_position.last_claimed_epoch == curr_epoch - 1);
+  assert!(ctx.accounts.stake_position.hnt_amount <= d_entry.amount_deposited_native);
 
   let ratio = ctx
     .accounts
@@ -77,10 +83,7 @@ pub fn handler(ctx: Context<UnstakeV0>, args: UnstakeArgsV0) -> Result<()> {
 
   // remove this StakePosition information from the subdao and epoch
   sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(position_vehnt).unwrap();
-  sub_dao.vehnt_fall_rate = sub_dao
-    .vehnt_fall_rate
-    .checked_sub(position_vehnt.checked_mul(fall_rate).unwrap())
-    .unwrap();
+  sub_dao.vehnt_fall_rate = sub_dao.vehnt_fall_rate.checked_sub(fall_rate).unwrap();
   ctx.accounts.sub_dao_epoch_info.total_vehnt = sub_dao.vehnt_staked;
 
   // TODO remove position from staker

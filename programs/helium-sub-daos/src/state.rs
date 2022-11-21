@@ -91,6 +91,7 @@ pub struct SubDaoEpochInfoV0 {
   /// Precise number with 12 decimals
   pub utility_score: Option<u128>,
   pub rewards_issued: bool,
+  pub staking_rewards_issued: u64,
   pub bump_seed: u8,
 }
 

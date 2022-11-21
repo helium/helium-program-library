@@ -63,6 +63,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
   let curr_ts = registrar.clock_unix_timestamp();
   let available_vehnt = d_entry.voting_power(voting_mint_config, curr_ts)?;
   let future_vehnt = d_entry.voting_power(voting_mint_config, curr_ts + 1)?;
+  let fall_rate = available_vehnt.checked_sub(future_vehnt).unwrap();
 
   assert!(available_vehnt >= args.vehnt_amount);
 
@@ -78,26 +79,19 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     // new StakePosition
     // vehnt_staked += vehnt_amount
     // vehnt_staked -= vehnt_fall_rate * (curr_ts - vehnt_last_calculated_ts)
-    // vehnt_fall_rate = vehnt_fall_rate + (vehnt_amount * vehnt_fall_per_second) = vehnt_fall_rate + (vehnt_amount * (current_vehnt - future_vehnt))
+    // vehnt_fall_rate = vehnt_fall_rate + (current_vehnt - future_vehnt)
 
     let sub_dao = &mut ctx.accounts.sub_dao;
 
     update_subdao_vehnt(sub_dao, curr_ts);
     sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_add(args.vehnt_amount).unwrap();
-    sub_dao.vehnt_fall_rate = sub_dao
-      .vehnt_fall_rate
-      .checked_add(
-        args
-          .vehnt_amount
-          .checked_mul(available_vehnt.checked_sub(future_vehnt).unwrap())
-          .unwrap(),
-      )
-      .unwrap();
+    sub_dao.vehnt_fall_rate = sub_dao.vehnt_fall_rate.checked_add(fall_rate).unwrap();
 
     ctx.accounts.sub_dao_epoch_info.total_vehnt = sub_dao.vehnt_staked;
 
     let ratio = args.vehnt_amount.checked_div(available_vehnt).unwrap();
     let underlying_hnt = ratio.checked_mul(d_entry.amount_deposited_native).unwrap();
+
     ctx.accounts.stake_position.set_inner(StakePosition {
       hnt_amount: underlying_hnt,
       deposit_entry_idx: args.deposit_entry_idx,

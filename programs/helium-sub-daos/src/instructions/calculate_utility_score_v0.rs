@@ -71,6 +71,8 @@ pub fn handler(
   let epoch_info = &mut ctx.accounts.sub_dao_epoch_info;
   let sub_dao = &mut ctx.accounts.sub_dao;
   update_subdao_vehnt(sub_dao, ctx.accounts.clock.unix_timestamp);
+  epoch_info.total_vehnt = sub_dao.vehnt_staked;
+
   let dc_burned = PreciseNumber::new(epoch_info.dc_burned.into())
     .or_arith_error()?
     .checked_div(&PreciseNumber::new(100000_u128).or_arith_error()?) // DC has 8 decimals, plus 10^5 to get to dollars.
