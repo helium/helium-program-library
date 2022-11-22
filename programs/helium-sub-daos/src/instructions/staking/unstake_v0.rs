@@ -58,8 +58,6 @@ pub fn handler(ctx: Context<UnstakeV0>, args: UnstakeArgsV0) -> Result<()> {
   let voting_mint_config = &registrar.voting_mints[d_entry.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
   let available_vehnt = d_entry.voting_power(voting_mint_config, curr_ts)?;
-  let future_vehnt = d_entry.voting_power(voting_mint_config, curr_ts + 1)?;
-  let fall_rate = available_vehnt.checked_sub(future_vehnt).unwrap();
 
   // don't allow unstake without claiming available rewards
   let curr_epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
@@ -79,7 +77,10 @@ pub fn handler(ctx: Context<UnstakeV0>, args: UnstakeArgsV0) -> Result<()> {
 
   // remove this StakePosition information from the subdao and epoch
   sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(position_vehnt).unwrap();
-  sub_dao.vehnt_fall_rate = sub_dao.vehnt_fall_rate.checked_sub(fall_rate).unwrap();
+  sub_dao.vehnt_fall_rate = sub_dao
+    .vehnt_fall_rate
+    .checked_sub(ctx.accounts.stake_position.fall_rate)
+    .unwrap();
   ctx.accounts.sub_dao_epoch_info.total_vehnt = sub_dao.vehnt_staked;
 
   // TODO remove position from staker

@@ -1,16 +1,15 @@
-use crate::{current_epoch, state::*, utils::*};
+use crate::{current_epoch, error::ErrorCode, state::*, utils::*};
 use anchor_lang::prelude::*;
 use voter_stake_registry::state::{Registrar, Voter};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct StakeArgsV0 {
-  pub vehnt_amount: u64,
+pub struct RefreshPositionArgsV0 {
   pub deposit_entry_idx: u8,
 }
 
 #[derive(Accounts)]
-#[instruction(args: StakeArgsV0)]
-pub struct StakeV0<'info> {
+#[instruction(args: RefreshPositionArgsV0)]
+pub struct RefreshPositionV0<'info> {
   #[account(
     mut,
     seeds = [vsr_voter.load()?.registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
@@ -30,9 +29,7 @@ pub struct StakeV0<'info> {
   )]
   pub staker: Box<Account<'info, Staker>>,
   #[account(
-    init,
-    space = 60 + 8 + std::mem::size_of::<StakePosition>(),
-    payer = voter_authority,
+    mut,
     seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &[args.deposit_entry_idx]],
     bump,
   )]
@@ -54,7 +51,7 @@ pub struct StakeV0<'info> {
   pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<RefreshPositionV0>, args: RefreshPositionArgsV0) -> Result<()> {
   // load the vehnt information
   let voter = ctx.accounts.vsr_voter.load()?;
   let registrar = &ctx.accounts.registrar.load()?;
@@ -65,43 +62,36 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
   let future_vehnt = d_entry.voting_power(voting_mint_config, curr_ts + 1)?;
   let fall_rate = available_vehnt.checked_sub(future_vehnt).unwrap();
 
-  assert!(available_vehnt >= args.vehnt_amount);
-
-  let curr_epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
-
-  if ctx.accounts.stake_position.hnt_amount > 0 {
-    // this is updating an existing StakePosition
-
-    // assert that all available rewards have been claimed
-    assert!(ctx.accounts.stake_position.last_claimed_epoch == curr_epoch - 1);
-    // TODO allow updates
-  } else {
-    // new StakePosition
-    // vehnt_staked += vehnt_amount
-    // vehnt_staked -= vehnt_fall_rate * (curr_ts - vehnt_last_calculated_ts)
-    // vehnt_fall_rate = vehnt_fall_rate + (current_vehnt - future_vehnt)
-
-    let sub_dao = &mut ctx.accounts.sub_dao;
-
-    update_subdao_vehnt(sub_dao, curr_ts);
-    sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_add(args.vehnt_amount).unwrap();
-    sub_dao.vehnt_fall_rate = sub_dao.vehnt_fall_rate.checked_add(fall_rate).unwrap();
-
-    ctx.accounts.sub_dao_epoch_info.total_vehnt = sub_dao.vehnt_staked;
-
-    let ratio = args.vehnt_amount.checked_div(available_vehnt).unwrap();
-    let underlying_hnt = ratio.checked_mul(d_entry.amount_deposited_native).unwrap();
-    let position_fall_rate = ratio.checked_mul(fall_rate).unwrap();
-
-    ctx.accounts.stake_position.set_inner(StakePosition {
-      hnt_amount: underlying_hnt,
-      deposit_entry_idx: args.deposit_entry_idx,
-      sub_dao: ctx.accounts.sub_dao.key(),
-      last_claimed_epoch: curr_epoch,
-      fall_rate: position_fall_rate,
-      purged: false,
-    });
-    // TODO add stakeposition to staker
+  if ctx.accounts.stake_position.hnt_amount <= d_entry.amount_deposited_native {
+    // this position doesn't need to be refreshed
+    error!(ErrorCode::RefreshNotNeeded);
   }
+  // this position needs to be reduced
+
+  let sub_dao = &mut ctx.accounts.sub_dao;
+  update_subdao_vehnt(sub_dao, curr_ts);
+
+  let excess_ratio = ctx
+    .accounts
+    .stake_position
+    .hnt_amount
+    .checked_div(d_entry.amount_deposited_native)
+    .unwrap();
+  let old_position_vehnt = available_vehnt.checked_mul(excess_ratio).unwrap();
+  assert!(old_position_vehnt > available_vehnt);
+  assert!(ctx.accounts.stake_position.fall_rate > fall_rate);
+
+  let vehnt_diff = old_position_vehnt.checked_sub(available_vehnt).unwrap();
+  let fall_rate_diff = ctx
+    .accounts
+    .stake_position
+    .fall_rate
+    .checked_sub(fall_rate)
+    .unwrap();
+
+  // update subdao calculations
+  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(vehnt_diff).unwrap();
+  sub_dao.vehnt_fall_rate = sub_dao.vehnt_fall_rate.checked_sub(fall_rate_diff).unwrap();
+  ctx.accounts.sub_dao_epoch_info.total_vehnt = sub_dao.vehnt_staked;
   Ok(())
 }

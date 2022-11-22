@@ -28,4 +28,7 @@ pub enum ErrorCode {
 
   #[msg("This staking position has already been purged")]
   PositionAlreadyPurged,
+
+  #[msg("This position is healthy, refresh not needed")]
+  RefreshNotNeeded,
 }
