@@ -100,7 +100,7 @@ export const initTestHotspotConfig = async (
     });
 
   const { collection, hotspotConfig } = await method.pubkeys();
-  await method.rpc({ skipPreflight: true });
+  await method.rpc();
 
   return {
     collection: collection!,

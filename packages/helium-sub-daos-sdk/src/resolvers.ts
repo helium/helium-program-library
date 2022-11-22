@@ -49,5 +49,11 @@ export const heliumSubDaosResolvers = combineResolvers(
     account: "treasury",
     mint: "hntMint",
     owner: "treasuryManagement",
+  }),
+  ataResolver({
+    instruction: "initializeSubDaoV0",
+    account: "stakerPool",
+    mint: "dntMint",
+    owner: "subDao"
   })
 );

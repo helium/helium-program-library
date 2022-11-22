@@ -53,8 +53,8 @@ pub mod helium_sub_daos {
     claim_rewards_v0::handler(ctx, args)
   }
 
-  pub fn purge_position_v0(ctx: Context<PurgePositionV0>, args: PurgePositionArgsV0) -> Result<()> {
-    purge_position_v0::handler(ctx, args)
+  pub fn purge_position_v0(ctx: Context<PurgePositionV0>) -> Result<()> {
+    purge_position_v0::handler(ctx)
   }
 
   pub fn refresh_position_v0(

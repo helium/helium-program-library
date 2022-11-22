@@ -24,12 +24,6 @@ pub struct StakeV0<'info> {
   pub registrar: AccountLoader<'info, Registrar>,
 
   #[account(
-    init_if_needed,
-    space = 60 + 8 + std::mem::size_of::<Staker>(),
-    payer = voter_authority
-  )]
-  pub staker: Box<Account<'info, Staker>>,
-  #[account(
     init,
     space = 60 + 8 + std::mem::size_of::<StakePosition>(),
     payer = voter_authority,
@@ -101,7 +95,6 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
       fall_rate: position_fall_rate,
       purged: false,
     });
-    // TODO add stakeposition to staker
   }
   Ok(())
 }

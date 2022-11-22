@@ -22,8 +22,6 @@ pub struct UnstakeV0<'info> {
   pub voter_authority: Signer<'info>,
   pub registrar: AccountLoader<'info, Registrar>,
 
-  #[account(mut)]
-  pub staker: Box<Account<'info, Staker>>,
   #[account(
     mut,
     close = voter_authority,
@@ -83,6 +81,5 @@ pub fn handler(ctx: Context<UnstakeV0>, args: UnstakeArgsV0) -> Result<()> {
     .unwrap();
   ctx.accounts.sub_dao_epoch_info.total_vehnt = sub_dao.vehnt_staked;
 
-  // TODO remove position from staker
   Ok(())
 }

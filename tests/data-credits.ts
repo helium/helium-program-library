@@ -102,7 +102,7 @@ describe("data-credits", () => {
         config: {
           windowSizeSeconds: new BN(60),
           thresholdType: ThresholdType.Absolute as never,
-          threshold: new BN("10000000000000000000")
+          threshold: new BN("100000000000")
         }
       })
       .accounts({ hntMint, dcMint, payer: me });

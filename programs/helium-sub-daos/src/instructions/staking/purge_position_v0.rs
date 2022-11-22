@@ -1,12 +1,8 @@
-use crate::{current_epoch, error::ErrorCode, state::*, utils::*};
+use crate::{current_epoch, error::ErrorCode, state::*};
 use anchor_lang::prelude::*;
 use voter_stake_registry::state::{Registrar, Voter};
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct PurgePositionArgsV0 {}
-
 #[derive(Accounts)]
-#[instruction(args: PurgePositionArgsV0)]
 pub struct PurgePositionV0<'info> {
   #[account(
     mut,
@@ -43,18 +39,17 @@ pub struct PurgePositionV0<'info> {
   pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn handler(ctx: Context<PurgePositionV0>, args: PurgePositionArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {
   // load the vehnt information
   let voter = ctx.accounts.vsr_voter.load()?;
   let registrar = &ctx.accounts.registrar.load()?;
   let d_entry = voter.deposits[ctx.accounts.stake_position.deposit_entry_idx as usize];
-  let voting_mint_config = &registrar.voting_mints[d_entry.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
   if !d_entry.lockup.expired(curr_ts) {
-    error!(ErrorCode::LockupNotExpired);
+    return Err(error!(ErrorCode::LockupNotExpired));
   }
   if ctx.accounts.stake_position.purged {
-    error!(ErrorCode::PositionAlreadyPurged);
+    return Err(error!(ErrorCode::PositionAlreadyPurged));
   }
   let time_since_expiry = d_entry.lockup.seconds_since_expiry(curr_ts);
 

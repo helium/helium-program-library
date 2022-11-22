@@ -95,7 +95,7 @@ export async function initTestSubdao(
       hntMint: daoAcc.hntMint,
     });
   const { subDao, treasury, treasuryCircuitBreaker } = await method.pubkeys();
-  await method.rpc({ skipPreflight: true });
+  await method.rpc();
 
   return {
     treasuryCircuitBreaker: treasuryCircuitBreaker!,

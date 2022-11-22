@@ -23,12 +23,6 @@ pub struct RefreshPositionV0<'info> {
   pub registrar: AccountLoader<'info, Registrar>,
 
   #[account(
-    init_if_needed,
-    space = 60 + 8 + std::mem::size_of::<Staker>(),
-    payer = voter_authority
-  )]
-  pub staker: Box<Account<'info, Staker>>,
-  #[account(
     mut,
     seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &[args.deposit_entry_idx]],
     bump,
@@ -64,7 +58,7 @@ pub fn handler(ctx: Context<RefreshPositionV0>, args: RefreshPositionArgsV0) -> 
 
   if ctx.accounts.stake_position.hnt_amount <= d_entry.amount_deposited_native {
     // this position doesn't need to be refreshed
-    error!(ErrorCode::RefreshNotNeeded);
+    return Err(error!(ErrorCode::RefreshNotNeeded));
   }
   // this position needs to be reduced
 

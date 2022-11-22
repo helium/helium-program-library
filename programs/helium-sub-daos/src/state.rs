@@ -67,12 +67,6 @@ pub struct DaoEpochInfoV0 {
 
 #[account]
 #[derive(Default)]
-pub struct Staker {
-  pub positions: Vec<StakePosition>,
-}
-
-#[account]
-#[derive(Default)]
 pub struct StakePosition {
   pub hnt_amount: u64,
   pub deposit_entry_idx: u8, // the deposit_entry in vsr that this position is drawing from

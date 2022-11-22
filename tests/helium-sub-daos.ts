@@ -22,6 +22,9 @@ import { DC_FEE, ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
 import { createNft } from "@helium/spl-utils";
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
+import { VoterStakeRegistry, IDL } from "../deps/helium-voter-stake-registry/src/voter_stake_registry";
+
+const VSR_PID = new PublicKey("vsrZ1Nfkxmt1hVaB7ftvcj7XpRoQ1YtCgPLajeaV6Uj");
 
 const EPOCH_REWARDS = 100000000;
 const SUB_DAO_EPOCH_REWARDS = 10000000;
@@ -43,6 +46,7 @@ describe("helium-sub-daos", () => {
   let dcProgram: Program<DataCredits>;
   let hemProgram: Program<HeliumEntityManager>;
   let cbProgram: Program<CircuitBreaker>;
+  let vsrProgram: Program<VoterStakeRegistry>;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -64,6 +68,12 @@ describe("helium-sub-daos", () => {
       provider,
       anchor.workspace.HeliumEntityManager.programId,
       anchor.workspace.HeliumEntityManager.idl
+    );
+
+    vsrProgram = new Program<VoterStakeRegistry>(
+      IDL as VoterStakeRegistry,
+      VSR_PID,
+      provider,
     );
   });
 
@@ -202,6 +212,13 @@ describe("helium-sub-daos", () => {
       expect(epochInfo.dcBurned.toNumber()).eq(toBN(10, 8).toNumber());
     });
 
+    it("allows vehnt staking", async () => {
+    });
+
+    it("allows vehnt staking over multiple vsr deposits", async () => {
+        
+    });
+
     it("calculates subdao rewards", async () => {
       await createHospot();
       const { subDaoEpochInfo } = await burnDc(1600000);
@@ -293,6 +310,25 @@ describe("helium-sub-daos", () => {
         expect((postMobileBalance - preMobileBalance).toString()).to.eq(
           SUB_DAO_EPOCH_REWARDS.toString()
         );
+      });
+
+      describe("with vehnt stake", () => {
+
+        it("claim rewards", async () => {
+          
+        });
+
+        it("allows unstaking", async () => {
+          
+        });
+
+        it("can't unstake without claiming rewards", async () => {
+          
+        });
+  
+        it("purge a closed position", async () => {
+          
+        });
       });
     });
   });
