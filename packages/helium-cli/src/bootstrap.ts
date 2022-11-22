@@ -2,6 +2,7 @@ import {
   thresholdPercent,
   ThresholdType
 } from "@helium/circuit-breaker-sdk";
+import { HNT_PYTH_PRICE_FEED } from "@helium/spl-utils";
 import Address from "@helium/address";
 import {
   dataCreditsKey,
@@ -203,7 +204,11 @@ async function run() {
           threshold: new BN("1000000000000"),
         },
       })
-      .accounts({ hntMint: hntKeypair.publicKey, dcMint: dcKeypair.publicKey })
+      .accounts({
+        hntMint: hntKeypair.publicKey,
+        dcMint: dcKeypair.publicKey,
+        hntPriceOracle: HNT_PYTH_PRICE_FEED,
+      })
       .rpc({ skipPreflight: true });
   }
 

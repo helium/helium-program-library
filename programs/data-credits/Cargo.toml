@@ -23,3 +23,4 @@ anchor-lang = { version="0.24.2", features = ["init-if-needed"] }
 anchor-spl = "0.24.2"
 helium-sub-daos = { path = "../helium-sub-daos", features = ["cpi"] }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
+pyth-sdk-solana = { version = "0.6.1" }

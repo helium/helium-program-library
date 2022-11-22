@@ -34,3 +34,10 @@ build-metadata = "cd deps/metaplex-program-library/token-metadata/program && pwd
 [[test.genesis]]
 address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 program = "./deps/metaplex-program-library/token-metadata/target/deploy/mpl_token_metadata.so"
+
+[test.validator]
+url = "https://api.mainnet-beta.solana.com"
+
+
+[[test.validator.clone]]
+address = "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB"

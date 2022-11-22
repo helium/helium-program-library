@@ -122,7 +122,7 @@ describe("helium-entity-manager", () => {
       } = await initWorld(provider, hsProgram, hsdProgram, dcProgram);
       await dcProgram.methods
         .mintDataCreditsV0({
-          amount: toBN(DC_FEE*3, 8),
+          hntAmount: toBN(DC_FEE*3, 8),
         })
         .accounts({ dcMint: dataCredits.dcMint })
         .rpc({ skipPreflight: true });
@@ -206,7 +206,7 @@ describe("helium-entity-manager", () => {
 
         await dcProgram.methods
           .mintDataCreditsV0({
-            amount: toBN(startDcBal, 8),
+            hntAmount: toBN(startDcBal, 8),
           })
           .accounts({ dcMint, recipient: hotspotOwner.publicKey })
           .rpc();
@@ -243,7 +243,7 @@ describe("helium-entity-manager", () => {
         await method.rpc();
 
         const storageAcc = await hsProgram.account.hotspotStorageV0.fetch(storage!);
-        assert.equal(storageAcc.location.toNumber(), location.toNumber());
+        assert.equal(storageAcc.location!.toNumber(), location.toNumber());
         assert.equal(storageAcc.elevation, elevation);
         assert.equal(storageAcc.gain, gain);
       });

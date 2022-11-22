@@ -13,6 +13,7 @@
   "dependencies": {
     "@helium/crypto": "^4.6.2",
     "@project-serum/anchor": "0.24.2",
+    "@pythnetwork/client": "^2.8.0",
     "lerna": "^5.5.4"
   },
   "devDependencies": {
