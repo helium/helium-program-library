@@ -33,4 +33,11 @@ pub mod lazy_distributor {
   pub fn distribute_rewards_v0(ctx: Context<DistributeRewardsV0>) -> Result<()> {
     distribute_rewards_v0::handler(ctx)
   }
+
+  pub fn update_lazy_distributor_v0(
+    ctx: Context<UpdateLazyDistributorV0>,
+    args: UpdateLazyDistributorArgsV0,
+  ) -> Result<()> {
+    update_lazy_distributor_v0::handler(ctx, args)
+  }
 }
