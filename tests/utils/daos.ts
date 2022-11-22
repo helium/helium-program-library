@@ -64,7 +64,7 @@ export async function initTestSubdao(
 }> {
   const daoAcc = await program.account.daoV0.fetch(dao);
   const dntMint = await createMint(provider, 6, authority, authority);
-  const rewardsEscrow = await createAtaAndMint(provider, dntMint, 0, provider.wallet.publicKey)
+  const rewardsEscrow = await createAtaAndMint(provider, dntMint, 0, provider.wallet.publicKey);
   const method = await program.methods
     .initializeSubDaoV0({
       authority: authority,

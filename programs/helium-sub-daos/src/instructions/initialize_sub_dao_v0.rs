@@ -104,12 +104,12 @@ pub struct InitializeSubDaoV0<'info> {
   #[account(
     constraint = rewards_escrow.mint == dnt_mint.key()
   )]
-  pub rewards_escrow: Box<Account<'info, TokenAccount>>,
+  pub rewards_escrow: Box<Account<'info, TokenAccount>>, // TODO why can this just be any tokenaccount?
 
   /// CHECK: Initialized via cpi
   #[account(
     mut,
-    seeds = ["account_windowed_breaker".as_bytes(), dnt_mint.key().as_ref()],
+    seeds = ["account_windowed_breaker".as_bytes(), staker_pool.key().as_ref()],
     seeds::program = circuit_breaker_program.key(),
     bump
   )]
@@ -117,8 +117,10 @@ pub struct InitializeSubDaoV0<'info> {
   #[account(
     init,
     payer = payer,
-    associated_token::mint = dnt_mint,
-    associated_token::authority = sub_dao,
+    seeds = ["staker_pool".as_bytes(), dnt_mint.key().as_ref()],
+    bump,
+    token::mint = dnt_mint,
+    token::authority = sub_dao,
   )]
   pub staker_pool: Box<Account<'info, TokenAccount>>,
 
@@ -183,15 +185,23 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     },
   )?;
 
+  let signer_seeds: &[&[&[u8]]] = &[&[
+    "sub_dao".as_bytes(),
+    ctx.accounts.dnt_mint.to_account_info().key.as_ref(),
+    &[ctx.bumps["sub_dao"]],
+  ]];
   initialize_account_windowed_breaker_v0(
-    ctx.accounts.initialize_staker_pool_breaker_ctx(),
+    ctx
+      .accounts
+      .initialize_staker_pool_breaker_ctx()
+      .with_signer(signer_seeds),
     InitializeAccountWindowedBreakerArgsV0 {
       authority: args.authority,
       config: CBWindowedCircuitBreakerConfigV0 {
-        // Only allow distributing 20% of the total staker pool per epoch.
+        // Only allow distributing 20% of the total staker pool per epoch length.
         window_size_seconds: u64::try_from(EPOCH_LENGTH).unwrap(),
         threshold_type: CBThresholdType::Percent,
-        threshold: u64::MAX.checked_mul(20).unwrap().checked_div(100).unwrap(),
+        threshold: 20,
       },
       owner: ctx.accounts.sub_dao.key(),
     },
