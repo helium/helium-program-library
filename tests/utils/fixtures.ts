@@ -97,6 +97,8 @@ export const initTestHotspotConfig = async (
       maxGain: 150,
       fullLocationStakingFee: toBN(1000000, 8),
       dataonlyLocationStakingFee: toBN(500000, 8),
+      maxDepth: 3,
+      maxBufferSize: 8,
     })
     .accounts({
       dcMint,

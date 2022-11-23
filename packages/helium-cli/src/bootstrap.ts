@@ -307,6 +307,8 @@ async function run() {
         maxGain: 150,
         fullLocationStakingFee: toBN(1000000, 8),
         dataonlyLocationStakingFee: toBN(500000, 8),
+        maxDepth: 26,
+        maxBufferSize: 1024
       })
       .preInstructions([
         SystemProgram.createAccount({
