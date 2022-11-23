@@ -67,7 +67,7 @@ pub fn distribute_impl(ctx: &mut DistributeRewardsCommonV0) -> Result<()> {
     .collect();
   filtered.sort_unstable();
   require!(
-    filtered.len() > ctx.accounts.lazy_distributor.oracles.len() / 2,
+    filtered.len() > ctx.lazy_distributor.oracles.len() / 2,
     ErrorCode::NotEnoughOracles
   );
 
