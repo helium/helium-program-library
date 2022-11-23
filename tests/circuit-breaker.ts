@@ -44,7 +44,7 @@ describe("circuit-breaker", () => {
           windowSizeSeconds: new BN(10),
           thresholdType: ThresholdType.Percent as never,
           threshold: thresholdPercent(50),
-        },
+        } as never,
       })
       .accounts({
         mint,
@@ -71,7 +71,7 @@ describe("circuit-breaker", () => {
           windowSizeSeconds: new BN(10),
           thresholdType: ThresholdType.Percent as never,
           threshold: thresholdPercent(50),
-        },
+        } as never,
       })
       .accounts({
         tokenAccount,
@@ -103,7 +103,7 @@ describe("circuit-breaker", () => {
             windowSizeSeconds: new BN(10),
             thresholdType: ThresholdType.Percent as never,
             threshold: thresholdPercent(50),
-          },
+          } as never,
         })
         .accounts({
           mint,
@@ -220,7 +220,7 @@ describe("circuit-breaker", () => {
             windowSizeSeconds: new BN(10),
             thresholdType: ThresholdType.Percent as never,
             threshold: thresholdPercent(50),
-          },
+          } as never,
         })
         .signers([accountHolder])
         .accounts({

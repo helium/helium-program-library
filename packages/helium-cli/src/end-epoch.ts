@@ -2,19 +2,14 @@ import {
   init as initDao, subDaoKey
 } from "@helium/helium-sub-daos-sdk";
 import {
-  init as initLazy, lazyDistributorKey,
+  init as initLazy
 } from "@helium/lazy-distributor-sdk";
 import * as anchor from "@project-serum/anchor";
-import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
+import { ComputeBudgetProgram } from "@solana/web3.js";
 import axios from "axios";
 import os from "os";
 import yargs from "yargs/yargs";
 import { loadKeypair } from "./bootstrap";
-import * as client from "@helium/distributor-oracle";
-import Address from "@helium/address";
-import { PROGRAM_ID, hotspotKey } from "@helium/helium-entity-manager-sdk";
-import { sendAndConfirmWithRetry } from "@helium/spl-utils";
-import { getCurrentRewards } from "@helium/distributor-oracle";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({

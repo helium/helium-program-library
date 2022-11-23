@@ -10,4 +10,7 @@ pub enum ErrorCode {
 
   #[msg("Not enough oracles have reported the amount")]
   NotEnoughOracles,
+  
+  #[msg("Provided asset was invalid")]
+  InvalidAsset,
 }
