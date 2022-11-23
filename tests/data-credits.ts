@@ -133,6 +133,7 @@ describe("data-credits", () => {
               emissionsPerEpoch: new BN(EPOCH_REWARDS),
             },
           ],
+          activeDeviceOracles: []
         })
         .accounts({
           dcMint,

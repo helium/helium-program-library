@@ -3,8 +3,9 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use helium_sub_daos::{
   cpi::{accounts::TrackDcBurnV0, track_dc_burn_v0},
-  current_epoch, DaoV0, SubDaoV0, TrackDcBurnArgsV0,
+  DaoV0, SubDaoV0, TrackDcBurnArgsV0,
 };
+use shared_utils::current_epoch;
 
 #[derive(Debug, Clone)]
 pub struct HeliumSubDaos;

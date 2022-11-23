@@ -1,7 +1,7 @@
 use crate::state::*;
-use crate::utils::current_epoch;
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
+use shared_utils::{current_epoch, resize_to_fit};
 use std::str::FromStr;
 
 pub const DC_KEY: &str = "credacwrBVewZAgCwNgowCSMbCiepuesprUWPBeLTSg";
@@ -18,7 +18,7 @@ pub struct TrackDcBurnV0<'info> {
   #[account(
     init_if_needed,
     payer = account_payer,
-    space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
+    space = std::cmp::max(8 + std::mem::size_of::<SubDaoEpochInfoV0>(), sub_dao_epoch_info.data.borrow_mut().len()),
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(clock.unix_timestamp).to_le_bytes()], // Break into 30m epochs
     bump,
   )]
@@ -49,8 +49,14 @@ pub fn handler(ctx: Context<TrackDcBurnV0>, args: TrackDcBurnArgsV0) -> Result<(
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
   ctx.accounts.sub_dao_epoch_info.dc_burned += args.dc_burned;
   ctx.accounts.sub_dao_epoch_info.bump_seed = *ctx.bumps.get("sub_dao_epoch_info").unwrap();
-  ctx.accounts.sub_dao_epoch_info.total_devices = ctx.accounts.sub_dao.total_devices;
+  ctx.accounts.sub_dao_epoch_info.current_config_version = ctx.accounts.dao.config_version;
   ctx.accounts.sub_dao_epoch_info.epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
+
+  resize_to_fit(
+    &ctx.accounts.account_payer.to_account_info(),
+    &ctx.accounts.system_program.to_account_info(),
+    &ctx.accounts.sub_dao_epoch_info,
+  )?;
 
   Ok(())
 }

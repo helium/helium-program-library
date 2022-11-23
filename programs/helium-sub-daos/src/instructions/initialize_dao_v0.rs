@@ -1,4 +1,4 @@
-use crate::{state::*, EPOCH_LENGTH};
+use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::{set_authority, SetAuthority};
@@ -8,11 +8,13 @@ use circuit_breaker::{
   CircuitBreaker, InitializeMintWindowedBreakerArgsV0,
 };
 use circuit_breaker::{ThresholdType, WindowedCircuitBreakerConfigV0};
+use shared_utils::EPOCH_LENGTH;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDaoArgsV0 {
   pub authority: Pubkey,
   pub emission_schedule: Vec<EmissionScheduleItem>,
+  pub active_device_oracles: Vec<OracleConfigV0>,
 }
 
 #[derive(Accounts)]
@@ -23,7 +25,7 @@ pub struct InitializeDaoV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 60 + 8 + std::mem::size_of::<DaoV0>() + (std::mem::size_of::<EmissionScheduleItem>() * args.emission_schedule.len()),
+    space = 60 + 8 + std::mem::size_of::<DaoV0>() + (std::mem::size_of::<EmissionScheduleItem>() * args.emission_schedule.len()) + (std::mem::size_of::<OracleConfigV0>() * args.active_device_oracles.len()),
     seeds = ["dao".as_bytes(), hnt_mint.key().as_ref()],
     bump,
   )]
@@ -91,9 +93,11 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
   )?;
 
   ctx.accounts.dao.set_inner(DaoV0 {
+    config_version: 0,
     dc_mint: ctx.accounts.dc_mint.key(),
     hnt_mint: ctx.accounts.hnt_mint.key(),
     authority: args.authority,
+    active_device_oracles: args.active_device_oracles,
     num_sub_daos: 0,
     emission_schedule: args.emission_schedule,
     bump_seed: ctx.bumps["dao"],

@@ -99,43 +99,9 @@ describe("helium-sub-daos", () => {
   describe("with dao and subdao", () => {
     let dao: PublicKey;
     let subDao: PublicKey;
-    let hotspotIssuer: PublicKey;
     let treasury: PublicKey;
     let dcMint: PublicKey;
     let rewardsEscrow: PublicKey;
-    let makerKeypair: Keypair;
-    let subDaoEpochInfo: PublicKey;
-
-    async function createHospot() {
-      const ecc = await (await HeliumKeypair.makeRandom()).address.publicKey;
-      const hotspotOwner = Keypair.generate().publicKey;
-
-      await dcProgram.methods
-        .mintDataCreditsV0({
-          amount: toBN(DC_FEE, 8),
-        })
-        .accounts({ dcMint })
-        .rpc({ skipPreflight: true });
-
-      const method = await hemProgram.methods
-        .issueHotspotV0({ eccCompact: Buffer.from(ecc), uri: '' })
-        .accounts({
-          hotspotIssuer,
-          maker: makerKeypair.publicKey,
-          hotspotOwner,
-        })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-        ])
-        .signers([makerKeypair]);
-
-      subDaoEpochInfo = (await method.pubkeys()).subDaoEpochInfo!;
-      await method.rpc({
-        skipPreflight: true,
-      });
-
-      return subDaoEpochInfo;
-    }
 
     async function burnDc(
       amount: number
@@ -165,12 +131,22 @@ describe("helium-sub-daos", () => {
       });
     }
 
+    async function setActiveDevices(
+      activeDevices: number
+    ): Promise<void> {
+      await program.methods.setActiveDevicesV0({
+        oracleIndex: 0,
+        activeDevices,
+      })
+      .accounts({ subDao })
+      .rpc({ skipPreflight: true })
+    }
+
     beforeEach(async () => {
       ({
         dataCredits: { dcMint },
         subDao: { subDao, treasury, rewardsEscrow },
         dao: { dao },
-        issuer: { makerKeypair, hotspotIssuer },
       } = await initWorld(
         provider,
         hemProgram,
@@ -180,17 +156,7 @@ describe("helium-sub-daos", () => {
         SUB_DAO_EPOCH_REWARDS
       ));
     });
-
-    it("allows tracking hotspots", async () => {
-      await createHospot();
-      const epochInfo = await program.account.subDaoEpochInfoV0.fetch(
-        subDaoEpochInfo
-      );
-      expect(epochInfo.totalDevices.toNumber()).eq(1);
-
-      const subDaoAcct = await program.account.subDaoV0.fetch(subDao);
-      expect(subDaoAcct.totalDevices.toNumber()).eq(1);
-    });
+    
 
     it("allows tracking dc spend", async () => {
       const { subDaoEpochInfo } = await burnDc(10);
@@ -203,7 +169,7 @@ describe("helium-sub-daos", () => {
     });
 
     it("calculates subdao rewards", async () => {
-      await createHospot();
+      await setActiveDevices(1);
       const { subDaoEpochInfo } = await burnDc(1600000);
       const epoch = (
         await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
@@ -245,7 +211,7 @@ describe("helium-sub-daos", () => {
       let epoch: anchor.BN;
 
       beforeEach(async () => {
-        await createHospot();
+        await setActiveDevices(1);
         const { subDaoEpochInfo } = await burnDc(1600000);
         epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
           .epoch;

@@ -1,5 +1,6 @@
-use crate::{current_epoch, error::ErrorCode, state::*, OrArithError};
+use crate::{error::ErrorCode, state::*, OrArithError};
 use anchor_lang::prelude::*;
+use shared_utils::current_epoch;
 use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
 
 const DEVICE_ACTIVATION_FEE: u128 = 50;
@@ -32,7 +33,7 @@ pub struct CalculateUtilityScoreV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
+    space = std::cmp::max(8 + std::mem::size_of::<SubDaoEpochInfoV0>(), sub_dao_epoch_info.data.borrow_mut().len()),
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()], // Break into 30m epochs
     bump,
   )]
@@ -74,7 +75,21 @@ pub fn handler(
     .checked_div(&PreciseNumber::new(10000000000000_u128).or_arith_error()?) // DC has 8 decimals, plus 10^5 to get to dollars.
     .or_arith_error()?;
 
-  let total_devices = PreciseNumber::new(epoch_info.total_devices.into()).or_arith_error()?;
+  let mut filtered: Vec<u32> = epoch_info
+    .active_devices
+    .clone()
+    .into_iter()
+    .flatten()
+    .collect();
+  filtered.sort_unstable();
+  require!(
+    filtered.len() > ctx.accounts.dao.active_device_oracles.len() / 2,
+    ErrorCode::NotEnoughOracles
+  );
+  let median_idx = filtered.len() / 2;
+  let total_devices_median = filtered[median_idx];
+
+  let total_devices = PreciseNumber::new(total_devices_median.into()).or_arith_error()?;
   let devices_with_fee = total_devices
     .checked_mul(
       &PreciseNumber::new(DEVICE_ACTIVATION_FEE).or_arith_error()?, // TODO: Don't hardcode this
@@ -99,7 +114,7 @@ pub fn handler(
     one.clone()
   };
 
-  let a = if epoch_info.total_devices > 0 {
+  let a = if total_devices_median > 0 {
     std::cmp::max(
       one,
       devices_with_fee

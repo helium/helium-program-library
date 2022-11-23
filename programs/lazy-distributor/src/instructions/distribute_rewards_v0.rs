@@ -65,6 +65,7 @@ pub fn handler(ctx: Context<DistributeRewardsV0>) -> Result<()> {
     &[ctx.accounts.lazy_distributor.bump_seed],
   ]];
   let recipient = &mut ctx.accounts.recipient;
+
   let mut filtered: Vec<u64> = recipient
     .current_rewards
     .clone()
@@ -72,6 +73,11 @@ pub fn handler(ctx: Context<DistributeRewardsV0>) -> Result<()> {
     .flatten()
     .collect();
   filtered.sort_unstable();
+  require!(
+    filtered.len() > ctx.accounts.lazy_distributor.oracles.len() / 2,
+    ErrorCode::NotEnoughOracles
+  );
+
   let median_idx = filtered.len() / 2;
   let median = filtered[median_idx];
 

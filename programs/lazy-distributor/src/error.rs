@@ -7,4 +7,7 @@ pub enum ErrorCode {
 
   #[msg("Error in arithmetic")]
   ArithmeticError,
+
+  #[msg("Not enough oracles have reported the amount")]
+  NotEnoughOracles,
 }

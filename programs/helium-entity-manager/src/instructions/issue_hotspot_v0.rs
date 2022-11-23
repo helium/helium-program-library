@@ -11,17 +11,12 @@ use anchor_spl::{
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
 use angry_purple_tiger::AnimalName;
-use data_credits::HeliumSubDaos;
 use data_credits::{
   cpi::{
     accounts::{BurnCommonV0, BurnFromIssuanceV0},
     burn_from_issuance_v0,
   },
   BurnFromIssuanceArgsV0, DataCreditsV0,
-};
-use helium_sub_daos::{
-  cpi::{accounts::TrackAddedDeviceV0, track_added_device_v0},
-  TrackAddedDeviceArgsV0,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -61,7 +56,6 @@ pub struct IssueHotspotV0<'info> {
   #[account(
     has_one = collection,
     has_one = dc_mint,
-    has_one = sub_dao
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
   #[account(
@@ -143,24 +137,15 @@ pub struct IssueHotspotV0<'info> {
   )]
   pub dc_burner: Box<Account<'info, TokenAccount>>,
 
-  /// CHECK: Verified by cpi    
-  #[account(mut)]
-  pub sub_dao_epoch_info: AccountInfo<'info>,
-  /// CHECK: Verified by cpi
-  #[account(mut)]
-  pub sub_dao: AccountInfo<'info>,
-
   /// CHECK: Verified by constraint  
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
   /// CHECK: Verified by constraint  
   #[account(address = data_credits::ID)]
   pub data_credits_program: AccountInfo<'info>,
-  pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
-  pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
 }
 
@@ -188,18 +173,6 @@ impl<'info> IssueHotspotV0<'info> {
       authority: self.hotspot_config.to_account_info(),
     };
     CpiContext::new(self.data_credits_program.to_account_info(), cpi_accounts)
-  }
-  fn add_device_ctx(&self) -> CpiContext<'_, '_, '_, 'info, TrackAddedDeviceV0<'info>> {
-    let cpi_accounts = TrackAddedDeviceV0 {
-      payer: self.payer.to_account_info(),
-      sub_dao_epoch_info: self.sub_dao_epoch_info.to_account_info(),
-      sub_dao: self.sub_dao.to_account_info(),
-      authority: self.hotspot_config.to_account_info(),
-      system_program: self.system_program.to_account_info(),
-      clock: self.clock.to_account_info(),
-      rent: self.rent.to_account_info(),
-    };
-    CpiContext::new(self.helium_sub_daos_program.to_account_info(), cpi_accounts)
   }
 }
 
@@ -300,17 +273,6 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
     ),
     VerifySizedCollectionItemArgs {
       collection_authority_record: None,
-    },
-  )?;
-
-  track_added_device_v0(
-    ctx
-      .accounts
-      .add_device_ctx()
-      .with_signer(hotspot_config_seeds),
-    TrackAddedDeviceArgsV0 {
-      authority_bump: ctx.accounts.hotspot_config.bump_seed,
-      symbol: ctx.accounts.hotspot_config.symbol.clone(),
     },
   )?;
 

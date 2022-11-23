@@ -41,6 +41,12 @@ impl GetEmissions for Vec<EmissionScheduleItem> {
   }
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct OracleConfigV0 {
+  pub oracle: Pubkey,
+  pub url: String,
+}
+
 #[account]
 #[derive(Default)]
 pub struct DaoV0 {
@@ -49,6 +55,8 @@ pub struct DaoV0 {
   pub authority: Pubkey,
   pub num_sub_daos: u32,
   pub emission_schedule: Vec<EmissionScheduleItem>,
+  pub active_device_oracles: Vec<OracleConfigV0>,
+  pub config_version: u32,
   pub bump_seed: u8,
 }
 
@@ -68,12 +76,13 @@ pub struct DaoEpochInfoV0 {
 #[account]
 #[derive(Default)]
 pub struct SubDaoEpochInfoV0 {
+  pub current_config_version: u32,
   pub epoch: u64,
   pub sub_dao: Pubkey,
-  pub total_devices: u64,
   pub dc_burned: u64,
   /// Precise number with 12 decimals
   pub utility_score: Option<u128>,
+  pub active_devices: Vec<Option<u32>>,
   pub rewards_issued: bool,
   pub bump_seed: u8,
 }

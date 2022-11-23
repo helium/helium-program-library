@@ -1,5 +1,5 @@
 use crate::circuit_breaker::*;
-use crate::{state::*, EPOCH_LENGTH};
+use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
@@ -12,7 +12,7 @@ use circuit_breaker::{
   ThresholdType as CBThresholdType,
   WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
 };
-use shared_utils::resize_to_fit;
+use shared_utils::{resize_to_fit, EPOCH_LENGTH};
 use treasury_management::{
   cpi::{accounts::InitializeTreasuryManagementV0, initialize_treasury_management_v0},
   Curve as TreasuryCurve, InitializeTreasuryManagementArgsV0, TreasuryManagement,

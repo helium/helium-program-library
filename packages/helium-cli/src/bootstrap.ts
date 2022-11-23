@@ -123,17 +123,28 @@ const yarg = yargs(hideBin(process.argv)).options({
     default:
       "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib",
   },
-  oracleUrl: {
-    alias: "o",
+  distributorOracleUrl: {
+    alias: "do",
     type: "string",
-    describe: "The oracle URL",
+    describe: "The distributor oracle URL",
     default: "http://localhost:8080",
   },
-  oracleKeypair: {
+  activeDevicesOracleUrl: {
+    alias: "do",
+    type: "string",
+    describe: "The active devices oracle URL",
+    default: "http://localhost:8081",
+  },
+  distributorOracleKeypair: {
     type: "string",
     describe: "Keypair of the oracle",
     default: "./keypairs/oracle.json",
   },
+  activeDeviceOracleKeypair: {
+    type: "string",
+    describe: "Keypair of the oracle",
+    default: "./keypairs/oracle.json",
+  }
 });
 
 const HNT_EPOCH_REWARDS = 10000000000;
@@ -162,9 +173,11 @@ async function run() {
     argv.onboardingServerKeypair
   );
   const makerKeypair = await loadKeypair(argv.makerKeypair);
-  const oracleKeypair = loadKeypair(argv.oracleKeypair);
-  const oracleKey = oracleKeypair.publicKey;
-  const oracleUrl = argv.oracleUrl;
+  const distributorOracleKeypair = loadKeypair(argv.distributorOracleKeypair);
+  const activeDeviceOracleKeypair = loadKeypair(argv.activeDeviceOracleKeypair);
+  const distributorOracleKey = distributorOracleKeypair.publicKey;
+  const distributorOracleUrl = argv.distributorOracleUrl;
+  const activeDevicesOracleUrl = argv.activeDeviceOracleKeypair;
 
   console.log("HNT", hntKeypair.publicKey.toBase58());
   console.log("MOBILE", mobileKeypair.publicKey.toBase58());
@@ -213,10 +226,18 @@ async function run() {
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         authority: provider.wallet.publicKey,
-        emissionSchedule: [{
-          startUnixTime: new anchor.BN(0),
-          emissionsPerEpoch: new anchor.BN(HNT_EPOCH_REWARDS),
-        }],
+        emissionSchedule: [
+          {
+            startUnixTime: new anchor.BN(0),
+            emissionsPerEpoch: new anchor.BN(HNT_EPOCH_REWARDS),
+          },
+        ],
+        activeDeviceOracles: [
+          {
+            oracle: activeDeviceOracleKeypair.publicKey,
+            url: activeDevicesOracleUrl,
+          },
+        ],
       })
       .accounts({
         dcMint: dcKeypair.publicKey,
@@ -239,8 +260,8 @@ async function run() {
         authority: provider.wallet.publicKey,
         oracles: [
           {
-            oracle: oracleKey,
-            url: oracleUrl,
+            oracle: distributorOracleKey,
+            url: distributorOracleUrl,
           },
         ],
         // 10 x epoch rewards in a 24 hour period

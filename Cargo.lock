@@ -507,6 +507,7 @@ dependencies = [
  "anchor-spl",
  "circuit-breaker",
  "helium-sub-daos",
+ "shared-utils",
 ]
 
 [[package]]

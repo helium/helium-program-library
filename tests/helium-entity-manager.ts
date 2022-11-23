@@ -243,7 +243,7 @@ describe("helium-entity-manager", () => {
         await method.rpc();
 
         const storageAcc = await hsProgram.account.hotspotStorageV0.fetch(storage!);
-        assert.equal(storageAcc.location.toNumber(), location.toNumber());
+        assert.equal(storageAcc.location!.toNumber(), location.toNumber());
         assert.equal(storageAcc.elevation, elevation);
         assert.equal(storageAcc.gain, gain);
       });

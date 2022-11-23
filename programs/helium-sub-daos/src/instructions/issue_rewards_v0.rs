@@ -1,8 +1,9 @@
-use crate::{current_epoch, error::ErrorCode, state::*, OrArithError, TESTING};
+use crate::{error::ErrorCode, state::*, OrArithError, TESTING};
 use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
+use shared_utils::current_epoch;
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};

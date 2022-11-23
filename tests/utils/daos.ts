@@ -35,6 +35,10 @@ export async function initTestDao(
           emissionsPerEpoch: new BN(epochRewards),
         },
       ],
+      activeDeviceOracles: [{
+        oracle: me,
+        url: "not-used-in-testing"
+      }]
     })
     .accounts({
       hntMint: mint,
