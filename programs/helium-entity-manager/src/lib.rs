@@ -32,6 +32,13 @@ pub mod helium_entity_manager {
     issue_hotspot_v0::handler(ctx, args)
   }
 
+  pub fn genesis_issue_hotspot_v0(
+    ctx: Context<GenesisIssueHotspotV0>,
+    args: GenesisIssueHotspotArgsV0,
+  ) -> Result<()> {
+    genesis_issue_hotspot_v0::handler(ctx, args)
+  }
+
   pub fn update_hotspot_config_v0(
     ctx: Context<UpdateHotspotConfigV0>,
     args: UpdateHotspotConfigArgsV0,
@@ -46,8 +53,8 @@ pub mod helium_entity_manager {
     update_hotspot_issuer_v0::handler(ctx, args)
   }
 
-  pub fn change_metadata_v0(
-    ctx: Context<ChangeMetadataV0>,
+  pub fn change_metadata_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, ChangeMetadataV0<'info>>,
     args: ChangeMetadataArgsV0,
   ) -> Result<()> {
     change_metadata_v0::handler(ctx, args)

@@ -1,14 +1,10 @@
 use crate::error::ErrorCode;
 use crate::state::*;
-use crate::token_metadata::{
-  create_master_edition_v3, create_metadata_account_v3, verify_sized_collection_item, Collection,
-  CreateMasterEdition, CreateMasterEditionArgs, CreateMetadataAccount, CreateMetadataAccountArgs,
-  VerifySizedCollectionItem, VerifySizedCollectionItemArgs,
-};
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::hash::hash;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{self, Mint, MintTo, Token, TokenAccount},
+  token::{Mint, Token, TokenAccount},
 };
 use angry_purple_tiger::AnimalName;
 use data_credits::HeliumSubDaos;
@@ -23,11 +19,20 @@ use helium_sub_daos::{
   cpi::{accounts::TrackAddedDeviceV0, track_added_device_v0},
   TrackAddedDeviceArgsV0,
 };
+use mpl_bubblegum::state::{metaplex_adapter::TokenStandard, TreeConfig};
+use mpl_bubblegum::{
+  cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
+  program::Bubblegum,
+};
+use mpl_bubblegum::{
+  state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion},
+  utils::get_asset_id,
+};
+use spl_account_compression::{program::SplAccountCompression, Wrapper};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHotspotArgsV0 {
-  pub ecc_compact: Vec<u8>,
-  pub uri: String,
+  pub hotspot_key: String,
   pub is_full_hotspot: bool,
 }
 
@@ -38,9 +43,6 @@ pub struct IssueHotspotV0<'info> {
   pub payer: Signer<'info>,
   pub dc_fee_payer: Signer<'info>,
   pub maker: Signer<'info>,
-  /// CHECK: Hotspot nft sent here
-  pub hotspot_owner: AccountInfo<'info>,
-  #[account(mut)]
   pub collection: Box<Account<'info, Mint>>,
   /// CHECK: Handled by cpi
   #[account(
@@ -52,7 +54,6 @@ pub struct IssueHotspotV0<'info> {
   pub collection_metadata: UncheckedAccount<'info>,
   /// CHECK: Handled By cpi account
   #[account(
-    mut,
     seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), collection.key().as_ref(), "edition".as_bytes()],
     seeds::program = token_metadata_program.key(),
     bump,
@@ -61,7 +62,8 @@ pub struct IssueHotspotV0<'info> {
   #[account(
     has_one = collection,
     has_one = dc_mint,
-    has_one = sub_dao
+    has_one = sub_dao,
+    has_one = merkle_tree
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
   #[account(
@@ -75,51 +77,33 @@ pub struct IssueHotspotV0<'info> {
   #[account(
     init,
     payer = payer,
-    mint::decimals = 0,
-    mint::authority = hotspot_issuer,
-    mint::freeze_authority = hotspot_issuer,
-    seeds = [
-      "hotspot".as_bytes(),
-      collection.key().as_ref(),
-      &args.ecc_compact,
-    ],
-    bump
-  )]
-  pub hotspot: Box<Account<'info, Mint>>,
-  #[account(
-    init,
-    payer = payer,
     space = 8 + 60 + std::mem::size_of::<HotspotStorageV0>(),
     seeds = [
       "storage".as_bytes(),
-      hotspot.key().as_ref()
+      &hash(args.hotspot_key.as_bytes()).to_bytes()
     ],
     bump
   )]
   pub storage: Box<Account<'info, HotspotStorageV0>>,
-  /// CHECK: Handled by cpi
   #[account(
-    mut,
-    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), hotspot.key().as_ref()],
-    seeds::program = token_metadata_program.key(),
+      mut,
+      seeds = [merkle_tree.key().as_ref()],
+      seeds::program = bubblegum_program.key(),
+      bump,
+  )]
+  pub tree_authority: Box<Account<'info, TreeConfig>>,
+  /// CHECK: Used in cpi
+  pub recipient: AccountInfo<'info>,
+  /// CHECK: Used in cpi
+  #[account(mut)]
+  pub merkle_tree: AccountInfo<'info>,
+  #[account(
+    seeds = ["collection_cpi".as_bytes()],
+    seeds::program = bubblegum_program.key(),
     bump,
   )]
-  pub metadata: UncheckedAccount<'info>,
-  /// CHECK: Handled by cpi
-  #[account(
-    mut,
-    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), hotspot.key().as_ref(), "edition".as_bytes()],
-    seeds::program = token_metadata_program.key(),
-    bump,
-  )]
-  pub master_edition: UncheckedAccount<'info>,
-  #[account(
-    init_if_needed,
-    payer = payer,
-    associated_token::mint = hotspot,
-    associated_token::authority = hotspot_owner,
-  )]
-  pub recipient_token_account: Box<Account<'info, TokenAccount>>,
+  /// CHECK: Used in cpi
+  pub bubblegum_signer: UncheckedAccount<'info>,
 
   /// CHECK: Verified by cpi  
   #[account(
@@ -131,7 +115,7 @@ pub struct IssueHotspotV0<'info> {
     bump,
     has_one = dc_mint
   )]
-  pub dc: Account<'info, DataCreditsV0>,
+  pub dc: Box<Account<'info, DataCreditsV0>>,
   #[account(mut)]
   /// CHECK: Verified by cpi
   pub dc_mint: AccountInfo<'info>,
@@ -156,6 +140,9 @@ pub struct IssueHotspotV0<'info> {
   /// CHECK: Verified by constraint  
   #[account(address = data_credits::ID)]
   pub data_credits_program: AccountInfo<'info>,
+  pub log_wrapper: Program<'info, Wrapper>,
+  pub bubblegum_program: Program<'info, Bubblegum>,
+  pub compression_program: Program<'info, SplAccountCompression>,
   pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
@@ -165,13 +152,26 @@ pub struct IssueHotspotV0<'info> {
 }
 
 impl<'info> IssueHotspotV0<'info> {
-  fn mint_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintTo<'info>> {
-    let cpi_accounts = MintTo {
-      mint: self.hotspot.to_account_info(),
-      to: self.recipient_token_account.to_account_info(),
-      authority: self.hotspot_issuer.to_account_info(),
+  fn mint_to_collection_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintToCollectionV1<'info>> {
+    let cpi_accounts = MintToCollectionV1 {
+      tree_authority: self.tree_authority.to_account_info(),
+      leaf_delegate: self.recipient.to_account_info(),
+      leaf_owner: self.recipient.to_account_info(),
+      merkle_tree: self.merkle_tree.to_account_info(),
+      payer: self.payer.to_account_info(),
+      tree_delegate: self.hotspot_config.to_account_info(),
+      log_wrapper: self.log_wrapper.to_account_info(),
+      compression_program: self.compression_program.to_account_info(),
+      system_program: self.system_program.to_account_info(),
+      collection_authority: self.hotspot_config.to_account_info(),
+      collection_authority_record_pda: self.bubblegum_program.to_account_info(),
+      collection_mint: self.collection.to_account_info(),
+      collection_metadata: self.collection_metadata.to_account_info(),
+      edition_account: self.collection_master_edition.to_account_info(),
+      bubblegum_signer: self.bubblegum_signer.to_account_info(),
+      token_metadata_program: self.token_metadata_program.to_account_info(),
     };
-    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+    CpiContext::new(self.bubblegum_program.to_account_info(), cpi_accounts)
   }
   fn burn_dc_ctx(&self) -> CpiContext<'_, '_, '_, 'info, BurnFromIssuanceV0<'info>> {
     let cpi_accounts = BurnFromIssuanceV0 {
@@ -204,17 +204,15 @@ impl<'info> IssueHotspotV0<'info> {
 }
 
 pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result<()> {
-  let decoded = bs58::encode(args.ecc_compact.clone()).into_string();
-  let animal_name: AnimalName = decoded
+  let asset_id = get_asset_id(
+    &ctx.accounts.merkle_tree.key(),
+    ctx.accounts.tree_authority.num_minted,
+  );
+
+  let animal_name: AnimalName = args
+    .hotspot_key
     .parse()
     .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
-
-  let signer_seeds: &[&[&[u8]]] = &[&[
-    b"hotspot_issuer",
-    ctx.accounts.hotspot_config.to_account_info().key.as_ref(),
-    ctx.accounts.maker.to_account_info().key.as_ref(),
-    &[ctx.accounts.hotspot_issuer.bump_seed],
-  ]];
 
   let hotspot_config_seeds: &[&[&[u8]]] = &[&[
     b"hotspot_config",
@@ -232,75 +230,32 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
     },
   )?;
 
-  token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
-
-  create_metadata_account_v3(
-    CpiContext::new_with_signer(
-      ctx.accounts.token_metadata_program.clone(),
-      CreateMetadataAccount {
-        metadata_account: ctx.accounts.metadata.to_account_info().clone(),
-        mint: ctx.accounts.hotspot.to_account_info().clone(),
-        mint_authority: ctx.accounts.hotspot_issuer.to_account_info().clone(),
-        payer: ctx.accounts.payer.to_account_info().clone(),
-        update_authority: ctx.accounts.hotspot_issuer.to_account_info().clone(),
-        system_program: ctx.accounts.system_program.to_account_info().clone(),
-        rent: ctx.accounts.rent.to_account_info().clone(),
-      },
-      signer_seeds,
+  let metadata = MetadataArgs {
+    name: animal_name.to_string(),
+    symbol: String::from("HOTSPOT"),
+    uri: format!(
+      "https://mobile-metadata.test-helium.com/{}",
+      args.hotspot_key
     ),
-    CreateMetadataAccountArgs {
-      name: animal_name.to_string(),
-      symbol: String::from("HOTSPOT"),
-      uri: args.uri,
-      collection: Some(Collection {
-        key: ctx.accounts.collection.key(),
-        verified: false,
-      }),
-      collection_details: None,
-    },
-  )?;
-
-  create_master_edition_v3(
-    CpiContext::new_with_signer(
-      ctx.accounts.token_metadata_program.clone(),
-      CreateMasterEdition {
-        edition: ctx.accounts.master_edition.to_account_info().clone(),
-        mint: ctx.accounts.hotspot.to_account_info().clone(),
-        update_authority: ctx.accounts.hotspot_issuer.to_account_info().clone(),
-        mint_authority: ctx.accounts.hotspot_issuer.to_account_info().clone(),
-        metadata: ctx.accounts.metadata.to_account_info().clone(),
-        payer: ctx.accounts.payer.to_account_info().clone(),
-        token_program: ctx.accounts.token_program.to_account_info().clone(),
-        system_program: ctx.accounts.system_program.to_account_info().clone(),
-        rent: ctx.accounts.rent.to_account_info().clone(),
-      },
-      signer_seeds,
-    ),
-    CreateMasterEditionArgs {
-      max_supply: Some(0),
-    },
-  )?;
-
-  verify_sized_collection_item(
-    CpiContext::new_with_signer(
-      ctx.accounts.token_metadata_program.clone(),
-      VerifySizedCollectionItem {
-        metadata: ctx.accounts.metadata.to_account_info().clone(),
-        collection_authority: ctx.accounts.hotspot_config.to_account_info().clone(),
-        payer: ctx.accounts.payer.to_account_info().clone(),
-        collection_mint: ctx.accounts.collection.to_account_info().clone(),
-        collection_metadata: ctx.accounts.collection_metadata.to_account_info().clone(),
-        collection_master_edition_account: ctx
-          .accounts
-          .collection_master_edition
-          .to_account_info()
-          .clone(),
-      },
-      hotspot_config_seeds,
-    ),
-    VerifySizedCollectionItemArgs {
-      collection_authority_record: None,
-    },
+    collection: Some(Collection {
+      key: ctx.accounts.collection.key(),
+      verified: false, // Verified in cpi
+    }),
+    primary_sale_happened: true,
+    is_mutable: true,
+    edition_nonce: None,
+    token_standard: Some(TokenStandard::NonFungible),
+    uses: None,
+    token_program_version: TokenProgramVersion::Original,
+    creators: vec![],
+    seller_fee_basis_points: 0,
+  };
+  mint_to_collection_v1(
+    ctx
+      .accounts
+      .mint_to_collection_ctx()
+      .with_signer(hotspot_config_seeds),
+    metadata,
   )?;
 
   track_added_device_v0(
@@ -317,13 +272,12 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
   ctx.accounts.hotspot_issuer.count += 1;
 
   ctx.accounts.storage.set_inner(HotspotStorageV0 {
-    ecc_compact: args.ecc_compact,
+    asset: asset_id,
+    hotspot_key: args.hotspot_key,
     location: None,
     elevation: None,
     gain: None,
-    authority: ctx.accounts.hotspot.key(),
     is_full_hotspot: args.is_full_hotspot,
-
     bump_seed: ctx.bumps["storage"],
   });
 

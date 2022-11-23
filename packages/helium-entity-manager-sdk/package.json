@@ -31,6 +31,7 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
+    "@helium/address": "^4.6.2",
     "@helium/helium-sub-daos-sdk": "^0.0.5",
     "@helium/idls": "^0.0.5",
     "@helium/spl-utils": "^0.0.5",

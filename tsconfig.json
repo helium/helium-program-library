@@ -8,6 +8,9 @@
       "path": "./packages/spl-utils"
     },
     {
+      "path": "./packages/lazy-transactions-sdk"
+    },
+    {
       "path": "./packages/helium-react-hooks"
     },
     {

@@ -33,7 +33,7 @@ pub struct InitializeRecipientV0<'info> {
 
 pub fn handler(ctx: Context<InitializeRecipientV0>) -> Result<()> {
   ctx.accounts.recipient.set_inner(RecipientV0 {
-    mint: ctx.accounts.mint.key(),
+    asset: ctx.accounts.mint.key(),
     total_rewards: 0,
     current_config_version: 0,
     current_rewards: vec![None; ctx.accounts.lazy_distributor.oracles.len()],

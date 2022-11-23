@@ -17,9 +17,6 @@ pub enum ErrorCode {
   #[msg("The realloc increase was too large")]
   InvalidDataIncrease,
 
-  #[msg("Invalid hotspot collection")]
-  InvalidHotspotCollection,
-
   #[msg("Gain outside valid range")]
   InvalidGain,
 }
