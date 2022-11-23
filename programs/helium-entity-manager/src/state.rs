@@ -10,6 +10,7 @@ pub struct HotspotConfigV0 {
   pub authority: Pubkey,
   pub symbol: String,
   pub sub_dao: Pubkey,
+  pub merkle_tree: Pubkey,
   pub min_gain: i32,
   pub max_gain: i32,
   pub full_location_staking_fee: u64,
@@ -33,8 +34,8 @@ pub struct HotspotIssuerV0 {
 #[account]
 #[derive(Default)]
 pub struct HotspotStorageV0 {
-  pub ecc_compact: Vec<u8>,
-  pub authority: Pubkey,
+  pub asset: Pubkey,
+  pub hotspot_key: String,
 
   pub bump_seed: u8,
 

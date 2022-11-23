@@ -1,35 +1,30 @@
-import dotenv from "dotenv";
-dotenv.config();
-import express, { Application, Request, Response } from "express";
 import Address from "@helium/address";
+import dotenv from "dotenv";
+import express, { Application, Request, Response } from "express";
+dotenv.config();
 // @ts-ignore
-import cors from "cors";
 import {
-  PublicKey,
-  Transaction,
-  Keypair,
-  TransactionInstruction,
-} from "@solana/web3.js";
-import bodyParser from "body-parser";
+  init as initHeliumEntityManager
+} from "@helium/helium-entity-manager-sdk";
+import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
+import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
+import { init, PROGRAM_ID } from "@helium/lazy-distributor-sdk";
+import { Asset, getAsset } from "@helium/spl-utils";
 import {
   AnchorProvider,
-  BorshInstructionCoder,
-  Program,
-  setProvider,
-  getProvider,
+  BorshInstructionCoder, getProvider, Program,
+  setProvider
 } from "@project-serum/anchor";
-import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import {
-  hotspotStorageKey,
-  init as initHeliumEntityManager,
-} from "@helium/helium-entity-manager-sdk";
-import { init, PROGRAM_ID } from "@helium/lazy-distributor-sdk";
+  Keypair, PublicKey,
+  Transaction, TransactionInstruction
+} from "@solana/web3.js";
+import bodyParser from "body-parser";
+import cors from "cors";
 import fs from "fs";
-import { getAccount } from "@solana/spl-token";
 
 export interface Database {
-  getCurrentRewards: (mint: PublicKey) => Promise<string>;
+  getCurrentRewards: (asset: PublicKey) => Promise<string>;
   incrementHotspotRewards: (hotspotKey: string) => Promise<void>;
   endEpoch: () => Promise<{
     [key: string]: number;
@@ -49,7 +44,10 @@ export class DatabaseMock implements Database {
     };
   };
 
-  constructor(readonly issuanceProgram: Program<HeliumEntityManager>) {
+  constructor(
+    readonly issuanceProgram: Program<HeliumEntityManager>,
+    readonly getAssetFn: (url: string, asset: PublicKey) => Promise<Asset | undefined> = getAsset
+  ) {
     this.inMemHash = {
       totalClicks: 0,
       lifetimeRewards: 0,
@@ -64,20 +62,22 @@ export class DatabaseMock implements Database {
     }
   };
 
-  async getCurrentRewards(mint: PublicKey) {
-    const storageKey = hotspotStorageKey(mint)[0];
+  async getCurrentRewards(assetId: PublicKey) {
+    // @ts-ignore
+    const asset = await this.getAssetFn(this.issuanceProgram.provider.connection._rpcEndpoint, assetId);
+    if (!asset) {
+      console.error("No asset found", assetId.toBase58())
+      return "0"
+    }
+    const eccCompact = asset.content.uri.split("/").slice(-1)[0] as string;
     try {
-      const storage = await this.issuanceProgram.account.hotspotStorageV0.fetch(
-        storageKey
-      );
-      // @ts-ignore
-      const pubkey = new Address(0, 0, 0, storage.eccCompact).b58;
+    const pubkey = Address.fromB58(eccCompact);
       return Math.floor(
-        (this.inMemHash.byHotspot[pubkey]?.lifetimeRewards || 0) *
+        (this.inMemHash.byHotspot[pubkey.b58]?.lifetimeRewards || 0) *
           Math.pow(10, 8)
       ).toString();
     } catch (err) {
-      console.error("Mint with error: ", mint.toString());
+      console.error("Mint with error: ", asset.toString());
       console.error(err);
       return "0";
     }
@@ -140,7 +140,7 @@ export class OracleServer {
   constructor(
     public program: Program<LazyDistributor>,
     private oracle: Keypair,
-    public db: Database
+    public db: Database,
   ) {
     const app = express();
     app.use(cors());
@@ -250,6 +250,7 @@ export class OracleServer {
         !decoded ||
         (decoded.name !== "setCurrentRewardsV0" &&
           decoded.name !== "distributeRewardsV0" &&
+          decoded.name !== "distributeCompressionRewardsV0" &&
           decoded.name !== "initializeRecipientV0")
       ) {
         res.status(400).json({ error: "Invalid instructions in transaction" });
@@ -292,7 +293,7 @@ export class OracleServer {
         let mint = (recipientToLazyDistToMint[recipient.toBase58()] || {})[lazyDist.toBase58()];
         if (!mint) {
           const recipientAcc = await this.program.account.recipientV0.fetch(recipient);
-          mint = recipientAcc.mint;
+          mint = recipientAcc.asset;
         }
 
         const currentRewards = await this.db.getCurrentRewards(

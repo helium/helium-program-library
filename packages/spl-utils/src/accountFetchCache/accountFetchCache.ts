@@ -147,13 +147,18 @@ export class AccountFetchCache {
       options?: SendOptions
     ) {
       const result = await self.oldSendRawTransaction(rawTransaction, options);
-      const instructions = Transaction.from(rawTransaction).instructions;
 
-      this.confirmTransaction(result, "finalized")
-        .then(() => {
-          return self.requeryMissing(instructions);
-        })
-        .catch(console.error);
+      try {
+        const instructions = Transaction.from(rawTransaction).instructions;
+
+        this.confirmTransaction(result, "finalized")
+          .then(() => {
+            return self.requeryMissing(instructions);
+          })
+          .catch(console.error);
+      } catch(e: any) {
+        // TODO: handle transaction v2
+      }
 
       return result;
     };

@@ -1,34 +1,32 @@
+import Address from "@helium/address";
 import {
   thresholdPercent,
   ThresholdType
 } from "@helium/circuit-breaker-sdk";
-import Address from "@helium/address";
 import {
   dataCreditsKey,
   init as initDc
 } from "@helium/data-credits-sdk";
+import { hotspotConfigKey, hotspotIssuerKey, init as initHem } from "@helium/helium-entity-manager-sdk";
 import {
   daoKey,
   init as initDao,
   subDaoKey
 } from "@helium/helium-sub-daos-sdk";
-import {
-  hotspotCollectionKey, hotspotConfigKey, hotspotIssuerKey, init as initHem
-} from "@helium/helium-entity-manager-sdk";
-import { lazyDistributorKey, init as initLazy } from "@helium/lazy-distributor-sdk";
-import { createAtaAndMintInstructions, createAtaAndMint, createMintInstructions, createNft, sendInstructions, toBN } from "@helium/spl-utils";
+import { init as initLazy, lazyDistributorKey } from "@helium/lazy-distributor-sdk";
+import { createAtaAndMintInstructions, createMintInstructions, sendInstructions, toBN } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";
 import {
   createCreateMetadataAccountV3Instruction,
   PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
+import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
-  Connection,
+  ComputeBudgetProgram, Connection,
   Keypair,
-  PublicKey,
-  ComputeBudgetProgram,
+  PublicKey, SystemProgram
 } from "@solana/web3.js";
 import { BN } from "bn.js";
 import fs from "fs";
@@ -295,6 +293,9 @@ async function run() {
   if (!(await provider.connection.getAccountInfo(hsConfigKey))) {
     console.log("Initalizing `MOBILE` HotspotConfig");
 
+    const merkle = Keypair.generate()
+    const space = getConcurrentMerkleTreeAccountSize(26, 1024);
+
     await hemProgram.methods
       .initializeHotspotConfigV0({
         name: "Mobile Hotspot Collection",
@@ -307,7 +308,23 @@ async function run() {
         fullLocationStakingFee: toBN(1000000, 8),
         dataonlyLocationStakingFee: toBN(500000, 8),
       })
-      .accounts({ dcMint: dcKeypair.publicKey, subDao: mobileSubdao })
+      .preInstructions([
+        SystemProgram.createAccount({
+          fromPubkey: provider.wallet.publicKey,
+          newAccountPubkey: merkle.publicKey,
+          lamports: await provider.connection.getMinimumBalanceForRentExemption(
+            space
+          ),
+          space: space,
+          programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+        }),
+      ])
+      .accounts({
+        merkleTree: merkle.publicKey,
+        dcMint: dcKeypair.publicKey,
+        subDao: mobileSubdao,
+      })
+      .signers([merkle])
       .rpc({ skipPreflight: true });
   }
 
@@ -334,8 +351,7 @@ async function run() {
     hardcodeHotspots.map(async (hotspot, index) => {
       const create = await hemProgram.methods
         .issueHotspotV0({
-          eccCompact: Buffer.from(Address.fromB58(hotspot.eccKey).publicKey),
-          uri: hotspot.uri,
+          hotspotKey: hotspot.eccKey,
           isFullHotspot: true,
         })
         .preInstructions([
@@ -347,7 +363,7 @@ async function run() {
           maker: makerKeypair.publicKey,
         })
         .signers([makerKeypair]);
-      const key = (await create.pubkeys()).hotspot!;
+      const key = (await create.pubkeys()).storage!;
       if (!(await exists(conn, key))) {
         console.log("Creating hotspot", index);
         await create.rpc({ skipPreflight: true });
@@ -453,7 +469,6 @@ run()
 export function loadKeypair(keypair: string): Keypair {
   console.log(process.env.ANCHOR_PROVIDER_URL);
   anchor.setProvider(anchor.AnchorProvider.env());
-  const provider = anchor.getProvider() as anchor.AnchorProvider;
 
   return Keypair.fromSecretKey(
     new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString()))

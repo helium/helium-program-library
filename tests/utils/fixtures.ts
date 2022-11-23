@@ -1,7 +1,7 @@
 import { toBN } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { SystemProgram, Keypair, PublicKey } from "@solana/web3.js";
 import { execSync } from "child_process";
 import { DataCredits } from "../../target/types/data_credits";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
@@ -10,6 +10,7 @@ import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
 import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import { ThresholdType } from "../../packages/circuit-breaker-sdk/src"
+import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =
@@ -82,6 +83,9 @@ export const initTestHotspotConfig = async (
   }
 
   const onboardingServerKeypair = Keypair.generate();
+  const merkle = Keypair.generate();
+  // Testing -- small tree
+  const space = getConcurrentMerkleTreeAccountSize(3, 8);
   const method = await program.methods
     .initializeHotspotConfigV0({
       name: "Helium Network Hotspots",
@@ -96,8 +100,21 @@ export const initTestHotspotConfig = async (
     })
     .accounts({
       dcMint,
-      subDao
-    });
+      subDao,
+      merkleTree: merkle.publicKey,
+    })
+    .preInstructions([
+      SystemProgram.createAccount({
+        fromPubkey: provider.wallet.publicKey,
+        newAccountPubkey: merkle.publicKey,
+        lamports: await provider.connection.getMinimumBalanceForRentExemption(
+          space
+        ),
+        space: space,
+        programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+      }),
+    ])
+    .signers([merkle]);
 
   const { collection, hotspotConfig } = await method.pubkeys();
   await method.rpc({ skipPreflight: true });
