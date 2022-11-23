@@ -161,7 +161,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
   // price * hnt_amount / 10^(8 + expo - 5)
   let price_expo = -hnt_price.expo;
   let right_shift = 8 + price_expo - 5;
-  let normalize = (10 as u64)
+  let normalize = 10_u64
     .checked_pow(u32::try_from(right_shift).unwrap())
     .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?;
 
