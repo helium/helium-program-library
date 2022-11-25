@@ -176,7 +176,7 @@ describe("helium-sub-daos", () => {
         SUB_DAO_EPOCH_REWARDS
       ));
     });
-145805406925;
+
     it("allows tracking dc spend", async () => {
       const { subDaoEpochInfo } = await burnDc(10);
 

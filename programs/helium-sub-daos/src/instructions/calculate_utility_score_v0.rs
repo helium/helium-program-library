@@ -84,7 +84,15 @@ pub fn handler(
 
   let history_buffer = AggregatorHistoryBuffer::new(&ctx.accounts.history_buffer)?;
   let timestamp = i64::try_from(args.epoch).unwrap() * EPOCH_LENGTH;
-  let total_devices_u64 = u64::try_from(history_buffer.lower_bound(timestamp).unwrap().value.mantissa).unwrap();
+  let total_devices_u64 = u64::try_from(
+    history_buffer
+      .lower_bound(timestamp)
+      .unwrap()
+      .value
+      .mantissa,
+  )
+  .unwrap();
+
   msg!("Total devices: {}", total_devices_u64);
 
   let total_devices = PreciseNumber::new(total_devices_u64.into()).or_arith_error()?;
