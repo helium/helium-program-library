@@ -55,5 +55,11 @@ export const heliumSubDaosResolvers = combineResolvers(
     account: "stakerPool",
     mint: "dntMint",
     owner: "subDao"
-  })
+  }),
+  ataResolver({
+    instruction: "claimRewardsV0",
+    account: "stakerAta",
+    mint: "dntMint",
+    owner: "voterAuthority"
+  }),
 );

@@ -1489,7 +1489,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "voter-stake-registry"
 version = "0.2.4"
-source = "git+https://github.com/helium/voter-stake-registry?branch=feature/minimum-lockup#052ef3df5bfe1431c8610c1140945010c7c35073"
+source = "git+https://github.com/helium/voter-stake-registry?branch=feature/minimum-lockup#5410a6d96e046c2e967beb84cb676a0a96fe7d06"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

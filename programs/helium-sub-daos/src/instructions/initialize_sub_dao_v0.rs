@@ -200,8 +200,12 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
       config: CBWindowedCircuitBreakerConfigV0 {
         // Only allow distributing 20% of the total staker pool per epoch length.
         window_size_seconds: u64::try_from(EPOCH_LENGTH).unwrap(),
-        threshold_type: CBThresholdType::Percent,
-        threshold: 20,
+        threshold_type: CBThresholdType::Absolute,
+        threshold: 5
+          * args
+            .emission_schedule
+            .get_emissions_at(ctx.accounts.clock.unix_timestamp)
+            .unwrap(),
       },
       owner: ctx.accounts.sub_dao.key(),
     },

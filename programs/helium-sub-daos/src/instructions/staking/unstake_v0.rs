@@ -12,7 +12,8 @@ pub struct UnstakeArgsV0 {
 pub struct UnstakeV0<'info> {
   #[account(
     mut,
-    seeds = [vsr_voter.load()?.registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
+    seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
+    seeds::program = vsr_program.key(),
     bump = vsr_voter.load()?.voter_bump,
     has_one = voter_authority,
     has_one = registrar,
@@ -28,7 +29,7 @@ pub struct UnstakeV0<'info> {
     seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &[args.deposit_entry_idx]],
     bump
   )]
-  pub stake_position: Account<'info, StakePosition>,
+  pub stake_position: Account<'info, StakePositionV0>,
 
   #[account(mut)]
   pub sub_dao: Account<'info, SubDaoV0>,
@@ -41,6 +42,9 @@ pub struct UnstakeV0<'info> {
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
 
+  ///CHECK: constraints
+  #[account(address = voter_stake_registry::ID)]
+  pub vsr_program: AccountInfo<'info>,
   pub system_program: Program<'info, System>,
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
@@ -59,21 +63,20 @@ pub fn handler(ctx: Context<UnstakeV0>, args: UnstakeArgsV0) -> Result<()> {
 
   // don't allow unstake without claiming available rewards
   let curr_epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
-  assert!(ctx.accounts.stake_position.last_claimed_epoch == curr_epoch - 1);
+  assert!(ctx.accounts.stake_position.last_claimed_epoch >= curr_epoch - 1);
   assert!(ctx.accounts.stake_position.hnt_amount <= d_entry.amount_deposited_native);
 
-  let ratio = ctx
-    .accounts
-    .stake_position
-    .hnt_amount
+  // position_vehnt = available_vehnt * hnt_amount / amount_deposited_native
+  let position_vehnt = available_vehnt
+    .checked_mul(ctx.accounts.stake_position.hnt_amount)
+    .unwrap()
     .checked_div(d_entry.amount_deposited_native)
     .unwrap();
-  let position_vehnt = ratio.checked_mul(available_vehnt).unwrap();
 
   let sub_dao = &mut ctx.accounts.sub_dao;
   update_subdao_vehnt(sub_dao, curr_ts);
 
-  // remove this StakePosition information from the subdao and epoch
+  // remove this StakePositionV0 information from the subdao and epoch
   sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(position_vehnt).unwrap();
   sub_dao.vehnt_fall_rate = sub_dao
     .vehnt_fall_rate

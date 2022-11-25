@@ -37,6 +37,7 @@ pub struct IssueRewardsV0<'info> {
   )]
   pub dao_epoch_info: Box<Account<'info, DaoEpochInfoV0>>,
   #[account(
+    mut,
     has_one = sub_dao,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump = sub_dao_epoch_info.bump_seed,
@@ -197,7 +198,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
       &[ctx.accounts.dao.bump_seed],
     ]]),
     MintArgsV0 {
-      amount: rewards_amount, // 6% of emissions are sent to staking pool
+      amount: rewards_amount,
     },
   )?;
 

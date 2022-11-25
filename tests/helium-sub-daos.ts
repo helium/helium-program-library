@@ -1,18 +1,18 @@
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
-import { sendInstructions, toBN } from "@helium/spl-utils";
+import { createAtaAndMint, createMint, sendInstructions, toBN } from "@helium/spl-utils";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import { AccountLayout } from "@solana/spl-token";
+import { AccountLayout, getAssociatedTokenAddress } from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
   SystemProgram,
 } from "@solana/web3.js";
-import { expect } from "chai";
+import { assert, expect } from "chai";
 import { init as dcInit } from "../packages/data-credits-sdk/src";
-import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
+import { heliumSubDaosResolvers, stakePositionKey } from "../packages/helium-sub-daos-sdk/src";
 import { init as issuerInit } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
@@ -23,8 +23,9 @@ import { createNft } from "@helium/spl-utils";
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { VoterStakeRegistry, IDL } from "../deps/helium-voter-stake-registry/src/voter_stake_registry";
+import { initVsr, VSR_PID } from "./utils/vsr";
+import { BN } from "bn.js";
 
-const VSR_PID = new PublicKey("vsrZ1Nfkxmt1hVaB7ftvcj7XpRoQ1YtCgPLajeaV6Uj");
 
 const EPOCH_REWARDS = 100000000;
 const SUB_DAO_EPOCH_REWARDS = 10000000;
@@ -47,6 +48,10 @@ describe("helium-sub-daos", () => {
   let hemProgram: Program<HeliumEntityManager>;
   let cbProgram: Program<CircuitBreaker>;
   let vsrProgram: Program<VoterStakeRegistry>;
+
+  let registrar: PublicKey;
+  let voter: PublicKey;
+  let voterKp: Keypair;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -75,6 +80,11 @@ describe("helium-sub-daos", () => {
       VSR_PID,
       provider,
     );
+
+    voterKp = Keypair.generate();
+    const vsr = await initVsr(vsrProgram, provider, me, voterKp);
+    registrar = vsr.registrar;
+    voter = vsr.voter;
   });
 
   it("initializes a dao", async () => {
@@ -113,6 +123,7 @@ describe("helium-sub-daos", () => {
     let treasury: PublicKey;
     let dcMint: PublicKey;
     let rewardsEscrow: PublicKey;
+    let stakerPool: PublicKey;
     let makerKeypair: Keypair;
     let subDaoEpochInfo: PublicKey;
 
@@ -178,7 +189,7 @@ describe("helium-sub-daos", () => {
     beforeEach(async () => {
       ({
         dataCredits: { dcMint },
-        subDao: { subDao, treasury, rewardsEscrow },
+        subDao: { subDao, treasury, rewardsEscrow, stakerPool },
         dao: { dao },
         issuer: { makerKeypair, hotspotIssuer },
       } = await initWorld(
@@ -189,6 +200,11 @@ describe("helium-sub-daos", () => {
         EPOCH_REWARDS,
         SUB_DAO_EPOCH_REWARDS
       ));
+
+      voterKp = Keypair.generate();
+      const vsr = await initVsr(vsrProgram, provider, me, voterKp);
+      registrar = vsr.registrar;
+      voter = vsr.voter;
     });
 
     it("allows tracking hotspots", async () => {
@@ -213,15 +229,43 @@ describe("helium-sub-daos", () => {
     });
 
     it("allows vehnt staking", async () => {
+      const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+      await program.methods.stakeV0({
+        vehntAmount: toBN(1, 8),
+        depositEntryIdx: 0,
+      }).accounts({
+        registrar,
+        subDao,
+        voterAuthority: voterKp.publicKey,
+        vsrProgram: VSR_PID,
+        stakePosition,
+      }).signers([voterKp]).rpc({skipPreflight: true});
     });
 
-    it("allows vehnt staking over multiple vsr deposits", async () => {
-        
-    });
+    function expectBnAccuracy(expectedBn: anchor.BN, actualBn: anchor.BN, percentUncertainty: number) {
+      const upper = expectedBn.mul(new BN(1 + percentUncertainty));
+      const lower = expectedBn.mul(new BN(1 - percentUncertainty));
+      expect(actualBn.gte(lower));
+      expect(actualBn.lte(upper));
+    }
 
     it("calculates subdao rewards", async () => {
       await createHospot();
       const { subDaoEpochInfo } = await burnDc(1600000);
+      
+      // stake some vehnt
+      const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+      await program.methods.stakeV0({
+        vehntAmount: toBN(15, 8),
+        depositEntryIdx: 0,
+      }).accounts({
+        registrar,
+        subDao,
+        voterAuthority: voterKp.publicKey,
+        vsrProgram: VSR_PID,
+        stakePosition,
+      }).signers([voterKp]).rpc({skipPreflight: true});
+      
       const epoch = (
         await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
       ).epoch;
@@ -251,85 +295,143 @@ describe("helium-sub-daos", () => {
 
       expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
 
-      // 4 dc burned, activation fee of 50
-      // sqrt(1 * 50) * (16)^1/4 = 14.14213562373095 = 14_142_135_623_730
-      const totalUtility = "14142135623731";
-      expect(daoInfo.totalUtilityScore.toString()).to.eq(totalUtility);
-      expect(subDaoInfo.utilityScore!.toString()).to.eq(totalUtility);
+      // 4 dc burned, activation fee of 50, 15 vehnt staked
+      // sqrt(1 * 50) * (16)^1/4 * 15 = 212.13203435596426 = 21_213_203_435_596_426
+      const totalUtility = new BN("21213203435596426");
+      expectBnAccuracy(totalUtility, daoInfo.totalUtilityScore, 0.01);
+      expectBnAccuracy(totalUtility, subDaoInfo.utilityScore!, 0.01);
     });
 
-    describe("with calculated rewards", () => {
-      let epoch: anchor.BN;
+    describe("with staked vehnt", () => {
+      let stakePosition: PublicKey;
+      beforeEach(async() => {
+        voterKp = Keypair.generate();
+        const vsr = await initVsr(vsrProgram, provider, me, voterKp);
+        registrar = vsr.registrar;
+        voter = vsr.voter;
 
-      beforeEach(async () => {
-        await createHospot();
-        const { subDaoEpochInfo } = await burnDc(1600000);
-        epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
-          .epoch;
-        await program.methods
-          .calculateUtilityScoreV0({
-            epoch,
-          })
-          .preInstructions([
-            ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-          ])
-          .accounts({
-            subDao,
-            dao,
-          })
-          .rpc({ skipPreflight: true });
+        stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+        await program.methods.stakeV0({
+          vehntAmount: toBN(1, 8),
+          depositEntryIdx: 0,
+        }).accounts({
+          registrar,
+          subDao,
+          voterAuthority: voterKp.publicKey,
+          vsrProgram: VSR_PID,
+          stakePosition,
+        }).signers([voterKp]).rpc({skipPreflight: true});
+      })
+
+      it("allows unstaking", async () => {
+        await program.methods.unstakeV0({
+          depositEntryIdx: 0,
+        }).accounts({
+          registrar,
+          stakePosition,
+          subDao,
+          voterAuthority: voterKp.publicKey,
+          vsrProgram: VSR_PID,
+        }).signers([voterKp]).rpc({skipPreflight: true});
+
+        assert.isFalse(!!(await provider.connection.getAccountInfo(stakePosition)));
       });
 
-      it("issues hnt rewards to subdaos and dnt to rewards escrow", async () => {
-        const preBalance = AccountLayout.decode(
-          (await provider.connection.getAccountInfo(treasury))?.data!
-        ).amount;
-        const preMobileBalance = AccountLayout.decode(
-          (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
-        ).amount;
-        await sendInstructions(provider, [
+      it("purge a position", async () => {
+        
+      });
+      describe("with calculated rewards", () => {
+        let epoch: anchor.BN;
+  
+        beforeEach(async () => {
+          await createHospot();
+          const { subDaoEpochInfo } = await burnDc(1600000);
+          epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
+            .epoch;
           await program.methods
-            .issueRewardsV0({
+            .calculateUtilityScoreV0({
               epoch,
             })
+            .preInstructions([
+              ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+            ])
             .accounts({
               subDao,
+              dao,
             })
-            .instruction(),
-        ]);
-
-        const postBalance = AccountLayout.decode(
-          (await provider.connection.getAccountInfo(treasury))?.data!
-        ).amount;
-        const postMobileBalance = AccountLayout.decode(
-          (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
-        ).amount;
-        expect((postBalance - preBalance).toString()).to.eq(
-          EPOCH_REWARDS.toString()
-        );
-        expect((postMobileBalance - preMobileBalance).toString()).to.eq(
-          SUB_DAO_EPOCH_REWARDS.toString()
-        );
-      });
-
-      describe("with vehnt stake", () => {
-
-        it("claim rewards", async () => {
-          
-        });
-
-        it("allows unstaking", async () => {
-          
-        });
-
-        it("can't unstake without claiming rewards", async () => {
-          
+            .rpc({ skipPreflight: true });
         });
   
-        it("purge a closed position", async () => {
+        it("issues hnt rewards to subdaos and dnt to rewards escrow", async () => {
+          const preBalance = AccountLayout.decode(
+            (await provider.connection.getAccountInfo(treasury))?.data!
+          ).amount;
+          const preMobileBalance = AccountLayout.decode(
+            (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
+          ).amount;
+          await sendInstructions(provider, [
+            await program.methods
+              .issueRewardsV0({
+                epoch,
+              })
+              .accounts({
+                subDao,
+              })
+              .instruction(),
+          ]);
+  
+          const postBalance = AccountLayout.decode(
+            (await provider.connection.getAccountInfo(treasury))?.data!
+          ).amount;
+          const postMobileBalance = AccountLayout.decode(
+            (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
+          ).amount;
+          expect((postBalance - preBalance).toString()).to.eq(
+            EPOCH_REWARDS.toString()
+          );
+          expect(((postMobileBalance - preMobileBalance)).toString()).to.eq(
+            ((SUB_DAO_EPOCH_REWARDS / 100) * 94).toString()
+          );
+
+          const acc = await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo);
+          expect(acc.rewardsIssued).to.be.true;
+        });
+  
+        it("claim rewards", async () => {
+          // issue rewards
+          await sendInstructions(provider, [
+            await program.methods
+              .issueRewardsV0({
+                epoch,
+              })
+              .accounts({
+                subDao,
+              })
+              .instruction(),
+          ]);
+
+          const method = program.methods.claimRewardsV0({
+            depositEntryIdx: 0,
+            epoch,
+          }).accounts({
+            registrar,
+            stakePosition,
+            subDao,
+            voterAuthority: voterKp.publicKey,
+            vsrProgram: VSR_PID,
+          }).signers([voterKp]);
+          const { stakerAta } = await method.pubkeys();
+          await method.rpc({skipPreflight: true});
           
+          const postAtaBalance = AccountLayout.decode(
+            (await provider.connection.getAccountInfo(stakerAta!))?.data!
+          ).amount;
+          assert.isTrue(postAtaBalance <= BigInt(SUB_DAO_EPOCH_REWARDS*6 / 100));
+          assert.isTrue(postAtaBalance > BigInt(SUB_DAO_EPOCH_REWARDS*6 / 100 - 5));
+
         });
       });
-    });
+    })
+    
   });
 });

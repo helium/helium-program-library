@@ -32,6 +32,9 @@ build-deps = "anchor run build-metadata && anchor run build-vsr"
 build-metadata = "cd deps/metaplex-program-library/token-metadata/program && pwd && cargo build-bpf && cd ../../../../"
 build-vsr = "pushd deps/helium-voter-stake-registry && pwd && anchor build && popd"
 
+[test]
+startup_wait = 10000
+
 [[test.genesis]]
 address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 program = "./deps/metaplex-program-library/token-metadata/target/deploy/mpl_token_metadata.so"
@@ -39,3 +42,12 @@ program = "./deps/metaplex-program-library/token-metadata/target/deploy/mpl_toke
 [[test.genesis]]
 address = "vsrZ1Nfkxmt1hVaB7ftvcj7XpRoQ1YtCgPLajeaV6Uj"
 program = "deps/helium-voter-stake-registry/target/deploy/voter_stake_registry.so"
+
+[test.validator]
+url = "https://api.mainnet-beta.solana.com"
+
+[[test.validator.clone]]
+address = "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw" # spl governance program
+
+[[test.validator.clone]]
+address = "ENmcpFCpxN1CqyUjuog9yyUVfdXBKF3LVCwLr7grJZpk" # required by spl governance 

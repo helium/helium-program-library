@@ -21,7 +21,7 @@ pub struct PurgePositionV0<'info> {
     seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &[stake_position.deposit_entry_idx]],
     bump,
   )]
-  pub stake_position: Account<'info, StakePosition>,
+  pub stake_position: Account<'info, StakePositionV0>,
 
   #[account(mut)]
   pub sub_dao: Account<'info, SubDaoV0>,

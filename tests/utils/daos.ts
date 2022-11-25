@@ -60,10 +60,11 @@ export async function initTestSubdao(
   subDao: PublicKey;
   treasury: PublicKey;
   rewardsEscrow: PublicKey;
+  stakerPool: PublicKey;
   treasuryCircuitBreaker: PublicKey;
 }> {
   const daoAcc = await program.account.daoV0.fetch(dao);
-  const dntMint = await createMint(provider, 6, authority, authority);
+  const dntMint = await createMint(provider, 8, authority, authority);
   const rewardsEscrow = await createAtaAndMint(provider, dntMint, 0, provider.wallet.publicKey);
   const method = await program.methods
     .initializeSubDaoV0({
@@ -94,7 +95,7 @@ export async function initTestSubdao(
       dntMint,
       hntMint: daoAcc.hntMint,
     });
-  const { subDao, treasury, treasuryCircuitBreaker } = await method.pubkeys();
+  const { subDao, treasury, treasuryCircuitBreaker, stakerPool } = await method.pubkeys();
   await method.rpc();
 
   return {
@@ -103,5 +104,6 @@ export async function initTestSubdao(
     subDao: subDao!,
     treasury: treasury!,
     rewardsEscrow,
+    stakerPool: stakerPool!,
   };
 }

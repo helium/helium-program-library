@@ -75,7 +75,7 @@ pub fn handler(
 
   let dc_burned = PreciseNumber::new(epoch_info.dc_burned.into())
     .or_arith_error()?
-    .checked_div(&PreciseNumber::new(100000_u128).or_arith_error()?) // DC has 8 decimals, plus 10^5 to get to dollars.
+    .checked_div(&PreciseNumber::new(100000_u128).or_arith_error()?) // 10^5 to get to dollars.
     .or_arith_error()?;
 
   let total_devices = PreciseNumber::new(epoch_info.total_devices.into()).or_arith_error()?;
@@ -103,10 +103,12 @@ pub fn handler(
     one.clone()
   };
 
-  let v = std::cmp::max(
-    one.clone(),
-    PreciseNumber::new(sub_dao.vehnt_staked.into()).or_arith_error()?,
-  );
+  let vehnt_staked = PreciseNumber::new(epoch_info.total_vehnt.into())
+    .or_arith_error()?
+    .checked_div(&PreciseNumber::new(100000000_u128).or_arith_error()?) // vehnt has 8 decimals
+    .or_arith_error()?;
+
+  let v = std::cmp::max(one.clone(), vehnt_staked);
 
   let a = if epoch_info.total_devices > 0 {
     std::cmp::max(

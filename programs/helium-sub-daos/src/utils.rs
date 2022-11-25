@@ -35,7 +35,8 @@ pub fn update_subdao_vehnt(sub_dao: &mut SubDaoV0, curr_ts: i64) {
     .checked_sub(
       u64::try_from(
         (curr_ts - sub_dao.vehnt_last_calculated_ts)
-          * i64::try_from(sub_dao.vehnt_fall_rate).unwrap(),
+          .checked_mul(i64::try_from(sub_dao.vehnt_fall_rate).unwrap())
+          .unwrap(),
       )
       .unwrap(),
     )

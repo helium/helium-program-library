@@ -67,7 +67,7 @@ pub struct DaoEpochInfoV0 {
 
 #[account]
 #[derive(Default)]
-pub struct StakePosition {
+pub struct StakePositionV0 {
   pub hnt_amount: u64,
   pub deposit_entry_idx: u8, // the deposit_entry in vsr that this position is drawing from
   pub sub_dao: Pubkey,       // the subdao the vehnt is staked to

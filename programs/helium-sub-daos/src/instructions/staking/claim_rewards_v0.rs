@@ -1,6 +1,9 @@
-use crate::{current_epoch, error::ErrorCode, state::*, EPOCH_LENGTH};
+use crate::{current_epoch, error::ErrorCode, state::*, EPOCH_LENGTH, TESTING};
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token::{Mint, Token, TokenAccount},
+};
 use circuit_breaker::{
   cpi::{accounts::TransferV0, transfer_v0},
   CircuitBreaker, TransferArgsV0,
@@ -18,8 +21,9 @@ pub struct ClaimRewardsArgsV0 {
 pub struct ClaimRewardsV0<'info> {
   #[account(
     mut,
-    seeds = [vsr_voter.load()?.registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
-    bump = vsr_voter.load()?.voter_bump,
+    seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
+    seeds::program = vsr_program.key(),
+    bump,
     has_one = voter_authority,
     has_one = registrar,
   )]
@@ -29,13 +33,11 @@ pub struct ClaimRewardsV0<'info> {
   pub registrar: AccountLoader<'info, Registrar>,
 
   #[account(
-    init,
-    space = 60 + 8 + std::mem::size_of::<StakePosition>(),
-    payer = voter_authority,
+    mut,
     seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &[args.deposit_entry_idx]],
     bump,
   )]
-  pub stake_position: Account<'info, StakePosition>,
+  pub stake_position: Account<'info, StakePositionV0>,
 
   #[account(
     mut,
@@ -46,9 +48,6 @@ pub struct ClaimRewardsV0<'info> {
   pub dnt_mint: Box<Account<'info, Mint>>,
 
   #[account(
-    init_if_needed,
-    payer = voter_authority,
-    space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()], // Break into 30m epochs
     bump,
   )]
@@ -56,7 +55,8 @@ pub struct ClaimRewardsV0<'info> {
   #[account(mut)]
   pub staker_pool: Box<Account<'info, TokenAccount>>,
   #[account(
-    mut,
+    init_if_needed,
+    payer = voter_authority,
     associated_token::mint = dnt_mint,
     associated_token::authority = voter_authority,
   )]
@@ -65,14 +65,18 @@ pub struct ClaimRewardsV0<'info> {
   /// CHECK: checked via cpi
   #[account(
     mut,
-    seeds = ["account_windowed_breaker".as_bytes(), dnt_mint.key().as_ref()],
+    seeds = ["account_windowed_breaker".as_bytes(), staker_pool.key().as_ref()],
     seeds::program = circuit_breaker_program.key(),
     bump
   )]
   pub staker_pool_circuit_breaker: AccountInfo<'info>,
 
+  ///CHECK: constraints
+  #[account(address = voter_stake_registry::ID)]
+  pub vsr_program: AccountInfo<'info>,
   pub system_program: Program<'info, System>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
+  pub associated_token_program: Program<'info, AssociatedToken>,
   pub token_program: Program<'info, Token>,
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
@@ -105,37 +109,47 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   let fall_rate = available_vehnt.checked_sub(future_vehnt).unwrap();
 
   // find the current vehnt value of this position
-  let ratio = ctx
-    .accounts
-    .stake_position
-    .hnt_amount
+  // curr_position_vehnt = available_vehnt * hnt_amount / amount_deposited_native
+  let curr_position_vehnt = available_vehnt
+    .checked_mul(ctx.accounts.stake_position.hnt_amount)
+    .unwrap()
     .checked_div(d_entry.amount_deposited_native)
     .unwrap();
-  let curr_position_vehnt = ratio.checked_mul(available_vehnt).unwrap();
 
   // check epoch that's being claimed is over
   let epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
-  if args.epoch >= epoch {
+  if !TESTING && args.epoch >= epoch {
     return Err(error!(ErrorCode::EpochNotOver));
   }
 
-  let epoch_end_ts = i64::try_from(args.epoch)
-    .unwrap()
-    .checked_mul(EPOCH_LENGTH)
-    .unwrap();
+  let epoch_end_ts = if TESTING {
+    curr_ts
+  } else {
+    i64::try_from(args.epoch)
+      .unwrap()
+      .checked_mul(EPOCH_LENGTH)
+      .unwrap()
+  };
 
   // calculate the vehnt value of this position at the time of the epoch
   let ts_diff = curr_ts.checked_sub(epoch_end_ts).unwrap();
   let staked_vehnt_at_epoch = curr_position_vehnt
-    .checked_add(fall_rate.checked_mul(ts_diff.try_into().unwrap()).unwrap())
+    .checked_add(
+      ctx
+        .accounts
+        .stake_position
+        .fall_rate
+        .checked_mul(ts_diff.try_into().unwrap())
+        .unwrap(),
+    )
     .unwrap();
 
   // calculate the position's share of that epoch's rewards
-  let share = staked_vehnt_at_epoch
-    .checked_div(ctx.accounts.sub_dao_epoch_info.total_vehnt)
-    .unwrap();
-  let rewards = share
+  // rewards = staking_rewards_issued * staked_vehnt_at_epoch / total_vehnt
+  let rewards = staked_vehnt_at_epoch
     .checked_mul(ctx.accounts.sub_dao_epoch_info.staking_rewards_issued)
+    .unwrap()
+    .checked_div(ctx.accounts.sub_dao_epoch_info.total_vehnt)
     .unwrap();
 
   transfer_v0(
