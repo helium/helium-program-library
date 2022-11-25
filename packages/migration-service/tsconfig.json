@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.root.json",
+  "references": [
+    {
+      "path": "../idls"
+    },
+    {
+      "path": "../helium-sub-daos-sdk"
+    },
+    {
+      "path": "../lazy-transactions-sdk"
+    },
+    {
+      "path": "../spl-utils"
+    },
+    {
+      "path": "./tsconfig.cjs.json"
+    },
+    {
+      "path": "./tsconfig.esm.json"
+    }
+  ]
+}

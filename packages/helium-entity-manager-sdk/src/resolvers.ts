@@ -1,13 +1,13 @@
-import { PublicKey } from "@solana/web3.js";
+import { subDaoEpochInfoResolver } from "@helium/helium-sub-daos-sdk";
 import {
   ataResolver,
   combineResolvers,
   heliumCommonResolver,
   resolveIndividual,
 } from "@helium/spl-utils";
-import { subDaoEpochInfoResolver } from "@helium/helium-sub-daos-sdk";
-import { hotspotKey } from "./pdas";
+import { hotspotStorageKey } from "./pdas";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { PublicKey } from "@solana/web3.js";
 
 export const heliumEntityManagerResolvers = combineResolvers(
   heliumCommonResolver,
@@ -17,11 +17,15 @@ export const heliumEntityManagerResolvers = combineResolvers(
     mint: "collection",
     owner: "hotspotConfig",
   }),
-  resolveIndividual(async ({ path, args, accounts }) => {
-    if (path[path.length - 1] === "hotspot" && accounts.collection) {
-      return (
-        hotspotKey(accounts.collection as PublicKey, args[args.length - 1].eccCompact)
-      )[0];
+  resolveIndividual(async ({ path, args, provider }) => {
+    if (
+      path[path.length - 1] === "storage" &&
+      args[args.length - 1].hotspotKey
+    ) {
+      return hotspotStorageKey(args[args.length - 1].hotspotKey)[0];
+    } else if (path[path.length - 1] === "recipient") {
+      // @ts-ignore
+      return provider.wallet?.publicKey;
     }
   }),
   resolveIndividual(async ({ path, accounts }) => {

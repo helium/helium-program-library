@@ -8,6 +8,7 @@ data_credits = "credacwrBVewZAgCwNgowCSMbCiepuesprUWPBeLTSg"
 helium_entity_manager = "hemABtqNUst4MmqsVcuN217ZzBspENbGt9uueSe5jts"
 circuit_breaker = "circcmKGcSE61r768bFtD1GkG3x6qfEE1GD2PgwA6C3"
 treasury_management = "treaRzaa4b98D1NQMQdQXzBupbgWhyJ2e1pXhJzkTwU"
+lazy_transactions = "1atNarMiQ8RMLkcTwqHHUESs2f4SB3uouPKFLbXcMwE"
 
 [workspace]
 members = [
@@ -17,6 +18,7 @@ members = [
   "programs/helium-entity-manager",
   "programs/circuit-breaker",
   "programs/treasury-management",
+  "programs/lazy-transactions",
 ]
 
 [registry]
@@ -34,6 +36,11 @@ build-vsr = "pushd deps/helium-voter-stake-registry && pwd && anchor build && po
 
 [test]
 startup_wait = 10000
+build-deps = "anchor run build-metadata && anchor run build-bubblegum && anchor run build-noop && anchor run build-account-compression"
+build-metadata = "cd deps/metaplex-program-library/token-metadata/program && pwd && cargo build-bpf && cd ../../../../"
+build-bubblegum = "pushd deps/metaplex-program-library && pwd && anchor build -p mpl_bubblegum && popd"
+build-account-compression = "pushd deps/solana-program-library/account-compression/programs/account-compression && pwd && cargo build-bpf && popd"
+build-noop = "pushd deps/solana-program-library/account-compression/programs/noop && pwd && cargo build-bpf && popd"
 
 [[test.genesis]]
 address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
@@ -43,6 +50,18 @@ program = "./deps/metaplex-program-library/token-metadata/target/deploy/mpl_toke
 address = "vsrZ1Nfkxmt1hVaB7ftvcj7XpRoQ1YtCgPLajeaV6Uj"
 program = "deps/helium-voter-stake-registry/target/deploy/voter_stake_registry.so"
 
+[[test.genesis]]
+address = "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"
+program = "deps/metaplex-program-library/bubblegum/program/target/deploy/mpl_bubblegum.so"
+
+[[test.genesis]]
+address = "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"
+program = "./deps/solana-program-library/account-compression/target/deploy/spl_noop.so"
+
+[[test.genesis]]
+address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"
+program = "./deps/solana-program-library/account-compression/target/deploy/spl_account_compression.so"
+
 [test.validator]
 url = "https://api.mainnet-beta.solana.com"
 
@@ -51,3 +70,18 @@ address = "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw" # spl governance progra
 
 [[test.validator.clone]]
 address = "ENmcpFCpxN1CqyUjuog9yyUVfdXBKF3LVCwLr7grJZpk" # required by spl governance 
+
+# [test.validator]
+# url = "https://api.devnet.solana.com"
+
+# [[test.validator.clone]]
+# address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+
+# [[test.validator.clone]]
+# address = "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"
+
+# [[test.validator.clone]]
+# address = "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"
+
+# [[test.validator.clone]]
+# address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"

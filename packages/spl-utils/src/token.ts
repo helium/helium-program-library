@@ -2,7 +2,7 @@ import {
   createCreateMasterEditionV3Instruction,
   createCreateMetadataAccountV3Instruction,
   createVerifyCollectionInstruction,
-  PROGRAM_ID as METADATA_PROGRAM_ID,
+  PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
 import {
@@ -10,15 +10,14 @@ import {
   createInitializeMintInstruction,
   createMintToInstruction,
   getAssociatedTokenAddress,
-  TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
 import {
-  Keypair,
+  ConfirmOptions, Keypair,
   PublicKey,
   SystemProgram,
   Transaction,
-  TransactionInstruction,
-  ConfirmOptions,
+  TransactionInstruction
 } from "@solana/web3.js";
 
 export async function mintTo(

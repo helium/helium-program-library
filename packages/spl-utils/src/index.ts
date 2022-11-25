@@ -12,3 +12,6 @@ export * from "./executeRemoteTxn";
 export * from "./utils";
 export * from "./token";
 export * from "./constants";
+
+export type { AssetProof, Asset } from "./mplAssetAPI";
+export { getAsset, getAssetProof } from "./mplAssetAPI";

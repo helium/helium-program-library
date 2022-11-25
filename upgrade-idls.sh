@@ -6,4 +6,3 @@
 ../anchor/target/debug/anchor idl upgrade circcmKGcSE61r768bFtD1GkG3x6qfEE1GD2PgwA6C3 --filepath target/idl/circuit_breaker.json --provider.cluster devnet --provider.wallet ~/.config/solana/id.json
 ../anchor/target/debug/anchor idl upgrade hemABtqNUst4MmqsVcuN217ZzBspENbGt9uueSe5jts --filepath target/idl/helium_entity_manager.json --provider.cluster devnet --provider.wallet ~/.config/solana/id.json
 ../anchor/target/debug/anchor idl upgrade treaRzaa4b98D1NQMQdQXzBupbgWhyJ2e1pXhJzkTwU --filepath target/idl/treasury_management.json --provider.cluster devnet --provider.wallet ~/.config/solana/id.json
-Ò

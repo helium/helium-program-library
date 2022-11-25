@@ -19,9 +19,9 @@
     "lib"
   ],
   "exports": {
-    "import": "./lib/esm/src/",
+    "import": "./lib/esm/",
     "require": "./lib/cjs/",
-    "types": "./lib/types/src/"
+    "types": "./lib/types/"
   },
   "scripts": {
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",

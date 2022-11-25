@@ -22,3 +22,22 @@ export function recipientKey(
     programId
   );
 }
+
+export function compressedRecipientKey(
+  lazyDistributor: PublicKey,
+  merkleTree: PublicKey,
+  index: number,
+  programId: PublicKey = PROGRAM_ID
+): [PublicKey, number] {
+  const indexBuf = Buffer.alloc(4);
+  indexBuf.writeInt32LE(index);
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("recipient", "utf-8"),
+      lazyDistributor.toBuffer(),
+      merkleTree.toBuffer(),
+      indexBuf
+    ],
+    programId
+  );
+}

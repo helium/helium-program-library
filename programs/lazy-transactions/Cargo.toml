@@ -1,0 +1,23 @@
+[package]
+name = "lazy-transactions"
+version = "0.0.1"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "lazy_transactions"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[profile.release]
+overflow-checks = true
+
+[dependencies]
+anchor-lang = { version = "0.25.0", features = ["init-if-needed"] }
+anchor-spl = "0.25.0"

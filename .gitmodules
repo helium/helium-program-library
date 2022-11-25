@@ -5,3 +5,6 @@
 	path = deps/helium-voter-stake-registry
 	url = https://github.com/helium/voter-stake-registry
 	branch = feature/minimum-lockup
+[submodule "deps/solana-program-library"]
+	path = deps/solana-program-library
+	url = https://github.com/solana-labs/solana-program-library.git

@@ -12,41 +12,39 @@ use data_credits::{
   },
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
-use mpl_token_metadata::state::{Metadata, TokenMetadataAccount};
-use std::str::FromStr;
-
-pub const TESTING: bool = std::option_env!("TESTING").is_some();
-const DC_MINT: &str = "8po3rj3xE1wo5y38zW8gH2ZoTZzqowMAuD1ugBpUKj32";
+use mpl_bubblegum::utils::get_asset_id;
+use mpl_bubblegum::{program::Bubblegum, state::TreeConfig};
+use shared_utils::*;
+use spl_account_compression::program::SplAccountCompression;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ChangeMetadataArgsV0 {
   pub location: Option<u64>,
   pub elevation: Option<i32>,
   pub gain: Option<i32>,
+  pub hash: [u8; 32],
+  pub root: [u8; 32],
+  pub index: u32,
 }
 
 #[derive(Accounts)]
 #[instruction(args: ChangeMetadataArgsV0)]
 pub struct ChangeMetadataV0<'info> {
-  pub hotspot: Box<Account<'info, Mint>>,
   #[account(
     mut,
-    seeds = [
-      "storage".as_bytes(),
-      hotspot.key().as_ref()
-    ],
-    bump
+    constraint = storage.asset == get_asset_id(&merkle_tree.key(), u64::try_from(args.index).unwrap())
   )]
   pub storage: Box<Account<'info, HotspotStorageV0>>,
   #[account(mut)]
   pub hotspot_owner: Signer<'info>,
+  /// CHECK: THe merkle tree
+  pub merkle_tree: UncheckedAccount<'info>,
   #[account(
-    associated_token::mint = hotspot,
-    associated_token::authority = hotspot_owner,
-    constraint = owner_hotspot_ata.amount == 1,
-  )]
-  pub owner_hotspot_ata: Box<Account<'info, TokenAccount>>,
-
+        seeds = [merkle_tree.key().as_ref()],
+        bump,
+        seeds::program = bubblegum_program.key()
+    )]
+  pub tree_authority: Account<'info, TreeConfig>,
   #[account(
     mut,
     associated_token::mint = dc_mint,
@@ -54,25 +52,14 @@ pub struct ChangeMetadataV0<'info> {
   )]
   pub owner_dc_ata: Box<Account<'info, TokenAccount>>,
 
-  /// CHECK: seeds checked and verification in handler
   #[account(
-    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), hotspot.key().as_ref()],
-    seeds::program = token_metadata_program.key(),
-    bump,
-  )]
-  pub hotspot_metadata: UncheckedAccount<'info>,
-
-  #[account(
-    seeds = ["hotspot_config".as_bytes(), hotspot_config.sub_dao.as_ref(), hotspot_config.symbol.as_bytes()],
-    bump,
+    has_one = dc_mint,
+    has_one = merkle_tree,
     constraint = args.gain.is_none() || (args.gain.unwrap() <= hotspot_config.max_gain && args.gain.unwrap() >= hotspot_config.min_gain) @ ErrorCode::InvalidGain
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
 
-  #[account(
-    mut,
-    constraint = TESTING || (dc_mint.key() == Pubkey::from_str(DC_MINT).unwrap())
-  )]
+  #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,
 
   #[account(
@@ -86,9 +73,8 @@ pub struct ChangeMetadataV0<'info> {
   )]
   pub dc: Account<'info, DataCreditsV0>,
 
-  /// CHECK: Checked with constraints
-  #[account(address = mpl_token_metadata::ID)]
-  pub token_metadata_program: AccountInfo<'info>,
+  pub bubblegum_program: Program<'info, Bubblegum>,
+  pub compression_program: Program<'info, SplAccountCompression>,
   /// CHECK: Checked with constraints
   #[account(address = data_credits::ID)]
   pub data_credits_program: AccountInfo<'info>,
@@ -117,13 +103,20 @@ impl<'info> ChangeMetadataV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<ChangeMetadataV0>, args: ChangeMetadataArgsV0) -> Result<()> {
-  let metadata: Metadata =
-    Metadata::from_account_info(&ctx.accounts.hotspot_metadata.to_account_info())?;
-  require!(
-    metadata.collection.unwrap().key == ctx.accounts.hotspot_config.collection,
-    ErrorCode::InvalidHotspotCollection
-  );
+pub fn handler<'info>(
+  ctx: Context<'_, '_, '_, 'info, ChangeMetadataV0<'info>>,
+  args: ChangeMetadataArgsV0,
+) -> Result<()> {
+  verify_compressed_nft(VerifyCompressedNftArgs {
+    hash: args.hash,
+    root: args.root,
+    index: args.index,
+    compression_program: ctx.accounts.compression_program.to_account_info(),
+    merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
+    owner: ctx.accounts.hotspot_owner.owner.key(),
+    delegate: ctx.accounts.hotspot_owner.owner.key(),
+    proof_accounts: ctx.remaining_accounts.to_vec(),
+  })?;
 
   if args.location.is_some() {
     let mut dc_fee: u64 = ctx.accounts.hotspot_config.dataonly_location_staking_fee;
