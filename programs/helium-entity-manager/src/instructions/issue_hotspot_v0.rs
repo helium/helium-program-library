@@ -7,7 +7,6 @@ use anchor_spl::{
   token::{Mint, Token, TokenAccount},
 };
 use angry_purple_tiger::AnimalName;
-use data_credits::HeliumSubDaos;
 use data_credits::{
   cpi::{
     accounts::{BurnCommonV0, BurnFromIssuanceV0},
