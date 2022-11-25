@@ -56,7 +56,7 @@ export async function changeMetadata({
       index: nodeIndex,
     })
     .accounts({
-      hotspot: assetId,
+      // hotspot: assetId,
       hotspotConfig,
       hotspotOwner: owner,
       storage,

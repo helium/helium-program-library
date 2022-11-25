@@ -30,17 +30,15 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 tests/**/*.ts"
-build-deps = "anchor run build-metadata && anchor run build-vsr"
+build-deps = "anchor run build-metadata && anchor run build-bubblegum && anchor run build-noop && anchor run build-account-compression && anchor run build-vsr"
 build-metadata = "cd deps/metaplex-program-library/token-metadata/program && pwd && cargo build-bpf && cd ../../../../"
+build-bubblegum = "pushd deps/metaplex-program-library && pwd && anchor build -p mpl_bubblegum && popd"
+build-noop = "pushd deps/solana-program-library/account-compression/programs/noop && pwd && cargo build-bpf && popd"
+build-account-compression = "pushd deps/solana-program-library/account-compression/programs/account-compression && pwd && cargo build-bpf && popd"
 build-vsr = "pushd deps/helium-voter-stake-registry && pwd && anchor build && popd"
 
 [test]
 startup_wait = 10000
-build-deps = "anchor run build-metadata && anchor run build-bubblegum && anchor run build-noop && anchor run build-account-compression"
-build-metadata = "cd deps/metaplex-program-library/token-metadata/program && pwd && cargo build-bpf && cd ../../../../"
-build-bubblegum = "pushd deps/metaplex-program-library && pwd && anchor build -p mpl_bubblegum && popd"
-build-account-compression = "pushd deps/solana-program-library/account-compression/programs/account-compression && pwd && cargo build-bpf && popd"
-build-noop = "pushd deps/solana-program-library/account-compression/programs/noop && pwd && cargo build-bpf && popd"
 
 [[test.genesis]]
 address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"

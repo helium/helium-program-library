@@ -52,10 +52,10 @@ pub fn calculate_voting_power(
   amount_initially_locked_native: u64,
   curr_ts: i64,
 ) -> Result<u64> {
-  if voting_mint_config.min_required_lockup_saturation_secs > 0 {
-    if d_entry.lockup.kind == LockupKind::None {
-      return Ok(0);
-    }
+  if voting_mint_config.min_required_lockup_saturation_secs > 0
+    && d_entry.lockup.kind == LockupKind::None
+  {
+    return Ok(0);
   }
   let baseline_vote_weight = voting_mint_config.baseline_vote_weight(amount_deposited_native)?;
 
