@@ -285,6 +285,9 @@ async function run() {
         dntMint: mobileKeypair.publicKey,
         rewardsEscrow,
         hntMint: hntKeypair.publicKey,
+        activeDeviceAggregator: new PublicKey(
+          "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
+        ), // TODO: Create actual aggregator
       })
       .rpc({ skipPreflight: true });
   }

@@ -13,6 +13,7 @@ use circuit_breaker::{
   WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
 };
 use shared_utils::resize_to_fit;
+use switchboard_v2::AggregatorAccountData;
 use treasury_management::{
   cpi::{accounts::InitializeTreasuryManagementV0, initialize_treasury_management_v0},
   Curve as TreasuryCurve, InitializeTreasuryManagementArgsV0, TreasuryManagement,
@@ -102,6 +103,7 @@ pub struct InitializeSubDaoV0<'info> {
     constraint = rewards_escrow.mint == dnt_mint.key()
   )]
   pub rewards_escrow: Box<Account<'info, TokenAccount>>,
+  pub active_device_aggregator: AccountLoader<'info, AggregatorAccountData>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub treasury_management_program: Program<'info, TreasuryManagement>,
@@ -181,6 +183,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
 
   ctx.accounts.dao.num_sub_daos += 1;
   ctx.accounts.sub_dao.set_inner(SubDaoV0 {
+    active_device_aggregator: ctx.accounts.active_device_aggregator.key(),
     dao: ctx.accounts.dao.key(),
     dnt_mint: ctx.accounts.dnt_mint.key(),
     treasury: ctx.accounts.treasury.key(),
@@ -188,7 +191,6 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     authority: args.authority,
     emission_schedule: args.emission_schedule,
     bump_seed: ctx.bumps["sub_dao"],
-    total_devices: 0,
   });
 
   resize_to_fit(

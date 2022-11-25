@@ -27,13 +27,6 @@ pub mod helium_sub_daos {
     initialize_sub_dao_v0::handler(ctx, args)
   }
 
-  pub fn track_added_device_v0(
-    ctx: Context<TrackAddedDeviceV0>,
-    args: TrackAddedDeviceArgsV0,
-  ) -> Result<()> {
-    track_added_device_v0::handler(ctx, args)
-  }
-
   pub fn track_dc_burn_v0(ctx: Context<TrackDcBurnV0>, args: TrackDcBurnArgsV0) -> Result<()> {
     track_dc_burn_v0::handler(ctx, args)
   }

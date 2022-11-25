@@ -22,6 +22,7 @@ import { DC_FEE, ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
 import { createNft } from "@helium/spl-utils";
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
+import { loadSwitchboardProgram, AggregatorAccount } from "@switchboard-xyz/switchboard-v2";
 
 const EPOCH_REWARDS = 100000000;
 const SUB_DAO_EPOCH_REWARDS = 10000000;
@@ -93,7 +94,6 @@ describe("helium-sub-daos", () => {
     expect(account.authority.toBase58()).eq(me.toBase58());
     expect(account.treasury.toBase58()).eq(treasury.toBase58());
     expect(account.dntMint.toBase58()).eq(mint.toBase58());
-    expect(account.totalDevices.toNumber()).eq(0);
   });
 
   describe("with dao and subdao", () => {
@@ -104,9 +104,8 @@ describe("helium-sub-daos", () => {
     let dcMint: PublicKey;
     let rewardsEscrow: PublicKey;
     let makerKeypair: Keypair;
-    let subDaoEpochInfo: PublicKey;
 
-    async function createHospot() {
+    async function createHotspot() {
       const ecc = await (await HeliumKeypair.makeRandom()).address.b58;
       const hotspotOwner = Keypair.generate().publicKey;
 
@@ -129,12 +128,9 @@ describe("helium-sub-daos", () => {
         ])
         .signers([makerKeypair]);
 
-      subDaoEpochInfo = (await method.pubkeys()).subDaoEpochInfo!;
       await method.rpc({
         skipPreflight: true,
       });
-
-      return subDaoEpochInfo;
     }
 
     async function burnDc(
@@ -180,18 +176,7 @@ describe("helium-sub-daos", () => {
         SUB_DAO_EPOCH_REWARDS
       ));
     });
-
-    it("allows tracking hotspots", async () => {
-      await createHospot();
-      const epochInfo = await program.account.subDaoEpochInfoV0.fetch(
-        subDaoEpochInfo
-      );
-      expect(epochInfo.totalDevices.toNumber()).eq(1);
-
-      const subDaoAcct = await program.account.subDaoV0.fetch(subDao);
-      expect(subDaoAcct.totalDevices.toNumber()).eq(1);
-    });
-
+145805406925;
     it("allows tracking dc spend", async () => {
       const { subDaoEpochInfo } = await burnDc(10);
 
@@ -203,11 +188,32 @@ describe("helium-sub-daos", () => {
     });
 
     it("calculates subdao rewards", async () => {
-      await createHospot();
+      await createHotspot();
       const { subDaoEpochInfo } = await burnDc(1600000);
       const epoch = (
         await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
       ).epoch;
+
+      const aggregator = new AggregatorAccount({
+        program: await loadSwitchboardProgram(
+          "mainnet-beta",
+          provider.connection,
+          Keypair.fromSeed(new Uint8Array(32).fill(1)) // using dummy keypair since we wont be submitting any transactions
+        ),
+        publicKey: new PublicKey(
+          "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
+        ),
+      });
+      const history = await aggregator.loadHistory();
+      const epochTs = epoch.toNumber() * 24 * 60 * 60;
+      const currHistory = history
+        .reverse()
+        .find((h) => h.timestamp.toNumber() <= epochTs);
+      // Remove the . since right now we're just cloning eth price feed
+      const currentActiveDeviceCount = Number(
+        currHistory?.value.toNumber().toString().replace(".", "")
+      );
+      console.log(currentActiveDeviceCount);
 
       const instr = await program.methods
         .calculateUtilityScoreV0({
@@ -234,18 +240,22 @@ describe("helium-sub-daos", () => {
 
       expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
 
-      // 4 dc burned, activation fee of 50
+      // 16 dc burned, activation fee of 50
       // sqrt(1 * 50) * (16)^1/4 = 14.14213562373095 = 14_142_135_623_730
-      const totalUtility = "14142135623731";
-      expect(daoInfo.totalUtilityScore.toString()).to.eq(totalUtility);
-      expect(subDaoInfo.utilityScore!.toString()).to.eq(totalUtility);
+      const totalUtility = Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1/4);
+      const utility = twelveDecimalsToNumber(daoInfo.totalUtilityScore);
+
+      expect(utility).to.eq(totalUtility);
+      expect(twelveDecimalsToNumber(subDaoInfo.utilityScore!)).to.eq(
+        totalUtility
+      );
     });
 
     describe("with calculated rewards", () => {
       let epoch: anchor.BN;
 
       beforeEach(async () => {
-        await createHospot();
+        await createHotspot();
         const { subDaoEpochInfo } = await burnDc(1600000);
         epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
           .epoch;
@@ -297,3 +307,15 @@ describe("helium-sub-daos", () => {
     });
   });
 });
+function twelveDecimalsToNumber(totalUtilityScore: anchor.BN) {
+  const utilityStr = totalUtilityScore.toString()
+  // format utility with 12 decimals
+  const utility = Number(
+    `${utilityStr.slice(0, utilityStr.length - 12)}.${utilityStr.slice(
+      utilityStr.length - 12,
+      utilityStr.length
+    )}`
+  );
+  return utility;
+}
+

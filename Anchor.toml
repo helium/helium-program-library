@@ -53,6 +53,22 @@ address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"
 program = "./deps/solana-program-library/account-compression/target/deploy/spl_account_compression.so"
 
 
+[test.validator]
+url = "https://api.mainnet-beta.solana.com"
+
+
+[[test.validator.clone]]
+address = "SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f"
+
+[[test.validator.clone]]
+address = "E3cqnoFvTeKKNsGmC8YitpMjo2E39hwfoyt2Aiem7dCb"
+
+[[test.validator.clone]]
+address = "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
+
+[[test.validator.clone]]
+address = "Fi8vncGpNKbq62gPo56G4toCehWNy77GgqGkTaAF5Lkk"
+
 # [test.validator]
 # url = "https://api.devnet.solana.com"
 
