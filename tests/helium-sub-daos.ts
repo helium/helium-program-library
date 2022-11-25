@@ -82,10 +82,6 @@ describe("helium-sub-daos", () => {
       VSR_PID,
       provider,
     );
-
-    voterKp = Keypair.generate();
-    ({registrar, voter, vault, hntMint} = await initVsr(vsrProgram, provider, me, voterKp));
-
   });
 
   it("initializes a dao", async () => {
@@ -304,9 +300,6 @@ describe("helium-sub-daos", () => {
     describe("with staked vehnt", () => {
       let stakePosition: PublicKey;
       beforeEach(async() => {
-        voterKp = Keypair.generate();
-        ({registrar, voter, vault, hntMint} = await initVsr(vsrProgram, provider, me, voterKp));
-
         stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
         await program.methods.stakeV0({
           vehntAmount: toBN(1, 8),
