@@ -114,5 +114,7 @@ export async function initVsr(
     registrar,
     realm: realmPk,
     voter,
+    vault,
+    hntMint,
   }
 }

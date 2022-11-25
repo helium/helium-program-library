@@ -31,4 +31,7 @@ pub enum ErrorCode {
 
   #[msg("This position is healthy, refresh not needed")]
   RefreshNotNeeded,
+
+  #[msg("Failed to calculate the voting power")]
+  FailedVotingPowerCalculation,
 }

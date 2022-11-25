@@ -51,6 +51,8 @@ describe("helium-sub-daos", () => {
 
   let registrar: PublicKey;
   let voter: PublicKey;
+  let vault: PublicKey;
+  let hntMint: PublicKey;
   let voterKp: Keypair;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
@@ -82,9 +84,8 @@ describe("helium-sub-daos", () => {
     );
 
     voterKp = Keypair.generate();
-    const vsr = await initVsr(vsrProgram, provider, me, voterKp);
-    registrar = vsr.registrar;
-    voter = vsr.voter;
+    ({registrar, voter, vault, hntMint} = await initVsr(vsrProgram, provider, me, voterKp));
+
   });
 
   it("initializes a dao", async () => {
@@ -202,9 +203,7 @@ describe("helium-sub-daos", () => {
       ));
 
       voterKp = Keypair.generate();
-      const vsr = await initVsr(vsrProgram, provider, me, voterKp);
-      registrar = vsr.registrar;
-      voter = vsr.voter;
+      ({registrar, voter, vault, hntMint} = await initVsr(vsrProgram, provider, me, voterKp));
     });
 
     it("allows tracking hotspots", async () => {
@@ -306,9 +305,7 @@ describe("helium-sub-daos", () => {
       let stakePosition: PublicKey;
       beforeEach(async() => {
         voterKp = Keypair.generate();
-        const vsr = await initVsr(vsrProgram, provider, me, voterKp);
-        registrar = vsr.registrar;
-        voter = vsr.voter;
+        ({registrar, voter, vault, hntMint} = await initVsr(vsrProgram, provider, me, voterKp));
 
         stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
         await program.methods.stakeV0({
@@ -338,8 +335,54 @@ describe("helium-sub-daos", () => {
       });
 
       it("purge a position", async () => {
-        
+        await program.methods.purgePositionV0().accounts({
+          registrar,
+          stakePosition,
+          subDao,
+          voterAuthority: voterKp.publicKey,
+          vsrProgram: VSR_PID,
+        }).signers([voterKp]).rpc({skipPreflight: true});
+
+        let acc = await program.account.stakePositionV0.fetch(stakePosition);
+        assert.isTrue(acc.purged);
+        let subDaoAcc = await program.account.subDaoV0.fetch(subDao);
+        assert.equal(subDaoAcc.vehntFallRate.toNumber(), 0);
       });
+
+      it("refreshes a position", async () => {
+        await vsrProgram.methods.createDepositEntry(1, {cliff: {}}, null, 183, false).accounts({ // lock for 6 months
+          registrar,
+          voter,
+          vault,
+          depositMint: hntMint,
+          voterAuthority: voterKp.publicKey,
+          payer: voterKp.publicKey,
+        }).signers([voterKp]).rpc({skipPreflight: true});
+        await vsrProgram.methods.internalTransferLocked(0, 1, toBN(1, 8)).accounts({
+          registrar,
+          voter,
+          voterAuthority: voterKp.publicKey,
+        }).signers([voterKp]).rpc({skipPreflight: true});
+
+        await program.methods.refreshPositionV0({
+          depositEntryIdx: 0,
+        }).accounts({
+          registrar,
+          stakePosition,
+          subDao,
+          voterAuthority: voterKp.publicKey,
+          vsrProgram: VSR_PID,
+        }).signers([voterKp]).rpc({skipPreflight: true});
+
+        const acc = await program.account.stakePositionV0.fetch(stakePosition);
+        assert.equal(acc.hntAmount.toNumber(), 0);
+        assert.equal(acc.fallRate.toNumber(), 0);
+        const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
+        assert.equal(subDaoAcc.vehntStaked.toNumber(), 0);
+        assert.equal(subDaoAcc.vehntFallRate.toNumber(), 0);
+
+      });
+
       describe("with calculated rewards", () => {
         let epoch: anchor.BN;
   

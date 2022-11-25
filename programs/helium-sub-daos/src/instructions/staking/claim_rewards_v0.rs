@@ -105,8 +105,6 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   let voting_mint_config = &registrar.voting_mints[d_entry.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
   let available_vehnt = d_entry.voting_power(voting_mint_config, curr_ts)?;
-  let future_vehnt = d_entry.voting_power(voting_mint_config, curr_ts + 1)?;
-  let fall_rate = available_vehnt.checked_sub(future_vehnt).unwrap();
 
   // find the current vehnt value of this position
   // curr_position_vehnt = available_vehnt * hnt_amount / amount_deposited_native

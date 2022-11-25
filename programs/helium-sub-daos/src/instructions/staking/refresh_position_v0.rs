@@ -12,8 +12,9 @@ pub struct RefreshPositionArgsV0 {
 pub struct RefreshPositionV0<'info> {
   #[account(
     mut,
-    seeds = [vsr_voter.load()?.registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
-    bump = vsr_voter.load()?.voter_bump,
+    seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
+    seeds::program = vsr_program.key(),
+    bump,
     has_one = voter_authority,
     has_one = registrar,
   )]
@@ -40,6 +41,9 @@ pub struct RefreshPositionV0<'info> {
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
 
+  ///CHECK: constraints
+  #[account(address = voter_stake_registry::ID)]
+  pub vsr_program: AccountInfo<'info>,
   pub system_program: Program<'info, System>,
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
@@ -63,15 +67,15 @@ pub fn handler(ctx: Context<RefreshPositionV0>, args: RefreshPositionArgsV0) -> 
   // this position needs to be reduced
 
   let sub_dao = &mut ctx.accounts.sub_dao;
-  update_subdao_vehnt(sub_dao, curr_ts);
 
-  let excess_ratio = ctx
-    .accounts
-    .stake_position
-    .hnt_amount
-    .checked_div(d_entry.amount_deposited_native)
-    .unwrap();
-  let old_position_vehnt = available_vehnt.checked_mul(excess_ratio).unwrap();
+  let old_position_vehnt = calculate_voting_power(
+    d_entry,
+    voting_mint_config,
+    ctx.accounts.stake_position.hnt_amount,
+    ctx.accounts.stake_position.hnt_amount,
+    curr_ts,
+  )?;
+
   assert!(old_position_vehnt > available_vehnt);
   assert!(ctx.accounts.stake_position.fall_rate > fall_rate);
 
@@ -83,7 +87,12 @@ pub fn handler(ctx: Context<RefreshPositionV0>, args: RefreshPositionArgsV0) -> 
     .checked_sub(fall_rate)
     .unwrap();
 
+  // update the stake position
+  ctx.accounts.stake_position.fall_rate = fall_rate;
+  ctx.accounts.stake_position.hnt_amount = d_entry.amount_deposited_native;
+
   // update subdao calculations
+  update_subdao_vehnt(sub_dao, curr_ts);
   sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(vehnt_diff).unwrap();
   sub_dao.vehnt_fall_rate = sub_dao.vehnt_fall_rate.checked_sub(fall_rate_diff).unwrap();
   ctx.accounts.sub_dao_epoch_info.total_vehnt = sub_dao.vehnt_staked;

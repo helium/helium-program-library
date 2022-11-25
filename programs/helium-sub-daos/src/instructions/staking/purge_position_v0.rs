@@ -1,4 +1,4 @@
-use crate::{current_epoch, error::ErrorCode, state::*};
+use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, TESTING};
 use anchor_lang::prelude::*;
 use voter_stake_registry::state::{Registrar, Voter};
 
@@ -6,8 +6,9 @@ use voter_stake_registry::state::{Registrar, Voter};
 pub struct PurgePositionV0<'info> {
   #[account(
     mut,
-    seeds = [vsr_voter.load()?.registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
-    bump = vsr_voter.load()?.voter_bump,
+    seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
+    seeds::program = vsr_program.key(),
+    bump,
     has_one = voter_authority,
     has_one = registrar,
   )]
@@ -34,6 +35,9 @@ pub struct PurgePositionV0<'info> {
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
 
+  ///CHECK: constraints
+  #[account(address = voter_stake_registry::ID)]
+  pub vsr_program: AccountInfo<'info>,
   pub system_program: Program<'info, System>,
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
@@ -45,7 +49,7 @@ pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {
   let registrar = &ctx.accounts.registrar.load()?;
   let d_entry = voter.deposits[ctx.accounts.stake_position.deposit_entry_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
-  if !d_entry.lockup.expired(curr_ts) {
+  if !TESTING && !d_entry.lockup.expired(curr_ts) {
     return Err(error!(ErrorCode::LockupNotExpired));
   }
   if ctx.accounts.stake_position.purged {
@@ -53,8 +57,10 @@ pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {
   }
   let time_since_expiry = d_entry.lockup.seconds_since_expiry(curr_ts);
 
-  ctx.accounts.sub_dao.vehnt_fall_rate -= ctx.accounts.stake_position.fall_rate;
-  ctx.accounts.sub_dao.vehnt_staked += ctx
+  let sub_dao = &mut ctx.accounts.sub_dao;
+  update_subdao_vehnt(sub_dao, curr_ts);
+  sub_dao.vehnt_fall_rate -= ctx.accounts.stake_position.fall_rate;
+  sub_dao.vehnt_staked += ctx
     .accounts
     .stake_position
     .fall_rate
