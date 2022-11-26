@@ -15,6 +15,7 @@
     "@metaplex-foundation/mpl-bubblegum": "^0.3.0",
     "@project-serum/anchor": "0.24.2",
     "@solana/spl-account-compression": "^0.1.4",
+    "@switchboard-xyz/switchboard-v2": "^0.0.165",
     "angry-purple-tiger": "^1.0.5",
     "lerna": "^5.5.4"
   },
