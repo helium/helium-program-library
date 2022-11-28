@@ -67,6 +67,7 @@ pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()>
 
   let sub_daos = &mut ctx.remaining_accounts.to_vec();
   let stake_position = &mut ctx.accounts.stake_position;
+  assert!(sub_daos.len() == stake_position.allocations.len());
 
   // remove any remaining stakes
   for i in 0..stake_position.allocations.len() {

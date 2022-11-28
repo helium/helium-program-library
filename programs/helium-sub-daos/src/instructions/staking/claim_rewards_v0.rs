@@ -1,4 +1,7 @@
-use crate::{current_epoch, error::ErrorCode, state::*, EPOCH_LENGTH, TESTING};
+use crate::{
+  current_epoch, error::ErrorCode, find_allocation_index, get_percent, state::*, EPOCH_LENGTH,
+  TESTING,
+};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
@@ -106,10 +109,11 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   let curr_ts = registrar.clock_unix_timestamp();
   let available_vehnt = d_entry.voting_power(voting_mint_config, curr_ts)?;
 
+  let stake_position = &mut ctx.accounts.stake_position;
   // find the current vehnt value of this position
   // curr_position_vehnt = available_vehnt * hnt_amount / amount_deposited_native
   let curr_position_vehnt = available_vehnt
-    .checked_mul(ctx.accounts.stake_position.hnt_amount)
+    .checked_mul(stake_position.hnt_amount)
     .unwrap()
     .checked_div(d_entry.amount_deposited_native)
     .unwrap();
@@ -133,22 +137,25 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   let ts_diff = curr_ts.checked_sub(epoch_end_ts).unwrap();
   let staked_vehnt_at_epoch = curr_position_vehnt
     .checked_add(
-      ctx
-        .accounts
-        .stake_position
+      stake_position
         .fall_rate
         .checked_mul(ts_diff.try_into().unwrap())
         .unwrap(),
     )
     .unwrap();
+  let allocation_index = find_allocation_index(stake_position, ctx.accounts.sub_dao.key()).unwrap();
 
   // calculate the position's share of that epoch's rewards
   // rewards = staking_rewards_issued * staked_vehnt_at_epoch / total_vehnt
-  let rewards = staked_vehnt_at_epoch
-    .checked_mul(ctx.accounts.sub_dao_epoch_info.staking_rewards_issued)
-    .unwrap()
-    .checked_div(ctx.accounts.sub_dao_epoch_info.total_vehnt)
-    .unwrap();
+  let rewards = get_percent(
+    staked_vehnt_at_epoch,
+    stake_position.allocations[allocation_index].percent,
+  )
+  .unwrap()
+  .checked_mul(ctx.accounts.sub_dao_epoch_info.staking_rewards_issued)
+  .unwrap()
+  .checked_div(ctx.accounts.sub_dao_epoch_info.total_vehnt)
+  .unwrap();
 
   transfer_v0(
     ctx.accounts.transfer_ctx().with_signer(&[&[

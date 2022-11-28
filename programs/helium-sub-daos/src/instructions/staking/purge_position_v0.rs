@@ -1,4 +1,4 @@
-use crate::{create_cron, error::ErrorCode, state::*, update_subdao_vehnt, TESTING};
+use crate::{create_cron, error::ErrorCode, get_percent, state::*, update_subdao_vehnt, TESTING};
 use anchor_lang::prelude::*;
 use clockwork_sdk::thread_program::{
   self,
@@ -28,9 +28,6 @@ pub struct PurgePositionV0<'info> {
     bump,
   )]
   pub stake_position: Account<'info, StakePositionV0>,
-
-  #[account(mut)]
-  pub sub_dao: Account<'info, SubDaoV0>,
 
   ///CHECK: constraints
   #[account(address = voter_stake_registry::ID)]
@@ -85,20 +82,41 @@ pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {
     )?;
     return Ok(());
   }
+
   if ctx.accounts.stake_position.purged {
     return Err(error!(ErrorCode::PositionAlreadyPurged));
   }
   let time_since_expiry = d_entry.lockup.seconds_since_expiry(curr_ts);
 
-  let sub_dao = &mut ctx.accounts.sub_dao;
-  update_subdao_vehnt(sub_dao, curr_ts);
-  sub_dao.vehnt_fall_rate -= ctx.accounts.stake_position.fall_rate;
-  sub_dao.vehnt_staked += ctx
-    .accounts
-    .stake_position
-    .fall_rate
-    .checked_mul(time_since_expiry)
+  let sub_daos = &mut ctx.remaining_accounts.to_vec();
+  let stake_position = &mut ctx.accounts.stake_position;
+  assert!(sub_daos.len() == stake_position.allocations.len());
+  for i in 0..stake_position.allocations.len() {
+    if stake_position.allocations[i].percent == 0 || sub_daos[i].key() == Pubkey::default() {
+      continue;
+    }
+    assert!(stake_position.allocations[i].sub_dao == sub_daos[i].key());
+    assert!(sub_daos[i].is_writable);
+
+    let mut sub_dao_data: &[u8] = &sub_daos[i].try_borrow_data()?;
+    let sub_dao = &mut SubDaoV0::try_deserialize(&mut sub_dao_data)?;
+
+    update_subdao_vehnt(sub_dao, curr_ts);
+    sub_dao.vehnt_fall_rate -= get_percent(
+      stake_position.fall_rate,
+      stake_position.allocations[i].percent,
+    )
     .unwrap();
-  ctx.accounts.stake_position.purged = true;
+    sub_dao.vehnt_staked += get_percent(
+      stake_position
+        .fall_rate
+        .checked_mul(time_since_expiry)
+        .unwrap(),
+      stake_position.allocations[i].percent,
+    )
+    .unwrap();
+    stake_position.purged = true;
+  }
+
   Ok(())
 }
