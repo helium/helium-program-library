@@ -2,6 +2,7 @@ use crate::{error::ErrorCode, state::*};
 use anchor_lang::prelude::*;
 use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
 use std::convert::TryInto;
+use time::{Duration, OffsetDateTime};
 use voter_stake_registry::state::{DepositEntry, LockupKind, VotingMintConfig};
 
 pub trait OrArithError<T> {
@@ -82,4 +83,21 @@ pub fn calculate_voting_power(
   baseline_vote_weight
     .checked_add(locked_vote_weight)
     .ok_or_else(|| error!(ErrorCode::FailedVotingPowerCalculation))
+}
+
+pub fn create_cron(execution_ts: i64, offset: i64) -> String {
+  let expiry_dt = OffsetDateTime::from_unix_timestamp(execution_ts)
+    .ok()
+    .unwrap()
+    .checked_add(Duration::new(offset, 0)) // call purge ix two hours after expiry
+    .unwrap();
+  let cron = format!(
+    "0 {:?} {:?} {:?} {:?} * {:?}",
+    expiry_dt.minute(),
+    expiry_dt.hour(),
+    expiry_dt.day(),
+    expiry_dt.month(),
+    expiry_dt.year(),
+  );
+  return cron;
 }

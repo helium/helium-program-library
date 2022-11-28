@@ -6,7 +6,6 @@ use clockwork_sdk::thread_program::{
   cpi::thread_create,
   ThreadProgram,
 };
-use time::{Duration, OffsetDateTime};
 
 use voter_stake_registry::{
   self,
@@ -142,19 +141,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     let expiry_ts = curr_ts
       .checked_add(seconds_until_expiry.try_into().unwrap())
       .unwrap();
-    let expiry_dt = OffsetDateTime::from_unix_timestamp(expiry_ts)
-      .ok()
-      .unwrap()
-      .checked_add(Duration::new(60 * 60 * 2, 0)) // call purge ix two hours after expiry
-      .unwrap();
-    let cron = format!(
-      "0 {:?} {:?} {:?} {:?} * {:?}",
-      expiry_dt.minute(),
-      expiry_dt.hour(),
-      expiry_dt.day(),
-      expiry_dt.month(),
-      expiry_dt.year(),
-    );
+    let cron = create_cron(expiry_ts, (60 * 60 * 2).try_into().unwrap());
 
     // build clockwork kickoff ix
     let purge_ix = Instruction {
@@ -167,6 +154,9 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
         AccountMeta::new(ctx.accounts.sub_dao.key(), false),
         AccountMeta::new_readonly(ctx.accounts.vsr_program.key(), false),
         AccountMeta::new_readonly(ctx.accounts.clock.key(), false),
+        AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
+        AccountMeta::new(ctx.accounts.thread.key(), false),
+        AccountMeta::new_readonly(ctx.accounts.clockwork.key(), false),
       ],
       data: clockwork_sdk::anchor_sighash("purge_position_v0").to_vec(),
     };
