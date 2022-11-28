@@ -38,7 +38,7 @@ pub struct PurgePositionV0<'info> {
   pub clock: Sysvar<'info, Clock>,
 
   pub system_program: Program<'info, System>,
-  #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", stake_position.deposit_entry_idx).into()))]
+  #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", stake_position.deposit_entry_idx)))]
   pub thread: SystemAccount<'info>,
   #[account(address = thread_program::ID)]
   pub clockwork: Program<'info, ThreadProgram>,
@@ -62,7 +62,7 @@ pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {
     let expiry_ts = curr_ts
       .checked_add(seconds_until_expiry.try_into().unwrap())
       .unwrap();
-    let cron = create_cron(expiry_ts, (60 * 60 * 1).try_into().unwrap());
+    let cron = create_cron(expiry_ts, (60 * 60).try_into().unwrap());
     thread_update(
       CpiContext::new_with_signer(
         ctx.accounts.clockwork.to_account_info(),

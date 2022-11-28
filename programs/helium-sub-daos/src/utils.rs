@@ -91,13 +91,34 @@ pub fn create_cron(execution_ts: i64, offset: i64) -> String {
     .unwrap()
     .checked_add(Duration::new(offset, 0)) // call purge ix two hours after expiry
     .unwrap();
-  let cron = format!(
+  format!(
     "0 {:?} {:?} {:?} {:?} * {:?}",
     expiry_dt.minute(),
     expiry_dt.hour(),
     expiry_dt.day(),
     expiry_dt.month(),
     expiry_dt.year(),
-  );
-  return cron;
+  )
+}
+
+pub fn find_allocation_index(
+  stake_position: &mut StakePositionV0,
+  sub_dao_key: Pubkey,
+) -> Option<usize> {
+  for i in 0..stake_position.allocations.len() {
+    if stake_position.allocations[i].sub_dao == Pubkey::default() {
+      return Some(i);
+    }
+    if stake_position.allocations[i].sub_dao == sub_dao_key {
+      return Some(i);
+    }
+  }
+  None
+}
+
+pub fn get_percent(num: u64, perc: u8) -> Option<u64> {
+  num
+    .checked_div(100)
+    .unwrap()
+    .checked_mul(perc.try_into().unwrap())
 }

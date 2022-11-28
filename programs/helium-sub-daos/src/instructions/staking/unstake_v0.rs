@@ -50,7 +50,7 @@ pub struct UnstakeV0<'info> {
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
 
-  #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", args.deposit_entry_idx).into()))]
+  #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", args.deposit_entry_idx)))]
   pub thread: SystemAccount<'info>,
   #[account(address = thread_program::ID)]
   pub clockwork: Program<'info, ThreadProgram>,
