@@ -53,8 +53,8 @@ pub mod helium_sub_daos {
     stake_v0::handler(ctx, args)
   }
 
-  pub fn unstake_v0(ctx: Context<UnstakeV0>, args: UnstakeArgsV0) -> Result<()> {
-    unstake_v0::handler(ctx, args)
+  pub fn close_stake_v0(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()> {
+    close_stake_v0::handler(ctx, args)
   }
 
   pub fn claim_rewards_v0(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result<()> {
