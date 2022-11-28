@@ -1,4 +1,5 @@
 import cors from "@fastify/cors";
+// @ts-ignore
 import animalHash from "angry-purple-tiger";
 import Fastify, { FastifyInstance } from "fastify";
 
