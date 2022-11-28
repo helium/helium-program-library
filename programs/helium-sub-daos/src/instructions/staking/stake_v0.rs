@@ -1,5 +1,13 @@
 use crate::{current_epoch, state::*, utils::*};
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
+use clockwork_sdk::thread_program::{
+  self,
+  accounts::{Thread, Trigger},
+  cpi::thread_create,
+  ThreadProgram,
+};
+use time::{Duration, OffsetDateTime};
+
 use voter_stake_registry::{
   self,
   state::{Registrar, Voter},
@@ -51,6 +59,11 @@ pub struct StakeV0<'info> {
   pub system_program: Program<'info, System>,
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
+
+  #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", args.deposit_entry_idx).into()))]
+  pub thread: SystemAccount<'info>,
+  #[account(address = thread_program::ID)]
+  pub clockwork: Program<'info, ThreadProgram>,
 }
 
 pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
@@ -117,6 +130,65 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
       fall_rate: position_fall_rate,
       purged: false,
     });
+
+    let signer_seeds: &[&[&[u8]]] = &[&[
+      "stake_position".as_bytes(),
+      ctx.accounts.voter_authority.key.as_ref(),
+      &[args.deposit_entry_idx],
+      &[ctx.bumps["stake_position"]],
+    ]];
+
+    let seconds_until_expiry = d_entry.lockup.seconds_left(curr_ts);
+    let expiry_ts = curr_ts
+      .checked_add(seconds_until_expiry.try_into().unwrap())
+      .unwrap();
+    let expiry_dt = OffsetDateTime::from_unix_timestamp(expiry_ts)
+      .ok()
+      .unwrap()
+      .checked_add(Duration::new(60 * 60 * 2, 0)) // call purge ix two hours after expiry
+      .unwrap();
+    let cron = format!(
+      "0 {:?} {:?} {:?} {:?} * {:?}",
+      expiry_dt.minute(),
+      expiry_dt.hour(),
+      expiry_dt.day(),
+      expiry_dt.month(),
+      expiry_dt.year(),
+    );
+
+    // build clockwork kickoff ix
+    let purge_ix = Instruction {
+      program_id: crate::ID,
+      accounts: vec![
+        AccountMeta::new_readonly(ctx.accounts.vsr_voter.key(), false),
+        AccountMeta::new(ctx.accounts.voter_authority.key(), true),
+        AccountMeta::new_readonly(ctx.accounts.registrar.key(), false),
+        AccountMeta::new(ctx.accounts.stake_position.key(), false),
+        AccountMeta::new(ctx.accounts.sub_dao.key(), false),
+        AccountMeta::new_readonly(ctx.accounts.vsr_program.key(), false),
+        AccountMeta::new_readonly(ctx.accounts.clock.key(), false),
+      ],
+      data: clockwork_sdk::anchor_sighash("purge_position_v0").to_vec(),
+    };
+    // initialize thread
+    thread_create(
+      CpiContext::new_with_signer(
+        ctx.accounts.clockwork.to_account_info(),
+        clockwork_sdk::thread_program::cpi::accounts::ThreadCreate {
+          authority: ctx.accounts.stake_position.to_account_info(),
+          payer: ctx.accounts.voter_authority.to_account_info(),
+          thread: ctx.accounts.thread.to_account_info(),
+          system_program: ctx.accounts.system_program.to_account_info(),
+        },
+        signer_seeds,
+      ),
+      format!("purge-{:?}", args.deposit_entry_idx).into(),
+      purge_ix.into(),
+      Trigger::Cron {
+        schedule: cron,
+        skippable: false,
+      },
+    )?;
   }
   Ok(())
 }

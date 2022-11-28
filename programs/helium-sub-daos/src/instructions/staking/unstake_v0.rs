@@ -1,5 +1,6 @@
 use crate::{current_epoch, state::*, update_subdao_vehnt};
 use anchor_lang::prelude::*;
+use clockwork_sdk::thread_program::{self, accounts::Thread, cpi::thread_delete, ThreadProgram};
 use voter_stake_registry::state::{Registrar, Voter};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -48,6 +49,11 @@ pub struct UnstakeV0<'info> {
   pub system_program: Program<'info, System>,
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
+
+  #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", args.deposit_entry_idx).into()))]
+  pub thread: SystemAccount<'info>,
+  #[account(address = thread_program::ID)]
+  pub clockwork: Program<'info, ThreadProgram>,
 }
 
 pub fn handler(ctx: Context<UnstakeV0>, args: UnstakeArgsV0) -> Result<()> {
@@ -84,5 +90,21 @@ pub fn handler(ctx: Context<UnstakeV0>, args: UnstakeArgsV0) -> Result<()> {
     .unwrap();
   ctx.accounts.sub_dao_epoch_info.total_vehnt = sub_dao.vehnt_staked;
 
+  // delete the purge position thread
+  let signer_seeds: &[&[&[u8]]] = &[&[
+    "stake_position".as_bytes(),
+    ctx.accounts.voter_authority.key.as_ref(),
+    &[args.deposit_entry_idx],
+    &[ctx.bumps["stake_position"]],
+  ]];
+  thread_delete(CpiContext::new_with_signer(
+    ctx.accounts.clockwork.to_account_info(),
+    clockwork_sdk::thread_program::cpi::accounts::ThreadDelete {
+      authority: ctx.accounts.stake_position.to_account_info(),
+      close_to: ctx.accounts.voter_authority.to_account_info(),
+      thread: ctx.accounts.thread.to_account_info(),
+    },
+    signer_seeds,
+  ))?;
   Ok(())
 }

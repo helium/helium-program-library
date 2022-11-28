@@ -26,6 +26,7 @@ import { VoterStakeRegistry, IDL } from "../deps/helium-voter-stake-registry/src
 import { initVsr, VSR_PID } from "./utils/vsr";
 import { BN } from "bn.js";
 
+const THREAD_PID = new PublicKey("3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv");
 
 const EPOCH_REWARDS = 100000000;
 const SUB_DAO_EPOCH_REWARDS = 10000000;
@@ -54,6 +55,7 @@ describe("helium-sub-daos", () => {
   let vault: PublicKey;
   let hntMint: PublicKey;
   let voterKp: Keypair;
+  let thread: PublicKey;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -200,6 +202,10 @@ describe("helium-sub-daos", () => {
 
       voterKp = Keypair.generate();
       ({registrar, voter, vault, hntMint} = await initVsr(vsrProgram, provider, me, voterKp));
+      const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+      thread = PublicKey.findProgramAddressSync([
+        Buffer.from("thread", "utf8"), stakePosition.toBuffer(), Buffer.from(`purge-${0}`, "utf8")
+      ], THREAD_PID)[0];
     });
 
     it("allows tracking hotspots", async () => {
@@ -234,7 +240,9 @@ describe("helium-sub-daos", () => {
         voterAuthority: voterKp.publicKey,
         vsrProgram: VSR_PID,
         stakePosition,
-      }).signers([voterKp]).rpc({skipPreflight: true});
+        thread,
+        clockwork: THREAD_PID,
+      }).signers([voterKp]).rpc();
     });
 
     function expectBnAccuracy(expectedBn: anchor.BN, actualBn: anchor.BN, percentUncertainty: number) {
@@ -259,6 +267,8 @@ describe("helium-sub-daos", () => {
         voterAuthority: voterKp.publicKey,
         vsrProgram: VSR_PID,
         stakePosition,
+        thread,
+        clockwork: THREAD_PID,
       }).signers([voterKp]).rpc({skipPreflight: true});
       
       const epoch = (
@@ -310,6 +320,8 @@ describe("helium-sub-daos", () => {
           voterAuthority: voterKp.publicKey,
           vsrProgram: VSR_PID,
           stakePosition,
+          thread,
+          clockwork: THREAD_PID,
         }).signers([voterKp]).rpc({skipPreflight: true});
       })
 
@@ -322,6 +334,8 @@ describe("helium-sub-daos", () => {
           subDao,
           voterAuthority: voterKp.publicKey,
           vsrProgram: VSR_PID,
+          thread,
+          clockwork: THREAD_PID,
         }).signers([voterKp]).rpc({skipPreflight: true});
 
         assert.isFalse(!!(await provider.connection.getAccountInfo(stakePosition)));

@@ -1,11 +1,10 @@
-use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, TESTING};
+use crate::{error::ErrorCode, state::*, update_subdao_vehnt, TESTING};
 use anchor_lang::prelude::*;
 use voter_stake_registry::state::{Registrar, Voter};
 
 #[derive(Accounts)]
 pub struct PurgePositionV0<'info> {
   #[account(
-    mut,
     seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
     seeds::program = vsr_program.key(),
     bump,
@@ -26,21 +25,11 @@ pub struct PurgePositionV0<'info> {
 
   #[account(mut)]
   pub sub_dao: Account<'info, SubDaoV0>,
-  #[account(
-    init_if_needed,
-    payer = voter_authority,
-    space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(clock.unix_timestamp).to_le_bytes()], // Break into 30m epochs
-    bump,
-  )]
-  pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
 
   ///CHECK: constraints
   #[account(address = voter_stake_registry::ID)]
   pub vsr_program: AccountInfo<'info>,
-  pub system_program: Program<'info, System>,
   pub clock: Sysvar<'info, Clock>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {

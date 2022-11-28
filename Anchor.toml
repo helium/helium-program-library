@@ -30,12 +30,13 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 tests/**/*.ts"
-build-deps = "anchor run build-metadata && anchor run build-bubblegum && anchor run build-noop && anchor run build-account-compression && anchor run build-vsr"
+build-deps = "anchor run build-metadata && anchor run build-bubblegum && anchor run build-noop && anchor run build-account-compression && anchor run build-vsr && anchor run build-clockwork"
 build-metadata = "cd deps/metaplex-program-library/token-metadata/program && pwd && cargo build-bpf && cd ../../../../"
 build-bubblegum = "pushd deps/metaplex-program-library && pwd && anchor build -p mpl_bubblegum && popd"
 build-noop = "pushd deps/solana-program-library/account-compression/programs/noop && pwd && cargo build-bpf && popd"
 build-account-compression = "pushd deps/solana-program-library/account-compression/programs/account-compression && pwd && cargo build-bpf && popd"
 build-vsr = "pushd deps/helium-voter-stake-registry && pwd && anchor build && popd"
+build-clockwork = "pushd deps/clockwork && ./scripts/build-all.sh . && popd"
 
 [test]
 startup_wait = 10000
@@ -59,6 +60,18 @@ program = "./deps/solana-program-library/account-compression/target/deploy/spl_n
 [[test.genesis]]
 address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"
 program = "./deps/solana-program-library/account-compression/target/deploy/spl_account_compression.so"
+
+[[test.genesis]]
+address = "F8dKseqmBoAkHx3c58Lmb9TgJv5qeTf3BbtZZSEzYvUa"
+program = "./deps/clockwork/lib/clockwork_network_program.so"
+
+[[test.genesis]]
+address = "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
+program = "./deps/clockwork/lib/clockwork_thread_program.so"
+
+[[test.genesis]]
+address = "E7p5KFo8kKCDm6BUnWtnVFkQSYh6ZA6xaGAuvpv8NXTa"
+program = "./deps/clockwork/lib/clockwork_webhook_program.so"
 
 [test.validator]
 url = "https://api.mainnet-beta.solana.com"
