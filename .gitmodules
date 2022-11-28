@@ -8,3 +8,6 @@
 [submodule "deps/solana-program-library"]
 	path = deps/solana-program-library
 	url = https://github.com/solana-labs/solana-program-library.git
+[submodule "deps/clockwork"]
+	path = deps/clockwork
+	url = https://github.com/clockwork-xyz/clockwork.git
