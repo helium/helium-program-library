@@ -82,6 +82,9 @@ jobs:
         with:
           path: |
             ./deps/metaplex-program-library
+            ./deps/solana-program-library
+            ./deps/helium-voter-stake-registry
+            ./deps/clockwork
           key: deps-${{ runner.os }}-cargo-build-${{ hashFiles('./deps/**/Cargo.lock') }}
       - run: ~/.cargo/bin/anchor run build-deps
         shell: bash

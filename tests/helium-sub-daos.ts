@@ -275,7 +275,6 @@ describe("helium-sub-daos", () => {
 
       const acc = await program.account.stakePositionV0.fetch(stakePosition);
       const sdAcc = await program.account.subDaoV0.fetch(subDao);
-      console.log(acc, sdAcc);
       expectBnAccuracy(toBN(1, 8), sdAcc.vehntStaked, 0.01);
       expectBnAccuracy(toBN(1,8), acc.hntAmount, 0.0);
       assert.isTrue(acc.fallRate.toNumber() > 0);
