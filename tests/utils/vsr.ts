@@ -100,7 +100,7 @@ export async function initVsr(
 
   // deposit some hnt
   const fromAcc = await getAssociatedTokenAddress(hntMint, voterKp.publicKey);
-  instructions.push(await program.methods.deposit(0, toBN(1, 8)).accounts({ // deposit 1 hnt
+  instructions.push(await program.methods.deposit(0, toBN(2, 8)).accounts({ // deposit 2 hnt
     registrar,
     voter,
     vault,

@@ -35,7 +35,7 @@ pub struct StakeV0<'info> {
   pub registrar: AccountLoader<'info, Registrar>,
 
   #[account(
-    init,
+    init_if_needed,
     space = 60 + 8 + std::mem::size_of::<StakePositionV0>(),
     payer = voter_authority,
     seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &[args.deposit_entry_idx]],
@@ -50,8 +50,9 @@ pub struct StakeV0<'info> {
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
 
+  /// CHECK: handled by thread_create
   #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", args.deposit_entry_idx)))]
-  pub thread: SystemAccount<'info>,
+  pub thread: AccountInfo<'info>,
   #[account(address = thread_program::ID)]
   pub clockwork: Program<'info, ThreadProgram>,
 }
@@ -163,10 +164,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
 
   if stake_position.last_claimed_epoch == 0 {
     // init stake position
-    stake_position.hnt_amount = underlying_hnt;
     stake_position.deposit_entry_idx = args.deposit_entry_idx;
-    stake_position.last_claimed_epoch = curr_epoch;
-    stake_position.fall_rate = position_fall_rate;
     stake_position.purged = false;
     for i in 0..stake_position.allocations.len() {
       stake_position.allocations[i].percent = args.percentages[i];
@@ -225,5 +223,8 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
       },
     )?;
   }
+  stake_position.hnt_amount = underlying_hnt;
+  stake_position.last_claimed_epoch = curr_epoch;
+  stake_position.fall_rate = position_fall_rate;
   Ok(())
 }

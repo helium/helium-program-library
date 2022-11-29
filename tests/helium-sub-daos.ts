@@ -278,6 +278,7 @@ describe("helium-sub-daos", () => {
       expectBnAccuracy(toBN(1, 8), sdAcc.vehntStaked, 0.01);
       expectBnAccuracy(toBN(1,8), acc.hntAmount, 0.0);
       assert.isTrue(acc.fallRate.toNumber() > 0);
+      assert.isTrue(!!(await provider.connection.getAccountInfo(thread)));
     });
 
     function expectBnAccuracy(expectedBn: anchor.BN, actualBn: anchor.BN, percentUncertainty: number) {
@@ -348,7 +349,7 @@ describe("helium-sub-daos", () => {
       beforeEach(async() => {
         stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
         await program.methods.stakeV0({
-          vehntAmount: toBN(1, 8),
+          vehntAmount: toBN(2, 8),
           depositEntryIdx: 0,
           percentages: [100, 0, 0, 0, 0],
         }).accounts({
@@ -405,7 +406,7 @@ describe("helium-sub-daos", () => {
           voterAuthority: voterKp.publicKey,
           payer: voterKp.publicKey,
         }).signers([voterKp]).rpc({skipPreflight: true});
-        await vsrProgram.methods.internalTransferLocked(0, 1, toBN(1, 8)).accounts({
+        await vsrProgram.methods.internalTransferLocked(0, 1, toBN(2, 8)).accounts({
           registrar,
           voter,
           voterAuthority: voterKp.publicKey,
@@ -418,7 +419,7 @@ describe("helium-sub-daos", () => {
           stakePosition,
           voterAuthority: voterKp.publicKey,
           vsrProgram: VSR_PID,
-        }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
+        }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({ skipPreflight: true });
 
         const acc = await program.account.stakePositionV0.fetch(stakePosition);
         assert.equal(acc.hntAmount.toNumber(), 0);
@@ -427,6 +428,52 @@ describe("helium-sub-daos", () => {
         assert.equal(subDaoAcc.vehntStaked.toNumber(), 0);
         assert.equal(subDaoAcc.vehntFallRate.toNumber(), 0);
 
+      });
+
+      it("updates vehnt stake", async () => {
+        const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+  
+        await program.methods.stakeV0({
+          vehntAmount: toBN(2, 8),
+          depositEntryIdx: 0,
+          percentages: [100, 0, 0, 0, 0],
+        }).accounts({
+          registrar,
+          subDao,
+          voterAuthority: voterKp.publicKey,
+          vsrProgram: VSR_PID,
+          stakePosition,
+          thread,
+          clockwork: THREAD_PID,
+        }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
+  
+        const acc = await program.account.stakePositionV0.fetch(stakePosition);
+        const sdAcc = await program.account.subDaoV0.fetch(subDao);
+        expectBnAccuracy(toBN(2, 8), sdAcc.vehntStaked, 0.01);
+        // expectBnAccuracy(toBN(2,8), acc.hntAmount, 0.01);
+        assert.equal(acc.hntAmount.toNumber(), toBN(2,8).toNumber());
+        assert.isTrue(acc.fallRate.toNumber() > 0);
+
+        await program.methods.stakeV0({
+          vehntAmount: toBN(1, 8),
+          depositEntryIdx: 0,
+          percentages: [100, 0, 0, 0, 0],
+        }).accounts({
+          registrar,
+          subDao,
+          voterAuthority: voterKp.publicKey,
+          vsrProgram: VSR_PID,
+          stakePosition,
+          thread,
+          clockwork: THREAD_PID,
+        }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
+  
+        const acc2 = await program.account.stakePositionV0.fetch(stakePosition);
+        const sdAcc2 = await program.account.subDaoV0.fetch(subDao);
+        expectBnAccuracy(toBN(1, 8), sdAcc2.vehntStaked, 0.01);
+        expectBnAccuracy(acc2.hntAmount, toBN(1,8), 0.001);
+        assert.isAbove(acc2.fallRate.toNumber(), 0);
+        assert.isBelow(acc2.fallRate.toNumber(), acc.fallRate.toNumber());
       });
 
       describe("with calculated rewards", () => {

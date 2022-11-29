@@ -68,7 +68,7 @@ pub fn handler(ctx: Context<RefreshPositionV0>, args: RefreshPositionArgsV0) -> 
   )?;
 
   assert!(old_position_vehnt > available_vehnt);
-  assert!(stake_position.fall_rate > fall_rate);
+  assert!(stake_position.fall_rate >= fall_rate);
 
   for (i, sd_acc_info) in sub_daos
     .iter()
