@@ -70,15 +70,19 @@ pub fn handler(ctx: Context<RefreshPositionV0>, args: RefreshPositionArgsV0) -> 
   assert!(old_position_vehnt > available_vehnt);
   assert!(stake_position.fall_rate > fall_rate);
 
-  for i in 0..stake_position.allocations.len() {
-    if (stake_position.allocations[i].percent == 0) || sub_daos[i].key() == Pubkey::default() {
+  for (i, sd_acc_info) in sub_daos
+    .iter()
+    .enumerate()
+    .take(stake_position.allocations.len())
+  {
+    if (stake_position.allocations[i].percent == 0) || sd_acc_info.key() == Pubkey::default() {
       continue;
     }
-    assert!(stake_position.allocations[i].sub_dao == sub_daos[i].key());
-    assert!(sub_daos[i].is_writable);
+    assert!(stake_position.allocations[i].sub_dao == sd_acc_info.key());
+    assert!(sd_acc_info.is_writable);
     let perc = stake_position.allocations[i].percent;
 
-    let mut sub_dao_data = sub_daos[i].try_borrow_mut_data()?;
+    let mut sub_dao_data = sd_acc_info.try_borrow_mut_data()?;
     let mut sub_dao_data_slice: &[u8] = &sub_dao_data;
     let sub_dao = &mut SubDaoV0::try_deserialize(&mut sub_dao_data_slice)?;
 

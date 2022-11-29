@@ -108,23 +108,27 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
   }
 
   // update all the subdao stakes
-  for i in 0..stake_position.allocations.len() {
+  for (i, sd_acc_info) in sub_daos
+    .iter()
+    .enumerate()
+    .take(stake_position.allocations.len())
+  {
     if (stake_position.allocations[i].percent == 0 && args.percentages[i] == 0)
-      || sub_daos[i].key() == Pubkey::default()
+      || sd_acc_info.key() == Pubkey::default()
     {
       continue;
     }
 
     assert!(
       stake_position.last_claimed_epoch == 0
-        || stake_position.allocations[i].sub_dao == sub_daos[i].key()
+        || stake_position.allocations[i].sub_dao == sd_acc_info.key()
     ); // must be new account or the subdao keys should be equal
-    assert!(sub_daos[i].is_writable);
+    assert!(sd_acc_info.is_writable);
 
-    let mut sub_dao_data = sub_daos[i].try_borrow_mut_data()?;
+    let mut sub_dao_data = sd_acc_info.try_borrow_mut_data()?;
     let mut sub_dao_data_slice: &[u8] = &sub_dao_data;
     let sub_dao = &mut SubDaoV0::try_deserialize(&mut sub_dao_data_slice)?;
-    stake_position.allocations[i].sub_dao = sub_daos[i].key();
+    stake_position.allocations[i].sub_dao = sd_acc_info.key();
 
     update_subdao_vehnt(sub_dao, curr_ts);
 
