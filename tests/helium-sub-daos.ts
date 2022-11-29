@@ -56,6 +56,7 @@ describe("helium-sub-daos", () => {
   let hntMint: PublicKey;
   let voterKp: Keypair;
   let thread: PublicKey;
+  let remainingAccounts: ({pubkey: PublicKey, isWritable: boolean, isSigner: boolean})[]
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -199,6 +200,33 @@ describe("helium-sub-daos", () => {
         EPOCH_REWARDS,
         SUB_DAO_EPOCH_REWARDS
       ));
+      remainingAccounts = [
+        {
+          pubkey: subDao,
+          isWritable: true,
+          isSigner: false,
+        },
+        {
+          pubkey: PublicKey.default,
+          isWritable: false,
+          isSigner: false,
+        },
+        {
+          pubkey: PublicKey.default,
+          isWritable: false,
+          isSigner: false,
+        },
+        {
+          pubkey: PublicKey.default,
+          isWritable: false,
+          isSigner: false,
+        },
+        {
+          pubkey: PublicKey.default,
+          isWritable: false,
+          isSigner: false,
+        }
+      ]
 
       voterKp = Keypair.generate();
       ({registrar, voter, vault, hntMint} = await initVsr(vsrProgram, provider, me, voterKp));
@@ -234,6 +262,7 @@ describe("helium-sub-daos", () => {
       await program.methods.stakeV0({
         vehntAmount: toBN(1, 8),
         depositEntryIdx: 0,
+        percentages: [100, 0, 0, 0, 0],
       }).accounts({
         registrar,
         subDao,
@@ -242,7 +271,14 @@ describe("helium-sub-daos", () => {
         stakePosition,
         thread,
         clockwork: THREAD_PID,
-      }).signers([voterKp]).rpc();
+      }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc();
+
+      const acc = await program.account.stakePositionV0.fetch(stakePosition);
+      const sdAcc = await program.account.subDaoV0.fetch(subDao);
+      console.log(acc, sdAcc);
+      expectBnAccuracy(toBN(1, 8), sdAcc.vehntStaked, 0.01);
+      expectBnAccuracy(toBN(1,8), acc.hntAmount, 0.0);
+      assert.isTrue(acc.fallRate.toNumber() > 0);
     });
 
     function expectBnAccuracy(expectedBn: anchor.BN, actualBn: anchor.BN, percentUncertainty: number) {
@@ -261,6 +297,7 @@ describe("helium-sub-daos", () => {
       await program.methods.stakeV0({
         vehntAmount: toBN(15, 8),
         depositEntryIdx: 0,
+        percentages: [100, 0, 0, 0, 0],
       }).accounts({
         registrar,
         subDao,
@@ -269,7 +306,7 @@ describe("helium-sub-daos", () => {
         stakePosition,
         thread,
         clockwork: THREAD_PID,
-      }).signers([voterKp]).rpc({skipPreflight: true});
+      }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
       
       const epoch = (
         await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
@@ -314,6 +351,7 @@ describe("helium-sub-daos", () => {
         await program.methods.stakeV0({
           vehntAmount: toBN(1, 8),
           depositEntryIdx: 0,
+          percentages: [100, 0, 0, 0, 0],
         }).accounts({
           registrar,
           subDao,
@@ -322,22 +360,24 @@ describe("helium-sub-daos", () => {
           stakePosition,
           thread,
           clockwork: THREAD_PID,
-        }).signers([voterKp]).rpc({skipPreflight: true});
+        }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
       })
 
-      it("allows unstaking", async () => {
-        await program.methods.unstakeV0({
+      it("allows closing stake", async () => {
+        await program.methods.closeStakeV0({
           depositEntryIdx: 0,
         }).accounts({
           registrar,
           stakePosition,
-          subDao,
           voterAuthority: voterKp.publicKey,
           vsrProgram: VSR_PID,
           thread,
           clockwork: THREAD_PID,
-        }).signers([voterKp]).rpc({skipPreflight: true});
+        }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
 
+        const sdAcc = await program.account.subDaoV0.fetch(subDao);
+        assert.equal(sdAcc.vehntFallRate.toNumber(), 0);
+        assert.equal(sdAcc.vehntStaked.toNumber(), 0);
         assert.isFalse(!!(await provider.connection.getAccountInfo(stakePosition)));
       });
 
@@ -345,10 +385,11 @@ describe("helium-sub-daos", () => {
         await program.methods.purgePositionV0().accounts({
           registrar,
           stakePosition,
-          subDao,
           voterAuthority: voterKp.publicKey,
           vsrProgram: VSR_PID,
-        }).signers([voterKp]).rpc({skipPreflight: true});
+          thread,
+          clockwork: THREAD_PID,
+        }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc();
 
         let acc = await program.account.stakePositionV0.fetch(stakePosition);
         assert.isTrue(acc.purged);
@@ -376,10 +417,9 @@ describe("helium-sub-daos", () => {
         }).accounts({
           registrar,
           stakePosition,
-          subDao,
           voterAuthority: voterKp.publicKey,
           vsrProgram: VSR_PID,
-        }).signers([voterKp]).rpc({skipPreflight: true});
+        }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
 
         const acc = await program.account.stakePositionV0.fetch(stakePosition);
         assert.equal(acc.hntAmount.toNumber(), 0);

@@ -1,4 +1,4 @@
-use crate::{current_epoch, error::ErrorCode, state::*, utils::*};
+use crate::{error::ErrorCode, state::*, utils::*};
 use anchor_lang::prelude::*;
 use voter_stake_registry::state::{Registrar, Voter};
 
@@ -29,17 +29,6 @@ pub struct RefreshPositionV0<'info> {
     bump,
   )]
   pub stake_position: Account<'info, StakePositionV0>,
-
-  #[account(mut)]
-  pub sub_dao: Account<'info, SubDaoV0>,
-  #[account(
-    init_if_needed,
-    payer = voter_authority,
-    space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(clock.unix_timestamp).to_le_bytes()], // Break into 30m epochs
-    bump,
-  )]
-  pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
 
   ///CHECK: constraints
   #[account(address = voter_stake_registry::ID)]
@@ -81,9 +70,6 @@ pub fn handler(ctx: Context<RefreshPositionV0>, args: RefreshPositionArgsV0) -> 
   assert!(old_position_vehnt > available_vehnt);
   assert!(stake_position.fall_rate > fall_rate);
 
-  // update the stake position
-  stake_position.fall_rate = fall_rate;
-  stake_position.hnt_amount = d_entry.amount_deposited_native;
   for i in 0..stake_position.allocations.len() {
     if (stake_position.allocations[i].percent == 0) || sub_daos[i].key() == Pubkey::default() {
       continue;
@@ -92,8 +78,9 @@ pub fn handler(ctx: Context<RefreshPositionV0>, args: RefreshPositionArgsV0) -> 
     assert!(sub_daos[i].is_writable);
     let perc = stake_position.allocations[i].percent;
 
-    let mut sub_dao_data: &[u8] = &sub_daos[i].try_borrow_data()?;
-    let sub_dao = &mut SubDaoV0::try_deserialize(&mut sub_dao_data)?;
+    let mut sub_dao_data = sub_daos[i].try_borrow_mut_data()?;
+    let mut sub_dao_data_slice: &[u8] = &sub_dao_data;
+    let sub_dao = &mut SubDaoV0::try_deserialize(&mut sub_dao_data_slice)?;
 
     let vehnt_diff = get_percent(
       old_position_vehnt.checked_sub(available_vehnt).unwrap(),
@@ -109,8 +96,13 @@ pub fn handler(ctx: Context<RefreshPositionV0>, args: RefreshPositionArgsV0) -> 
     update_subdao_vehnt(sub_dao, curr_ts);
     sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(vehnt_diff).unwrap();
     sub_dao.vehnt_fall_rate = sub_dao.vehnt_fall_rate.checked_sub(fall_rate_diff).unwrap();
-    ctx.accounts.sub_dao_epoch_info.total_vehnt = sub_dao.vehnt_staked;
+
+    sub_dao.try_serialize(&mut *sub_dao_data)?;
   }
+
+  // update the stake position
+  stake_position.fall_rate = fall_rate;
+  stake_position.hnt_amount = d_entry.amount_deposited_native;
 
   Ok(())
 }

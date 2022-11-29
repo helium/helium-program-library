@@ -94,7 +94,70 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
 
   let mut old_position_vehnt = 0;
 
-  if stake_position.hnt_amount == 0 {
+  if stake_position.last_claimed_epoch > 0 {
+    // updating pos, assert that all available rewards have been claimed
+    assert!(stake_position.last_claimed_epoch >= curr_epoch - 1);
+
+    old_position_vehnt = calculate_voting_power(
+      d_entry,
+      voting_mint_config,
+      stake_position.hnt_amount,
+      stake_position.hnt_amount,
+      curr_ts,
+    )?;
+  }
+
+  // update all the subdao stakes
+  for i in 0..stake_position.allocations.len() {
+    if (stake_position.allocations[i].percent == 0 && args.percentages[i] == 0)
+      || sub_daos[i].key() == Pubkey::default()
+    {
+      continue;
+    }
+
+    assert!(
+      stake_position.last_claimed_epoch == 0
+        || stake_position.allocations[i].sub_dao == sub_daos[i].key()
+    ); // must be new account or the subdao keys should be equal
+    assert!(sub_daos[i].is_writable);
+
+    let mut sub_dao_data = sub_daos[i].try_borrow_mut_data()?;
+    let mut sub_dao_data_slice: &[u8] = &sub_dao_data;
+    let sub_dao = &mut SubDaoV0::try_deserialize(&mut sub_dao_data_slice)?;
+    stake_position.allocations[i].sub_dao = sub_daos[i].key();
+
+    update_subdao_vehnt(sub_dao, curr_ts);
+
+    let old_subdao_stake =
+      get_percent(old_position_vehnt, stake_position.allocations[i].percent).unwrap();
+    let new_subdao_stake = get_percent(to_stake_vehnt_amount, args.percentages[i]).unwrap();
+
+    let old_fall_rate = get_percent(
+      stake_position.fall_rate,
+      stake_position.allocations[i].percent,
+    )
+    .unwrap();
+    let new_fall_rate = get_percent(position_fall_rate, args.percentages[i]).unwrap();
+
+    sub_dao.vehnt_staked = sub_dao
+      .vehnt_staked
+      .checked_sub(old_subdao_stake)
+      .unwrap()
+      .checked_add(new_subdao_stake)
+      .unwrap();
+    sub_dao.vehnt_fall_rate = sub_dao
+      .vehnt_fall_rate
+      .checked_sub(old_fall_rate)
+      .unwrap()
+      .checked_add(new_fall_rate)
+      .unwrap();
+
+    stake_position.allocations[i].percent = args.percentages[i];
+
+    sub_dao.try_serialize(&mut *sub_dao_data)?;
+  }
+
+  if stake_position.last_claimed_epoch == 0 {
     // init stake position
     stake_position.hnt_amount = underlying_hnt;
     stake_position.deposit_entry_idx = args.deposit_entry_idx;
@@ -157,62 +220,6 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
         skippable: false,
       },
     )?;
-  } else {
-    // updating a stake
-
-    // assert that all available rewards have been claimed
-    assert!(stake_position.last_claimed_epoch >= curr_epoch - 1);
-
-    old_position_vehnt = calculate_voting_power(
-      d_entry,
-      voting_mint_config,
-      stake_position.hnt_amount,
-      stake_position.hnt_amount,
-      curr_ts,
-    )?;
-  }
-
-  // update all the subdao stakes
-  for i in 0..stake_position.allocations.len() {
-    if (stake_position.allocations[i].percent == 0 && args.percentages[i] == 0)
-      || sub_daos[i].key() == Pubkey::default()
-    {
-      continue;
-    }
-    assert!(stake_position.allocations[i].sub_dao == sub_daos[i].key());
-    assert!(sub_daos[i].is_writable);
-
-    let mut sub_dao_data: &[u8] = &sub_daos[i].try_borrow_data()?;
-    let sub_dao = &mut SubDaoV0::try_deserialize(&mut sub_dao_data)?;
-    stake_position.allocations[i].sub_dao = sub_daos[i].key();
-
-    update_subdao_vehnt(sub_dao, curr_ts);
-
-    let old_subdao_stake =
-      get_percent(old_position_vehnt, stake_position.allocations[i].percent).unwrap();
-    let new_subdao_stake = get_percent(to_stake_vehnt_amount, args.percentages[i]).unwrap();
-
-    let old_fall_rate = get_percent(
-      stake_position.fall_rate,
-      stake_position.allocations[i].percent,
-    )
-    .unwrap();
-    let new_fall_rate = get_percent(position_fall_rate, args.percentages[i]).unwrap();
-
-    sub_dao.vehnt_staked = sub_dao
-      .vehnt_staked
-      .checked_sub(old_subdao_stake)
-      .unwrap()
-      .checked_add(new_subdao_stake)
-      .unwrap();
-    sub_dao.vehnt_fall_rate = sub_dao
-      .vehnt_fall_rate
-      .checked_sub(old_fall_rate)
-      .unwrap()
-      .checked_add(new_fall_rate)
-      .unwrap();
-
-    stake_position.allocations[i].percent = args.percentages[i];
   }
   Ok(())
 }

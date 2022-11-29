@@ -36,7 +36,7 @@ pub struct PurgePositionV0<'info> {
 
   pub system_program: Program<'info, System>,
   #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", stake_position.deposit_entry_idx)))]
-  pub thread: SystemAccount<'info>,
+  pub thread: Account<'info, Thread>,
   #[account(address = thread_program::ID)]
   pub clockwork: Program<'info, ThreadProgram>,
 }
@@ -98,8 +98,9 @@ pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {
     assert!(stake_position.allocations[i].sub_dao == sub_daos[i].key());
     assert!(sub_daos[i].is_writable);
 
-    let mut sub_dao_data: &[u8] = &sub_daos[i].try_borrow_data()?;
-    let sub_dao = &mut SubDaoV0::try_deserialize(&mut sub_dao_data)?;
+    let mut sub_dao_data = sub_daos[i].try_borrow_mut_data()?;
+    let mut sub_dao_data_slice: &[u8] = &sub_dao_data;
+    let sub_dao = &mut SubDaoV0::try_deserialize(&mut sub_dao_data_slice)?;
 
     update_subdao_vehnt(sub_dao, curr_ts);
     sub_dao.vehnt_fall_rate -= get_percent(
@@ -116,6 +117,8 @@ pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {
     )
     .unwrap();
     stake_position.purged = true;
+
+    sub_dao.try_serialize(&mut *sub_dao_data)?;
   }
 
   Ok(())

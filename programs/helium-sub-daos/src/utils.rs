@@ -118,7 +118,7 @@ pub fn find_allocation_index(
 
 pub fn get_percent(num: u64, perc: u8) -> Option<u64> {
   num
-    .checked_div(100)
-    .unwrap()
     .checked_mul(perc.try_into().unwrap())
+    .unwrap()
+    .checked_div(100)
 }
