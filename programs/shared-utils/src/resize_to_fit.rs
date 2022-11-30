@@ -22,6 +22,7 @@ impl Write for IgnoreWriter {
 }
 
 /// Resizes the account to the size of the struct
+#[allow(clippy::result-large-err)]
 pub fn resize_to_fit<'info, T: AccountSerialize + AccountDeserialize + Owner + Clone>(
   payer: &AccountInfo<'info>,
   system_program: &AccountInfo<'info>,
