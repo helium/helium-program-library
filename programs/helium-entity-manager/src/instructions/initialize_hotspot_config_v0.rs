@@ -21,7 +21,6 @@ pub struct InitializeHotspotConfigArgsV0 {
   pub name: String,
   pub symbol: String,
   pub metadata_url: String,
-  pub dc_fee: u64,
   pub onboarding_server: Pubkey,
   pub min_gain: i32,
   pub max_gain: i32,
@@ -206,7 +205,6 @@ pub fn handler(
   )?;
 
   ctx.accounts.hotspot_config.set_inner(HotspotConfigV0 {
-    dc_fee: args.dc_fee,
     sub_dao: ctx.accounts.sub_dao.key(),
     symbol: args.symbol.clone(),
     collection: ctx.accounts.collection.key(),

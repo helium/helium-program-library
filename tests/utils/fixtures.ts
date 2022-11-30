@@ -36,7 +36,7 @@ export const initTestDataCredits = async (
   let dcBal = 0;
 
   hntMint = await createMint(provider, 8, me, me);
-  dcMint = await createMint(provider, 8, me, me);
+  dcMint = await createMint(provider, 0, me, me);
 
   await createAtaAndMint(
     provider,
@@ -91,7 +91,6 @@ export const initTestHotspotConfig = async (
       name: "Helium Network Hotspots",
       symbol: random(), // symbol is unique would need to restart localnet everytime
       metadataUrl: DEFAULT_METADATA_URL,
-      dcFee: toBN(DC_FEE, 8),
       onboardingServer: onboardingServerKeypair.publicKey,
       minGain: 10,
       maxGain: 150,

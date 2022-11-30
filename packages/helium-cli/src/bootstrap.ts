@@ -279,6 +279,7 @@ async function run() {
           thresholdType: ThresholdType.Percent as never,
           threshold: thresholdPercent(20),
         },
+        onboardingDcFee: toBN(5, 0),
       })
       .accounts({
         dao,
@@ -301,12 +302,11 @@ async function run() {
         name: "Mobile Hotspot Collection",
         symbol: "MOBILE",
         metadataUrl: `${argv.bucket}/mobile_collection.json`,
-        dcFee: toBN(5, 0),
         onboardingServer: onboardingServerKeypair.publicKey,
         minGain: 10,
         maxGain: 150,
-        fullLocationStakingFee: toBN(1000000, 8),
-        dataonlyLocationStakingFee: toBN(500000, 8),
+        fullLocationStakingFee: toBN(1000000, 0),
+        dataonlyLocationStakingFee: toBN(500000, 0),
         maxDepth: 26,
         maxBufferSize: 1024
       })

@@ -17,7 +17,7 @@ use data_credits::{
 };
 use helium_sub_daos::{
   cpi::{accounts::TrackAddedDeviceV0, track_added_device_v0},
-  TrackAddedDeviceArgsV0,
+  TrackAddedDeviceArgsV0, SubDaoV0,
 };
 use mpl_bubblegum::state::{metaplex_adapter::TokenStandard, TreeConfig};
 use mpl_bubblegum::{
@@ -130,9 +130,8 @@ pub struct IssueHotspotV0<'info> {
   /// CHECK: Verified by cpi    
   #[account(mut)]
   pub sub_dao_epoch_info: AccountInfo<'info>,
-  /// CHECK: Verified by cpi
   #[account(mut)]
-  pub sub_dao: AccountInfo<'info>,
+  pub sub_dao: Box<Account<'info, SubDaoV0>>,
 
   /// CHECK: Verified by constraint  
   #[account(address = mpl_token_metadata::ID)]
@@ -223,7 +222,7 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
   burn_from_issuance_v0(
     ctx.accounts.burn_dc_ctx().with_signer(hotspot_config_seeds),
     BurnFromIssuanceArgsV0 {
-      amount: ctx.accounts.hotspot_config.dc_fee,
+      amount: ctx.accounts.sub_dao.onboarding_dc_fee,
       symbol: ctx.accounts.hotspot_config.symbol.clone(),
       sub_dao: ctx.accounts.hotspot_config.sub_dao,
       authority_bump: ctx.accounts.hotspot_config.bump_seed,
