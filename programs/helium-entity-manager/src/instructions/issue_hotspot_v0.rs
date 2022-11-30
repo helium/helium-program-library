@@ -74,6 +74,7 @@ pub struct IssueHotspotV0<'info> {
     space = 8 + 60 + std::mem::size_of::<HotspotStorageV0>(),
     seeds = [
       "storage".as_bytes(),
+      hotspot_config.key().as_ref(),
       &hash(args.hotspot_key.as_bytes()).to_bytes()
     ],
     bump
