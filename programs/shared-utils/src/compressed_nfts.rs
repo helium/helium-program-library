@@ -15,7 +15,6 @@ pub struct VerifyCompressedNftArgs<'info> {
   pub proof_accounts: Vec<AccountInfo<'info>>,
 }
 
-#[allow(clippy::result_large_err)]
 pub fn verify_compressed_nft(args: VerifyCompressedNftArgs) -> Result<()> {
   let verify_ctx = CpiContext::new(
     args.compression_program,

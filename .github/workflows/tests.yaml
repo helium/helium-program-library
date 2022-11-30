@@ -29,7 +29,7 @@ jobs:
             ~/.cargo/git/db/
           key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo fmt -- --check
-      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo clippy --all-targets -- -D warnings -A clippy::result_large_err
 
   test-unit:
     name: Rust Unit Tests
