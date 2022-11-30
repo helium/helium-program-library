@@ -111,7 +111,7 @@ describe("helium-sub-daos", () => {
 
       await dcProgram.methods
         .mintDataCreditsV0({
-          amount: toBN(DC_FEE, 8),
+          hntAmount: toBN(DC_FEE, 8),
         })
         .accounts({ dcMint })
         .rpc({ skipPreflight: true });
@@ -138,7 +138,7 @@ describe("helium-sub-daos", () => {
     ): Promise<{ subDaoEpochInfo: PublicKey }> {
       await dcProgram.methods
         .mintDataCreditsV0({
-          amount: toBN(amount, 8),
+          hntAmount: toBN(amount, 8),
         })
         .accounts({ dcMint })
         .rpc({ skipPreflight: true });
@@ -184,12 +184,12 @@ describe("helium-sub-daos", () => {
         subDaoEpochInfo
       );
       
-      expect(epochInfo.dcBurned.toNumber()).eq(toBN(10, 8).toNumber());
+      expect(epochInfo.dcBurned.toNumber()).eq(toBN(10, 0).toNumber());
     });
 
     it("calculates subdao rewards", async () => {
       await createHotspot();
-      const { subDaoEpochInfo } = await burnDc(1600000);
+      const { subDaoEpochInfo } = await burnDc(16);
       const epoch = (
         await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
       ).epoch;

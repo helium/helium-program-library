@@ -27,9 +27,9 @@ pub struct InitializeHotspotConfigArgsV0 {
   pub max_gain: i32,
   pub full_location_staking_fee: u64,
   pub dataonly_location_staking_fee: u64,
+  pub max_depth: u32,
+  pub max_buffer_size: u32,
 }
-
-pub const TESTING: bool = std::option_env!("TESTING").is_some();
 
 #[derive(Accounts)]
 #[instruction(args: InitializeHotspotConfigArgsV0)]
@@ -200,8 +200,8 @@ pub fn handler(
       },
       signer_seeds,
     ),
-    if TESTING { 3 } else { 26 },
-    if TESTING { 8 } else { 1024 },
+    args.max_depth,
+    args.max_buffer_size,
     None,
   )?;
 
