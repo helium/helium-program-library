@@ -1,4 +1,3 @@
-import Address from "@helium/address";
 import {
   thresholdPercent,
   ThresholdType
@@ -14,7 +13,7 @@ import {
   subDaoKey
 } from "@helium/helium-sub-daos-sdk";
 import { init as initLazy, lazyDistributorKey } from "@helium/lazy-distributor-sdk";
-import { createAtaAndMintInstructions, createMintInstructions, sendInstructions, toBN } from "@helium/spl-utils";
+import { createAtaAndMintInstructions, createMintInstructions, HNT_PYTH_PRICE_FEED, sendInstructions, toBN } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";
 import {
   createCreateMetadataAccountV3Instruction,
@@ -201,7 +200,11 @@ async function run() {
           threshold: new BN("1000000000000"),
         },
       })
-      .accounts({ hntMint: hntKeypair.publicKey, dcMint: dcKeypair.publicKey })
+      .accounts({
+        hntMint: hntKeypair.publicKey,
+        dcMint: dcKeypair.publicKey,
+        hntPriceOracle: HNT_PYTH_PRICE_FEED,
+      })
       .rpc({ skipPreflight: true });
   }
 

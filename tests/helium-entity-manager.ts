@@ -130,7 +130,7 @@ describe("helium-entity-manager", () => {
       } = await initWorld(provider, hemProgram, hsdProgram, dcProgram);
       await dcProgram.methods
         .mintDataCreditsV0({
-          amount: toBN(DC_FEE*3, 8),
+          hntAmount: toBN(DC_FEE*3, 8),
         })
         .accounts({ dcMint: dataCredits.dcMint })
         .rpc({ skipPreflight: true });
@@ -218,7 +218,7 @@ describe("helium-entity-manager", () => {
 
         await dcProgram.methods
           .mintDataCreditsV0({
-            amount: toBN(startDcBal, 8),
+            hntAmount: toBN(startDcBal, 8),
           })
           .accounts({ dcMint, recipient: hotspotOwner.publicKey })
           .rpc();

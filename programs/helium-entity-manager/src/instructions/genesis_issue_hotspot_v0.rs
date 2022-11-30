@@ -147,7 +147,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
       .accounts
       .mint_to_collection_ctx()
       .with_signer(hotspot_config_seeds),
-    metadata.clone(),
+    metadata,
   )?;
 
   ctx.accounts.storage.set_inner(HotspotStorageV0 {

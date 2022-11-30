@@ -1,3 +1,6 @@
+use std::ops::Div;
+
+use crate::errors::*;
 use crate::DataCreditsV0;
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -8,11 +11,14 @@ use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
+use pyth_sdk_solana::{load_price_feed_from_account_info, PriceStatus};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MintDataCreditsArgsV0 {
-  amount: u64,
+  hnt_amount: u64,
 }
+
+pub const TESTING: bool = std::option_env!("TESTING").is_some();
 
 #[derive(Accounts)]
 #[instruction(args: MintDataCreditsArgsV0)]
@@ -24,15 +30,18 @@ pub struct MintDataCreditsV0<'info> {
     ],
     bump = data_credits.data_credits_bump,
     has_one = hnt_mint,
-    has_one = dc_mint
+    has_one = dc_mint,
+    has_one = hnt_price_oracle
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
+  /// CHECK: Checked via load call in handler
+  pub hnt_price_oracle: AccountInfo<'info>,
 
   // hnt tokens from this account are burned
   #[account(
     mut,
     constraint = burner.mint == hnt_mint.key(),
-    constraint = burner.amount >= args.amount,
+    constraint = burner.amount >= args.hnt_amount,
     has_one = owner,
   )]
   pub burner: Box<Account<'info, TokenAccount>>,
@@ -119,20 +128,63 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
   ]];
 
   // burn the hnt tokens
-  token::burn(ctx.accounts.burn_ctx(), args.amount)?;
+  token::burn(ctx.accounts.burn_ctx(), args.hnt_amount)?;
 
   // unfreeze the recipient_token_account if necessary
   if ctx.accounts.recipient_token_account.is_frozen() {
     token::thaw_account(ctx.accounts.thaw_ctx().with_signer(signer_seeds))?;
   }
 
+  let hnt_price_oracle = load_price_feed_from_account_info(&ctx.accounts.hnt_price_oracle)
+    .map_err(|e| {
+      msg!("Pyth error {}", e);
+      error!(DataCreditsErrors::PythError)
+    })?;
+
+  // Don't validate price feed on localnet
+  if !TESTING {
+    let current_time = Clock::get()?.unix_timestamp;
+    require!(
+      current_time > hnt_price_oracle.publish_time + 60,
+      DataCreditsErrors::PythPriceFeedStale
+    );
+    require!(
+      hnt_price_oracle.status != PriceStatus::Trading,
+      DataCreditsErrors::HntNotTrading
+    );
+  }
+
+  let hnt_price = hnt_price_oracle
+    .get_ema_price()
+    .ok_or_else(|| error!(DataCreditsErrors::PythPriceNotFound))?;
+
+  // price * hnt_amount / 10^(8 + expo - 5)
+  let price_expo = -hnt_price.expo;
+  let right_shift = 8 + price_expo - 5;
+  let normalize = 10_u64
+    .checked_pow(u32::try_from(right_shift).unwrap())
+    .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?;
+
+  let dc_amount = u64::try_from(
+    u128::from(args.hnt_amount)
+      .checked_mul(u128::try_from(hnt_price.price).unwrap())
+      .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
+      .div(u128::from(normalize)),
+  )
+  .map_err(|_| error!(DataCreditsErrors::ArithmeticError))?;
+
+  msg!(
+    "HNT Price is {} * 10^{}, issuing {} data credits",
+    hnt_price.price,
+    hnt_price.expo,
+    dc_amount
+  );
+
   // mint the new tokens to recipient
   // TODO needs to mint at an oracle provided rate to hnt
   mint_v0(
     ctx.accounts.mint_ctx().with_signer(signer_seeds),
-    MintArgsV0 {
-      amount: args.amount,
-    },
+    MintArgsV0 { amount: dc_amount },
   )?;
 
   token::freeze_account(ctx.accounts.freeze_ctx().with_signer(signer_seeds))?;

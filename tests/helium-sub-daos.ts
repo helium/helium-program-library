@@ -112,7 +112,7 @@ describe("helium-sub-daos", () => {
 
       await dcProgram.methods
         .mintDataCreditsV0({
-          amount: toBN(DC_FEE, 8),
+          hntAmount: toBN(DC_FEE, 8),
         })
         .accounts({ dcMint })
         .rpc({ skipPreflight: true });
@@ -142,7 +142,7 @@ describe("helium-sub-daos", () => {
     ): Promise<{ subDaoEpochInfo: PublicKey }> {
       await dcProgram.methods
         .mintDataCreditsV0({
-          amount: toBN(amount, 8),
+          hntAmount: toBN(amount, 8),
         })
         .accounts({ dcMint })
         .rpc({ skipPreflight: true });
@@ -199,12 +199,12 @@ describe("helium-sub-daos", () => {
         subDaoEpochInfo
       );
       
-      expect(epochInfo.dcBurned.toNumber()).eq(toBN(10, 8).toNumber());
+      expect(epochInfo.dcBurned.toNumber()).eq(toBN(10, 0).toNumber());
     });
 
     it("calculates subdao rewards", async () => {
       await createHospot();
-      const { subDaoEpochInfo } = await burnDc(1600000);
+      const { subDaoEpochInfo } = await burnDc(16);
       const epoch = (
         await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
       ).epoch;
@@ -236,7 +236,7 @@ describe("helium-sub-daos", () => {
 
       // 4 dc burned, activation fee of 50
       // sqrt(1 * 50) * (16)^1/4 = 14.14213562373095 = 14_142_135_623_730
-      const totalUtility = "14142135623731";
+      const totalUtility = "7071067811865";
       expect(daoInfo.totalUtilityScore.toString()).to.eq(totalUtility);
       expect(subDaoInfo.utilityScore!.toString()).to.eq(totalUtility);
     });

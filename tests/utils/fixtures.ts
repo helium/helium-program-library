@@ -1,4 +1,4 @@
-import { toBN } from "@helium/spl-utils";
+import { HNT_PYTH_PRICE_FEED, toBN } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { SystemProgram, Keypair, PublicKey } from "@solana/web3.js";
@@ -54,7 +54,7 @@ export const initTestDataCredits = async (
         threshold: new anchor.BN("10000000000000000000"),
       },
     })
-    .accounts({ hntMint, dcMint });
+    .accounts({ hntMint, dcMint, hntPriceOracle: HNT_PYTH_PRICE_FEED });
   
   const dcKey = (await initDataCredits.pubkeys()).dataCredits!;
 
