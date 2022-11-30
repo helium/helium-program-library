@@ -10,6 +10,7 @@ import {
   init as initDao
 } from "@helium/helium-sub-daos-sdk";
 import { init as initLazy } from "@helium/lazy-distributor-sdk";
+import { HNT_PYTH_PRICE_FEED } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
@@ -140,7 +141,13 @@ async function run() {
           threshold: new BN("1000000000000"),
         },
       })
-      .accounts({ hntMint: hntKeypair.publicKey, dcMint: dcKeypair.publicKey })
+      .accounts({
+        hntMint: hntKeypair.publicKey,
+        dcMint: dcKeypair.publicKey,
+        hntPriceOracle: new PublicKey(
+          "CqFJLrT4rSpA46RQkVYWn8tdBDuQ7p7RXcp6Um76oaph"
+        ) // TODO: Replace with HNT price feed,
+      })
       .rpc({ skipPreflight: true });
   }
 

@@ -246,7 +246,7 @@ async function run() {
               tasks: [
                 {
                   httpTask: {
-                    url: argv.activeDeviceOracleUrl,
+                    url: argv.activeDeviceOracleUrl + "/" + name.toLowerCase(),
                   },
                 },
                 {
@@ -260,6 +260,7 @@ async function run() {
         },
       ],
     });
+    console.log("Created active device aggregator", agg.publicKey.toBase58());
     await agg.setHistoryBuffer({
       size: 24 * 7
     })
@@ -308,13 +309,17 @@ async function run() {
       .initializeHotspotConfigV0({
         name: `${name} Hotspot Collection`,
         symbol: name.toUpperCase(),
-        metadataUrl: `${argv.bucket}/${name.toLocaleLowerCase()}_collection.json`,
+        metadataUrl: `${
+          argv.bucket
+        }/${name.toLocaleLowerCase()}_collection.json`,
         dcFee: toBN(5, 0),
         onboardingServer: onboardingServerKeypair.publicKey,
         minGain: 10,
         maxGain: 150,
         fullLocationStakingFee: toBN(1000000, 8),
         dataonlyLocationStakingFee: toBN(500000, 8),
+        maxDepth: 26,
+        maxBufferSize: 1024,
       })
       .preInstructions([
         SystemProgram.createAccount({

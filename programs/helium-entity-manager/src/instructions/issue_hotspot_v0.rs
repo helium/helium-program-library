@@ -100,7 +100,6 @@ pub struct IssueHotspotV0<'info> {
   /// CHECK: Used in cpi
   pub bubblegum_signer: UncheckedAccount<'info>,
 
-  /// CHECK: Verified by cpi  
   #[account(
     seeds=[
       "dc".as_bytes(),
