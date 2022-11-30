@@ -1,6 +1,7 @@
+import { init as cbInit } from "@helium/circuit-breaker-sdk";
+import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
 import { sendInstructions, toBN } from "@helium/spl-utils";
-import { Keypair as HeliumKeypair } from "@helium/crypto";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { AccountLayout } from "@solana/spl-token";
@@ -8,21 +9,18 @@ import {
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
-  SystemProgram,
+  SystemProgram
 } from "@solana/web3.js";
+import { AggregatorAccount, loadSwitchboardProgram } from "@switchboard-xyz/switchboard-v2";
 import { expect } from "chai";
 import { init as dcInit } from "../packages/data-credits-sdk/src";
-import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
 import { init as issuerInit } from "../packages/helium-entity-manager-sdk/src";
+import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { burnDataCredits } from "./data-credits";
 import { initTestDao, initTestSubdao } from "./utils/daos";
-import { DC_FEE, ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
-import { createNft } from "@helium/spl-utils";
-import { init as cbInit } from "@helium/circuit-breaker-sdk";
-import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
-import { loadSwitchboardProgram, AggregatorAccount } from "@switchboard-xyz/switchboard-v2";
+import { ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
 
 const EPOCH_REWARDS = 100000000;
 const SUB_DAO_EPOCH_REWARDS = 10000000;
@@ -105,34 +103,6 @@ describe("helium-sub-daos", () => {
     let rewardsEscrow: PublicKey;
     let makerKeypair: Keypair;
 
-    async function createHotspot() {
-      const ecc = await (await HeliumKeypair.makeRandom()).address.b58;
-      const hotspotOwner = Keypair.generate().publicKey;
-
-      await dcProgram.methods
-        .mintDataCreditsV0({
-          hntAmount: toBN(DC_FEE, 8),
-        })
-        .accounts({ dcMint })
-        .rpc({ skipPreflight: true });
-
-      const method = await hemProgram.methods
-        .issueHotspotV0({ hotspotKey: ecc, isFullHotspot: true })
-        .accounts({
-          hotspotIssuer,
-          maker: makerKeypair.publicKey,
-          hotspotOwner,
-        })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-        ])
-        .signers([makerKeypair]);
-
-      await method.rpc({
-        skipPreflight: true,
-      });
-    }
-
     async function burnDc(
       amount: number
     ): Promise<{ subDaoEpochInfo: PublicKey }> {
@@ -188,8 +158,7 @@ describe("helium-sub-daos", () => {
     });
 
     it("calculates subdao rewards", async () => {
-      await createHotspot();
-      const { subDaoEpochInfo } = await burnDc(16);
+      const { subDaoEpochInfo } = await burnDc(1600000);
       const epoch = (
         await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
       ).epoch;
@@ -240,11 +209,16 @@ describe("helium-sub-daos", () => {
 
       expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
 
-      // 16 dc burned, activation fee of 50
-      // sqrt(1 * 50) * (16)^1/4 = 14.14213562373095 = 14_142_135_623_730
+      // sqrt(active devices * 50) * 4th_root(dc burned)
       const totalUtility = Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1/4);
       const utility = twelveDecimalsToNumber(daoInfo.totalUtilityScore);
 
+      console.log(
+        utility,
+        twelveDecimalsToNumber(subDaoInfo.utilityScore!),
+        totalUtility,
+        subDaoInfo.dcBurned.toNumber()
+      );
       expect(utility).to.eq(totalUtility);
       expect(twelveDecimalsToNumber(subDaoInfo.utilityScore!)).to.eq(
         totalUtility
@@ -255,7 +229,6 @@ describe("helium-sub-daos", () => {
       let epoch: anchor.BN;
 
       beforeEach(async () => {
-        await createHotspot();
         const { subDaoEpochInfo } = await burnDc(1600000);
         epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
           .epoch;

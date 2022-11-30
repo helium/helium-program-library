@@ -36,7 +36,7 @@ export const initTestDataCredits = async (
   let dcBal = 0;
 
   hntMint = await createMint(provider, 8, me, me);
-  dcMint = await createMint(provider, 8, me, me);
+  dcMint = await createMint(provider, 0, me, me);
 
   await createAtaAndMint(
     provider,

@@ -79,7 +79,7 @@ pub fn handler(
   let epoch_info = &mut ctx.accounts.sub_dao_epoch_info;
   let dc_burned = PreciseNumber::new(epoch_info.dc_burned.into())
     .or_arith_error()?
-    .checked_div(&PreciseNumber::new(10000000000000_u128).or_arith_error()?) // DC has 8 decimals, plus 10^5 to get to dollars.
+    .checked_div(&PreciseNumber::new(100000_u128).or_arith_error()?) // DC has 0 decimals, plus 10^5 to get to dollars.
     .or_arith_error()?;
 
   let history_buffer = AggregatorHistoryBuffer::new(&ctx.accounts.history_buffer)?;
