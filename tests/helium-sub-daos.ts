@@ -163,27 +163,6 @@ describe("helium-sub-daos", () => {
         await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
       ).epoch;
 
-      const aggregator = new AggregatorAccount({
-        program: await loadSwitchboardProgram(
-          "mainnet-beta",
-          provider.connection,
-          Keypair.fromSeed(new Uint8Array(32).fill(1)) // using dummy keypair since we wont be submitting any transactions
-        ),
-        publicKey: new PublicKey(
-          "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
-        ),
-      });
-      const history = await aggregator.loadHistory();
-      const epochTs = epoch.toNumber() * 24 * 60 * 60;
-      const currHistory = history
-        .reverse()
-        .find((h) => h.timestamp.toNumber() <= epochTs);
-      // Remove the . since right now we're just cloning eth price feed
-      const currentActiveDeviceCount = Number(
-        currHistory?.value.toNumber().toString().replace(".", "")
-      );
-      console.log(currentActiveDeviceCount);
-
       const instr = await program.methods
         .calculateUtilityScoreV0({
           epoch,
@@ -198,7 +177,14 @@ describe("helium-sub-daos", () => {
 
 
       const pubkeys = await instr.pubkeys();
-      await instr.rpc({ skipPreflight: true });
+      const sig = await instr.rpc({ skipPreflight: true, commitment: "confirmed" });
+      const resp = await provider.connection.getTransaction(sig, { commitment: "confirmed" });
+      
+      const currentActiveDeviceCount = Number(resp?.meta?.logMessages
+        ?.find((m) => m.includes("Total devices"))
+        ?.replace("Program log: Total devices: ", "")
+        .split(".")[0]!);
+      console.log(currentActiveDeviceCount);
 
       const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
         subDaoEpochInfo
@@ -213,12 +199,6 @@ describe("helium-sub-daos", () => {
       const totalUtility = Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1/4);
       const utility = twelveDecimalsToNumber(daoInfo.totalUtilityScore);
 
-      console.log(
-        utility,
-        twelveDecimalsToNumber(subDaoInfo.utilityScore!),
-        totalUtility,
-        subDaoInfo.dcBurned.toNumber()
-      );
       expect(utility).to.eq(totalUtility);
       expect(twelveDecimalsToNumber(subDaoInfo.utilityScore!)).to.eq(
         totalUtility

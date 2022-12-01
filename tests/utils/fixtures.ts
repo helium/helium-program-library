@@ -94,8 +94,8 @@ export const initTestHotspotConfig = async (
       onboardingServer: onboardingServerKeypair.publicKey,
       minGain: 10,
       maxGain: 150,
-      fullLocationStakingFee: toBN(1000000, 8),
-      dataonlyLocationStakingFee: toBN(500000, 8),
+      fullLocationStakingFee: toBN(1000000, 0),
+      dataonlyLocationStakingFee: toBN(500000, 0),
       maxDepth: 3,
       maxBufferSize: 8,
     })

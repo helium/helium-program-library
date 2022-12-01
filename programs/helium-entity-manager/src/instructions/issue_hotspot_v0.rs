@@ -14,6 +14,7 @@ use data_credits::{
   },
   BurnFromIssuanceArgsV0, DataCreditsV0,
 };
+use helium_sub_daos::SubDaoV0;
 use mpl_bubblegum::state::{metaplex_adapter::TokenStandard, TreeConfig};
 use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
@@ -57,9 +58,11 @@ pub struct IssueHotspotV0<'info> {
   #[account(
     has_one = collection,
     has_one = dc_mint,
-    has_one = merkle_tree
+    has_one = merkle_tree,
+    has_one = sub_dao
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
+  pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
     mut,
     seeds = ["hotspot_issuer".as_bytes(), hotspot_config.key().as_ref(), maker.key().as_ref()],

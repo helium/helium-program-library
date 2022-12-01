@@ -64,7 +64,7 @@ export async function initTestSubdao(
   treasuryCircuitBreaker: PublicKey;
 }> {
   const daoAcc = await program.account.daoV0.fetch(dao);
-  const dntMint = await createMint(provider, 6, authority, authority);
+  const dntMint = await createMint(provider, 8, authority, authority);
   const rewardsEscrow = await createAtaAndMint(provider, dntMint, 0, provider.wallet.publicKey)
   const method = await program.methods
     .initializeSubDaoV0({

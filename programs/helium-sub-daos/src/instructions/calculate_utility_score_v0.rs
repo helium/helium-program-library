@@ -91,7 +91,7 @@ pub fn handler(
   )
   .unwrap();
 
-  msg!("Total devices: {}", total_devices_u64);
+  msg!("Total devices: {}. Dc burned: {}.", total_devices_u64, epoch_info.dc_burned);
 
   let total_devices = PreciseNumber::new(total_devices_u64.into()).or_arith_error()?;
   let devices_with_fee = total_devices
