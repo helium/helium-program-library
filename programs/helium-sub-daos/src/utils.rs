@@ -1,8 +1,6 @@
 use crate::{error::ErrorCode, state::*};
 use anchor_lang::prelude::*;
-use shared_utils::{
-  precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber, TWO_PREC,
-};
+use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
 use std::convert::TryInto;
 use time::{Duration, OffsetDateTime};
 use voter_stake_registry::state::{DepositEntry, LockupKind, VotingMintConfig};
@@ -149,15 +147,7 @@ pub fn find_allocation_index(
   }
   None
 }
-pub const FALL_RATE_FACTOR: u128 = 1_000_000_000_000_000;
-
-// TODO delete this
-pub fn get_percent(num: u64, perc: u8) -> Option<u64> {
-  num
-    .checked_mul(perc.try_into().unwrap())
-    .unwrap()
-    .checked_div(100)
-}
+pub const FALL_RATE_FACTOR: u128 = 1_000_000_000_000;
 
 pub fn calculate_fall_rate(curr_vp: u64, future_vp: u64, num_seconds: u64) -> Option<u64> {
   let diff: u128 = u128::from(curr_vp.checked_sub(future_vp).unwrap())

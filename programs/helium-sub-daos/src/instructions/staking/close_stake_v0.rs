@@ -1,4 +1,4 @@
-use crate::{calculate_voting_power, current_epoch, state::*, update_subdao_vehnt, GetPercent};
+use crate::{current_epoch, state::*, update_subdao_vehnt, GetPercent};
 use anchor_lang::prelude::*;
 use clockwork_sdk::thread_program::{self, accounts::Thread, cpi::thread_delete, ThreadProgram};
 use shared_utils::precise_number::PreciseNumber;
@@ -107,15 +107,6 @@ pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()>
       .get_percent(stake_position.allocations[i].percent)
       .unwrap();
 
-    let vp = calculate_voting_power(
-      d_entry,
-      voting_mint_config,
-      stake_position.hnt_amount,
-      stake_position.hnt_amount,
-      curr_ts,
-    )
-    .ok()
-    .unwrap();
     // remove this stake information from the subdao
     sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(sd_stake).unwrap();
     sub_dao.vehnt_fall_rate = sub_dao.vehnt_fall_rate.checked_sub(sd_fall_rate).unwrap();
