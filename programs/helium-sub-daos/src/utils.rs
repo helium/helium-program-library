@@ -1,6 +1,8 @@
 use crate::{error::ErrorCode, state::*};
 use anchor_lang::prelude::*;
-use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
+use shared_utils::{
+  precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber, TWO_PREC,
+};
 use std::convert::TryInto;
 use time::{Duration, OffsetDateTime};
 use voter_stake_registry::state::{DepositEntry, LockupKind, VotingMintConfig};
@@ -21,6 +23,29 @@ impl OrArithError<SignedPreciseNumber> for Option<SignedPreciseNumber> {
   }
 }
 
+pub trait GetPercent {
+  fn get_percent(&self, percent: u8) -> Option<Self>
+  where
+    Self: Sized;
+}
+
+impl<T> GetPercent for T
+where
+  T: Copy + Into<u128> + TryFrom<u128>,
+{
+  fn get_percent(&self, percent: u8) -> Option<Self> {
+    let num: u128 = (*self).into();
+    TryFrom::try_from(
+      num
+        .checked_mul(percent.try_into().unwrap())
+        .unwrap()
+        .checked_div(100)
+        .unwrap(),
+    )
+    .ok()
+  }
+}
+
 pub const EPOCH_LENGTH: i64 = 24 * 60 * 60;
 
 pub fn current_epoch(unix_timestamp: i64) -> u64 {
@@ -32,17 +57,26 @@ pub fn next_epoch_ts(unix_timestamp: i64) -> u64 {
 }
 
 pub fn update_subdao_vehnt(sub_dao: &mut SubDaoV0, curr_ts: i64) {
-  sub_dao.vehnt_staked = sub_dao
-    .vehnt_staked
-    .checked_sub(
-      u64::try_from(
+  let fall: u64 = PreciseNumber::new(sub_dao.vehnt_fall_rate.into())
+    .unwrap()
+    .checked_mul(
+      &PreciseNumber::new(
         (curr_ts - sub_dao.vehnt_last_calculated_ts)
-          .checked_mul(i64::try_from(sub_dao.vehnt_fall_rate).unwrap())
+          .try_into()
           .unwrap(),
       )
       .unwrap(),
     )
+    .unwrap()
+    .checked_div(&PreciseNumber::new(FALL_RATE_FACTOR.into()).unwrap())
+    .unwrap()
+    .to_imprecise()
+    .unwrap()
+    .try_into()
+    .ok()
     .unwrap();
+
+  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(fall).unwrap();
   sub_dao.vehnt_last_calculated_ts = curr_ts;
 }
 
@@ -115,10 +149,24 @@ pub fn find_allocation_index(
   }
   None
 }
+pub const FALL_RATE_FACTOR: u128 = 1_000_000_000_000_000;
 
+// TODO delete this
 pub fn get_percent(num: u64, perc: u8) -> Option<u64> {
   num
     .checked_mul(perc.try_into().unwrap())
     .unwrap()
     .checked_div(100)
+}
+
+pub fn calculate_fall_rate(curr_vp: u64, future_vp: u64, num_seconds: u64) -> Option<u64> {
+  let diff: u128 = u128::from(curr_vp.checked_sub(future_vp).unwrap())
+    .checked_mul(FALL_RATE_FACTOR.into())
+    .unwrap(); // add decimals of precision for fall rate calculation
+
+  diff
+    .checked_div(num_seconds.into())
+    .unwrap()
+    .try_into()
+    .ok()
 }

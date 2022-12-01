@@ -109,61 +109,61 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   let curr_ts = registrar.clock_unix_timestamp();
   let available_vehnt = d_entry.voting_power(voting_mint_config, curr_ts)?;
 
-  let stake_position = &mut ctx.accounts.stake_position;
-  // find the current vehnt value of this position
-  // curr_position_vehnt = available_vehnt * hnt_amount / amount_deposited_native
-  let curr_position_vehnt = available_vehnt
-    .checked_mul(stake_position.hnt_amount)
-    .unwrap()
-    .checked_div(d_entry.amount_deposited_native)
-    .unwrap();
+  // let stake_position = &mut ctx.accounts.stake_position;
+  // // find the current vehnt value of this position
+  // // curr_position_vehnt = available_vehnt * hnt_amount / amount_deposited_native
+  // let curr_position_vehnt = available_vehnt
+  //   .checked_mul(stake_position.hnt_amount)
+  //   .unwrap()
+  //   .checked_div(d_entry.amount_deposited_native)
+  //   .unwrap();
 
-  // check epoch that's being claimed is over
-  let epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
-  if !TESTING && args.epoch >= epoch {
-    return Err(error!(ErrorCode::EpochNotOver));
-  }
+  // // check epoch that's being claimed is over
+  // let epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
+  // if !TESTING && args.epoch >= epoch {
+  //   return Err(error!(ErrorCode::EpochNotOver));
+  // }
 
-  let epoch_end_ts = if TESTING {
-    curr_ts
-  } else {
-    i64::try_from(args.epoch)
-      .unwrap()
-      .checked_mul(EPOCH_LENGTH)
-      .unwrap()
-  };
+  // let epoch_end_ts = if TESTING {
+  //   curr_ts
+  // } else {
+  //   i64::try_from(args.epoch)
+  //     .unwrap()
+  //     .checked_mul(EPOCH_LENGTH)
+  //     .unwrap()
+  // };
 
-  // calculate the vehnt value of this position at the time of the epoch
-  let ts_diff = curr_ts.checked_sub(epoch_end_ts).unwrap();
-  let staked_vehnt_at_epoch = curr_position_vehnt
-    .checked_add(
-      stake_position
-        .fall_rate
-        .checked_mul(ts_diff.try_into().unwrap())
-        .unwrap(),
-    )
-    .unwrap();
-  let allocation_index = find_allocation_index(stake_position, ctx.accounts.sub_dao.key()).unwrap();
+  // // calculate the vehnt value of this position at the time of the epoch
+  // let ts_diff = curr_ts.checked_sub(epoch_end_ts).unwrap();
+  // let staked_vehnt_at_epoch = curr_position_vehnt
+  //   .checked_add(
+  //     stake_position
+  //       .fall_rate
+  //       .checked_mul(ts_diff.try_into().unwrap())
+  //       .unwrap(),
+  //   )
+  //   .unwrap();
+  // let allocation_index = find_allocation_index(stake_position, ctx.accounts.sub_dao.key()).unwrap();
 
-  // calculate the position's share of that epoch's rewards
-  // rewards = staking_rewards_issued * staked_vehnt_at_epoch / total_vehnt
-  let rewards = get_percent(
-    staked_vehnt_at_epoch,
-    stake_position.allocations[allocation_index].percent,
-  )
-  .unwrap()
-  .checked_mul(ctx.accounts.sub_dao_epoch_info.staking_rewards_issued)
-  .unwrap()
-  .checked_div(ctx.accounts.sub_dao_epoch_info.total_vehnt)
-  .unwrap();
+  // // calculate the position's share of that epoch's rewards
+  // // rewards = staking_rewards_issued * staked_vehnt_at_epoch / total_vehnt
+  // let rewards = get_percent(
+  //   staked_vehnt_at_epoch,
+  //   stake_position.allocations[allocation_index].percent,
+  // )
+  // .unwrap()
+  // .checked_mul(ctx.accounts.sub_dao_epoch_info.staking_rewards_issued)
+  // .unwrap()
+  // .checked_div(ctx.accounts.sub_dao_epoch_info.total_vehnt)
+  // .unwrap();
 
-  transfer_v0(
-    ctx.accounts.transfer_ctx().with_signer(&[&[
-      b"sub_dao",
-      ctx.accounts.sub_dao.dnt_mint.as_ref(),
-      &[ctx.accounts.sub_dao.bump_seed],
-    ]]),
-    TransferArgsV0 { amount: rewards },
-  )?;
+  // transfer_v0(
+  //   ctx.accounts.transfer_ctx().with_signer(&[&[
+  //     b"sub_dao",
+  //     ctx.accounts.sub_dao.dnt_mint.as_ref(),
+  //     &[ctx.accounts.sub_dao.bump_seed],
+  //   ]]),
+  //   TransferArgsV0 { amount: rewards },
+  // )?;
   Ok(())
 }

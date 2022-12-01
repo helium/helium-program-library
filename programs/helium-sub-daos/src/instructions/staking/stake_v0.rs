@@ -6,7 +6,7 @@ use clockwork_sdk::thread_program::{
   cpi::thread_create,
   ThreadProgram,
 };
-
+use shared_utils::PreciseNumber;
 use voter_stake_registry::{
   self,
   state::{Registrar, Voter},
@@ -68,8 +68,18 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
   let voting_mint_config = &registrar.voting_mints[d_entry.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
   let available_vehnt = d_entry.voting_power(voting_mint_config, curr_ts)?;
-  let future_vehnt = d_entry.voting_power(voting_mint_config, curr_ts + 1)?;
-  let fall_rate = available_vehnt.checked_sub(future_vehnt).unwrap();
+
+  let seconds_left = d_entry
+    .lockup
+    .seconds_left(curr_ts)
+    .checked_sub(10)
+    .unwrap();
+  let future_ts = curr_ts
+    .checked_add(seconds_left.try_into().unwrap())
+    .unwrap();
+  let future_vehnt = d_entry.voting_power(voting_mint_config, future_ts)?;
+
+  let fall_rate = calculate_fall_rate(available_vehnt, future_vehnt, seconds_left).unwrap();
 
   let to_stake_vehnt_amount = std::cmp::min(args.vehnt_amount, available_vehnt);
 
@@ -77,16 +87,19 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
 
   // underlying_hnt = amount_deposited_native * vehnt_amount / available_vehnt
   // position_fall_rate = fall_rate * vehnt_amount / available_vehnt
-  let underlying_hnt = d_entry
-    .amount_deposited_native
-    .checked_mul(to_stake_vehnt_amount)
+  let underlying_hnt = PreciseNumber::new(d_entry.amount_deposited_native.into())
     .unwrap()
-    .checked_div(available_vehnt)
+    .checked_mul(&PreciseNumber::new(to_stake_vehnt_amount.into()).unwrap())
+    .unwrap()
+    .checked_div(&PreciseNumber::new(available_vehnt.into()).unwrap())
     .unwrap();
-  let position_fall_rate = fall_rate
-    .checked_mul(to_stake_vehnt_amount)
+  let position_fall_rate: u64 = u128::from(fall_rate)
+    .checked_mul(to_stake_vehnt_amount.into())
     .unwrap()
-    .checked_div(available_vehnt)
+    .checked_div(available_vehnt.into())
+    .unwrap()
+    .try_into()
+    .ok()
     .unwrap();
 
   let sub_daos = &mut ctx.remaining_accounts.to_vec();
@@ -133,16 +146,18 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
 
     update_subdao_vehnt(sub_dao, curr_ts);
 
-    let old_subdao_stake =
-      get_percent(old_position_vehnt, stake_position.allocations[i].percent).unwrap();
-    let new_subdao_stake = get_percent(to_stake_vehnt_amount, args.percentages[i]).unwrap();
+    let old_subdao_stake = old_position_vehnt
+      .get_percent(stake_position.allocations[i].percent)
+      .unwrap();
+    let new_subdao_stake = to_stake_vehnt_amount
+      .get_percent(args.percentages[i])
+      .unwrap();
 
-    let old_fall_rate = get_percent(
-      stake_position.fall_rate,
-      stake_position.allocations[i].percent,
-    )
-    .unwrap();
-    let new_fall_rate = get_percent(position_fall_rate, args.percentages[i]).unwrap();
+    let old_fall_rate = stake_position
+      .fall_rate
+      .get_percent(stake_position.allocations[i].percent)
+      .unwrap();
+    let new_fall_rate = position_fall_rate.get_percent(args.percentages[i]).unwrap();
 
     sub_dao.vehnt_staked = sub_dao
       .vehnt_staked
@@ -223,8 +238,9 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
       },
     )?;
   }
-  stake_position.hnt_amount = underlying_hnt;
+  stake_position.hnt_amount = underlying_hnt.to_imprecise().unwrap().try_into().unwrap();
   stake_position.last_claimed_epoch = curr_epoch;
   stake_position.fall_rate = position_fall_rate;
+
   Ok(())
 }

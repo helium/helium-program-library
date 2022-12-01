@@ -31,6 +31,10 @@ const THREAD_PID = new PublicKey("3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv")
 const EPOCH_REWARDS = 100000000;
 const SUB_DAO_EPOCH_REWARDS = 10000000;
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 describe("helium-sub-daos", () => {
   // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -200,40 +204,7 @@ describe("helium-sub-daos", () => {
         EPOCH_REWARDS,
         SUB_DAO_EPOCH_REWARDS
       ));
-      remainingAccounts = [
-        {
-          pubkey: subDao,
-          isWritable: true,
-          isSigner: false,
-        },
-        {
-          pubkey: PublicKey.default,
-          isWritable: false,
-          isSigner: false,
-        },
-        {
-          pubkey: PublicKey.default,
-          isWritable: false,
-          isSigner: false,
-        },
-        {
-          pubkey: PublicKey.default,
-          isWritable: false,
-          isSigner: false,
-        },
-        {
-          pubkey: PublicKey.default,
-          isWritable: false,
-          isSigner: false,
-        }
-      ]
 
-      voterKp = Keypair.generate();
-      ({registrar, voter, vault, hntMint} = await initVsr(vsrProgram, provider, me, voterKp));
-      const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
-      thread = PublicKey.findProgramAddressSync([
-        Buffer.from("thread", "utf8"), stakePosition.toBuffer(), Buffer.from(`purge-${0}`, "utf8")
-      ], THREAD_PID)[0];
     });
 
     it("allows tracking hotspots", async () => {
@@ -257,317 +228,368 @@ describe("helium-sub-daos", () => {
       expect(epochInfo.dcBurned.toNumber()).eq(toBN(10, 8).toNumber());
     });
 
-    it("allows vehnt staking", async () => {
-      const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
-      await program.methods.stakeV0({
-        vehntAmount: toBN(1, 8),
-        depositEntryIdx: 0,
-        percentages: [100, 0, 0, 0, 0],
-      }).accounts({
-        registrar,
-        subDao,
-        voterAuthority: voterKp.publicKey,
-        vsrProgram: VSR_PID,
-        stakePosition,
-        thread,
-        clockwork: THREAD_PID,
-      }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc();
+    const vehntOptions = [
+      { name: "Case 1", options: {delay: 0, lockupPeriods: 183, lockupAmount: 2, stakeAmount: 2} },
+      { name: "Case 2", options: {delay: 15000, lockupPeriods: 183*4, lockupAmount: 50, stakeAmount: 1} },
+      { name: "Case 3", options: {delay: 45000, lockupPeriods: 183*8, lockupAmount: 100, stakeAmount: 10000} },
+      { name: "Case 4", options: {delay: 5000, lockupPeriods: 183*8, lockupAmount: 1000, stakeAmount: 10000} },
+    ]
 
-      const acc = await program.account.stakePositionV0.fetch(stakePosition);
-      const sdAcc = await program.account.subDaoV0.fetch(subDao);
-      expectBnAccuracy(toBN(1, 8), sdAcc.vehntStaked, 0.01);
-      expectBnAccuracy(toBN(1,8), acc.hntAmount, 0.0);
-      assert.isTrue(acc.fallRate.toNumber() > 0);
-      assert.isTrue(!!(await provider.connection.getAccountInfo(thread)));
-    });
-
-    function expectBnAccuracy(expectedBn: anchor.BN, actualBn: anchor.BN, percentUncertainty: number) {
-      const upper = expectedBn.mul(new BN(1 + percentUncertainty));
-      const lower = expectedBn.mul(new BN(1 - percentUncertainty));
-      expect(actualBn.gte(lower));
-      expect(actualBn.lte(upper));
-    }
-
-    it("calculates subdao rewards", async () => {
-      await createHospot();
-      const { subDaoEpochInfo } = await burnDc(1600000);
-      
-      // stake some vehnt
-      const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
-      await program.methods.stakeV0({
-        vehntAmount: toBN(15, 8),
-        depositEntryIdx: 0,
-        percentages: [100, 0, 0, 0, 0],
-      }).accounts({
-        registrar,
-        subDao,
-        voterAuthority: voterKp.publicKey,
-        vsrProgram: VSR_PID,
-        stakePosition,
-        thread,
-        clockwork: THREAD_PID,
-      }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
-      
-      const epoch = (
-        await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
-      ).epoch;
-
-      const instr = await program.methods
-        .calculateUtilityScoreV0({
-          epoch,
+    vehntOptions.forEach(function ({name, options}) {
+      describe("vehnt tests - " + name, () => {
+        beforeEach(async() => {
+          remainingAccounts = [
+            {
+              pubkey: subDao,
+              isWritable: true,
+              isSigner: false,
+            },
+            {
+              pubkey: PublicKey.default,
+              isWritable: false,
+              isSigner: false,
+            },
+            {
+              pubkey: PublicKey.default,
+              isWritable: false,
+              isSigner: false,
+            },
+            {
+              pubkey: PublicKey.default,
+              isWritable: false,
+              isSigner: false,
+            },
+            {
+              pubkey: PublicKey.default,
+              isWritable: false,
+              isSigner: false,
+            }
+          ]
+    
+          voterKp = Keypair.generate();
+          ({registrar, voter, vault, hntMint} = await initVsr(vsrProgram, provider, me, voterKp, options ));
+          const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+          thread = PublicKey.findProgramAddressSync([
+            Buffer.from("thread", "utf8"), stakePosition.toBuffer(), Buffer.from(`purge-${0}`, "utf8")
+          ], THREAD_PID)[0];
         })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-        ])
-        .accounts({
-          subDao,
-          dao,
+
+        it("allows vehnt staking", async () => {
+          const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+          const vehntStake = toBN(options.stakeAmount,8);
+          await program.methods.stakeV0({
+            vehntAmount: vehntStake,
+            depositEntryIdx: 0,
+            percentages: [100, 0, 0, 0, 0],
+          }).accounts({
+            registrar,
+            subDao,
+            voterAuthority: voterKp.publicKey,
+            vsrProgram: VSR_PID,
+            stakePosition,
+            thread,
+            clockwork: THREAD_PID,
+          }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc();
+    
+          const acc = await program.account.stakePositionV0.fetch(stakePosition);
+          const sdAcc = await program.account.subDaoV0.fetch(subDao);
+          expectBnAccuracy(vehntStake, sdAcc.vehntStaked, 0.001);
+          expectBnAccuracy(vehntStake, acc.hntAmount, 0.001);
+          assert.isTrue(acc.fallRate.gt(new anchor.BN(0)))
+          assert.isTrue(!!(await provider.connection.getAccountInfo(thread)));
         });
-
-
-      const pubkeys = await instr.pubkeys();
-      await instr.rpc({ skipPreflight: true });
-
-      const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
-        subDaoEpochInfo
-      );
-      const daoInfo = await program.account.daoEpochInfoV0.fetch(
-        pubkeys.daoEpochInfo!
-      );
-
-      expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
-
-      // 4 dc burned, activation fee of 50, 15 vehnt staked
-      // sqrt(1 * 50) * (16)^1/4 * 15 = 212.13203435596426 = 21_213_203_435_596_426
-      const totalUtility = new BN("21213203435596426");
-      expectBnAccuracy(totalUtility, daoInfo.totalUtilityScore, 0.01);
-      expectBnAccuracy(totalUtility, subDaoInfo.utilityScore!, 0.01);
-    });
-
-    describe("with staked vehnt", () => {
-      let stakePosition: PublicKey;
-      beforeEach(async() => {
-        stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
-        await program.methods.stakeV0({
-          vehntAmount: toBN(2, 8),
-          depositEntryIdx: 0,
-          percentages: [100, 0, 0, 0, 0],
-        }).accounts({
-          registrar,
-          subDao,
-          voterAuthority: voterKp.publicKey,
-          vsrProgram: VSR_PID,
-          stakePosition,
-          thread,
-          clockwork: THREAD_PID,
-        }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
-      })
-
-      it("allows closing stake", async () => {
-        await program.methods.closeStakeV0({
-          depositEntryIdx: 0,
-        }).accounts({
-          registrar,
-          stakePosition,
-          voterAuthority: voterKp.publicKey,
-          vsrProgram: VSR_PID,
-          thread,
-          clockwork: THREAD_PID,
-        }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
-
-        const sdAcc = await program.account.subDaoV0.fetch(subDao);
-        assert.equal(sdAcc.vehntFallRate.toNumber(), 0);
-        assert.equal(sdAcc.vehntStaked.toNumber(), 0);
-        assert.isFalse(!!(await provider.connection.getAccountInfo(stakePosition)));
-      });
-
-      it("purge a position", async () => {
-        await program.methods.purgePositionV0().accounts({
-          registrar,
-          stakePosition,
-          voterAuthority: voterKp.publicKey,
-          vsrProgram: VSR_PID,
-          thread,
-          clockwork: THREAD_PID,
-        }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc();
-
-        let acc = await program.account.stakePositionV0.fetch(stakePosition);
-        assert.isTrue(acc.purged);
-        let subDaoAcc = await program.account.subDaoV0.fetch(subDao);
-        assert.equal(subDaoAcc.vehntFallRate.toNumber(), 0);
-      });
-
-      it("refreshes a position", async () => {
-        await vsrProgram.methods.createDepositEntry(1, {cliff: {}}, null, 183, false).accounts({ // lock for 6 months
-          registrar,
-          voter,
-          vault,
-          depositMint: hntMint,
-          voterAuthority: voterKp.publicKey,
-          payer: voterKp.publicKey,
-        }).signers([voterKp]).rpc({skipPreflight: true});
-        await vsrProgram.methods.internalTransferLocked(0, 1, toBN(2, 8)).accounts({
-          registrar,
-          voter,
-          voterAuthority: voterKp.publicKey,
-        }).signers([voterKp]).rpc({skipPreflight: true});
-
-        await program.methods.refreshPositionV0({
-          depositEntryIdx: 0,
-        }).accounts({
-          registrar,
-          stakePosition,
-          voterAuthority: voterKp.publicKey,
-          vsrProgram: VSR_PID,
-        }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({ skipPreflight: true });
-
-        const acc = await program.account.stakePositionV0.fetch(stakePosition);
-        assert.equal(acc.hntAmount.toNumber(), 0);
-        assert.equal(acc.fallRate.toNumber(), 0);
-        const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
-        assert.equal(subDaoAcc.vehntStaked.toNumber(), 0);
-        assert.equal(subDaoAcc.vehntFallRate.toNumber(), 0);
-
-      });
-
-      it("updates vehnt stake", async () => {
-        const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
-  
-        await program.methods.stakeV0({
-          vehntAmount: toBN(2, 8),
-          depositEntryIdx: 0,
-          percentages: [100, 0, 0, 0, 0],
-        }).accounts({
-          registrar,
-          subDao,
-          voterAuthority: voterKp.publicKey,
-          vsrProgram: VSR_PID,
-          stakePosition,
-          thread,
-          clockwork: THREAD_PID,
-        }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
-  
-        const acc = await program.account.stakePositionV0.fetch(stakePosition);
-        const sdAcc = await program.account.subDaoV0.fetch(subDao);
-        expectBnAccuracy(toBN(2, 8), sdAcc.vehntStaked, 0.01);
-        // expectBnAccuracy(toBN(2,8), acc.hntAmount, 0.01);
-        assert.equal(acc.hntAmount.toNumber(), toBN(2,8).toNumber());
-        assert.isTrue(acc.fallRate.toNumber() > 0);
-
-        await program.methods.stakeV0({
-          vehntAmount: toBN(1, 8),
-          depositEntryIdx: 0,
-          percentages: [100, 0, 0, 0, 0],
-        }).accounts({
-          registrar,
-          subDao,
-          voterAuthority: voterKp.publicKey,
-          vsrProgram: VSR_PID,
-          stakePosition,
-          thread,
-          clockwork: THREAD_PID,
-        }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
-  
-        const acc2 = await program.account.stakePositionV0.fetch(stakePosition);
-        const sdAcc2 = await program.account.subDaoV0.fetch(subDao);
-        expectBnAccuracy(toBN(1, 8), sdAcc2.vehntStaked, 0.01);
-        expectBnAccuracy(acc2.hntAmount, toBN(1,8), 0.001);
-        assert.isAbove(acc2.fallRate.toNumber(), 0);
-        assert.isBelow(acc2.fallRate.toNumber(), acc.fallRate.toNumber());
-      });
-
-      describe("with calculated rewards", () => {
-        let epoch: anchor.BN;
-  
-        beforeEach(async () => {
+    
+        function expectBnAccuracy(expectedBn: anchor.BN, actualBn: anchor.BN, percentUncertainty: number) {
+          const upper = expectedBn.mul(new BN(1 + percentUncertainty));
+          const lower = expectedBn.mul(new BN(1 - percentUncertainty));
+          expect(actualBn.gte(lower));
+          expect(actualBn.lte(upper));
+        }
+    
+        it("calculates subdao rewards", async () => {
           await createHospot();
           const { subDaoEpochInfo } = await burnDc(1600000);
-          epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
-            .epoch;
-          await program.methods
+          
+          // stake some vehnt
+          const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+          await program.methods.stakeV0({
+            vehntAmount: toBN(15, 8),
+            depositEntryIdx: 0,
+            percentages: [100, 0, 0, 0, 0],
+          }).accounts({
+            registrar,
+            subDao,
+            voterAuthority: voterKp.publicKey,
+            vsrProgram: VSR_PID,
+            stakePosition,
+            thread,
+            clockwork: THREAD_PID,
+          }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
+          
+          const epoch = (
+            await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+          ).epoch;
+    
+          const instr = await program.methods
             .calculateUtilityScoreV0({
               epoch,
             })
             .preInstructions([
-              ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+              ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
             ])
             .accounts({
               subDao,
               dao,
-            })
-            .rpc({ skipPreflight: true });
-        });
-  
-        it("issues hnt rewards to subdaos and dnt to rewards escrow", async () => {
-          const preBalance = AccountLayout.decode(
-            (await provider.connection.getAccountInfo(treasury))?.data!
-          ).amount;
-          const preMobileBalance = AccountLayout.decode(
-            (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
-          ).amount;
-          await sendInstructions(provider, [
-            await program.methods
-              .issueRewardsV0({
-                epoch,
-              })
-              .accounts({
-                subDao,
-              })
-              .instruction(),
-          ]);
-  
-          const postBalance = AccountLayout.decode(
-            (await provider.connection.getAccountInfo(treasury))?.data!
-          ).amount;
-          const postMobileBalance = AccountLayout.decode(
-            (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
-          ).amount;
-          expect((postBalance - preBalance).toString()).to.eq(
-            EPOCH_REWARDS.toString()
+            });
+    
+    
+          const pubkeys = await instr.pubkeys();
+          await instr.rpc({ skipPreflight: true });
+    
+          const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
+            subDaoEpochInfo
           );
-          expect(((postMobileBalance - preMobileBalance)).toString()).to.eq(
-            ((SUB_DAO_EPOCH_REWARDS / 100) * 94).toString()
+          const daoInfo = await program.account.daoEpochInfoV0.fetch(
+            pubkeys.daoEpochInfo!
           );
-
-          const acc = await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo);
-          expect(acc.rewardsIssued).to.be.true;
+    
+          expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
+    
+          // 4 dc burned, activation fee of 50, 15 vehnt staked
+          // sqrt(1 * 50) * (16)^1/4 * 15 = 212.13203435596426 = 21_213_203_435_596_426
+          const totalUtility = new BN("21213203435596426");
+          expectBnAccuracy(totalUtility, daoInfo.totalUtilityScore, 0.01);
+          expectBnAccuracy(totalUtility, subDaoInfo.utilityScore!, 0.01);
         });
-  
-        it("claim rewards", async () => {
-          // issue rewards
-          await sendInstructions(provider, [
-            await program.methods
-              .issueRewardsV0({
+    
+        describe("with staked vehnt", () => {
+          let stakePosition: PublicKey;
+          beforeEach(async() => {
+            stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+            await program.methods.stakeV0({
+              vehntAmount: toBN(options.stakeAmount, 8),
+              depositEntryIdx: 0,
+              percentages: [100, 0, 0, 0, 0],
+            }).accounts({
+              registrar,
+              subDao,
+              voterAuthority: voterKp.publicKey,
+              vsrProgram: VSR_PID,
+              stakePosition,
+              thread,
+              clockwork: THREAD_PID,
+            }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
+          })
+    
+          it("allows closing stake", async () => {
+            await sleep(options.delay);
+            await program.methods.closeStakeV0({
+              depositEntryIdx: 0,
+            }).accounts({
+              registrar,
+              stakePosition,
+              voterAuthority: voterKp.publicKey,
+              vsrProgram: VSR_PID,
+              thread,
+              clockwork: THREAD_PID,
+            }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
+    
+            const sdAcc = await program.account.subDaoV0.fetch(subDao);
+            assert.equal(sdAcc.vehntFallRate.toNumber(), 0);
+            assert.equal(sdAcc.vehntStaked.toNumber(), 0);
+            assert.isFalse(!!(await provider.connection.getAccountInfo(stakePosition)));
+          });
+    
+          it("purge a position", async () => {
+            await program.methods.purgePositionV0().accounts({
+              registrar,
+              stakePosition,
+              voterAuthority: voterKp.publicKey,
+              vsrProgram: VSR_PID,
+              thread,
+              clockwork: THREAD_PID,
+            }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc();
+    
+            let acc = await program.account.stakePositionV0.fetch(stakePosition);
+            assert.isTrue(acc.purged);
+            let subDaoAcc = await program.account.subDaoV0.fetch(subDao);
+            assert.equal(subDaoAcc.vehntFallRate.toNumber(), 0);
+          });
+    
+          it("refreshes a position", async () => {
+            await vsrProgram.methods.createDepositEntry(1, {cliff: {}}, null, options.lockupPeriods, false).accounts({ // lock for 6 months
+              registrar,
+              voter,
+              vault,
+              depositMint: hntMint,
+              voterAuthority: voterKp.publicKey,
+              payer: voterKp.publicKey,
+            }).signers([voterKp]).rpc({skipPreflight: true});
+            await vsrProgram.methods.internalTransferLocked(0, 1, toBN(options.stakeAmount, 8)).accounts({
+              registrar,
+              voter,
+              voterAuthority: voterKp.publicKey,
+            }).signers([voterKp]).rpc({skipPreflight: true});
+    
+            await program.methods.refreshPositionV0({
+              depositEntryIdx: 0,
+            }).accounts({
+              registrar,
+              stakePosition,
+              voterAuthority: voterKp.publicKey,
+              vsrProgram: VSR_PID,
+            }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({ skipPreflight: true });
+    
+            const acc = await program.account.stakePositionV0.fetch(stakePosition);
+            assert.equal(acc.hntAmount.toNumber(), 0);
+            assert.equal(acc.fallRate.toNumber(), 0);
+            const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
+            assert.equal(subDaoAcc.vehntStaked.toNumber(), 0);
+            assert.equal(subDaoAcc.vehntFallRate.toNumber(), 0);
+    
+          });
+    
+          it("updates vehnt stake", async () => {
+            const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+      
+            await program.methods.stakeV0({
+              vehntAmount: toBN(2, 8),
+              depositEntryIdx: 0,
+              percentages: [100, 0, 0, 0, 0],
+            }).accounts({
+              registrar,
+              subDao,
+              voterAuthority: voterKp.publicKey,
+              vsrProgram: VSR_PID,
+              stakePosition,
+              thread,
+              clockwork: THREAD_PID,
+            }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
+      
+            const acc = await program.account.stakePositionV0.fetch(stakePosition);
+            const sdAcc = await program.account.subDaoV0.fetch(subDao);
+            expectBnAccuracy(toBN(2, 8), sdAcc.vehntStaked, 0.01);
+            expectBnAccuracy(acc.hntAmount, toBN(2,8), 0.001);
+            assert.isTrue(acc.fallRate.toNumber() > 0);
+    
+            await program.methods.stakeV0({
+              vehntAmount: toBN(1, 8),
+              depositEntryIdx: 0,
+              percentages: [100, 0, 0, 0, 0],
+            }).accounts({
+              registrar,
+              subDao,
+              voterAuthority: voterKp.publicKey,
+              vsrProgram: VSR_PID,
+              stakePosition,
+              thread,
+              clockwork: THREAD_PID,
+            }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
+      
+            const acc2 = await program.account.stakePositionV0.fetch(stakePosition);
+            const sdAcc2 = await program.account.subDaoV0.fetch(subDao);
+            expectBnAccuracy(toBN(1, 8), sdAcc2.vehntStaked, 0.01);
+            expectBnAccuracy(acc2.hntAmount, toBN(1,8), 0.001);
+            assert.isAbove(acc2.fallRate.toNumber(), 0);
+            assert.isBelow(acc2.fallRate.toNumber(), acc.fallRate.toNumber());
+          });
+    
+          describe("with calculated rewards", () => {
+            let epoch: anchor.BN;
+      
+            beforeEach(async () => {
+              await createHospot();
+              const { subDaoEpochInfo } = await burnDc(1600000);
+              epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
+                .epoch;
+              await program.methods
+                .calculateUtilityScoreV0({
+                  epoch,
+                })
+                .preInstructions([
+                  ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+                ])
+                .accounts({
+                  subDao,
+                  dao,
+                })
+                .rpc({ skipPreflight: true });
+            });
+      
+            it("issues hnt rewards to subdaos and dnt to rewards escrow", async () => {
+              const preBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(treasury))?.data!
+              ).amount;
+              const preMobileBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
+              ).amount;
+              await sendInstructions(provider, [
+                await program.methods
+                  .issueRewardsV0({
+                    epoch,
+                  })
+                  .accounts({
+                    subDao,
+                  })
+                  .instruction(),
+              ]);
+      
+              const postBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(treasury))?.data!
+              ).amount;
+              const postMobileBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
+              ).amount;
+              expect((postBalance - preBalance).toString()).to.eq(
+                EPOCH_REWARDS.toString()
+              );
+              expect(((postMobileBalance - preMobileBalance)).toString()).to.eq(
+                ((SUB_DAO_EPOCH_REWARDS / 100) * 94).toString()
+              );
+    
+              const acc = await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo);
+              expect(acc.rewardsIssued).to.be.true;
+            });
+      
+            it("claim rewards", async () => {
+              // issue rewards
+              await sendInstructions(provider, [
+                await program.methods
+                  .issueRewardsV0({
+                    epoch,
+                  })
+                  .accounts({
+                    subDao,
+                  })
+                  .instruction(),
+              ]);
+    
+              const method = program.methods.claimRewardsV0({
+                depositEntryIdx: 0,
                 epoch,
-              })
-              .accounts({
+              }).accounts({
+                registrar,
+                stakePosition,
                 subDao,
-              })
-              .instruction(),
-          ]);
-
-          const method = program.methods.claimRewardsV0({
-            depositEntryIdx: 0,
-            epoch,
-          }).accounts({
-            registrar,
-            stakePosition,
-            subDao,
-            voterAuthority: voterKp.publicKey,
-            vsrProgram: VSR_PID,
-          }).signers([voterKp]);
-          const { stakerAta } = await method.pubkeys();
-          await method.rpc({skipPreflight: true});
-          
-          const postAtaBalance = AccountLayout.decode(
-            (await provider.connection.getAccountInfo(stakerAta!))?.data!
-          ).amount;
-          assert.isTrue(postAtaBalance <= BigInt(SUB_DAO_EPOCH_REWARDS*6 / 100));
-          assert.isTrue(postAtaBalance > BigInt(SUB_DAO_EPOCH_REWARDS*6 / 100 - 5));
-
-        });
-      });
+                voterAuthority: voterKp.publicKey,
+                vsrProgram: VSR_PID,
+              }).signers([voterKp]);
+              const { stakerAta } = await method.pubkeys();
+              await method.rpc({skipPreflight: true});
+              
+              const postAtaBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(stakerAta!))?.data!
+              ).amount;
+              assert.isTrue(postAtaBalance <= BigInt(SUB_DAO_EPOCH_REWARDS*6 / 100));
+              assert.isTrue(postAtaBalance > BigInt(SUB_DAO_EPOCH_REWARDS*6 / 100 - 5));
+    
+            });
+          });
+        })
+      })
     })
+
+    
     
   });
 });

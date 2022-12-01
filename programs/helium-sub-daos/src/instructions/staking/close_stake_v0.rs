@@ -1,6 +1,7 @@
-use crate::{current_epoch, get_percent, state::*, update_subdao_vehnt};
+use crate::{calculate_voting_power, current_epoch, state::*, update_subdao_vehnt, GetPercent};
 use anchor_lang::prelude::*;
 use clockwork_sdk::thread_program::{self, accounts::Thread, cpi::thread_delete, ThreadProgram};
+use shared_utils::precise_number::PreciseNumber;
 use voter_stake_registry::state::{Registrar, Voter};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -59,10 +60,21 @@ pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()>
   assert!(ctx.accounts.stake_position.last_claimed_epoch >= curr_epoch - 1);
 
   // position_vehnt = available_vehnt * hnt_amount / amount_deposited_native
-  let position_vehnt = available_vehnt
-    .checked_mul(ctx.accounts.stake_position.hnt_amount)
+  // let position_vehnt = available_vehnt
+  //   .checked_mul(ctx.accounts.stake_position.hnt_amount)
+  //   .unwrap()
+  //   .checked_div(d_entry.amount_deposited_native)
+  //   .unwrap();
+  let position_vehnt: u64 = PreciseNumber::new(available_vehnt.into())
     .unwrap()
-    .checked_div(d_entry.amount_deposited_native)
+    .checked_mul(&PreciseNumber::new(ctx.accounts.stake_position.hnt_amount.into()).unwrap())
+    .unwrap()
+    .checked_div(&PreciseNumber::new(d_entry.amount_deposited_native.into()).unwrap())
+    .unwrap()
+    .to_imprecise()
+    .unwrap()
+    .try_into()
+    .ok()
     .unwrap();
 
   let sub_daos = &mut ctx.remaining_accounts.to_vec();
@@ -87,11 +99,22 @@ pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()>
 
     update_subdao_vehnt(sub_dao, curr_ts);
 
-    let sd_stake = get_percent(position_vehnt, stake_position.allocations[i].percent).unwrap();
-    let sd_fall_rate = get_percent(
-      stake_position.fall_rate,
-      stake_position.allocations[i].percent,
+    let sd_stake = position_vehnt
+      .get_percent(stake_position.allocations[i].percent)
+      .unwrap();
+    let sd_fall_rate = stake_position
+      .fall_rate
+      .get_percent(stake_position.allocations[i].percent)
+      .unwrap();
+
+    let vp = calculate_voting_power(
+      d_entry,
+      voting_mint_config,
+      stake_position.hnt_amount,
+      stake_position.hnt_amount,
+      curr_ts,
     )
+    .ok()
     .unwrap();
     // remove this stake information from the subdao
     sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(sd_stake).unwrap();
