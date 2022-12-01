@@ -8,14 +8,16 @@ import { getAssociatedTokenAddress } from "@solana/spl-token";
 export const SPL_GOVERNANCE_PID = new PublicKey("GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw");
 export const VSR_PID = new PublicKey("vsrZ1Nfkxmt1hVaB7ftvcj7XpRoQ1YtCgPLajeaV6Uj");
 
+
 export async function initVsr(
   program: Program<VoterStakeRegistry>, 
   provider: AnchorProvider, 
   me: PublicKey, 
   voterKp: Keypair,
+  options: {delay: number, lockupPeriods: number, lockupAmount: number, stakeAmount: number},
 ) {
   const hntMint = await createMint(provider, 8, me, me);
-  const tokenAccount = await createAtaAndMint(provider, hntMint, toBN(100, 8), voterKp.publicKey);
+  const tokenAccount = await createAtaAndMint(provider, hntMint, toBN(1000, 8), voterKp.publicKey);
   await provider.connection.requestAirdrop(voterKp.publicKey, web3.LAMPORTS_PER_SOL);
 
   const programVersion = await getGovernanceProgramVersion(
@@ -54,14 +56,14 @@ export async function initVsr(
   // Configure voting mint
   const minLockupSeconds = 15811200; // 6 months
   instructions.push(await program.methods.configureVotingMint(
-    0, 
-    9, // digit shift is 9 to give vehnt 8 decimals (because of SCALED_FACTOR_BASE in vsr)
-    new BN(0), 
-    new BN(100), 
-    new BN(minLockupSeconds * 8), 
-    me, 
-    new BN(1), 
-    new BN(minLockupSeconds)
+    0, // idx
+    0, // digit shift
+    new BN(0), // baseline vote weight
+    toBN(100, 8), // max vote weight
+    new BN(minLockupSeconds * 8), // lockup saturation seconds
+    me, // authority
+    toBN(1, 8), // min required vote weight
+    new BN(minLockupSeconds) // min lockup seconds
   ).accounts({
     registrar,
     mint: hntMint,
@@ -89,7 +91,7 @@ export async function initVsr(
 
   // create deposit entry
   const vault = await getAssociatedTokenAddress(hntMint, voter, true);
-  instructions.push(await program.methods.createDepositEntry(0, {cliff: {}}, null, 183, false).accounts({ // lock for 6 months
+  instructions.push(await program.methods.createDepositEntry(0, {cliff: {}}, null, options.lockupPeriods, false).accounts({ // lock for 6 months
     registrar,
     voter,
     vault,
@@ -100,7 +102,7 @@ export async function initVsr(
 
   // deposit some hnt
   const fromAcc = await getAssociatedTokenAddress(hntMint, voterKp.publicKey);
-  instructions.push(await program.methods.deposit(0, toBN(2, 8)).accounts({ // deposit 2 hnt
+  instructions.push(await program.methods.deposit(0, toBN(options.lockupAmount, 8)).accounts({ // deposit 2 hnt
     registrar,
     voter,
     vault,
