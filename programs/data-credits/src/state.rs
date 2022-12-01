@@ -14,10 +14,10 @@ pub struct DataCreditsV0 {
 
 #[account]
 #[derive(Default)]
-pub struct InUseDataCreditsV0 {
+pub struct DelegatedDataCreditsV0 {
   pub data_credits: Pubkey,
+  pub manager: Pubkey,
   pub sub_dao: Pubkey,
-  pub owner: Pubkey,
   pub escrow_account: Pubkey,
   pub bump: u8,
 }

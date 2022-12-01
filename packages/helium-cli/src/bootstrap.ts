@@ -263,6 +263,7 @@ async function run() {
     console.log("Initializing Mobile SubDAO");
     await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
+        dcBurnAuthority: provider.wallet.publicKey,
         authority: provider.wallet.publicKey,
         emissionSchedule: [
           {

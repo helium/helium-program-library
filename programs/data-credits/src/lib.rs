@@ -29,11 +29,11 @@ pub mod data_credits {
     instructions::mint_data_credits_v0::handler(ctx, args)
   }
 
-  pub fn burn_in_use_data_credits_v0(
-    ctx: Context<BurnInUseDataCreditsV0>,
-    args: BurnInUseDataCreditsArgsV0,
+  pub fn burn_delegated_data_credits_v0(
+    ctx: Context<BurnDelegatedDataCreditsV0>,
+    args: BurnDelegatedDataCreditsArgsV0,
   ) -> Result<()> {
-    instructions::burn_in_use_data_credits_v0::handler(ctx, args)
+    instructions::burn_delegated_data_credits::handler(ctx, args)
   }
 
   pub fn burn_from_issuance_v0(
@@ -50,11 +50,11 @@ pub mod data_credits {
     instructions::burn_without_tracking_v0::handler(ctx, args)
   }
 
-  pub fn use_data_credits_v0(
-    ctx: Context<UseDataCreditsV0>,
-    args: UseDataCreditsArgsV0,
+  pub fn delegate_data_credits_v0(
+    ctx: Context<DelegateDataCreditsV0>,
+    args: DelegateDataCreditsArgsV0,
   ) -> Result<()> {
-    instructions::use_data_credits_v0::handler(ctx, args)
+    instructions::delegate_data_credits_v0::handler(ctx, args)
   }
 
   pub fn update_data_credits_v0(
