@@ -2,9 +2,10 @@ import * as anchor from "@project-serum/anchor";
 import { BN } from "@project-serum/anchor";
 import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
-import { createAtaAndMint, createMint } from "@helium/spl-utils";
+import { createAtaAndMint, createMint, toBN } from "@helium/spl-utils";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { toU128 } from "../../packages/treasury-management-sdk/src";
+import { DC_FEE } from "./fixtures";
 
 export async function initTestDao(
   program: anchor.Program<HeliumSubDaos>,
@@ -67,6 +68,7 @@ export async function initTestSubdao(
   const rewardsEscrow = await createAtaAndMint(provider, dntMint, 0, provider.wallet.publicKey)
   const method = await program.methods
     .initializeSubDaoV0({
+      onboardingDcFee: toBN(DC_FEE, 0),
       authority: authority,
       emissionSchedule: [
         {

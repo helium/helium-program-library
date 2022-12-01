@@ -3,8 +3,6 @@ use anchor_lang::prelude::*;
 use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
 use switchboard_v2::{AggregatorAccountData, AggregatorHistoryBuffer};
 
-const DEVICE_ACTIVATION_FEE: u128 = 50;
-
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CalculateUtilityScoreArgsV0 {
   pub epoch: u64,
@@ -98,8 +96,10 @@ pub fn handler(
   let total_devices = PreciseNumber::new(total_devices_u64.into()).or_arith_error()?;
   let devices_with_fee = total_devices
     .checked_mul(
-      &PreciseNumber::new(DEVICE_ACTIVATION_FEE).or_arith_error()?, // TODO: Don't hardcode this
+      &PreciseNumber::new(u128::from(ctx.accounts.sub_dao.onboarding_dc_fee)).or_arith_error()?,
     )
+    .or_arith_error()?
+    .checked_div(&PreciseNumber::new(100000_u128).or_arith_error()?) // Need onboarding fee in dollars
     .or_arith_error()?;
 
   // sqrt(x) = e^(ln(x)/2)

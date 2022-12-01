@@ -45,6 +45,7 @@ pub struct InitializeSubDaoArgsV0 {
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub treasury_curve: Curve,
   pub treasury_window_config: WindowedCircuitBreakerConfigV0,
+  pub onboarding_dc_fee: u64,
 }
 
 #[derive(Accounts)]
@@ -187,6 +188,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     dao: ctx.accounts.dao.key(),
     dnt_mint: ctx.accounts.dnt_mint.key(),
     treasury: ctx.accounts.treasury.key(),
+    onboarding_dc_fee: args.onboarding_dc_fee,
     rewards_escrow: ctx.accounts.rewards_escrow.key(),
     authority: args.authority,
     emission_schedule: args.emission_schedule,

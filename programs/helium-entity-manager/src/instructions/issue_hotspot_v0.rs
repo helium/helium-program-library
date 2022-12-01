@@ -197,7 +197,7 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
   burn_from_issuance_v0(
     ctx.accounts.burn_dc_ctx().with_signer(hotspot_config_seeds),
     BurnFromIssuanceArgsV0 {
-      amount: ctx.accounts.hotspot_config.dc_fee,
+      amount: ctx.accounts.sub_dao.onboarding_dc_fee,
       symbol: ctx.accounts.hotspot_config.symbol.clone(),
       sub_dao: ctx.accounts.hotspot_config.sub_dao,
       authority_bump: ctx.accounts.hotspot_config.bump_seed,
