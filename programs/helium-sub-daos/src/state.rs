@@ -110,6 +110,7 @@ pub struct SubDaoV0 {
   pub vehnt_fall_rate: u64,
   pub authority: Pubkey,
   pub total_devices: u64,
+  pub onboarding_dc_fee: u64,
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub bump_seed: u8,
 }

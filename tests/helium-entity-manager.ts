@@ -88,7 +88,6 @@ describe("helium-entity-manager", () => {
       provider.wallet.publicKey.toBase58()
     );
     expect(account.collection.toBase58()).eq(collection.toBase58());
-    expect(account.dcFee.toString()).eq(toBN(DC_FEE, 8).toString());
     expect(account.onboardingServer.toBase58()).eq(
       onboardingServerKeypair.publicKey.toBase58()
     );
@@ -130,7 +129,7 @@ describe("helium-entity-manager", () => {
       } = await initWorld(provider, hemProgram, hsdProgram, dcProgram);
       await dcProgram.methods
         .mintDataCreditsV0({
-          amount: toBN(DC_FEE*3, 8),
+          hntAmount: toBN(DC_FEE*3, 8),
         })
         .accounts({ dcMint: dataCredits.dcMint })
         .rpc({ skipPreflight: true });
@@ -172,7 +171,6 @@ describe("helium-entity-manager", () => {
       
       await hemProgram.methods.updateHotspotConfigV0({
         newAuthority: PublicKey.default,
-        dcFee: null,
         onboardingServer: PublicKey.default,
       }).accounts({
         hotspotConfig,
@@ -218,7 +216,7 @@ describe("helium-entity-manager", () => {
 
         await dcProgram.methods
           .mintDataCreditsV0({
-            amount: toBN(startDcBal, 8),
+            hntAmount: toBN(startDcBal, 8),
           })
           .accounts({ dcMint, recipient: hotspotOwner.publicKey })
           .rpc();
@@ -304,7 +302,7 @@ describe("helium-entity-manager", () => {
         ).signers([hotspotOwner]);
 
         const storage = (await method.pubkeys()).storage!;
-        await method.rpc();
+        await method.rpc({ skipPreflight: true });
 
         const storageAcc = await hemProgram.account.hotspotStorageV0.fetch(storage!);
         expect(storageAcc.location?.toNumber()).to.eq(location.toNumber());

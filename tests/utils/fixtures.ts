@@ -1,4 +1,4 @@
-import { toBN } from "@helium/spl-utils";
+import { HNT_PYTH_PRICE_FEED, toBN } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { SystemProgram, Keypair, PublicKey } from "@solana/web3.js";
@@ -36,7 +36,7 @@ export const initTestDataCredits = async (
   let dcBal = 0;
 
   hntMint = await createMint(provider, 8, me, me);
-  dcMint = await createMint(provider, 8, me, me);
+  dcMint = await createMint(provider, 0, me, me);
 
   await createAtaAndMint(
     provider,
@@ -54,7 +54,7 @@ export const initTestDataCredits = async (
         threshold: new anchor.BN("10000000000000000000"),
       },
     })
-    .accounts({ hntMint, dcMint });
+    .accounts({ hntMint, dcMint, hntPriceOracle: HNT_PYTH_PRICE_FEED });
   
   const dcKey = (await initDataCredits.pubkeys()).dataCredits!;
 
@@ -91,7 +91,6 @@ export const initTestHotspotConfig = async (
       name: "Helium Network Hotspots",
       symbol: random(), // symbol is unique would need to restart localnet everytime
       metadataUrl: DEFAULT_METADATA_URL,
-      dcFee: toBN(DC_FEE, 8),
       onboardingServer: onboardingServerKeypair.publicKey,
       minGain: 10,
       maxGain: 150,
