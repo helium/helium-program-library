@@ -7,3 +7,8 @@ export const HNT_MINT = new PublicKey("BJUtKj5M6w69N3vcZP6n1DUVUsZSVvNRPoeqkToXE
 export const MOBILE_MINT = new PublicKey(
   "8K38wjyEXdUX8w6GPida3X9BQhcSJ9fnVjRyUaotkqAs"
 );
+
+// TODO: Replace with actual HNT feed
+export const HNT_PYTH_PRICE_FEED = new PublicKey(
+  "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB"
+);

@@ -1,4 +1,3 @@
-import Address from "@helium/address";
 import {
   thresholdPercent,
   ThresholdType
@@ -14,7 +13,7 @@ import {
   subDaoKey
 } from "@helium/helium-sub-daos-sdk";
 import { init as initLazy, lazyDistributorKey } from "@helium/lazy-distributor-sdk";
-import { createAtaAndMintInstructions, createMintInstructions, sendInstructions, toBN } from "@helium/spl-utils";
+import { createAtaAndMintInstructions, createMintInstructions, HNT_PYTH_PRICE_FEED, sendInstructions, toBN } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";
 import {
   createCreateMetadataAccountV3Instruction,
@@ -201,7 +200,11 @@ async function run() {
           threshold: new BN("1000000000000"),
         },
       })
-      .accounts({ hntMint: hntKeypair.publicKey, dcMint: dcKeypair.publicKey })
+      .accounts({
+        hntMint: hntKeypair.publicKey,
+        dcMint: dcKeypair.publicKey,
+        hntPriceOracle: HNT_PYTH_PRICE_FEED,
+      })
       .rpc({ skipPreflight: true });
   }
 
@@ -279,6 +282,7 @@ async function run() {
           thresholdType: ThresholdType.Percent as never,
           threshold: thresholdPercent(20),
         },
+        onboardingDcFee: toBN(5, 0),
       })
       .accounts({
         dao,
@@ -301,12 +305,11 @@ async function run() {
         name: "Mobile Hotspot Collection",
         symbol: "MOBILE",
         metadataUrl: `${argv.bucket}/mobile_collection.json`,
-        dcFee: toBN(5, 0),
         onboardingServer: onboardingServerKeypair.publicKey,
         minGain: 10,
         maxGain: 150,
-        fullLocationStakingFee: toBN(1000000, 8),
-        dataonlyLocationStakingFee: toBN(500000, 8),
+        fullLocationStakingFee: toBN(1000000, 0),
+        dataonlyLocationStakingFee: toBN(500000, 0),
         maxDepth: 26,
         maxBufferSize: 1024
       })

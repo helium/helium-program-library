@@ -137,7 +137,7 @@ describe("helium-sub-daos", () => {
 
       await dcProgram.methods
         .mintDataCreditsV0({
-          amount: toBN(DC_FEE, 8),
+          hntAmount: toBN(DC_FEE, 8),
         })
         .accounts({ dcMint })
         .rpc({ skipPreflight: true });
@@ -167,7 +167,7 @@ describe("helium-sub-daos", () => {
     ): Promise<{ subDaoEpochInfo: PublicKey }> {
       await dcProgram.methods
         .mintDataCreditsV0({
-          amount: toBN(amount, 8),
+          hntAmount: toBN(amount, 8),
         })
         .accounts({ dcMint })
         .rpc({ skipPreflight: true });
@@ -225,7 +225,7 @@ describe("helium-sub-daos", () => {
         subDaoEpochInfo
       );
       
-      expect(epochInfo.dcBurned.toNumber()).eq(toBN(10, 8).toNumber());
+      expect(epochInfo.dcBurned.toNumber()).eq(toBN(10, 0).toNumber());
     });
 
     const vehntOptions = [
