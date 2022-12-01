@@ -87,6 +87,7 @@ pub struct SubDaoV0 {
   pub rewards_escrow: Pubkey, // The escrow account for DNT rewards
   pub authority: Pubkey,
   pub total_devices: u64,
+  pub onboarding_dc_fee: u64,
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub bump_seed: u8,
 }
