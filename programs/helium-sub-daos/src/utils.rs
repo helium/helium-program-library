@@ -66,7 +66,7 @@ pub fn update_subdao_vehnt(sub_dao: &mut SubDaoV0, curr_ts: i64) {
       .unwrap(),
     )
     .unwrap()
-    .checked_div(&PreciseNumber::new(FALL_RATE_FACTOR.into()).unwrap())
+    .checked_div(&PreciseNumber::new(FALL_RATE_FACTOR).unwrap())
     .unwrap()
     .to_imprecise()
     .unwrap()
@@ -151,7 +151,7 @@ pub const FALL_RATE_FACTOR: u128 = 1_000_000_000_000;
 
 pub fn calculate_fall_rate(curr_vp: u64, future_vp: u64, num_seconds: u64) -> Option<u64> {
   let diff: u128 = u128::from(curr_vp.checked_sub(future_vp).unwrap())
-    .checked_mul(FALL_RATE_FACTOR.into())
+    .checked_mul(FALL_RATE_FACTOR)
     .unwrap(); // add decimals of precision for fall rate calculation
 
   diff
