@@ -70,7 +70,6 @@ pub struct DaoEpochInfoV0 {
 pub struct SubDaoEpochInfoV0 {
   pub epoch: u64,
   pub sub_dao: Pubkey,
-  pub total_devices: u64,
   pub dc_burned: u64,
   /// Precise number with 12 decimals
   pub utility_score: Option<u128>,
@@ -86,8 +85,8 @@ pub struct SubDaoV0 {
   pub treasury: Pubkey,       // The treasury of HNT
   pub rewards_escrow: Pubkey, // The escrow account for DNT rewards
   pub authority: Pubkey,
+  pub active_device_aggregator: Pubkey,
   pub dc_burn_authority: Pubkey, // Authority to burn data delegated data credits
-  pub total_devices: u64,
   pub onboarding_dc_fee: u64,
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub bump_seed: u8,

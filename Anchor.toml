@@ -40,12 +40,6 @@ build-noop = "pushd deps/solana-program-library/account-compression/programs/noo
 address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 program = "./deps/metaplex-program-library/token-metadata/target/deploy/mpl_token_metadata.so"
 
-[test.validator]
-url = "https://api.mainnet-beta.solana.com"
-
-
-[[test.validator.clone]]
-address = "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB"
 [[test.genesis]]
 address = "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"
 program = "deps/metaplex-program-library/bubblegum/program/target/deploy/mpl_bubblegum.so"
@@ -58,6 +52,29 @@ program = "./deps/solana-program-library/account-compression/target/deploy/spl_n
 address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"
 program = "./deps/solana-program-library/account-compression/target/deploy/spl_account_compression.so"
 
+[test.validator]
+url = "https://api.mainnet-beta.solana.com"
+
+# Pyth price oracle
+[[test.validator.clone]]
+address = "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB"
+
+# Switchboard program
+[[test.validator.clone]]
+address = "SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f"
+
+
+# Switchboard aggregator
+[[test.validator.clone]]
+address = "E3cqnoFvTeKKNsGmC8YitpMjo2E39hwfoyt2Aiem7dCb"
+
+# Switchboard aggregator history
+[[test.validator.clone]]
+address = "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
+
+# Switchboard aggregator
+[[test.validator.clone]]
+address = "Fi8vncGpNKbq62gPo56G4toCehWNy77GgqGkTaAF5Lkk"
 
 # [[test.validator.clone]]
 # address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"

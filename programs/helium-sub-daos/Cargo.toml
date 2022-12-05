@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "helium_sub_daos"
 
 [features]
+devnet = ["switchboard-v2/devnet"]
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
@@ -25,3 +26,4 @@ mpl-token-metadata = { version = "1.3.4", features = ["no-entrypoint"] }
 shared-utils = { path = "../shared-utils" }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }
+switchboard-v2 = { version = "^0.1.14" }

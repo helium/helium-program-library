@@ -42,6 +42,7 @@ export const hotspotIssuerKey = (
   );
 
 export const hotspotStorageKey = (
+  hotspotConfig: PublicKey,
   hotspotKey: string,
   programId: PublicKey = PROGRAM_ID
 ) => {
@@ -52,7 +53,7 @@ export const hotspotStorageKey = (
   let seed = Uint8Array.from(Buffer.from(hexString, "hex"));
 
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("storage", "utf-8"), seed],
+    [Buffer.from("storage", "utf-8"), hotspotConfig.toBuffer(), seed],
     programId
   );
 };

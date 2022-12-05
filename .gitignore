@@ -11,3 +11,5 @@ packages/helium-cli/keypairs-prod/
 .parcel-cache
 .vscode
 yarn-error.log
+**/*/transactions.json
+**/*/transactions-with-lut.json

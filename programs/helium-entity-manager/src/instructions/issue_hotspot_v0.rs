@@ -7,7 +7,6 @@ use anchor_spl::{
   token::{Mint, Token, TokenAccount},
 };
 use angry_purple_tiger::AnimalName;
-use data_credits::HeliumSubDaos;
 use data_credits::{
   cpi::{
     accounts::{BurnCommonV0, BurnFromIssuanceV0},
@@ -15,10 +14,7 @@ use data_credits::{
   },
   BurnFromIssuanceArgsV0, DataCreditsV0,
 };
-use helium_sub_daos::{
-  cpi::{accounts::TrackAddedDeviceV0, track_added_device_v0},
-  SubDaoV0, TrackAddedDeviceArgsV0,
-};
+use helium_sub_daos::SubDaoV0;
 use mpl_bubblegum::state::{metaplex_adapter::TokenStandard, TreeConfig};
 use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
@@ -62,10 +58,11 @@ pub struct IssueHotspotV0<'info> {
   #[account(
     has_one = collection,
     has_one = dc_mint,
-    has_one = sub_dao,
-    has_one = merkle_tree
+    has_one = merkle_tree,
+    has_one = sub_dao
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
+  pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
     mut,
     seeds = ["hotspot_issuer".as_bytes(), hotspot_config.key().as_ref(), maker.key().as_ref()],
@@ -80,6 +77,7 @@ pub struct IssueHotspotV0<'info> {
     space = 8 + 60 + std::mem::size_of::<HotspotStorageV0>(),
     seeds = [
       "storage".as_bytes(),
+      hotspot_config.key().as_ref(),
       &hash(args.hotspot_key.as_bytes()).to_bytes()
     ],
     bump
@@ -105,7 +103,6 @@ pub struct IssueHotspotV0<'info> {
   /// CHECK: Used in cpi
   pub bubblegum_signer: UncheckedAccount<'info>,
 
-  /// CHECK: Verified by cpi  
   #[account(
     seeds=[
       "dc".as_bytes(),
@@ -127,12 +124,6 @@ pub struct IssueHotspotV0<'info> {
   )]
   pub dc_burner: Box<Account<'info, TokenAccount>>,
 
-  /// CHECK: Verified by cpi    
-  #[account(mut)]
-  pub sub_dao_epoch_info: AccountInfo<'info>,
-  #[account(mut)]
-  pub sub_dao: Box<Account<'info, SubDaoV0>>,
-
   /// CHECK: Verified by constraint  
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
@@ -142,7 +133,6 @@ pub struct IssueHotspotV0<'info> {
   pub log_wrapper: Program<'info, Wrapper>,
   pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
-  pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
@@ -187,18 +177,6 @@ impl<'info> IssueHotspotV0<'info> {
       authority: self.hotspot_config.to_account_info(),
     };
     CpiContext::new(self.data_credits_program.to_account_info(), cpi_accounts)
-  }
-  fn add_device_ctx(&self) -> CpiContext<'_, '_, '_, 'info, TrackAddedDeviceV0<'info>> {
-    let cpi_accounts = TrackAddedDeviceV0 {
-      payer: self.payer.to_account_info(),
-      sub_dao_epoch_info: self.sub_dao_epoch_info.to_account_info(),
-      sub_dao: self.sub_dao.to_account_info(),
-      authority: self.hotspot_config.to_account_info(),
-      system_program: self.system_program.to_account_info(),
-      clock: self.clock.to_account_info(),
-      rent: self.rent.to_account_info(),
-    };
-    CpiContext::new(self.helium_sub_daos_program.to_account_info(), cpi_accounts)
   }
 }
 
@@ -255,17 +233,6 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
       .mint_to_collection_ctx()
       .with_signer(hotspot_config_seeds),
     metadata,
-  )?;
-
-  track_added_device_v0(
-    ctx
-      .accounts
-      .add_device_ctx()
-      .with_signer(hotspot_config_seeds),
-    TrackAddedDeviceArgsV0 {
-      authority_bump: ctx.accounts.hotspot_config.bump_seed,
-      symbol: ctx.accounts.hotspot_config.symbol.clone(),
-    },
   )?;
 
   ctx.accounts.hotspot_issuer.count += 1;

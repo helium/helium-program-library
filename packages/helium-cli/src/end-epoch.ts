@@ -9,7 +9,7 @@ import { ComputeBudgetProgram } from "@solana/web3.js";
 import axios from "axios";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair } from "./bootstrap";
+import { loadKeypair } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
