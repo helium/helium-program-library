@@ -45,6 +45,8 @@ pub struct InitializeSubDaoArgsV0 {
   pub treasury_curve: Curve,
   pub treasury_window_config: WindowedCircuitBreakerConfigV0,
   pub onboarding_dc_fee: u64,
+  /// Authority to burn delegated data credits
+  pub dc_burn_authority: Pubkey,
 }
 
 #[derive(Accounts)]
@@ -184,6 +186,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
   ctx.accounts.sub_dao.set_inner(SubDaoV0 {
     dao: ctx.accounts.dao.key(),
     dnt_mint: ctx.accounts.dnt_mint.key(),
+    dc_burn_authority: args.dc_burn_authority,
     treasury: ctx.accounts.treasury.key(),
     onboarding_dc_fee: args.onboarding_dc_fee,
     rewards_escrow: ctx.accounts.rewards_escrow.key(),

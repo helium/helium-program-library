@@ -4,7 +4,7 @@
     getAccount, getAssociatedTokenAddress
   } from "@solana/spl-token";
   import * as web3 from "@solana/web3.js";
-  import { PublicKey } from "@solana/web3.js";
+  import { Keypair, PublicKey } from "@solana/web3.js";
   import BN from "bn.js";
   import { assert, expect } from "chai";
   import { accountPayerKey, dataCreditsKey, init } from "../packages/data-credits-sdk/src";
@@ -33,20 +33,21 @@
     subDao: PublicKey;
   }): Promise<{ subDaoEpochInfo: PublicKey }> {
     const useData = await program.methods
-      .useDataCreditsV0({
+      .delegateDataCreditsV0({
         amount: toBN(amount, 0),
+        manager: Keypair.generate().publicKey
       })
       .accounts({
         subDao,
       });
-    const inUseDataCredits = (await useData.pubkeys()).inUseDataCredits!;
+    const delegatedDataCredits = (await useData.pubkeys()).delegatedDataCredits!;
     await useData.rpc({ skipPreflight: true });
     const burn = program.methods
-      .burnInUseDataCreditsV0({
+      .burnDelegatedDataCreditsV0({
         amount: toBN(amount, 0),
       })
       .accounts({
-        inUseDataCredits,
+        delegatedDataCredits
       });
 
     await burn.rpc({ skipPreflight: true });

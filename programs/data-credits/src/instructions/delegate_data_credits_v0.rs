@@ -10,21 +10,22 @@ use anchor_spl::{
 use helium_sub_daos::{DaoV0, SubDaoV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct UseDataCreditsArgsV0 {
+pub struct DelegateDataCreditsArgsV0 {
   amount: u64,
+  manager: Pubkey,
 }
 
 #[derive(Accounts)]
-#[instruction(args: UseDataCreditsArgsV0)]
-pub struct UseDataCreditsV0<'info> {
+#[instruction(args: DelegateDataCreditsArgsV0)]
+pub struct DelegateDataCreditsV0<'info> {
   #[account(
     init, // prevents from reinit attack
     payer = payer,
     space = 60 + std::mem::size_of::<DataCreditsV0>(),
-    seeds = ["in_use_dc".as_bytes(), sub_dao.key().as_ref(), owner.key().as_ref()],
+    seeds = ["delegated_data_credits".as_bytes(), sub_dao.key().as_ref(), args.manager.as_ref()],
     bump,
   )]
-  pub in_use_data_credits: Box<Account<'info, InUseDataCreditsV0>>,
+  pub delegated_data_credits: Box<Account<'info, DelegatedDataCreditsV0>>,
   #[account(
     has_one = dc_mint,
     seeds = ["dc".as_bytes(), dc_mint.key().as_ref()],
@@ -54,10 +55,10 @@ pub struct UseDataCreditsV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    seeds = ["in_use_dc_account".as_bytes(), in_use_data_credits.key().as_ref()],
+    seeds = ["escrow_dc_account".as_bytes(), delegated_data_credits.key().as_ref()],
     bump,
     token::mint = dc_mint,
-    token::authority = in_use_data_credits
+    token::authority = delegated_data_credits
   )]
   pub escrow_account: Account<'info, TokenAccount>,
 
@@ -69,16 +70,16 @@ pub struct UseDataCreditsV0<'info> {
   pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn handler(ctx: Context<UseDataCreditsV0>, args: UseDataCreditsArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<DelegateDataCreditsV0>, args: DelegateDataCreditsArgsV0) -> Result<()> {
   ctx
     .accounts
-    .in_use_data_credits
-    .set_inner(InUseDataCreditsV0 {
+    .delegated_data_credits
+    .set_inner(DelegatedDataCreditsV0 {
       data_credits: ctx.accounts.data_credits.key(),
-      owner: ctx.accounts.owner.key(),
+      manager: args.manager,
       sub_dao: ctx.accounts.sub_dao.key(),
       escrow_account: ctx.accounts.escrow_account.key(),
-      bump: ctx.bumps["in_use_data_credits"],
+      bump: ctx.bumps["delegated_data_credits"],
     });
 
   let signer_seeds: &[&[&[u8]]] = &[&[
