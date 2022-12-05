@@ -86,6 +86,7 @@ export async function initTestSubdao(
         thresholdType: ThresholdType.Absolute as never,
         threshold: new anchor.BN("10000000000000000000"),
       },
+      dcBurnAuthority: authority,
     })
     .preInstructions([
       ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
