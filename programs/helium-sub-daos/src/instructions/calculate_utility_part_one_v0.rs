@@ -1,17 +1,17 @@
-use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError};
+use crate::{
+  current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError, TESTING,
+};
 use anchor_lang::prelude::*;
-use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
+use shared_utils::precise_number::{PreciseNumber, FOUR_PREC};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct CalculateUtilityScoreArgsV0 {
+pub struct CalculateUtilityPartOneArgsV0 {
   pub epoch: u64,
 }
 
-pub const TESTING: bool = std::option_env!("TESTING").is_some();
-
 #[derive(Accounts)]
-#[instruction(args: CalculateUtilityScoreArgsV0)]
-pub struct CalculateUtilityScoreV0<'info> {
+#[instruction(args: CalculateUtilityPartOneArgsV0)]
+pub struct CalculateUtilityPartOneV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   pub dao: Box<Account<'info, DaoV0>>,
@@ -41,8 +41,8 @@ pub struct CalculateUtilityScoreV0<'info> {
 }
 
 pub fn handler(
-  ctx: Context<CalculateUtilityScoreV0>,
-  args: CalculateUtilityScoreArgsV0,
+  ctx: Context<CalculateUtilityPartOneV0>,
+  args: CalculateUtilityPartOneArgsV0,
 ) -> Result<()> {
   let epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
 
@@ -76,15 +76,6 @@ pub fn handler(
     .checked_div(&PreciseNumber::new(100000_u128).or_arith_error()?) // 10^5 to get to dollars.
     .or_arith_error()?;
 
-  let total_devices = PreciseNumber::new(epoch_info.total_devices.into()).or_arith_error()?;
-  let devices_with_fee = total_devices
-    .checked_mul(
-      &PreciseNumber::new(u128::from(ctx.accounts.sub_dao.onboarding_dc_fee)).or_arith_error()?,
-    )
-    .or_arith_error()?
-    .checked_div(&PreciseNumber::new(100000_u128).or_arith_error()?) // Need onboarding fee in dollars
-    .or_arith_error()?;
-
   // sqrt(x) = e^(ln(x)/2)
   // x^1/4 = e^(ln(x)/4))
   let one = PreciseNumber::one();
@@ -110,28 +101,9 @@ pub fn handler(
 
   let v = std::cmp::max(one.clone(), vehnt_staked);
 
-  let a = if epoch_info.total_devices > 0 {
-    std::cmp::max(
-      one,
-      devices_with_fee
-        .log()
-        .or_arith_error()?
-        .checked_div(&TWO_PREC.clone().signed())
-        .or_arith_error()?
-        .exp()
-        .or_arith_error()?,
-    )
-  } else {
-    one
-  };
-
-  let utility_score_prec = d
-    .checked_mul(&a)
-    .or_arith_error()?
-    .checked_mul(&v)
-    .or_arith_error()?;
+  let dv_prec = d.checked_mul(&v).or_arith_error()?;
   // Convert to u128 with 12 decimals of precision
-  let utility_score = utility_score_prec
+  let dv = dv_prec
     .checked_mul(
       &PreciseNumber::new(1000000000000_u128).or_arith_error()?, // u128 with 12 decimal places
     )
@@ -139,22 +111,8 @@ pub fn handler(
     .to_imprecise()
     .unwrap();
 
-  // Store utility scores
-  epoch_info.utility_score = Some(utility_score);
-
-  // Only increment utility scores when either (a) in prod or (b) testing and we haven't already over-calculated utility scores.
-  // TODO: We can remove this after breakpoint demo
-  if !(TESTING
-    && ctx.accounts.dao_epoch_info.num_utility_scores_calculated > ctx.accounts.dao.num_sub_daos)
-  {
-    ctx.accounts.dao_epoch_info.num_utility_scores_calculated += 1;
-    ctx.accounts.dao_epoch_info.total_utility_score = ctx
-      .accounts
-      .dao_epoch_info
-      .total_utility_score
-      .checked_add(utility_score)
-      .unwrap();
-  }
+  // Store the first part of the utility score
+  epoch_info.utility_score = Some(dv);
 
   Ok(())
 }
