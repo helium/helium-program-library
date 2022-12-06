@@ -5,7 +5,7 @@ import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import { init } from "@helium/lazy-distributor-sdk";
 import * as client from "@helium/distributor-oracle";
 import { HotspotListItem } from "./HotspotListItem";
-import { LAZY_KEY, useTokenAccounts } from "../../../../utils/index";
+import { LAZY_KEY, useRewardableNfts } from "../../../../utils/index";
 import { LoadingIndicator, SvgSpinner } from "../../../common";
 import { useStyledTitle } from "../../../../utils/hooks";
 import { useAsyncCallback } from "react-async-hook";
@@ -16,7 +16,7 @@ interface HotspotListScreenProps {}
 
 export const HotspotListScreen: FC<HotspotListScreenProps> = () => {
   useStyledTitle(true);
-  const tokenAccounts = useTokenAccounts();
+  const { result: assets } = useRewardableNfts();
   const publicKey = usePublicKey();
   const connection = useConnection();
   const { setMessage } = useNotification();
@@ -32,18 +32,18 @@ export const HotspotListScreen: FC<HotspotListScreenProps> = () => {
     const program = await init(stubProvider);
 
     const txs = await Promise.all(
-      tokenAccounts.map(async (nft) => {
+      (assets || []).map(async (nft) => {
         const rewards = await client.getCurrentRewards(
           program,
           LAZY_KEY,
-          new PublicKey(nft.mint)
+          new PublicKey(nft.id)
         );
         return await client.formTransaction({
           program,
           //@ts-ignore
           provider: window.xnft.solana,
           rewards,
-          hotspot: new PublicKey(nft.mint),
+          hotspot: new PublicKey(nft.id),
           lazyDistributor: LAZY_KEY,
           wallet: publicKey,
         });
@@ -75,13 +75,13 @@ export const HotspotListScreen: FC<HotspotListScreenProps> = () => {
     }
   }, [error]);
 
-  if (!tokenAccounts) return <LoadingIndicator />;
+  if (!assets) return <LoadingIndicator />;
 
   return (
     <View tw="flex flex-col pt-5 justify-between h-full">
       <View tw="flex flex-col px-5 gap-2">
-        {tokenAccounts.map((nft) => (
-          <HotspotListItem key={nft.mint} nft={nft} />
+        {assets.map((nft) => (
+          <HotspotListItem key={nft.id.toBase58()} nft={nft} />
         ))}
       </View>
       <View tw="flex w-full justify-center sticky bottom-0 p-5 bg-gradient-to-b from-white/[.0] to-zinc-200/[.5] dark:to-zinc-900/[.5]">

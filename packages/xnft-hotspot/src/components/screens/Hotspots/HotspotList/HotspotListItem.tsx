@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { MOBILE_MINT, numberWithCommas } from "@helium/spl-utils";
+import { Asset, MOBILE_MINT, numberWithCommas } from "@helium/spl-utils";
 import React, { FC, useMemo } from "react";
 import {
   Button,
@@ -18,12 +18,12 @@ import { useFetchedCachedJson } from "../../../../hooks/useFetchedJson";
 import { SvgSpinner } from "../../../common";
 
 interface HotspotListItemProps {
-  nft: any; // TODO: actually type this
+  nft: Asset;
 }
 
 export const HotspotListItem: FC<HotspotListItemProps> = ({ nft }) => {
-  const mint = useMemo(() => new PublicKey(nft.mint), [nft.mint]);
-  const { result: tokenMetaUriData } = useFetchedCachedJson(nft.data.uri);
+  const mint = useMemo(() => new PublicKey(nft.id), [nft.id.toBase58()]);
+  const tokenMetaUriData = nft.content.metadata;
   const nav = useNavigation();
   const { info: metadata } = useMetaplexMetadata(MOBILE_MINT);
   const symbol = metadata?.data.symbol;
@@ -49,7 +49,7 @@ export const HotspotListItem: FC<HotspotListItemProps> = ({ nft }) => {
         <View tw="flex flex-col gap-2 grow justify-center">
           <View tw="flex flex-row justify-between items-center">
             <Text tw="text-left w-20 truncate text-md font-bold text-zinc-900 dark:text-white !m-0">
-              {nft.data.name}
+              {tokenMetaUriData.name}
             </Text>
             <View tw="flex justify-end">
               <Button

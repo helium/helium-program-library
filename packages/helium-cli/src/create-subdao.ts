@@ -47,7 +47,7 @@ type Hotspot = {
 
 const hardcodeHotspots: Hotspot[] = [
   {
-    eccKey: "112UE9mbEB4NWHgdutev5PXTszp1V8HwBptwNMDQVc6fAyu34Tz4",
+    eccKey: "1122WVpJNesC4DU6s6cQ6caKC5LShQFTX8ouFQ2ybLhkwkKZjM8u",
     uri: "https://mobile-metadata.test-helium.com/112UE9mbEB4NWHgdutev5PXTszp1V8HwBptwNMDQVc6fAyu34Tz4",
   },
   {
@@ -90,7 +90,7 @@ const yarg = yargs(hideBin(process.argv)).options({
     alias: "n",
     describe: "The name of the subdao",
     type: "string",
-    required: true
+    required: true,
   },
   subdaoKeypair: {
     type: "string",
@@ -144,13 +144,13 @@ const yarg = yargs(hideBin(process.argv)).options({
   crank: {
     type: "string",
     describe: "Switchboard crank",
-    default: "85L2cFUvXaeGQ4HrzP8RJEVCL7WvRrXM2msvEmQ82AVr",
+    default: "GN9jjCy2THzZxhYqZETmPM3my8vg4R5JyNkgULddUMa5",
   },
   switchboardNetwork: {
     type: "string",
     describe: "The switchboard network",
-    default: "devnet"
-  }
+    default: "devnet",
+  },
 });
 
 const MOBILE_EPOCH_REWARDS = 5000000000;
@@ -179,7 +179,7 @@ async function run() {
   const oracleKey = oracleKeypair.publicKey;
   const rewardsOracleUrl = argv.rewardsOracleUrl;
 
-  console.log("SUBDAO", subdaoKeypair.publicKey.toBase58());
+  console.log("Subdao mint", subdaoKeypair.publicKey.toBase58());
 
   const conn = provider.connection;
 
@@ -298,6 +298,9 @@ async function run() {
         activeDeviceAggregator: agg.publicKey,
       })
       .rpc({ skipPreflight: true });
+  } else {
+    const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
+    console.log(`Subdao exits. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}`);
   }
 
   const hsConfigKey = (await hotspotConfigKey(subdao, name.toUpperCase()))[0];
