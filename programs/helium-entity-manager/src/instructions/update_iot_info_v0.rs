@@ -131,28 +131,26 @@ pub fn handler<'info>(
     proof_accounts: ctx.remaining_accounts.to_vec(),
   })?;
 
-  match (args.location, ctx.accounts.hotspot_config.settings) {
-    (
-      Some(location),
-      ConfigSettingsV0::IotConfig {
-        full_location_staking_fee,
-        dataonly_location_staking_fee,
-        ..
-      },
-    ) => {
-      let mut dc_fee: u64 = dataonly_location_staking_fee;
-      if ctx.accounts.info.is_full_hotspot {
-        dc_fee = full_location_staking_fee;
-      }
-
-      // burn the dc tokens
-      burn_without_tracking_v0(
-        ctx.accounts.burn_ctx(),
-        BurnWithoutTrackingArgsV0 { amount: dc_fee },
-      )?;
-      ctx.accounts.info.location = Some(location);
+  if let (
+    Some(location),
+    ConfigSettingsV0::IotConfig {
+      full_location_staking_fee,
+      dataonly_location_staking_fee,
+      ..
+    },
+  ) = (args.location, ctx.accounts.hotspot_config.settings)
+  {
+    let mut dc_fee: u64 = dataonly_location_staking_fee;
+    if ctx.accounts.info.is_full_hotspot {
+      dc_fee = full_location_staking_fee;
     }
-    _ => {}
+
+    // burn the dc tokens
+    burn_without_tracking_v0(
+      ctx.accounts.burn_ctx(),
+      BurnWithoutTrackingArgsV0 { amount: dc_fee },
+    )?;
+    ctx.accounts.info.location = Some(location);
   }
 
   if args.elevation.is_some() {
