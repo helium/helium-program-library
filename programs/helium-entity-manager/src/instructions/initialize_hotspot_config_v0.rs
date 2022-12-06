@@ -22,10 +22,7 @@ pub struct InitializeHotspotConfigArgsV0 {
   pub symbol: String,
   pub metadata_url: String,
   pub onboarding_server: Pubkey,
-  pub min_gain: i32,
-  pub max_gain: i32,
-  pub full_location_staking_fee: u64,
-  pub dataonly_location_staking_fee: u64,
+  pub settings: ConfigSettingsV0,
   pub max_depth: u32,
   pub max_buffer_size: u32,
 }
@@ -214,10 +211,7 @@ pub fn handler(
     bump_seed: ctx.bumps["hotspot_config"],
     collection_bump_seed: ctx.bumps["collection"],
     merkle_tree: ctx.accounts.merkle_tree.key(),
-    min_gain: args.min_gain,
-    max_gain: args.max_gain,
-    full_location_staking_fee: args.full_location_staking_fee,
-    dataonly_location_staking_fee: args.dataonly_location_staking_fee,
+    settings: args.settings,
   });
 
   Ok(())

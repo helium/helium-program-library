@@ -115,7 +115,7 @@ frame HeliumEntityManager {
   }
 
   entity HotspotStorage {
-    "storage", hotspot_mint
+    "iot_info", hotspot_mint
     --
     ecc_compact
     location

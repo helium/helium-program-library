@@ -10,13 +10,31 @@ pub struct HotspotConfigV0 {
   pub symbol: String,
   pub sub_dao: Pubkey,
   pub merkle_tree: Pubkey,
-  pub min_gain: i32,
-  pub max_gain: i32,
-  pub full_location_staking_fee: u64,
-  pub dataonly_location_staking_fee: u64,
+  pub settings: ConfigSettingsV0,
 
   pub bump_seed: u8,
   pub collection_bump_seed: u8,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
+pub enum ConfigSettingsV0 {
+  IotConfig {
+    min_gain: i32,
+    max_gain: i32,
+    full_location_staking_fee: u64,
+    dataonly_location_staking_fee: u64,
+  },
+}
+
+impl Default for ConfigSettingsV0 {
+  fn default() -> Self {
+    ConfigSettingsV0::IotConfig {
+      min_gain: 0,
+      max_gain: 10000000,
+      full_location_staking_fee: 0,
+      dataonly_location_staking_fee: 0,
+    }
+  }
 }
 
 #[account]
@@ -32,7 +50,7 @@ pub struct HotspotIssuerV0 {
 
 #[account]
 #[derive(Default)]
-pub struct HotspotStorageV0 {
+pub struct IotHotspotInfoV0 {
   pub asset: Pubkey,
   pub hotspot_key: String,
 

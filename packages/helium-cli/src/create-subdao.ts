@@ -41,26 +41,20 @@ import { createAndMint, exists, loadKeypair } from "./utils";
 
 type Hotspot = {
   eccKey: string;
-  uri: string;
-  mint?: PublicKey;
 };
 
 const hardcodeHotspots: Hotspot[] = [
   {
     eccKey: "1122WVpJNesC4DU6s6cQ6caKC5LShQFTX8ouFQ2ybLhkwkKZjM8u",
-    uri: "https://mobile-metadata.test-helium.com/112UE9mbEB4NWHgdutev5PXTszp1V8HwBptwNMDQVc6fAyu34Tz4",
   },
   {
     eccKey: "11bNfVbDL8Tp2T6jsEevRzBG5QuJpHVUz1Z21ACDcD4wW6RbVAZ",
-    uri: "https://mobile-metadata.test-helium.com/11bNfVbDL8Tp2T6jsEevRzBG5QuJpHVUz1Z21ACDcD4wW6RbVAZ",
   },
   {
     eccKey: "11wsqKcoXGesnSbEwKTY8QkoqdFsG7oafcyPn8jBnzRK4sfCSw8",
-    uri: "https://mobile-metadata.test-helium.com/11wsqKcoXGesnSbEwKTY8QkoqdFsG7oafcyPn8jBnzRK4sfCSw8",
   },
   {
     eccKey: "11t1Yvm7QbyVnmqdCUpfA8XUiGVbpHPVnaNtR25gb8p2d4Dzjxi",
-    uri: "https://mobile-metadata.test-helium.com/11t1Yvm7QbyVnmqdCUpfA8XUiGVbpHPVnaNtR25gb8p2d4Dzjxi",
   },
 ];
 
@@ -318,10 +312,14 @@ async function run() {
           argv.bucket
         }/${name.toLocaleLowerCase()}_collection.json`,
         onboardingServer: onboardingServerKeypair.publicKey,
-        minGain: 10,
-        maxGain: 150,
-        fullLocationStakingFee: toBN(1000000, 0),
-        dataonlyLocationStakingFee: toBN(500000, 0),
+        settings: {
+          iotConfig: {
+            minGain: 10,
+            maxGain: 150,
+            fullLocationStakingFee: toBN(1000000, 0),
+            dataonlyLocationStakingFee: toBN(500000, 0),
+          } as any,
+        },
         maxDepth: 26,
         maxBufferSize: 1024,
       })
@@ -367,7 +365,7 @@ async function run() {
   await Promise.all(
     hardcodeHotspots.map(async (hotspot, index) => {
       const create = await hemProgram.methods
-        .issueHotspotV0({
+        .issueIotHotspotV0({
           hotspotKey: hotspot.eccKey,
           isFullHotspot: true,
         })
@@ -380,7 +378,7 @@ async function run() {
           maker: makerKeypair.publicKey,
         })
         .signers([makerKeypair]);
-      const key = (await create.pubkeys()).storage!;
+      const key = (await create.pubkeys()).info!;
       if (!(await exists(conn, key))) {
         console.log("Creating hotspot", index);
         await create.rpc({ skipPreflight: true });

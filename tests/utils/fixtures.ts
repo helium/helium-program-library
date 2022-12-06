@@ -92,10 +92,14 @@ export const initTestHotspotConfig = async (
       symbol: random(), // symbol is unique would need to restart localnet everytime
       metadataUrl: DEFAULT_METADATA_URL,
       onboardingServer: onboardingServerKeypair.publicKey,
-      minGain: 10,
-      maxGain: 150,
-      fullLocationStakingFee: toBN(1000000, 0),
-      dataonlyLocationStakingFee: toBN(500000, 0),
+      settings: {
+        iotConfig: {
+          minGain: 10,
+          maxGain: 150,
+          fullLocationStakingFee: toBN(1000000, 0),
+          dataonlyLocationStakingFee: toBN(500000, 0),
+        } as any,
+      },
       maxDepth: 3,
       maxBufferSize: 8,
     })

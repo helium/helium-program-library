@@ -85,7 +85,7 @@ async function run() {
       .map(async () => await (await HeliumKeypair.makeRandom()).address.b58)
   );
   const pubkeys = await hemProgram.methods
-    .issueHotspotV0({
+    .issueIotHotspotV0({
       hotspotKey: (await HeliumKeypair.makeRandom()).address.b58,
       isFullHotspot: true
     })

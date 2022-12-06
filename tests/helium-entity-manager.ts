@@ -10,7 +10,7 @@ import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
 import chai from "chai";
-import { changeMetadata, hotspotStorageKey, init as initHeliumEntityManager } from "../packages/helium-entity-manager-sdk/src";
+import { changeMetadata, init as initHeliumEntityManager } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
@@ -91,6 +91,7 @@ describe("helium-entity-manager", () => {
     expect(account.onboardingServer.toBase58()).eq(
       onboardingServerKeypair.publicKey.toBase58()
     );
+    console.log(account.settings)
   });
 
   it("initializes a hotspot issuer", async () => {
@@ -145,7 +146,7 @@ describe("helium-entity-manager", () => {
       const hotspotOwner = Keypair.generate().publicKey;
 
       const method = hemProgram.methods
-        .issueHotspotV0({ hotspotKey: ecc, isFullHotspot: true })
+        .issueIotHotspotV0({ hotspotKey: ecc, isFullHotspot: true })
         .accounts({
           hotspotIssuer,
           hotspotOwner,
@@ -203,7 +204,7 @@ describe("helium-entity-manager", () => {
         hotspotOwner = Keypair.generate();
 
         const method = hemProgram.methods
-          .issueHotspotV0({ hotspotKey: ecc, isFullHotspot: true })
+          .issueIotHotspotV0({ hotspotKey: ecc, isFullHotspot: true })
           .accounts({
             hotspotIssuer,
             hotspotOwner: hotspotOwner.publicKey,
@@ -233,7 +234,7 @@ describe("helium-entity-manager", () => {
         const metadata = {
           name: animalHash(ecc).replace(/\s/g, "-").toLowerCase(),
           symbol: "HOTSPOT",
-          uri: `https://mobile-metadata.test-helium.com/${ecc}`,
+          uri: `https://mobile-metadata.oracle.test-helium.com/${ecc}`,
           collection: {
             key: hotspotCollection,
             verified: true,
@@ -301,10 +302,10 @@ describe("helium-entity-manager", () => {
           })
         ).signers([hotspotOwner]);
 
-        const storage = (await method.pubkeys()).storage!;
+        const info = (await method.pubkeys()).info!;
         await method.rpc({ skipPreflight: true });
 
-        const storageAcc = await hemProgram.account.hotspotStorageV0.fetch(storage!);
+        const storageAcc = await hemProgram.account.iotHotspotInfoV0.fetch(info!);
         expect(storageAcc.location?.toNumber()).to.eq(location.toNumber());
         expect(storageAcc.elevation).to.eq(elevation);
         expect(storageAcc.gain).to.eq(gain);

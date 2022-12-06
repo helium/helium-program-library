@@ -28,8 +28,11 @@ pub mod helium_entity_manager {
     initialize_hotspot_issuer_v0::handler(ctx, args)
   }
 
-  pub fn issue_hotspot_v0(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result<()> {
-    issue_hotspot_v0::handler(ctx, args)
+  pub fn issue_iot_hotspot_v0(
+    ctx: Context<IssueIotHotspotV0>,
+    args: IssueIotHotspotArgsV0,
+  ) -> Result<()> {
+    issue_iot_hotspot_v0::handler(ctx, args)
   }
 
   pub fn genesis_issue_hotspot_v0(
@@ -53,10 +56,10 @@ pub mod helium_entity_manager {
     update_hotspot_issuer_v0::handler(ctx, args)
   }
 
-  pub fn change_metadata_v0<'info>(
-    ctx: Context<'_, '_, '_, 'info, ChangeMetadataV0<'info>>,
-    args: ChangeMetadataArgsV0,
+  pub fn update_iot_info_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, UpdateIotInfoV0<'info>>,
+    args: UpdateIotInfoArgsV0,
   ) -> Result<()> {
-    change_metadata_v0::handler(ctx, args)
+    update_iot_info_v0::handler(ctx, args)
   }
 }
