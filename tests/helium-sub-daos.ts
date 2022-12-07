@@ -289,40 +289,7 @@ describe("helium-sub-daos", () => {
             clockwork: THREAD_PID,
           }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
           
-          const epoch = (
-            await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
-          ).epoch;
-
-
-      const pubkeys = await instr.pubkeys();
-      const sig = await instr.rpc({ skipPreflight: true, commitment: "confirmed" });
-      const resp = await provider.connection.getTransaction(sig, { commitment: "confirmed" });
-      
-      const currentActiveDeviceCount = Number(resp?.meta?.logMessages
-        ?.find((m) => m.includes("Total devices"))
-        ?.replace("Program log: Total devices: ", "")
-        .split(".")[0]!);
-      console.log(currentActiveDeviceCount);
-
-      const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
-        subDaoEpochInfo
-      );
-      const daoInfo = await program.account.daoEpochInfoV0.fetch(
-        pubkeys.daoEpochInfo!
-      );
-
-      expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
-
-      // sqrt(active devices * 50) * 4th_root(dc burned)
-      const totalUtility = Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1/4);
-      const utility = twelveDecimalsToNumber(daoInfo.totalUtilityScore);
-
-      expect(utility).to.eq(totalUtility);
-      expect(twelveDecimalsToNumber(subDaoInfo.utilityScore!)).to.eq(
-        totalUtility
-      );
-    
-          const instr = await program.methods
+          const instr = program.methods
             .calculateUtilityScoreV0({
               epoch,
             })
@@ -333,25 +300,38 @@ describe("helium-sub-daos", () => {
               subDao,
               dao,
             });
-    
-    
+
           const pubkeys = await instr.pubkeys();
-          await instr.rpc({ skipPreflight: true });
-    
+          const sig = await instr.rpc({ skipPreflight: true, commitment: "confirmed" });
+          const resp = await provider.connection.getTransaction(sig, { commitment: "confirmed" });
+          
+          const currentActiveDeviceCount = Number(resp?.meta?.logMessages
+            ?.find((m) => m.includes("Total devices"))
+            ?.replace("Program log: Total devices: ", "")
+            .split(".")[0]!);
+          console.log(currentActiveDeviceCount);
+
           const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
             subDaoEpochInfo
           );
           const daoInfo = await program.account.daoEpochInfoV0.fetch(
             pubkeys.daoEpochInfo!
           );
-    
+
           expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
-    
+
           // 4 dc burned, activation fee of 50, 15 vehnt staked
           // sqrt(1 * 50) * (16)^1/4 * 15 = 212.13203435596426 = 21_213_203_435_596_426
-          const totalUtility = new BN("21213203435596426");
-          expectBnAccuracy(totalUtility, daoInfo.totalUtilityScore, 0.01);
-          expectBnAccuracy(totalUtility, subDaoInfo.utilityScore!, 0.01);
+          const totalUtility = Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1/4) * 15;
+          const utility = twelveDecimalsToNumber(daoInfo.totalUtilityScore);
+
+          expect(utility).to.eq(totalUtility);
+          expect(twelveDecimalsToNumber(subDaoInfo.utilityScore!)).to.eq(
+            totalUtility
+          );
+
+          expectBnAccuracy(new BN(totalUtility), daoInfo.totalUtilityScore, 0.01);
+          expectBnAccuracy(new BN(totalUtility), subDaoInfo.utilityScore!, 0.01);
         });
     
         describe("with staked vehnt", () => {
@@ -492,7 +472,6 @@ describe("helium-sub-daos", () => {
             let epoch: anchor.BN;
       
             beforeEach(async () => {
-              await createHospot();
               const { subDaoEpochInfo } = await burnDc(1600000);
               epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
                 .epoch;
@@ -582,9 +561,6 @@ describe("helium-sub-daos", () => {
         })
       })
     })
-
-    
-    
   });
 });
 function twelveDecimalsToNumber(totalUtilityScore: anchor.BN) {
