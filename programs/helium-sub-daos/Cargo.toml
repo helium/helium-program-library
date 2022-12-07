@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "helium_sub_daos"
 
 [features]
+devnet = ["switchboard-v2/devnet"]
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
@@ -28,3 +29,4 @@ circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }
 clockwork-sdk = { git = "https://github.com/clockwork-xyz/clockwork", version = "1.3.8", features = ["thread"] }
 time = "0.3.17"
+switchboard-v2 = { version = "^0.1.14" }

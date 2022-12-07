@@ -17,12 +17,13 @@ export const heliumEntityManagerResolvers = combineResolvers(
     mint: "collection",
     owner: "hotspotConfig",
   }),
-  resolveIndividual(async ({ path, args, provider }) => {
+  resolveIndividual(async ({ path, args, provider, accounts }) => {
     if (
       path[path.length - 1] === "storage" &&
-      args[args.length - 1].hotspotKey
+      args[args.length - 1].hotspotKey &&
+      accounts.hotspotConfig
     ) {
-      return hotspotStorageKey(args[args.length - 1].hotspotKey)[0];
+      return hotspotStorageKey(accounts.hotspotConfig as PublicKey, args[args.length - 1].hotspotKey)[0];
     } else if (path[path.length - 1] === "recipient") {
       // @ts-ignore
       return provider.wallet?.publicKey;

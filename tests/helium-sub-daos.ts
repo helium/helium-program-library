@@ -1,3 +1,5 @@
+import { init as cbInit } from "@helium/circuit-breaker-sdk";
+import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
 import { createAtaAndMint, createMint, sendInstructions, toBN } from "@helium/spl-utils";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
@@ -8,12 +10,14 @@ import {
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
-  SystemProgram,
+  SystemProgram
 } from "@solana/web3.js";
 import { assert, expect } from "chai";
+import { AggregatorAccount, loadSwitchboardProgram } from "@switchboard-xyz/switchboard-v2";
 import { init as dcInit } from "../packages/data-credits-sdk/src";
 import { heliumSubDaosResolvers, stakePositionKey } from "../packages/helium-sub-daos-sdk/src";
 import { init as issuerInit } from "../packages/helium-entity-manager-sdk/src";
+import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { burnDataCredits } from "./data-credits";
@@ -117,7 +121,6 @@ describe("helium-sub-daos", () => {
     expect(account.authority.toBase58()).eq(me.toBase58());
     expect(account.treasury.toBase58()).eq(treasury.toBase58());
     expect(account.dntMint.toBase58()).eq(mint.toBase58());
-    expect(account.totalDevices.toNumber()).eq(0);
   });
 
   describe("with dao and subdao", () => {
@@ -129,38 +132,6 @@ describe("helium-sub-daos", () => {
     let rewardsEscrow: PublicKey;
     let stakerPool: PublicKey;
     let makerKeypair: Keypair;
-    let subDaoEpochInfo: PublicKey;
-
-    async function createHospot() {
-      const ecc = await (await HeliumKeypair.makeRandom()).address.b58;
-      const hotspotOwner = Keypair.generate().publicKey;
-
-      await dcProgram.methods
-        .mintDataCreditsV0({
-          hntAmount: toBN(DC_FEE, 8),
-        })
-        .accounts({ dcMint })
-        .rpc({ skipPreflight: true });
-
-      const method = await hemProgram.methods
-        .issueHotspotV0({ hotspotKey: ecc, isFullHotspot: true })
-        .accounts({
-          hotspotIssuer,
-          maker: makerKeypair.publicKey,
-          hotspotOwner,
-        })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-        ])
-        .signers([makerKeypair]);
-
-      subDaoEpochInfo = (await method.pubkeys()).subDaoEpochInfo!;
-      await method.rpc({
-        skipPreflight: true,
-      });
-
-      return subDaoEpochInfo;
-    }
 
     async function burnDc(
       amount: number
@@ -205,17 +176,6 @@ describe("helium-sub-daos", () => {
         SUB_DAO_EPOCH_REWARDS
       ));
 
-    });
-
-    it("allows tracking hotspots", async () => {
-      await createHospot();
-      const epochInfo = await program.account.subDaoEpochInfoV0.fetch(
-        subDaoEpochInfo
-      );
-      expect(epochInfo.totalDevices.toNumber()).eq(1);
-
-      const subDaoAcct = await program.account.subDaoV0.fetch(subDao);
-      expect(subDaoAcct.totalDevices.toNumber()).eq(1);
     });
 
     it("allows tracking dc spend", async () => {
@@ -307,8 +267,11 @@ describe("helium-sub-daos", () => {
         }
     
         it("calculates subdao rewards", async () => {
-          await createHospot();
           const { subDaoEpochInfo } = await burnDc(1600000);
+            const epoch = (
+                await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+            ).epoch;
+
           
           // stake some vehnt
           const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
@@ -329,6 +292,35 @@ describe("helium-sub-daos", () => {
           const epoch = (
             await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
           ).epoch;
+
+
+      const pubkeys = await instr.pubkeys();
+      const sig = await instr.rpc({ skipPreflight: true, commitment: "confirmed" });
+      const resp = await provider.connection.getTransaction(sig, { commitment: "confirmed" });
+      
+      const currentActiveDeviceCount = Number(resp?.meta?.logMessages
+        ?.find((m) => m.includes("Total devices"))
+        ?.replace("Program log: Total devices: ", "")
+        .split(".")[0]!);
+      console.log(currentActiveDeviceCount);
+
+      const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
+        subDaoEpochInfo
+      );
+      const daoInfo = await program.account.daoEpochInfoV0.fetch(
+        pubkeys.daoEpochInfo!
+      );
+
+      expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
+
+      // sqrt(active devices * 50) * 4th_root(dc burned)
+      const totalUtility = Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1/4);
+      const utility = twelveDecimalsToNumber(daoInfo.totalUtilityScore);
+
+      expect(utility).to.eq(totalUtility);
+      expect(twelveDecimalsToNumber(subDaoInfo.utilityScore!)).to.eq(
+        totalUtility
+      );
     
           const instr = await program.methods
             .calculateUtilityScoreV0({
@@ -595,3 +587,15 @@ describe("helium-sub-daos", () => {
     
   });
 });
+function twelveDecimalsToNumber(totalUtilityScore: anchor.BN) {
+  const utilityStr = totalUtilityScore.toString()
+  // format utility with 12 decimals
+  const utility = Number(
+    `${utilityStr.slice(0, utilityStr.length - 12)}.${utilityStr.slice(
+      utilityStr.length - 12,
+      utilityStr.length
+    )}`
+  );
+  return utility;
+}
+

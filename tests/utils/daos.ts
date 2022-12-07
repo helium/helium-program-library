@@ -87,6 +87,7 @@ export async function initTestSubdao(
         thresholdType: ThresholdType.Absolute as never,
         threshold: new anchor.BN("10000000000000000000"),
       },
+      dcBurnAuthority: authority,
     })
     .preInstructions([
       ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
@@ -96,6 +97,9 @@ export async function initTestSubdao(
       rewardsEscrow,
       dntMint,
       hntMint: daoAcc.hntMint,
+      activeDeviceAggregator: new PublicKey(
+        "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
+      ), // Copied from mainnet to localnet
     });
   const { subDao, treasury, treasuryCircuitBreaker, stakerPool } = await method.pubkeys();
   await method.rpc();
