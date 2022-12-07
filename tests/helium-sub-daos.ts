@@ -230,7 +230,7 @@ describe("helium-sub-daos", () => {
 
     const vehntOptions = [
       { name: "Case 1", options: {delay: 0, lockupPeriods: 183, lockupAmount: 100, stakeAmount: 100} },
-      { name: "Case 2", options: {delay: 15000, lockupPeriods: 183*4, lockupAmount: 50, stakeAmount: 1} },
+      // { name: "Case 2", options: {delay: 15000, lockupPeriods: 183*4, lockupAmount: 50, stakeAmount: 1} },
       // { name: "Case 3", options: {delay: 45000, lockupPeriods: 183*8, lockupAmount: 100, stakeAmount: 10000} },
       // { name: "Case 4", options: {delay: 5000, lockupPeriods: 183*8, lockupAmount: 1000, stakeAmount: 10000} },
     ]
@@ -445,7 +445,9 @@ describe("helium-sub-daos", () => {
             assert.equal(acc.hntAmount.toNumber(), 0);
             assert.equal(acc.fallRate.toNumber(), 0);
             const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
-            assert.isTrue(subDaoAcc.vehntStaked.toNumber() == 0 || subDaoAcc.vehntStaked.toNumber() == 1);
+            let vehnt = subDaoAcc.vehntStaked.toNumber();
+            if (vehnt > 1) console.log(vehnt);
+            assert.isBelow(vehnt, 2);
             assert.equal(subDaoAcc.vehntFallRate.toNumber(), 0);
     
           });
@@ -504,16 +506,42 @@ describe("helium-sub-daos", () => {
               const { subDaoEpochInfo } = await burnDc(1600000);
               epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
                 .epoch;
+
+              const thread = PublicKey.findProgramAddressSync([
+                Buffer.from("thread", "utf8"), subDao.toBuffer(), Buffer.from("end-epoch", "utf8")
+              ], THREAD_PID)[0];
+
               await program.methods
-                .calculateUtilityScoreV0({
+                .calculateUtilityPartOneV0({
                   epoch,
                 })
-                .preInstructions([
-                  ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-                ])
                 .accounts({
                   subDao,
                   dao,
+                  thread,
+                  clockwork: THREAD_PID,
+                })
+                .rpc({ skipPreflight: true });
+              await program.methods
+                .calculateUtilityPartTwoV0({
+                  epoch,
+                })
+                .accounts({
+                  subDao,
+                  dao,
+                  thread,
+                  clockwork: THREAD_PID,
+                })
+                .rpc({ skipPreflight: true });
+                await program.methods
+                .calculateUtilityPartThreeV0({
+                  epoch,
+                })
+                .accounts({
+                  subDao,
+                  dao,
+                  thread,
+                  clockwork: THREAD_PID,
                 })
                 .rpc({ skipPreflight: true });
             });
@@ -525,16 +553,14 @@ describe("helium-sub-daos", () => {
               const preMobileBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
               ).amount;
-              await sendInstructions(provider, [
-                await program.methods
+              await program.methods
                   .issueRewardsV0({
                     epoch,
                   })
                   .accounts({
                     subDao,
                   })
-                  .instruction(),
-              ]);
+                  .rpc({skipPreflight: true})
       
               const postBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!

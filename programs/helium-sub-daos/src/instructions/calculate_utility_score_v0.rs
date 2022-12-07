@@ -23,7 +23,7 @@ pub struct CalculateUtilityScoreV0<'info> {
     init_if_needed,
     payer = payer,
     space = 60 + 8 + std::mem::size_of::<DaoEpochInfoV0>(),
-    seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()], // Break into 30m epochs
+    seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
   )]
   pub dao_epoch_info: Box<Account<'info, DaoEpochInfoV0>>,
@@ -31,7 +31,7 @@ pub struct CalculateUtilityScoreV0<'info> {
     init_if_needed,
     payer = payer,
     space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()], // Break into 30m epochs
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,

@@ -29,6 +29,7 @@ pub struct IssueRewardsV0<'info> {
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
+    mut,
     has_one = dao,
     constraint = dao_epoch_info.num_utility_scores_calculated >= dao.num_sub_daos @ ErrorCode::MissingUtilityScores,
     seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
@@ -126,6 +127,10 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
 
   if !TESTING && args.epoch >= epoch {
     return Err(error!(ErrorCode::EpochNotOver));
+  }
+
+  if ctx.accounts.sub_dao_epoch_info.calculation_stage != 3 {
+    return Err(error!(ErrorCode::IncorrectCalculationStage));
   }
 
   let utility_score = to_prec(ctx.accounts.sub_dao_epoch_info.utility_score)

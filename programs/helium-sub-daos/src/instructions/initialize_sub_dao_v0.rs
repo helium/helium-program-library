@@ -1,6 +1,6 @@
-use crate::circuit_breaker::*;
+use crate::{circuit_breaker::*, current_epoch, next_epoch_ts, CalculateUtilityPartOneArgsV0};
 use crate::{state::*, EPOCH_LENGTH};
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::{set_authority, Mint, SetAuthority, Token, TokenAccount};
@@ -15,7 +15,14 @@ use circuit_breaker::{
   ThresholdType as CBThresholdType,
   WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
 };
+use clockwork_sdk::thread_program::{
+  self,
+  accounts::{Thread, Trigger},
+  cpi::thread_create,
+  ThreadProgram,
+};
 use shared_utils::resize_to_fit;
+use time::OffsetDateTime;
 use treasury_management::{
   cpi::{accounts::InitializeTreasuryManagementV0, initialize_treasury_management_v0},
   Curve as TreasuryCurve, InitializeTreasuryManagementArgsV0, TreasuryManagement,
@@ -132,6 +139,20 @@ pub struct InitializeSubDaoV0<'info> {
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
+
+  /// CHECK: handled by thread_create
+  #[account(mut, address = Thread::pubkey(sub_dao.key(), "end-epoch".to_string()))]
+  pub thread: AccountInfo<'info>,
+  #[account(address = thread_program::ID)]
+  pub clockwork: Program<'info, ThreadProgram>,
+}
+
+fn create_end_epoch_cron(curr_ts: i64, offset: u64) -> String {
+  let next_epoch = next_epoch_ts(curr_ts) + offset;
+  let dt = OffsetDateTime::from_unix_timestamp(next_epoch.try_into().unwrap())
+    .ok()
+    .unwrap();
+  format!("0 {:?} {:?} * * * *", dt.minute(), dt.hour(),)
 }
 
 impl<'info> InitializeSubDaoV0<'info> {
@@ -167,6 +188,7 @@ impl<'info> InitializeSubDaoV0<'info> {
 }
 
 pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -> Result<()> {
+  let curr_ts = ctx.accounts.clock.unix_timestamp;
   initialize_mint_windowed_breaker_v0(
     ctx.accounts.initialize_dnt_mint_breaker_ctx(),
     InitializeMintWindowedBreakerArgsV0 {
@@ -176,11 +198,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
         // should never get triggered.
         window_size_seconds: u64::try_from(EPOCH_LENGTH).unwrap(),
         threshold_type: CBThresholdType::Absolute,
-        threshold: 5
-          * args
-            .emission_schedule
-            .get_emissions_at(ctx.accounts.clock.unix_timestamp)
-            .unwrap(),
+        threshold: 5 * args.emission_schedule.get_emissions_at(curr_ts).unwrap(),
       },
       mint_authority: ctx.accounts.sub_dao.key(),
     },
@@ -270,6 +288,68 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     &ctx.accounts.payer.to_account_info(),
     &ctx.accounts.system_program.to_account_info(),
     &ctx.accounts.sub_dao,
+  )?;
+
+  // get epoch info accounts needed
+  let epoch = current_epoch(curr_ts);
+  let dao_key = ctx.accounts.dao.key();
+  let dao_ei_seeds: &[&[u8]] = &[
+    "dao_epoch_info".as_bytes(),
+    dao_key.as_ref(),
+    &epoch.to_le_bytes(),
+  ];
+  let dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
+  let sub_dao_key = ctx.accounts.sub_dao.key();
+  let sub_dao_ei_seeds: &[&[u8]] = &[
+    "sub_dao_epoch_info".as_bytes(),
+    sub_dao_key.as_ref(),
+    &epoch.to_le_bytes(),
+  ];
+  let sub_dao_epoch_info = Pubkey::find_program_address(sub_dao_ei_seeds, &crate::id()).0;
+
+  // build clockwork kickoff ix
+  let accounts = vec![
+    AccountMeta::new(ctx.accounts.payer.key(), true),
+    AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
+    AccountMeta::new(ctx.accounts.sub_dao.key(), false),
+    AccountMeta::new(dao_epoch_info, false),
+    AccountMeta::new(sub_dao_epoch_info, false),
+    AccountMeta::new_readonly(ctx.accounts.clock.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.rent.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
+    AccountMeta::new(ctx.accounts.thread.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.clockwork.key(), false),
+  ];
+  let kickoff_ix = Instruction {
+    program_id: crate::ID,
+    accounts,
+    data: crate::instruction::CalculateUtilityPartOneV0 {
+      args: CalculateUtilityPartOneArgsV0 { epoch },
+    }
+    .data(),
+  };
+
+  let cron = create_end_epoch_cron(curr_ts, 60 * 5);
+  // initialize thread
+  thread_create(
+    CpiContext::new_with_signer(
+      ctx.accounts.clockwork.to_account_info(),
+      clockwork_sdk::thread_program::cpi::accounts::ThreadCreate {
+        authority: ctx.accounts.sub_dao.to_account_info(),
+        payer: ctx.accounts.payer.to_account_info(),
+        thread: ctx.accounts.thread.to_account_info(),
+        system_program: ctx.accounts.system_program.to_account_info(),
+      },
+      signer_seeds,
+    ),
+    "end-epoch".to_string(),
+    kickoff_ix.into(),
+    Trigger::Cron {
+      schedule: cron,
+      skippable: false,
+    },
   )?;
 
   Ok(())

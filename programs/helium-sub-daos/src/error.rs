@@ -35,6 +35,6 @@ pub enum ErrorCode {
   #[msg("Failed to calculate the voting power")]
   FailedVotingPowerCalculation,
 
-  #[msg("Must calculate part one first")]
-  PartOneNotCalculated,
+  #[msg("Utility score needs to be calculated in the correct order")]
+  IncorrectCalculationStage,
 }

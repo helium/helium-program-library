@@ -1,5 +1,13 @@
-use crate::{current_epoch, error::ErrorCode, state::*, OrArithError, TESTING};
-use anchor_lang::prelude::*;
+use crate::{
+  current_epoch, error::ErrorCode, state::*, CalculateUtilityPartThreeArgsV0, OrArithError, TESTING,
+};
+use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
+use anchor_spl::token::Token;
+use circuit_breaker::CircuitBreaker;
+use clockwork_sdk::{
+  thread_program::{self, accounts::Thread, ThreadProgram},
+  ThreadResponse,
+};
 use shared_utils::precise_number::{PreciseNumber, TWO_PREC};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -14,40 +22,75 @@ pub struct CalculateUtilityPartTwoV0<'info> {
   pub payer: Signer<'info>,
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
+    mut,
+    seeds = ["sub_dao".as_bytes(), sub_dao.dnt_mint.as_ref()],
+    bump,
     has_one = dao
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
-    seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()], // Break into 30m epochs
+    mut,
+    seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
   )]
   pub dao_epoch_info: Box<Account<'info, DaoEpochInfoV0>>,
   #[account(
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()], // Break into 30m epochs
+    mut,
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
   pub system_program: Program<'info, System>,
+  pub token_program: Program<'info, Token>,
+  pub circuit_breaker_program: Program<'info, CircuitBreaker>,
+
+  /// CHECK: address checked
+  #[account(mut, address = Thread::pubkey(sub_dao.key(), "end-epoch".to_string()))]
+  pub thread: AccountInfo<'info>,
+  #[account(address = thread_program::ID)]
+  pub clockwork: Program<'info, ThreadProgram>,
+}
+
+fn construct_next_ix(ctx: &Context<CalculateUtilityPartTwoV0>, epoch: u64) -> Instruction {
+  let accounts = vec![
+    AccountMeta::new(ctx.accounts.payer.key(), true),
+    AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
+    AccountMeta::new(ctx.accounts.sub_dao.key(), false),
+    AccountMeta::new(ctx.accounts.dao_epoch_info.key(), false),
+    AccountMeta::new(ctx.accounts.sub_dao_epoch_info.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.clock.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.rent.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
+    AccountMeta::new(ctx.accounts.thread.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.clockwork.key(), false),
+  ];
+  Instruction {
+    program_id: crate::ID,
+    accounts,
+    data: crate::instruction::CalculateUtilityPartThreeV0 {
+      args: CalculateUtilityPartThreeArgsV0 { epoch },
+    }
+    .data(),
+  }
 }
 
 pub fn handler(
   ctx: Context<CalculateUtilityPartTwoV0>,
   args: CalculateUtilityPartTwoArgsV0,
-) -> Result<()> {
-  let epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
+) -> Result<ThreadResponse> {
+  let curr_ts = ctx.accounts.clock.unix_timestamp;
+  let epoch = current_epoch(curr_ts);
 
   if !TESTING && args.epoch >= epoch {
     return Err(error!(ErrorCode::EpochNotOver));
   }
 
-  if !ctx.accounts.sub_dao_epoch_info.utility_score.is_some() {
-    return Err(error!(ErrorCode::PartOneNotCalculated));
-  }
-
-  if ctx.accounts.sub_dao_epoch_info.calculation_finished {
-    return Err(error!(ErrorCode::UtilityScoreAlreadyCalculated));
+  if ctx.accounts.sub_dao_epoch_info.calculation_stage != 1 {
+    return Err(error!(ErrorCode::IncorrectCalculationStage));
   }
 
   let epoch_info = &mut ctx.accounts.sub_dao_epoch_info;
@@ -93,7 +136,8 @@ pub fn handler(
 
   // Store utility scores
   epoch_info.utility_score = Some(utility_score);
-  epoch_info.calculation_finished = true;
+  // epoch_info.calculation_finished = true;
+  epoch_info.calculation_stage = 2;
 
   // Only increment utility scores when either (a) in prod or (b) testing and we haven't already over-calculated utility scores.
   // TODO: We can remove this after breakpoint demo
@@ -108,6 +152,11 @@ pub fn handler(
       .checked_add(utility_score)
       .unwrap();
   }
+  let epoch = current_epoch(curr_ts);
 
-  Ok(())
+  let next_ix = construct_next_ix(&ctx, epoch);
+  Ok(ThreadResponse {
+    kickoff_instruction: None,
+    next_instruction: Some(next_ix.into()),
+  })
 }

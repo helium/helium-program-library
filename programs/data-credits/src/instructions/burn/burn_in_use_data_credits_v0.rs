@@ -25,7 +25,7 @@ pub struct BurnInUseDataCreditsV0<'info> {
   /// CHECK: Verified by cpi
   #[account(
     mut,
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(),  &current_epoch(clock.unix_timestamp).to_le_bytes()], // Break into 30m epochs
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(),  &current_epoch(clock.unix_timestamp).to_le_bytes()],
     seeds::program = helium_sub_daos_program.key(),
     bump
   )]

@@ -1,7 +1,14 @@
 use crate::{
-  current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError, TESTING,
+  current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, CalculateUtilityPartTwoArgsV0,
+  OrArithError, TESTING,
 };
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
+use anchor_spl::token::Token;
+use circuit_breaker::CircuitBreaker;
+use clockwork_sdk::{
+  thread_program::{self, accounts::Thread, ThreadProgram},
+  ThreadResponse,
+};
 use shared_utils::precise_number::{PreciseNumber, FOUR_PREC};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -16,6 +23,7 @@ pub struct CalculateUtilityPartOneV0<'info> {
   pub payer: Signer<'info>,
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
+    mut,
     has_one = dao
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
@@ -23,7 +31,7 @@ pub struct CalculateUtilityPartOneV0<'info> {
     init_if_needed,
     payer = payer,
     space = 60 + 8 + std::mem::size_of::<DaoEpochInfoV0>(),
-    seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()], // Break into 30m epochs
+    seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
   )]
   pub dao_epoch_info: Box<Account<'info, DaoEpochInfoV0>>,
@@ -31,26 +39,37 @@ pub struct CalculateUtilityPartOneV0<'info> {
     init_if_needed,
     payer = payer,
     space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()], // Break into 30m epochs
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
   pub system_program: Program<'info, System>,
+  pub token_program: Program<'info, Token>,
+  pub circuit_breaker_program: Program<'info, CircuitBreaker>,
+
+  /// CHECK: address checked  
+  #[account(mut, address = Thread::pubkey(sub_dao.key(), "end-epoch".to_string()))]
+  pub thread: AccountInfo<'info>,
+  #[account(address = thread_program::ID)]
+  pub clockwork: Program<'info, ThreadProgram>,
 }
 
 pub fn handler(
   ctx: Context<CalculateUtilityPartOneV0>,
   args: CalculateUtilityPartOneArgsV0,
-) -> Result<()> {
+) -> Result<ThreadResponse> {
   let epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
 
   if !TESTING && args.epoch >= epoch {
+    // TODO here return a thread response to try again
     return Err(error!(ErrorCode::EpochNotOver));
   }
 
-  if !TESTING && ctx.accounts.sub_dao_epoch_info.utility_score.is_some() {
+  if ctx.accounts.sub_dao_epoch_info.utility_score.is_some()
+    || ctx.accounts.sub_dao_epoch_info.calculation_stage != 0
+  {
     return Err(error!(ErrorCode::UtilityScoreAlreadyCalculated));
   }
 
@@ -113,6 +132,33 @@ pub fn handler(
 
   // Store the first part of the utility score
   epoch_info.utility_score = Some(dv);
+  epoch_info.calculation_stage = 1;
 
-  Ok(())
+  // build next ix to call
+  let accounts = vec![
+    AccountMeta::new(ctx.accounts.payer.key(), true),
+    AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
+    AccountMeta::new(ctx.accounts.sub_dao.key(), false),
+    AccountMeta::new(ctx.accounts.dao_epoch_info.key(), false),
+    AccountMeta::new(ctx.accounts.sub_dao_epoch_info.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.clock.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.rent.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
+    AccountMeta::new(ctx.accounts.thread.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.clockwork.key(), false),
+  ];
+  let next_ix = Instruction {
+    program_id: crate::ID,
+    accounts,
+    data: crate::instruction::CalculateUtilityPartTwoV0 {
+      args: CalculateUtilityPartTwoArgsV0 { epoch },
+    }
+    .data(),
+  };
+  Ok(ThreadResponse {
+    kickoff_instruction: None,
+    next_instruction: Some(next_ix.into()),
+  })
 }

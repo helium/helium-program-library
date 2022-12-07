@@ -1,4 +1,5 @@
 pub mod calculate_utility_part_one_v0;
+pub mod calculate_utility_part_three_v0;
 pub mod calculate_utility_part_two_v0;
 pub mod calculate_utility_score_v0;
 pub mod initialize_dao_v0;
@@ -9,6 +10,7 @@ pub mod track_added_device_v0;
 pub mod track_dc_burn_v0;
 
 pub use calculate_utility_part_one_v0::*;
+pub use calculate_utility_part_three_v0::*;
 pub use calculate_utility_part_two_v0::*;
 pub use calculate_utility_score_v0::*;
 pub use initialize_dao_v0::*;
