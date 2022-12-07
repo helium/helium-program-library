@@ -199,7 +199,6 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     InitializeAccountWindowedBreakerArgsV0 {
       authority: args.authority,
       config: CBWindowedCircuitBreakerConfigV0 {
-        // Only allow distributing 20% of the total staker pool per epoch length.
         window_size_seconds: u64::try_from(EPOCH_LENGTH).unwrap(),
         threshold_type: CBThresholdType::Absolute,
         threshold: 5

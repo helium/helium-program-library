@@ -134,7 +134,17 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   };
 
   // calculate the vehnt value of this position at the time of the epoch
-  let ts_diff = curr_ts.checked_sub(epoch_end_ts).unwrap();
+  let ts_diff = curr_ts
+    .checked_sub(epoch_end_ts)
+    .unwrap()
+    .checked_sub(
+      d_entry
+        .lockup
+        .seconds_since_expiry(curr_ts)
+        .try_into()
+        .unwrap(),
+    )
+    .unwrap();
   let staked_vehnt_at_epoch = curr_position_vehnt
     .checked_add(
       stake_position

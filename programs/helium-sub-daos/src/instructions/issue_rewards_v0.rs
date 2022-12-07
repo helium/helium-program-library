@@ -167,17 +167,17 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     ]]),
     MintArgsV0 {
       amount: total_emissions
-        .checked_div(100.try_into().unwrap())
-        .unwrap()
         .checked_mul(94)
+        .unwrap()
+        .checked_div(100)
         .unwrap(), // 94% of emissions are sent to treasury
     },
   )?;
 
   let staking_rewards_amount = total_emissions
-    .checked_div(100.try_into().unwrap())
-    .unwrap()
     .checked_mul(6)
+    .unwrap()
+    .checked_div(100)
     .unwrap();
 
   mint_v0(
