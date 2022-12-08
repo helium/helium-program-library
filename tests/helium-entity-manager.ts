@@ -148,7 +148,7 @@ describe("helium-entity-manager", () => {
         .issueHotspotV0({ hotspotKey: ecc, isFullHotspot: true })
         .accounts({
           hotspotIssuer,
-          hotspotOwner,
+          recipient: hotspotOwner,
           maker: makerKeypair.publicKey,
         })
         .preInstructions([
@@ -206,7 +206,7 @@ describe("helium-entity-manager", () => {
           .issueHotspotV0({ hotspotKey: ecc, isFullHotspot: true })
           .accounts({
             hotspotIssuer,
-            hotspotOwner: hotspotOwner.publicKey,
+            recipient: hotspotOwner.publicKey,
             maker: makerKeypair.publicKey,
           })
           .preInstructions([
