@@ -1632,6 +1632,14 @@
   dependencies:
     "@chakra-ui/utils" "1.10.4"
 
+"@coral-xyz/borsh@^0.2.6":
+  version "0.2.6"
+  resolved "https://registry.yarnpkg.com/@coral-xyz/borsh/-/borsh-0.2.6.tgz#0f11b223bf2967574310705afd3c53ce26688ada"
+  integrity sha512-y6nmHw1bFcJib7sMHsQPpC8r47xhqDZVvhUdna7NUPzpSbOZG6f46N21+aXsQ2w/tG8Ggls488J/ZmwbgVmyjg==
+  dependencies:
+    bn.js "^5.1.2"
+    buffer-layout "^1.2.0"
+
 "@coral-xyz/common-public@*":
   version "0.0.1"
   resolved "https://registry.npmjs.org/@coral-xyz/common-public/-/common-public-0.0.1.tgz"
@@ -4581,6 +4589,16 @@
   dependencies:
     buffer "~6.0.3"
 
+"@solana/spl-account-compression@^0.1.1", "@solana/spl-account-compression@^0.1.4":
+  version "0.1.4"
+  resolved "https://registry.yarnpkg.com/@solana/spl-account-compression/-/spl-account-compression-0.1.4.tgz#a401d7c47b3d960d00ea18fe1b423877fb3dc380"
+  integrity sha512-y4kD1Ecw1R4qjp0A0SouV2GxKSIbffVo17kROJh/gt9zzGyROQ10KL5pPpirEJ1Yj7GjIjF8MiFxKBGm+Jrygw==
+  dependencies:
+    "@metaplex-foundation/beet" "^0.7.1"
+    "@metaplex-foundation/beet-solana" "^0.4.0"
+    bn.js "^5.2.1"
+    borsh "^0.7.0"
+
 "@solana/spl-governance@^0.3.17":
   version "0.3.17"
   resolved "https://registry.yarnpkg.com/@solana/spl-governance/-/spl-governance-0.3.17.tgz#ec6fc9c3e3c2eb5de0c00ebc8c4d46f6e5a899e9"
@@ -4593,17 +4611,6 @@
     borsh "^0.3.1"
     bs58 "^4.0.1"
     superstruct "^0.15.2"
-
-"@solana/spl-token-registry@^0.2.3225":
-"@solana/spl-account-compression@^0.1.1", "@solana/spl-account-compression@^0.1.4":
-  version "0.1.4"
-  resolved "https://registry.yarnpkg.com/@solana/spl-account-compression/-/spl-account-compression-0.1.4.tgz#a401d7c47b3d960d00ea18fe1b423877fb3dc380"
-  integrity sha512-y4kD1Ecw1R4qjp0A0SouV2GxKSIbffVo17kROJh/gt9zzGyROQ10KL5pPpirEJ1Yj7GjIjF8MiFxKBGm+Jrygw==
-  dependencies:
-    "@metaplex-foundation/beet" "^0.7.1"
-    "@metaplex-foundation/beet-solana" "^0.4.0"
-    bn.js "^5.2.1"
-    borsh "^0.7.0"
 
 "@solana/spl-token-registry@^0.2.2405", "@solana/spl-token-registry@^0.2.3225":
   version "0.2.4574"
@@ -4680,7 +4687,7 @@
     rpc-websockets "^7.5.0"
     superstruct "^0.14.2"
 
-"@solana/web3.js@^1.22.0":
+"@solana/web3.js@^1.22.0", "@solana/web3.js@^1.50.1", "@solana/web3.js@^1.56.2", "@solana/web3.js@^1.66.2":
   version "1.66.2"
   resolved "https://registry.yarnpkg.com/@solana/web3.js/-/web3.js-1.66.2.tgz#80b43c5868b846124fe3ebac7d3943930c3fa60c"
   integrity sha512-RyaHMR2jGmaesnYP045VLeBGfR/gAW3cvZHzMFGg7bkO+WOYOYp1nEllf0/la4U4qsYGKCsO9eEevR5fhHiVHg==
@@ -4728,27 +4735,6 @@
   version "1.66.1"
   resolved "https://registry.yarnpkg.com/@solana/web3.js/-/web3.js-1.66.1.tgz#f11bf657e76500780a1b94fa286e9ff9e6106c71"
   integrity sha512-AAVW9vGqYo8m2kMdwQtzEFuEBT21D0Z13wCzGC0lv4vay1BaqDUGSangmakeDEirtIsaAtM0gfAPu1YNLkIy/Q==
-  dependencies:
-    "@babel/runtime" "^7.12.5"
-    "@noble/ed25519" "^1.7.0"
-    "@noble/hashes" "^1.1.2"
-    "@noble/secp256k1" "^1.6.3"
-    "@solana/buffer-layout" "^4.0.0"
-    bigint-buffer "^1.1.5"
-    bn.js "^5.0.0"
-    borsh "^0.7.0"
-    bs58 "^4.0.1"
-    buffer "6.0.1"
-    fast-stable-stringify "^1.0.0"
-    jayson "^3.4.4"
-    node-fetch "2"
-    rpc-websockets "^7.5.0"
-    superstruct "^0.14.2"
-
-"@solana/web3.js@^1.50.1", "@solana/web3.js@^1.56.2", "@solana/web3.js@^1.66.2":
-  version "1.66.2"
-  resolved "https://registry.yarnpkg.com/@solana/web3.js/-/web3.js-1.66.2.tgz#80b43c5868b846124fe3ebac7d3943930c3fa60c"
-  integrity sha512-RyaHMR2jGmaesnYP045VLeBGfR/gAW3cvZHzMFGg7bkO+WOYOYp1nEllf0/la4U4qsYGKCsO9eEevR5fhHiVHg==
   dependencies:
     "@babel/runtime" "^7.12.5"
     "@noble/ed25519" "^1.7.0"

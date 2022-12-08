@@ -330,7 +330,7 @@ describe("helium-sub-daos", () => {
             await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
           ).epoch;
     
-          const instr = await program.methods
+          const instr = program.methods
             .calculateUtilityScoreV0({
               epoch,
             })
@@ -340,6 +340,8 @@ describe("helium-sub-daos", () => {
             .accounts({
               subDao,
               dao,
+              thread,
+              clockwork: THREAD_PID,
             });
     
     
@@ -512,38 +514,19 @@ describe("helium-sub-daos", () => {
               ], THREAD_PID)[0];
 
               await program.methods
-                .calculateUtilityPartOneV0({
+                .calculateUtilityScoreV0({
                   epoch,
                 })
+                .preInstructions([
+                  ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+                ])
                 .accounts({
                   subDao,
                   dao,
                   thread,
                   clockwork: THREAD_PID,
-                })
-                .rpc({ skipPreflight: true });
-              await program.methods
-                .calculateUtilityPartTwoV0({
-                  epoch,
-                })
-                .accounts({
-                  subDao,
-                  dao,
-                  thread,
-                  clockwork: THREAD_PID,
-                })
-                .rpc({ skipPreflight: true });
-                await program.methods
-                .calculateUtilityPartThreeV0({
-                  epoch,
-                })
-                .accounts({
-                  subDao,
-                  dao,
-                  thread,
-                  clockwork: THREAD_PID,
-                })
-                .rpc({ skipPreflight: true });
+                }).rpc({skipPreflight: true});
+              
             });
       
             it("issues hnt rewards to subdaos and dnt to rewards escrow", async () => {

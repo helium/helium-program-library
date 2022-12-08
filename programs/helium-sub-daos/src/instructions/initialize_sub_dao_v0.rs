@@ -1,4 +1,4 @@
-use crate::{circuit_breaker::*, current_epoch, next_epoch_ts, CalculateUtilityPartOneArgsV0};
+use crate::{circuit_breaker::*, current_epoch, next_epoch_ts};
 use crate::{state::*, EPOCH_LENGTH};
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use anchor_spl::associated_token::AssociatedToken;
@@ -325,8 +325,8 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
   let kickoff_ix = Instruction {
     program_id: crate::ID,
     accounts,
-    data: crate::instruction::CalculateUtilityPartOneV0 {
-      args: CalculateUtilityPartOneArgsV0 { epoch },
+    data: crate::instruction::CalculateUtilityScoreV0 {
+      args: crate::CalculateUtilityScoreArgsV0 { epoch },
     }
     .data(),
   };

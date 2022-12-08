@@ -42,7 +42,7 @@ pub mod helium_sub_daos {
   pub fn calculate_utility_score_v0(
     ctx: Context<CalculateUtilityScoreV0>,
     args: CalculateUtilityScoreArgsV0,
-  ) -> Result<()> {
+  ) -> Result<ThreadResponse> {
     calculate_utility_score_v0::handler(ctx, args)
   }
 
