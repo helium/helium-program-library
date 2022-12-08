@@ -90,7 +90,6 @@ address = "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB"
 [[test.validator.clone]]
 address = "SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f"
 
-
 # Switchboard aggregator
 [[test.validator.clone]]
 address = "E3cqnoFvTeKKNsGmC8YitpMjo2E39hwfoyt2Aiem7dCb"
