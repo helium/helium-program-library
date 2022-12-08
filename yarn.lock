@@ -1632,6 +1632,14 @@
   dependencies:
     "@chakra-ui/utils" "1.10.4"
 
+"@coral-xyz/borsh@^0.2.6":
+  version "0.2.6"
+  resolved "https://registry.yarnpkg.com/@coral-xyz/borsh/-/borsh-0.2.6.tgz#0f11b223bf2967574310705afd3c53ce26688ada"
+  integrity sha512-y6nmHw1bFcJib7sMHsQPpC8r47xhqDZVvhUdna7NUPzpSbOZG6f46N21+aXsQ2w/tG8Ggls488J/ZmwbgVmyjg==
+  dependencies:
+    bn.js "^5.1.2"
+    buffer-layout "^1.2.0"
+
 "@coral-xyz/common-public@*":
   version "0.0.1"
   resolved "https://registry.npmjs.org/@coral-xyz/common-public/-/common-public-0.0.1.tgz"
