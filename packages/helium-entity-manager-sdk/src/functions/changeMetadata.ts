@@ -44,7 +44,7 @@ export async function changeMetadata({
   } = asset;
   const eccCompact = uri.split("/").slice(-1)[0];
 
-  const [storage] = hotspotStorageKey(eccCompact);
+  const [storage] = hotspotStorageKey(hotspotConfig, eccCompact);
 
   return program.methods
     .changeMetadataV0({

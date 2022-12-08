@@ -1,4 +1,4 @@
-use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError};
+use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError, EPOCH_LENGTH};
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use anchor_spl::token::Token;
 use circuit_breaker::CircuitBreaker;
@@ -6,7 +6,11 @@ use clockwork_sdk::{
   thread_program::{self, accounts::Thread, ThreadProgram},
   ThreadResponse,
 };
+use crate::{
+  current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError, EPOCH_LENGTH,
+};
 use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
+use switchboard_v2::{AggregatorAccountData, AggregatorHistoryBuffer};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CalculateUtilityScoreArgsV0 {
@@ -22,9 +26,16 @@ pub struct CalculateUtilityScoreV0<'info> {
   pub payer: Signer<'info>,
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
-    has_one = dao
+    has_one = dao,
+    has_one = active_device_aggregator
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
+  #[account(
+    has_one = history_buffer
+  )]
+  pub active_device_aggregator: AccountLoader<'info, AggregatorAccountData>,
+  /// CHECK: Checked by has_one with active device aggregator
+  pub history_buffer: AccountInfo<'info>,
   #[account(
     init_if_needed,
     payer = payer,
@@ -172,10 +183,27 @@ pub fn handler(
 
   let dc_burned = PreciseNumber::new(epoch_info.dc_burned.into())
     .or_arith_error()?
-    .checked_div(&PreciseNumber::new(100000_u128).or_arith_error()?) // 10^5 to get to dollars.
+    .checked_div(&PreciseNumber::new(100000_u128).or_arith_error()?) // DC has 0 decimals, plus 10^5 to get to dollars.
     .or_arith_error()?;
 
-  let total_devices = PreciseNumber::new(epoch_info.total_devices.into()).or_arith_error()?;
+  let history_buffer = AggregatorHistoryBuffer::new(&ctx.accounts.history_buffer)?;
+  let timestamp = i64::try_from(args.epoch).unwrap() * EPOCH_LENGTH;
+  let total_devices_u64 = u64::try_from(
+    history_buffer
+      .lower_bound(timestamp)
+      .unwrap()
+      .value
+      .mantissa,
+  )
+  .unwrap();
+
+  msg!(
+    "Total devices: {}. Dc burned: {}.",
+    total_devices_u64,
+    epoch_info.dc_burned
+  );
+
+  let total_devices = PreciseNumber::new(total_devices_u64.into()).or_arith_error()?;
   let devices_with_fee = total_devices
     .checked_mul(
       &PreciseNumber::new(u128::from(ctx.accounts.sub_dao.onboarding_dc_fee)).or_arith_error()?,
@@ -209,7 +237,7 @@ pub fn handler(
 
   let v = std::cmp::max(one.clone(), vehnt_staked);
 
-  let a = if epoch_info.total_devices > 0 {
+  let a = if total_devices_u64 > 0 {
     std::cmp::max(
       one,
       devices_with_fee

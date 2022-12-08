@@ -41,8 +41,10 @@ export function stakePositionKey(
   depositEntryIdx: number,
   programId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
+  const b = Buffer.alloc(1)
+  b.writeUInt8(depositEntryIdx)
   return PublicKey.findProgramAddressSync([
-    Buffer.from("stake_position", "utf-8"), voterAuthority.toBuffer(), (new BN(depositEntryIdx)).toBuffer()], 
+    Buffer.from("stake_position", "utf-8"), voterAuthority.toBuffer(), b], 
     programId
   );
 }

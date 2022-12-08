@@ -1,4 +1,4 @@
-use crate::{DataCreditsV0, InUseDataCreditsV0};
+use crate::{DataCreditsV0, DelegatedDataCreditsV0};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use helium_sub_daos::{
@@ -16,12 +16,12 @@ impl anchor_lang::Id for HeliumSubDaos {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct BurnInUseDataCreditsArgsV0 {
+pub struct BurnDelegatedDataCreditsArgsV0 {
   pub amount: u64,
 }
 
 #[derive(Accounts)]
-pub struct BurnInUseDataCreditsV0<'info> {
+pub struct BurnDelegatedDataCreditsV0<'info> {
   /// CHECK: Verified by cpi
   #[account(
     mut,
@@ -31,9 +31,11 @@ pub struct BurnInUseDataCreditsV0<'info> {
   )]
   pub sub_dao_epoch_info: AccountInfo<'info>,
   #[account(
-    has_one = dao
+    has_one = dao,
+    has_one = dc_burn_authority
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
+  pub dc_burn_authority: Signer<'info>,
   #[account(
     has_one = dc_mint,
   )]
@@ -46,7 +48,7 @@ pub struct BurnInUseDataCreditsV0<'info> {
     seeds = ["account_payer".as_bytes()],
     bump,
   )]
-  pub authority: AccountInfo<'info>,
+  pub account_payer: AccountInfo<'info>,
   #[account(
     seeds=[
       "dc".as_bytes(),
@@ -59,9 +61,9 @@ pub struct BurnInUseDataCreditsV0<'info> {
   #[account(
     has_one = escrow_account,
     has_one = sub_dao,
-    has_one = data_credits
+    has_one = data_credits,
   )]
-  pub in_use_data_credits: Box<Account<'info, InUseDataCreditsV0>>,
+  pub delegated_data_credits: Box<Account<'info, DelegatedDataCreditsV0>>,
 
   // dc tokens from this account are burned
   #[account(mut)]
@@ -77,8 +79,8 @@ pub struct BurnInUseDataCreditsV0<'info> {
   pub rent: Sysvar<'info, Rent>,
 }
 
-impl<'info> BurnInUseDataCreditsV0<'info> {
-  fn track_context(self: &BurnInUseDataCreditsV0<'info>) -> TrackDcBurnV0<'info> {
+impl<'info> BurnDelegatedDataCreditsV0<'info> {
+  fn track_context(self: &BurnDelegatedDataCreditsV0<'info>) -> TrackDcBurnV0<'info> {
     TrackDcBurnV0 {
       sub_dao_epoch_info: self.sub_dao_epoch_info.to_account_info(),
       sub_dao: self.sub_dao.to_account_info(),
@@ -86,15 +88,15 @@ impl<'info> BurnInUseDataCreditsV0<'info> {
       system_program: self.system_program.to_account_info(),
       clock: self.clock.to_account_info(),
       rent: self.rent.to_account_info(),
-      account_payer: self.authority.to_account_info(),
+      account_payer: self.account_payer.to_account_info(),
       dc_mint: self.dc_mint.to_account_info(),
     }
   }
 }
 
 pub fn handler(
-  ctx: Context<BurnInUseDataCreditsV0>,
-  args: BurnInUseDataCreditsArgsV0,
+  ctx: Context<BurnDelegatedDataCreditsV0>,
+  args: BurnDelegatedDataCreditsArgsV0,
 ) -> Result<()> {
   // burn the dc tokens
   token::burn(
@@ -103,13 +105,13 @@ pub fn handler(
       token::Burn {
         mint: ctx.accounts.dc_mint.to_account_info(),
         from: ctx.accounts.escrow_account.to_account_info(),
-        authority: ctx.accounts.in_use_data_credits.to_account_info(),
+        authority: ctx.accounts.delegated_data_credits.to_account_info(),
       },
       &[&[
-        b"in_use_dc",
+        b"delegated_data_credits",
         ctx.accounts.sub_dao.key().as_ref(),
-        ctx.accounts.in_use_data_credits.owner.as_ref(),
-        &[ctx.accounts.in_use_data_credits.bump],
+        ctx.accounts.delegated_data_credits.manager.as_ref(),
+        &[ctx.accounts.delegated_data_credits.bump],
       ]],
     ),
     args.amount,

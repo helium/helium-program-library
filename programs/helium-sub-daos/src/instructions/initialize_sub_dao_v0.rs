@@ -23,6 +23,7 @@ use clockwork_sdk::thread_program::{
 };
 use shared_utils::resize_to_fit;
 use time::OffsetDateTime;
+use switchboard_v2::AggregatorAccountData;
 use treasury_management::{
   cpi::{accounts::InitializeTreasuryManagementV0, initialize_treasury_management_v0},
   Curve as TreasuryCurve, InitializeTreasuryManagementArgsV0, TreasuryManagement,
@@ -55,6 +56,8 @@ pub struct InitializeSubDaoArgsV0 {
   pub treasury_curve: Curve,
   pub treasury_window_config: WindowedCircuitBreakerConfigV0,
   pub onboarding_dc_fee: u64,
+  /// Authority to burn delegated data credits
+  pub dc_burn_authority: Pubkey,
 }
 
 #[derive(Accounts)]
@@ -132,6 +135,7 @@ pub struct InitializeSubDaoV0<'info> {
   )]
   pub staker_pool: Box<Account<'info, TokenAccount>>,
 
+  pub active_device_aggregator: AccountLoader<'info, AggregatorAccountData>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub treasury_management_program: Program<'info, TreasuryManagement>,
@@ -217,7 +221,6 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     InitializeAccountWindowedBreakerArgsV0 {
       authority: args.authority,
       config: CBWindowedCircuitBreakerConfigV0 {
-        // Only allow distributing 20% of the total staker pool per epoch length.
         window_size_seconds: u64::try_from(EPOCH_LENGTH).unwrap(),
         threshold_type: CBThresholdType::Absolute,
         threshold: 5
@@ -269,15 +272,16 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
 
   ctx.accounts.dao.num_sub_daos += 1;
   ctx.accounts.sub_dao.set_inner(SubDaoV0 {
+    active_device_aggregator: ctx.accounts.active_device_aggregator.key(),
     dao: ctx.accounts.dao.key(),
     dnt_mint: ctx.accounts.dnt_mint.key(),
+    dc_burn_authority: args.dc_burn_authority,
     treasury: ctx.accounts.treasury.key(),
     onboarding_dc_fee: args.onboarding_dc_fee,
     rewards_escrow: ctx.accounts.rewards_escrow.key(),
     authority: args.authority,
     emission_schedule: args.emission_schedule,
     bump_seed: ctx.bumps["sub_dao"],
-    total_devices: 0,
     vehnt_staked: 0,
     vehnt_last_calculated_ts: ctx.accounts.clock.unix_timestamp,
     vehnt_fall_rate: 0,

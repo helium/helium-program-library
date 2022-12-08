@@ -109,6 +109,7 @@ pub fn handler(ctx: Context<RefreshPositionV0>, args: RefreshPositionArgsV0) -> 
   // update the stake position
   stake_position.fall_rate = fall_rate;
   stake_position.hnt_amount = d_entry.amount_deposited_native;
+  stake_position.last_claimed_epoch = current_epoch(curr_ts);
 
   Ok(())
 }

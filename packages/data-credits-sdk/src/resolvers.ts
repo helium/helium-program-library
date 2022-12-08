@@ -20,7 +20,7 @@ export const dataCreditsResolvers = combineResolvers(
     owner: "owner",
   }),
   ataResolver({
-    instruction: "useDataCreditsV0",
+    instruction: "delegateDataCreditsV0",
     account: "fromAccount",
     mint: "dcMint",
     owner: "owner",

@@ -135,6 +135,7 @@ export async function formTransaction({
     const distributeIx = await program.methods
       .distributeRewardsV0()
       .accounts({
+        // @ts-ignore
         common: {
           recipient,
           lazyDistributor,

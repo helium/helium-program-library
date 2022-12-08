@@ -87,7 +87,6 @@ pub struct StakePositionV0 {
 pub struct SubDaoEpochInfoV0 {
   pub epoch: u64,
   pub sub_dao: Pubkey,
-  pub total_devices: u64,
   pub dc_burned: u64,
   pub total_vehnt: u64,
   /// Precise number with 12 decimals
@@ -111,7 +110,8 @@ pub struct SubDaoV0 {
   pub vehnt_last_calculated_ts: i64,
   pub vehnt_fall_rate: u64,
   pub authority: Pubkey,
-  pub total_devices: u64,
+  pub active_device_aggregator: Pubkey,
+  pub dc_burn_authority: Pubkey, // Authority to burn data delegated data credits
   pub onboarding_dc_fee: u64,
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub bump_seed: u8,
