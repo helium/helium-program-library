@@ -23,7 +23,6 @@ pub struct ClaimRewardsArgsV0 {
 #[instruction(args: ClaimRewardsArgsV0)]
 pub struct ClaimRewardsV0<'info> {
   #[account(
-    mut,
     seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
     seeds::program = vsr_program.key(),
     bump,
@@ -33,7 +32,13 @@ pub struct ClaimRewardsV0<'info> {
   pub vsr_voter: AccountLoader<'info, Voter>,
   #[account(mut)]
   pub voter_authority: Signer<'info>,
+  #[account(
+    seeds = [registrar.load()?.realm.as_ref(), b"registrar".as_ref(), dao.hnt_mint.as_ref()],
+    seeds::program = vsr_program.key(),
+    bump,
+  )]
   pub registrar: AccountLoader<'info, Registrar>,
+  pub dao: Box<Account<'info, DaoV0>>,
 
   #[account(
     mut,
@@ -124,6 +129,10 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     return Err(error!(ErrorCode::EpochNotOver));
   }
 
+  if args.epoch != stake_position.last_claimed_epoch + 1 {
+    return Err(error!(ErrorCode::InvalidClaimEpoch));
+  }
+
   let epoch_end_ts = if TESTING {
     curr_ts
   } else {
@@ -164,6 +173,8 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     .unwrap()
     .checked_div(ctx.accounts.sub_dao_epoch_info.total_vehnt)
     .unwrap();
+
+  stake_position.last_claimed_epoch = epoch;
 
   transfer_v0(
     ctx.accounts.transfer_ctx().with_signer(&[&[

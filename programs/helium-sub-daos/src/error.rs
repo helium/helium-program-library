@@ -34,4 +34,7 @@ pub enum ErrorCode {
 
   #[msg("Failed to calculate the voting power")]
   FailedVotingPowerCalculation,
+
+  #[msg("Rewards need to be claimed in the correct epoch order")]
+  InvalidClaimEpoch,
 }

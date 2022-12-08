@@ -13,17 +13,22 @@ pub struct CloseStakeArgsV0 {
 #[instruction(args: CloseStakeArgsV0)]
 pub struct CloseStakeV0<'info> {
   #[account(
-    mut,
     seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
     seeds::program = vsr_program.key(),
-    bump = vsr_voter.load()?.voter_bump,
+    bump,
     has_one = voter_authority,
     has_one = registrar,
   )]
   pub vsr_voter: AccountLoader<'info, Voter>,
   #[account(mut)]
   pub voter_authority: Signer<'info>,
+  #[account(
+    seeds = [registrar.load()?.realm.as_ref(), b"registrar".as_ref(), dao.hnt_mint.as_ref()],
+    seeds::program = vsr_program.key(),
+    bump,
+  )]
   pub registrar: AccountLoader<'info, Registrar>,
+  pub dao: Box<Account<'info, DaoV0>>,
 
   #[account(
     mut,
@@ -60,11 +65,6 @@ pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()>
   assert!(ctx.accounts.stake_position.last_claimed_epoch >= curr_epoch - 1);
 
   // position_vehnt = available_vehnt * hnt_amount / amount_deposited_native
-  // let position_vehnt = available_vehnt
-  //   .checked_mul(ctx.accounts.stake_position.hnt_amount)
-  //   .unwrap()
-  //   .checked_div(d_entry.amount_deposited_native)
-  //   .unwrap();
   let position_vehnt: u64 = PreciseNumber::new(available_vehnt.into())
     .unwrap()
     .checked_mul(&PreciseNumber::new(ctx.accounts.stake_position.hnt_amount.into()).unwrap())
@@ -96,6 +96,7 @@ pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()>
     let mut sub_dao_data = sd_acc_info.try_borrow_mut_data()?;
     let mut sub_dao_data_slice: &[u8] = &sub_dao_data;
     let sub_dao = &mut SubDaoV0::try_deserialize(&mut sub_dao_data_slice)?;
+    assert!(sub_dao.dao == ctx.accounts.dao.key());
 
     update_subdao_vehnt(sub_dao, curr_ts);
 

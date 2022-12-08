@@ -32,7 +32,13 @@ pub struct StakeV0<'info> {
   pub vsr_voter: AccountLoader<'info, Voter>,
   #[account(mut)]
   pub voter_authority: Signer<'info>,
+  #[account(
+    seeds = [registrar.load()?.realm.as_ref(), b"registrar".as_ref(), dao.hnt_mint.as_ref()],
+    seeds::program = vsr_program.key(),
+    bump,
+  )]
   pub registrar: AccountLoader<'info, Registrar>,
+  pub dao: Box<Account<'info, DaoV0>>,
 
   #[account(
     init_if_needed,
@@ -83,7 +89,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
 
   let to_stake_vehnt_amount = std::cmp::min(args.vehnt_amount, available_vehnt);
 
-  let curr_epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
+  let curr_epoch = current_epoch(curr_ts);
 
   // underlying_hnt = amount_deposited_native * vehnt_amount / available_vehnt
   // position_fall_rate = fall_rate * vehnt_amount / available_vehnt
@@ -142,6 +148,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     let mut sub_dao_data = sd_acc_info.try_borrow_mut_data()?;
     let mut sub_dao_data_slice: &[u8] = &sub_dao_data;
     let sub_dao = &mut SubDaoV0::try_deserialize(&mut sub_dao_data_slice)?;
+    assert!(sub_dao.dao == ctx.accounts.dao.key());
     stake_position.allocations[i].sub_dao = sd_acc_info.key();
 
     update_subdao_vehnt(sub_dao, curr_ts);
@@ -181,6 +188,9 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     // init stake position
     stake_position.deposit_entry_idx = args.deposit_entry_idx;
     stake_position.purged = false;
+    stake_position.expiry_ts = curr_ts
+      .checked_add(d_entry.lockup.seconds_left(curr_ts).try_into().unwrap())
+      .unwrap();
     for i in 0..stake_position.allocations.len() {
       stake_position.allocations[i].percent = args.percentages[i];
     }

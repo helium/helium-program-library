@@ -244,6 +244,7 @@ describe("helium-sub-daos", () => {
           }).accounts({
             registrar,
             subDao,
+            dao,
             voterAuthority: voterKp.publicKey,
             vsrProgram: VSR_PID,
             stakePosition,
@@ -355,6 +356,7 @@ describe("helium-sub-daos", () => {
               voterAuthority: voterKp.publicKey,
               vsrProgram: VSR_PID,
               thread,
+              dao,
               clockwork: THREAD_PID,
             }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc({skipPreflight: true});
     
@@ -372,6 +374,7 @@ describe("helium-sub-daos", () => {
               voterAuthority: voterKp.publicKey,
               vsrProgram: VSR_PID,
               thread,
+              dao,
               clockwork: THREAD_PID,
             }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc();
     
@@ -401,6 +404,7 @@ describe("helium-sub-daos", () => {
             }).accounts({
               registrar,
               stakePosition,
+              dao,
               voterAuthority: voterKp.publicKey,
               vsrProgram: VSR_PID,
             }).remainingAccounts(remainingAccounts).signers([voterKp]).rpc();
@@ -515,6 +519,7 @@ describe("helium-sub-daos", () => {
                 registrar,
                 stakePosition,
                 subDao,
+                dao,
                 voterAuthority: voterKp.publicKey,
                 vsrProgram: VSR_PID,
               }).signers([voterKp]);
