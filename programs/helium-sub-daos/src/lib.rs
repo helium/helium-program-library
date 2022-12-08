@@ -39,27 +39,6 @@ pub mod helium_sub_daos {
     calculate_utility_score_v0::handler(ctx, args)
   }
 
-  pub fn calculate_utility_part_one_v0(
-    ctx: Context<CalculateUtilityPartOneV0>,
-    args: CalculateUtilityPartOneArgsV0,
-  ) -> Result<ThreadResponse> {
-    calculate_utility_part_one_v0::handler(ctx, args)
-  }
-
-  pub fn calculate_utility_part_two_v0(
-    ctx: Context<CalculateUtilityPartTwoV0>,
-    args: CalculateUtilityPartTwoArgsV0,
-  ) -> Result<ThreadResponse> {
-    calculate_utility_part_two_v0::handler(ctx, args)
-  }
-
-  pub fn calculate_utility_part_three_v0(
-    ctx: Context<CalculateUtilityPartThreeV0>,
-    args: CalculateUtilityPartThreeArgsV0,
-  ) -> Result<ThreadResponse> {
-    calculate_utility_part_three_v0::handler(ctx, args)
-  }
-
   pub fn issue_rewards_v0(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<()> {
     issue_rewards_v0::handler(ctx, args)
   }

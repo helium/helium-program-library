@@ -105,7 +105,7 @@ export async function initTestSubdao(
       dntMint,
       hntMint: daoAcc.hntMint,
       thread,
-      clockwork: THREAD_PID
+      clockwork: THREAD_PID,
       activeDeviceAggregator: new PublicKey(
         "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
       ), // Copied from mainnet to localnet
