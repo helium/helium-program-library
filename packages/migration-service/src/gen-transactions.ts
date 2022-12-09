@@ -4,13 +4,20 @@ import { Keypair as HeliumKeypair } from "@helium/crypto";
 import {
   hotspotConfigKey,
   hotspotStorageKey,
-  init as initHem
+  init as initHem,
+  PROGRAM_ID as HEM_PROGRAM_ID,
 } from "@helium/helium-entity-manager-sdk";
 import {
   subDaoKey
 } from "@helium/helium-sub-daos-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
-import { compile, init, lazySignerKey, lazyTransactionsKey } from "@helium/lazy-transactions-sdk";
+import {
+  compile,
+  init,
+  lazySignerKey,
+  lazyTransactionsKey,
+  PROGRAM_ID as LAZY_PROGRAM_ID,
+} from "@helium/lazy-transactions-sdk";
 import { AccountFetchCache, chunks, sendInstructions } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import format from "pg-format";
@@ -96,6 +103,10 @@ const yarg = yargs(hideBin(process.argv)).options({
     alias: "n",
     required: true,
     type: "string",
+  },
+  payer: {
+    required: true,
+    descibe: "The Payer of the transactions from the migration server, that way this can be included in the lut"
   }
 });
 
@@ -169,10 +180,14 @@ async function run() {
         hotspotPubkeys.systemProgram,
         hotspotPubkeys.rent,
         hotspotPubkeys.hotspotConfig,
+        lazyTransactionsKey(argv.name)[0],
+        LAZY_PROGRAM_ID,
         lazySigner,
+        HEM_PROGRAM_ID,
         dc,
         hnt,
         mobile,
+        new PublicKey(argv.payer),
       ],
     });
   await sendInstructions(provider, [sig, addAddressesInstruction], []);

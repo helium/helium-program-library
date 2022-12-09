@@ -8,7 +8,10 @@ import {
 import { truthy } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
 import {
+  MessageV0,
   PublicKey,
+  SystemProgram,
+  SYSVAR_RENT_PUBKEY,
   TransactionMessage,
   VersionedTransaction
 } from "@solana/web3.js";
@@ -60,33 +63,54 @@ server.get<{ Params: { wallet: string } }>(
       const recentBlockhash = (await provider.connection.getLatestBlockhash())
         .blockhash;
 
+      console.log(`Found ${results.length} transactions to migrate}`)
       const asExecuteTxs: TransactionMessage[] = (
         await Promise.all(
-          results.map(async ({ proof, compiled, id }: { id: number, lookup_table: string, compiled: Buffer, proof: string[] }) => {
-            const compiledTx = decompress(compiled);
-            const hasRun = await provider.connection.getAccountInfo(
-              blockKey(lazyTransactions, id)[0]
-            );
-            if (!hasRun) {
-              const ix = await program.methods
-                .executeTransactionV0({
-                  proof: proof.map((p) => Buffer.from(p, "hex").toJSON().data),
-                  instructions: compiledTx.instructions,
-                  index: compiledTx.index,
-                })
-                .accounts({ lazyTransactions, lazySigner })
-                .remainingAccounts(
-                  compiledTx.accounts
-                )
-                .instruction();
+          results.map(
+            async ({
+              proof,
+              compiled,
+              id,
+            }: {
+              id: number;
+              lookup_table: string;
+              compiled: Buffer;
+              proof: string[];
+            }) => {
+              const compiledTx = decompress(compiled);
+              const block = blockKey(lazyTransactions, id)[0];
+              const hasRun = await provider.connection.getAccountInfo(
+                block,
+                "confirmed"
+              );
+              if (!hasRun) {
+                const ix = await program.methods
+                  .executeTransactionV0({
+                    proof: proof.map(
+                      (p) => Buffer.from(p, "hex").toJSON().data
+                    ),
+                    instructions: compiledTx.instructions,
+                    index: compiledTx.index,
+                  })
+                  .accountsStrict({
+                    payer: provider.wallet.publicKey,
+                    lazyTransactions,
+                    lazySigner,
+                    block,
+                    systemProgram: SystemProgram.programId,
+                    rent: SYSVAR_RENT_PUBKEY,
+                  })
+                  .remainingAccounts(compiledTx.accounts)
+                  .instruction();
 
-              return new TransactionMessage({
-                payerKey: provider.wallet.publicKey,
-                recentBlockhash,
-                instructions: [ix],
-              });
+                return new TransactionMessage({
+                  payerKey: provider.wallet.publicKey,
+                  recentBlockhash,
+                  instructions: [ix],
+                });
+              }
             }
-          })
+          )
         )
       ).filter(truthy);
 
@@ -98,10 +122,11 @@ server.get<{ Params: { wallet: string } }>(
         ).value;
         return {
           transactions: await Promise.all(
-            asExecuteTxs.map((tx) => {
+            asExecuteTxs.map((tx, idx) => {
               const ret = new VersionedTransaction(
                 tx.compileToV0Message([lookupTableAcc])
               );
+
               ret.sign([wallet]);
               return Buffer.from(ret.serialize()).toJSON().data;
             })

@@ -13,3 +13,4 @@ packages/helium-cli/keypairs-prod/
 yarn-error.log
 **/*/transactions.json
 **/*/transactions-with-lut.json
+data
