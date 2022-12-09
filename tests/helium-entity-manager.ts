@@ -10,7 +10,7 @@ import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
 import chai from "chai";
-import { changeMetadata, init as initHeliumEntityManager } from "../packages/helium-entity-manager-sdk/src";
+import { updateMetadata, init as initHeliumEntityManager } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
@@ -290,7 +290,7 @@ describe("helium-entity-manager", () => {
         const hotspotConfig = (await hemProgram.account.hotspotIssuerV0.fetch(hotspotIssuer)).hotspotConfig;
 
         const method = (
-          await changeMetadata({
+          await updateMetadata({
             program: hemProgram,
             assetId: hotspot,
             hotspotConfig,
@@ -313,7 +313,7 @@ describe("helium-entity-manager", () => {
 
       it("doesn't assert gain outside range", async() => {
         const method = (
-          await changeMetadata({
+          await updateMetadata({
             program: hemProgram,
             assetId: hotspot,
             location: null,
@@ -329,7 +329,7 @@ describe("helium-entity-manager", () => {
         expect(method.rpc()).to.be.rejected;
 
         const method2 = (
-          await changeMetadata({
+          await updateMetadata({
             program: hemProgram,
             assetId: hotspot,
             location: null,

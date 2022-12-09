@@ -5,7 +5,7 @@ import { PublicKey } from "@solana/web3.js";
 import Address from "@helium/address"
 import { iotInfoKey } from "../pdas";
 
-export async function changeMetadata({
+export async function updateMetadata({
   program,
   hotspotConfig,
   assetId,
