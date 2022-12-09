@@ -374,7 +374,7 @@ async function run() {
         ])
         .accounts({
           hotspotIssuer: hsIssuerKey,
-          hotspotOwner: provider.wallet.publicKey,
+          recipient: provider.wallet.publicKey,
           maker: makerKeypair.publicKey,
         })
         .signers([makerKeypair]);
