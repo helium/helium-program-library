@@ -25,6 +25,10 @@ server.get<{ Params: { eccCompact: string } }>("/:eccCompact", async (request, r
     description: "A hotspot NFT on Helium",
     image:
       "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/hotspot.png",
+    attributes: [
+      { trait_type: "ecc_compact", value: eccCompact },
+      { trait_type: "rewardable", value: true },
+    ],
   };
 });
 

@@ -41,26 +41,20 @@ import { createAndMint, exists, loadKeypair } from "./utils";
 
 type Hotspot = {
   eccKey: string;
-  uri: string;
-  mint?: PublicKey;
 };
 
 const hardcodeHotspots: Hotspot[] = [
   {
-    eccKey: "112UE9mbEB4NWHgdutev5PXTszp1V8HwBptwNMDQVc6fAyu34Tz4",
-    uri: "https://mobile-metadata.test-helium.com/112UE9mbEB4NWHgdutev5PXTszp1V8HwBptwNMDQVc6fAyu34Tz4",
+    eccKey: "1122WVpJNesC4DU6s6cQ6caKC5LShQFTX8ouFQ2ybLhkwkKZjM8u",
   },
   {
     eccKey: "11bNfVbDL8Tp2T6jsEevRzBG5QuJpHVUz1Z21ACDcD4wW6RbVAZ",
-    uri: "https://mobile-metadata.test-helium.com/11bNfVbDL8Tp2T6jsEevRzBG5QuJpHVUz1Z21ACDcD4wW6RbVAZ",
   },
   {
     eccKey: "11wsqKcoXGesnSbEwKTY8QkoqdFsG7oafcyPn8jBnzRK4sfCSw8",
-    uri: "https://mobile-metadata.test-helium.com/11wsqKcoXGesnSbEwKTY8QkoqdFsG7oafcyPn8jBnzRK4sfCSw8",
   },
   {
     eccKey: "11t1Yvm7QbyVnmqdCUpfA8XUiGVbpHPVnaNtR25gb8p2d4Dzjxi",
-    uri: "https://mobile-metadata.test-helium.com/11t1Yvm7QbyVnmqdCUpfA8XUiGVbpHPVnaNtR25gb8p2d4Dzjxi",
   },
 ];
 
@@ -90,7 +84,7 @@ const yarg = yargs(hideBin(process.argv)).options({
     alias: "n",
     describe: "The name of the subdao",
     type: "string",
-    required: true
+    required: true,
   },
   subdaoKeypair: {
     type: "string",
@@ -144,13 +138,13 @@ const yarg = yargs(hideBin(process.argv)).options({
   crank: {
     type: "string",
     describe: "Switchboard crank",
-    default: "85L2cFUvXaeGQ4HrzP8RJEVCL7WvRrXM2msvEmQ82AVr",
+    default: "GN9jjCy2THzZxhYqZETmPM3my8vg4R5JyNkgULddUMa5",
   },
   switchboardNetwork: {
     type: "string",
     describe: "The switchboard network",
-    default: "devnet"
-  }
+    default: "devnet",
+  },
 });
 
 const MOBILE_EPOCH_REWARDS = 5000000000;
@@ -179,7 +173,7 @@ async function run() {
   const oracleKey = oracleKeypair.publicKey;
   const rewardsOracleUrl = argv.rewardsOracleUrl;
 
-  console.log("SUBDAO", subdaoKeypair.publicKey.toBase58());
+  console.log("Subdao mint", subdaoKeypair.publicKey.toBase58());
 
   const conn = provider.connection;
 
@@ -298,6 +292,9 @@ async function run() {
         activeDeviceAggregator: agg.publicKey,
       })
       .rpc({ skipPreflight: true });
+  } else {
+    const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
+    console.log(`Subdao exits. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}`);
   }
 
   const hsConfigKey = (await hotspotConfigKey(subdao, name.toUpperCase()))[0];
@@ -315,10 +312,14 @@ async function run() {
           argv.bucket
         }/${name.toLocaleLowerCase()}_collection.json`,
         onboardingServer: onboardingServerKeypair.publicKey,
-        minGain: 10,
-        maxGain: 150,
-        fullLocationStakingFee: toBN(1000000, 0),
-        dataonlyLocationStakingFee: toBN(500000, 0),
+        settings: {
+          iotConfig: {
+            minGain: 10,
+            maxGain: 150,
+            fullLocationStakingFee: toBN(1000000, 0),
+            dataonlyLocationStakingFee: toBN(500000, 0),
+          } as any,
+        },
         maxDepth: 26,
         maxBufferSize: 1024,
       })
@@ -364,7 +365,7 @@ async function run() {
   await Promise.all(
     hardcodeHotspots.map(async (hotspot, index) => {
       const create = await hemProgram.methods
-        .issueHotspotV0({
+        .issueIotHotspotV0({
           hotspotKey: hotspot.eccKey,
           isFullHotspot: true,
         })
@@ -377,7 +378,7 @@ async function run() {
           maker: makerKeypair.publicKey,
         })
         .signers([makerKeypair]);
-      const key = (await create.pubkeys()).storage!;
+      const key = (await create.pubkeys()).info!;
       if (!(await exists(conn, key))) {
         console.log("Creating hotspot", index);
         await create.rpc({ skipPreflight: true });

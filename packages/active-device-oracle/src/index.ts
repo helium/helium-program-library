@@ -1,5 +1,4 @@
 import cors from "@fastify/cors";
-import animalHash from "angry-purple-tiger";
 import Fastify, { FastifyInstance } from "fastify";
 
 const server: FastifyInstance = Fastify({

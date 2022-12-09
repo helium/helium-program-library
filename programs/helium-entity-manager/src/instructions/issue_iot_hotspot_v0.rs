@@ -27,14 +27,14 @@ use mpl_bubblegum::{
 use spl_account_compression::{program::SplAccountCompression, Wrapper};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct IssueHotspotArgsV0 {
+pub struct IssueIotHotspotArgsV0 {
   pub hotspot_key: String,
   pub is_full_hotspot: bool,
 }
 
 #[derive(Accounts)]
-#[instruction(args: IssueHotspotArgsV0)]
-pub struct IssueHotspotV0<'info> {
+#[instruction(args: IssueIotHotspotArgsV0)]
+pub struct IssueIotHotspotV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   pub dc_fee_payer: Signer<'info>,
@@ -74,15 +74,15 @@ pub struct IssueHotspotV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 8 + 60 + std::mem::size_of::<HotspotStorageV0>(),
+    space = 8 + 60 + std::mem::size_of::<IotHotspotInfoV0>(),
     seeds = [
-      "storage".as_bytes(),
+      "iot_info".as_bytes(),
       hotspot_config.key().as_ref(),
       &hash(args.hotspot_key.as_bytes()).to_bytes()
     ],
     bump
   )]
-  pub storage: Box<Account<'info, HotspotStorageV0>>,
+  pub info: Box<Account<'info, IotHotspotInfoV0>>,
   #[account(
       mut,
       seeds = [merkle_tree.key().as_ref()],
@@ -140,7 +140,7 @@ pub struct IssueHotspotV0<'info> {
   pub rent: Sysvar<'info, Rent>,
 }
 
-impl<'info> IssueHotspotV0<'info> {
+impl<'info> IssueIotHotspotV0<'info> {
   fn mint_to_collection_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintToCollectionV1<'info>> {
     let cpi_accounts = MintToCollectionV1 {
       tree_authority: self.tree_authority.to_account_info(),
@@ -180,7 +180,7 @@ impl<'info> IssueHotspotV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<IssueIotHotspotV0>, args: IssueIotHotspotArgsV0) -> Result<()> {
   let asset_id = get_asset_id(
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,
@@ -211,7 +211,7 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
     name: animal_name.to_string(),
     symbol: String::from("HOTSPOT"),
     uri: format!(
-      "https://mobile-metadata.test-helium.com/{}",
+      "https://mobile-metadata.oracle.test-helium.com/{}",
       args.hotspot_key
     ),
     collection: Some(Collection {
@@ -237,14 +237,14 @@ pub fn handler(ctx: Context<IssueHotspotV0>, args: IssueHotspotArgsV0) -> Result
 
   ctx.accounts.hotspot_issuer.count += 1;
 
-  ctx.accounts.storage.set_inner(HotspotStorageV0 {
+  ctx.accounts.info.set_inner(IotHotspotInfoV0 {
     asset: asset_id,
     hotspot_key: args.hotspot_key,
     location: None,
     elevation: None,
     gain: None,
     is_full_hotspot: args.is_full_hotspot,
-    bump_seed: ctx.bumps["storage"],
+    bump_seed: ctx.bumps["info"],
   });
 
   Ok(())

@@ -41,7 +41,7 @@ export const hotspotIssuerKey = (
     programId
   );
 
-export const hotspotStorageKey = (
+export const iotInfoKey = (
   hotspotConfig: PublicKey,
   hotspotKey: string,
   programId: PublicKey = PROGRAM_ID
@@ -53,7 +53,7 @@ export const hotspotStorageKey = (
   let seed = Uint8Array.from(Buffer.from(hexString, "hex"));
 
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("storage", "utf-8"), hotspotConfig.toBuffer(), seed],
+    [Buffer.from("iot_info", "utf-8"), hotspotConfig.toBuffer(), seed],
     programId
   );
 };

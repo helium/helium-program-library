@@ -2,15 +2,17 @@ import * as client from "@helium/distributor-oracle";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import {
   init,
-  lazyDistributorKey,
+  lazyDistributorKey
 } from "@helium/lazy-distributor-sdk";
-import { recipientKey } from "@helium/lazy-distributor-sdk";
-import { toNumber, MOBILE_MINT, truthy } from "@helium/spl-utils";
+import {
+  Asset, AssetsByOwnerOpts, getAssetsByOwner, MOBILE_MINT, toNumber, truthy
+} from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
 import { getMint } from "@solana/spl-token";
-import { PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useAsync, UseAsyncReturn } from "react-async-hook";
 import { useConnection, usePublicKey } from "react-xnft";
 import { Recipient } from "../hooks/useRecipient";
 
@@ -18,19 +20,41 @@ export const LAZY_KEY = lazyDistributorKey(
   MOBILE_MINT
 )[0];
 
-export function useTokenAccounts() {
-  const publicKey = usePublicKey();
-  const connection = useConnection();
+function getRpc(connection: Connection): string {
+  // @ts-ignore
+  const endpoint = connection._rpcEndpoint
 
-  const [tokenAccounts, setTokenAccounts] = useState<any[] | null>(null);
-  useEffect(() => {
-    (async () => {
-      setTokenAccounts(null);
-      const res = await fetchTokenAccounts(publicKey);
-      setTokenAccounts(res);
-    })();
-  }, [publicKey, connection]);
-  return tokenAccounts;
+  if (endpoint.includes("devnet")) {
+    return "https://rpc-devnet.aws.metaplex.com";
+  }
+
+  return endpoint
+}
+
+
+export function useAssets(
+  wallet: PublicKey,
+  opts: AssetsByOwnerOpts
+): UseAsyncReturn<Asset[]> {
+  const connection = useConnection();
+  const rpc = useMemo(() => getRpc(connection), [connection]);
+  const stableOpts = useMemo(() => opts, [JSON.stringify(opts)])
+  return useAsync(getAssetsByOwner, [rpc, wallet.toBase58(), stableOpts]);
+}
+
+export function useRewardableNfts(): UseAsyncReturn<Asset[]> {
+  const publicKey = usePublicKey();
+  const { result, ...rest } = useAssets(publicKey, { limit: 10000 });
+
+  return {
+    result: result?.filter(
+      (nft) =>
+        nft.content.metadata.attributes
+          ?.find((att) => att.trait_name == "rewardable")
+          ?.value?.toString() == "true"
+    ),
+    ...rest,
+  };
 }
 
 export function useProgram() {
