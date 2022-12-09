@@ -39,7 +39,7 @@ build-vsr = "pushd deps/helium-voter-stake-registry && pwd && anchor build && po
 build-clockwork = "pushd deps/clockwork && ./scripts/build-all.sh . && popd"
 
 [test]
-startup_wait = 10000
+startup_wait = 15000
 
 [test.validator]
 url = "https://api.mainnet-beta.solana.com"
