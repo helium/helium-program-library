@@ -1,4 +1,4 @@
-use crate::{current_epoch, state::*, update_subdao_vehnt, GetPercent};
+use crate::{current_epoch, state::*, update_subdao_vehnt};
 use anchor_lang::prelude::*;
 use clockwork_sdk::thread_program::{self, accounts::Thread, cpi::thread_delete, ThreadProgram};
 use shared_utils::precise_number::PreciseNumber;
@@ -13,17 +13,27 @@ pub struct CloseStakeArgsV0 {
 #[instruction(args: CloseStakeArgsV0)]
 pub struct CloseStakeV0<'info> {
   #[account(
-    mut,
     seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
     seeds::program = vsr_program.key(),
-    bump = vsr_voter.load()?.voter_bump,
+    bump,
     has_one = voter_authority,
     has_one = registrar,
   )]
   pub vsr_voter: AccountLoader<'info, Voter>,
   #[account(mut)]
   pub voter_authority: Signer<'info>,
+  #[account(
+    seeds = [registrar.load()?.realm.as_ref(), b"registrar".as_ref(), dao.hnt_mint.as_ref()],
+    seeds::program = vsr_program.key(),
+    bump,
+  )]
   pub registrar: AccountLoader<'info, Registrar>,
+  pub dao: Box<Account<'info, DaoV0>>,
+  #[account(
+    mut,
+    has_one = dao,
+  )]
+  pub sub_dao: Box<Account<'info, SubDaoV0>>,
 
   #[account(
     mut,
@@ -60,11 +70,6 @@ pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()>
   assert!(ctx.accounts.stake_position.last_claimed_epoch >= curr_epoch - 1);
 
   // position_vehnt = available_vehnt * hnt_amount / amount_deposited_native
-  // let position_vehnt = available_vehnt
-  //   .checked_mul(ctx.accounts.stake_position.hnt_amount)
-  //   .unwrap()
-  //   .checked_div(d_entry.amount_deposited_native)
-  //   .unwrap();
   let position_vehnt: u64 = PreciseNumber::new(available_vehnt.into())
     .unwrap()
     .checked_mul(&PreciseNumber::new(ctx.accounts.stake_position.hnt_amount.into()).unwrap())
@@ -77,42 +82,17 @@ pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()>
     .ok()
     .unwrap();
 
-  let sub_daos = &mut ctx.remaining_accounts.to_vec();
   let stake_position = &mut ctx.accounts.stake_position;
-  assert!(sub_daos.len() == stake_position.allocations.len());
+  let sub_dao = &mut ctx.accounts.sub_dao;
 
-  // remove any remaining stakes
-  for (i, sd_acc_info) in sub_daos
-    .iter()
-    .enumerate()
-    .take(stake_position.allocations.len())
-  {
-    if (stake_position.allocations[i].percent == 0) || sd_acc_info.key() == Pubkey::default() {
-      continue;
-    }
-    assert!(stake_position.allocations[i].sub_dao == sd_acc_info.key());
-    assert!(sd_acc_info.is_writable);
+  update_subdao_vehnt(sub_dao, curr_ts);
 
-    let mut sub_dao_data = sd_acc_info.try_borrow_mut_data()?;
-    let mut sub_dao_data_slice: &[u8] = &sub_dao_data;
-    let sub_dao = &mut SubDaoV0::try_deserialize(&mut sub_dao_data_slice)?;
-
-    update_subdao_vehnt(sub_dao, curr_ts);
-
-    let sd_stake = position_vehnt
-      .get_percent(stake_position.allocations[i].percent)
-      .unwrap();
-    let sd_fall_rate = stake_position
-      .fall_rate
-      .get_percent(stake_position.allocations[i].percent)
-      .unwrap();
-
-    // remove this stake information from the subdao
-    sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(sd_stake).unwrap();
-    sub_dao.vehnt_fall_rate = sub_dao.vehnt_fall_rate.checked_sub(sd_fall_rate).unwrap();
-
-    sub_dao.try_serialize(&mut *sub_dao_data)?;
-  }
+  // remove this stake information from the subdao
+  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(position_vehnt).unwrap();
+  sub_dao.vehnt_fall_rate = sub_dao
+    .vehnt_fall_rate
+    .checked_sub(stake_position.fall_rate)
+    .unwrap();
 
   // delete the purge position thread
   let signer_seeds: &[&[&[u8]]] = &[&[

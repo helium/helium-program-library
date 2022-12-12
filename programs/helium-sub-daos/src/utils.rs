@@ -21,29 +21,6 @@ impl OrArithError<SignedPreciseNumber> for Option<SignedPreciseNumber> {
   }
 }
 
-pub trait GetPercent {
-  fn get_percent(&self, percent: u8) -> Option<Self>
-  where
-    Self: Sized;
-}
-
-impl<T> GetPercent for T
-where
-  T: Copy + Into<u128> + TryFrom<u128>,
-{
-  fn get_percent(&self, percent: u8) -> Option<Self> {
-    let num: u128 = (*self).into();
-    TryFrom::try_from(
-      num
-        .checked_mul(percent.try_into().unwrap())
-        .unwrap()
-        .checked_div(100)
-        .unwrap(),
-    )
-    .ok()
-  }
-}
-
 pub const EPOCH_LENGTH: i64 = 24 * 60 * 60;
 
 pub fn current_epoch(unix_timestamp: i64) -> u64 {
@@ -133,20 +110,6 @@ pub fn create_cron(execution_ts: i64, offset: i64) -> String {
   )
 }
 
-pub fn find_allocation_index(
-  stake_position: &mut StakePositionV0,
-  sub_dao_key: Pubkey,
-) -> Option<usize> {
-  for i in 0..stake_position.allocations.len() {
-    if stake_position.allocations[i].sub_dao == Pubkey::default() {
-      return Some(i);
-    }
-    if stake_position.allocations[i].sub_dao == sub_dao_key {
-      return Some(i);
-    }
-  }
-  None
-}
 pub const FALL_RATE_FACTOR: u128 = 1_000_000_000_000;
 
 pub fn calculate_fall_rate(curr_vp: u64, future_vp: u64, num_seconds: u64) -> Option<u64> {

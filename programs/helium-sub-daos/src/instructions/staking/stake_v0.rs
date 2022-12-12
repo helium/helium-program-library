@@ -16,7 +16,6 @@ use voter_stake_registry::{
 pub struct StakeArgsV0 {
   pub vehnt_amount: u64,
   pub deposit_entry_idx: u8,
-  pub percentages: [u8; 5],
 }
 
 #[derive(Accounts)]
@@ -32,7 +31,18 @@ pub struct StakeV0<'info> {
   pub vsr_voter: AccountLoader<'info, Voter>,
   #[account(mut)]
   pub voter_authority: Signer<'info>,
+  #[account(
+    seeds = [registrar.load()?.realm.as_ref(), b"registrar".as_ref(), dao.hnt_mint.as_ref()],
+    seeds::program = vsr_program.key(),
+    bump,
+  )]
   pub registrar: AccountLoader<'info, Registrar>,
+  pub dao: Box<Account<'info, DaoV0>>,
+  #[account(
+    mut,
+    has_one = dao,
+  )]
+  pub sub_dao: Box<Account<'info, SubDaoV0>>,
 
   #[account(
     init_if_needed,
@@ -58,9 +68,6 @@ pub struct StakeV0<'info> {
 }
 
 pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
-  let sum: u8 = args.percentages.iter().sum();
-  assert!(sum == 100);
-
   // load the vehnt information
   let voter = ctx.accounts.vsr_voter.load()?;
   let registrar = &ctx.accounts.registrar.load()?;
@@ -83,7 +90,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
 
   let to_stake_vehnt_amount = std::cmp::min(args.vehnt_amount, available_vehnt);
 
-  let curr_epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
+  let curr_epoch = current_epoch(curr_ts);
 
   // underlying_hnt = amount_deposited_native * vehnt_amount / available_vehnt
   // position_fall_rate = fall_rate * vehnt_amount / available_vehnt
@@ -102,9 +109,8 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     .ok()
     .unwrap();
 
-  let sub_daos = &mut ctx.remaining_accounts.to_vec();
+  let sub_dao = &mut ctx.accounts.sub_dao;
   let stake_position = &mut ctx.accounts.stake_position;
-  assert!(sub_daos.len() == stake_position.allocations.len());
 
   let mut old_position_vehnt = 0;
 
@@ -121,69 +127,28 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     )?;
   }
 
-  // update all the subdao stakes
-  for (i, sd_acc_info) in sub_daos
-    .iter()
-    .enumerate()
-    .take(stake_position.allocations.len())
-  {
-    if (stake_position.allocations[i].percent == 0 && args.percentages[i] == 0)
-      || sd_acc_info.key() == Pubkey::default()
-    {
-      continue;
-    }
-
-    assert!(
-      stake_position.last_claimed_epoch == 0
-        || stake_position.allocations[i].sub_dao == sd_acc_info.key()
-    ); // must be new account or the subdao keys should be equal
-    assert!(sd_acc_info.is_writable);
-
-    let mut sub_dao_data = sd_acc_info.try_borrow_mut_data()?;
-    let mut sub_dao_data_slice: &[u8] = &sub_dao_data;
-    let sub_dao = &mut SubDaoV0::try_deserialize(&mut sub_dao_data_slice)?;
-    stake_position.allocations[i].sub_dao = sd_acc_info.key();
-
-    update_subdao_vehnt(sub_dao, curr_ts);
-
-    let old_subdao_stake = old_position_vehnt
-      .get_percent(stake_position.allocations[i].percent)
-      .unwrap();
-    let new_subdao_stake = to_stake_vehnt_amount
-      .get_percent(args.percentages[i])
-      .unwrap();
-
-    let old_fall_rate = stake_position
-      .fall_rate
-      .get_percent(stake_position.allocations[i].percent)
-      .unwrap();
-    let new_fall_rate = position_fall_rate.get_percent(args.percentages[i]).unwrap();
-
-    sub_dao.vehnt_staked = sub_dao
-      .vehnt_staked
-      .checked_sub(old_subdao_stake)
-      .unwrap()
-      .checked_add(new_subdao_stake)
-      .unwrap();
-    sub_dao.vehnt_fall_rate = sub_dao
-      .vehnt_fall_rate
-      .checked_sub(old_fall_rate)
-      .unwrap()
-      .checked_add(new_fall_rate)
-      .unwrap();
-
-    stake_position.allocations[i].percent = args.percentages[i];
-
-    sub_dao.try_serialize(&mut *sub_dao_data)?;
-  }
+  // update the stake
+  update_subdao_vehnt(sub_dao, curr_ts);
+  sub_dao.vehnt_staked = sub_dao
+    .vehnt_staked
+    .checked_sub(old_position_vehnt)
+    .unwrap()
+    .checked_add(to_stake_vehnt_amount)
+    .unwrap();
+  sub_dao.vehnt_fall_rate = sub_dao
+    .vehnt_fall_rate
+    .checked_sub(stake_position.fall_rate)
+    .unwrap()
+    .checked_add(position_fall_rate)
+    .unwrap();
 
   if stake_position.last_claimed_epoch == 0 {
     // init stake position
     stake_position.deposit_entry_idx = args.deposit_entry_idx;
     stake_position.purged = false;
-    for i in 0..stake_position.allocations.len() {
-      stake_position.allocations[i].percent = args.percentages[i];
-    }
+    stake_position.expiry_ts = curr_ts
+      .checked_add(d_entry.lockup.seconds_left(curr_ts).try_into().unwrap())
+      .unwrap();
 
     // init the clockwork thread to purge the position when it expires
     let signer_seeds: &[&[&[u8]]] = &[&[
@@ -200,10 +165,12 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     let cron = create_cron(expiry_ts, (60 * 60 * 2).try_into().unwrap());
 
     // build clockwork kickoff ix
-    let mut accounts = vec![
+    let accounts = vec![
       AccountMeta::new_readonly(ctx.accounts.vsr_voter.key(), false),
       AccountMeta::new(ctx.accounts.voter_authority.key(), true),
       AccountMeta::new_readonly(ctx.accounts.registrar.key(), false),
+      AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
+      AccountMeta::new(ctx.accounts.sub_dao.key(), false),
       AccountMeta::new(stake_position.key(), false),
       AccountMeta::new_readonly(ctx.accounts.vsr_program.key(), false),
       AccountMeta::new_readonly(ctx.accounts.clock.key(), false),
@@ -211,7 +178,6 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
       AccountMeta::new(ctx.accounts.thread.key(), false),
       AccountMeta::new_readonly(ctx.accounts.clockwork.key(), false),
     ];
-    accounts.extend(sub_daos.iter().map(|s| AccountMeta::new(s.key(), false)));
     let purge_ix = Instruction {
       program_id: crate::ID,
       accounts,

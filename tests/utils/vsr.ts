@@ -1,4 +1,4 @@
-import { createAtaAndMint, createMint, sendInstructions, toBN } from "@helium/spl-utils";
+import { createAtaAndMint, createMint, sendInstructions, toBN, createAtaAndTransfer } from "@helium/spl-utils";
 import { Program, BN, AnchorProvider, web3 } from "@project-serum/anchor";
 import { getGovernanceProgramVersion, MintMaxVoteWeightSource, withCreateRealm } from "@solana/spl-governance";
 import { PublicKey, Keypair, TransactionInstruction, Transaction } from "@solana/web3.js";
@@ -13,11 +13,11 @@ export async function initVsr(
   program: Program<VoterStakeRegistry>, 
   provider: AnchorProvider, 
   me: PublicKey, 
+  hntMint: PublicKey,
   voterKp: Keypair,
   options: {delay: number, lockupPeriods: number, lockupAmount: number, stakeAmount: number},
 ) {
-  const hntMint = await createMint(provider, 8, me, me);
-  const tokenAccount = await createAtaAndMint(provider, hntMint, toBN(1000, 8), voterKp.publicKey);
+  await createAtaAndTransfer(provider, hntMint, toBN(1000, 8), provider.wallet.publicKey, voterKp.publicKey);
   await provider.connection.requestAirdrop(voterKp.publicKey, web3.LAMPORTS_PER_SOL);
 
   const programVersion = await getGovernanceProgramVersion(

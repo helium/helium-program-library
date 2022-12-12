@@ -1,7 +1,4 @@
-use crate::{
-  current_epoch, error::ErrorCode, find_allocation_index, state::*, GetPercent, EPOCH_LENGTH,
-  TESTING,
-};
+use crate::{current_epoch, error::ErrorCode, state::*, EPOCH_LENGTH, TESTING};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
@@ -23,7 +20,6 @@ pub struct ClaimRewardsArgsV0 {
 #[instruction(args: ClaimRewardsArgsV0)]
 pub struct ClaimRewardsV0<'info> {
   #[account(
-    mut,
     seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
     seeds::program = vsr_program.key(),
     bump,
@@ -33,8 +29,21 @@ pub struct ClaimRewardsV0<'info> {
   pub vsr_voter: AccountLoader<'info, Voter>,
   #[account(mut)]
   pub voter_authority: Signer<'info>,
+  #[account(
+    seeds = [registrar.load()?.realm.as_ref(), b"registrar".as_ref(), dao.hnt_mint.as_ref()],
+    seeds::program = vsr_program.key(),
+    bump,
+  )]
   pub registrar: AccountLoader<'info, Registrar>,
+  pub dao: Box<Account<'info, DaoV0>>,
 
+  #[account(
+    mut,
+    has_one = staker_pool,
+    has_one = dnt_mint,
+    has_one = dao,
+  )]
+  pub sub_dao: Account<'info, SubDaoV0>,
   #[account(
     mut,
     seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &[args.deposit_entry_idx]],
@@ -42,12 +51,6 @@ pub struct ClaimRewardsV0<'info> {
   )]
   pub stake_position: Account<'info, StakePositionV0>,
 
-  #[account(
-    mut,
-    has_one = staker_pool,
-    has_one = dnt_mint,
-  )]
-  pub sub_dao: Account<'info, SubDaoV0>,
   pub dnt_mint: Box<Account<'info, Mint>>,
 
   #[account(
@@ -124,6 +127,10 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     return Err(error!(ErrorCode::EpochNotOver));
   }
 
+  if !TESTING && args.epoch != stake_position.last_claimed_epoch + 1 {
+    return Err(error!(ErrorCode::InvalidClaimEpoch));
+  }
+
   let epoch_end_ts = if TESTING {
     curr_ts
   } else {
@@ -153,17 +160,16 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
         .unwrap(),
     )
     .unwrap();
-  let allocation_index = find_allocation_index(stake_position, ctx.accounts.sub_dao.key()).unwrap();
 
   // calculate the position's share of that epoch's rewards
   // rewards = staking_rewards_issued * staked_vehnt_at_epoch / total_vehnt
   let rewards = staked_vehnt_at_epoch
-    .get_percent(stake_position.allocations[allocation_index].percent)
-    .unwrap()
     .checked_mul(ctx.accounts.sub_dao_epoch_info.staking_rewards_issued)
     .unwrap()
     .checked_div(ctx.accounts.sub_dao_epoch_info.total_vehnt)
     .unwrap();
+
+  stake_position.last_claimed_epoch = epoch;
 
   transfer_v0(
     ctx.accounts.transfer_ctx().with_signer(&[&[
