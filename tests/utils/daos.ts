@@ -61,11 +61,12 @@ export async function initTestSubdao(
   subDao: PublicKey;
   treasury: PublicKey;
   rewardsEscrow: PublicKey;
+  stakerPool: PublicKey;
   treasuryCircuitBreaker: PublicKey;
 }> {
   const daoAcc = await program.account.daoV0.fetch(dao);
   const dntMint = await createMint(provider, 8, authority, authority);
-  const rewardsEscrow = await createAtaAndMint(provider, dntMint, 0, provider.wallet.publicKey)
+  const rewardsEscrow = await createAtaAndMint(provider, dntMint, 0, provider.wallet.publicKey);
   const method = await program.methods
     .initializeSubDaoV0({
       onboardingDcFee: toBN(DC_FEE, 0),
@@ -100,8 +101,8 @@ export async function initTestSubdao(
         "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
       ), // Copied from mainnet to localnet
     });
-  const { subDao, treasury, treasuryCircuitBreaker } = await method.pubkeys();
-  await method.rpc({ skipPreflight: true });
+  const { subDao, treasury, treasuryCircuitBreaker, stakerPool } = await method.pubkeys();
+  await method.rpc();
 
   return {
     treasuryCircuitBreaker: treasuryCircuitBreaker!,
@@ -109,5 +110,6 @@ export async function initTestSubdao(
     subDao: subDao!,
     treasury: treasury!,
     rewardsEscrow,
+    stakerPool: stakerPool!,
   };
 }

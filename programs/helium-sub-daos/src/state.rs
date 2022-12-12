@@ -67,13 +67,27 @@ pub struct DaoEpochInfoV0 {
 
 #[account]
 #[derive(Default)]
+pub struct StakePositionV0 {
+  pub hnt_amount: u64,
+  pub deposit_entry_idx: u8, // the deposit_entry in vsr that this position is drawing from
+  pub sub_dao: Pubkey,
+  pub last_claimed_epoch: u64, // the epoch number that the dnt rewards were last claimed at
+  pub fall_rate: u64,          // the vehnt amount that the position decays by per second
+  pub expiry_ts: i64,
+  pub purged: bool, // if true, this position has been removed from subdao calculations. rewards can still be claimed.
+}
+
+#[account]
+#[derive(Default)]
 pub struct SubDaoEpochInfoV0 {
   pub epoch: u64,
   pub sub_dao: Pubkey,
   pub dc_burned: u64,
+  pub total_vehnt: u64,
   /// Precise number with 12 decimals
   pub utility_score: Option<u128>,
   pub rewards_issued: bool,
+  pub staking_rewards_issued: u64,
   pub bump_seed: u8,
 }
 
@@ -81,9 +95,13 @@ pub struct SubDaoEpochInfoV0 {
 #[derive(Default)]
 pub struct SubDaoV0 {
   pub dao: Pubkey,
-  pub dnt_mint: Pubkey,       // The mint of the subdao token
-  pub treasury: Pubkey,       // The treasury of HNT
-  pub rewards_escrow: Pubkey, // The escrow account for DNT rewards
+  pub dnt_mint: Pubkey,       // Mint of the subdao token
+  pub treasury: Pubkey,       // Treasury of HNT
+  pub rewards_escrow: Pubkey, // Escrow account for DNT rewards
+  pub staker_pool: Pubkey,    // Pool of DNT tokens which veHNT stakers can claim from
+  pub vehnt_staked: u64,
+  pub vehnt_last_calculated_ts: i64,
+  pub vehnt_fall_rate: u64,
   pub authority: Pubkey,
   pub active_device_aggregator: Pubkey,
   pub dc_burn_authority: Pubkey, // Authority to burn data delegated data credits

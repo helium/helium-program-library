@@ -1,4 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
+import { BN } from "@project-serum/anchor";
 import { PROGRAM_ID } from "./constants";
 
 export function subDaoEpochInfoKey(
@@ -14,7 +15,6 @@ export function subDaoEpochInfoKey(
     programId
   );
 }
-
 
 export function daoKey(
   mint: PublicKey,
@@ -32,6 +32,19 @@ export function subDaoKey(
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("sub_dao", "utf-8"), mint.toBuffer()],
+    programId
+  );
+}
+
+export function stakePositionKey(
+  voterAuthority: PublicKey,
+  depositEntryIdx: number,
+  programId: PublicKey = PROGRAM_ID
+): [PublicKey, number] {
+  const b = Buffer.alloc(1)
+  b.writeUInt8(depositEntryIdx)
+  return PublicKey.findProgramAddressSync([
+    Buffer.from("stake_position", "utf-8"), voterAuthority.toBuffer(), b], 
     programId
   );
 }

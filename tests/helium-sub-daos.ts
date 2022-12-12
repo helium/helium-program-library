@@ -1,29 +1,43 @@
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
-import { sendInstructions, toBN } from "@helium/spl-utils";
+import { createAtaAndMint, createMint, sendInstructions, toBN } from "@helium/spl-utils";
+import { Keypair as HeliumKeypair } from "@helium/crypto";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import { AccountLayout } from "@solana/spl-token";
+import { AccountLayout, getAssociatedTokenAddress } from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
   SystemProgram
 } from "@solana/web3.js";
+import { assert, expect } from "chai";
 import { AggregatorAccount, loadSwitchboardProgram } from "@switchboard-xyz/switchboard-v2";
-import { expect } from "chai";
 import { init as dcInit } from "../packages/data-credits-sdk/src";
+import { heliumSubDaosResolvers, stakePositionKey } from "../packages/helium-sub-daos-sdk/src";
 import { init as issuerInit } from "../packages/helium-entity-manager-sdk/src";
 import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { burnDataCredits } from "./data-credits";
 import { initTestDao, initTestSubdao } from "./utils/daos";
-import { ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
+import { DC_FEE, ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
+import { createNft } from "@helium/spl-utils";
+import { init as cbInit } from "@helium/circuit-breaker-sdk";
+import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
+import { VoterStakeRegistry, IDL } from "../deps/helium-voter-stake-registry/src/voter_stake_registry";
+import { initVsr, VSR_PID } from "./utils/vsr";
+import { BN } from "bn.js";
+
+const THREAD_PID = new PublicKey("3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv");
 
 const EPOCH_REWARDS = 100000000;
 const SUB_DAO_EPOCH_REWARDS = 10000000;
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 describe("helium-sub-daos", () => {
   // Configure the client to use the local cluster.
@@ -42,6 +56,14 @@ describe("helium-sub-daos", () => {
   let dcProgram: Program<DataCredits>;
   let hemProgram: Program<HeliumEntityManager>;
   let cbProgram: Program<CircuitBreaker>;
+  let vsrProgram: Program<VoterStakeRegistry>;
+
+  let registrar: PublicKey;
+  let voter: PublicKey;
+  let vault: PublicKey;
+  let hntMint: PublicKey;
+  let voterKp: Keypair;
+  let thread: PublicKey;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -63,6 +85,12 @@ describe("helium-sub-daos", () => {
       provider,
       anchor.workspace.HeliumEntityManager.programId,
       anchor.workspace.HeliumEntityManager.idl
+    );
+
+    vsrProgram = new Program<VoterStakeRegistry>(
+      IDL as VoterStakeRegistry,
+      VSR_PID,
+      provider,
     );
   });
 
@@ -101,6 +129,7 @@ describe("helium-sub-daos", () => {
     let treasury: PublicKey;
     let dcMint: PublicKey;
     let rewardsEscrow: PublicKey;
+    let stakerPool: PublicKey;
     let makerKeypair: Keypair;
 
     async function burnDc(
@@ -133,8 +162,8 @@ describe("helium-sub-daos", () => {
 
     beforeEach(async () => {
       ({
-        dataCredits: { dcMint },
-        subDao: { subDao, treasury, rewardsEscrow },
+        dataCredits: { dcMint, hntMint },
+        subDao: { subDao, treasury, rewardsEscrow, stakerPool },
         dao: { dao },
         issuer: { makerKeypair, hotspotIssuer },
       } = await initWorld(
@@ -145,6 +174,7 @@ describe("helium-sub-daos", () => {
         EPOCH_REWARDS,
         SUB_DAO_EPOCH_REWARDS
       ));
+
     });
 
     it("allows tracking dc spend", async () => {
@@ -157,107 +187,321 @@ describe("helium-sub-daos", () => {
       expect(epochInfo.dcBurned.toNumber()).eq(toBN(10, 0).toNumber());
     });
 
-    it("calculates subdao rewards", async () => {
-      const { subDaoEpochInfo } = await burnDc(1600000);
-      const epoch = (
-        await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
-      ).epoch;
+    const vehntOptions = [
+      { name: "Case 1", options: {delay: 1000, lockupPeriods: 183, lockupAmount: 100, stakeAmount: 100} },
+      { name: "Case 2", options: {delay: 15000, lockupPeriods: 183*4, lockupAmount: 50, stakeAmount: 1} },
+      // { name: "Case 3", options: {delay: 45000, lockupPeriods: 183*8, lockupAmount: 100, stakeAmount: 10000} },
+      // { name: "Case 4", options: {delay: 5000, lockupPeriods: 183*8, lockupAmount: 1000, stakeAmount: 10000} },
+    ]
 
-      const instr = await program.methods
-        .calculateUtilityScoreV0({
-          epoch,
+    vehntOptions.forEach(function ({name, options}) {
+      describe("vehnt tests - " + name, () => {
+        beforeEach(async() => {
+          voterKp = Keypair.generate();
+          ({registrar, voter, vault} = await initVsr(vsrProgram, provider, me, hntMint, voterKp, options ));
+          const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+          thread = PublicKey.findProgramAddressSync([
+            Buffer.from("thread", "utf8"), stakePosition.toBuffer(), Buffer.from(`purge-${0}`, "utf8")
+          ], THREAD_PID)[0];
         })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-        ])
-        .accounts({
-          subDao,
-          dao,
-        });
 
-
-      const pubkeys = await instr.pubkeys();
-      const sig = await instr.rpc({ skipPreflight: true, commitment: "confirmed" });
-      const resp = await provider.connection.getTransaction(sig, { commitment: "confirmed" });
-      
-      const currentActiveDeviceCount = Number(resp?.meta?.logMessages
-        ?.find((m) => m.includes("Total devices"))
-        ?.replace("Program log: Total devices: ", "")
-        .split(".")[0]!);
-      console.log(currentActiveDeviceCount);
-
-      const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
-        subDaoEpochInfo
-      );
-      const daoInfo = await program.account.daoEpochInfoV0.fetch(
-        pubkeys.daoEpochInfo!
-      );
-
-      expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
-
-      // sqrt(active devices * 50) * 4th_root(dc burned)
-      const totalUtility = Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1/4);
-      const utility = twelveDecimalsToNumber(daoInfo.totalUtilityScore);
-
-      expect(utility).to.eq(totalUtility);
-      expect(twelveDecimalsToNumber(subDaoInfo.utilityScore!)).to.eq(
-        totalUtility
-      );
-    });
-
-    describe("with calculated rewards", () => {
-      let epoch: anchor.BN;
-
-      beforeEach(async () => {
-        const { subDaoEpochInfo } = await burnDc(1600000);
-        epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
-          .epoch;
-        await program.methods
-          .calculateUtilityScoreV0({
-            epoch,
-          })
-          .preInstructions([
-            ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-          ])
-          .accounts({
+        it("allows vehnt staking", async () => {
+          const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+          const vehntStake = toBN(options.stakeAmount,8);
+          await program.methods.stakeV0({
+            vehntAmount: vehntStake,
+            depositEntryIdx: 0,
+          }).accounts({
+            registrar,
             subDao,
-            dao,
-          })
-          .rpc({ skipPreflight: true });
-      });
+            voterAuthority: voterKp.publicKey,
+            vsrProgram: VSR_PID,
+            stakePosition,
+            thread,
+            clockwork: THREAD_PID,
+          }).signers([voterKp]).rpc();
 
-      it("issues hnt rewards to subdaos and dnt to rewards escrow", async () => {
-        const preBalance = AccountLayout.decode(
-          (await provider.connection.getAccountInfo(treasury))?.data!
-        ).amount;
-        const preMobileBalance = AccountLayout.decode(
-          (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
-        ).amount;
-        await sendInstructions(provider, [
-          await program.methods
-            .issueRewardsV0({
+          const acc = await program.account.stakePositionV0.fetch(stakePosition);
+          const sdAcc = await program.account.subDaoV0.fetch(subDao);
+          expectBnAccuracy(vehntStake, sdAcc.vehntStaked, 0.001);
+          expectBnAccuracy(vehntStake, acc.hntAmount, 0.001);
+          assert.isTrue(acc.fallRate.gt(new anchor.BN(0)))
+          assert.isTrue(!!(await provider.connection.getAccountInfo(thread)));
+        });
+    
+        function expectBnAccuracy(expectedBn: anchor.BN, actualBn: anchor.BN, percentUncertainty: number) {
+          const upper = expectedBn.mul(new BN(1 + percentUncertainty));
+          const lower = expectedBn.mul(new BN(1 - percentUncertainty));
+          expect(actualBn.gte(lower));
+          expect(actualBn.lte(upper));
+        }
+    
+        it("calculates subdao rewards", async () => {
+          const { subDaoEpochInfo } = await burnDc(1600000);
+            const epoch = (
+                await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+            ).epoch;
+
+          
+          // stake some vehnt
+          const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+          await program.methods.stakeV0({
+            vehntAmount: toBN(options.stakeAmount, 8),
+            depositEntryIdx: 0,
+          }).accounts({
+            registrar,
+            subDao,
+            voterAuthority: voterKp.publicKey,
+            vsrProgram: VSR_PID,
+            stakePosition,
+            thread,
+            clockwork: THREAD_PID,
+          }).signers([voterKp]).rpc({skipPreflight: true});
+          
+          const instr = program.methods
+            .calculateUtilityScoreV0({
               epoch,
             })
+            .preInstructions([
+              ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+            ])
             .accounts({
               subDao,
-            })
-            .instruction(),
-        ]);
+              dao,
+            });
 
-        const postBalance = AccountLayout.decode(
-          (await provider.connection.getAccountInfo(treasury))?.data!
-        ).amount;
-        const postMobileBalance = AccountLayout.decode(
-          (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
-        ).amount;
-        expect((postBalance - preBalance).toString()).to.eq(
-          EPOCH_REWARDS.toString()
-        );
-        expect((postMobileBalance - preMobileBalance).toString()).to.eq(
-          SUB_DAO_EPOCH_REWARDS.toString()
-        );
-      });
-    });
+          const pubkeys = await instr.pubkeys();
+          const sig = await instr.rpc({ skipPreflight: true, commitment: "confirmed" });
+          const resp = await provider.connection.getTransaction(sig, { commitment: "confirmed" });
+          
+          const currentActiveDeviceCount = Number(resp?.meta?.logMessages
+            ?.find((m) => m.includes("Total devices"))
+            ?.replace("Program log: Total devices: ", "")
+            .split(".")[0]!);
+          console.log(currentActiveDeviceCount);
+
+          const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
+            subDaoEpochInfo
+          );
+          const daoInfo = await program.account.daoEpochInfoV0.fetch(
+            pubkeys.daoEpochInfo!
+          );
+
+          expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
+
+          const totalUtility = Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1/4) * options.stakeAmount;
+
+          expectBnAccuracy(toBN(totalUtility, 12), daoInfo.totalUtilityScore, 0.01);
+          expectBnAccuracy(toBN(totalUtility, 12), subDaoInfo.utilityScore!, 0.01);
+        });
+    
+        describe("with staked vehnt", () => {
+          let stakePosition: PublicKey;
+          beforeEach(async() => {
+            stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+            await program.methods.stakeV0({
+              vehntAmount: toBN(options.stakeAmount, 8),
+              depositEntryIdx: 0,
+            }).accounts({
+              registrar,
+              subDao,
+              voterAuthority: voterKp.publicKey,
+              vsrProgram: VSR_PID,
+              stakePosition,
+              thread,
+              clockwork: THREAD_PID,
+            }).signers([voterKp]).rpc({skipPreflight: true});
+          })
+    
+          it("allows closing stake", async () => {
+            await sleep(options.delay);
+            await program.methods.closeStakeV0({
+              depositEntryIdx: 0,
+            }).accounts({
+              registrar,
+              stakePosition,
+              subDao,
+              voterAuthority: voterKp.publicKey,
+              vsrProgram: VSR_PID,
+              thread,
+              clockwork: THREAD_PID,
+            }).signers([voterKp]).rpc({skipPreflight: true});
+    
+            const sdAcc = await program.account.subDaoV0.fetch(subDao);
+            let st = sdAcc.vehntStaked.toNumber();
+            assert.equal(sdAcc.vehntFallRate.toNumber(), 0);
+            assert.isTrue(st == 0 || st == 1)
+            assert.isFalse(!!(await provider.connection.getAccountInfo(stakePosition)));
+          });
+    
+          it("purge a position", async () => {
+            await program.methods.purgePositionV0().accounts({
+              registrar,
+              stakePosition,
+              voterAuthority: voterKp.publicKey,
+              vsrProgram: VSR_PID,
+              thread,
+              subDao,
+              clockwork: THREAD_PID,
+            }).signers([voterKp]).rpc();
+    
+            let acc = await program.account.stakePositionV0.fetch(stakePosition);
+            assert.isTrue(acc.purged);
+            let subDaoAcc = await program.account.subDaoV0.fetch(subDao);
+            assert.equal(subDaoAcc.vehntFallRate.toNumber(), 0);
+          });
+    
+          it("refreshes a position", async () => {
+            await vsrProgram.methods.createDepositEntry(1, {cliff: {}}, null, options.lockupPeriods, false).accounts({ // lock for 6 months
+              registrar,
+              voter,
+              vault,
+              depositMint: hntMint,
+              voterAuthority: voterKp.publicKey,
+              payer: voterKp.publicKey,
+            }).signers([voterKp]).rpc({skipPreflight: true});
+            await vsrProgram.methods.internalTransferLocked(0, 1, toBN(options.lockupAmount, 8)).accounts({
+              registrar,
+              voter,
+              voterAuthority: voterKp.publicKey,
+            }).signers([voterKp]).rpc({skipPreflight: true});
+    
+            await program.methods.refreshPositionV0({
+              depositEntryIdx: 0,
+            }).accounts({
+              registrar,
+              stakePosition,
+              subDao,
+              voterAuthority: voterKp.publicKey,
+              vsrProgram: VSR_PID,
+            }).signers([voterKp]).rpc();
+    
+            const acc = await program.account.stakePositionV0.fetch(stakePosition);
+            assert.equal(acc.hntAmount.toNumber(), 0);
+            assert.equal(acc.fallRate.toNumber(), 0);
+            const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
+            assert.isTrue(subDaoAcc.vehntStaked.toNumber() == 0 || subDaoAcc.vehntStaked.toNumber() == 1);
+            assert.equal(subDaoAcc.vehntFallRate.toNumber(), 0);
+    
+          });
+    
+          it("updates vehnt stake", async () => {
+            const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
+      
+            await program.methods.stakeV0({
+              vehntAmount: toBN(2, 8),
+              depositEntryIdx: 0,
+            }).accounts({
+              registrar,
+              subDao,
+              voterAuthority: voterKp.publicKey,
+              vsrProgram: VSR_PID,
+              stakePosition,
+              thread,
+              clockwork: THREAD_PID,
+            }).signers([voterKp]).rpc({skipPreflight: true});
+      
+            const acc = await program.account.stakePositionV0.fetch(stakePosition);
+            const sdAcc = await program.account.subDaoV0.fetch(subDao);
+            expectBnAccuracy(toBN(2, 8), sdAcc.vehntStaked, 0.01);
+            expectBnAccuracy(acc.hntAmount, toBN(2,8), 0.001);
+            assert.isTrue(acc.fallRate.gt(new BN(0)));
+          });
+    
+          describe("with calculated rewards", () => {
+            let epoch: anchor.BN;
+            let subDaoEpochInfo: PublicKey;
+      
+            beforeEach(async () => {
+              ({ subDaoEpochInfo } = await burnDc(1600000));
+              epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
+                .epoch;
+              await program.methods
+                .calculateUtilityScoreV0({
+                  epoch,
+                })
+                .preInstructions([
+                  ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+                ])
+                .accounts({
+                  subDao,
+                  dao,
+                })
+                .rpc({ skipPreflight: true });
+            });
+      
+            it("issues hnt rewards to subdaos and dnt to rewards escrow", async () => {
+              const preBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(treasury))?.data!
+              ).amount;
+              const preMobileBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
+              ).amount;
+              await sendInstructions(provider, [
+                await program.methods
+                  .issueRewardsV0({
+                    epoch,
+                  })
+                  .accounts({
+                    subDao,
+                  })
+                  .instruction(),
+              ]);
+      
+              const postBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(treasury))?.data!
+              ).amount;
+              const postMobileBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
+              ).amount;
+              expect((postBalance - preBalance).toString()).to.eq(
+                EPOCH_REWARDS.toString()
+              );
+              expect(((postMobileBalance - preMobileBalance)).toString()).to.eq(
+                ((SUB_DAO_EPOCH_REWARDS / 100) * 94).toString()
+              );
+    
+              const acc = await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo);
+              expect(acc.rewardsIssued).to.be.true;
+            });
+      
+            it("claim rewards", async () => {
+              // issue rewards
+              await sendInstructions(provider, [
+                await program.methods
+                  .issueRewardsV0({
+                    epoch,
+                  })
+                  .accounts({
+                    subDao,
+                  })
+                  .instruction(),
+              ]);
+    
+              const method = program.methods.claimRewardsV0({
+                depositEntryIdx: 0,
+                epoch,
+              }).accounts({
+                registrar,
+                stakePosition,
+                subDao,
+                voterAuthority: voterKp.publicKey,
+                vsrProgram: VSR_PID,
+              }).signers([voterKp]);
+              const { stakerAta } = await method.pubkeys();
+              await method.rpc({skipPreflight: true});
+              
+              const postAtaBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(stakerAta!))?.data!
+              ).amount;
+              assert.isTrue(postAtaBalance <= BigInt(SUB_DAO_EPOCH_REWARDS*6 / 100));
+              assert.isTrue(postAtaBalance > BigInt(SUB_DAO_EPOCH_REWARDS*6 / 100 - 5));
+    
+            });
+          });
+        })
+      })
+    })
   });
 });
 function twelveDecimalsToNumber(totalUtilityScore: anchor.BN) {
