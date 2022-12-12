@@ -129,10 +129,6 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     return Err(error!(ErrorCode::EpochNotOver));
   }
 
-  if ctx.accounts.sub_dao_epoch_info.calculation_stage != 3 {
-    return Err(error!(ErrorCode::IncorrectCalculationStage));
-  }
-
   let utility_score = to_prec(ctx.accounts.sub_dao_epoch_info.utility_score)
     .ok_or_else(|| error!(ErrorCode::NoUtilityScore))?;
   let total_utility_score = to_prec(Some(ctx.accounts.dao_epoch_info.total_utility_score))
