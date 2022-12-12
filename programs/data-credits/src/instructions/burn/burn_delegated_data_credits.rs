@@ -5,6 +5,7 @@ use helium_sub_daos::{
   cpi::{accounts::TrackDcBurnV0, track_dc_burn_v0},
   current_epoch, DaoV0, SubDaoV0, TrackDcBurnArgsV0,
 };
+use anchor_lang::solana_program::hash::hash;
 
 #[derive(Debug, Clone)]
 pub struct HeliumSubDaos;
@@ -110,7 +111,7 @@ pub fn handler(
       &[&[
         b"delegated_data_credits",
         ctx.accounts.sub_dao.key().as_ref(),
-        ctx.accounts.delegated_data_credits.manager.as_ref(),
+        &hash(ctx.accounts.delegated_data_credits.router_key.as_bytes()).to_bytes(),
         &[ctx.accounts.delegated_data_credits.bump],
       ]],
     ),

@@ -8,11 +8,12 @@ use anchor_spl::{
   },
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
+use anchor_lang::solana_program::hash::hash;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct DelegateDataCreditsArgsV0 {
   amount: u64,
-  manager: Pubkey,
+  router_key: String,
 }
 
 #[derive(Accounts)]
@@ -22,7 +23,11 @@ pub struct DelegateDataCreditsV0<'info> {
     init, // prevents from reinit attack
     payer = payer,
     space = 60 + std::mem::size_of::<DataCreditsV0>(),
-    seeds = ["delegated_data_credits".as_bytes(), sub_dao.key().as_ref(), args.manager.as_ref()],
+    seeds = [
+      "delegated_data_credits".as_bytes(),
+      sub_dao.key().as_ref(), 
+      &hash(args.router_key.as_bytes()).to_bytes()
+    ],
     bump,
   )]
   pub delegated_data_credits: Box<Account<'info, DelegatedDataCreditsV0>>,
@@ -76,7 +81,7 @@ pub fn handler(ctx: Context<DelegateDataCreditsV0>, args: DelegateDataCreditsArg
     .delegated_data_credits
     .set_inner(DelegatedDataCreditsV0 {
       data_credits: ctx.accounts.data_credits.key(),
-      manager: args.manager,
+      router_key: args.router_key,
       sub_dao: ctx.accounts.sub_dao.key(),
       escrow_account: ctx.accounts.escrow_account.key(),
       bump: ctx.bumps["delegated_data_credits"],
