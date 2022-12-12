@@ -1,4 +1,4 @@
-import { AnchorProvider, Idl, Program } from "@project-serum/anchor";
+import { AnchorProvider, Idl, Program } from "../anchor/browser";
 import { PublicKey } from "@solana/web3.js";
 import { TreasuryManagement } from "@helium/idls/lib/types/treasury_management";
 import { PROGRAM_ID } from "./constants";
