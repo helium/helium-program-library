@@ -17,6 +17,7 @@
   import { ensureHSDIdl } from "./utils/fixtures";
   import { createAtaAndMint, createMint, createNft } from "@helium/spl-utils";
   import { parsePriceData } from "@pythnetwork/client";
+  import { Keypair as HeliumKeypair } from "@helium/crypto";
 
   import {
     ThresholdType
@@ -35,7 +36,7 @@
     const useData = await program.methods
       .delegateDataCreditsV0({
         amount: toBN(amount, 0),
-        manager: Keypair.generate().publicKey
+        routerKey: (await HeliumKeypair.makeRandom()).address.b58,
       })
       .accounts({
         subDao,
