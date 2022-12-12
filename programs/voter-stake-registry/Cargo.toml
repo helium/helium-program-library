@@ -1,0 +1,28 @@
+[package]
+name = "voter-stake-registry"
+version = "0.0.1"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "voter_stake_registry"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[profile.release]
+overflow-checks = true
+
+[dependencies]
+bs58 = "0.3.1"
+anchor-lang = { version = "0.25.0", features = ["init-if-needed"]}
+anchor-spl = "0.25.0"
+bytemuck = "1.12.3"
+spl-governance = { version = "2.2.4", features = ["no-entrypoint"] }
+spl-governance-addin-api = { version = "0.1.2" }
+shared-utils = { path = "../shared-utils" }

@@ -9,6 +9,7 @@ helium_entity_manager = "hemABtqNUst4MmqsVcuN217ZzBspENbGt9uueSe5jts"
 circuit_breaker = "circcmKGcSE61r768bFtD1GkG3x6qfEE1GD2PgwA6C3"
 treasury_management = "treaRzaa4b98D1NQMQdQXzBupbgWhyJ2e1pXhJzkTwU"
 lazy_transactions = "1atNarMiQ8RMLkcTwqHHUESs2f4SB3uouPKFLbXcMwE"
+voter_stake_registry = "vsrYuGJU88umvTsQbp8bVwa3vUeEKNnLRtxEYP65rBm"
 
 [workspace]
 members = [
@@ -19,6 +20,7 @@ members = [
   "programs/circuit-breaker",
   "programs/treasury-management",
   "programs/lazy-transactions",
+  "programs/voter-stake-registry",
 ]
 
 [registry]
@@ -30,7 +32,7 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 tests/**/*.ts"
-build-deps = "anchor run build-metadata && anchor run build-bubblegum && anchor run build-noop && anchor run build-account-compression"
+build-deps = "anchor run build-metadata && anchor run build-bubblegum && anchor run build-noop && anchor run build-account-compression &&"
 build-metadata = "cd deps/metaplex-program-library/token-metadata/program && pwd && cargo build-bpf && cd ../../../../"
 build-bubblegum = "pushd deps/metaplex-program-library && pwd && anchor build -p mpl_bubblegum && popd"
 build-account-compression = "pushd deps/solana-program-library/account-compression/programs/account-compression && pwd && cargo build-bpf && popd"
