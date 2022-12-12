@@ -1,5 +1,6 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::hash::hash;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{
@@ -8,7 +9,6 @@ use anchor_spl::{
   },
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
-use anchor_lang::solana_program::hash::hash;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct DelegateDataCreditsArgsV0 {
@@ -25,7 +25,7 @@ pub struct DelegateDataCreditsV0<'info> {
     space = 60 + std::mem::size_of::<DataCreditsV0>(),
     seeds = [
       "delegated_data_credits".as_bytes(),
-      sub_dao.key().as_ref(), 
+      sub_dao.key().as_ref(),
       &hash(args.router_key.as_bytes()).to_bytes()
     ],
     bump,
