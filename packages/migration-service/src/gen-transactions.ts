@@ -237,7 +237,7 @@ async function run() {
     32 + 32 + 1 + 8 + 4 + 4 + 1 + 60
   );
   const PER_TX = 0.000005;
-  const dustAmount = PER_TX * 100 * LAMPORTS_PER_SOL;
+  const dustAmount = (PER_TX * 100 * LAMPORTS_PER_SOL) + await provider.connection.getMinimumBalanceForRentExemption(0);
   const dustAmountBn = new BN(dustAmount);
   let ix = 0;
   let txIdx = 0;
