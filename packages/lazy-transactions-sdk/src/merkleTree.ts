@@ -61,7 +61,8 @@ export class MerkleTree {
     leafIndex: number,
     minimizeProofHeight: boolean = false,
     treeHeight: number = -1,
-    verbose = false
+    verbose = false,
+    verify = true
   ): MerkleTreeProof {
     let proof: TreeNode[] = [];
 
@@ -79,20 +80,24 @@ export class MerkleTree {
       if (parent.left!.id === node.id) {
         proof.push(parent.right!);
 
-        const hashed = hash(node.node, parent.right!.node);
-        if (!hashed.equals(parent.node)) {
-          console.log(hashed);
-          console.log(parent.node);
-          throw new Error("Invariant broken when hashing left node");
+        if (verify) {
+          const hashed = hash(node.node, parent.right!.node);
+          if (!hashed.equals(parent.node)) {
+            console.log(hashed);
+            console.log(parent.node);
+            throw new Error("Invariant broken when hashing left node");
+          }
         }
       } else {
         proof.push(parent.left!);
 
-        const hashed = hash(parent.left!.node, node.node);
-        if (!hashed.equals(parent.node)) {
-          console.log(hashed);
-          console.log(parent.node);
-          throw new Error("Invariant broken when hashing right node");
+        if (verify) {
+          const hashed = hash(parent.left!.node, node.node);
+          if (!hashed.equals(parent.node)) {
+            console.log(hashed);
+            console.log(parent.node);
+            throw new Error("Invariant broken when hashing right node");
+          }
         }
       }
       node = parent;
