@@ -5,6 +5,7 @@ import { TransactionInstruction, PublicKey, AccountMeta } from "@solana/web3.js"
 import { PROGRAM_ID } from "./constants";
 import { MerkleTree } from "./merkleTree";
 import { keccak_256 } from 'js-sha3';
+import { Layout } from "buffer-layout";
 
 export * from "./pdas";
 export * from "./constants";
@@ -98,15 +99,23 @@ const CompiledInstructionDef: any = {
     ],
   },
 };
-const layout = IdlCoder.typeDefLayout(CompiledInstructionDef);
-function serialize(ct: CompiledInstruction): Buffer {
-  const ixBuffer = Buffer.alloc(1000); // TODO: (originally from anchor) use a tighter buffer.
-  const len = layout.encode(ct, ixBuffer);
-  return ixBuffer.slice(0, len);
+export const compiledIxLayout: Layout = IdlCoder.typeDefLayout(CompiledInstructionDef);
+export function numBytes(compiledIx: CompiledInstruction): number {
+  return 1 + 4 * 2 + compiledIx.accounts.length + compiledIx.data.length
+}
+
+export function ixToBin(ct: CompiledInstruction): Buffer {
+  const ixBuffer = Buffer.alloc(numBytes(ct));
+  compiledIxLayout.encode(ct, ixBuffer);
+  return ixBuffer
+}
+
+export function ixFromBin(ct: Buffer): CompiledInstruction {
+  return compiledIxLayout.decode(ct)
 }
 
 export function toLeaf(compiledTransaction: CompiledTransaction): Buffer {
-  const ixBuffer = Buffer.concat(compiledTransaction.instructions.map(serialize));
+  const ixBuffer = Buffer.concat(compiledTransaction.instructions.map(ixToBin));
   const accountBuffer = Buffer.concat(compiledTransaction.accounts.map(account => account.pubkey.toBuffer()))
   const indexBuffer = Buffer.alloc(4);
   indexBuffer.writeUInt32LE(compiledTransaction.index);

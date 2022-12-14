@@ -21,6 +21,9 @@
     },
     {
       "path": "./packages/monitor-service"
+    }, 
+    {
+      "path": "./packages/migration-service"
     },
     {
       "path": "./packages/treasury-management-sdk"
