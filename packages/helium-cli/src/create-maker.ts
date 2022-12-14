@@ -71,7 +71,7 @@ async function run() {
     makerKey
   )[0];
 
-  console.log("Issuer: ", await hemProgram.account.hotspotIssuerV0.fetch(hsIssuerKey));
+  // console.log("Issuer: ", await hemProgram.account.hotspotIssuerV0.fetch(hsIssuerKey));
   if (!(await exists(conn, hsIssuerKey))) {
     console.log("Initalizing HotspotIssuer");
 

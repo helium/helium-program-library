@@ -12,6 +12,7 @@ export async function updateMetadata({
   location,
   elevation,
   gain,
+  assetEndpoint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
 }: {
@@ -21,6 +22,7 @@ export async function updateMetadata({
   gain: number | null;
   assetId: PublicKey;
   hotspotConfig: PublicKey;
+  assetEndpoint?: string;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
   getAssetProofFn?: (
     url: string,
@@ -28,7 +30,7 @@ export async function updateMetadata({
   ) => Promise<AssetProof | undefined>;
 }) {
   // @ts-ignore
-  const endpoint = program.provider.connection._rpcEndpoint;
+  const endpoint = assetEndpoint || program.provider.connection._rpcEndpoint;
   const asset = await getAssetFn(endpoint, assetId);
   if (!asset) {
     throw new Error("No asset with ID " + assetId.toBase58());

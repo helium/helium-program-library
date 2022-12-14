@@ -211,7 +211,7 @@ pub fn handler(ctx: Context<IssueIotHotspotV0>, args: IssueIotHotspotArgsV0) -> 
     name: animal_name.to_string(),
     symbol: String::from("HOTSPOT"),
     uri: format!(
-      "https://mobile-metadata.oracle.test-helium.com/{}",
+      "https://iot-metadata.oracle.test-helium.com/{}",
       args.hotspot_key
     ),
     collection: Some(Collection {

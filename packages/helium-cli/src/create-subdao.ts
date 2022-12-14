@@ -22,7 +22,7 @@ import {
 } from "@solana/spl-account-compression";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
-  Cluster, Keypair,
+  Cluster, ComputeBudgetProgram, Keypair,
   PublicKey,
   SystemProgram
 } from "@solana/web3.js";
@@ -35,26 +35,8 @@ import os from "os";
 import yargs from "yargs/yargs";
 import { createAndMint, exists, loadKeypair } from "./utils";
 
-type Hotspot = {
-  eccKey: string;
-};
-
-const hardcodeHotspots: Hotspot[] = [
-  {
-    eccKey: "1122WVpJNesC4DU6s6cQ6caKC5LShQFTX8ouFQ2ybLhkwkKZjM8u",
-  },
-  {
-    eccKey: "11bNfVbDL8Tp2T6jsEevRzBG5QuJpHVUz1Z21ACDcD4wW6RbVAZ",
-  },
-  {
-    eccKey: "11wsqKcoXGesnSbEwKTY8QkoqdFsG7oafcyPn8jBnzRK4sfCSw8",
-  },
-  {
-    eccKey: "11t1Yvm7QbyVnmqdCUpfA8XUiGVbpHPVnaNtR25gb8p2d4Dzjxi",
-  },
-];
-
 const { hideBin } = require("yargs/helpers");
+
 const yarg = yargs(hideBin(process.argv)).options({
   wallet: {
     alias: "k",
@@ -135,10 +117,13 @@ const yarg = yargs(hideBin(process.argv)).options({
     type: "string",
     describe: "The switchboard network",
     default: "devnet",
+  },
+  startEpochRewards: {
+    type: "number",
+    describe: "The starting epoch rewards (yearly)",
+    required: true
   }
 });
-
-const MOBILE_EPOCH_REWARDS = 5000000000;
 
 async function run() {
   const argv = await yarg.argv;
@@ -197,7 +182,7 @@ async function run() {
         windowConfig: {
           windowSizeSeconds: new anchor.BN(24 * 60 * 60),
           thresholdType: ThresholdType.Absolute as never,
-          threshold: new anchor.BN(10 * MOBILE_EPOCH_REWARDS),
+          threshold: new anchor.BN(10 * argv.startEpochRewards),
         },
       })
       .accounts({
@@ -254,12 +239,7 @@ async function run() {
       .initializeSubDaoV0({
         dcBurnAuthority: provider.wallet.publicKey,
         authority: provider.wallet.publicKey,
-        emissionSchedule: [
-          {
-            startUnixTime: new anchor.BN(0),
-            emissionsPerEpoch: new anchor.BN(MOBILE_EPOCH_REWARDS),
-          },
-        ],
+        emissionSchedule: emissionSchedule(argv.startEpochRewards),
         // Linear curve
         treasuryCurve: {
           exponentialCurveV0: {
@@ -281,6 +261,9 @@ async function run() {
         hntMint: new PublicKey(argv.hntPubkey),
         activeDeviceAggregator: agg.publicKey,
       })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+      ])
       .rpc({ skipPreflight: true });
   } else {
     const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
@@ -341,3 +324,18 @@ run()
   })
   .then(() => process.exit());
 
+function emissionSchedule(
+  startEpochRewards: number
+): { startUnixTime: anchor.BN; emissionsPerEpoch: anchor.BN }[] {
+  const now = new Date().getDate() / 1000
+  // Do 20 years out, halving every 2 years
+  return new Array(10).fill(0).map((_, twoYear) => {
+    return {
+      startUnixTime: new anchor.BN(twoYear * 2 * 31557600 + now), // 2 years in seconds
+      emissionsPerEpoch: toBN(
+        (startEpochRewards / Math.pow(2, twoYear)) / (365.25 * 24), // Break into daily
+        8
+      ),
+    };
+  });
+}
