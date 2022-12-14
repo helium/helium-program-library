@@ -1869,6 +1869,7 @@ dependencies = [
  "bs58 0.3.1",
  "bytemuck",
  "shared-utils",
+ "solana-program",
  "spl-governance",
  "spl-governance-addin-api",
 ]
