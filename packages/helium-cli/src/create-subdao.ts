@@ -1,8 +1,6 @@
 import { thresholdPercent, ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
-  hotspotConfigKey,
-  hotspotIssuerKey,
-  init as initHem
+  hotspotConfigKey, init as initHem
 } from "@helium/helium-entity-manager-sdk";
 import {
   daoKey,
@@ -24,14 +22,12 @@ import {
 } from "@solana/spl-account-compression";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
-  Cluster,
-  ComputeBudgetProgram, Keypair,
+  Cluster, Keypair,
   PublicKey,
   SystemProgram
 } from "@solana/web3.js";
 import { OracleJob } from "@switchboard-xyz/common";
 import {
-  CrankAccount,
   QueueAccount,
   SwitchboardProgram
 } from "@switchboard-xyz/solana.js";
@@ -96,11 +92,6 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Keypair of the onboarding server",
     default: `${os.homedir()}/.config/solana/id.json`,
   },
-  makerKeypair: {
-    type: "string",
-    describe: "Keypair of a maker",
-    default: `${os.homedir()}/.config/solana/id.json`,
-  },
   numTokens: {
     type: "number",
     describe:
@@ -144,7 +135,7 @@ const yarg = yargs(hideBin(process.argv)).options({
     type: "string",
     describe: "The switchboard network",
     default: "devnet",
-  },
+  }
 });
 
 const MOBILE_EPOCH_REWARDS = 5000000000;
@@ -168,7 +159,6 @@ async function run() {
   const onboardingServerKeypair = await loadKeypair(
     argv.onboardingServerKeypair
   );
-  const makerKeypair = await loadKeypair(argv.makerKeypair);
   const oracleKeypair = loadKeypair(argv.oracleKeypair);
   const oracleKey = oracleKeypair.publicKey;
   const rewardsOracleUrl = argv.rewardsOracleUrl;
@@ -342,49 +332,6 @@ async function run() {
       .signers([merkle])
       .rpc({ skipPreflight: true });
   }
-
-  const hsIssuerKey = await hotspotIssuerKey(
-    hsConfigKey,
-    makerKeypair.publicKey
-  )[0];
-
-  if (!(await exists(conn, hsIssuerKey))) {
-    console.log("Initalizing HotspotIssuer");
-
-    await hemProgram.methods
-      .initializeHotspotIssuerV0({
-        maker: makerKeypair.publicKey,
-        authority: provider.wallet.publicKey,
-      })
-      .accounts({
-        hotspotConfig: hsConfigKey,
-      })
-      .rpc({ skipPreflight: true });
-  }
-
-  await Promise.all(
-    hardcodeHotspots.map(async (hotspot, index) => {
-      const create = await hemProgram.methods
-        .issueIotHotspotV0({
-          hotspotKey: hotspot.eccKey,
-          isFullHotspot: true,
-        })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-        ])
-        .accounts({
-          hotspotIssuer: hsIssuerKey,
-          recipient: provider.wallet.publicKey,
-          maker: makerKeypair.publicKey,
-        })
-        .signers([makerKeypair]);
-      const key = (await create.pubkeys()).info!;
-      if (!(await exists(conn, key))) {
-        console.log("Creating hotspot", index);
-        await create.rpc({ skipPreflight: true });
-      }
-    })
-  );
 }
 
 run()
