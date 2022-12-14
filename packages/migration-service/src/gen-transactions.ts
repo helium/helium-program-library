@@ -3,8 +3,8 @@ import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import {
   hotspotConfigKey,
-  hotspotStorageKey,
   init as initHem,
+  iotInfoKey,
   PROGRAM_ID as HEM_PROGRAM_ID,
 } from "@helium/helium-entity-manager-sdk";
 import {
@@ -137,14 +137,14 @@ async function run() {
 
   const mobile = new PublicKey(argv.mobile);
   const dc = new PublicKey(argv.dc);
-  // const iot = new PublicKey(argv.iot);
+  const iot = new PublicKey(argv.iot);
   const hnt = new PublicKey(argv.hnt);
 
-  const mobileSubdao = (await subDaoKey(mobile))[0];
-  const hsConfigKey = (await hotspotConfigKey(mobileSubdao, "MOBILE"))[0];
+  const iotSubdao = (await subDaoKey(iot))[0];
+  const hsConfigKey = (await hotspotConfigKey(iotSubdao, "IOT"))[0];
 
   const hotspotPubkeys = await hemProgram.methods
-    .issueHotspotV0({
+    .issueIotHotspotV0({
       hotspotKey: (await HeliumKeypair.makeRandom()).address.b58,
       isFullHotspot: true,
     })
@@ -278,7 +278,7 @@ async function run() {
               rent: hotspotPubkeys.rent,
               hotspotConfig: hotspotPubkeys.hotspotConfig,
               recipient: solAddress,
-              storage: hotspotStorageKey(
+              info: iotInfoKey(
                 hotspotPubkeys.hotspotConfig,
                 hotspot.address
               )[0],
@@ -371,7 +371,10 @@ async function run() {
     password: argv.pgPassword,
     host: argv.pgHost,
     database: argv.pgDatabase,
-    pgPort: argv.pgPort,
+    port: argv.pgPort,
+    ssl: {
+      rejectUnauthorized: false
+    }
   });
   await client.connect();
 
