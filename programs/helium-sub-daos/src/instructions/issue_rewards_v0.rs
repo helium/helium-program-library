@@ -24,10 +24,12 @@ pub struct IssueRewardsV0<'info> {
     has_one = dao,
     has_one = treasury,
     has_one = dnt_mint,
-    has_one = rewards_escrow
+    has_one = rewards_escrow,
+    has_one = staker_pool,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
+    mut,
     has_one = dao,
     constraint = dao_epoch_info.num_utility_scores_calculated >= dao.num_sub_daos @ ErrorCode::MissingUtilityScores,
     seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
@@ -36,6 +38,7 @@ pub struct IssueRewardsV0<'info> {
   )]
   pub dao_epoch_info: Box<Account<'info, DaoEpochInfoV0>>,
   #[account(
+    mut,
     has_one = sub_dao,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump = sub_dao_epoch_info.bump_seed,
@@ -64,6 +67,8 @@ pub struct IssueRewardsV0<'info> {
   pub treasury: Box<Account<'info, TokenAccount>>,
   #[account(mut)]
   pub rewards_escrow: Box<Account<'info, TokenAccount>>,
+  #[account(mut)]
+  pub staker_pool: Box<Account<'info, TokenAccount>>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
@@ -74,6 +79,47 @@ fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
   Some(PreciseNumber {
     value: InnerUint::from(n?),
   })
+}
+
+impl<'info> IssueRewardsV0<'info> {
+  pub fn mint_dnt_emissions_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
+    let cpi_accounts = MintV0 {
+      mint: self.dnt_mint.to_account_info(),
+      to: self.rewards_escrow.to_account_info(),
+      mint_authority: self.sub_dao.to_account_info(),
+      circuit_breaker: self.dnt_circuit_breaker.to_account_info(),
+      token_program: self.token_program.to_account_info(),
+      clock: self.clock.to_account_info(),
+    };
+
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+  }
+
+  pub fn mint_staking_rewards_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
+    let cpi_accounts = MintV0 {
+      mint: self.dnt_mint.to_account_info(),
+      to: self.staker_pool.to_account_info(),
+      mint_authority: self.sub_dao.to_account_info(),
+      circuit_breaker: self.dnt_circuit_breaker.to_account_info(),
+      token_program: self.token_program.to_account_info(),
+      clock: self.clock.to_account_info(),
+    };
+
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+  }
+
+  pub fn mint_treasury_emissions_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
+    let cpi_accounts = MintV0 {
+      mint: self.hnt_mint.to_account_info(),
+      to: self.treasury.to_account_info(),
+      mint_authority: self.dao.to_account_info(),
+      circuit_breaker: self.hnt_circuit_breaker.to_account_info(),
+      token_program: self.token_program.to_account_info(),
+      clock: self.clock.to_account_info(),
+    };
+
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+  }
 }
 
 pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<()> {
@@ -107,50 +153,51 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .try_into()
     .unwrap();
 
+  let total_emissions = ctx
+    .accounts
+    .sub_dao
+    .emission_schedule
+    .get_emissions_at(ctx.accounts.clock.unix_timestamp)
+    .unwrap();
+
   mint_v0(
-    CpiContext::new_with_signer(
-      ctx.accounts.circuit_breaker_program.to_account_info(),
-      MintV0 {
-        mint: ctx.accounts.dnt_mint.to_account_info(),
-        to: ctx.accounts.rewards_escrow.to_account_info(),
-        mint_authority: ctx.accounts.sub_dao.to_account_info(),
-        circuit_breaker: ctx.accounts.dnt_circuit_breaker.to_account_info(),
-        token_program: ctx.accounts.token_program.to_account_info(),
-        clock: ctx.accounts.clock.to_account_info(),
-      },
-      &[&[
-        b"sub_dao",
-        ctx.accounts.dnt_mint.key().as_ref(),
-        &[ctx.accounts.sub_dao.bump_seed],
-      ]],
-    ),
+    ctx.accounts.mint_dnt_emissions_ctx().with_signer(&[&[
+      b"sub_dao",
+      ctx.accounts.dnt_mint.key().as_ref(),
+      &[ctx.accounts.sub_dao.bump_seed],
+    ]]),
     MintArgsV0 {
-      amount: ctx
-        .accounts
-        .sub_dao
-        .emission_schedule
-        .get_emissions_at(ctx.accounts.clock.unix_timestamp)
-        .unwrap(),
+      amount: total_emissions
+        .checked_mul(94)
+        .unwrap()
+        .checked_div(100)
+        .unwrap(), // 94% of emissions are sent to treasury
+    },
+  )?;
+
+  let staking_rewards_amount = total_emissions
+    .checked_mul(6)
+    .unwrap()
+    .checked_div(100)
+    .unwrap();
+
+  mint_v0(
+    ctx.accounts.mint_staking_rewards_ctx().with_signer(&[&[
+      b"sub_dao",
+      ctx.accounts.dnt_mint.key().as_ref(),
+      &[ctx.accounts.sub_dao.bump_seed],
+    ]]),
+    MintArgsV0 {
+      amount: staking_rewards_amount, // 6% of emissions are sent to staking pool
     },
   )?;
 
   mint_v0(
-    CpiContext::new_with_signer(
-      ctx.accounts.circuit_breaker_program.to_account_info(),
-      MintV0 {
-        mint: ctx.accounts.hnt_mint.to_account_info(),
-        to: ctx.accounts.treasury.to_account_info(),
-        mint_authority: ctx.accounts.dao.to_account_info(),
-        circuit_breaker: ctx.accounts.hnt_circuit_breaker.to_account_info(),
-        token_program: ctx.accounts.token_program.to_account_info(),
-        clock: ctx.accounts.clock.to_account_info(),
-      },
-      &[&[
-        b"dao",
-        ctx.accounts.hnt_mint.key().as_ref(),
-        &[ctx.accounts.dao.bump_seed],
-      ]],
-    ),
+    ctx.accounts.mint_treasury_emissions_ctx().with_signer(&[&[
+      b"dao",
+      ctx.accounts.hnt_mint.key().as_ref(),
+      &[ctx.accounts.dao.bump_seed],
+    ]]),
     MintArgsV0 {
       amount: rewards_amount,
     },
@@ -158,6 +205,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
 
   ctx.accounts.dao_epoch_info.num_rewards_issued += 1;
   ctx.accounts.sub_dao_epoch_info.rewards_issued = true;
+  ctx.accounts.sub_dao_epoch_info.staking_rewards_issued = staking_rewards_amount;
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 

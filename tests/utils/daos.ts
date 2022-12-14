@@ -6,6 +6,9 @@ import { createAtaAndMint, createMint, toBN } from "@helium/spl-utils";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { toU128 } from "../../packages/treasury-management-sdk/src";
 import { DC_FEE } from "./fixtures";
+import { subDaoKey } from "@helium/helium-sub-daos-sdk";
+
+const THREAD_PID = new PublicKey("3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv");
 
 export async function initTestDao(
   program: anchor.Program<HeliumSubDaos>,
@@ -61,12 +64,17 @@ export async function initTestSubdao(
   subDao: PublicKey;
   treasury: PublicKey;
   rewardsEscrow: PublicKey;
+  stakerPool: PublicKey;
   treasuryCircuitBreaker: PublicKey;
 }> {
   const daoAcc = await program.account.daoV0.fetch(dao);
   const dntMint = await createMint(provider, 8, authority, authority);
-  const rewardsEscrow = await createAtaAndMint(provider, dntMint, 0, provider.wallet.publicKey)
-  const method = await program.methods
+  const rewardsEscrow = await createAtaAndMint(provider, dntMint, 0, provider.wallet.publicKey);
+  const subDao = subDaoKey(dntMint)[0];
+  const thread = PublicKey.findProgramAddressSync([
+    Buffer.from("thread", "utf8"), subDao.toBuffer(), Buffer.from("end-epoch", "utf8")
+  ], THREAD_PID)[0];
+  const method = program.methods
     .initializeSubDaoV0({
       onboardingDcFee: toBN(DC_FEE, 0),
       authority: authority,
@@ -96,12 +104,14 @@ export async function initTestSubdao(
       rewardsEscrow,
       dntMint,
       hntMint: daoAcc.hntMint,
+      thread,
+      clockwork: THREAD_PID,
       activeDeviceAggregator: new PublicKey(
         "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
       ), // Copied from mainnet to localnet
     });
-  const { subDao, treasury, treasuryCircuitBreaker } = await method.pubkeys();
-  await method.rpc({ skipPreflight: true });
+  const { treasury, treasuryCircuitBreaker, stakerPool } = await method.pubkeys();
+  await method.rpc();
 
   return {
     treasuryCircuitBreaker: treasuryCircuitBreaker!,
@@ -109,5 +119,6 @@ export async function initTestSubdao(
     subDao: subDao!,
     treasury: treasury!,
     rewardsEscrow,
+    stakerPool: stakerPool!,
   };
 }

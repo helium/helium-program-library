@@ -14,7 +14,7 @@ env:
 jobs:
   test-rust-lint:
     name: Test Rust Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/setup/
@@ -33,7 +33,7 @@ jobs:
 
   test-unit:
     name: Rust Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/setup/
@@ -52,7 +52,7 @@ jobs:
 
   test-contracts:
     name: Test Anchor Contracts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/setup/
@@ -68,7 +68,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}-2
       - uses: actions/cache@v2
         name: Cache Builds
         id: cache-cargo-builds
@@ -83,6 +83,8 @@ jobs:
           path: |
             ./deps/metaplex-program-library
             ./deps/solana-program-library
+            ./deps/helium-voter-stake-registry
+            ./deps/clockwork
           key: deps-${{ runner.os }}-build-${{ hashFiles('./deps/**/Cargo.lock') }}
       - run: ~/.cargo/bin/anchor run build-deps
         shell: bash
