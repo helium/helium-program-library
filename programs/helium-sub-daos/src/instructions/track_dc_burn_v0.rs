@@ -19,7 +19,7 @@ pub struct TrackDcBurnV0<'info> {
     init_if_needed,
     payer = account_payer,
     space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(clock.unix_timestamp).to_le_bytes()], // Break into 30m epochs
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(clock.unix_timestamp).to_le_bytes()],
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
