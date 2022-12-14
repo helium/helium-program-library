@@ -5,7 +5,7 @@ import {
   heliumCommonResolver,
   resolveIndividual,
 } from "@helium/spl-utils";
-import { hotspotStorageKey } from "./pdas";
+import { iotInfoKey } from "./pdas";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 
@@ -19,11 +19,11 @@ export const heliumEntityManagerResolvers = combineResolvers(
   }),
   resolveIndividual(async ({ path, args, provider, accounts }) => {
     if (
-      path[path.length - 1] === "storage" &&
+      path[path.length - 1] === "info" &&
       args[args.length - 1].hotspotKey &&
       accounts.hotspotConfig
     ) {
-      return hotspotStorageKey(accounts.hotspotConfig as PublicKey, args[args.length - 1].hotspotKey)[0];
+      return iotInfoKey(accounts.hotspotConfig as PublicKey, args[args.length - 1].hotspotKey)[0];
     } else if (path[path.length - 1] === "recipient") {
       // @ts-ignore
       return provider.wallet?.publicKey;
@@ -35,19 +35,19 @@ export const heliumEntityManagerResolvers = combineResolvers(
     }
   }),
   ataResolver({
-    instruction: "issueHotspotV0",
+    instruction: "issueIotHotspotV0",
     account: "recipientTokenAccount",
     mint: "hotspot",
     owner: "hotspotOwner",
   }),
   ataResolver({
-    instruction: "issueHotspotV0",
+    instruction: "issueIotHotspotV0",
     account: "dcBurner",
     mint: "dcMint",
     owner: "dcFeePayer",
   }),
   ataResolver({
-    instruction: "changeMetadataV0",
+    instruction: "updateIotInfoV0",
     account: "ownerDcAta",
     mint: "dcMint",
     owner: "hotspotOwner",

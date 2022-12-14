@@ -195,20 +195,20 @@ export class OracleServer {
   }
 
   private async getCurrentRewardsHandler(req: Request, res: Response) {
-    const mintStr = req.query.mint;
-    if (!mintStr) {
-      res.status(400).json({ error: "No mint key provided" });
+    const assetId = req.query.assetId;
+    if (!assetId) {
+      res.status(400).json({ error: "No asset id provided" });
       return;
     }
-    let mint: PublicKey;
+    let asset: PublicKey;
     try {
-      mint = new PublicKey(mintStr);
+      asset = new PublicKey(assetId);
     } catch (err) {
-      res.status(400).json({ error: "Invalid mint key" });
+      res.status(400).json({ error: "Invalid asset id" });
       return;
     }
 
-    const currentRewards = await this.db.getCurrentRewards(mint);
+    const currentRewards = await this.db.getCurrentRewards(asset);
 
     res.json({
       currentRewards,

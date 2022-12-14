@@ -47,15 +47,15 @@ pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     init,
     payer = lazy_signer,
-    space = 8 + 60 + std::mem::size_of::<HotspotStorageV0>(),
+    space = 8 + 60 + std::mem::size_of::<IotHotspotInfoV0>(),
     seeds = [
-      "storage".as_bytes(),
+      "iot_info".as_bytes(),
       hotspot_config.key().as_ref(),
       &hash(args.hotspot_key.as_bytes()).to_bytes()
     ],
     bump
   )]
-  pub storage: Box<Account<'info, HotspotStorageV0>>,
+  pub info: Box<Account<'info, IotHotspotInfoV0>>,
   /// CHECK: Handled by cpi
   #[account(mut)]
   pub tree_authority: Account<'info, TreeConfig>,
@@ -151,11 +151,11 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     metadata,
   )?;
 
-  ctx.accounts.storage.set_inner(HotspotStorageV0 {
+  ctx.accounts.info.set_inner(IotHotspotInfoV0 {
     asset: asset_id,
     hotspot_key: args.hotspot_key,
     location: args.location,
-    bump_seed: ctx.bumps["storage"],
+    bump_seed: ctx.bumps["info"],
     elevation: args.elevation,
     gain: args.gain,
     is_full_hotspot: args.is_full_hotspot,

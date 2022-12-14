@@ -114,8 +114,8 @@ frame HeliumEntityManager {
     ...
   }
 
-  entity HotspotStorage {
-    "storage", hotspot_mint
+  entity IotHotspotInfo {
+    "iot_info", hotspot_mint
     --
     ecc_compact
     location
@@ -203,6 +203,6 @@ Recipient }o--|| RewardableNFT
 
 RewardableNFT ||-|| Collection
 
-HotspotStorage ||-|| RewardableNFT : pda(hotspot_mint)
+IotHotspotInfo ||-|| RewardableNFT : pda(hotspot_mint)
 
 @enduml

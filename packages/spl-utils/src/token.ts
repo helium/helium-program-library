@@ -9,6 +9,7 @@ import {
   createAssociatedTokenAccountInstruction,
   createInitializeMintInstruction,
   createMintToInstruction,
+  createTransferInstruction,
   getAssociatedTokenAddress,
   TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
@@ -44,6 +45,68 @@ export async function mintTo(
     }
     throw e;
   }
+}
+
+export async function createAtaAndTransferInstructions(
+  provider: anchor.AnchorProvider,
+  mint: PublicKey,
+  amount: number | anchor.BN,
+  from: PublicKey = provider.wallet.publicKey,
+  to: PublicKey = provider.wallet.publicKey,
+  payer: PublicKey = provider.wallet.publicKey
+): Promise<{ instructions: TransactionInstruction[]; toAta: PublicKey }> {
+  const toAta = await getAssociatedTokenAddress(mint, to, true);
+  const instructions: TransactionInstruction[] = [];
+  if (!(await provider.connection.getAccountInfo(toAta))) {
+    instructions.push(
+      createAssociatedTokenAccountInstruction(payer, toAta, to, mint)
+    );
+  }
+  const fromAta = await getAssociatedTokenAddress(mint, from);
+  if (amount != 0) {
+    instructions.push(
+      createTransferInstruction(fromAta, toAta, from, BigInt(amount.toString()))
+    );
+  }
+
+  return {
+    instructions,
+    toAta,
+  };
+}
+
+export async function createAtaAndTransfer(
+  provider: anchor.AnchorProvider,
+  mint: PublicKey,
+  amount: number | anchor.BN,
+  from: PublicKey = provider.wallet.publicKey,
+  to: PublicKey = provider.wallet.publicKey,
+  authority: PublicKey = provider.wallet.publicKey,
+  payer: PublicKey = provider.wallet.publicKey,
+  confirmOptions?: ConfirmOptions
+): Promise<PublicKey> {
+  const transferIx = new Transaction();
+  const { instructions, toAta } = await createAtaAndTransferInstructions(
+    provider,
+    mint,
+    amount,
+    from,
+    to,
+    payer
+  );
+  if (instructions.length > 0) transferIx.add(...instructions);
+
+  try {
+    if (instructions.length > 0)
+      await provider.sendAndConfirm(transferIx, undefined, confirmOptions);
+  } catch (e: any) {
+    console.log("Error", e, e.logs);
+    if (e.logs) {
+      console.error(e.logs.join("\n"));
+    }
+    throw e;
+  }
+  return toAta;
 }
 
 export async function createAtaAndMintInstructions(

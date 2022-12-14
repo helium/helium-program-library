@@ -3,9 +3,9 @@ import { Asset, getAsset, getAssetProof, AssetProof } from "@helium/spl-utils";
 import { BN, Idl, Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import Address from "@helium/address"
-import { hotspotStorageKey } from "../pdas";
+import { iotInfoKey } from "../pdas";
 
-export async function changeMetadata({
+export async function updateMetadata({
   program,
   hotspotConfig,
   assetId,
@@ -44,10 +44,10 @@ export async function changeMetadata({
   } = asset;
   const eccCompact = uri.split("/").slice(-1)[0];
 
-  const [storage] = hotspotStorageKey(hotspotConfig, eccCompact);
+  const [info] = iotInfoKey(hotspotConfig, eccCompact);
 
   return program.methods
-    .changeMetadataV0({
+    .updateIotInfoV0({
       location,
       elevation,
       gain,
@@ -56,10 +56,10 @@ export async function changeMetadata({
       index: nodeIndex,
     })
     .accounts({
-      hotspot: assetId,
+      // hotspot: assetId,
       hotspotConfig,
       hotspotOwner: owner,
-      storage,
+      info,
       merkleTree: treeId,
     })
     .remainingAccounts(
