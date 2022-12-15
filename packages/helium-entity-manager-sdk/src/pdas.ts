@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
-import crypto from "crypto";
+import crypto from "crypto-js";
 
 export const hotspotConfigKey = (
   subDao: PublicKey,

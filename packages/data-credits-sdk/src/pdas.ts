@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
-import crypto from "crypto";
+import crypto from "crypto-js";
 
 export function dataCreditsKey(dcMint: PublicKey, programId = PROGRAM_ID): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(

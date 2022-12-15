@@ -28,6 +28,7 @@ import {
 } from "@solana/web3.js";
 import { OracleJob } from "@switchboard-xyz/common";
 import {
+  AggregatorHistoryBuffer,
   QueueAccount,
   SwitchboardProgram
 } from "@switchboard-xyz/solana.js";
@@ -200,7 +201,7 @@ async function run() {
       wallet
     );
     const queueAccount = new QueueAccount(switchboard, new PublicKey(argv.queue));
-    const [_, agg] = await queueAccount.createFeed({
+    const [agg, _] = await queueAccount.createFeed({
       batchSize: 3,
       minRequiredOracleResults: 2,
       minRequiredJobResults: 1,
@@ -230,9 +231,10 @@ async function run() {
       ],
     });
     console.log("Created active device aggregator", agg.publicKey.toBase58());
-    await agg.setHistoryBuffer({
-      size: 24 * 7
-    })
+    await AggregatorHistoryBuffer.create(switchboard, {
+      aggregatorAccount: agg,
+      maxSamples: 24 * 7,
+    });
 
     console.log(`Initializing ${name} SubDAO`);
     await heliumSubDaosProgram.methods
