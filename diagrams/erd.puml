@@ -45,8 +45,8 @@ frame DataCredits {
     ...
   }
 
-  entity InUseDataCredits {
-    "in_use_dc", sub_dao, owner
+  entity DelegatedDataCredits {
+    "delegated_data_credits", sub_dao, owner
     --
     data_credits
     sub_dao
@@ -58,8 +58,8 @@ frame DataCredits {
 }
 
 frame SplToken {
-  entity InUseDataCreditsTokenAccount {
-    "in_use_dc_account", in_use_data_credits
+  entity DelegatedDataCreditsTokenAccount {
+    "delegated_data_credits_account", delegated_data_credits
     --
     amount
     owner // Will be manager
@@ -99,10 +99,8 @@ frame HeliumEntityManager {
     sub_dao
     symbol
     dc_fee
-    dc_mint
     collection
     authority
-    onboarding_server
   }
 
   entity HotspotIssuer {
@@ -173,10 +171,10 @@ frame TreasuryManagement {
 }
 
 
-DataCredits  ||--o{ InUseDataCredits
-InUseDataCredits ||--|| InUseDataCreditsTokenAccount
+DataCredits  ||--o{ DelegatedDataCredits
+DelegatedDataCredits ||--|| DelegatedDataCreditsTokenAccount
 
-SubDao ||--o{ InUseDataCredits
+SubDao ||--o{ DelegatedDataCredits
 
 SubDao ||--|| TreasuryTokenAccount
 TreasuryTokenAccount ||--|| TreasuryManagement

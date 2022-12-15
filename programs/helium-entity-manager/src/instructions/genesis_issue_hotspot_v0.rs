@@ -127,7 +127,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     name: animal_name.to_string(),
     symbol: String::from("HOTSPOT"),
     uri: format!(
-      "https://mobile-metadata.test-helium.com/{}",
+      "https://iot-metadata.test-helium.com/{}",
       args.hotspot_key
     ),
     collection: Some(Collection {

@@ -11,6 +11,7 @@ use data_credits::{
   },
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
+use helium_sub_daos::{DaoV0, SubDaoV0};
 use mpl_bubblegum::utils::get_asset_id;
 use mpl_bubblegum::{program::Bubblegum, state::TreeConfig};
 use shared_utils::*;
@@ -50,13 +51,13 @@ pub struct UpdateIotInfoV0<'info> {
   pub info: Box<Account<'info, IotHotspotInfoV0>>,
   #[account(mut)]
   pub hotspot_owner: Signer<'info>,
-  /// CHECK: THe merkle tree
+  /// CHECK: The merkle tree
   pub merkle_tree: UncheckedAccount<'info>,
   #[account(
-        seeds = [merkle_tree.key().as_ref()],
-        bump,
-        seeds::program = bubblegum_program.key()
-    )]
+    seeds = [merkle_tree.key().as_ref()],
+    bump,
+    seeds::program = bubblegum_program.key()
+  )]
   pub tree_authority: Account<'info, TreeConfig>,
   #[account(
     mut,
@@ -66,12 +67,19 @@ pub struct UpdateIotInfoV0<'info> {
   pub owner_dc_ata: Box<Account<'info, TokenAccount>>,
 
   #[account(
-    has_one = dc_mint,
     has_one = merkle_tree,
+    has_one = sub_dao,
     constraint = hotspot_config.settings.is_valid(args)
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
-
+  #[account(
+    has_one = dc_mint
+  )]
+  pub dao: Box<Account<'info, DaoV0>>,
+  #[account(
+    has_one = dao
+  )]
+  pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,
 
@@ -81,7 +89,7 @@ pub struct UpdateIotInfoV0<'info> {
       dc_mint.key().as_ref()
     ],
     seeds::program = data_credits_program.key(),
-    bump,
+    bump = dc.data_credits_bump,
     has_one = dc_mint
   )]
   pub dc: Account<'info, DataCreditsV0>,
