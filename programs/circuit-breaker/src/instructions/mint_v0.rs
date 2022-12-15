@@ -18,6 +18,7 @@ pub struct MintV0<'info> {
   #[account(
     mut,
     has_one = mint_authority,
+    has_one = mint,
     seeds = ["mint_windowed_breaker".as_bytes(), mint.key().as_ref()],
     bump = circuit_breaker.bump_seed
   )]
