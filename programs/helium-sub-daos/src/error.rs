@@ -19,4 +19,22 @@ pub enum ErrorCode {
 
   #[msg("The subdao does not have a utility score")]
   NoUtilityScore,
+
+  #[msg("Not enough veHNT")]
+  NotEnoughVeHnt,
+
+  #[msg("Lockup hasn't expired yet")]
+  LockupNotExpired,
+
+  #[msg("This staking position has already been purged")]
+  PositionAlreadyPurged,
+
+  #[msg("This position is healthy, refresh not needed")]
+  RefreshNotNeeded,
+
+  #[msg("Failed to calculate the voting power")]
+  FailedVotingPowerCalculation,
+
+  #[msg("Rewards need to be claimed in the correct epoch order")]
+  InvalidClaimEpoch,
 }

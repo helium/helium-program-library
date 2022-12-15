@@ -122,7 +122,7 @@ export const initTestHotspotConfig = async (
     .signers([merkle]);
 
   const { collection, hotspotConfig } = await method.pubkeys();
-  await method.rpc({ skipPreflight: true });
+  await method.rpc();
 
   return {
     collection: collection!,
@@ -200,6 +200,7 @@ export const initWorld = async (
     subDao: PublicKey;
     treasury: PublicKey;
     rewardsEscrow: PublicKey;
+    stakerPool: PublicKey;
   };
   dataCredits: {
     dcKey: PublicKey;

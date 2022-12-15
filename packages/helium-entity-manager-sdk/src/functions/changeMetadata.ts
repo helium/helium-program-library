@@ -56,7 +56,7 @@ export async function updateMetadata({
       index: nodeIndex,
     })
     .accounts({
-      hotspot: assetId,
+      // hotspot: assetId,
       hotspotConfig,
       hotspotOwner: owner,
       info,
