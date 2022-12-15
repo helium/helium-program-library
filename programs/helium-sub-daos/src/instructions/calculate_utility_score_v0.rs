@@ -163,6 +163,10 @@ pub fn handler(
     return Err(error!(ErrorCode::UtilityScoreAlreadyCalculated));
   }
 
+  if ctx.accounts.clock.unix_timestamp < ctx.accounts.dao.emission_schedule[0].start_unix_time {
+    return Err(error!(ErrorCode::EpochToEarly));
+  }
+
   ctx.accounts.sub_dao_epoch_info.epoch = epoch;
   ctx.accounts.dao_epoch_info.epoch = epoch;
   ctx.accounts.dao_epoch_info.dao = ctx.accounts.dao.key();

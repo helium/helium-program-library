@@ -37,4 +37,7 @@ pub enum ErrorCode {
 
   #[msg("Rewards need to be claimed in the correct epoch order")]
   InvalidClaimEpoch,
+
+  #[msg("Epochs start after the earliest emission schedule")]
+  EpochToEarly,
 }
