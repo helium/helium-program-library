@@ -1566,6 +1566,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "helium-voter-stake-registry"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "base64 0.13.0",
+ "bincode",
+ "bytemuck",
+ "env_logger",
+ "log",
+ "serde",
+ "solana-banks-client",
+ "solana-logger",
+ "solana-program",
+ "solana-program-test",
+ "solana-sdk",
+ "spl-associated-token-account",
+ "spl-governance",
+ "spl-governance-addin-api",
+ "spl-token",
+ "static_assertions",
+ "time 0.3.15",
+]
+
+[[package]]
 name = "hermit-abi"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5084,31 +5109,6 @@ name = "void"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
-
-[[package]]
-name = "voter-stake-registry"
-version = "0.0.1"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "base64 0.13.0",
- "bincode",
- "bytemuck",
- "env_logger",
- "log",
- "serde",
- "solana-banks-client",
- "solana-logger",
- "solana-program",
- "solana-program-test",
- "solana-sdk",
- "spl-associated-token-account",
- "spl-governance",
- "spl-governance-addin-api",
- "spl-token",
- "static_assertions",
- "time 0.3.15",
-]
 
 [[package]]
 name = "walkdir"

@@ -9,7 +9,7 @@ helium_entity_manager = "hemABtqNUst4MmqsVcuN217ZzBspENbGt9uueSe5jts"
 circuit_breaker = "circcmKGcSE61r768bFtD1GkG3x6qfEE1GD2PgwA6C3"
 treasury_management = "treaRzaa4b98D1NQMQdQXzBupbgWhyJ2e1pXhJzkTwU"
 lazy_transactions = "1atNarMiQ8RMLkcTwqHHUESs2f4SB3uouPKFLbXcMwE"
-voter_stake_registry = "vsrYuGJU88umvTsQbp8bVwa3vUeEKNnLRtxEYP65rBm"
+helium_voter_stake_registry = "vsrYuGJU88umvTsQbp8bVwa3vUeEKNnLRtxEYP65rBm"
 
 [workspace]
 members = [
