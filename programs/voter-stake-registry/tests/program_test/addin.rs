@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use solana_sdk::pubkey::Pubkey;
-use solana_sdk::transport::TransportError;
+use solana_banks_client::{
+  BanksClientError
+};
 use solana_sdk::{
     instruction::Instruction,
     signature::{Keypair, Signer},
@@ -239,7 +241,7 @@ impl AddinCookie {
         lockup_kind: voter_stake_registry::state::LockupKind,
         start_ts: Option<u64>,
         periods: u32,
-    ) -> std::result::Result<(), TransportError> {
+    ) -> std::result::Result<(), BanksClientError> {
         let vault = voter.vault_address(&voting_mint);
 
         let data = anchor_lang::InstructionData::data(
@@ -291,7 +293,7 @@ impl AddinCookie {
         token_address: Pubkey,
         deposit_entry_index: u8,
         amount: u64,
-    ) -> std::result::Result<(), TransportError> {
+    ) -> std::result::Result<(), BanksClientError> {
         let vault = voter.vault_address(&voting_mint);
 
         let data =
@@ -336,7 +338,7 @@ impl AddinCookie {
         token_address: Pubkey,
         deposit_entry_index: u8,
         amount: u64,
-    ) -> std::result::Result<(), TransportError> {
+    ) -> std::result::Result<(), BanksClientError> {
         let vault = voter.vault_address(&voting_mint);
 
         let data =
@@ -380,7 +382,7 @@ impl AddinCookie {
         voter: &VoterCookie,
         voting_mint: &VotingMintConfigCookie,
         voter_authority: &Keypair,
-    ) -> std::result::Result<(), TransportError> {
+    ) -> std::result::Result<(), BanksClientError> {
         let vault = voter.vault_address(&voting_mint);
 
         let data =
@@ -443,7 +445,7 @@ impl AddinCookie {
         &self,
         registrar: &RegistrarCookie,
         voter: &VoterCookie,
-    ) -> std::result::Result<voter_stake_registry::state::VoterWeightRecord, TransportError> {
+    ) -> std::result::Result<voter_stake_registry::state::VoterWeightRecord, BanksClientError> {
         let instructions = vec![self.update_voter_weight_record_instruction(registrar, voter)];
 
         self.solana.process_transaction(&instructions, None).await?;
@@ -462,7 +464,7 @@ impl AddinCookie {
         voter: &VoterCookie,
         authority: &Keypair,
         deposit_entry_index: u8,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let data = anchor_lang::InstructionData::data(
             &voter_stake_registry::instruction::CloseDepositEntry {
                 deposit_entry_index,
@@ -500,7 +502,7 @@ impl AddinCookie {
         deposit_entry_index: u8,
         kind: voter_stake_registry::state::LockupKind,
         periods: u32,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let data =
             anchor_lang::InstructionData::data(&voter_stake_registry::instruction::ResetLockup {
                 deposit_entry_index,
@@ -540,7 +542,7 @@ impl AddinCookie {
         source_deposit_entry_index: u8,
         target_deposit_entry_index: u8,
         amount: u64,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let data = anchor_lang::InstructionData::data(
             &voter_stake_registry::instruction::InternalTransferLocked {
                 source_deposit_entry_index,
@@ -581,7 +583,7 @@ impl AddinCookie {
         source_deposit_entry_index: u8,
         target_deposit_entry_index: u8,
         amount: u64,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         let data = anchor_lang::InstructionData::data(
             &voter_stake_registry::instruction::InternalTransferUnlocked {
                 source_deposit_entry_index,

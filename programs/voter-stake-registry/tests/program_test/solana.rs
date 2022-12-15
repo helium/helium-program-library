@@ -5,13 +5,15 @@ use anchor_lang::AccountDeserialize;
 use anchor_spl::token::TokenAccount;
 use solana_program::{program_pack::Pack, rent::*, system_instruction};
 use solana_program_test::*;
+use solana_banks_client::{
+  BanksClientError
+};
 use solana_sdk::{
     account::ReadableAccount,
     instruction::Instruction,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
     transaction::Transaction,
-    transport::TransportError,
 };
 use spl_token::*;
 
@@ -27,7 +29,7 @@ impl SolanaCookie {
         &self,
         instructions: &[Instruction],
         signers: Option<&[&Keypair]>,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         *self.program_output.write().unwrap() = super::ProgramOutput::default();
 
         let mut context = self.context.borrow_mut();
@@ -45,6 +47,7 @@ impl SolanaCookie {
         // let recent_blockhash = self.context.banks_client.get_recent_blockhash().await.unwrap();
 
         transaction.sign(&all_signers, context.last_blockhash);
+
 
         context
             .banks_client

@@ -27,3 +27,6 @@ shared-utils = { path = "../shared-utils" }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }
 switchboard-v2 = { version = "^0.1.14" }
+
+[dev-dependencies]
+rust_decimal = "=1.26.0"

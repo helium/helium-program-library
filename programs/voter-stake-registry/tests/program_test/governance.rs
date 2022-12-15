@@ -2,6 +2,9 @@ use std::sync::Arc;
 
 use solana_program::instruction::Instruction;
 use solana_sdk::pubkey::Pubkey;
+use solana_banks_client::{
+  BanksClientError
+};
 use solana_sdk::signature::{Keypair, Signer};
 use spl_governance::state::{proposal, vote_record};
 
@@ -258,7 +261,7 @@ impl GovernanceRealmCookie {
         voter: &VoterCookie,
         payer: &Keypair,
         vwr_instruction: Instruction,
-    ) -> std::result::Result<ProposalCookie, TransportError> {
+    ) -> std::result::Result<ProposalCookie, BanksClientError> {
         let proposal = spl_governance::state::proposal::get_proposal_address(
             &self.governance.program_id,
             &governance,
@@ -325,7 +328,7 @@ impl GovernanceRealmCookie {
         authority: &Keypair,
         payer: &Keypair,
         vwr_instruction: Instruction,
-    ) -> std::result::Result<(), TransportError> {
+    ) -> std::result::Result<(), BanksClientError> {
         let instructions = vec![
             vwr_instruction,
             spl_governance::instruction::cast_vote(
@@ -364,7 +367,7 @@ impl GovernanceRealmCookie {
         token_owner_record: Pubkey,
         authority: &Keypair,
         beneficiary: Pubkey,
-    ) -> std::result::Result<(), TransportError> {
+    ) -> std::result::Result<(), BanksClientError> {
         let instructions = vec![spl_governance::instruction::relinquish_vote(
             &self.governance.program_id,
             &governance,
