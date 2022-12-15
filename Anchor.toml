@@ -20,7 +20,7 @@ members = [
   "programs/circuit-breaker",
   "programs/treasury-management",
   "programs/lazy-transactions",
-  "programs/voter-stake-registry",
+  "programs/helium-voter-stake-registry",
 ]
 
 [registry]
