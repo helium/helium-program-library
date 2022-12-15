@@ -332,7 +332,7 @@ dependencies = [
  "num-traits",
  "rusticata-macros",
  "thiserror",
- "time 0.3.15",
+ "time 0.3.17",
 ]
 
 [[package]]
@@ -734,6 +734,61 @@ dependencies = [
  "textwrap",
  "unicode-width",
  "vec_map",
+]
+
+[[package]]
+name = "clockwork-cron"
+version = "1.3.9"
+source = "git+https://github.com/clockwork-xyz/clockwork#49c78d89def9d7f7f4ebea831c81f29316861f44"
+dependencies = [
+ "chrono",
+ "nom",
+ "once_cell",
+]
+
+[[package]]
+name = "clockwork-network-program"
+version = "1.3.9"
+source = "git+https://github.com/clockwork-xyz/clockwork#49c78d89def9d7f7f4ebea831c81f29316861f44"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "clockwork-utils",
+]
+
+[[package]]
+name = "clockwork-sdk"
+version = "1.3.9"
+source = "git+https://github.com/clockwork-xyz/clockwork#49c78d89def9d7f7f4ebea831c81f29316861f44"
+dependencies = [
+ "chrono",
+ "clockwork-thread-program",
+ "nom",
+ "once_cell",
+]
+
+[[package]]
+name = "clockwork-thread-program"
+version = "1.3.9"
+source = "git+https://github.com/clockwork-xyz/clockwork#49c78d89def9d7f7f4ebea831c81f29316861f44"
+dependencies = [
+ "anchor-lang",
+ "chrono",
+ "clockwork-cron",
+ "clockwork-network-program",
+ "clockwork-utils",
+ "static-pubkey",
+ "version",
+]
+
+[[package]]
+name = "clockwork-utils"
+version = "1.3.9"
+source = "git+https://github.com/clockwork-xyz/clockwork#49c78d89def9d7f7f4ebea831c81f29316861f44"
+dependencies = [
+ "anchor-lang",
+ "base64 0.13.0",
+ "static-pubkey",
 ]
 
 [[package]]
@@ -1563,7 +1618,7 @@ dependencies = [
  "rust_decimal",
  "shared-utils",
  "switchboard-v2",
- "time",
+ "time 0.3.17",
  "treasury-management",
  "voter-stake-registry",
 ]
@@ -1590,7 +1645,6 @@ dependencies = [
  "spl-governance-addin-api",
  "spl-token",
  "static_assertions",
- "time 0.3.15",
 ]
 
 [[package]]
@@ -2308,16 +2362,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num-integer"
-version = "0.1.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "225d3389fb3509a24c93f5c29eb6bde2586b98d9f016636dff58d7c6f7569cd9"
-dependencies = [
- "autocfg",
- "num-traits",
-]
-
-[[package]]
 name = "num-traits"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2355,15 +2399,6 @@ dependencies = [
  "proc-macro2 1.0.43",
  "quote 1.0.21",
  "syn 1.0.99",
-]
-
-[[package]]
-name = "num_threads"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2819ce041d2ee131036f4fc9d6ae7ae125a3a40e97ba64d04fe799ad9dabbb44"
-dependencies = [
- "libc",
 ]
 
 [[package]]
@@ -2910,7 +2945,7 @@ checksum = "6413f3de1edee53342e6138e75b56d32e7bc6e332b3bd62d497b1929d4cfbcdd"
 dependencies = [
  "pem",
  "ring",
- "time 0.3.15",
+ "time 0.3.17",
  "yasna",
 ]
 
@@ -4480,6 +4515,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
+name = "static-pubkey"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0547d5945c93f55e1b18bf2a67d1a3d0548561f2687645b22c1c1d4fbb9a8e90"
+dependencies = [
+ "bs58 0.4.0",
+ "proc-macro2 1.0.43",
+ "quote 1.0.21",
+ "syn 1.0.99",
+]
+
+[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4710,21 +4757,30 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.15"
+version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d634a985c4d4238ec39cacaed2e7ae552fbd3c476b552c1deac3021b7d7eaf0c"
+checksum = "a561bf4617eebd33bca6434b988f39ed798e527f51a1e797d0ee4f61c0a38376"
 dependencies = [
  "itoa",
- "libc",
- "num_threads",
+ "serde",
+ "time-core",
  "time-macros",
 ]
 
 [[package]]
-name = "time-macros"
-version = "0.2.4"
+name = "time-core"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42657b1a6f4d817cda8e7a0ace261fe0cc946cf3a80314390b22cc61ae080792"
+checksum = "2e153e1f1acaef8acc537e68b44906d2db6436e2b35ac2c6b42640fff91f00fd"
+
+[[package]]
+name = "time-macros"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d967f99f534ca7e495c575c62638eebc2898a8c84c119b89e250477bc4ba16b2"
+dependencies = [
+ "time-core",
+]
 
 [[package]]
 name = "tiny-bip39"
@@ -4873,22 +4929,6 @@ dependencies = [
  "tokio",
  "tracing",
 ]
-
-[[package]]
-name = "time"
-version = "0.3.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a561bf4617eebd33bca6434b988f39ed798e527f51a1e797d0ee4f61c0a38376"
-dependencies = [
- "serde",
- "time-core",
-]
-
-[[package]]
-name = "time-core"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e153e1f1acaef8acc537e68b44906d2db6436e2b35ac2c6b42640fff91f00fd"
 
 [[package]]
 name = "toml"
@@ -5128,6 +5168,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
+name = "version"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a449064fee414fcc201356a3e6c1510f6c8829ed28bb06b91c54ebe208ce065"
+
+[[package]]
 name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5138,6 +5184,20 @@ name = "void"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
+
+[[package]]
+name = "voter-stake-registry"
+version = "0.2.4"
+source = "git+https://github.com/helium/voter-stake-registry?branch=feature/minimum-lockup#f6e6379a83444888f0f461a90bedd26d5bd98168"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "solana-program",
+ "spl-governance",
+ "spl-governance-addin-api",
+ "static_assertions",
+]
 
 [[package]]
 name = "walkdir"
@@ -5428,7 +5488,7 @@ dependencies = [
  "oid-registry",
  "rusticata-macros",
  "thiserror",
- "time 0.3.15",
+ "time 0.3.17",
 ]
 
 [[package]]
@@ -5461,7 +5521,7 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "346d34a236c9d3e5f3b9b74563f238f955bbd05fa0b8b4efa53c130c43982f4c"
 dependencies = [
- "time 0.3.15",
+ "time 0.3.17",
 ]
 
 [[package]]
