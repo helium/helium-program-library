@@ -14,7 +14,7 @@ use mpl_bubblegum::{
   cpi::{accounts::CreateTree, create_tree},
   program::Bubblegum,
 };
-use spl_account_compression::{program::SplAccountCompression, Wrapper};
+use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeHotspotConfigArgsV0 {
@@ -96,7 +96,7 @@ pub struct InitializeHotspotConfigV0<'info> {
   /// CHECK: Checked with constraints
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
-  pub log_wrapper: Program<'info, Wrapper>,
+  pub log_wrapper: Program<'info, Noop>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub bubblegum_program: Program<'info, Bubblegum>,

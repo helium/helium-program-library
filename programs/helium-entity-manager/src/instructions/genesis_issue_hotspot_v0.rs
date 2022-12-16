@@ -12,7 +12,7 @@ use mpl_bubblegum::{
   program::Bubblegum,
   state::TreeConfig,
 };
-use spl_account_compression::{program::SplAccountCompression, Wrapper};
+use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct GenesisIssueHotspotArgsV0 {
@@ -75,7 +75,7 @@ pub struct GenesisIssueHotspotV0<'info> {
   /// CHECK: Verified by constraint  
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
-  pub log_wrapper: Program<'info, Wrapper>,
+  pub log_wrapper: Program<'info, Noop>,
   pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
   pub system_program: Program<'info, System>,

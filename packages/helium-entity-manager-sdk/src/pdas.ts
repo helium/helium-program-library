@@ -1,7 +1,8 @@
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
-import crypto from "crypto-js";
+import sha256 from "crypto-js/sha256";
+import hex from "crypto-js/enc-hex";
 
 export const hotspotConfigKey = (
   subDao: PublicKey,
@@ -46,10 +47,7 @@ export const iotInfoKey = (
   hotspotKey: string,
   programId: PublicKey = PROGRAM_ID
 ) => {
-  let hexString = crypto
-    .createHash("sha256")
-    .update(hotspotKey, "utf-8")
-    .digest("hex");
+  let hexString = sha256(hotspotKey).toString(hex)
   let seed = Uint8Array.from(Buffer.from(hexString, "hex"));
 
   return PublicKey.findProgramAddressSync(

@@ -23,7 +23,7 @@ import * as anchor from "@project-serum/anchor";
 import format from "pg-format";
 import { Program } from "@project-serum/anchor";
 import {
-  ACCOUNT_SIZE, createAssociatedTokenAccountInstruction,
+  ACCOUNT_SIZE, createAssociatedTokenAccountIdempotentInstruction,
   createTransferInstruction,
   getAssociatedTokenAddressSync
 } from "@solana/spl-token";
@@ -288,10 +288,6 @@ async function run() {
         })
       );
 
-      // Create all atas in one tx, so in case the ATAs get created elsewhere the transfer ixns still work
-      // May have to recover by manually creating the ATAs. Hopefully in practice this doesn't happen ever.
-      // But just want to account for it so we don't have to redo the whole lazy txns.
-      const ataIxns = [];
       const tokenIxs = [];
       const hntBal = new BN(account.hnt);
       const dcBal = new BN(account.dc);
@@ -301,21 +297,21 @@ async function run() {
         totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
         totalBalances.hnt = totalBalances.hnt.add(hntBal);
         const { instruction, ata } = createAta(hnt, solAddress, lazySigner);
-        ataIxns.push(instruction);
+        tokenIxs.push(instruction);
         tokenIxs.push(createTransfer(hnt, ata, lazySigner, hntBal));
       }
       if (dcBal.gt(zero)) {
         totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
         totalBalances.dc = totalBalances.dc.add(dcBal);
         const { instruction, ata } = createAta(dc, solAddress, lazySigner);
-        ataIxns.push(instruction);
+        tokenIxs.push(instruction);
         tokenIxs.push(createTransfer(dc, ata, lazySigner, dcBal));
       }
       if (mobileBal.gt(zero)) {
         totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
         totalBalances.mobile = totalBalances.mobile.add(mobileBal);
         const { instruction, ata } = createAta(mobile, solAddress, lazySigner);
-        ataIxns.push(instruction);
+        tokenIxs.push(instruction);
         tokenIxs.push(createTransfer(mobile, ata, lazySigner, mobileBal));
       }
 
@@ -329,7 +325,7 @@ async function run() {
       );
       totalBalances.sol = totalBalances.sol.add(dustAmountBn);
 
-      const ixnGroups = [ataIxns, tokenIxs, ...chunks(hotspotIxs, 2)].filter(
+      const ixnGroups = [tokenIxs, ...chunks(hotspotIxs, 2)].filter(
         (ixGroup) => ixGroup.length > 0
       );
 
@@ -497,7 +493,12 @@ function createAta(
 ): { instruction: TransactionInstruction; ata: PublicKey } {
   const ata = getAssociatedTokenAddressSync(mint, to, true);
   return {
-    instruction: createAssociatedTokenAccountInstruction(payer, ata, to, mint),
+    instruction: createAssociatedTokenAccountIdempotentInstruction(
+      payer,
+      ata,
+      to,
+      mint
+    ),
     ata,
   };
 }

@@ -1730,9 +1730,9 @@ dependencies = [
 
 [[package]]
 name = "spl-account-compression"
-version = "0.1.3"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac790c7c173ddf5fe13b724018f3ef28b628584d211d9a1c32f804d8d6760c22"
+checksum = "0f7d92234d687ea747283907e0e89eca8f3679a5408d9a3f01b7e0763b720aea"
 dependencies = [
  "anchor-lang",
  "bytemuck",

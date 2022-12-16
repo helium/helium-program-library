@@ -77,7 +77,7 @@ describe("helium-entity-manager", () => {
   });
 
   it("initializes a hotspot config", async () => {
-    const { hotspotConfig, collection, onboardingServerKeypair } =
+    const { hotspotConfig, collection } =
       await initTestHotspotConfig(hemProgram, provider, subDao);
 
     const account = await hemProgram.account.hotspotConfigV0.fetch(
@@ -88,10 +88,6 @@ describe("helium-entity-manager", () => {
       provider.wallet.publicKey.toBase58()
     );
     expect(account.collection.toBase58()).eq(collection.toBase58());
-    expect(account.onboardingServer.toBase58()).eq(
-      onboardingServerKeypair.publicKey.toBase58()
-    );
-    console.log(account.settings)
   });
 
   it("initializes a hotspot issuer", async () => {
@@ -167,21 +163,18 @@ describe("helium-entity-manager", () => {
     });
 
     it("updates hotspot config", async() => {
-      const { hotspotConfig, onboardingServerKeypair } =
+      const { hotspotConfig } =
         await initTestHotspotConfig(hemProgram, provider, subDao);
       
       await hemProgram.methods.updateHotspotConfigV0({
         newAuthority: PublicKey.default,
-        onboardingServer: PublicKey.default,
       }).accounts({
         hotspotConfig,
       }).rpc();
 
       const acc = await hemProgram.account.hotspotConfigV0.fetch(hotspotConfig);
       expect(acc.authority.toBase58()).to.equal(PublicKey.default.toBase58());
-      expect(acc.onboardingServer.toBase58()).to.equal(PublicKey.default.toBase58());
     });
-
     
     describe("with hotspot", () => {
       let hotspot: PublicKey;

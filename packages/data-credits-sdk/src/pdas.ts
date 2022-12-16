@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
-import crypto from "crypto-js";
+import sha256 from "crypto-js/sha256";
+import hex from "crypto-js/enc-hex";
 
 export function dataCreditsKey(dcMint: PublicKey, programId = PROGRAM_ID): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
@@ -23,10 +24,7 @@ export function delegatedDataCreditsKey(
   routerKey: string,
   programId: PublicKey = PROGRAM_ID
 ) {
-  let hexString = crypto
-    .createHash("sha256")
-    .update(routerKey, "utf-8")
-    .digest("hex");
+  let hexString = sha256(routerKey).toString(hex);
   let seed = Uint8Array.from(Buffer.from(hexString, "hex"));
 
   return PublicKey.findProgramAddressSync(

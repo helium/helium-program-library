@@ -1,41 +1,35 @@
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
-import { createAtaAndMint, createMint, sendInstructions, toBN } from "@helium/spl-utils";
-import { Keypair as HeliumKeypair } from "@helium/crypto";
+import { sendInstructions, toBN } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import { AccountLayout, getAssociatedTokenAddress } from "@solana/spl-token";
+import { AccountLayout } from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
   SystemProgram
 } from "@solana/web3.js";
+import { BN } from "bn.js";
 import { assert, expect } from "chai";
-import { AggregatorAccount, loadSwitchboardProgram } from "@switchboard-xyz/switchboard-v2";
+import { IDL, VoterStakeRegistry } from "../deps/helium-voter-stake-registry/src/voter_stake_registry";
 import { init as dcInit } from "../packages/data-credits-sdk/src";
-import { heliumSubDaosResolvers, stakePositionKey } from "../packages/helium-sub-daos-sdk/src";
 import { init as issuerInit } from "../packages/helium-entity-manager-sdk/src";
-import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
+import { heliumSubDaosResolvers, stakePositionKey } from "../packages/helium-sub-daos-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { burnDataCredits } from "./data-credits";
 import { initTestDao, initTestSubdao } from "./utils/daos";
-import { DC_FEE, ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
-import { createNft } from "@helium/spl-utils";
-import { init as cbInit } from "@helium/circuit-breaker-sdk";
-import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
-import { VoterStakeRegistry, IDL } from "../deps/helium-voter-stake-registry/src/voter_stake_registry";
+import { ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
 import { initVsr, VSR_PID } from "./utils/vsr";
-import { BN } from "bn.js";
 
 const THREAD_PID = new PublicKey("3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv");
 
 const EPOCH_REWARDS = 100000000;
 const SUB_DAO_EPOCH_REWARDS = 10000000;
 
-function sleep(ms) {
+function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 

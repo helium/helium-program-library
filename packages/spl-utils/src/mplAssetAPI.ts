@@ -1,5 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import axios from "axios";
+// @ts-ignore
 import base58 from "bs58";
 
 export type AssetProof = {

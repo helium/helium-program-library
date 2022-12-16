@@ -24,7 +24,7 @@ use mpl_bubblegum::{
   state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion},
   utils::get_asset_id,
 };
-use spl_account_compression::{program::SplAccountCompression, Wrapper};
+use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueIotHotspotArgsV0 {
@@ -136,7 +136,7 @@ pub struct IssueIotHotspotV0<'info> {
   /// CHECK: Verified by constraint  
   #[account(address = data_credits::ID)]
   pub data_credits_program: AccountInfo<'info>,
-  pub log_wrapper: Program<'info, Wrapper>,
+  pub log_wrapper: Program<'info, Noop>,
   pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
   pub associated_token_program: Program<'info, AssociatedToken>,

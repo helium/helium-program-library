@@ -70,11 +70,6 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Keypair of the subdao token",
     required: true,
   },
-  onboardingServerKeypair: {
-    type: "string",
-    describe: "Keypair of the onboarding server",
-    default: `${os.homedir()}/.config/solana/id.json`,
-  },
   numTokens: {
     type: "number",
     describe:
@@ -142,9 +137,6 @@ async function run() {
 
   const wallet = loadKeypair(argv.wallet);
   const subdaoKeypair = await loadKeypair(argv.subdaoKeypair);
-  const onboardingServerKeypair = await loadKeypair(
-    argv.onboardingServerKeypair
-  );
   const oracleKeypair = loadKeypair(argv.oracleKeypair);
   const oracleKey = oracleKeypair.publicKey;
   const rewardsOracleUrl = argv.rewardsOracleUrl;
@@ -286,7 +278,6 @@ async function run() {
         metadataUrl: `${
           argv.bucket
         }/${name.toLocaleLowerCase()}_collection.json`,
-        onboardingServer: onboardingServerKeypair.publicKey,
         settings: {
           iotConfig: {
             minGain: 10,
@@ -311,7 +302,6 @@ async function run() {
       ])
       .accounts({
         merkleTree: merkle.publicKey,
-        dcMint: new PublicKey(argv.dcPubkey),
         subDao: subdao,
       })
       .signers([merkle])
