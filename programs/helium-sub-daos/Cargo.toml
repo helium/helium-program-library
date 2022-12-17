@@ -20,13 +20,13 @@ default = []
 overflow-checks = true
 
 [dependencies]
-anchor-lang = { version = "0.25.0", features = ["init-if-needed"] }
-anchor-spl = "0.25.0"
-mpl-token-metadata = { version = "1.3.4", features = ["no-entrypoint"] }
+anchor-lang = { version = "0.26.0", features = ["init-if-needed"] }
+anchor-spl = "0.26.0"
+mpl-token-metadata = { version = "1.6.4", path = "../../deps/metaplex-program-library/token-metadata/program", features = ["no-entrypoint"] }
 voter-stake-registry = { git = "https://github.com/helium/voter-stake-registry", branch = "feature/minimum-lockup", features = ["no-entrypoint"] }
 shared-utils = { path = "../shared-utils" }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }
-clockwork-sdk = { git = "https://github.com/clockwork-xyz/clockwork", version = "1.3.8", features = ["thread"] }
+clockwork-sdk = { git = "https://github.com/clockwork-xyz/clockwork", version = "1.3.16", features = ["thread"] }
 time = "0.3.17"
-switchboard-v2 = { version = "^0.1.14" }
+switchboard-v2 = { version = "0.1.17", git = "https://github.com/ChewingGlass/sbv2-solana.git" }
