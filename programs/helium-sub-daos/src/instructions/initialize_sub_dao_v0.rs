@@ -1,4 +1,4 @@
-use crate::{circuit_breaker::*, current_epoch, next_epoch_ts};
+use crate::{circuit_breaker::*, current_epoch, next_epoch_ts, ThreadProgram};
 use crate::{state::*, EPOCH_LENGTH};
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use anchor_spl::associated_token::AssociatedToken;
@@ -15,11 +15,9 @@ use circuit_breaker::{
   ThresholdType as CBThresholdType,
   WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
 };
-use clockwork_sdk::thread_program::{
-  self,
-  accounts::{Thread, Trigger},
+use clockwork_sdk::{
   cpi::thread_create,
-  ThreadProgram,
+  state::{Thread, Trigger},
 };
 use shared_utils::resize_to_fit;
 use switchboard_v2::AggregatorAccountData;
@@ -147,7 +145,6 @@ pub struct InitializeSubDaoV0<'info> {
   /// CHECK: handled by thread_create
   #[account(mut, address = Thread::pubkey(sub_dao.key(), "end-epoch".to_string()))]
   pub thread: AccountInfo<'info>,
-  #[account(address = thread_program::ID)]
   pub clockwork: Program<'info, ThreadProgram>,
 }
 
@@ -340,7 +337,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
   thread_create(
     CpiContext::new_with_signer(
       ctx.accounts.clockwork.to_account_info(),
-      clockwork_sdk::thread_program::cpi::accounts::ThreadCreate {
+      clockwork_sdk::cpi::ThreadCreate {
         authority: ctx.accounts.sub_dao.to_account_info(),
         payer: ctx.accounts.payer.to_account_info(),
         thread: ctx.accounts.thread.to_account_info(),
