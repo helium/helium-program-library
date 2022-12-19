@@ -8,19 +8,23 @@ use anchor_spl::{
     Transfer,
   },
 };
+use circuit_breaker::{
+  cpi::{accounts::MintV0, mint_v0},
+  CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
+};
 use helium_sub_daos::{DaoV0, SubDaoV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct DelegateDataCreditsArgsV0 {
+pub struct GenesisIssueDelegatedDataCreditsArgsV0 {
   amount: u64,
   router_key: String,
 }
 
 #[derive(Accounts)]
-#[instruction(args: DelegateDataCreditsArgsV0)]
-pub struct DelegateDataCreditsV0<'info> {
+#[instruction(args: GenesisIssueDelegatedDataCreditsArgsV0)]
+pub struct GenesisIssueDelegatedDataCreditsV0<'info> {
   #[account(
-    init_if_needed,
+    init,
     payer = payer,
     space = 60 + std::mem::size_of::<DataCreditsV0>(),
     seeds = [
@@ -37,7 +41,23 @@ pub struct DelegateDataCreditsV0<'info> {
     bump = data_credits.data_credits_bump
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
+  #[account(
+    mut,
+    seeds = [b"lazy_signer", b"helium"],
+    seeds::program = lazy_transactions::ID,
+    bump,
+  )]
+  pub lazy_signer: Signer<'info>,
   pub dc_mint: Box<Account<'info, Mint>>,
+    /// CHECK: Verified by cpi
+  #[account(
+    mut,
+    seeds = ["mint_windowed_breaker".as_bytes(), dc_mint.key().as_ref()],
+    seeds::program = circuit_breaker_program.key(),
+    bump = circuit_breaker.bump_seed
+  )]
+  pub circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
+  pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   #[account(
     has_one = dc_mint
   )]
@@ -47,19 +67,9 @@ pub struct DelegateDataCreditsV0<'info> {
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
 
-  pub owner: Signer<'info>,
-
-  #[account(
-    mut,
-    associated_token::authority = owner,
-    associated_token::mint = dc_mint
-  )]
-  pub from_account: Box<Account<'info, TokenAccount>>,
-
-  /// CHECK: Verified by cpi
-  #[account(
+  #[account(k
     init_if_needed,
-    payer = payer,
+    payer = lazy_signer,
     seeds = ["escrow_dc_account".as_bytes(), delegated_data_credits.key().as_ref()],
     bump,
     token::mint = dc_mint,
@@ -67,15 +77,13 @@ pub struct DelegateDataCreditsV0<'info> {
   )]
   pub escrow_account: Account<'info, TokenAccount>,
 
-  #[account(mut)]
-  pub payer: Signer<'info>,
-  pub associated_token_program: Program<'info, AssociatedToken>,
   pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
   pub rent: Sysvar<'info, Rent>,
+  pub clock: Sysvar<'info, Clock>,
 }
 
-pub fn handler(ctx: Context<DelegateDataCreditsV0>, args: DelegateDataCreditsArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<GenesisIssueDelegatedDataCreditsV0>, args: GenesisIssueDelegatedDataCreditsArgsV0) -> Result<()> {
   ctx
     .accounts
     .delegated_data_credits
@@ -93,39 +101,23 @@ pub fn handler(ctx: Context<DelegateDataCreditsV0>, args: DelegateDataCreditsArg
     &[ctx.accounts.data_credits.data_credits_bump],
   ]];
 
-  if ctx.accounts.from_account.is_frozen() {
-    thaw_account(CpiContext::new_with_signer(
-      ctx.accounts.token_program.to_account_info(),
-      ThawAccount {
-        account: ctx.accounts.from_account.to_account_info(),
-        mint: ctx.accounts.dc_mint.to_account_info(),
-        authority: ctx.accounts.data_credits.to_account_info(),
-      },
-      signer_seeds,
-    ))?;
-  }
-
-  transfer(
-    CpiContext::new(
-      ctx.accounts.token_program.to_account_info(),
-      Transfer {
-        from: ctx.accounts.from_account.to_account_info(),
-        to: ctx.accounts.escrow_account.to_account_info(),
-        authority: ctx.accounts.owner.to_account_info(),
-      },
+  let cpi_accounts = MintV0 {
+    mint: ctx.accounts.dc_mint.to_account_info(),
+    to: ctx.accounts.recipient_token_account.to_account_info(),
+    mint_authority: ctx.accounts.data_credits.to_account_info(),
+    token_program: ctx.accounts.token_program.to_account_info(),
+    circuit_breaker: ctx.accounts.circuit_breaker.to_account_info(),
+    clock: ctx.accounts.clock.to_account_info(),
+  };
+  
+  // mint the new tokens to recipient
+  mint_v0(
+    CpiContext::new_with_signer(
+      cpi_accounts,
+      signer_seeds
     ),
-    args.amount,
+    MintArgsV0 { amount: args.amount },
   )?;
-
-  freeze_account(CpiContext::new_with_signer(
-    ctx.accounts.token_program.to_account_info(),
-    FreezeAccount {
-      account: ctx.accounts.from_account.to_account_info(),
-      mint: ctx.accounts.dc_mint.to_account_info(),
-      authority: ctx.accounts.data_credits.to_account_info(),
-    },
-    signer_seeds,
-  ))?;
 
   Ok(())
 }
