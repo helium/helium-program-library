@@ -12,8 +12,6 @@ pub struct UpdateAccountWindowedBreakerArgsV0 {
 pub struct UpdateAccountWindowedBreakerV0<'info> {
   #[account(
     mut,
-    seeds = ["account_windowed_breaker".as_bytes(), circuit_breaker.token_account.key().as_ref()],
-    bump,
     has_one = authority,
   )]
   pub circuit_breaker: Box<Account<'info, AccountWindowedCircuitBreakerV0>>,

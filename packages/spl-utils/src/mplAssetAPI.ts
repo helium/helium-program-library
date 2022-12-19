@@ -1,5 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import axios from "axios";
+// @ts-ignore
+import base58 from "bs58";
 
 export type AssetProof = {
   root: PublicKey;
@@ -39,34 +41,36 @@ export async function getAsset(
     });
     const result = response.data.result;
     if (result) {
-      return {
-        ...result,
-        id: new PublicKey(result.id),
-        compression: {
-          ...result.compression,
-          dataHash:
-            result.compression.dataHash ??
-            new PublicKey(result.compression.dataHash).toBase58(),
-          creatorHash:
-            result.compression.creatorHash ??
-            new PublicKey(result.compression.creatorHash).toBase58(),
-          assetHash:
-            result.compression.assetHash ??
-            new PublicKey(result.compression.assetHash).toBase58(),
-          tree:
-            result.compression.tree ??
-            new PublicKey(result.compression.tree).toBase58(),
-        },
-        ownership: {
-          ...result.ownership,
-          owner: new PublicKey(result.ownership.owner),
-        },
-      };
+      return toAsset(result);
     }
   } catch (error) {
     console.error(error);
     throw error;
   }
+}
+
+function toAsset(result: any): Asset {
+  return {
+    ...result,
+    id: new PublicKey(result.id),
+    compression: {
+      ...result.compression,
+      dataHash:
+        result.compression.data_hash ??
+        base58.decode(result.compression.data_hash),
+      creatorHash:
+        result.compression.creator_hash ??
+        base58.decode(result.compression.creator_hash),
+      assetHash:
+        result.compression.asset_hash ??
+        base58.decode(result.compression.asset_hash),
+      tree: result.compression.tree ?? base58.decode(result.compression.tree),
+    },
+    ownership: {
+      ...result.ownership,
+      owner: result.ownership.owner ?? new PublicKey(result.ownership.owner),
+    },
+  };
 }
 
 export async function getAssetProof(
@@ -124,7 +128,7 @@ export async function getAssetsByOwner(
       params: [wallet, sortBy, limit, page, before, after],
     });
 
-    return response.data.result?.items;
+    return response.data.result?.items.map(toAsset);
   } catch (error) {
     console.error(error);
     throw error;

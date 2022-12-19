@@ -80,12 +80,11 @@ pub fn handler(ctx: Context<RefreshPositionV0>, args: RefreshPositionArgsV0) -> 
   }
   // this position needs to be reduced
 
-  let old_position_vehnt = calculate_voting_power(
-    d_entry,
+  let old_position_vehnt = d_entry.voting_power_with_deposits(
     voting_mint_config,
-    stake_position.hnt_amount,
-    stake_position.hnt_amount,
     curr_ts,
+    stake_position.hnt_amount,
+    stake_position.hnt_amount,
   )?;
 
   let sub_dao = &mut ctx.accounts.sub_dao;

@@ -70,9 +70,6 @@ pub struct BurnDelegatedDataCreditsV0<'info> {
   #[account(mut)]
   pub escrow_account: Box<Account<'info, TokenAccount>>,
 
-  #[account(mut)]
-  pub manager: Signer<'info>,
-
   pub token_program: Program<'info, Token>,
   pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
   pub system_program: Program<'info, System>,

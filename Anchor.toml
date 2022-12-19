@@ -9,7 +9,7 @@ helium_entity_manager = "hemABtqNUst4MmqsVcuN217ZzBspENbGt9uueSe5jts"
 circuit_breaker = "circcmKGcSE61r768bFtD1GkG3x6qfEE1GD2PgwA6C3"
 treasury_management = "treaRzaa4b98D1NQMQdQXzBupbgWhyJ2e1pXhJzkTwU"
 lazy_transactions = "1atNarMiQ8RMLkcTwqHHUESs2f4SB3uouPKFLbXcMwE"
-helium_voter_stake_registry = "hvsrY9UBtHhYRvstM2BWCsni81kevfn7B2DEhYbGA1a"
+voter_stake_registry = "hvsrY9UBtHhYRvstM2BWCsni81kevfn7B2DEhYbGA1a"
 
 [workspace]
 members = [
@@ -20,7 +20,7 @@ members = [
   "programs/circuit-breaker",
   "programs/treasury-management",
   "programs/lazy-transactions",
-  "programs/helium-voter-stake-registry",
+  "programs/voter-stake-registry",
 ]
 
 [registry]

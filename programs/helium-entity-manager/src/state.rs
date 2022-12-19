@@ -4,8 +4,6 @@ use anchor_lang::prelude::*;
 #[derive(Default)]
 pub struct HotspotConfigV0 {
   pub collection: Pubkey, // The metaplex collection to be issued
-  pub dc_mint: Pubkey,
-  pub onboarding_server: Pubkey,
   pub authority: Pubkey,
   pub symbol: String,
   pub sub_dao: Pubkey,

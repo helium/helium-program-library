@@ -1,8 +1,6 @@
 import { thresholdPercent, ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
-  hotspotConfigKey,
-  hotspotIssuerKey,
-  init as initHem
+  hotspotConfigKey, init as initHem
 } from "@helium/helium-entity-manager-sdk";
 import {
   daoKey,
@@ -24,14 +22,13 @@ import {
 } from "@solana/spl-account-compression";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
-  Cluster,
-  ComputeBudgetProgram, Keypair,
+  Cluster, ComputeBudgetProgram, Keypair,
   PublicKey,
   SystemProgram
 } from "@solana/web3.js";
 import { OracleJob } from "@switchboard-xyz/common";
 import {
-  CrankAccount,
+  AggregatorHistoryBuffer,
   QueueAccount,
   SwitchboardProgram
 } from "@switchboard-xyz/solana.js";
@@ -39,26 +36,8 @@ import os from "os";
 import yargs from "yargs/yargs";
 import { createAndMint, exists, loadKeypair } from "./utils";
 
-type Hotspot = {
-  eccKey: string;
-};
-
-const hardcodeHotspots: Hotspot[] = [
-  {
-    eccKey: "1122WVpJNesC4DU6s6cQ6caKC5LShQFTX8ouFQ2ybLhkwkKZjM8u",
-  },
-  {
-    eccKey: "11bNfVbDL8Tp2T6jsEevRzBG5QuJpHVUz1Z21ACDcD4wW6RbVAZ",
-  },
-  {
-    eccKey: "11wsqKcoXGesnSbEwKTY8QkoqdFsG7oafcyPn8jBnzRK4sfCSw8",
-  },
-  {
-    eccKey: "11t1Yvm7QbyVnmqdCUpfA8XUiGVbpHPVnaNtR25gb8p2d4Dzjxi",
-  },
-];
-
 const { hideBin } = require("yargs/helpers");
+
 const yarg = yargs(hideBin(process.argv)).options({
   wallet: {
     alias: "k",
@@ -90,16 +69,6 @@ const yarg = yargs(hideBin(process.argv)).options({
     type: "string",
     describe: "Keypair of the subdao token",
     required: true,
-  },
-  onboardingServerKeypair: {
-    type: "string",
-    describe: "Keypair of the onboarding server",
-    default: `${os.homedir()}/.config/solana/id.json`,
-  },
-  makerKeypair: {
-    type: "string",
-    describe: "Keypair of a maker",
-    default: `${os.homedir()}/.config/solana/id.json`,
   },
   numTokens: {
     type: "number",
@@ -145,9 +114,12 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "The switchboard network",
     default: "devnet",
   },
+  startEpochRewards: {
+    type: "number",
+    describe: "The starting epoch rewards (yearly)",
+    required: true
+  }
 });
-
-const MOBILE_EPOCH_REWARDS = 5000000000;
 
 async function run() {
   const argv = await yarg.argv;
@@ -165,10 +137,6 @@ async function run() {
 
   const wallet = loadKeypair(argv.wallet);
   const subdaoKeypair = await loadKeypair(argv.subdaoKeypair);
-  const onboardingServerKeypair = await loadKeypair(
-    argv.onboardingServerKeypair
-  );
-  const makerKeypair = await loadKeypair(argv.makerKeypair);
   const oracleKeypair = loadKeypair(argv.oracleKeypair);
   const oracleKey = oracleKeypair.publicKey;
   const rewardsOracleUrl = argv.rewardsOracleUrl;
@@ -207,7 +175,7 @@ async function run() {
         windowConfig: {
           windowSizeSeconds: new anchor.BN(24 * 60 * 60),
           thresholdType: ThresholdType.Absolute as never,
-          threshold: new anchor.BN(10 * MOBILE_EPOCH_REWARDS),
+          threshold: new anchor.BN(10 * argv.startEpochRewards),
         },
       })
       .accounts({
@@ -225,7 +193,7 @@ async function run() {
       wallet
     );
     const queueAccount = new QueueAccount(switchboard, new PublicKey(argv.queue));
-    const [_, agg] = await queueAccount.createFeed({
+    const [agg, _] = await queueAccount.createFeed({
       batchSize: 3,
       minRequiredOracleResults: 2,
       minRequiredJobResults: 1,
@@ -255,21 +223,17 @@ async function run() {
       ],
     });
     console.log("Created active device aggregator", agg.publicKey.toBase58());
-    await agg.setHistoryBuffer({
-      size: 24 * 7
-    })
+    await AggregatorHistoryBuffer.create(switchboard, {
+      aggregatorAccount: agg,
+      maxSamples: 24 * 7,
+    });
 
     console.log(`Initializing ${name} SubDAO`);
     await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
         dcBurnAuthority: provider.wallet.publicKey,
         authority: provider.wallet.publicKey,
-        emissionSchedule: [
-          {
-            startUnixTime: new anchor.BN(0),
-            emissionsPerEpoch: new anchor.BN(MOBILE_EPOCH_REWARDS),
-          },
-        ],
+        emissionSchedule: emissionSchedule(argv.startEpochRewards),
         // Linear curve
         treasuryCurve: {
           exponentialCurveV0: {
@@ -291,6 +255,9 @@ async function run() {
         hntMint: new PublicKey(argv.hntPubkey),
         activeDeviceAggregator: agg.publicKey,
       })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+      ])
       .rpc({ skipPreflight: true });
   } else {
     const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
@@ -311,7 +278,6 @@ async function run() {
         metadataUrl: `${
           argv.bucket
         }/${name.toLocaleLowerCase()}_collection.json`,
-        onboardingServer: onboardingServerKeypair.publicKey,
         settings: {
           iotConfig: {
             minGain: 10,
@@ -336,55 +302,11 @@ async function run() {
       ])
       .accounts({
         merkleTree: merkle.publicKey,
-        dcMint: new PublicKey(argv.dcPubkey),
         subDao: subdao,
       })
       .signers([merkle])
       .rpc({ skipPreflight: true });
   }
-
-  const hsIssuerKey = await hotspotIssuerKey(
-    hsConfigKey,
-    makerKeypair.publicKey
-  )[0];
-
-  if (!(await exists(conn, hsIssuerKey))) {
-    console.log("Initalizing HotspotIssuer");
-
-    await hemProgram.methods
-      .initializeHotspotIssuerV0({
-        maker: makerKeypair.publicKey,
-        authority: provider.wallet.publicKey,
-      })
-      .accounts({
-        hotspotConfig: hsConfigKey,
-      })
-      .rpc({ skipPreflight: true });
-  }
-
-  await Promise.all(
-    hardcodeHotspots.map(async (hotspot, index) => {
-      const create = await hemProgram.methods
-        .issueIotHotspotV0({
-          hotspotKey: hotspot.eccKey,
-          isFullHotspot: true,
-        })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-        ])
-        .accounts({
-          hotspotIssuer: hsIssuerKey,
-          recipient: provider.wallet.publicKey,
-          maker: makerKeypair.publicKey,
-        })
-        .signers([makerKeypair]);
-      const key = (await create.pubkeys()).info!;
-      if (!(await exists(conn, key))) {
-        console.log("Creating hotspot", index);
-        await create.rpc({ skipPreflight: true });
-      }
-    })
-  );
 }
 
 run()
@@ -394,3 +316,18 @@ run()
   })
   .then(() => process.exit());
 
+function emissionSchedule(
+  startEpochRewards: number
+): { startUnixTime: anchor.BN; emissionsPerEpoch: anchor.BN }[] {
+  const now = new Date().getDate() / 1000
+  // Do 20 years out, halving every 2 years
+  return new Array(10).fill(0).map((_, twoYear) => {
+    return {
+      startUnixTime: new anchor.BN(twoYear * 2 * 31557600 + now), // 2 years in seconds
+      emissionsPerEpoch: toBN(
+        (startEpochRewards / Math.pow(2, twoYear)) / (365.25 * 24), // Break into daily
+        8
+      ),
+    };
+  });
+}

@@ -3,8 +3,8 @@ import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import {
   hotspotConfigKey,
-  hotspotStorageKey,
   init as initHem,
+  iotInfoKey,
   PROGRAM_ID as HEM_PROGRAM_ID,
 } from "@helium/helium-entity-manager-sdk";
 import {
@@ -23,7 +23,7 @@ import * as anchor from "@project-serum/anchor";
 import format from "pg-format";
 import { Program } from "@project-serum/anchor";
 import {
-  ACCOUNT_SIZE, createAssociatedTokenAccountInstruction,
+  ACCOUNT_SIZE, createAssociatedTokenAccountIdempotentInstruction,
   createTransferInstruction,
   getAssociatedTokenAddressSync
 } from "@solana/spl-token";
@@ -137,14 +137,14 @@ async function run() {
 
   const mobile = new PublicKey(argv.mobile);
   const dc = new PublicKey(argv.dc);
-  // const iot = new PublicKey(argv.iot);
+  const iot = new PublicKey(argv.iot);
   const hnt = new PublicKey(argv.hnt);
 
-  const mobileSubdao = (await subDaoKey(mobile))[0];
-  const hsConfigKey = (await hotspotConfigKey(mobileSubdao, "MOBILE"))[0];
+  const iotSubdao = (await subDaoKey(iot))[0];
+  const hsConfigKey = (await hotspotConfigKey(iotSubdao, "IOT"))[0];
 
   const hotspotPubkeys = await hemProgram.methods
-    .issueHotspotV0({
+    .issueIotHotspotV0({
       hotspotKey: (await HeliumKeypair.makeRandom()).address.b58,
       isFullHotspot: true,
     })
@@ -237,7 +237,7 @@ async function run() {
     32 + 32 + 1 + 8 + 4 + 4 + 1 + 60
   );
   const PER_TX = 0.000005;
-  const dustAmount = PER_TX * 100 * LAMPORTS_PER_SOL;
+  const dustAmount = (PER_TX * 100 * LAMPORTS_PER_SOL) + await provider.connection.getMinimumBalanceForRentExemption(0);
   const dustAmountBn = new BN(dustAmount);
   let ix = 0;
   let txIdx = 0;
@@ -278,7 +278,7 @@ async function run() {
               rent: hotspotPubkeys.rent,
               hotspotConfig: hotspotPubkeys.hotspotConfig,
               recipient: solAddress,
-              storage: hotspotStorageKey(
+              info: iotInfoKey(
                 hotspotPubkeys.hotspotConfig,
                 hotspot.address
               )[0],
@@ -288,10 +288,6 @@ async function run() {
         })
       );
 
-      // Create all atas in one tx, so in case the ATAs get created elsewhere the transfer ixns still work
-      // May have to recover by manually creating the ATAs. Hopefully in practice this doesn't happen ever.
-      // But just want to account for it so we don't have to redo the whole lazy txns.
-      const ataIxns = [];
       const tokenIxs = [];
       const hntBal = new BN(account.hnt);
       const dcBal = new BN(account.dc);
@@ -301,21 +297,21 @@ async function run() {
         totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
         totalBalances.hnt = totalBalances.hnt.add(hntBal);
         const { instruction, ata } = createAta(hnt, solAddress, lazySigner);
-        ataIxns.push(instruction);
+        tokenIxs.push(instruction);
         tokenIxs.push(createTransfer(hnt, ata, lazySigner, hntBal));
       }
       if (dcBal.gt(zero)) {
         totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
         totalBalances.dc = totalBalances.dc.add(dcBal);
         const { instruction, ata } = createAta(dc, solAddress, lazySigner);
-        ataIxns.push(instruction);
+        tokenIxs.push(instruction);
         tokenIxs.push(createTransfer(dc, ata, lazySigner, dcBal));
       }
       if (mobileBal.gt(zero)) {
         totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
         totalBalances.mobile = totalBalances.mobile.add(mobileBal);
         const { instruction, ata } = createAta(mobile, solAddress, lazySigner);
-        ataIxns.push(instruction);
+        tokenIxs.push(instruction);
         tokenIxs.push(createTransfer(mobile, ata, lazySigner, mobileBal));
       }
 
@@ -329,7 +325,7 @@ async function run() {
       );
       totalBalances.sol = totalBalances.sol.add(dustAmountBn);
 
-      const ixnGroups = [ataIxns, tokenIxs, ...chunks(hotspotIxs, 2)].filter(
+      const ixnGroups = [tokenIxs, ...chunks(hotspotIxs, 2)].filter(
         (ixGroup) => ixGroup.length > 0
       );
 
@@ -371,7 +367,10 @@ async function run() {
     password: argv.pgPassword,
     host: argv.pgHost,
     database: argv.pgDatabase,
-    pgPort: argv.pgPort,
+    port: argv.pgPort,
+    ssl: {
+      rejectUnauthorized: false
+    }
   });
   await client.connect();
 
@@ -494,7 +493,12 @@ function createAta(
 ): { instruction: TransactionInstruction; ata: PublicKey } {
   const ata = getAssociatedTokenAddressSync(mint, to, true);
   return {
-    instruction: createAssociatedTokenAccountInstruction(payer, ata, to, mint),
+    instruction: createAssociatedTokenAccountIdempotentInstruction(
+      payer,
+      ata,
+      to,
+      mint
+    ),
     ata,
   };
 }

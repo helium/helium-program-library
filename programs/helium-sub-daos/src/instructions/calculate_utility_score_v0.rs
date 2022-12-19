@@ -5,8 +5,10 @@ use anchor_lang::{prelude::*, solana_program::instruction::Instruction, Instruct
 use anchor_spl::token::Token;
 use circuit_breaker::CircuitBreaker;
 use clockwork_sdk::{
-  thread_program::{self, accounts::Thread, ThreadProgram},
-  ThreadResponse,
+  self,
+  state::{Thread, ThreadResponse},
+  utils::PAYER_PUBKEY,
+  ThreadProgram,
 };
 use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
 use switchboard_v2::{AggregatorAccountData, AggregatorHistoryBuffer};
@@ -60,7 +62,6 @@ pub struct CalculateUtilityScoreV0<'info> {
   /// CHECK: address checked
   #[account(mut, address = Thread::pubkey(sub_dao.key(), "end-epoch".to_string()))]
   pub thread: AccountInfo<'info>,
-  #[account(address = thread_program::ID)]
   pub clockwork: Program<'info, ThreadProgram>,
 }
 
@@ -128,7 +129,7 @@ fn construct_kickoff_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> I
 
   // build clockwork kickoff ix
   let accounts = vec![
-    AccountMeta::new(ctx.accounts.payer.key(), true),
+    AccountMeta::new(PAYER_PUBKEY, true),
     AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
     AccountMeta::new(ctx.accounts.sub_dao.key(), false),
     AccountMeta::new(dao_epoch_info, false),
@@ -161,6 +162,10 @@ pub fn handler(
 
   if !TESTING && ctx.accounts.sub_dao_epoch_info.utility_score.is_some() {
     return Err(error!(ErrorCode::UtilityScoreAlreadyCalculated));
+  }
+
+  if ctx.accounts.clock.unix_timestamp < ctx.accounts.dao.emission_schedule[0].start_unix_time {
+    return Err(error!(ErrorCode::EpochToEarly));
   }
 
   ctx.accounts.sub_dao_epoch_info.epoch = epoch;

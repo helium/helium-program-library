@@ -15,15 +15,15 @@ use circuit_breaker::{
   ThresholdType as CBThresholdType,
   WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
 };
-use clockwork_sdk::thread_program::{
-  self,
-  accounts::{Thread, Trigger},
+use clockwork_sdk::{
   cpi::thread_create,
+  state::{Thread, Trigger},
+  utils::PAYER_PUBKEY,
   ThreadProgram,
 };
 use shared_utils::resize_to_fit;
-use time::OffsetDateTime;
 use switchboard_v2::AggregatorAccountData;
+use time::OffsetDateTime;
 use treasury_management::{
   cpi::{accounts::InitializeTreasuryManagementV0, initialize_treasury_management_v0},
   Curve as TreasuryCurve, InitializeTreasuryManagementArgsV0, TreasuryManagement,
@@ -147,7 +147,6 @@ pub struct InitializeSubDaoV0<'info> {
   /// CHECK: handled by thread_create
   #[account(mut, address = Thread::pubkey(sub_dao.key(), "end-epoch".to_string()))]
   pub thread: AccountInfo<'info>,
-  #[account(address = thread_program::ID)]
   pub clockwork: Program<'info, ThreadProgram>,
 }
 
@@ -313,7 +312,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
 
   // build clockwork kickoff ix
   let accounts = vec![
-    AccountMeta::new(ctx.accounts.payer.key(), true),
+    AccountMeta::new(PAYER_PUBKEY, true),
     AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
     AccountMeta::new(ctx.accounts.sub_dao.key(), false),
     AccountMeta::new(dao_epoch_info, false),
@@ -340,7 +339,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
   thread_create(
     CpiContext::new_with_signer(
       ctx.accounts.clockwork.to_account_info(),
-      clockwork_sdk::thread_program::cpi::accounts::ThreadCreate {
+      clockwork_sdk::cpi::ThreadCreate {
         authority: ctx.accounts.sub_dao.to_account_info(),
         payer: ctx.accounts.payer.to_account_info(),
         thread: ctx.accounts.thread.to_account_info(),

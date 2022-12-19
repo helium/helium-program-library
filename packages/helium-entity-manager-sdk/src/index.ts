@@ -6,7 +6,7 @@ import { heliumEntityManagerResolvers } from "./resolvers";
 export * from "./pdas";
 export * from "./resolvers";
 export * from "./constants";
-export { updateMetadata } from "./functions/changeMetadata";
+export { updateMetadata } from "./functions/updateMetadata";
 
 export const init = async (
   provider: AnchorProvider,

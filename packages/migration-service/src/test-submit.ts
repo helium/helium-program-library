@@ -36,7 +36,10 @@ async function run() {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const txs = (await axios.get(`${argv.migrateUrl}/migrate/${argv.targetWallet}`)).data.transactions;
   const txids = await Promise.all(txs.map(async tx => await provider.connection.sendRawTransaction(
-    Buffer.from(tx)
+    Buffer.from(tx),
+    {
+      skipPreflight: true
+    }
   )));
   console.log("Sending", txids);
   await Promise.all(txids.map(async txid => {

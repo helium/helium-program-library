@@ -1,9 +1,8 @@
 use crate::{current_epoch, state::*, utils::*};
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
-use clockwork_sdk::thread_program::{
-  self,
-  accounts::{Thread, Trigger},
+use clockwork_sdk::{
   cpi::thread_create,
+  state::{Thread, Trigger},
   ThreadProgram,
 };
 use shared_utils::PreciseNumber;
@@ -63,7 +62,6 @@ pub struct StakeV0<'info> {
   /// CHECK: handled by thread_create
   #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", args.deposit_entry_idx)))]
   pub thread: AccountInfo<'info>,
-  #[account(address = thread_program::ID)]
   pub clockwork: Program<'info, ThreadProgram>,
 }
 
@@ -118,12 +116,11 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     // updating pos, assert that all available rewards have been claimed
     assert!(stake_position.last_claimed_epoch >= curr_epoch - 1);
 
-    old_position_vehnt = calculate_voting_power(
-      d_entry,
+    old_position_vehnt = d_entry.voting_power_with_deposits(
       voting_mint_config,
-      stake_position.hnt_amount,
-      stake_position.hnt_amount,
       curr_ts,
+      stake_position.hnt_amount,
+      stake_position.hnt_amount,
     )?;
   }
 
@@ -181,14 +178,14 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     let purge_ix = Instruction {
       program_id: crate::ID,
       accounts,
-      data: clockwork_sdk::anchor_sighash("purge_position_v0").to_vec(),
+      data: clockwork_sdk::utils::anchor_sighash("purge_position_v0").to_vec(),
     };
 
     // initialize thread
     thread_create(
       CpiContext::new_with_signer(
         ctx.accounts.clockwork.to_account_info(),
-        clockwork_sdk::thread_program::cpi::accounts::ThreadCreate {
+        clockwork_sdk::cpi::ThreadCreate {
           authority: stake_position.to_account_info(),
           payer: ctx.accounts.voter_authority.to_account_info(),
           thread: ctx.accounts.thread.to_account_info(),

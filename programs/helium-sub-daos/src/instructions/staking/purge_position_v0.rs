@@ -1,9 +1,8 @@
 use crate::{create_cron, error::ErrorCode, state::*, update_subdao_vehnt, TESTING};
 use anchor_lang::prelude::*;
-use clockwork_sdk::thread_program::{
-  self,
-  accounts::{Thread, ThreadSettings, Trigger},
+use clockwork_sdk::{
   cpi::thread_update,
+  state::{Thread, ThreadSettings, Trigger},
   ThreadProgram,
 };
 use voter_stake_registry::state::{Registrar, Voter};
@@ -48,7 +47,6 @@ pub struct PurgePositionV0<'info> {
   pub system_program: Program<'info, System>,
   #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", stake_position.deposit_entry_idx)))]
   pub thread: Account<'info, Thread>,
-  #[account(address = thread_program::ID)]
   pub clockwork: Program<'info, ThreadProgram>,
 }
 
@@ -74,7 +72,7 @@ pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {
     thread_update(
       CpiContext::new_with_signer(
         ctx.accounts.clockwork.to_account_info(),
-        clockwork_sdk::thread_program::cpi::accounts::ThreadUpdate {
+        clockwork_sdk::cpi::ThreadUpdate {
           authority: ctx.accounts.stake_position.to_account_info(),
           system_program: ctx.accounts.system_program.to_account_info(),
           thread: ctx.accounts.thread.to_account_info(),

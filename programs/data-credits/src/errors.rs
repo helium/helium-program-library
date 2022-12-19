@@ -15,9 +15,6 @@ pub enum DataCreditsErrors {
   #[msg("Pyth price is stale")]
   PythPriceFeedStale,
 
-  #[msg("HNT is not trading")]
-  HntNotTrading,
-
   #[msg("Arithmetic error")]
   ArithmeticError,
 }

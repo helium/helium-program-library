@@ -12,7 +12,7 @@ use mpl_bubblegum::{
   program::Bubblegum,
   state::TreeConfig,
 };
-use spl_account_compression::{program::SplAccountCompression, Wrapper};
+use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct GenesisIssueHotspotArgsV0 {
@@ -75,7 +75,7 @@ pub struct GenesisIssueHotspotV0<'info> {
   /// CHECK: Verified by constraint  
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
-  pub log_wrapper: Program<'info, Wrapper>,
+  pub log_wrapper: Program<'info, Noop>,
   pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
   pub system_program: Program<'info, System>,
@@ -126,10 +126,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
   let metadata = MetadataArgs {
     name: animal_name.to_string(),
     symbol: String::from("HOTSPOT"),
-    uri: format!(
-      "https://mobile-metadata.test-helium.com/{}",
-      args.hotspot_key
-    ),
+    uri: format!("https://iot-metadata.test-helium.com/{}", args.hotspot_key),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi

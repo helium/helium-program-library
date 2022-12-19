@@ -39,7 +39,11 @@ export function useAssets(
   const connection = useConnection();
   const rpc = useMemo(() => getRpc(connection), [connection]);
   const stableOpts = useMemo(() => opts, [JSON.stringify(opts)])
-  return useAsync(getAssetsByOwner, [rpc, wallet.toBase58(), stableOpts]);
+  return useAsync(getAssetsByOwner, [
+    "https://rpc-devnet.aws.metaplex.com/", /// TODO: Backpack should have a provider that supports this api
+    wallet.toBase58(),
+    stableOpts,
+  ]);
 }
 
 export function useRewardableNfts(): UseAsyncReturn<Asset[]> {
@@ -50,7 +54,7 @@ export function useRewardableNfts(): UseAsyncReturn<Asset[]> {
     result: result?.filter(
       (nft) =>
         nft.content.metadata.attributes
-          ?.find((att) => att.trait_name == "rewardable")
+          ?.find((att) => att.trait_type == "rewardable")
           ?.value?.toString() == "true"
     ),
     ...rest,

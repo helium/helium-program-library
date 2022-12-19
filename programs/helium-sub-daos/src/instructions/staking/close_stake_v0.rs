@@ -1,6 +1,6 @@
 use crate::{current_epoch, state::*, update_subdao_vehnt};
 use anchor_lang::prelude::*;
-use clockwork_sdk::thread_program::{self, accounts::Thread, cpi::thread_delete, ThreadProgram};
+use clockwork_sdk::{cpi::thread_delete, state::Thread, ThreadProgram};
 use shared_utils::precise_number::PreciseNumber;
 use voter_stake_registry::state::{Registrar, Voter};
 
@@ -52,7 +52,6 @@ pub struct CloseStakeV0<'info> {
 
   #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", args.deposit_entry_idx)))]
   pub thread: Account<'info, Thread>,
-  #[account(address = thread_program::ID)]
   pub clockwork: Program<'info, ThreadProgram>,
 }
 
@@ -103,7 +102,7 @@ pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()>
   ]];
   thread_delete(CpiContext::new_with_signer(
     ctx.accounts.clockwork.to_account_info(),
-    clockwork_sdk::thread_program::cpi::accounts::ThreadDelete {
+    clockwork_sdk::cpi::ThreadDelete {
       authority: stake_position.to_account_info(),
       close_to: ctx.accounts.voter_authority.to_account_info(),
       thread: ctx.accounts.thread.to_account_info(),

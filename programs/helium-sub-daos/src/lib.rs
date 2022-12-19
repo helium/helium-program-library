@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use clockwork_sdk::ThreadResponse;
+use clockwork_sdk::state::ThreadResponse;
 
 declare_id!("hdaojPkgSD8bciDc1w2Z4kXFFibCXngJiw2GRpEL7Wf");
 

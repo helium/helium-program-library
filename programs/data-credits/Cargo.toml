@@ -19,8 +19,8 @@ default = []
 overflow-checks = true
 
 [dependencies]
-anchor-lang = { version="0.25.0", features = ["init-if-needed"] }
-anchor-spl = "0.25.0"
+anchor-lang = { version="0.26.0", features = ["init-if-needed"] }
+anchor-spl = "0.26.0"
 helium-sub-daos = { path = "../helium-sub-daos", features = ["cpi"] }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
-pyth-sdk-solana = { version = "0.6.1" }
+pyth-sdk-solana = { version = "0.7.0" }

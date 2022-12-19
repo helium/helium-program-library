@@ -71,7 +71,6 @@ export const initTestHotspotConfig = async (
 ): Promise<{
   collection: PublicKey;
   hotspotConfig: PublicKey;
-  onboardingServerKeypair: Keypair;
 }> => {
   if (!dcMint) {
     dcMint = await createMint(
@@ -82,7 +81,6 @@ export const initTestHotspotConfig = async (
     );
   }
 
-  const onboardingServerKeypair = Keypair.generate();
   const merkle = Keypair.generate();
   // Testing -- small tree
   const space = getConcurrentMerkleTreeAccountSize(3, 8);
@@ -91,7 +89,6 @@ export const initTestHotspotConfig = async (
       name: "Helium Network Hotspots",
       symbol: random(), // symbol is unique would need to restart localnet everytime
       metadataUrl: DEFAULT_METADATA_URL,
-      onboardingServer: onboardingServerKeypair.publicKey,
       settings: {
         iotConfig: {
           minGain: 10,
@@ -104,7 +101,6 @@ export const initTestHotspotConfig = async (
       maxBufferSize: 8,
     })
     .accounts({
-      dcMint,
       subDao,
       merkleTree: merkle.publicKey,
     })
@@ -127,7 +123,6 @@ export const initTestHotspotConfig = async (
   return {
     collection: collection!,
     hotspotConfig: hotspotConfig!,
-    onboardingServerKeypair,
   };
 };
 
@@ -212,7 +207,6 @@ export const initWorld = async (
   hotspotConfig: {
     collection: PublicKey;
     hotspotConfig: PublicKey;
-    onboardingServerKeypair: Keypair;
   };
   issuer: {
     hotspotIssuer: PublicKey;

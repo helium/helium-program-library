@@ -1,5 +1,5 @@
 import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
-import { subDaoEpochInfoKey } from "./pdas";
+import { subDaoEpochInfoKey, subDaoKey } from "./pdas";
 import {
   ataResolver,
   combineResolvers,
@@ -8,6 +8,10 @@ import {
 import { resolveIndividual } from "@helium/spl-utils";
 import { PROGRAM_ID } from "./constants";
 import { treasuryManagementResolvers } from "@helium/treasury-management-sdk";
+
+const THREAD_PID = new PublicKey(
+  "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
+);
 
 export const subDaoEpochInfoResolver = resolveIndividual(
   async ({ provider, path, accounts }) => {
@@ -54,12 +58,26 @@ export const heliumSubDaosResolvers = combineResolvers(
     instruction: "initializeSubDaoV0",
     account: "stakerPool",
     mint: "dntMint",
-    owner: "subDao"
+    owner: "subDao",
   }),
   ataResolver({
     instruction: "claimRewardsV0",
     account: "stakerAta",
     mint: "dntMint",
-    owner: "voterAuthority"
+    owner: "voterAuthority",
   }),
+  resolveIndividual(async ({ path, accounts, idlIx }) => {
+    if (path[path.length - 1] == "thread" && accounts.subDao && idlIx.name === "initializeSubDaoV0") {
+      return PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("thread", "utf8"),
+          (accounts.subDao as PublicKey).toBuffer(),
+          Buffer.from(`end-epoch`, "utf8"),
+        ],
+        THREAD_PID
+      )[0];
+    } else if (path[path.length - 1] == "clockwork") {
+      return THREAD_PID;
+    }
+  })
 );
