@@ -143,7 +143,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
 
   let current_time = Clock::get()?.unix_timestamp;
   let hnt_price = hnt_price_oracle
-    .get_ema_price_no_older_than(current_time, 60)
+    .get_ema_price_no_older_than(current_time, if TESTING { 6000000 } else { 60 })
     .ok_or_else(|| error!(DataCreditsErrors::PythPriceNotFound))?;
 
   // price * hnt_amount / 10^(8 + expo - 5)

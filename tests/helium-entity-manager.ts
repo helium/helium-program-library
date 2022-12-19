@@ -227,7 +227,7 @@ describe("helium-entity-manager", () => {
         const metadata = {
           name: animalHash(ecc).replace(/\s/g, "-").toLowerCase(),
           symbol: "HOTSPOT",
-          uri: `https://mobile-metadata.oracle.test-helium.com/${ecc}`,
+          uri: `https://iot-metadata.oracle.test-helium.com/${ecc}`,
           collection: {
             key: hotspotCollection,
             verified: true,
@@ -243,8 +243,8 @@ describe("helium-entity-manager", () => {
         };
         const hash = computeCompressedNFTHash(
           hotspot,
-          me,
-          me,
+          hotspotOwner.publicKey,
+          hotspotOwner.publicKey,
           new anchor.BN(0),
           metadata
         );

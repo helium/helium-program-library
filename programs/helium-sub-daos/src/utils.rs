@@ -5,15 +5,6 @@ use std::convert::TryInto;
 use time::{Duration, OffsetDateTime};
 use voter_stake_registry::state::{DepositEntry, VotingMintConfig};
 
-#[derive(Clone, Default)]
-pub struct ThreadProgram;
-
-impl Id for ThreadProgram {
-  fn id() -> Pubkey {
-    clockwork_sdk::ID
-  }
-}
-
 pub trait OrArithError<T> {
   fn or_arith_error(self) -> Result<T>;
 }
@@ -65,11 +56,11 @@ pub fn update_subdao_vehnt(sub_dao: &mut SubDaoV0, curr_ts: i64) {
 }
 
 pub fn calculate_voting_power(
-  d_entry: DepositEntry,
-  voting_mint_config: &VotingMintConfig,
-  amount_deposited_native: u64,
-  amount_initially_locked_native: u64,
-  curr_ts: i64,
+  _d_entry: DepositEntry,
+  _voting_mint_config: &VotingMintConfig,
+  _amount_deposited_native: u64,
+  _amount_initially_locked_native: u64,
+  _curr_ts: i64,
 ) -> Result<u64> {
   return Ok(0) // TODO: Bry!
   // if voting_mint_config.min_required_lockup_saturation_secs > 0

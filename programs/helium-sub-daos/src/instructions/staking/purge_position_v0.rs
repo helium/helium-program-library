@@ -1,6 +1,7 @@
-use crate::{create_cron, error::ErrorCode, state::*, update_subdao_vehnt, TESTING, ThreadProgram};
+use crate::{create_cron, error::ErrorCode, state::*, update_subdao_vehnt, TESTING};
 use anchor_lang::prelude::*;
 use clockwork_sdk::{
+  ThreadProgram,
   state::{Thread, ThreadSettings, Trigger},
   cpi::thread_update,
 };

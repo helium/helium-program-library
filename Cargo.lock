@@ -537,8 +537,9 @@ dependencies = [
 
 [[package]]
 name = "clockwork-cron"
-version = "1.3.16"
-source = "git+https://github.com/clockwork-xyz/clockwork#7aba53c239e050ce50e3c9796aa42aaa13b56dbe"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbc3881dddc06e5186ef288dba9dfce9e44bb00158a5629c32327b5c5fb60e95"
 dependencies = [
  "chrono",
  "nom",
@@ -547,8 +548,9 @@ dependencies = [
 
 [[package]]
 name = "clockwork-network-program"
-version = "1.3.16"
-source = "git+https://github.com/clockwork-xyz/clockwork#7aba53c239e050ce50e3c9796aa42aaa13b56dbe"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a281044d28fe35047dec60cd55cf2000307132ad54c68f6b14952c90eaa01a73"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -557,8 +559,9 @@ dependencies = [
 
 [[package]]
 name = "clockwork-sdk"
-version = "1.3.16"
-source = "git+https://github.com/clockwork-xyz/clockwork#7aba53c239e050ce50e3c9796aa42aaa13b56dbe"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5cb27a6546c10877fb0b309bb94f23fd13903d73ba793dda8b4acab4b70fc286"
 dependencies = [
  "anchor-lang",
  "chrono",
@@ -569,8 +572,9 @@ dependencies = [
 
 [[package]]
 name = "clockwork-thread-program"
-version = "1.3.16"
-source = "git+https://github.com/clockwork-xyz/clockwork#7aba53c239e050ce50e3c9796aa42aaa13b56dbe"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6aa4a3843764e300bd15aefb83b33fbd590de3d0a5ad0b934827833837d2e9f6"
 dependencies = [
  "anchor-lang",
  "chrono",
@@ -583,8 +587,9 @@ dependencies = [
 
 [[package]]
 name = "clockwork-utils"
-version = "1.3.16"
-source = "git+https://github.com/clockwork-xyz/clockwork#7aba53c239e050ce50e3c9796aa42aaa13b56dbe"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80a384f1b7b90796c3a3ad3852b4eb56cc6b3f40a8b15fa4d05688e1a034d538"
 dependencies = [
  "anchor-lang",
  "base64 0.13.1",
@@ -2299,7 +2304,8 @@ checksum = "ab16ced94dbd8a46c82fd81e3ed9a8727dac2977ea869d217bcc4ea1f122e81f"
 [[package]]
 name = "switchboard-v2"
 version = "0.1.17"
-source = "git+https://github.com/ChewingGlass/sbv2-solana.git#2ee4db4c9fc6152a81b243263c905c913fa6a1dd"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "851e6a042596afa363d13733422561fdd0677fb2a9eb6d29358677adfce1d233"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

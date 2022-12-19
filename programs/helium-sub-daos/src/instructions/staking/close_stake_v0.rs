@@ -1,6 +1,6 @@
-use crate::{current_epoch, state::*, update_subdao_vehnt, ThreadProgram};
+use crate::{current_epoch, state::*, update_subdao_vehnt};
 use anchor_lang::prelude::*;
-use clockwork_sdk::{state::Thread, cpi::thread_delete};
+use clockwork_sdk::{ThreadProgram, state::Thread, cpi::thread_delete};
 use shared_utils::precise_number::PreciseNumber;
 use voter_stake_registry::state::{Registrar, Voter};
 

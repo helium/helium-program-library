@@ -1,6 +1,7 @@
-use crate::{ThreadProgram, current_epoch, state::*, utils::*};
+use crate::{current_epoch, state::*, utils::*};
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
 use clockwork_sdk::{
+  ThreadProgram,
   state::{Thread, Trigger},
   cpi::thread_create,
 };

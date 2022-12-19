@@ -1,4 +1,4 @@
-use crate::{circuit_breaker::*, current_epoch, next_epoch_ts, ThreadProgram};
+use crate::{circuit_breaker::*, current_epoch, next_epoch_ts};
 use crate::{state::*, EPOCH_LENGTH};
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use anchor_spl::associated_token::AssociatedToken;
@@ -16,7 +16,9 @@ use circuit_breaker::{
   WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
 };
 use clockwork_sdk::{
+  ThreadProgram,
   cpi::thread_create,
+  utils::{PAYER_PUBKEY},
   state::{Thread, Trigger},
 };
 use shared_utils::resize_to_fit;
@@ -310,7 +312,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
 
   // build clockwork kickoff ix
   let accounts = vec![
-    AccountMeta::new(ctx.accounts.payer.key(), true),
+    AccountMeta::new(PAYER_PUBKEY, true),
     AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
     AccountMeta::new(ctx.accounts.sub_dao.key(), false),
     AccountMeta::new(dao_epoch_info, false),

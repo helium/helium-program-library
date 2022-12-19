@@ -1,11 +1,11 @@
 use crate::{
-  current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError, EPOCH_LENGTH, ThreadProgram,
+  current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError, EPOCH_LENGTH,
 };
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use anchor_spl::token::Token;
 use circuit_breaker::CircuitBreaker;
 use clockwork_sdk::{
-  self, state::{Thread, ThreadResponse},
+  self, utils::{PAYER_PUBKEY}, ThreadProgram, state::{Thread, ThreadResponse},
 };
 use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
 use switchboard_v2::{AggregatorAccountData, AggregatorHistoryBuffer};
@@ -126,7 +126,7 @@ fn construct_kickoff_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> I
 
   // build clockwork kickoff ix
   let accounts = vec![
-    AccountMeta::new(ctx.accounts.payer.key(), true),
+    AccountMeta::new(PAYER_PUBKEY, true),
     AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
     AccountMeta::new(ctx.accounts.sub_dao.key(), false),
     AccountMeta::new(dao_epoch_info, false),
