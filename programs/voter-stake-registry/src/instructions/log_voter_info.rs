@@ -50,7 +50,7 @@ pub fn log_voter_info(
     let voting_mint_config = &registrar.voting_mints[deposit.voting_mint_config_idx as usize];
     let locking_info = (seconds_left > 0).then(|| LockingInfo {
       amount: deposit.amount_locked(curr_ts),
-      end_timestamp: (lockup.kind != LockupKind::Constant).then(|| end_ts),
+      end_timestamp: (lockup.kind != LockupKind::Constant).then_some(end_ts),
     });
 
     emit!(DepositEntryInfo {

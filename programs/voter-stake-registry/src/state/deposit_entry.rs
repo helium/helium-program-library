@@ -180,7 +180,7 @@ impl DepositEntry {
     genesis_vote_power_multiplier: u8,
     genesis_vote_power_multiplier_expiration_ts: i64,
   ) -> Result<u64> {
-    let mut altered = self.clone();
+    let mut altered = *self;
 
     // Trigger the unlock phase for constant lockups
     if self.lockup.kind == LockupKind::Constant {
