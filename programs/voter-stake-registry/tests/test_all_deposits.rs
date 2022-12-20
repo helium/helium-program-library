@@ -1,4 +1,4 @@
-/// TODO: Why does this test hang?
+// TODO: Why does this test hang?
 
 // use anchor_spl::token::TokenAccount;
 // use program_test::*;
