@@ -32,7 +32,7 @@ impl SolanaCookie {
 
     let mut context = self.context.borrow_mut();
 
-    let mut transaction = Transaction::new_with_payer(&instructions, Some(&context.payer.pubkey()));
+    let mut transaction = Transaction::new_with_payer(instructions, Some(&context.payer.pubkey()));
 
     let mut all_signers = vec![&context.payer];
 
@@ -95,7 +95,7 @@ impl SolanaCookie {
       .process_transaction(&instructions, Some(&[&keypair]))
       .await
       .unwrap();
-    return keypair.pubkey();
+    keypair.pubkey()
   }
 
   #[allow(dead_code)]

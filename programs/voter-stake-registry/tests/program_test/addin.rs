@@ -242,7 +242,7 @@ impl AddinCookie {
     start_ts: Option<u64>,
     periods: u32,
   ) -> std::result::Result<(), BanksClientError> {
-    let vault = voter.vault_address(&voting_mint);
+    let vault = voter.vault_address(voting_mint);
 
     let data =
       anchor_lang::InstructionData::data(&voter_stake_registry::instruction::CreateDepositEntry {
@@ -294,7 +294,7 @@ impl AddinCookie {
     deposit_entry_index: u8,
     amount: u64,
   ) -> std::result::Result<(), BanksClientError> {
-    let vault = voter.vault_address(&voting_mint);
+    let vault = voter.vault_address(voting_mint);
 
     let data = anchor_lang::InstructionData::data(&voter_stake_registry::instruction::Deposit {
       deposit_entry_index,
@@ -305,7 +305,7 @@ impl AddinCookie {
       &voter_stake_registry::accounts::Deposit {
         registrar: registrar.address,
         voter: voter.address,
-        vault: vault,
+        vault,
         deposit_token: token_address,
         deposit_authority: authority.pubkey(),
         token_program: spl_token::id(),
@@ -339,7 +339,7 @@ impl AddinCookie {
     deposit_entry_index: u8,
     amount: u64,
   ) -> std::result::Result<(), BanksClientError> {
-    let vault = voter.vault_address(&voting_mint);
+    let vault = voter.vault_address(voting_mint);
 
     let data = anchor_lang::InstructionData::data(&voter_stake_registry::instruction::Withdraw {
       deposit_entry_index,
@@ -383,7 +383,7 @@ impl AddinCookie {
     voting_mint: &VotingMintConfigCookie,
     voter_authority: &Keypair,
   ) -> std::result::Result<(), BanksClientError> {
-    let vault = voter.vault_address(&voting_mint);
+    let vault = voter.vault_address(voting_mint);
 
     let data =
       anchor_lang::InstructionData::data(&voter_stake_registry::instruction::CloseVoter {});
@@ -693,7 +693,7 @@ impl AddinCookie {
 impl VotingMintConfigCookie {
   #[allow(dead_code)]
   pub async fn vault_balance(&self, solana: &SolanaCookie, voter: &VoterCookie) -> u64 {
-    let vault = voter.vault_address(&self);
+    let vault = voter.vault_address(self);
     solana.get_account::<TokenAccount>(vault).await.amount
   }
 }

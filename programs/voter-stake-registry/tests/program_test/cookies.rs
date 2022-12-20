@@ -20,7 +20,7 @@ impl Clone for MintCookie {
       unit: self.unit,
       base_lot: self.base_lot,
       quote_lot: self.quote_lot,
-      pubkey: self.pubkey.clone(),
+      pubkey: self.pubkey,
       authority: clone_keypair(&self.authority),
     }
   }
