@@ -2,11 +2,11 @@ import { createAtaAndMint, createMint, sendInstructions, toBN, createAtaAndTrans
 import { Program, BN, AnchorProvider, web3 } from "@project-serum/anchor";
 import { getGovernanceProgramVersion, MintMaxVoteWeightSource, withCreateRealm } from "@solana/spl-governance";
 import { PublicKey, Keypair, TransactionInstruction, Transaction } from "@solana/web3.js";
-import { VoterStakeRegistry } from "../../deps/helium-voter-stake-registry/src/voter_stake_registry";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 
 export const SPL_GOVERNANCE_PID = new PublicKey("GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw");
-export const VSR_PID = new PublicKey("vsrZ1Nfkxmt1hVaB7ftvcj7XpRoQ1YtCgPLajeaV6Uj");
+export const VSR_PID = new PublicKey("hvsrY9UBtHhYRvstM2BWCsni81kevfn7B2DEhYbGA1a");
 
 
 export async function initVsr(
@@ -55,23 +55,32 @@ export async function initVsr(
 
   // Configure voting mint
   const minLockupSeconds = 15811200; // 6 months
-  instructions.push(await program.methods.configureVotingMint(
-    0, // idx
-    0, // digit shift
-    new BN(0), // baseline vote weight
-    toBN(100, 8), // max vote weight
-    new BN(minLockupSeconds * 8), // lockup saturation seconds
-    me, // authority
-    toBN(1, 8), // min required vote weight
-    new BN(minLockupSeconds) // min lockup seconds
-  ).accounts({
-    registrar,
-    mint: hntMint,
-  }).remainingAccounts([{
-    pubkey: hntMint,
-    isSigner: false,
-    isWritable: false,
-  }]).instruction());
+  instructions.push(
+    await program.methods
+      .configureVotingMint(
+        0, // idx
+        0, // digit shift
+        new BN(0), // locked vote weight scaled factor
+        new BN(minLockupSeconds), // min lockup seconds
+        new BN(100), // scaled factor
+        3,
+        new BN(1),
+        new BN(minLockupSeconds * 8), // lockup saturation seconds
+        null
+      )
+      .accounts({
+        registrar,
+        mint: hntMint,
+      })
+      .remainingAccounts([
+        {
+          pubkey: hntMint,
+          isSigner: false,
+          isWritable: false,
+        },
+      ])
+      .instruction()
+  );
 
   // create voter
   const [voter, voter_bump] = PublicKey.findProgramAddressSync([
@@ -91,7 +100,7 @@ export async function initVsr(
 
   // create deposit entry
   const vault = await getAssociatedTokenAddress(hntMint, voter, true);
-  instructions.push(await program.methods.createDepositEntry(0, {cliff: {}}, null, options.lockupPeriods, false).accounts({ // lock for 6 months
+  instructions.push(await program.methods.createDepositEntry(0, {cliff: {}}, null, options.lockupPeriods).accounts({ // lock for 6 months
     registrar,
     voter,
     vault,

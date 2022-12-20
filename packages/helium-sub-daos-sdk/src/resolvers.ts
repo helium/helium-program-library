@@ -67,7 +67,11 @@ export const heliumSubDaosResolvers = combineResolvers(
     owner: "voterAuthority",
   }),
   resolveIndividual(async ({ path, accounts, idlIx }) => {
-    if (path[path.length - 1] == "thread" && accounts.subDao && idlIx.name === "initializeSubDaoV0") {
+    if (
+      path[path.length - 1] == "thread" &&
+      accounts.subDao &&
+      new Set(["calculateUtilityScoreV0", "initializeSubDaoV0"]).has(idlIx.name)
+    ) {
       return PublicKey.findProgramAddressSync(
         [
           Buffer.from("thread", "utf8"),

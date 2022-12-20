@@ -1,12 +1,12 @@
 {
-  "name": "@helium/helium-voter-stake-registry-sdk",
+  "name": "@helium/voter-stake-registry-sdk",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
   "version": "0.0.9",
-  "description": "Interface to the helium-voter-stake-registry smart contract",
+  "description": "Interface to the voter-stake-registry smart contract",
   "repository": {
     "type": "git",
     "url": "https://github.com/HeliumFoundation/helium-program-libary"
