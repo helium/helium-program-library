@@ -60,7 +60,7 @@ export async function initVsr(
       .configureVotingMint(
         0, // idx
         0, // digit shift
-        new BN(0), // locked vote weight scaled factor
+        new BN(1), // locked vote weight scaled factor
         new BN(minLockupSeconds), // min lockup seconds
         new BN(100), // scaled factor
         3,

@@ -225,6 +225,7 @@ impl DepositEntry {
       1
     };
 
+    msg!("remaining: {}, minimum_required_lockup_secs: {}", remaining, minimum_required_lockup_secs);
     if remaining > minimum_required_lockup_secs {
       Ok(
         u64::try_from(
