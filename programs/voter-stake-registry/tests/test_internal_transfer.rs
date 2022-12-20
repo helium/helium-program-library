@@ -22,7 +22,7 @@ async fn get_lockup_data(
   let duration = d.lockup.periods_total().unwrap() * d.lockup.kind.period_secs();
   (
     // time since lockup start (saturating at "duration")
-    (duration - d.lockup.seconds_left(now)) as u64,
+    (duration - d.lockup.seconds_left(now)),
     // duration of lockup
     duration,
     d.amount_initially_locked_native,
@@ -45,14 +45,14 @@ async fn test_internal_transfer() -> Result<(), TransportError> {
       "testrealm",
       realm_authority.pubkey(),
       &context.mints[0],
-      &payer,
+      payer,
       &context.addin.program_id,
     )
     .await;
 
   let voter_authority = &context.users[1].key;
   let token_owner_record = realm
-    .create_token_owner_record(voter_authority.pubkey(), &payer)
+    .create_token_owner_record(voter_authority.pubkey(), payer)
     .await;
 
   let registrar = addin
@@ -78,7 +78,7 @@ async fn test_internal_transfer() -> Result<(), TransportError> {
     .await;
 
   let voter = addin
-    .create_voter(&registrar, &token_owner_record, &voter_authority, &payer)
+    .create_voter(&registrar, &token_owner_record, voter_authority, payer)
     .await;
 
   let reference_account = context.users[1].token_accounts[0];
@@ -87,17 +87,17 @@ async fn test_internal_transfer() -> Result<(), TransportError> {
       &registrar,
       &voter,
       &voting_mint,
-      &voter_authority,
+      voter_authority,
       reference_account,
       index,
       amount,
     )
   };
   let internal_transfer_locked = |source: u8, target: u8, amount: u64| {
-    addin.internal_transfer_locked(&registrar, &voter, &voter_authority, source, target, amount)
+    addin.internal_transfer_locked(&registrar, &voter, voter_authority, source, target, amount)
   };
   let internal_transfer_unlocked = |source: u8, target: u8, amount: u64| {
-    addin.internal_transfer_unlocked(&registrar, &voter, &voter_authority, source, target, amount)
+    addin.internal_transfer_unlocked(&registrar, &voter, voter_authority, source, target, amount)
   };
   let time_offset = Arc::new(RefCell::new(0i64));
   let advance_time = |extra: u64| {
@@ -114,7 +114,7 @@ async fn test_internal_transfer() -> Result<(), TransportError> {
     .create_deposit_entry(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       &voting_mint,
       0,
       LockupKind::None,
@@ -129,7 +129,7 @@ async fn test_internal_transfer() -> Result<(), TransportError> {
     .create_deposit_entry(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       &voting_mint,
       1,
       LockupKind::None,
@@ -165,7 +165,7 @@ async fn test_internal_transfer() -> Result<(), TransportError> {
     .create_deposit_entry(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       &voting_mint,
       2,
       LockupKind::Constant,
@@ -179,7 +179,7 @@ async fn test_internal_transfer() -> Result<(), TransportError> {
     .create_deposit_entry(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       &voting_mint,
       3,
       LockupKind::Cliff,
@@ -207,7 +207,7 @@ async fn test_internal_transfer() -> Result<(), TransportError> {
     .create_deposit_entry(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       &voting_mint,
       4,
       LockupKind::Cliff,

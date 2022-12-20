@@ -22,7 +22,7 @@ async fn get_lockup_data(
   let duration = d.lockup.periods_total().unwrap() * d.lockup.kind.period_secs();
   (
     // time since lockup start (saturating at "duration")
-    (duration - d.lockup.seconds_left(now)) as u64,
+    (duration - d.lockup.seconds_left(now)),
     // duration of lockup
     duration,
     d.amount_initially_locked_native,
@@ -45,14 +45,14 @@ async fn test_reset_lockup() -> Result<(), TransportError> {
       "testrealm",
       realm_authority.pubkey(),
       &context.mints[0],
-      &payer,
+      payer,
       &context.addin.program_id,
     )
     .await;
 
   let voter_authority = &context.users[1].key;
   let token_owner_record = realm
-    .create_token_owner_record(voter_authority.pubkey(), &payer)
+    .create_token_owner_record(voter_authority.pubkey(), payer)
     .await;
 
   let registrar = addin
@@ -78,7 +78,7 @@ async fn test_reset_lockup() -> Result<(), TransportError> {
     .await;
 
   let voter = addin
-    .create_voter(&registrar, &token_owner_record, &voter_authority, &payer)
+    .create_voter(&registrar, &token_owner_record, voter_authority, payer)
     .await;
 
   let reference_account = context.users[1].token_accounts[0];
@@ -87,7 +87,7 @@ async fn test_reset_lockup() -> Result<(), TransportError> {
       &registrar,
       &voter,
       &voting_mint,
-      &voter_authority,
+      voter_authority,
       reference_account,
       index,
       amount,
@@ -98,14 +98,14 @@ async fn test_reset_lockup() -> Result<(), TransportError> {
       &registrar,
       &voter,
       &voting_mint,
-      &voter_authority,
+      voter_authority,
       reference_account,
       index,
       amount,
     )
   };
   let reset_lockup = |index: u8, periods: u32, kind: LockupKind| {
-    addin.reset_lockup(&registrar, &voter, &voter_authority, index, kind, periods)
+    addin.reset_lockup(&registrar, &voter, voter_authority, index, kind, periods)
   };
   let time_offset = Arc::new(RefCell::new(0i64));
   let advance_time = |extra: u64| {
@@ -123,7 +123,7 @@ async fn test_reset_lockup() -> Result<(), TransportError> {
     .create_deposit_entry(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       &voting_mint,
       5,
       LockupKind::Cliff,
@@ -151,7 +151,7 @@ async fn test_reset_lockup() -> Result<(), TransportError> {
 
   assert_eq!(lockup_status(5).await, (4 * day, 4 * day, 80, 80, 80));
   reset_lockup(5, 1, LockupKind::Cliff).await.unwrap();
-  assert_eq!(lockup_status(5).await, (0, 1 * day, 80, 80, 0));
+  assert_eq!(lockup_status(5).await, (0, day, 80, 80, 0));
   withdraw(5, 10).await.expect_err("nothing unlocked");
 
   // advance to end of cliff again
@@ -164,9 +164,9 @@ async fn test_reset_lockup() -> Result<(), TransportError> {
   deposit(5, 5).await.unwrap();
   assert_eq!(lockup_status(5).await, (0, 0, 5, 75, 75));
   reset_lockup(5, 1, LockupKind::Cliff).await.unwrap();
-  assert_eq!(lockup_status(5).await, (0, 1 * day, 75, 75, 0));
+  assert_eq!(lockup_status(5).await, (0, day, 75, 75, 0));
   deposit(5, 15).await.unwrap();
-  assert_eq!(lockup_status(5).await, (0, 1 * day, 90, 90, 0));
+  assert_eq!(lockup_status(5).await, (0, day, 90, 90, 0));
 
   Ok(())
 }

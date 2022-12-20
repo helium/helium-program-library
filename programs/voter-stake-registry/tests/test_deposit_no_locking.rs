@@ -27,11 +27,11 @@ async fn balances(
   context.solana.advance_clock_by_slots(2).await;
 
   let token = context.solana.token_account_balance(address).await;
-  let vault = voting_mint.vault_balance(&context.solana, &voter).await;
+  let vault = voting_mint.vault_balance(&context.solana, voter).await;
   let deposit = voter.deposit_amount(&context.solana, deposit_id).await;
   let vwr = context
     .addin
-    .update_voter_weight_record(&registrar, &voter)
+    .update_voter_weight_record(registrar, voter)
     .await
     .unwrap();
   Balances {
@@ -56,7 +56,7 @@ async fn test_deposit_no_locking() -> Result<(), TransportError> {
       "testrealm",
       realm_authority.pubkey(),
       &context.mints[0],
-      &payer,
+      payer,
       &context.addin.program_id,
     )
     .await;
@@ -64,10 +64,10 @@ async fn test_deposit_no_locking() -> Result<(), TransportError> {
   let voter_authority = &context.users[1].key;
   let voter2_authority = &context.users[2].key;
   let token_owner_record = realm
-    .create_token_owner_record(voter_authority.pubkey(), &payer)
+    .create_token_owner_record(voter_authority.pubkey(), payer)
     .await;
   let token_owner_record2 = realm
-    .create_token_owner_record(voter2_authority.pubkey(), &payer)
+    .create_token_owner_record(voter2_authority.pubkey(), payer)
     .await;
 
   let registrar = addin
@@ -93,11 +93,11 @@ async fn test_deposit_no_locking() -> Result<(), TransportError> {
     .await;
 
   let voter = addin
-    .create_voter(&registrar, &token_owner_record, &voter_authority, &payer)
+    .create_voter(&registrar, &token_owner_record, voter_authority, payer)
     .await;
 
   let voter2 = addin
-    .create_voter(&registrar, &token_owner_record2, &voter2_authority, &payer)
+    .create_voter(&registrar, &token_owner_record2, voter2_authority, payer)
     .await;
 
   let reference_account = context.users[1].token_accounts[0];
@@ -116,7 +116,7 @@ async fn test_deposit_no_locking() -> Result<(), TransportError> {
       &registrar,
       &voter,
       &voting_mint,
-      &voter_authority,
+      voter_authority,
       reference_account,
       0,
       amount,
@@ -127,7 +127,7 @@ async fn test_deposit_no_locking() -> Result<(), TransportError> {
       &registrar,
       &voter,
       &voting_mint,
-      &voter_authority,
+      voter_authority,
       reference_account,
       deposit_id,
       amount,
@@ -143,7 +143,7 @@ async fn test_deposit_no_locking() -> Result<(), TransportError> {
     .create_deposit_entry(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       &voting_mint,
       0,
       LockupKind::None,
@@ -174,7 +174,7 @@ async fn test_deposit_no_locking() -> Result<(), TransportError> {
     .create_deposit_entry(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       &voting_mint,
       1,
       LockupKind::None,
@@ -211,15 +211,15 @@ async fn test_deposit_no_locking() -> Result<(), TransportError> {
 
   // Close the empty deposit (closing deposits 1 and 2 fails)
   addin
-    .close_deposit_entry(&voter, &voter_authority, 2)
+    .close_deposit_entry(&voter, voter_authority, 2)
     .await
     .expect_err("deposit not in use");
   addin
-    .close_deposit_entry(&voter, &voter_authority, 1)
+    .close_deposit_entry(&voter, voter_authority, 1)
     .await
     .expect_err("deposit not empty");
   addin
-    .close_deposit_entry(&voter, &voter_authority, 0)
+    .close_deposit_entry(&voter, voter_authority, 0)
     .await
     .unwrap();
 
@@ -246,7 +246,7 @@ async fn test_deposit_no_locking() -> Result<(), TransportError> {
     .create_deposit_entry(
       &registrar,
       &voter2,
-      &voter2_authority,
+      voter2_authority,
       &voting_mint,
       5,
       LockupKind::None,
@@ -260,7 +260,7 @@ async fn test_deposit_no_locking() -> Result<(), TransportError> {
       &registrar,
       &voter2,
       &voting_mint,
-      &voter2_authority,
+      voter2_authority,
       context.users[2].token_accounts[0],
       5,
       1000,
@@ -286,7 +286,7 @@ async fn test_deposit_no_locking() -> Result<(), TransportError> {
     .create_deposit_entry(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       &voting_mint,
       0,
       LockupKind::None,

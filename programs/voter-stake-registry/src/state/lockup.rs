@@ -555,12 +555,12 @@ mod tests {
   }
 
   fn locked_cliff_power_float(amount: u64, remaining_days: f64) -> f64 {
-    let relevant_days = if remaining_days < MAX_DAYS_LOCKED as f64 {
+    let relevant_days = if remaining_days < MAX_DAYS_LOCKED {
       remaining_days
     } else {
-      MAX_DAYS_LOCKED as f64
+      MAX_DAYS_LOCKED
     };
-    (amount as f64) * relevant_days / (MAX_DAYS_LOCKED as f64)
+    (amount as f64) * relevant_days / MAX_DAYS_LOCKED
   }
 
   fn locked_cliff_power(amount: u64, remaining_days: f64) -> u64 {

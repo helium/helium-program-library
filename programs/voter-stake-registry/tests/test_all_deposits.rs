@@ -20,7 +20,7 @@ async fn test_all_deposits() -> Result<(), TransportError> {
       "testrealm",
       realm_authority.pubkey(),
       &context.mints[0],
-      &payer,
+      payer,
       &context.addin.program_id,
     )
     .await;
@@ -28,7 +28,7 @@ async fn test_all_deposits() -> Result<(), TransportError> {
   let voter_authority = &context.users[1].key;
   let voter_mngo = context.users[1].token_accounts[0];
   let token_owner_record = realm
-    .create_token_owner_record(voter_authority.pubkey(), &payer)
+    .create_token_owner_record(voter_authority.pubkey(), payer)
     .await;
 
   let registrar = addin
@@ -56,7 +56,7 @@ async fn test_all_deposits() -> Result<(), TransportError> {
     .await;
 
   let voter = addin
-    .create_voter(&registrar, &token_owner_record, &voter_authority, &payer)
+    .create_voter(&registrar, &token_owner_record, voter_authority, payer)
     .await;
 
   let reference_account = context.users[1].token_accounts[0];
@@ -66,7 +66,7 @@ async fn test_all_deposits() -> Result<(), TransportError> {
       &registrar,
       &voter,
       &voting_mint,
-      &voter_authority,
+      voter_authority,
       reference_account,
       0,
       amount,
@@ -103,7 +103,7 @@ async fn test_all_deposits() -> Result<(), TransportError> {
 
   // advance time, to be in the middle of all deposit lockups
   addin
-    .set_time_offset(&registrar, &realm_authority, 32 * 24 * 60 * 60 as i64)
+    .set_time_offset(&registrar, &realm_authority, 32 * 24 * 60 * 60_i64)
     .await;
   context.solana.advance_clock_by_slots(2).await;
 

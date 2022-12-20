@@ -25,11 +25,11 @@ async fn balances(
   context.solana.advance_clock_by_slots(2).await;
 
   let token = context.solana.token_account_balance(address).await;
-  let vault = voting_mint.vault_balance(&context.solana, &voter).await;
+  let vault = voting_mint.vault_balance(&context.solana, voter).await;
   let deposit = voter.deposit_amount(&context.solana, deposit_id).await;
   let vwr = context
     .addin
-    .update_voter_weight_record(&registrar, &voter)
+    .update_voter_weight_record(registrar, voter)
     .await
     .unwrap();
   Balances {
@@ -54,14 +54,14 @@ async fn test_deposit_cliff_minimum_lockup() -> Result<(), TransportError> {
       "testrealm",
       realm_authority.pubkey(),
       &context.mints[0],
-      &payer,
+      payer,
       &context.addin.program_id,
     )
     .await;
 
   let voter_authority = &context.users[1].key;
   let token_owner_record = realm
-    .create_token_owner_record(voter_authority.pubkey(), &payer)
+    .create_token_owner_record(voter_authority.pubkey(), payer)
     .await;
 
   let registrar = addin
@@ -87,7 +87,7 @@ async fn test_deposit_cliff_minimum_lockup() -> Result<(), TransportError> {
     .await;
 
   let voter = addin
-    .create_voter(&registrar, &token_owner_record, &voter_authority, &payer)
+    .create_voter(&registrar, &token_owner_record, voter_authority, payer)
     .await;
 
   let reference_account = context.users[1].token_accounts[0];
@@ -106,7 +106,7 @@ async fn test_deposit_cliff_minimum_lockup() -> Result<(), TransportError> {
       &registrar,
       &voter,
       &voting_mint,
-      &voter_authority,
+      voter_authority,
       reference_account,
       0,
       amount,
@@ -117,7 +117,7 @@ async fn test_deposit_cliff_minimum_lockup() -> Result<(), TransportError> {
       &registrar,
       &voter,
       &voting_mint,
-      &voter_authority,
+      voter_authority,
       reference_account,
       0,
       amount,
@@ -135,7 +135,7 @@ async fn test_deposit_cliff_minimum_lockup() -> Result<(), TransportError> {
     .create_deposit_entry(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       &voting_mint,
       0,
       voter_stake_registry::state::LockupKind::Constant,
@@ -150,7 +150,7 @@ async fn test_deposit_cliff_minimum_lockup() -> Result<(), TransportError> {
     .create_deposit_entry(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       &voting_mint,
       0,
       voter_stake_registry::state::LockupKind::Constant,
@@ -164,7 +164,7 @@ async fn test_deposit_cliff_minimum_lockup() -> Result<(), TransportError> {
 
   let after_deposit = get_balances(0).await;
   assert_eq!(token, after_deposit.token + after_deposit.vault);
-  assert_eq!(after_deposit.voter_weight, 1 * after_deposit.vault); // saturated locking bonus
+  assert_eq!(after_deposit.voter_weight, after_deposit.vault); // saturated locking bonus
   assert_eq!(after_deposit.vault, 9000);
   assert_eq!(after_deposit.deposit, 9000);
 
@@ -183,7 +183,7 @@ async fn test_deposit_cliff_minimum_lockup() -> Result<(), TransportError> {
 
   let after_deposit = get_balances(0).await;
   assert_eq!(token, after_deposit.token + after_deposit.vault);
-  assert_eq!(after_deposit.voter_weight, 1 * after_deposit.vault); // saturated locking bonus
+  assert_eq!(after_deposit.voter_weight, after_deposit.vault); // saturated locking bonus
   assert_eq!(after_deposit.vault, 10000);
   assert_eq!(after_deposit.deposit, 10000);
 
@@ -194,7 +194,7 @@ async fn test_deposit_cliff_minimum_lockup() -> Result<(), TransportError> {
     .reset_lockup(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       0,
       voter_stake_registry::state::LockupKind::Cliff,
       1,
@@ -205,7 +205,7 @@ async fn test_deposit_cliff_minimum_lockup() -> Result<(), TransportError> {
     .reset_lockup(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       0,
       voter_stake_registry::state::LockupKind::Cliff,
       2,
@@ -215,7 +215,7 @@ async fn test_deposit_cliff_minimum_lockup() -> Result<(), TransportError> {
 
   let after_reset = get_balances(0).await;
   assert_eq!(token, after_reset.token + after_reset.vault);
-  assert_eq!(after_reset.voter_weight, 1 * after_reset.vault); // saturated locking bonus
+  assert_eq!(after_reset.voter_weight, after_reset.vault); // saturated locking bonus
   assert_eq!(after_reset.vault, 10000);
   assert_eq!(after_reset.deposit, 10000);
 

@@ -20,14 +20,14 @@ async fn test_basic() -> Result<(), TransportError> {
       "testrealm",
       realm_authority.pubkey(),
       &context.mints[0],
-      &payer,
+      payer,
       &context.addin.program_id,
     )
     .await;
 
   let voter_authority = &context.users[1].key;
   let token_owner_record = realm
-    .create_token_owner_record(voter_authority.pubkey(), &payer)
+    .create_token_owner_record(voter_authority.pubkey(), payer)
     .await;
 
   let registrar = context
@@ -75,13 +75,13 @@ async fn test_basic() -> Result<(), TransportError> {
 
   let voter = context
     .addin
-    .create_voter(&registrar, &token_owner_record, &voter_authority, &payer)
+    .create_voter(&registrar, &token_owner_record, voter_authority, payer)
     .await;
 
   // create the voter again, should have no effect
   context
     .addin
-    .create_voter(&registrar, &token_owner_record, &voter_authority, &payer)
+    .create_voter(&registrar, &token_owner_record, voter_authority, payer)
     .await;
 
   // test deposit and withdraw
@@ -113,7 +113,7 @@ async fn test_basic() -> Result<(), TransportError> {
       &registrar,
       &voter,
       &voting_mint,
-      &voter_authority,
+      voter_authority,
       reference_account,
       0,
       10000,
@@ -136,7 +136,7 @@ async fn test_basic() -> Result<(), TransportError> {
       &registrar,
       &voter,
       &voting_mint,
-      &&context.users[2].key,
+      &context.users[2].key,
       reference_account,
       0,
       10000,
@@ -150,7 +150,7 @@ async fn test_basic() -> Result<(), TransportError> {
       &registrar,
       &voter,
       &voting_mint,
-      &voter_authority,
+      voter_authority,
       reference_account,
       0,
       10000,
@@ -176,7 +176,7 @@ async fn test_basic() -> Result<(), TransportError> {
     .await?;
   context
     .addin
-    .close_voter(&registrar, &voter, &voting_mint, &voter_authority)
+    .close_voter(&registrar, &voter, &voting_mint, voter_authority)
     .await?;
   let lamports_after = context
     .solana

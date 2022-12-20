@@ -25,11 +25,11 @@ async fn balances(
   context.solana.advance_clock_by_slots(2).await;
 
   let token = context.solana.token_account_balance(address).await;
-  let vault = voting_mint.vault_balance(&context.solana, &voter).await;
+  let vault = voting_mint.vault_balance(&context.solana, voter).await;
   let deposit = voter.deposit_amount(&context.solana, deposit_id).await;
   let vwr = context
     .addin
-    .update_voter_weight_record(&registrar, &voter)
+    .update_voter_weight_record(registrar, voter)
     .await
     .unwrap();
   Balances {
@@ -54,14 +54,14 @@ async fn test_deposit_constant() -> Result<(), TransportError> {
       "testrealm",
       realm_authority.pubkey(),
       &context.mints[0],
-      &payer,
+      payer,
       &context.addin.program_id,
     )
     .await;
 
   let voter_authority = &context.users[1].key;
   let token_owner_record = realm
-    .create_token_owner_record(voter_authority.pubkey(), &payer)
+    .create_token_owner_record(voter_authority.pubkey(), payer)
     .await;
 
   let registrar = addin
@@ -87,7 +87,7 @@ async fn test_deposit_constant() -> Result<(), TransportError> {
     .await;
 
   let voter = addin
-    .create_voter(&registrar, &token_owner_record, &voter_authority, &payer)
+    .create_voter(&registrar, &token_owner_record, voter_authority, payer)
     .await;
 
   let reference_account = context.users[1].token_accounts[0];
@@ -106,7 +106,7 @@ async fn test_deposit_constant() -> Result<(), TransportError> {
       &registrar,
       &voter,
       &voting_mint,
-      &voter_authority,
+      voter_authority,
       reference_account,
       0,
       amount,
@@ -117,7 +117,7 @@ async fn test_deposit_constant() -> Result<(), TransportError> {
       &registrar,
       &voter,
       &voting_mint,
-      &voter_authority,
+      voter_authority,
       reference_account,
       0,
       amount,
@@ -134,7 +134,7 @@ async fn test_deposit_constant() -> Result<(), TransportError> {
     .create_deposit_entry(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       &voting_mint,
       0,
       voter_stake_registry::state::LockupKind::Constant,
@@ -177,7 +177,7 @@ async fn test_deposit_constant() -> Result<(), TransportError> {
     .reset_lockup(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       0,
       voter_stake_registry::state::LockupKind::Cliff,
       1,
@@ -188,7 +188,7 @@ async fn test_deposit_constant() -> Result<(), TransportError> {
     .reset_lockup(
       &registrar,
       &voter,
-      &voter_authority,
+      voter_authority,
       0,
       voter_stake_registry::state::LockupKind::Cliff,
       2,
