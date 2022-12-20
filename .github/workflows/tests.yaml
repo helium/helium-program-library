@@ -49,24 +49,6 @@ jobs:
           key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo test --lib
 
-  test-bpf:
-    name: Rust Bpf Tests
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: ./.github/actions/setup/
-      - uses: actions/cache@v2
-        name: Cache Cargo registry + index
-        id: cache-cargo-build
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo test-bpf
-
   test-contracts:
     name: Test Anchor Contracts
     runs-on: ubuntu-22.04
