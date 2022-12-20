@@ -1,3 +1,5 @@
+#![allow(clippy::await_holding_refcell_ref)]
+
 use anchor_spl::token::TokenAccount;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, signer::Signer, transport::TransportError};
