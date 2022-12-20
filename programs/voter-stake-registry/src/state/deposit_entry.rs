@@ -217,8 +217,7 @@ impl DepositEntry {
   ) -> Result<u64> {
     let remaining = min(self.lockup.seconds_left(curr_ts), lockup_saturation_secs);
     let genesis_multiplier = if self.lockup.start_ts < genesis_vote_power_multiplier_expiration_ts
-      || curr_ts < genesis_vote_power_multiplier_expiration_ts
-        && genesis_vote_power_multiplier > 0
+      || curr_ts < genesis_vote_power_multiplier_expiration_ts && genesis_vote_power_multiplier > 0
     {
       genesis_vote_power_multiplier
     } else {

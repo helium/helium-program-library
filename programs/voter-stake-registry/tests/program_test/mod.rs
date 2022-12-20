@@ -1,4 +1,8 @@
-#![allow(clippy::needless_range_loop, clippy::await_holding_refcell_ref, clippy::needless_late_init)]
+#![allow(
+  clippy::needless_range_loop,
+  clippy::await_holding_refcell_ref,
+  clippy::needless_late_init
+)]
 
 use log::*;
 use std::cell::RefCell;
@@ -23,7 +27,6 @@ pub mod cookies;
 pub mod governance;
 pub mod solana;
 pub mod utils;
-
 
 trait AddPacked {
   fn add_packable_account<T: Pack>(
