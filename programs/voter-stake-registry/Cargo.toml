@@ -28,8 +28,8 @@ bytemuck = "1.12.3"
 #          Recently the discriminator for new VoterWeightRecord accounts has changed, and upgrading
 #          this dependency here without also upgrading the spl-governance program instance beforehand
 #          would lead to VWR accounts that are unusable until the spl-governance program is upgraded.
-spl-governance = { version = "=2.2.1", features = ["no-entrypoint"] }
-spl-governance-addin-api = "=0.1.1"
+spl-governance = { version = "2.2.4", features = ["no-entrypoint"] }
+spl-governance-addin-api = "0.1.2"
 solana-program = "1.14.10"
 static_assertions = "1.1"
 
