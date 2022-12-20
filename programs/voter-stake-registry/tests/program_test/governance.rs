@@ -4,7 +4,7 @@ use solana_banks_client::BanksClientError;
 use solana_program::instruction::Instruction;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::{Keypair, Signer};
-use spl_governance::state::realm::{get_realm_address, get_governing_token_holding_address};
+use spl_governance::state::realm::{get_governing_token_holding_address, get_realm_address};
 use spl_governance::state::{proposal, vote_record};
 
 use crate::*;
