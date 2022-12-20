@@ -1642,7 +1642,7 @@ dependencies = [
  "mpl-bubblegum",
  "mpl-token-metadata",
  "shared-utils",
- "spl-account-compression",
+ "spl-account-compression 0.1.5",
 ]
 
 [[package]]
@@ -1962,7 +1962,7 @@ dependencies = [
  "mpl-bubblegum",
  "mpl-token-metadata",
  "shared-utils",
- "spl-account-compression",
+ "spl-account-compression 0.1.5",
 ]
 
 [[package]]
@@ -2220,7 +2220,7 @@ dependencies = [
  "bytemuck",
  "mpl-token-metadata",
  "solana-program",
- "spl-account-compression",
+ "spl-account-compression 0.1.6",
  "spl-associated-token-account",
  "spl-token",
 ]
@@ -3476,7 +3476,7 @@ version = "0.0.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
- "spl-account-compression",
+ "spl-account-compression 0.1.5",
  "uint",
 ]
 
@@ -4398,8 +4398,19 @@ source = "git+https://github.com/ChewingGlass/solana-program-library?branch=feat
 dependencies = [
  "anchor-lang",
  "bytemuck",
- "spl-concurrent-merkle-tree",
- "spl-noop",
+ "spl-concurrent-merkle-tree 0.1.2 (git+https://github.com/ChewingGlass/solana-program-library?branch=feature/anchor-26)",
+ "spl-noop 0.1.3 (git+https://github.com/ChewingGlass/solana-program-library?branch=feature/anchor-26)",
+]
+
+[[package]]
+name = "spl-account-compression"
+version = "0.1.6"
+source = "git+https://github.com/solana-labs/solana-program-library#6386f24253686fbfe4ee5f5a118e5fa02c7a0b5e"
+dependencies = [
+ "anchor-lang",
+ "bytemuck",
+ "spl-concurrent-merkle-tree 0.1.2 (git+https://github.com/solana-labs/solana-program-library)",
+ "spl-noop 0.1.3 (git+https://github.com/solana-labs/solana-program-library)",
 ]
 
 [[package]]
@@ -4422,6 +4433,16 @@ dependencies = [
 name = "spl-concurrent-merkle-tree"
 version = "0.1.2"
 source = "git+https://github.com/ChewingGlass/solana-program-library?branch=feature/anchor-26#e6db7bcf6da7b41c3ab250a0c8489ea50d511a90"
+dependencies = [
+ "bytemuck",
+ "solana-program",
+ "thiserror",
+]
+
+[[package]]
+name = "spl-concurrent-merkle-tree"
+version = "0.1.2"
+source = "git+https://github.com/solana-labs/solana-program-library#6386f24253686fbfe4ee5f5a118e5fa02c7a0b5e"
 dependencies = [
  "bytemuck",
  "solana-program",
@@ -4490,6 +4511,14 @@ dependencies = [
 name = "spl-noop"
 version = "0.1.3"
 source = "git+https://github.com/ChewingGlass/solana-program-library?branch=feature/anchor-26#e6db7bcf6da7b41c3ab250a0c8489ea50d511a90"
+dependencies = [
+ "solana-program",
+]
+
+[[package]]
+name = "spl-noop"
+version = "0.1.3"
+source = "git+https://github.com/solana-labs/solana-program-library#6386f24253686fbfe4ee5f5a118e5fa02c7a0b5e"
 dependencies = [
  "solana-program",
 ]
