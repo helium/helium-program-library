@@ -90,7 +90,6 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
 
   let curr_epoch = current_epoch(curr_ts);
 
-  msg!("{} {} {}", d_entry.amount_deposited_native, to_stake_vehnt_amount, available_vehnt);
   // underlying_hnt = amount_deposited_native * vehnt_amount / available_vehnt
   // position_fall_rate = fall_rate * vehnt_amount / available_vehnt
   let underlying_hnt = PreciseNumber::new(d_entry.amount_deposited_native.into())

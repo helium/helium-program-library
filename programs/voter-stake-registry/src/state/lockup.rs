@@ -180,7 +180,7 @@ impl Lockup {
 }
 
 #[repr(u8)]
-#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LockupKind {
   /// No lockup, tokens can be withdrawn as long as not engaged in a proposal.
   None,

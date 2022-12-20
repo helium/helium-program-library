@@ -504,9 +504,7 @@ describe("helium-sub-daos", () => {
               const postAtaBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(stakerAta!))?.data!
               ).amount;
-              assert.isTrue(postAtaBalance <= BigInt(SUB_DAO_EPOCH_REWARDS*6 / 100));
-              assert.isTrue(postAtaBalance > BigInt(SUB_DAO_EPOCH_REWARDS*6 / 100 - 5));
-    
+              expect(Number(postAtaBalance)).to.be.within(SUB_DAO_EPOCH_REWARDS*6 / 100 - 5, SUB_DAO_EPOCH_REWARDS*6 / 100)    
             });
           });
         })

@@ -225,7 +225,6 @@ impl DepositEntry {
       1
     };
 
-    msg!("remaining: {}, minimum_required_lockup_secs: {}", remaining, minimum_required_lockup_secs);
     if remaining > minimum_required_lockup_secs {
       Ok(
         u64::try_from(
@@ -339,7 +338,7 @@ mod tests {
     // Check that constant lockups are handled correctly.
     let day: i64 = 86_400;
     let saturation = (10 * day) as u64;
-    let minimum_required_lockup_secs = 0 as u64;
+    let minimum_required_lockup_secs = 0_u64;
     let start = 10_000_000_000; // arbitrary point
     let deposit = DepositEntry {
       amount_deposited_native: 10_000,
