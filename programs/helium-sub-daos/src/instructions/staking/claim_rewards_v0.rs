@@ -46,6 +46,7 @@ pub struct ClaimRewardsV0<'info> {
   pub sub_dao: Account<'info, SubDaoV0>,
   #[account(
     mut,
+    has_one = sub_dao,
     seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &[args.deposit_entry_idx]],
     bump,
   )]
@@ -110,16 +111,8 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   let d_entry = voter.deposits[args.deposit_entry_idx as usize];
   let voting_mint_config = &registrar.voting_mints[d_entry.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
-  let available_vehnt = d_entry.voting_power(voting_mint_config, curr_ts)?;
 
   let stake_position = &mut ctx.accounts.stake_position;
-  // find the current vehnt value of this position
-  // curr_position_vehnt = available_vehnt * hnt_amount / amount_deposited_native
-  let curr_position_vehnt = available_vehnt
-    .checked_mul(stake_position.hnt_amount)
-    .unwrap()
-    .checked_div(d_entry.amount_deposited_native)
-    .unwrap();
 
   // check epoch that's being claimed is over
   let epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
@@ -140,26 +133,7 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
       .unwrap()
   };
 
-  // calculate the vehnt value of this position at the time of the epoch
-  let ts_diff = curr_ts
-    .checked_sub(epoch_end_ts)
-    .unwrap()
-    .checked_sub(
-      d_entry
-        .lockup
-        .seconds_since_expiry(curr_ts)
-        .try_into()
-        .unwrap(),
-    )
-    .unwrap();
-  let staked_vehnt_at_epoch = curr_position_vehnt
-    .checked_add(
-      stake_position
-        .fall_rate
-        .checked_mul(ts_diff.try_into().unwrap())
-        .unwrap(),
-    )
-    .unwrap();
+  let staked_vehnt_at_epoch = d_entry.voting_power(voting_mint_config, epoch_end_ts)?;
 
   // calculate the position's share of that epoch's rewards
   // rewards = staking_rewards_issued * staked_vehnt_at_epoch / total_vehnt
