@@ -1,7 +1,7 @@
 use crate::{current_epoch, state::*, update_subdao_vehnt};
 use anchor_lang::prelude::*;
 use clockwork_sdk::{cpi::thread_delete, state::Thread, ThreadProgram};
-use shared_utils::precise_number::PreciseNumber;
+
 use voter_stake_registry::state::{Registrar, Voter};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]

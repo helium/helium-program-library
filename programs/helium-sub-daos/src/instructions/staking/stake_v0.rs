@@ -5,7 +5,7 @@ use clockwork_sdk::{
   state::{Thread, Trigger},
   ThreadProgram,
 };
-use shared_utils::PreciseNumber;
+
 use voter_stake_registry::{
   self,
   state::{Registrar, Voter},

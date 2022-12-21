@@ -119,12 +119,9 @@ describe("helium-sub-daos", () => {
   describe("with dao and subdao", () => {
     let dao: PublicKey;
     let subDao: PublicKey;
-    let hotspotIssuer: PublicKey;
     let treasury: PublicKey;
     let dcMint: PublicKey;
     let rewardsEscrow: PublicKey;
-    let stakerPool: PublicKey;
-    let makerKeypair: Keypair;
 
     async function burnDc(
       amount: number
@@ -157,9 +154,8 @@ describe("helium-sub-daos", () => {
     beforeEach(async () => {
       ({
         dataCredits: { dcMint, hntMint },
-        subDao: { subDao, treasury, rewardsEscrow, stakerPool },
+        subDao: { subDao, treasury, rewardsEscrow },
         dao: { dao },
-        issuer: { makerKeypair, hotspotIssuer },
       } = await initWorld(
         provider,
         hemProgram,
