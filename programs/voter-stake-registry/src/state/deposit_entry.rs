@@ -233,9 +233,18 @@ impl DepositEntry {
     // To get an accurate read, we must put all multiplied numerators first, then divide.
 
     // This is the seconds passed the minimum lockup at the time of deposit
-    let total_seconds = self.lockup.seconds_left(self.lockup.start_ts);
+    let total_seconds = u64::try_from(
+      self.lockup.end_ts.checked_sub(self.lockup.start_ts).unwrap()
+    ).unwrap();
+
+    if total_seconds < minimum_required_lockup_secs {
+      return Ok(0);
+    }
+
     let seconds_passsed_min_lockup_initial = total_seconds
-      .saturating_sub(minimum_required_lockup_secs);
+      .checked_sub(minimum_required_lockup_secs)
+      .unwrap();
+    
     let seconds_from_min_lockup_to_max_lockup = lockup_saturation_secs
       .checked_sub(minimum_required_lockup_secs)
       .unwrap();
