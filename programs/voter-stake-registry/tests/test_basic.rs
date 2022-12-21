@@ -1,16 +1,10 @@
 #![allow(clippy::await_holding_refcell_ref)]
 
-use anchor_lang::prelude::Pubkey;
 use anchor_spl::token::TokenAccount;
-use solana_program::borsh::try_from_slice_unchecked;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, signer::Signer, transport::TransportError};
 
 use program_test::*;
-use spl_governance::state::{
-  enums::{GovernanceAccountType, MintMaxVoteWeightSource},
-  realm::{get_governing_token_holding_address, get_realm_data, RealmConfig, RealmV2},
-};
 use voter_stake_registry::state::Voter;
 
 mod program_test;
@@ -19,26 +13,6 @@ mod program_test;
 #[tokio::test]
 async fn test_basic() -> Result<(), TransportError> {
   let context = TestContext::new().await;
-
-  let realmy = RealmV2 {
-    account_type: GovernanceAccountType::RealmV2,
-    community_mint: context.mints[1].pubkey.unwrap(),
-    name: "testrealm".to_string(),
-    reserved: [0; 6],
-    authority: None,
-    config: RealmConfig {
-      council_mint: context.mints[0].pubkey,
-      reserved: [0; 6],
-      community_mint_max_vote_weight_source: MintMaxVoteWeightSource::Absolute(0_u64),
-      min_community_weight_to_create_governance: 1_u64,
-      use_community_voter_weight_addin: false,
-      use_max_community_voter_weight_addin: false,
-    },
-    voting_proposal_count: 0,
-    reserved_v2: [0; 128],
-  };
-  let mut buffer: Vec<u8> = Vec::new();
-  realmy.serialize(&mut buffer).unwrap();
 
   let payer = &context.users[0].key;
   let realm_authority = Keypair::new();
@@ -52,12 +26,8 @@ async fn test_basic() -> Result<(), TransportError> {
       &context.addin.program_id,
     )
     .await;
-  let pid = realm.governance.program_id.to_string();
 
-  let acct = context.solana.get_account_data(realm.realm).await;
-  let realm_str: RealmV2 = try_from_slice_unchecked(&acct).unwrap();
-
-  let voter_authority = &context.users[1].key;
+    let voter_authority = &context.users[1].key;
   let token_owner_record = realm
     .create_token_owner_record(voter_authority.pubkey(), payer)
     .await;
