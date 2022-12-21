@@ -27,7 +27,7 @@ async fn test_basic() -> Result<(), TransportError> {
     )
     .await;
 
-    let voter_authority = &context.users[1].key;
+  let voter_authority = &context.users[1].key;
   let token_owner_record = realm
     .create_token_owner_record(voter_authority.pubkey(), payer)
     .await;

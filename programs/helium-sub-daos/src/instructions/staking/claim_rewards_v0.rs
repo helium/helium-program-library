@@ -123,11 +123,10 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     return Err(error!(ErrorCode::InvalidClaimEpoch));
   }
 
-  let epoch_end_ts = 
-    i64::try_from(args.epoch + 1)
-      .unwrap()
-      .checked_mul(EPOCH_LENGTH)
-      .unwrap();
+  let epoch_end_ts = i64::try_from(args.epoch + 1)
+    .unwrap()
+    .checked_mul(EPOCH_LENGTH)
+    .unwrap();
 
   let staked_vehnt_at_epoch = d_entry.voting_power(voting_mint_config, epoch_end_ts)?;
 

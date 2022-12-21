@@ -258,7 +258,13 @@ impl DepositEntry {
       .checked_div(total_seconds)
       .unwrap();
 
-    Ok(first_arg.checked_add(second_arg).unwrap().checked_mul(genesis_multiplier as u64).unwrap())
+    Ok(
+      first_arg
+        .checked_add(second_arg)
+        .unwrap()
+        .checked_mul(genesis_multiplier as u64)
+        .unwrap(),
+    )
   }
 
   /// Returns the amount of unlocked tokens for this deposit--in native units

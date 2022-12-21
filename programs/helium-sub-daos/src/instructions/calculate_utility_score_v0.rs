@@ -181,7 +181,10 @@ pub fn handler(
   // D = max(1, sqrt(DCs burned in USD)). 1 DC = $0.00001.
   // A = max(1, fourth_root(Total active device count * device activation fee)).
   let epoch_info = &mut ctx.accounts.sub_dao_epoch_info;
-  let epoch_end_ts = i64::try_from(args.epoch + 1).unwrap().checked_mul(EPOCH_LENGTH).unwrap();
+  let epoch_end_ts = i64::try_from(args.epoch + 1)
+    .unwrap()
+    .checked_mul(EPOCH_LENGTH)
+    .unwrap();
   let sub_dao = &mut ctx.accounts.sub_dao;
   update_subdao_vehnt(sub_dao, epoch_end_ts);
   epoch_info.total_vehnt = sub_dao.vehnt_staked;
