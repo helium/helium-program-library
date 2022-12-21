@@ -235,8 +235,7 @@ impl DepositEntry {
     // This is the seconds passed the minimum lockup at the time of deposit
     let total_seconds = self.lockup.seconds_left(self.lockup.start_ts);
     let seconds_passsed_min_lockup_initial = total_seconds
-      .checked_sub(minimum_required_lockup_secs)
-      .unwrap_or(0_u64);
+      .saturating_sub(minimum_required_lockup_secs);
     let seconds_from_min_lockup_to_max_lockup = lockup_saturation_secs
       .checked_sub(minimum_required_lockup_secs)
       .unwrap();
