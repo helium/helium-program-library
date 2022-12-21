@@ -1,6 +1,7 @@
 use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
+use anchor_spl::token::Mint;
 use anchor_spl::token::{self, Token, TokenAccount};
 
 #[derive(Accounts)]
@@ -19,13 +20,16 @@ pub struct Deposit<'info> {
   #[account(
         mut,
         associated_token::authority = voter,
-        associated_token::mint = deposit_token.mint,
+        associated_token::mint = mint.key(),
     )]
   pub vault: Box<Account<'info, TokenAccount>>,
+
+  pub mint: Box<Account<'info, Mint>>,
 
   #[account(
         mut,
         constraint = deposit_token.owner == deposit_authority.key(),
+        has_one = mint
     )]
   pub deposit_token: Box<Account<'info, TokenAccount>>,
   pub deposit_authority: Signer<'info>,
@@ -53,14 +57,6 @@ impl<'info> Deposit<'info> {
 ///
 /// `deposit_entry_index`: Index of the deposit entry.
 /// `amount`: Number of native tokens to transfer.
-///
-/// Note that adding tokens to a deposit entry with vesting, where some vesting
-/// periods are already in the past is supported. What happens is that the tokens
-/// get distributed over vesting points in the future.
-///
-/// Example: 20 tokens are deposited to a three-day vesting deposit entry
-/// that started 36 hours ago. That means 10 extra tokens will vest in 12 hours
-/// and another 10 in 36 hours.
 pub fn deposit(ctx: Context<Deposit>, deposit_entry_index: u8, amount: u64) -> Result<()> {
   if amount == 0 {
     return Ok(());
@@ -79,24 +75,11 @@ pub fn deposit(ctx: Context<Deposit>, deposit_entry_index: u8, amount: u64) -> R
     VsrError::InvalidMint
   );
 
-  // Adding funds to a lockup that is already in progress can be complicated
-  // for linear vesting schedules because all added funds should be paid out
-  // gradually over the remaining lockup duration.
-  // The logic used is to:
-  // - realize the vesting by reducing the locked amount and moving the start
-  //   if the lockup forward by the number of expired vesting periods
-  // - add the new funds to the locked up token count, so they will vest over
-  //   the remaining periods.
   let curr_ts = registrar.clock_unix_timestamp();
-  d_entry.resolve_vesting(curr_ts)?;
 
   // Deposit tokens into the vault and increase the lockup amount too.
   token::transfer(ctx.accounts.transfer_ctx(), amount)?;
   d_entry.amount_deposited_native = d_entry.amount_deposited_native.checked_add(amount).unwrap();
-  d_entry.amount_initially_locked_native = d_entry
-    .amount_initially_locked_native
-    .checked_add(amount)
-    .unwrap();
 
   msg!(
     "Deposited amount {} at deposit index {} with lockup kind {:?} and {} seconds left",

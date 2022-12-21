@@ -12,10 +12,7 @@ pub struct Voter {
   pub deposits: [DepositEntry; 32],
   pub voter_bump: u8,
   pub voter_weight_record_bump: u8,
-  pub reserved: [u8; 94],
 }
-const_assert!(std::mem::size_of::<Voter>() == 2 * 32 + 32 * 80 + 2 + 94);
-const_assert!(std::mem::size_of::<Voter>() % 8 == 0);
 
 impl Voter {
   /// The full vote weight available to the voter
@@ -63,10 +60,9 @@ impl Voter {
       .filter(|d| d.is_used)
       .try_fold(0u64, |sum, d| {
         let mint_config = &registrar.voting_mints[d.voting_mint_config_idx as usize];
-        let locked_vote_weight =
-          mint_config.locked_vote_weight(d.amount_initially_locked_native)?;
+        let locked_vote_weight = mint_config.locked_vote_weight(d.amount_deposited_native)?;
         let max_locked_vote_weight =
-          mint_config.max_extra_lockup_vote_weight(d.amount_initially_locked_native)?;
+          mint_config.max_extra_lockup_vote_weight(d.amount_deposited_native)?;
         let amount = d.voting_power_locked_guaranteed(
           curr_ts,
           at_ts,

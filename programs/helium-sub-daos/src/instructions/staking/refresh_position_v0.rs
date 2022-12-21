@@ -4,7 +4,7 @@ use voter_stake_registry::state::{Registrar, Voter};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct RefreshPositionArgsV0 {
-  pub deposit_entry_idx: u8,
+  pub deposit: u8,
 }
 
 #[derive(Accounts)]
@@ -35,8 +35,9 @@ pub struct RefreshPositionV0<'info> {
 
   #[account(
     mut,
-    seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &[args.deposit_entry_idx]],
+    seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &args.deposit.to_le_bytes()],
     bump,
+    has_one = sub_dao
   )]
   pub stake_position: Account<'info, StakePositionV0>,
 
@@ -52,7 +53,7 @@ pub fn handler(ctx: Context<RefreshPositionV0>, args: RefreshPositionArgsV0) -> 
   // load the vehnt information
   let voter = ctx.accounts.vsr_voter.load()?;
   let registrar = &ctx.accounts.registrar.load()?;
-  let d_entry = voter.deposits[args.deposit_entry_idx as usize];
+  let d_entry = voter.deposits[args.deposit as usize];
   let voting_mint_config = &registrar.voting_mints[d_entry.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
   let available_vehnt = d_entry.voting_power(voting_mint_config, curr_ts)?;
@@ -80,12 +81,8 @@ pub fn handler(ctx: Context<RefreshPositionV0>, args: RefreshPositionArgsV0) -> 
   }
   // this position needs to be reduced
 
-  let old_position_vehnt = d_entry.voting_power_with_deposits(
-    voting_mint_config,
-    curr_ts,
-    stake_position.hnt_amount,
-    stake_position.hnt_amount,
-  )?;
+  let old_position_vehnt =
+    d_entry.voting_power_with_deposits(voting_mint_config, curr_ts, stake_position.hnt_amount)?;
 
   let sub_dao = &mut ctx.accounts.sub_dao;
 

@@ -50,13 +50,7 @@ pub struct VotingMintConfig {
 
   /// Number of digits to shift native amounts, applying a 10^digit_shift factor.
   pub digit_shift: i8,
-
-  // Empty bytes for future upgrades.
-  pub reserved1: [u8; 7],
-  pub reserved2: [u64; 4], // split because `Default` does not support [u8; 55]
 }
-const_assert!(std::mem::size_of::<VotingMintConfig>() == 2 * 32 + 6 * 8 + 1 + 7 + 32);
-const_assert!(std::mem::size_of::<VotingMintConfig>() % 8 == 0);
 
 impl VotingMintConfig {
   /// Converts an amount in this voting mints's native currency

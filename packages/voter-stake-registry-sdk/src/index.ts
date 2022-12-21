@@ -2,6 +2,7 @@ import { AnchorProvider, Idl, Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { PROGRAM_ID } from "./constants";
+import { ataResolver, combineResolvers, heliumCommonResolver } from "@helium/spl-utils";
 export * from "./pdas";
 // export * from "./resolvers";
 export * from "./constants";
@@ -19,8 +20,36 @@ export const init = async (
     idl as VoterStakeRegistry,
     programId,
     provider,
-    undefined
-    // () => future add resolvers here
+    undefined,
+    () => {
+      return combineResolvers(
+        heliumCommonResolver,
+        ataResolver({
+          instruction: "createDepositEntry",
+          account: "vault",
+          mint: "depositMint",
+          owner: "voter",
+        }),
+        ataResolver({
+          instruction: "deposit",
+          account: "vault",
+          mint: "mint",
+          owner: "voter",
+        }),
+        ataResolver({
+          instruction: "deposit",
+          account: "depositToken",
+          mint: "mint",
+          owner: "depositAuthority",
+        }),
+        ataResolver({
+          instruction: "withdraw",
+          account: "vault",
+          mint: "mint",
+          owner: "voter",
+        })
+      );
+    }
   ) as Program<VoterStakeRegistry>;
 
   return heliumVoterStakeRegistry;

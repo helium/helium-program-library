@@ -4,7 +4,6 @@ use crate::state::voting_mint_config::VotingMintConfig;
 use anchor_lang::prelude::*;
 use std::cmp::min;
 use std::convert::TryFrom;
-use std::ops::Sub;
 
 /// Bookkeeping for a single deposit for a given mint and lockup schedule.
 #[zero_copy]
@@ -20,26 +19,12 @@ pub struct DepositEntry {
   /// never withdraw more than this amount.
   pub amount_deposited_native: u64,
 
-  /// Amount in locked when the lockup began, in native currency.
-  ///
-  /// Note that this is not adjusted for withdraws. It is possible for this
-  /// value to be bigger than amount_deposited_native after some vesting
-  /// and withdrawals.
-  ///
-  /// This value is needed to compute the amount that vests each peroid,
-  /// which should not change due to withdraws.
-  pub amount_initially_locked_native: u64,
-
   // True if the deposit entry is being used.
   pub is_used: bool,
 
   // Points to the VotingMintConfig this deposit uses.
   pub voting_mint_config_idx: u8,
-
-  pub reserved: [u8; 29],
 }
-const_assert!(std::mem::size_of::<DepositEntry>() == 32 + 2 * 8 + 3 + 29);
-const_assert!(std::mem::size_of::<DepositEntry>() % 8 == 0);
 
 impl DepositEntry {
   /// # Voting Power Caclulation
@@ -69,9 +54,6 @@ impl DepositEntry {
   ///   - the VotingMintConfig providing the values for
   ///     locked_vote_weight, minimum_required_lockup_secs, genesis_vote_power_multiplier
   ///
-  /// Linear vesting schedules can be thought of as a sequence of cliff-
-  /// locked tokens and have the matching voting weight.
-  ///
   /// ## Cliff Lockup
   ///
   /// The cliff lockup allows one to lockup their tokens for a set period
@@ -87,12 +69,7 @@ impl DepositEntry {
   /// made for the remaining time period.
   ///
   pub fn voting_power(&self, voting_mint_config: &VotingMintConfig, curr_ts: i64) -> Result<u64> {
-    self.voting_power_with_deposits(
-      voting_mint_config,
-      curr_ts,
-      self.amount_deposited_native,
-      self.amount_initially_locked_native,
-    )
+    self.voting_power_with_deposits(voting_mint_config, curr_ts, self.amount_deposited_native)
   }
 
   pub fn voting_power_with_deposits(
@@ -100,11 +77,10 @@ impl DepositEntry {
     voting_mint_config: &VotingMintConfig,
     curr_ts: i64,
     amount_deposited_native: u64,
-    amount_initially_locked_native: u64,
   ) -> Result<u64> {
     let locked_vote_weight = voting_mint_config.locked_vote_weight(amount_deposited_native)?;
     let max_locked_vote_weight =
-      voting_mint_config.max_extra_lockup_vote_weight(amount_initially_locked_native)?;
+      voting_mint_config.max_extra_lockup_vote_weight(amount_deposited_native)?;
 
     let voting_power_locked = self.voting_power_locked(
       curr_ts,
@@ -204,7 +180,6 @@ impl DepositEntry {
     )
   }
 
-  /// Vote power contribution from funds with linear vesting.
   fn voting_power_cliff(
     &self,
     curr_ts: i64,
@@ -234,8 +209,13 @@ impl DepositEntry {
 
     // This is the seconds passed the minimum lockup at the time of deposit
     let total_seconds = u64::try_from(
-      self.lockup.end_ts.checked_sub(self.lockup.start_ts).unwrap()
-    ).unwrap();
+      self
+        .lockup
+        .end_ts
+        .checked_sub(self.lockup.start_ts)
+        .unwrap(),
+    )
+    .unwrap();
 
     if total_seconds < minimum_required_lockup_secs {
       return Ok(0);
@@ -244,104 +224,52 @@ impl DepositEntry {
     let seconds_passsed_min_lockup_initial = total_seconds
       .checked_sub(minimum_required_lockup_secs)
       .unwrap();
-    
+
     let seconds_from_min_lockup_to_max_lockup = lockup_saturation_secs
       .checked_sub(minimum_required_lockup_secs)
       .unwrap();
 
-    let first_arg = locked_vote_weight
-      .checked_mul(remaining)
+    let first_arg = (locked_vote_weight as u128)
+      .checked_mul(remaining as u128)
       .unwrap()
-      .checked_div(total_seconds)
+      .checked_div(total_seconds as u128)
       .unwrap();
-    let second_arg = locked_vote_weight
-      .checked_mul(seconds_passsed_min_lockup_initial)
+    let second_arg = (locked_vote_weight as u128)
+      .checked_mul(seconds_passsed_min_lockup_initial as u128)
       .unwrap()
-      .checked_mul(max_locked_vote_weight)
+      .checked_mul(max_locked_vote_weight as u128)
       .unwrap()
-      .checked_mul(remaining)
+      .checked_mul(remaining as u128)
       .unwrap()
-      .checked_div(seconds_from_min_lockup_to_max_lockup)
+      .checked_div(seconds_from_min_lockup_to_max_lockup as u128)
       .unwrap()
-      .checked_div(total_seconds)
+      .checked_div(total_seconds as u128)
       .unwrap();
 
     Ok(
-      first_arg
+      u64::try_from(
+first_arg
         .checked_add(second_arg)
         .unwrap()
-        .checked_mul(genesis_multiplier as u64)
-        .unwrap(),
+        .checked_mul(genesis_multiplier as u128)
+        .unwrap()
+      ).unwrap(),
     )
   }
 
-  /// Returns the amount of unlocked tokens for this deposit--in native units
-  /// of the original token amount (not scaled by the exchange rate).
-  pub fn vested(&self, curr_ts: i64) -> Result<u64> {
-    if self.lockup.expired(curr_ts) {
-      return Ok(self.amount_initially_locked_native);
-    }
-    match self.lockup.kind {
-      LockupKind::None => Ok(self.amount_initially_locked_native),
-      LockupKind::Cliff => Ok(0),
-      LockupKind::Constant => Ok(0),
+  pub fn amount_unlocked(&self, curr_ts: i64) -> u64 {
+    if self.lockup.end_ts <= curr_ts {
+      self.amount_deposited_native
+    } else {
+      0
     }
   }
 
-  /// Returns native tokens still locked.
-  #[inline(always)]
   pub fn amount_locked(&self, curr_ts: i64) -> u64 {
     self
-      .amount_initially_locked_native
-      .checked_sub(self.vested(curr_ts).unwrap())
-      .unwrap()
-  }
-
-  /// Returns native tokens that are unlocked given current vesting
-  /// and previous withdraws.
-  #[inline(always)]
-  pub fn amount_unlocked(&self, curr_ts: i64) -> u64 {
-    self
       .amount_deposited_native
-      .checked_sub(self.amount_locked(curr_ts))
+      .checked_sub(self.amount_unlocked(curr_ts))
       .unwrap()
-  }
-
-  /// Adjusts the deposit and remaining lockup periods such that
-  /// no parts of amount_initially_locked_native have vested.
-  ///
-  /// That makes it easier to deal with changes to the locked
-  /// amount because amount_initially_locked_native represents
-  /// exactly the amount that is locked.
-  ///
-  /// Example:
-  ///   If 30 tokens are locked up over 3 months, vesting each month,
-  ///   then after month 2:
-  ///      amount_initially_locked_native = 30
-  ///      amount_deposited_native = 30
-  ///      vested() = 20
-  ///      period_current() = 2
-  ///      periods_total() = 3
-  ///   And after this function was called:
-  ///      amount_initially_locked_native = 10
-  ///      amount_deposited_native = 30
-  ///      vested() = 0
-  ///      period_current() = 0
-  ///      periods_total() = 1
-  pub fn resolve_vesting(&mut self, curr_ts: i64) -> Result<()> {
-    let vested_amount = self.vested(curr_ts)?;
-    require_gte!(
-      self.amount_initially_locked_native,
-      vested_amount,
-      VsrError::InternalProgramError
-    );
-    self.amount_initially_locked_native = self
-      .amount_initially_locked_native
-      .checked_sub(vested_amount)
-      .unwrap();
-    self.lockup.remove_past_periods(curr_ts)?;
-    require_eq!(self.vested(curr_ts)?, 0, VsrError::InternalProgramError);
-    Ok(())
   }
 }
 
@@ -359,16 +287,13 @@ mod tests {
     let start = 10_000_000_000; // arbitrary point
     let deposit = DepositEntry {
       amount_deposited_native: 10_000,
-      amount_initially_locked_native: 10_000,
       lockup: Lockup {
         start_ts: start,
         end_ts: start + 5 * day,
         kind: Constant,
-        reserved: [0; 15],
       },
       is_used: true,
       voting_mint_config_idx: 0,
-      reserved: [0; 29],
     };
 
     let v = |curr_offset, at_offset| {
@@ -412,16 +337,13 @@ mod tests {
     let lockup_start = 10_000_000_000; // arbitrary point
     let deposit = DepositEntry {
       amount_deposited_native: 1_000,
-      amount_initially_locked_native: 1_000,
       lockup: Lockup {
         start_ts: lockup_start,
         end_ts: lockup_start + 10 * day,
         kind: Cliff,
-        reserved: [0; 15],
       },
       is_used: true,
       voting_mint_config_idx: 0,
-      reserved: [0; 29],
     };
 
     let voting_mint_config = VotingMintConfig {
@@ -434,8 +356,6 @@ mod tests {
       genesis_vote_power_multiplier_expiration_ts: 0,
       lockup_saturation_secs: saturation as u64,
       digit_shift: 0,
-      reserved1: [0; 7],
-      reserved2: [0; 4],
     };
 
     let locked_vote_weight =
@@ -443,7 +363,7 @@ mod tests {
     assert_eq!(locked_vote_weight, 1000);
 
     let max_locked_vote_weight =
-      voting_mint_config.max_extra_lockup_vote_weight(deposit.amount_initially_locked_native)?;
+      voting_mint_config.max_extra_lockup_vote_weight(deposit.amount_deposited_native)?;
     assert_eq!(max_locked_vote_weight, 99_000);
 
     // The timestamp 100_000 is very far before the lockup_start timestamp
@@ -495,16 +415,13 @@ mod tests {
     let lockup_start = 10_000_000_000; // arbitrary point
     let deposit = DepositEntry {
       amount_deposited_native: 1_000,
-      amount_initially_locked_native: 1_000,
       lockup: Lockup {
         start_ts: lockup_start,
         end_ts: lockup_start + 5 * day,
         kind: Cliff,
-        reserved: [0; 15],
       },
       is_used: true,
       voting_mint_config_idx: 0,
-      reserved: [0; 29],
     };
 
     let voting_mint_config = VotingMintConfig {
@@ -517,8 +434,6 @@ mod tests {
       lockup_saturation_secs: saturation as u64,
       minimum_required_lockup_secs: minimum_required_lockup_secs as u64,
       digit_shift: 0,
-      reserved1: [0; 7],
-      reserved2: [0; 4],
     };
 
     let locked_vote_weight =
@@ -526,7 +441,7 @@ mod tests {
     assert_eq!(locked_vote_weight, 1000);
 
     let max_locked_vote_weight =
-      voting_mint_config.max_extra_lockup_vote_weight(deposit.amount_initially_locked_native)?;
+      voting_mint_config.max_extra_lockup_vote_weight(deposit.amount_deposited_native)?;
     assert_eq!(max_locked_vote_weight, 99_000);
 
     // The timestamp 100_000 is very far before the lockup_start timestamp

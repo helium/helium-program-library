@@ -244,6 +244,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f32390ce8356f54c0f0245ea156f8190717e37285b8bf4f406a613dc4b954cde"
 dependencies = [
  "anchor-lang",
+ "mpl-token-metadata 1.4.3",
  "solana-program",
  "spl-associated-token-account",
  "spl-token",
@@ -1640,7 +1641,7 @@ dependencies = [
  "helium-sub-daos",
  "lazy-transactions",
  "mpl-bubblegum",
- "mpl-token-metadata",
+ "mpl-token-metadata 1.6.4",
  "shared-utils",
  "spl-account-compression 0.1.5",
 ]
@@ -1653,7 +1654,7 @@ dependencies = [
  "anchor-spl",
  "circuit-breaker",
  "clockwork-sdk",
- "mpl-token-metadata",
+ "mpl-token-metadata 1.6.4",
  "rust_decimal",
  "shared-utils",
  "switchboard-v2",
@@ -1960,7 +1961,7 @@ dependencies = [
  "anchor-spl",
  "circuit-breaker",
  "mpl-bubblegum",
- "mpl-token-metadata",
+ "mpl-token-metadata 1.6.4",
  "shared-utils",
  "spl-account-compression 0.1.5",
 ]
@@ -2218,11 +2219,29 @@ version = "0.6.0"
 dependencies = [
  "anchor-lang",
  "bytemuck",
- "mpl-token-metadata",
+ "mpl-token-metadata 1.6.4",
  "solana-program",
  "spl-account-compression 0.1.6",
  "spl-associated-token-account",
  "spl-token",
+]
+
+[[package]]
+name = "mpl-token-metadata"
+version = "1.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e719d7e0b5a9d97c7fd4d6f52ebfc32f1e3942e068173e47355f8c275656488a"
+dependencies = [
+ "arrayref",
+ "borsh",
+ "mpl-token-vault",
+ "num-derive",
+ "num-traits",
+ "shank",
+ "solana-program",
+ "spl-associated-token-account",
+ "spl-token",
+ "thiserror",
 ]
 
 [[package]]

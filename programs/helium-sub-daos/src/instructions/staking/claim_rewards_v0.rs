@@ -12,7 +12,7 @@ use voter_stake_registry::state::{Registrar, Voter};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ClaimRewardsArgsV0 {
-  pub deposit_entry_idx: u8,
+  pub deposit: u8,
   pub epoch: u64,
 }
 
@@ -47,7 +47,7 @@ pub struct ClaimRewardsV0<'info> {
   #[account(
     mut,
     has_one = sub_dao,
-    seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &[args.deposit_entry_idx]],
+    seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &args.deposit.to_le_bytes()],
     bump,
   )]
   pub stake_position: Account<'info, StakePositionV0>,
@@ -108,7 +108,7 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   // load the vehnt information
   let voter = ctx.accounts.vsr_voter.load()?;
   let registrar = &ctx.accounts.registrar.load()?;
-  let d_entry = voter.deposits[args.deposit_entry_idx as usize];
+  let d_entry = voter.deposits[args.deposit as usize];
   let voting_mint_config = &registrar.voting_mints[d_entry.voting_mint_config_idx as usize];
 
   let stake_position = &mut ctx.accounts.stake_position;

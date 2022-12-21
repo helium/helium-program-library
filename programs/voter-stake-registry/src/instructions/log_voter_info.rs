@@ -45,8 +45,6 @@ pub fn log_voter_info(
     let lockup = &deposit.lockup;
     let seconds_left = lockup.seconds_left(curr_ts);
     let end_ts = curr_ts as u64 + seconds_left;
-    // let periods_total = lockup.periods_total()?;
-    // let periods_left = lockup.periods_left(curr_ts)?;
     let voting_mint_config = &registrar.voting_mints[deposit.voting_mint_config_idx as usize];
     let locking_info = (seconds_left > 0).then(|| LockingInfo {
       amount: deposit.amount_locked(curr_ts),

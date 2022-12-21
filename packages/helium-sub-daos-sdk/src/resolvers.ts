@@ -1,9 +1,10 @@
 import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
-import { subDaoEpochInfoKey, subDaoKey } from "./pdas";
+import { stakePositionKey, subDaoEpochInfoKey, subDaoKey } from "./pdas";
 import {
   ataResolver,
   combineResolvers,
   get,
+  heliumCommonResolver,
 } from "@helium/spl-utils";
 import { resolveIndividual } from "@helium/spl-utils";
 import { PROGRAM_ID } from "./constants";
@@ -45,6 +46,7 @@ export const heliumSubDaosProgramResolver = resolveIndividual(
 );
 
 export const heliumSubDaosResolvers = combineResolvers(
+  heliumCommonResolver,
   subDaoEpochInfoResolver,
   heliumSubDaosProgramResolver,
   treasuryManagementResolvers,
@@ -66,7 +68,7 @@ export const heliumSubDaosResolvers = combineResolvers(
     mint: "dntMint",
     owner: "voterAuthority",
   }),
-  resolveIndividual(async ({ path, accounts, idlIx }) => {
+  resolveIndividual(async ({ args, path, accounts, idlIx }) => {
     if (
       path[path.length - 1] == "thread" &&
       accounts.subDao &&
@@ -77,6 +79,21 @@ export const heliumSubDaosResolvers = combineResolvers(
           Buffer.from("thread", "utf8"),
           (accounts.subDao as PublicKey).toBuffer(),
           Buffer.from(`end-epoch`, "utf8"),
+        ],
+        THREAD_PID
+      )[0];
+    } else if (
+      path[path.length - 1] == "thread" &&
+      new Set(["stakeV0", "closeStakeV0", "purgePositionV0"]).has(
+        idlIx.name
+      ) &&
+      accounts.stakePosition
+    ) {
+      return PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("thread", "utf8"),
+          (accounts.stakePosition as PublicKey).toBuffer(),
+          Buffer.from(`purge-${0}`, "utf8"),
         ],
         THREAD_PID
       )[0];

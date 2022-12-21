@@ -1,12 +1,10 @@
-import { createAtaAndMint, createMint, sendInstructions, toBN, createAtaAndTransfer } from "@helium/spl-utils";
-import { Program, BN, AnchorProvider, web3 } from "@project-serum/anchor";
-import { getGovernanceProgramVersion, MintMaxVoteWeightSource, withCreateRealm } from "@solana/spl-governance";
-import { PublicKey, Keypair, TransactionInstruction, Transaction } from "@solana/web3.js";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { createAtaAndTransfer, sendInstructions, toBN } from "@helium/spl-utils";
+import { AnchorProvider, BN, Program, web3 } from "@project-serum/anchor";
+import { getGovernanceProgramVersion, MintMaxVoteWeightSource, withCreateRealm } from "@solana/spl-governance";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
-
+import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 export const SPL_GOVERNANCE_PID = new PublicKey("GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw");
-export const VSR_PID = new PublicKey("hvsrY9UBtHhYRvstM2BWCsni81kevfn7B2DEhYbGA1a");
 
 
 export async function initVsr(
@@ -42,16 +40,12 @@ export async function initVsr(
     new BN(1),
   );
 
-  // Create Registrar
-  const [registrar, registrar_bump] = PublicKey.findProgramAddressSync([
-    realmPk.toBuffer(), Buffer.from("registrar", "utf-8"), hntMint.toBuffer(),
-  ], VSR_PID);
-  instructions.push(await program.methods.createRegistrar(registrar_bump).accounts({
-    registrar,
+  const createRegistrar = program.methods.createRegistrar().accounts({
     realm: realmPk,
-    governanceProgramId: SPL_GOVERNANCE_PID,
     realmGoverningTokenMint: hntMint,
-  }).instruction());
+  });
+  instructions.push(await createRegistrar.instruction());
+  const { registrar } = await createRegistrar.pubkeys();
 
   // Configure voting mint
   const minLockupSeconds = 15811200; // 6 months
@@ -82,49 +76,40 @@ export async function initVsr(
       .instruction()
   );
 
-  // create voter
-  const [voter, voter_bump] = PublicKey.findProgramAddressSync([
-    registrar.toBuffer(), Buffer.from("voter", "utf-8"), voterKp.publicKey.toBuffer()
-  ], VSR_PID);
-  const [voterWeightRecord, voter_weight_record_bump] = PublicKey.findProgramAddressSync([
-    registrar.toBuffer(), Buffer.from("voter-weight-record", "utf-8"), voterKp.publicKey.toBuffer()
-  ], VSR_PID);
-  instructions.push(await program.methods.createVoter(voter_bump, voter_weight_record_bump).accounts({
-    registrar,
-    voter,
-    voterAuthority: voterKp.publicKey,
-    voterWeightRecord,
-    instructions: new PublicKey("Sysvar1nstructions1111111111111111111111111"),
-    payer: voterKp.publicKey,
-  }).signers([voterKp]).instruction());
+  const createVoter = program.methods
+    .createVoter()
+    .accounts({
+      registrar,
+      voterAuthority: voterKp.publicKey,
+      payer: voterKp.publicKey,
+    })
+    .signers([voterKp]);
+  instructions.push(await createVoter.instruction());
+  const { voter } = await createVoter.pubkeys();
 
   // create deposit entry
-  const vault = await getAssociatedTokenAddress(hntMint, voter, true);
+  const vault = await getAssociatedTokenAddress(hntMint, voter!, true);
   instructions.push(await program.methods.createDepositEntry(0, {cliff: {}}, null, options.lockupPeriods).accounts({ // lock for 6 months
     registrar,
-    voter,
-    vault,
     depositMint: hntMint,
     voterAuthority: voterKp.publicKey,
     payer: voterKp.publicKey,
   }).signers([voterKp]).instruction());
 
   // deposit some hnt
-  const fromAcc = await getAssociatedTokenAddress(hntMint, voterKp.publicKey);
   instructions.push(await program.methods.deposit(0, toBN(options.lockupAmount, 8)).accounts({ // deposit 2 hnt
     registrar,
     voter,
-    vault,
-    depositToken: fromAcc,
+    mint: hntMint,
     depositAuthority: voterKp.publicKey,
   }).signers([voterKp]).instruction())
 
   await sendInstructions(provider, instructions, signers);
 
   return {
-    registrar,
+    registrar: registrar!,
     realm: realmPk,
-    voter,
+    voter: voter!,
     vault,
     hntMint,
   }

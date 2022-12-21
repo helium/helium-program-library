@@ -34,7 +34,7 @@ pub struct PurgePositionV0<'info> {
 
   #[account(
     mut,
-    seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &[stake_position.deposit_entry_idx]],
+    seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &stake_position.deposit.to_le_bytes()],
     bump,
   )]
   pub stake_position: Account<'info, StakePositionV0>,
@@ -45,7 +45,7 @@ pub struct PurgePositionV0<'info> {
   pub clock: Sysvar<'info, Clock>,
 
   pub system_program: Program<'info, System>,
-  #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", stake_position.deposit_entry_idx)))]
+  #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", stake_position.deposit)))]
   pub thread: Account<'info, Thread>,
   pub clockwork: Program<'info, ThreadProgram>,
 }
@@ -54,14 +54,14 @@ pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {
   // load the vehnt information
   let voter = ctx.accounts.vsr_voter.load()?;
   let registrar = &ctx.accounts.registrar.load()?;
-  let d_entry = voter.deposits[ctx.accounts.stake_position.deposit_entry_idx as usize];
+  let d_entry = voter.deposits[ctx.accounts.stake_position.deposit as usize];
   let curr_ts = registrar.clock_unix_timestamp();
   if !TESTING && !d_entry.lockup.expired(curr_ts) {
     // update the thread to make sure it's tracking the right lockup. this case can happen if user increases their vsr lockup period
     let signer_seeds: &[&[&[u8]]] = &[&[
       "stake_position".as_bytes(),
       ctx.accounts.voter_authority.key.as_ref(),
-      &[ctx.accounts.stake_position.deposit_entry_idx],
+      &ctx.accounts.stake_position.deposit.to_le_bytes(),
       &[ctx.bumps["stake_position"]],
     ]];
     let seconds_until_expiry = d_entry.lockup.seconds_left(curr_ts);

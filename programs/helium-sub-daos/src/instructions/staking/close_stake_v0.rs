@@ -6,7 +6,7 @@ use voter_stake_registry::state::{Registrar, Voter};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CloseStakeArgsV0 {
-  pub deposit_entry_idx: u8,
+  pub deposit: u8,
 }
 
 #[derive(Accounts)]
@@ -38,7 +38,7 @@ pub struct CloseStakeV0<'info> {
   #[account(
     mut,
     close = voter_authority,
-    seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &[args.deposit_entry_idx]],
+    seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &args.deposit.to_le_bytes()],
     bump
   )]
   pub stake_position: Account<'info, StakePositionV0>,
@@ -50,7 +50,7 @@ pub struct CloseStakeV0<'info> {
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
 
-  #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", args.deposit_entry_idx)))]
+  #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", args.deposit)))]
   pub thread: Account<'info, Thread>,
   pub clockwork: Program<'info, ThreadProgram>,
 }
@@ -59,7 +59,7 @@ pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()>
   // load the vehnt information
   let voter = ctx.accounts.vsr_voter.load()?;
   let registrar = &ctx.accounts.registrar.load()?;
-  let d_entry = voter.deposits[args.deposit_entry_idx as usize];
+  let d_entry = voter.deposits[args.deposit as usize];
   let voting_mint_config = &registrar.voting_mints[d_entry.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
   let available_vehnt = d_entry.voting_power(voting_mint_config, curr_ts)?;
@@ -68,26 +68,13 @@ pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()>
   let curr_epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
   assert!(ctx.accounts.stake_position.last_claimed_epoch >= curr_epoch - 1);
 
-  // position_vehnt = available_vehnt * hnt_amount / amount_deposited_native
-  let position_vehnt: u64 = PreciseNumber::new(available_vehnt.into())
-    .unwrap()
-    .checked_mul(&PreciseNumber::new(ctx.accounts.stake_position.hnt_amount.into()).unwrap())
-    .unwrap()
-    .checked_div(&PreciseNumber::new(d_entry.amount_deposited_native.into()).unwrap())
-    .unwrap()
-    .to_imprecise()
-    .unwrap()
-    .try_into()
-    .ok()
-    .unwrap();
-
   let stake_position = &mut ctx.accounts.stake_position;
   let sub_dao = &mut ctx.accounts.sub_dao;
 
   update_subdao_vehnt(sub_dao, curr_ts);
 
   // remove this stake information from the subdao
-  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(position_vehnt).unwrap();
+  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(available_vehnt).unwrap();
   sub_dao.vehnt_fall_rate = sub_dao
     .vehnt_fall_rate
     .checked_sub(stake_position.fall_rate)
@@ -97,7 +84,7 @@ pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()>
   let signer_seeds: &[&[&[u8]]] = &[&[
     "stake_position".as_bytes(),
     ctx.accounts.voter_authority.key.as_ref(),
-    &[args.deposit_entry_idx],
+    &args.deposit.to_le_bytes(),
     &[ctx.bumps["stake_position"]],
   ]];
   thread_delete(CpiContext::new_with_signer(

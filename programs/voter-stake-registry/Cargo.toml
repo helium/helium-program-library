@@ -22,7 +22,7 @@ overflow-checks = true
 
 [dependencies]
 anchor-lang = { version = "0.26.0", features = ["init-if-needed"] }
-anchor-spl = { version = "0.26.0" }
+anchor-spl = { version = "0.26.0", features = ["metadata"] }
 bytemuck = "1.12.3"
 # WARNING: Be careful about upgrading the spl-governance dependency!
 #          Recently the discriminator for new VoterWeightRecord accounts has changed, and upgrading

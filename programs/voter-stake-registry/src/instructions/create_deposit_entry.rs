@@ -50,9 +50,6 @@ pub struct CreateDepositEntry<'info> {
 /// - `start_ts`: Start timestamp in seconds, defaults to current clock.
 ///    The lockup will end after `start + periods * period_secs()`.
 ///
-///    Note that tokens will already be locked before start_ts, it only defines
-///    the vesting start time and the anchor for the periods computation.
-///
 /// - `periods`: How long to lock up, depending on `kind`. See LockupKind::period_secs()
 pub fn create_deposit_entry(
   ctx: Context<CreateDepositEntry>,
@@ -101,7 +98,6 @@ pub fn create_deposit_entry(
   d_entry.is_used = true;
   d_entry.voting_mint_config_idx = mint_idx as u8;
   d_entry.amount_deposited_native = 0;
-  d_entry.amount_initially_locked_native = 0;
   d_entry.lockup = lockup;
 
   Ok(())

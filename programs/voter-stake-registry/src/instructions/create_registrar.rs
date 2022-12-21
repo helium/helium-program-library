@@ -14,7 +14,7 @@ pub struct CreateRegistrar<'info> {
         seeds = [realm.key().as_ref(), b"registrar".as_ref(), realm_governing_token_mint.key().as_ref()],
         bump,
         payer = payer,
-        space = 8 + size_of::<Registrar>()
+        space = 8 + size_of::<Registrar>() + 60
     )]
   pub registrar: AccountLoader<'info, Registrar>,
 
@@ -48,10 +48,9 @@ pub struct CreateRegistrar<'info> {
 ///
 /// To use the registrar, call ConfigVotingMint to register token mints that may be
 /// used for voting.
-pub fn create_registrar(ctx: Context<CreateRegistrar>, registrar_bump: u8) -> Result<()> {
+pub fn create_registrar(ctx: Context<CreateRegistrar>) -> Result<()> {
   let registrar = &mut ctx.accounts.registrar.load_init()?;
-  require_eq!(registrar_bump, *ctx.bumps.get("registrar").unwrap());
-  registrar.bump = registrar_bump;
+  registrar.bump = *ctx.bumps.get("registrar").unwrap();
   registrar.governance_program_id = ctx.accounts.governance_program_id.key();
   registrar.realm = ctx.accounts.realm.key();
   registrar.realm_governing_token_mint = ctx.accounts.realm_governing_token_mint.key();

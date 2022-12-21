@@ -1,6 +1,7 @@
 use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
+use anchor_spl::token::Mint;
 use anchor_spl::token::{self, Token, TokenAccount};
 
 #[derive(Accounts)]
@@ -45,11 +46,14 @@ pub struct Withdraw<'info> {
   #[account(
         mut,
         associated_token::authority = voter,
-        associated_token::mint = destination.mint,
+        associated_token::mint = mint.key(),
     )]
   pub vault: Box<Account<'info, TokenAccount>>,
-
-  #[account(mut)]
+  pub mint: Box<Account<'info, Mint>>,
+  #[account(
+    mut,
+    has_one = mint
+  )]
   pub destination: Box<Account<'info, TokenAccount>>,
 
   pub token_program: Program<'info, Token>,
@@ -67,8 +71,7 @@ impl<'info> Withdraw<'info> {
   }
 }
 
-/// Withdraws tokens from a deposit entry, if they are unlocked according
-/// to the deposit's vesting schedule.
+/// Withdraws tokens from a deposit entry, if they are unlocked
 ///
 /// `deposit_entry_index`: The deposit entry to withdraw from.
 /// `amount` is in units of the native currency being withdrawn.

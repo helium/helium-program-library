@@ -49,11 +49,7 @@ pub struct CreateVoter<'info> {
 ///
 /// The user must register with spl-governance using the same voter_authority.
 /// Their token owner record will be required for withdrawing funds later.
-pub fn create_voter(
-  ctx: Context<CreateVoter>,
-  voter_bump: u8,
-  voter_weight_record_bump: u8,
-) -> Result<()> {
+pub fn create_voter(ctx: Context<CreateVoter>) -> Result<()> {
   // Forbid creating voter accounts from CPI. The goal is to make automation
   // impossible that weakens some of the limitations intentionally imposed on
   // locked tokens.
@@ -68,19 +64,13 @@ pub fn create_voter(
     );
   }
 
-  require_eq!(voter_bump, *ctx.bumps.get("voter").unwrap());
-  require_eq!(
-    voter_weight_record_bump,
-    *ctx.bumps.get("voter_weight_record").unwrap()
-  );
-
   // Load accounts.
   let registrar = &ctx.accounts.registrar.load()?;
   let voter_authority = ctx.accounts.voter_authority.key();
 
   let voter = &mut ctx.accounts.voter.load_init()?;
-  voter.voter_bump = voter_bump;
-  voter.voter_weight_record_bump = voter_weight_record_bump;
+  voter.voter_bump = *ctx.bumps.get("voter").unwrap();
+  voter.voter_weight_record_bump = *ctx.bumps.get("voter_weight_record").unwrap();
   voter.voter_authority = voter_authority;
   voter.registrar = ctx.accounts.registrar.key();
 

@@ -47,7 +47,6 @@ pub fn reset_lockup(
 
   // Change the deposit entry.
   let d_entry = voter.active_deposit_mut(deposit_entry_index)?;
-  d_entry.amount_initially_locked_native = d_entry.amount_deposited_native;
   d_entry.lockup = Lockup::new_from_periods(kind, curr_ts, curr_ts, periods)?;
 
   Ok(())

@@ -8,9 +8,6 @@ mod governance;
 mod instructions;
 pub mod state;
 
-#[macro_use]
-extern crate static_assertions;
-
 // The program address.
 declare_id!("hvsrY9UBtHhYRvstM2BWCsni81kevfn7B2DEhYbGA1a");
 
@@ -62,8 +59,8 @@ declare_id!("hvsrY9UBtHhYRvstM2BWCsni81kevfn7B2DEhYbGA1a");
 pub mod voter_stake_registry {
   use super::*;
 
-  pub fn create_registrar(ctx: Context<CreateRegistrar>, registrar_bump: u8) -> Result<()> {
-    instructions::create_registrar(ctx, registrar_bump)
+  pub fn create_registrar(ctx: Context<CreateRegistrar>) -> Result<()> {
+    instructions::create_registrar(ctx)
   }
 
   pub fn configure_voting_mint(
@@ -92,12 +89,8 @@ pub mod voter_stake_registry {
     )
   }
 
-  pub fn create_voter(
-    ctx: Context<CreateVoter>,
-    voter_bump: u8,
-    voter_weight_record_bump: u8,
-  ) -> Result<()> {
-    instructions::create_voter(ctx, voter_bump, voter_weight_record_bump)
+  pub fn create_voter(ctx: Context<CreateVoter>) -> Result<()> {
+    instructions::create_voter(ctx)
   }
 
   pub fn create_deposit_entry(

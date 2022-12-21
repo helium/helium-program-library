@@ -13,8 +13,7 @@ use voter_stake_registry::{
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct StakeArgsV0 {
-  pub vehnt_amount: u64,
-  pub deposit_entry_idx: u8,
+  pub deposit: u8,
 }
 
 #[derive(Accounts)]
@@ -44,10 +43,10 @@ pub struct StakeV0<'info> {
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
 
   #[account(
-    init_if_needed,
+    init,
     space = 60 + 8 + std::mem::size_of::<StakePositionV0>(),
     payer = voter_authority,
-    seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &[args.deposit_entry_idx]],
+    seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &args.deposit.to_le_bytes()],
     bump,
   )]
   pub stake_position: Box<Account<'info, StakePositionV0>>,
@@ -60,7 +59,7 @@ pub struct StakeV0<'info> {
   pub rent: Sysvar<'info, Rent>,
 
   /// CHECK: handled by thread_create
-  #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", args.deposit_entry_idx)))]
+  #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", args.deposit)))]
   pub thread: AccountInfo<'info>,
   pub clockwork: Program<'info, ThreadProgram>,
 }
@@ -69,7 +68,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
   // load the vehnt information
   let voter = ctx.accounts.vsr_voter.load()?;
   let registrar = &ctx.accounts.registrar.load()?;
-  let d_entry = voter.deposits[args.deposit_entry_idx as usize];
+  let d_entry = voter.deposits[args.deposit as usize];
   let voting_mint_config = &registrar.voting_mints[d_entry.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
   let available_vehnt = d_entry.voting_power(voting_mint_config, curr_ts)?;
@@ -86,62 +85,27 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
 
   let fall_rate = calculate_fall_rate(available_vehnt, future_vehnt, seconds_left).unwrap();
 
-  let to_stake_vehnt_amount = std::cmp::min(args.vehnt_amount, available_vehnt);
-
   let curr_epoch = current_epoch(curr_ts);
-
-  // underlying_hnt = amount_deposited_native * vehnt_amount / available_vehnt
-  // position_fall_rate = fall_rate * vehnt_amount / available_vehnt
-  let underlying_hnt = PreciseNumber::new(d_entry.amount_deposited_native.into())
-    .unwrap()
-    .checked_mul(&PreciseNumber::new(to_stake_vehnt_amount.into()).unwrap())
-    .unwrap()
-    .checked_div(&PreciseNumber::new(available_vehnt.into()).unwrap())
-    .unwrap();
-  let position_fall_rate: u64 = u128::from(fall_rate)
-    .checked_mul(to_stake_vehnt_amount.into())
-    .unwrap()
-    .checked_div(available_vehnt.into())
-    .unwrap()
-    .try_into()
-    .ok()
-    .unwrap();
-
+    
   let sub_dao = &mut ctx.accounts.sub_dao;
   let stake_position = &mut ctx.accounts.stake_position;
-
-  let mut old_position_vehnt = 0;
-
-  if stake_position.last_claimed_epoch > 0 {
-    // updating pos, assert that all available rewards have been claimed
-    assert!(stake_position.last_claimed_epoch >= curr_epoch - 1);
-
-    old_position_vehnt = d_entry.voting_power_with_deposits(
-      voting_mint_config,
-      curr_ts,
-      stake_position.hnt_amount,
-      stake_position.hnt_amount,
-    )?;
-  }
 
   // update the stake
   update_subdao_vehnt(sub_dao, curr_ts);
   sub_dao.vehnt_staked = sub_dao
     .vehnt_staked
-    .checked_sub(old_position_vehnt)
-    .unwrap()
-    .checked_add(to_stake_vehnt_amount)
+    .checked_add(available_vehnt)
     .unwrap();
   sub_dao.vehnt_fall_rate = sub_dao
     .vehnt_fall_rate
     .checked_sub(stake_position.fall_rate)
     .unwrap()
-    .checked_add(position_fall_rate)
+    .checked_add(fall_rate)
     .unwrap();
 
   if stake_position.last_claimed_epoch == 0 {
     // init stake position
-    stake_position.deposit_entry_idx = args.deposit_entry_idx;
+    stake_position.deposit = args.deposit;
     stake_position.purged = false;
     stake_position.expiry_ts = curr_ts
       .checked_add(d_entry.lockup.seconds_left(curr_ts).try_into().unwrap())
@@ -151,7 +115,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     let signer_seeds: &[&[&[u8]]] = &[&[
       "stake_position".as_bytes(),
       ctx.accounts.voter_authority.key.as_ref(),
-      &[args.deposit_entry_idx],
+      &[args.deposit],
       &[ctx.bumps["stake_position"]],
     ]];
 
@@ -193,7 +157,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
         },
         signer_seeds,
       ),
-      format!("purge-{:?}", args.deposit_entry_idx),
+      format!("purge-{:?}", args.deposit),
       purge_ix.into(),
       Trigger::Cron {
         schedule: cron,
@@ -201,9 +165,9 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
       },
     )?;
   }
-  stake_position.hnt_amount = underlying_hnt.to_imprecise().unwrap().try_into().unwrap();
+  stake_position.hnt_amount = d_entry.amount_deposited_native;
   stake_position.last_claimed_epoch = curr_epoch;
-  stake_position.fall_rate = position_fall_rate;
+  stake_position.fall_rate = fall_rate;
   stake_position.sub_dao = ctx.accounts.sub_dao.key();
 
   Ok(())
