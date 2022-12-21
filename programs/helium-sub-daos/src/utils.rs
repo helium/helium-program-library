@@ -31,11 +31,15 @@ pub fn next_epoch_ts(unix_timestamp: i64) -> u64 {
 }
 
 pub fn update_subdao_vehnt(sub_dao: &mut SubDaoV0, curr_ts: i64) {
+  if curr_ts < sub_dao.vehnt_last_calculated_ts {
+    return
+  }
+  
   let fall: u64 = PreciseNumber::new(sub_dao.vehnt_fall_rate.into())
     .unwrap()
     .checked_mul(
       &PreciseNumber::new(
-        (curr_ts - sub_dao.vehnt_last_calculated_ts)
+        (curr_ts.checked_sub(sub_dao.vehnt_last_calculated_ts).unwrap())
           .try_into()
           .unwrap(),
       )

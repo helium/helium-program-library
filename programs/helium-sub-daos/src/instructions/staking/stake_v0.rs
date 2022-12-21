@@ -204,6 +204,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
   stake_position.hnt_amount = underlying_hnt.to_imprecise().unwrap().try_into().unwrap();
   stake_position.last_claimed_epoch = curr_epoch;
   stake_position.fall_rate = position_fall_rate;
+  stake_position.sub_dao = ctx.accounts.sub_dao.key();
 
   Ok(())
 }

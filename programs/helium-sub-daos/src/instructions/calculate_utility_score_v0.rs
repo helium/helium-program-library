@@ -181,8 +181,9 @@ pub fn handler(
   // D = max(1, sqrt(DCs burned in USD)). 1 DC = $0.00001.
   // A = max(1, fourth_root(Total active device count * device activation fee)).
   let epoch_info = &mut ctx.accounts.sub_dao_epoch_info;
+  let epoch_end_ts = i64::try_from(args.epoch + 1).unwrap().checked_mul(EPOCH_LENGTH).unwrap();
   let sub_dao = &mut ctx.accounts.sub_dao;
-  update_subdao_vehnt(sub_dao, ctx.accounts.clock.unix_timestamp);
+  update_subdao_vehnt(sub_dao, epoch_end_ts);
   epoch_info.total_vehnt = sub_dao.vehnt_staked;
 
   let dc_burned = PreciseNumber::new(epoch_info.dc_burned.into())
@@ -191,10 +192,9 @@ pub fn handler(
     .or_arith_error()?;
 
   let history_buffer = AggregatorHistoryBuffer::new(&ctx.accounts.history_buffer)?;
-  let timestamp = i64::try_from(args.epoch).unwrap() * EPOCH_LENGTH;
   let total_devices_u64 = u64::try_from(
     history_buffer
-      .lower_bound(timestamp)
+      .lower_bound(epoch_end_ts)
       .unwrap()
       .value
       .mantissa,

@@ -183,11 +183,25 @@ describe("helium-sub-daos", () => {
     });
 
     const vehntOptions = [
-      { name: "Case 1", options: {delay: 1000, lockupPeriods: 183, lockupAmount: 100, stakeAmount: 100} },
-      { name: "Case 2", options: {delay: 15000, lockupPeriods: 183*4, lockupAmount: 50, stakeAmount: 1} },
+      {
+        name: "Case 1",
+        options: {
+          delay: 1000,
+          lockupPeriods: 183,
+          lockupAmount: 100,
+        },
+      },
+      {
+        name: "Case 2",
+        options: {
+          delay: 15000,
+          lockupPeriods: 183 * 4,
+          lockupAmount: 50,
+        },
+      },
       // { name: "Case 3", options: {delay: 45000, lockupPeriods: 183*8, lockupAmount: 100, stakeAmount: 10000} },
       // { name: "Case 4", options: {delay: 5000, lockupPeriods: 183*8, lockupAmount: 1000, stakeAmount: 10000} },
-    ]
+    ];
 
     vehntOptions.forEach(function ({name, options}) {
       describe("vehnt tests - " + name, () => {
@@ -202,7 +216,7 @@ describe("helium-sub-daos", () => {
 
         it("allows vehnt staking", async () => {
           const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
-          const vehntStake = toBN(options.stakeAmount,8);
+          const vehntStake = toBN(options.lockupAmount,8);
           await program.methods.stakeV0({
             vehntAmount: vehntStake,
             depositEntryIdx: 0,
@@ -241,7 +255,7 @@ describe("helium-sub-daos", () => {
           // stake some vehnt
           const stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
           await program.methods.stakeV0({
-            vehntAmount: toBN(options.stakeAmount, 8),
+            vehntAmount: toBN(options.lockupAmount, 8),
             depositEntryIdx: 0,
           }).accounts({
             registrar,
@@ -283,7 +297,7 @@ describe("helium-sub-daos", () => {
 
           expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
 
-          const totalUtility = Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1/4) * options.stakeAmount;
+          const totalUtility = Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1/4) * options.lockupAmount;
 
           expectBnAccuracy(toBN(totalUtility, 12), daoInfo.totalUtilityScore, 0.01);
           expectBnAccuracy(toBN(totalUtility, 12), subDaoInfo.utilityScore!, 0.01);
@@ -294,7 +308,7 @@ describe("helium-sub-daos", () => {
           beforeEach(async() => {
             stakePosition = stakePositionKey(voterKp.publicKey, 0)[0];
             await program.methods.stakeV0({
-              vehntAmount: toBN(options.stakeAmount, 8),
+              vehntAmount: toBN(options.lockupAmount, 8),
               depositEntryIdx: 0,
             }).accounts({
               registrar,
@@ -472,7 +486,7 @@ describe("helium-sub-daos", () => {
               );
     
               const acc = await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo);
-              expect(acc.rewardsIssued).to.be.true;
+              expect(Boolean(acc.rewardsIssuedAt)).to.be.true;
             });
       
             it("claim rewards", async () => {

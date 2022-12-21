@@ -86,7 +86,7 @@ pub struct SubDaoEpochInfoV0 {
   pub total_vehnt: u64,
   /// Precise number with 12 decimals
   pub utility_score: Option<u128>,
-  pub rewards_issued: bool,
+  pub rewards_issued_at: Option<i64>,
   pub staking_rewards_issued: u64,
   pub bump_seed: u8,
 }

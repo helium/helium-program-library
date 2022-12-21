@@ -224,37 +224,41 @@ impl DepositEntry {
       1
     };
 
-    if remaining > minimum_required_lockup_secs {
-      Ok(
-        u64::try_from(
-          (locked_vote_weight as u128)
-            .checked_add(
-              (max_locked_vote_weight as u128)
-                .checked_mul(remaining.sub(minimum_required_lockup_secs) as u128)
-                .unwrap()
-                .checked_div(lockup_saturation_secs.sub(minimum_required_lockup_secs) as u128)
-                .unwrap(),
-            )
-            .unwrap()
-            .checked_mul(genesis_multiplier as u128)
-            .unwrap(),
-        )
-        .unwrap(),
-      )
-    } else {
-      Ok(
-        u64::try_from(
-          (locked_vote_weight as u128)
-            .checked_mul(remaining as u128)
-            .unwrap()
-            .checked_div(minimum_required_lockup_secs as u128)
-            .unwrap()
-            .checked_mul(genesis_multiplier as u128)
-            .unwrap(),
-        )
-        .unwrap(),
-      )
-    }
+    // from 0 to min lockup is 0.
+    // min lockup is 1
+    // min lockup to max lockup is 1 + (seconds_passed_min_lockup_initial / seconds_from_min_lockup_to_max_lockup_initial) * (max_locked_vote_weight - 1)
+    // Current voting power multiplier is the above, scaled by (remaining / total_seconds)
+    // = (1 + (seconds_passed_min_lockup_initial / seconds_from_min_lockup_to_max_lockup) * (max_locked_vote_weight - 1)) * (remaining / total_seconds)
+    // Voting power then is (seconds_passed / total_seconds) multiplied by that.
+    // To get an accurate read, we must put all multiplied numerators first, then divide.
+
+    // This is the seconds passed the minimum lockup at the time of deposit
+    let total_seconds = self.lockup.seconds_left(self.lockup.start_ts);
+    let seconds_passsed_min_lockup_initial = total_seconds
+      .checked_sub(minimum_required_lockup_secs)
+      .unwrap_or(0_u64);
+    let seconds_from_min_lockup_to_max_lockup = lockup_saturation_secs
+      .checked_sub(minimum_required_lockup_secs)
+      .unwrap();
+
+    let first_arg = locked_vote_weight
+      .checked_mul(remaining)
+      .unwrap()
+      .checked_div(total_seconds)
+      .unwrap();
+    let second_arg = locked_vote_weight
+      .checked_mul(seconds_passsed_min_lockup_initial)
+      .unwrap()
+      .checked_mul(max_locked_vote_weight)
+      .unwrap()
+      .checked_mul(remaining)
+      .unwrap()
+      .checked_div(seconds_from_min_lockup_to_max_lockup)
+      .unwrap()
+      .checked_div(total_seconds)
+      .unwrap();
+
+    Ok(first_arg.checked_add(second_arg).unwrap().checked_mul(genesis_multiplier as u64).unwrap())
   }
 
   /// Returns the amount of unlocked tokens for this deposit--in native units

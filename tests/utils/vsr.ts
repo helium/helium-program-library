@@ -15,7 +15,7 @@ export async function initVsr(
   me: PublicKey, 
   hntMint: PublicKey,
   voterKp: Keypair,
-  options: {delay: number, lockupPeriods: number, lockupAmount: number, stakeAmount: number},
+  options: {delay: number, lockupPeriods: number, lockupAmount: number},
 ) {
   await createAtaAndTransfer(provider, hntMint, toBN(1000, 8), provider.wallet.publicKey, voterKp.publicKey);
   await provider.connection.requestAirdrop(voterKp.publicKey, web3.LAMPORTS_PER_SOL);
@@ -60,7 +60,7 @@ export async function initVsr(
       .configureVotingMint(
         0, // idx
         0, // digit shift
-        new BN(1), // locked vote weight scaled factor
+        new BN(1_000_000_000), // locked vote weight scaled factor
         new BN(minLockupSeconds), // min lockup seconds
         new BN(100), // scaled factor
         3,

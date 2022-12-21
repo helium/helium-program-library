@@ -110,7 +110,6 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   let registrar = &ctx.accounts.registrar.load()?;
   let d_entry = voter.deposits[args.deposit_entry_idx as usize];
   let voting_mint_config = &registrar.voting_mints[d_entry.voting_mint_config_idx as usize];
-  let curr_ts = registrar.clock_unix_timestamp();
 
   let stake_position = &mut ctx.accounts.stake_position;
 
@@ -124,16 +123,15 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     return Err(error!(ErrorCode::InvalidClaimEpoch));
   }
 
-  let epoch_end_ts = if TESTING {
-    curr_ts
-  } else {
-    i64::try_from(args.epoch)
+  let epoch_end_ts = 
+    i64::try_from(args.epoch + 1)
       .unwrap()
       .checked_mul(EPOCH_LENGTH)
-      .unwrap()
-  };
+      .unwrap();
 
   let staked_vehnt_at_epoch = d_entry.voting_power(voting_mint_config, epoch_end_ts)?;
+
+  msg!("Staked {} veHNT at end of epoch with {} total veHNT delegated to subdao and {} total rewards to subdao", staked_vehnt_at_epoch, ctx.accounts.sub_dao_epoch_info.total_vehnt, ctx.accounts.sub_dao_epoch_info.staking_rewards_issued);
 
   // calculate the position's share of that epoch's rewards
   // rewards = staking_rewards_issued * staked_vehnt_at_epoch / total_vehnt

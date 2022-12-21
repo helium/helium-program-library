@@ -42,7 +42,7 @@ pub struct IssueRewardsV0<'info> {
     has_one = sub_dao,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump = sub_dao_epoch_info.bump_seed,
-    constraint = TESTING || !sub_dao_epoch_info.rewards_issued
+    constraint = TESTING || sub_dao_epoch_info.rewards_issued_at.is_none()
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   #[account(
@@ -204,7 +204,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   )?;
 
   ctx.accounts.dao_epoch_info.num_rewards_issued += 1;
-  ctx.accounts.sub_dao_epoch_info.rewards_issued = true;
+  ctx.accounts.sub_dao_epoch_info.rewards_issued_at = Some(ctx.accounts.clock.unix_timestamp);
   ctx.accounts.sub_dao_epoch_info.staking_rewards_issued = staking_rewards_amount;
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
