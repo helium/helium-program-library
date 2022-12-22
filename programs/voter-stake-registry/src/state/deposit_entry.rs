@@ -248,12 +248,13 @@ impl DepositEntry {
 
     Ok(
       u64::try_from(
-first_arg
-        .checked_add(second_arg)
-        .unwrap()
-        .checked_mul(genesis_multiplier as u128)
-        .unwrap()
-      ).unwrap(),
+        first_arg
+          .checked_add(second_arg)
+          .unwrap()
+          .checked_mul(genesis_multiplier as u128)
+          .unwrap(),
+      )
+      .unwrap(),
     )
   }
 

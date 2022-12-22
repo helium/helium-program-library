@@ -86,16 +86,13 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
   let fall_rate = calculate_fall_rate(available_vehnt, future_vehnt, seconds_left).unwrap();
 
   let curr_epoch = current_epoch(curr_ts);
-    
+
   let sub_dao = &mut ctx.accounts.sub_dao;
   let stake_position = &mut ctx.accounts.stake_position;
 
   // update the stake
   update_subdao_vehnt(sub_dao, curr_ts);
-  sub_dao.vehnt_staked = sub_dao
-    .vehnt_staked
-    .checked_add(available_vehnt)
-    .unwrap();
+  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_add(available_vehnt).unwrap();
   sub_dao.vehnt_fall_rate = sub_dao
     .vehnt_fall_rate
     .checked_sub(stake_position.fall_rate)
