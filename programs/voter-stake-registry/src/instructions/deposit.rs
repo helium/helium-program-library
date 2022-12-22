@@ -11,10 +11,11 @@ pub struct Deposit<'info> {
   // checking the PDA address it just an extra precaution,
   // the other constraints must be exhaustive
   #[account(
-        mut,
-        seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter.load()?.voter_authority.key().as_ref()],
-        bump = voter.load()?.voter_bump,
-        has_one = registrar)]
+    mut,
+    seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter.load()?.mint.key().as_ref()],
+    bump = voter.load()?.voter_bump,
+    has_one = registrar
+  )]
   pub voter: AccountLoader<'info, Voter>,
 
   #[account(

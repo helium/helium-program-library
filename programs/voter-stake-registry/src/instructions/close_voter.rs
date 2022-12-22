@@ -3,6 +3,7 @@ use std::ops::DerefMut;
 use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
+use anchor_spl::token::Mint;
 use anchor_spl::token::{self, CloseAccount, Token, TokenAccount};
 use bytemuck::bytes_of_mut;
 
@@ -16,13 +17,20 @@ pub struct CloseVoter<'info> {
   // checking the PDA address it just an extra precaution,
   // the other constraints must be exhaustive
   #[account(
-        mut,
-        seeds = [voter.load()?.registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
-        bump = voter.load()?.voter_bump,
-        has_one = voter_authority,
-        close = sol_destination
-    )]
+    mut,
+    seeds = [voter.load()?.registrar.key().as_ref(), b"voter".as_ref(), mint.key().as_ref()],
+    bump = voter.load()?.voter_bump,
+    close = sol_destination,
+    has_one = mint
+  )]
   pub voter: AccountLoader<'info, Voter>,
+  pub mint: Box<Account<'info, Mint>>,
+  #[account(
+    token::mint = mint,
+    token::authority = voter_authority,
+    constraint = voter_token_account.amount > 0
+  )]
+  pub voter_token_account: Box<Account<'info, TokenAccount>>,
 
   pub voter_authority: Signer<'info>,
 

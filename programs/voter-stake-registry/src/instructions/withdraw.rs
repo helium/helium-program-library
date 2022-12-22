@@ -12,12 +12,18 @@ pub struct Withdraw<'info> {
   // the other constraints must be exhaustive
   #[account(
         mut,
-        seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
+        seeds = [registrar.key().as_ref(), b"voter".as_ref(), mint.key().as_ref()],
         bump = voter.load()?.voter_bump,
         has_one = registrar,
-        has_one = voter_authority,
     )]
   pub voter: AccountLoader<'info, Voter>,
+  pub mint: Box<Account<'info, Mint>>,
+  #[account(
+    token::mint = mint,
+    token::authority = voter_authority,
+    constraint = voter_token_account.amount > 0
+  )]
+  pub voter_token_account: Box<Account<'info, TokenAccount>>,
   pub voter_authority: Signer<'info>,
 
   /// The token_owner_record for the voter_authority. This is needed
@@ -34,25 +40,25 @@ pub struct Withdraw<'info> {
   /// Withdraws must update the voter weight record, to prevent a stale
   /// record being used to vote after the withdraw.
   #[account(
-        mut,
-        seeds = [registrar.key().as_ref(), b"voter-weight-record".as_ref(), voter_authority.key().as_ref()],
-        bump = voter.load()?.voter_weight_record_bump,
-        constraint = voter_weight_record.realm == registrar.load()?.realm,
-        constraint = voter_weight_record.governing_token_owner == voter.load()?.voter_authority,
-        constraint = voter_weight_record.governing_token_mint == registrar.load()?.realm_governing_token_mint,
-    )]
+    mut,
+    seeds = [registrar.key().as_ref(), b"voter-weight-record".as_ref(), voter_authority.key().as_ref()],
+    bump = voter.load()?.voter_weight_record_bump,
+    constraint = voter_weight_record.realm == registrar.load()?.realm,
+    constraint = voter_weight_record.governing_token_owner == voter_token_account.owner,
+    constraint = voter_weight_record.governing_token_mint == registrar.load()?.realm_governing_token_mint,
+  )]
   pub voter_weight_record: Account<'info, VoterWeightRecord>,
 
   #[account(
         mut,
         associated_token::authority = voter,
-        associated_token::mint = mint.key(),
+        associated_token::mint = deposit_mint.key(),
     )]
   pub vault: Box<Account<'info, TokenAccount>>,
-  pub mint: Box<Account<'info, Mint>>,
+  pub deposit_mint: Box<Account<'info, Mint>>,
   #[account(
     mut,
-    has_one = mint
+    constraint = destination.mint == deposit_mint.key()
   )]
   pub destination: Box<Account<'info, TokenAccount>>,
 
@@ -98,6 +104,7 @@ pub fn withdraw(ctx: Context<Withdraw>, deposit_entry_index: u8, amount: u64) ->
   if registrar.voting_mints[mint_idx].grants_vote_weight() {
     let token_owner_record = voter.load_token_owner_record(
       &ctx.accounts.token_owner_record.to_account_info(),
+      &ctx.accounts.voter_token_account,
       registrar,
     )?;
     token_owner_record.assert_can_withdraw_governing_tokens()?;

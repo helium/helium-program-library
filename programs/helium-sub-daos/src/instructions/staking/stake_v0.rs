@@ -1,5 +1,6 @@
 use crate::{current_epoch, state::*, utils::*};
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
+use anchor_spl::token::{Mint, TokenAccount};
 use clockwork_sdk::{
   cpi::thread_create,
   state::{Thread, Trigger},
@@ -20,20 +21,22 @@ pub struct StakeArgsV0 {
 #[instruction(args: StakeArgsV0)]
 pub struct StakeV0<'info> {
   #[account(
-    seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
+    seeds = [b"voter".as_ref(), mint.key().as_ref()],
     seeds::program = vsr_program.key(),
     bump,
-    has_one = voter_authority,
+    has_one = mint,
     has_one = registrar,
   )]
   pub vsr_voter: AccountLoader<'info, Voter>,
+  pub mint: Box<Account<'info, Mint>>,
+  #[account(
+    token::mint = mint,
+    token::authority = voter_authority,
+    constraint = voter_token_account.amount > 0
+  )]
+  pub voter_token_account: Box<Account<'info, TokenAccount>>,
   #[account(mut)]
   pub voter_authority: Signer<'info>,
-  #[account(
-    seeds = [registrar.load()?.realm.as_ref(), b"registrar".as_ref(), dao.hnt_mint.as_ref()],
-    seeds::program = vsr_program.key(),
-    bump,
-  )]
   pub registrar: AccountLoader<'info, Registrar>,
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
@@ -128,8 +131,6 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     // build clockwork kickoff ix
     let accounts = vec![
       AccountMeta::new_readonly(ctx.accounts.vsr_voter.key(), false),
-      AccountMeta::new(ctx.accounts.voter_authority.key(), true),
-      AccountMeta::new_readonly(ctx.accounts.registrar.key(), false),
       AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
       AccountMeta::new(ctx.accounts.sub_dao.key(), false),
       AccountMeta::new(stake_position.key(), false),
@@ -169,6 +170,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
   stake_position.last_claimed_epoch = curr_epoch;
   stake_position.fall_rate = fall_rate;
   stake_position.sub_dao = ctx.accounts.sub_dao.key();
+  stake_position.mint = ctx.accounts.mint.key();
 
   Ok(())
 }

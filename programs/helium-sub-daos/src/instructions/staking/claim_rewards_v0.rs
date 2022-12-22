@@ -20,13 +20,20 @@ pub struct ClaimRewardsArgsV0 {
 #[instruction(args: ClaimRewardsArgsV0)]
 pub struct ClaimRewardsV0<'info> {
   #[account(
-    seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
+    seeds = [b"voter".as_ref(), mint.key().as_ref()],
     seeds::program = vsr_program.key(),
     bump,
-    has_one = voter_authority,
+    has_one = mint,
     has_one = registrar,
   )]
   pub vsr_voter: AccountLoader<'info, Voter>,
+  pub mint: Box<Account<'info, Mint>>,
+  #[account(
+    token::mint = mint,
+    token::authority = voter_authority,
+    constraint = voter_token_account.amount > 0
+  )]
+  pub voter_token_account: Box<Account<'info, TokenAccount>>,
   #[account(mut)]
   pub voter_authority: Signer<'info>,
   #[account(

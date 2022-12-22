@@ -47,6 +47,11 @@ export const init = async (
           account: "vault",
           mint: "mint",
           owner: "voter",
+        }),
+        ataResolver({
+          account: "voterTokenAccount",
+          mint: "mint",
+          owner: "voterAuthority",
         })
       );
     }

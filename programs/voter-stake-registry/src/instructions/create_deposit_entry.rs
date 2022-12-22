@@ -12,13 +12,20 @@ pub struct CreateDepositEntry<'info> {
   // checking the PDA address it just an extra precaution,
   // the other constraints must be exhaustive
   #[account(
-        mut,
-        seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
-        bump = voter.load()?.voter_bump,
-        has_one = registrar,
-        has_one = voter_authority)]
+    mut,
+    seeds = [b"voter".as_ref(), mint.key().as_ref()],
+    bump = voter.load()?.voter_bump,
+    has_one = registrar,
+    has_one = mint,
+  )]
   pub voter: AccountLoader<'info, Voter>,
-
+  pub mint: Box<Account<'info, Mint>>,
+  #[account(
+    token::mint = mint,
+    token::authority = voter_authority,
+    constraint = voter_token_account.amount > 0
+  )]
+  pub voter_token_account: Box<Account<'info, TokenAccount>>,
   #[account(
         init_if_needed,
         associated_token::authority = voter,

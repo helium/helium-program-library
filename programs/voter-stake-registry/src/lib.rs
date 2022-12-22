@@ -141,20 +141,6 @@ pub mod voter_stake_registry {
     )
   }
 
-  pub fn internal_transfer_unlocked(
-    ctx: Context<InternalTransferUnlocked>,
-    source_deposit_entry_index: u8,
-    target_deposit_entry_index: u8,
-    amount: u64,
-  ) -> Result<()> {
-    instructions::internal_transfer_unlocked(
-      ctx,
-      source_deposit_entry_index,
-      target_deposit_entry_index,
-      amount,
-    )
-  }
-
   pub fn update_voter_weight_record(ctx: Context<UpdateVoterWeightRecord>) -> Result<()> {
     instructions::update_voter_weight_record(ctx)
   }

@@ -16,15 +16,13 @@ export const registrarKey = (
   );
 
 export const voterKey = (
-  registrar: PublicKey,
-  voterAuthority: PublicKey,
+  mint: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
     [
-      registrar.toBuffer(),
       Buffer.from("voter", "utf-8"),
-      voterAuthority.toBuffer(),
+      mint.toBuffer(),
     ],
     programId
   );

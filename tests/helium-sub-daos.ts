@@ -212,7 +212,7 @@ describe("helium-sub-daos", () => {
               deposit: 0,
             })
             .accounts({
-              registrar,
+              vsrVoter: voter,
               subDao,
               voterAuthority: voterKp.publicKey,
             })
@@ -246,7 +246,7 @@ describe("helium-sub-daos", () => {
           await program.methods.stakeV0({
             deposit: 0,
           }).accounts({
-            registrar,
+            vsrVoter: voter,
             subDao,
             voterAuthority: voterKp.publicKey,
           }).signers([voterKp]).rpc({skipPreflight: true});
@@ -295,7 +295,7 @@ describe("helium-sub-daos", () => {
                 deposit: 0,
               })
               .accounts({
-                registrar,
+                vsrVoter: voter,
                 subDao,
                 voterAuthority: voterKp.publicKey,
               })
@@ -310,7 +310,7 @@ describe("helium-sub-daos", () => {
                 deposit: 0,
               })
               .accounts({
-                registrar,
+                vsrVoter: voter,
                 subDao,
                 voterAuthority: voterKp.publicKey,
               })
@@ -330,8 +330,7 @@ describe("helium-sub-daos", () => {
             const method = program.methods
               .purgePositionV0()
               .accounts({
-                registrar,
-                voterAuthority: voterKp.publicKey,
+                vsrVoter: voter,
                 subDao,
                 stakePosition: stakePositionKey(voterKp.publicKey, 0)[0]
               })
@@ -378,7 +377,7 @@ describe("helium-sub-daos", () => {
               .accounts({
                 registrar,
                 subDao,
-                voterAuthority: voterKp.publicKey,
+                vsrVoter: voter
               })
               .signers([voterKp])
               .rpcAndKeys();

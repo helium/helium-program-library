@@ -5,26 +5,16 @@ use clockwork_sdk::{
   state::{Thread, ThreadSettings, Trigger},
   ThreadProgram,
 };
-use voter_stake_registry::state::{Registrar, Voter};
+use voter_stake_registry::state::{Voter};
 
 #[derive(Accounts)]
 pub struct PurgePositionV0<'info> {
   #[account(
-    seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
+    seeds = [b"voter".as_ref(), vsr_voter.load()?.mint.as_ref()],
     seeds::program = vsr_program.key(),
-    bump,
-    has_one = voter_authority,
-    has_one = registrar,
+    bump = vsr_voter.load()?.voter_bump,
   )]
   pub vsr_voter: AccountLoader<'info, Voter>,
-  #[account(mut)]
-  pub voter_authority: Signer<'info>,
-  #[account(
-    seeds = [registrar.load()?.realm.as_ref(), b"registrar".as_ref(), dao.hnt_mint.as_ref()],
-    seeds::program = vsr_program.key(),
-    bump,
-  )]
-  pub registrar: AccountLoader<'info, Registrar>,
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
     mut,
@@ -34,33 +24,31 @@ pub struct PurgePositionV0<'info> {
 
   #[account(
     mut,
-    seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &stake_position.deposit.to_le_bytes()],
-    bump,
+    has_one = sub_dao
   )]
   pub stake_position: Account<'info, StakePositionV0>,
 
   ///CHECK: constraints
   #[account(address = voter_stake_registry::ID)]
   pub vsr_program: AccountInfo<'info>,
-  pub clock: Sysvar<'info, Clock>,
 
   pub system_program: Program<'info, System>,
   #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", stake_position.deposit)))]
   pub thread: Account<'info, Thread>,
   pub clockwork: Program<'info, ThreadProgram>,
+  pub clock: Sysvar<'info, Clock>,
 }
 
 pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {
   // load the vehnt information
   let voter = ctx.accounts.vsr_voter.load()?;
-  let registrar = &ctx.accounts.registrar.load()?;
   let d_entry = voter.deposits[ctx.accounts.stake_position.deposit as usize];
-  let curr_ts = registrar.clock_unix_timestamp();
+  let curr_ts = ctx.accounts.clock.unix_timestamp;
   if !TESTING && !d_entry.lockup.expired(curr_ts) {
     // update the thread to make sure it's tracking the right lockup. this case can happen if user increases their vsr lockup period
     let signer_seeds: &[&[&[u8]]] = &[&[
       "stake_position".as_bytes(),
-      ctx.accounts.voter_authority.key.as_ref(),
+      ctx.accounts.stake_position.mint.as_ref(),
       &ctx.accounts.stake_position.deposit.to_le_bytes(),
       &[ctx.bumps["stake_position"]],
     ]];

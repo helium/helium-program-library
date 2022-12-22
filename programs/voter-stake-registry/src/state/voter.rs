@@ -2,13 +2,14 @@ use crate::error::*;
 use crate::state::deposit_entry::DepositEntry;
 use crate::state::registrar::Registrar;
 use anchor_lang::prelude::*;
+use anchor_spl::token::TokenAccount;
 use spl_governance::state::token_owner_record;
 
 /// User account for minting voting rights.
 #[account(zero_copy)]
 pub struct Voter {
-  pub voter_authority: Pubkey,
   pub registrar: Pubkey,
+  pub mint: Pubkey,
   pub deposits: [DepositEntry; 32],
   pub voter_bump: u8,
   pub voter_weight_record_bump: u8,
@@ -92,6 +93,7 @@ impl Voter {
   pub fn load_token_owner_record(
     &self,
     account_info: &AccountInfo,
+    token_account: &Account<TokenAccount>,
     registrar: &Registrar,
   ) -> Result<token_owner_record::TokenOwnerRecordV2> {
     let record = token_owner_record::get_token_owner_record_data_for_realm_and_governing_mint(
@@ -101,8 +103,13 @@ impl Voter {
       &registrar.realm_governing_token_mint,
     )?;
     require_keys_eq!(
+      token_account.key(),
+      self.mint,
+      VsrError::InvalidTokenOwnerRecord
+    );
+    require_keys_eq!(
       record.governing_token_owner,
-      self.voter_authority,
+      token_account.owner,
       VsrError::InvalidTokenOwnerRecord
     );
     Ok(record)
@@ -113,9 +120,8 @@ impl Voter {
 macro_rules! voter_seeds {
   ( $voter:expr ) => {
     &[
-      $voter.registrar.as_ref(),
       b"voter".as_ref(),
-      $voter.voter_authority.as_ref(),
+      $voter.mint.as_ref(),
       &[$voter.voter_bump],
     ]
   };

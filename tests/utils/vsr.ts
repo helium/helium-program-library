@@ -1,9 +1,10 @@
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
-import { createAtaAndTransfer, sendInstructions, toBN } from "@helium/spl-utils";
+import { createAtaAndTransfer, createMintInstructions, sendInstructions, toBN } from "@helium/spl-utils";
 import { AnchorProvider, BN, Program, web3 } from "@project-serum/anchor";
 import { getGovernanceProgramVersion, MintMaxVoteWeightSource, withCreateRealm } from "@solana/spl-governance";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { voterKey } from "../../packages/voter-stake-registry-sdk/src";
 export const SPL_GOVERNANCE_PID = new PublicKey("GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw");
 
 
@@ -76,10 +77,22 @@ export async function initVsr(
       .instruction()
   );
 
+  const mintKeypair = Keypair.generate();
+  const vKey = voterKey(mintKeypair.publicKey)[0];
   const createVoter = program.methods
     .createVoter()
+    .preInstructions(
+      await createMintInstructions(
+        provider,
+        0,
+        vKey,
+        vKey,
+        mintKeypair
+      )
+    )
     .accounts({
       registrar,
+      mint: mintKeypair.publicKey,
       voterAuthority: voterKp.publicKey,
       payer: voterKp.publicKey,
     })
@@ -92,6 +105,7 @@ export async function initVsr(
   instructions.push(await program.methods.createDepositEntry(0, {cliff: {}}, null, options.lockupPeriods).accounts({ // lock for 6 months
     registrar,
     depositMint: hntMint,
+    mint: mintKeypair.publicKey,
     voterAuthority: voterKp.publicKey,
     payer: voterKp.publicKey,
   }).signers([voterKp]).instruction());
@@ -112,5 +126,6 @@ export async function initVsr(
     voter: voter!,
     vault,
     hntMint,
-  }
+    mint: mintKeypair.publicKey,
+  };
 }
