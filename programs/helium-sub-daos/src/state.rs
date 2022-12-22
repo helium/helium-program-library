@@ -69,13 +69,14 @@ pub struct DaoEpochInfoV0 {
 #[derive(Default)]
 pub struct StakePositionV0 {
   pub mint: Pubkey,
+  pub position: Pubkey,
   pub hnt_amount: u64,
-  pub deposit: u8, // the deposit_entry in vsr that this position is drawing from
   pub sub_dao: Pubkey,
   pub last_claimed_epoch: u64, // the epoch number that the dnt rewards were last claimed at
   pub fall_rate: u64,          // the vehnt amount that the position decays by per second
   pub expiry_ts: i64,
   pub purged: bool, // if true, this position has been removed from subdao calculations. rewards can still be claimed.
+  pub bump_seed: u8,
 }
 
 #[account]

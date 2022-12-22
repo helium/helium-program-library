@@ -1,5 +1,5 @@
 use crate::error::*;
-use crate::state::voting_mint_config::VotingMintConfig;
+use crate::state::voting_mint_config::VotingMintConfigV0;
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 
@@ -14,7 +14,7 @@ pub struct Registrar {
 
   /// Storage for voting mints and their configuration.
   /// The length should be adjusted for one's use case.
-  pub voting_mints: [VotingMintConfig; 4],
+  pub voting_mints: [VotingMintConfigV0; 4],
 
   /// Debug only: time offset, to allow tests to move forward in time.
   pub time_offset: i64,

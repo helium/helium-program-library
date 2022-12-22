@@ -37,14 +37,11 @@ export function subDaoKey(
 }
 
 export function stakePositionKey(
-  voterAuthority: PublicKey,
-  deposit: number,
+  position: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
-  const b = Buffer.alloc(1)
-  b.writeUInt8(deposit)
   return PublicKey.findProgramAddressSync([
-    Buffer.from("stake_position", "utf-8"), voterAuthority.toBuffer(), b], 
+    Buffer.from("stake_position", "utf-8"), position.toBuffer()], 
     programId
   );
 }

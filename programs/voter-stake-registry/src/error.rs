@@ -119,4 +119,17 @@ pub enum VsrError {
   // 6038 / 0x1796
   #[msg("")]
   DepositLockupLessThanVotingMintConfigMinRequired,
+
+  #[msg("Cast vote is not allowed on update_voter_weight_record_v0 endpoint")]
+  CastVoteIsNotAllowed,
+
+  #[msg("Program id was not what was expected")]
+  InvalidProgramId,
+
+  #[msg("")]
+  InvalidMintOwner,
+  #[msg("")]
+  InvalidMintAmount,
+  #[msg("")]
+  DuplicatedNftDetected,
 }

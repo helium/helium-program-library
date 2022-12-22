@@ -22,7 +22,7 @@ import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { burnDataCredits } from "./data-credits";
 import { initTestDao, initTestSubdao } from "./utils/daos";
-import { ensureDCIdl, ensureHSDIdl, initWorld } from "./utils/fixtures";
+import { ensureDCIdl, ensureHSDIdl, ensureVSRIdl, initWorld } from "./utils/fixtures";
 import { initVsr } from "./utils/vsr";
 
 const THREAD_PID = new PublicKey("3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv");
@@ -54,10 +54,10 @@ describe("helium-sub-daos", () => {
   let vsrProgram: Program<VoterStakeRegistry>;
 
   let registrar: PublicKey;
-  let voter: PublicKey;
+  let position: PublicKey;
   let vault: PublicKey;
   let hntMint: PublicKey;
-  let voterKp: Keypair;
+  let positionAuthorityKp: Keypair;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -86,6 +86,7 @@ describe("helium-sub-daos", () => {
       anchor.workspace.VoterStakeRegistry.programId,
       anchor.workspace.VoterStakeRegistry.idl
     );
+    ensureVSRIdl(vsrProgram);
   });
 
   it("initializes a dao", async () => {
@@ -184,6 +185,7 @@ describe("helium-sub-daos", () => {
           delay: 1000,
           lockupPeriods: 183,
           lockupAmount: 100,
+          expectedMultiplier: 1
         },
       },
       {
@@ -192,6 +194,7 @@ describe("helium-sub-daos", () => {
           delay: 15000,
           lockupPeriods: 183 * 4,
           lockupAmount: 50,
+          expectedMultiplier: 1 + ((183 * 4 - 183) / (365 * 4 - 183)) * 99
         },
       },
       // { name: "Case 3", options: {delay: 45000, lockupPeriods: 183*8, lockupAmount: 100, stakeAmount: 10000} },
@@ -201,38 +204,55 @@ describe("helium-sub-daos", () => {
     vehntOptions.forEach(function ({name, options}) {
       describe("vehnt tests - " + name, () => {
         beforeEach(async() => {
-          voterKp = Keypair.generate();
-          ({registrar, voter, vault} = await initVsr(vsrProgram, provider, me, hntMint, voterKp, options ));
+          positionAuthorityKp = Keypair.generate();
+          ({registrar, position, vault} = await initVsr(vsrProgram, provider, me, hntMint, positionAuthorityKp, options ));
         })
 
         it("allows vehnt staking", async () => {
-          const vehntStake = toBN(options.lockupAmount,8);
+          const lockupAmount = toBN(options.lockupAmount,8);
           const method = program.methods
-            .stakeV0({
-              deposit: 0,
-            })
+            .stakeV0()
             .accounts({
-              vsrVoter: voter,
+              position,
               subDao,
-              voterAuthority: voterKp.publicKey,
+              positionAuthority: positionAuthorityKp.publicKey,
             })
-            .signers([voterKp]);
+            .signers([positionAuthorityKp]);
           const { stakePosition, thread } = await method.pubkeys();
           await method.rpc();
 
           const acc = await program.account.stakePositionV0.fetch(stakePosition!);
           const sdAcc = await program.account.subDaoV0.fetch(subDao);
-          expectBnAccuracy(vehntStake, sdAcc.vehntStaked, 0.001);
-          expectBnAccuracy(vehntStake, acc.hntAmount, 0.001);
+
+          expectBnAccuracy(
+            toBN(options.lockupAmount * options.expectedMultiplier, 8),
+            sdAcc.vehntStaked,
+            0.001
+          );
+          expectBnAccuracy(lockupAmount, acc.hntAmount, 0.001);
           assert.isTrue(acc.fallRate.gt(new anchor.BN(0)))
           assert.isTrue(!!(await provider.connection.getAccountInfo(thread!)));
         });
     
-        function expectBnAccuracy(expectedBn: anchor.BN, actualBn: anchor.BN, percentUncertainty: number) {
-          const upper = expectedBn.mul(new BN(1 + percentUncertainty));
-          const lower = expectedBn.mul(new BN(1 - percentUncertainty));
-          expect(actualBn.gte(lower));
-          expect(actualBn.lte(upper));
+        function expectBnAccuracy(
+          expectedBn: anchor.BN,
+          actualBn: anchor.BN,
+          percentUncertainty: number
+        ) {
+          let upperBound = expectedBn.mul(new BN(1 + percentUncertainty));
+          let lowerBound = expectedBn.mul(new BN(1 - percentUncertainty));
+          try {
+            expect(upperBound.gte(actualBn)).to.be.true;
+            expect(lowerBound.lte(actualBn)).to.be.true;
+          } catch (e) {
+            console.error(
+              "Expected",
+              expectedBn.toString(),
+              "Actual",
+              actualBn.toString()
+            );
+            throw e;
+          }
         }
     
         it("calculates subdao rewards", async () => {
@@ -243,13 +263,11 @@ describe("helium-sub-daos", () => {
 
           
           // stake some vehnt
-          await program.methods.stakeV0({
-            deposit: 0,
-          }).accounts({
-            vsrVoter: voter,
+          await program.methods.stakeV0().accounts({
+            position,
             subDao,
-            voterAuthority: voterKp.publicKey,
-          }).signers([voterKp]).rpc({skipPreflight: true});
+            positionAuthority: positionAuthorityKp.publicKey,
+          }).signers([positionAuthorityKp]).rpc({skipPreflight: true});
           
           const instr = program.methods
             .calculateUtilityScoreV0({
@@ -282,7 +300,7 @@ describe("helium-sub-daos", () => {
 
           expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
 
-          const totalUtility = Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1/4) * options.lockupAmount;
+          const totalUtility = Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1/4) * (options.lockupAmount * options.expectedMultiplier);
 
           expectBnAccuracy(toBN(totalUtility, 12), daoInfo.totalUtilityScore, 0.01);
           expectBnAccuracy(toBN(totalUtility, 12), subDaoInfo.utilityScore!, 0.01);
@@ -291,37 +309,33 @@ describe("helium-sub-daos", () => {
         describe("with staked vehnt", () => {
           beforeEach(async() => {
             await program.methods
-              .stakeV0({
-                deposit: 0,
-              })
+              .stakeV0()
               .accounts({
-                vsrVoter: voter,
+                position,
                 subDao,
-                voterAuthority: voterKp.publicKey,
+                positionAuthority: positionAuthorityKp.publicKey,
               })
-              .signers([voterKp])
+              .signers([positionAuthorityKp])
               .rpc({ skipPreflight: true });
           })
     
           it("allows closing stake", async () => {
             await sleep(options.delay);
             const method = program.methods
-              .closeStakeV0({
-                deposit: 0,
-              })
+              .closeStakeV0()
               .accounts({
-                vsrVoter: voter,
+                position,
                 subDao,
-                voterAuthority: voterKp.publicKey,
+                positionAuthority: positionAuthorityKp.publicKey,
               })
-              .signers([voterKp]);
+              .signers([positionAuthorityKp]);
 
             const { stakePosition } = await method.pubkeys();
             await method.rpc({skipPreflight: true});
     
             const sdAcc = await program.account.subDaoV0.fetch(subDao);
             let st = sdAcc.vehntStaked.toNumber();
-            assert.equal(sdAcc.vehntFallRate.toNumber(), 0);
+            expect(sdAcc.vehntFallRate.toNumber()).to.eq(0);
             assert.isTrue(st == 0 || st == 1)
             assert.isFalse(!!(await provider.connection.getAccountInfo(stakePosition!)));
           });
@@ -330,11 +344,9 @@ describe("helium-sub-daos", () => {
             const method = program.methods
               .purgePositionV0()
               .accounts({
-                vsrVoter: voter,
+                position,
                 subDao,
-                stakePosition: stakePositionKey(voterKp.publicKey, 0)[0]
               })
-              .signers([voterKp]);
             await method.rpc();
             const { stakePosition } = await method.pubkeys();
     
@@ -345,53 +357,39 @@ describe("helium-sub-daos", () => {
           });
     
           it("refreshes a position", async () => {
-            await vsrProgram.methods
-              .createDepositEntry(
-                1,
-                { cliff: {} },
-                null,
-                options.lockupPeriods
-              )
-              .accounts({
-                registrar,
-                voter,
-                vault,
-                depositMint: hntMint,
-                voterAuthority: voterKp.publicKey,
-                payer: voterKp.publicKey,
-              })
-              .signers([voterKp])
-              .rpc({ skipPreflight: true });
-            await vsrProgram.methods.internalTransferLocked(0, 1, toBN(options.lockupAmount, 8)).accounts({
+            await vsrProgram.methods.depositV0({
+              amount: toBN(options.lockupAmount, 8)
+            }).accounts({
               registrar,
-              voter,
-              voterAuthority: voterKp.publicKey,
-            }).signers([voterKp]).rpc({skipPreflight: true});
+              position,
+              mint: hntMint
+            }).rpc({skipPreflight: true});
     
             const {
               pubkeys: { stakePosition },
             } = await program.methods
-              .refreshPositionV0({
-                deposit: 0,
-              })
+              .refreshPositionV0()
               .accounts({
                 registrar,
                 subDao,
-                vsrVoter: voter
+                position
               })
-              .signers([voterKp])
-              .rpcAndKeys();
+              .rpcAndKeys({ skipPreflight: true });
 
             const acc = await program.account.stakePositionV0.fetch(
               stakePosition!
             );
-            assert.equal(acc.hntAmount.toNumber(), 0);
-            assert.equal(acc.fallRate.toNumber(), 0);
+            expect(acc.hntAmount.toNumber()).to.eq(
+              toBN(options.lockupAmount * 2, 8).toNumber()
+            );
+            expect(acc.fallRate.toNumber()).to.be.gt(0);
             const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
-            let vehnt = subDaoAcc.vehntStaked.toNumber();
-            if (vehnt > 1) console.log(vehnt);
-            assert.isBelow(vehnt, 2);
-            assert.equal(subDaoAcc.vehntFallRate.toNumber(), 0);
+            expectBnAccuracy(
+              toBN(options.lockupAmount * 2 * options.expectedMultiplier, 8),
+              subDaoAcc.vehntStaked,
+              0.01
+            );
+            expect(subDaoAcc.vehntFallRate.toNumber()).to.be.gt(0);
           });
           
           describe("with calculated rewards", () => {
@@ -470,13 +468,12 @@ describe("helium-sub-daos", () => {
               ]);
     
               const method = program.methods.claimRewardsV0({
-                deposit: 0,
                 epoch,
               }).accounts({
-                registrar,
+                position,
                 subDao,
-                voterAuthority: voterKp.publicKey,
-              }).signers([voterKp]);
+                positionAuthority: positionAuthorityKp.publicKey,
+              }).signers([positionAuthorityKp]);
               const { stakerAta } = await method.pubkeys();
               await method.rpc({skipPreflight: true});
               

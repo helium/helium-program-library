@@ -11,6 +11,7 @@ import { random } from "./string";
 import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import { ThresholdType } from "../../packages/circuit-breaker-sdk/src"
 import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =
@@ -180,6 +181,21 @@ export async function ensureHSDIdl(hsdProgram: Program<HeliumSubDaos>) {
     );
   }
 }
+
+export async function ensureVSRIdl(vsrProgram: Program<VoterStakeRegistry>) {
+  try {
+    execSync(
+      `anchor idl init --filepath ${__dirname}/../../target/idl/voter_stake_registry.json ${vsrProgram.programId}`,
+      { stdio: "inherit" }
+    );
+  } catch {
+    execSync(
+      `anchor idl upgrade --filepath ${__dirname}/../../target/idl/voter_stake_registry.json ${vsrProgram.programId}`,
+      { stdio: "inherit" }
+    );
+  }
+}
+
 
 export const initWorld = async (
   provider: anchor.AnchorProvider,

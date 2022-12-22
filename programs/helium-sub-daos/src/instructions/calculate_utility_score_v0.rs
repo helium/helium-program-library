@@ -4,12 +4,7 @@ use crate::{
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use anchor_spl::token::Token;
 use circuit_breaker::CircuitBreaker;
-use clockwork_sdk::{
-  self,
-  state::{Thread, ThreadResponse},
-  utils::PAYER_PUBKEY,
-  ThreadProgram,
-};
+use clockwork_sdk::{self, state::ThreadResponse, utils::PAYER_PUBKEY, ThreadProgram};
 use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
 use switchboard_v2::{AggregatorAccountData, AggregatorHistoryBuffer};
 
@@ -60,7 +55,12 @@ pub struct CalculateUtilityScoreV0<'info> {
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
 
   /// CHECK: address checked
-  #[account(mut, address = Thread::pubkey(sub_dao.key(), "end-epoch".to_string()))]
+  #[account(
+    mut,
+    seeds = [b"thread", sub_dao.key().as_ref(), b"end-epoch"],
+    seeds::program = clockwork.key(),
+    bump
+  )]
   pub thread: AccountInfo<'info>,
   pub clockwork: Program<'info, ThreadProgram>,
 }

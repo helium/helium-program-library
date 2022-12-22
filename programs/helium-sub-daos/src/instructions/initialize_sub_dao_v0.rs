@@ -15,12 +15,7 @@ use circuit_breaker::{
   ThresholdType as CBThresholdType,
   WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
 };
-use clockwork_sdk::{
-  cpi::thread_create,
-  state::{Thread, Trigger},
-  utils::PAYER_PUBKEY,
-  ThreadProgram,
-};
+use clockwork_sdk::{cpi::thread_create, state::Trigger, utils::PAYER_PUBKEY, ThreadProgram};
 use shared_utils::resize_to_fit;
 use switchboard_v2::AggregatorAccountData;
 use time::OffsetDateTime;
@@ -145,7 +140,12 @@ pub struct InitializeSubDaoV0<'info> {
   pub rent: Sysvar<'info, Rent>,
 
   /// CHECK: handled by thread_create
-  #[account(mut, address = Thread::pubkey(sub_dao.key(), "end-epoch".to_string()))]
+  #[account(
+    mut,
+    seeds = [b"thread", sub_dao.key().as_ref(), b"end-epoch"],
+    seeds::program = clockwork.key(),
+    bump
+  )]
   pub thread: AccountInfo<'info>,
   pub clockwork: Program<'info, ThreadProgram>,
 }
