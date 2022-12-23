@@ -42,7 +42,7 @@ pub struct RelinquishVoteV0<'info> {
             owner = registrar.load()?.governance_program_id
          )]
   /// CHECK: Owned by spl-governance instance specified in registrar.governance_program_id
-  voter_token_owner_record: UncheckedAccount<'info>,
+  pub voter_token_owner_record: UncheckedAccount<'info>,
 
   /// Authority of the voter who cast the original vote
   /// It can be either governing_token_owner or its delegate and must sign this instruction

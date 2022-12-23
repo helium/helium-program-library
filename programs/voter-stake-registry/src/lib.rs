@@ -110,7 +110,7 @@ pub mod voter_stake_registry {
 
   pub fn cast_vote_v0<'a, 'b, 'c, 'info>(
     ctx: Context<'a, 'b, 'c, 'info, CastVoteV0<'info>>,
-    args: CastVoteArgsV0
+    args: CastVoteArgsV0,
   ) -> Result<()> {
     instructions::cast_vote_v0::handler(ctx, args)
   }

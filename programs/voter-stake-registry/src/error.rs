@@ -155,5 +155,5 @@ pub enum VsrError {
   #[msg("")]
   InvalidOwner,
   #[msg("You may not deposit additional tokens on a position created during the genesis period that still has the genesis multiplier")]
-  NoDepositOnGenesisPositions
+  NoDepositOnGenesisPositions,
 }

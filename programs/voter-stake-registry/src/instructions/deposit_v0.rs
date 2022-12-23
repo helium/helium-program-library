@@ -88,7 +88,8 @@ pub fn handler(ctx: Context<DepositV0>, args: DepositArgsV0) -> Result<()> {
   let config = registrar.voting_mints[mint_idx];
 
   require!(
-    curr_ts >= position.genesis_end || curr_ts <= config.genesis_vote_power_multiplier_expiration_ts,
+    curr_ts >= position.genesis_end
+      || curr_ts <= config.genesis_vote_power_multiplier_expiration_ts,
     VsrError::NoDepositOnGenesisPositions
   );
 

@@ -5,7 +5,6 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use anchor_spl::token::{self, Token, TokenAccount};
 
-
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct WithdrawArgsV0 {
   pub amount: u64,
@@ -77,12 +76,10 @@ pub fn handler(ctx: Context<WithdrawV0>, args: WithdrawArgsV0) -> Result<()> {
   let position = &mut ctx.accounts.position;
   let registrar = &ctx.accounts.registrar.load()?;
 
-  // Get the exchange rate for the token being withdrawn.
   let mint_idx = registrar.voting_mint_config_index(ctx.accounts.destination.mint)?;
 
-  // Get the deposit being withdrawn from.
   let curr_ts = registrar.clock_unix_timestamp();
-  
+
   require_eq!(
     mint_idx,
     position.voting_mint_config_idx as usize,

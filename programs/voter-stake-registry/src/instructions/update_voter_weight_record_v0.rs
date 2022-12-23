@@ -18,7 +18,6 @@ impl Default for VoterWeightAction {
   }
 }
 
-
 #[derive(Accounts)]
 #[instruction(args: UpdateVoterWeightRecordArgsV0)]
 pub struct UpdateVoterWeightRecordV0<'info> {

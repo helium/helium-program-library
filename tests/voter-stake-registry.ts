@@ -5,7 +5,7 @@ import {
   createMintInstructions,
   sendInstructions,
   toBN,
-  truthy,
+  truthy
 } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
@@ -27,26 +27,30 @@ import {
   withCreateProposal,
   withCreateRealm,
   withCreateTokenOwnerRecord,
+  withRelinquishVote,
   withSetRealmConfig,
   withSignOffProposal,
-  YesNoVote,
+  YesNoVote
 } from "@solana/spl-governance";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction } from "@solana/spl-token";
 import {
   Keypair,
   PublicKey,
   SYSVAR_CLOCK_PUBKEY,
-  TransactionInstruction,
+  TransactionInstruction
 } from "@solana/web3.js";
-import { expect } from "chai";
+import chai, { expect } from "chai";
+import chaiAsPromised from "chai-as-promised";
 import {
   init,
   nftVoteRecordKey,
   positionKey,
   PROGRAM_ID,
-  voterWeightRecordKey,
+  voterWeightRecordKey
 } from "../packages/voter-stake-registry-sdk/src";
 import { SPL_GOVERNANCE_PID } from "./utils/vsr";
+
+chai.use(chaiAsPromised);
 
 const MIN_LOCKUP = 15811200; // 6 months
 const MAX_LOCKUP = MIN_LOCKUP * 8;
@@ -61,6 +65,7 @@ describe("voter-stake-registry", () => {
   let registrar: PublicKey;
   let hntMint: PublicKey;
   let realm: PublicKey;
+  let programVersion: number;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
 
@@ -78,7 +83,7 @@ describe("voter-stake-registry", () => {
     );
     hntMint = await createMint(provider, 8, me, me);
     await createAtaAndMint(provider, hntMint, toBN(10000000000, 8));
-    const programVersion = await getGovernanceProgramVersion(
+    programVersion = await getGovernanceProgramVersion(
       program.provider.connection,
       SPL_GOVERNANCE_PID
     );
@@ -235,74 +240,10 @@ describe("voter-stake-registry", () => {
   describe("with proposal", async () => {
     let proposal: PublicKey;
     let governance: PublicKey;
-    let programVersion: number;
     let proposalOwner: PublicKey;
-
-    let voteTestCases = [
-      {
-        name: "genesis constant (within genesis)",
-        lockupAmount: 10000,
-        periods: 200,
-        delay: 0, // days
-        fastForward: 60, // days
-        kind: { constant: {} },
-        expectedVeHnt:
-          10000 *
-          GENESIS_MULTIPLIER *
-          (1 +
-            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
-              (MAX_LOCKUP - MIN_LOCKUP)),
-      },
-      {
-        name: "genesis cliff (within genesis)",
-        lockupAmount: 10000,
-        periods: 200,
-        delay: 0, // days
-        fastForward: 60, // days
-        kind: { cliff: {} },
-        expectedVeHnt:
-          10000 *
-          GENESIS_MULTIPLIER *
-          (1 +
-            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
-              (MAX_LOCKUP - MIN_LOCKUP)) *
-          ((200 - 60) / 200),
-      },
-      {
-        name: "genesis constant (outside of genesis)",
-        lockupAmount: 10000,
-        periods: 200,
-        delay: 0, // days
-        fastForward: 201, // days
-        kind: { constant: {} },
-        expectedVeHnt:
-          10000 *
-          (1 +
-            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
-              (MAX_LOCKUP - MIN_LOCKUP)),
-      },
-      {
-        name: "cliff (outside genesis)",
-        lockupAmount: 10000,
-        periods: 200,
-        delay: 7, // days
-        fastForward: 60, // days
-        kind: { cliff: {} },
-        expectedVeHnt:
-          10000 *
-          (1 +
-            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
-              (MAX_LOCKUP - MIN_LOCKUP)) *
-          ((200 - 60) / 200),
-      },
-    ];
 
     beforeEach(async () => {
       const instructions: TransactionInstruction[] = [];
-      programVersion = await getGovernanceProgramVersion(
-        provider.connection,
-        SPL_GOVERNANCE_PID
-      );
       const tokenOwnerRecord = await getTokenOwnerRecordAddress(
         SPL_GOVERNANCE_PID,
         realm,
@@ -415,6 +356,65 @@ describe("voter-stake-registry", () => {
       await sendInstructions(provider, instructions);
     });
 
+
+    let voteTestCases = [
+      {
+        name: "genesis constant (within genesis)",
+        lockupAmount: 10000,
+        periods: 200,
+        delay: 0, // days
+        fastForward: 60, // days
+        kind: { constant: {} },
+        expectedVeHnt:
+          10000 *
+          GENESIS_MULTIPLIER *
+          (1 +
+            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
+              (MAX_LOCKUP - MIN_LOCKUP)),
+      },
+      {
+        name: "genesis cliff (within genesis)",
+        lockupAmount: 10000,
+        periods: 200,
+        delay: 0, // days
+        fastForward: 60, // days
+        kind: { cliff: {} },
+        expectedVeHnt:
+          10000 *
+          GENESIS_MULTIPLIER *
+          (1 +
+            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
+              (MAX_LOCKUP - MIN_LOCKUP)) *
+          ((200 - 60) / 200),
+      },
+      {
+        name: "genesis constant (outside of genesis)",
+        lockupAmount: 10000,
+        periods: 200,
+        delay: 0, // days
+        fastForward: 201, // days
+        kind: { constant: {} },
+        expectedVeHnt:
+          10000 *
+          (1 +
+            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
+              (MAX_LOCKUP - MIN_LOCKUP)),
+      },
+      {
+        name: "cliff (outside genesis)",
+        lockupAmount: 10000,
+        periods: 200,
+        delay: 7, // days
+        fastForward: 60, // days
+        kind: { cliff: {} },
+        expectedVeHnt:
+          10000 *
+          (1 +
+            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
+              (MAX_LOCKUP - MIN_LOCKUP)) *
+          ((200 - 60) / 200),
+      },
+    ];
     voteTestCases.forEach((testCase) => {
       const depositor = Keypair.generate();
       it("should allow me to vote with " + testCase.name, async () => {
@@ -511,29 +511,353 @@ describe("voter-stake-registry", () => {
         expectBnAccuracy(toBN(testCase.expectedVeHnt, 8), voteRecord.account.getYesVoteWeight() as anchor.BN, 0.00001);
       });
     });
+
+    describe("with an active vote", async () => {
+      let position: PublicKey;
+      let mint: PublicKey;
+      let tokenOwnerRecord: PublicKey;
+      let voteRecord: PublicKey;
+      let voterWeightRecord: PublicKey;
+
+      beforeEach(async () => {
+        const instructions: TransactionInstruction[] = []
+        tokenOwnerRecord = await getTokenOwnerRecordAddress(
+          SPL_GOVERNANCE_PID,
+          realm,
+          hntMint,
+          me
+        );
+
+        ({ position, mint } = await createAndDeposit(10000, 200));
+        
+        const {
+          pubkeys: { voterWeightRecord: vw },
+          instruction,
+        } = await program.methods
+          .castVoteV0({
+            proposal,
+            owner: me,
+          })
+          .accounts({
+            registrar,
+            voterAuthority: me,
+            voterTokenOwnerRecord: tokenOwnerRecord,
+          })
+          .remainingAccounts([
+            {
+              pubkey: await getAssociatedTokenAddress(
+                mint,
+                me
+              ),
+              isSigner: false,
+              isWritable: false,
+            },
+            {
+              pubkey: position,
+              isSigner: false,
+              isWritable: true,
+            },
+            {
+              pubkey: await nftVoteRecordKey(proposal, mint)[0],
+              isSigner: false,
+              isWritable: true,
+            },
+          ])
+          .prepare();
+        voterWeightRecord = vw!;
+        instructions.push(instruction);
+
+        voteRecord = await withCastVote(
+          instructions,
+          SPL_GOVERNANCE_PID,
+          programVersion,
+          realm,
+          governance,
+          proposal,
+          proposalOwner,
+          tokenOwnerRecord,
+          me,
+          hntMint,
+          Vote.fromYesNoVote(YesNoVote.Yes),
+          me,
+          voterWeightRecord
+        );
+
+        await sendInstructions(provider, instructions);
+      })
+
+      it("should not allow me to vote twice", async () => {
+        const instructions: TransactionInstruction[] = []
+        const {
+          pubkeys: { voterWeightRecord: r },
+          instruction,
+        } = await program.methods
+          .castVoteV0({
+            proposal,
+            owner: me,
+          })
+          .accounts({
+            registrar,
+            voterAuthority: me,
+            voterTokenOwnerRecord: tokenOwnerRecord,
+          })
+          .remainingAccounts([
+            {
+              pubkey: await getAssociatedTokenAddress(
+                mint,
+                me
+              ),
+              isSigner: false,
+              isWritable: false,
+            },
+            {
+              pubkey: position,
+              isSigner: false,
+              isWritable: true,
+            },
+            {
+              pubkey: await nftVoteRecordKey(proposal, mint)[0],
+              isSigner: false,
+              isWritable: true,
+            },
+          ])
+          .prepare();
+        voterWeightRecord = r!;
+        instructions.push(instruction);
+
+        await withCastVote(
+          instructions,
+          SPL_GOVERNANCE_PID,
+          programVersion,
+          realm,
+          governance,
+          proposal,
+          proposalOwner,
+          tokenOwnerRecord,
+          me,
+          hntMint,
+          Vote.fromYesNoVote(YesNoVote.Yes),
+          me,
+          voterWeightRecord
+        );
+
+        try {
+          await sendInstructions(provider, instructions)
+        } catch (e: any) {
+          expect(e.InstructionError[1].Custom).to.eq(6045)
+        }
+      });
+
+      it("should not allow me to vote twice after transferring", async () => {
+        const voter = Keypair.generate();
+        const instructions: TransactionInstruction[] = [];
+        const tokenOwnerRecord2 = await getTokenOwnerRecordAddress(
+          SPL_GOVERNANCE_PID,
+          realm,
+          hntMint,
+          voter.publicKey
+        );
+        await withCreateTokenOwnerRecord(
+          instructions,
+          SPL_GOVERNANCE_PID,
+          programVersion,
+          realm,
+          voter.publicKey,
+          hntMint,
+          me
+        );
+        instructions.push(
+          createAssociatedTokenAccountInstruction(
+            me,
+            await getAssociatedTokenAddress(mint, voter.publicKey),
+            voter.publicKey,
+            mint
+          ),
+          await createTransferInstruction(
+            await getAssociatedTokenAddress(mint, me),
+            await getAssociatedTokenAddress(mint, voter.publicKey),
+            me,
+            1
+          )
+        )
+
+        const {
+          pubkeys: { voterWeightRecord },
+          instruction,
+        } = await program.methods
+          .castVoteV0({
+            proposal,
+            owner: voter.publicKey,
+          })
+          .accounts({
+            registrar,
+            voterAuthority: voter.publicKey,
+            voterTokenOwnerRecord: tokenOwnerRecord2,
+          })
+          .remainingAccounts([
+            {
+              pubkey: await getAssociatedTokenAddress(mint, voter.publicKey),
+              isSigner: false,
+              isWritable: false,
+            },
+            {
+              pubkey: position,
+              isSigner: false,
+              isWritable: true,
+            },
+            {
+              pubkey: await nftVoteRecordKey(proposal, mint)[0],
+              isSigner: false,
+              isWritable: true,
+            },
+          ])
+          .prepare();
+        instructions.push(instruction);
+
+        await withCastVote(
+          instructions,
+          SPL_GOVERNANCE_PID,
+          programVersion,
+          realm,
+          governance,
+          proposal,
+          proposalOwner,
+          tokenOwnerRecord2,
+          voter.publicKey,
+          hntMint,
+          Vote.fromYesNoVote(YesNoVote.No),
+          me,
+          voterWeightRecord
+        );
+
+        try {
+          await sendInstructions(provider, instructions, [voter]);
+        } catch (e: any) {
+          expect(e.InstructionError[1].Custom).to.eq(6045);
+        }
+      });
+
+      it("should allow me to relinquish my vote", async () => {
+        const instructions: TransactionInstruction[] = [];
+        await withRelinquishVote(
+          instructions,
+          SPL_GOVERNANCE_PID,
+          programVersion,
+          realm,
+          governance,
+          proposal,
+          tokenOwnerRecord,
+          hntMint,
+          voteRecord,
+          me,
+          me
+        );
+        instructions.push(
+          await program.methods
+            .relinquishVoteV0()
+            .accounts({
+              registrar,
+              voterAuthority: me,
+              voterTokenOwnerRecord: tokenOwnerRecord,
+              proposal,
+              governance,
+              voterWeightRecord,
+              voteRecord,
+              beneficiary: me,
+            })
+            .remainingAccounts([
+              {
+                pubkey: mint,
+                isWritable: false,
+                isSigner: false,
+              },
+              {
+                pubkey: position,
+                isWritable: true,
+                isSigner: false,
+              },
+            ])
+            .instruction()
+        );
+        await sendInstructions(provider, instructions);
+      });
+    });
   });
 
-  it("should allow me to withdraw and close a position", async () => {
-    
-  })
+  describe("with position", async () => {
+    let position: PublicKey;
 
-  it ("should allow me to extend my lockup", async () => {
+    beforeEach(async () => {
+      ({ position } = await createAndDeposit(100, 184));
+    });
 
-  })
+    it("should allow me to withdraw and close a position after lockup", async () => {
+      await program.methods
+        .setTimeOffsetV0(new anchor.BN(185 * SECS_PER_DAY))
+        .accounts({ registrar })
+        .rpc({ skipPreflight: true });
 
-  it ("should allow me to move tokens to a position with a greater or equal lockup", async () => {
+      await program.methods
+        .withdrawV0({ amount: toBN(100, 8) })
+        .accounts({ position, depositMint: hntMint })
+        .rpc({ skipPreflight: true });
 
-  })
+      const positionAccount = await program.account.positionV0.fetch(position);
+      expect(positionAccount.amountDepositedNative.toNumber()).to.equal(0);
 
-  describe("with an active vote", async () => {
-    it("should not allow me to vote twice", async () => {});
+      await program.methods.closePositionV0().accounts({ position }).rpc();
+      expect(await program.account.positionV0.fetchNullable(position)).to.be
+        .null;
+    });
 
-    it("should not allow me to vote twice after transferring", async () => {});
+    it("should not allow me to withdraw a position before lockup", async () => {
+      await expect(
+        program.methods
+          .withdrawV0({ amount: toBN(100, 8) })
+          .accounts({ position, depositMint: hntMint })
+          .rpc()
+      ).to.be.rejected;
+    });
 
-    it("should not allow me to transfer tokens", async () => {})
+    it("should allow me to extend my lockup", async () => {
+      await program.methods
+        .resetLockupV0({
+          kind: { constant: {} },
+          periods: 185,
+        })
+        .accounts({
+          position,
+        })
+        .rpc({ skipPreflight: true });
 
-    it("should not allow me to withdraw tokens", async () => {});
-  });
+      const positionAcc = await program.account.positionV0.fetch(position);
+      expect(Boolean(positionAcc.lockup.kind.constant)).to.be.true;
+      expect(
+        positionAcc.lockup.endTs.sub(positionAcc.lockup.startTs).toNumber()
+      ).to.equal(185 * SECS_PER_DAY);
+    });
+
+    it("should allow me to move tokens to a position with a greater or equal lockup", async () => {
+      const { position: newPos } = await createAndDeposit(10, 185);
+      await program.methods
+        .transferV0({ amount: toBN(10, 8) })
+        .accounts({
+          sourcePosition: position,
+          targetPosition: newPos,
+          depositMint: hntMint
+        })
+        .rpc({ skipPreflight: true });
+
+      const newPosAcc = await program.account.positionV0.fetch(newPos);
+      const oldPosAcc = await program.account.positionV0.fetch(position);
+      expect(newPosAcc.amountDepositedNative.toNumber()).to.equal(
+        toBN(20, 8).toNumber()
+      );
+      expect(oldPosAcc.amountDepositedNative.toNumber()).to.equal(
+        toBN(90, 8).toNumber()
+      );
+    });
+  });  
 });
 
 function expectBnAccuracy(

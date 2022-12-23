@@ -11,7 +11,7 @@ use spl_governance_tools::account::create_and_serialize_account_signed;
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CastVoteArgsV0 {
   proposal: Pubkey,
-  owner: Pubkey
+  owner: Pubkey,
 }
 
 /// Casts NFT vote. The NFTs used for voting are tracked using NftVoteRecord accounts
@@ -96,9 +96,9 @@ pub fn handler<'a, 'b, 'c, 'info>(
     voter_weight = voter_weight.checked_add(nft_vote_weight).unwrap();
 
     // Increase num active votes
-    let position_acc = &mut PositionV0::try_deserialize(&mut position.data.borrow().as_ref())?;
+    let position_acc: &mut Account<PositionV0> = &mut Account::try_from(position)?;
     position_acc.num_active_votes += 1;
-    position_acc.serialize(&mut *position.try_borrow_mut_data()?)?;
+    position_acc.exit(&crate::ID)?;
     require!(position.is_writable, VsrError::PositionNotWritable);
 
     // Create NFT vote record to ensure the same NFT hasn't been already used for voting
@@ -133,7 +133,7 @@ pub fn handler<'a, 'b, 'c, 'info>(
       &id(),
       &ctx.accounts.system_program.to_account_info(),
       &rent,
-      0
+      0,
     )?;
   }
 
