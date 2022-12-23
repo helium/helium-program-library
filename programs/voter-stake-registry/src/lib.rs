@@ -7,6 +7,7 @@ pub mod events;
 mod governance;
 mod instructions;
 pub mod state;
+pub mod util;
 
 // The program address.
 declare_id!("hvsrY9UBtHhYRvstM2BWCsni81kevfn7B2DEhYbGA1a");
@@ -59,125 +60,63 @@ declare_id!("hvsrY9UBtHhYRvstM2BWCsni81kevfn7B2DEhYbGA1a");
 pub mod voter_stake_registry {
   use super::*;
 
-  pub fn create_registrar(ctx: Context<CreateRegistrar>) -> Result<()> {
-    instructions::create_registrar(ctx)
+  pub fn initialize_registrar_v0(ctx: Context<InitializeRegistrarV0>) -> Result<()> {
+    instructions::initialize_registrar_v0::handler(ctx)
   }
 
-  pub fn configure_voting_mint(
-    ctx: Context<ConfigureVotingMint>,
-    idx: u16,
-    digit_shift: i8,
-    locked_vote_weight_scaled_factor: u64,
-    minimum_required_lockup_secs: u64,
-    max_extra_lockup_vote_weight_scaled_factor: u64,
-    genesis_vote_power_multiplier: u8,
-    genesis_vote_power_multiplier_expiration_ts: i64,
-    lockup_saturation_secs: u64,
-    grant_authority: Option<Pubkey>,
+  pub fn configure_voting_mint_v0(
+    ctx: Context<ConfigureVotingMintV0>,
+    args: ConfigureVotingMintArgsV0,
   ) -> Result<()> {
-    instructions::configure_voting_mint(
-      ctx,
-      idx,
-      digit_shift,
-      locked_vote_weight_scaled_factor,
-      minimum_required_lockup_secs,
-      max_extra_lockup_vote_weight_scaled_factor,
-      genesis_vote_power_multiplier,
-      genesis_vote_power_multiplier_expiration_ts,
-      lockup_saturation_secs,
-      grant_authority,
-    )
+    instructions::configure_voting_mint_v0::handler(ctx, args)
   }
 
-  pub fn create_voter(ctx: Context<CreateVoter>) -> Result<()> {
-    instructions::create_voter(ctx)
-  }
-
-  pub fn create_deposit_entry(
-    ctx: Context<CreateDepositEntry>,
-    deposit_entry_index: u8,
-    kind: LockupKind,
-    start_ts: Option<u64>,
-    periods: u32,
+  pub fn initialize_position_v0(
+    ctx: Context<InitializePositionV0>,
+    args: InitializePositionArgsV0,
   ) -> Result<()> {
-    instructions::create_deposit_entry(ctx, deposit_entry_index, kind, start_ts, periods)
+    instructions::initialize_position_v0::handler(ctx, args)
   }
 
-  pub fn deposit(ctx: Context<Deposit>, deposit_entry_index: u8, amount: u64) -> Result<()> {
-    instructions::deposit(ctx, deposit_entry_index, amount)
+  pub fn deposit_v0(ctx: Context<DepositV0>, args: DepositArgsV0) -> Result<()> {
+    instructions::deposit_v0::handler(ctx, args)
   }
 
-  pub fn withdraw(ctx: Context<Withdraw>, deposit_entry_index: u8, amount: u64) -> Result<()> {
-    instructions::withdraw(ctx, deposit_entry_index, amount)
+  pub fn withdraw_v0(ctx: Context<WithdrawV0>, args: WithdrawArgsV0) -> Result<()> {
+    instructions::withdraw_v0::handler(ctx, args)
   }
 
-  pub fn close_deposit_entry(
-    ctx: Context<CloseDepositEntry>,
-    deposit_entry_index: u8,
+  pub fn close_position_v0(ctx: Context<ClosePositionV0>) -> Result<()> {
+    instructions::close_position_v0::handler(ctx)
+  }
+
+  pub fn reset_lockup_v0(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<()> {
+    instructions::reset_lockup_v0::handler(ctx, args)
+  }
+
+  pub fn transfer_v0(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
+    instructions::transfer_v0::handler(ctx, args)
+  }
+
+  pub fn update_voter_weight_record_v0(
+    ctx: Context<UpdateVoterWeightRecordV0>,
+    voter_weight_action: VoterWeightAction,
   ) -> Result<()> {
-    instructions::close_deposit_entry(ctx, deposit_entry_index)
+    instructions::update_voter_weight_record_v0::handler(ctx, voter_weight_action)
   }
 
-  pub fn reset_lockup(
-    ctx: Context<ResetLockup>,
-    deposit_entry_index: u8,
-    kind: LockupKind,
-    periods: u32,
+  pub fn set_time_offset_v0(ctx: Context<SetTimeOffsetV0>, time_offset: i64) -> Result<()> {
+    instructions::set_time_offset_v0::handler(ctx, time_offset)
+  }
+
+  pub fn cast_vote_v0<'a, 'b, 'c, 'info>(
+    ctx: Context<'a, 'b, 'c, 'info, CastVoteV0<'info>>,
+    proposal: Pubkey,
   ) -> Result<()> {
-    instructions::reset_lockup(ctx, deposit_entry_index, kind, periods)
+    instructions::cast_vote_v0::handler(ctx, proposal)
   }
 
-  pub fn internal_transfer_locked(
-    ctx: Context<InternalTransferLocked>,
-    source_deposit_entry_index: u8,
-    target_deposit_entry_index: u8,
-    amount: u64,
-  ) -> Result<()> {
-    instructions::internal_transfer_locked(
-      ctx,
-      source_deposit_entry_index,
-      target_deposit_entry_index,
-      amount,
-    )
-  }
-
-  pub fn internal_transfer_unlocked(
-    ctx: Context<InternalTransferUnlocked>,
-    source_deposit_entry_index: u8,
-    target_deposit_entry_index: u8,
-    amount: u64,
-  ) -> Result<()> {
-    instructions::internal_transfer_unlocked(
-      ctx,
-      source_deposit_entry_index,
-      target_deposit_entry_index,
-      amount,
-    )
-  }
-
-  pub fn update_voter_weight_record(ctx: Context<UpdateVoterWeightRecord>) -> Result<()> {
-    instructions::update_voter_weight_record(ctx)
-  }
-
-  pub fn update_max_vote_weight(ctx: Context<UpdateMaxVoteWeight>) -> Result<()> {
-    instructions::update_max_vote_weight(ctx)
-  }
-
-  pub fn close_voter<'key, 'accounts, 'remaining, 'info>(
-    ctx: Context<'key, 'accounts, 'remaining, 'info, CloseVoter<'info>>,
-  ) -> Result<()> {
-    instructions::close_voter(ctx)
-  }
-
-  pub fn log_voter_info(
-    ctx: Context<LogVoterInfo>,
-    deposit_entry_begin: u8,
-    deposit_entry_count: u8,
-  ) -> Result<()> {
-    instructions::log_voter_info(ctx, deposit_entry_begin, deposit_entry_count)
-  }
-
-  pub fn set_time_offset(ctx: Context<SetTimeOffset>, time_offset: i64) -> Result<()> {
-    instructions::set_time_offset(ctx, time_offset)
+  pub fn relinquish_vote_v0(ctx: Context<RelinquishVoteV0>) -> Result<()> {
+    instructions::relinquish_vote_v0::handler(ctx)
   }
 }

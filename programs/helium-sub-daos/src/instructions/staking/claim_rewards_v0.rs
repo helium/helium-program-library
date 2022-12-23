@@ -8,11 +8,10 @@ use circuit_breaker::{
   cpi::{accounts::TransferV0, transfer_v0},
   CircuitBreaker, TransferArgsV0,
 };
-use voter_stake_registry::state::{Registrar, Voter};
+use voter_stake_registry::state::{PositionV0, Registrar};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ClaimRewardsArgsV0 {
-  pub deposit: u8,
   pub epoch: u64,
 }
 
@@ -20,20 +19,22 @@ pub struct ClaimRewardsArgsV0 {
 #[instruction(args: ClaimRewardsArgsV0)]
 pub struct ClaimRewardsV0<'info> {
   #[account(
-    seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
+    seeds = [b"position".as_ref(), mint.key().as_ref()],
     seeds::program = vsr_program.key(),
-    bump,
-    has_one = voter_authority,
+    bump = position.bump_seed,
+    has_one = mint,
     has_one = registrar,
   )]
-  pub vsr_voter: AccountLoader<'info, Voter>,
-  #[account(mut)]
-  pub voter_authority: Signer<'info>,
+  pub position: Box<Account<'info, PositionV0>>,
+  pub mint: Box<Account<'info, Mint>>,
   #[account(
-    seeds = [registrar.load()?.realm.as_ref(), b"registrar".as_ref(), dao.hnt_mint.as_ref()],
-    seeds::program = vsr_program.key(),
-    bump,
+    token::mint = mint,
+    token::authority = position_authority,
+    constraint = position_token_account.amount > 0
   )]
+  pub position_token_account: Box<Account<'info, TokenAccount>>,
+  #[account(mut)]
+  pub position_authority: Signer<'info>,
   pub registrar: AccountLoader<'info, Registrar>,
   pub dao: Box<Account<'info, DaoV0>>,
 
@@ -47,7 +48,7 @@ pub struct ClaimRewardsV0<'info> {
   #[account(
     mut,
     has_one = sub_dao,
-    seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &args.deposit.to_le_bytes()],
+    seeds = ["stake_position".as_bytes(), position.key().as_ref()],
     bump,
   )]
   pub stake_position: Account<'info, StakePositionV0>,
@@ -63,9 +64,9 @@ pub struct ClaimRewardsV0<'info> {
   pub staker_pool: Box<Account<'info, TokenAccount>>,
   #[account(
     init_if_needed,
-    payer = voter_authority,
+    payer = position_authority,
     associated_token::mint = dnt_mint,
-    associated_token::authority = voter_authority,
+    associated_token::authority = position_authority,
   )]
   pub staker_ata: Box<Account<'info, TokenAccount>>,
 
@@ -106,10 +107,9 @@ impl<'info> ClaimRewardsV0<'info> {
 
 pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result<()> {
   // load the vehnt information
-  let voter = ctx.accounts.vsr_voter.load()?;
+  let position = &mut ctx.accounts.position;
   let registrar = &ctx.accounts.registrar.load()?;
-  let d_entry = voter.deposits[args.deposit as usize];
-  let voting_mint_config = &registrar.voting_mints[d_entry.voting_mint_config_idx as usize];
+  let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
 
   let stake_position = &mut ctx.accounts.stake_position;
 
@@ -128,7 +128,7 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     .checked_mul(EPOCH_LENGTH)
     .unwrap();
 
-  let staked_vehnt_at_epoch = d_entry.voting_power(voting_mint_config, epoch_end_ts)?;
+  let staked_vehnt_at_epoch = position.voting_power(voting_mint_config, epoch_end_ts)?;
 
   msg!("Staked {} veHNT at end of epoch with {} total veHNT delegated to subdao and {} total rewards to subdao", staked_vehnt_at_epoch, ctx.accounts.sub_dao_epoch_info.total_vehnt, ctx.accounts.sub_dao_epoch_info.staking_rewards_issued);
 

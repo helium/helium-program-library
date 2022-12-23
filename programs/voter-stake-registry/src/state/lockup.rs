@@ -26,7 +26,7 @@ pub const MAX_LOCKUP_PERIODS: u32 = 365 * 200;
 
 pub const MAX_LOCKUP_IN_FUTURE_SECS: i64 = 100 * 365 * 24 * 60 * 60;
 
-#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Lockup {
   /// Start of the lockup.
   ///
@@ -35,10 +35,10 @@ pub struct Lockup {
   ///
   /// Similarly vote power computations don't care about start_ts and always
   /// assume the full interval from now to end_ts.
-  pub(crate) start_ts: i64,
+  pub start_ts: i64,
 
   /// End of the lockup.
-  pub(crate) end_ts: i64,
+  pub end_ts: i64,
 
   /// Type of lockup.
   pub kind: LockupKind,
@@ -159,8 +159,9 @@ impl LockupKind {
 
 #[cfg(test)]
 mod tests {
+  use crate::state::PositionV0;
+
   use super::*;
-  use crate::state::deposit_entry::DepositEntry;
 
   // intentionally not a multiple of a day
   const MAX_SECS_LOCKED: u64 = 365 * 24 * 60 * 60 + 7 * 60 * 60;
@@ -312,12 +313,6 @@ mod tests {
     })
   }
 
-  struct TestDaysLeft {
-    expected_days_left: u64,
-    days_total: f64,
-    curr_day: f64,
-  }
-
   struct TestVotingPower {
     amount_deposited: u64,
     days_total: f64,
@@ -329,8 +324,11 @@ mod tests {
   fn run_test_voting_power(t: TestVotingPower) -> Result<()> {
     let start_ts = 1634929833;
     let end_ts = start_ts + days_to_secs(t.days_total);
-    let d = DepositEntry {
-      is_used: true,
+    let d = PositionV0 {
+      registrar: Pubkey::new_unique(),
+      mint: Pubkey::new_unique(),
+      bump_seed: 0,
+      num_active_votes: 0,
       voting_mint_config_idx: 0,
       amount_deposited_native: t.amount_deposited,
       lockup: Lockup {

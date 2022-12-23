@@ -5269,7 +5269,9 @@ dependencies = [
  "bincode",
  "bytemuck",
  "env_logger",
+ "itertools",
  "log",
+ "mpl-token-metadata 1.4.3",
  "serde",
  "solana-banks-client",
  "solana-logger",
@@ -5279,6 +5281,7 @@ dependencies = [
  "spl-associated-token-account",
  "spl-governance",
  "spl-governance-addin-api",
+ "spl-governance-tools",
  "spl-token",
  "static_assertions",
 ]

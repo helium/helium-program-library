@@ -1,5 +1,7 @@
+use std::cell::Ref;
+
 use crate::error::*;
-use crate::state::voting_mint_config::VotingMintConfig;
+use crate::state::voting_mint_config::VotingMintConfigV0;
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 
@@ -14,7 +16,7 @@ pub struct Registrar {
 
   /// Storage for voting mints and their configuration.
   /// The length should be adjusted for one's use case.
-  pub voting_mints: [VotingMintConfig; 4],
+  pub voting_mints: [VotingMintConfigV0; 4],
 
   /// Debug only: time offset, to allow tests to move forward in time.
   pub time_offset: i64,
@@ -62,6 +64,35 @@ impl Registrar {
   }
 }
 
+// Resolves governing_token_owner from voter TokenOwnerRecord and
+// 1) asserts it matches the given Registrar and VoterWeightRecord
+// 2) asserts governing_token_owner or its delegate is a signer
+pub fn resolve_governing_token_owner(
+  registrar: &Ref<Registrar>,
+  voter_token_owner_record_info: &AccountInfo,
+  voter_authority_info: &AccountInfo,
+  voter_weight_record: &VoterWeightRecord,
+) -> Result<Pubkey> {
+  let voter_token_owner_record =
+    token_owner_record::get_token_owner_record_data_for_realm_and_governing_mint(
+      &registrar.governance_program_id,
+      voter_token_owner_record_info,
+      &registrar.realm,
+      &registrar.realm_governing_token_mint,
+    )?;
+
+  voter_token_owner_record.assert_token_owner_or_delegate_is_signer(voter_authority_info)?;
+
+  // Assert voter TokenOwnerRecord and VoterWeightRecord are for the same governing_token_owner
+  require_eq!(
+    voter_token_owner_record.governing_token_owner,
+    voter_weight_record.governing_token_owner,
+    VsrError::InvalidTokenOwnerForVoterWeightRecord
+  );
+
+  Ok(voter_token_owner_record.governing_token_owner)
+}
+
 #[macro_export]
 macro_rules! registrar_seeds {
   ($registrar:expr) => {
@@ -75,3 +106,6 @@ macro_rules! registrar_seeds {
 }
 
 pub use registrar_seeds;
+use spl_governance::state::token_owner_record;
+
+use super::VoterWeightRecord;

@@ -6,7 +6,7 @@ use anchor_spl::token::Mint;
 // Remaining accounts must be all the token mints that have registered
 // as voting mints, including the newly registered one.
 #[derive(Accounts)]
-pub struct ConfigureVotingMint<'info> {
+pub struct ConfigureVotingMintV0<'info> {
   #[account(mut, has_one = realm_authority)]
   pub registrar: AccountLoader<'info, Registrar>,
   pub realm_authority: Signer<'info>,
@@ -15,6 +15,18 @@ pub struct ConfigureVotingMint<'info> {
   pub mint: Account<'info, Mint>,
   // This instruction expects that all voting mint addresses, including a
   // newly registered one, are passed in ctx.remainingAccounts.
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct ConfigureVotingMintArgsV0 {
+  pub idx: u16,
+  pub digit_shift: i8,
+  pub locked_vote_weight_scaled_factor: u64,
+  pub minimum_required_lockup_secs: u64,
+  pub max_extra_lockup_vote_weight_scaled_factor: u64,
+  pub genesis_vote_power_multiplier: u8,
+  pub genesis_vote_power_multiplier_expiration_ts: i64,
+  pub lockup_saturation_secs: u64,
 }
 
 /// Creates a new exchange rate for a given mint. This allows a voter to
@@ -80,18 +92,17 @@ pub struct ConfigureVotingMint<'info> {
 ///    * B with digit_shift=0, locked_vote_weight_scaled_factor=1e9, max_extra_lockup_vote_weight_scaled_factor=1e9
 /// to not lose precision on B tokens.
 ///
-pub fn configure_voting_mint(
-  ctx: Context<ConfigureVotingMint>,
-  idx: u16,
-  digit_shift: i8,
-  locked_vote_weight_scaled_factor: u64,
-  minimum_required_lockup_secs: u64,
-  max_extra_lockup_vote_weight_scaled_factor: u64,
-  genesis_vote_power_multiplier: u8,
-  genesis_vote_power_multiplier_expiration_ts: i64,
-  lockup_saturation_secs: u64,
-  grant_authority: Option<Pubkey>,
-) -> Result<()> {
+pub fn handler(ctx: Context<ConfigureVotingMintV0>, args: ConfigureVotingMintArgsV0) -> Result<()> {
+  let ConfigureVotingMintArgsV0 {
+    idx,
+    digit_shift,
+    locked_vote_weight_scaled_factor,
+    minimum_required_lockup_secs,
+    max_extra_lockup_vote_weight_scaled_factor,
+    genesis_vote_power_multiplier,
+    genesis_vote_power_multiplier_expiration_ts,
+    lockup_saturation_secs,
+  } = args;
   require_gt!(
     lockup_saturation_secs,
     0,
@@ -122,7 +133,7 @@ pub fn configure_voting_mint(
     ),
   };
 
-  registrar.voting_mints[idx] = VotingMintConfig {
+  registrar.voting_mints[idx] = VotingMintConfigV0 {
     mint,
     digit_shift,
     locked_vote_weight_scaled_factor,
@@ -131,7 +142,6 @@ pub fn configure_voting_mint(
     genesis_vote_power_multiplier,
     genesis_vote_power_multiplier_expiration_ts,
     lockup_saturation_secs,
-    grant_authority: grant_authority.unwrap_or_default(),
   };
 
   // Check for overflow in vote weight

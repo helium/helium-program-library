@@ -1,32 +1,29 @@
 use crate::{current_epoch, state::*, update_subdao_vehnt};
 use anchor_lang::prelude::*;
+use anchor_spl::token::{Mint, TokenAccount};
 use clockwork_sdk::{cpi::thread_delete, state::Thread, ThreadProgram};
 
-use voter_stake_registry::state::{Registrar, Voter};
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct CloseStakeArgsV0 {
-  pub deposit: u8,
-}
+use voter_stake_registry::state::{PositionV0, Registrar};
 
 #[derive(Accounts)]
-#[instruction(args: CloseStakeArgsV0)]
 pub struct CloseStakeV0<'info> {
   #[account(
-    seeds = [registrar.key().as_ref(), b"voter".as_ref(), voter_authority.key().as_ref()],
+    seeds = [b"position".as_ref(), mint.key().as_ref()],
     seeds::program = vsr_program.key(),
-    bump,
-    has_one = voter_authority,
+    bump = position.bump_seed,
+    has_one = mint,
     has_one = registrar,
   )]
-  pub vsr_voter: AccountLoader<'info, Voter>,
-  #[account(mut)]
-  pub voter_authority: Signer<'info>,
+  pub position: Box<Account<'info, PositionV0>>,
+  pub mint: Box<Account<'info, Mint>>,
   #[account(
-    seeds = [registrar.load()?.realm.as_ref(), b"registrar".as_ref(), dao.hnt_mint.as_ref()],
-    seeds::program = vsr_program.key(),
-    bump,
+    token::mint = mint,
+    token::authority = position_authority,
+    constraint = position_token_account.amount > 0
   )]
+  pub position_token_account: Box<Account<'info, TokenAccount>>,
+  #[account(mut)]
+  pub position_authority: Signer<'info>,
   pub registrar: AccountLoader<'info, Registrar>,
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
@@ -37,8 +34,8 @@ pub struct CloseStakeV0<'info> {
 
   #[account(
     mut,
-    close = voter_authority,
-    seeds = ["stake_position".as_bytes(), voter_authority.key().as_ref(), &args.deposit.to_le_bytes()],
+    close = position_authority,
+    seeds = ["stake_position".as_bytes(), position.key().as_ref()],
     bump
   )]
   pub stake_position: Account<'info, StakePositionV0>,
@@ -50,19 +47,23 @@ pub struct CloseStakeV0<'info> {
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
 
-  #[account(mut, address = Thread::pubkey(stake_position.key(), format!("purge-{:?}", args.deposit)))]
+  #[account(
+    mut,
+    seeds = [b"thread", stake_position.key().as_ref(), b"purge"],
+    seeds::program = clockwork.key(),
+    bump
+  )]
   pub thread: Account<'info, Thread>,
   pub clockwork: Program<'info, ThreadProgram>,
 }
 
-pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<CloseStakeV0>) -> Result<()> {
   // load the vehnt information
-  let voter = ctx.accounts.vsr_voter.load()?;
+  let position = &mut ctx.accounts.position;
   let registrar = &ctx.accounts.registrar.load()?;
-  let d_entry = voter.deposits[args.deposit as usize];
-  let voting_mint_config = &registrar.voting_mints[d_entry.voting_mint_config_idx as usize];
+  let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
-  let available_vehnt = d_entry.voting_power(voting_mint_config, curr_ts)?;
+  let available_vehnt = position.voting_power(voting_mint_config, curr_ts)?;
 
   // don't allow unstake without claiming available rewards
   let curr_epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
@@ -74,7 +75,7 @@ pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()>
   update_subdao_vehnt(sub_dao, curr_ts);
 
   // remove this stake information from the subdao
-  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(available_vehnt).unwrap();
+  sub_dao.vehnt_staked = sub_dao.vehnt_staked.saturating_sub(available_vehnt);
   sub_dao.vehnt_fall_rate = sub_dao
     .vehnt_fall_rate
     .checked_sub(stake_position.fall_rate)
@@ -83,15 +84,14 @@ pub fn handler(ctx: Context<CloseStakeV0>, args: CloseStakeArgsV0) -> Result<()>
   // delete the purge position thread
   let signer_seeds: &[&[&[u8]]] = &[&[
     "stake_position".as_bytes(),
-    ctx.accounts.voter_authority.key.as_ref(),
-    &args.deposit.to_le_bytes(),
+    ctx.accounts.position.to_account_info().key.as_ref(),
     &[ctx.bumps["stake_position"]],
   ]];
   thread_delete(CpiContext::new_with_signer(
     ctx.accounts.clockwork.to_account_info(),
     clockwork_sdk::cpi::ThreadDelete {
       authority: stake_position.to_account_info(),
-      close_to: ctx.accounts.voter_authority.to_account_info(),
+      close_to: ctx.accounts.position_authority.to_account_info(),
       thread: ctx.accounts.thread.to_account_info(),
     },
     signer_seeds,

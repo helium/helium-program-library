@@ -11,12 +11,9 @@ const SCALED_FACTOR_BASE: u64 = 1_000_000_000;
 /// native token amounts convert to vote weight.
 #[zero_copy]
 #[derive(Default)]
-pub struct VotingMintConfig {
+pub struct VotingMintConfigV0 {
   /// Mint for this entry.
   pub mint: Pubkey,
-
-  /// The authority that is allowed to push grants into voters
-  pub grant_authority: Pubkey,
 
   /// Vote weight factor for all funds in the account when locked up
   /// for minimum_required_lockup_secs, must be >= 0
@@ -52,7 +49,7 @@ pub struct VotingMintConfig {
   pub digit_shift: i8,
 }
 
-impl VotingMintConfig {
+impl VotingMintConfigV0 {
   /// Converts an amount in this voting mints's native currency
   /// to the base vote weight (without the deposit or lockup scalings)
   /// by applying the digit_shift factor.
@@ -114,4 +111,4 @@ impl VotingMintConfig {
   }
 }
 
-unsafe impl Zeroable for VotingMintConfig {}
+unsafe impl Zeroable for VotingMintConfigV0 {}

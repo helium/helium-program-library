@@ -66,38 +66,15 @@ export const heliumSubDaosResolvers = combineResolvers(
     instruction: "claimRewardsV0",
     account: "stakerAta",
     mint: "dntMint",
-    owner: "voterAuthority",
+    owner: "positionAuthority",
+  }),
+  ataResolver({
+    account: "positionTokenAccount",
+    mint: "mint",
+    owner: "positionAuthority",
   }),
   resolveIndividual(async ({ args, path, accounts, idlIx }) => {
-    if (
-      path[path.length - 1] == "thread" &&
-      accounts.subDao &&
-      new Set(["calculateUtilityScoreV0", "initializeSubDaoV0"]).has(idlIx.name)
-    ) {
-      return PublicKey.findProgramAddressSync(
-        [
-          Buffer.from("thread", "utf8"),
-          (accounts.subDao as PublicKey).toBuffer(),
-          Buffer.from(`end-epoch`, "utf8"),
-        ],
-        THREAD_PID
-      )[0];
-    } else if (
-      path[path.length - 1] == "thread" &&
-      new Set(["stakeV0", "closeStakeV0", "purgePositionV0"]).has(
-        idlIx.name
-      ) &&
-      accounts.stakePosition
-    ) {
-      return PublicKey.findProgramAddressSync(
-        [
-          Buffer.from("thread", "utf8"),
-          (accounts.stakePosition as PublicKey).toBuffer(),
-          Buffer.from(`purge-${0}`, "utf8"),
-        ],
-        THREAD_PID
-      )[0];
-    } else if (path[path.length - 1] == "clockwork") {
+    if (path[path.length - 1] == "clockwork") {
       return THREAD_PID;
     }
   })

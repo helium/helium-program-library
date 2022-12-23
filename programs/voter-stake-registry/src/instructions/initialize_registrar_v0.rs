@@ -6,7 +6,7 @@ use spl_governance::state::realm;
 use std::mem::size_of;
 
 #[derive(Accounts)]
-pub struct CreateRegistrar<'info> {
+pub struct InitializeRegistrarV0<'info> {
   /// The voting registrar. There can only be a single registrar
   /// per governance realm and governing mint.
   #[account(
@@ -48,7 +48,7 @@ pub struct CreateRegistrar<'info> {
 ///
 /// To use the registrar, call ConfigVotingMint to register token mints that may be
 /// used for voting.
-pub fn create_registrar(ctx: Context<CreateRegistrar>) -> Result<()> {
+pub fn handler(ctx: Context<InitializeRegistrarV0>) -> Result<()> {
   let registrar = &mut ctx.accounts.registrar.load_init()?;
   registrar.bump = *ctx.bumps.get("registrar").unwrap();
   registrar.governance_program_id = ctx.accounts.governance_program_id.key();
