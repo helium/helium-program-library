@@ -5281,6 +5281,7 @@ dependencies = [
  "spl-associated-token-account",
  "spl-governance",
  "spl-governance-addin-api",
+ "spl-governance-tools",
  "spl-token",
  "static_assertions",
 ]

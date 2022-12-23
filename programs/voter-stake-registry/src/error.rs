@@ -132,4 +132,24 @@ pub enum VsrError {
   InvalidMintAmount,
   #[msg("")]
   DuplicatedNftDetected,
+  #[msg("")]
+  InvalidTokenOwnerForVoterWeightRecord,
+  #[msg("")]
+  NftAlreadyVoted,
+  #[msg("")]
+  InvalidProposalForNftVoteRecord,
+  #[msg("")]
+  InvalidTokenOwnerForNftVoteRecord,
+  #[msg("")]
+  UninitializedAccount,
+  #[msg("")]
+  PositionNotWritable,
+  #[msg("")]
+  InvalidVoteRecordForNftVoteRecord,
+  #[msg("")]
+  VoteRecordMustBeWithdrawn,
+  #[msg("")]
+  VoterWeightRecordMustBeExpired,
+  #[msg("")]
+  InvalidMintForPosition
 }

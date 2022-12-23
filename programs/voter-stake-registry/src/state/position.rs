@@ -1,8 +1,5 @@
 use std::cmp::min;
-
-use crate::error::*;
 use anchor_lang::prelude::*;
-
 use super::{Lockup, LockupKind, VotingMintConfigV0};
 
 #[account]
@@ -23,7 +20,7 @@ pub struct PositionV0 {
   // Points to the VotingMintConfig this position uses.
   pub voting_mint_config_idx: u8,
   // The number of votes this position is active for.
-  pub num_active_votes: i64,
+  pub num_active_votes: u64,
   pub bump_seed: u8,
 }
 
