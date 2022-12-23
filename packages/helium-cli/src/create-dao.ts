@@ -15,7 +15,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { createAndMint, loadKeypair } from "./utils";
+import { createAndMint, isLocalhost, loadKeypair } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -32,12 +32,12 @@ const yarg = yargs(hideBin(process.argv)).options({
   hntKeypair: {
     type: "string",
     describe: "Keypair of the HNT token",
-    default: "./keypairs/hnt.json",
+    default: `${__dirname}/../keypairs/hnt.json`,
   },
   dcKeypair: {
     type: "string",
     describe: "Keypair of the Data Credit token",
-    default: "./keypairs/dc.json",
+    default: `${__dirname}/../keypairs/dc.json`,
   },
   makerKeypair: {
     type: "string",
@@ -83,9 +83,8 @@ async function run() {
 
   const hntKeypair = await loadKeypair(argv.hntKeypair);
   const dcKeypair = await loadKeypair(argv.dcKeypair);
-
-  console.log("HNT", hntKeypair.publicKey.toBase58());
-  console.log("DC", dcKeypair.publicKey.toBase58());
+  console.log(`HNT: ${hntKeypair.publicKey.toString()}`);
+  console.log(`DC: ${dcKeypair.publicKey.toString()}`);
 
   const conn = provider.connection;
 
@@ -118,7 +117,7 @@ async function run() {
         hntMint: hntKeypair.publicKey,
         dcMint: dcKeypair.publicKey,
         hntPriceOracle: new PublicKey(
-          "CqFJLrT4rSpA46RQkVYWn8tdBDuQ7p7RXcp6Um76oaph"
+          isLocalhost(provider) ? "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB" : "CqFJLrT4rSpA46RQkVYWn8tdBDuQ7p7RXcp6Um76oaph"
         ) // TODO: Replace with HNT price feed,
       })
       .rpc({ skipPreflight: true });

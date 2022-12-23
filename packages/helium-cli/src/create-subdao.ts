@@ -16,6 +16,7 @@ import {
 } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";
 import * as anchor from "@project-serum/anchor";
+import { idlAddress } from "@project-serum/anchor/dist/cjs/idl";
 import {
   getConcurrentMerkleTreeAccountSize,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID
@@ -34,7 +35,7 @@ import {
 } from "@switchboard-xyz/solana.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { createAndMint, exists, loadKeypair } from "./utils";
+import { createAndMint, exists, isLocalhost, loadKeypair } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
 
@@ -52,12 +53,12 @@ const yarg = yargs(hideBin(process.argv)).options({
   hntPubkey: {
     type: "string",
     describe: "Pubkey of the HNT token",
-    default: loadKeypair("./keypairs/hnt.json").publicKey,
+    default: loadKeypair(`${__dirname}/../keypairs/hnt.json`).publicKey,
   },
   dcPubkey: {
     type: "string",
     describe: "Pubkey of the DC token",
-    default: loadKeypair("./keypairs/dc.json").publicKey,
+    default: loadKeypair(`${__dirname}/../keypairs/dc.json`).publicKey,
   },
   name: {
     alias: "n",
@@ -91,7 +92,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   oracleKeypair: {
     type: "string",
     describe: "Keypair of the oracle",
-    default: "./keypairs/oracle.json",
+    default: `${__dirname}/../keypairs/oracle.json`,
   },
   activeDeviceOracleUrl: {
     alias: "ao",
@@ -187,46 +188,51 @@ async function run() {
 
   if (!(await exists(conn, subdao))) {
     console.log("Initializing switchboard oracle")
-    const switchboard = await SwitchboardProgram.load(
-      argv.switchboardNetwork as Cluster,
-      provider.connection,
-      wallet
-    );
-    const queueAccount = new QueueAccount(switchboard, new PublicKey(argv.queue));
-    const [agg, _] = await queueAccount.createFeed({
-      batchSize: 3,
-      minRequiredOracleResults: 2,
-      minRequiredJobResults: 1,
-      minUpdateDelaySeconds: 60 * 60, // hourly
-      fundAmount: 1,
-      enable: true,
-      crankPubkey: new PublicKey(argv.crank),
-      jobs: [
-        {
-          data: OracleJob.encodeDelimited(
-            OracleJob.fromObject({
-              tasks: [
-                {
-                  httpTask: {
-                    url: argv.activeDeviceOracleUrl + "/" + name.toLowerCase(),
+    let aggregatorKey = new PublicKey("GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"); // value cloned from mainnet to localnet
+    if (!isLocalhost(provider)) {
+      const switchboard = await SwitchboardProgram.load(
+        argv.switchboardNetwork as Cluster,
+        provider.connection,
+        wallet
+      );
+      const queueAccount = new QueueAccount(switchboard, new PublicKey(argv.queue));
+      const [agg, _] = await queueAccount.createFeed({
+        batchSize: 3,
+        minRequiredOracleResults: 2,
+        minRequiredJobResults: 1,
+        minUpdateDelaySeconds: 60 * 60, // hourly
+        fundAmount: 1,
+        enable: true,
+        crankPubkey: new PublicKey(argv.crank),
+        jobs: [
+          {
+            data: OracleJob.encodeDelimited(
+              OracleJob.fromObject({
+                tasks: [
+                  {
+                    httpTask: {
+                      url: argv.activeDeviceOracleUrl + "/" + name.toLowerCase(),
+                    },
                   },
-                },
-                {
-                  jsonParseTask: {
-                    path: "$.count",
+                  {
+                    jsonParseTask: {
+                      path: "$.count",
+                    },
                   },
-                },
-              ],
-            })
-          ).finish(),
-        },
-      ],
-    });
-    console.log("Created active device aggregator", agg.publicKey.toBase58());
-    await AggregatorHistoryBuffer.create(switchboard, {
-      aggregatorAccount: agg,
-      maxSamples: 24 * 7,
-    });
+                ],
+              })
+            ).finish(),
+          },
+        ],
+      });
+      console.log("Created active device aggregator", agg.publicKey.toBase58());
+      await AggregatorHistoryBuffer.create(switchboard, {
+        aggregatorAccount: agg,
+        maxSamples: 24 * 7,
+      });
+      aggregatorKey = agg.publicKey;
+    }
+    
 
     console.log(`Initializing ${name} SubDAO`);
     await heliumSubDaosProgram.methods
@@ -253,7 +259,7 @@ async function run() {
         dntMint: subdaoKeypair.publicKey,
         rewardsEscrow,
         hntMint: new PublicKey(argv.hntPubkey),
-        activeDeviceAggregator: agg.publicKey,
+        activeDeviceAggregator: aggregatorKey,
       })
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),

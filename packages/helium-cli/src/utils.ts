@@ -116,3 +116,9 @@ export function loadKeypair(keypair: string): Keypair {
     new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString()))
   );
 }
+
+export function isLocalhost(provider: anchor.AnchorProvider): boolean {
+  const ep = provider.connection.rpcEndpoint
+  return ep.includes("127.0.0.1") || ep.includes("localhost");
+
+}
