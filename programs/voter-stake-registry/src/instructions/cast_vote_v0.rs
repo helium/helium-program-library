@@ -77,7 +77,7 @@ pub fn handler<'a, 'b, 'c, 'info>(
       &mut unique_nft_mints,
     )?;
 
-    voter_weight = voter_weight.checked_add(nft_vote_weight as u64).unwrap();
+    voter_weight = voter_weight.checked_add(nft_vote_weight).unwrap();
 
     // Increase num active votes
     let position_acc = &mut PositionV0::try_deserialize(&mut position.data.borrow().as_ref())?;

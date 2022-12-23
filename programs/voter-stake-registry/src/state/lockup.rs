@@ -313,12 +313,6 @@ mod tests {
     })
   }
 
-  struct TestDaysLeft {
-    expected_days_left: u64,
-    days_total: f64,
-    curr_day: f64,
-  }
-
   struct TestVotingPower {
     amount_deposited: u64,
     days_total: f64,

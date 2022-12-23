@@ -13,7 +13,7 @@ pub fn resolve_vote_weight(
   governing_token_owner: &Pubkey,
   token_account: &AccountInfo,
   position: &AccountInfo,
-  unique_nft_mints: &mut Vec<Pubkey>,
+  unique_nft_mints: &mut [Pubkey],
 ) -> Result<u64> {
   let token_account_acc = TokenAccount::try_deserialize(&mut token_account.data.borrow().as_ref())?;
   require!(
