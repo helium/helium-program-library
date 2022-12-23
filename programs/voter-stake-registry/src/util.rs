@@ -13,7 +13,7 @@ pub fn resolve_vote_weight(
   governing_token_owner: &Pubkey,
   token_account: &AccountInfo,
   position: &AccountInfo,
-  unique_nft_mints: &mut [Pubkey],
+  unique_nft_mints: &mut Vec<Pubkey>,
 ) -> Result<u64> {
   let token_account_acc = TokenAccount::try_deserialize(&mut token_account.data.borrow().as_ref())?;
   require!(
@@ -36,6 +36,8 @@ pub fn resolve_vote_weight(
     !unique_nft_mints.contains(&token_account.key()),
     VsrError::DuplicatedNftDetected
   );
+
+  unique_nft_mints.push(token_account_acc.mint);
 
   let voting_mint_config = registrar.voting_mints[usize::from(position_acc.voting_mint_config_idx)];
 

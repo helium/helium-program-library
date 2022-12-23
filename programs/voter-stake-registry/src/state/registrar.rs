@@ -83,7 +83,6 @@ pub fn resolve_governing_token_owner(
 
   voter_token_owner_record.assert_token_owner_or_delegate_is_signer(voter_authority_info)?;
 
-  // Assert voter TokenOwnerRecord and VoterWeightRecord are for the same governing_token_owner
   require_eq!(
     voter_token_owner_record.governing_token_owner,
     voter_weight_record.governing_token_owner,

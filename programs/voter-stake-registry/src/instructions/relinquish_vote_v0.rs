@@ -133,7 +133,7 @@ pub fn handler(ctx: Context<RelinquishVoteV0>) -> Result<()> {
       &governing_token_owner,
     )?;
 
-    dispose_account(nft_vote_record_info, &ctx.accounts.beneficiary);
+    dispose_account(nft_vote_record_info, &ctx.accounts.beneficiary)?;
 
     let position_acc = &mut PositionV0::try_deserialize(&mut position.data.borrow().as_ref())?;
     require!(

@@ -95,7 +95,6 @@ export async function initVsr(
     await program.methods
       .initializePositionV0({
         kind: { cliff: {} },
-        startTs: null,
         periods: options.lockupPeriods,
       })
       .accounts({

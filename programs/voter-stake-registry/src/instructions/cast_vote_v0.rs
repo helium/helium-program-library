@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 use crate::error::VsrError;
 use crate::util::resolve_vote_weight;
 use crate::{id, state::*};
@@ -6,32 +8,40 @@ use anchor_lang::Accounts;
 use itertools::Itertools;
 use spl_governance_tools::account::create_and_serialize_account_signed;
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct CastVoteArgsV0 {
+  proposal: Pubkey,
+  owner: Pubkey
+}
+
 /// Casts NFT vote. The NFTs used for voting are tracked using NftVoteRecord accounts
 /// This instruction updates VoterWeightRecord which is valid for the current Slot and the target Proposal only
 /// and hance the instruction has to be executed inside the same transaction as spl-gov.CastVote
 ///
-/// CastNftVote is accumulative and can be invoked using several transactions if voter owns more than 5 NFTs to calculate total voter_weight
+/// CastNftVote is cumulative and can be invoked using several transactions if voter owns more than 5 NFTs to calculate total voter_weight
 /// In this scenario only the last CastNftVote should be bundled  with spl-gov.CastVote in the same transaction
 ///
 /// CastNftVote instruction and NftVoteRecord are not directional. They don't record vote choice (ex Yes/No)
 /// VoteChoice is recorded by spl-gov in VoteRecord and this CastNftVote only tracks voting NFTs
 ///
 #[derive(Accounts)]
-#[instruction(proposal: Pubkey)]
+#[instruction(args: CastVoteArgsV0)]
 pub struct CastVoteV0<'info> {
   pub registrar: AccountLoader<'info, Registrar>,
 
   #[account(
-    mut,
-    constraint = voter_weight_record.realm == registrar.load()?.realm,
-    constraint = voter_weight_record.governing_token_mint == registrar.load()?.realm_governing_token_mint
+    init_if_needed,
+    payer = payer,
+    space = 8 + size_of::<VoterWeightRecord>(),
+    seeds = [registrar.key().as_ref(), b"voter-weight-record".as_ref(), args.owner.as_ref()],
+    bump,
   )]
   pub voter_weight_record: Account<'info, VoterWeightRecord>,
 
-  /// TokenOwnerRecord of the voter who casts the vote
+  // TokenOwnerRecord of the voter who casts the vote
   #[account(
-    owner = registrar.load()?.governance_program_id
-  )]
+      owner = registrar.load()?.governance_program_id
+    )]
   /// CHECK: Owned by spl-governance instance specified in registrar.governance_program_id
   pub voter_token_owner_record: UncheckedAccount<'info>,
 
@@ -49,17 +59,14 @@ pub struct CastVoteV0<'info> {
 /// Casts vote with the NFT
 pub fn handler<'a, 'b, 'c, 'info>(
   ctx: Context<'a, 'b, 'c, 'info, CastVoteV0<'info>>,
-  proposal: Pubkey,
+  args: CastVoteArgsV0,
 ) -> Result<()> {
   let registrar = &ctx.accounts.registrar;
   let voter_weight_record = &mut ctx.accounts.voter_weight_record;
 
-  let governing_token_owner = resolve_governing_token_owner(
-    &registrar.load()?,
-    &ctx.accounts.voter_token_owner_record,
-    &ctx.accounts.voter_authority,
-    voter_weight_record,
-  )?;
+  voter_weight_record.governing_token_owner = args.owner;
+  voter_weight_record.realm = registrar.load()?.realm;
+  voter_weight_record.governing_token_mint = registrar.load()?.realm_governing_token_mint;
 
   let mut voter_weight = 0_u64;
 
@@ -68,11 +75,20 @@ pub fn handler<'a, 'b, 'c, 'info>(
 
   let rent = Rent::get()?;
 
-  for (mint, position, nft_vote_record_info) in ctx.remaining_accounts.iter().tuples() {
+  let governing_token_owner = resolve_governing_token_owner(
+    &registrar.load()?,
+    &ctx.accounts.voter_token_owner_record,
+    &ctx.accounts.voter_authority,
+    voter_weight_record,
+  )?;
+
+  require_eq!(governing_token_owner, args.owner, VsrError::InvalidOwner);
+
+  for (token_account, position, nft_vote_record_info) in ctx.remaining_accounts.iter().tuples() {
     let nft_vote_weight = resolve_vote_weight(
       registrar.load()?,
-      &governing_token_owner,
-      mint,
+      &args.owner,
+      token_account,
       position,
       &mut unique_nft_mints,
     )?;
@@ -99,11 +115,12 @@ pub fn handler<'a, 'b, 'c, 'info>(
 
     // Note: Once the NFT plugin is enabled the governing_token_mint is used only as identity
     // for the voting population and the tokens of that mint are no longer used
+    let nft_mint = unique_nft_mints.last().unwrap().clone();
     let nft_vote_record = NftVoteRecord {
       account_discriminator: NftVoteRecord::ACCOUNT_DISCRIMINATOR,
-      proposal,
-      nft_mint: mint.key(),
-      governing_token_owner,
+      proposal: args.proposal,
+      nft_mint,
+      governing_token_owner: args.owner,
     };
 
     // Anchor doesn't natively support dynamic account creation using remaining_accounts
@@ -112,14 +129,15 @@ pub fn handler<'a, 'b, 'c, 'info>(
       &ctx.accounts.payer.to_account_info(),
       nft_vote_record_info,
       &nft_vote_record,
-      &get_nft_vote_record_seeds(&proposal, &mint.key()),
+      &get_nft_vote_record_seeds(&args.proposal, &nft_mint.key()),
       &id(),
       &ctx.accounts.system_program.to_account_info(),
       &rent,
+      0
     )?;
   }
 
-  if voter_weight_record.weight_action_target == Some(proposal)
+  if voter_weight_record.weight_action_target == Some(args.proposal)
     && voter_weight_record.weight_action == Some(VoterWeightAction::CastVote.into())
   {
     // If cast_nft_vote is called for the same proposal then we keep accumulating the weight
@@ -137,7 +155,7 @@ pub fn handler<'a, 'b, 'c, 'info>(
 
   // The record is only valid for casting vote on the given Proposal
   voter_weight_record.weight_action = Some(VoterWeightAction::CastVote.into());
-  voter_weight_record.weight_action_target = Some(proposal);
+  voter_weight_record.weight_action_target = Some(args.proposal);
 
   Ok(())
 }

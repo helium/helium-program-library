@@ -3,11 +3,6 @@ use crate::vote_weight_record;
 use anchor_lang::prelude::*;
 use std::convert::TryFrom;
 
-// Generate a VoteWeightRecord Anchor wrapper, owned by the current program.
-// VoteWeightRecords are unique in that they are defined by the SPL governance
-// program, but they are actually owned by this program.
-vote_weight_record!(crate::ID);
-
 /// Seconds in one day.
 pub const SECS_PER_DAY: u64 = 86_400;
 

@@ -5,7 +5,14 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use anchor_spl::token::{self, Token, TokenAccount};
 
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct WithdrawArgsV0 {
+  pub amount: u64,
+}
+
 #[derive(Accounts)]
+#[instruction(args: WithdrawArgsV0)]
 pub struct WithdrawV0<'info> {
   pub registrar: AccountLoader<'info, Registrar>,
 
@@ -15,7 +22,8 @@ pub struct WithdrawV0<'info> {
     bump = position.bump_seed,
     constraint = position.num_active_votes == 0,
     has_one = registrar,
-    has_one = mint
+    has_one = mint,
+    constraint = position.amount_unlocked(registrar.load()?.clock_unix_timestamp()) >= args.amount @ VsrError::InsufficientUnlockedTokens
   )]
   pub position: Box<Account<'info, PositionV0>>,
   pub mint: Box<Account<'info, Mint>>,
@@ -55,11 +63,6 @@ impl<'info> WithdrawV0<'info> {
   }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct WithdrawArgsV0 {
-  pub amount: u64,
-}
-
 /// Withdraws tokens from a deposit entry, if they are unlocked
 ///
 /// `deposit_entry_index`: The deposit entry to withdraw from.
@@ -79,11 +82,7 @@ pub fn handler(ctx: Context<WithdrawV0>, args: WithdrawArgsV0) -> Result<()> {
 
   // Get the deposit being withdrawn from.
   let curr_ts = registrar.clock_unix_timestamp();
-  require_gte!(
-    position.amount_unlocked(curr_ts),
-    amount,
-    VsrError::InsufficientUnlockedTokens
-  );
+  
   require_eq!(
     mint_idx,
     position.voting_mint_config_idx as usize,

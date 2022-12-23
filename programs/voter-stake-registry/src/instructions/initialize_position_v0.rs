@@ -86,7 +86,6 @@ pub struct InitializePositionV0<'info> {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializePositionArgsV0 {
   pub kind: LockupKind,
-  pub start_ts: Option<u64>,
   pub periods: u32,
 }
 
@@ -103,9 +102,6 @@ impl Default for LockupKind {
 ///
 /// - `deposit_entry_index`: deposit entry to use
 /// - `kind`: Type of lockup to use.
-/// - `start_ts`: Start timestamp in seconds, defaults to current clock.
-///    The lockup will end after `start + periods * period_secs()`.
-///
 /// - `periods`: How long to lock up, depending on `kind`. See LockupKind::period_secs()
 pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV0) -> Result<()> {
   // Load accounts.
@@ -113,15 +109,18 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
 
   // Get the exchange rate entry associated with this deposit.
   let mint_idx = registrar.voting_mint_config_index(ctx.accounts.deposit_mint.key())?;
+  // Get the mint config associated with this deposit.
+  let mint_config = registrar.voting_mints[mint_idx];
 
   let curr_ts = registrar.clock_unix_timestamp();
-  let start_ts = if let Some(v) = args.start_ts {
-    i64::try_from(v).unwrap()
-  } else {
-    curr_ts
-  };
+  let start_ts = curr_ts;
 
   let lockup = Lockup::new_from_periods(args.kind, curr_ts, start_ts, args.periods)?;
+  let genesis_end = if curr_ts <= mint_config.genesis_vote_power_multiplier_expiration_ts {
+    i64::try_from(lockup.total_seconds()).unwrap() + curr_ts
+  } else {
+    0
+  };
   ctx.accounts.position.set_inner(PositionV0 {
     registrar: ctx.accounts.registrar.key(),
     mint: ctx.accounts.mint.key(),
@@ -129,11 +128,11 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
     amount_deposited_native: 0,
     voting_mint_config_idx: u8::try_from(mint_idx).unwrap(),
     lockup,
+    genesis_end,
     num_active_votes: 0,
   });
 
-  // Get the mint config associated with this deposit.
-  let mint_config = registrar.voting_mints[mint_idx];
+  
 
   if args.kind != LockupKind::None {
     require_gte!(

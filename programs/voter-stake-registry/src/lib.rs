@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use instructions::*;
-use state::*;
 
 mod error;
 pub mod events;
@@ -100,9 +99,9 @@ pub mod voter_stake_registry {
 
   pub fn update_voter_weight_record_v0(
     ctx: Context<UpdateVoterWeightRecordV0>,
-    voter_weight_action: VoterWeightAction,
+    args: UpdateVoterWeightRecordArgsV0,
   ) -> Result<()> {
-    instructions::update_voter_weight_record_v0::handler(ctx, voter_weight_action)
+    instructions::update_voter_weight_record_v0::handler(ctx, args)
   }
 
   pub fn set_time_offset_v0(ctx: Context<SetTimeOffsetV0>, time_offset: i64) -> Result<()> {
@@ -111,9 +110,9 @@ pub mod voter_stake_registry {
 
   pub fn cast_vote_v0<'a, 'b, 'c, 'info>(
     ctx: Context<'a, 'b, 'c, 'info, CastVoteV0<'info>>,
-    proposal: Pubkey,
+    args: CastVoteArgsV0
   ) -> Result<()> {
-    instructions::cast_vote_v0::handler(ctx, proposal)
+    instructions::cast_vote_v0::handler(ctx, args)
   }
 
   pub fn relinquish_vote_v0(ctx: Context<RelinquishVoteV0>) -> Result<()> {
