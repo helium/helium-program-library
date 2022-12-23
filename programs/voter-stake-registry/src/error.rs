@@ -151,5 +151,5 @@ pub enum VsrError {
   #[msg("")]
   VoterWeightRecordMustBeExpired,
   #[msg("")]
-  InvalidMintForPosition
+  InvalidMintForPosition,
 }

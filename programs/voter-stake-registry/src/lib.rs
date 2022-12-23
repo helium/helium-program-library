@@ -109,7 +109,10 @@ pub mod voter_stake_registry {
     instructions::set_time_offset_v0::handler(ctx, time_offset)
   }
 
-  pub fn cast_vote_v0<'a, 'b, 'c, 'info>(ctx: Context<'a, 'b, 'c, 'info, CastVoteV0<'info>>, proposal: Pubkey) -> Result<()> {
+  pub fn cast_vote_v0<'a, 'b, 'c, 'info>(
+    ctx: Context<'a, 'b, 'c, 'info, CastVoteV0<'info>>,
+    proposal: Pubkey,
+  ) -> Result<()> {
     instructions::cast_vote_v0::handler(ctx, proposal)
   }
 

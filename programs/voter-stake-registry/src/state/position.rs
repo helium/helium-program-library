@@ -1,6 +1,6 @@
-use std::cmp::min;
-use anchor_lang::prelude::*;
 use super::{Lockup, LockupKind, VotingMintConfigV0};
+use anchor_lang::prelude::*;
+use std::cmp::min;
 
 #[account]
 #[derive(Default)]

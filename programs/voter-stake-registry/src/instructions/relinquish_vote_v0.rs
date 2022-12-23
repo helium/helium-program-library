@@ -132,11 +132,14 @@ pub fn handler(ctx: Context<RelinquishVoteV0>) -> Result<()> {
       &ctx.accounts.proposal.key(),
       &governing_token_owner,
     )?;
-    
+
     dispose_account(nft_vote_record_info, &ctx.accounts.beneficiary);
-    
+
     let position_acc = &mut PositionV0::try_deserialize(&mut position.data.borrow().as_ref())?;
-    require!(position_acc.mint == nft_vote_record.nft_mint, VsrError::InvalidMintForPosition);
+    require!(
+      position_acc.mint == nft_vote_record.nft_mint,
+      VsrError::InvalidMintForPosition
+    );
 
     position_acc.num_active_votes -= 1;
     position_acc.serialize(&mut *position.try_borrow_mut_data()?)?;
