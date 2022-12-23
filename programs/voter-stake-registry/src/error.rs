@@ -153,5 +153,7 @@ pub enum VsrError {
   #[msg("")]
   InvalidMintForPosition,
   #[msg("")]
-  InvalidOwner
+  InvalidOwner,
+  #[msg("You may not deposit additional tokens on a position created during the genesis period that still has the genesis multiplier")]
+  NoDepositOnGenesisPositions
 }

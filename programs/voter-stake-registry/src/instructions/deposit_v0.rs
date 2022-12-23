@@ -85,6 +85,13 @@ pub fn handler(ctx: Context<DepositV0>, args: DepositArgsV0) -> Result<()> {
 
   let curr_ts = registrar.clock_unix_timestamp();
 
+  let config = registrar.voting_mints[mint_idx];
+
+  require!(
+    curr_ts >= position.genesis_end || curr_ts <= config.genesis_vote_power_multiplier_expiration_ts,
+    VsrError::NoDepositOnGenesisPositions
+  );
+
   msg!(
     "Deposited amount {} with lockup kind {:?} and {} seconds left",
     amount,

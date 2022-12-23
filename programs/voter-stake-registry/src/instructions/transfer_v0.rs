@@ -81,7 +81,8 @@ pub fn handler(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
     .unwrap();
 
   // Check target compatibility
-  let mint_id = registrar.voting_mints[usize::from(source_mint_idx)].mint;
+  let config = registrar.voting_mints[usize::from(source_mint_idx)];
+  let mint_id = config.mint;
   require_eq!(
     ctx.accounts.deposit_mint.key(),
     mint_id,
@@ -101,6 +102,11 @@ pub fn handler(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
     target_position.lockup.kind.strictness(),
     source_strictness,
     VsrError::InvalidLockupKind
+  );
+
+  require!(
+    curr_ts >= target_position.genesis_end || curr_ts <= config.genesis_vote_power_multiplier_expiration_ts,
+    VsrError::NoDepositOnGenesisPositions
   );
 
   // Add target amounts
