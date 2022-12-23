@@ -6,7 +6,6 @@ use crate::util::resolve_vote_weight;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use itertools::Itertools;
-use spl_governance_addin_api::voter_weight::VoterWeightAction;
 
 #[derive(Accounts)]
 pub struct UpdateVoterWeightRecordV0<'info> {
@@ -43,38 +42,6 @@ pub struct UpdateVoterWeightRecordV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-// Duplicating because anchor.
-#[derive(Clone, Debug, PartialEq, Eq, AnchorSerialize, AnchorDeserialize)]
-pub enum OurVoterWeightAction {
-  /// Cast vote for a proposal. Target: Proposal
-  CastVote,
-
-  /// Comment a proposal. Target: Proposal
-  CommentProposal,
-
-  /// Create Governance within a realm. Target: Realm
-  CreateGovernance,
-
-  /// Create a proposal for a governance. Target: Governance
-  CreateProposal,
-
-  /// Signs off a proposal for a governance. Target: Proposal
-  /// Note: SignOffProposal is not supported in the current version
-  SignOffProposal,
-}
-
-impl From<OurVoterWeightAction> for VoterWeightAction {
-  fn from(value: OurVoterWeightAction) -> Self {
-    match value {
-      OurVoterWeightAction::CastVote => VoterWeightAction::CastVote,
-      OurVoterWeightAction::CommentProposal => VoterWeightAction::CommentProposal,
-      OurVoterWeightAction::CreateGovernance => VoterWeightAction::CreateGovernance,
-      OurVoterWeightAction::CreateProposal => VoterWeightAction::CreateProposal,
-      OurVoterWeightAction::SignOffProposal => VoterWeightAction::SignOffProposal,
-    }
-  }
-}
-
 /// Calculates the lockup-scaled, time-decayed voting power for the given
 /// voter and writes it into a `VoteWeightRecord` account to be used by
 /// the SPL governance program.
@@ -83,18 +50,18 @@ impl From<OurVoterWeightAction> for VoterWeightAction {
 /// the same transaction.
 pub fn handler(
   ctx: Context<UpdateVoterWeightRecordV0>,
-  voter_weight_action: OurVoterWeightAction,
+  voter_weight_action: VoterWeightAction,
 ) -> Result<()> {
   let registrar = &ctx.accounts.registrar;
   let governing_token_owner = &ctx.accounts.voter_weight_record.governing_token_owner;
 
   match voter_weight_action {
     // voter_weight for CastVote action can't be evaluated using this instruction
-    OurVoterWeightAction::CastVote => return err!(VsrError::CastVoteIsNotAllowed),
-    OurVoterWeightAction::CommentProposal
-    | OurVoterWeightAction::CreateGovernance
-    | OurVoterWeightAction::CreateProposal
-    | OurVoterWeightAction::SignOffProposal => {}
+    VoterWeightAction::CastVote => return err!(VsrError::CastVoteIsNotAllowed),
+    VoterWeightAction::CommentProposal
+    | VoterWeightAction::CreateGovernance
+    | VoterWeightAction::CreateProposal
+    | VoterWeightAction::SignOffProposal => {}
   }
 
   let mut voter_weight = 0u64;
@@ -111,7 +78,7 @@ pub fn handler(
       &mut unique_nft_mints,
     )?;
 
-    voter_weight = voter_weight.checked_add(nft_vote_weight as u64).unwrap();
+    voter_weight = voter_weight.checked_add(nft_vote_weight).unwrap();
   }
 
   let voter_weight_record = &mut ctx.accounts.voter_weight_record;
