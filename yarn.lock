@@ -2027,6 +2027,28 @@
     create-hash "^1.2.0"
     libsodium-wrappers "^0.7.6"
 
+"@helium/idls@^0.0.9":
+  version "0.0.9"
+  resolved "https://registry.yarnpkg.com/@helium/idls/-/idls-0.0.9.tgz#64f26bacb1eb9041d236116ed61a21a03530afa1"
+  integrity sha512-Z4S0fqXWFZWgCLXJaG982keBKuTfzVv98tmPiSomXLUbdRy4siI2OGZedVHAHYXbg7azGmoF3T35M8yPZMyOLw==
+  dependencies:
+    "@project-serum/anchor" "0.24.2"
+    "@solana/web3.js" "^1.43.4"
+    bn.js "^5.2.0"
+    borsh "^0.7.0"
+    bs58 "^4.0.1"
+
+"@helium/spl-utils@^0.0.9":
+  version "0.0.9"
+  resolved "https://registry.yarnpkg.com/@helium/spl-utils/-/spl-utils-0.0.9.tgz#5cba221a6ce4bd125038599c9c9b53cc84f03e5a"
+  integrity sha512-a2W7s3iz4ADwUwvOQBXivAUDLyEvnHBL93syUl1VbV2IiwwOP+vpai4QDFFLhoZP9k7TaarP85W3nvB4JY+/Kw==
+  dependencies:
+    "@project-serum/anchor" "0.24.2"
+    "@solana/web3.js" "^1.43.4"
+    bn.js "^5.2.0"
+    borsh "^0.7.0"
+    bs58 "^4.0.1"
+
 "@humanwhocodes/config-array@^0.11.6":
   version "0.11.8"
   resolved "https://registry.yarnpkg.com/@humanwhocodes/config-array/-/config-array-0.11.8.tgz#03595ac2075a4dc0f191cc2131de14fbd7d410b9"
@@ -4657,7 +4679,7 @@
     bs58 "^4.0.1"
     superstruct "^0.15.2"
 
-"@solana/spl-governance@^0.3.17":
+"@solana/spl-governance@^0.3.17", "@solana/spl-governance@^0.3.18":
   version "0.3.18"
   resolved "https://registry.yarnpkg.com/@solana/spl-governance/-/spl-governance-0.3.18.tgz#13a17c6344b196fa8303749b68e8fec2a0b1988a"
   integrity sha512-7bHAiQkzpJS1FYMBMSoVMfUmVqTHV9I5kF4KbcUZaUe08sGPUTNeu/EXXQaQyoJLqlrSYRQWIq/ckLaA9YJzJg==

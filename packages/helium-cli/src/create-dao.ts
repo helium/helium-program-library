@@ -1,17 +1,20 @@
-import {
-  ThresholdType
-} from "@helium/circuit-breaker-sdk";
-import {
-  dataCreditsKey,
-  init as initDc
-} from "@helium/data-credits-sdk";
-import {
-  daoKey,
-  init as initDao
-} from "@helium/helium-sub-daos-sdk";
+import { ThresholdType } from "@helium/circuit-breaker-sdk";
+import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
+import { daoKey, init as initDao } from "@helium/helium-sub-daos-sdk";
 import { init as initLazy } from "@helium/lazy-distributor-sdk";
 import * as anchor from "@project-serum/anchor";
-import { Connection, PublicKey } from "@solana/web3.js";
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  TransactionInstruction,
+} from "@solana/web3.js";
+import {
+  getGovernanceProgramVersion,
+  MintMaxVoteWeightSource,
+  withCreateRealm,
+  withSetRealmConfig,
+} from "@solana/spl-governance";
 import { BN } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -28,6 +31,11 @@ const yarg = yargs(hideBin(process.argv)).options({
     alias: "u",
     default: "http://127.0.0.1:8899",
     describe: "The solana url",
+  },
+  govPubkey: {
+    type: "string",
+    describe: "Pubkey of the GOV instance",
+    default: "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw",
   },
   hntKeypair: {
     type: "string",
@@ -66,7 +74,10 @@ const yarg = yargs(hideBin(process.argv)).options({
 
 const HNT_EPOCH_REWARDS = 10000000000;
 const MOBILE_EPOCH_REWARDS = 5000000000;
-async function exists(connection: Connection, account: PublicKey): Promise<boolean> {
+async function exists(
+  connection: Connection,
+  account: PublicKey
+): Promise<boolean> {
   return Boolean(await connection.getAccountInfo(account));
 }
 
@@ -80,14 +91,18 @@ async function run() {
   const dataCreditsProgram = await initDc(provider);
   const lazyDistributorProgram = await initLazy(provider);
   const heliumSubDaosProgram = await initDao(provider);
+  //const heliumVsrProgram = await initVsr(provider);
 
   const hntKeypair = await loadKeypair(argv.hntKeypair);
   const dcKeypair = await loadKeypair(argv.dcKeypair);
+  const govPubkey = new PublicKey(argv.govPubkey);
 
   console.log("HNT", hntKeypair.publicKey.toBase58());
   console.log("DC", dcKeypair.publicKey.toBase58());
+  console.log("GOV", govPubkey.toBase58());
 
   const conn = provider.connection;
+  const walletPk = provider.wallet.publicKey;
 
   await createAndMint({
     provider,
@@ -95,6 +110,7 @@ async function run() {
     amount: argv.numHnt,
     metadataUrl: `${argv.bucket}/hnt.json`,
   });
+
   await createAndMint({
     provider,
     mintKeypair: dcKeypair,
@@ -107,7 +123,7 @@ async function run() {
   if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
-        authority: provider.wallet.publicKey,
+        authority: walletPk,
         config: {
           windowSizeSeconds: new BN(60 * 60),
           thresholdType: ThresholdType.Absolute as never,
@@ -119,7 +135,7 @@ async function run() {
         dcMint: dcKeypair.publicKey,
         hntPriceOracle: new PublicKey(
           "CqFJLrT4rSpA46RQkVYWn8tdBDuQ7p7RXcp6Um76oaph"
-        ) // TODO: Replace with HNT price feed,
+        ), // TODO: Replace with HNT price feed,
       })
       .rpc({ skipPreflight: true });
   }
@@ -129,11 +145,13 @@ async function run() {
     console.log("Initializing DAO");
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
-        authority: provider.wallet.publicKey,
-        emissionSchedule: [{
-          startUnixTime: new anchor.BN(0),
-          emissionsPerEpoch: new anchor.BN(HNT_EPOCH_REWARDS),
-        }],
+        authority: walletPk,
+        emissionSchedule: [
+          {
+            startUnixTime: new anchor.BN(0),
+            emissionsPerEpoch: new anchor.BN(HNT_EPOCH_REWARDS),
+          },
+        ],
       })
       .accounts({
         dcMint: dcKeypair.publicKey,
@@ -141,6 +159,47 @@ async function run() {
       })
       .rpc({ skipPreflight: true });
   }
+
+  // Get governance program version
+  const programVersion = await getGovernanceProgramVersion(conn, govPubkey);
+
+  let instructions: TransactionInstruction[] = [];
+  let signers: Keypair[] = [];
+
+  // Create realm
+  const name = `Realm-${dao.toBase58().slice(0, 6)}`;
+  const realmAuthorityPk = walletPk;
+  const governanceAuthorityPk = walletPk;
+  const communityMintMaxVoteWeightSource =
+    MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION;
+  const councilMintPk = undefined;
+
+  const realmPk = await withCreateRealm(
+    instructions,
+    govPubkey,
+    programVersion,
+    name,
+    realmAuthorityPk,
+    hntKeypair.publicKey,
+    walletPk,
+    councilMintPk,
+    communityMintMaxVoteWeightSource,
+    new BN(1)
+  );
+
+  await withSetRealmConfig(
+    instructions,
+    govPubkey,
+    programVersion,
+    realmPk,
+    realmAuthorityPk,
+    councilMintPk,
+    communityMintMaxVoteWeightSource,
+    new BN(1),
+    undefined,
+    undefined,
+    walletPk
+  );
 }
 
 run()
@@ -149,4 +208,3 @@ run()
     process.exit(1);
   })
   .then(() => process.exit());
-

@@ -2,18 +2,14 @@ import {
   createAtaAndMintInstructions,
   createMintInstructions,
   sendInstructions,
-  toBN
+  toBN,
 } from "@helium/spl-utils";
 import {
   createCreateMetadataAccountV3Instruction,
-  PROGRAM_ID as METADATA_PROGRAM_ID
+  PROGRAM_ID as METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
-import {
-  Connection,
-  Keypair,
-  PublicKey
-} from "@solana/web3.js";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import fs from "fs";
 import fetch from "node-fetch";
 

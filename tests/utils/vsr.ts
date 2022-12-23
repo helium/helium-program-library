@@ -1,20 +1,30 @@
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
-import { createAtaAndTransfer, createMintInstructions, sendInstructions, toBN } from "@helium/spl-utils";
+import {
+  createAtaAndTransfer,
+  createMintInstructions,
+  sendInstructions,
+  toBN,
+} from "@helium/spl-utils";
 import { AnchorProvider, BN, Program, web3 } from "@project-serum/anchor";
-import { getGovernanceProgramVersion, MintMaxVoteWeightSource, withCreateRealm } from "@solana/spl-governance";
+import {
+  getGovernanceProgramVersion,
+  MintMaxVoteWeightSource,
+  withCreateRealm,
+} from "@solana/spl-governance";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { positionKey } from "../../packages/voter-stake-registry-sdk/src";
-export const SPL_GOVERNANCE_PID = new PublicKey("GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw");
-
+export const SPL_GOVERNANCE_PID = new PublicKey(
+  "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw"
+);
 
 export async function initVsr(
-  program: Program<VoterStakeRegistry>, 
-  provider: AnchorProvider, 
-  me: PublicKey, 
+  program: Program<VoterStakeRegistry>,
+  provider: AnchorProvider,
+  me: PublicKey,
   hntMint: PublicKey,
   positionKp: Keypair,
-  options: {delay: number, lockupPeriods: number, lockupAmount: number},
+  options: { delay: number; lockupPeriods: number; lockupAmount: number }
 ) {
   await createAtaAndTransfer(
     provider,
@@ -89,7 +99,13 @@ export async function initVsr(
   // create deposit entry
   const position = positionKey(mintKeypair.publicKey)[0];
   instructions.push(
-    ...await createMintInstructions(provider, 0, position, position, mintKeypair)
+    ...(await createMintInstructions(
+      provider,
+      0,
+      position,
+      position,
+      mintKeypair
+    ))
   );
   instructions.push(
     await program.methods

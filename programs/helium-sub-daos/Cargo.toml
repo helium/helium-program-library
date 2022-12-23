@@ -28,7 +28,7 @@ shared-utils = { path = "../shared-utils" }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }
 clockwork-sdk = { version = "1.4.0" }
-time = "0.3.17"
+time = "=0.3.15"
 switchboard-v2 = { version = "0.1.17" }
 
 [dev-dependencies]
