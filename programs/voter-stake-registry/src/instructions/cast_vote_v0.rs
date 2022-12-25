@@ -115,7 +115,7 @@ pub fn handler<'a, 'b, 'c, 'info>(
 
     // Note: Once the NFT plugin is enabled the governing_token_mint is used only as identity
     // for the voting population and the tokens of that mint are no longer used
-    let nft_mint = unique_nft_mints.last().unwrap().clone();
+    let nft_mint = *unique_nft_mints.last().unwrap();
     let nft_vote_record = NftVoteRecord {
       account_discriminator: NftVoteRecord::ACCOUNT_DISCRIMINATOR,
       proposal: args.proposal,
@@ -138,7 +138,7 @@ pub fn handler<'a, 'b, 'c, 'info>(
   }
 
   if voter_weight_record.weight_action_target == Some(args.proposal)
-    && voter_weight_record.weight_action == Some(VoterWeightAction::CastVote.into())
+    && voter_weight_record.weight_action == Some(VoterWeightAction::CastVote)
   {
     // If cast_nft_vote is called for the same proposal then we keep accumulating the weight
     // this way cast_nft_vote can be called multiple times in different transactions to allow voting with any number of NFTs
@@ -154,7 +154,7 @@ pub fn handler<'a, 'b, 'c, 'info>(
   voter_weight_record.voter_weight_expiry = Some(Clock::get()?.slot);
 
   // The record is only valid for casting vote on the given Proposal
-  voter_weight_record.weight_action = Some(VoterWeightAction::CastVote.into());
+  voter_weight_record.weight_action = Some(VoterWeightAction::CastVote);
   voter_weight_record.weight_action_target = Some(args.proposal);
 
   Ok(())
