@@ -42,7 +42,7 @@ impl From<VoterWeightAction> for GovVoterWeightAction {
 ///
 /// The account is used as an api interface to provide voting power to the governance program from external addin contracts
 #[account]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct VoterWeightRecord {
   /// The Realm the VoterWeightRecord belongs to
   pub realm: Pubkey,
