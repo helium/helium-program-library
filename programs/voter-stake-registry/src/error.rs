@@ -156,4 +156,6 @@ pub enum VsrError {
   InvalidOwner,
   #[msg("You may not deposit additional tokens on a position created during the genesis period that still has the genesis multiplier")]
   NoDepositOnGenesisPositions,
+  #[msg("Cannot change a position while active votes exist")]
+  ActiveVotesExist,
 }

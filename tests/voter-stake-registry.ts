@@ -767,8 +767,8 @@ describe("voter-stake-registry", () => {
             })
             .remainingAccounts([
               {
-                pubkey: mint,
-                isWritable: false,
+                pubkey: nftVoteRecordKey(proposal, mint)[0],
+                isWritable: true,
                 isSigner: false,
               },
               {
@@ -780,6 +780,22 @@ describe("voter-stake-registry", () => {
             .instruction()
         );
         await sendInstructions(provider, instructions);
+      });
+
+      it("should not allow me to move tokens to another position while vote is active", async () => {
+        const { position: newPos } = await createAndDeposit(10, 185);
+        await expect(
+          program.methods
+            .transferV0({ amount: toBN(10, 8) })
+            .accounts({
+              sourcePosition: position,
+              targetPosition: newPos,
+              depositMint: hntMint,
+            })
+            .rpc()
+        ).to.eventually.be.rejectedWith(
+          "AnchorError caused by account: source_position. Error Code: ActiveVotesExist. Error Number: 6056. Error Message: Cannot change a position while active votes exist."
+        );
       });
     });
   });

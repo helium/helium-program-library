@@ -14,7 +14,7 @@ pub struct TransferV0<'info> {
     mut,
     seeds = [b"position".as_ref(), mint.key().as_ref()],
     bump = source_position.bump_seed,
-    constraint = source_position.num_active_votes == 0,
+    constraint = source_position.num_active_votes == 0 @ VsrError::ActiveVotesExist,
     has_one = registrar,
     has_one = mint
   )]
