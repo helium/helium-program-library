@@ -210,6 +210,7 @@ describe("helium-sub-daos", () => {
 
         it("allows vehnt staking", async () => {
           const lockupAmount = toBN(options.lockupAmount,8);
+          console.log("Staking", position.toBase58())
           const method = program.methods
             .stakeV0()
             .accounts({
