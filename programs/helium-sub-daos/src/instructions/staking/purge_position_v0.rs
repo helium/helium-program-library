@@ -1,15 +1,19 @@
-use crate::{create_cron, error::ErrorCode, state::*, update_subdao_vehnt, TESTING};
+use crate::{create_cron, error::ErrorCode, state::*, update_subdao_vehnt, TESTING, FALL_RATE_FACTOR};
 use anchor_lang::prelude::*;
 use clockwork_sdk::{
   cpi::thread_update,
   state::{Thread, ThreadSettings, Trigger},
   ThreadProgram,
 };
-use voter_stake_registry::state::PositionV0;
+use voter_stake_registry::state::{PositionV0, Registrar};
 
 #[derive(Accounts)]
 pub struct PurgePositionV0<'info> {
+  #[account(
+    has_one = registrar
+  )]
   pub position: Box<Account<'info, PositionV0>>,
+  pub registrar: AccountLoader<'info, Registrar>,
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
     mut,
@@ -45,8 +49,8 @@ pub struct PurgePositionV0<'info> {
 pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {
   // load the vehnt information
   let position = &mut ctx.accounts.position;
-  let curr_ts = ctx.accounts.clock.unix_timestamp;
-  if !TESTING && !position.lockup.expired(curr_ts) {
+  let curr_ts  = ctx.accounts.registrar.load()?.clock_unix_timestamp();
+  if !position.lockup.expired(curr_ts) {
     // update the thread to make sure it's tracking the right lockup. this case can happen if user increases their vsr lockup period
     let signer_seeds: &[&[&[u8]]] = &[&[
       "stake_position".as_bytes(),
@@ -90,11 +94,17 @@ pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {
   let sub_dao = &mut ctx.accounts.sub_dao;
 
   update_subdao_vehnt(sub_dao, curr_ts);
-  sub_dao.vehnt_fall_rate -= stake_position.fall_rate;
-  sub_dao.vehnt_staked += stake_position
-    .fall_rate
-    .checked_mul(time_since_expiry)
-    .unwrap();
+  sub_dao.vehnt_fall_rate = sub_dao.vehnt_fall_rate.checked_sub(stake_position.fall_rate).unwrap();
+  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_add(
+    stake_position
+      .fall_rate
+      .checked_mul(u128::from(time_since_expiry))
+      .unwrap()
+      .checked_div(FALL_RATE_FACTOR)
+      .unwrap()
+      .try_into()
+      .unwrap()
+  ).unwrap();
   stake_position.purged = true;
 
   Ok(())

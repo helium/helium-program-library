@@ -5,7 +5,7 @@ use clockwork_sdk::{cpi::thread_create, state::Trigger, ThreadProgram};
 
 use voter_stake_registry::{
   self,
-  state::{PositionV0, Registrar},
+  state::{PositionV0, Registrar}, program::VoterStakeRegistry,
 };
 
 #[derive(Accounts)]
@@ -44,9 +44,7 @@ pub struct StakeV0<'info> {
   )]
   pub stake_position: Box<Account<'info, StakePositionV0>>,
 
-  ///CHECK: constraints
-  #[account(address = voter_stake_registry::ID)]
-  pub vsr_program: AccountInfo<'info>,
+  pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
@@ -72,9 +70,7 @@ pub fn handler(ctx: Context<StakeV0>) -> Result<()> {
 
   let seconds_left = position
     .lockup
-    .seconds_left(curr_ts)
-    .checked_sub(10)
-    .unwrap();
+    .seconds_left(curr_ts);
   let future_ts = curr_ts
     .checked_add(seconds_left.try_into().unwrap())
     .unwrap();

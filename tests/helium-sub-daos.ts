@@ -185,7 +185,7 @@ describe("helium-sub-daos", () => {
           delay: 1000,
           lockupPeriods: 183,
           lockupAmount: 100,
-          expectedMultiplier: 1
+          expectedMultiplier: 1,
         },
       },
       {
@@ -194,7 +194,7 @@ describe("helium-sub-daos", () => {
           delay: 15000,
           lockupPeriods: 183 * 4,
           lockupAmount: 50,
-          expectedMultiplier: 1 + ((183 * 4 - 183) / (365 * 4 - 183)) * 99
+          expectedMultiplier: 1 + ((183 * 4 - 183) / (365 * 4 - 183)) * 99,
         },
       },
       // { name: "Case 3", options: {delay: 45000, lockupPeriods: 183*8, lockupAmount: 100, stakeAmount: 10000} },
@@ -210,7 +210,6 @@ describe("helium-sub-daos", () => {
 
         it("allows vehnt staking", async () => {
           const lockupAmount = toBN(options.lockupAmount,8);
-          console.log("Staking", position.toBase58())
           const method = program.methods
             .stakeV0()
             .accounts({
@@ -225,13 +224,16 @@ describe("helium-sub-daos", () => {
           const acc = await program.account.stakePositionV0.fetch(stakePosition!);
           const sdAcc = await program.account.subDaoV0.fetch(subDao);
 
+          const expectedVeHnt =
+            options.lockupAmount * options.expectedMultiplier;
           expectBnAccuracy(
-            toBN(options.lockupAmount * options.expectedMultiplier, 8),
+            toBN(expectedVeHnt, 8),
             sdAcc.vehntStaked,
             0.001
           );
           expectBnAccuracy(lockupAmount, acc.hntAmount, 0.001);
-          assert.isTrue(acc.fallRate.gt(new anchor.BN(0)))
+          const expectedFallRate = toBN(expectedVeHnt, 8 + 12).div(toBN(options.lockupPeriods * 60 * 60 * 24, 0));
+          expectBnAccuracy(expectedFallRate, acc.fallRate, 0.001);
           assert.isTrue(!!(await provider.connection.getAccountInfo(thread!)));
         });
     
@@ -342,19 +344,26 @@ describe("helium-sub-daos", () => {
           });
     
           it("purge a position", async () => {
-            const method = program.methods
-              .purgePositionV0()
-              .accounts({
-                position,
-                subDao,
-              })
+            await vsrProgram.methods
+              .setTimeOffsetV0(
+                new BN((options.lockupPeriods + 1) * 60 * 60 * 24)
+              )
+              .accounts({ registrar })
+              .rpc();
+            const method = program.methods.purgePositionV0().accounts({
+              position,
+              subDao,
+            });
             await method.rpc();
             const { stakePosition } = await method.pubkeys();
-    
-            let acc = await program.account.stakePositionV0.fetch(stakePosition!);
-            assert.isTrue(acc.purged);
+
+            let acc = await program.account.stakePositionV0.fetch(
+              stakePosition!
+            );
+            expect(acc.purged).to.be.true;
             let subDaoAcc = await program.account.subDaoV0.fetch(subDao);
-            assert.equal(subDaoAcc.vehntFallRate.toNumber(), 0);
+            expect(subDaoAcc.vehntFallRate.toNumber()).to.eq(0);
+            expect(subDaoAcc.vehntStaked.toNumber()).to.eq(0);
           });
     
           it("refreshes a position", async () => {
@@ -383,14 +392,19 @@ describe("helium-sub-daos", () => {
             expect(acc.hntAmount.toNumber()).to.eq(
               toBN(options.lockupAmount * 2, 8).toNumber()
             );
-            expect(acc.fallRate.toNumber()).to.be.gt(0);
+            const expectedVeHnt =
+              2 * options.lockupAmount * options.expectedMultiplier;
+            const expectedFallRate = toBN(expectedVeHnt, 8 + 12).div(
+              toBN(options.lockupPeriods * 60 * 60 * 24, 0)
+            );
+            expectBnAccuracy(expectedFallRate, acc.fallRate, 0.001);
             const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
             expectBnAccuracy(
               toBN(options.lockupAmount * 2 * options.expectedMultiplier, 8),
               subDaoAcc.vehntStaked,
               0.01
             );
-            expect(subDaoAcc.vehntFallRate.toNumber()).to.be.gt(0);
+            expectBnAccuracy(expectedFallRate, subDaoAcc.vehntFallRate, 0.001);
           });
           
           describe("with calculated rewards", () => {

@@ -78,14 +78,11 @@ pub fn create_cron(execution_ts: i64, offset: i64) -> String {
 
 pub const FALL_RATE_FACTOR: u128 = 1_000_000_000_000;
 
-pub fn calculate_fall_rate(curr_vp: u64, future_vp: u64, num_seconds: u64) -> Option<u64> {
+pub fn calculate_fall_rate(curr_vp: u64, future_vp: u64, num_seconds: u64) -> Option<u128> {
   let diff: u128 = u128::from(curr_vp.checked_sub(future_vp).unwrap())
     .checked_mul(FALL_RATE_FACTOR)
     .unwrap(); // add decimals of precision for fall rate calculation
 
   diff
     .checked_div(num_seconds.into())
-    .unwrap()
-    .try_into()
-    .ok()
 }
