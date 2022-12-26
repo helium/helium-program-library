@@ -35,7 +35,7 @@ pub fn update_subdao_vehnt(sub_dao: &mut SubDaoV0, curr_ts: i64) {
     return;
   }
 
-  let fall: u64 = PreciseNumber::new(sub_dao.vehnt_fall_rate.into())
+  let fall: u64 = PreciseNumber::new(sub_dao.vehnt_fall_rate)
     .unwrap()
     .checked_mul(
       &PreciseNumber::new(

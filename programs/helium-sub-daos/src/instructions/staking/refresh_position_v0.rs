@@ -75,7 +75,7 @@ pub fn handler(ctx: Context<RefreshPositionV0>) -> Result<()> {
   // update subdao calculations
   update_subdao_vehnt(sub_dao, curr_ts);
 
-  sub_dao.vehnt_staked = i128::from(sub_dao.vehnt_staked)
+  sub_dao.vehnt_staked = sub_dao.vehnt_staked
     .checked_sub(vehnt_diff)
     .unwrap();
   sub_dao.vehnt_fall_rate = u128::try_from(
