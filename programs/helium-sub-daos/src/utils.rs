@@ -56,7 +56,7 @@ pub fn update_subdao_vehnt(sub_dao: &mut SubDaoV0, curr_ts: i64) {
     .ok()
     .unwrap();
 
-  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(fall).unwrap();
+  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(i128::from(fall)).unwrap();
   sub_dao.vehnt_last_calculated_ts = curr_ts;
 }
 

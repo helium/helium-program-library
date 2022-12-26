@@ -1,4 +1,4 @@
-use crate::{create_cron, error::ErrorCode, state::*, update_subdao_vehnt, TESTING, FALL_RATE_FACTOR};
+use crate::{create_cron, error::ErrorCode, state::*, update_subdao_vehnt, FALL_RATE_FACTOR};
 use anchor_lang::prelude::*;
 use clockwork_sdk::{
   cpi::thread_update,
@@ -42,8 +42,7 @@ pub struct PurgePositionV0<'info> {
     bump
   )]
   pub thread: Account<'info, Thread>,
-  pub clockwork: Program<'info, ThreadProgram>,
-  pub clock: Sysvar<'info, Clock>,
+  pub clockwork: Program<'info, ThreadProgram>
 }
 
 pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {

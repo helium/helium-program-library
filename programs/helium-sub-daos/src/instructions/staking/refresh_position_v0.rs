@@ -40,9 +40,7 @@ pub fn handler(ctx: Context<RefreshPositionV0>) -> Result<()> {
     &ctx.accounts.registrar.load()?.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = ctx.accounts.clock.unix_timestamp;
   let available_vehnt = position.voting_power(voting_mint_config, curr_ts)?;
-  let seconds_left = position
-    .lockup
-    .seconds_left(curr_ts);
+  let seconds_left = position.lockup.seconds_left(curr_ts);
   let future_ts = curr_ts
     .checked_add(seconds_left.try_into().unwrap())
     .unwrap();
@@ -77,17 +75,14 @@ pub fn handler(ctx: Context<RefreshPositionV0>) -> Result<()> {
   // update subdao calculations
   update_subdao_vehnt(sub_dao, curr_ts);
 
-  sub_dao.vehnt_staked = u64::try_from(
-    i128::from(sub_dao.vehnt_staked)
-      .checked_sub(vehnt_diff)
-      .unwrap(),
-  )
-  .unwrap();
+  sub_dao.vehnt_staked = i128::from(sub_dao.vehnt_staked)
+    .checked_sub(vehnt_diff)
+    .unwrap();
   sub_dao.vehnt_fall_rate = u128::try_from(
     i128::try_from(sub_dao.vehnt_fall_rate)
       .unwrap()
       .checked_sub(fall_rate_diff)
-      .unwrap()
+      .unwrap(),
   )
   .unwrap();
 

@@ -75,7 +75,7 @@ pub fn handler(ctx: Context<CloseStakeV0>) -> Result<()> {
   update_subdao_vehnt(sub_dao, curr_ts);
 
   // remove this stake information from the subdao
-  sub_dao.vehnt_staked = sub_dao.vehnt_staked.saturating_sub(available_vehnt);
+  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(i128::from(available_vehnt)).unwrap();
   sub_dao.vehnt_fall_rate = sub_dao
     .vehnt_fall_rate
     .checked_sub(stake_position.fall_rate)

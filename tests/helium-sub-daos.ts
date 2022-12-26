@@ -349,12 +349,12 @@ describe("helium-sub-daos", () => {
                 new BN((options.lockupPeriods + 1) * 60 * 60 * 24)
               )
               .accounts({ registrar })
-              .rpc();
+              .rpc({ skipPreflight: true });
             const method = program.methods.purgePositionV0().accounts({
               position,
               subDao,
             });
-            await method.rpc();
+            await method.rpc({skipPreflight: true});
             const { stakePosition } = await method.pubkeys();
 
             let acc = await program.account.stakePositionV0.fetch(
