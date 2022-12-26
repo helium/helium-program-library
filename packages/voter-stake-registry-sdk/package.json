@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "Interface to the voter-stake-registry smart contract",
   "repository": {
     "type": "git",
