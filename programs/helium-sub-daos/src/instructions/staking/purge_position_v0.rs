@@ -42,13 +42,13 @@ pub struct PurgePositionV0<'info> {
     bump
   )]
   pub thread: Account<'info, Thread>,
-  pub clockwork: Program<'info, ThreadProgram>
+  pub clockwork: Program<'info, ThreadProgram>,
 }
 
 pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {
   // load the vehnt information
   let position = &mut ctx.accounts.position;
-  let curr_ts  = ctx.accounts.registrar.load()?.clock_unix_timestamp();
+  let curr_ts = ctx.accounts.registrar.load()?.clock_unix_timestamp();
   if !position.lockup.expired(curr_ts) {
     // update the thread to make sure it's tracking the right lockup. this case can happen if user increases their vsr lockup period
     let signer_seeds: &[&[&[u8]]] = &[&[
@@ -93,17 +93,23 @@ pub fn handler(ctx: Context<PurgePositionV0>) -> Result<()> {
   let sub_dao = &mut ctx.accounts.sub_dao;
 
   update_subdao_vehnt(sub_dao, curr_ts);
-  sub_dao.vehnt_fall_rate = sub_dao.vehnt_fall_rate.checked_sub(stake_position.fall_rate).unwrap();
-  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_add(
-    stake_position
-      .fall_rate
-      .checked_mul(u128::from(time_since_expiry))
-      .unwrap()
-      .checked_div(FALL_RATE_FACTOR)
-      .unwrap()
-      .try_into()
-      .unwrap()
-  ).unwrap();
+  sub_dao.vehnt_fall_rate = sub_dao
+    .vehnt_fall_rate
+    .checked_sub(stake_position.fall_rate)
+    .unwrap();
+  sub_dao.vehnt_staked = sub_dao
+    .vehnt_staked
+    .checked_add(
+      stake_position
+        .fall_rate
+        .checked_mul(u128::from(time_since_expiry))
+        .unwrap()
+        .checked_div(FALL_RATE_FACTOR)
+        .unwrap()
+        .try_into()
+        .unwrap(),
+    )
+    .unwrap();
   stake_position.purged = true;
 
   Ok(())

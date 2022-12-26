@@ -73,7 +73,7 @@ pub struct StakePositionV0 {
   pub hnt_amount: u64,
   pub sub_dao: Pubkey,
   pub last_claimed_epoch: u64, // the epoch number that the dnt rewards were last claimed at
-  pub fall_rate: u128,         // the vehnt amount that the position decays by per second, with 12 decimals of extra precision
+  pub fall_rate: u128, // the vehnt amount that the position decays by per second, with 12 decimals of extra precision
   pub expiry_ts: i64,
   pub purged: bool, // if true, this position has been removed from subdao calculations. rewards can still be claimed.
   pub bump_seed: u8,

@@ -5,7 +5,8 @@ use clockwork_sdk::{cpi::thread_create, state::Trigger, ThreadProgram};
 
 use voter_stake_registry::{
   self,
-  state::{PositionV0, Registrar}, program::VoterStakeRegistry,
+  program::VoterStakeRegistry,
+  state::{PositionV0, Registrar},
 };
 
 #[derive(Accounts)]
@@ -68,9 +69,7 @@ pub fn handler(ctx: Context<StakeV0>) -> Result<()> {
   let curr_ts = registrar.clock_unix_timestamp();
   let available_vehnt = position.voting_power(voting_mint_config, curr_ts)?;
 
-  let seconds_left = position
-    .lockup
-    .seconds_left(curr_ts);
+  let seconds_left = position.lockup.seconds_left(curr_ts);
   let future_ts = curr_ts
     .checked_add(seconds_left.try_into().unwrap())
     .unwrap();
@@ -85,7 +84,10 @@ pub fn handler(ctx: Context<StakeV0>) -> Result<()> {
 
   // update the stake
   update_subdao_vehnt(sub_dao, curr_ts);
-  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_add(i128::from(available_vehnt)).unwrap();
+  sub_dao.vehnt_staked = sub_dao
+    .vehnt_staked
+    .checked_add(i128::from(available_vehnt))
+    .unwrap();
   sub_dao.vehnt_fall_rate = sub_dao
     .vehnt_fall_rate
     .checked_sub(stake_position.fall_rate)

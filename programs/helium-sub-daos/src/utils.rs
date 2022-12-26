@@ -83,6 +83,5 @@ pub fn calculate_fall_rate(curr_vp: u64, future_vp: u64, num_seconds: u64) -> Op
     .checked_mul(FALL_RATE_FACTOR)
     .unwrap(); // add decimals of precision for fall rate calculation
 
-  diff
-    .checked_div(num_seconds.into())
+  diff.checked_div(num_seconds.into())
 }
