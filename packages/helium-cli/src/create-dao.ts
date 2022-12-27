@@ -129,6 +129,7 @@ async function run() {
     console.log("Initializing DAO");
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
+        registrar: PublicKey.default, // TODO: Replace with VSR reg after Bry is done
         authority: provider.wallet.publicKey,
         emissionSchedule: [{
           startUnixTime: new anchor.BN(0),

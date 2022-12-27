@@ -5,7 +5,7 @@ use clockwork_sdk::{
   state::{Thread, ThreadSettings, Trigger},
   ThreadProgram,
 };
-use voter_stake_registry::state::{PositionV0, Registrar};
+use voter_stake_registry::{state::{PositionV0, Registrar}, program::VoterStakeRegistry};
 
 #[derive(Accounts)]
 pub struct PurgePositionV0<'info> {
@@ -14,6 +14,9 @@ pub struct PurgePositionV0<'info> {
   )]
   pub position: Box<Account<'info, PositionV0>>,
   pub registrar: AccountLoader<'info, Registrar>,
+  #[account(
+    has_one = registrar
+  )]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
     mut,
@@ -30,9 +33,7 @@ pub struct PurgePositionV0<'info> {
   )]
   pub stake_position: Account<'info, StakePositionV0>,
 
-  ///CHECK: constraints
-  #[account(address = voter_stake_registry::ID)]
-  pub vsr_program: AccountInfo<'info>,
+  pub vsr_program: Program<'info, VoterStakeRegistry>,
 
   pub system_program: Program<'info, System>,
   #[account(

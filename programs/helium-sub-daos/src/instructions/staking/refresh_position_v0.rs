@@ -1,6 +1,6 @@
 use crate::{error::ErrorCode, state::*, utils::*};
 use anchor_lang::prelude::*;
-use voter_stake_registry::state::{PositionV0, Registrar};
+use voter_stake_registry::{state::{PositionV0, Registrar}, program::VoterStakeRegistry};
 
 #[derive(Accounts)]
 pub struct RefreshPositionV0<'info> {
@@ -9,6 +9,9 @@ pub struct RefreshPositionV0<'info> {
   )]
   pub position: Box<Account<'info, PositionV0>>,
   pub registrar: AccountLoader<'info, Registrar>,
+  #[account(
+    has_one = registrar
+  )]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
     mut,
@@ -25,9 +28,7 @@ pub struct RefreshPositionV0<'info> {
   )]
   pub stake_position: Account<'info, StakePositionV0>,
 
-  ///CHECK: constraints
-  #[account(address = voter_stake_registry::ID)]
-  pub vsr_program: AccountInfo<'info>,
+  pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
   pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,

@@ -47,6 +47,7 @@ pub struct DaoV0 {
   pub hnt_mint: Pubkey,
   pub dc_mint: Pubkey,
   pub authority: Pubkey,
+  pub registrar: Pubkey, // vsr registrar
   pub num_sub_daos: u32,
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub bump_seed: u8,
