@@ -405,7 +405,7 @@ describe("helium-sub-daos", () => {
             const sdAcc = await program.account.subDaoV0.fetch(subDao);
             let st = sdAcc.vehntStaked.toNumber();
             expect(sdAcc.vehntFallRate.toNumber()).to.eq(0);
-            assert.isTrue(st == 0 || st == 1);
+            expect(st).to.be.lte(1);
             assert.isFalse(
               !!(await provider.connection.getAccountInfo(stakePosition!))
             );
