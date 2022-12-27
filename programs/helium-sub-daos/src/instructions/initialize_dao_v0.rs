@@ -13,7 +13,7 @@ use circuit_breaker::{ThresholdType, WindowedCircuitBreakerConfigV0};
 pub struct InitializeDaoArgsV0 {
   pub authority: Pubkey,
   pub emission_schedule: Vec<EmissionScheduleItem>,
-  pub registrar: Pubkey
+  pub registrar: Pubkey,
 }
 
 #[derive(Accounts)]

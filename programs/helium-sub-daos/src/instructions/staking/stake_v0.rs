@@ -91,10 +91,7 @@ pub fn handler(ctx: Context<StakeV0>) -> Result<()> {
     .vehnt_staked
     .checked_add(i128::from(available_vehnt))
     .unwrap();
-  sub_dao.vehnt_fall_rate = sub_dao
-    .vehnt_fall_rate
-    .checked_add(fall_rate)
-    .unwrap();
+  sub_dao.vehnt_fall_rate = sub_dao.vehnt_fall_rate.checked_add(fall_rate).unwrap();
 
   stake_position.purged = false;
   stake_position.expiry_ts = curr_ts

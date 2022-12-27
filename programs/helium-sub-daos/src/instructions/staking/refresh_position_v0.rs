@@ -1,6 +1,9 @@
 use crate::{error::ErrorCode, state::*, utils::*};
 use anchor_lang::prelude::*;
-use voter_stake_registry::{state::{PositionV0, Registrar}, program::VoterStakeRegistry};
+use voter_stake_registry::{
+  program::VoterStakeRegistry,
+  state::{PositionV0, Registrar},
+};
 
 #[derive(Accounts)]
 pub struct RefreshPositionV0<'info> {
@@ -76,9 +79,7 @@ pub fn handler(ctx: Context<RefreshPositionV0>) -> Result<()> {
   // update subdao calculations
   update_subdao_vehnt(sub_dao, curr_ts);
 
-  sub_dao.vehnt_staked = sub_dao.vehnt_staked
-    .checked_sub(vehnt_diff)
-    .unwrap();
+  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(vehnt_diff).unwrap();
   sub_dao.vehnt_fall_rate = u128::try_from(
     i128::try_from(sub_dao.vehnt_fall_rate)
       .unwrap()

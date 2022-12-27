@@ -5,7 +5,10 @@ use clockwork_sdk::{
   state::{Thread, ThreadSettings, Trigger},
   ThreadProgram,
 };
-use voter_stake_registry::{state::{PositionV0, Registrar}, program::VoterStakeRegistry};
+use voter_stake_registry::{
+  program::VoterStakeRegistry,
+  state::{PositionV0, Registrar},
+};
 
 #[derive(Accounts)]
 pub struct PurgePositionV0<'info> {
