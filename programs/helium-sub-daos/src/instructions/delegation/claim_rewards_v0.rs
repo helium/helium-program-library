@@ -1,4 +1,4 @@
-use crate::{current_epoch, error::ErrorCode, state::*, EPOCH_LENGTH, TESTING};
+use crate::{current_epoch, error::ErrorCode, state::*, TESTING};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,

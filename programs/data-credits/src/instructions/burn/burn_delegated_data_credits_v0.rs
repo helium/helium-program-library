@@ -3,8 +3,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use helium_sub_daos::{
-  cpi::{accounts::TrackDcBurnV0, track_dc_burn_v0},
-  current_epoch, DaoV0, SubDaoV0, TrackDcBurnArgsV0,
+  cpi::{accounts::TrackDcBurnV0, track_dc_burn_v0}, DaoV0, SubDaoV0, TrackDcBurnArgsV0,
 };
 
 #[derive(Debug, Clone)]

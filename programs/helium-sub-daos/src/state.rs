@@ -109,11 +109,11 @@ pub struct SubDaoEpochInfoV0 {
 }
 
 impl SubDaoEpochInfoV0 {
-  pub fn start_ts(self: &Self) -> i64 {
+  pub fn start_ts(&self) -> i64 {
     i64::try_from(self.epoch).unwrap() * EPOCH_LENGTH
   }
 
-  pub fn end_ts(self: &Self) -> i64 {
+  pub fn end_ts(&self) -> i64 {
     i64::try_from(self.epoch + 1).unwrap() * EPOCH_LENGTH
   }
 }

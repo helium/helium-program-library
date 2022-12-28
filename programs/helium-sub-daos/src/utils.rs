@@ -128,7 +128,7 @@ pub fn update_subdao_vehnt(
     .unwrap();
   sub_dao.vehnt_last_calculated_ts = curr_ts;
 
-  return Ok(());
+  Ok(())
 }
 
 pub fn create_cron(execution_ts: i64, offset: i64) -> String {
