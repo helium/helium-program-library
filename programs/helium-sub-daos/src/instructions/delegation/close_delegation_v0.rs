@@ -101,6 +101,18 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
       .unwrap();
   }
 
+  // Remove this position from the current epoch vehnt
+  let vehnt_at_start = position.voting_power(
+    voting_mint_config,
+    ctx.accounts.sub_dao_epoch_info.start_ts(),
+  )?;
+  ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start = ctx
+    .accounts
+    .sub_dao_epoch_info
+    .vehnt_at_epoch_start
+    .checked_sub(vehnt_at_start)
+    .unwrap();
+
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
   ctx.accounts.sub_dao_epoch_info.bump_seed = *ctx.bumps.get("sub_dao_epoch_info").unwrap();
   ctx.accounts.sub_dao_epoch_info.initialized = true;
