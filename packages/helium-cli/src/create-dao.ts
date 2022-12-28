@@ -2,13 +2,12 @@ import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
 import { daoKey, init as initDao } from "@helium/helium-sub-daos-sdk";
 import { init as initLazy } from "@helium/lazy-distributor-sdk";
-import * as anchor from "@project-serum/anchor";
 import {
-  Connection,
-  Keypair,
-  PublicKey,
-  TransactionInstruction,
-} from "@solana/web3.js";
+  registrarKey,
+  init as initVsr,
+} from "@helium/voter-stake-registry-sdk";
+import * as anchor from "@project-serum/anchor";
+import { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import {
   getGovernanceProgramVersion,
   MintMaxVoteWeightSource,
@@ -18,15 +17,19 @@ import {
   VoteThresholdType,
   VoteTipping,
   GovernanceConfig,
-  withSetRealmConfig,
-  withCreateMintGovernance,
-  GoverningTokenConfigArgs,
   GoverningTokenConfigAccountArgs,
+  withCreateGovernance,
+  withSetRealmAuthority,
+  SetRealmAuthorityAction,
 } from "@solana/spl-governance";
-import { BN } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { createAndMint, getTimestampFromDays, loadKeypair } from "./utils";
+import {
+  createAndMint,
+  getTimestampFromDays,
+  getUnixTimestamp,
+  loadKeypair,
+} from "./utils";
 import { sendInstructions } from "@helium/spl-utils";
 
 const { hideBin } = require("yargs/helpers");
@@ -74,26 +77,40 @@ const yarg = yargs(hideBin(process.argv)).options({
     default:
       "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib",
   },
-  councilKeypair: {
-    type: "string",
-    describe: "Keypair of gov council token",
-    default: "./keypairs/council.json",
-  },
-  numCouncil: {
-    type: "number",
-    describe:
-      "Number of Gov Council tokens to pre mint before assigning authority to dao",
-    default: 7,
-  },
   govProgramId: {
     type: "string",
     describe: "Pubkey of the GOV program",
     default: "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw",
   },
+  realmName: {
+    type: "string",
+    describe: "Name of the realm to be generated",
+    default: "Helium",
+  },
+  councilKeypair: {
+    type: "string",
+    describe: "Keypair of gov council token",
+    default: "./keypairs/council.json",
+  },
+  councilTokenHolder: {
+    type: "string",
+    describe: "Pubkey for holding/distributing council tokens",
+    default: `${os.homedir()}/.config/solana/id.json`,
+  },
+  numCouncil: {
+    type: "number",
+    describe:
+      "Number of Gov Council tokens to pre mint before assigning authority to dao",
+    default: 10,
+  },
 });
 
 const HNT_EPOCH_REWARDS = 10000000000;
 const MOBILE_EPOCH_REWARDS = 5000000000;
+const MIN_LOCKUP = 15811200; // 6 months
+const MAX_LOCKUP = MIN_LOCKUP * 8;
+const SCALE = 100;
+const GENESIS_MULTIPLIER = 3;
 async function exists(
   connection: Connection,
   account: PublicKey
@@ -111,7 +128,7 @@ async function run() {
   const dataCreditsProgram = await initDc(provider);
   const lazyDistributorProgram = await initLazy(provider);
   const heliumSubDaosProgram = await initDao(provider);
-  //const heliumVsrProgram = await initVsr(provider);
+  const heliumVsrProgram = await initVsr(provider);
 
   const hntKeypair = await loadKeypair(argv.hntKeypair);
   const dcKeypair = await loadKeypair(argv.dcKeypair);
@@ -154,9 +171,9 @@ async function run() {
       .initializeDataCreditsV0({
         authority: provider.wallet.publicKey,
         config: {
-          windowSizeSeconds: new BN(60 * 60),
+          windowSizeSeconds: new anchor.BN(60 * 60),
           thresholdType: ThresholdType.Absolute as never,
-          threshold: new BN("1000000000000"),
+          threshold: new anchor.BN("1000000000000"),
         },
       })
       .accounts({
@@ -169,12 +186,156 @@ async function run() {
       .rpc({ skipPreflight: true });
   }
 
+  let instructions: TransactionInstruction[] = [];
+  const govProgramVersion = await getGovernanceProgramVersion(
+    conn,
+    govProgramId
+  );
+
+  const realmName = argv.realmName;
+  const realm = await PublicKey.findProgramAddressSync(
+    [Buffer.from("governance", "utf-8"), Buffer.from(realmName, "utf-8")],
+    govProgramId
+  )[0];
+  if (!(await exists(conn, realm))) {
+    console.log("Initializing Realm");
+    await withCreateRealm(
+      instructions,
+      govProgramId,
+      govProgramVersion,
+      realmName,
+      provider.wallet.publicKey, // realmAuthorityPk
+      hntKeypair.publicKey, // communityMintPk
+      provider.wallet.publicKey, // payer
+      councilKeypair.publicKey, // councilMintPk
+      MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION,
+      new anchor.BN(1), // minCommunityWeightToCreateGovernance
+      new GoverningTokenConfigAccountArgs({
+        // community token config
+        voterWeightAddin: heliumVsrProgram.programId,
+        maxVoterWeightAddin: undefined,
+        tokenType: GoverningTokenType.Liquid,
+      }),
+      new GoverningTokenConfigAccountArgs({
+        // council token config
+        voterWeightAddin: undefined,
+        maxVoterWeightAddin: undefined,
+        tokenType: GoverningTokenType.Liquid,
+      })
+    );
+  }
+
+  const registrar = (await registrarKey(realm, hntKeypair.publicKey))[0];
+  if (!(await exists(conn, registrar))) {
+    console.log("Initializing VSR Registrar");
+    instructions.push(
+      await heliumVsrProgram.methods
+        .initializeRegistrarV0()
+        .accounts({
+          realm,
+          realmGoverningTokenMint: hntKeypair.publicKey,
+        })
+        .instruction()
+    );
+  }
+
+  console.log("Configuring VSR voting mint at [0]");
+  instructions.push(
+    await heliumVsrProgram.methods
+      .configureVotingMintV0({
+        idx: 0, // idx
+        digitShift: 0, // digit shift
+        lockedVoteWeightScaledFactor: new anchor.BN(1_000_000_000),
+        minimumRequiredLockupSecs: new anchor.BN(MIN_LOCKUP),
+        maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE),
+        genesisVotePowerMultiplier: GENESIS_MULTIPLIER,
+        genesisVotePowerMultiplierExpirationTs: new anchor.BN(
+          Number(await getUnixTimestamp(provider)) + getTimestampFromDays(7)
+        ),
+        lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
+      })
+      .accounts({
+        registrar,
+        mint: hntKeypair.publicKey,
+      })
+      .remainingAccounts([
+        {
+          pubkey: hntKeypair.publicKey,
+          isSigner: false,
+          isWritable: false,
+        },
+      ])
+      .instruction()
+  );
+
+  await sendInstructions(provider, instructions, []);
+  instructions = [];
+
+  const governance = await PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("account-governance", "utf-8"),
+      realm.toBuffer(),
+      PublicKey.default.toBuffer(),
+    ],
+    govProgramId
+  )[0];
+  if (!(await exists(conn, governance))) {
+    console.log(`Initializing Governance on Realm: ${realmName}`);
+    await withCreateGovernance(
+      instructions,
+      govProgramId,
+      govProgramVersion,
+      realm,
+      hntKeypair.publicKey,
+      new GovernanceConfig({
+        communityVoteThreshold: new VoteThreshold({
+          type: VoteThresholdType.YesVotePercentage,
+          value: 60,
+        }),
+        minCommunityTokensToCreateProposal: new anchor.BN(1),
+        minInstructionHoldUpTime: 0,
+        maxVotingTime: getTimestampFromDays(3),
+        communityVoteTipping: VoteTipping.Strict,
+        councilVoteTipping: VoteTipping.Early,
+        minCouncilTokensToCreateProposal: new anchor.BN(1),
+        councilVoteThreshold: new VoteThreshold({
+          type: VoteThresholdType.YesVotePercentage,
+          value: 50,
+        }),
+        councilVetoVoteThreshold: new VoteThreshold({
+          type: VoteThresholdType.YesVotePercentage,
+          value: 50,
+        }),
+        communityVetoVoteThreshold: new VoteThreshold({
+          type: VoteThresholdType.Disabled,
+        }),
+        votingCoolOffTime: 0,
+        depositExemptProposalCount: 10,
+      }),
+      PublicKey.default,
+      provider.wallet.publicKey,
+      provider.wallet.publicKey
+    );
+
+    withSetRealmAuthority(
+      instructions,
+      govProgramId,
+      govProgramVersion,
+      realm,
+      provider.wallet.publicKey,
+      governance,
+      SetRealmAuthorityAction.SetChecked
+    );
+  }
+
+  await sendInstructions(provider, instructions, []);
+
   const dao = (await daoKey(hntKeypair.publicKey))[0];
   if (!(await exists(conn, dao))) {
     console.log("Initializing DAO");
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
-        registrar: PublicKey.default, // TODO: Replace with VSR reg after Bry is done
+        registrar: registrar,
         authority: provider.wallet.publicKey,
         emissionSchedule: [
           {
@@ -189,85 +350,6 @@ async function run() {
       })
       .rpc({ skipPreflight: true });
   }
-
-  let instructions: TransactionInstruction[] = [];
-  let signers: Keypair[] = [];
-  const govProgramVersion = await getGovernanceProgramVersion(
-    conn,
-    govProgramId
-  );
-
-  const name = `Realm-${dao.toBase58().slice(0, 6)}`;
-  const communityMintMaxVoteWeightSource =
-    MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION;
-
-  const realmPk = await withCreateRealm(
-    instructions,
-    govProgramId,
-    govProgramVersion,
-    name,
-    provider.wallet.publicKey, // realmAuthorityPk
-    hntKeypair.publicKey, // communityMintPk
-    provider.wallet.publicKey, // payer
-    councilKeypair.publicKey, // councilMintPk
-    communityMintMaxVoteWeightSource,
-    new BN(1), // minCommunityWeightToCreateGovernance
-    undefined,
-    undefined
-  );
-
-  await withSetRealmConfig(
-    instructions,
-    govProgramId,
-    govProgramVersion,
-    realmPk,
-    provider.wallet.publicKey, // realmAuthorityPk
-    councilKeypair.publicKey, // councilMintPk
-    communityMintMaxVoteWeightSource,
-    new BN(1),
-    new GoverningTokenConfigAccountArgs({
-      voterWeightAddin: undefined,
-      maxVoterWeightAddin: undefined,
-      tokenType: GoverningTokenType.Liquid,
-    }),
-    new GoverningTokenConfigAccountArgs({
-      voterWeightAddin: undefined,
-      maxVoterWeightAddin: undefined,
-      tokenType: GoverningTokenType.Liquid,
-    }),
-    provider.wallet.publicKey // payer
-  );
-
-  await sendInstructions(provider, instructions, signers);
-  instructions = [];
-  signers = [];
-
-  const govConfig = new GovernanceConfig({
-    communityVoteThreshold: new VoteThreshold({
-      type: VoteThresholdType.YesVotePercentage,
-      value: 60,
-    }),
-    minCommunityTokensToCreateProposal: new BN(1),
-    minInstructionHoldUpTime: 0,
-    maxVotingTime: getTimestampFromDays(3),
-    communityVoteTipping: VoteTipping.Strict,
-    councilVoteTipping: VoteTipping.Strict,
-    minCouncilTokensToCreateProposal: new BN(1),
-    councilVoteThreshold: new VoteThreshold({
-      type: VoteThresholdType.YesVotePercentage,
-      value: 10,
-    }),
-    councilVetoVoteThreshold: new VoteThreshold({
-      type: VoteThresholdType.YesVotePercentage,
-      value: 10,
-    }),
-    communityVetoVoteThreshold: new VoteThreshold({
-      type: VoteThresholdType.YesVotePercentage,
-      value: 80,
-    }),
-    votingCoolOffTime: 0,
-    depositExemptProposalCount: 0,
-  });
 }
 
 run()

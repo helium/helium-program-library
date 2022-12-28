@@ -9,13 +9,26 @@ import {
   PROGRAM_ID as METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
-import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  SYSVAR_CLOCK_PUBKEY,
+} from "@solana/web3.js";
 import fs from "fs";
 import fetch from "node-fetch";
 
 const SECONDS_PER_DAY = 86400;
 
 export const getTimestampFromDays = (days: number) => days * SECONDS_PER_DAY;
+
+export const getUnixTimestamp = async (
+  provider: anchor.Provider
+): Promise<bigint> => {
+  const clock = await provider.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+  const unixTime = clock!.data.readBigInt64LE(8 * 4);
+  return unixTime;
+};
 
 export async function exists(
   connection: Connection,
