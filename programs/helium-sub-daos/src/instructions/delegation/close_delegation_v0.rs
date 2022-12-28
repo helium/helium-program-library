@@ -74,6 +74,9 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   let delegated_position = &mut ctx.accounts.delegated_position;
   let sub_dao = &mut ctx.accounts.sub_dao;
 
+  ctx.accounts.sub_dao_epoch_info.epoch =
+    current_epoch(ctx.accounts.registrar.load()?.clock_unix_timestamp());
+
   update_subdao_vehnt(sub_dao, &mut ctx.accounts.sub_dao_epoch_info, curr_ts)?;
 
   // Only subtract from the stake if the position ends after the end of this epoch. Otherwise,
@@ -100,8 +103,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
 
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
   ctx.accounts.sub_dao_epoch_info.bump_seed = *ctx.bumps.get("sub_dao_epoch_info").unwrap();
-  ctx.accounts.sub_dao_epoch_info.epoch =
-    current_epoch(ctx.accounts.registrar.load()?.clock_unix_timestamp());
+  ctx.accounts.sub_dao_epoch_info.initialized = true;
 
   Ok(())
 }

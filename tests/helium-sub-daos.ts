@@ -198,7 +198,9 @@ describe("helium-sub-daos", () => {
         positionAuthorityKp.publicKey,
         LAMPORTS_PER_SOL
       );
+          console.log(minLockupSeconds);
 
+      
       ({ registrar } = await initVsr(
         vsrProgram,
         provider,
@@ -239,8 +241,6 @@ describe("helium-sub-daos", () => {
       });
 
       beforeEach(async () => {
-        console.log("star1");
-
         ({ position, vault } = await createPosition(
           vsrProgram,
           provider,
@@ -303,6 +303,9 @@ describe("helium-sub-daos", () => {
 
     vehntOptions.forEach(function ({ name, options }) {
       describe("vehnt tests - " + name, () => {
+        before(() => {
+          minLockupSeconds = 15811200; // 6 months
+        });
         beforeEach(async () => {
           ({ position, vault } = await createPosition(
             vsrProgram,
@@ -460,7 +463,7 @@ describe("helium-sub-daos", () => {
           await program.methods
             .resetLockupV0({
               kind: { constant: {} },
-              periods: 182 * 4,
+              periods: 182 * 8,
             })
             .accounts({
               dao,
@@ -562,6 +565,11 @@ describe("helium-sub-daos", () => {
             let subDaoEpochInfo: PublicKey;
 
             beforeEach(async () => {
+              await vsrProgram.methods
+                    .setTimeOffsetV0(new BN(1 * 60 * 60 * 24))
+                    .accounts({ registrar })
+                    .rpc({ skipPreflight: true });
+                    
               ({ subDaoEpochInfo } = await burnDc(1600000));
               epoch = (
                 await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)

@@ -24,21 +24,20 @@ pub struct BurnDelegatedDataCreditsArgsV0 {
 #[derive(Accounts)]
 pub struct BurnDelegatedDataCreditsV0<'info> {
   /// CHECK: Verified by cpi
-  #[account(
-    mut,
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(),  &current_epoch(clock.unix_timestamp).to_le_bytes()],
-    seeds::program = helium_sub_daos_program.key(),
-    bump
-  )]
+  #[account(mut)]
   pub sub_dao_epoch_info: AccountInfo<'info>,
   #[account(
+    mut,
     has_one = dao,
     has_one = dc_burn_authority
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   pub dc_burn_authority: Signer<'info>,
+  /// CHECK: Used by cpi
+  pub registrar: AccountInfo<'info>,
   #[account(
     has_one = dc_mint,
+    has_one = registrar
   )]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(mut)]
@@ -84,7 +83,7 @@ impl<'info> BurnDelegatedDataCreditsV0<'info> {
       sub_dao: self.sub_dao.to_account_info(),
       dao: self.dao.to_account_info(),
       system_program: self.system_program.to_account_info(),
-      clock: self.clock.to_account_info(),
+      registrar: self.registrar.to_account_info(),
       rent: self.rent.to_account_info(),
       account_payer: self.account_payer.to_account_info(),
       dc_mint: self.dc_mint.to_account_info(),

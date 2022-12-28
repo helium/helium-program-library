@@ -105,6 +105,7 @@ pub struct SubDaoEpochInfoV0 {
   /// useful in the future, or at least for debugging purposes
   pub rewards_issued_at: Option<i64>,
   pub bump_seed: u8,
+  pub initialized: bool,
 }
 
 impl SubDaoEpochInfoV0 {

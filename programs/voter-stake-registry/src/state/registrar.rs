@@ -13,16 +13,15 @@ pub struct Registrar {
   pub realm: Pubkey,
   pub realm_governing_token_mint: Pubkey,
   pub realm_authority: Pubkey,
+  /// Debug only: time offset, to allow tests to move forward in time.
+  pub time_offset: i64,
+  /// Allows a program to wrap updates to the position (transfer or reset lockup)
+  pub position_update_authority: Option<Pubkey>,
 
   /// Storage for voting mints and their configuration.
   /// The length should be adjusted for one's use case.
   pub voting_mints: [VotingMintConfigV0; 4],
 
-  /// Allows a program to wrap updates to the position (transfer or reset lockup)
-  pub position_update_authority: Option<Pubkey>,
-
-  /// Debug only: time offset, to allow tests to move forward in time.
-  pub time_offset: i64,
   pub bump: u8,
 }
 

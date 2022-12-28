@@ -127,15 +127,22 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     )
   }
 
-  let epoch_end_ts = i64::try_from(args.epoch + 1)
-    .unwrap()
-    .checked_mul(EPOCH_LENGTH)
-    .unwrap();
+  let delegated_vehnt_at_epoch = position.voting_power(
+    voting_mint_config,
+    ctx.accounts.sub_dao_epoch_info.start_ts(),
+  )?;
 
-  let delegated_vehnt_at_epoch = position.voting_power(voting_mint_config, epoch_end_ts)?;
+  msg!("Staked {} veHNT at start of epoch with {} total veHNT delegated to subdao and {} total rewards to subdao", 
+    delegated_vehnt_at_epoch,
+    ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start,
+    ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued
+  );
 
-  msg!("Staked {} veHNT at end of epoch with {} total veHNT delegated to subdao and {} total rewards to subdao", delegated_vehnt_at_epoch, ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start, ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued);
-
+  // Invariant check, they should never have more vehnt than the total vehnt at epoch start
+  require_gte!(
+    ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start,
+    delegated_vehnt_at_epoch,
+  );
   // calculate the position's share of that epoch's rewards
   // rewards = staking_rewards_issued * staked_vehnt_at_epoch / total_vehnt
   let rewards = delegated_vehnt_at_epoch

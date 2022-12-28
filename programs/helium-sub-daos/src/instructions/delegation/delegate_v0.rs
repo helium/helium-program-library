@@ -91,8 +91,11 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
   let sub_dao = &mut ctx.accounts.sub_dao;
   let delegated_position = &mut ctx.accounts.delegated_position;
 
-  // update the stake
+  // Update the veHnt at start of epoch
+  ctx.accounts.sub_dao_epoch_info.epoch =
+    current_epoch(ctx.accounts.registrar.load()?.clock_unix_timestamp());
   update_subdao_vehnt(sub_dao, &mut ctx.accounts.sub_dao_epoch_info, curr_ts)?;
+
   sub_dao.vehnt_delegated = sub_dao
     .vehnt_delegated
     .checked_add(available_vehnt)
@@ -128,8 +131,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
 
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
   ctx.accounts.sub_dao_epoch_info.bump_seed = *ctx.bumps.get("sub_dao_epoch_info").unwrap();
-  ctx.accounts.sub_dao_epoch_info.epoch =
-    current_epoch(ctx.accounts.registrar.load()?.clock_unix_timestamp());
+  ctx.accounts.sub_dao_epoch_info.initialized = true;
 
   Ok(())
 }

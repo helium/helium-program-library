@@ -160,6 +160,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .get_emissions_at(ctx.accounts.clock.unix_timestamp)
     .unwrap();
 
+  let stakers_present = ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start > 0;
   mint_v0(
     ctx.accounts.mint_dnt_emissions_ctx().with_signer(&[&[
       b"sub_dao",
@@ -175,11 +176,15 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     },
   )?;
 
-  let staking_rewards_amount = total_emissions
-    .checked_mul(6)
-    .unwrap()
-    .checked_div(100)
-    .unwrap();
+  let staking_rewards_amount = if stakers_present {
+    total_emissions
+      .checked_mul(6)
+      .unwrap()
+      .checked_div(100)
+      .unwrap()
+  } else {
+    0
+  };
 
   mint_v0(
     ctx.accounts.mint_staking_rewards_ctx().with_signer(&[&[

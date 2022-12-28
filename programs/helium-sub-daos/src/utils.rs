@@ -48,7 +48,13 @@ pub fn update_subdao_vehnt(
   {
     return Err(error!(ErrorCode::MustCalculateVehntLinearly));
   }
-
+  msg!(
+    "Current vehnt is {} with last updated of {}. Fast forwarding to {} at fall rate {}",
+    sub_dao.vehnt_delegated,
+    sub_dao.vehnt_last_calculated_ts,
+    curr_ts,
+    sub_dao.vehnt_fall_rate
+  );
   // Step 1. Update veHNT up to the point that this epoch starts
   if epoch_start > sub_dao.vehnt_last_calculated_ts {
     let fall = sub_dao
@@ -69,17 +75,37 @@ pub fn update_subdao_vehnt(
       .unwrap();
   }
 
+  // If sub dao epoch info account was just created, log the vehnt
+  if !curr_epoch_info.initialized {
+    msg!(
+      "Setting vehnt_at_epoch_start to {}",
+      sub_dao.vehnt_delegated
+    );
+    curr_epoch_info.vehnt_at_epoch_start = sub_dao.vehnt_delegated;
+  }
+
   // Step 2. Update fall rate according to this epoch's closed position corrections
-  sub_dao.vehnt_fall_rate = sub_dao
-    .vehnt_fall_rate
-    .checked_sub(curr_epoch_info.fall_rates_from_closing_positions)
-    .unwrap();
-  // Since this has already been applied, set to 0
-  curr_epoch_info.fall_rates_from_closing_positions = 0;
-  sub_dao.vehnt_delegated = sub_dao
-    .vehnt_delegated
-    .checked_sub(curr_epoch_info.vehnt_in_closing_positions)
-    .unwrap();
+  if curr_epoch_info.fall_rates_from_closing_positions > 0
+    || curr_epoch_info.vehnt_in_closing_positions > 0
+  {
+    msg!(
+      "Correcting fall rate by {} and vehnt by {} due to closed positions",
+      curr_epoch_info.fall_rates_from_closing_positions,
+      curr_epoch_info.vehnt_in_closing_positions
+    );
+    sub_dao.vehnt_fall_rate = sub_dao
+      .vehnt_fall_rate
+      .checked_sub(curr_epoch_info.fall_rates_from_closing_positions)
+      .unwrap();
+
+    sub_dao.vehnt_delegated = sub_dao
+      .vehnt_delegated
+      .checked_sub(curr_epoch_info.vehnt_in_closing_positions)
+      .unwrap();
+    // Since this has already been applied, set to 0
+    curr_epoch_info.fall_rates_from_closing_positions = 0;
+    curr_epoch_info.vehnt_in_closing_positions = 0;
+  }
 
   // Step 3. Update veHNT up to now (from start of epoch) using the current fall rate. At this point, closing positions are effectively ignored.
   let fall = sub_dao
