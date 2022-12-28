@@ -94,7 +94,7 @@ fn construct_next_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> Inst
     AccountMeta::new(ctx.accounts.sub_dao.dnt_mint, false),
     AccountMeta::new(ctx.accounts.sub_dao.treasury, false),
     AccountMeta::new(ctx.accounts.sub_dao.rewards_escrow, false),
-    AccountMeta::new(ctx.accounts.sub_dao.staker_pool, false),
+    AccountMeta::new(ctx.accounts.sub_dao.delegator_pool, false),
     AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
     AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
     AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
@@ -186,8 +186,9 @@ pub fn handler(
     .checked_mul(EPOCH_LENGTH)
     .unwrap();
   let sub_dao = &mut ctx.accounts.sub_dao;
-  update_subdao_vehnt(sub_dao, epoch_end_ts);
-  epoch_info.total_vehnt = u64::try_from(std::cmp::max(sub_dao.vehnt_staked, 0)).unwrap();
+  update_subdao_vehnt(sub_dao, epoch_info, epoch_end_ts)?;
+  epoch_info.vehnt_at_epoch_start =
+    u64::try_from(std::cmp::max(sub_dao.vehnt_delegated, 0)).unwrap();
 
   let dc_burned = PreciseNumber::new(epoch_info.dc_burned.into())
     .or_arith_error()?
@@ -237,7 +238,7 @@ pub fn handler(
     one.clone()
   };
 
-  let vehnt_staked = PreciseNumber::new(epoch_info.total_vehnt.into())
+  let vehnt_staked = PreciseNumber::new(epoch_info.vehnt_at_epoch_start.into())
     .or_arith_error()?
     .checked_div(&PreciseNumber::new(100000000_u128).or_arith_error()?) // vehnt has 8 decimals
     .or_arith_error()?;

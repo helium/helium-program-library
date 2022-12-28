@@ -41,6 +41,11 @@ pub struct InitializeRegistrarV0<'info> {
   pub rent: Sysvar<'info, Rent>,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Default, Clone)]
+pub struct InitializeRegistrarArgsV0 {
+  pub position_update_authority: Option<Pubkey>,
+}
+
 /// Creates a new voting registrar.
 ///
 /// `vote_weight_decimals` is the number of decimals used on the vote weight. It must be
@@ -48,7 +53,7 @@ pub struct InitializeRegistrarV0<'info> {
 ///
 /// To use the registrar, call ConfigVotingMint to register token mints that may be
 /// used for voting.
-pub fn handler(ctx: Context<InitializeRegistrarV0>) -> Result<()> {
+pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArgsV0) -> Result<()> {
   let registrar = &mut ctx.accounts.registrar.load_init()?;
   registrar.bump = *ctx.bumps.get("registrar").unwrap();
   registrar.governance_program_id = ctx.accounts.governance_program_id.key();
@@ -56,6 +61,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>) -> Result<()> {
   registrar.realm_governing_token_mint = ctx.accounts.realm_governing_token_mint.key();
   registrar.realm_authority = ctx.accounts.realm_authority.key();
   registrar.time_offset = 0;
+  registrar.position_update_authority = args.position_update_authority;
 
   // Verify that "realm_authority" is the expected authority on "realm"
   // and that the mint matches one of the realm mints too.

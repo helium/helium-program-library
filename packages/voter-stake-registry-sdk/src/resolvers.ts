@@ -4,8 +4,10 @@ import {
   heliumCommonResolver,
   resolveIndividual
 } from "@helium/spl-utils";
+import { AnchorProvider } from "@project-serum/anchor";
 import { getAccount } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
+import { init } from ".";
 import { voterWeightRecordKey } from "./pdas";
 export * from "./constants";
 export * from "./pdas";
@@ -89,6 +91,11 @@ export const vsrResolvers = combineResolvers(
           acct.owner
         )[0];
       }
+    } else if (path[path.length - 1] === "positionUpdateAuthority" && accounts.registrar) {
+      const vsr = await init(provider as AnchorProvider);
+      const reg = await vsr.account.registrar.fetch(accounts.registrar as PublicKey);
+      // @ts-ignore
+      return reg.positionUpdateAuthority || provider.wallet.publicKey;
     }
   })
 );

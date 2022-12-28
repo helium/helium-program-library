@@ -13,6 +13,8 @@ export async function initVsr(
   provider: AnchorProvider, 
   me: PublicKey, 
   hntMint: PublicKey,
+  positionUpdateAuthority: PublicKey,
+  minLockupSeconds:number = 15811200 // 6 months
 ) {
   const programVersion = await getGovernanceProgramVersion(
     program.provider.connection,
@@ -36,7 +38,9 @@ export async function initVsr(
     new BN(1)
   );
 
-  const createRegistrar = program.methods.initializeRegistrarV0().accounts({
+  const createRegistrar = program.methods.initializeRegistrarV0({
+    positionUpdateAuthority
+  }).accounts({
     realm: realmPk,
     realmGoverningTokenMint: hntMint,
   });
@@ -44,7 +48,6 @@ export async function initVsr(
   const { registrar } = await createRegistrar.pubkeys();
 
   // Configure voting mint
-  const minLockupSeconds = 15811200; // 6 months
   instructions.push(
     await program.methods
       .configureVotingMintV0({
@@ -55,7 +58,7 @@ export async function initVsr(
         maxExtraLockupVoteWeightScaledFactor: new BN(100), // scaled factor
         genesisVotePowerMultiplier: 3,
         genesisVotePowerMultiplierExpirationTs: new BN(1),
-        lockupSaturationSecs: new BN(minLockupSeconds * 8), // lockup saturation seconds
+        lockupSaturationSecs: new BN(15811200 * 8), // 4 years
       })
       .accounts({
         registrar,
@@ -85,7 +88,7 @@ export async function createPosition(
   provider: AnchorProvider,
   registrar: PublicKey,
   hntMint: PublicKey,
-  options: { delay: number; lockupPeriods: number; lockupAmount: number },
+  options: { lockupPeriods: number; lockupAmount: number },
   positionKp?: Keypair
 ) {
   let positionOwner = positionKp?.publicKey || provider.wallet.publicKey;
@@ -109,7 +112,6 @@ export async function createPosition(
         periods: options.lockupPeriods,
       })
       .accounts({
-        // lock for 6 months
         registrar,
         mint: mintKeypair.publicKey,
         depositMint: hntMint,

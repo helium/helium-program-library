@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
-use instructions::*;
+pub use instructions::*;
 
-mod error;
+pub mod error;
 pub mod events;
-mod governance;
-mod instructions;
+pub mod governance;
+pub mod instructions;
 pub mod state;
 pub mod util;
 
@@ -59,8 +59,11 @@ declare_id!("hvsrY9UBtHhYRvstM2BWCsni81kevfn7B2DEhYbGA1a");
 pub mod voter_stake_registry {
   use super::*;
 
-  pub fn initialize_registrar_v0(ctx: Context<InitializeRegistrarV0>) -> Result<()> {
-    instructions::initialize_registrar_v0::handler(ctx)
+  pub fn initialize_registrar_v0(
+    ctx: Context<InitializeRegistrarV0>,
+    args: InitializeRegistrarArgsV0,
+  ) -> Result<()> {
+    instructions::initialize_registrar_v0::handler(ctx, args)
   }
 
   pub fn configure_voting_mint_v0(

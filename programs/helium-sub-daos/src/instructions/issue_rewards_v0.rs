@@ -25,7 +25,7 @@ pub struct IssueRewardsV0<'info> {
     has_one = treasury,
     has_one = dnt_mint,
     has_one = rewards_escrow,
-    has_one = staker_pool,
+    has_one = delegator_pool,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
@@ -68,7 +68,7 @@ pub struct IssueRewardsV0<'info> {
   #[account(mut)]
   pub rewards_escrow: Box<Account<'info, TokenAccount>>,
   #[account(mut)]
-  pub staker_pool: Box<Account<'info, TokenAccount>>,
+  pub delegator_pool: Box<Account<'info, TokenAccount>>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
@@ -98,7 +98,7 @@ impl<'info> IssueRewardsV0<'info> {
   pub fn mint_staking_rewards_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
     let cpi_accounts = MintV0 {
       mint: self.dnt_mint.to_account_info(),
-      to: self.staker_pool.to_account_info(),
+      to: self.delegator_pool.to_account_info(),
       mint_authority: self.sub_dao.to_account_info(),
       circuit_breaker: self.dnt_circuit_breaker.to_account_info(),
       token_program: self.token_program.to_account_info(),
@@ -205,7 +205,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
 
   ctx.accounts.dao_epoch_info.num_rewards_issued += 1;
   ctx.accounts.sub_dao_epoch_info.rewards_issued_at = Some(ctx.accounts.clock.unix_timestamp);
-  ctx.accounts.sub_dao_epoch_info.staking_rewards_issued = staking_rewards_amount;
+  ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued = staking_rewards_amount;
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 

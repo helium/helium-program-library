@@ -32,12 +32,10 @@ import {
   withSignOffProposal,
   YesNoVote
 } from "@solana/spl-governance";
-import { getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction } from "@solana/spl-token";
+import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 import {
   Keypair,
-  PublicKey,
-  SYSVAR_CLOCK_PUBKEY,
-  TransactionInstruction
+  PublicKey, TransactionInstruction
 } from "@solana/web3.js";
 import chai, { expect } from "chai";
 import chaiAsPromised from "chai-as-promised";
@@ -45,9 +43,9 @@ import {
   init,
   nftVoteRecordKey,
   positionKey,
-  PROGRAM_ID,
-  voterWeightRecordKey
+  PROGRAM_ID
 } from "../packages/voter-stake-registry-sdk/src";
+import { getUnixTimestamp } from "./utils/solana";
 import { SPL_GOVERNANCE_PID } from "./utils/vsr";
 
 chai.use(chaiAsPromised);
@@ -68,12 +66,6 @@ describe("voter-stake-registry", () => {
   let programVersion: number;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
-
-  async function getUnixTimestamp(): Promise<bigint> {
-    const clock = await provider.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
-    const unixTime = clock!.data.readBigInt64LE(8 * 4);
-    return unixTime;
-  }
 
   beforeEach(async () => {
     program = await init(
@@ -126,7 +118,9 @@ describe("voter-stake-registry", () => {
       instruction: createRegistrar,
       pubkeys: { registrar: rkey },
     } = await program.methods
-      .initializeRegistrarV0()
+      .initializeRegistrarV0({
+        positionUpdateAuthority: null
+      })
       .accounts({
         realm: realm,
         realmGoverningTokenMint: hntMint,
@@ -136,7 +130,7 @@ describe("voter-stake-registry", () => {
     instructions.push(createRegistrar);
 
     // Configure voting mint
-    const oneWeekFromNow = Number(await getUnixTimestamp()) + 60 * 60 * 24 * 7;
+    const oneWeekFromNow = Number(await getUnixTimestamp(provider)) + 60 * 60 * 24 * 7;
     instructions.push(
       await program.methods
         .configureVotingMintV0({

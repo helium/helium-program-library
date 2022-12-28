@@ -66,7 +66,7 @@ export async function initTestSubdao(
   subDao: PublicKey;
   treasury: PublicKey;
   rewardsEscrow: PublicKey;
-  stakerPool: PublicKey;
+  delegatorPool: PublicKey;
   treasuryCircuitBreaker: PublicKey;
 }> {
   const daoAcc = await program.account.daoV0.fetch(dao);
@@ -112,7 +112,7 @@ export async function initTestSubdao(
         "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
       ), // Copied from mainnet to localnet
     });
-  const { treasury, treasuryCircuitBreaker, stakerPool } = await method.pubkeys();
+  const { treasury, treasuryCircuitBreaker, delegatorPool } = await method.pubkeys();
   await method.rpc();
 
   return {
@@ -121,6 +121,6 @@ export async function initTestSubdao(
     subDao: subDao!,
     treasury: treasury!,
     rewardsEscrow,
-    stakerPool: stakerPool!,
+    delegatorPool: delegatorPool!,
   };
 }

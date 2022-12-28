@@ -1,4 +1,5 @@
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
+import { daoKey } from "@helium/helium-sub-daos-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
@@ -15,15 +16,19 @@ import { AccountLayout } from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
   Keypair,
+  LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
-  LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import { BN } from "bn.js";
-import { assert, expect } from "chai";
+import chai, { assert, expect } from "chai";
+import chaiAsPromised from "chai-as-promised";
 import { init as dcInit } from "../packages/data-credits-sdk/src";
 import { init as issuerInit } from "../packages/helium-entity-manager-sdk/src";
-import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
+import {
+  currentEpoch,
+  heliumSubDaosResolvers,
+} from "../packages/helium-sub-daos-sdk/src";
 import { init as vsrInit } from "../packages/voter-stake-registry-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
@@ -35,7 +40,10 @@ import {
   ensureVSRIdl,
   initWorld,
 } from "./utils/fixtures";
+import { getUnixTimestamp } from "./utils/solana";
 import { createPosition, initVsr } from "./utils/vsr";
+
+chai.use(chaiAsPromised);
 
 const THREAD_PID = new PublicKey(
   "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
@@ -145,6 +153,7 @@ describe("helium-sub-daos", () => {
     let treasury: PublicKey;
     let dcMint: PublicKey;
     let rewardsEscrow: PublicKey;
+    let minLockupSeconds = 15811200; // 6 months
 
     async function burnDc(
       amount: number
@@ -190,7 +199,14 @@ describe("helium-sub-daos", () => {
         LAMPORTS_PER_SOL
       );
 
-      ({ registrar } = await initVsr(vsrProgram, provider, me, hntMint));
+      ({ registrar } = await initVsr(
+        vsrProgram,
+        provider,
+        me,
+        hntMint,
+        daoKey(hntMint)[0],
+        minLockupSeconds
+      ));
       ({
         dataCredits: { dcMint },
         subDao: { subDao, treasury, rewardsEscrow },
@@ -217,6 +233,51 @@ describe("helium-sub-daos", () => {
       expect(epochInfo.dcBurned.toNumber()).eq(toBN(10, 0).toNumber());
     });
 
+    describe("with no min lockup", () => {
+      before(() => {
+        minLockupSeconds = 0;
+      });
+
+      beforeEach(async () => {
+        console.log("star1");
+
+        ({ position, vault } = await createPosition(
+          vsrProgram,
+          provider,
+          registrar,
+          hntMint,
+          { lockupPeriods: 1, lockupAmount: 100 },
+          positionAuthorityKp
+        ));
+      });
+
+      it("updates the subdao vehnt to 0 when the final epoch passes", async () => {
+        const epoch = currentEpoch(
+          new BN(Number(await getUnixTimestamp(provider)))
+        );
+
+        await vsrProgram.methods
+          .setTimeOffsetV0(new BN(1 * 60 * 60 * 24))
+          .accounts({ registrar })
+          .rpc({ skipPreflight: true });
+        await program.methods
+          .calculateUtilityScoreV0({
+            epoch,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+          ])
+          .accounts({
+            subDao,
+            dao,
+          })
+          .rpc({ skipPreflight: true });
+
+        const subDaoAccount = await program.account.subDaoV0.fetch(subDao);
+        expect(subDaoAccount.vehntDelegated.toNumber()).eq(0);
+      });
+    });
+
     const vehntOptions = [
       {
         name: "Case 1",
@@ -236,8 +297,8 @@ describe("helium-sub-daos", () => {
           expectedMultiplier: 1 + ((183 * 4 - 183) / (365 * 4 - 183)) * 99,
         },
       },
-      // { name: "Case 3", options: {delay: 45000, lockupPeriods: 183*8, lockupAmount: 100, stakeAmount: 10000} },
-      // { name: "Case 4", options: {delay: 5000, lockupPeriods: 183*8, lockupAmount: 1000, stakeAmount: 10000} },
+      // { name: "Case 3", options: {delay: 45000, lockupPeriods: 183*8, lockupAmount: 100, delegateAmount: 10000} },
+      // { name: "Case 4", options: {delay: 5000, lockupPeriods: 183*8, lockupAmount: 1000, delegateAmount: 10000} },
     ];
 
     vehntOptions.forEach(function ({ name, options }) {
@@ -253,33 +314,32 @@ describe("helium-sub-daos", () => {
           ));
         });
 
-        it("allows vehnt staking", async () => {
+        it("allows vehnt delegation", async () => {
           const lockupAmount = toBN(options.lockupAmount, 8);
           const method = program.methods
-            .stakeV0()
+            .delegateV0()
             .accounts({
               position,
               subDao,
               positionAuthority: positionAuthorityKp.publicKey,
             })
             .signers([positionAuthorityKp]);
-          const { stakePosition, thread } = await method.pubkeys();
+          const { delegatedPosition } = await method.pubkeys();
           await method.rpc();
 
-          const acc = await program.account.stakePositionV0.fetch(
-            stakePosition!
+          const acc = await program.account.delegatedPositionV0.fetch(
+            delegatedPosition!
           );
           const sdAcc = await program.account.subDaoV0.fetch(subDao);
 
           const expectedVeHnt =
             options.lockupAmount * options.expectedMultiplier;
-          expectBnAccuracy(toBN(expectedVeHnt, 8), sdAcc.vehntStaked, 0.001);
+          expectBnAccuracy(toBN(expectedVeHnt, 8), sdAcc.vehntDelegated, 0.001);
           expectBnAccuracy(lockupAmount, acc.hntAmount, 0.001);
           const expectedFallRate = toBN(expectedVeHnt, 8 + 12).div(
             toBN(options.lockupPeriods * 60 * 60 * 24, 0)
           );
           expectBnAccuracy(expectedFallRate, acc.fallRate, 0.001);
-          assert.isTrue(!!(await provider.connection.getAccountInfo(thread!)));
         });
 
         function expectBnAccuracy(
@@ -309,9 +369,9 @@ describe("helium-sub-daos", () => {
             await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
           ).epoch;
 
-          // stake some vehnt
+          // delegate some vehnt
           await program.methods
-            .stakeV0()
+            .delegateV0()
             .accounts({
               position,
               subDao,
@@ -375,10 +435,46 @@ describe("helium-sub-daos", () => {
           );
         });
 
-        describe("with staked vehnt", () => {
+        it("allows transfers", async () => {
+          const { position: newPos } = await createPosition(
+            vsrProgram,
+            provider,
+            registrar,
+            hntMint,
+            options,
+            positionAuthorityKp
+          );
+          await program.methods
+            .transferV0({ amount: toBN(10, 8) })
+            .accounts({
+              sourcePosition: position,
+              targetPosition: newPos,
+              depositMint: hntMint,
+              positionAuthority: positionAuthorityKp.publicKey,
+            })
+            .signers([positionAuthorityKp])
+            .rpc();
+        });
+
+        it("allows lockup resets", async () => {
+          await program.methods
+            .resetLockupV0({
+              kind: { constant: {} },
+              periods: 182 * 4,
+            })
+            .accounts({
+              dao,
+              position: position,
+              positionAuthority: positionAuthorityKp.publicKey,
+            })
+            .signers([positionAuthorityKp])
+            .rpc();
+        });
+
+        describe("with delegated vehnt", () => {
           beforeEach(async () => {
             await program.methods
-              .stakeV0()
+              .delegateV0()
               .accounts({
                 position,
                 subDao,
@@ -388,10 +484,54 @@ describe("helium-sub-daos", () => {
               .rpc({ skipPreflight: true });
           });
 
-          it("allows closing stake", async () => {
+          it("does not allow transfers", async () => {
+            const { position: newPos } = await createPosition(
+              vsrProgram,
+              provider,
+              registrar,
+              hntMint,
+              options,
+              positionAuthorityKp
+            );
+            await expect(
+              program.methods
+                .transferV0({ amount: toBN(10, 8) })
+                .accounts({
+                  sourcePosition: position,
+                  targetPosition: newPos,
+                  depositMint: hntMint,
+                  positionAuthority: positionAuthorityKp.publicKey,
+                })
+                .signers([positionAuthorityKp])
+                .rpc()
+            ).to.eventually.be.rejectedWith(
+              "AnchorError caused by account: source_delegated_position. Error Code: PositionChangeWhileDelegated. Error Number: 6014. Error Message: Cannot change a position while it is delegated."
+            );
+          });
+
+          it("does not allow lockup resets", async () => {
+            await expect(
+              program.methods
+                .resetLockupV0({
+                  kind: { constant: {} },
+                  periods: 182 * 4,
+                })
+                .accounts({
+                  dao,
+                  position: position,
+                  positionAuthority: positionAuthorityKp.publicKey,
+                })
+                .signers([positionAuthorityKp])
+                .rpc()
+            ).to.eventually.be.rejectedWith(
+              "AnchorError caused by account: delegated_position. Error Code: PositionChangeWhileDelegated. Error Number: 6014. Error Message: Cannot change a position while it is delegated."
+            );
+          });
+
+          it("allows closing delegate", async () => {
             await sleep(options.delay);
             const method = program.methods
-              .closeStakeV0()
+              .closeDelegationV0()
               .accounts({
                 position,
                 subDao,
@@ -399,83 +539,22 @@ describe("helium-sub-daos", () => {
               })
               .signers([positionAuthorityKp]);
 
-            const { stakePosition } = await method.pubkeys();
+            const { delegatedPosition, subDaoEpochInfo } =
+              await method.pubkeys();
+            const sed = await program.account.subDaoEpochInfoV0.fetch(
+              subDaoEpochInfo!
+            );
+            console.log(sed.fallRatesFromClosingPositions.toNumber());
+            console.log(sed.vehntInClosingPositions.toNumber());
             await method.rpc({ skipPreflight: true });
 
             const sdAcc = await program.account.subDaoV0.fetch(subDao);
-            let st = sdAcc.vehntStaked.toNumber();
+            let st = sdAcc.vehntDelegated.toNumber();
             expect(sdAcc.vehntFallRate.toNumber()).to.eq(0);
             expect(st).to.be.lte(1);
             assert.isFalse(
-              !!(await provider.connection.getAccountInfo(stakePosition!))
+              !!(await provider.connection.getAccountInfo(delegatedPosition!))
             );
-          });
-
-          it("purge a position", async () => {
-            await vsrProgram.methods
-              .setTimeOffsetV0(
-                new BN((options.lockupPeriods + 1) * 60 * 60 * 24)
-              )
-              .accounts({ registrar })
-              .rpc({ skipPreflight: true });
-            const method = program.methods.purgePositionV0().accounts({
-              position,
-              subDao,
-            });
-            await method.rpc({ skipPreflight: true });
-            const { stakePosition } = await method.pubkeys();
-
-            let acc = await program.account.stakePositionV0.fetch(
-              stakePosition!
-            );
-            expect(acc.purged).to.be.true;
-            let subDaoAcc = await program.account.subDaoV0.fetch(subDao);
-            expect(subDaoAcc.vehntFallRate.toNumber()).to.eq(0);
-            expect(subDaoAcc.vehntStaked.toNumber()).to.eq(0);
-          });
-
-          it("refreshes a position", async () => {
-            await vsrProgram.methods
-              .depositV0({
-                amount: toBN(options.lockupAmount, 8),
-              })
-              .accounts({
-                registrar,
-                position,
-                mint: hntMint,
-              })
-              .rpc({ skipPreflight: true });
-
-            const {
-              pubkeys: { stakePosition },
-            } = await program.methods
-              .refreshPositionV0()
-              .accounts({
-                registrar,
-                subDao,
-                position,
-              })
-              .rpcAndKeys({ skipPreflight: true });
-
-            const acc = await program.account.stakePositionV0.fetch(
-              stakePosition!
-            );
-            expect(acc.hntAmount.toNumber()).to.eq(
-              toBN(options.lockupAmount * 2, 8).toNumber()
-            );
-            const expectedVeHnt =
-              2 * options.lockupAmount * options.expectedMultiplier;
-            const expectedFallRate = toBN(expectedVeHnt, 8 + 12).div(
-              toBN(options.lockupPeriods * 60 * 60 * 24, 0)
-            );
-            expectBnAccuracy(expectedFallRate, acc.fallRate, 0.001);
-            const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
-            expectBnAccuracy(
-              toBN(options.lockupAmount * 2 * options.expectedMultiplier, 8),
-              subDaoAcc.vehntStaked,
-              0.01
-            );
-            expectBnAccuracy(expectedFallRate, subDaoAcc.vehntFallRate, 0.001);
           });
 
           describe("with calculated rewards", () => {
@@ -571,11 +650,11 @@ describe("helium-sub-daos", () => {
                   positionAuthority: positionAuthorityKp.publicKey,
                 })
                 .signers([positionAuthorityKp]);
-              const { stakerAta } = await method.pubkeys();
+              const { delegatorAta } = await method.pubkeys();
               await method.rpc({ skipPreflight: true });
 
               const postAtaBalance = AccountLayout.decode(
-                (await provider.connection.getAccountInfo(stakerAta!))?.data!
+                (await provider.connection.getAccountInfo(delegatorAta!))?.data!
               ).amount;
               expect(Number(postAtaBalance)).to.be.within(
                 (SUB_DAO_EPOCH_REWARDS * 6) / 100 - 5,
