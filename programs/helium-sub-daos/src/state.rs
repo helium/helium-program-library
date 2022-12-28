@@ -47,6 +47,7 @@ pub struct DaoV0 {
   pub hnt_mint: Pubkey,
   pub dc_mint: Pubkey,
   pub authority: Pubkey,
+  pub registrar: Pubkey, // vsr registrar
   pub num_sub_daos: u32,
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub bump_seed: u8,
@@ -73,7 +74,7 @@ pub struct StakePositionV0 {
   pub hnt_amount: u64,
   pub sub_dao: Pubkey,
   pub last_claimed_epoch: u64, // the epoch number that the dnt rewards were last claimed at
-  pub fall_rate: u64,          // the vehnt amount that the position decays by per second
+  pub fall_rate: u128, // the vehnt amount that the position decays by per second, with 12 decimals of extra precision
   pub expiry_ts: i64,
   pub purged: bool, // if true, this position has been removed from subdao calculations. rewards can still be claimed.
   pub bump_seed: u8,
@@ -101,9 +102,9 @@ pub struct SubDaoV0 {
   pub treasury: Pubkey,       // Treasury of HNT
   pub rewards_escrow: Pubkey, // Escrow account for DNT rewards
   pub staker_pool: Pubkey,    // Pool of DNT tokens which veHNT stakers can claim from
-  pub vehnt_staked: u64,
+  pub vehnt_staked: i128, // This can go negative if a position isn't purged in time and so the fall rate is over-applied. Then corrected in purge_position_v0
   pub vehnt_last_calculated_ts: i64,
-  pub vehnt_fall_rate: u64,
+  pub vehnt_fall_rate: u128, // the vehnt amount that the position decays by per second, with 12 decimals of extra precision
   pub authority: Pubkey,
   pub active_device_aggregator: Pubkey,
   pub dc_burn_authority: Pubkey, // Authority to burn data delegated data credits

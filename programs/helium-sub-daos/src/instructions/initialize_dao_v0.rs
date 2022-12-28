@@ -13,6 +13,7 @@ use circuit_breaker::{ThresholdType, WindowedCircuitBreakerConfigV0};
 pub struct InitializeDaoArgsV0 {
   pub authority: Pubkey,
   pub emission_schedule: Vec<EmissionScheduleItem>,
+  pub registrar: Pubkey,
 }
 
 #[derive(Accounts)]
@@ -96,6 +97,7 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
     authority: args.authority,
     num_sub_daos: 0,
     emission_schedule: args.emission_schedule,
+    registrar: args.registrar,
     bump_seed: ctx.bumps["dao"],
   });
 

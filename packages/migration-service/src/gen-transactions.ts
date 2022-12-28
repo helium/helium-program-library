@@ -7,6 +7,7 @@ import {
   iotInfoKey,
   PROGRAM_ID as HEM_PROGRAM_ID,
 } from "@helium/helium-entity-manager-sdk";
+import { init as initVsr, registrarKey } from "@helium/voter-stake-registry-sdk";
 import {
   subDaoKey
 } from "@helium/helium-sub-daos-sdk";
@@ -29,6 +30,7 @@ import {
 } from "@solana/spl-token";
 import {
   AddressLookupTableProgram,
+  Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
@@ -127,6 +129,7 @@ async function run() {
 
   const hemProgram = await initHem(provider);
   const lazyTransactionsProgram = await init(provider);
+  const vsrProgram = await initVsr(provider);
 
   // For speed
   const hemProgramNoResolve = new Program<HeliumEntityManager>(
@@ -217,6 +220,7 @@ async function run() {
   // Keep track of balances so we can send that balance to the lazy signer
   const totalBalances = {
     hnt: new BN(0),
+    stakedHnt: new BN(0),
     mobile: new BN(0),
     dc: new BN(0),
     sol: new BN(0),
@@ -224,6 +228,7 @@ async function run() {
   // Keep track of unresolved balances so we can reserve them for later;
   const unresolvedBalances = {
     hnt: new BN(0),
+    stakedHnt: new BN(0),
     mobile: new BN(0),
     dc: new BN(0),
   };
@@ -242,6 +247,8 @@ async function run() {
   let ix = 0;
   let txIdx = 0;
   const txIdsToWallet = {};
+
+  const registrar = registrarKey(new PublicKey(argv.realm), hnt)[0];
 
   /// Iterate through accounts in order so we don't create 1mm promises.
   for (const [address, account] of Object.entries(accounts)) {
@@ -325,7 +332,39 @@ async function run() {
       );
       totalBalances.sol = totalBalances.sol.add(dustAmountBn);
 
-      const ixnGroups = [tokenIxs, ...chunks(hotspotIxs, 2)].filter(
+      const stakedHnt = new BN(account.staked_hnt);
+      const mintKeypair = Keypair.generate();
+      const stakedInstructions = [];
+      if (stakedHnt.gt(new BN(0))) {
+        const { instruction: createPosition, pubkeys: { position } } = await vsrProgram.methods
+          .initializePositionV0({
+            kind: { constant: {} },
+            periods: 183, // 6 months
+          })
+          .accounts({
+            registrar,
+            mint: mintKeypair.publicKey,
+            depositMint: hnt,
+            positionAuthority: solAddress,
+            payer: lazySigner,
+          })
+          .prepare();
+        const depositPosition = await vsrProgram.methods
+          .depositV0({
+            amount: stakedHnt,
+          })
+          .accounts({
+            position,
+            mint: hnt,
+            depositAuthority: lazySigner
+          })
+          .instruction();
+
+        totalBalances.stakedHnt = totalBalances.stakedHnt.add(stakedHnt);
+        stakedInstructions.push(createPosition, depositPosition);
+      }
+
+      const ixnGroups = [tokenIxs, stakedInstructions, ...chunks(hotspotIxs, 2)].filter(
         (ixGroup) => ixGroup.length > 0
       );
 
@@ -347,6 +386,7 @@ async function run() {
       unresolvedBalances.mobile = unresolvedBalances.mobile.add(
         new BN(account.mobile)
       );
+      unresolvedBalances.stakedHnt = unresolvedBalances.stakedHnt.add(new BN(account.staked_hnt));
     }
 
     if (argv.progress) {
@@ -460,6 +500,7 @@ async function run() {
 
   console.log(`Lazy transactions signer ${lazySigner} needs:
     HNT: ${totalBalances.hnt.toString()}
+    STAKED HNT: ${totalBalances.stakedHnt.toString()}
     DC: ${totalBalances.dc.toString()}
     MOBILE: ${totalBalances.mobile.toString()}
     SOL: ${totalBalances.sol

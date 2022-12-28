@@ -16,7 +16,8 @@ export async function initTestDao(
   epochRewards: number,
   authority: PublicKey,
   dcMint?: PublicKey,
-  mint?: PublicKey
+  mint?: PublicKey,
+  registrar?: PublicKey
 ): Promise<{
   mint: PublicKey;
   dao: PublicKey;
@@ -32,6 +33,7 @@ export async function initTestDao(
 
   const method = await program.methods
     .initializeDaoV0({
+      registrar: registrar || PublicKey.default,
       authority: authority,
       emissionSchedule: [
         {

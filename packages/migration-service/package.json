@@ -38,6 +38,7 @@
     "@helium/crypto": "^4.6.2",
     "@helium/data-credits-sdk": "^0.0.10",
     "@helium/distributor-oracle": "^0.0.10",
+    "@helium/voter-stake-registry-sdk": "^0.0.10",
     "@helium/helium-entity-manager-sdk": "^0.0.10",
     "@helium/helium-sub-daos-sdk": "^0.0.10",
     "@helium/lazy-distributor-sdk": "^0.0.10",

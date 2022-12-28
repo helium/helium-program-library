@@ -136,6 +136,7 @@
         const method = await hsdProgram.methods
           .initializeDaoV0({
             authority: me,
+            registrar: PublicKey.default,
             emissionSchedule: [
               {
                 startUnixTime: new anchor.BN(0),

@@ -187,7 +187,7 @@ pub fn handler(
     .unwrap();
   let sub_dao = &mut ctx.accounts.sub_dao;
   update_subdao_vehnt(sub_dao, epoch_end_ts);
-  epoch_info.total_vehnt = sub_dao.vehnt_staked;
+  epoch_info.total_vehnt = u64::try_from(std::cmp::max(sub_dao.vehnt_staked, 0)).unwrap();
 
   let dc_burned = PreciseNumber::new(epoch_info.dc_burned.into())
     .or_arith_error()?

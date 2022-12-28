@@ -42,7 +42,7 @@ pub struct RelinquishVoteV0<'info> {
             owner = registrar.load()?.governance_program_id
          )]
   /// CHECK: Owned by spl-governance instance specified in registrar.governance_program_id
-  voter_token_owner_record: UncheckedAccount<'info>,
+  pub voter_token_owner_record: UncheckedAccount<'info>,
 
   /// Authority of the voter who cast the original vote
   /// It can be either governing_token_owner or its delegate and must sign this instruction
@@ -133,7 +133,7 @@ pub fn handler(ctx: Context<RelinquishVoteV0>) -> Result<()> {
       &governing_token_owner,
     )?;
 
-    dispose_account(nft_vote_record_info, &ctx.accounts.beneficiary);
+    dispose_account(nft_vote_record_info, &ctx.accounts.beneficiary)?;
 
     let position_acc = &mut PositionV0::try_deserialize(&mut position.data.borrow().as_ref())?;
     require!(

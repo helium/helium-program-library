@@ -35,7 +35,7 @@ pub fn update_subdao_vehnt(sub_dao: &mut SubDaoV0, curr_ts: i64) {
     return;
   }
 
-  let fall: u64 = PreciseNumber::new(sub_dao.vehnt_fall_rate.into())
+  let fall: u64 = PreciseNumber::new(sub_dao.vehnt_fall_rate)
     .unwrap()
     .checked_mul(
       &PreciseNumber::new(
@@ -56,7 +56,7 @@ pub fn update_subdao_vehnt(sub_dao: &mut SubDaoV0, curr_ts: i64) {
     .ok()
     .unwrap();
 
-  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(fall).unwrap();
+  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(i128::from(fall)).unwrap();
   sub_dao.vehnt_last_calculated_ts = curr_ts;
 }
 
@@ -78,14 +78,10 @@ pub fn create_cron(execution_ts: i64, offset: i64) -> String {
 
 pub const FALL_RATE_FACTOR: u128 = 1_000_000_000_000;
 
-pub fn calculate_fall_rate(curr_vp: u64, future_vp: u64, num_seconds: u64) -> Option<u64> {
+pub fn calculate_fall_rate(curr_vp: u64, future_vp: u64, num_seconds: u64) -> Option<u128> {
   let diff: u128 = u128::from(curr_vp.checked_sub(future_vp).unwrap())
     .checked_mul(FALL_RATE_FACTOR)
     .unwrap(); // add decimals of precision for fall rate calculation
 
-  diff
-    .checked_div(num_seconds.into())
-    .unwrap()
-    .try_into()
-    .ok()
+  diff.checked_div(num_seconds.into())
 }

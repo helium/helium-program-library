@@ -4479,9 +4479,9 @@ dependencies = [
 
 [[package]]
 name = "spl-governance"
-version = "2.2.4"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ab3e781972cd03348c14217739ddf946ab5324c32a85392237cf3ab9492df7a"
+checksum = "e0e20402049d3c185837f4d97aa005b83f8d5e8c6a54ddc6ba800dbe82e736e8"
 dependencies = [
  "arrayref",
  "bincode",
@@ -4499,9 +4499,9 @@ dependencies = [
 
 [[package]]
 name = "spl-governance-addin-api"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5df620226aed88689457ef18a80dfed709721365bee0bf8c843dcef30279d5fc"
+checksum = "1e0feddb2c7efa42f39954e3bb1b0bfc6dc7e9292ca467eff40ecd934c14106b"
 dependencies = [
  "borsh",
  "solana-program",
@@ -4510,9 +4510,9 @@ dependencies = [
 
 [[package]]
 name = "spl-governance-tools"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a206f0837415046d919f3075d6b3af9bd3f1f707c887898c335a6210b194627"
+checksum = "3bd674d9e8f3fc9ea628dcbe56d48991ea1cb05b994a7845782572c705efd836"
 dependencies = [
  "arrayref",
  "bincode",

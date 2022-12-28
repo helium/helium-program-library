@@ -1,8 +1,14 @@
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
-import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
-import { sendInstructions, toBN } from "@helium/spl-utils";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import {
+  createAtaAndMint,
+  createAtaAndTransfer,
+  createMint,
+  sendInstructions,
+  toBN,
+} from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { AccountLayout } from "@solana/spl-token";
@@ -10,28 +16,36 @@ import {
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
-  SystemProgram
+  SystemProgram,
+  LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import { BN } from "bn.js";
 import { assert, expect } from "chai";
-import { init as vsrInit } from "../packages/voter-stake-registry-sdk/src";
 import { init as dcInit } from "../packages/data-credits-sdk/src";
 import { init as issuerInit } from "../packages/helium-entity-manager-sdk/src";
-import { heliumSubDaosResolvers, stakePositionKey } from "../packages/helium-sub-daos-sdk/src";
+import { heliumSubDaosResolvers } from "../packages/helium-sub-daos-sdk/src";
+import { init as vsrInit } from "../packages/voter-stake-registry-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { burnDataCredits } from "./data-credits";
 import { initTestDao, initTestSubdao } from "./utils/daos";
-import { ensureDCIdl, ensureHSDIdl, ensureVSRIdl, initWorld } from "./utils/fixtures";
-import { initVsr } from "./utils/vsr";
+import {
+  ensureDCIdl,
+  ensureHSDIdl,
+  ensureVSRIdl,
+  initWorld,
+} from "./utils/fixtures";
+import { createPosition, initVsr } from "./utils/vsr";
 
-const THREAD_PID = new PublicKey("3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv");
+const THREAD_PID = new PublicKey(
+  "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
+);
 
 const EPOCH_REWARDS = 100000000;
 const SUB_DAO_EPOCH_REWARDS = 10000000;
 
 function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 describe("helium-sub-daos", () => {
@@ -90,24 +104,32 @@ describe("helium-sub-daos", () => {
   });
 
   it("initializes a dao", async () => {
-    const { dao, mint } = await initTestDao(program, provider, EPOCH_REWARDS, provider.wallet.publicKey);
+    const { dao, mint } = await initTestDao(
+      program,
+      provider,
+      EPOCH_REWARDS,
+      provider.wallet.publicKey
+    );
     const account = await program.account.daoV0.fetch(dao!);
     expect(account.authority.toBase58()).eq(me.toBase58());
     expect(account.hntMint.toBase58()).eq(mint.toBase58());
   });
 
   it("initializes a subdao", async () => {
-    const { dao } = await initTestDao(program, provider, EPOCH_REWARDS, provider.wallet.publicKey);
+    const { dao } = await initTestDao(
+      program,
+      provider,
+      EPOCH_REWARDS,
+      provider.wallet.publicKey
+    );
     const { subDao, treasury, mint, treasuryCircuitBreaker } =
-      await initTestSubdao(
-        program,
-        provider,
-        provider.wallet.publicKey,
-        dao,
-      );
+      await initTestSubdao(program, provider, provider.wallet.publicKey, dao);
 
     const account = await program.account.subDaoV0.fetch(subDao!);
-    const breaker = await cbProgram.account.accountWindowedCircuitBreakerV0.fetch(treasuryCircuitBreaker);
+    const breaker =
+      await cbProgram.account.accountWindowedCircuitBreakerV0.fetch(
+        treasuryCircuitBreaker
+      );
 
     // @ts-ignore
     expect(Boolean(breaker.config.thresholdType.absolute)).to.be.true;
@@ -153,8 +175,24 @@ describe("helium-sub-daos", () => {
     }
 
     beforeEach(async () => {
+      positionAuthorityKp = Keypair.generate();
+      hntMint = await createMint(provider, 8, me, me);
+      await createAtaAndMint(provider, hntMint, toBN(10000000000, 8));
+      await createAtaAndTransfer(
+        provider,
+        hntMint,
+        toBN(1000, 8),
+        me,
+        positionAuthorityKp.publicKey
+      );
+      await provider.connection.requestAirdrop(
+        positionAuthorityKp.publicKey,
+        LAMPORTS_PER_SOL
+      );
+
+      ({ registrar } = await initVsr(vsrProgram, provider, me, hntMint));
       ({
-        dataCredits: { dcMint, hntMint },
+        dataCredits: { dcMint },
         subDao: { subDao, treasury, rewardsEscrow },
         dao: { dao },
       } = await initWorld(
@@ -163,9 +201,10 @@ describe("helium-sub-daos", () => {
         program,
         dcProgram,
         EPOCH_REWARDS,
-        SUB_DAO_EPOCH_REWARDS
+        SUB_DAO_EPOCH_REWARDS,
+        registrar,
+        hntMint
       ));
-
     });
 
     it("allows tracking dc spend", async () => {
@@ -174,7 +213,7 @@ describe("helium-sub-daos", () => {
       const epochInfo = await program.account.subDaoEpochInfoV0.fetch(
         subDaoEpochInfo
       );
-      
+
       expect(epochInfo.dcBurned.toNumber()).eq(toBN(10, 0).toNumber());
     });
 
@@ -185,7 +224,7 @@ describe("helium-sub-daos", () => {
           delay: 1000,
           lockupPeriods: 183,
           lockupAmount: 100,
-          expectedMultiplier: 1
+          expectedMultiplier: 1,
         },
       },
       {
@@ -194,22 +233,28 @@ describe("helium-sub-daos", () => {
           delay: 15000,
           lockupPeriods: 183 * 4,
           lockupAmount: 50,
-          expectedMultiplier: 1 + ((183 * 4 - 183) / (365 * 4 - 183)) * 99
+          expectedMultiplier: 1 + ((183 * 4 - 183) / (365 * 4 - 183)) * 99,
         },
       },
       // { name: "Case 3", options: {delay: 45000, lockupPeriods: 183*8, lockupAmount: 100, stakeAmount: 10000} },
       // { name: "Case 4", options: {delay: 5000, lockupPeriods: 183*8, lockupAmount: 1000, stakeAmount: 10000} },
     ];
 
-    vehntOptions.forEach(function ({name, options}) {
+    vehntOptions.forEach(function ({ name, options }) {
       describe("vehnt tests - " + name, () => {
-        beforeEach(async() => {
-          positionAuthorityKp = Keypair.generate();
-          ({registrar, position, vault} = await initVsr(vsrProgram, provider, me, hntMint, positionAuthorityKp, options ));
-        })
+        beforeEach(async () => {
+          ({ position, vault } = await createPosition(
+            vsrProgram,
+            provider,
+            registrar,
+            hntMint,
+            options,
+            positionAuthorityKp
+          ));
+        });
 
         it("allows vehnt staking", async () => {
-          const lockupAmount = toBN(options.lockupAmount,8);
+          const lockupAmount = toBN(options.lockupAmount, 8);
           const method = program.methods
             .stakeV0()
             .accounts({
@@ -221,19 +266,22 @@ describe("helium-sub-daos", () => {
           const { stakePosition, thread } = await method.pubkeys();
           await method.rpc();
 
-          const acc = await program.account.stakePositionV0.fetch(stakePosition!);
+          const acc = await program.account.stakePositionV0.fetch(
+            stakePosition!
+          );
           const sdAcc = await program.account.subDaoV0.fetch(subDao);
 
-          expectBnAccuracy(
-            toBN(options.lockupAmount * options.expectedMultiplier, 8),
-            sdAcc.vehntStaked,
-            0.001
-          );
+          const expectedVeHnt =
+            options.lockupAmount * options.expectedMultiplier;
+          expectBnAccuracy(toBN(expectedVeHnt, 8), sdAcc.vehntStaked, 0.001);
           expectBnAccuracy(lockupAmount, acc.hntAmount, 0.001);
-          assert.isTrue(acc.fallRate.gt(new anchor.BN(0)))
+          const expectedFallRate = toBN(expectedVeHnt, 8 + 12).div(
+            toBN(options.lockupPeriods * 60 * 60 * 24, 0)
+          );
+          expectBnAccuracy(expectedFallRate, acc.fallRate, 0.001);
           assert.isTrue(!!(await provider.connection.getAccountInfo(thread!)));
         });
-    
+
         function expectBnAccuracy(
           expectedBn: anchor.BN,
           actualBn: anchor.BN,
@@ -254,21 +302,24 @@ describe("helium-sub-daos", () => {
             throw e;
           }
         }
-    
+
         it("calculates subdao rewards", async () => {
           const { subDaoEpochInfo } = await burnDc(1600000);
-            const epoch = (
-                await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
-            ).epoch;
+          const epoch = (
+            await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+          ).epoch;
 
-          
           // stake some vehnt
-          await program.methods.stakeV0().accounts({
-            position,
-            subDao,
-            positionAuthority: positionAuthorityKp.publicKey,
-          }).signers([positionAuthorityKp]).rpc({skipPreflight: true});
-          
+          await program.methods
+            .stakeV0()
+            .accounts({
+              position,
+              subDao,
+              positionAuthority: positionAuthorityKp.publicKey,
+            })
+            .signers([positionAuthorityKp])
+            .rpc({ skipPreflight: true });
+
           const instr = program.methods
             .calculateUtilityScoreV0({
               epoch,
@@ -282,13 +333,20 @@ describe("helium-sub-daos", () => {
             });
 
           const pubkeys = await instr.pubkeys();
-          const sig = await instr.rpc({ skipPreflight: true, commitment: "confirmed" });
-          const resp = await provider.connection.getTransaction(sig, { commitment: "confirmed" });
-          
-          const currentActiveDeviceCount = Number(resp?.meta?.logMessages
-            ?.find((m) => m.includes("Total devices"))
-            ?.replace("Program log: Total devices: ", "")
-            .split(".")[0]!);
+          const sig = await instr.rpc({
+            skipPreflight: true,
+            commitment: "confirmed",
+          });
+          const resp = await provider.connection.getTransaction(sig, {
+            commitment: "confirmed",
+          });
+
+          const currentActiveDeviceCount = Number(
+            resp?.meta?.logMessages
+              ?.find((m) => m.includes("Total devices"))
+              ?.replace("Program log: Total devices: ", "")
+              .split(".")[0]!
+          );
           console.log(currentActiveDeviceCount);
 
           const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
@@ -300,14 +358,25 @@ describe("helium-sub-daos", () => {
 
           expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
 
-          const totalUtility = Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1/4) * (options.lockupAmount * options.expectedMultiplier);
+          const totalUtility =
+            Math.sqrt(currentActiveDeviceCount * 50) *
+            Math.pow(16, 1 / 4) *
+            (options.lockupAmount * options.expectedMultiplier);
 
-          expectBnAccuracy(toBN(totalUtility, 12), daoInfo.totalUtilityScore, 0.01);
-          expectBnAccuracy(toBN(totalUtility, 12), subDaoInfo.utilityScore!, 0.01);
+          expectBnAccuracy(
+            toBN(totalUtility, 12),
+            daoInfo.totalUtilityScore,
+            0.01
+          );
+          expectBnAccuracy(
+            toBN(totalUtility, 12),
+            subDaoInfo.utilityScore!,
+            0.01
+          );
         });
-    
+
         describe("with staked vehnt", () => {
-          beforeEach(async() => {
+          beforeEach(async () => {
             await program.methods
               .stakeV0()
               .accounts({
@@ -317,8 +386,8 @@ describe("helium-sub-daos", () => {
               })
               .signers([positionAuthorityKp])
               .rpc({ skipPreflight: true });
-          })
-    
+          });
+
           it("allows closing stake", async () => {
             await sleep(options.delay);
             const method = program.methods
@@ -331,40 +400,52 @@ describe("helium-sub-daos", () => {
               .signers([positionAuthorityKp]);
 
             const { stakePosition } = await method.pubkeys();
-            await method.rpc({skipPreflight: true});
-    
+            await method.rpc({ skipPreflight: true });
+
             const sdAcc = await program.account.subDaoV0.fetch(subDao);
             let st = sdAcc.vehntStaked.toNumber();
             expect(sdAcc.vehntFallRate.toNumber()).to.eq(0);
-            assert.isTrue(st == 0 || st == 1)
-            assert.isFalse(!!(await provider.connection.getAccountInfo(stakePosition!)));
+            expect(st).to.be.lte(1);
+            assert.isFalse(
+              !!(await provider.connection.getAccountInfo(stakePosition!))
+            );
           });
-    
+
           it("purge a position", async () => {
-            const method = program.methods
-              .purgePositionV0()
-              .accounts({
-                position,
-                subDao,
-              })
-            await method.rpc();
-            const { stakePosition } = await method.pubkeys();
-    
-            let acc = await program.account.stakePositionV0.fetch(stakePosition!);
-            assert.isTrue(acc.purged);
-            let subDaoAcc = await program.account.subDaoV0.fetch(subDao);
-            assert.equal(subDaoAcc.vehntFallRate.toNumber(), 0);
-          });
-    
-          it("refreshes a position", async () => {
-            await vsrProgram.methods.depositV0({
-              amount: toBN(options.lockupAmount, 8)
-            }).accounts({
-              registrar,
+            await vsrProgram.methods
+              .setTimeOffsetV0(
+                new BN((options.lockupPeriods + 1) * 60 * 60 * 24)
+              )
+              .accounts({ registrar })
+              .rpc({ skipPreflight: true });
+            const method = program.methods.purgePositionV0().accounts({
               position,
-              mint: hntMint
-            }).rpc({skipPreflight: true});
-    
+              subDao,
+            });
+            await method.rpc({ skipPreflight: true });
+            const { stakePosition } = await method.pubkeys();
+
+            let acc = await program.account.stakePositionV0.fetch(
+              stakePosition!
+            );
+            expect(acc.purged).to.be.true;
+            let subDaoAcc = await program.account.subDaoV0.fetch(subDao);
+            expect(subDaoAcc.vehntFallRate.toNumber()).to.eq(0);
+            expect(subDaoAcc.vehntStaked.toNumber()).to.eq(0);
+          });
+
+          it("refreshes a position", async () => {
+            await vsrProgram.methods
+              .depositV0({
+                amount: toBN(options.lockupAmount, 8),
+              })
+              .accounts({
+                registrar,
+                position,
+                mint: hntMint,
+              })
+              .rpc({ skipPreflight: true });
+
             const {
               pubkeys: { stakePosition },
             } = await program.methods
@@ -372,7 +453,7 @@ describe("helium-sub-daos", () => {
               .accounts({
                 registrar,
                 subDao,
-                position
+                position,
               })
               .rpcAndKeys({ skipPreflight: true });
 
@@ -382,28 +463,39 @@ describe("helium-sub-daos", () => {
             expect(acc.hntAmount.toNumber()).to.eq(
               toBN(options.lockupAmount * 2, 8).toNumber()
             );
-            expect(acc.fallRate.toNumber()).to.be.gt(0);
+            const expectedVeHnt =
+              2 * options.lockupAmount * options.expectedMultiplier;
+            const expectedFallRate = toBN(expectedVeHnt, 8 + 12).div(
+              toBN(options.lockupPeriods * 60 * 60 * 24, 0)
+            );
+            expectBnAccuracy(expectedFallRate, acc.fallRate, 0.001);
             const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
             expectBnAccuracy(
               toBN(options.lockupAmount * 2 * options.expectedMultiplier, 8),
               subDaoAcc.vehntStaked,
               0.01
             );
-            expect(subDaoAcc.vehntFallRate.toNumber()).to.be.gt(0);
+            expectBnAccuracy(expectedFallRate, subDaoAcc.vehntFallRate, 0.001);
           });
-          
+
           describe("with calculated rewards", () => {
             let epoch: anchor.BN;
             let subDaoEpochInfo: PublicKey;
-      
+
             beforeEach(async () => {
               ({ subDaoEpochInfo } = await burnDc(1600000));
-              epoch = (await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo))
-                .epoch;
+              epoch = (
+                await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+              ).epoch;
 
-              const thread = PublicKey.findProgramAddressSync([
-                Buffer.from("thread", "utf8"), subDao.toBuffer(), Buffer.from("end-epoch", "utf8")
-              ], THREAD_PID)[0];
+              const thread = PublicKey.findProgramAddressSync(
+                [
+                  Buffer.from("thread", "utf8"),
+                  subDao.toBuffer(),
+                  Buffer.from("end-epoch", "utf8"),
+                ],
+                THREAD_PID
+              )[0];
 
               await program.methods
                 .calculateUtilityScoreV0({
@@ -417,10 +509,10 @@ describe("helium-sub-daos", () => {
                   dao,
                   thread,
                   clockwork: THREAD_PID,
-                }).rpc({skipPreflight: true});
-              
+                })
+                .rpc({ skipPreflight: true });
             });
-      
+
             it("issues hnt rewards to subdaos and dnt to rewards escrow", async () => {
               const preBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
@@ -429,14 +521,14 @@ describe("helium-sub-daos", () => {
                 (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
               ).amount;
               await program.methods
-                  .issueRewardsV0({
-                    epoch,
-                  })
-                  .accounts({
-                    subDao,
-                  })
-                  .rpc({skipPreflight: true})
-      
+                .issueRewardsV0({
+                  epoch,
+                })
+                .accounts({
+                  subDao,
+                })
+                .rpc({ skipPreflight: true });
+
               const postBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
               ).amount;
@@ -446,14 +538,16 @@ describe("helium-sub-daos", () => {
               expect((postBalance - preBalance).toString()).to.eq(
                 EPOCH_REWARDS.toString()
               );
-              expect(((postMobileBalance - preMobileBalance)).toString()).to.eq(
+              expect((postMobileBalance - preMobileBalance).toString()).to.eq(
                 ((SUB_DAO_EPOCH_REWARDS / 100) * 94).toString()
               );
-    
-              const acc = await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo);
+
+              const acc = await program.account.subDaoEpochInfoV0.fetch(
+                subDaoEpochInfo
+              );
               expect(Boolean(acc.rewardsIssuedAt)).to.be.true;
             });
-      
+
             it("claim rewards", async () => {
               // issue rewards
               await sendInstructions(provider, [
@@ -466,26 +560,31 @@ describe("helium-sub-daos", () => {
                   })
                   .instruction(),
               ]);
-    
-              const method = program.methods.claimRewardsV0({
-                epoch,
-              }).accounts({
-                position,
-                subDao,
-                positionAuthority: positionAuthorityKp.publicKey,
-              }).signers([positionAuthorityKp]);
+
+              const method = program.methods
+                .claimRewardsV0({
+                  epoch,
+                })
+                .accounts({
+                  position,
+                  subDao,
+                  positionAuthority: positionAuthorityKp.publicKey,
+                })
+                .signers([positionAuthorityKp]);
               const { stakerAta } = await method.pubkeys();
-              await method.rpc({skipPreflight: true});
-              
+              await method.rpc({ skipPreflight: true });
+
               const postAtaBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(stakerAta!))?.data!
               ).amount;
-              expect(Number(postAtaBalance)).to.be.within(SUB_DAO_EPOCH_REWARDS*6 / 100 - 5, SUB_DAO_EPOCH_REWARDS*6 / 100)    
+              expect(Number(postAtaBalance)).to.be.within(
+                (SUB_DAO_EPOCH_REWARDS * 6) / 100 - 5,
+                (SUB_DAO_EPOCH_REWARDS * 6) / 100
+              );
             });
           });
-        })
-      })
-    })
+        });
+      });
+    });
   });
 });
-

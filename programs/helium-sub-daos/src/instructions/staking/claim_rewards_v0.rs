@@ -36,6 +36,9 @@ pub struct ClaimRewardsV0<'info> {
   #[account(mut)]
   pub position_authority: Signer<'info>,
   pub registrar: AccountLoader<'info, Registrar>,
+  #[account(
+    has_one = registrar
+  )]
   pub dao: Box<Account<'info, DaoV0>>,
 
   #[account(
