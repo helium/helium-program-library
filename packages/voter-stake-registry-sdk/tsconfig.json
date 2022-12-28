@@ -8,9 +8,6 @@
       "path": "../spl-utils"
     },
     {
-      "path": "../helium-sub-daos-sdk"
-    },
-    {
       "path": "./tsconfig.cjs.json"
     },
     {
