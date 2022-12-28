@@ -33,7 +33,7 @@ pub mod data_credits {
     ctx: Context<BurnDelegatedDataCreditsV0>,
     args: BurnDelegatedDataCreditsArgsV0,
   ) -> Result<()> {
-    instructions::burn_delegated_data_credits::handler(ctx, args)
+    instructions::burn_delegated_data_credits_v0::handler(ctx, args)
   }
 
   pub fn burn_from_issuance_v0(

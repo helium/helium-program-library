@@ -158,4 +158,6 @@ pub enum VsrError {
   NoDepositOnGenesisPositions,
   #[msg("Cannot change a position while active votes exist")]
   ActiveVotesExist,
+  #[msg("Position update authority must sign off on this transaction")]
+  UnauthorizedPositionUpdateAuthority,
 }

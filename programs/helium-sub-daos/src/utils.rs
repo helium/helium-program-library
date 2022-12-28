@@ -30,34 +30,105 @@ pub fn next_epoch_ts(unix_timestamp: i64) -> u64 {
   (current_epoch(unix_timestamp) + 1) * u64::try_from(EPOCH_LENGTH).unwrap()
 }
 
-pub fn update_subdao_vehnt(sub_dao: &mut SubDaoV0, curr_ts: i64) {
+pub fn update_subdao_vehnt(
+  sub_dao: &mut SubDaoV0,
+  curr_epoch_info: &mut SubDaoEpochInfoV0,
+  curr_ts: i64,
+) -> Result<()> {
   if curr_ts < sub_dao.vehnt_last_calculated_ts {
-    return;
+    return Ok(());
   }
 
-  let fall: u64 = PreciseNumber::new(sub_dao.vehnt_fall_rate)
+  // If last calculated was more than an epoch ago
+  let epoch_start = curr_epoch_info.start_ts();
+  if epoch_start
+    .checked_sub(sub_dao.vehnt_last_calculated_ts)
     .unwrap()
-    .checked_mul(
-      &PreciseNumber::new(
-        (curr_ts
-          .checked_sub(sub_dao.vehnt_last_calculated_ts)
-          .unwrap())
-        .try_into()
-        .unwrap(),
+    > EPOCH_LENGTH
+  {
+    return Err(error!(ErrorCode::MustCalculateVehntLinearly));
+  }
+  msg!(
+    "Current vehnt is {} with last updated of {}. Fast forwarding to {} at fall rate {}",
+    sub_dao.vehnt_delegated,
+    sub_dao.vehnt_last_calculated_ts,
+    curr_ts,
+    sub_dao.vehnt_fall_rate
+  );
+  // Step 1. Update veHNT up to the point that this epoch starts
+  if epoch_start > sub_dao.vehnt_last_calculated_ts {
+    let fall = sub_dao
+      .vehnt_fall_rate
+      .checked_mul(
+        u128::try_from(epoch_start)
+          .unwrap()
+          .checked_sub(u128::try_from(sub_dao.vehnt_last_calculated_ts).unwrap())
+          .unwrap(),
       )
-      .unwrap(),
+      .unwrap()
+      .checked_div(FALL_RATE_FACTOR)
+      .unwrap();
+
+    sub_dao.vehnt_delegated = sub_dao
+      .vehnt_delegated
+      .checked_sub(u64::try_from(fall).unwrap())
+      .unwrap();
+  }
+
+  // If sub dao epoch info account was just created, log the vehnt
+  if !curr_epoch_info.initialized {
+    msg!(
+      "Setting vehnt_at_epoch_start to {}",
+      sub_dao.vehnt_delegated
+    );
+    curr_epoch_info.vehnt_at_epoch_start = sub_dao.vehnt_delegated;
+  }
+
+  // Step 2. Update fall rate according to this epoch's closed position corrections
+  if curr_epoch_info.fall_rates_from_closing_positions > 0
+    || curr_epoch_info.vehnt_in_closing_positions > 0
+  {
+    msg!(
+      "Correcting fall rate by {} and vehnt by {} due to closed positions",
+      curr_epoch_info.fall_rates_from_closing_positions,
+      curr_epoch_info.vehnt_in_closing_positions
+    );
+    sub_dao.vehnt_fall_rate = sub_dao
+      .vehnt_fall_rate
+      .checked_sub(curr_epoch_info.fall_rates_from_closing_positions)
+      .unwrap();
+
+    sub_dao.vehnt_delegated = sub_dao
+      .vehnt_delegated
+      .checked_sub(curr_epoch_info.vehnt_in_closing_positions)
+      .unwrap();
+    // Since this has already been applied, set to 0
+    curr_epoch_info.fall_rates_from_closing_positions = 0;
+    curr_epoch_info.vehnt_in_closing_positions = 0;
+  }
+
+  // Step 3. Update veHNT up to now (from start of epoch) using the current fall rate. At this point, closing positions are effectively ignored.
+  let fall = sub_dao
+    .vehnt_fall_rate
+    .checked_mul(
+      u128::try_from(curr_ts)
+        .unwrap()
+        .checked_sub(
+          u128::try_from(std::cmp::max(sub_dao.vehnt_last_calculated_ts, epoch_start)).unwrap(),
+        )
+        .unwrap(),
     )
     .unwrap()
-    .checked_div(&PreciseNumber::new(FALL_RATE_FACTOR).unwrap())
-    .unwrap()
-    .to_imprecise()
-    .unwrap()
-    .try_into()
-    .ok()
+    .checked_div(FALL_RATE_FACTOR)
     .unwrap();
 
-  sub_dao.vehnt_staked = sub_dao.vehnt_staked.checked_sub(i128::from(fall)).unwrap();
+  sub_dao.vehnt_delegated = sub_dao
+    .vehnt_delegated
+    .checked_sub(u64::try_from(fall).unwrap())
+    .unwrap();
   sub_dao.vehnt_last_calculated_ts = curr_ts;
+
+  Ok(())
 }
 
 pub fn create_cron(execution_ts: i64, offset: i64) -> String {

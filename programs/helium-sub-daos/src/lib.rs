@@ -43,23 +43,23 @@ pub mod helium_sub_daos {
     issue_rewards_v0::handler(ctx, args)
   }
 
-  pub fn stake_v0(ctx: Context<StakeV0>) -> Result<()> {
-    stake_v0::handler(ctx)
+  pub fn delegate_v0(ctx: Context<DelegateV0>) -> Result<()> {
+    delegate_v0::handler(ctx)
   }
 
-  pub fn close_stake_v0(ctx: Context<CloseStakeV0>) -> Result<()> {
-    close_stake_v0::handler(ctx)
+  pub fn close_delegation_v0(ctx: Context<CloseDelegationV0>) -> Result<()> {
+    close_delegation_v0::handler(ctx)
   }
 
   pub fn claim_rewards_v0(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result<()> {
     claim_rewards_v0::handler(ctx, args)
   }
 
-  pub fn purge_position_v0(ctx: Context<PurgePositionV0>) -> Result<()> {
-    purge_position_v0::handler(ctx)
+  pub fn transfer_v0(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
+    transfer_v0::handler(ctx, args)
   }
 
-  pub fn refresh_position_v0(ctx: Context<RefreshPositionV0>) -> Result<()> {
-    refresh_position_v0::handler(ctx)
+  pub fn reset_lockup_v0(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<()> {
+    reset_lockup_v0::handler(ctx, args)
   }
 }

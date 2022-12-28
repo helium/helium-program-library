@@ -213,7 +213,7 @@ export const initWorld = async (
     subDao: PublicKey;
     treasury: PublicKey;
     rewardsEscrow: PublicKey;
-    stakerPool: PublicKey;
+    delegatorPool: PublicKey;
   };
   dataCredits: {
     dcKey: PublicKey;

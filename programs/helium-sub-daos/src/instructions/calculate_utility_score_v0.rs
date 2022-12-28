@@ -1,12 +1,15 @@
-use crate::{
-  current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError, EPOCH_LENGTH,
+use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError};
+use anchor_lang::{
+  prelude::*,
+  solana_program::{instruction::Instruction, sysvar::SysvarId},
+  InstructionData,
 };
-use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use anchor_spl::token::Token;
 use circuit_breaker::CircuitBreaker;
 use clockwork_sdk::{self, state::ThreadResponse, utils::PAYER_PUBKEY, ThreadProgram};
 use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
 use switchboard_v2::{AggregatorAccountData, AggregatorHistoryBuffer};
+use voter_stake_registry::state::Registrar;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CalculateUtilityScoreArgsV0 {
@@ -20,8 +23,13 @@ pub const TESTING: bool = std::option_env!("TESTING").is_some();
 pub struct CalculateUtilityScoreV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
+  pub registrar: AccountLoader<'info, Registrar>,
+  #[account(
+    has_one = registrar
+  )]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
+    mut,
     has_one = dao,
     has_one = active_device_aggregator
   )]
@@ -48,7 +56,6 @@ pub struct CalculateUtilityScoreV0<'info> {
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
-  pub clock: Sysvar<'info, Clock>,
   pub rent: Sysvar<'info, Rent>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
@@ -94,11 +101,11 @@ fn construct_next_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> Inst
     AccountMeta::new(ctx.accounts.sub_dao.dnt_mint, false),
     AccountMeta::new(ctx.accounts.sub_dao.treasury, false),
     AccountMeta::new(ctx.accounts.sub_dao.rewards_escrow, false),
-    AccountMeta::new(ctx.accounts.sub_dao.staker_pool, false),
+    AccountMeta::new(ctx.accounts.sub_dao.delegator_pool, false),
     AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
     AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
     AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.clock.key(), false),
+    AccountMeta::new_readonly(Clock::id(), false),
   ];
   Instruction {
     program_id: crate::ID,
@@ -130,11 +137,11 @@ fn construct_kickoff_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> I
   // build clockwork kickoff ix
   let accounts = vec![
     AccountMeta::new(PAYER_PUBKEY, true),
+    AccountMeta::new_readonly(ctx.accounts.registrar.key(), false),
     AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
     AccountMeta::new(ctx.accounts.sub_dao.key(), false),
     AccountMeta::new(dao_epoch_info, false),
     AccountMeta::new(sub_dao_epoch_info, false),
-    AccountMeta::new_readonly(ctx.accounts.clock.key(), false),
     AccountMeta::new_readonly(ctx.accounts.rent.key(), false),
     AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
     AccountMeta::new(ctx.accounts.thread.key(), false),
@@ -154,7 +161,8 @@ pub fn handler(
   ctx: Context<CalculateUtilityScoreV0>,
   args: CalculateUtilityScoreArgsV0,
 ) -> Result<ThreadResponse> {
-  let epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
+  let curr_ts = ctx.accounts.registrar.load()?.clock_unix_timestamp();
+  let epoch = current_epoch(curr_ts);
 
   if !TESTING && args.epoch >= epoch {
     return Err(error!(ErrorCode::EpochNotOver));
@@ -164,15 +172,22 @@ pub fn handler(
     return Err(error!(ErrorCode::UtilityScoreAlreadyCalculated));
   }
 
-  if ctx.accounts.clock.unix_timestamp < ctx.accounts.dao.emission_schedule[0].start_unix_time {
+  if curr_ts < ctx.accounts.dao.emission_schedule[0].start_unix_time {
     return Err(error!(ErrorCode::EpochToEarly));
   }
 
   ctx.accounts.sub_dao_epoch_info.epoch = epoch;
-  ctx.accounts.dao_epoch_info.epoch = epoch;
+  let epoch_end_ts = ctx.accounts.sub_dao_epoch_info.end_ts();
+  update_subdao_vehnt(
+    &mut ctx.accounts.sub_dao,
+    &mut ctx.accounts.sub_dao_epoch_info,
+    epoch_end_ts,
+  )?;
+
   ctx.accounts.dao_epoch_info.dao = ctx.accounts.dao.key();
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
   ctx.accounts.sub_dao_epoch_info.bump_seed = *ctx.bumps.get("sub_dao_epoch_info").unwrap();
+  ctx.accounts.sub_dao_epoch_info.initialized = true;
   ctx.accounts.dao_epoch_info.bump_seed = *ctx.bumps.get("dao_epoch_info").unwrap();
 
   // Calculate utility score
@@ -181,13 +196,6 @@ pub fn handler(
   // D = max(1, sqrt(DCs burned in USD)). 1 DC = $0.00001.
   // A = max(1, fourth_root(Total active device count * device activation fee)).
   let epoch_info = &mut ctx.accounts.sub_dao_epoch_info;
-  let epoch_end_ts = i64::try_from(args.epoch + 1)
-    .unwrap()
-    .checked_mul(EPOCH_LENGTH)
-    .unwrap();
-  let sub_dao = &mut ctx.accounts.sub_dao;
-  update_subdao_vehnt(sub_dao, epoch_end_ts);
-  epoch_info.total_vehnt = u64::try_from(std::cmp::max(sub_dao.vehnt_staked, 0)).unwrap();
 
   let dc_burned = PreciseNumber::new(epoch_info.dc_burned.into())
     .or_arith_error()?
@@ -237,7 +245,7 @@ pub fn handler(
     one.clone()
   };
 
-  let vehnt_staked = PreciseNumber::new(epoch_info.total_vehnt.into())
+  let vehnt_staked = PreciseNumber::new(epoch_info.vehnt_at_epoch_start.into())
     .or_arith_error()?
     .checked_div(&PreciseNumber::new(100000000_u128).or_arith_error()?) // vehnt has 8 decimals
     .or_arith_error()?;

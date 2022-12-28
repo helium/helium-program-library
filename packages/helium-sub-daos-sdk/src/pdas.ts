@@ -1,14 +1,14 @@
 import { PublicKey } from "@solana/web3.js";
 import { BN } from "@project-serum/anchor";
-import { PROGRAM_ID } from "./constants";
+import { currentEpoch, PROGRAM_ID } from "./constants";
 
 export function subDaoEpochInfoKey(
   subDao: PublicKey,
-  unixTime: number,
+  unixTime: number | BN,
   programId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
   let bU64 = Buffer.alloc(8);
-  const epoch = Math.floor(unixTime / (24 * 60 * 60));
+  const epoch = currentEpoch(new BN(unixTime)).toNumber();
   bU64.writeBigUInt64LE(BigInt(epoch));
   return PublicKey.findProgramAddressSync(
     [Buffer.from("sub_dao_epoch_info", "utf-8"), subDao.toBuffer(), bU64],
