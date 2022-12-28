@@ -1,27 +1,29 @@
-  import * as anchor from "@project-serum/anchor";
-  import { Program } from "@project-serum/anchor";
-  import {
-    getAccount, getAssociatedTokenAddress
-  } from "@solana/spl-token";
-  import * as web3 from "@solana/web3.js";
-  import { Keypair, PublicKey } from "@solana/web3.js";
-  import BN from "bn.js";
-  import { assert, expect } from "chai";
-  import { accountPayerKey, dataCreditsKey, init } from "../packages/data-credits-sdk/src";
-  import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
-  import * as hsd from "../packages/helium-sub-daos-sdk/src";
-  import { execute, HNT_PYTH_PRICE_FEED, toBN, toNumber } from "../packages/spl-utils/src";
-  import { DataCredits } from "../target/types/data_credits";
-  import { HeliumSubDaos } from "../target/types/helium_sub_daos";
-  import { initTestSubdao } from "./utils/daos";
-  import { ensureHSDIdl } from "./utils/fixtures";
-  import { createAtaAndMint, createMint, createNft } from "@helium/spl-utils";
-  import { parsePriceData } from "@pythnetwork/client";
   import { Keypair as HeliumKeypair } from "@helium/crypto";
+import { createAtaAndMint, createMint } from "@helium/spl-utils";
+import * as anchor from "@project-serum/anchor";
+import { Program } from "@project-serum/anchor";
+import { parsePriceData } from "@pythnetwork/client";
+import {
+  getAccount, getAssociatedTokenAddress
+} from "@solana/spl-token";
+import * as web3 from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
+import BN from "bn.js";
+import { assert, expect } from "chai";
+import { accountPayerKey, dataCreditsKey, init } from "../packages/data-credits-sdk/src";
+import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
+import * as hsd from "../packages/helium-sub-daos-sdk/src";
+import { HNT_PYTH_PRICE_FEED, toBN, toNumber } from "../packages/spl-utils/src";
+import * as vsr from "../packages/voter-stake-registry-sdk/src";
+import { DataCredits } from "../target/types/data_credits";
+import { HeliumSubDaos } from "../target/types/helium_sub_daos";
+import { initTestSubdao } from "./utils/daos";
+import { ensureHSDIdl, ensureVSRIdl } from "./utils/fixtures";
 
-  import {
-    ThresholdType
-  } from "../packages/circuit-breaker-sdk/src";
+  import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import {
+  ThresholdType
+} from "../packages/circuit-breaker-sdk/src";
   const EPOCH_REWARDS = 100000000;
 
   export async function burnDataCredits({
@@ -64,6 +66,7 @@
 
     let program: Program<DataCredits>;
     let hsdProgram: Program<HeliumSubDaos>;
+    let vsrProgram: Program<VoterStakeRegistry>;
     let dcKey: PublicKey;
     let hntMint: PublicKey;
     let dcMint: PublicKey;
@@ -85,6 +88,12 @@
         hsd.PROGRAM_ID,
         anchor.workspace.HeliumSubDaos.idl
       );
+      vsrProgram = await vsr.init(
+        provider,
+        vsr.PROGRAM_ID,
+        anchor.workspace.VoterStakeRegistry.idl
+      );
+      ensureVSRIdl(vsrProgram);
       // fresh start
       hntMint = await createMint(provider, hntDecimals, me, me);
       dcMint = await createMint(provider, dcDecimals, me, me);
