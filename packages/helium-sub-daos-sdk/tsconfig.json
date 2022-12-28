@@ -8,6 +8,9 @@
       "path": "../spl-utils"
     },
     {
+      "path": "../voter-stake-registry-sdk"
+    },
+    {
       "path": "../circuit-breaker-sdk"
     },
     {
