@@ -402,7 +402,9 @@ async function run() {
     console.log("Initializing VSR Registrar");
     instructions.push(
       await heliumVsrProgram.methods
-        .initializeRegistrarV0()
+        .initializeRegistrarV0({
+          positionUpdateAuthority: null,
+        })
         .accounts({
           realm,
           realmGoverningTokenMint: subdaoKeypair.publicKey,

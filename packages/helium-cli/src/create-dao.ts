@@ -225,18 +225,42 @@ async function run() {
     );
   }
 
+  const dao = (await daoKey(hntKeypair.publicKey))[0];
   const registrar = (await registrarKey(realm, hntKeypair.publicKey))[0];
+
   if (!(await exists(conn, registrar))) {
     console.log("Initializing VSR Registrar");
     instructions.push(
       await heliumVsrProgram.methods
-        .initializeRegistrarV0()
+        .initializeRegistrarV0({
+          positionUpdateAuthority: dao,
+        })
         .accounts({
           realm,
           realmGoverningTokenMint: hntKeypair.publicKey,
         })
         .instruction()
     );
+  }
+
+  if (!(await exists(conn, dao))) {
+    console.log("Initializing DAO");
+    await heliumSubDaosProgram.methods
+      .initializeDaoV0({
+        registrar: registrar,
+        authority: provider.wallet.publicKey,
+        emissionSchedule: [
+          {
+            startUnixTime: new anchor.BN(0),
+            emissionsPerEpoch: new anchor.BN(HNT_EPOCH_REWARDS),
+          },
+        ],
+      })
+      .accounts({
+        dcMint: dcKeypair.publicKey,
+        hntMint: hntKeypair.publicKey,
+      })
+      .rpc({ skipPreflight: true });
   }
 
   console.log("Configuring VSR voting mint at [0]");
@@ -329,27 +353,6 @@ async function run() {
   }
 
   await sendInstructions(provider, instructions, []);
-
-  const dao = (await daoKey(hntKeypair.publicKey))[0];
-  if (!(await exists(conn, dao))) {
-    console.log("Initializing DAO");
-    await heliumSubDaosProgram.methods
-      .initializeDaoV0({
-        registrar: registrar,
-        authority: provider.wallet.publicKey,
-        emissionSchedule: [
-          {
-            startUnixTime: new anchor.BN(0),
-            emissionsPerEpoch: new anchor.BN(HNT_EPOCH_REWARDS),
-          },
-        ],
-      })
-      .accounts({
-        dcMint: dcKeypair.publicKey,
-        hntMint: hntKeypair.publicKey,
-      })
-      .rpc({ skipPreflight: true });
-  }
 }
 
 run()
