@@ -13,6 +13,10 @@ import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import fs from "fs";
 import fetch from "node-fetch";
 
+const SECONDS_PER_DAY = 86400;
+
+export const getTimestampFromDays = (days: number) => days * SECONDS_PER_DAY;
+
 export async function exists(
   connection: Connection,
   account: PublicKey

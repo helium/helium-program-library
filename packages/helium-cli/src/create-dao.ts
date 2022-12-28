@@ -13,12 +13,21 @@ import {
   getGovernanceProgramVersion,
   MintMaxVoteWeightSource,
   withCreateRealm,
+  GoverningTokenType,
+  VoteThreshold,
+  VoteThresholdType,
+  VoteTipping,
+  GovernanceConfig,
   withSetRealmConfig,
+  withCreateMintGovernance,
+  GoverningTokenConfigArgs,
+  GoverningTokenConfigAccountArgs,
 } from "@solana/spl-governance";
 import { BN } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { createAndMint, loadKeypair } from "./utils";
+import { createAndMint, getTimestampFromDays, loadKeypair } from "./utils";
+import { sendInstructions } from "@helium/spl-utils";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -31,11 +40,6 @@ const yarg = yargs(hideBin(process.argv)).options({
     alias: "u",
     default: "http://127.0.0.1:8899",
     describe: "The solana url",
-  },
-  govPubkey: {
-    type: "string",
-    describe: "Pubkey of the GOV instance",
-    default: "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw",
   },
   hntKeypair: {
     type: "string",
@@ -70,6 +74,22 @@ const yarg = yargs(hideBin(process.argv)).options({
     default:
       "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib",
   },
+  councilKeypair: {
+    type: "string",
+    describe: "Keypair of gov council token",
+    default: "./keypairs/council.json",
+  },
+  numCouncil: {
+    type: "number",
+    describe:
+      "Number of Gov Council tokens to pre mint before assigning authority to dao",
+    default: 7,
+  },
+  govProgramId: {
+    type: "string",
+    describe: "Pubkey of the GOV program",
+    default: "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw",
+  },
 });
 
 const HNT_EPOCH_REWARDS = 10000000000;
@@ -95,14 +115,15 @@ async function run() {
 
   const hntKeypair = await loadKeypair(argv.hntKeypair);
   const dcKeypair = await loadKeypair(argv.dcKeypair);
-  const govPubkey = new PublicKey(argv.govPubkey);
+  const govProgramId = new PublicKey(argv.govProgramId);
+  const councilKeypair = await loadKeypair(argv.councilKeypair);
 
   console.log("HNT", hntKeypair.publicKey.toBase58());
   console.log("DC", dcKeypair.publicKey.toBase58());
-  console.log("GOV", govPubkey.toBase58());
+  console.log("GOV PID", govProgramId.toBase58());
+  console.log("COUNCIL", councilKeypair.publicKey.toBase58());
 
   const conn = provider.connection;
-  const walletPk = provider.wallet.publicKey;
 
   await createAndMint({
     provider,
@@ -119,11 +140,19 @@ async function run() {
     metadataUrl: `${argv.bucket}/dc.json`,
   });
 
+  await createAndMint({
+    provider,
+    mintKeypair: councilKeypair,
+    amount: argv.numCouncil,
+    decimals: 0,
+    metadataUrl: `${argv.bucket}/council.json}`,
+  });
+
   const dcKey = (await dataCreditsKey(dcKeypair.publicKey))[0];
   if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
-        authority: walletPk,
+        authority: provider.wallet.publicKey,
         config: {
           windowSizeSeconds: new BN(60 * 60),
           thresholdType: ThresholdType.Absolute as never,
@@ -145,7 +174,7 @@ async function run() {
     console.log("Initializing DAO");
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
-        authority: walletPk,
+        authority: provider.wallet.publicKey,
         emissionSchedule: [
           {
             startUnixTime: new anchor.BN(0),
@@ -160,46 +189,84 @@ async function run() {
       .rpc({ skipPreflight: true });
   }
 
-  // Get governance program version
-  const programVersion = await getGovernanceProgramVersion(conn, govPubkey);
-
   let instructions: TransactionInstruction[] = [];
   let signers: Keypair[] = [];
+  const govProgramVersion = await getGovernanceProgramVersion(
+    conn,
+    govProgramId
+  );
 
-  // Create realm
   const name = `Realm-${dao.toBase58().slice(0, 6)}`;
-  const realmAuthorityPk = walletPk;
-  const governanceAuthorityPk = walletPk;
   const communityMintMaxVoteWeightSource =
     MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION;
-  const councilMintPk = undefined;
 
   const realmPk = await withCreateRealm(
     instructions,
-    govPubkey,
-    programVersion,
+    govProgramId,
+    govProgramVersion,
     name,
-    realmAuthorityPk,
-    hntKeypair.publicKey,
-    walletPk,
-    councilMintPk,
+    provider.wallet.publicKey, // realmAuthorityPk
+    hntKeypair.publicKey, // communityMintPk
+    provider.wallet.publicKey, // payer
+    councilKeypair.publicKey, // councilMintPk
     communityMintMaxVoteWeightSource,
-    new BN(1)
+    new BN(1), // minCommunityWeightToCreateGovernance
+    undefined,
+    undefined
   );
 
   await withSetRealmConfig(
     instructions,
-    govPubkey,
-    programVersion,
+    govProgramId,
+    govProgramVersion,
     realmPk,
-    realmAuthorityPk,
-    councilMintPk,
+    provider.wallet.publicKey, // realmAuthorityPk
+    councilKeypair.publicKey, // councilMintPk
     communityMintMaxVoteWeightSource,
     new BN(1),
-    undefined,
-    undefined,
-    walletPk
+    new GoverningTokenConfigAccountArgs({
+      voterWeightAddin: undefined,
+      maxVoterWeightAddin: undefined,
+      tokenType: GoverningTokenType.Liquid,
+    }),
+    new GoverningTokenConfigAccountArgs({
+      voterWeightAddin: undefined,
+      maxVoterWeightAddin: undefined,
+      tokenType: GoverningTokenType.Liquid,
+    }),
+    provider.wallet.publicKey // payer
   );
+
+  await sendInstructions(provider, instructions, signers);
+  instructions = [];
+  signers = [];
+
+  const govConfig = new GovernanceConfig({
+    communityVoteThreshold: new VoteThreshold({
+      type: VoteThresholdType.YesVotePercentage,
+      value: 60,
+    }),
+    minCommunityTokensToCreateProposal: new BN(1),
+    minInstructionHoldUpTime: 0,
+    maxVotingTime: getTimestampFromDays(3),
+    communityVoteTipping: VoteTipping.Strict,
+    councilVoteTipping: VoteTipping.Strict,
+    minCouncilTokensToCreateProposal: new BN(1),
+    councilVoteThreshold: new VoteThreshold({
+      type: VoteThresholdType.YesVotePercentage,
+      value: 10,
+    }),
+    councilVetoVoteThreshold: new VoteThreshold({
+      type: VoteThresholdType.YesVotePercentage,
+      value: 10,
+    }),
+    communityVetoVoteThreshold: new VoteThreshold({
+      type: VoteThresholdType.YesVotePercentage,
+      value: 80,
+    }),
+    votingCoolOffTime: 0,
+    depositExemptProposalCount: 0,
+  });
 }
 
 run()
