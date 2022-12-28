@@ -37,9 +37,9 @@ async function resolveIndividualImpl({
   resolver: IndividualResolver;
   idlIx: AllInstructions<anchor.Idl>;
 }): Promise<number> {
+  const newPath = [...path, camelCase(idlAccounts.name)];
+  
   try {
-    const newPath = [...path, camelCase(idlAccounts.name)];
-
     if ((idlAccounts as IdlAccounts).accounts) {
       let resolved = 0;
       const subAccounts = (idlAccounts as IdlAccounts).accounts;
@@ -79,7 +79,7 @@ async function resolveIndividualImpl({
       return resolved;
     }
   } catch (e: any) {
-    console.error(`Error while resolving ${args[0].path}`, e);
+    console.error(`Error while resolving ${newPath}`, e);
     throw e;
   }
 }

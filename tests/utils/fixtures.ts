@@ -207,7 +207,7 @@ export const initWorld = async (
   registrar?: PublicKey,
   hntMint?: PublicKey
 ): Promise<{
-  dao: { mint: PublicKey; dao: PublicKey };
+  dao: { mint: PublicKey; dao: PublicKey; };
   subDao: {
     mint: PublicKey;
     subDao: PublicKey;
