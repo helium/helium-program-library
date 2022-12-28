@@ -117,10 +117,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
   }
 
   delegated_position.purged = false;
-  delegated_position.expiry_ts = curr_ts
-    .checked_add(seconds_left.try_into().unwrap())
-    .unwrap();
-
+  delegated_position.start_ts = curr_ts;
   delegated_position.hnt_amount = position.amount_deposited_native;
   delegated_position.last_claimed_epoch = curr_epoch;
   delegated_position.fall_rate = fall_rate;

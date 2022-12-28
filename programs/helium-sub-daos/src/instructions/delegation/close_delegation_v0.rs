@@ -40,6 +40,7 @@ pub struct CloseDelegationV0<'info> {
     mut,
     close = position_authority,
     seeds = ["delegated_position".as_bytes(), position.key().as_ref()],
+    has_one = sub_dao,
     bump
   )]
   pub delegated_position: Account<'info, DelegatedPositionV0>,
@@ -100,18 +101,24 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
       .checked_sub(delegated_position.fall_rate)
       .unwrap();
   }
-
-  // Remove this position from the current epoch vehnt
-  let vehnt_at_start = position.voting_power(
-    voting_mint_config,
-    ctx.accounts.sub_dao_epoch_info.start_ts(),
-  )?;
-  ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start = ctx
-    .accounts
-    .sub_dao_epoch_info
-    .vehnt_at_epoch_start
-    .checked_sub(vehnt_at_start)
-    .unwrap();
+  // Unless the position was staked during this epoch, remove it.
+  if current_epoch(delegated_position.start_ts) < curr_epoch {
+    let vehnt_at_start = position.voting_power(
+      voting_mint_config,
+      ctx.accounts.sub_dao_epoch_info.start_ts(),
+    )?;
+    msg!(
+      "Removing {} vehnt from this epoch for this subdao, which currently has {} vehnt",
+      vehnt_at_start,
+      ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start
+    );
+    ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start = ctx
+      .accounts
+      .sub_dao_epoch_info
+      .vehnt_at_epoch_start
+      .checked_sub(vehnt_at_start)
+      .unwrap();
+  }
 
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
   ctx.accounts.sub_dao_epoch_info.bump_seed = *ctx.bumps.get("sub_dao_epoch_info").unwrap();
