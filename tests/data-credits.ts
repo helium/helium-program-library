@@ -24,6 +24,8 @@ import { ensureHSDIdl, ensureVSRIdl } from "./utils/fixtures";
 import {
   ThresholdType
 } from "../packages/circuit-breaker-sdk/src";
+import { initVsr } from "./utils/vsr";
+import { daoKey } from "../packages/helium-sub-daos-sdk/src";
   const EPOCH_REWARDS = 100000000;
 
   export async function burnDataCredits({
@@ -142,10 +144,19 @@ import {
       let subDao: PublicKey;
 
       beforeEach(async () => {
+        const registrar = (
+          await initVsr(
+            vsrProgram,
+            provider,
+            provider.wallet.publicKey,
+            hntMint,
+            daoKey(hntMint)[0]
+          )
+        ).registrar;
         const method = await hsdProgram.methods
           .initializeDaoV0({
             authority: me,
-            registrar: PublicKey.default,
+            registrar,
             emissionSchedule: [
               {
                 startUnixTime: new anchor.BN(0),

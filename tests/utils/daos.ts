@@ -1,6 +1,6 @@
 import * as anchor from "@project-serum/anchor";
 import { BN } from "@project-serum/anchor";
-import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
+import { Keypair, ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { createAtaAndMint, createMint, toBN } from "@helium/spl-utils";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
@@ -33,7 +33,7 @@ export async function initTestDao(
 
   const method = await program.methods
     .initializeDaoV0({
-      registrar: registrar || PublicKey.default,
+      registrar: registrar || Keypair.generate().publicKey,
       authority: authority,
       emissionSchedule: [
         {

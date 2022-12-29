@@ -19,12 +19,17 @@ export const subDaoEpochInfoResolver = resolveIndividual(
   async ({ provider, path, accounts }) => {
     if (path[path.length - 1] === "subDaoEpochInfo" && accounts.registrar) {
       const vsr = await init(provider as AnchorProvider, VSR_PROGRAM_ID);
-      const registrar = await vsr.account.registrar.fetch(accounts.registrar as PublicKey);
+      let registrar;
+      try {
+        registrar = await vsr.account.registrar.fetch(accounts.registrar as PublicKey);
+      } catch (e: any) {
+        // ignore. It's fine, we just won't use time offset which is only used in testing cases
+      }
       
       const clock = await provider.connection.getAccountInfo(
         SYSVAR_CLOCK_PUBKEY
       );
-      const unixTime = Number(clock!.data.readBigInt64LE(8 * 4)) + registrar.timeOffset.toNumber();
+      const unixTime = Number(clock!.data.readBigInt64LE(8 * 4)) + (registrar?.timeOffset.toNumber() || 0);
       const subDao = get(accounts, [
         ...path.slice(0, path.length - 1),
         "subDao",
