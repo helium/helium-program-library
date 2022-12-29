@@ -92,7 +92,7 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Keypair of gov council token",
     default: "./keypairs/council.json",
   },
-  councilTokenHolder: {
+  councilWallet: {
     type: "string",
     describe: "Pubkey for holding/distributing council tokens",
     default: `${os.homedir()}/.config/solana/id.json`,
@@ -134,11 +134,13 @@ async function run() {
   const dcKeypair = await loadKeypair(argv.dcKeypair);
   const govProgramId = new PublicKey(argv.govProgramId);
   const councilKeypair = await loadKeypair(argv.councilKeypair);
+  const councilWallet = new PublicKey(argv.councilWallet);
 
   console.log("HNT", hntKeypair.publicKey.toBase58());
   console.log("DC", dcKeypair.publicKey.toBase58());
   console.log("GOV PID", govProgramId.toBase58());
   console.log("COUNCIL", councilKeypair.publicKey.toBase58());
+  console.log("COUNCIL WALLET", councilWallet.toBase58());
 
   const conn = provider.connection;
 
@@ -163,28 +165,8 @@ async function run() {
     amount: argv.numCouncil,
     decimals: 0,
     metadataUrl: `${argv.bucket}/council.json}`,
+    to: councilWallet,
   });
-
-  const dcKey = (await dataCreditsKey(dcKeypair.publicKey))[0];
-  if (!(await exists(conn, dcKey))) {
-    await dataCreditsProgram.methods
-      .initializeDataCreditsV0({
-        authority: provider.wallet.publicKey,
-        config: {
-          windowSizeSeconds: new anchor.BN(60 * 60),
-          thresholdType: ThresholdType.Absolute as never,
-          threshold: new anchor.BN("1000000000000"),
-        },
-      })
-      .accounts({
-        hntMint: hntKeypair.publicKey,
-        dcMint: dcKeypair.publicKey,
-        hntPriceOracle: new PublicKey(
-          "CqFJLrT4rSpA46RQkVYWn8tdBDuQ7p7RXcp6Um76oaph"
-        ), // TODO: Replace with HNT price feed,
-      })
-      .rpc({ skipPreflight: true });
-  }
 
   let instructions: TransactionInstruction[] = [];
   const govProgramVersion = await getGovernanceProgramVersion(
@@ -225,15 +207,13 @@ async function run() {
     );
   }
 
-  const dao = (await daoKey(hntKeypair.publicKey))[0];
   const registrar = (await registrarKey(realm, hntKeypair.publicKey))[0];
-
   if (!(await exists(conn, registrar))) {
     console.log("Initializing VSR Registrar");
     instructions.push(
       await heliumVsrProgram.methods
         .initializeRegistrarV0({
-          positionUpdateAuthority: dao,
+          positionUpdateAuthority: (await daoKey(hntKeypair.publicKey))[0],
         })
         .accounts({
           realm,
@@ -241,26 +221,6 @@ async function run() {
         })
         .instruction()
     );
-  }
-
-  if (!(await exists(conn, dao))) {
-    console.log("Initializing DAO");
-    await heliumSubDaosProgram.methods
-      .initializeDaoV0({
-        registrar: registrar,
-        authority: provider.wallet.publicKey,
-        emissionSchedule: [
-          {
-            startUnixTime: new anchor.BN(0),
-            emissionsPerEpoch: new anchor.BN(HNT_EPOCH_REWARDS),
-          },
-        ],
-      })
-      .accounts({
-        dcMint: dcKeypair.publicKey,
-        hntMint: hntKeypair.publicKey,
-      })
-      .rpc({ skipPreflight: true });
   }
 
   console.log("Configuring VSR voting mint at [0]");
@@ -353,6 +313,48 @@ async function run() {
   }
 
   await sendInstructions(provider, instructions, []);
+
+  const dcKey = (await dataCreditsKey(dcKeypair.publicKey))[0];
+  if (!(await exists(conn, dcKey))) {
+    await dataCreditsProgram.methods
+      .initializeDataCreditsV0({
+        authority: governance,
+        config: {
+          windowSizeSeconds: new anchor.BN(60 * 60),
+          thresholdType: ThresholdType.Absolute as never,
+          threshold: new anchor.BN("1000000000000"),
+        },
+      })
+      .accounts({
+        hntMint: hntKeypair.publicKey,
+        dcMint: dcKeypair.publicKey,
+        hntPriceOracle: new PublicKey(
+          "CqFJLrT4rSpA46RQkVYWn8tdBDuQ7p7RXcp6Um76oaph"
+        ), // TODO: Replace with HNT price feed,
+      })
+      .rpc({ skipPreflight: true });
+  }
+
+  const dao = (await daoKey(hntKeypair.publicKey))[0];
+  if (!(await exists(conn, dao))) {
+    console.log("Initializing DAO");
+    await heliumSubDaosProgram.methods
+      .initializeDaoV0({
+        registrar: registrar,
+        authority: governance,
+        emissionSchedule: [
+          {
+            startUnixTime: new anchor.BN(0),
+            emissionsPerEpoch: new anchor.BN(HNT_EPOCH_REWARDS),
+          },
+        ],
+      })
+      .accounts({
+        dcMint: dcKeypair.publicKey,
+        hntMint: hntKeypair.publicKey,
+      })
+      .rpc({ skipPreflight: true });
+  }
 }
 
 run()

@@ -43,13 +43,16 @@ export async function createAndMint({
   amount,
   metadataUrl,
   decimals = 8,
+  to,
 }: {
   provider: anchor.AnchorProvider;
   mintKeypair?: Keypair;
   amount: number;
   metadataUrl: string;
   decimals?: number;
+  to?: PublicKey;
 }): Promise<void> {
+  const mintTo = to || provider.wallet.publicKey;
   const metadata = await fetch(metadataUrl).then((r) => r.json());
 
   if (!(await exists(provider.connection, mintKeypair.publicKey))) {
@@ -68,7 +71,8 @@ export async function createAndMint({
           await createAtaAndMintInstructions(
             provider,
             mintKeypair.publicKey,
-            toBN(amount, decimals)
+            toBN(amount, decimals),
+            mintTo
           )
         ).instructions,
       ],

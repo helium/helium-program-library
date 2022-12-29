@@ -205,158 +205,6 @@ async function run() {
     lazyDist,
     true
   );
-  if (!(await exists(conn, lazyDist))) {
-    console.log(`Initializing ${name} lazy distributor`);
-    await lazyDistributorProgram.methods
-      .initializeLazyDistributorV0({
-        authority: provider.wallet.publicKey,
-        oracles: [
-          {
-            oracle: oracleKey,
-            url: rewardsOracleUrl,
-          },
-        ],
-        // 10 x epoch rewards in a 24 hour period
-        windowConfig: {
-          windowSizeSeconds: new anchor.BN(24 * 60 * 60),
-          thresholdType: ThresholdType.Absolute as never,
-          threshold: new anchor.BN(10 * argv.startEpochRewards),
-        },
-      })
-      .accounts({
-        rewardsMint: subdaoKeypair.publicKey,
-        rewardsEscrow,
-      })
-      .rpc({ skipPreflight: true });
-  }
-
-  if (!(await exists(conn, subdao))) {
-    console.log("Initializing switchboard oracle");
-    const switchboard = await SwitchboardProgram.load(
-      argv.switchboardNetwork as Cluster,
-      provider.connection,
-      wallet
-    );
-    const queueAccount = new QueueAccount(
-      switchboard,
-      new PublicKey(argv.queue)
-    );
-    const [agg, _] = await queueAccount.createFeed({
-      batchSize: 3,
-      minRequiredOracleResults: 2,
-      minRequiredJobResults: 1,
-      minUpdateDelaySeconds: 60 * 60, // hourly
-      fundAmount: 1,
-      enable: true,
-      crankPubkey: new PublicKey(argv.crank),
-      jobs: [
-        {
-          data: OracleJob.encodeDelimited(
-            OracleJob.fromObject({
-              tasks: [
-                {
-                  httpTask: {
-                    url: argv.activeDeviceOracleUrl + "/" + name.toLowerCase(),
-                  },
-                },
-                {
-                  jsonParseTask: {
-                    path: "$.count",
-                  },
-                },
-              ],
-            })
-          ).finish(),
-        },
-      ],
-    });
-    console.log("Created active device aggregator", agg.publicKey.toBase58());
-    await AggregatorHistoryBuffer.create(switchboard, {
-      aggregatorAccount: agg,
-      maxSamples: 24 * 7,
-    });
-
-    console.log(`Initializing ${name} SubDAO`);
-    await heliumSubDaosProgram.methods
-      .initializeSubDaoV0({
-        dcBurnAuthority: provider.wallet.publicKey,
-        authority: provider.wallet.publicKey,
-        emissionSchedule: emissionSchedule(argv.startEpochRewards),
-        // Linear curve
-        treasuryCurve: {
-          exponentialCurveV0: {
-            k: toU128(1),
-          },
-        } as any,
-        // 20% in a day
-        treasuryWindowConfig: {
-          windowSizeSeconds: new anchor.BN(24 * 60 * 60),
-          thresholdType: ThresholdType.Percent as never,
-          threshold: thresholdPercent(20),
-        },
-        onboardingDcFee: toBN(5, 0),
-      })
-      .accounts({
-        dao,
-        dntMint: subdaoKeypair.publicKey,
-        rewardsEscrow,
-        hntMint: new PublicKey(argv.hntPubkey),
-        activeDeviceAggregator: agg.publicKey,
-      })
-      .preInstructions([
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-      ])
-      .rpc({ skipPreflight: true });
-  } else {
-    const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
-    console.log(
-      `Subdao exits. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}`
-    );
-  }
-
-  const hsConfigKey = (await hotspotConfigKey(subdao, name.toUpperCase()))[0];
-  if (!(await provider.connection.getAccountInfo(hsConfigKey))) {
-    console.log(`Initalizing ${name} HotspotConfig`);
-
-    const merkle = Keypair.generate();
-    const space = getConcurrentMerkleTreeAccountSize(26, 1024);
-
-    await hemProgram.methods
-      .initializeHotspotConfigV0({
-        name: `${name} Hotspot Collection`,
-        symbol: name.toUpperCase(),
-        metadataUrl: `${
-          argv.bucket
-        }/${name.toLocaleLowerCase()}_collection.json`,
-        settings: {
-          iotConfig: {
-            minGain: 10,
-            maxGain: 150,
-            fullLocationStakingFee: toBN(1000000, 0),
-            dataonlyLocationStakingFee: toBN(500000, 0),
-          } as any,
-        },
-        maxDepth: 26,
-        maxBufferSize: 1024,
-      })
-      .preInstructions([
-        SystemProgram.createAccount({
-          fromPubkey: provider.wallet.publicKey,
-          newAccountPubkey: merkle.publicKey,
-          lamports: await provider.connection.getMinimumBalanceForRentExemption(
-            space
-          ),
-          space: space,
-          programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-        }),
-      ])
-      .accounts({
-        merkleTree: merkle.publicKey,
-        subDao: subdao,
-      })
-      .signers([merkle])
-      .rpc({ skipPreflight: true });
-  }
 
   let instructions: TransactionInstruction[] = [];
   const govProgramVersion = await getGovernanceProgramVersion(
@@ -503,6 +351,159 @@ async function run() {
   }
 
   await sendInstructions(provider, instructions, []);
+
+  if (!(await exists(conn, lazyDist))) {
+    console.log(`Initializing ${name} lazy distributor`);
+    await lazyDistributorProgram.methods
+      .initializeLazyDistributorV0({
+        authority: governance,
+        oracles: [
+          {
+            oracle: oracleKey,
+            url: rewardsOracleUrl,
+          },
+        ],
+        // 10 x epoch rewards in a 24 hour period
+        windowConfig: {
+          windowSizeSeconds: new anchor.BN(24 * 60 * 60),
+          thresholdType: ThresholdType.Absolute as never,
+          threshold: new anchor.BN(10 * argv.startEpochRewards),
+        },
+      })
+      .accounts({
+        rewardsMint: subdaoKeypair.publicKey,
+        rewardsEscrow,
+      })
+      .rpc({ skipPreflight: true });
+  }
+
+  if (!(await exists(conn, subdao))) {
+    console.log("Initializing switchboard oracle");
+    const switchboard = await SwitchboardProgram.load(
+      argv.switchboardNetwork as Cluster,
+      provider.connection,
+      wallet
+    );
+    const queueAccount = new QueueAccount(
+      switchboard,
+      new PublicKey(argv.queue)
+    );
+    const [agg, _] = await queueAccount.createFeed({
+      batchSize: 3,
+      minRequiredOracleResults: 2,
+      minRequiredJobResults: 1,
+      minUpdateDelaySeconds: 60 * 60, // hourly
+      fundAmount: 1,
+      enable: true,
+      crankPubkey: new PublicKey(argv.crank),
+      jobs: [
+        {
+          data: OracleJob.encodeDelimited(
+            OracleJob.fromObject({
+              tasks: [
+                {
+                  httpTask: {
+                    url: argv.activeDeviceOracleUrl + "/" + name.toLowerCase(),
+                  },
+                },
+                {
+                  jsonParseTask: {
+                    path: "$.count",
+                  },
+                },
+              ],
+            })
+          ).finish(),
+        },
+      ],
+    });
+    console.log("Created active device aggregator", agg.publicKey.toBase58());
+    await AggregatorHistoryBuffer.create(switchboard, {
+      aggregatorAccount: agg,
+      maxSamples: 24 * 7,
+    });
+
+    console.log(`Initializing ${name} SubDAO`);
+    await heliumSubDaosProgram.methods
+      .initializeSubDaoV0({
+        dcBurnAuthority: governance,
+        authority: governance,
+        emissionSchedule: emissionSchedule(argv.startEpochRewards),
+        // Linear curve
+        treasuryCurve: {
+          exponentialCurveV0: {
+            k: toU128(1),
+          },
+        } as any,
+        // 20% in a day
+        treasuryWindowConfig: {
+          windowSizeSeconds: new anchor.BN(24 * 60 * 60),
+          thresholdType: ThresholdType.Percent as never,
+          threshold: thresholdPercent(20),
+        },
+        onboardingDcFee: toBN(5, 0),
+      })
+      .accounts({
+        dao,
+        dntMint: subdaoKeypair.publicKey,
+        rewardsEscrow,
+        hntMint: new PublicKey(argv.hntPubkey),
+        activeDeviceAggregator: agg.publicKey,
+      })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+      ])
+      .rpc({ skipPreflight: true });
+  } else {
+    const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
+    console.log(
+      `Subdao exits. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}`
+    );
+  }
+
+  const hsConfigKey = (await hotspotConfigKey(subdao, name.toUpperCase()))[0];
+  if (!(await provider.connection.getAccountInfo(hsConfigKey))) {
+    console.log(`Initalizing ${name} HotspotConfig`);
+
+    const merkle = Keypair.generate();
+    const space = getConcurrentMerkleTreeAccountSize(26, 1024);
+
+    await hemProgram.methods
+      .initializeHotspotConfigV0({
+        name: `${name} Hotspot Collection`,
+        symbol: name.toUpperCase(),
+        metadataUrl: `${
+          argv.bucket
+        }/${name.toLocaleLowerCase()}_collection.json`,
+        settings: {
+          iotConfig: {
+            minGain: 10,
+            maxGain: 150,
+            fullLocationStakingFee: toBN(1000000, 0),
+            dataonlyLocationStakingFee: toBN(500000, 0),
+          } as any,
+        },
+        maxDepth: 26,
+        maxBufferSize: 1024,
+      })
+      .preInstructions([
+        SystemProgram.createAccount({
+          fromPubkey: provider.wallet.publicKey,
+          newAccountPubkey: merkle.publicKey,
+          lamports: await provider.connection.getMinimumBalanceForRentExemption(
+            space
+          ),
+          space: space,
+          programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+        }),
+      ])
+      .accounts({
+        merkleTree: merkle.publicKey,
+        subDao: subdao,
+      })
+      .signers([merkle])
+      .rpc({ skipPreflight: true });
+  }
 }
 
 run()
