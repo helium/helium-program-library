@@ -240,7 +240,7 @@ async function run() {
     mobile: new BN(0),
     dc: new BN(0),
     sol: new BN(0),
-    hst: new BN(0)
+    hst: new BN(0),
   };
   // Keep track of unresolved balances so we can reserve them for later;
   const unresolvedBalances = {
@@ -248,6 +248,13 @@ async function run() {
     stakedHnt: new BN(0),
     mobile: new BN(0),
     dc: new BN(0),
+    hst: new BN(0),
+  };
+  // Keep track of router burned balances
+  const routerBalances = {
+    hnt: new BN(0),
+    stakedHnt: new BN(0),
+    mobile: new BN(0),
     hst: new BN(0),
   };
   const transactionsByWallet = [];
@@ -283,18 +290,14 @@ async function run() {
 
     if (isRouter) {
       const dcBal = new BN(account.dc);
-      unresolvedBalances.hnt = unresolvedBalances.hnt.add(
-        new BN(account.hnt)
-      );
-      unresolvedBalances.mobile = unresolvedBalances.mobile.add(
+      routerBalances.hnt = routerBalances.hnt.add(new BN(account.hnt));
+      routerBalances.mobile = routerBalances.mobile.add(
         new BN(account.mobile)
       );
-      unresolvedBalances.stakedHnt = unresolvedBalances.stakedHnt.add(
+      routerBalances.stakedHnt = routerBalances.stakedHnt.add(
         new BN(account.staked_hnt)
       );
-      unresolvedBalances.hst = unresolvedBalances.hst.add(
-        new BN(account.hst)
-      );
+      routerBalances.hst = routerBalances.hst.add(new BN(account.hst));
       const instruction = await dcProgram.methods
         .genesisIssueDelegatedDataCreditsV0({
           amount: dcBal,
@@ -309,7 +312,6 @@ async function run() {
           subDao,
         })
         .instruction();
-      
 
       transactionsByWallet.push({
         solAddress,
@@ -388,11 +390,7 @@ async function run() {
       if (hstBal.gt(zero)) {
         totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
         totalBalances.hst = totalBalances.hst.add(hstBal);
-        const { instruction, ata } = createAta(
-          hst,
-          solAddress,
-          lazySigner
-        );
+        const { instruction, ata } = createAta(hst, solAddress, lazySigner);
         tokenIxs.push(instruction);
         tokenIxs.push(createTransfer(hst, ata, lazySigner, hstBal));
       }
@@ -536,7 +534,7 @@ async function run() {
           .proof.map((p) => p.toString("hex"))
       ),
       lut.toBase58(),
-      routers.has(txIdsToWallet[compiledTransaction.index])
+      routers.has(txIdsToWallet[compiledTransaction.index]),
     ];
   });
   // Show progress if requested
@@ -602,7 +600,12 @@ async function run() {
     STAKED HNT: ${unresolvedBalances.stakedHnt.toString()}
     MOBILE: ${unresolvedBalances.mobile.toString()}
   `);
-
+  console.log(`Router:
+    HNT: ${routerBalances.hnt.toString()}
+    HST: ${routerBalances.hst.toString()}
+    STAKED HNT: ${routerBalances.stakedHnt.toString()}
+    MOBILE: ${routerBalances.mobile.toString()}
+  `);
   const finish = new Date().valueOf();
 
   console.log(`Finished in ${finish - start}ms`);
