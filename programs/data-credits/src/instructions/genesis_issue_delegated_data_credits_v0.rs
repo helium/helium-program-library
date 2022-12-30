@@ -2,10 +2,8 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_spl::{
-  associated_token::AssociatedToken,
   token::{
-    freeze_account, thaw_account, transfer, FreezeAccount, Mint, ThawAccount, Token, TokenAccount,
-    Transfer,
+    Mint, Token, TokenAccount,
   },
 };
 use circuit_breaker::{
@@ -25,7 +23,7 @@ pub struct GenesisIssueDelegatedDataCreditsArgsV0 {
 pub struct GenesisIssueDelegatedDataCreditsV0<'info> {
   #[account(
     init,
-    payer = payer,
+    payer = lazy_signer,
     space = 60 + std::mem::size_of::<DataCreditsV0>(),
     seeds = [
       "delegated_data_credits".as_bytes(),
@@ -67,7 +65,7 @@ pub struct GenesisIssueDelegatedDataCreditsV0<'info> {
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
 
-  #[account(k
+  #[account(
     init_if_needed,
     payer = lazy_signer,
     seeds = ["escrow_dc_account".as_bytes(), delegated_data_credits.key().as_ref()],
@@ -103,7 +101,7 @@ pub fn handler(ctx: Context<GenesisIssueDelegatedDataCreditsV0>, args: GenesisIs
 
   let cpi_accounts = MintV0 {
     mint: ctx.accounts.dc_mint.to_account_info(),
-    to: ctx.accounts.recipient_token_account.to_account_info(),
+    to: ctx.accounts.escrow_account.to_account_info(),
     mint_authority: ctx.accounts.data_credits.to_account_info(),
     token_program: ctx.accounts.token_program.to_account_info(),
     circuit_breaker: ctx.accounts.circuit_breaker.to_account_info(),
@@ -113,6 +111,7 @@ pub fn handler(ctx: Context<GenesisIssueDelegatedDataCreditsV0>, args: GenesisIs
   // mint the new tokens to recipient
   mint_v0(
     CpiContext::new_with_signer(
+      ctx.accounts.circuit_breaker_program.to_account_info(),
       cpi_accounts,
       signer_seeds
     ),
