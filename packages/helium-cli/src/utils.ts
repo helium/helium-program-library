@@ -2,20 +2,33 @@ import {
   createAtaAndMintInstructions,
   createMintInstructions,
   sendInstructions,
-  toBN
+  toBN,
 } from "@helium/spl-utils";
 import {
   createCreateMetadataAccountV3Instruction,
-  PROGRAM_ID as METADATA_PROGRAM_ID
+  PROGRAM_ID as METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
 import {
   Connection,
   Keypair,
-  PublicKey
+  PublicKey,
+  SYSVAR_CLOCK_PUBKEY,
 } from "@solana/web3.js";
 import fs from "fs";
 import fetch from "node-fetch";
+
+const SECONDS_PER_DAY = 86400;
+
+export const getTimestampFromDays = (days: number) => days * SECONDS_PER_DAY;
+
+export const getUnixTimestamp = async (
+  provider: anchor.Provider
+): Promise<bigint> => {
+  const clock = await provider.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+  const unixTime = clock!.data.readBigInt64LE(8 * 4);
+  return unixTime;
+};
 
 export async function exists(
   connection: Connection,
@@ -30,13 +43,16 @@ export async function createAndMint({
   amount,
   metadataUrl,
   decimals = 8,
+  to,
 }: {
   provider: anchor.AnchorProvider;
   mintKeypair?: Keypair;
   amount: number;
   metadataUrl: string;
   decimals?: number;
+  to?: PublicKey;
 }): Promise<void> {
+  const mintTo = to || provider.wallet.publicKey;
   const metadata = await fetch(metadataUrl).then((r) => r.json());
 
   if (!(await exists(provider.connection, mintKeypair.publicKey))) {
@@ -55,7 +71,8 @@ export async function createAndMint({
           await createAtaAndMintInstructions(
             provider,
             mintKeypair.publicKey,
-            toBN(amount, decimals)
+            toBN(amount, decimals),
+            mintTo
           )
         ).instructions,
       ],

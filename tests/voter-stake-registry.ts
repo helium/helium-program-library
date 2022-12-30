@@ -5,7 +5,7 @@ import {
   createMintInstructions,
   sendInstructions,
   toBN,
-  truthy
+  truthy,
 } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
@@ -30,7 +30,7 @@ import {
   withRelinquishVote,
   withSetRealmConfig,
   withSignOffProposal,
-  YesNoVote
+  YesNoVote,
 } from "@solana/spl-governance";
 import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 import {
@@ -108,7 +108,7 @@ describe("voter-stake-registry", () => {
       new GoverningTokenConfigAccountArgs({
         voterWeightAddin: program.programId,
         maxVoterWeightAddin: undefined,
-        tokenType: GoverningTokenType.Liquid
+        tokenType: GoverningTokenType.Liquid,
       }),
       undefined,
       me
@@ -276,8 +276,8 @@ describe("voter-stake-registry", () => {
           {
             pubkey: position,
             isWritable: false,
-            isSigner: false
-          }
+            isSigner: false,
+          },
         ])
         .prepare();
       instructions.push(instruction);
@@ -349,7 +349,6 @@ describe("voter-stake-registry", () => {
       );
       await sendInstructions(provider, instructions);
     });
-
 
     let voteTestCases = [
       {
@@ -426,7 +425,9 @@ describe("voter-stake-registry", () => {
         );
         await program.methods
           .setTimeOffsetV0(
-            new anchor.BN((testCase.delay + testCase.fastForward) * SECS_PER_DAY)
+            new anchor.BN(
+              (testCase.delay + testCase.fastForward) * SECS_PER_DAY
+            )
           )
           .accounts({ registrar })
           .rpc();
@@ -436,7 +437,7 @@ describe("voter-stake-registry", () => {
           hntMint,
           depositor.publicKey
         );
-        
+
         await withCreateTokenOwnerRecord(
           instructions,
           SPL_GOVERNANCE_PID,
@@ -502,7 +503,11 @@ describe("voter-stake-registry", () => {
         await sendInstructions(provider, instructions, [depositor]);
 
         const voteRecord = await getVoteRecord(provider.connection, vote);
-        expectBnAccuracy(toBN(testCase.expectedVeHnt, 8), voteRecord.account.getYesVoteWeight() as anchor.BN, 0.00001);
+        expectBnAccuracy(
+          toBN(testCase.expectedVeHnt, 8),
+          voteRecord.account.getYesVoteWeight() as anchor.BN,
+          0.00001
+        );
       });
     });
 
@@ -514,7 +519,7 @@ describe("voter-stake-registry", () => {
       let voterWeightRecord: PublicKey;
 
       beforeEach(async () => {
-        const instructions: TransactionInstruction[] = []
+        const instructions: TransactionInstruction[] = [];
         tokenOwnerRecord = await getTokenOwnerRecordAddress(
           SPL_GOVERNANCE_PID,
           realm,
@@ -523,7 +528,7 @@ describe("voter-stake-registry", () => {
         );
 
         ({ position, mint } = await createAndDeposit(10000, 200));
-        
+
         const {
           pubkeys: { voterWeightRecord: vw },
           instruction,
@@ -539,10 +544,7 @@ describe("voter-stake-registry", () => {
           })
           .remainingAccounts([
             {
-              pubkey: await getAssociatedTokenAddress(
-                mint,
-                me
-              ),
+              pubkey: await getAssociatedTokenAddress(mint, me),
               isSigner: false,
               isWritable: false,
             },
@@ -578,10 +580,10 @@ describe("voter-stake-registry", () => {
         );
 
         await sendInstructions(provider, instructions);
-      })
+      });
 
       it("should not allow me to vote twice", async () => {
-        const instructions: TransactionInstruction[] = []
+        const instructions: TransactionInstruction[] = [];
         const {
           pubkeys: { voterWeightRecord: r },
           instruction,
@@ -597,10 +599,7 @@ describe("voter-stake-registry", () => {
           })
           .remainingAccounts([
             {
-              pubkey: await getAssociatedTokenAddress(
-                mint,
-                me
-              ),
+              pubkey: await getAssociatedTokenAddress(mint, me),
               isSigner: false,
               isWritable: false,
             },
@@ -636,9 +635,9 @@ describe("voter-stake-registry", () => {
         );
 
         try {
-          await sendInstructions(provider, instructions)
+          await sendInstructions(provider, instructions);
         } catch (e: any) {
-          expect(e.InstructionError[1].Custom).to.eq(6045)
+          expect(e.InstructionError[1].Custom).to.eq(6045);
         }
       });
 
@@ -673,7 +672,7 @@ describe("voter-stake-registry", () => {
             me,
             1
           )
-        )
+        );
 
         const {
           pubkeys: { voterWeightRecord },
@@ -854,7 +853,7 @@ describe("voter-stake-registry", () => {
         .accounts({
           sourcePosition: position,
           targetPosition: newPos,
-          depositMint: hntMint
+          depositMint: hntMint,
         })
         .rpc({ skipPreflight: true });
 
@@ -867,7 +866,7 @@ describe("voter-stake-registry", () => {
         toBN(90, 8).toNumber()
       );
     });
-  });  
+  });
 });
 
 function expectBnAccuracy(
