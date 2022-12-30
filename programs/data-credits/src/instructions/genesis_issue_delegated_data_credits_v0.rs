@@ -1,11 +1,7 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
-use anchor_spl::{
-  token::{
-    Mint, Token, TokenAccount,
-  },
-};
+use anchor_spl::token::{Mint, Token, TokenAccount};
 use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
@@ -47,7 +43,7 @@ pub struct GenesisIssueDelegatedDataCreditsV0<'info> {
   )]
   pub lazy_signer: Signer<'info>,
   pub dc_mint: Box<Account<'info, Mint>>,
-    /// CHECK: Verified by cpi
+  /// CHECK: Verified by cpi
   #[account(
     mut,
     seeds = ["mint_windowed_breaker".as_bytes(), dc_mint.key().as_ref()],
@@ -81,7 +77,10 @@ pub struct GenesisIssueDelegatedDataCreditsV0<'info> {
   pub clock: Sysvar<'info, Clock>,
 }
 
-pub fn handler(ctx: Context<GenesisIssueDelegatedDataCreditsV0>, args: GenesisIssueDelegatedDataCreditsArgsV0) -> Result<()> {
+pub fn handler(
+  ctx: Context<GenesisIssueDelegatedDataCreditsV0>,
+  args: GenesisIssueDelegatedDataCreditsArgsV0,
+) -> Result<()> {
   ctx
     .accounts
     .delegated_data_credits
@@ -107,15 +106,17 @@ pub fn handler(ctx: Context<GenesisIssueDelegatedDataCreditsV0>, args: GenesisIs
     circuit_breaker: ctx.accounts.circuit_breaker.to_account_info(),
     clock: ctx.accounts.clock.to_account_info(),
   };
-  
+
   // mint the new tokens to recipient
   mint_v0(
     CpiContext::new_with_signer(
       ctx.accounts.circuit_breaker_program.to_account_info(),
       cpi_accounts,
-      signer_seeds
+      signer_seeds,
     ),
-    MintArgsV0 { amount: args.amount },
+    MintArgsV0 {
+      amount: args.amount,
+    },
   )?;
 
   Ok(())

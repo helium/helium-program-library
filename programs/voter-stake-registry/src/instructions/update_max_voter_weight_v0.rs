@@ -7,7 +7,7 @@ use crate::state::{MaxVoterWeightRecord, Registrar};
 /// This instruction should only be executed once per realm/governing_token_mint to create the account
 #[derive(Accounts)]
 pub struct UpdateMaxVoterWeightV0<'info> {
-    #[account(
+  #[account(
         init_if_needed,
         seeds = [ b"max-voter-weight-record".as_ref(),
                 registrar.load()?.realm.as_ref(),
@@ -16,17 +16,17 @@ pub struct UpdateMaxVoterWeightV0<'info> {
         payer = payer,
         space = MaxVoterWeightRecord::get_space()
     )]
-    pub max_voter_weight_record: Account<'info, MaxVoterWeightRecord>,
-    #[account(
+  pub max_voter_weight_record: Account<'info, MaxVoterWeightRecord>,
+  #[account(
       has_one = realm_governing_token_mint
     )]
-    pub registrar: AccountLoader<'info, Registrar>,
-    pub realm_governing_token_mint: Account<'info, Mint>,
+  pub registrar: AccountLoader<'info, Registrar>,
+  pub realm_governing_token_mint: Account<'info, Mint>,
 
-    #[account(mut)]
-    pub payer: Signer<'info>,
+  #[account(mut)]
+  pub payer: Signer<'info>,
 
-    pub system_program: Program<'info, System>,
+  pub system_program: Program<'info, System>,
 }
 
 pub fn handler(ctx: Context<UpdateMaxVoterWeightV0>) -> Result<()> {
@@ -37,9 +37,15 @@ pub fn handler(ctx: Context<UpdateMaxVoterWeightV0>) -> Result<()> {
   max_voter_weight_record.governing_token_mint = registrar.realm_governing_token_mint;
 
   max_voter_weight_record.max_voter_weight_expiry = None;
-  let config_idx = registrar.voting_mint_config_index(ctx.accounts.realm_governing_token_mint.key())?;
+  let config_idx =
+    registrar.voting_mint_config_index(ctx.accounts.realm_governing_token_mint.key())?;
   let max_scale = registrar.voting_mints[config_idx].max_extra_lockup_vote_weight_scaled_factor;
-  max_voter_weight_record.max_voter_weight = ctx.accounts.realm_governing_token_mint.supply.checked_mul(max_scale).unwrap();
+  max_voter_weight_record.max_voter_weight = ctx
+    .accounts
+    .realm_governing_token_mint
+    .supply
+    .checked_mul(max_scale)
+    .unwrap();
 
-  return Ok(())
+  return Ok(());
 }
