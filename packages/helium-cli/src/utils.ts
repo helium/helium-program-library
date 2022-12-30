@@ -29,6 +29,7 @@ import {
   withSignOffProposal,
 } from "@solana/spl-governance";
 import {
+  AddressLookupTableProgram,
   Commitment,
   Connection,
   Keypair,
@@ -37,11 +38,18 @@ import {
   SYSVAR_CLOCK_PUBKEY,
   Transaction,
   TransactionInstruction,
+  TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import fs from "fs";
 import fetch from "node-fetch";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import {
+  AuthorityType,
+  createSetAuthorityInstruction,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
 import { BN } from "bn.js";
+import { sleep } from "@switchboard-xyz/common";
 
 const SECONDS_PER_DAY = 86400;
 
@@ -69,6 +77,8 @@ export async function createAndMint({
   metadataUrl,
   decimals = 8,
   to,
+  mintAuthority = provider.wallet.publicKey,
+  freezeAuthority = provider.wallet.publicKey,
 }: {
   provider: anchor.AnchorProvider;
   mintKeypair?: Keypair;
@@ -76,6 +86,8 @@ export async function createAndMint({
   metadataUrl: string;
   decimals?: number;
   to?: PublicKey;
+  mintAuthority?: PublicKey;
+  freezeAuthority?: PublicKey;
 }): Promise<void> {
   const mintTo = to || provider.wallet.publicKey;
   const metadata = await fetch(metadataUrl).then((r) => r.json());
@@ -89,7 +101,7 @@ export async function createAndMint({
           provider,
           decimals,
           provider.wallet.publicKey,
-          provider.wallet.publicKey,
+          freezeAuthority,
           mintKeypair
         )),
         ...(
@@ -150,6 +162,18 @@ export async function createAndMint({
         }
       ),
     ]);
+
+    // Set mint authority to the proper authority
+    if (!provider.wallet.publicKey.equals(mintAuthority)) {
+      await sendInstructions(provider, [
+        await createSetAuthorityInstruction(
+          mintKeypair.publicKey,
+          provider.wallet.publicKey,
+          AuthorityType.MintTokens,
+          mintAuthority
+        ),
+      ]);
+    }
   }
 }
 
@@ -170,7 +194,9 @@ export async function sendInstructionsOrCreateProposal({
   idlErrors = new Map(),
   votingMint,
   dao,
+  walletSigner,
 }: {
+  walletSigner?: Signer; // If we need to send a versioned tx, this signs as the wallet. Version tx not supported by Wallet interface yet
   provider: anchor.AnchorProvider;
   instructions: TransactionInstruction[];
   signers?: Signer[];
@@ -191,6 +217,11 @@ export async function sendInstructionsOrCreateProposal({
       )
     )
   ).map((k) => new PublicKey(k));
+  console.log(
+    instructions.map((ix) =>
+      ix.keys.filter((k) => k.isSigner).map((k) => k.pubkey.toBase58())
+    )
+  );
 
   const wallet = provider.wallet;
   // Missing signer, must be gov
@@ -324,7 +355,51 @@ export async function sendInstructionsOrCreateProposal({
       console.log(
         `Adding txn ${idx} to proposal ${proposalName}, ${proposal.toBase58()}`
       );
-      await sendInstructions(provider, addTxIxns);
+      try {
+        await sendInstructions(provider, addTxIxns);
+      } catch (e: any) {
+        if (e.message.includes("Transaction too large")) {
+          const [sig, lut] = await AddressLookupTableProgram.createLookupTable({
+            authority: provider.wallet.publicKey,
+            payer: provider.wallet.publicKey,
+            recentSlot: await provider.connection.getSlot(),
+          });
+          const addAddressesInstruction =
+            await AddressLookupTableProgram.extendLookupTable({
+              payer: provider.wallet.publicKey,
+              authority: provider.wallet.publicKey,
+              lookupTable: lut,
+              addresses: addTxIxns[0].keys
+                .map((k) => k.pubkey)
+                .filter((p) => !walletSigner.publicKey.equals(p)),
+            });
+          await sendInstructions(provider, [sig, addAddressesInstruction], []);
+          await sleep(4000) // Wait for the lut to activate
+          const lookupTableAcc = (
+            await provider.connection.getAddressLookupTable(lut)
+          ).value;
+          const tx = new VersionedTransaction(
+            new TransactionMessage({
+              payerKey: payer,
+              recentBlockhash: (await provider.connection.getLatestBlockhash())
+                .blockhash,
+              instructions: [addTxIxns[0]],
+            }).compileToV0Message([lookupTableAcc])
+          );
+          console.log("Created lookup table since ix too big", lut.toBase58());
+          await tx.sign([walletSigner]);
+          const sent = await provider.connection.sendTransaction(tx);
+          await provider.connection.confirmTransaction(sent, "confirmed");
+          console.log(`Added tx ${idx}`, sent);
+
+          await AddressLookupTableProgram.closeLookupTable({
+            lookupTable: lut,
+            authority: provider.wallet.publicKey,
+            recipient: provider.wallet.publicKey,
+          });
+          console.log("Closed lookup table");
+        }
+      }
       idx++;
     }
 

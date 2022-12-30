@@ -209,13 +209,6 @@ async function run() {
 
   const conn = provider.connection;
 
-  await createAndMint({
-    provider,
-    mintKeypair: subdaoKeypair,
-    amount: argv.numTokens,
-    metadataUrl: `${argv.bucket}/${name.toLowerCase()}.json`,
-  });
-
   const dao = (await daoKey(new PublicKey(argv.hntPubkey)))[0];
   const subdao = (await subDaoKey(subdaoKeypair.publicKey))[0];
   const daoAcc = await heliumSubDaosProgram.account.daoV0.fetch(dao);
@@ -225,6 +218,15 @@ async function run() {
     lazyDist,
     true
   );
+
+  await createAndMint({
+    provider,
+    mintKeypair: subdaoKeypair,
+    amount: argv.numTokens,
+    metadataUrl: `${argv.bucket}/${name.toLowerCase()}.json`,
+    mintAuthority: daoAcc.authority,
+    freezeAuthority: daoAcc.authority,
+  });
 
   let instructions: TransactionInstruction[] = [];
   const govProgramVersion = await getGovernanceProgramVersion(
@@ -486,6 +488,9 @@ async function run() {
           hntMint: new PublicKey(argv.hntPubkey),
           activeDeviceAggregator: agg,
           payer: daoAcc.authority,
+          dntMintAuthority: daoAcc.authority,
+          subDaoFreezeAuthority: daoAcc.authority,
+          authority: daoAcc.authority
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
@@ -547,6 +552,7 @@ async function run() {
           merkleTree: merkle.publicKey,
           subDao: subdao,
           payer: daoAcc.authority,
+          authority: daoAcc.authority,
         })
         .signers([merkle])
         .instruction()
@@ -555,6 +561,7 @@ async function run() {
   await sendInstructionsOrCreateProposal({
     provider,
     instructions: possibleProposals,
+    walletSigner: wallet,
     signers: [],
     govProgramId,
     dao,
@@ -574,8 +581,9 @@ function emissionSchedule(
   startEpochRewards: number
 ): { startUnixTime: anchor.BN; emissionsPerEpoch: anchor.BN }[] {
   const now = new Date().getDate() / 1000;
-  // Do 10 years out, halving every 2 years
-  return new Array(10).fill(0).map((_, twoYear) => {
+  // Do 6 years out, halving every  years
+  // Any larger and it wont fit in a tx
+  return new Array(3).fill(0).map((_, twoYear) => {
     return {
       startUnixTime: new anchor.BN(twoYear * 2 * 31557600 + now), // 2 years in seconds
       emissionsPerEpoch: toBN(

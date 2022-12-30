@@ -91,7 +91,7 @@ pub struct InitializeHotspotConfigV0<'info> {
 
   /// CHECK: Checked by cpi
   #[account(mut)]
-  pub merkle_tree: Signer<'info>,
+  pub merkle_tree: UncheckedAccount<'info>,
 
   /// CHECK: Checked with constraints
   #[account(address = mpl_token_metadata::ID)]
