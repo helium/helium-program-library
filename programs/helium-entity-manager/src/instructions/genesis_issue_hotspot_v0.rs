@@ -79,7 +79,6 @@ pub struct GenesisIssueHotspotV0<'info> {
   pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
   pub system_program: Program<'info, System>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> GenesisIssueHotspotV0<'info> {

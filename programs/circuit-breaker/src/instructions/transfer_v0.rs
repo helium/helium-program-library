@@ -23,7 +23,6 @@ pub struct TransferV0<'info> {
   )]
   pub circuit_breaker: Box<Account<'info, AccountWindowedCircuitBreakerV0>>,
   pub token_program: Program<'info, Token>,
-  pub clock: Sysvar<'info, Clock>,
 }
 
 pub fn handler(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
@@ -34,7 +33,7 @@ pub fn handler(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
     &circuit_breaker.last_window,
     args.amount,
     ctx.accounts.from.amount,
-    ctx.accounts.clock.unix_timestamp,
+    Clock::get()?.unix_timestamp,
   )?;
 
   transfer(

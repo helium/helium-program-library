@@ -56,7 +56,6 @@ pub struct CalculateUtilityScoreV0<'info> {
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
-  pub rent: Sysvar<'info, Rent>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
@@ -142,7 +141,6 @@ fn construct_kickoff_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> I
     AccountMeta::new(ctx.accounts.sub_dao.key(), false),
     AccountMeta::new(dao_epoch_info, false),
     AccountMeta::new(sub_dao_epoch_info, false),
-    AccountMeta::new_readonly(ctx.accounts.rent.key(), false),
     AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
     AccountMeta::new(ctx.accounts.thread.key(), false),
     AccountMeta::new_readonly(ctx.accounts.clockwork.key(), false),

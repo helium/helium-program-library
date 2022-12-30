@@ -57,7 +57,6 @@ pub struct CloseDelegationV0<'info> {
   #[account(address = voter_stake_registry::ID)]
   pub vsr_program: AccountInfo<'info>,
   pub system_program: Program<'info, System>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {

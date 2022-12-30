@@ -21,6 +21,7 @@ import {
   withCreateGovernance,
   withSetRealmAuthority,
   SetRealmAuthorityAction,
+  getTokenOwnerRecordAddress,
 } from "@solana/spl-governance";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -33,77 +34,6 @@ import {
 import { sendInstructions } from "@helium/spl-utils";
 
 const { hideBin } = require("yargs/helpers");
-const yarg = yargs(hideBin(process.argv)).options({
-  wallet: {
-    alias: "k",
-    describe: "Anchor wallet keypair",
-    default: `${os.homedir()}/.config/solana/id.json`,
-  },
-  url: {
-    alias: "u",
-    default: "http://127.0.0.1:8899",
-    describe: "The solana url",
-  },
-  hntKeypair: {
-    type: "string",
-    describe: "Keypair of the HNT token",
-    default: "./keypairs/hnt.json",
-  },
-  dcKeypair: {
-    type: "string",
-    describe: "Keypair of the Data Credit token",
-    default: "./keypairs/dc.json",
-  },
-  makerKeypair: {
-    type: "string",
-    describe: "Keypair of a maker",
-    default: `${os.homedir()}/.config/solana/id.json`,
-  },
-  numHnt: {
-    type: "number",
-    describe:
-      "Number of HNT tokens to pre mint before assigning authority to lazy distributor",
-    default: 0,
-  },
-  numDc: {
-    type: "number",
-    describe:
-      "Number of DC tokens to pre mint before assigning authority to lazy distributor",
-    default: 1000,
-  },
-  bucket: {
-    type: "string",
-    describe: "Bucket URL prefix holding all of the metadata jsons",
-    default:
-      "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib",
-  },
-  govProgramId: {
-    type: "string",
-    describe: "Pubkey of the GOV program",
-    default: "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw",
-  },
-  realmName: {
-    type: "string",
-    describe: "Name of the realm to be generated",
-    default: "Helium",
-  },
-  councilKeypair: {
-    type: "string",
-    describe: "Keypair of gov council token",
-    default: "./keypairs/council.json",
-  },
-  councilWallet: {
-    type: "string",
-    describe: "Pubkey for holding/distributing council tokens",
-    default: `${os.homedir()}/.config/solana/id.json`,
-  },
-  numCouncil: {
-    type: "number",
-    describe:
-      "Number of Gov Council tokens to pre mint before assigning authority to dao",
-    default: 10,
-  },
-});
 
 const HNT_EPOCH_REWARDS = 10000000000;
 const MOBILE_EPOCH_REWARDS = 5000000000;
@@ -119,6 +49,91 @@ async function exists(
 }
 
 async function run() {
+  const yarg = yargs(hideBin(process.argv)).options({
+    wallet: {
+      alias: "k",
+      describe: "Anchor wallet keypair",
+      default: `${os.homedir()}/.config/solana/id.json`,
+    },
+    url: {
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
+    },
+    hntKeypair: {
+      type: "string",
+      describe: "Keypair of the HNT token",
+      default: "./keypairs/hnt.json",
+    },
+    hstKeypair: {
+      type: "string",
+      describe: "Keypair of the HST token",
+      default: "./keypairs/hst.json",
+    },
+    dcKeypair: {
+      type: "string",
+      describe: "Keypair of the Data Credit token",
+      default: "./keypairs/dc.json",
+    },
+    makerKeypair: {
+      type: "string",
+      describe: "Keypair of a maker",
+      default: `${os.homedir()}/.config/solana/id.json`,
+    },
+    numHnt: {
+      type: "number",
+      describe:
+        "Number of HNT tokens to pre mint before assigning authority to lazy distributor",
+      default: 0,
+    },
+    numHst: {
+      type: "number",
+      describe:
+        "Number of HST tokens to pre mint before assigning authority to lazy distributor",
+      default: 0,
+    },
+    numDc: {
+      type: "number",
+      describe:
+        "Number of DC tokens to pre mint before assigning authority to lazy distributor",
+      default: 1000,
+    },
+    bucket: {
+      type: "string",
+      describe: "Bucket URL prefix holding all of the metadata jsons",
+      default:
+        "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib",
+    },
+    govProgramId: {
+      type: "string",
+      describe: "Pubkey of the GOV program",
+      default: "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw",
+    },
+    realmName: {
+      type: "string",
+      describe: "Name of the realm to be generated",
+      default: "Helium",
+    },
+    councilKeypair: {
+      type: "string",
+      describe: "Keypair of gov council token",
+      default: "./keypairs/council.json",
+    },
+    councilWallet: {
+      type: "string",
+      describe: "Pubkey for holding/distributing council tokens",
+      default: await loadKeypair(
+        `${os.homedir()}/.config/solana/id.json`
+      ).publicKey.toBase58(),
+    },
+    numCouncil: {
+      type: "number",
+      describe:
+        "Number of Gov Council tokens to pre mint before assigning authority to dao",
+      default: 10,
+    },
+  });
+  
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
@@ -131,12 +146,14 @@ async function run() {
   const heliumVsrProgram = await initVsr(provider);
 
   const hntKeypair = await loadKeypair(argv.hntKeypair);
+  const hstKeypair = await loadKeypair(argv.hstKeypair);
   const dcKeypair = await loadKeypair(argv.dcKeypair);
   const govProgramId = new PublicKey(argv.govProgramId);
   const councilKeypair = await loadKeypair(argv.councilKeypair);
   const councilWallet = new PublicKey(argv.councilWallet);
 
   console.log("HNT", hntKeypair.publicKey.toBase58());
+  console.log("HST", hstKeypair.publicKey.toBase58());
   console.log("DC", dcKeypair.publicKey.toBase58());
   console.log("GOV PID", govProgramId.toBase58());
   console.log("COUNCIL", councilKeypair.publicKey.toBase58());
@@ -153,6 +170,13 @@ async function run() {
 
   await createAndMint({
     provider,
+    mintKeypair: hstKeypair,
+    amount: argv.numHst,
+    metadataUrl: `${argv.bucket}/hst.json`,
+  });
+
+  await createAndMint({
+    provider,
     mintKeypair: dcKeypair,
     amount: argv.numDc,
     decimals: 0,
@@ -164,7 +188,7 @@ async function run() {
     mintKeypair: councilKeypair,
     amount: argv.numCouncil,
     decimals: 0,
-    metadataUrl: `${argv.bucket}/council.json}`,
+    metadataUrl: `${argv.bucket}/council.json`,
     to: councilWallet,
   });
 
@@ -255,14 +279,23 @@ async function run() {
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
-  const governance = await PublicKey.findProgramAddressSync(
+  const dao = (await daoKey(hntKeypair.publicKey))[0];
+  const governance = PublicKey.findProgramAddressSync(
     [
       Buffer.from("account-governance", "utf-8"),
       realm.toBuffer(),
-      PublicKey.default.toBuffer(),
+      dao.toBuffer(),
     ],
     govProgramId
   )[0];
+  const nativeTreasury = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("native-treasury", "utf-8"),
+      governance.toBuffer(),
+    ],
+    govProgramId
+  )[0];
+  console.log(`Using governance treasury ${nativeTreasury.toBase58()} as authority`);
   if (!(await exists(conn, governance))) {
     console.log(`Initializing Governance on Realm: ${realmName}`);
     await withCreateGovernance(
@@ -270,13 +303,13 @@ async function run() {
       govProgramId,
       govProgramVersion,
       realm,
-      hntKeypair.publicKey,
+      dao,
       new GovernanceConfig({
         communityVoteThreshold: new VoteThreshold({
           type: VoteThresholdType.YesVotePercentage,
           value: 60,
         }),
-        minCommunityTokensToCreateProposal: new anchor.BN(1),
+        minCommunityTokensToCreateProposal: new anchor.BN("100000000000000"),
         minInstructionHoldUpTime: 0,
         maxVotingTime: getTimestampFromDays(3),
         communityVoteTipping: VoteTipping.Strict,
@@ -294,9 +327,14 @@ async function run() {
           type: VoteThresholdType.Disabled,
         }),
         votingCoolOffTime: 0,
-        depositExemptProposalCount: 10,
+        depositExemptProposalCount: 20,
       }),
-      PublicKey.default,
+      await getTokenOwnerRecordAddress(
+        govProgramId,
+        realm,
+        hntKeypair.publicKey,
+        provider.wallet.publicKey
+      ),
       provider.wallet.publicKey,
       provider.wallet.publicKey
     );
@@ -318,7 +356,7 @@ async function run() {
   if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
-        authority: governance,
+        authority: nativeTreasury,
         config: {
           windowSizeSeconds: new anchor.BN(60 * 60),
           thresholdType: ThresholdType.Absolute as never,
@@ -335,13 +373,12 @@ async function run() {
       .rpc({ skipPreflight: true });
   }
 
-  const dao = (await daoKey(hntKeypair.publicKey))[0];
   if (!(await exists(conn, dao))) {
     console.log("Initializing DAO");
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         registrar: registrar,
-        authority: governance,
+        authority: nativeTreasury,
         emissionSchedule: [
           {
             startUnixTime: new anchor.BN(0),

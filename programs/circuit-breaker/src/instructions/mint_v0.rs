@@ -24,7 +24,6 @@ pub struct MintV0<'info> {
   )]
   pub circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
   pub token_program: Program<'info, Token>,
-  pub clock: Sysvar<'info, Clock>,
 }
 
 pub fn handler(ctx: Context<MintV0>, args: MintArgsV0) -> Result<()> {
@@ -35,7 +34,7 @@ pub fn handler(ctx: Context<MintV0>, args: MintArgsV0) -> Result<()> {
     &circuit_breaker.last_window,
     args.amount,
     ctx.accounts.mint.supply,
-    ctx.accounts.clock.unix_timestamp,
+    Clock::get()?.unix_timestamp,
   )?;
 
   mint_to(

@@ -67,7 +67,6 @@ pub struct DelegateV0<'info> {
 
   pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {

@@ -48,8 +48,6 @@ pub struct DistributeRewardsCommonV0<'info> {
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
-  pub rent: Sysvar<'info, Rent>,
-  pub clock: Sysvar<'info, Clock>,
 }
 
 pub fn distribute_impl(ctx: &mut DistributeRewardsCommonV0) -> Result<()> {
@@ -84,7 +82,6 @@ pub fn distribute_impl(ctx: &mut DistributeRewardsCommonV0) -> Result<()> {
         owner: ctx.lazy_distributor.to_account_info().clone(),
         circuit_breaker: ctx.circuit_breaker.to_account_info().clone(),
         token_program: ctx.token_program.to_account_info().clone(),
-        clock: ctx.clock.to_account_info().clone(),
       },
       seeds,
     ),

@@ -27,7 +27,6 @@ pub struct InitializeHotspotIssuerV0<'info> {
   pub hotspot_issuer: Box<Account<'info, HotspotIssuerV0>>,
 
   pub system_program: Program<'info, System>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(

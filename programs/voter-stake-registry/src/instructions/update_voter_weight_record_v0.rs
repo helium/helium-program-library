@@ -33,7 +33,6 @@ pub struct UpdateVoterWeightRecordV0<'info> {
     bump,
   )]
   pub voter_weight_record: Account<'info, VoterWeightRecord>,
-  pub rent: Sysvar<'info, Rent>,
   pub system_program: Program<'info, System>,
 }
 

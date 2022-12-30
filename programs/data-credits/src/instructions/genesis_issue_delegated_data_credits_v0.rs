@@ -73,8 +73,6 @@ pub struct GenesisIssueDelegatedDataCreditsV0<'info> {
 
   pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
-  pub rent: Sysvar<'info, Rent>,
-  pub clock: Sysvar<'info, Clock>,
 }
 
 pub fn handler(
@@ -104,7 +102,6 @@ pub fn handler(
     mint_authority: ctx.accounts.data_credits.to_account_info(),
     token_program: ctx.accounts.token_program.to_account_info(),
     circuit_breaker: ctx.accounts.circuit_breaker.to_account_info(),
-    clock: ctx.accounts.clock.to_account_info(),
   };
 
   // mint the new tokens to recipient

@@ -45,7 +45,6 @@ pub struct TrackDcBurnV0<'info> {
   )]
   pub account_payer: Signer<'info>, // can't be a HSD PDA because init_if_needed can't be used
   pub system_program: Program<'info, System>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(ctx: Context<TrackDcBurnV0>, args: TrackDcBurnArgsV0) -> Result<()> {

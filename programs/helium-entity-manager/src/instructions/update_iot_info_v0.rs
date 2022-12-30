@@ -101,7 +101,6 @@ pub struct UpdateIotInfoV0<'info> {
   pub data_credits_program: AccountInfo<'info>,
   pub token_program: Program<'info, Token>,
   pub associated_token_program: Program<'info, AssociatedToken>,
-  pub rent: Sysvar<'info, Rent>,
   pub system_program: Program<'info, System>,
 }
 
@@ -115,7 +114,6 @@ impl<'info> UpdateIotInfoV0<'info> {
         dc_mint: self.dc_mint.to_account_info(),
         token_program: self.token_program.to_account_info(),
         associated_token_program: self.associated_token_program.to_account_info(),
-        rent: self.rent.to_account_info(),
         system_program: self.system_program.to_account_info(),
       },
     };

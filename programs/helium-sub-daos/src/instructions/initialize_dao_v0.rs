@@ -45,8 +45,6 @@ pub struct InitializeDaoV0<'info> {
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
-  pub clock: Sysvar<'info, Clock>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Result<()> {
@@ -60,7 +58,6 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
         mint_authority: ctx.accounts.hnt_mint_authority.to_account_info(),
         token_program: ctx.accounts.token_program.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
-        rent: ctx.accounts.rent.to_account_info(),
       },
     ),
     InitializeMintWindowedBreakerArgsV0 {
@@ -73,7 +70,7 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
         threshold: 5
           * args
             .emission_schedule
-            .get_emissions_at(ctx.accounts.clock.unix_timestamp)
+            .get_emissions_at(Clock::get()?.unix_timestamp)
             .unwrap(),
       },
       mint_authority: ctx.accounts.dao.key(),

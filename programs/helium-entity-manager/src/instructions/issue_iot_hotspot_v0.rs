@@ -142,8 +142,6 @@ pub struct IssueIotHotspotV0<'info> {
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
-  pub clock: Sysvar<'info, Clock>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> IssueIotHotspotV0<'info> {
@@ -177,7 +175,6 @@ impl<'info> IssueIotHotspotV0<'info> {
         dc_mint: self.dc_mint.to_account_info(),
         token_program: self.token_program.to_account_info(),
         associated_token_program: self.associated_token_program.to_account_info(),
-        rent: self.rent.to_account_info(),
         system_program: self.system_program.to_account_info(),
       },
       authority: self.hotspot_config.to_account_info(),

@@ -33,7 +33,6 @@ pub struct InitializeAccountWindowedBreakerV0<'info> {
 
   pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(

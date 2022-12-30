@@ -72,8 +72,6 @@ pub struct BurnDelegatedDataCreditsV0<'info> {
   pub token_program: Program<'info, Token>,
   pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
   pub system_program: Program<'info, System>,
-  pub clock: Sysvar<'info, Clock>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> BurnDelegatedDataCreditsV0<'info> {
@@ -84,7 +82,6 @@ impl<'info> BurnDelegatedDataCreditsV0<'info> {
       dao: self.dao.to_account_info(),
       system_program: self.system_program.to_account_info(),
       registrar: self.registrar.to_account_info(),
-      rent: self.rent.to_account_info(),
       account_payer: self.account_payer.to_account_info(),
       dc_mint: self.dc_mint.to_account_info(),
     }

@@ -89,8 +89,6 @@ pub struct ClaimRewardsV0<'info> {
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub token_program: Program<'info, Token>,
-  pub clock: Sysvar<'info, Clock>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> ClaimRewardsV0<'info> {
@@ -101,7 +99,6 @@ impl<'info> ClaimRewardsV0<'info> {
       owner: self.sub_dao.to_account_info(),
       circuit_breaker: self.delegator_pool_circuit_breaker.to_account_info(),
       token_program: self.token_program.to_account_info(),
-      clock: self.clock.to_account_info(),
     };
 
     CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)

@@ -1,22 +1,47 @@
+import { init } from "@helium/helium-sub-daos-sdk";
 import {
   createAtaAndMintInstructions,
   createMintInstructions,
   sendInstructions,
   toBN,
+  truthy,
 } from "@helium/spl-utils";
 import {
   createCreateMetadataAccountV3Instruction,
   PROGRAM_ID as METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
+import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import * as anchor from "@project-serum/anchor";
 import {
+  AccountMetaData,
+  getGovernanceProgramVersion,
+  getTokenOwnerRecordAddress,
+  Governance,
+  GovernanceAccountParser,
+  InstructionData,
+  Realm,
+  VoteType,
+  withAddSignatory,
+  withCreateProposal,
+  withCreateTokenOwnerRecord,
+  withDepositGoverningTokens,
+  withInsertTransaction,
+  withSignOffProposal,
+} from "@solana/spl-governance";
+import {
+  Commitment,
   Connection,
   Keypair,
   PublicKey,
+  Signer,
   SYSVAR_CLOCK_PUBKEY,
+  Transaction,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import fs from "fs";
 import fetch from "node-fetch";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { BN } from "bn.js";
 
 const SECONDS_PER_DAY = 86400;
 
@@ -131,5 +156,210 @@ export async function createAndMint({
 export function loadKeypair(keypair: string): Keypair {
   return Keypair.fromSecretKey(
     new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString()))
+  );
+}
+
+export async function sendInstructionsOrCreateProposal({
+  provider,
+  instructions,
+  signers = [],
+  govProgramId,
+  proposalName,
+  payer = provider.wallet.publicKey,
+  commitment = "confirmed",
+  idlErrors = new Map(),
+  votingMint,
+  dao,
+}: {
+  provider: anchor.AnchorProvider;
+  instructions: TransactionInstruction[];
+  signers?: Signer[];
+  govProgramId: PublicKey;
+  dao: PublicKey;
+  votingMint?: PublicKey; // Defaults to community token
+  proposalName: string;
+  payer?: PublicKey;
+  commitment?: Commitment;
+  idlErrors?: Map<number, string>;
+}): Promise<string> {
+  PublicKey.prototype.toString = PublicKey.prototype.toBase58;
+
+  const signerKeys = Array.from(
+    new Set(
+      instructions.map((ix) =>
+        ix.keys.filter((k) => k.isSigner).map((k) => k.pubkey.toBase58())
+      )
+    )
+  ).map((k) => new PublicKey(k));
+
+  const wallet = provider.wallet;
+  // Missing signer, must be gov
+  if (
+    signerKeys.some(
+      (k) =>
+        !k.equals(provider.wallet.publicKey) &&
+        !signers.some((s) => s.publicKey.equals(k))
+    )
+  ) {
+    const proposalIxns = [];
+    const hsd = await init(provider);
+    const daoAcc = await hsd.account.daoV0.fetch(dao);
+    const vsr = await initVsr(provider);
+    const registrar = await vsr.account.registrar.fetch(daoAcc.registrar);
+
+    const governanceKey = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("account-governance", "utf-8"),
+        registrar.realm.toBuffer(),
+        dao.toBuffer(),
+      ],
+      govProgramId
+    )[0];
+    const info = await provider.connection.getAccountInfo(governanceKey);
+    const gov = GovernanceAccountParser(Governance)(
+      governanceKey,
+      info!
+    ).account;
+    const realmKey = gov.realm;
+    const realmInfo = await provider.connection.getAccountInfo(realmKey);
+    const realm = GovernanceAccountParser(Realm)(
+      governanceKey,
+      realmInfo!
+    ).account;
+
+    if (!votingMint) {
+      votingMint = realm.communityMint;
+    }
+    const tokenOwner = await getTokenOwnerRecordAddress(
+      govProgramId,
+      realmKey,
+      votingMint,
+      wallet.publicKey
+    );
+
+    const version = await getGovernanceProgramVersion(
+      provider.connection,
+      govProgramId
+    );
+
+    if (!(await provider.connection.getAccountInfo(tokenOwner))) {
+      await withCreateTokenOwnerRecord(
+        proposalIxns,
+        govProgramId,
+        version,
+        realmKey,
+        wallet.publicKey,
+        votingMint,
+        wallet.publicKey
+      );
+      withDepositGoverningTokens(
+        proposalIxns,
+        govProgramId,
+        version,
+        realmKey,
+        await getAssociatedTokenAddress(votingMint, wallet.publicKey),
+        votingMint,
+        wallet.publicKey,
+        wallet.publicKey,
+        wallet.publicKey,
+        new BN(1)
+      );
+    }
+
+    const proposal = await withCreateProposal(
+      proposalIxns,
+      govProgramId,
+      version,
+      realmKey,
+      governanceKey,
+      tokenOwner,
+      proposalName,
+      "Created via helium cli with args",
+      votingMint,
+      wallet.publicKey,
+      gov.proposalCount,
+      VoteType.SINGLE_CHOICE,
+      ["Approve"],
+      true,
+      wallet.publicKey
+    );
+
+    const signatoryRecord = await withAddSignatory(
+      proposalIxns,
+      govProgramId,
+      1,
+      proposal,
+      tokenOwner,
+      wallet.publicKey,
+      wallet.publicKey,
+      wallet.publicKey
+    );
+
+    console.log(`Creating proposal ${proposalName}, ${proposal.toBase58()}`);
+    await sendInstructions(provider, proposalIxns);
+
+    let idx = 0;
+    for (const instruction of instructions) {
+      const addTxIxns = [];
+      await withInsertTransaction(
+        addTxIxns,
+        govProgramId,
+        version,
+        governanceKey,
+        proposal,
+        tokenOwner,
+        wallet.publicKey,
+        idx,
+        0,
+        0,
+        [
+          new InstructionData({
+            programId: instruction.programId,
+            accounts: instruction.keys.map((key) => new AccountMetaData(key)),
+            data: instruction.data,
+          }),
+        ],
+        wallet.publicKey
+      );
+      console.log(
+        `Adding txn ${idx} to proposal ${proposalName}, ${proposal.toBase58()}`
+      );
+      await sendInstructions(provider, addTxIxns);
+      idx++;
+    }
+
+    const signOffIxns = [];
+    await withSignOffProposal(
+      signOffIxns,
+      govProgramId,
+      version,
+      realmKey,
+      governanceKey,
+      proposal,
+      wallet.publicKey,
+      signatoryRecord,
+      undefined
+    );
+
+    console.log(
+      `Signing off on proposal ${proposalName}, ${proposal.toBase58()}`
+    );
+    return await sendInstructions(
+      provider,
+      signOffIxns,
+      signers,
+      payer,
+      commitment,
+      idlErrors
+    );
+  }
+
+  return await sendInstructions(
+    provider,
+    instructions,
+    signers,
+    payer,
+    commitment,
+    idlErrors
   );
 }

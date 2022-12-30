@@ -72,7 +72,6 @@ pub struct DelegateDataCreditsV0<'info> {
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(ctx: Context<DelegateDataCreditsV0>, args: DelegateDataCreditsArgsV0) -> Result<()> {

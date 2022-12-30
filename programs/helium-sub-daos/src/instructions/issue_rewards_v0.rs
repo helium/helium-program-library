@@ -72,7 +72,6 @@ pub struct IssueRewardsV0<'info> {
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
-  pub clock: Sysvar<'info, Clock>,
 }
 
 fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
@@ -89,7 +88,6 @@ impl<'info> IssueRewardsV0<'info> {
       mint_authority: self.sub_dao.to_account_info(),
       circuit_breaker: self.dnt_circuit_breaker.to_account_info(),
       token_program: self.token_program.to_account_info(),
-      clock: self.clock.to_account_info(),
     };
 
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
@@ -102,7 +100,6 @@ impl<'info> IssueRewardsV0<'info> {
       mint_authority: self.sub_dao.to_account_info(),
       circuit_breaker: self.dnt_circuit_breaker.to_account_info(),
       token_program: self.token_program.to_account_info(),
-      clock: self.clock.to_account_info(),
     };
 
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
@@ -115,7 +112,6 @@ impl<'info> IssueRewardsV0<'info> {
       mint_authority: self.dao.to_account_info(),
       circuit_breaker: self.hnt_circuit_breaker.to_account_info(),
       token_program: self.token_program.to_account_info(),
-      clock: self.clock.to_account_info(),
     };
 
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
@@ -123,7 +119,7 @@ impl<'info> IssueRewardsV0<'info> {
 }
 
 pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<()> {
-  let epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
+  let epoch = current_epoch(Clock::get()?.unix_timestamp);
 
   if !TESTING && args.epoch >= epoch {
     return Err(error!(ErrorCode::EpochNotOver));
@@ -141,7 +137,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .accounts
     .dao
     .emission_schedule
-    .get_emissions_at(ctx.accounts.clock.unix_timestamp)
+    .get_emissions_at(Clock::get()?.unix_timestamp)
     .unwrap();
   let total_rewards = PreciseNumber::new(emissions.into()).or_arith_error()?;
   let rewards_prec = percent_share.checked_mul(&total_rewards).or_arith_error()?;
@@ -157,7 +153,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .accounts
     .sub_dao
     .emission_schedule
-    .get_emissions_at(ctx.accounts.clock.unix_timestamp)
+    .get_emissions_at(Clock::get()?.unix_timestamp)
     .unwrap();
 
   let stakers_present = ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start > 0;
@@ -209,7 +205,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   )?;
 
   ctx.accounts.dao_epoch_info.num_rewards_issued += 1;
-  ctx.accounts.sub_dao_epoch_info.rewards_issued_at = Some(ctx.accounts.clock.unix_timestamp);
+  ctx.accounts.sub_dao_epoch_info.rewards_issued_at = Some(Clock::get()?.unix_timestamp);
   ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued = staking_rewards_amount;
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
