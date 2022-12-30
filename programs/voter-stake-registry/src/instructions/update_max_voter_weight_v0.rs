@@ -47,5 +47,5 @@ pub fn handler(ctx: Context<UpdateMaxVoterWeightV0>) -> Result<()> {
     .checked_mul(max_scale)
     .unwrap();
 
-  return Ok(());
+  Ok(())
 }

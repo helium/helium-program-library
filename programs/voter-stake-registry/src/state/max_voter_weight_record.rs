@@ -8,7 +8,7 @@ use solana_program::pubkey::PUBKEY_BYTES;
 ///
 /// The account is used as an api interface to provide max voting power to the governance program from external addin contracts
 #[account]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct MaxVoterWeightRecord {
   /// The Realm the MaxVoterWeightRecord belongs to
   pub realm: Pubkey,
