@@ -1080,6 +1080,7 @@ dependencies = [
  "anchor-spl",
  "circuit-breaker",
  "helium-sub-daos",
+ "lazy-transactions",
  "pyth-sdk-solana",
 ]
 

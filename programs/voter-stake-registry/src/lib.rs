@@ -73,6 +73,12 @@ pub mod voter_stake_registry {
     instructions::configure_voting_mint_v0::handler(ctx, args)
   }
 
+  pub fn update_max_voter_weight_v0(
+    ctx: Context<UpdateMaxVoterWeightV0>,
+  ) -> Result<()> {
+    instructions::update_max_voter_weight_v0::handler(ctx)
+  }
+
   pub fn initialize_position_v0(
     ctx: Context<InitializePositionV0>,
     args: InitializePositionArgsV0,
