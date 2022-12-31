@@ -8,6 +8,47 @@ pub struct EmissionScheduleItem {
   pub emissions_per_epoch: u64,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct PercentItem {
+  pub start_unix_time: i64,
+  pub percent: u8, // percent / 100
+}
+
+pub trait GetPercent {
+  fn get_percent_at(&self, unix_time: i64) -> Option<u8>;
+}
+
+impl GetPercent for Vec<PercentItem> {
+  // Binary search for the emissions amongst the schedule.
+  fn get_percent_at(&self, unix_time: i64) -> Option<u8> {
+    if self.is_empty() {
+      return None;
+    }
+
+    let mut ans: Option<u8> = None;
+    let mut low: usize = 0;
+    let mut high: usize = self.len() - 1;
+
+    while low <= high {
+      let middle = (high + low) / 2;
+      if let Some(current) = self.get(middle) {
+        // Move to the right side if target time is greater
+        if current.start_unix_time <= unix_time {
+          ans = Some(current.percent);
+          low = middle + 1;
+        } else {
+          // move left side
+          high = middle - 1;
+        }
+      } else {
+        break;
+      }
+    }
+
+    ans
+  }
+}
+
 pub trait GetEmissions {
   fn get_emissions_at(&self, unix_time: i64) -> Option<u64>;
 }
@@ -50,8 +91,11 @@ pub struct DaoV0 {
   pub dc_mint: Pubkey,
   pub authority: Pubkey,
   pub registrar: Pubkey, // vsr registrar
+  pub hst_pool: Pubkey,
+  pub net_emissions_cap: u64, // Cap, in HNT, for net emissions
   pub num_sub_daos: u32,
   pub emission_schedule: Vec<EmissionScheduleItem>,
+  pub hst_emission_schedule: Vec<PercentItem>,
   pub bump_seed: u8,
 }
 
@@ -60,11 +104,14 @@ pub struct DaoV0 {
 pub struct DaoEpochInfoV0 {
   pub epoch: u64,
   pub dao: Pubkey,
+  pub total_rewards: u64,
+  pub current_hnt_supply: u64,
   /// Precise number with 12 decimals
   pub total_utility_score: u128,
   pub num_utility_scores_calculated: u32,
   pub num_rewards_issued: u32,
   pub done_issuing_rewards: bool,
+  pub done_issuing_hst_pool: bool,
   pub bump_seed: u8,
 }
 

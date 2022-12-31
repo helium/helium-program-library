@@ -119,7 +119,8 @@ impl<'info> IssueRewardsV0<'info> {
 }
 
 pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<()> {
-  let epoch = current_epoch(Clock::get()?.unix_timestamp);
+  let curr_ts = Clock::get()?.unix_timestamp;
+  let epoch = current_epoch(curr_ts);
 
   if !TESTING && args.epoch >= epoch {
     return Err(error!(ErrorCode::EpochNotOver));
@@ -133,11 +134,20 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   let percent_share = utility_score
     .checked_div(&total_utility_score)
     .or_arith_error()?;
-  let emissions = ctx
+  let total_emissions = ctx.accounts.dao_epoch_info.total_rewards;
+  let percent = ctx
     .accounts
     .dao
-    .emission_schedule
-    .get_emissions_at(Clock::get()?.unix_timestamp)
+    .hst_emission_schedule
+    .get_percent_at(curr_ts)
+    .unwrap();
+  // Subdaos get the remainder after hst
+  let emissions = 100_u64
+    .checked_sub(percent.into())
+    .unwrap()
+    .checked_mul(total_emissions)
+    .unwrap()
+    .checked_div(100)
     .unwrap();
   let total_rewards = PreciseNumber::new(emissions.into()).or_arith_error()?;
   let rewards_prec = percent_share.checked_mul(&total_rewards).or_arith_error()?;

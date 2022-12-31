@@ -31,7 +31,8 @@ import {
   getUnixTimestamp,
   loadKeypair,
 } from "./utils";
-import { sendInstructions } from "@helium/spl-utils";
+import { sendInstructions, toBN } from "@helium/spl-utils";
+import { createAssociatedTokenAccountIdempotentInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 
 const { hideBin } = require("yargs/helpers");
 
@@ -133,7 +134,7 @@ async function run() {
       default: 10,
     },
   });
-  
+
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
@@ -289,13 +290,12 @@ async function run() {
     govProgramId
   )[0];
   const nativeTreasury = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("native-treasury", "utf-8"),
-      governance.toBuffer(),
-    ],
+    [Buffer.from("native-treasury", "utf-8"), governance.toBuffer()],
     govProgramId
   )[0];
-  console.log(`Using governance treasury ${nativeTreasury.toBase58()} as authority`);
+  console.log(
+    `Using governance treasury ${nativeTreasury.toBase58()} as authority`
+  );
   if (!(await exists(conn, governance))) {
     console.log(`Initializing Governance on Realm: ${realmName}`);
     await withCreateGovernance(
@@ -379,6 +379,14 @@ async function run() {
       .initializeDaoV0({
         registrar: registrar,
         authority: governance,
+        netEmissionsCap: toBN(34.24, 8),
+        // TODO: Emissions and net emissions schedule for hnt
+        hstEmissionSchedule: [
+          {
+            startUnixTime: new anchor.BN(0),
+            percent: 32,
+          },
+        ],
         emissionSchedule: [
           {
             startUnixTime: new anchor.BN(0),
@@ -386,9 +394,22 @@ async function run() {
           },
         ],
       })
+      .preInstructions([
+        createAssociatedTokenAccountIdempotentInstruction(
+          provider.wallet.publicKey,
+          await getAssociatedTokenAddress(hntKeypair.publicKey, governance),
+          governance,
+          hntKeypair.publicKey
+        ),
+      ])
       .accounts({
         dcMint: dcKeypair.publicKey,
         hntMint: hntKeypair.publicKey,
+        // TODO: Create actual HST pool
+        hstPool: await getAssociatedTokenAddress(
+          hntKeypair.publicKey,
+          governance
+        ),
       })
       .rpc({ skipPreflight: true });
   }

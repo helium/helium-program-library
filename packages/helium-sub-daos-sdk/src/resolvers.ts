@@ -8,8 +8,8 @@ import { treasuryManagementResolvers } from "@helium/treasury-management-sdk";
 import { init, PROGRAM_ID as VSR_PROGRAM_ID, vsrResolvers } from "@helium/voter-stake-registry-sdk";
 import { AnchorProvider } from "@project-serum/anchor";
 import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
-import { PROGRAM_ID } from "./constants";
-import { subDaoEpochInfoKey } from "./pdas";
+import { EPOCH_LENGTH, PROGRAM_ID } from "./constants";
+import { daoEpochInfoKey, subDaoEpochInfoKey } from "./pdas";
 
 const THREAD_PID = new PublicKey(
   "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
@@ -114,9 +114,11 @@ export const heliumSubDaosResolvers = combineResolvers(
     mint: "mint",
     owner: "positionAuthority",
   }),
-  resolveIndividual(async ({ args, path, accounts, idlIx }) => {
+  resolveIndividual(async ({ args, path, accounts }) => {
     if (path[path.length - 1] == "clockwork") {
       return THREAD_PID;
+    } else if (path[path.length - 1] == "prevDaoEpochInfo" && accounts.dao) {
+      return daoEpochInfoKey(accounts.dao as PublicKey, (args[0].epoch.toNumber() - 1) * EPOCH_LENGTH)[0]
     }
   }),
   vsrResolvers

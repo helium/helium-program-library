@@ -4,7 +4,7 @@ use anchor_lang::{
   solana_program::{instruction::Instruction, sysvar::SysvarId},
   InstructionData,
 };
-use anchor_spl::token::Token;
+use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
 use clockwork_sdk::{self, state::ThreadResponse, utils::PAYER_PUBKEY, ThreadProgram};
 use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
@@ -25,9 +25,11 @@ pub struct CalculateUtilityScoreV0<'info> {
   pub payer: Signer<'info>,
   pub registrar: AccountLoader<'info, Registrar>,
   #[account(
-    has_one = registrar
+    has_one = registrar,
+    has_one = hnt_mint
   )]
   pub dao: Box<Account<'info, DaoV0>>,
+  pub hnt_mint: Box<Account<'info, Mint>>,
   #[account(
     mut,
     has_one = dao,
@@ -40,6 +42,12 @@ pub struct CalculateUtilityScoreV0<'info> {
   pub active_device_aggregator: AccountLoader<'info, AggregatorAccountData>,
   /// CHECK: Checked by has_one with active device aggregator
   pub history_buffer: AccountInfo<'info>,
+  #[account(
+    seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &(args.epoch - 1).to_le_bytes()],
+    bump,
+  )]
+  /// CHECK: May not have ever been initialized
+  pub prev_dao_epoch_info: UncheckedAccount<'info>,
   #[account(
     init_if_needed,
     payer = payer,
@@ -124,7 +132,13 @@ fn construct_kickoff_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> I
     dao_key.as_ref(),
     &epoch.to_le_bytes(),
   ];
+  let prev_dao_ei_seeds: &[&[u8]] = &[
+    "dao_epoch_info".as_bytes(),
+    dao_key.as_ref(),
+    &(epoch - 1).to_le_bytes(),
+  ];
   let dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
+  let prev_dao_epoch_info = Pubkey::find_program_address(prev_dao_ei_seeds, &crate::id()).0;
   let sub_dao_key = ctx.accounts.sub_dao.key();
   let sub_dao_ei_seeds: &[&[u8]] = &[
     "sub_dao_epoch_info".as_bytes(),
@@ -138,7 +152,9 @@ fn construct_kickoff_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> I
     AccountMeta::new(PAYER_PUBKEY, true),
     AccountMeta::new_readonly(ctx.accounts.registrar.key(), false),
     AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.hnt_mint.key(), false),
     AccountMeta::new(ctx.accounts.sub_dao.key(), false),
+    AccountMeta::new(prev_dao_epoch_info, false),
     AccountMeta::new(dao_epoch_info, false),
     AccountMeta::new(sub_dao_epoch_info, false),
     AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
@@ -161,6 +177,31 @@ pub fn handler(
 ) -> Result<ThreadResponse> {
   let curr_ts = ctx.accounts.registrar.load()?.clock_unix_timestamp();
   let epoch = current_epoch(curr_ts);
+
+  // Set total rewards, accounting for net emmissions by counting
+  // burned hnt since last supply setting.
+  let curr_supply = ctx.accounts.hnt_mint.supply;
+  let mut prev_supply = curr_supply;
+  if ctx.accounts.prev_dao_epoch_info.lamports() > 0 {
+    let info: Account<DaoEpochInfoV0> = Account::try_from(&ctx.accounts.prev_dao_epoch_info)?;
+    prev_supply = info.current_hnt_supply;
+  }
+
+  ctx.accounts.dao_epoch_info.total_rewards = ctx
+    .accounts
+    .dao
+    .emission_schedule
+    .get_emissions_at(Clock::get()?.unix_timestamp)
+    .unwrap()
+    .checked_add(std::cmp::min(
+      curr_supply.checked_sub(prev_supply).unwrap(),
+      ctx.accounts.dao.net_emissions_cap,
+    ))
+    .unwrap();
+
+  ctx.accounts.dao_epoch_info.current_hnt_supply = curr_supply
+    .checked_add(ctx.accounts.dao_epoch_info.total_rewards)
+    .unwrap();
 
   if !TESTING && args.epoch >= epoch {
     return Err(error!(ErrorCode::EpochNotOver));

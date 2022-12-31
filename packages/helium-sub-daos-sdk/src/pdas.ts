@@ -16,6 +16,20 @@ export function subDaoEpochInfoKey(
   );
 }
 
+export function daoEpochInfoKey(
+  dao: PublicKey,
+  unixTime: number | BN,
+  programId: PublicKey = PROGRAM_ID
+): [PublicKey, number] {
+  let bU64 = Buffer.alloc(8);
+  const epoch = currentEpoch(new BN(unixTime)).toNumber();
+  bU64.writeBigUInt64LE(BigInt(epoch));
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("dao_epoch_info", "utf-8"), dao.toBuffer(), bU64],
+    programId
+  );
+}
+
 export function daoKey(
   mint: PublicKey,
   programId: PublicKey = PROGRAM_ID

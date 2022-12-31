@@ -3,6 +3,7 @@ import { BN } from "@project-serum/anchor";
 import { Keypair, ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { createAtaAndMint, createMint, toBN } from "@helium/spl-utils";
+import { getAssociatedTokenAddress, createAssociatedTokenAccountIdempotentInstruction } from "@solana/spl-token";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { toU128 } from "../../packages/treasury-management-sdk/src";
 import { DC_FEE } from "./fixtures";
@@ -35,16 +36,30 @@ export async function initTestDao(
     .initializeDaoV0({
       registrar: registrar || Keypair.generate().publicKey,
       authority: authority,
+      netEmissionsCap: toBN(34.24, 8),
       emissionSchedule: [
         {
           startUnixTime: new anchor.BN(0),
           emissionsPerEpoch: new BN(epochRewards),
         },
       ],
+      hstEmissionSchedule: [
+        {
+          startUnixTime: new anchor.BN(0),
+          percent: 32,
+        },
+      ],
     })
+    .preInstructions([createAssociatedTokenAccountIdempotentInstruction(
+      me,
+      await getAssociatedTokenAddress(mint, me),
+      me,
+      mint
+    )])
     .accounts({
       hntMint: mint,
       dcMint,
+      hstPool: await getAssociatedTokenAddress(mint, me),
     });
   const { dao } = await method.pubkeys();
 

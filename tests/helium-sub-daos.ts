@@ -12,7 +12,7 @@ import {
 } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import { AccountLayout } from "@solana/spl-token";
+import { AccountLayout, getMint } from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
   Keypair,
@@ -151,9 +151,11 @@ describe("helium-sub-daos", () => {
     let dao: PublicKey;
     let subDao: PublicKey;
     let treasury: PublicKey;
+    let hstPool: PublicKey;
     let dcMint: PublicKey;
     let rewardsEscrow: PublicKey;
     let minLockupSeconds = 15811200; // 6 months
+    let initialSupply = toBN(10000000000, 8);
 
     async function burnDc(
       amount: number
@@ -186,7 +188,7 @@ describe("helium-sub-daos", () => {
     beforeEach(async () => {
       positionAuthorityKp = Keypair.generate();
       hntMint = await createMint(provider, 8, me, me);
-      await createAtaAndMint(provider, hntMint, toBN(10000000000, 8));
+      await createAtaAndMint(provider, hntMint, initialSupply);
       await createAtaAndTransfer(
         provider,
         hntMint,
@@ -223,6 +225,7 @@ describe("helium-sub-daos", () => {
         registrar,
         hntMint
       ));
+      hstPool = (await program.account.daoV0.fetch(dao)).hstPool;
     });
 
     it("allows tracking dc spend", async () => {
@@ -421,10 +424,17 @@ describe("helium-sub-daos", () => {
 
           expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
 
+          const supply = (await getMint(provider.connection, hntMint)).supply;
+
           const totalUtility =
             Math.sqrt(currentActiveDeviceCount * 50) *
             Math.pow(16, 1 / 4) *
             (options.lockupAmount * options.expectedMultiplier);
+
+          expect(daoInfo.totalRewards.toString()).to.eq(EPOCH_REWARDS.toString());
+          expect(daoInfo.currentHntSupply.toString()).to.eq(
+            new BN(supply.toString()).add(new BN(EPOCH_REWARDS)).toString()
+          );
 
           expectBnAccuracy(
             toBN(totalUtility, 12),
@@ -600,9 +610,12 @@ describe("helium-sub-daos", () => {
                 .rpc({ skipPreflight: true });
             });
 
-            it("issues hnt rewards to subdaos and dnt to rewards escrow", async () => {
+            it("issues hnt rewards to subdaos, dnt to rewards escrow, and hst to hst pool", async () => {
               const preBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
+              ).amount;
+              const preHstBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(hstPool))?.data!
               ).amount;
               const preMobileBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
@@ -616,14 +629,29 @@ describe("helium-sub-daos", () => {
                 })
                 .rpc({ skipPreflight: true });
 
+              await program.methods
+                .issueHstPoolV0({
+                  epoch,
+                })
+                .accounts({
+                  dao,
+                })
+                .rpc({ skipPreflight: true });
+
               const postBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
               ).amount;
               const postMobileBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
               ).amount;
+              const postHstBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(hstPool))?.data!
+              ).amount;
               expect((postBalance - preBalance).toString()).to.eq(
-                EPOCH_REWARDS.toString()
+                ((1 - 0.32) * EPOCH_REWARDS).toString()
+              );
+              expect((postHstBalance - preHstBalance).toString()).to.eq(
+                (0.32 * EPOCH_REWARDS).toString()
               );
               expect((postMobileBalance - preMobileBalance).toString()).to.eq(
                 ((SUB_DAO_EPOCH_REWARDS / 100) * 94).toString()
