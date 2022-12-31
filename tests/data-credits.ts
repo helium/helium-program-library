@@ -3,7 +3,10 @@ import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { parsePriceData } from "@pythnetwork/client";
-import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
+import {
+  createAssociatedTokenAccountIdempotentInstruction, getAccount,
+  getAssociatedTokenAddress
+} from "@solana/spl-token";
 import * as web3 from "@solana/web3.js";
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
@@ -11,7 +14,7 @@ import { assert, expect } from "chai";
 import {
   accountPayerKey,
   dataCreditsKey,
-  init,
+  init
 } from "../packages/data-credits-sdk/src";
 import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
 import * as hsd from "../packages/helium-sub-daos-sdk/src";
@@ -24,8 +27,8 @@ import { ensureHSDIdl, ensureVSRIdl } from "./utils/fixtures";
 
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { ThresholdType } from "../packages/circuit-breaker-sdk/src";
-import { initVsr } from "./utils/vsr";
 import { daoKey } from "../packages/helium-sub-daos-sdk/src";
+import { initVsr } from "./utils/vsr";
 const EPOCH_REWARDS = 100000000;
 
 export async function burnDataCredits({
@@ -170,9 +173,18 @@ describe("data-credits", () => {
             },
           ],
         })
+        .preInstructions([
+          createAssociatedTokenAccountIdempotentInstruction(
+            me,
+            await getAssociatedTokenAddress(hntMint, me),
+            me,
+            hntMint
+          ),
+        ])
         .accounts({
           dcMint,
           hntMint,
+          hstPool: await getAssociatedTokenAddress(hntMint, me),
         });
       ensureHSDIdl(hsdProgram);
 
