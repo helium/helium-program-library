@@ -197,7 +197,6 @@ async function run() {
         hotspotPubkeys.bubblegumProgram,
         hotspotPubkeys.compressionProgram,
         hotspotPubkeys.systemProgram,
-        hotspotPubkeys.rent,
         hotspotPubkeys.hotspotConfig,
         lazyTransactionsKey(argv.name)[0],
         LAZY_PROGRAM_ID,
@@ -346,7 +345,6 @@ async function run() {
               bubblegumProgram: hotspotPubkeys.bubblegumProgram,
               compressionProgram: hotspotPubkeys.compressionProgram,
               systemProgram: hotspotPubkeys.systemProgram,
-              rent: hotspotPubkeys.rent,
               hotspotConfig: hotspotPubkeys.hotspotConfig,
               recipient: solAddress,
               info: iotInfoKey(
