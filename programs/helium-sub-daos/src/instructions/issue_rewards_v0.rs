@@ -93,7 +93,7 @@ impl<'info> IssueRewardsV0<'info> {
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 
-  pub fn mint_staking_rewards_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
+  pub fn mint_delegation_rewards_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
     let cpi_accounts = MintV0 {
       mint: self.dnt_mint.to_account_info(),
       to: self.delegator_pool.to_account_info(),
@@ -166,7 +166,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .get_emissions_at(Clock::get()?.unix_timestamp)
     .unwrap();
 
-  let stakers_present = ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start > 0;
+  let delegators_present = ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start > 0;
   mint_v0(
     ctx.accounts.mint_dnt_emissions_ctx().with_signer(&[&[
       b"sub_dao",
@@ -182,7 +182,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     },
   )?;
 
-  let staking_rewards_amount = if stakers_present {
+  let delegation_rewards_amount = if delegators_present {
     total_emissions
       .checked_mul(6)
       .unwrap()
@@ -193,13 +193,13 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   };
 
   mint_v0(
-    ctx.accounts.mint_staking_rewards_ctx().with_signer(&[&[
+    ctx.accounts.mint_delegation_rewards_ctx().with_signer(&[&[
       b"sub_dao",
       ctx.accounts.dnt_mint.key().as_ref(),
       &[ctx.accounts.sub_dao.bump_seed],
     ]]),
     MintArgsV0 {
-      amount: staking_rewards_amount, // 6% of emissions are sent to staking pool
+      amount: delegation_rewards_amount, // 6% of emissions are sent to delegation pool
     },
   )?;
 
@@ -216,7 +216,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
 
   ctx.accounts.dao_epoch_info.num_rewards_issued += 1;
   ctx.accounts.sub_dao_epoch_info.rewards_issued_at = Some(Clock::get()?.unix_timestamp);
-  ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued = staking_rewards_amount;
+  ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued = delegation_rewards_amount;
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 

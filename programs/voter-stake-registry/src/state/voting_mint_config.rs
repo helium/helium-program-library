@@ -100,15 +100,6 @@ impl VotingMintConfigV0 {
   pub fn in_use(&self) -> bool {
     self.mint != Pubkey::default()
   }
-
-  /// Do tokens of this mint contribute to voting weight?
-  ///
-  /// DAOs may configure mints without any vote weight contributions if they
-  /// want to use the grant / vesting / clawback functionality for non-voting
-  /// tokens like USDC.
-  pub fn grants_vote_weight(&self) -> bool {
-    self.locked_vote_weight_scaled_factor > 0 || self.max_extra_lockup_vote_weight_scaled_factor > 0
-  }
 }
 
 unsafe impl Zeroable for VotingMintConfigV0 {}
