@@ -311,7 +311,7 @@ async function run() {
         }),
         minCommunityTokensToCreateProposal: new anchor.BN("100000000000000"),
         minInstructionHoldUpTime: 0,
-        maxVotingTime: getTimestampFromDays(3),
+        maxVotingTime: getTimestampFromDays(30),
         communityVoteTipping: VoteTipping.Strict,
         councilVoteTipping: VoteTipping.Early,
         minCouncilTokensToCreateProposal: new anchor.BN(1),
@@ -356,7 +356,7 @@ async function run() {
   if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
-        authority: nativeTreasury,
+        authority: governance,
         config: {
           windowSizeSeconds: new anchor.BN(60 * 60),
           thresholdType: ThresholdType.Absolute as never,
@@ -378,7 +378,7 @@ async function run() {
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         registrar: registrar,
-        authority: nativeTreasury,
+        authority: governance,
         emissionSchedule: [
           {
             startUnixTime: new anchor.BN(0),

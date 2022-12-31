@@ -136,6 +136,11 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Keypair of the merkle tree",
     default: "./keypairs/merkle.json",
   },
+  dcBurnAuthority: {
+    type: "string",
+    describe: "The authority to burn DC tokens",
+    required: true,
+  },
   activeDeviceOracleUrl: {
     alias: "ao",
     type: "string",
@@ -218,6 +223,16 @@ async function run() {
     lazyDist,
     true
   );
+
+  let payer = provider.wallet.publicKey;
+  const auth = await provider.connection.getAccountInfo(daoAcc.authority);
+  if (auth.owner.equals(govProgramId)) {
+    const daoPayer = PublicKey.findProgramAddressSync(
+      [Buffer.from("native-treasury", "utf-8"), daoAcc.authority.toBuffer()],
+      govProgramId
+    )[0];
+    payer = daoPayer;
+  }
 
   await createAndMint({
     provider,
@@ -323,10 +338,16 @@ async function run() {
     ],
     govProgramId
   )[0];
-  // const nativeTreasury = await PublicKey.findProgramAddressSync(
-  //   [Buffer.from("native-treasury", "utf-8"), realm.toBuffer(), dao.toBuffer()],
-  //   govProgramId
-  // )[0];
+  const nativeTreasury = await PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("native-treasury", "utf-8"),
+      governance.toBuffer(),
+    ],
+    govProgramId
+  )[0];
+  console.log(
+    `Using governance treasury ${nativeTreasury.toBase58()} as authority`
+  );
   if (!(await exists(conn, governance))) {
     console.log(`Initializing Governance on Realm: ${realmName}`);
     await withCreateGovernance(
@@ -342,7 +363,7 @@ async function run() {
         }),
         minCommunityTokensToCreateProposal: new anchor.BN(1),
         minInstructionHoldUpTime: 0,
-        maxVotingTime: getTimestampFromDays(3),
+        maxVotingTime: getTimestampFromDays(30),
         communityVoteTipping: VoteTipping.Strict,
         councilVoteTipping: VoteTipping.Early,
         minCouncilTokensToCreateProposal: new anchor.BN(1),
@@ -408,8 +429,8 @@ async function run() {
       .rpc({ skipPreflight: true });
   }
 
-  const possibleProposals: TransactionInstruction[] = [];
   if (!(await exists(conn, subdao))) {
+    const instructions: TransactionInstruction[] = [];
     console.log("Initializing switchboard oracle");
     const switchboard = await SwitchboardProgram.load(
       argv.switchboardNetwork as Cluster,
@@ -461,10 +482,10 @@ async function run() {
     }
 
     console.log(`Initializing ${name} SubDAO`);
-    possibleProposals.push(
+    instructions.push(
       await heliumSubDaosProgram.methods
         .initializeSubDaoV0({
-          dcBurnAuthority: governance,
+          dcBurnAuthority: new PublicKey(argv.dcBurnAuthority),
           authority: governance,
           emissionSchedule: emissionSchedule(argv.startEpochRewards),
           // Linear curve
@@ -487,16 +508,25 @@ async function run() {
           rewardsEscrow,
           hntMint: new PublicKey(argv.hntPubkey),
           activeDeviceAggregator: agg,
-          payer: daoAcc.authority,
+          payer,
           dntMintAuthority: daoAcc.authority,
           subDaoFreezeAuthority: daoAcc.authority,
-          authority: daoAcc.authority
+          authority: daoAcc.authority,
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ])
         .instruction()
     );
+    await sendInstructionsOrCreateProposal({
+      provider,
+      instructions,
+      walletSigner: wallet,
+      signers: [],
+      govProgramId,
+      proposalName: `Create ${name} SubDAO`,
+      votingMint: councilKeypair.publicKey,
+    });
   } else {
     const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
     console.log(
@@ -506,6 +536,7 @@ async function run() {
 
   const hsConfigKey = (await hotspotConfigKey(subdao, name.toUpperCase()))[0];
   if (!(await provider.connection.getAccountInfo(hsConfigKey))) {
+    const instructions: TransactionInstruction[] = [];
     console.log(`Initalizing ${name} HotspotConfig`);
 
     // Create a merkle account and assign it to compression
@@ -529,7 +560,7 @@ async function run() {
       );
     }
 
-    possibleProposals.push(
+    instructions.push(
       await hemProgram.methods
         .initializeHotspotConfigV0({
           name: `${name} Hotspot Collection`,
@@ -551,23 +582,22 @@ async function run() {
         .accounts({
           merkleTree: merkle.publicKey,
           subDao: subdao,
-          payer: daoAcc.authority,
-          authority: daoAcc.authority,
+          payer: nativeTreasury,
+          authority: governance,
         })
         .signers([merkle])
         .instruction()
     );
+    await sendInstructionsOrCreateProposal({
+      provider,
+      instructions,
+      walletSigner: wallet,
+      signers: [],
+      govProgramId,
+      proposalName: `Create ${name} HotspotConfig`,
+      votingMint: councilKeypair.publicKey,
+    });
   }
-  await sendInstructionsOrCreateProposal({
-    provider,
-    instructions: possibleProposals,
-    walletSigner: wallet,
-    signers: [],
-    govProgramId,
-    dao,
-    proposalName: `Create ${name} SubDAO`,
-    votingMint: councilKeypair.publicKey,
-  });
 }
 
 run()

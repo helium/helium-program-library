@@ -193,7 +193,6 @@ export async function sendInstructionsOrCreateProposal({
   commitment = "confirmed",
   idlErrors = new Map(),
   votingMint,
-  dao,
   walletSigner,
 }: {
   walletSigner?: Signer; // If we need to send a versioned tx, this signs as the wallet. Version tx not supported by Wallet interface yet
@@ -201,7 +200,6 @@ export async function sendInstructionsOrCreateProposal({
   instructions: TransactionInstruction[];
   signers?: Signer[];
   govProgramId: PublicKey;
-  dao: PublicKey;
   votingMint?: PublicKey; // Defaults to community token
   proposalName: string;
   payer?: PublicKey;
@@ -212,7 +210,7 @@ export async function sendInstructionsOrCreateProposal({
 
   const signerKeys = Array.from(
     new Set(
-      instructions.map((ix) =>
+      ...instructions.map((ix) =>
         ix.keys.filter((k) => k.isSigner).map((k) => k.pubkey.toBase58())
       )
     )
@@ -225,28 +223,27 @@ export async function sendInstructionsOrCreateProposal({
 
   const wallet = provider.wallet;
   // Missing signer, must be gov
-  if (
-    signerKeys.some(
-      (k) =>
-        !k.equals(provider.wallet.publicKey) &&
-        !signers.some((s) => s.publicKey.equals(k))
+  const missingSigs = (
+    await Promise.all(
+      signerKeys
+        .filter(
+          (k) =>
+            !k.equals(provider.wallet.publicKey) &&
+            !signers.some((s) => s.publicKey.equals(k))
+        )
+        .map(async (governanceKey) => {
+          const info = await provider.connection.getAccountInfo(governanceKey);
+          return {
+            info,
+            governanceKey,
+          };
+        })
     )
-  ) {
+  ).filter((r) => r.info && r.info.owner.equals(govProgramId));
+  console.log(missingSigs[0].governanceKey.toBase58());
+  if (missingSigs[0]) {
     const proposalIxns = [];
-    const hsd = await init(provider);
-    const daoAcc = await hsd.account.daoV0.fetch(dao);
-    const vsr = await initVsr(provider);
-    const registrar = await vsr.account.registrar.fetch(daoAcc.registrar);
-
-    const governanceKey = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("account-governance", "utf-8"),
-        registrar.realm.toBuffer(),
-        dao.toBuffer(),
-      ],
-      govProgramId
-    )[0];
-    const info = await provider.connection.getAccountInfo(governanceKey);
+    const { governanceKey, info } = missingSigs[0];
     const gov = GovernanceAccountParser(Governance)(
       governanceKey,
       info!
@@ -374,7 +371,7 @@ export async function sendInstructionsOrCreateProposal({
                 .filter((p) => !walletSigner.publicKey.equals(p)),
             });
           await sendInstructions(provider, [sig, addAddressesInstruction], []);
-          await sleep(4000) // Wait for the lut to activate
+          await sleep(4000); // Wait for the lut to activate
           const lookupTableAcc = (
             await provider.connection.getAddressLookupTable(lut)
           ).value;
