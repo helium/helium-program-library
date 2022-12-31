@@ -7,7 +7,6 @@ use circuit_breaker::{
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 
-
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHstPoolArgsV0 {
   pub epoch: u64,
