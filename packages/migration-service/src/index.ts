@@ -1,4 +1,5 @@
 import cors from "@fastify/cors";
+import Address from "@helium/address";
 import { LazyTransactions } from "@helium/idls/lib/types/lazy_transactions";
 import {
   blockKey, init,
@@ -8,18 +9,14 @@ import {
 import { truthy } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
 import {
-  MessageV0,
   PublicKey,
-  SystemProgram,
-  SYSVAR_RENT_PUBKEY,
-  TransactionMessage,
+  SystemProgram, TransactionMessage,
   VersionedTransaction
 } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { Pool } from "pg";
 import { LAZY_TRANSACTIONS_NAME } from "./env";
 import { provider, wallet } from "./solana";
-import Address from "@helium/address";
 import { decompress } from "./utils";
 
 const pool = new Pool();
@@ -98,7 +95,6 @@ server.get<{ Params: { wallet: string } }>(
                     lazySigner,
                     block,
                     systemProgram: SystemProgram.programId,
-                    rent: SYSVAR_RENT_PUBKEY,
                   })
                   .remainingAccounts(compiledTx.accounts)
                   .instruction();
