@@ -285,7 +285,7 @@ async function run() {
   const registrar = daoAcc.registrar;
 
   /// Iterate through accounts in order so we don't create 1mm promises.
-  for (const [address, account] of Object.entries(accounts).slice(0, 10000)) {
+  for (const [address, account] of Object.entries(accounts)) {
     const solAddress = toSolana(address);
     const isRouter = routers.has(address);
 
