@@ -11,6 +11,7 @@ import {
   init as initVsr,
   registrarKey,
 } from "@helium/voter-stake-registry-sdk";
+import { init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { subDaoKey, daoKey } from "@helium/helium-sub-daos-sdk";
 import { mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
 import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
@@ -145,6 +146,7 @@ async function run() {
   const lazyTransactionsProgram = await init(provider);
   const vsrProgram = await initVsr(provider);
   const dcProgram = await initDc(provider);
+  const hsdProgram = await initHsd(provider);
 
   // For speed
   const hemProgramNoResolve = new Program<HeliumEntityManager>(
@@ -274,16 +276,16 @@ async function run() {
   let txIdx = 0;
   const txIdsToWallet = {};
 
-  const registrar = registrarKey(new PublicKey(argv.realm), hnt)[0];
-
   const routers = new Set(Object.keys(state.routers));
   const dataCredits = dataCreditsKey(dc)[0];
   const dcCircuitBreaker = mintWindowedBreakerKey(dc)[0];
   const dao = daoKey(hnt)[0];
   const subDao = subDaoKey(iot)[0];
+  const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
+  const registrar = daoAcc.registrar;
 
   /// Iterate through accounts in order so we don't create 1mm promises.
-  for (const [address, account] of Object.entries(accounts)) {
+  for (const [address, account] of Object.entries(accounts).slice(0, 10000)) {
     const solAddress = toSolana(address);
     const isRouter = routers.has(address);
 
@@ -431,6 +433,7 @@ async function run() {
             position,
             mint: hnt,
             depositAuthority: lazySigner,
+            registrar
           })
           .instruction();
 
@@ -487,9 +490,9 @@ async function run() {
     host: argv.pgHost,
     database: argv.pgDatabase,
     port: argv.pgPort,
-    ssl: {
-      rejectUnauthorized: false,
-    },
+    // ssl: {
+    //   rejectUnauthorized: false,
+    // },
   });
   await client.connect();
 
@@ -605,6 +608,61 @@ async function run() {
     MOBILE: ${routerBalances.mobile.toString()}
   `);
   const finish = new Date().valueOf();
+
+  console.log("Loading up lazy signer with hnt, dc, mobile...");
+  const me = provider.wallet.publicKey;
+  const transfers = [
+    await createAssociatedTokenAccountIdempotentInstruction(
+      me,
+      getAssociatedTokenAddressSync(hnt, lazySigner, true),
+      lazySigner,
+      hnt
+    ),
+    await createTransferInstruction(
+      getAssociatedTokenAddressSync(hnt, me),
+      getAssociatedTokenAddressSync(hnt, lazySigner, true),
+      me,
+      BigInt(totalBalances.hnt.toString())
+    ),
+    await createAssociatedTokenAccountIdempotentInstruction(
+      me,
+      getAssociatedTokenAddressSync(hst, lazySigner, true),
+      lazySigner,
+      hst
+    ),
+    await createTransferInstruction(
+      getAssociatedTokenAddressSync(hst, me),
+      getAssociatedTokenAddressSync(hst, lazySigner, true),
+      me,
+      BigInt(totalBalances.hst.toString())
+    ),
+    await createAssociatedTokenAccountIdempotentInstruction(
+      me,
+      getAssociatedTokenAddressSync(dc, lazySigner, true),
+      lazySigner,
+      dc
+    ),
+    await createTransferInstruction(
+      getAssociatedTokenAddressSync(dc, me),
+      getAssociatedTokenAddressSync(dc, lazySigner, true),
+      me,
+      BigInt(totalBalances.dc.toString())
+    ),
+    await createAssociatedTokenAccountIdempotentInstruction(
+      me,
+      getAssociatedTokenAddressSync(mobile, lazySigner, true),
+      lazySigner,
+      mobile
+    ),
+    await createTransferInstruction(
+      getAssociatedTokenAddressSync(mobile, me),
+      getAssociatedTokenAddressSync(mobile, lazySigner, true),
+      me,
+      BigInt(totalBalances.mobile.toString())
+    ),
+  ];
+  await sendInstructions(provider, transfers);
+  
 
   console.log(`Finished in ${finish - start}ms`);
 }

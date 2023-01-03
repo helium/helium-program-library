@@ -28,7 +28,7 @@ pub struct GenesisIssueHotspotArgsV0 {
 pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     mut,
-    seeds = [b"lazy_signer", b"helium"],
+    seeds = [b"lazy_signer", b"testhelium5"],
     seeds::program = lazy_transactions::ID,
     bump,
   )]

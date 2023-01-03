@@ -1,16 +1,13 @@
-import { init } from "@helium/helium-sub-daos-sdk";
 import {
   createAtaAndMintInstructions,
   createMintInstructions,
   sendInstructions,
-  toBN,
-  truthy,
+  toBN
 } from "@helium/spl-utils";
 import {
   createCreateMetadataAccountV3Instruction,
-  PROGRAM_ID as METADATA_PROGRAM_ID,
+  PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
-import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import * as anchor from "@project-serum/anchor";
 import {
   AccountMetaData,
@@ -26,8 +23,13 @@ import {
   withCreateTokenOwnerRecord,
   withDepositGoverningTokens,
   withInsertTransaction,
-  withSignOffProposal,
+  withSignOffProposal
 } from "@solana/spl-governance";
+import {
+  AuthorityType,
+  createSetAuthorityInstruction,
+  getAssociatedTokenAddress
+} from "@solana/spl-token";
 import {
   AddressLookupTableProgram,
   Commitment,
@@ -35,21 +37,14 @@ import {
   Keypair,
   PublicKey,
   Signer,
-  SYSVAR_CLOCK_PUBKEY,
-  Transaction,
-  TransactionInstruction,
+  SYSVAR_CLOCK_PUBKEY, TransactionInstruction,
   TransactionMessage,
-  VersionedTransaction,
+  VersionedTransaction
 } from "@solana/web3.js";
+import { sleep } from "@switchboard-xyz/common";
+import { BN } from "bn.js";
 import fs from "fs";
 import fetch from "node-fetch";
-import {
-  AuthorityType,
-  createSetAuthorityInstruction,
-  getAssociatedTokenAddress,
-} from "@solana/spl-token";
-import { BN } from "bn.js";
-import { sleep } from "@switchboard-xyz/common";
 
 const SECONDS_PER_DAY = 86400;
 

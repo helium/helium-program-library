@@ -1,5 +1,6 @@
 import cors from "@fastify/cors";
 import Address from "@helium/address";
+import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
 import { LazyTransactions } from "@helium/idls/lib/types/lazy_transactions";
 import {
   blockKey, init,
@@ -9,6 +10,7 @@ import {
 import { truthy } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
 import {
+  ComputeBudgetProgram,
   PublicKey,
   SystemProgram, TransactionMessage,
   VersionedTransaction
@@ -43,6 +45,17 @@ server.get<{ Params: { heliumWallet: string } }>(
     return { solanaAddress: new PublicKey(addr.publicKey).toBase58() };
   }
 );
+
+server.get<{ Params: { solanaWallet: string } }>(
+  "/solana/:solanaWallet",
+  async (request) => {
+    const pkey = new PublicKey(request.params.solanaWallet);
+    const heliumAddr = new Address(0, 0, ED25519_KEY_TYPE, pkey.toBytes());
+    return { heliumAddress: heliumAddr.b58 };
+  }
+);
+
+
 
 server.get<{ Params: { wallet: string } }>(
   "/migrate/:wallet",
@@ -102,7 +115,10 @@ server.get<{ Params: { wallet: string } }>(
                 return new TransactionMessage({
                   payerKey: provider.wallet.publicKey,
                   recentBlockhash,
-                  instructions: [ix],
+                  instructions: [
+                    ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+                    ix,
+                  ],
                 });
               }
             }

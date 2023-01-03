@@ -72,6 +72,10 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Anchor wallet keypair",
     default: `${os.homedir()}/.config/solana/id.json`,
   },
+  noHotspots: {
+    type: "boolean",
+    default: false
+  },
   url: {
     alias: "u",
     default: "http://127.0.0.1:8899",
@@ -348,6 +352,17 @@ async function run() {
   console.log(
     `Using governance treasury ${nativeTreasury.toBase58()} as authority`
   );
+  const balance = await provider.connection.getAccountInfo(nativeTreasury);
+  if (!balance) {
+    console.log("Transfering 1 sol to governance treasury for subdao creation");
+    await sendInstructions(provider, [
+      SystemProgram.transfer({
+        fromPubkey: provider.wallet.publicKey,
+        toPubkey: nativeTreasury,
+        lamports: BigInt(toBN(1, 9).toString()),
+      }),
+    ]);
+  }
   if (!(await exists(conn, governance))) {
     console.log(`Initializing Governance on Realm: ${realmName}`);
     await withCreateGovernance(
@@ -535,7 +550,7 @@ async function run() {
   }
 
   const hsConfigKey = (await hotspotConfigKey(subdao, name.toUpperCase()))[0];
-  if (!(await provider.connection.getAccountInfo(hsConfigKey))) {
+  if (!(await provider.connection.getAccountInfo(hsConfigKey)) && !argv.noHotspots) {
     const instructions: TransactionInstruction[] = [];
     console.log(`Initalizing ${name} HotspotConfig`);
 

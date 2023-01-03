@@ -7,7 +7,12 @@ import {
   init as initVsr,
 } from "@helium/voter-stake-registry-sdk";
 import * as anchor from "@project-serum/anchor";
-import { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
+import {
+  Connection,
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import {
   getGovernanceProgramVersion,
   MintMaxVoteWeightSource,
@@ -32,7 +37,11 @@ import {
   loadKeypair,
 } from "./utils";
 import { sendInstructions, toBN } from "@helium/spl-utils";
-import { createAssociatedTokenAccountIdempotentInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
+import { BN } from "bn.js";
 
 const { hideBin } = require("yargs/helpers");
 
@@ -296,6 +305,17 @@ async function run() {
   console.log(
     `Using governance treasury ${nativeTreasury.toBase58()} as authority`
   );
+  const balance = await provider.connection.getAccountInfo(nativeTreasury);
+  if (!balance) {
+    console.log("Transfering 1 sol to governance treasury for subdao creation")
+    await sendInstructions(provider, [
+      SystemProgram.transfer({
+        fromPubkey: provider.wallet.publicKey,
+        toPubkey: nativeTreasury,
+        lamports: BigInt(toBN(1, 9).toString()),
+      }),
+    ]);
+  }
   if (!(await exists(conn, governance))) {
     console.log(`Initializing Governance on Realm: ${realmName}`);
     await withCreateGovernance(
@@ -397,7 +417,7 @@ async function run() {
       .preInstructions([
         createAssociatedTokenAccountIdempotentInstruction(
           provider.wallet.publicKey,
-          await getAssociatedTokenAddress(hntKeypair.publicKey, governance),
+          await getAssociatedTokenAddress(hntKeypair.publicKey, governance, true),
           governance,
           hntKeypair.publicKey
         ),
@@ -408,7 +428,8 @@ async function run() {
         // TODO: Create actual HST pool
         hstPool: await getAssociatedTokenAddress(
           hntKeypair.publicKey,
-          governance
+          governance,
+          true
         ),
       })
       .rpc({ skipPreflight: true });
