@@ -40,4 +40,10 @@ pub enum ErrorCode {
 
   #[msg("Epochs start after the earliest emission schedule")]
   EpochToEarly,
+
+  #[msg("Must calculate vehnt linearly. Please ensure the previous epoch has been completed")]
+  MustCalculateVehntLinearly,
+
+  #[msg("Cannot change a position while it is delegated")]
+  PositionChangeWhileDelegated,
 }

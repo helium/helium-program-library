@@ -136,8 +136,7 @@ impl PositionV0 {
     genesis_vote_power_multiplier: u8,
   ) -> Result<u64> {
     let remaining = min(self.lockup.seconds_left(curr_ts), lockup_saturation_secs);
-    let genesis_multiplier = if curr_ts < self.genesis_end && genesis_vote_power_multiplier > 0
-    {
+    let genesis_multiplier = if curr_ts < self.genesis_end && genesis_vote_power_multiplier > 0 {
       genesis_vote_power_multiplier
     } else {
       1

@@ -5,4 +5,5 @@ members = [
 exclude = [
   "deps/metaplex-program-library/bubblegum/program", 
   "deps/metaplex-program-library/token-metadata/program",
+  "utils/migration-tx-executor"
 ]

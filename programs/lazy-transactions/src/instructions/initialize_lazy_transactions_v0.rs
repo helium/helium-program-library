@@ -21,7 +21,6 @@ pub struct InitializeLazyTransactionsV0<'info> {
   )]
   pub lazy_transactions: Box<Account<'info, LazyTransactionsV0>>,
   pub system_program: Program<'info, System>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(

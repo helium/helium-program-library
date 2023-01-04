@@ -9,12 +9,18 @@ use anchor_spl::token::TokenAccount;
 #[derive(Accounts)]
 pub struct TransferV0<'info> {
   pub registrar: AccountLoader<'info, Registrar>,
-
+  /// CHECK: Checked conditionally based on registrar
+  #[account(
+    constraint = registrar.load()?.position_update_authority.map(|k|
+      k == *position_update_authority.key
+    ).unwrap_or(true) @ VsrError::UnauthorizedPositionUpdateAuthority,
+  )]
+  pub position_update_authority: Signer<'info>,
   #[account(
     mut,
     seeds = [b"position".as_ref(), mint.key().as_ref()],
     bump = source_position.bump_seed,
-    constraint = source_position.num_active_votes == 0,
+    constraint = source_position.num_active_votes == 0 @ VsrError::ActiveVotesExist,
     has_one = registrar,
     has_one = mint
   )]
@@ -41,7 +47,7 @@ pub struct TransferV0<'info> {
   pub source_vault: Box<Account<'info, TokenAccount>>,
   #[account(
     mut,
-    associated_token::authority = source_position,
+    associated_token::authority = target_position,
     associated_token::mint = deposit_mint,
   )]
   pub target_vault: Box<Account<'info, TokenAccount>>,
@@ -105,7 +111,8 @@ pub fn handler(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
   );
 
   require!(
-    curr_ts >= target_position.genesis_end || curr_ts <= config.genesis_vote_power_multiplier_expiration_ts,
+    curr_ts >= target_position.genesis_end
+      || curr_ts <= config.genesis_vote_power_multiplier_expiration_ts,
     VsrError::NoDepositOnGenesisPositions
   );
 

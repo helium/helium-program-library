@@ -115,20 +115,20 @@ pub struct InitializeSubDaoV0<'info> {
   /// CHECK: Initialized via cpi
   #[account(
     mut,
-    seeds = ["account_windowed_breaker".as_bytes(), staker_pool.key().as_ref()],
+    seeds = ["account_windowed_breaker".as_bytes(), delegator_pool.key().as_ref()],
     seeds::program = circuit_breaker_program.key(),
     bump
   )]
-  pub staker_pool_circuit_breaker: AccountInfo<'info>,
+  pub delegator_pool_circuit_breaker: AccountInfo<'info>,
   #[account(
     init,
     payer = payer,
-    seeds = ["staker_pool".as_bytes(), dnt_mint.key().as_ref()],
+    seeds = ["delegator_pool".as_bytes(), dnt_mint.key().as_ref()],
     bump,
     token::mint = dnt_mint,
     token::authority = sub_dao,
   )]
-  pub staker_pool: Box<Account<'info, TokenAccount>>,
+  pub delegator_pool: Box<Account<'info, TokenAccount>>,
 
   pub active_device_aggregator: AccountLoader<'info, AggregatorAccountData>,
   pub system_program: Program<'info, System>,
@@ -136,8 +136,6 @@ pub struct InitializeSubDaoV0<'info> {
   pub treasury_management_program: Program<'info, TreasuryManagement>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub associated_token_program: Program<'info, AssociatedToken>,
-  pub clock: Sysvar<'info, Clock>,
-  pub rent: Sysvar<'info, Rent>,
 
   /// CHECK: handled by thread_create
   #[account(
@@ -159,17 +157,16 @@ fn create_end_epoch_cron(curr_ts: i64, offset: u64) -> String {
 }
 
 impl<'info> InitializeSubDaoV0<'info> {
-  fn initialize_staker_pool_breaker_ctx(
+  fn initialize_delegator_pool_breaker_ctx(
     &self,
   ) -> CpiContext<'_, '_, '_, 'info, InitializeAccountWindowedBreakerV0<'info>> {
     let cpi_accounts = InitializeAccountWindowedBreakerV0 {
       payer: self.payer.to_account_info(),
-      circuit_breaker: self.staker_pool_circuit_breaker.to_account_info(),
-      token_account: self.staker_pool.to_account_info(),
+      circuit_breaker: self.delegator_pool_circuit_breaker.to_account_info(),
+      token_account: self.delegator_pool.to_account_info(),
       owner: self.sub_dao.to_account_info(),
       token_program: self.token_program.to_account_info(),
       system_program: self.system_program.to_account_info(),
-      rent: self.rent.to_account_info(),
     };
     CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
   }
@@ -184,14 +181,13 @@ impl<'info> InitializeSubDaoV0<'info> {
       mint_authority: self.dnt_mint_authority.to_account_info(),
       token_program: self.token_program.to_account_info(),
       system_program: self.system_program.to_account_info(),
-      rent: self.rent.to_account_info(),
     };
     CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
   }
 }
 
 pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -> Result<()> {
-  let curr_ts = ctx.accounts.clock.unix_timestamp;
+  let curr_ts = Clock::get()?.unix_timestamp;
   initialize_mint_windowed_breaker_v0(
     ctx.accounts.initialize_dnt_mint_breaker_ctx(),
     InitializeMintWindowedBreakerArgsV0 {
@@ -215,7 +211,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
   initialize_account_windowed_breaker_v0(
     ctx
       .accounts
-      .initialize_staker_pool_breaker_ctx()
+      .initialize_delegator_pool_breaker_ctx()
       .with_signer(signer_seeds),
     InitializeAccountWindowedBreakerArgsV0 {
       authority: args.authority,
@@ -225,7 +221,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
         threshold: 5
           * args
             .emission_schedule
-            .get_emissions_at(ctx.accounts.clock.unix_timestamp)
+            .get_emissions_at(Clock::get()?.unix_timestamp)
             .unwrap(),
       },
       owner: ctx.accounts.sub_dao.key(),
@@ -258,7 +254,6 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
         circuit_breaker_program: ctx.accounts.circuit_breaker_program.to_account_info(),
         associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
         token_program: ctx.accounts.token_program.to_account_info(),
-        rent: ctx.accounts.rent.to_account_info(),
       },
     ),
     InitializeTreasuryManagementArgsV0 {
@@ -281,10 +276,10 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     authority: args.authority,
     emission_schedule: args.emission_schedule,
     bump_seed: ctx.bumps["sub_dao"],
-    vehnt_staked: 0,
-    vehnt_last_calculated_ts: ctx.accounts.clock.unix_timestamp,
+    vehnt_delegated: 0,
+    vehnt_last_calculated_ts: Clock::get()?.unix_timestamp,
     vehnt_fall_rate: 0,
-    staker_pool: ctx.accounts.staker_pool.key(),
+    delegator_pool: ctx.accounts.delegator_pool.key(),
   });
 
   resize_to_fit(
@@ -317,8 +312,6 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     AccountMeta::new(ctx.accounts.sub_dao.key(), false),
     AccountMeta::new(dao_epoch_info, false),
     AccountMeta::new(sub_dao_epoch_info, false),
-    AccountMeta::new_readonly(ctx.accounts.clock.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.rent.key(), false),
     AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
     AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
     AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),

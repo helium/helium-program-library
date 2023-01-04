@@ -25,7 +25,7 @@ pub struct IssueRewardsV0<'info> {
     has_one = treasury,
     has_one = dnt_mint,
     has_one = rewards_escrow,
-    has_one = staker_pool,
+    has_one = delegator_pool,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
@@ -68,11 +68,10 @@ pub struct IssueRewardsV0<'info> {
   #[account(mut)]
   pub rewards_escrow: Box<Account<'info, TokenAccount>>,
   #[account(mut)]
-  pub staker_pool: Box<Account<'info, TokenAccount>>,
+  pub delegator_pool: Box<Account<'info, TokenAccount>>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
-  pub clock: Sysvar<'info, Clock>,
 }
 
 fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
@@ -89,20 +88,18 @@ impl<'info> IssueRewardsV0<'info> {
       mint_authority: self.sub_dao.to_account_info(),
       circuit_breaker: self.dnt_circuit_breaker.to_account_info(),
       token_program: self.token_program.to_account_info(),
-      clock: self.clock.to_account_info(),
     };
 
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 
-  pub fn mint_staking_rewards_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
+  pub fn mint_delegation_rewards_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
     let cpi_accounts = MintV0 {
       mint: self.dnt_mint.to_account_info(),
-      to: self.staker_pool.to_account_info(),
+      to: self.delegator_pool.to_account_info(),
       mint_authority: self.sub_dao.to_account_info(),
       circuit_breaker: self.dnt_circuit_breaker.to_account_info(),
       token_program: self.token_program.to_account_info(),
-      clock: self.clock.to_account_info(),
     };
 
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
@@ -115,7 +112,6 @@ impl<'info> IssueRewardsV0<'info> {
       mint_authority: self.dao.to_account_info(),
       circuit_breaker: self.hnt_circuit_breaker.to_account_info(),
       token_program: self.token_program.to_account_info(),
-      clock: self.clock.to_account_info(),
     };
 
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
@@ -123,7 +119,8 @@ impl<'info> IssueRewardsV0<'info> {
 }
 
 pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<()> {
-  let epoch = current_epoch(ctx.accounts.clock.unix_timestamp);
+  let curr_ts = Clock::get()?.unix_timestamp;
+  let epoch = current_epoch(curr_ts);
 
   if !TESTING && args.epoch >= epoch {
     return Err(error!(ErrorCode::EpochNotOver));
@@ -137,11 +134,20 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   let percent_share = utility_score
     .checked_div(&total_utility_score)
     .or_arith_error()?;
-  let emissions = ctx
+  let total_emissions = ctx.accounts.dao_epoch_info.total_rewards;
+  let percent = ctx
     .accounts
     .dao
-    .emission_schedule
-    .get_emissions_at(ctx.accounts.clock.unix_timestamp)
+    .hst_emission_schedule
+    .get_percent_at(curr_ts)
+    .unwrap();
+  // Subdaos get the remainder after hst
+  let emissions = 100_u64
+    .checked_sub(percent.into())
+    .unwrap()
+    .checked_mul(total_emissions)
+    .unwrap()
+    .checked_div(100)
     .unwrap();
   let total_rewards = PreciseNumber::new(emissions.into()).or_arith_error()?;
   let rewards_prec = percent_share.checked_mul(&total_rewards).or_arith_error()?;
@@ -157,9 +163,10 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .accounts
     .sub_dao
     .emission_schedule
-    .get_emissions_at(ctx.accounts.clock.unix_timestamp)
+    .get_emissions_at(Clock::get()?.unix_timestamp)
     .unwrap();
 
+  let delegators_present = ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start > 0;
   mint_v0(
     ctx.accounts.mint_dnt_emissions_ctx().with_signer(&[&[
       b"sub_dao",
@@ -175,20 +182,24 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     },
   )?;
 
-  let staking_rewards_amount = total_emissions
-    .checked_mul(6)
-    .unwrap()
-    .checked_div(100)
-    .unwrap();
+  let delegation_rewards_amount = if delegators_present {
+    total_emissions
+      .checked_mul(6)
+      .unwrap()
+      .checked_div(100)
+      .unwrap()
+  } else {
+    0
+  };
 
   mint_v0(
-    ctx.accounts.mint_staking_rewards_ctx().with_signer(&[&[
+    ctx.accounts.mint_delegation_rewards_ctx().with_signer(&[&[
       b"sub_dao",
       ctx.accounts.dnt_mint.key().as_ref(),
       &[ctx.accounts.sub_dao.bump_seed],
     ]]),
     MintArgsV0 {
-      amount: staking_rewards_amount, // 6% of emissions are sent to staking pool
+      amount: delegation_rewards_amount, // 6% of emissions are sent to delegation pool
     },
   )?;
 
@@ -204,8 +215,8 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   )?;
 
   ctx.accounts.dao_epoch_info.num_rewards_issued += 1;
-  ctx.accounts.sub_dao_epoch_info.rewards_issued_at = Some(ctx.accounts.clock.unix_timestamp);
-  ctx.accounts.sub_dao_epoch_info.staking_rewards_issued = staking_rewards_amount;
+  ctx.accounts.sub_dao_epoch_info.rewards_issued_at = Some(Clock::get()?.unix_timestamp);
+  ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued = delegation_rewards_amount;
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 

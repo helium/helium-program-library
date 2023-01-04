@@ -18,7 +18,6 @@ impl Default for VoterWeightAction {
   }
 }
 
-
 #[derive(Accounts)]
 #[instruction(args: UpdateVoterWeightRecordArgsV0)]
 pub struct UpdateVoterWeightRecordV0<'info> {
@@ -34,7 +33,6 @@ pub struct UpdateVoterWeightRecordV0<'info> {
     bump,
   )]
   pub voter_weight_record: Account<'info, VoterWeightRecord>,
-  pub rent: Sysvar<'info, Rent>,
   pub system_program: Program<'info, System>,
 }
 
@@ -89,7 +87,7 @@ pub fn handler(
   voter_weight_record.voter_weight_expiry = Some(Clock::get()?.slot);
 
   // Set the action to make it specific and prevent being used for voting
-  voter_weight_record.weight_action = Some(voter_weight_action.into());
+  voter_weight_record.weight_action = Some(voter_weight_action);
   voter_weight_record.weight_action_target = None;
 
   msg!("Set voter weight to {}", voter_weight);

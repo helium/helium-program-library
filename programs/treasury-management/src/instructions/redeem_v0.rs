@@ -53,7 +53,6 @@ pub struct RedeemV0<'info> {
   pub owner: Signer<'info>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub token_program: Program<'info, Token>,
-  pub clock: Sysvar<'info, Clock>,
 }
 
 pub fn handler(ctx: Context<RedeemV0>, args: RedeemArgsV0) -> Result<()> {
@@ -64,7 +63,7 @@ pub fn handler(ctx: Context<RedeemV0>, args: RedeemArgsV0) -> Result<()> {
   let supply_u64 = ctx.accounts.supply_mint.supply;
   let supply = precise_supply_amt(supply_u64, &ctx.accounts.supply_mint);
 
-  if ctx.accounts.treasury_management.freeze_unix_time <= ctx.accounts.clock.unix_timestamp {
+  if ctx.accounts.treasury_management.freeze_unix_time <= Clock::get()?.unix_timestamp {
     return Err(error!(ErrorCode::Frozen));
   }
 
@@ -98,7 +97,6 @@ pub fn handler(ctx: Context<RedeemV0>, args: RedeemArgsV0) -> Result<()> {
         owner: ctx.accounts.treasury_management.to_account_info(),
         circuit_breaker: ctx.accounts.circuit_breaker.to_account_info(),
         token_program: ctx.accounts.token_program.to_account_info(),
-        clock: ctx.accounts.clock.to_account_info(),
       },
       &[&[
         b"treasury_management",

@@ -42,10 +42,17 @@ async function run() {
     }
   )));
   console.log("Sending", txids);
-  await Promise.all(txids.map(async txid => {
-    await provider.connection.confirmTransaction(txid, "processed");
+  const success = await Promise.all(txids.map(async txid => {
+    const tx = await provider.connection.confirmTransaction(txid, "processed");
+    if(tx.value.err) {
+      const tx = await provider.connection.getTransaction(txid);
+      console.error(txid, tx.meta.logMessages?.join("\n"));
+    }
+    return !tx.value.err
   }));
-  console.log("done");
+
+
+  console.log("done", success.filter(s => !s).length, "failed", success.filter(s => s).length, "succeeded");
 }
 
 run()

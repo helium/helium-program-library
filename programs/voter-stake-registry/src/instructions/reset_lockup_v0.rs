@@ -7,7 +7,13 @@ use anchor_spl::token::TokenAccount;
 #[derive(Accounts)]
 pub struct ResetLockupV0<'info> {
   pub registrar: AccountLoader<'info, Registrar>,
-
+  /// CHECK: Checked conditionally based on registrar
+  #[account(
+    constraint = registrar.load()?.position_update_authority.map(|k|
+      k == *position_update_authority.key
+    ).unwrap_or(true) @ VsrError::UnauthorizedPositionUpdateAuthority,
+  )]
+  pub position_update_authority: Signer<'info>,
   #[account(
     mut,
     seeds = [b"position".as_ref(), mint.key().as_ref()],

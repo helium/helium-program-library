@@ -1,8 +1,9 @@
 import * as anchor from "@project-serum/anchor";
 import { BN } from "@project-serum/anchor";
-import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
+import { Keypair, ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { createAtaAndMint, createMint, toBN } from "@helium/spl-utils";
+import { getAssociatedTokenAddress, createAssociatedTokenAccountIdempotentInstruction } from "@solana/spl-token";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { toU128 } from "../../packages/treasury-management-sdk/src";
 import { DC_FEE } from "./fixtures";
@@ -16,7 +17,8 @@ export async function initTestDao(
   epochRewards: number,
   authority: PublicKey,
   dcMint?: PublicKey,
-  mint?: PublicKey
+  mint?: PublicKey,
+  registrar?: PublicKey
 ): Promise<{
   mint: PublicKey;
   dao: PublicKey;
@@ -32,17 +34,32 @@ export async function initTestDao(
 
   const method = await program.methods
     .initializeDaoV0({
+      registrar: registrar || Keypair.generate().publicKey,
       authority: authority,
+      netEmissionsCap: toBN(34.24, 8),
       emissionSchedule: [
         {
           startUnixTime: new anchor.BN(0),
           emissionsPerEpoch: new BN(epochRewards),
         },
       ],
+      hstEmissionSchedule: [
+        {
+          startUnixTime: new anchor.BN(0),
+          percent: 32,
+        },
+      ],
     })
+    .preInstructions([createAssociatedTokenAccountIdempotentInstruction(
+      me,
+      await getAssociatedTokenAddress(mint, me),
+      me,
+      mint
+    )])
     .accounts({
       hntMint: mint,
       dcMint,
+      hstPool: await getAssociatedTokenAddress(mint, me),
     });
   const { dao } = await method.pubkeys();
 
@@ -64,7 +81,7 @@ export async function initTestSubdao(
   subDao: PublicKey;
   treasury: PublicKey;
   rewardsEscrow: PublicKey;
-  stakerPool: PublicKey;
+  delegatorPool: PublicKey;
   treasuryCircuitBreaker: PublicKey;
 }> {
   const daoAcc = await program.account.daoV0.fetch(dao);
@@ -110,7 +127,7 @@ export async function initTestSubdao(
         "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
       ), // Copied from mainnet to localnet
     });
-  const { treasury, treasuryCircuitBreaker, stakerPool } = await method.pubkeys();
+  const { treasury, treasuryCircuitBreaker, delegatorPool } = await method.pubkeys();
   await method.rpc();
 
   return {
@@ -119,6 +136,6 @@ export async function initTestSubdao(
     subDao: subDao!,
     treasury: treasury!,
     rewardsEscrow,
-    stakerPool: stakerPool!,
+    delegatorPool: delegatorPool!,
   };
 }

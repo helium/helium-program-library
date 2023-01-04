@@ -132,8 +132,6 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
     num_active_votes: 0,
   });
 
-  
-
   if args.kind != LockupKind::None {
     require_gte!(
       ctx.accounts.position.lockup.total_seconds(),

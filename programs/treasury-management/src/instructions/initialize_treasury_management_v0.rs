@@ -53,7 +53,6 @@ pub struct InitializeTreasuryManagementV0<'info> {
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub token_program: Program<'info, Token>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(
@@ -70,7 +69,6 @@ pub fn handler(
         owner: ctx.accounts.treasury_management.to_account_info(),
         token_program: ctx.accounts.token_program.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
-        rent: ctx.accounts.rent.to_account_info(),
       },
       &[&[
         b"treasury_management",

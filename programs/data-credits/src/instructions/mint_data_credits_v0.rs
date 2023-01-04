@@ -72,8 +72,6 @@ pub struct MintDataCreditsV0<'info> {
   pub circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub token_program: Program<'info, Token>,
-  pub clock: Sysvar<'info, Clock>,
-  pub rent: Sysvar<'info, Rent>,
   pub system_program: Program<'info, System>,
   pub associated_token_program: Program<'info, AssociatedToken>,
 }
@@ -105,7 +103,6 @@ impl<'info> MintDataCreditsV0<'info> {
       mint_authority: self.data_credits.to_account_info(),
       token_program: self.token_program.to_account_info(),
       circuit_breaker: self.circuit_breaker.to_account_info(),
-      clock: self.clock.to_account_info(),
     };
     CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
   }
