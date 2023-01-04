@@ -176,6 +176,13 @@ async function run() {
     .pubkeys();
   const lazySigner = lazySignerKey(argv.name)[0];
 
+  const dataCredits = dataCreditsKey(dc)[0];
+  const dcCircuitBreaker = mintWindowedBreakerKey(dc)[0];
+  const dao = daoKey(hnt)[0];
+  const subDao = subDaoKey(iot)[0];
+  const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
+  const registrar = daoAcc.registrar;
+
   // Create a lookup table of used pubkeys
   const [sig, lut] = await AddressLookupTableProgram.createLookupTable({
     authority: provider.wallet.publicKey,
@@ -200,6 +207,10 @@ async function run() {
         hotspotPubkeys.compressionProgram,
         hotspotPubkeys.systemProgram,
         hotspotPubkeys.hotspotConfig,
+        hst,
+        dao,
+        subDao,
+        registrar,
         lazyTransactionsKey(argv.name)[0],
         LAZY_PROGRAM_ID,
         lazySigner,
@@ -277,12 +288,6 @@ async function run() {
   const txIdsToWallet = {};
 
   const routers = new Set(Object.keys(state.routers));
-  const dataCredits = dataCreditsKey(dc)[0];
-  const dcCircuitBreaker = mintWindowedBreakerKey(dc)[0];
-  const dao = daoKey(hnt)[0];
-  const subDao = subDaoKey(iot)[0];
-  const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
-  const registrar = daoAcc.registrar;
 
   /// Iterate through accounts in order so we don't create 1mm promises.
   for (const [address, account] of Object.entries(accounts)) {

@@ -235,7 +235,7 @@ export async function sendInstructionsOrCreateProposal({
         })
     )
   ).filter((r) => r.info && r.info.owner.equals(govProgramId));
-  console.log(missingSigs[0].governanceKey.toBase58());
+
   if (missingSigs[0]) {
     const proposalIxns = [];
     const { governanceKey, info } = missingSigs[0];
