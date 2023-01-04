@@ -2,7 +2,10 @@ use crate::{current_epoch, state::*, update_subdao_vehnt};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 
-use voter_stake_registry::state::{LockupKind, PositionV0, Registrar};
+use voter_stake_registry::{
+  state::{LockupKind, PositionV0, Registrar},
+  VoterStakeRegistry
+};
 
 #[derive(Accounts)]
 pub struct CloseDelegationV0<'info> {
@@ -53,9 +56,7 @@ pub struct CloseDelegationV0<'info> {
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
 
-  ///CHECK: constraints
-  #[account(address = voter_stake_registry::ID)]
-  pub vsr_program: AccountInfo<'info>,
+  pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
 }
 

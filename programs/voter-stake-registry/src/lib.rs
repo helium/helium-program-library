@@ -11,6 +11,15 @@ pub mod util;
 // The program address.
 declare_id!("hvsrY9UBtHhYRvstM2BWCsni81kevfn7B2DEhYbGA1a");
 
+#[derive(Clone)]
+pub struct VoterStakeRegistry;
+
+impl anchor_lang::Id for VoterStakeRegistry {
+  fn id() -> Pubkey {
+    crate::id()
+  }
+}
+
 // # Introduction
 //
 // The governance registry is an "addin" to the SPL governance program that

@@ -110,7 +110,7 @@ pub struct InitializeSubDaoV0<'info> {
   #[account(
     constraint = rewards_escrow.mint == dnt_mint.key()
   )]
-  pub rewards_escrow: Box<Account<'info, TokenAccount>>, // TODO why can this just be any tokenaccount?
+  pub rewards_escrow: Box<Account<'info, TokenAccount>>,
 
   /// CHECK: Initialized via cpi
   #[account(

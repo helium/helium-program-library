@@ -29,7 +29,7 @@ pub struct BurnDelegatedDataCreditsV0<'info> {
   #[account(
     mut,
     has_one = dao,
-    has_one = dc_burn_authority
+    has_one = dc_burn_authority,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   pub dc_burn_authority: Signer<'info>,
