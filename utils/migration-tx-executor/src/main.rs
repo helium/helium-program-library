@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::{Instant, Duration}, thread::sleep, sync::
 
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
-use reqwest::blocking::Client;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use solana_client::{
   rpc_client::RpcClient,
@@ -14,7 +14,6 @@ use prometheus::{
 };
 use lazy_static::lazy_static;
 use warp::{Rejection, Reply, Filter};
-use futures::future::{Abortable, AbortHandle, Aborted};
 
 pub(crate) const TRANSACTION_RESEND_INTERVAL: Duration = Duration::from_secs(4);
 pub const MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS: usize = 256;
@@ -70,7 +69,7 @@ struct TransactionResponse {
   pub transactions: Vec<Vec<u8>>,
 }
 
-fn run_transactions(
+async fn run_transactions(
   migration_url: String,
   solana_url: String,
   solana_wss_url: String,
@@ -95,8 +94,10 @@ fn run_transactions(
       let results = client
         .get(format!("{}/{}", migration_url, "top-wallets").as_str())
         .send()
+        .await
         .unwrap()
         .json::<Vec<WalletResponse>>()
+        .await
         .unwrap();
 
       results
@@ -122,8 +123,10 @@ fn run_transactions(
       let response = client
         .get(url.as_str())
         .send()
+        .await
         .unwrap()
         .json::<TransactionResponse>()
+        .await
         .unwrap();
 
       if offset > response.count {
@@ -321,8 +324,8 @@ fn set_message_for_confirmed_transactions(
 }
 
 
-// #[tokio::main]
-fn main() {
+#[tokio::main]
+async fn main() {
   let migration_url = env::var("MIGRATION_SERVICE_URL").expect("MIGRATION_SERVICE_URL must be set");
   let solana_url = env::var("SOLANA_URL").expect("SOLANA_URL must be set");
   let solana_wss_url = env::var("SOLANA_WSS_URL").expect("SOLANA_WSS_URL must be set");
@@ -330,18 +333,15 @@ fn main() {
 
   register_custom_metrics();
   let metrics_route = warp::path!("metrics").and_then(metrics_handler);
-  let (abort_handle, abort_registration) = AbortHandle::new_pair();
-  let _future = Abortable::new(async {
+  tokio::spawn(
     warp::serve(metrics_route)
           .run(([0, 0, 0, 0], 8080))
-          .await
-  }, abort_registration);
+  );
 
   run_transactions(
     migration_url,
     solana_url,
     solana_wss_url,
     args
-  );
-  abort_handle.abort();
+  ).await;
 }
