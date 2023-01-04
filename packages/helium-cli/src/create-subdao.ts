@@ -134,12 +134,12 @@ const yarg = yargs(hideBin(process.argv)).options({
   aggregatorKeypair: {
     type: "string",
     describe: "Keypair of the aggregtor",
-    default: "./keypairs/aggregator.json",
+    default: `${__dirname}/../keypairs/aggregator.json`,
   },
   merkleKeypair: {
     type: "string",
     describe: "Keypair of the merkle tree",
-    default: "./keypairs/merkle.json",
+    default: `${__dirname}/../keypairs/merkle.json`,
   },
   dcBurnAuthority: {
     type: "string",
@@ -180,7 +180,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   councilKeypair: {
     type: "string",
     describe: "Keypair of gov council token",
-    default: "./keypairs/council.json",
+    default: `${__dirname}/../keypairs/council.json`,
   },
 });
 

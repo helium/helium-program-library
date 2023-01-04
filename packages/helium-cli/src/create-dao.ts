@@ -35,6 +35,7 @@ import {
   getTimestampFromDays,
   getUnixTimestamp,
   loadKeypair,
+  isLocalhost,
 } from "./utils";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import {
@@ -73,17 +74,17 @@ async function run() {
     hntKeypair: {
       type: "string",
       describe: "Keypair of the HNT token",
-      default: "./keypairs/hnt.json",
+      default: `${__dirname}/../keypairs/hnt.json`,
     },
     hstKeypair: {
       type: "string",
       describe: "Keypair of the HST token",
-      default: "./keypairs/hst.json",
+      default: `${__dirname}/../keypairs/hst.json`,
     },
     dcKeypair: {
       type: "string",
       describe: "Keypair of the Data Credit token",
-      default: "./keypairs/dc.json",
+      default: `${__dirname}/../keypairs/dc.json`,
     },
     makerKeypair: {
       type: "string",
@@ -127,7 +128,7 @@ async function run() {
     councilKeypair: {
       type: "string",
       describe: "Keypair of gov council token",
-      default: "./keypairs/council.json",
+      default: `${__dirname}/../keypairs/council.json`,
     },
     councilWallet: {
       type: "string",
@@ -213,6 +214,7 @@ async function run() {
     [Buffer.from("governance", "utf-8"), Buffer.from(realmName, "utf-8")],
     govProgramId
   )[0];
+  console.log(realm.toString());
   if (!(await exists(conn, realm))) {
     console.log("Initializing Realm");
     await withCreateRealm(

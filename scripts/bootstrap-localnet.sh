@@ -3,7 +3,7 @@
 ./scripts/init-idls.sh
 
 # create keypairs if they don't exist
-KEYPAIRS=( 'dc.json' 'hnt.json' 'iot.json' 'mobile.json' 'oracle.json' )
+KEYPAIRS=( 'hnt.json' 'hst.json' 'dc.json' 'mobile.json' 'iot.json' 'council.json' 'aggregator.json' 'merkle.json' 'oracle.json' )
 for f in "${KEYPAIRS[@]}"; do
 	if [ ! -f "./packages/helium-cli/keypairs/$f" ]; then
         echo "$f keypair doesn't exist, creating it"
@@ -12,13 +12,20 @@ for f in "${KEYPAIRS[@]}"; do
 done 
 
 # init the dao and subdaos
-npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-dao.ts
+npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-dao.ts \
+    --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium Test2"
 
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-subdao.ts \
-    --name IOT --subdaoKeypair ./packages/helium-cli/keypairs/iot.json --startEpochRewards 100000
+    -rewardsOracleUrl https://iot-oracle.oracle.test-helium.com \
+    --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n IOT --subdaoKeypair packages/helium-cli/keypairs/iot.json \
+    --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "Helium IOT Test2" --dcBurnAuthority $(solana address)
 
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-subdao.ts \
-    --name MOBILE --subdaoKeypair ./packages/helium-cli/keypairs/mobile.json --startEpochRewards 100000
+    -rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com \
+    --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n Mobile --subdaoKeypair packages/helium-cli/keypairs/mobile.json \
+    --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Helium Mobile Test2" \
+    --dcBurnAuthority $(solana address)  --noHotspots
+
 
 # save the keypairs as environment variables (used by other packages)
 export DC_MINT=$(solana address -k ./packages/helium-cli/keypairs/dc.json)
