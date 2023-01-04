@@ -189,7 +189,7 @@ describe("voter-stake-registry", () => {
           registrar,
           mint: mintKeypair.publicKey,
           depositMint: hntMint,
-          positionAuthority: owner?.publicKey,
+          recipient: owner?.publicKey,
         })
         .instruction()
     );
@@ -208,7 +208,7 @@ describe("voter-stake-registry", () => {
     await sendInstructions(
       provider,
       instructions,
-      [mintKeypair, owner].filter(truthy)
+      [mintKeypair].filter(truthy)
     );
 
     return { position, mint: mintKeypair.publicKey };

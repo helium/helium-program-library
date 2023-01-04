@@ -67,8 +67,17 @@ export const vsrResolvers = combineResolvers(
     mint: "mint",
     owner: "positionAuthority",
   }),
+  ataResolver({
+    instruction: "initializePositionV0",
+    account: "positionTokenAccount",
+    mint: "mint",
+    owner: "recipient",
+  }),
   resolveIndividual(async ({ accounts, path, provider }) => {
-    if (path[path.length - 1] === "solDestination") {
+    if (path[path.length - 1] === "recipient") {
+      // @ts-ignore
+      return provider.wallet.publicKey;
+    } if (path[path.length - 1] === "solDestination") {
       // @ts-ignore
       return provider.wallet.publicKey;
     } else if (

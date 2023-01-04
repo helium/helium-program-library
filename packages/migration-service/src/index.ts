@@ -186,6 +186,7 @@ server.get<{
     }
     return {
       transactions: [],
+      count: 0
     };
   } catch (e: any) {
     console.error(e);

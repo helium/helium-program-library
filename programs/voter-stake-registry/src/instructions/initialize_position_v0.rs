@@ -55,14 +55,12 @@ pub struct InitializePositionV0<'info> {
     init_if_needed,
     payer = payer,
     associated_token::mint = mint,
-    associated_token::authority = position_authority,
+    associated_token::authority = recipient,
   )]
   pub position_token_account: Box<Account<'info, TokenAccount>>,
 
-  /// The authority controling the voter. Must be the same as the
-  /// `governing_token_owner` in the token owner record used with
-  /// spl-governance.
-  pub position_authority: Signer<'info>,
+  /// CHECK: needed for token account init
+  pub recipient: UncheckedAccount<'info>,
   #[account(
     init_if_needed,
     associated_token::authority = position,
