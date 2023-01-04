@@ -9,7 +9,7 @@ use solana_client::{
   rpc_client::RpcClient,
   tpu_client::{TpuClient, TpuClientConfig, TpuSenderError},
 };
-use solana_sdk::{message::{Message, VersionedMessage}, transaction::{TransactionError, VersionedTransaction}, signature::Signature};
+use solana_sdk::{message::{Message, VersionedMessage}, transaction::{TransactionError, VersionedTransaction}, signature::Signature, commitment_config::CommitmentConfig};
 pub(crate) const TRANSACTION_RESEND_INTERVAL: Duration = Duration::from_secs(4);
 pub const MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS: usize = 256;
 pub(crate) const SEND_TRANSACTION_INTERVAL: Duration = Duration::from_millis(10);
@@ -35,12 +35,18 @@ struct TransactionResponse {
 }
 
 fn main() {
-  let migration_url = env::var("MIGRATION_SERVICE_URL").expect("MIGRATION_SERVICE_URL must be set");
-  let solana_url = env::var("SOLANA_URL").expect("SOLANA_URL must be set");
-  let solana_wss_url = env::var("SOLANA_WSS_URL").expect("SOLANA_WSS_URL must be set");
+  // let migration_url = env::var("MIGRATION_SERVICE_URL").expect("MIGRATION_SERVICE_URL must be set");
+  // let solana_url = env::var("SOLANA_URL").expect("SOLANA_URL must be set");
+  // let solana_wss_url = env::var("SOLANA_WSS_URL").expect("SOLANA_WSS_URL must be set");
+  let migration_url = "http://localhost:8081";
+  let solana_url = "https://api.devnet.solana.com";
+  let solana_wss_url = "wss://api.devnet.solana.com";
   let args = Args::parse();
 
-  let rpc_client: Arc<RpcClient> = solana_client::rpc_client::RpcClient::new(solana_url.clone()).into();
+  let rpc_client: Arc<RpcClient> = solana_client::rpc_client::RpcClient::new_with_commitment(
+    solana_url.clone(),
+    CommitmentConfig { commitment: solana_sdk::commitment_config::CommitmentLevel::Confirmed }
+  ).into();
   let tpu_client = TpuClient::new(
     rpc_client.clone(),
     &solana_wss_url,
@@ -123,11 +129,11 @@ pub fn send_and_confirm_messages_with_spinner(
   let mut block_height = rpc_client.get_block_height()?;
 
   while expired_blockhash_retries > 0 {
-    let (blockhash, last_valid_block_height) =
+    let (_, last_valid_block_height) =
       rpc_client.get_latest_blockhash_with_commitment(rpc_client.commitment())?;
 
     let mut pending_transactions = HashMap::new();
-    for (idx, (i, transaction, deserialized)) in transactions_with_sigs.into_iter().enumerate() {
+    for (idx, (_, transaction, deserialized)) in transactions_with_sigs.into_iter().enumerate() {
       pending_transactions.insert(deserialized.signatures[0], (idx, transaction, deserialized));
     }
 
@@ -138,9 +144,10 @@ pub fn send_and_confirm_messages_with_spinner(
       // Periodically re-send all pending transactions
       if Instant::now().duration_since(last_resend) > TRANSACTION_RESEND_INTERVAL {
         for (index, (_i, transaction, deser)) in pending_transactions.values().enumerate() {
-          if !tpu_client.send_wire_transaction(transaction.clone()) {
-            let _result = rpc_client.send_transaction(deser).ok();
-          }
+          // if !tpu_client.send_wire_transaction(transaction.clone()) {
+            println!("{:?}", deser.message);
+            let _result = rpc_client.send_transaction(deser).unwrap();
+          // }
           set_message_for_confirmed_transactions(
             &progress_bar,
             confirmed_transactions,

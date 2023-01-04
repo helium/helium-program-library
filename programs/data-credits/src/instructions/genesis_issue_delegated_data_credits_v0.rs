@@ -37,7 +37,7 @@ pub struct GenesisIssueDelegatedDataCreditsV0<'info> {
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
   #[account(
     mut,
-    seeds = [b"lazy_signer", b"testhelium5"],
+    seeds = [b"lazy_signer", b"testhelium9"],
     seeds::program = lazy_transactions::ID,
     bump,
   )]

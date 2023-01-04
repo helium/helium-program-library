@@ -147,7 +147,7 @@ server.get<{
           }
         )
       )
-    ).filter((v) => !!v.transaction);
+    ).filter((v) => Boolean(v && v.transaction));
 
     if (asExecuteTxs.length > 0) {
       const lookupTableAcc = (

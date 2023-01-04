@@ -329,6 +329,7 @@ async function run() {
       const hotspotIxs = await Promise.all(
         (account.hotspots || []).map(async (hotspot) => {
           totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
+
           return hemProgramNoResolve.methods
             .genesisIssueHotspotV0({
               hotspotKey: hotspot.address,
@@ -449,7 +450,7 @@ async function run() {
       const ixnGroups = [
         tokenIxs,
         stakedInstructions,
-        ...chunks(hotspotIxs, 2),
+        ...hotspotIxs,
       ].filter((ixGroup) => ixGroup.length > 0);
 
       transactionsByWallet.push({
@@ -578,6 +579,7 @@ async function run() {
     .initializeLazyTransactionsV0({
       root: merkleTree.getRoot().toJSON().data,
       name: argv.name,
+      authority: provider.wallet.publicKey
     })
     .rpc({ skipPreflight: true });
 
