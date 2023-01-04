@@ -5,6 +5,7 @@ use anchor_lang::prelude::*;
 pub struct InitializeLazyTransactionsArgsV0 {
   pub root: [u8; 32],
   pub name: String,
+  pub authority: Pubkey,
 }
 
 #[derive(Accounts)]
@@ -33,6 +34,7 @@ pub fn handler(
     .set_inner(LazyTransactionsV0 {
       root: args.root,
       name: args.name,
+      authority: args.authority,
       bump_seed: ctx.bumps["lazy_transactions"],
     });
 

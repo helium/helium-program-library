@@ -35,6 +35,7 @@ pub struct DistributeRewardsCommonV0<'info> {
     bump = circuit_breaker.bump_seed
   )]
   pub circuit_breaker: Box<Account<'info, AccountWindowedCircuitBreakerV0>>,
+  /// TODO: Should this be permissioned? Should the owner have to sign to receive rewards?
   /// CHECK: Just required for ATA
   pub owner: AccountInfo<'info>,
   #[account(

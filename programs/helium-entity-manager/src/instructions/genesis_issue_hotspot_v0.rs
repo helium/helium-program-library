@@ -21,6 +21,7 @@ pub struct GenesisIssueHotspotArgsV0 {
   pub elevation: Option<i32>,
   pub gain: Option<i32>,
   pub is_full_hotspot: bool,
+  pub num_location_asserts: u16
 }
 
 #[derive(Accounts)]
@@ -28,7 +29,7 @@ pub struct GenesisIssueHotspotArgsV0 {
 pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     mut,
-    seeds = [b"lazy_signer", b"testhelium5"],
+    seeds = [b"lazy_signer", b"testhelium9"],
     seeds::program = lazy_transactions::ID,
     bump,
   )]
@@ -125,7 +126,10 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
   let metadata = MetadataArgs {
     name: animal_name.to_string(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("https://iot-metadata.test-helium.com/{}", args.hotspot_key),
+    uri: format!(
+      "https://iot-metadata.oracle.test-helium.com/{}",
+      args.hotspot_key
+    ),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
@@ -155,6 +159,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     elevation: args.elevation,
     gain: args.gain,
     is_full_hotspot: args.is_full_hotspot,
+    num_location_asserts: args.num_location_asserts
   });
 
   Ok(())

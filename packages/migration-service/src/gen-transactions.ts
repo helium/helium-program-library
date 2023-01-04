@@ -10,6 +10,7 @@ import {
 import {
   init as initVsr,
   registrarKey,
+  PROGRAM_ID as VSR_PROGRAM_ID,
 } from "@helium/voter-stake-registry-sdk";
 import { init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { subDaoKey, daoKey } from "@helium/helium-sub-daos-sdk";
@@ -32,6 +33,7 @@ import {
   createAssociatedTokenAccountIdempotentInstruction,
   createTransferInstruction,
   getAssociatedTokenAddressSync,
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import {
   AddressLookupTableProgram,
@@ -39,6 +41,7 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
+  SYSVAR_RENT_PUBKEY,
   TransactionInstruction,
 } from "@solana/web3.js";
 import { BN } from "bn.js";
@@ -48,6 +51,7 @@ import os from "os";
 import { Client } from "pg";
 import yargs from "yargs/yargs";
 import { compress } from "./utils";
+import { ASSOCIATED_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -219,6 +223,10 @@ async function run() {
         hnt,
         mobile,
         new PublicKey(argv.payer),
+        ASSOCIATED_PROGRAM_ID,
+        TOKEN_PROGRAM_ID,
+        SYSVAR_RENT_PUBKEY,
+        VSR_PROGRAM_ID,
       ],
     });
   await sendInstructions(provider, [sig, addAddressesInstruction], []);
@@ -329,6 +337,7 @@ async function run() {
       const hotspotIxs = await Promise.all(
         (account.hotspots || []).map(async (hotspot) => {
           totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
+
           return hemProgramNoResolve.methods
             .genesisIssueHotspotV0({
               hotspotKey: hotspot.address,
@@ -426,7 +435,7 @@ async function run() {
             registrar,
             mint: mintKeypair.publicKey,
             depositMint: hnt,
-            positionAuthority: solAddress,
+            recipient: solAddress,
             payer: lazySigner,
           })
           .prepare();
@@ -449,7 +458,7 @@ async function run() {
       const ixnGroups = [
         tokenIxs,
         stakedInstructions,
-        ...chunks(hotspotIxs, 2),
+        ...chunks(hotspotIxs, 1),
       ].filter((ixGroup) => ixGroup.length > 0);
 
       transactionsByWallet.push({
@@ -574,12 +583,27 @@ async function run() {
   );
   pgProgress.stop();
 
-  await lazyTransactionsProgram.methods
-    .initializeLazyTransactionsV0({
-      root: merkleTree.getRoot().toJSON().data,
-      name: argv.name,
-    })
-    .rpc({ skipPreflight: true });
+  const ltKey = lazyTransactionsKey(argv.name)[0];
+  if (await provider.connection.getAccountInfo(ltKey)) {
+    await lazyTransactionsProgram.methods
+      .updateLazyTransactionsV0({
+        root: merkleTree.getRoot().toJSON().data,
+        authority: provider.wallet.publicKey,
+      })
+      .accounts({
+        lazyTransactions: ltKey,
+      })
+      .rpc({ skipPreflight: true });
+  } else {
+    await lazyTransactionsProgram.methods
+      .initializeLazyTransactionsV0({
+        root: merkleTree.getRoot().toJSON().data,
+        name: argv.name,
+        authority: provider.wallet.publicKey,
+      })
+      .rpc({ skipPreflight: true });
+  }
+
 
   console.log(
     `Created lazy transactions ${lazyTransactionsKey(argv.name)[0]} ${

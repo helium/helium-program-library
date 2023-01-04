@@ -126,10 +126,8 @@ export async function createPosition(
         registrar,
         mint: mintKeypair.publicKey,
         depositMint: hntMint,
-        positionAuthority: positionOwner,
-        payer: positionOwner,
+        recipient: positionOwner,
       })
-      .signers([positionKp].filter(truthy))
       .instruction()
   );
 

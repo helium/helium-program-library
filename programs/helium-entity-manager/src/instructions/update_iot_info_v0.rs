@@ -150,6 +150,8 @@ pub fn handler<'info>(
     if ctx.accounts.info.is_full_hotspot {
       dc_fee = full_location_staking_fee;
     }
+    
+    ctx.accounts.info.num_location_asserts = ctx.accounts.info.num_location_asserts + 1;
 
     // burn the dc tokens
     burn_without_tracking_v0(
