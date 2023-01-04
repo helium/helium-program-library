@@ -348,7 +348,7 @@ async function run() {
               gain: hotspot.gain,
               elevation: hotspot.altitude,
               isFullHotspot: !hotspot.dataonly,
-              numLocationAsserts: new BN(hotspot.nonce).toNumber(),
+              numLocationAsserts: hotspot.nonce ? new BN(hotspot.nonce).toNumber() : 0,
             })
             .accountsStrict({
               collection: hotspotPubkeys.collection,

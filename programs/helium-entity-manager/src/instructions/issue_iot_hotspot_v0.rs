@@ -248,7 +248,7 @@ pub fn handler(ctx: Context<IssueIotHotspotV0>, args: IssueIotHotspotArgsV0) -> 
     gain: None,
     is_full_hotspot: args.is_full_hotspot,
     bump_seed: ctx.bumps["info"],
-    num_location_asserts: 0
+    num_location_asserts: 0,
   });
 
   Ok(())
