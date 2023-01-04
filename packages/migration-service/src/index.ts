@@ -8,7 +8,7 @@ import {
   lazySignerKey,
   lazyTransactionsKey,
 } from "@helium/lazy-transactions-sdk";
-import { truthy } from "@helium/spl-utils";
+import { chunks, truthy } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
 import {
   ComputeBudgetProgram,
@@ -94,6 +94,11 @@ server.get<{
       .blockhash;
 
     console.log(`Found ${results.length} transactions to migrate}`);
+    const blocks = results.map(r => blockKey(lazyTransactions, r.id)[0]);
+    const blocksExist = (await Promise.all(
+      chunks(blocks, 100).map(async chunk => await provider.connection.getMultipleAccountsInfo(chunk as PublicKey[], "confirmed"))
+    )).flat();
+
     const asExecuteTxs: { id: number; transaction: TransactionMessage }[] = (
       await Promise.all(
         results.map(
@@ -106,13 +111,11 @@ server.get<{
             lookup_table: string;
             compiled: Buffer;
             proof: string[];
-          }) => {
+          }, idx) => {
+            const hasRun = blocksExist[idx];
             const compiledTx = decompress(compiled);
             const block = blockKey(lazyTransactions, id)[0];
-            const hasRun = await provider.connection.getAccountInfo(
-              block,
-              "confirmed"
-            );
+            
             if (!hasRun) {
               const ix = await program.methods
                 .executeTransactionV0({

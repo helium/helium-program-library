@@ -10,10 +10,11 @@ use solana_client::{
 };
 use solana_sdk::{transaction::{TransactionError, VersionedTransaction}, commitment_config::CommitmentConfig};
 use prometheus::{
-    IntCounter, IntCounterVec, IntGauge, Opts, Registry,
+    IntCounter, Registry,
 };
 use lazy_static::lazy_static;
 use warp::{Rejection, Reply, Filter};
+use futures::future::{Abortable, AbortHandle, Aborted};
 
 pub(crate) const TRANSACTION_RESEND_INTERVAL: Duration = Duration::from_secs(4);
 pub const MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS: usize = 256;
@@ -69,7 +70,7 @@ struct TransactionResponse {
   pub transactions: Vec<Vec<u8>>,
 }
 
-async fn run_transactions(
+fn run_transactions(
   migration_url: String,
   solana_url: String,
   solana_wss_url: String,
@@ -174,28 +175,6 @@ async fn metrics_handler() -> Result<impl Reply, Rejection> {
 
     res.push_str(&res_custom);
     Ok(res)
-}
-
-#[tokio::main]
-async fn main() {
-  let migration_url = env::var("MIGRATION_SERVICE_URL").expect("MIGRATION_SERVICE_URL must be set");
-  let solana_url = env::var("SOLANA_URL").expect("SOLANA_URL must be set");
-  let solana_wss_url = env::var("SOLANA_WSS_URL").expect("SOLANA_WSS_URL must be set");
-  let args = Args::parse();
-
-  register_custom_metrics();
-  let metrics_route = warp::path!("metrics").and_then(metrics_handler);
-  
-  tokio::task::spawn(run_transactions(
-    migration_url,
-    solana_url,
-    solana_wss_url,
-    args
-  ));
-
-  warp::serve(metrics_route)
-      .run(([0, 0, 0, 0], 8080))
-      .await;
 }
 
 // This is stolen from tpu_client but rewritten to work with raw versioned txs
@@ -339,4 +318,30 @@ fn set_message_for_confirmed_transactions(
       None => String::new(),
     },
   ));
+}
+
+
+// #[tokio::main]
+fn main() {
+  let migration_url = env::var("MIGRATION_SERVICE_URL").expect("MIGRATION_SERVICE_URL must be set");
+  let solana_url = env::var("SOLANA_URL").expect("SOLANA_URL must be set");
+  let solana_wss_url = env::var("SOLANA_WSS_URL").expect("SOLANA_WSS_URL must be set");
+  let args = Args::parse();
+
+  register_custom_metrics();
+  let metrics_route = warp::path!("metrics").and_then(metrics_handler);
+  let (abort_handle, abort_registration) = AbortHandle::new_pair();
+  let _future = Abortable::new(async {
+    warp::serve(metrics_route)
+          .run(([0, 0, 0, 0], 8080))
+          .await
+  }, abort_registration);
+
+  run_transactions(
+    migration_url,
+    solana_url,
+    solana_wss_url,
+    args
+  );
+  abort_handle.abort();
 }

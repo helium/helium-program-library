@@ -10,6 +10,7 @@ import {
 import {
   init as initVsr,
   registrarKey,
+  PROGRAM_ID as VSR_PROGRAM_ID,
 } from "@helium/voter-stake-registry-sdk";
 import { init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { subDaoKey, daoKey } from "@helium/helium-sub-daos-sdk";
@@ -225,6 +226,7 @@ async function run() {
         ASSOCIATED_PROGRAM_ID,
         TOKEN_PROGRAM_ID,
         SYSVAR_RENT_PUBKEY,
+        VSR_PROGRAM_ID,
       ],
     });
   await sendInstructions(provider, [sig, addAddressesInstruction], []);

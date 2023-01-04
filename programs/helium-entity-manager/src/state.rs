@@ -42,7 +42,6 @@ pub struct HotspotIssuerV0 {
   pub maker: Pubkey,          // Maker issuing these hotspots
   pub hotspot_config: Pubkey, // The HotspotConfigV0 to be issued
   pub authority: Pubkey,
-
   pub bump_seed: u8,
 }
 
@@ -58,4 +57,5 @@ pub struct IotHotspotInfoV0 {
   pub elevation: Option<i32>,
   pub gain: Option<i32>,
   pub is_full_hotspot: bool,
+  pub num_location_asserts: u32,
 }

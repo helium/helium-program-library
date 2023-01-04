@@ -1,5 +1,5 @@
-use crate::{state::*};
-use anchor_lang::{prelude::*};
+use crate::state::*;
+use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CloseMarkerArgsV0 {

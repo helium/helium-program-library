@@ -1815,6 +1815,7 @@ version = "0.0.1"
 dependencies = [
  "bincode",
  "clap 4.0.32",
+ "futures",
  "indicatif 0.17.2",
  "lazy_static",
  "prometheus",

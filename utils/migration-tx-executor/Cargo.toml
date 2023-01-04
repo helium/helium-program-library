@@ -19,3 +19,4 @@ tokio = { version = "1.23.0", features = ["macros"] }
 warp = "0.3.3"
 prometheus = { version = "0.13.3", features = ["process"] }
 lazy_static = "1.4"
+futures = "0.3.25"

@@ -125,7 +125,10 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
   let metadata = MetadataArgs {
     name: animal_name.to_string(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("https://iot-metadata.oracle.test-helium.com/{}", args.hotspot_key),
+    uri: format!(
+      "https://iot-metadata.oracle.test-helium.com/{}",
+      args.hotspot_key
+    ),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
@@ -155,6 +158,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     elevation: args.elevation,
     gain: args.gain,
     is_full_hotspot: args.is_full_hotspot,
+    num_location_asserts: 0
   });
 
   Ok(())
