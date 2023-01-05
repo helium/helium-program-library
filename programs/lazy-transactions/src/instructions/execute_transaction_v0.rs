@@ -14,7 +14,6 @@ pub struct CompiledInstruction {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ExecuteTransactionArgsV0 {
-  pub proof: Vec<[u8; 32]>,
   pub instructions: Vec<CompiledInstruction>,
   pub index: u32,
 }
@@ -44,8 +43,20 @@ pub struct ExecuteTransactionV0<'info> {
 }
 
 pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV0) -> Result<()> {
-  let accts = ctx
-    .remaining_accounts
+  let largest_acct_idx: usize = (*args
+    .instructions
+    .iter()
+    .flat_map(|i| i.accounts.iter())
+    .max()
+    .unwrap())
+  .into();
+
+  let proof = ctx.remaining_accounts[(largest_acct_idx + 1)..]
+    .iter()
+    .map(|a| a.key.to_bytes())
+    .collect::<Vec<_>>();
+
+  let accts = ctx.remaining_accounts[..(largest_acct_idx + 1)]
     .iter()
     .map(|a| a.key.to_bytes().to_vec())
     .collect::<Vec<_>>();
@@ -67,12 +78,7 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
 
   let hash = solana_program::keccak::hashv(to_hash).0;
 
-  if !verify(
-    args.proof,
-    ctx.accounts.lazy_transactions.root,
-    hash,
-    args.index,
-  ) {
+  if !verify(proof, ctx.accounts.lazy_transactions.root, hash, args.index) {
     return Err(error!(ErrorCode::InvalidData));
   };
 

@@ -1,5 +1,9 @@
-import { createAtaAndMint, createMint, sendInstructions } from "@helium/spl-utils";
-import { SystemProgram } from "@solana/web3.js";
+import {
+  createAtaAndMint,
+  createMint,
+  sendInstructions,
+} from "@helium/spl-utils";
+import { SystemProgram, PublicKey } from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { expect } from "chai";
@@ -65,33 +69,39 @@ describe("lazy-transactions", () => {
     // Execute instructions via lazy transactions
     const { merkleTree, compiledTransactions } = compile(lazySigner, [
       instructions,
-      instructions
+      instructions,
     ]);
     await program.methods
       .initializeLazyTransactionsV0({
         root: merkleTree.getRoot().toJSON().data,
         name,
-        authority: me
+        authority: me,
       })
       .rpc({ skipPreflight: true });
-  
+
+    const accounts = [
+      ...compiledTransactions[0].accounts,
+      ...merkleTree.getProof(0).proof.map((p) => ({
+        pubkey: new PublicKey(p),
+        isWritable: false,
+        isSigner: false,
+      })),
+    ];
+
     /// Ensure we fail if you execute the wrong tx
     try {
       const bogus = [
         createAssociatedTokenAccountInstruction(lazySigner, myAta, me, mint),
         createTransferInstruction(lazySignerAta, myAta, lazySigner, 1000),
       ];
-      const { compiledTransactions } = compile(lazySigner, [
-        bogus,
-      ]);
+      const { compiledTransactions: badTransactions } = compile(lazySigner, [bogus]);
       await program.methods
         .executeTransactionV0({
-          proof: merkleTree.getProof(0).proof.map((p) => p.toJSON().data),
-          instructions: compiledTransactions[0].instructions,
-          index: compiledTransactions[0].index,
+          instructions: badTransactions[0].instructions,
+          index: badTransactions[0].index,
         })
         .accounts({ lazyTransactions })
-        .remainingAccounts(compiledTransactions[0].accounts)
+        .remainingAccounts(accounts)
         .rpc({ skipPreflight: true });
 
       throw new Error("Should have failed");
@@ -101,24 +111,23 @@ describe("lazy-transactions", () => {
 
     await program.methods
       .executeTransactionV0({
-        proof: merkleTree.getProof(0).proof.map((p) => p.toJSON().data),
         instructions: compiledTransactions[0].instructions,
         index: compiledTransactions[0].index,
       })
       .accounts({ lazyTransactions })
-      .remainingAccounts(compiledTransactions[0].accounts)
-      .rpc();
+      .remainingAccounts(accounts)
+      .rpc({ skipPreflight: true });
+
 
     /// Ensure we fail executing the same tx twice
     try {
       await program.methods
         .executeTransactionV0({
-          proof: merkleTree.getProof(0).proof.map((p) => p.toJSON().data),
           instructions: compiledTransactions[0].instructions,
           index: compiledTransactions[0].index,
         })
         .accounts({ lazyTransactions })
-        .remainingAccounts(compiledTransactions[0].accounts)
+        .remainingAccounts(accounts)
         .rpc({ skipPreflight: true });
 
       throw new Error("Should have failed");

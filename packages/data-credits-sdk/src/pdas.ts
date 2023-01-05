@@ -32,3 +32,16 @@ export function delegatedDataCreditsKey(
     programId
   );
 };
+
+export function escrowAccountKey(
+  delegatedDataCredits: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+) {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("escrow_dc_account", "utf-8"),
+      delegatedDataCredits.toBuffer(),
+    ],
+    programId
+  );
+};

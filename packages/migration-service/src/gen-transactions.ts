@@ -12,6 +12,7 @@ import {
   registrarKey,
   PROGRAM_ID as VSR_PROGRAM_ID,
 } from "@helium/voter-stake-registry-sdk";
+import * as Collections from "typescript-collections";
 import { init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { subDaoKey, daoKey } from "@helium/helium-sub-daos-sdk";
 import { mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
@@ -52,6 +53,7 @@ import { Client } from "pg";
 import yargs from "yargs/yargs";
 import { compress } from "./utils";
 import { ASSOCIATED_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
+import { TreeNode } from "@solana/spl-account-compression/dist/types/merkle-tree";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -305,9 +307,7 @@ async function run() {
     if (isRouter) {
       const dcBal = new BN(account.dc);
       routerBalances.hnt = routerBalances.hnt.add(new BN(account.hnt));
-      routerBalances.mobile = routerBalances.mobile.add(
-        new BN(account.mobile)
-      );
+      routerBalances.mobile = routerBalances.mobile.add(new BN(account.mobile));
       routerBalances.stakedHnt = routerBalances.stakedHnt.add(
         new BN(account.staked_hnt)
       );
@@ -348,7 +348,9 @@ async function run() {
               gain: hotspot.gain,
               elevation: hotspot.altitude,
               isFullHotspot: !hotspot.dataonly,
-              numLocationAsserts: hotspot.nonce ? new BN(hotspot.nonce).toNumber() : 0,
+              numLocationAsserts: hotspot.nonce
+                ? new BN(hotspot.nonce).toNumber()
+                : 0,
             })
             .accountsStrict({
               collection: hotspotPubkeys.collection,
@@ -448,7 +450,7 @@ async function run() {
             position,
             mint: hnt,
             depositAuthority: lazySigner,
-            registrar
+            registrar,
           })
           .instruction();
 
@@ -519,6 +521,39 @@ async function run() {
     lazySigner,
     flatTransactions
   );
+
+
+  console.log("Extending merkle tree with cached nodes")
+  let rootNode = merkleTree.leaves[0];
+  while (typeof rootNode.parent !== "undefined") {
+    rootNode = rootNode.parent;
+  }
+
+  let numCachedNodes = 128; // Cache 128 nodes in the lookup table (7 levels) to reduce the size of tx
+  const cachedNodes: PublicKey[] = [];
+  const queue = new Collections.Queue<TreeNode>();
+  queue.enqueue(rootNode);
+  while (cachedNodes.length < numCachedNodes) {
+    const top = queue.dequeue();
+    if (!top.left || !top.right) {
+      break;
+    }
+    cachedNodes.push(new PublicKey(top.left.node));
+    cachedNodes.push(new PublicKey(top.right.node));
+    queue.enqueue(top.left);
+    queue.enqueue(top.right);
+  }
+  for (const nodes of chunks(cachedNodes, 5)) {
+    const instruction =
+      await AddressLookupTableProgram.extendLookupTable({
+        payer: provider.wallet.publicKey,
+        authority: provider.wallet.publicKey,
+        lookupTable: lut,
+        addresses: nodes
+      });
+    await sendInstructions(provider, [instruction], []);
+  }
+    
 
   console.log("Creating tables");
   await client.query(`
@@ -604,7 +639,6 @@ async function run() {
       })
       .rpc({ skipPreflight: true });
   }
-
 
   console.log(
     `Created lazy transactions ${lazyTransactionsKey(argv.name)[0]} ${
@@ -692,7 +726,6 @@ async function run() {
     ),
   ];
   await sendInstructions(provider, transfers);
-  
 
   console.log(`Finished in ${finish - start}ms`);
 }

@@ -94,32 +94,42 @@ server.get<{
       .blockhash;
 
     console.log(`Found ${results.length} transactions to migrate}`);
-    const blocks = results.map(r => blockKey(lazyTransactions, r.id)[0]);
-    const blocksExist = (await Promise.all(
-      chunks(blocks, 100).map(async chunk => await provider.connection.getMultipleAccountsInfo(chunk as PublicKey[], "confirmed"))
-    )).flat();
+    const blocks = results.map((r) => blockKey(lazyTransactions, r.id)[0]);
+    const blocksExist = (
+      await Promise.all(
+        chunks(blocks, 100).map(
+          async (chunk) =>
+            await provider.connection.getMultipleAccountsInfo(
+              chunk as PublicKey[],
+              "confirmed"
+            )
+        )
+      )
+    ).flat();
 
     const asExecuteTxs: { id: number; transaction: TransactionMessage }[] = (
       await Promise.all(
         results.map(
-          async ({
-            proof,
-            compiled,
-            id,
-          }: {
-            id: number;
-            lookup_table: string;
-            compiled: Buffer;
-            proof: string[];
-          }, idx) => {
+          async (
+            {
+              proof,
+              compiled,
+              id,
+            }: {
+              id: number;
+              lookup_table: string;
+              compiled: Buffer;
+              proof: string[];
+            },
+            idx
+          ) => {
             const hasRun = blocksExist[idx];
             const compiledTx = decompress(compiled);
             const block = blockKey(lazyTransactions, id)[0];
-            
+
             if (!hasRun) {
               const ix = await program.methods
                 .executeTransactionV0({
-                  proof: proof.map((p) => Buffer.from(p, "hex").toJSON().data),
                   instructions: compiledTx.instructions,
                   index: compiledTx.index,
                 })
@@ -130,7 +140,14 @@ server.get<{
                   block,
                   systemProgram: SystemProgram.programId,
                 })
-                .remainingAccounts(compiledTx.accounts)
+                .remainingAccounts([
+                  ...compiledTx.accounts,
+                  ...proof.map((p) => ({
+                    pubkey: new PublicKey(Buffer.from(p, "hex")),
+                    isWritable: false,
+                    isSigner: false,
+                  })),
+                ])
                 .instruction();
 
               return {
@@ -189,7 +206,7 @@ server.get<{
     }
     return {
       transactions: [],
-      count: 0
+      count: 0,
     };
   } catch (e: any) {
     console.error(e);
