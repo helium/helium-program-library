@@ -3,9 +3,8 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 
 use voter_stake_registry::{
-  self,
-  program::VoterStakeRegistry,
   state::{LockupKind, PositionV0, Registrar},
+  VoterStakeRegistry
 };
 
 #[derive(Accounts)]
