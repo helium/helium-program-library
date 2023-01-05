@@ -130,44 +130,72 @@ The client should:
 
 ## Local Setup
 
-1. Start localnet
+1. Install dependencies
 
 ```
-$: anchor localnet
+$: yarn
+$: git submodule init
+$: git submodule update
 ```
 
-2. Start watcher
+2. Build anchor dependencies
+```
+$: anchor run build-deps
+```
+
+3. Start localnet
+
+```
+$: TESTING=true anchor localnet
+```
+
+4. Start watcher
 
 ```
 $: yarn watch
 ```
 
-3. Bootstrap localnet
+5. Bootstrap localnet
 
 ```
-$: ./bootstrap-localnet
+$: . ./scripts/bootstrap-localnet.sh
 ```
 
-4. Start monitor
+6. Run tests against localnet
+
+```
+$: anchor test --provider.cluster localnet --skip-deploy --skip-local-validator --skip-build
+```
+
+If you run into trouble with your installation, run the following command to rebuild everything from scratch.
+
+```
+$: yarn clean && yarn && anchor run build-deps && TESTING=true anchor build && yarn build
+```
+
+## Running packages
+There's several packages that can be run as servers or applications. The individual instructions for them are included below.
+
+- Start monitor
 
 ```
 $: cd packages/monitor-service && yarn dev
 $: cd packages/monitor-service/docker-compose && docker-compose up -d
 ```
 
-5. Start breakpoint demo ui
+- Start breakpoint demo ui
 
 ```
 $: cd packages/breakpoint-demo-ui && yarn start
 ```
 
-6. Start oracle server
+- Start oracle server
 
 ```
 $: cd packages/distributor-oracle && yarn start
 ```
 
-7. Start xNFT
+- Start xNFT
 
 ```
 $: cd packages/xnft-hotspot && yarn dev

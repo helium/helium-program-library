@@ -178,6 +178,12 @@ export function loadKeypair(keypair: string): Keypair {
   );
 }
 
+export function isLocalhost(provider: anchor.AnchorProvider): boolean {
+  const ep = provider.connection.rpcEndpoint
+  return ep.includes("127.0.0.1") || ep.includes("localhost");
+
+}
+
 export async function sendInstructionsOrCreateProposal({
   provider,
   instructions,
