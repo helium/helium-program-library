@@ -34,9 +34,6 @@ async function start() {
     // update db in chunks of 100
     await Hotspot.bulkCreate(records.slice(i, i + chunkSize));
   }
-  
-  
- 
 }
 
 start();
