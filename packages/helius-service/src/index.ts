@@ -1,42 +1,18 @@
-import {Sequelize, STRING, INTEGER, Model} from 'sequelize';
 import fastify from 'fastify';
 import {init, PROGRAM_ID} from "@helium/helium-entity-manager-sdk";
-
 import { AnchorProvider, BN, BorshInstructionCoder, Program } from '@project-serum/anchor';
 import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
 import { Keypair, PublicKey } from '@solana/web3.js';
-
-// initialize sequelize
-const sequelize = new Sequelize('database', 'postgres', 'postgres', {
-  host: 'localhost',
-  dialect: 'postgres'
-});
-
-class Hotspot extends Model {}
-Hotspot.init({
-  hotspot_key: {
-    type: STRING,
-    primaryKey: true,
-  },
-  location: {
-    type: INTEGER
-  },
-  elevation: {
-    type: INTEGER
-  },
-  gain: {
-    type: INTEGER
-  },
-}, { sequelize, modelName: 'hotspot' });
+import { sequelize, Hotspot } from './model';
 
 // sync the model with the database
 sequelize.sync()
-.then(() => {
-  console.log('Hotspot table synced');
-})
-.catch(error => {
-  console.error('Error syncing Hotspot table:', error);
-});
+  .then(() => {
+    console.log('Hotspot table synced');
+  })
+  .catch(error => {
+    console.error('Error syncing Hotspot table:', error);
+  });
 
 function getLeafAssetId(tree: PublicKey, leafIndex: BN): PublicKey {
   const [assetId] = PublicKey.findProgramAddressSync(
@@ -85,7 +61,7 @@ server.post('/', async (request, reply) => {
         let infoKey = tx.message.accountKeys[ix.accounts[idx]];
         let info = await hemProgram.account.iotHotspotInfoV0.fetch(infoKey);
         const hotspotData = {
-          asset: info.asset;
+          asset: info.asset,
           hotspot_key: args.hotspotKey,
           location: null,
           elevation: null,
@@ -95,11 +71,11 @@ server.post('/', async (request, reply) => {
         await Hotspot.create(hotspotData);
       } else if (decoded.name == "updateIotInfoV0") {
         const asset = getLeafAssetId(tx.message.accountKeys[ix.accounts[treeIdx]], args.index);
-        const hotspot = await Hotspot.findByPk(asset.toString());
+        const hotspot = await Hotspot.findOne({ where: { asset: asset.toString() } });
 
         // Update the hotspot's location, elevation and gain
         if (args.location) {
-          hotspot.set("location", args.location);
+          hotspot.set("location", `${args.location}`);
         }
         if (args.elevation) {
           hotspot.set("elevation", args.elevation);

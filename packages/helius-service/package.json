@@ -29,14 +29,15 @@
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
     "build": "tsc -p tsconfig.json",
     "start": "node lib/esm/index.js",
-    "dev": "npx ts-node --project tsconfig.cjs.json src/index.ts"
+    "dev": "npx ts-node --project tsconfig.cjs.json src/index.ts",
+    "seed-db": "npx ts-node --project tsconfig.cjs.json src/seed-db.ts"
   },
   "dependencies": {
     "@fastify/cors": "^8.1.1",
     "@helium/address": "^4.6.2",
-    "@helium/helium-entity-manager-sdk": "^0.0.10",
-    "@helium/idls": "^0.0.10",
-    "@helium/helium-sub-daos-sdk": "^0.0.10",
+    "@helium/helium-entity-manager-sdk": "^0.0.12",
+    "@helium/idls": "^0.0.12",
+    "@helium/helium-sub-daos-sdk": "^0.0.12",
     "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
     "@project-serum/anchor": "^0.26",
     "@solana/spl-token": "0.3.5",
