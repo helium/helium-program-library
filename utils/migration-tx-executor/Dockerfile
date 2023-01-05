@@ -2,11 +2,13 @@ FROM rust:latest as builder
 
 WORKDIR /app
 
-COPY . .
+COPY Cargo.toml .
+COPY Cargo.lock .
+COPY src src
 
 RUN cargo build --release
 
 EXPOSE 8080
 
 # Pass all arguments etc to binary
-# ENTRYPOINT [ "/target/release/migration-tx-executor" ]
+ENTRYPOINT [ "/app/target/release/migration-tx-executor" ]
