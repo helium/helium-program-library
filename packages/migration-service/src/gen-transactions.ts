@@ -543,18 +543,17 @@ async function run() {
     queue.enqueue(top.left);
     queue.enqueue(top.right);
   }
-  await Promise.all(
-    chunks(cachedNodes, 5).map(async (nodes) => {
-      const instruction =
-        await AddressLookupTableProgram.extendLookupTable({
-          payer: provider.wallet.publicKey,
-          authority: provider.wallet.publicKey,
-          lookupTable: lut,
-          addresses: nodes
-        });
-      await sendInstructions(provider, [instruction], []);
-    })
-  );
+  for (const nodes of chunks(cachedNodes, 5)) {
+    const instruction =
+      await AddressLookupTableProgram.extendLookupTable({
+        payer: provider.wallet.publicKey,
+        authority: provider.wallet.publicKey,
+        lookupTable: lut,
+        addresses: nodes
+      });
+    await sendInstructions(provider, [instruction], []);
+  }
+    
 
   console.log("Creating tables");
   await client.query(`
