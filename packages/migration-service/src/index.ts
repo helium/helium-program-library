@@ -156,9 +156,9 @@ server.get<{
                   payerKey: provider.wallet.publicKey,
                   recentBlockhash,
                   instructions: [
-                    ComputeBudgetProgram.setComputeUnitLimit({
-                      units: 350000,
-                    }),
+                    // ComputeBudgetProgram.setComputeUnitLimit({
+                    //   units: 350000,
+                    // }),
                     ix,
                   ],
                 }),

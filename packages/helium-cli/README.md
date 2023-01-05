@@ -8,9 +8,9 @@ npx ts-node --project tsconfig.cjs.json src/create-subdao.ts -u https://api.devn
 Now, go approve and run all commands in realms.
 
 ```
-npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u https://api.devnet.solana.com -n IOT --subdaoMint $(solana address -k keypairs/iot.json) --makerKey 13AjXWhBNWdxq63dSQmPvRx3uQtaa3pMu5wXB1bPUZTTYEiwpgC
+npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u https://api.devnet.solana.com -n IOT --subdaoMint $(solana address -k keypairs/iot.json) --makerKey 13EYmQgDF1ScLxXfugVrFCa3HiJUALwsaLBHJpTsXx1KP6UncH7
 
-npx ts-node --project tsconfig.cjs.json src/mint-dc.ts -u https://api.devnet.solana.com --destination 2z8Mo3ZQZrS9VkEi1TAc6jJdNauW3CgehqodKqnUzhSw --numHnt 10000 --dcKey $(solana address -k keypairs/dc.json)
+npx ts-node --project tsconfig.cjs.json src/mint-dc.ts -u https://api.devnet.solana.com --destination 3ZwL45WPyjKg3GejkGTbP6kMCQcr73qkVCdQL3Afb3Cx --numHnt 10000 --dcKey $(solana address -k keypairs/dc.json)
 ```
 
 Now, go approve and run maker create in realms

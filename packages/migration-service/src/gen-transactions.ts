@@ -461,7 +461,7 @@ async function run() {
       const ixnGroups = [
         tokenIxs,
         stakedInstructions,
-        ...chunks(hotspotIxs, 2),
+        ...chunks(hotspotIxs, 1),
       ].filter((ixGroup) => ixGroup.length > 0);
 
       transactionsByWallet.push({
