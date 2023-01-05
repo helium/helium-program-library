@@ -66,9 +66,7 @@ export class AccountFetchCache {
     com?: Commitment
   ) => Promise<AccountInfo<Buffer> | null>;
   oldSendTransaction: (
-    transaction: Transaction,
-    signers: Array<Signer>,
-    options?: SendOptions
+    ...args: any[]
   ) => Promise<string>;
   oldSendRawTransaction: (
     rawTransaction: Buffer | Uint8Array | Array<number>,
@@ -128,15 +126,13 @@ export class AccountFetchCache {
       };
     }
     connection.sendTransaction = async function overloadedSendTransaction(
-      transaction: Transaction,
-      signers: Array<Signer>,
-      options?: SendOptions
+      ...args: any[]
     ) {
-      const result = await self.oldSendTransaction(transaction, signers, options);
+      const result = await self.oldSendTransaction(...args);
 
       this.confirmTransaction(result, "finalized")
         .then(() => {
-          return self.requeryMissing(transaction.instructions);
+          return self.requeryMissing(args[0].instructions);
         })
         .catch(console.error);
       return result;

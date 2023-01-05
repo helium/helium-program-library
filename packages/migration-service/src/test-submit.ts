@@ -36,13 +36,23 @@ async function run() {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const txs = (await axios.get(`${argv.migrateUrl}/migrate/${argv.targetWallet}`)).data.transactions;
   const txids = await Promise.all(txs.map(async tx => await provider.connection.sendRawTransaction(
-    Buffer.from(tx)
+    Buffer.from(tx),
+    {
+      skipPreflight: true
+    }
   )));
   console.log("Sending", txids);
-  await Promise.all(txids.map(async txid => {
-    await provider.connection.confirmTransaction(txid, "processed");
+  const success = await Promise.all(txids.map(async txid => {
+    const tx = await provider.connection.confirmTransaction(txid, "processed");
+    if(tx.value.err) {
+      const tx = await provider.connection.getTransaction(txid);
+      console.error(txid, tx.meta.logMessages?.join("\n"));
+    }
+    return !tx.value.err
   }));
-  console.log("done");
+
+
+  console.log("done", success.filter(s => !s).length, "failed", success.filter(s => s).length, "succeeded");
 }
 
 run()

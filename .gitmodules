@@ -1,10 +1,6 @@
 [submodule "deps/metaplex-program-library"]
 	path = deps/metaplex-program-library
-	url = https://github.com/metaplex-foundation/metaplex-program-library.git
-[submodule "deps/helium-voter-stake-registry"]
-	path = deps/helium-voter-stake-registry
-	url = https://github.com/helium/voter-stake-registry
-	branch = feature/minimum-lockup
+	url = https://github.com/ChewingGlass/metaplex-program-library.git
 [submodule "deps/solana-program-library"]
 	path = deps/solana-program-library
 	url = https://github.com/solana-labs/solana-program-library.git

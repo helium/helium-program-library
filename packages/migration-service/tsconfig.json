@@ -5,6 +5,24 @@
       "path": "../idls"
     },
     {
+      "path": "../circuit-breaker-sdk"
+    },
+    {
+      "path": "../data-credits-sdk"
+    },
+    {
+      "path": "../distributor-oracle"
+    },
+    {
+      "path": "../voter-stake-registry-sdk"
+    },
+    {
+      "path": "../helium-entity-manager-sdk"
+    },
+    {
+      "path": "../lazy-distributor-sdk"
+    },
+    {
       "path": "../helium-sub-daos-sdk"
     },
     {

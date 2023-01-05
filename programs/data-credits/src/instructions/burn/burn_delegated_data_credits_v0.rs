@@ -4,7 +4,7 @@ use anchor_lang::solana_program::hash::hash;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use helium_sub_daos::{
   cpi::{accounts::TrackDcBurnV0, track_dc_burn_v0},
-  current_epoch, DaoV0, SubDaoV0, TrackDcBurnArgsV0,
+  DaoV0, SubDaoV0, TrackDcBurnArgsV0,
 };
 
 #[derive(Debug, Clone)]
@@ -24,21 +24,20 @@ pub struct BurnDelegatedDataCreditsArgsV0 {
 #[derive(Accounts)]
 pub struct BurnDelegatedDataCreditsV0<'info> {
   /// CHECK: Verified by cpi
-  #[account(
-    mut,
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(),  &current_epoch(clock.unix_timestamp).to_le_bytes()],
-    seeds::program = helium_sub_daos_program.key(),
-    bump
-  )]
+  #[account(mut)]
   pub sub_dao_epoch_info: AccountInfo<'info>,
   #[account(
+    mut,
     has_one = dao,
-    has_one = dc_burn_authority
+    has_one = dc_burn_authority,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   pub dc_burn_authority: Signer<'info>,
+  /// CHECK: Used by cpi
+  pub registrar: AccountInfo<'info>,
   #[account(
     has_one = dc_mint,
+    has_one = registrar
   )]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(mut)]
@@ -70,14 +69,9 @@ pub struct BurnDelegatedDataCreditsV0<'info> {
   #[account(mut)]
   pub escrow_account: Box<Account<'info, TokenAccount>>,
 
-  #[account(mut)]
-  pub manager: Signer<'info>,
-
   pub token_program: Program<'info, Token>,
   pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
   pub system_program: Program<'info, System>,
-  pub clock: Sysvar<'info, Clock>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> BurnDelegatedDataCreditsV0<'info> {
@@ -87,8 +81,7 @@ impl<'info> BurnDelegatedDataCreditsV0<'info> {
       sub_dao: self.sub_dao.to_account_info(),
       dao: self.dao.to_account_info(),
       system_program: self.system_program.to_account_info(),
-      clock: self.clock.to_account_info(),
-      rent: self.rent.to_account_info(),
+      registrar: self.registrar.to_account_info(),
       account_payer: self.account_payer.to_account_info(),
       dc_mint: self.dc_mint.to_account_info(),
     }

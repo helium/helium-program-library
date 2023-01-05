@@ -1,7 +1,7 @@
 use crate::{errors::ErrorCode, ThresholdType, WindowV0, WindowedCircuitBreakerConfigV0};
 use anchor_lang::prelude::*;
 
-pub fn get_new_aggregated_value(
+pub fn time_decay_previous_value(
   config: &WindowedCircuitBreakerConfigV0,
   window: &WindowV0,
   unix_timestamp: i64,
@@ -46,7 +46,7 @@ pub fn enforce_window(
 
   let new_aggregated_value = amount
     .checked_add(
-      get_new_aggregated_value(config, window, unix_timestamp)
+      time_decay_previous_value(config, window, unix_timestamp)
         .ok_or_else(|| error!(ErrorCode::ArithmeticError))?,
     )
     .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;

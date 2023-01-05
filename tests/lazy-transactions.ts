@@ -71,6 +71,7 @@ describe("lazy-transactions", () => {
       .initializeLazyTransactionsV0({
         root: merkleTree.getRoot().toJSON().data,
         name,
+        authority: me
       })
       .rpc({ skipPreflight: true });
   

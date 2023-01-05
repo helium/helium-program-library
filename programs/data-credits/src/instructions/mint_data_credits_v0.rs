@@ -11,7 +11,7 @@ use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
-use pyth_sdk_solana::{load_price_feed_from_account_info, PriceStatus};
+use pyth_sdk_solana::load_price_feed_from_account_info;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MintDataCreditsArgsV0 {
@@ -72,8 +72,6 @@ pub struct MintDataCreditsV0<'info> {
   pub circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub token_program: Program<'info, Token>,
-  pub clock: Sysvar<'info, Clock>,
-  pub rent: Sysvar<'info, Rent>,
   pub system_program: Program<'info, System>,
   pub associated_token_program: Program<'info, AssociatedToken>,
 }
@@ -105,7 +103,6 @@ impl<'info> MintDataCreditsV0<'info> {
       mint_authority: self.data_credits.to_account_info(),
       token_program: self.token_program.to_account_info(),
       circuit_breaker: self.circuit_breaker.to_account_info(),
-      clock: self.clock.to_account_info(),
     };
     CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
   }
@@ -141,21 +138,9 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
       error!(DataCreditsErrors::PythError)
     })?;
 
-  // Don't validate price feed on localnet
-  if !TESTING {
-    let current_time = Clock::get()?.unix_timestamp;
-    require!(
-      current_time > hnt_price_oracle.publish_time + 60,
-      DataCreditsErrors::PythPriceFeedStale
-    );
-    require!(
-      hnt_price_oracle.status != PriceStatus::Trading,
-      DataCreditsErrors::HntNotTrading
-    );
-  }
-
+  let current_time = Clock::get()?.unix_timestamp;
   let hnt_price = hnt_price_oracle
-    .get_ema_price()
+    .get_ema_price_no_older_than(current_time, if TESTING { 6000000 } else { 60 })
     .ok_or_else(|| error!(DataCreditsErrors::PythPriceNotFound))?;
 
   // price * hnt_amount / 10^(8 + expo - 5)

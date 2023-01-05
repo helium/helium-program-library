@@ -41,7 +41,6 @@ pub struct ExecuteTransactionV0<'info> {
   )]
   pub block: Account<'info, Block>,
   pub system_program: Program<'info, System>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV0) -> Result<()> {

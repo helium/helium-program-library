@@ -51,6 +51,10 @@ export async function sendInstructions(
   commitment: Commitment = "confirmed",
   idlErrors: Map<number, string> = new Map()
 ): Promise<string> {
+  if (instructions.length == 0) {
+    return ""
+  }
+  
   let tx = new Transaction();
   tx.recentBlockhash = (
     await provider.connection.getRecentBlockhash()

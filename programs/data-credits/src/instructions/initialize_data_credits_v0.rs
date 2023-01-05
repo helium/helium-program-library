@@ -59,7 +59,6 @@ pub struct InitializeDataCreditsV0<'info> {
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handler(
@@ -99,7 +98,6 @@ pub fn handler(
         mint_authority: ctx.accounts.mint_authority.to_account_info(),
         token_program: ctx.accounts.token_program.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
-        rent: ctx.accounts.rent.to_account_info(),
       },
     ),
     InitializeMintWindowedBreakerArgsV0 {

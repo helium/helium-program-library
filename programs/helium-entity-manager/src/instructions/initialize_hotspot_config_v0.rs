@@ -14,14 +14,13 @@ use mpl_bubblegum::{
   cpi::{accounts::CreateTree, create_tree},
   program::Bubblegum,
 };
-use spl_account_compression::{program::SplAccountCompression, Wrapper};
+use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeHotspotConfigArgsV0 {
   pub name: String,
   pub symbol: String,
   pub metadata_url: String,
-  pub onboarding_server: Pubkey,
   pub settings: ConfigSettingsV0,
   pub max_depth: u32,
   pub max_buffer_size: u32,
@@ -80,7 +79,6 @@ pub struct InitializeHotspotConfigV0<'info> {
     bump,
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
-  pub dc_mint: Box<Account<'info, Mint>>,
 
   #[account(
     mut,
@@ -93,12 +91,12 @@ pub struct InitializeHotspotConfigV0<'info> {
 
   /// CHECK: Checked by cpi
   #[account(mut)]
-  pub merkle_tree: Signer<'info>,
+  pub merkle_tree: UncheckedAccount<'info>,
 
   /// CHECK: Checked with constraints
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
-  pub log_wrapper: Program<'info, Wrapper>,
+  pub log_wrapper: Program<'info, Noop>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub bubblegum_program: Program<'info, Bubblegum>,
@@ -205,8 +203,6 @@ pub fn handler(
     sub_dao: ctx.accounts.sub_dao.key(),
     symbol: args.symbol.clone(),
     collection: ctx.accounts.collection.key(),
-    dc_mint: ctx.accounts.dc_mint.key(),
-    onboarding_server: args.onboarding_server,
     authority: ctx.accounts.authority.key(),
     bump_seed: ctx.bumps["hotspot_config"],
     collection_bump_seed: ctx.bumps["collection"],

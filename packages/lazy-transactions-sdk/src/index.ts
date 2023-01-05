@@ -5,6 +5,7 @@ import { TransactionInstruction, PublicKey, AccountMeta } from "@solana/web3.js"
 import { PROGRAM_ID } from "./constants";
 import { MerkleTree } from "./merkleTree";
 import { keccak_256 } from 'js-sha3';
+// @ts-ignore
 import { Layout } from "buffer-layout";
 
 export * from "./pdas";

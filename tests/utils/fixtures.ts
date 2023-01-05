@@ -11,6 +11,7 @@ import { random } from "./string";
 import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import { ThresholdType } from "../../packages/circuit-breaker-sdk/src"
 import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =
@@ -21,7 +22,8 @@ export const DC_FEE = 5000000;
 export const initTestDataCredits = async (
   program: Program<DataCredits>,
   provider: anchor.AnchorProvider,
-  startingHntbal: number = 10000000000,
+  startingHntbal?: number,
+  hntMint?: PublicKey,
 ): Promise<{
   dcKey: PublicKey;
   hntMint: PublicKey;
@@ -29,21 +31,20 @@ export const initTestDataCredits = async (
   hntBal: number;
   dcBal: number;
 }> => {
+  if (!startingHntbal) {
+    startingHntbal = 10000000000;
+  }
   const me = provider.wallet.publicKey;
-  let hntMint;
   let hntBal = startingHntbal;
   let dcMint;
   let dcBal = 0;
 
-  hntMint = await createMint(provider, 8, me, me);
+  if (!hntMint) {
+    hntMint = await createMint(provider, 8, me, me);
+  }
   dcMint = await createMint(provider, 0, me, me);
 
-  await createAtaAndMint(
-    provider,
-    hntMint,
-    toBN(startingHntbal, 8),
-    me
-  );
+  await createAtaAndMint(provider, hntMint, toBN(startingHntbal, 8), me);
 
   const initDataCredits = await program.methods
     .initializeDataCreditsV0({
@@ -55,7 +56,7 @@ export const initTestDataCredits = async (
       },
     })
     .accounts({ hntMint, dcMint, hntPriceOracle: HNT_PYTH_PRICE_FEED });
-  
+
   const dcKey = (await initDataCredits.pubkeys()).dataCredits!;
 
   await initDataCredits.rpc({ skipPreflight: true });
@@ -71,7 +72,6 @@ export const initTestHotspotConfig = async (
 ): Promise<{
   collection: PublicKey;
   hotspotConfig: PublicKey;
-  onboardingServerKeypair: Keypair;
 }> => {
   if (!dcMint) {
     dcMint = await createMint(
@@ -82,7 +82,6 @@ export const initTestHotspotConfig = async (
     );
   }
 
-  const onboardingServerKeypair = Keypair.generate();
   const merkle = Keypair.generate();
   // Testing -- small tree
   const space = getConcurrentMerkleTreeAccountSize(3, 8);
@@ -91,7 +90,6 @@ export const initTestHotspotConfig = async (
       name: "Helium Network Hotspots",
       symbol: random(), // symbol is unique would need to restart localnet everytime
       metadataUrl: DEFAULT_METADATA_URL,
-      onboardingServer: onboardingServerKeypair.publicKey,
       settings: {
         iotConfig: {
           minGain: 10,
@@ -104,7 +102,6 @@ export const initTestHotspotConfig = async (
       maxBufferSize: 8,
     })
     .accounts({
-      dcMint,
       subDao,
       merkleTree: merkle.publicKey,
     })
@@ -127,7 +124,6 @@ export const initTestHotspotConfig = async (
   return {
     collection: collection!,
     hotspotConfig: hotspotConfig!,
-    onboardingServerKeypair,
   };
 };
 
@@ -186,6 +182,21 @@ export async function ensureHSDIdl(hsdProgram: Program<HeliumSubDaos>) {
   }
 }
 
+export async function ensureVSRIdl(vsrProgram: Program<VoterStakeRegistry>) {
+  try {
+    execSync(
+      `anchor idl init --filepath ${__dirname}/../../target/idl/voter_stake_registry.json ${vsrProgram.programId}`,
+      { stdio: "inherit" }
+    );
+  } catch {
+    execSync(
+      `anchor idl upgrade --filepath ${__dirname}/../../target/idl/voter_stake_registry.json ${vsrProgram.programId}`,
+      { stdio: "inherit" }
+    );
+  }
+}
+
+
 export const initWorld = async (
   provider: anchor.AnchorProvider,
   hsProgram: Program<HeliumEntityManager>,
@@ -193,14 +204,16 @@ export const initWorld = async (
   dcProgram: Program<DataCredits>,
   epochRewards?: number,
   subDaoEpochRewards?: number,
+  registrar?: PublicKey,
+  hntMint?: PublicKey
 ): Promise<{
-  dao: { mint: PublicKey; dao: PublicKey };
+  dao: { mint: PublicKey; dao: PublicKey; };
   subDao: {
     mint: PublicKey;
     subDao: PublicKey;
     treasury: PublicKey;
     rewardsEscrow: PublicKey;
-    stakerPool: PublicKey;
+    delegatorPool: PublicKey;
   };
   dataCredits: {
     dcKey: PublicKey;
@@ -212,14 +225,13 @@ export const initWorld = async (
   hotspotConfig: {
     collection: PublicKey;
     hotspotConfig: PublicKey;
-    onboardingServerKeypair: Keypair;
   };
   issuer: {
     hotspotIssuer: PublicKey;
     makerKeypair: Keypair;
   };
 }> => {
-  const dataCredits = await initTestDataCredits(dcProgram, provider);
+  const dataCredits = await initTestDataCredits(dcProgram, provider, undefined, hntMint);
 
   const dao = await initTestDao(
     hsdProgram,
@@ -227,7 +239,8 @@ export const initWorld = async (
     epochRewards || 50,
     provider.wallet.publicKey,
     dataCredits.dcMint,
-    dataCredits.hntMint
+    dataCredits.hntMint,
+    registrar
   );
   const subDao = await initTestSubdao(
     hsdProgram,

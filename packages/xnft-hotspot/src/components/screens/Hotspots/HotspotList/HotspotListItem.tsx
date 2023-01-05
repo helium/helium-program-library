@@ -1,20 +1,17 @@
-import { PublicKey } from "@solana/web3.js";
 import { Asset, MOBILE_MINT, numberWithCommas } from "@helium/spl-utils";
+import { PublicKey } from "@solana/web3.js";
+import classnames from "classnames";
 import React, { FC, useMemo } from "react";
 import {
   Button,
   Image,
   Text,
   useNavigation,
-  View,
-  Svg,
-  Path,
+  View
 } from "react-xnft";
-import classnames from "classnames";
 import { useMetaplexMetadata } from "../../../../hooks/useMetaplexMetadata";
 import { usePendingRewards } from "../../../../hooks/usePendingRewards";
 import { useClaimRewards } from "../../../../utils/hooks";
-import { useFetchedCachedJson } from "../../../../hooks/useFetchedJson";
 import { SvgSpinner } from "../../../common";
 
 interface HotspotListItemProps {
@@ -24,6 +21,7 @@ interface HotspotListItemProps {
 export const HotspotListItem: FC<HotspotListItemProps> = ({ nft }) => {
   const mint = useMemo(() => new PublicKey(nft.id), [nft.id.toBase58()]);
   const tokenMetaUriData = nft.content.metadata;
+  const image = nft.content.files[0]?.uri;
   const nav = useNavigation();
   const { info: metadata } = useMetaplexMetadata(MOBILE_MINT);
   const symbol = metadata?.data.symbol;
@@ -43,7 +41,7 @@ export const HotspotListItem: FC<HotspotListItemProps> = ({ nft }) => {
       <View tw="flex w-full gap-x-3 justify-center items-center">
         <Image
           tw="rounded-md"
-          src={tokenMetaUriData?.image}
+          src={image}
           style={{ width: "60px" }}
         />
         <View tw="flex flex-col gap-2 grow justify-center">

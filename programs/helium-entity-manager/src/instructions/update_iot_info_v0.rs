@@ -11,6 +11,7 @@ use data_credits::{
   },
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
+use helium_sub_daos::{DaoV0, SubDaoV0};
 use mpl_bubblegum::utils::get_asset_id;
 use mpl_bubblegum::{program::Bubblegum, state::TreeConfig};
 use shared_utils::*;
@@ -50,13 +51,13 @@ pub struct UpdateIotInfoV0<'info> {
   pub info: Box<Account<'info, IotHotspotInfoV0>>,
   #[account(mut)]
   pub hotspot_owner: Signer<'info>,
-  /// CHECK: THe merkle tree
+  /// CHECK: The merkle tree
   pub merkle_tree: UncheckedAccount<'info>,
   #[account(
-        seeds = [merkle_tree.key().as_ref()],
-        bump,
-        seeds::program = bubblegum_program.key()
-    )]
+    seeds = [merkle_tree.key().as_ref()],
+    bump,
+    seeds::program = bubblegum_program.key()
+  )]
   pub tree_authority: Account<'info, TreeConfig>,
   #[account(
     mut,
@@ -66,12 +67,19 @@ pub struct UpdateIotInfoV0<'info> {
   pub owner_dc_ata: Box<Account<'info, TokenAccount>>,
 
   #[account(
-    has_one = dc_mint,
     has_one = merkle_tree,
+    has_one = sub_dao,
     constraint = hotspot_config.settings.is_valid(args)
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
-
+  #[account(
+    has_one = dc_mint
+  )]
+  pub dao: Box<Account<'info, DaoV0>>,
+  #[account(
+    has_one = dao
+  )]
+  pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,
 
@@ -81,7 +89,7 @@ pub struct UpdateIotInfoV0<'info> {
       dc_mint.key().as_ref()
     ],
     seeds::program = data_credits_program.key(),
-    bump,
+    bump = dc.data_credits_bump,
     has_one = dc_mint
   )]
   pub dc: Account<'info, DataCreditsV0>,
@@ -93,7 +101,6 @@ pub struct UpdateIotInfoV0<'info> {
   pub data_credits_program: AccountInfo<'info>,
   pub token_program: Program<'info, Token>,
   pub associated_token_program: Program<'info, AssociatedToken>,
-  pub rent: Sysvar<'info, Rent>,
   pub system_program: Program<'info, System>,
 }
 
@@ -107,7 +114,6 @@ impl<'info> UpdateIotInfoV0<'info> {
         dc_mint: self.dc_mint.to_account_info(),
         token_program: self.token_program.to_account_info(),
         associated_token_program: self.associated_token_program.to_account_info(),
-        rent: self.rent.to_account_info(),
         system_program: self.system_program.to_account_info(),
       },
     };
@@ -144,6 +150,13 @@ pub fn handler<'info>(
     if ctx.accounts.info.is_full_hotspot {
       dc_fee = full_location_staking_fee;
     }
+
+    ctx.accounts.info.num_location_asserts = ctx
+      .accounts
+      .info
+      .num_location_asserts
+      .checked_add(1)
+      .unwrap();
 
     // burn the dc tokens
     burn_without_tracking_v0(

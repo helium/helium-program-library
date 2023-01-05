@@ -1,69 +1,80 @@
 import { thresholdPercent, ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
   hotspotConfigKey,
-  hotspotIssuerKey,
-  init as initHem
+  init as initHem,
 } from "@helium/helium-entity-manager-sdk";
 import {
   daoKey,
   init as initDao,
-  subDaoKey
+  subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
-  lazyDistributorKey
+  lazyDistributorKey,
 } from "@helium/lazy-distributor-sdk";
 import {
-  toBN
-} from "@helium/spl-utils";
+  registrarKey,
+  init as initVsr,
+} from "@helium/voter-stake-registry-sdk";
+import { sendInstructions, toBN } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";
 import * as anchor from "@project-serum/anchor";
 import {
   getConcurrentMerkleTreeAccountSize,
-  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
 } from "@solana/spl-account-compression";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
   Cluster,
-  ComputeBudgetProgram, Keypair,
+  ComputeBudgetProgram,
+  Keypair,
   PublicKey,
-  SystemProgram
+  SystemProgram,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import { OracleJob } from "@switchboard-xyz/common";
 import {
-  CrankAccount,
+  AggregatorHistoryBuffer,
   QueueAccount,
-  SwitchboardProgram
+  SwitchboardProgram,
 } from "@switchboard-xyz/solana.js";
+import {
+  getGovernanceProgramVersion,
+  MintMaxVoteWeightSource,
+  withCreateRealm,
+  GoverningTokenType,
+  VoteThreshold,
+  VoteThresholdType,
+  VoteTipping,
+  GovernanceConfig,
+  GoverningTokenConfigAccountArgs,
+  withCreateGovernance,
+  withSetRealmAuthority,
+  SetRealmAuthorityAction,
+  getTokenOwnerRecordAddress,
+} from "@solana/spl-governance";
 import os from "os";
 import yargs from "yargs/yargs";
-import { createAndMint, exists, loadKeypair } from "./utils";
-
-type Hotspot = {
-  eccKey: string;
-};
-
-const hardcodeHotspots: Hotspot[] = [
-  {
-    eccKey: "1122WVpJNesC4DU6s6cQ6caKC5LShQFTX8ouFQ2ybLhkwkKZjM8u",
-  },
-  {
-    eccKey: "11bNfVbDL8Tp2T6jsEevRzBG5QuJpHVUz1Z21ACDcD4wW6RbVAZ",
-  },
-  {
-    eccKey: "11wsqKcoXGesnSbEwKTY8QkoqdFsG7oafcyPn8jBnzRK4sfCSw8",
-  },
-  {
-    eccKey: "11t1Yvm7QbyVnmqdCUpfA8XUiGVbpHPVnaNtR25gb8p2d4Dzjxi",
-  },
-];
+import {
+  createAndMint,
+  exists,
+  getTimestampFromDays,
+  getUnixTimestamp,
+  loadKeypair,
+  sendInstructionsOrCreateProposal,
+} from "./utils";
 
 const { hideBin } = require("yargs/helpers");
+
 const yarg = yargs(hideBin(process.argv)).options({
   wallet: {
     alias: "k",
     describe: "Anchor wallet keypair",
     default: `${os.homedir()}/.config/solana/id.json`,
+  },
+  noHotspots: {
+    type: "boolean",
+    default: false
   },
   url: {
     alias: "u",
@@ -86,20 +97,15 @@ const yarg = yargs(hideBin(process.argv)).options({
     type: "string",
     required: true,
   },
+  realmName: {
+    describe: "The name of the realm",
+    type: "string",
+    required: true,
+  },
   subdaoKeypair: {
     type: "string",
     describe: "Keypair of the subdao token",
     required: true,
-  },
-  onboardingServerKeypair: {
-    type: "string",
-    describe: "Keypair of the onboarding server",
-    default: `${os.homedir()}/.config/solana/id.json`,
-  },
-  makerKeypair: {
-    type: "string",
-    describe: "Keypair of a maker",
-    default: `${os.homedir()}/.config/solana/id.json`,
   },
   numTokens: {
     type: "number",
@@ -124,6 +130,21 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Keypair of the oracle",
     default: "./keypairs/oracle.json",
   },
+  aggregatorKeypair: {
+    type: "string",
+    describe: "Keypair of the aggregtor",
+    default: "./keypairs/aggregator.json",
+  },
+  merkleKeypair: {
+    type: "string",
+    describe: "Keypair of the merkle tree",
+    default: "./keypairs/merkle.json",
+  },
+  dcBurnAuthority: {
+    type: "string",
+    describe: "The authority to burn DC tokens",
+    required: true,
+  },
   activeDeviceOracleUrl: {
     alias: "ao",
     type: "string",
@@ -145,13 +166,30 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "The switchboard network",
     default: "devnet",
   },
+  startEpochRewards: {
+    type: "number",
+    describe: "The starting epoch rewards (yearly)",
+    required: true,
+  },
+  govProgramId: {
+    type: "string",
+    describe: "Pubkey of the GOV program",
+    default: "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw",
+  },
+  councilKeypair: {
+    type: "string",
+    describe: "Keypair of gov council token",
+    default: "./keypairs/council.json",
+  },
 });
 
-const MOBILE_EPOCH_REWARDS = 5000000000;
+const MIN_LOCKUP = 15811200; // 6 months
+const MAX_LOCKUP = MIN_LOCKUP * 8;
+const SCALE = 100;
 
 async function run() {
   const argv = await yarg.argv;
-  console.log(argv.url)
+  console.log(argv.url);
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
@@ -162,41 +200,230 @@ async function run() {
   const lazyDistributorProgram = await initLazy(provider);
   const heliumSubDaosProgram = await initDao(provider);
   const hemProgram = await initHem(provider);
+  const heliumVsrProgram = await initVsr(provider);
 
   const wallet = loadKeypair(argv.wallet);
+  const aggKeypair = await loadKeypair(argv.aggregatorKeypair);
+  const merkle = await loadKeypair(argv.merkleKeypair);
   const subdaoKeypair = await loadKeypair(argv.subdaoKeypair);
-  const onboardingServerKeypair = await loadKeypair(
-    argv.onboardingServerKeypair
-  );
-  const makerKeypair = await loadKeypair(argv.makerKeypair);
-  const oracleKeypair = loadKeypair(argv.oracleKeypair);
+  const oracleKeypair = await loadKeypair(argv.oracleKeypair);
   const oracleKey = oracleKeypair.publicKey;
   const rewardsOracleUrl = argv.rewardsOracleUrl;
+  const govProgramId = new PublicKey(argv.govProgramId);
+  const councilKeypair = await loadKeypair(argv.councilKeypair);
 
   console.log("Subdao mint", subdaoKeypair.publicKey.toBase58());
+  console.log("GOV PID", govProgramId.toBase58());
+  console.log("COUNCIL", councilKeypair.publicKey.toBase58());
 
   const conn = provider.connection;
 
-  await createAndMint({
-    provider,
-    mintKeypair: subdaoKeypair,
-    amount: argv.numTokens,
-    metadataUrl: `${argv.bucket}/${name.toLowerCase()}.json`,
-  });
-
   const dao = (await daoKey(new PublicKey(argv.hntPubkey)))[0];
   const subdao = (await subDaoKey(subdaoKeypair.publicKey))[0];
+  const daoAcc = await heliumSubDaosProgram.account.daoV0.fetch(dao);
   const [lazyDist] = await lazyDistributorKey(subdaoKeypair.publicKey);
   const rewardsEscrow = await getAssociatedTokenAddress(
     subdaoKeypair.publicKey,
     lazyDist,
     true
   );
+
+  let payer = provider.wallet.publicKey;
+  const auth = await provider.connection.getAccountInfo(daoAcc.authority);
+  if (auth.owner.equals(govProgramId)) {
+    const daoPayer = PublicKey.findProgramAddressSync(
+      [Buffer.from("native-treasury", "utf-8"), daoAcc.authority.toBuffer()],
+      govProgramId
+    )[0];
+    payer = daoPayer;
+  }
+
+  await createAndMint({
+    provider,
+    mintKeypair: subdaoKeypair,
+    amount: argv.numTokens,
+    metadataUrl: `${argv.bucket}/${name.toLowerCase()}.json`,
+    mintAuthority: daoAcc.authority,
+    freezeAuthority: daoAcc.authority,
+  });
+
+  let instructions: TransactionInstruction[] = [];
+  const govProgramVersion = await getGovernanceProgramVersion(
+    conn,
+    govProgramId
+  );
+
+  const realmName = argv.realmName;
+  const realm = await PublicKey.findProgramAddressSync(
+    [Buffer.from("governance", "utf-8"), Buffer.from(realmName, "utf-8")],
+    govProgramId
+  )[0];
+  if (!(await exists(conn, realm))) {
+    console.log("Initializing Realm");
+    await withCreateRealm(
+      instructions,
+      govProgramId,
+      govProgramVersion,
+      realmName,
+      provider.wallet.publicKey, // realmAuthorityPk
+      subdaoKeypair.publicKey, // communityMintPk
+      provider.wallet.publicKey, // payer
+      councilKeypair.publicKey, // councilMintPk
+      MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION,
+      new anchor.BN(100000000000000), // TODO: 1mm vehnt to create governance
+      new GoverningTokenConfigAccountArgs({
+        // community token config
+        voterWeightAddin: heliumVsrProgram.programId,
+        maxVoterWeightAddin: heliumVsrProgram.programId,
+        tokenType: GoverningTokenType.Liquid,
+      }),
+      new GoverningTokenConfigAccountArgs({
+        // council token config
+        voterWeightAddin: undefined,
+        maxVoterWeightAddin: undefined,
+        tokenType: GoverningTokenType.Liquid,
+      })
+    );
+  }
+
+  const registrar = (await registrarKey(realm, subdaoKeypair.publicKey))[0];
+  if (!(await exists(conn, registrar))) {
+    console.log("Initializing VSR Registrar");
+    instructions.push(
+      await heliumVsrProgram.methods
+        .initializeRegistrarV0({
+          positionUpdateAuthority: null,
+        })
+        .accounts({
+          realm,
+          realmGoverningTokenMint: subdaoKeypair.publicKey,
+        })
+        .instruction()
+    );
+  }
+
+  console.log("Configuring VSR voting mint at [0]");
+  instructions.push(
+    await heliumVsrProgram.methods
+      .configureVotingMintV0({
+        idx: 0, // idx
+        digitShift: 0, // digit shift
+        lockedVoteWeightScaledFactor: new anchor.BN(1_000_000_000),
+        minimumRequiredLockupSecs: new anchor.BN(MIN_LOCKUP),
+        maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE),
+        genesisVotePowerMultiplier: 0,
+        genesisVotePowerMultiplierExpirationTs: new anchor.BN(
+          Number(await getUnixTimestamp(provider))
+        ),
+        lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
+      })
+      .accounts({
+        registrar,
+        mint: subdaoKeypair.publicKey,
+      })
+      .remainingAccounts([
+        {
+          pubkey: subdaoKeypair.publicKey,
+          isSigner: false,
+          isWritable: false,
+        },
+      ])
+      .instruction()
+  );
+
+  await sendInstructions(provider, instructions, []);
+  instructions = [];
+
+  const governance = await PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("account-governance", "utf-8"),
+      realm.toBuffer(),
+      subdao.toBuffer(),
+    ],
+    govProgramId
+  )[0];
+  const nativeTreasury = await PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("native-treasury", "utf-8"),
+      governance.toBuffer(),
+    ],
+    govProgramId
+  )[0];
+  console.log(
+    `Using governance treasury ${nativeTreasury.toBase58()} as authority`
+  );
+  const balance = await provider.connection.getAccountInfo(nativeTreasury);
+  if (!balance) {
+    console.log("Transfering 1 sol to governance treasury for subdao creation");
+    await sendInstructions(provider, [
+      SystemProgram.transfer({
+        fromPubkey: provider.wallet.publicKey,
+        toPubkey: nativeTreasury,
+        lamports: BigInt(toBN(1, 9).toString()),
+      }),
+    ]);
+  }
+  if (!(await exists(conn, governance))) {
+    console.log(`Initializing Governance on Realm: ${realmName}`);
+    await withCreateGovernance(
+      instructions,
+      govProgramId,
+      govProgramVersion,
+      realm,
+      subdao,
+      new GovernanceConfig({
+        communityVoteThreshold: new VoteThreshold({
+          type: VoteThresholdType.YesVotePercentage,
+          value: 60,
+        }),
+        minCommunityTokensToCreateProposal: new anchor.BN(1),
+        minInstructionHoldUpTime: 0,
+        maxVotingTime: getTimestampFromDays(30),
+        communityVoteTipping: VoteTipping.Strict,
+        councilVoteTipping: VoteTipping.Early,
+        minCouncilTokensToCreateProposal: new anchor.BN(1),
+        councilVoteThreshold: new VoteThreshold({
+          type: VoteThresholdType.YesVotePercentage,
+          value: 50,
+        }),
+        councilVetoVoteThreshold: new VoteThreshold({
+          type: VoteThresholdType.YesVotePercentage,
+          value: 50,
+        }),
+        communityVetoVoteThreshold: new VoteThreshold({
+          type: VoteThresholdType.Disabled,
+        }),
+        votingCoolOffTime: 0,
+        depositExemptProposalCount: 10,
+      }),
+      await getTokenOwnerRecordAddress(
+        govProgramId,
+        realm,
+        subdaoKeypair.publicKey,
+        provider.wallet.publicKey
+      ),
+      provider.wallet.publicKey,
+      provider.wallet.publicKey
+    );
+
+    withSetRealmAuthority(
+      instructions,
+      govProgramId,
+      govProgramVersion,
+      realm,
+      provider.wallet.publicKey,
+      daoAcc.authority,
+      SetRealmAuthorityAction.SetUnchecked
+    );
+  }
+
+  await sendInstructions(provider, instructions, []);
+
   if (!(await exists(conn, lazyDist))) {
     console.log(`Initializing ${name} lazy distributor`);
     await lazyDistributorProgram.methods
       .initializeLazyDistributorV0({
-        authority: provider.wallet.publicKey,
+        authority: daoAcc.authority,
         oracles: [
           {
             oracle: oracleKey,
@@ -207,7 +434,7 @@ async function run() {
         windowConfig: {
           windowSizeSeconds: new anchor.BN(24 * 60 * 60),
           thresholdType: ThresholdType.Absolute as never,
-          threshold: new anchor.BN(10 * MOBILE_EPOCH_REWARDS),
+          threshold: new anchor.BN(10 * argv.startEpochRewards),
         },
       })
       .accounts({
@@ -218,173 +445,174 @@ async function run() {
   }
 
   if (!(await exists(conn, subdao))) {
-    console.log("Initializing switchboard oracle")
+    const instructions: TransactionInstruction[] = [];
+    console.log("Initializing switchboard oracle");
     const switchboard = await SwitchboardProgram.load(
       argv.switchboardNetwork as Cluster,
       provider.connection,
       wallet
     );
-    const queueAccount = new QueueAccount(switchboard, new PublicKey(argv.queue));
-    const [_, agg] = await queueAccount.createFeed({
-      batchSize: 3,
-      minRequiredOracleResults: 2,
-      minRequiredJobResults: 1,
-      minUpdateDelaySeconds: 60 * 60, // hourly
-      fundAmount: 1,
-      enable: true,
-      crankPubkey: new PublicKey(argv.crank),
-      jobs: [
-        {
-          data: OracleJob.encodeDelimited(
-            OracleJob.fromObject({
-              tasks: [
-                {
-                  httpTask: {
-                    url: argv.activeDeviceOracleUrl + "/" + name.toLowerCase(),
-                  },
-                },
-                {
-                  jsonParseTask: {
-                    path: "$.count",
-                  },
-                },
-              ],
-            })
-          ).finish(),
-        },
-      ],
-    });
-    console.log("Created active device aggregator", agg.publicKey.toBase58());
-    await agg.setHistoryBuffer({
-      size: 24 * 7
-    })
-
-    console.log(`Initializing ${name} SubDAO`);
-    await heliumSubDaosProgram.methods
-      .initializeSubDaoV0({
-        dcBurnAuthority: provider.wallet.publicKey,
-        authority: provider.wallet.publicKey,
-        emissionSchedule: [
+    const queueAccount = new QueueAccount(
+      switchboard,
+      new PublicKey(argv.queue)
+    );
+    const agg = aggKeypair.publicKey;
+    if (!(await exists(conn, agg))) {
+      const [agg, _] = await queueAccount.createFeed({
+        keypair: aggKeypair,
+        batchSize: 3,
+        minRequiredOracleResults: 2,
+        minRequiredJobResults: 1,
+        minUpdateDelaySeconds: 60 * 60, // hourly
+        fundAmount: 0.2,
+        enable: true,
+        crankPubkey: new PublicKey(argv.crank),
+        jobs: [
           {
-            startUnixTime: new anchor.BN(0),
-            emissionsPerEpoch: new anchor.BN(MOBILE_EPOCH_REWARDS),
+            data: OracleJob.encodeDelimited(
+              OracleJob.fromObject({
+                tasks: [
+                  {
+                    httpTask: {
+                      url:
+                        argv.activeDeviceOracleUrl + "/" + name.toLowerCase(),
+                    },
+                  },
+                  {
+                    jsonParseTask: {
+                      path: "$.count",
+                    },
+                  },
+                ],
+              })
+            ).finish(),
           },
         ],
-        // Linear curve
-        treasuryCurve: {
-          exponentialCurveV0: {
-            k: toU128(1),
+      });
+      console.log("Created active device aggregator", agg.publicKey.toBase58());
+      await AggregatorHistoryBuffer.create(switchboard, {
+        aggregatorAccount: agg,
+        maxSamples: 24 * 7,
+      });
+    }
+
+    console.log(`Initializing ${name} SubDAO`);
+    instructions.push(
+      await heliumSubDaosProgram.methods
+        .initializeSubDaoV0({
+          dcBurnAuthority: new PublicKey(argv.dcBurnAuthority),
+          authority: governance,
+          emissionSchedule: emissionSchedule(argv.startEpochRewards),
+          // Linear curve
+          treasuryCurve: {
+            exponentialCurveV0: {
+              k: toU128(1),
+            },
+          } as any,
+          // 20% in a day
+          treasuryWindowConfig: {
+            windowSizeSeconds: new anchor.BN(24 * 60 * 60),
+            thresholdType: ThresholdType.Percent as never,
+            threshold: thresholdPercent(20),
           },
-        } as any,
-        // 20% in a day
-        treasuryWindowConfig: {
-          windowSizeSeconds: new anchor.BN(24 * 60 * 60),
-          thresholdType: ThresholdType.Percent as never,
-          threshold: thresholdPercent(20),
-        },
-        onboardingDcFee: toBN(5, 0),
-      })
-      .accounts({
-        dao,
-        dntMint: subdaoKeypair.publicKey,
-        rewardsEscrow,
-        hntMint: new PublicKey(argv.hntPubkey),
-        activeDeviceAggregator: agg.publicKey,
-      })
-      .rpc({ skipPreflight: true });
+          onboardingDcFee: toBN(4000000, 0), // $40 in dc
+        })
+        .accounts({
+          dao,
+          dntMint: subdaoKeypair.publicKey,
+          rewardsEscrow,
+          hntMint: new PublicKey(argv.hntPubkey),
+          activeDeviceAggregator: agg,
+          payer,
+          dntMintAuthority: daoAcc.authority,
+          subDaoFreezeAuthority: daoAcc.authority,
+          authority: daoAcc.authority,
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+        ])
+        .instruction()
+    );
+    await sendInstructionsOrCreateProposal({
+      provider,
+      instructions,
+      walletSigner: wallet,
+      signers: [],
+      govProgramId,
+      proposalName: `Create ${name} SubDAO`,
+      votingMint: councilKeypair.publicKey,
+    });
   } else {
     const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
-    console.log(`Subdao exits. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}`);
+    console.log(
+      `Subdao exits. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}`
+    );
   }
 
   const hsConfigKey = (await hotspotConfigKey(subdao, name.toUpperCase()))[0];
-  if (!(await provider.connection.getAccountInfo(hsConfigKey))) {
+  if (!(await provider.connection.getAccountInfo(hsConfigKey)) && !argv.noHotspots) {
+    const instructions: TransactionInstruction[] = [];
     console.log(`Initalizing ${name} HotspotConfig`);
 
-    const merkle = Keypair.generate();
-    const space = getConcurrentMerkleTreeAccountSize(26, 1024);
+    // Create a merkle account and assign it to compression
+    if (!(await exists(conn, merkle.publicKey))) {
+      const space = getConcurrentMerkleTreeAccountSize(26, 1024);
+      await sendInstructions(
+        provider,
+        [
+          SystemProgram.createAccount({
+            fromPubkey: provider.wallet.publicKey,
+            newAccountPubkey: merkle.publicKey,
+            lamports:
+              await provider.connection.getMinimumBalanceForRentExemption(
+                space
+              ),
+            space: space,
+            programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+          }),
+        ],
+        [merkle]
+      );
+    }
 
-    await hemProgram.methods
-      .initializeHotspotConfigV0({
-        name: `${name} Hotspot Collection`,
-        symbol: name.toUpperCase(),
-        metadataUrl: `${
-          argv.bucket
-        }/${name.toLocaleLowerCase()}_collection.json`,
-        onboardingServer: onboardingServerKeypair.publicKey,
-        settings: {
-          iotConfig: {
-            minGain: 10,
-            maxGain: 150,
-            fullLocationStakingFee: toBN(1000000, 0),
-            dataonlyLocationStakingFee: toBN(500000, 0),
-          } as any,
-        },
-        maxDepth: 26,
-        maxBufferSize: 1024,
-      })
-      .preInstructions([
-        SystemProgram.createAccount({
-          fromPubkey: provider.wallet.publicKey,
-          newAccountPubkey: merkle.publicKey,
-          lamports: await provider.connection.getMinimumBalanceForRentExemption(
-            space
-          ),
-          space: space,
-          programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-        }),
-      ])
-      .accounts({
-        merkleTree: merkle.publicKey,
-        dcMint: new PublicKey(argv.dcPubkey),
-        subDao: subdao,
-      })
-      .signers([merkle])
-      .rpc({ skipPreflight: true });
-  }
-
-  const hsIssuerKey = await hotspotIssuerKey(
-    hsConfigKey,
-    makerKeypair.publicKey
-  )[0];
-
-  if (!(await exists(conn, hsIssuerKey))) {
-    console.log("Initalizing HotspotIssuer");
-
-    await hemProgram.methods
-      .initializeHotspotIssuerV0({
-        maker: makerKeypair.publicKey,
-        authority: provider.wallet.publicKey,
-      })
-      .accounts({
-        hotspotConfig: hsConfigKey,
-      })
-      .rpc({ skipPreflight: true });
-  }
-
-  await Promise.all(
-    hardcodeHotspots.map(async (hotspot, index) => {
-      const create = await hemProgram.methods
-        .issueIotHotspotV0({
-          hotspotKey: hotspot.eccKey,
-          isFullHotspot: true,
+    instructions.push(
+      await hemProgram.methods
+        .initializeHotspotConfigV0({
+          name: `${name} Hotspot Collection`,
+          symbol: name.toUpperCase(),
+          metadataUrl: `${
+            argv.bucket
+          }/${name.toLocaleLowerCase()}_collection.json`,
+          settings: {
+            iotConfig: {
+              minGain: 10,
+              maxGain: 150,
+              fullLocationStakingFee: toBN(1000000, 0),
+              dataonlyLocationStakingFee: toBN(500000, 0),
+            } as any,
+          },
+          maxDepth: 26,
+          maxBufferSize: 1024,
         })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-        ])
         .accounts({
-          hotspotIssuer: hsIssuerKey,
-          recipient: provider.wallet.publicKey,
-          maker: makerKeypair.publicKey,
+          merkleTree: merkle.publicKey,
+          subDao: subdao,
+          payer: nativeTreasury,
+          authority: governance,
         })
-        .signers([makerKeypair]);
-      const key = (await create.pubkeys()).info!;
-      if (!(await exists(conn, key))) {
-        console.log("Creating hotspot", index);
-        await create.rpc({ skipPreflight: true });
-      }
-    })
-  );
+        .signers([merkle])
+        .instruction()
+    );
+    await sendInstructionsOrCreateProposal({
+      provider,
+      instructions,
+      walletSigner: wallet,
+      signers: [],
+      govProgramId,
+      proposalName: `Create ${name} HotspotConfig`,
+      votingMint: councilKeypair.publicKey,
+    });
+  }
 }
 
 run()
@@ -394,3 +622,19 @@ run()
   })
   .then(() => process.exit());
 
+function emissionSchedule(
+  startEpochRewards: number
+): { startUnixTime: anchor.BN; emissionsPerEpoch: anchor.BN }[] {
+  const now = new Date().getDate() / 1000;
+  // Do 6 years out, halving every  years
+  // Any larger and it wont fit in a tx
+  return new Array(3).fill(0).map((_, twoYear) => {
+    return {
+      startUnixTime: new anchor.BN(twoYear * 2 * 31557600 + now), // 2 years in seconds
+      emissionsPerEpoch: toBN(
+        startEpochRewards / Math.pow(2, twoYear) / (365.25 * 24), // Break into daily
+        8
+      ),
+    };
+  });
+}

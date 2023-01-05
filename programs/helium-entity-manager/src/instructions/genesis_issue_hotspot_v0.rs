@@ -1,3 +1,5 @@
+use std::cmp::min;
+
 use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -12,7 +14,7 @@ use mpl_bubblegum::{
   program::Bubblegum,
   state::TreeConfig,
 };
-use spl_account_compression::{program::SplAccountCompression, Wrapper};
+use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct GenesisIssueHotspotArgsV0 {
@@ -21,6 +23,7 @@ pub struct GenesisIssueHotspotArgsV0 {
   pub elevation: Option<i32>,
   pub gain: Option<i32>,
   pub is_full_hotspot: bool,
+  pub num_location_asserts: u16,
 }
 
 #[derive(Accounts)]
@@ -28,7 +31,7 @@ pub struct GenesisIssueHotspotArgsV0 {
 pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     mut,
-    seeds = [b"lazy_signer", b"helium"],
+    seeds = [b"lazy_signer", b"testhelium9"],
     seeds::program = lazy_transactions::ID,
     bump,
   )]
@@ -75,11 +78,10 @@ pub struct GenesisIssueHotspotV0<'info> {
   /// CHECK: Verified by constraint  
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
-  pub log_wrapper: Program<'info, Wrapper>,
+  pub log_wrapper: Program<'info, Noop>,
   pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
   pub system_program: Program<'info, System>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> GenesisIssueHotspotV0<'info> {
@@ -123,11 +125,12 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     &[ctx.accounts.hotspot_config.bump_seed],
   ]];
 
+  let name = animal_name.to_string();
   let metadata = MetadataArgs {
-    name: animal_name.to_string(),
+    name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
     uri: format!(
-      "https://mobile-metadata.test-helium.com/{}",
+      "https://iot-metadata.oracle.test-helium.com/{}",
       args.hotspot_key
     ),
     collection: Some(Collection {
@@ -159,6 +162,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     elevation: args.elevation,
     gain: args.gain,
     is_full_hotspot: args.is_full_hotspot,
+    num_location_asserts: args.num_location_asserts,
   });
 
   Ok(())

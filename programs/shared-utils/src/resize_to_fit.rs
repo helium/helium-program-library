@@ -12,7 +12,7 @@ pub struct IgnoreWriter {
 
 impl Write for IgnoreWriter {
   fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-    self.total += buf.len() as usize;
+    self.total += buf.len();
     Ok(buf.len())
   }
 

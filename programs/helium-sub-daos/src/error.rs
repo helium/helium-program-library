@@ -37,4 +37,13 @@ pub enum ErrorCode {
 
   #[msg("Rewards need to be claimed in the correct epoch order")]
   InvalidClaimEpoch,
+
+  #[msg("Epochs start after the earliest emission schedule")]
+  EpochToEarly,
+
+  #[msg("Must calculate vehnt linearly. Please ensure the previous epoch has been completed")]
+  MustCalculateVehntLinearly,
+
+  #[msg("Cannot change a position while it is delegated")]
+  PositionChangeWhileDelegated,
 }

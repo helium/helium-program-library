@@ -13,7 +13,7 @@ pub struct UpdateDataCreditsV0<'info> {
   #[account(
     mut,
     seeds = ["dc".as_bytes(), dc_mint.key().as_ref()],
-    bump,
+    bump = data_credits.data_credits_bump,
     has_one = authority,
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,

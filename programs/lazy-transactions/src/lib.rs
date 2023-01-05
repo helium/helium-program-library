@@ -27,4 +27,15 @@ pub mod lazy_transactions {
   ) -> Result<()> {
     execute_transaction_v0::handler(ctx, args)
   }
+
+  pub fn close_marker_v0(ctx: Context<CloseMarkerV0>, args: CloseMarkerArgsV0) -> Result<()> {
+    close_marker_v0::handler(ctx, args)
+  }
+
+  pub fn update_lazy_transactions_v0(
+    ctx: Context<UpdateLazyTransactionsV0>,
+    args: UpdateLazyTransactionsArgsV0,
+  ) -> Result<()> {
+    update_lazy_transactions_v0::handler(ctx, args)
+  }
 }

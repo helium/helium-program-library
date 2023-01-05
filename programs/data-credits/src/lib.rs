@@ -29,11 +29,18 @@ pub mod data_credits {
     instructions::mint_data_credits_v0::handler(ctx, args)
   }
 
+  pub fn genesis_issue_delegated_data_credits_v0(
+    ctx: Context<GenesisIssueDelegatedDataCreditsV0>,
+    args: GenesisIssueDelegatedDataCreditsArgsV0,
+  ) -> Result<()> {
+    instructions::genesis_issue_delegated_data_credits_v0::handler(ctx, args)
+  }
+
   pub fn burn_delegated_data_credits_v0(
     ctx: Context<BurnDelegatedDataCreditsV0>,
     args: BurnDelegatedDataCreditsArgsV0,
   ) -> Result<()> {
-    instructions::burn_delegated_data_credits::handler(ctx, args)
+    instructions::burn_delegated_data_credits_v0::handler(ctx, args)
   }
 
   pub fn burn_from_issuance_v0(

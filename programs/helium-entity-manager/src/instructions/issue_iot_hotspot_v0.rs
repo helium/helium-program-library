@@ -1,3 +1,5 @@
+use std::cmp::min;
+
 use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -14,7 +16,7 @@ use data_credits::{
   },
   BurnFromIssuanceArgsV0, DataCreditsV0,
 };
-use helium_sub_daos::SubDaoV0;
+use helium_sub_daos::{DaoV0, SubDaoV0};
 use mpl_bubblegum::state::{metaplex_adapter::TokenStandard, TreeConfig};
 use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
@@ -24,7 +26,7 @@ use mpl_bubblegum::{
   state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion},
   utils::get_asset_id,
 };
-use spl_account_compression::{program::SplAccountCompression, Wrapper};
+use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueIotHotspotArgsV0 {
@@ -57,11 +59,17 @@ pub struct IssueIotHotspotV0<'info> {
   pub collection_master_edition: UncheckedAccount<'info>,
   #[account(
     has_one = collection,
-    has_one = dc_mint,
     has_one = merkle_tree,
     has_one = sub_dao
   )]
   pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
+  #[account(
+    has_one = dc_mint
+  )]
+  pub dao: Box<Account<'info, DaoV0>>,
+  #[account(
+    has_one = dao
+  )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
     mut,
@@ -130,14 +138,12 @@ pub struct IssueIotHotspotV0<'info> {
   /// CHECK: Verified by constraint  
   #[account(address = data_credits::ID)]
   pub data_credits_program: AccountInfo<'info>,
-  pub log_wrapper: Program<'info, Wrapper>,
+  pub log_wrapper: Program<'info, Noop>,
   pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
-  pub clock: Sysvar<'info, Clock>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> IssueIotHotspotV0<'info> {
@@ -171,7 +177,6 @@ impl<'info> IssueIotHotspotV0<'info> {
         dc_mint: self.dc_mint.to_account_info(),
         token_program: self.token_program.to_account_info(),
         associated_token_program: self.associated_token_program.to_account_info(),
-        rent: self.rent.to_account_info(),
         system_program: self.system_program.to_account_info(),
       },
       authority: self.hotspot_config.to_account_info(),
@@ -207,11 +212,12 @@ pub fn handler(ctx: Context<IssueIotHotspotV0>, args: IssueIotHotspotArgsV0) -> 
     },
   )?;
 
+  let name = animal_name.to_string();
   let metadata = MetadataArgs {
-    name: animal_name.to_string(),
+    name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
     uri: format!(
-      "https://mobile-metadata.oracle.test-helium.com/{}",
+      "https://iot-metadata.oracle.test-helium.com/{}",
       args.hotspot_key
     ),
     collection: Some(Collection {
@@ -245,6 +251,7 @@ pub fn handler(ctx: Context<IssueIotHotspotV0>, args: IssueIotHotspotArgsV0) -> 
     gain: None,
     is_full_hotspot: args.is_full_hotspot,
     bump_seed: ctx.bumps["info"],
+    num_location_asserts: 0,
   });
 
   Ok(())
