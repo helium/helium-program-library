@@ -61,6 +61,7 @@ import {
   exists,
   getTimestampFromDays,
   getUnixTimestamp,
+  isLocalhost,
   loadKeypair,
   sendInstructionsOrCreateProposal,
 } from "./utils";
@@ -182,6 +183,11 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Keypair of gov council token",
     default: `${__dirname}/../keypairs/council.json`,
   },
+  noGovernance: {
+    type: "boolean",
+    describe: "If this is set, governance will be skipped. Ensure that you also included --noGovernance when running create-dao",
+    default: false,
+  }
 });
 
 const MIN_LOCKUP = 15811200; // 6 months
@@ -221,6 +227,8 @@ async function run() {
 
   const dao = (await daoKey(new PublicKey(argv.hntPubkey)))[0];
   const subdao = (await subDaoKey(subdaoKeypair.publicKey))[0];
+  console.log("DAO", dao.toString());
+  console.log("SUBDAO", subdao.toString());
   const daoAcc = await heliumSubDaosProgram.account.daoV0.fetch(dao);
   const [lazyDist] = await lazyDistributorKey(subdaoKeypair.publicKey);
   const rewardsEscrow = await getAssociatedTokenAddress(
@@ -446,103 +454,112 @@ async function run() {
   }
 
   if (!(await exists(conn, subdao))) {
-    const instructions: TransactionInstruction[] = [];
-    console.log("Initializing switchboard oracle");
-    const switchboard = await SwitchboardProgram.load(
-      argv.switchboardNetwork as Cluster,
-      provider.connection,
-      wallet
-    );
-    const queueAccount = new QueueAccount(
-      switchboard,
-      new PublicKey(argv.queue)
-    );
-    const agg = aggKeypair.publicKey;
-    if (!(await exists(conn, agg))) {
-      const [agg, _] = await queueAccount.createFeed({
-        keypair: aggKeypair,
-        batchSize: 3,
-        minRequiredOracleResults: 2,
-        minRequiredJobResults: 1,
-        minUpdateDelaySeconds: 60 * 60, // hourly
-        fundAmount: 0.2,
-        enable: true,
-        crankPubkey: new PublicKey(argv.crank),
-        jobs: [
-          {
-            data: OracleJob.encodeDelimited(
-              OracleJob.fromObject({
-                tasks: [
-                  {
-                    httpTask: {
-                      url:
-                        argv.activeDeviceOracleUrl + "/" + name.toLowerCase(),
+    let aggregatorKey = new PublicKey("GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"); // value cloned from mainnet to localnet
+    if (!isLocalhost(provider)) {
+      console.log("Initializing switchboard oracle");
+      const switchboard = await SwitchboardProgram.load(
+        argv.switchboardNetwork as Cluster,
+        provider.connection,
+        wallet
+      );
+      const queueAccount = new QueueAccount(
+        switchboard,
+        new PublicKey(argv.queue)
+      );
+      const agg = aggKeypair.publicKey;
+      if (!(await exists(conn, agg))) {
+        const [agg, _] = await queueAccount.createFeed({
+          keypair: aggKeypair,
+          batchSize: 3,
+          minRequiredOracleResults: 2,
+          minRequiredJobResults: 1,
+          minUpdateDelaySeconds: 60 * 60, // hourly
+          fundAmount: 0.2,
+          enable: true,
+          crankPubkey: new PublicKey(argv.crank),
+          jobs: [
+            {
+              data: OracleJob.encodeDelimited(
+                OracleJob.fromObject({
+                  tasks: [
+                    {
+                      httpTask: {
+                        url:
+                          argv.activeDeviceOracleUrl + "/" + name.toLowerCase(),
+                      },
                     },
-                  },
-                  {
-                    jsonParseTask: {
-                      path: "$.count",
+                    {
+                      jsonParseTask: {
+                        path: "$.count",
+                      },
                     },
-                  },
-                ],
-              })
-            ).finish(),
-          },
-        ],
-      });
-      console.log("Created active device aggregator", agg.publicKey.toBase58());
-      await AggregatorHistoryBuffer.create(switchboard, {
-        aggregatorAccount: agg,
-        maxSamples: 24 * 7,
-      });
+                  ],
+                })
+              ).finish(),
+            },
+          ],
+        });
+        console.log("Created active device aggregator", agg.publicKey.toBase58());
+        await AggregatorHistoryBuffer.create(switchboard, {
+          aggregatorAccount: agg,
+          maxSamples: 24 * 7,
+        });
+        aggregatorKey = agg.publicKey;
+      }
     }
+    
+    const instructions: TransactionInstruction[] = [];
 
     console.log(`Initializing ${name} SubDAO`);
-    instructions.push(
-      await heliumSubDaosProgram.methods
-        .initializeSubDaoV0({
-          dcBurnAuthority: new PublicKey(argv.dcBurnAuthority),
-          authority: governance,
-          emissionSchedule: emissionSchedule(argv.startEpochRewards),
-          // Linear curve
-          treasuryCurve: {
-            exponentialCurveV0: {
-              k: toU128(1),
-            },
-          } as any,
-          // 20% in a day
-          treasuryWindowConfig: {
-            windowSizeSeconds: new anchor.BN(24 * 60 * 60),
-            thresholdType: ThresholdType.Percent as never,
-            threshold: thresholdPercent(20),
+    const initSubdaoMethod = await heliumSubDaosProgram.methods
+      .initializeSubDaoV0({
+        dcBurnAuthority: new PublicKey(argv.dcBurnAuthority),
+        authority: governance,
+        emissionSchedule: emissionSchedule(argv.startEpochRewards),
+        // Linear curve
+        treasuryCurve: {
+          exponentialCurveV0: {
+            k: toU128(1),
           },
-          onboardingDcFee: toBN(4000000, 0), // $40 in dc
-        })
-        .accounts({
-          dao,
-          dntMint: subdaoKeypair.publicKey,
-          rewardsEscrow,
-          hntMint: new PublicKey(argv.hntPubkey),
-          activeDeviceAggregator: agg,
-          payer,
-          dntMintAuthority: daoAcc.authority,
-          subDaoFreezeAuthority: daoAcc.authority,
-          authority: daoAcc.authority,
-        })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-        ])
-        .instruction()
-    );
-    await sendInstructionsOrCreateProposal({
-      provider,
-      instructions,
-      walletSigner: wallet,
-      signers: [],
-      govProgramId,
-      proposalName: `Create ${name} SubDAO`,
-      votingMint: councilKeypair.publicKey,
-    });
+        } as any,
+        // 20% in a day
+        treasuryWindowConfig: {
+          windowSizeSeconds: new anchor.BN(24 * 60 * 60),
+          thresholdType: ThresholdType.Percent as never,
+          threshold: thresholdPercent(20),
+        },
+        onboardingDcFee: toBN(4000000, 0), // $40 in dc
+      })
+      .accounts({
+        dao,
+        dntMint: subdaoKeypair.publicKey,
+        rewardsEscrow,
+        hntMint: new PublicKey(argv.hntPubkey),
+        activeDeviceAggregator: aggregatorKey,
+        payer,
+        dntMintAuthority: daoAcc.authority,
+        subDaoFreezeAuthority: daoAcc.authority,
+        authority: daoAcc.authority,
+      })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+      ])
+    if (argv.noGovernance) {
+      await initSubdaoMethod.rpc({skipPreflight: true});
+    } else {
+      instructions.push(await initSubdaoMethod.instruction())
+      await sendInstructionsOrCreateProposal({
+        provider,
+        instructions,
+        walletSigner: wallet,
+        signers: [],
+        govProgramId,
+        proposalName: `Create ${name} SubDAO`,
+        votingMint: councilKeypair.publicKey,
+      });
+    }
+    
+    
   } else {
     const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
     console.log(

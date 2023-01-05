@@ -143,6 +143,11 @@ async function run() {
         "Number of Gov Council tokens to pre mint before assigning authority to dao",
       default: 10,
     },
+    noGovernance: {
+      type: "boolean",
+      describe: "If this is set, your wallet will be the dao authority instead of the governance",
+      default: false,
+    }
   });
 
   const argv = await yarg.argv;
@@ -378,7 +383,7 @@ async function run() {
   if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
-        authority: governance,
+        authority: argv.noGovernance ? provider.wallet.publicKey : governance,
         config: {
           windowSizeSeconds: new anchor.BN(60 * 60),
           thresholdType: ThresholdType.Absolute as never,
@@ -400,7 +405,7 @@ async function run() {
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         registrar: registrar,
-        authority: governance,
+        authority: argv.noGovernance ? provider.wallet.publicKey : governance,
         netEmissionsCap: toBN(34.24, 8),
         // TODO: Emissions and net emissions schedule for hnt
         hstEmissionSchedule: [
