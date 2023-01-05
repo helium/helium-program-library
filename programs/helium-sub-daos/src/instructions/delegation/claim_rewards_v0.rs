@@ -8,7 +8,10 @@ use circuit_breaker::{
   cpi::{accounts::TransferV0, transfer_v0},
   CircuitBreaker, TransferArgsV0,
 };
-use voter_stake_registry::state::{PositionV0, Registrar};
+use voter_stake_registry::{
+  state::{ PositionV0, Registrar },
+  VoterStakeRegistry
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ClaimRewardsArgsV0 {
@@ -81,10 +84,8 @@ pub struct ClaimRewardsV0<'info> {
     bump
   )]
   pub delegator_pool_circuit_breaker: AccountInfo<'info>,
-
-  ///CHECK: constraints
-  #[account(address = voter_stake_registry::ID)]
-  pub vsr_program: AccountInfo<'info>,
+  
+  pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub associated_token_program: Program<'info, AssociatedToken>,
