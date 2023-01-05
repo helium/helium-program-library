@@ -74,8 +74,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   let delegated_position = &mut ctx.accounts.delegated_position;
   let sub_dao = &mut ctx.accounts.sub_dao;
 
-  ctx.accounts.sub_dao_epoch_info.epoch =
-    current_epoch(curr_ts);
+  ctx.accounts.sub_dao_epoch_info.epoch = current_epoch(curr_ts);
 
   update_subdao_vehnt(sub_dao, &mut ctx.accounts.sub_dao_epoch_info, curr_ts)?;
 
