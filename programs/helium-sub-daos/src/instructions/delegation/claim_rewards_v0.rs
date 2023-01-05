@@ -9,8 +9,8 @@ use circuit_breaker::{
   CircuitBreaker, TransferArgsV0,
 };
 use voter_stake_registry::{
-  state::{ PositionV0, Registrar },
-  VoterStakeRegistry
+  state::{PositionV0, Registrar},
+  VoterStakeRegistry,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -84,7 +84,7 @@ pub struct ClaimRewardsV0<'info> {
     bump
   )]
   pub delegator_pool_circuit_breaker: AccountInfo<'info>,
-  
+
   pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,

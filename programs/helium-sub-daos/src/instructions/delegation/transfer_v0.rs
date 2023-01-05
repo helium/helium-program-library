@@ -6,10 +6,9 @@ use anchor_spl::token::Mint;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 use voter_stake_registry::{
-  VoterStakeRegistry,
   cpi::{accounts::TransferV0 as VsrTransferV0, transfer_v0},
   state::{PositionV0, Registrar},
-  TransferArgsV0 as VsrTransferArgsV0,
+  TransferArgsV0 as VsrTransferArgsV0, VoterStakeRegistry,
 };
 
 #[derive(Accounts)]

@@ -5,10 +5,9 @@ use anchor_spl::token::Mint;
 use anchor_spl::token::TokenAccount;
 use voter_stake_registry::state::LockupKind as VsrLockupKind;
 use voter_stake_registry::{
-  VoterStakeRegistry,
   cpi::{accounts::ResetLockupV0 as VsrResetLockupV0, reset_lockup_v0},
   state::{PositionV0, Registrar},
-  ResetLockupArgsV0 as VsrResetLockupArgsV0,
+  ResetLockupArgsV0 as VsrResetLockupArgsV0, VoterStakeRegistry,
 };
 
 #[derive(Accounts)]

@@ -4,7 +4,7 @@ use anchor_spl::token::{Mint, TokenAccount};
 
 use voter_stake_registry::{
   state::{LockupKind, PositionV0, Registrar},
-  VoterStakeRegistry
+  VoterStakeRegistry,
 };
 
 #[derive(Accounts)]
