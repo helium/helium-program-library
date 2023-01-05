@@ -294,7 +294,7 @@ pub fn send_and_confirm_messages_with_spinner(
                 confirmed_transactions += 1;
                 if status.err.is_some() {
                   FAILED_TX.inc();
-                  progress_bar.println(format!("Failed transaction: {:?}", status));
+                  progress_bar.println(format!("Failed transaction: {} {:?}", signature, status));
                 }
                 transaction_errors[i] = status.err;
               }
