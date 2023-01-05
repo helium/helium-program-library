@@ -199,7 +199,7 @@ export async function ensureVSRIdl(vsrProgram: Program<VoterStakeRegistry>) {
 
 export const initWorld = async (
   provider: anchor.AnchorProvider,
-  hsProgram: Program<HeliumEntityManager>,
+  hemProgram: Program<HeliumEntityManager>,
   hsdProgram: Program<HeliumSubDaos>,
   dcProgram: Program<DataCredits>,
   epochRewards?: number,
@@ -251,14 +251,14 @@ export const initWorld = async (
   );
 
   const hotspotConfig = await initTestHotspotConfig(
-    hsProgram,
+    hemProgram,
     provider,
     subDao.subDao,
     dataCredits.dcMint
   );
 
   const issuer = await initTestHotspotIssuer(
-    hsProgram,
+    hemProgram,
     provider,
     hotspotConfig.hotspotConfig,
   );

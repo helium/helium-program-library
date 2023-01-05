@@ -1,0 +1,64 @@
+{
+  "name": "@helium/helius-service",
+  "private": true,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "license": "Apache-2.0",
+  "version": "0.0.10",
+  "description": "Receives requests from Helius webhooks",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HeliumFoundation/helium-program-libary"
+  },
+  "main": "./lib/cjs/index.js",
+  "module": "./lib/esm/src/index.js",
+  "types": "./lib/types/src/index.d.ts",
+  "sideEffects": false,
+  "files": [
+    "lib"
+  ],
+  "exports": {
+    "import": "./lib/esm/src/index.js",
+    "require": "./lib/cjs/index.js",
+    "types": "./lib/types/src/index.d.ts"
+  },
+  "scripts": {
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
+    "build": "tsc -p tsconfig.json",
+    "start": "node lib/esm/index.js",
+    "dev": "npx ts-node --project tsconfig.cjs.json src/index.ts",
+    "seed-db": "npx ts-node --project tsconfig.cjs.json src/seed-db.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^8.1.1",
+    "@helium/address": "^4.6.2",
+    "@helium/helium-entity-manager-sdk": "^0.0.12",
+    "@helium/idls": "^0.0.12",
+    "@helium/helium-sub-daos-sdk": "^0.0.12",
+    "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
+    "@project-serum/anchor": "^0.26",
+    "@solana/spl-token": "0.3.5",
+    "@solana/web3.js": "^1.43.4",
+    "angry-purple-tiger": "^1.0.5",
+    "axios": "^1.1.3",
+    "bn.js": "^5.2.0",
+    "bs58": "^4.0.1",
+    "fastify": "^4.9.2",
+    "pg": "^8.8.0",
+    "sequelize": "^6.27.0"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.1.1",
+    "git-format-staged": "^2.1.3",
+    "ts-loader": "^9.2.3",
+    "ts-node": "^10.9.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^4.8.4",
+    "yarn": "^1.22.18"
+  },
+  "keywords": [],
+  "author": ""
+}
