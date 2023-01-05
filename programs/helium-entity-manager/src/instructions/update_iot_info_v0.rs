@@ -151,7 +151,7 @@ pub fn handler<'info>(
       dc_fee = full_location_staking_fee;
     }
 
-    ctx.accounts.info.num_location_asserts = ctx.accounts.info.num_location_asserts + 1;
+    ctx.accounts.info.num_location_asserts = ctx.accounts.info.num_location_asserts.checked_add(1).unwrap();
 
     // burn the dc tokens
     burn_without_tracking_v0(
