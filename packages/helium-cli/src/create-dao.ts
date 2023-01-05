@@ -35,6 +35,7 @@ import {
   getTimestampFromDays,
   getUnixTimestamp,
   loadKeypair,
+  isLocalhost,
 } from "./utils";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import {
@@ -73,17 +74,17 @@ async function run() {
     hntKeypair: {
       type: "string",
       describe: "Keypair of the HNT token",
-      default: "./keypairs/hnt.json",
+      default: `${__dirname}/../keypairs/hnt.json`,
     },
     hstKeypair: {
       type: "string",
       describe: "Keypair of the HST token",
-      default: "./keypairs/hst.json",
+      default: `${__dirname}/../keypairs/hst.json`,
     },
     dcKeypair: {
       type: "string",
       describe: "Keypair of the Data Credit token",
-      default: "./keypairs/dc.json",
+      default: `${__dirname}/../keypairs/dc.json`,
     },
     makerKeypair: {
       type: "string",
@@ -127,7 +128,7 @@ async function run() {
     councilKeypair: {
       type: "string",
       describe: "Keypair of gov council token",
-      default: "./keypairs/council.json",
+      default: `${__dirname}/../keypairs/council.json`,
     },
     councilWallet: {
       type: "string",
@@ -142,6 +143,11 @@ async function run() {
         "Number of Gov Council tokens to pre mint before assigning authority to dao",
       default: 10,
     },
+    noGovernance: {
+      type: "boolean",
+      describe: "If this is set, your wallet will be the dao authority instead of the governance",
+      default: false,
+    }
   });
 
   const argv = await yarg.argv;
@@ -213,6 +219,7 @@ async function run() {
     [Buffer.from("governance", "utf-8"), Buffer.from(realmName, "utf-8")],
     govProgramId
   )[0];
+  console.log(realm.toString());
   if (!(await exists(conn, realm))) {
     console.log("Initializing Realm");
     await withCreateRealm(
@@ -376,7 +383,7 @@ async function run() {
   if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
-        authority: governance,
+        authority: argv.noGovernance ? provider.wallet.publicKey : governance,
         config: {
           windowSizeSeconds: new anchor.BN(60 * 60),
           thresholdType: ThresholdType.Absolute as never,
@@ -387,8 +394,8 @@ async function run() {
         hntMint: hntKeypair.publicKey,
         dcMint: dcKeypair.publicKey,
         hntPriceOracle: new PublicKey(
-          "CqFJLrT4rSpA46RQkVYWn8tdBDuQ7p7RXcp6Um76oaph"
-        ), // TODO: Replace with HNT price feed,
+          isLocalhost(provider) ? "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB" : "CqFJLrT4rSpA46RQkVYWn8tdBDuQ7p7RXcp6Um76oaph"
+        ) // TODO: Replace with HNT price feed,
       })
       .rpc({ skipPreflight: true });
   }
@@ -398,7 +405,7 @@ async function run() {
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         registrar: registrar,
-        authority: governance,
+        authority: argv.noGovernance ? provider.wallet.publicKey : governance,
         netEmissionsCap: toBN(34.24, 8),
         // TODO: Emissions and net emissions schedule for hnt
         hstEmissionSchedule: [
