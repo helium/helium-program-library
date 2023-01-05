@@ -1,3 +1,5 @@
+use std::cmp::min;
+
 use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -210,8 +212,9 @@ pub fn handler(ctx: Context<IssueIotHotspotV0>, args: IssueIotHotspotArgsV0) -> 
     },
   )?;
 
+  let name = animal_name.to_string();
   let metadata = MetadataArgs {
-    name: animal_name.to_string(),
+    name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
     uri: format!(
       "https://iot-metadata.oracle.test-helium.com/{}",
@@ -248,7 +251,7 @@ pub fn handler(ctx: Context<IssueIotHotspotV0>, args: IssueIotHotspotArgsV0) -> 
     gain: None,
     is_full_hotspot: args.is_full_hotspot,
     bump_seed: ctx.bumps["info"],
-    num_location_asserts: 0
+    num_location_asserts: 0,
   });
 
   Ok(())

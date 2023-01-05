@@ -1,3 +1,5 @@
+use std::cmp::min;
+
 use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -21,7 +23,7 @@ pub struct GenesisIssueHotspotArgsV0 {
   pub elevation: Option<i32>,
   pub gain: Option<i32>,
   pub is_full_hotspot: bool,
-  pub num_location_asserts: u16
+  pub num_location_asserts: u16,
 }
 
 #[derive(Accounts)]
@@ -123,8 +125,9 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     &[ctx.accounts.hotspot_config.bump_seed],
   ]];
 
+  let name = animal_name.to_string();
   let metadata = MetadataArgs {
-    name: animal_name.to_string(),
+    name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
     uri: format!(
       "https://iot-metadata.oracle.test-helium.com/{}",
@@ -159,7 +162,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     elevation: args.elevation,
     gain: args.gain,
     is_full_hotspot: args.is_full_hotspot,
-    num_location_asserts: args.num_location_asserts
+    num_location_asserts: args.num_location_asserts,
   });
 
   Ok(())
