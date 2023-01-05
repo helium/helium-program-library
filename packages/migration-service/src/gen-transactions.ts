@@ -8,8 +8,14 @@ import {
   PROGRAM_ID as HEM_PROGRAM_ID,
 } from "@helium/helium-entity-manager-sdk";
 import {
-  subDaoKey
-} from "@helium/helium-sub-daos-sdk";
+  init as initVsr,
+  registrarKey,
+  PROGRAM_ID as VSR_PROGRAM_ID,
+} from "@helium/voter-stake-registry-sdk";
+import { init as initHsd } from "@helium/helium-sub-daos-sdk";
+import { subDaoKey, daoKey } from "@helium/helium-sub-daos-sdk";
+import { mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
+import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import {
   compile,
@@ -23,16 +29,20 @@ import * as anchor from "@project-serum/anchor";
 import format from "pg-format";
 import { Program } from "@project-serum/anchor";
 import {
-  ACCOUNT_SIZE, createAssociatedTokenAccountIdempotentInstruction,
+  ACCOUNT_SIZE,
+  createAssociatedTokenAccountIdempotentInstruction,
   createTransferInstruction,
-  getAssociatedTokenAddressSync
+  getAssociatedTokenAddressSync,
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import {
   AddressLookupTableProgram,
+  Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
-  TransactionInstruction
+  SYSVAR_RENT_PUBKEY,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import { BN } from "bn.js";
 import cliProgress from "cli-progress";
@@ -41,6 +51,7 @@ import os from "os";
 import { Client } from "pg";
 import yargs from "yargs/yargs";
 import { compress } from "./utils";
+import { ASSOCIATED_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -57,18 +68,27 @@ const yarg = yargs(hideBin(process.argv)).options({
   hnt: {
     type: "string",
     describe: "Pubkey of hnt",
+    required: true,
+  },
+  hst: {
+    type: "string",
+    describe: "Pubkey of hst",
+    required: true,
   },
   mobile: {
     type: "string",
     describe: "Pubkey of mobile",
+    required: true,
   },
   dc: {
     type: "string",
     describe: "Pubkey of dc",
+    required: true,
   },
   iot: {
     type: "string",
     describe: "Pubkey of iot",
+    required: true,
   },
   pgUser: {
     default: "postgres",
@@ -106,8 +126,9 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
   payer: {
     required: true,
-    descibe: "The Payer of the transactions from the migration server, that way this can be included in the lut"
-  }
+    descibe:
+      "The Payer of the transactions from the migration server, that way this can be included in the lut",
+  },
 });
 
 async function run() {
@@ -127,6 +148,9 @@ async function run() {
 
   const hemProgram = await initHem(provider);
   const lazyTransactionsProgram = await init(provider);
+  const vsrProgram = await initVsr(provider);
+  const dcProgram = await initDc(provider);
+  const hsdProgram = await initHsd(provider);
 
   // For speed
   const hemProgramNoResolve = new Program<HeliumEntityManager>(
@@ -139,6 +163,7 @@ async function run() {
   const dc = new PublicKey(argv.dc);
   const iot = new PublicKey(argv.iot);
   const hnt = new PublicKey(argv.hnt);
+  const hst = new PublicKey(argv.hst);
 
   const iotSubdao = (await subDaoKey(iot))[0];
   const hsConfigKey = (await hotspotConfigKey(iotSubdao, "IOT"))[0];
@@ -154,6 +179,13 @@ async function run() {
     })
     .pubkeys();
   const lazySigner = lazySignerKey(argv.name)[0];
+
+  const dataCredits = dataCreditsKey(dc)[0];
+  const dcCircuitBreaker = mintWindowedBreakerKey(dc)[0];
+  const dao = daoKey(hnt)[0];
+  const subDao = subDaoKey(iot)[0];
+  const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
+  const registrar = daoAcc.registrar;
 
   // Create a lookup table of used pubkeys
   const [sig, lut] = await AddressLookupTableProgram.createLookupTable({
@@ -178,8 +210,11 @@ async function run() {
         hotspotPubkeys.bubblegumProgram,
         hotspotPubkeys.compressionProgram,
         hotspotPubkeys.systemProgram,
-        hotspotPubkeys.rent,
         hotspotPubkeys.hotspotConfig,
+        hst,
+        dao,
+        subDao,
+        registrar,
         lazyTransactionsKey(argv.name)[0],
         LAZY_PROGRAM_ID,
         lazySigner,
@@ -188,6 +223,10 @@ async function run() {
         hnt,
         mobile,
         new PublicKey(argv.payer),
+        ASSOCIATED_PROGRAM_ID,
+        TOKEN_PROGRAM_ID,
+        SYSVAR_RENT_PUBKEY,
+        VSR_PROGRAM_ID,
       ],
     });
   await sendInstructions(provider, [sig, addAddressesInstruction], []);
@@ -217,15 +256,26 @@ async function run() {
   // Keep track of balances so we can send that balance to the lazy signer
   const totalBalances = {
     hnt: new BN(0),
+    stakedHnt: new BN(0),
     mobile: new BN(0),
     dc: new BN(0),
     sol: new BN(0),
+    hst: new BN(0),
   };
   // Keep track of unresolved balances so we can reserve them for later;
   const unresolvedBalances = {
     hnt: new BN(0),
+    stakedHnt: new BN(0),
     mobile: new BN(0),
     dc: new BN(0),
+    hst: new BN(0),
+  };
+  // Keep track of router burned balances
+  const routerBalances = {
+    hnt: new BN(0),
+    stakedHnt: new BN(0),
+    mobile: new BN(0),
+    hst: new BN(0),
   };
   const transactionsByWallet = [];
   // Keep track of failed wallets
@@ -237,21 +287,57 @@ async function run() {
     32 + 32 + 1 + 8 + 4 + 4 + 1 + 60
   );
   const PER_TX = 0.000005;
-  const dustAmount = (PER_TX * 100 * LAMPORTS_PER_SOL) + await provider.connection.getMinimumBalanceForRentExemption(0);
+  const dustAmount =
+    PER_TX * 100 * LAMPORTS_PER_SOL +
+    (await provider.connection.getMinimumBalanceForRentExemption(0));
   const dustAmountBn = new BN(dustAmount);
   let ix = 0;
   let txIdx = 0;
   const txIdsToWallet = {};
 
+  const routers = new Set(Object.keys(state.routers));
+
   /// Iterate through accounts in order so we don't create 1mm promises.
   for (const [address, account] of Object.entries(accounts)) {
     const solAddress = toSolana(address);
+    const isRouter = routers.has(address);
 
-    if (solAddress) {
+    if (isRouter) {
+      const dcBal = new BN(account.dc);
+      routerBalances.hnt = routerBalances.hnt.add(new BN(account.hnt));
+      routerBalances.mobile = routerBalances.mobile.add(
+        new BN(account.mobile)
+      );
+      routerBalances.stakedHnt = routerBalances.stakedHnt.add(
+        new BN(account.staked_hnt)
+      );
+      routerBalances.hst = routerBalances.hst.add(new BN(account.hst));
+      const instruction = await dcProgram.methods
+        .genesisIssueDelegatedDataCreditsV0({
+          amount: dcBal,
+          routerKey: address,
+        })
+        .accounts({
+          dcMint: dc,
+          dataCredits,
+          lazySigner,
+          circuitBreaker: dcCircuitBreaker,
+          dao,
+          subDao,
+        })
+        .instruction();
+
+      transactionsByWallet.push({
+        solAddress,
+        transactions: [[instruction]],
+      });
+      txIdsToWallet[txIdx++] = address;
+    } else if (solAddress) {
       // Create hotspots
       const hotspotIxs = await Promise.all(
         (account.hotspots || []).map(async (hotspot) => {
           totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
+
           return hemProgramNoResolve.methods
             .genesisIssueHotspotV0({
               hotspotKey: hotspot.address,
@@ -262,6 +348,7 @@ async function run() {
               gain: hotspot.gain,
               elevation: hotspot.altitude,
               isFullHotspot: !hotspot.dataonly,
+              numLocationAsserts: hotspot.nonce ? new BN(hotspot.nonce).toNumber() : 0,
             })
             .accountsStrict({
               collection: hotspotPubkeys.collection,
@@ -275,7 +362,6 @@ async function run() {
               bubblegumProgram: hotspotPubkeys.bubblegumProgram,
               compressionProgram: hotspotPubkeys.compressionProgram,
               systemProgram: hotspotPubkeys.systemProgram,
-              rent: hotspotPubkeys.rent,
               hotspotConfig: hotspotPubkeys.hotspotConfig,
               recipient: solAddress,
               info: iotInfoKey(
@@ -292,6 +378,7 @@ async function run() {
       const hntBal = new BN(account.hnt);
       const dcBal = new BN(account.dc);
       const mobileBal = new BN(account.mobile);
+      const hstBal = new BN(account.hst);
       const zero = new BN(0);
       if (hntBal.gt(zero)) {
         totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
@@ -303,6 +390,7 @@ async function run() {
       if (dcBal.gt(zero)) {
         totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
         totalBalances.dc = totalBalances.dc.add(dcBal);
+
         const { instruction, ata } = createAta(dc, solAddress, lazySigner);
         tokenIxs.push(instruction);
         tokenIxs.push(createTransfer(dc, ata, lazySigner, dcBal));
@@ -313,6 +401,13 @@ async function run() {
         const { instruction, ata } = createAta(mobile, solAddress, lazySigner);
         tokenIxs.push(instruction);
         tokenIxs.push(createTransfer(mobile, ata, lazySigner, mobileBal));
+      }
+      if (hstBal.gt(zero)) {
+        totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
+        totalBalances.hst = totalBalances.hst.add(hstBal);
+        const { instruction, ata } = createAta(hst, solAddress, lazySigner);
+        tokenIxs.push(instruction);
+        tokenIxs.push(createTransfer(hst, ata, lazySigner, hstBal));
       }
 
       /// Dust with 100 txns of sol
@@ -325,9 +420,47 @@ async function run() {
       );
       totalBalances.sol = totalBalances.sol.add(dustAmountBn);
 
-      const ixnGroups = [tokenIxs, ...chunks(hotspotIxs, 2)].filter(
-        (ixGroup) => ixGroup.length > 0
-      );
+      const stakedHnt = new BN(account.staked_hnt);
+      const mintKeypair = Keypair.generate();
+      const stakedInstructions = [];
+      if (stakedHnt.gt(new BN(0))) {
+        const {
+          instruction: createPosition,
+          pubkeys: { position },
+        } = await vsrProgram.methods
+          .initializePositionV0({
+            kind: { constant: {} },
+            periods: 183, // 6 months
+          })
+          .accounts({
+            registrar,
+            mint: mintKeypair.publicKey,
+            depositMint: hnt,
+            recipient: solAddress,
+            payer: lazySigner,
+          })
+          .prepare();
+        const depositPosition = await vsrProgram.methods
+          .depositV0({
+            amount: stakedHnt,
+          })
+          .accounts({
+            position,
+            mint: hnt,
+            depositAuthority: lazySigner,
+            registrar
+          })
+          .instruction();
+
+        totalBalances.stakedHnt = totalBalances.stakedHnt.add(stakedHnt);
+        stakedInstructions.push(createPosition, depositPosition);
+      }
+
+      const ixnGroups = [
+        tokenIxs,
+        stakedInstructions,
+        ...chunks(hotspotIxs, 1),
+      ].filter((ixGroup) => ixGroup.length > 0);
 
       transactionsByWallet.push({
         solAddress,
@@ -342,10 +475,14 @@ async function run() {
         address,
         account,
       });
+      unresolvedBalances.hst = unresolvedBalances.hst.add(new BN(account.hst));
       unresolvedBalances.hnt = unresolvedBalances.hnt.add(new BN(account.hnt));
       unresolvedBalances.dc = unresolvedBalances.dc.add(new BN(account.dc));
       unresolvedBalances.mobile = unresolvedBalances.mobile.add(
         new BN(account.mobile)
+      );
+      unresolvedBalances.stakedHnt = unresolvedBalances.stakedHnt.add(
+        new BN(account.staked_hnt)
       );
     }
 
@@ -368,9 +505,9 @@ async function run() {
     host: argv.pgHost,
     database: argv.pgDatabase,
     port: argv.pgPort,
-    ssl: {
-      rejectUnauthorized: false
-    }
+    // ssl: {
+    //   rejectUnauthorized: false,
+    // },
   });
   await client.connect();
 
@@ -390,7 +527,8 @@ async function run() {
       wallet VARCHAR(66) NOT NULL,
       compiled bytea NOT NULL,
       proof jsonb NOT NULL,
-      lookup_table VARCHAR(66) NOT NULL
+      lookup_table VARCHAR(66) NOT NULL,
+      is_router BOOLEAN NOT NULL DEFAULT FALSE
     )
   `);
   await client.query(`
@@ -412,6 +550,7 @@ async function run() {
           .proof.map((p) => p.toString("hex"))
       ),
       lut.toBase58(),
+      routers.has(txIdsToWallet[compiledTransaction.index]),
     ];
   });
   // Show progress if requested
@@ -431,7 +570,7 @@ async function run() {
         const query = format(
           `
         INSERT INTO transactions(
-          id, wallet, compiled, proof, lookup_table
+          id, wallet, compiled, proof, lookup_table, is_router
         )
         VALUES %L
       `,
@@ -445,12 +584,27 @@ async function run() {
   );
   pgProgress.stop();
 
-  await lazyTransactionsProgram.methods
-    .initializeLazyTransactionsV0({
-      root: merkleTree.getRoot().toJSON().data,
-      name: argv.name,
-    })
-    .rpc({ skipPreflight: true });
+  const ltKey = lazyTransactionsKey(argv.name)[0];
+  if (await provider.connection.getAccountInfo(ltKey)) {
+    await lazyTransactionsProgram.methods
+      .updateLazyTransactionsV0({
+        root: merkleTree.getRoot().toJSON().data,
+        authority: provider.wallet.publicKey,
+      })
+      .accounts({
+        lazyTransactions: ltKey,
+      })
+      .rpc({ skipPreflight: true });
+  } else {
+    await lazyTransactionsProgram.methods
+      .initializeLazyTransactionsV0({
+        root: merkleTree.getRoot().toJSON().data,
+        name: argv.name,
+        authority: provider.wallet.publicKey,
+      })
+      .rpc({ skipPreflight: true });
+  }
+
 
   console.log(
     `Created lazy transactions ${lazyTransactionsKey(argv.name)[0]} ${
@@ -460,6 +614,8 @@ async function run() {
 
   console.log(`Lazy transactions signer ${lazySigner} needs:
     HNT: ${totalBalances.hnt.toString()}
+    HST: ${totalBalances.hst.toString()}
+    STAKED HNT: ${totalBalances.stakedHnt.toString()}
     DC: ${totalBalances.dc.toString()}
     MOBILE: ${totalBalances.mobile.toString()}
     SOL: ${totalBalances.sol
@@ -470,11 +626,73 @@ async function run() {
   `);
   console.log(`Unresolved:
     HNT: ${unresolvedBalances.hnt.toString()}
+    HST: ${unresolvedBalances.hst.toString()}
     DC: ${unresolvedBalances.dc.toString()}
+    STAKED HNT: ${unresolvedBalances.stakedHnt.toString()}
     MOBILE: ${unresolvedBalances.mobile.toString()}
   `);
-
+  console.log(`Router:
+    HNT: ${routerBalances.hnt.toString()}
+    HST: ${routerBalances.hst.toString()}
+    STAKED HNT: ${routerBalances.stakedHnt.toString()}
+    MOBILE: ${routerBalances.mobile.toString()}
+  `);
   const finish = new Date().valueOf();
+
+  console.log("Loading up lazy signer with hnt, dc, mobile...");
+  const me = provider.wallet.publicKey;
+  const transfers = [
+    await createAssociatedTokenAccountIdempotentInstruction(
+      me,
+      getAssociatedTokenAddressSync(hnt, lazySigner, true),
+      lazySigner,
+      hnt
+    ),
+    await createTransferInstruction(
+      getAssociatedTokenAddressSync(hnt, me),
+      getAssociatedTokenAddressSync(hnt, lazySigner, true),
+      me,
+      BigInt(totalBalances.hnt.toString())
+    ),
+    await createAssociatedTokenAccountIdempotentInstruction(
+      me,
+      getAssociatedTokenAddressSync(hst, lazySigner, true),
+      lazySigner,
+      hst
+    ),
+    await createTransferInstruction(
+      getAssociatedTokenAddressSync(hst, me),
+      getAssociatedTokenAddressSync(hst, lazySigner, true),
+      me,
+      BigInt(totalBalances.hst.toString())
+    ),
+    await createAssociatedTokenAccountIdempotentInstruction(
+      me,
+      getAssociatedTokenAddressSync(dc, lazySigner, true),
+      lazySigner,
+      dc
+    ),
+    await createTransferInstruction(
+      getAssociatedTokenAddressSync(dc, me),
+      getAssociatedTokenAddressSync(dc, lazySigner, true),
+      me,
+      BigInt(totalBalances.dc.toString())
+    ),
+    await createAssociatedTokenAccountIdempotentInstruction(
+      me,
+      getAssociatedTokenAddressSync(mobile, lazySigner, true),
+      lazySigner,
+      mobile
+    ),
+    await createTransferInstruction(
+      getAssociatedTokenAddressSync(mobile, me),
+      getAssociatedTokenAddressSync(mobile, lazySigner, true),
+      me,
+      BigInt(totalBalances.mobile.toString())
+    ),
+  ];
+  await sendInstructions(provider, transfers);
+  
 
   console.log(`Finished in ${finish - start}ms`);
 }

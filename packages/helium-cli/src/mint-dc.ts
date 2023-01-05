@@ -1,7 +1,7 @@
 import { init as initDc } from "@helium/data-credits-sdk";
 import { toBN } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { createAssociatedTokenAccountIdempotent, createAssociatedTokenAccountIdempotentInstruction, getAssociatedTokenAddress, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -65,6 +65,14 @@ async function run() {
     .mintDataCreditsV0({
       hntAmount: toBN(argv.numHnt, 8),
     })
+    .preInstructions([
+      await createAssociatedTokenAccountIdempotentInstruction(
+        provider.wallet.publicKey,
+        getAssociatedTokenAddressSync(dcKey, destination, true),
+        destination,
+        dcKey
+      )
+    ])
     .accounts({
       dcMint: dcKey,
       recipient: destination,

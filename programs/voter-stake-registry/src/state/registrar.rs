@@ -13,13 +13,15 @@ pub struct Registrar {
   pub realm: Pubkey,
   pub realm_governing_token_mint: Pubkey,
   pub realm_authority: Pubkey,
+  /// Debug only: time offset, to allow tests to move forward in time.
+  pub time_offset: i64,
+  /// Allows a program to wrap updates to the position (transfer or reset lockup)
+  pub position_update_authority: Option<Pubkey>,
 
   /// Storage for voting mints and their configuration.
   /// The length should be adjusted for one's use case.
   pub voting_mints: [VotingMintConfigV0; 4],
 
-  /// Debug only: time offset, to allow tests to move forward in time.
-  pub time_offset: i64,
   pub bump: u8,
 }
 
@@ -83,7 +85,6 @@ pub fn resolve_governing_token_owner(
 
   voter_token_owner_record.assert_token_owner_or_delegate_is_signer(voter_authority_info)?;
 
-  // Assert voter TokenOwnerRecord and VoterWeightRecord are for the same governing_token_owner
   require_eq!(
     voter_token_owner_record.governing_token_owner,
     voter_weight_record.governing_token_owner,

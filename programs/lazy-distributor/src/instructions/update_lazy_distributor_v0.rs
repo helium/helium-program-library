@@ -16,6 +16,7 @@ pub struct UpdateLazyDistributorV0<'info> {
     seeds = ["lazy_distributor".as_bytes(), rewards_mint.key().as_ref()],
     bump,
     has_one = authority,
+    has_one = rewards_mint
   )]
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
   pub rewards_mint: Box<Account<'info, Mint>>,

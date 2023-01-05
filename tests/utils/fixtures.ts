@@ -22,7 +22,8 @@ export const DC_FEE = 5000000;
 export const initTestDataCredits = async (
   program: Program<DataCredits>,
   provider: anchor.AnchorProvider,
-  startingHntbal: number = 10000000000,
+  startingHntbal?: number,
+  hntMint?: PublicKey,
 ): Promise<{
   dcKey: PublicKey;
   hntMint: PublicKey;
@@ -30,21 +31,20 @@ export const initTestDataCredits = async (
   hntBal: number;
   dcBal: number;
 }> => {
+  if (!startingHntbal) {
+    startingHntbal = 10000000000;
+  }
   const me = provider.wallet.publicKey;
-  let hntMint;
   let hntBal = startingHntbal;
   let dcMint;
   let dcBal = 0;
 
-  hntMint = await createMint(provider, 8, me, me);
+  if (!hntMint) {
+    hntMint = await createMint(provider, 8, me, me);
+  }
   dcMint = await createMint(provider, 0, me, me);
 
-  await createAtaAndMint(
-    provider,
-    hntMint,
-    toBN(startingHntbal, 8),
-    me
-  );
+  await createAtaAndMint(provider, hntMint, toBN(startingHntbal, 8), me);
 
   const initDataCredits = await program.methods
     .initializeDataCreditsV0({
@@ -56,7 +56,7 @@ export const initTestDataCredits = async (
       },
     })
     .accounts({ hntMint, dcMint, hntPriceOracle: HNT_PYTH_PRICE_FEED });
-  
+
   const dcKey = (await initDataCredits.pubkeys()).dataCredits!;
 
   await initDataCredits.rpc({ skipPreflight: true });
@@ -204,14 +204,16 @@ export const initWorld = async (
   dcProgram: Program<DataCredits>,
   epochRewards?: number,
   subDaoEpochRewards?: number,
+  registrar?: PublicKey,
+  hntMint?: PublicKey
 ): Promise<{
-  dao: { mint: PublicKey; dao: PublicKey };
+  dao: { mint: PublicKey; dao: PublicKey; };
   subDao: {
     mint: PublicKey;
     subDao: PublicKey;
     treasury: PublicKey;
     rewardsEscrow: PublicKey;
-    stakerPool: PublicKey;
+    delegatorPool: PublicKey;
   };
   dataCredits: {
     dcKey: PublicKey;
@@ -229,7 +231,7 @@ export const initWorld = async (
     makerKeypair: Keypair;
   };
 }> => {
-  const dataCredits = await initTestDataCredits(dcProgram, provider);
+  const dataCredits = await initTestDataCredits(dcProgram, provider, undefined, hntMint);
 
   const dao = await initTestDao(
     hsdProgram,
@@ -237,7 +239,8 @@ export const initWorld = async (
     epochRewards || 50,
     provider.wallet.publicKey,
     dataCredits.dcMint,
-    dataCredits.hntMint
+    dataCredits.hntMint,
+    registrar
   );
   const subDao = await initTestSubdao(
     hsdProgram,

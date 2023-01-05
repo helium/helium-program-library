@@ -20,7 +20,8 @@ pub struct PositionV0 {
   // Points to the VotingMintConfig this position uses.
   pub voting_mint_config_idx: u8,
   // The number of votes this position is active for.
-  pub num_active_votes: u64,
+  pub num_active_votes: u16,
+  pub genesis_end: i64,
   pub bump_seed: u8,
 }
 
@@ -85,7 +86,6 @@ impl PositionV0 {
       voting_mint_config.lockup_saturation_secs,
       voting_mint_config.max_extra_lockup_vote_weight_scaled_factor,
       voting_mint_config.genesis_vote_power_multiplier,
-      voting_mint_config.genesis_vote_power_multiplier_expiration_ts,
     )?;
 
     Ok(voting_power_locked)
@@ -100,7 +100,6 @@ impl PositionV0 {
     lockup_saturation_secs: u64,
     max_extra_lockup_vote_weight_scaled_factor: u64,
     genesis_vote_power_multiplier: u8,
-    genesis_vote_power_multiplier_expiration_ts: i64,
   ) -> Result<u64> {
     if self.lockup.expired(curr_ts) || (locked_vote_weight == 0) {
       return Ok(0);
@@ -115,7 +114,6 @@ impl PositionV0 {
         lockup_saturation_secs,
         max_extra_lockup_vote_weight_scaled_factor,
         genesis_vote_power_multiplier,
-        genesis_vote_power_multiplier_expiration_ts,
       ),
       LockupKind::Constant => self.voting_power_cliff(
         curr_ts,
@@ -124,7 +122,6 @@ impl PositionV0 {
         lockup_saturation_secs,
         max_extra_lockup_vote_weight_scaled_factor,
         genesis_vote_power_multiplier,
-        genesis_vote_power_multiplier_expiration_ts,
       ),
     }
   }
@@ -137,12 +134,9 @@ impl PositionV0 {
     lockup_saturation_secs: u64,
     max_extra_lockup_vote_weight_scaled_factor: u64,
     genesis_vote_power_multiplier: u8,
-    genesis_vote_power_multiplier_expiration_ts: i64,
   ) -> Result<u64> {
     let remaining = min(self.lockup.seconds_left(curr_ts), lockup_saturation_secs);
-    let genesis_multiplier = if self.lockup.start_ts < genesis_vote_power_multiplier_expiration_ts
-      || curr_ts < genesis_vote_power_multiplier_expiration_ts && genesis_vote_power_multiplier > 0
-    {
+    let genesis_multiplier = if curr_ts < self.genesis_end && genesis_vote_power_multiplier > 0 {
       genesis_vote_power_multiplier
     } else {
       1

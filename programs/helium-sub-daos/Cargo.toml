@@ -23,7 +23,7 @@ overflow-checks = true
 anchor-lang = { version = "0.26.0", features = ["init-if-needed"] }
 anchor-spl = "0.26.0"
 mpl-token-metadata = { version = "1.6.4", path = "../../deps/metaplex-program-library/token-metadata/program", features = ["no-entrypoint"] }
-voter-stake-registry = { path = "../voter-stake-registry", features = ["no-entrypoint"] }
+voter-stake-registry = { path = "../voter-stake-registry", features = ["no-entrypoint", "cpi"] }
 shared-utils = { path = "../shared-utils" }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }

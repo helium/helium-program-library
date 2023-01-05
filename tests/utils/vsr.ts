@@ -1,33 +1,32 @@
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
-import { createAtaAndTransfer, createMintInstructions, sendInstructions, toBN } from "@helium/spl-utils";
+import {
+  createAtaAndTransfer,
+  createMintInstructions,
+  sendInstructions,
+  toBN,
+  truthy,
+} from "@helium/spl-utils";
 import { AnchorProvider, BN, Program, web3 } from "@project-serum/anchor";
-import { getGovernanceProgramVersion, MintMaxVoteWeightSource, withCreateRealm } from "@solana/spl-governance";
+import {
+  getGovernanceProgramVersion,
+  MintMaxVoteWeightSource,
+  withCreateRealm,
+} from "@solana/spl-governance";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { positionKey } from "../../packages/voter-stake-registry-sdk/src";
-export const SPL_GOVERNANCE_PID = new PublicKey("GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw");
-
+export const SPL_GOVERNANCE_PID = new PublicKey(
+  "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw"
+);
 
 export async function initVsr(
   program: Program<VoterStakeRegistry>, 
   provider: AnchorProvider, 
   me: PublicKey, 
   hntMint: PublicKey,
-  positionKp: Keypair,
-  options: {delay: number, lockupPeriods: number, lockupAmount: number},
+  positionUpdateAuthority: PublicKey,
+  minLockupSeconds:number = 15811200 // 6 months
 ) {
-  await createAtaAndTransfer(
-    provider,
-    hntMint,
-    toBN(1000, 8),
-    provider.wallet.publicKey,
-    positionKp.publicKey
-  );
-  await provider.connection.requestAirdrop(
-    positionKp.publicKey,
-    web3.LAMPORTS_PER_SOL
-  );
-
   const programVersion = await getGovernanceProgramVersion(
     program.provider.connection,
     SPL_GOVERNANCE_PID
@@ -36,8 +35,7 @@ export async function initVsr(
   const name = `Realm-${new Keypair().publicKey.toBase58().slice(0, 6)}`;
   const realmAuthorityPk = me;
   let instructions: TransactionInstruction[] = [];
-  const mintKeypair = Keypair.generate();
-  let signers: Keypair[] = [positionKp, mintKeypair];
+  let signers: Keypair[] = [];
   const realmPk = await withCreateRealm(
     instructions,
     SPL_GOVERNANCE_PID,
@@ -51,7 +49,9 @@ export async function initVsr(
     new BN(1)
   );
 
-  const createRegistrar = program.methods.initializeRegistrarV0().accounts({
+  const createRegistrar = program.methods.initializeRegistrarV0({
+    positionUpdateAuthority
+  }).accounts({
     realm: realmPk,
     realmGoverningTokenMint: hntMint,
   });
@@ -59,7 +59,6 @@ export async function initVsr(
   const { registrar } = await createRegistrar.pubkeys();
 
   // Configure voting mint
-  const minLockupSeconds = 15811200; // 6 months
   instructions.push(
     await program.methods
       .configureVotingMintV0({
@@ -70,7 +69,7 @@ export async function initVsr(
         maxExtraLockupVoteWeightScaledFactor: new BN(100), // scaled factor
         genesisVotePowerMultiplier: 3,
         genesisVotePowerMultiplierExpirationTs: new BN(1),
-        lockupSaturationSecs: new BN(minLockupSeconds * 8), // lockup saturation seconds
+        lockupSaturationSecs: new BN(15811200 * 8), // 4 years
       })
       .accounts({
         registrar,
@@ -86,27 +85,49 @@ export async function initVsr(
       .instruction()
   );
 
+  await sendInstructions(provider, instructions, signers);
+
+  return {
+    registrar: registrar!,
+    realm: realmPk,
+    hntMint,
+  };
+}
+
+export async function createPosition(
+  program: Program<VoterStakeRegistry>,
+  provider: AnchorProvider,
+  registrar: PublicKey,
+  hntMint: PublicKey,
+  options: { lockupPeriods: number; lockupAmount: number },
+  positionKp?: Keypair
+) {
+  let positionOwner = positionKp?.publicKey || provider.wallet.publicKey;
+  const instructions: TransactionInstruction[] = [];
+  const mintKeypair = Keypair.generate();
   // create deposit entry
   const position = positionKey(mintKeypair.publicKey)[0];
   instructions.push(
-    ...await createMintInstructions(provider, 0, position, position, mintKeypair)
+    ...(await createMintInstructions(
+      provider,
+      0,
+      position,
+      position,
+      mintKeypair
+    ))
   );
   instructions.push(
     await program.methods
       .initializePositionV0({
         kind: { cliff: {} },
-        startTs: null,
         periods: options.lockupPeriods,
       })
       .accounts({
-        // lock for 6 months
         registrar,
         mint: mintKeypair.publicKey,
         depositMint: hntMint,
-        positionAuthority: positionKp.publicKey,
-        payer: positionKp.publicKey,
+        recipient: positionOwner,
       })
-      .signers([positionKp])
       .instruction()
   );
 
@@ -118,20 +139,20 @@ export async function initVsr(
         registrar,
         position,
         mint: hntMint,
-        depositAuthority: positionKp.publicKey,
+        depositAuthority: positionOwner,
       })
-      .signers([positionKp])
+      .signers([positionKp].filter(truthy))
       .instruction()
   );
 
-  await sendInstructions(provider, instructions, signers);
+  await sendInstructions(
+    provider,
+    instructions,
+    [mintKeypair, positionKp].filter(truthy)
+  );
 
   return {
-    registrar: registrar!,
-    realm: realmPk,
     position,
     vault: await getAssociatedTokenAddress(hntMint, position, true),
-    hntMint,
-    mint: mintKeypair.publicKey,
   };
 }

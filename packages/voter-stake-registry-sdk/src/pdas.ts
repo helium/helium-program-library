@@ -39,4 +39,18 @@ export const voterWeightRecordKey = (
       positionAuthority.toBuffer(),
     ],
     programId
+);
+
+export const nftVoteRecordKey = (
+  proposal: PublicKey,
+  mint: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+) =>
+  PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("nft-vote-record", "utf-8"),
+      proposal.toBuffer(),
+      mint.toBuffer(),
+    ],
+    programId
   );

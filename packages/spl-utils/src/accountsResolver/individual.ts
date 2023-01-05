@@ -38,48 +38,49 @@ async function resolveIndividualImpl({
   idlIx: AllInstructions<anchor.Idl>;
 }): Promise<number> {
   const newPath = [...path, camelCase(idlAccounts.name)];
+  
+  try {
+    if ((idlAccounts as IdlAccounts).accounts) {
+      let resolved = 0;
+      const subAccounts = (idlAccounts as IdlAccounts).accounts;
+      for (let k = 0; k < subAccounts.length; k += 1) {
+        const subAccount = subAccounts[k];
 
-  if ((idlAccounts as IdlAccounts).accounts) {
-    let resolved = 0;
-    const subAccounts = (idlAccounts as IdlAccounts).accounts;
-    for (let k = 0; k < subAccounts.length; k += 1) {
-      const subAccount = subAccounts[k];
-
-      resolved += await resolveIndividualImpl({
-        idlAccounts: subAccount,
-        programId,
-        provider,
-        args,
-        accounts,
-        path: newPath,
-        resolver,
-        idlIx,
-      });
-    }
-    
-    return resolved;
-  } else {
-    let resolved = 0;
-    let value = get(accounts, newPath);
-    if (!value) {
-      value = await resolver({
-        programId,
-        provider,
-        path: newPath,
-        args,
-        accounts,
-        idlIx,
-      });
-      if (value) {
-        resolved = 1;
+        resolved += await resolveIndividualImpl({
+          idlAccounts: subAccount,
+          programId,
+          provider,
+          args,
+          accounts,
+          path: newPath,
+          resolver,
+          idlIx,
+        });
       }
+
+      return resolved;
+    } else {
+      let resolved = 0;
+      let value = get(accounts, newPath);
+      if (!value) {
+        value = await resolver({
+          programId,
+          provider,
+          path: newPath,
+          args,
+          accounts,
+          idlIx,
+        });
+        if (value) {
+          resolved = 1;
+        }
+      }
+      set(accounts, newPath, value);
+      return resolved;
     }
-    set(
-      accounts,
-      newPath,
-      value
-    );
-    return resolved;
+  } catch (e: any) {
+    console.error(`Error while resolving ${newPath}`, e);
+    throw e;
   }
 }
 

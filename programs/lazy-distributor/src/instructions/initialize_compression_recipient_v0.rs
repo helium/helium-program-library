@@ -38,10 +38,10 @@ pub struct InitializeCompressionRecipientV0<'info> {
   /// CHECK: delegate of the NFT
   pub delegate: UncheckedAccount<'info>,
   #[account(
-        seeds = [merkle_tree.key().as_ref()],
-        bump,
-        seeds::program = bubblegum_program.key()
-    )]
+    seeds = [merkle_tree.key().as_ref()],
+    bump,
+    seeds::program = bubblegum_program.key()
+  )]
   pub tree_authority: Account<'info, TreeConfig>,
   pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
