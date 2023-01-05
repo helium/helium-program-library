@@ -114,7 +114,7 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   let delegated_position = &mut ctx.accounts.delegated_position;
 
   // check epoch that's being claimed is over
-  let epoch = current_epoch(ctx.accounts.registrar.load()?.clock_unix_timestamp());
+  let epoch = current_epoch(registrar.clock_unix_timestamp());
   if !TESTING {
     require_gt!(epoch, args.epoch, ErrorCode::EpochNotOver,);
     require_eq!(

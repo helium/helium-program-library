@@ -92,7 +92,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
 
   // Update the veHnt at start of epoch
   ctx.accounts.sub_dao_epoch_info.epoch =
-    current_epoch(ctx.accounts.registrar.load()?.clock_unix_timestamp());
+    current_epoch(curr_ts);
   update_subdao_vehnt(sub_dao, &mut ctx.accounts.sub_dao_epoch_info, curr_ts)?;
 
   sub_dao.vehnt_delegated = sub_dao

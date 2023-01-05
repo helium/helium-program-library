@@ -75,7 +75,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   let sub_dao = &mut ctx.accounts.sub_dao;
 
   ctx.accounts.sub_dao_epoch_info.epoch =
-    current_epoch(ctx.accounts.registrar.load()?.clock_unix_timestamp());
+    current_epoch(curr_ts);
 
   update_subdao_vehnt(sub_dao, &mut ctx.accounts.sub_dao_epoch_info, curr_ts)?;
 
