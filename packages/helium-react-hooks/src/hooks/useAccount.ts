@@ -151,7 +151,7 @@ export function useAccount<T>(
       disposeEmitter()
       setTimeout(disposeWatch, 30 * 1000) // Keep cached accounts around for 30s in case a rerender is causing reuse
     }
-  }, []) // only trigger on change to parser if it wasn't defined before.
+  }, [cache, id, !parser]); // only trigger on change to parser if it wasn't defined before.
 
   return state
 }
