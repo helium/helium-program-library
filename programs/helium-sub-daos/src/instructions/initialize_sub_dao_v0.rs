@@ -148,7 +148,7 @@ pub struct InitializeSubDaoV0<'info> {
   pub clockwork: Program<'info, ThreadProgram>,
 }
 
-fn create_end_epoch_cron(curr_ts: i64, offset: u64) -> String {
+pub fn create_end_epoch_cron(curr_ts: i64, offset: u64) -> String {
   let next_epoch = next_epoch_ts(curr_ts) + offset;
   let dt = OffsetDateTime::from_unix_timestamp(next_epoch.try_into().unwrap())
     .ok()

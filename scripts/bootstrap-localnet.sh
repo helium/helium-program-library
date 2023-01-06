@@ -7,23 +7,23 @@ KEYPAIRS=( 'hnt.json' 'hst.json' 'dc.json' 'mobile.json' 'iot.json' 'council.jso
 for f in "${KEYPAIRS[@]}"; do
 	if [ ! -f "./packages/helium-cli/keypairs/$f" ]; then
         echo "$f keypair doesn't exist, creating it"
-        solana-keygen new -o ./packages/helium-cli/keypairs/$f -s
+        solana-keygen new -o ./packages/helium-cli/keypairs/$f -s --no-bip39-passphrase
     fi
 done
 
 # init the dao and subdaos
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-dao.ts \
-    --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium Test2" --noGovernance
+    --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "HeliumT Test4" --noGovernance
 
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-subdao.ts \
     -rewardsOracleUrl https://iot-oracle.oracle.test-helium.com \
     --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n IOT --subdaoKeypair packages/helium-cli/keypairs/iot.json \
-    --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "Helium IOT Test2" --dcBurnAuthority $(solana address) --noGovernance
+    --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "HeliumT IOT Test4" --dcBurnAuthority $(solana address) --noGovernance
 
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-subdao.ts \
     -rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com \
     --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n Mobile --subdaoKeypair packages/helium-cli/keypairs/mobile.json \
-    --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Helium Mobile Test2" \
+    --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "HeliumT Mobile Test4" \
     --dcBurnAuthority $(solana address)  --noHotspots --noGovernance
 
 
