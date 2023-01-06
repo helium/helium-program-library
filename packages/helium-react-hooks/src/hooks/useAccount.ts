@@ -7,7 +7,7 @@ import { useAsync } from 'react-async-hook'
 export interface ParsedAccountBase {
   pubkey: PublicKey
   account: AccountInfo<Buffer>
-  info: unknown
+  info: any; // TODO: change to unkown
 }
 
 export interface UseAccountState<T> {
