@@ -42,7 +42,7 @@ export async function updateMetadata({
   const { root, proof, leaf, treeId, nodeIndex } = assetProof;
   const {
     ownership: { owner },
-    content: { uri },
+    content: { json_uri: uri },
   } = asset;
   const eccCompact = uri.split("/").slice(-1)[0];
 

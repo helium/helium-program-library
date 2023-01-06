@@ -45,7 +45,7 @@ describe('distributor-oracle', () => {
     ({
       compression: { compressed: true, tree: merkle.publicKey, leafId: 0 },
       ownership: { owner: me },
-      content: { uri },
+      content: { json_uri: uri },
     } as Asset);
   const getAssetProofFn = async () => {
     const proof = merkleTree.getProof(0);
