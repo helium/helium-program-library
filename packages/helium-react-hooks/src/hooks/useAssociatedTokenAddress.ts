@@ -16,11 +16,12 @@ const fetch = async (
     return undefined;
   }
 
-  return getAssociatedTokenAddress(
+  const associatedTokenAddress = await getAssociatedTokenAddress(
     mint,
     wallet,
-    true
-  );
+    true,
+  )
+  return associatedTokenAddress
 };
 
 export function useAssociatedTokenAddress(
