@@ -1,9 +1,5 @@
 use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError};
-use anchor_lang::{
-  prelude::*,
-  solana_program::{instruction::Instruction, sysvar::SysvarId},
-  InstructionData,
-};
+use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
 use clockwork_sdk::{self, state::ThreadResponse, utils::PAYER_PUBKEY, ThreadProgram};
@@ -112,7 +108,6 @@ fn construct_next_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> Inst
     AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
     AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
     AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
-    AccountMeta::new_readonly(Clock::id(), false),
   ];
   Instruction {
     program_id: crate::ID,
@@ -154,10 +149,14 @@ fn construct_kickoff_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> I
     AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
     AccountMeta::new_readonly(ctx.accounts.hnt_mint.key(), false),
     AccountMeta::new(ctx.accounts.sub_dao.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.active_device_aggregator.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.history_buffer.key(), false),
     AccountMeta::new(prev_dao_epoch_info, false),
     AccountMeta::new(dao_epoch_info, false),
     AccountMeta::new(sub_dao_epoch_info, false),
     AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
     AccountMeta::new(ctx.accounts.thread.key(), false),
     AccountMeta::new_readonly(ctx.accounts.clockwork.key(), false),
   ];
