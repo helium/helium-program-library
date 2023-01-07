@@ -66,4 +66,8 @@ pub mod helium_sub_daos {
   pub fn reset_lockup_v0(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<()> {
     reset_lockup_v0::handler(ctx, args)
   }
+
+  pub fn reset_clockwork_thread_v0(ctx: Context<ResetClockworkThreadV0>) -> Result<()> {
+    reset_clockwork_thread_v0::handler(ctx)
+  }
 }

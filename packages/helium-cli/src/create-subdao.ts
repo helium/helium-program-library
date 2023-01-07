@@ -514,7 +514,7 @@ async function run() {
     const initSubdaoMethod = await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
         dcBurnAuthority: new PublicKey(argv.dcBurnAuthority),
-        authority: governance,
+        authority: argv.noGovernance ? provider.wallet.publicKey : governance,
         emissionSchedule: emissionSchedule(argv.startEpochRewards),
         // Linear curve
         treasuryCurve: {
@@ -562,8 +562,18 @@ async function run() {
     
   } else {
     const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
+    const thread = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("thread", "utf8"),
+        subdao.toBuffer(),
+        Buffer.from("end-epoch", "utf8"),
+      ],
+      new PublicKey(
+        "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
+      )
+    )[0];
     console.log(
-      `Subdao exits. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}`
+      `Subdao exits. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}. Thread: ${thread.toString()}`
     );
   }
 

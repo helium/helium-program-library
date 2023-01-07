@@ -228,6 +228,12 @@ describe("helium-sub-daos", () => {
       hstPool = (await program.account.daoV0.fetch(dao)).hstPool;
     });
 
+    it("resets the clockwork thread", async() => {
+      await program.methods.resetClockworkThreadV0().accounts({
+        subDao,
+      }).rpc({ skipPreflight: true })
+    })
+
     it("allows tracking dc spend", async () => {
       const { subDaoEpochInfo } = await burnDc(10);
 
