@@ -51,16 +51,9 @@ export const heliumEntityManagerResolvers = combineResolvers(
     owner: "hotspotOwner",
   }),
   ataResolver({
-    instruction: "issueEntityV0",
     account: "dcBurner",
     mint: "dcMint",
     owner: "dcFeePayer",
-  }),
-  ataResolver({
-    instruction: "onboardIotHotspotV0",
-    account: "payerDcAta",
-    mint: "dcMint",
-    owner: "payer",
   }),
   subDaoEpochInfoResolver
 );

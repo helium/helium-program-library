@@ -3,7 +3,6 @@ use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateMakerArgsV0 {
-  pub maker: Option<Pubkey>,
   pub authority: Option<Pubkey>,
 }
 
@@ -20,12 +19,10 @@ pub struct UpdateMakerV0<'info> {
 }
 
 pub fn handler(ctx: Context<UpdateMakerV0>, args: UpdateMakerArgsV0) -> Result<()> {
-  let issuer = &mut ctx.accounts.maker;
-  if args.maker.is_some() {
-    issuer.authority = args.maker.unwrap();
-  }
+  let maker = &mut ctx.accounts.maker;
+
   if args.authority.is_some() {
-    issuer.authority = args.authority.unwrap();
+    maker.authority = args.authority.unwrap();
   }
   Ok(())
 }

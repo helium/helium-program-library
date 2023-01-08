@@ -13,8 +13,7 @@ use mpl_bubblegum::{
   program::Bubblegum,
 };
 use mpl_bubblegum::{
-  state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion},
-  utils::get_asset_id,
+  state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion}
 };
 use spl_account_compression::{program::SplAccountCompression, Noop};
 
@@ -28,7 +27,6 @@ pub struct IssueEntityArgsV0 {
 pub struct IssueEntityV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub dc_fee_payer: Signer<'info>,
   pub authority: Signer<'info>,
   pub collection: Box<Account<'info, Mint>>,
   /// CHECK: Handled by cpi
@@ -142,6 +140,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
     creators: vec![],
     seller_fee_basis_points: 0,
   };
+
   mint_to_collection_v1(
     ctx
       .accounts

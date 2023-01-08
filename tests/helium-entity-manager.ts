@@ -9,6 +9,7 @@ import chai from "chai";
 import {
   updateMetadata,
   init as initHeliumEntityManager,
+  onboardIotHotspot,
 } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
@@ -131,7 +132,7 @@ describe("helium-entity-manager", () => {
     ) => Promise<AssetProof | undefined>;
     let hotspotCollection: PublicKey;
     let rewardableEntityConfig: PublicKey;
-    let ecc: String;
+    let ecc: string;
     let hotspot: PublicKey;
     let hotspotOwner = Keypair.generate();
     let metadata: any;
@@ -166,7 +167,7 @@ describe("helium-entity-manager", () => {
 
       const leaves = Array(2 ** 3).fill(Buffer.alloc(32));
       metadata = {
-        name: animalHash(ecc).replace(/\s/g, "-").toLowerCase(),
+        name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
         symbol: "HOTSPOT",
         uri: `https://iot-metadata.oracle.test-helium.com/${ecc}`,
         collection: {
@@ -199,8 +200,30 @@ describe("helium-entity-manager", () => {
       const proof = merkleTree.getProof(0);
       getAssetFn = async () =>
         ({
-          content: metadata,
+          id: await getLeafAssetId(merkle, new BN(0)),
+          content: {
+            metadata: {
+              name: metadata.name,
+              symbol: metadata.symbol,
+            },
+            json_uri: metadata.uri,
+          },
+          royalty: {
+            basis_points: metadata.sellerFeeBasisPoints,
+            primary_sale_happened: true,
+          },
+          mutable: true,
+          supply: {
+            edition_nonce: null,
+          },
+          grouping: metadata.collection.key,
+          uses: metadata.uses,
+          creators: metadata.creators,
           ownership: { owner: hotspotOwner.publicKey },
+          compression: {
+            compressed: true,
+            eligible: true,
+          },
         } as Asset);
       getAssetProofFn = async () => {
         return {
@@ -214,8 +237,6 @@ describe("helium-entity-manager", () => {
     });
 
     it("issues an iot hotspot", async () => {
-      const ecc = (await HeliumKeypair.makeRandom()).address.b58;
-
       await hemProgram.methods
         .issueEntityV0({
           entityKey: ecc,
@@ -227,29 +248,19 @@ describe("helium-entity-manager", () => {
         })
         .signers([makerKeypair])
         .rpc({ skipPreflight: true });
-      const method = hemProgram.methods
-        .onboardIotHotspotV0({
-          root: merkleTree.getRoot().toJSON().data,
-          index: 0,
-          metadata: anchorAppropriateMetadata,
-        })
-        .accounts({
+
+      const method = (
+        await onboardIotHotspot({
+          program: hemProgram,
+          assetId: hotspot,
           maker,
           rewardableEntityConfig,
-          authority: makerKeypair.publicKey,
-          hotspotOwner: hotspotOwner.publicKey
+          getAssetFn,
+          getAssetProofFn,
         })
-        .remainingAccounts(
-          merkleTree.getProof(0).proof.map(p => ({
-            pubkey: new PublicKey(p),
-            isWritable: false,
-            isSigner: false
-          }))
-        )
-        .signers([makerKeypair, hotspotOwner]);
+      ).signers([makerKeypair, hotspotOwner]);
 
       await method.rpc({ skipPreflight: true });
-      console.log("stop");
       const { iotInfo } = await method.pubkeys();
 
       const iotInfoAccount = await hemProgram.account.iotHotspotInfoV0.fetch(
@@ -281,43 +292,31 @@ describe("helium-entity-manager", () => {
     });
 
     describe("with hotspot", () => {
-      let hotspot: PublicKey;
-      let hotspotOwner: Keypair;
-      let rewardableEntityConfig: PublicKey;
-      let hKeypair: HeliumKeypair;
-
       beforeEach(async () => {
-        hKeypair = await HeliumKeypair.makeRandom();
-        const ecc = hKeypair.address.b58;
-        hotspotOwner = Keypair.generate();
-
         await hemProgram.methods
           .issueEntityV0({
             entityKey: ecc,
           })
           .accounts({
-            maker: makerKeypair.publicKey,
+            maker,
             recipient: hotspotOwner.publicKey,
             authority: makerKeypair.publicKey,
           })
           .signers([makerKeypair])
           .rpc({ skipPreflight: true });
-        const method = hemProgram.methods
-          .onboardIotHotspotV0({
-            root: merkleTree.getRoot().toJSON().data,
-            index: 0,
-            metadata: anchorAppropriateMetadata,
-          })
-          .accounts({
+
+        const method = (
+          await onboardIotHotspot({
+            program: hemProgram,
+            assetId: hotspot,
             maker,
-            authority: makerKeypair.publicKey,
             rewardableEntityConfig,
-            hotspotOwner: hotspotOwner.publicKey,
+            getAssetFn,
+            getAssetProofFn,
           })
-          .preInstructions([
-            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-          ])
-          .signers([makerKeypair, hotspotOwner]);
+        ).signers([makerKeypair, hotspotOwner]);
+
+        await method.rpc({ skipPreflight: true });
 
         await dcProgram.methods
           .mintDataCreditsV0({
@@ -325,33 +324,28 @@ describe("helium-entity-manager", () => {
           })
           .accounts({ dcMint, recipient: hotspotOwner.publicKey })
           .rpc();
-
-        await method.rpc({ skipPreflight: true });
       });
 
       it("updates maker", async () => {
         await hemProgram.methods
           .updateMakerV0({
-            maker: PublicKey.default,
             authority: PublicKey.default,
           })
           .accounts({
             maker,
+            authority: makerKeypair.publicKey
           })
+          .signers([makerKeypair])
           .rpc();
 
         const acc = await hemProgram.account.makerV0.fetch(maker);
         expect(acc.authority.toBase58()).to.eq(PublicKey.default.toBase58());
-        expect(acc.maker.toBase58()).to.eq(PublicKey.default.toBase58());
       });
 
       it("changes the metadata", async () => {
         const location = new BN(1000);
         const elevation = 100;
         const gain = 100;
-        const rewardableEntityConfig = (
-          await hemProgram.account.makerV0.fetch(maker)
-        ).rewardableEntityConfig;
 
         const method = (
           await updateMetadata({
@@ -366,7 +360,7 @@ describe("helium-entity-manager", () => {
           })
         ).signers([hotspotOwner]);
 
-        const info = (await method.pubkeys()).info!;
+        const info = (await method.pubkeys()).iotInfo!;
         await method.rpc({ skipPreflight: true });
 
         const storageAcc = await hemProgram.account.iotHotspotInfoV0.fetch(

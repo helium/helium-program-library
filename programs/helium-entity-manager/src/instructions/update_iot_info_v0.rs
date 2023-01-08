@@ -4,7 +4,6 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
 };
-use anchor_lang::solana_program::hash::hash;
 use data_credits::{
   cpi::{
     accounts::{BurnCommonV0, BurnWithoutTrackingV0},
@@ -46,11 +45,12 @@ impl ConfigSettingsV0 {
 #[instruction(args: UpdateIotInfoArgsV0)]
 pub struct UpdateIotInfoV0<'info> {
   pub payer: Signer<'info>,
+  pub dc_fee_payer: Signer<'info>,
   #[account(
     mut,
-    constraint = info.asset == get_asset_id(&merkle_tree.key(), u64::try_from(args.index).unwrap())
+    constraint = iot_info.asset == get_asset_id(&merkle_tree.key(), u64::try_from(args.index).unwrap())
   )]
-  pub info: Box<Account<'info, IotHotspotInfoV0>>,
+  pub iot_info: Box<Account<'info, IotHotspotInfoV0>>,
   #[account(mut)]
   pub hotspot_owner: Signer<'info>,
   /// CHECK: The merkle tree
@@ -64,9 +64,9 @@ pub struct UpdateIotInfoV0<'info> {
   #[account(
     mut,
     associated_token::mint = dc_mint,
-    associated_token::authority = hotspot_owner,
+    associated_token::authority = dc_fee_payer,
   )]
-  pub owner_dc_ata: Box<Account<'info, TokenAccount>>,
+  pub dc_burner: Box<Account<'info, TokenAccount>>,
 
   #[account(
     has_one = sub_dao,
@@ -110,8 +110,8 @@ impl<'info> UpdateIotInfoV0<'info> {
     let cpi_accounts = BurnWithoutTrackingV0 {
       burn_accounts: BurnCommonV0 {
         data_credits: self.dc.to_account_info(),
-        burner: self.owner_dc_ata.to_account_info(),
-        owner: self.hotspot_owner.to_account_info(),
+        burner: self.dc_burner.to_account_info(),
+        owner: self.dc_fee_payer.to_account_info(),
         dc_mint: self.dc_mint.to_account_info(),
         token_program: self.token_program.to_account_info(),
         associated_token_program: self.associated_token_program.to_account_info(),
@@ -148,13 +148,13 @@ pub fn handler<'info>(
   ) = (args.location, ctx.accounts.rewardable_entity_config.settings)
   {
     let mut dc_fee: u64 = dataonly_location_staking_fee;
-    if ctx.accounts.info.is_full_hotspot {
+    if ctx.accounts.iot_info.is_full_hotspot {
       dc_fee = full_location_staking_fee;
     }
 
-    ctx.accounts.info.num_location_asserts = ctx
+    ctx.accounts.iot_info.num_location_asserts = ctx
       .accounts
-      .info
+      .iot_info
       .num_location_asserts
       .checked_add(1)
       .unwrap();
@@ -164,14 +164,14 @@ pub fn handler<'info>(
       ctx.accounts.burn_ctx(),
       BurnWithoutTrackingArgsV0 { amount: dc_fee },
     )?;
-    ctx.accounts.info.location = Some(location);
+    ctx.accounts.iot_info.location = Some(location);
   }
 
   if args.elevation.is_some() {
-    ctx.accounts.info.elevation = args.elevation;
+    ctx.accounts.iot_info.elevation = args.elevation;
   }
   if args.gain.is_some() {
-    ctx.accounts.info.gain = args.gain;
+    ctx.accounts.iot_info.gain = args.gain;
   }
   Ok(())
 }

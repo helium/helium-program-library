@@ -7,6 +7,7 @@ export * from "./pdas";
 export * from "./resolvers";
 export * from "./constants";
 export { updateMetadata } from "./functions/updateMetadata";
+export { onboardIotHotspot } from "./functions/onboardIotHotspot";
 
 export const init = async (
   provider: AnchorProvider,

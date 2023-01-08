@@ -209,7 +209,7 @@ async function run() {
   > = (await Promise.all(makers.map(async (maker) => {
     const helAddr = Address.fromB58(maker.id);
     const solAddr = new PublicKey(helAddr.publicKey);
-    const makerKeyp = makerKey(iotRewardableEntityConfig, maker.name)[0];
+    const makerKeyp = makerKey(maker.name)[0];
     const makerAcc = await hemProgram.account.makerV0.fetch(solAddr)
     const merkleTree = makerAcc.merkleTree;
 

@@ -1,27 +1,25 @@
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
-import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
-import { BN, Program } from "@project-serum/anchor";
+import { Asset, getAsset, getAssetProof, AssetProof } from "@helium/spl-utils";
+import { BN, Idl, Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
+import Address from "@helium/address";
 import { iotInfoKey } from "../pdas";
+import { assetToMetadataArgs } from "../utils";
 
-export async function updateMetadata({
+export async function onboardIotHotspot({
   program,
   rewardableEntityConfig,
   assetId,
-  location,
-  elevation,
-  gain,
+  maker,
   assetEndpoint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
 }: {
   program: Program<HeliumEntityManager>;
-  location: BN | null;
-  elevation: number | null;
-  gain: number | null;
   assetId: PublicKey;
   rewardableEntityConfig: PublicKey;
   assetEndpoint?: string;
+  maker: PublicKey;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
   getAssetProofFn?: (
     url: string,
@@ -47,12 +45,12 @@ export async function updateMetadata({
 
   const [info] = iotInfoKey(rewardableEntityConfig, eccCompact);
 
+  const makerAcc = await program.account.makerV0.fetchNullable(maker);
+
+  const anchorMetadata = assetToMetadataArgs(asset);
   return program.methods
-    .updateIotInfoV0({
-      location,
-      elevation,
-      gain,
-      hash: leaf.toBuffer().toJSON().data,
+    .onboardIotHotspotV0({
+      metadata: anchorMetadata,
       root: root.toBuffer().toJSON().data,
       index: nodeIndex,
     })
@@ -62,6 +60,8 @@ export async function updateMetadata({
       hotspotOwner: owner,
       iotInfo: info,
       merkleTree: treeId,
+      maker,
+      authority: makerAcc?.authority
     })
     .remainingAccounts(
       proof.map((p) => {

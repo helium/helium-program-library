@@ -23,7 +23,7 @@ use spl_account_compression::program::SplAccountCompression;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct OnboardIotHotspotArgsV0 {
-  pub hash: MetadataArgs,
+  pub metadata: MetadataArgs,
   pub root: [u8; 32],
   pub index: u32,
 }
@@ -39,6 +39,7 @@ fn hotspot_key(uri: &str) -> &str {
 pub struct OnboardIotHotspotV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
+  pub dc_fee_payer:  Signer<'info>,
   pub authority: Signer<'info>,
   #[account(
     init,
@@ -59,9 +60,9 @@ pub struct OnboardIotHotspotV0<'info> {
   #[account(
     mut,
     associated_token::mint = dc_mint,
-    associated_token::authority = payer,
+    associated_token::authority = dc_fee_payer,
   )]
-  pub payer_dc_ata: Box<Account<'info, TokenAccount>>,
+  pub dc_burner: Box<Account<'info, TokenAccount>>,
 
   #[account(
     has_one = sub_dao,
@@ -101,7 +102,6 @@ pub struct OnboardIotHotspotV0<'info> {
   )]
   pub dc: Account<'info, DataCreditsV0>,
 
-  pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
   pub data_credits_program: Program<'info, DataCredits>,
   pub token_program: Program<'info, Token>,
@@ -114,8 +114,8 @@ impl<'info> OnboardIotHotspotV0<'info> {
     let cpi_accounts = BurnWithoutTrackingV0 {
       burn_accounts: BurnCommonV0 {
         data_credits: self.dc.to_account_info(),
-        burner: self.payer_dc_ata.to_account_info(),
-        owner: self.hotspot_owner.to_account_info(),
+        burner: self.dc_burner.to_account_info(),
+        owner: self.dc_fee_payer.to_account_info(),
         dc_mint: self.dc_mint.to_account_info(),
         token_program: self.token_program.to_account_info(),
         associated_token_program: self.associated_token_program.to_account_info(),
@@ -170,7 +170,7 @@ pub fn handler<'info>(
   ctx.accounts.iot_info.set_inner(IotHotspotInfoV0 {
     asset: asset_id,
     hotspot_key: key.to_string(),
-    bump_seed: ctx.bumps["info"],
+    bump_seed: ctx.bumps["iot_info"],
     location: None,
     elevation: None,
     gain: None,
