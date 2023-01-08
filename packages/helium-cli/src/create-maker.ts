@@ -10,6 +10,7 @@ import Address from "@helium/address";
 import os from "os";
 import yargs from "yargs/yargs";
 import { exists, loadKeypair, sendInstructionsOrCreateProposal } from "./utils";
+import fs from "fs";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -23,12 +24,6 @@ const yarg = yargs(hideBin(process.argv)).options({
     default: "http://127.0.0.1:8899",
     describe: "The solana url",
   },
-  makerKey: {
-    alias: "m",
-    type: "string",
-    describe: "*Helium* Public Key of a maker",
-    required: true,
-  },
   subdaoMint: {
     required: true,
     describe: "Public Key of the subdao mint",
@@ -39,17 +34,28 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Pubkey of the GOV program",
     default: "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw",
   },
+  fromFile: {
+    describe: "Load makers from a json file and create in bulk",
+    required: false,
+    type: "string",
+  },
   name: {
     alias: "n",
     type: "string",
-    required: true,
+    required: false,
     describe: "The name of the maker",
+  },
+  makerKey: {
+    alias: "m",
+    type: "string",
+    describe: "*Helium* Public Key of a maker",
+    required: false,
   },
   symbol: {
     alias: "s",
     type: "string",
     required: true,
-    describe:" The symbol of the entity config"
+    describe: " The symbol of the entity config",
   },
   councilKeypair: {
     type: "string",
@@ -69,66 +75,89 @@ async function run() {
   const councilKeypair = await loadKeypair(argv.councilKeypair);
 
   const name = argv.name;
-  const symbol = argv.symbol
+  const symbol = argv.symbol;
+
+  let makers = [
+    {
+      name,
+      address: argv.makerKey,
+    },
+  ];
+
+  if (argv.fromFile) {
+    makers = JSON.parse(fs.readFileSync(argv.fromFile, "utf-8"));
+  }
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hemProgram = await initHem(provider);
-  const makerAuthority = new PublicKey(Address.fromB58(argv.makerKey).publicKey);
-  console.log(
-    `Using maker with helium addr: ${
-      argv.makerKey
-    }, solana addr: ${makerAuthority.toBase58()}`
-  );
-
   const conn = provider.connection;
 
   const subdaoMint = new PublicKey(argv.subdaoMint);
   const subdao = (await subDaoKey(subdaoMint))[0];
-  const entityConfigKey = (await rewardableEntityConfigKey(subdao, symbol.toUpperCase()))[0];
+  const entityConfigKey = (
+    await rewardableEntityConfigKey(subdao, symbol.toUpperCase())
+  )[0];
 
-  const maker = await makerKey(name)[0];
+  const instructions = (
+    await Promise.all(
+      makers.map(async ({ name, address }) => {
+        const makerAuthority = new PublicKey(
+          Address.fromB58(address).publicKey
+        );
 
-  // console.log("Issuer: ", await hemProgram.account.makerV0.fetch(makerKey));
-  if (!(await exists(conn, maker))) {
-    console.log("Initalizing Maker");
+        console.log(
+          `Creating maker with helium addr: ${address}, solana addr: ${makerAuthority.toBase58()}`
+        );
 
-    const authority = (await hemProgram.account.rewardableEntityConfigV0.fetch(entityConfigKey)).authority;
-    console.log("Auth is", authority);
-    const create = await hemProgram.methods
-      .initializeMakerV0({
-        name,
-        metadataUrl: "todo",
-        authority: makerAuthority,
-        maxDepth: 26,
-        maxBufferSize: 1024,
+        const maker = await makerKey(name)[0];
+
+        // console.log("Issuer: ", await hemProgram.account.makerV0.fetch(makerKey));
+        if (!(await exists(conn, maker))) {
+          console.log("Initalizing Maker");
+
+          const authority = (
+            await hemProgram.account.rewardableEntityConfigV0.fetch(
+              entityConfigKey
+            )
+          ).authority;
+          console.log("Auth is", authority);
+          const create = await hemProgram.methods
+            .initializeMakerV0({
+              name,
+              metadataUrl: "todo",
+              authority: makerAuthority,
+              maxDepth: 26,
+              maxBufferSize: 1024,
+            })
+            .accounts({
+              maker,
+            })
+            .instruction();
+
+          const approve = await hemProgram.methods
+            .approveMakerV0()
+            .accounts({
+              maker,
+              rewardableEntityConfig: entityConfigKey,
+              authority,
+            })
+            .instruction();
+
+          return [create, approve];
+        }
       })
-      .accounts({
-        maker
-      })
-      .instruction();
+    )
+  ).flat();
 
-    const approve = await hemProgram.methods
-      .approveMakerV0()
-      .accounts({
-        maker,
-        rewardableEntityConfig: entityConfigKey,
-        authority,
-      })
-      .instruction();
-
-    await sendInstructionsOrCreateProposal({
-      provider,
-      instructions: [
-        create,
-        approve,
-      ],
-      walletSigner: wallet,
-      signers: [],
-      govProgramId,
-      proposalName: `Create Maker ${name}, ${argv.makerKey}`,
-      votingMint: councilKeypair.publicKey,
-    });
-  }
+  await sendInstructionsOrCreateProposal({
+    provider,
+    instructions,
+    walletSigner: wallet,
+    signers: [],
+    govProgramId,
+    proposalName: `Create Makers`,
+    votingMint: councilKeypair.publicKey,
+  });
 }
 
 run()
