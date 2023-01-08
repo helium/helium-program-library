@@ -19,7 +19,7 @@ use data_credits::{
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
-use mpl_bubblegum::{program::Bubblegum, state::TreeConfig};
+
 use mpl_bubblegum::{state::leaf_schema::LeafSchema, utils::get_asset_id};
 use shared_utils::*;
 use spl_account_compression::program::SplAccountCompression;
@@ -34,7 +34,7 @@ pub struct OnboardIotHotspotArgsV0 {
 fn hotspot_key(uri: &str) -> &str {
   // Expect something like https://iot-metadata.oracle.test-helium.com/:eccCompact
   // So just take the id after the last slash
-  uri.split("/").last().unwrap()
+  uri.split('/').last().unwrap()
 }
 
 #[derive(Accounts)]
