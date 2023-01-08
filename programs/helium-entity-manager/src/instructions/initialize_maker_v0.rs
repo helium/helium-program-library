@@ -1,10 +1,10 @@
 use crate::error::ErrorCode;
 use crate::state::*;
+use crate::token_metadata::create_metadata_accounts_v3;
+use anchor_lang::prelude::*;
 use anchor_spl::metadata::{
   create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
 };
-use crate::token_metadata::create_metadata_accounts_v3;
-use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
@@ -97,7 +97,6 @@ pub struct InitializeMakerV0<'info> {
   pub rent: Sysvar<'info, Rent>,
 }
 
-
 impl<'info> InitializeMakerV0<'info> {
   fn mint_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintTo<'info>> {
     let cpi_accounts = MintTo {
@@ -109,21 +108,14 @@ impl<'info> InitializeMakerV0<'info> {
   }
 }
 
-pub fn handler(
-  ctx: Context<InitializeMakerV0>,
-  args: InitializeMakerArgsV0,
-) -> Result<()> {
+pub fn handler(ctx: Context<InitializeMakerV0>, args: InitializeMakerArgsV0) -> Result<()> {
   require!(args.name.len() <= 32, ErrorCode::InvalidStringLength);
   require!(
     args.metadata_url.len() <= 200,
     ErrorCode::InvalidStringLength
   );
 
-  let signer_seeds: &[&[&[u8]]] = &[&[
-    b"maker",
-    args.name.as_bytes(),
-    &[ctx.bumps["maker"]],
-  ]];
+  let signer_seeds: &[&[&[u8]]] = &[&[b"maker", args.name.as_bytes(), &[ctx.bumps["maker"]]]];
 
   token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
 
@@ -142,17 +134,17 @@ pub fn handler(
       signer_seeds,
     ),
     DataV2 {
-      name: args.name.clone(), 
-      symbol: "MAKER".to_string(), 
-      uri: args.metadata_url, 
-      seller_fee_basis_points: 0, 
-      creators: None, 
+      name: args.name.clone(),
+      symbol: "MAKER".to_string(),
+      uri: args.metadata_url,
+      seller_fee_basis_points: 0,
+      creators: None,
       collection: None,
-      uses: None
+      uses: None,
     },
     true,
     true,
-    None
+    None,
   )?;
 
   create_master_edition_v3(
@@ -171,7 +163,7 @@ pub fn handler(
       },
       signer_seeds,
     ),
-    Some(0)
+    Some(0),
   )?;
 
   create_tree(

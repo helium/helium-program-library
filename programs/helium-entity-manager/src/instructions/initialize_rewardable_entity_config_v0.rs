@@ -38,13 +38,16 @@ pub fn handler(
 ) -> Result<()> {
   require!(args.symbol.len() <= 10, ErrorCode::InvalidStringLength);
 
-  ctx.accounts.rewardable_entity_config.set_inner(RewardableEntityConfigV0 {
-    sub_dao: ctx.accounts.sub_dao.key(),
-    symbol: args.symbol.clone(),
-    authority: ctx.accounts.authority.key(),
-    bump_seed: ctx.bumps["rewardable_entity_config"],
-    settings: args.settings,
-  });
+  ctx
+    .accounts
+    .rewardable_entity_config
+    .set_inner(RewardableEntityConfigV0 {
+      sub_dao: ctx.accounts.sub_dao.key(),
+      symbol: args.symbol.clone(),
+      authority: ctx.accounts.authority.key(),
+      bump_seed: ctx.bumps["rewardable_entity_config"],
+      settings: args.settings,
+    });
 
   Ok(())
 }

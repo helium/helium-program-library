@@ -17,7 +17,10 @@ pub struct UpdateRewardableEntityConfigV0<'info> {
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
 }
 
-pub fn handler(ctx: Context<UpdateRewardableEntityConfigV0>, args: UpdateRewardableEntityConfigArgsV0) -> Result<()> {
+pub fn handler(
+  ctx: Context<UpdateRewardableEntityConfigV0>,
+  args: UpdateRewardableEntityConfigArgsV0,
+) -> Result<()> {
   let config = &mut ctx.accounts.rewardable_entity_config;
   if args.new_authority.is_some() {
     config.authority = args.new_authority.unwrap();

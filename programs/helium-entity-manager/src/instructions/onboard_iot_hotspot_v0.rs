@@ -1,6 +1,9 @@
 use std::mem::size_of;
 
-use crate::{state::*, token_metadata::{MetadataArgs, hash_metadata, hash_creators}};
+use crate::{
+  state::*,
+  token_metadata::{hash_creators, hash_metadata, MetadataArgs},
+};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_spl::{
@@ -39,7 +42,7 @@ fn hotspot_key(uri: &str) -> &str {
 pub struct OnboardIotHotspotV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub dc_fee_payer:  Signer<'info>,
+  pub dc_fee_payer: Signer<'info>,
   pub authority: Signer<'info>,
   #[account(
     init,

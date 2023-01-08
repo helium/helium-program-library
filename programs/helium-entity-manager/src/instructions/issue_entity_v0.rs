@@ -1,19 +1,15 @@
 use std::cmp::min;
 
-use crate::{error::ErrorCode, constants::IOT_METADATA_URL};
 use crate::state::*;
+use crate::{constants::IOT_METADATA_URL, error::ErrorCode};
 use anchor_lang::prelude::*;
-use anchor_spl::{
-  token::{Mint},
-};
+use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
+use mpl_bubblegum::state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion};
 use mpl_bubblegum::state::{metaplex_adapter::TokenStandard, TreeConfig};
 use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
   program::Bubblegum,
-};
-use mpl_bubblegum::{
-  state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion}
 };
 use spl_account_compression::{program::SplAccountCompression, Noop};
 
@@ -102,7 +98,6 @@ impl<'info> IssueEntityV0<'info> {
     };
     CpiContext::new(self.bubblegum_program.to_account_info(), cpi_accounts)
   }
-
 }
 
 pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<()> {
@@ -110,7 +105,6 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
     .entity_key
     .parse()
     .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
-
 
   let maker_seeds: &[&[&[u8]]] = &[&[
     b"maker",
@@ -122,11 +116,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
   let metadata = MetadataArgs {
     name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
-    uri: format!(
-      "{}/{}",
-      IOT_METADATA_URL,
-      args.entity_key
-    ),
+    uri: format!("{}/{}", IOT_METADATA_URL, args.entity_key),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi

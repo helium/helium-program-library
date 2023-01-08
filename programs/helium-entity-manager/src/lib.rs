@@ -2,11 +2,11 @@ use anchor_lang::prelude::*;
 
 declare_id!("hemABtqNUst4MmqsVcuN217ZzBspENbGt9uueSe5jts");
 
+pub mod constants;
 pub mod error;
 pub mod instructions;
 pub mod state;
 pub mod token_metadata;
-pub mod constants;
 
 pub use instructions::*;
 pub use state::*;
@@ -22,9 +22,7 @@ pub mod helium_entity_manager {
     initialize_rewardable_entity_config_v0::handler(ctx, args)
   }
 
-  pub fn approve_maker_v0(
-    ctx: Context<ApproveMakerV0>,
-  ) -> Result<()> {
+  pub fn approve_maker_v0(ctx: Context<ApproveMakerV0>) -> Result<()> {
     approve_maker_v0::handler(ctx)
   }
 
@@ -35,10 +33,7 @@ pub mod helium_entity_manager {
     initialize_maker_v0::handler(ctx, args)
   }
 
-  pub fn issue_entity_v0(
-    ctx: Context<IssueEntityV0>,
-    args: IssueEntityArgsV0,
-  ) -> Result<()> {
+  pub fn issue_entity_v0(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<()> {
     issue_entity_v0::handler(ctx, args)
   }
 
@@ -63,10 +58,7 @@ pub mod helium_entity_manager {
     update_rewardable_entity_config_v0::handler(ctx, args)
   }
 
-  pub fn update_maker_v0(
-    ctx: Context<UpdateMakerV0>,
-    args: UpdateMakerArgsV0,
-  ) -> Result<()> {
+  pub fn update_maker_v0(ctx: Context<UpdateMakerV0>, args: UpdateMakerArgsV0) -> Result<()> {
     update_maker_v0::handler(ctx, args)
   }
 

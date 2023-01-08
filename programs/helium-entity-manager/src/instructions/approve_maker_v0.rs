@@ -24,10 +24,7 @@ pub struct ApproveMakerV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-pub fn handler(
-  ctx: Context<ApproveMakerV0>,
-) -> Result<()> {
-
+pub fn handler(ctx: Context<ApproveMakerV0>) -> Result<()> {
   ctx.accounts.maker_approval.set_inner(MakerApprovalV0 {
     rewardable_entity_config: ctx.accounts.rewardable_entity_config.key(),
     maker: ctx.accounts.maker.key(),

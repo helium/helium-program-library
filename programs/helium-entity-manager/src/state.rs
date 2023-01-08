@@ -22,7 +22,7 @@ pub enum ConfigSettingsV0 {
   MobileConfig {
     full_location_staking_fee: u64,
     dataonly_location_staking_fee: u64,
-  }
+  },
 }
 
 impl Default for ConfigSettingsV0 {
@@ -50,7 +50,7 @@ pub struct MakerV0 {
 #[account]
 #[derive(Default)]
 pub struct MakerApprovalV0 {
-  pub rewardable_entity_config: Pubkey, 
+  pub rewardable_entity_config: Pubkey,
   pub maker: Pubkey,
   pub bump_seed: u8,
 }

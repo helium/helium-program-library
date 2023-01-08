@@ -145,8 +145,10 @@ pub fn handler<'info>(
       dataonly_location_staking_fee,
       ..
     },
-  ) = (args.location, ctx.accounts.rewardable_entity_config.settings)
-  {
+  ) = (
+    args.location,
+    ctx.accounts.rewardable_entity_config.settings,
+  ) {
     let mut dc_fee: u64 = dataonly_location_staking_fee;
     if ctx.accounts.iot_info.is_full_hotspot {
       dc_fee = full_location_staking_fee;
