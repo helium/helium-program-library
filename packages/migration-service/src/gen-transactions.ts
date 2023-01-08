@@ -1,12 +1,15 @@
 import Address from "@helium/address";
 import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
+import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
 import {
-  hotspotConfigKey,
+  rewardableEntityConfigKey,
   init as initHem,
   iotInfoKey,
   PROGRAM_ID as HEM_PROGRAM_ID,
+  makerKey,
 } from "@helium/helium-entity-manager-sdk";
+import { PROGRAM_ID as TOKEN_METATDATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import {
   init as initVsr,
   registrarKey,
@@ -54,6 +57,10 @@ import yargs from "yargs/yargs";
 import { compress } from "./utils";
 import { ASSOCIATED_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
 import { TreeNode } from "@solana/spl-account-compression/dist/types/merkle-tree";
+import {
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  SPL_NOOP_PROGRAM_ID,
+} from "@solana/spl-account-compression";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -116,6 +123,11 @@ const yarg = yargs(hideBin(process.argv)).options({
     alias: "s",
     default: "./export.json",
   },
+  makers: {
+    type: "string",
+    alias: "s",
+    default: "./makers.json",
+  },
   progress: {
     type: "boolean",
     alias: "-p",
@@ -168,18 +180,69 @@ async function run() {
   const hst = new PublicKey(argv.hst);
 
   const iotSubdao = (await subDaoKey(iot))[0];
-  const hsConfigKey = (await hotspotConfigKey(iotSubdao, "IOT"))[0];
+  const mobileSubdao = (await subDaoKey(mobile))[0];
+  const hsConfigKey = (await rewardableEntityConfigKey(iotSubdao, "IOT"))[0];
 
-  const hotspotPubkeys = await hemProgram.methods
-    .issueIotHotspotV0({
-      hotspotKey: (await HeliumKeypair.makeRandom()).address.b58,
-      isFullHotspot: true,
-    })
-    .accounts({
-      recipient: provider.wallet.publicKey,
-      hotspotConfig: hsConfigKey,
-    })
-    .pubkeys();
+  const makers: { id: string; name: string }[] = JSON.parse(
+    fs.readFileSync(argv.makers).toString()
+  );
+
+  const iotRewardableEntityConfig = rewardableEntityConfigKey(
+    iotSubdao,
+    "IOT"
+  )[0];
+  const mobileRewardableEntityConfig = rewardableEntityConfigKey(
+    mobile,
+    "MOBILE"
+  )[0];
+  const hotspotPubkeys: Record<
+    string,
+    {
+      maker: PublicKey,
+      makerAuthority: PublicKey;
+      collection: PublicKey;
+      collectionMetadata: PublicKey;
+      collectionMasterEdition: PublicKey;
+      treeAuthority: PublicKey;
+      merkleTree: PublicKey;
+    }
+  > = (await Promise.all(makers.map(async (maker) => {
+    const helAddr = Address.fromB58(maker.id);
+    const solAddr = new PublicKey(helAddr.publicKey);
+    const makerKeyp = makerKey(iotRewardableEntityConfig, maker.name)[0];
+    const makerAcc = await hemProgram.account.makerV0.fetch(solAddr)
+    const merkleTree = makerAcc.merkleTree;
+
+    return {
+      id: maker.id,
+      maker: makerKeyp,
+      makerAuthority: solAddr,
+      collection: makerAcc.collection,
+      collectionMetadata: PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("metadata", "utf-8"),
+          TOKEN_METATDATA_PROGRAM_ID.toBuffer(),
+          makerAcc.collection.toBuffer(),
+        ],
+        TOKEN_METATDATA_PROGRAM_ID
+      )[0],
+      collectionMasterEdition: PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("metadata", "utf-8"),
+          TOKEN_METATDATA_PROGRAM_ID.toBuffer(),
+          makerAcc.collection.toBuffer(),
+          Buffer.from("edition", "utf-8"),
+        ],
+        TOKEN_METATDATA_PROGRAM_ID
+      )[0],
+      treeAuthory: PublicKey.findProgramAddressSync([merkleTree.toBuffer()], BUBBLEGUM_PROGRAM_ID)[0],
+      merkleTree,
+    };
+  }))).reduce((acc, cur) => {
+    acc[cur.id] = cur;
+    return acc;
+  }, {});
+
   const lazySigner = lazySignerKey(argv.name)[0];
 
   const dataCredits = dataCreditsKey(dc)[0];
@@ -195,24 +258,22 @@ async function run() {
     payer: provider.wallet.publicKey,
     recentSlot: await provider.connection.getSlot(),
   });
+  const bubblegumSigner = PublicKey.findProgramAddressSync(
+    [Buffer.from("collection_cpi", "utf-8")],
+    BUBBLEGUM_PROGRAM_ID
+  )[0];
   const addAddressesInstruction =
     await AddressLookupTableProgram.extendLookupTable({
       payer: provider.wallet.publicKey,
       authority: provider.wallet.publicKey,
       lookupTable: lut,
       addresses: [
-        hotspotPubkeys.collection,
-        hotspotPubkeys.collectionMetadata,
-        hotspotPubkeys.collectionMasterEdition,
-        hotspotPubkeys.treeAuthority,
-        hotspotPubkeys.merkleTree,
-        hotspotPubkeys.bubblegumSigner,
-        hotspotPubkeys.tokenMetadataProgram,
-        hotspotPubkeys.logWrapper,
-        hotspotPubkeys.bubblegumProgram,
-        hotspotPubkeys.compressionProgram,
-        hotspotPubkeys.systemProgram,
-        hotspotPubkeys.hotspotConfig,
+        ...Object.values(hotspotPubkeys).flatMap(v => Object.values(v)),
+        TOKEN_METATDATA_PROGRAM_ID,
+        SPL_NOOP_PROGRAM_ID,
+        SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+        SystemProgram.programId,
+        bubblegumSigner,
         hst,
         dao,
         subDao,
@@ -229,6 +290,7 @@ async function run() {
         TOKEN_PROGRAM_ID,
         SYSVAR_RENT_PUBKEY,
         VSR_PROGRAM_ID,
+        BUBBLEGUM_PROGRAM_ID,
       ],
     });
   await sendInstructions(provider, [sig, addAddressesInstruction], []);
@@ -337,6 +399,8 @@ async function run() {
       const hotspotIxs = await Promise.all(
         (account.hotspots || []).map(async (hotspot) => {
           totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
+          const makerId = hotspot.maker;
+          const hotspotPubkeysForMaker = hotspotPubkeys[makerId];
 
           return hemProgramNoResolve.methods
             .genesisIssueHotspotV0({
@@ -353,21 +417,23 @@ async function run() {
                 : 0,
             })
             .accountsStrict({
-              collection: hotspotPubkeys.collection,
-              collectionMetadata: hotspotPubkeys.collectionMetadata,
-              collectionMasterEdition: hotspotPubkeys.collectionMasterEdition,
-              treeAuthority: hotspotPubkeys.treeAuthority,
-              merkleTree: hotspotPubkeys.merkleTree,
-              bubblegumSigner: hotspotPubkeys.bubblegumSigner,
-              tokenMetadataProgram: hotspotPubkeys.tokenMetadataProgram,
-              logWrapper: hotspotPubkeys.logWrapper,
-              bubblegumProgram: hotspotPubkeys.bubblegumProgram,
-              compressionProgram: hotspotPubkeys.compressionProgram,
-              systemProgram: hotspotPubkeys.systemProgram,
-              hotspotConfig: hotspotPubkeys.hotspotConfig,
+              collection: hotspotPubkeysForMaker.collection,
+              collectionMetadata: hotspotPubkeysForMaker.collectionMetadata,
+              collectionMasterEdition:
+                hotspotPubkeysForMaker.collectionMasterEdition,
+              treeAuthority: hotspotPubkeysForMaker.treeAuthority,
+              merkleTree: hotspotPubkeysForMaker.merkleTree,
+              bubblegumSigner,
+              tokenMetadataProgram: TOKEN_METATDATA_PROGRAM_ID,
+              logWrapper: SPL_NOOP_PROGRAM_ID,
+              bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
+              compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+              systemProgram: SystemProgram.programId,
+              rewardableEntityConfig: iotRewardableEntityConfig,
+              maker: PublicKey.default, // TODO: Fix this!
               recipient: solAddress,
               info: iotInfoKey(
-                hotspotPubkeys.hotspotConfig,
+                iotRewardableEntityConfig,
                 hotspot.address
               )[0],
               lazySigner,
@@ -522,8 +588,7 @@ async function run() {
     flatTransactions
   );
 
-
-  console.log("Extending merkle tree with cached nodes")
+  console.log("Extending merkle tree with cached nodes");
   let rootNode = merkleTree.leaves[0];
   while (typeof rootNode.parent !== "undefined") {
     rootNode = rootNode.parent;
@@ -544,16 +609,14 @@ async function run() {
     queue.enqueue(top.right);
   }
   for (const nodes of chunks(cachedNodes, 5)) {
-    const instruction =
-      await AddressLookupTableProgram.extendLookupTable({
-        payer: provider.wallet.publicKey,
-        authority: provider.wallet.publicKey,
-        lookupTable: lut,
-        addresses: nodes
-      });
+    const instruction = await AddressLookupTableProgram.extendLookupTable({
+      payer: provider.wallet.publicKey,
+      authority: provider.wallet.publicKey,
+      lookupTable: lut,
+      addresses: nodes,
+    });
     await sendInstructions(provider, [instruction], []);
   }
-    
 
   console.log("Creating tables");
   await client.query(`

@@ -6,6 +6,7 @@ pub mod error;
 pub mod instructions;
 pub mod state;
 pub mod token_metadata;
+pub mod constants;
 
 pub use instructions::*;
 pub use state::*;
@@ -14,25 +15,31 @@ pub use state::*;
 pub mod helium_entity_manager {
   use super::*;
 
-  pub fn initialize_hotspot_config_v0(
-    ctx: Context<InitializeHotspotConfigV0>,
-    args: InitializeHotspotConfigArgsV0,
+  pub fn initialize_rewardable_entity_config_v0(
+    ctx: Context<InitializeRewardableEntityConfigV0>,
+    args: InitializeRewardableEntityConfigArgsV0,
   ) -> Result<()> {
-    initialize_hotspot_config_v0::handler(ctx, args)
+    initialize_rewardable_entity_config_v0::handler(ctx, args)
   }
 
-  pub fn initialize_hotspot_issuer_v0(
-    ctx: Context<InitializeHotspotIssuerV0>,
-    args: InitializeHotspotIssuerArgsV0,
+  pub fn approve_maker_v0(
+    ctx: Context<ApproveMakerV0>,
   ) -> Result<()> {
-    initialize_hotspot_issuer_v0::handler(ctx, args)
+    approve_maker_v0::handler(ctx)
   }
 
-  pub fn issue_iot_hotspot_v0(
-    ctx: Context<IssueIotHotspotV0>,
-    args: IssueIotHotspotArgsV0,
+  pub fn initialize_maker_v0(
+    ctx: Context<InitializeMakerV0>,
+    args: InitializeMakerArgsV0,
   ) -> Result<()> {
-    issue_iot_hotspot_v0::handler(ctx, args)
+    initialize_maker_v0::handler(ctx, args)
+  }
+
+  pub fn issue_entity_v0(
+    ctx: Context<IssueEntityV0>,
+    args: IssueEntityArgsV0,
+  ) -> Result<()> {
+    issue_entity_v0::handler(ctx, args)
   }
 
   pub fn genesis_issue_hotspot_v0(
@@ -42,18 +49,25 @@ pub mod helium_entity_manager {
     genesis_issue_hotspot_v0::handler(ctx, args)
   }
 
-  pub fn update_hotspot_config_v0(
-    ctx: Context<UpdateHotspotConfigV0>,
-    args: UpdateHotspotConfigArgsV0,
+  pub fn onboard_iot_hotspot_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, OnboardIotHotspotV0<'info>>,
+    args: OnboardIotHotspotArgsV0,
   ) -> Result<()> {
-    update_hotspot_config_v0::handler(ctx, args)
+    onboard_iot_hotspot_v0::handler(ctx, args)
   }
 
-  pub fn update_hotspot_issuer_v0(
-    ctx: Context<UpdateHotspotIssuerV0>,
-    args: UpdateHotspotIssuerArgsV0,
+  pub fn update_rewardable_entity_config_v0(
+    ctx: Context<UpdateRewardableEntityConfigV0>,
+    args: UpdateRewardableEntityConfigArgsV0,
   ) -> Result<()> {
-    update_hotspot_issuer_v0::handler(ctx, args)
+    update_rewardable_entity_config_v0::handler(ctx, args)
+  }
+
+  pub fn update_maker_v0(
+    ctx: Context<UpdateMakerV0>,
+    args: UpdateMakerArgsV0,
+  ) -> Result<()> {
+    update_maker_v0::handler(ctx, args)
   }
 
   pub fn update_iot_info_v0<'info>(

@@ -12,45 +12,55 @@ import { PublicKey } from "@solana/web3.js";
 export const heliumEntityManagerResolvers = combineResolvers(
   heliumCommonResolver,
   ataResolver({
-    instruction: "initializeHotspotConfigV0",
+    instruction: "initializeMakerV0",
     account: "tokenAccount",
     mint: "collection",
-    owner: "hotspotConfig",
+    owner: "maker",
   }),
   resolveIndividual(async ({ path, args, provider, accounts }) => {
     if (
-      path[path.length - 1] === "info" &&
-      args[args.length - 1].hotspotKey &&
-      accounts.hotspotConfig
+      path[path.length - 1] === "iotInfo" &&
+      args[args.length - 1].metadata &&
+      accounts.rewardableEntityConfig
     ) {
-      return iotInfoKey(accounts.hotspotConfig as PublicKey, args[args.length - 1].hotspotKey)[0];
+      return iotInfoKey(
+        accounts.rewardableEntityConfig as PublicKey,
+        args[args.length - 1].metadata.uri.split("/").slice(-1)[0]
+      )[0];
     } else if (path[path.length - 1] === "recipient") {
       // @ts-ignore
       return provider.wallet?.publicKey;
     }
   }),
   resolveIndividual(async ({ path, accounts }) => {
-    if (path[path.length - 1] === "ownerHotspotAta" && (accounts.owner || accounts.hotspotOwner) && accounts.hotspot) {
-      return getAssociatedTokenAddress(accounts.hotspot as PublicKey, (accounts.owner || accounts.hotspotOwner) as PublicKey)
+    if (
+      path[path.length - 1] === "ownerHotspotAta" &&
+      (accounts.owner || accounts.hotspotOwner) &&
+      accounts.hotspot
+    ) {
+      return getAssociatedTokenAddress(
+        accounts.hotspot as PublicKey,
+        (accounts.owner || accounts.hotspotOwner) as PublicKey
+      );
     }
   }),
   ataResolver({
-    instruction: "issueIotHotspotV0",
+    instruction: "issueEntityV0",
     account: "recipientTokenAccount",
     mint: "hotspot",
     owner: "hotspotOwner",
   }),
   ataResolver({
-    instruction: "issueIotHotspotV0",
+    instruction: "issueEntityV0",
     account: "dcBurner",
     mint: "dcMint",
     owner: "dcFeePayer",
   }),
   ataResolver({
-    instruction: "updateIotInfoV0",
-    account: "ownerDcAta",
+    instruction: "onboardIotHotspotV0",
+    account: "payerDcAta",
     mint: "dcMint",
-    owner: "hotspotOwner",
+    owner: "payer",
   }),
   subDaoEpochInfoResolver
 );

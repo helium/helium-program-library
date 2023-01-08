@@ -1,6 +1,6 @@
 import {
-  hotspotConfigKey,
-  hotspotIssuerKey,
+  rewardableEntityConfigKey,
+  makerKey,
   init as initHem,
 } from "@helium/helium-entity-manager-sdk";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
@@ -43,7 +43,13 @@ const yarg = yargs(hideBin(process.argv)).options({
     alias: "n",
     type: "string",
     required: true,
-    describe: "The name of the hotspot config",
+    describe: "The name of the maker",
+  },
+  symbol: {
+    alias: "s",
+    type: "string",
+    required: true,
+    describe:" The symbol of the entity config"
   },
   councilKeypair: {
     type: "string",
@@ -63,50 +69,63 @@ async function run() {
   const councilKeypair = await loadKeypair(argv.councilKeypair);
 
   const name = argv.name;
+  const symbol = argv.symbol
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hemProgram = await initHem(provider);
-  const makerKey = new PublicKey(Address.fromB58(argv.makerKey).publicKey);
+  const makerAuthority = new PublicKey(Address.fromB58(argv.makerKey).publicKey);
   console.log(
     `Using maker with helium addr: ${
       argv.makerKey
-    }, solana addr: ${makerKey.toBase58()}`
+    }, solana addr: ${makerAuthority.toBase58()}`
   );
 
   const conn = provider.connection;
 
   const subdaoMint = new PublicKey(argv.subdaoMint);
   const subdao = (await subDaoKey(subdaoMint))[0];
-  const hsConfigKey = (await hotspotConfigKey(subdao, name.toUpperCase()))[0];
+  const entityConfigKey = (await rewardableEntityConfigKey(subdao, symbol.toUpperCase()))[0];
 
-  const hsIssuerKey = await hotspotIssuerKey(hsConfigKey, makerKey)[0];
+  const maker = await makerKey(name)[0];
 
-  // console.log("Issuer: ", await hemProgram.account.hotspotIssuerV0.fetch(hsIssuerKey));
-  if (!(await exists(conn, hsIssuerKey))) {
-    console.log("Initalizing HotspotIssuer");
+  // console.log("Issuer: ", await hemProgram.account.makerV0.fetch(makerKey));
+  if (!(await exists(conn, maker))) {
+    console.log("Initalizing Maker");
 
-    const authority = (await hemProgram.account.hotspotConfigV0.fetch(hsConfigKey)).authority;
+    const authority = (await hemProgram.account.rewardableEntityConfigV0.fetch(entityConfigKey)).authority;
     console.log("Auth is", authority);
-    const { instruction } = await hemProgram.methods
-      .initializeHotspotIssuerV0({
-        maker: makerKey,
-        authority,
+    const create = await hemProgram.methods
+      .initializeMakerV0({
+        name,
+        metadataUrl: "todo",
+        authority: makerAuthority,
+        maxDepth: 26,
+        maxBufferSize: 1024,
       })
       .accounts({
-        hotspotConfig: hsConfigKey,
-        authority
+        maker
       })
-      .prepare();
+      .instruction();
+
+    const approve = await hemProgram.methods
+      .approveMakerV0()
+      .accounts({
+        maker,
+        rewardableEntityConfig: entityConfigKey,
+        authority,
+      })
+      .instruction();
 
     await sendInstructionsOrCreateProposal({
       provider,
-      instructions: [instruction],
+      instructions: [
+        create,
+        approve,
+      ],
       walletSigner: wallet,
       signers: [],
       govProgramId,
-      proposalName: `Create Maker ${
-        argv.makerKey
-      }, solana addr: ${makerKey.toBase58()}`,
+      proposalName: `Create Maker ${name}, ${argv.makerKey}`,
       votingMint: councilKeypair.publicKey,
     });
   }

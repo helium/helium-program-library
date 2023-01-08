@@ -1,210 +1,182 @@
-use anchor_lang::{prelude::*, solana_program};
-use mpl_token_metadata::state::{
-  Collection as MplCollection, CollectionDetails as MplCollectionDetails,
+use anchor_lang::{
+  prelude::*,
+  solana_program::{keccak, self}
 };
+use anchor_spl::metadata::CreateMetadataAccountsV3;
+use mpl_token_metadata::{state::{CollectionDetails, DataV2}, ID};
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+#[derive(AnchorSerialize, AnchorDeserialize, PartialEq, Eq, Debug, Clone)]
+pub enum TokenProgramVersion {
+  Original,
+  Token2022,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, PartialEq, Eq, Debug, Clone)]
+pub struct Creator {
+  pub address: Pubkey,
+  pub verified: bool,
+  // In percentages, NOT basis points ;) Watch out!
+  pub share: u8,
+}
+
+impl Creator {
+  pub fn adapt(&self) -> mpl_token_metadata::state::Creator {
+    mpl_token_metadata::state::Creator {
+      address: self.address,
+      verified: self.verified,
+      share: self.share,
+    }
+  }
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, PartialEq, Eq, Debug, Clone)]
+pub enum TokenStandard {
+  NonFungible,        // This is a master edition
+  FungibleAsset,      // A token with metadata that can also have attrributes
+  Fungible,           // A token with simple metadata
+  NonFungibleEdition, // This is a limited edition
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, PartialEq, Eq, Debug, Clone)]
+pub enum UseMethod {
+  Burn,
+  Multiple,
+  Single,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, PartialEq, Eq, Debug, Clone)]
+pub struct Uses {
+  // 17 bytes + Option byte
+  pub use_method: UseMethod, //1
+  pub remaining: u64,        //8
+  pub total: u64,            //8
+}
+
+impl Uses {
+  pub fn adapt(&self) -> mpl_token_metadata::state::Uses {
+    mpl_token_metadata::state::Uses {
+      use_method: match self.use_method {
+        UseMethod::Burn => mpl_token_metadata::state::UseMethod::Burn,
+        UseMethod::Multiple => mpl_token_metadata::state::UseMethod::Multiple,
+        UseMethod::Single => mpl_token_metadata::state::UseMethod::Single,
+      },
+      remaining: self.remaining,
+      total: self.total,
+    }
+  }
+}
+
+#[repr(C)]
+#[derive(AnchorSerialize, AnchorDeserialize, PartialEq, Eq, Debug, Clone)]
 pub struct Collection {
   pub verified: bool,
   pub key: Pubkey,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub enum CollectionDetails {
-  V1 { size: u64 },
+impl Collection {
+  pub fn adapt(&self) -> mpl_token_metadata::state::Collection {
+    mpl_token_metadata::state::Collection {
+      verified: self.verified,
+      key: self.key,
+    }
+  }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct CreateMetadataAccountArgs {
+#[derive(AnchorSerialize, AnchorDeserialize, PartialEq, Eq, Debug, Clone)]
+pub struct MetadataArgs {
   /// The name of the asset
   pub name: String,
   /// The symbol for the asset
   pub symbol: String,
   /// URI pointing to JSON representing the asset
   pub uri: String,
+  /// Royalty basis points that goes to creators in secondary sales (0-10000)
+  pub seller_fee_basis_points: u16,
+  // Immutable, once flipped, all sales of this metadata are considered secondary.
+  pub primary_sale_happened: bool,
+  // Whether or not the data struct is mutable, default is not
+  pub is_mutable: bool,
+  /// nonce for easy calculation of editions, if present
+  pub edition_nonce: Option<u8>,
+  /// Since we cannot easily change Metadata, we add the new DataV2 fields here at the end.
+  pub token_standard: Option<TokenStandard>,
+  /// Collection
   pub collection: Option<Collection>,
-  pub collection_details: Option<CollectionDetails>,
+  /// Uses
+  pub uses: Option<Uses>,
+  pub token_program_version: TokenProgramVersion,
+  pub creators: Vec<Creator>,
 }
 
-#[derive(Accounts)]
-pub struct CreateMetadataAccount<'info> {
-  /// CHECK: Checked with cpi
-  pub metadata_account: AccountInfo<'info>,
-  /// CHECK: Checked with cpi  
-  pub mint: AccountInfo<'info>,
-  /// CHECK: Checked with cpi  
-  pub mint_authority: AccountInfo<'info>,
-  /// CHECK: Checked with cpi  
-  pub payer: AccountInfo<'info>,
-  /// CHECK: Checked with cpi  
-  pub update_authority: AccountInfo<'info>,
-  /// CHECK: Checked with cpi
-  pub system_program: AccountInfo<'info>,
-  /// CHECK: Checked with cpi
-  pub rent: AccountInfo<'info>,
-}
-
-pub fn create_metadata_account_v3<'a, 'b, 'c, 'info>(
-  ctx: CpiContext<'a, 'b, 'c, 'info, CreateMetadataAccount<'info>>,
-  args: CreateMetadataAccountArgs,
-) -> Result<()> {
-  let collection: Option<MplCollection> = args.collection.map(|c| MplCollection {
-    key: c.key,
-    verified: c.verified,
-  });
-
-  let collection_details: Option<MplCollectionDetails> = match args.collection_details {
-    Some(cd) => match cd {
-      CollectionDetails::V1 { size: s } => Some(MplCollectionDetails::V1 { size: s }),
-    },
-    None => None,
-  };
-
-  let ix = mpl_token_metadata::instruction::create_metadata_accounts_v3(
-    mpl_token_metadata::ID,
-    *ctx.accounts.metadata_account.key,
-    *ctx.accounts.mint.key,
-    *ctx.accounts.mint_authority.key,
-    *ctx.accounts.payer.key,
-    *ctx.accounts.update_authority.key,
-    args.name,
-    args.symbol,
-    args.uri,
-    None,
-    0,
-    true,
-    true,
-    collection,
-    None,
-    collection_details,
-  );
-
-  solana_program::program::invoke_signed(
-    &ix,
-    &[
-      ctx.accounts.metadata_account.clone(),
-      ctx.accounts.mint.clone(),
-      ctx.accounts.mint_authority.clone(),
-      ctx.accounts.payer.clone(),
-      ctx.accounts.update_authority.clone(),
-      ctx.program.clone(),
-      ctx.accounts.system_program.clone(),
-      ctx.accounts.rent.clone(),
-    ],
-    ctx.signer_seeds,
+pub fn hash_creators(creators: &[Creator]) -> Result<[u8; 32]> {
+  // Convert creator Vec to bytes Vec.
+  let creator_data = creators
+    .iter()
+    .map(|c| [c.address.as_ref(), &[c.verified as u8], &[c.share]].concat())
+    .collect::<Vec<_>>();
+  // Calculate new creator hash.
+  Ok(
+    keccak::hashv(
+      creator_data
+        .iter()
+        .map(|c| c.as_slice())
+        .collect::<Vec<&[u8]>>()
+        .as_ref(),
+    )
+    .to_bytes(),
   )
-  .map_err(|e| e.into())
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct CreateMasterEditionArgs {
-  pub max_supply: Option<u64>,
-}
-
-#[derive(Accounts)]
-pub struct CreateMasterEdition<'info> {
-  /// CHECK: Checked with cpi  
-  pub edition: AccountInfo<'info>,
-  /// CHECK: Checked with cpi  
-  pub mint: AccountInfo<'info>,
-  /// CHECK: Checked with cpi  
-  pub update_authority: AccountInfo<'info>,
-  /// CHECK: Checked with cpi  
-  pub mint_authority: AccountInfo<'info>,
-  /// CHECK: Checked with cpi  
-  pub metadata: AccountInfo<'info>,
-  /// CHECK: Checked with cpi  
-  pub payer: AccountInfo<'info>,
-  /// CHECK: Checked with cpi
-  pub system_program: AccountInfo<'info>,
-  /// CHECK: Checked with cpi
-  pub token_program: AccountInfo<'info>,
-  /// CHECK: Checked with cpi
-  pub rent: AccountInfo<'info>,
-}
-
-pub fn create_master_edition_v3<'a, 'b, 'c, 'info>(
-  ctx: CpiContext<'a, 'b, 'c, 'info, CreateMasterEdition<'info>>,
-  args: CreateMasterEditionArgs,
-) -> Result<()> {
-  let ix = mpl_token_metadata::instruction::create_master_edition_v3(
-    mpl_token_metadata::ID,
-    *ctx.accounts.edition.key,
-    *ctx.accounts.mint.key,
-    *ctx.accounts.update_authority.key,
-    *ctx.accounts.mint_authority.key,
-    *ctx.accounts.metadata.key,
-    *ctx.accounts.payer.key,
-    args.max_supply,
-  );
-
-  solana_program::program::invoke_signed(
-    &ix,
-    &[
-      ctx.accounts.edition.clone(),
-      ctx.accounts.mint.clone(),
-      ctx.accounts.update_authority.clone(),
-      ctx.accounts.mint_authority.clone(),
-      ctx.accounts.payer.clone(),
-      ctx.accounts.metadata.clone(),
-      ctx.program.clone(),
-      ctx.accounts.token_program.clone(),
-      ctx.accounts.system_program.clone(),
-      ctx.accounts.rent.clone(),
-    ],
-    ctx.signer_seeds,
+pub fn hash_metadata(metadata: &MetadataArgs) -> Result<[u8; 32]> {
+  let metadata_args_hash = keccak::hashv(&[metadata.try_to_vec()?.as_slice()]);
+  // Calculate new data hash.
+  Ok(
+    keccak::hashv(&[
+      &metadata_args_hash.to_bytes(),
+      &metadata.seller_fee_basis_points.to_le_bytes(),
+    ])
+    .to_bytes(),
   )
-  .map_err(|e| e.into())
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct VerifySizedCollectionItemArgs {
-  pub collection_authority_record: Option<Pubkey>,
-}
-
-#[derive(Accounts)]
-pub struct VerifySizedCollectionItem<'info> {
-  /// CHECK: Checked with cpi  
-  pub metadata: AccountInfo<'info>,
-  /// CHECK: Checked with cpi    
-  pub collection_authority: AccountInfo<'info>,
-  /// CHECK: Checked with cpi    
-  pub payer: AccountInfo<'info>,
-  /// CHECK: Checked with cpi    
-  pub collection_mint: AccountInfo<'info>,
-  /// CHECK: Checked with cpi    
-  pub collection_metadata: AccountInfo<'info>,
-  /// CHECK: Checked with cpi    
-  pub collection_master_edition_account: AccountInfo<'info>,
-}
-
-pub fn verify_sized_collection_item<'a, 'b, 'c, 'info>(
-  ctx: CpiContext<'a, 'b, 'c, 'info, VerifySizedCollectionItem<'info>>,
-  args: VerifySizedCollectionItemArgs,
+pub fn create_metadata_accounts_v3<'info>(
+    ctx: CpiContext<'_, '_, '_, 'info, CreateMetadataAccountsV3<'info>>,
+    data: DataV2,
+    is_mutable: bool,
+    update_authority_is_signer: bool,
+    details: Option<CollectionDetails>,
 ) -> Result<()> {
-  let ix = mpl_token_metadata::instruction::verify_sized_collection_item(
-    mpl_token_metadata::ID,
-    *ctx.accounts.metadata.key,
-    *ctx.accounts.collection_authority.key,
-    *ctx.accounts.payer.key,
-    *ctx.accounts.collection_mint.key,
-    *ctx.accounts.collection_metadata.key,
-    *ctx.accounts.collection_master_edition_account.key,
-    args.collection_authority_record,
-  );
-
-  solana_program::program::invoke_signed(
-    &ix,
-    &[
-      ctx.accounts.metadata.clone(),
-      ctx.accounts.collection_authority.clone(),
-      ctx.accounts.payer.clone(),
-      ctx.accounts.collection_mint.clone(),
-      ctx.accounts.collection_metadata.clone(),
-      ctx.accounts.collection_master_edition_account.clone(),
-      ctx.program.clone(),
-    ],
-    ctx.signer_seeds,
-  )
-  .map_err(|e| e.into())
+    let DataV2 {
+        name,
+        symbol,
+        uri,
+        creators,
+        seller_fee_basis_points,
+        collection,
+        uses,
+    } = data;
+    let ix = mpl_token_metadata::instruction::create_metadata_accounts_v3(
+        ID,
+        *ctx.accounts.metadata.key,
+        *ctx.accounts.mint.key,
+        *ctx.accounts.mint_authority.key,
+        *ctx.accounts.payer.key,
+        *ctx.accounts.update_authority.key,
+        name,
+        symbol,
+        uri,
+        creators,
+        seller_fee_basis_points,
+        update_authority_is_signer,
+        is_mutable,
+        collection,
+        uses,
+        details,
+    );
+    solana_program::program::invoke_signed(
+        &ix,
+        &ToAccountInfos::to_account_infos(&ctx),
+        ctx.signer_seeds,
+    )
+    .map_err(Into::into)
 }

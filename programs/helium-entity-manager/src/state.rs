@@ -2,16 +2,13 @@ use anchor_lang::prelude::*;
 
 #[account]
 #[derive(Default)]
-pub struct HotspotConfigV0 {
-  pub collection: Pubkey, // The metaplex collection to be issued
+pub struct RewardableEntityConfigV0 {
   pub authority: Pubkey,
   pub symbol: String,
   pub sub_dao: Pubkey,
-  pub merkle_tree: Pubkey,
   pub settings: ConfigSettingsV0,
 
   pub bump_seed: u8,
-  pub collection_bump_seed: u8,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
@@ -22,6 +19,10 @@ pub enum ConfigSettingsV0 {
     full_location_staking_fee: u64,
     dataonly_location_staking_fee: u64,
   },
+  MobileConfig {
+    full_location_staking_fee: u64,
+    dataonly_location_staking_fee: u64,
+  }
 }
 
 impl Default for ConfigSettingsV0 {
@@ -37,17 +38,41 @@ impl Default for ConfigSettingsV0 {
 
 #[account]
 #[derive(Default)]
-pub struct HotspotIssuerV0 {
-  pub count: u64,             // Track count of issuer
-  pub maker: Pubkey,          // Maker issuing these hotspots
-  pub hotspot_config: Pubkey, // The HotspotConfigV0 to be issued
-  pub authority: Pubkey,
+pub struct MakerV0 {
+  pub authority: Pubkey, // Maker issuing these hotspots
+  pub name: String,
+  pub bump_seed: u8,
+  pub collection: Pubkey, // The metaplex collection to be issued
+  pub merkle_tree: Pubkey,
+  pub collection_bump_seed: u8,
+}
+
+#[account]
+#[derive(Default)]
+pub struct MakerApprovalV0 {
+  pub rewardable_entity_config: Pubkey, 
+  pub maker: Pubkey,
   pub bump_seed: u8,
 }
 
 #[account]
 #[derive(Default)]
 pub struct IotHotspotInfoV0 {
+  pub asset: Pubkey,
+  pub hotspot_key: String,
+
+  pub bump_seed: u8,
+
+  pub location: Option<u64>,
+  pub elevation: Option<i32>,
+  pub gain: Option<i32>,
+  pub is_full_hotspot: bool,
+  pub num_location_asserts: u16,
+}
+
+#[account]
+#[derive(Default)]
+pub struct MobileHotspotInfoV0 {
   pub asset: Pubkey,
   pub hotspot_key: String,
 

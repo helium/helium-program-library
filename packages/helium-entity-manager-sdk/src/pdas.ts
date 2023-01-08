@@ -4,14 +4,14 @@ import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mp
 import sha256 from "crypto-js/sha256";
 import hex from "crypto-js/enc-hex";
 
-export const hotspotConfigKey = (
+export const rewardableEntityConfigKey = (
   subDao: PublicKey,
   symbol: string,
   programId: PublicKey = PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
     [
-      Buffer.from("hotspot_config", "utf-8"),
+      Buffer.from("rewardable_entity_config", "utf-8"),
       subDao.toBuffer(),
       Buffer.from(symbol, "utf-8"),
     ],
@@ -19,31 +19,28 @@ export const hotspotConfigKey = (
   );
 
 export const hotspotCollectionKey = (
-  subDao: PublicKey,
-  symbol: string,
-  programId: PublicKey = PROGRAM_ID
-) =>
-  PublicKey.findProgramAddressSync(
-    [Buffer.from("collection", "utf-8"), subDao.toBuffer(), Buffer.from(symbol, "utf-8")],
-    programId
-  );
-
-export const hotspotIssuerKey = (
-  hotspotConfig: PublicKey,
   maker: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
+    [Buffer.from("collection", "utf-8"), maker.toBuffer()],
+    programId
+  );
+
+export const makerKey = (
+  name: String,
+  programId: PublicKey = PROGRAM_ID
+) =>
+  PublicKey.findProgramAddressSync(
     [
-      Buffer.from("hotspot_issuer", "utf-8"),
-      hotspotConfig.toBuffer(),
-      maker.toBuffer(),
+      Buffer.from("maker", "utf-8"),
+      Buffer.from(name, "utf-8"),
     ],
     programId
   );
 
 export const iotInfoKey = (
-  hotspotConfig: PublicKey,
+  rewardableEntityConfig: PublicKey,
   hotspotKey: string,
   programId: PublicKey = PROGRAM_ID
 ) => {
@@ -51,7 +48,7 @@ export const iotInfoKey = (
   let seed = Uint8Array.from(Buffer.from(hexString, "hex"));
 
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("iot_info", "utf-8"), hotspotConfig.toBuffer(), seed],
+    [Buffer.from("iot_info", "utf-8"), rewardableEntityConfig.toBuffer(), seed],
     programId
   );
 };

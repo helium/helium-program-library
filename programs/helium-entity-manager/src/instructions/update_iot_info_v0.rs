@@ -4,6 +4,7 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
 };
+use anchor_lang::solana_program::hash::hash;
 use data_credits::{
   cpi::{
     accounts::{BurnCommonV0, BurnWithoutTrackingV0},
@@ -44,6 +45,7 @@ impl ConfigSettingsV0 {
 #[derive(Accounts)]
 #[instruction(args: UpdateIotInfoArgsV0)]
 pub struct UpdateIotInfoV0<'info> {
+  pub payer: Signer<'info>,
   #[account(
     mut,
     constraint = info.asset == get_asset_id(&merkle_tree.key(), u64::try_from(args.index).unwrap())
@@ -67,11 +69,10 @@ pub struct UpdateIotInfoV0<'info> {
   pub owner_dc_ata: Box<Account<'info, TokenAccount>>,
 
   #[account(
-    has_one = merkle_tree,
     has_one = sub_dao,
-    constraint = hotspot_config.settings.is_valid(args)
+    constraint = rewardable_entity_config.settings.is_valid(args)
   )]
-  pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
+  pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
   #[account(
     has_one = dc_mint
   )]
@@ -144,7 +145,7 @@ pub fn handler<'info>(
       dataonly_location_staking_fee,
       ..
     },
-  ) = (args.location, ctx.accounts.hotspot_config.settings)
+  ) = (args.location, ctx.accounts.rewardable_entity_config.settings)
   {
     let mut dc_fee: u64 = dataonly_location_staking_fee;
     if ctx.accounts.info.is_full_hotspot {

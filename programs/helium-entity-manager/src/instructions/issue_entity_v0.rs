@@ -1,70 +1,65 @@
 use std::cmp::min;
 
-use crate::error::ErrorCode;
+use crate::{error::ErrorCode, constants::IOT_METADATA_URL};
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
-use anchor_spl::token::Mint;
+use anchor_spl::{
+  token::{Mint},
+};
 use angry_purple_tiger::AnimalName;
-use mpl_bubblegum::state::metaplex_adapter::TokenStandard;
-use mpl_bubblegum::state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion};
-use mpl_bubblegum::utils::get_asset_id;
+use mpl_bubblegum::state::{metaplex_adapter::TokenStandard, TreeConfig};
 use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
   program::Bubblegum,
-  state::TreeConfig,
+};
+use mpl_bubblegum::{
+  state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion},
+  utils::get_asset_id,
 };
 use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct GenesisIssueHotspotArgsV0 {
-  pub hotspot_key: String,
-  pub location: Option<u64>,
-  pub elevation: Option<i32>,
-  pub gain: Option<i32>,
-  pub is_full_hotspot: bool,
-  pub num_location_asserts: u16,
+pub struct IssueEntityArgsV0 {
+  pub entity_key: String,
 }
 
 #[derive(Accounts)]
-#[instruction(args: GenesisIssueHotspotArgsV0)]
-pub struct GenesisIssueHotspotV0<'info> {
-  #[account(
-    mut,
-    seeds = [b"lazy_signer", b"testhelium10"],
-    seeds::program = lazy_transactions::ID,
-    bump,
-  )]
-  pub lazy_signer: Signer<'info>,
+#[instruction(args: IssueEntityArgsV0)]
+pub struct IssueEntityV0<'info> {
+  #[account(mut)]
+  pub payer: Signer<'info>,
+  pub dc_fee_payer: Signer<'info>,
+  pub authority: Signer<'info>,
   pub collection: Box<Account<'info, Mint>>,
   /// CHECK: Handled by cpi
-  #[account(mut)]
+  #[account(
+    mut,
+    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), collection.key().as_ref()],
+    seeds::program = token_metadata_program.key(),
+    bump,
+  )]
   pub collection_metadata: UncheckedAccount<'info>,
-  /// CHECK: Handled by cpi
+  /// CHECK: Handled By cpi account
+  #[account(
+    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), collection.key().as_ref(), "edition".as_bytes()],
+    seeds::program = token_metadata_program.key(),
+    bump,
+  )]
   pub collection_master_edition: UncheckedAccount<'info>,
   #[account(
+    mut,
+    has_one = authority,
     has_one = collection,
-    has_one = merkle_tree
+    has_one = merkle_tree,
   )]
   pub maker: Box<Account<'info, MakerV0>>,
-  /// CHECK: We trust the lazy signer, don't need to verify this account, it's just used in the seeds of iot info.
-  /// Not passing it as an arg because lookup table will compress this to 1 byte.
-  pub rewardable_entity_config: UncheckedAccount<'info>,
   #[account(
-    init,
-    payer = lazy_signer,
-    space = 8 + 60 + std::mem::size_of::<IotHotspotInfoV0>(),
-    seeds = [
-      "iot_info".as_bytes(),
-      rewardable_entity_config.key().as_ref(),
-      &hash(args.hotspot_key.as_bytes()).to_bytes()
-    ],
-    bump
+      mut,
+      seeds = [merkle_tree.key().as_ref()],
+      seeds::program = bubblegum_program.key(),
+      bump,
   )]
-  pub info: Box<Account<'info, IotHotspotInfoV0>>,
-  /// CHECK: Handled by cpi
-  #[account(mut)]
-  pub tree_authority: Account<'info, TreeConfig>,
+  pub tree_authority: Box<Account<'info, TreeConfig>>,
   /// CHECK: Used in cpi
   pub recipient: AccountInfo<'info>,
   /// CHECK: Used in cpi
@@ -87,14 +82,14 @@ pub struct GenesisIssueHotspotV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-impl<'info> GenesisIssueHotspotV0<'info> {
+impl<'info> IssueEntityV0<'info> {
   fn mint_to_collection_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintToCollectionV1<'info>> {
     let cpi_accounts = MintToCollectionV1 {
       tree_authority: self.tree_authority.to_account_info(),
       leaf_delegate: self.recipient.to_account_info(),
       leaf_owner: self.recipient.to_account_info(),
       merkle_tree: self.merkle_tree.to_account_info(),
-      payer: self.lazy_signer.to_account_info(),
+      payer: self.payer.to_account_info(),
       tree_delegate: self.maker.to_account_info(),
       log_wrapper: self.log_wrapper.to_account_info(),
       compression_program: self.compression_program.to_account_info(),
@@ -109,17 +104,15 @@ impl<'info> GenesisIssueHotspotV0<'info> {
     };
     CpiContext::new(self.bubblegum_program.to_account_info(), cpi_accounts)
   }
+
 }
 
-pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArgsV0) -> Result<()> {
-  let asset_id = get_asset_id(
-    &ctx.accounts.merkle_tree.key(),
-    ctx.accounts.tree_authority.num_minted,
-  );
+pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<()> {
   let animal_name: AnimalName = args
-    .hotspot_key
+    .entity_key
     .parse()
     .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
+
 
   let maker_seeds: &[&[&[u8]]] = &[&[
     b"maker",
@@ -132,8 +125,9 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
     uri: format!(
-      "https://iot-metadata.oracle.test-helium.com/{}",
-      args.hotspot_key
+      "{}/{}",
+      IOT_METADATA_URL,
+      args.entity_key
     ),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
@@ -155,17 +149,6 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
       .with_signer(maker_seeds),
     metadata,
   )?;
-
-  ctx.accounts.info.set_inner(IotHotspotInfoV0 {
-    asset: asset_id,
-    hotspot_key: args.hotspot_key,
-    location: args.location,
-    bump_seed: ctx.bumps["info"],
-    elevation: args.elevation,
-    gain: args.gain,
-    is_full_hotspot: args.is_full_hotspot,
-    num_location_asserts: args.num_location_asserts,
-  });
 
   Ok(())
 }

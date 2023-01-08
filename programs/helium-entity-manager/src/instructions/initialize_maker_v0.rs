@@ -1,53 +1,53 @@
 use crate::error::ErrorCode;
 use crate::state::*;
-use crate::token_metadata::{
-  create_master_edition_v3, create_metadata_account_v3, CollectionDetails, CreateMasterEdition,
-  CreateMasterEditionArgs, CreateMetadataAccount, CreateMetadataAccountArgs,
+use anchor_spl::metadata::{
+  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
 };
+use crate::token_metadata::create_metadata_accounts_v3;
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use helium_sub_daos::SubDaoV0;
 use mpl_bubblegum::{
   cpi::{accounts::CreateTree, create_tree},
   program::Bubblegum,
 };
+use mpl_token_metadata::state::DataV2;
 use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct InitializeHotspotConfigArgsV0 {
+pub struct InitializeMakerArgsV0 {
+  pub authority: Pubkey,
   pub name: String,
-  pub symbol: String,
   pub metadata_url: String,
-  pub settings: ConfigSettingsV0,
   pub max_depth: u32,
   pub max_buffer_size: u32,
 }
 
 #[derive(Accounts)]
-#[instruction(args: InitializeHotspotConfigArgsV0)]
-pub struct InitializeHotspotConfigV0<'info> {
+#[instruction(args: InitializeMakerArgsV0)]
+pub struct InitializeMakerV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
     init,
     payer = payer,
+    space = 60 + std::mem::size_of::<MakerV0>(),
+    seeds = ["maker".as_bytes(), args.name.as_bytes()],
+    bump,
+  )]
+  pub maker: Box<Account<'info, MakerV0>>,
+  #[account(
+    init,
+    payer = payer,
     mint::decimals = 0,
-    mint::authority = hotspot_config,
-    mint::freeze_authority = hotspot_config,
-    seeds = ["collection".as_bytes(), sub_dao.key().as_ref(), args.symbol.as_bytes()],
+    mint::authority = maker,
+    mint::freeze_authority = maker,
+    seeds = ["collection".as_bytes(), maker.key().as_ref()],
     bump
   )]
   pub collection: Box<Account<'info, Mint>>,
-
-  #[account(
-    has_one = authority
-  )]
-  pub sub_dao: Box<Account<'info, SubDaoV0>>,
-  pub authority: Signer<'info>,
-
   /// CHECK: Handled by cpi
   #[account(
     mut,
@@ -68,17 +68,9 @@ pub struct InitializeHotspotConfigV0<'info> {
     init_if_needed,
     payer = payer,
     associated_token::mint = collection,
-    associated_token::authority = hotspot_config,
+    associated_token::authority = maker,
   )]
   pub token_account: Box<Account<'info, TokenAccount>>,
-  #[account(
-    init,
-    payer = payer,
-    space = 60 + std::mem::size_of::<HotspotConfigV0>(),
-    seeds = ["hotspot_config".as_bytes(), sub_dao.key().as_ref(), args.symbol.as_bytes()],
-    bump,
-  )]
-  pub hotspot_config: Box<Account<'info, HotspotConfigV0>>,
 
   #[account(
     mut,
@@ -105,68 +97,72 @@ pub struct InitializeHotspotConfigV0<'info> {
   pub rent: Sysvar<'info, Rent>,
 }
 
-impl<'info> InitializeHotspotConfigV0<'info> {
+
+impl<'info> InitializeMakerV0<'info> {
   fn mint_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintTo<'info>> {
     let cpi_accounts = MintTo {
       mint: self.collection.to_account_info(),
       to: self.token_account.to_account_info(),
-      authority: self.hotspot_config.to_account_info(),
+      authority: self.maker.to_account_info(),
     };
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 }
 
 pub fn handler(
-  ctx: Context<InitializeHotspotConfigV0>,
-  args: InitializeHotspotConfigArgsV0,
+  ctx: Context<InitializeMakerV0>,
+  args: InitializeMakerArgsV0,
 ) -> Result<()> {
   require!(args.name.len() <= 32, ErrorCode::InvalidStringLength);
-  require!(args.symbol.len() <= 10, ErrorCode::InvalidStringLength);
   require!(
     args.metadata_url.len() <= 200,
     ErrorCode::InvalidStringLength
   );
 
   let signer_seeds: &[&[&[u8]]] = &[&[
-    b"hotspot_config",
-    ctx.accounts.sub_dao.to_account_info().key.as_ref(),
-    args.symbol.as_bytes(),
-    &[ctx.bumps["hotspot_config"]],
+    b"maker",
+    args.name.as_bytes(),
+    &[ctx.bumps["maker"]],
   ]];
 
   token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
 
-  create_metadata_account_v3(
+  create_metadata_accounts_v3(
     CpiContext::new_with_signer(
       ctx.accounts.token_metadata_program.clone(),
-      CreateMetadataAccount {
-        metadata_account: ctx.accounts.metadata.to_account_info().clone(),
+      CreateMetadataAccountsV3 {
+        metadata: ctx.accounts.metadata.to_account_info().clone(),
         mint: ctx.accounts.collection.to_account_info().clone(),
-        mint_authority: ctx.accounts.hotspot_config.to_account_info().clone(),
+        mint_authority: ctx.accounts.maker.to_account_info().clone(),
         payer: ctx.accounts.payer.to_account_info().clone(),
-        update_authority: ctx.accounts.hotspot_config.to_account_info().clone(),
+        update_authority: ctx.accounts.maker.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
         rent: ctx.accounts.rent.to_account_info().clone(),
       },
       signer_seeds,
     ),
-    CreateMetadataAccountArgs {
-      name: args.name,
-      symbol: args.symbol.clone(),
-      uri: args.metadata_url,
+    DataV2 {
+      name: args.name.clone(), 
+      symbol: "MAKER".to_string(), 
+      uri: args.metadata_url, 
+      seller_fee_basis_points: 0, 
+      creators: None, 
       collection: None,
-      collection_details: Some(CollectionDetails::V1 { size: 0 }),
+      uses: None
     },
+    true,
+    true,
+    None
   )?;
 
   create_master_edition_v3(
     CpiContext::new_with_signer(
       ctx.accounts.token_metadata_program.clone(),
-      CreateMasterEdition {
+      CreateMasterEditionV3 {
         edition: ctx.accounts.master_edition.to_account_info().clone(),
         mint: ctx.accounts.collection.to_account_info().clone(),
-        update_authority: ctx.accounts.hotspot_config.to_account_info().clone(),
-        mint_authority: ctx.accounts.hotspot_config.to_account_info().clone(),
+        update_authority: ctx.accounts.maker.to_account_info().clone(),
+        mint_authority: ctx.accounts.maker.to_account_info().clone(),
         metadata: ctx.accounts.metadata.to_account_info().clone(),
         payer: ctx.accounts.payer.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
@@ -175,9 +171,7 @@ pub fn handler(
       },
       signer_seeds,
     ),
-    CreateMasterEditionArgs {
-      max_supply: Some(0),
-    },
+    Some(0)
   )?;
 
   create_tree(
@@ -187,7 +181,7 @@ pub fn handler(
         tree_authority: ctx.accounts.tree_authority.to_account_info().clone(),
         merkle_tree: ctx.accounts.merkle_tree.to_account_info().clone(),
         payer: ctx.accounts.payer.to_account_info().clone(),
-        tree_creator: ctx.accounts.hotspot_config.to_account_info().clone(),
+        tree_creator: ctx.accounts.maker.to_account_info().clone(),
         log_wrapper: ctx.accounts.log_wrapper.to_account_info().clone(),
         compression_program: ctx.accounts.compression_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
@@ -198,16 +192,13 @@ pub fn handler(
     args.max_buffer_size,
     None,
   )?;
-
-  ctx.accounts.hotspot_config.set_inner(HotspotConfigV0 {
-    sub_dao: ctx.accounts.sub_dao.key(),
-    symbol: args.symbol.clone(),
+  ctx.accounts.maker.set_inner(MakerV0 {
+    name: args.name,
+    authority: args.authority,
     collection: ctx.accounts.collection.key(),
-    authority: ctx.accounts.authority.key(),
-    bump_seed: ctx.bumps["hotspot_config"],
-    collection_bump_seed: ctx.bumps["collection"],
     merkle_tree: ctx.accounts.merkle_tree.key(),
-    settings: args.settings,
+    bump_seed: ctx.bumps["maker"],
+    collection_bump_seed: ctx.bumps["collection"],
   });
 
   Ok(())

@@ -7,7 +7,7 @@ import { iotInfoKey } from "../pdas";
 
 export async function updateMetadata({
   program,
-  hotspotConfig,
+  rewardableEntityConfig,
   assetId,
   location,
   elevation,
@@ -21,7 +21,7 @@ export async function updateMetadata({
   elevation: number | null;
   gain: number | null;
   assetId: PublicKey;
-  hotspotConfig: PublicKey;
+  rewardableEntityConfig: PublicKey;
   assetEndpoint?: string;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
   getAssetProofFn?: (
@@ -46,7 +46,7 @@ export async function updateMetadata({
   } = asset;
   const eccCompact = uri.split("/").slice(-1)[0];
 
-  const [info] = iotInfoKey(hotspotConfig, eccCompact);
+  const [info] = iotInfoKey(rewardableEntityConfig, eccCompact);
 
   return program.methods
     .updateIotInfoV0({
@@ -59,7 +59,7 @@ export async function updateMetadata({
     })
     .accounts({
       // hotspot: assetId,
-      hotspotConfig,
+      rewardableEntityConfig,
       hotspotOwner: owner,
       info,
       merkleTree: treeId,
