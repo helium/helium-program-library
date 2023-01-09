@@ -23,7 +23,7 @@ pub struct IssueEntityArgsV0 {
 pub struct IssueEntityV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub authority: Signer<'info>,
+  pub issuing_authority: Signer<'info>,
   pub collection: Box<Account<'info, Mint>>,
   /// CHECK: Handled by cpi
   #[account(
@@ -42,7 +42,7 @@ pub struct IssueEntityV0<'info> {
   pub collection_master_edition: UncheckedAccount<'info>,
   #[account(
     mut,
-    has_one = authority,
+    has_one = issuing_authority,
     has_one = collection,
     has_one = merkle_tree,
   )]

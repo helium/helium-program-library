@@ -126,8 +126,8 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
   makers: {
     type: "string",
-    alias: "s",
-    default: "./makers.json",
+    alias: "m",
+    default: "../helium-cli/makers.json",
   },
   progress: {
     type: "boolean",
@@ -199,6 +199,7 @@ async function run() {
   const hotspotPubkeys: Record<
     string,
     {
+      id: string;
       maker: PublicKey;
       makerAuthority: PublicKey;
       collection: PublicKey;
@@ -213,7 +214,8 @@ async function run() {
         const helAddr = Address.fromB58(maker.address);
         const solAddr = new PublicKey(helAddr.publicKey);
         const makerKeyp = makerKey(maker.name)[0];
-        const makerAcc = await hemProgram.account.makerV0.fetch(solAddr);
+
+        const makerAcc = await hemProgram.account.makerV0.fetch(makerKeyp);
         const merkleTree = makerAcc.merkleTree;
 
         return {
@@ -238,7 +240,7 @@ async function run() {
             ],
             TOKEN_METATDATA_PROGRAM_ID
           )[0],
-          treeAuthory: PublicKey.findProgramAddressSync(
+          treeAuthority: PublicKey.findProgramAddressSync(
             [merkleTree.toBuffer()],
             BUBBLEGUM_PROGRAM_ID
           )[0],
@@ -330,6 +332,7 @@ async function run() {
 
   const routers = new Set(Object.keys(state.routers));
 
+  const bobcat = makers.find(maker => maker.name === "Bobcat") // TODO: For testing only until we get maker names
   /// Iterate through accounts in order so we don't create 1mm promises.
   for (const [address, account] of Object.entries(accounts)) {
     const solAddress = toSolana(address);
@@ -368,7 +371,7 @@ async function run() {
       const hotspotIxs = await Promise.all(
         (account.hotspots || []).map(async (hotspot) => {
           totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
-          const makerId = hotspot.maker;
+          const makerId = hotspot.maker || bobcat.address;
           const hotspotPubkeysForMaker = hotspotPubkeys[makerId];
 
           return hemProgramNoResolve.methods
@@ -399,7 +402,7 @@ async function run() {
               compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
               systemProgram: SystemProgram.programId,
               rewardableEntityConfig: iotRewardableEntityConfig,
-              maker: PublicKey.default, // TODO: Fix this!
+              maker: hotspotPubkeysForMaker.maker,
               recipient: solAddress,
               info: iotInfoKey(iotRewardableEntityConfig, hotspot.address)[0],
               lazySigner,
@@ -575,7 +578,7 @@ async function run() {
     queue.enqueue(top.right);
   }
   const addresses = [
-    ...Object.values(hotspotPubkeys).flatMap((v) => Object.values(v)),
+    ...Object.values(hotspotPubkeys).flatMap(({ id, ...rest }) => Object.values(rest)),
     TOKEN_METATDATA_PROGRAM_ID,
     SPL_NOOP_PROGRAM_ID,
     SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
@@ -625,7 +628,7 @@ async function run() {
   await client.query(`
     CREATE TABLE IF NOT EXISTS lookup_tables (
       id INTEGER PRIMARY KEY NOT NULL,
-      pubkey VARCHAR(66) NOT NULL,
+      pubkey VARCHAR(66) NOT NULL
     )
   `);
   await client.query(`
@@ -648,7 +651,7 @@ async function run() {
         )
         VALUES %L
       `,
-    luts.map((lut) => lut.toBase58())
+    luts.map((lut, idx) => [idx, lut.toBase58()])
   );
   await client.query(lutQuery);
 
@@ -687,7 +690,7 @@ async function run() {
         const query = format(
           `
         INSERT INTO transactions(
-          id, wallet, compiled, proof, lookup_table, is_router
+          id, wallet, compiled, proof, is_router
         )
         VALUES %L
       `,
@@ -695,11 +698,11 @@ async function run() {
         );
         await client.query(query);
         progIdx += chunkSize;
-        pgProgress.update(progIdx);
+        pgProgress && pgProgress.update(progIdx);
       }
     })
   );
-  pgProgress.stop();
+  pgProgress && pgProgress.stop();
 
   const ltKey = lazyTransactionsKey(argv.name)[0];
   if (await provider.connection.getAccountInfo(ltKey)) {

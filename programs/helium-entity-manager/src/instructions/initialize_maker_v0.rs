@@ -9,20 +9,14 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use mpl_bubblegum::{
-  cpi::{accounts::CreateTree, create_tree},
-  program::Bubblegum,
-};
 use mpl_token_metadata::state::DataV2;
-use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeMakerArgsV0 {
-  pub authority: Pubkey,
+  pub update_authority: Pubkey,
+  pub issuing_authority: Pubkey,
   pub name: String,
   pub metadata_url: String,
-  pub max_depth: u32,
-  pub max_buffer_size: u32,
 }
 
 #[derive(Accounts)]
@@ -72,27 +66,11 @@ pub struct InitializeMakerV0<'info> {
   )]
   pub token_account: Box<Account<'info, TokenAccount>>,
 
-  #[account(
-    mut,
-    seeds = [merkle_tree.key().as_ref()],
-    bump,
-    seeds::program = bubblegum_program.key()
-  )]
-  /// CHECK: Checked by cpi
-  pub tree_authority: AccountInfo<'info>,
-
-  /// CHECK: Checked by cpi
-  #[account(mut)]
-  pub merkle_tree: UncheckedAccount<'info>,
-
   /// CHECK: Checked with constraints
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
-  pub log_wrapper: Program<'info, Noop>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
-  pub bubblegum_program: Program<'info, Bubblegum>,
-  pub compression_program: Program<'info, SplAccountCompression>,
   pub token_program: Program<'info, Token>,
   pub rent: Sysvar<'info, Rent>,
 }
@@ -166,29 +144,13 @@ pub fn handler(ctx: Context<InitializeMakerV0>, args: InitializeMakerArgsV0) -> 
     Some(0),
   )?;
 
-  create_tree(
-    CpiContext::new_with_signer(
-      ctx.accounts.bubblegum_program.to_account_info().clone(),
-      CreateTree {
-        tree_authority: ctx.accounts.tree_authority.to_account_info().clone(),
-        merkle_tree: ctx.accounts.merkle_tree.to_account_info().clone(),
-        payer: ctx.accounts.payer.to_account_info().clone(),
-        tree_creator: ctx.accounts.maker.to_account_info().clone(),
-        log_wrapper: ctx.accounts.log_wrapper.to_account_info().clone(),
-        compression_program: ctx.accounts.compression_program.to_account_info().clone(),
-        system_program: ctx.accounts.system_program.to_account_info().clone(),
-      },
-      signer_seeds,
-    ),
-    args.max_depth,
-    args.max_buffer_size,
-    None,
-  )?;
   ctx.accounts.maker.set_inner(MakerV0 {
     name: args.name,
-    authority: args.authority,
+    issuing_authority: args.issuing_authority,
+    update_authority: args.update_authority,
     collection: ctx.accounts.collection.key(),
-    merkle_tree: ctx.accounts.merkle_tree.key(),
+    merkle_tree: Pubkey::default(),
+    /// Initialized via set_maker_tree
     bump_seed: ctx.bumps["maker"],
     collection_bump_seed: ctx.bumps["collection"],
   });

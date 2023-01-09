@@ -124,13 +124,19 @@ export const initTestMaker = async (
   const space = getConcurrentMerkleTreeAccountSize(3, 8);
   const name = random(10);
 
-  const method = await program.methods
-    .initializeMakerV0({
-      authority: makerKeypair.publicKey,
-      name,
-      metadataUrl: DEFAULT_METADATA_URL,
+  const maker = makerKey(name)[0];
+  const setTreeMethod = program.methods
+    .setMakerTreeV0({
       maxDepth: 3,
       maxBufferSize: 8,
+    })
+    .accounts({ maker, merkleTree: merkle.publicKey })
+  const method = await program.methods
+    .initializeMakerV0({
+      updateAuthority: makerKeypair.publicKey,
+      issuingAuthority: makerKeypair.publicKey,
+      name,
+      metadataUrl: DEFAULT_METADATA_URL,
     })
     .preInstructions([
       SystemProgram.createAccount({
@@ -142,22 +148,21 @@ export const initTestMaker = async (
         space: space,
         programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
       }),
+      await setTreeMethod.instruction(),
     ])
     .postInstructions([
       await program.methods
         .approveMakerV0()
         .accounts({
           rewardableEntityConfig,
-          maker: makerKey(name)[0],
+          maker,
         })
         .instruction(),
     ])
-    .accounts({
-      merkleTree: merkle.publicKey,
-    })
     .signers([merkle]);
 
-  const { maker, collection, treeAuthority } = await method.pubkeys();
+  const { treeAuthority } = await setTreeMethod.pubkeys();
+  const { collection } = await method.pubkeys();
   await method.rpc({ skipPreflight: true });
 
   return {

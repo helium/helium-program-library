@@ -62,6 +62,10 @@ pub mod helium_entity_manager {
     update_maker_v0::handler(ctx, args)
   }
 
+  pub fn set_maker_tree_v0(ctx: Context<SetMakerTreeV0>, args: SetMakerTreeArgsV0) -> Result<()> {
+    set_maker_tree_v0::handler(ctx, args)
+  }
+
   pub fn update_iot_info_v0<'info>(
     ctx: Context<'_, '_, '_, 'info, UpdateIotInfoV0<'info>>,
     args: UpdateIotInfoArgsV0,

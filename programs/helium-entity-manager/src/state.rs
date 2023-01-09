@@ -39,7 +39,8 @@ impl Default for ConfigSettingsV0 {
 #[account]
 #[derive(Default)]
 pub struct MakerV0 {
-  pub authority: Pubkey, // Maker issuing these hotspots
+  pub update_authority: Pubkey, // 
+  pub issuing_authority: Pubkey, // Maker issuing these hotspots
   pub name: String,
   pub bump_seed: u8,
   pub collection: Pubkey, // The metaplex collection to be issued

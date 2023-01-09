@@ -40,7 +40,7 @@ server.post('/', async (request, reply) => {
     
     // get relevant indices
     const issueInfoIdx = onboardHotspotIx.accounts.findIndex(
-      (x) => x.name === "info"
+      (x) => x.name === "iotInfo"
     )!
     const genesisIssueInfoIdx = genesisIssueIx.accounts.findIndex(
       (x) => x.name === "info"

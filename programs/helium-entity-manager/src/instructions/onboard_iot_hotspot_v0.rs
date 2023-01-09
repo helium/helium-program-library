@@ -43,7 +43,7 @@ pub struct OnboardIotHotspotV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   pub dc_fee_payer: Signer<'info>,
-  pub authority: Signer<'info>,
+  pub issuing_authority: Signer<'info>,
   #[account(
     init,
     payer = payer,
@@ -80,7 +80,7 @@ pub struct OnboardIotHotspotV0<'info> {
   pub maker_approval: Box<Account<'info, MakerApprovalV0>>,
   #[account(
     has_one = merkle_tree,
-    has_one = authority
+    has_one = issuing_authority
   )]
   pub maker: Box<Account<'info, MakerV0>>,
   #[account(

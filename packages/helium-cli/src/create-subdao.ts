@@ -343,6 +343,7 @@ async function run() {
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
+  const me = provider.wallet.publicKey;
   const governance = await PublicKey.findProgramAddressSync(
     [
       Buffer.from("account-governance", "utf-8"),
@@ -514,7 +515,7 @@ async function run() {
     const initSubdaoMethod = await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
         dcBurnAuthority: new PublicKey(argv.dcBurnAuthority),
-        authority: governance,
+        authority: argv.noGovernance ? me : governance,
         emissionSchedule: emissionSchedule(argv.startEpochRewards),
         // Linear curve
         treasuryCurve: {
@@ -608,8 +609,8 @@ async function run() {
         })
         .accounts({
           subDao: subdao,
-          payer: nativeTreasury,
-          authority: governance,
+          payer: argv.noGovernance ? me : nativeTreasury,
+          authority: argv.noGovernance ? me : governance,
         })
         .signers([merkle])
         .instruction()

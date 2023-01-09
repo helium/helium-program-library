@@ -3,7 +3,8 @@ use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateMakerArgsV0 {
-  pub authority: Option<Pubkey>,
+  pub issuing_authority: Option<Pubkey>,
+  pub update_authority: Option<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -11,18 +12,21 @@ pub struct UpdateMakerArgsV0 {
 pub struct UpdateMakerV0<'info> {
   #[account(
     mut,
-    has_one = authority,
+    has_one = update_authority,
   )]
   pub maker: Box<Account<'info, MakerV0>>,
 
-  pub authority: Signer<'info>,
+  pub update_authority: Signer<'info>,
 }
 
 pub fn handler(ctx: Context<UpdateMakerV0>, args: UpdateMakerArgsV0) -> Result<()> {
   let maker = &mut ctx.accounts.maker;
 
-  if args.authority.is_some() {
-    maker.authority = args.authority.unwrap();
+  if args.issuing_authority.is_some() {
+    maker.issuing_authority = args.issuing_authority.unwrap();
+  }
+  if args.update_authority.is_some() {
+    maker.update_authority = args.update_authority.unwrap();
   }
   Ok(())
 }

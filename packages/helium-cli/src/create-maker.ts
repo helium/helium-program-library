@@ -1,16 +1,21 @@
-import {
-  rewardableEntityConfigKey,
-  makerKey,
-  init as initHem,
-} from "@helium/helium-entity-manager-sdk";
-import { subDaoKey } from "@helium/helium-sub-daos-sdk";
-import * as anchor from "@project-serum/anchor";
-import { PublicKey } from "@solana/web3.js";
 import Address from "@helium/address";
+import {
+  init as initHem,
+  makerKey,
+  rewardableEntityConfigKey,
+} from "@helium/helium-entity-manager-sdk";
+import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { humanReadable, sendInstructions, truthy } from "@helium/spl-utils";
+import * as anchor from "@project-serum/anchor";
+import {
+  getConcurrentMerkleTreeAccountSize,
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+} from "@solana/spl-account-compression";
+import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import fs from "fs";
 import os from "os";
 import yargs from "yargs/yargs";
 import { exists, loadKeypair, sendInstructionsOrCreateProposal } from "./utils";
-import fs from "fs";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -51,6 +56,12 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "*Helium* Public Key of a maker",
     required: false,
   },
+  makerCount: {
+    alias: "m",
+    type: "number",
+    describe: "Estimated number of hotspots this maker will have",
+    required: false,
+  },
   symbol: {
     alias: "s",
     type: "string",
@@ -63,6 +74,15 @@ const yarg = yargs(hideBin(process.argv)).options({
     default: "./keypairs/council.json",
   },
 });
+
+// Goal = 3 proof nodes needed
+const merkleSizes = [
+  [3, 8, 0],
+  [5, 8, 2],
+  [14, 64, 11],
+  [20, 64, 17],
+  [24, 64, 17],
+];
 
 async function run() {
   const argv = await yarg.argv;
@@ -81,6 +101,7 @@ async function run() {
     {
       name,
       address: argv.makerKey,
+      count: argv.makerCount || 300000,
     },
   ];
 
@@ -90,6 +111,7 @@ async function run() {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hemProgram = await initHem(provider);
+  const hsdProgram = await initHsd(provider);
   const conn = provider.connection;
 
   const subdaoMint = new PublicKey(argv.subdaoMint);
@@ -98,40 +120,83 @@ async function run() {
     await rewardableEntityConfigKey(subdao, symbol.toUpperCase())
   )[0];
 
+  const subdaoAcc = await hsdProgram.account.subDaoV0.fetch(subdao);
+  const authorityAcc = await provider.connection.getAccountInfo(
+    subdaoAcc.authority
+  );
+  let payer = provider.wallet.publicKey;
+  const isGov = authorityAcc != null && authorityAcc.owner.equals(govProgramId);
+  if (isGov) {
+    const nativeTreasury = await PublicKey.findProgramAddressSync(
+      [Buffer.from("native-treasury", "utf-8"), subdaoAcc.authority.toBuffer()],
+      govProgramId
+    )[0];
+    payer = nativeTreasury;
+  }
+
   const instructions = (
     await Promise.all(
-      makers.map(async ({ name, address }) => {
+      makers.map(async ({ name, address, count }) => {
         const makerAuthority = new PublicKey(
           Address.fromB58(address).publicKey
         );
-
-        console.log(
-          `Creating maker with helium addr: ${address}, solana addr: ${makerAuthority.toBase58()}`
+        const [size, buffer, canopy] = merkleSizes.find(
+          ([height]) => Math.pow(2, height) > count * 2
         );
-
+        const space = getConcurrentMerkleTreeAccountSize(size, buffer, canopy);
         const maker = await makerKey(name)[0];
+        const rent =
+          await provider.connection.getMinimumBalanceForRentExemption(space);
 
-        // console.log("Issuer: ", await hemProgram.account.makerV0.fetch(makerKey));
         if (!(await exists(conn, maker))) {
-          console.log("Initalizing Maker");
+          console.log(
+            `
+            Creating maker with helium addr: ${address}.
+            Solana addr: ${makerAuthority.toBase58()}.
+            Size: ${size}, buffer: ${buffer}, canopy: ${canopy}. 
+            Space: ${space} bytes
+            Cost: ~${humanReadable(new anchor.BN(rent), 8)} Sol
+            `
+          );
+
+          if (space > 10000000) {
+            throw new Error("Space more than 10mb");
+          }
 
           const authority = (
             await hemProgram.account.rewardableEntityConfigV0.fetch(
               entityConfigKey
             )
           ).authority;
-          console.log("Auth is", authority);
+          console.log("Auth is", authority.toBase58());
+          let merkle: Keypair;
+          const merklePath = `./keypairs/merkle-${address}.json`;
+          if (fs.existsSync(merklePath)) {
+            merkle = loadKeypair(merklePath)
+          } else {
+            merkle = Keypair.generate();
+            fs.writeFileSync(merklePath, JSON.stringify(Array.from(merkle.secretKey)))
+          }
+
           const create = await hemProgram.methods
             .initializeMakerV0({
               name,
               metadataUrl: "todo",
-              authority: makerAuthority,
-              maxDepth: 26,
-              maxBufferSize: 1024,
+              issuingAuthority: makerAuthority,
+              updateAuthority: authority
             })
             .accounts({
               maker,
+              payer,
             })
+            .instruction();
+
+          const setTree = await hemProgram.methods
+            .setMakerTreeV0({
+              maxDepth: size,
+              maxBufferSize: buffer,
+            })
+            .accounts({ maker, merkleTree: merkle.publicKey })
             .instruction();
 
           const approve = await hemProgram.methods
@@ -140,24 +205,58 @@ async function run() {
               maker,
               rewardableEntityConfig: entityConfigKey,
               authority,
+              payer,
             })
             .instruction();
 
-          return [create, approve];
+          if (!await exists(conn, merkle.publicKey)) {
+            await sendInstructions(
+              provider,
+              [
+                SystemProgram.createAccount({
+                  fromPubkey: payer,
+                  newAccountPubkey: merkle.publicKey,
+                  lamports:
+                    await provider.connection.getMinimumBalanceForRentExemption(
+                      space
+                    ),
+                  space: space,
+                  programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+                }),
+              ],
+              [merkle]
+            );
+          }
+          return [
+            create,
+            setTree,
+            approve,
+          ].filter(truthy);
         }
       })
     )
-  ).flat();
+  );
 
-  await sendInstructionsOrCreateProposal({
-    provider,
-    instructions,
-    walletSigner: wallet,
-    signers: [],
-    govProgramId,
-    proposalName: `Create Makers`,
-    votingMint: councilKeypair.publicKey,
-  });
+  if (isGov) {
+    const instrs = instructions.flat().filter(truthy);
+    await sendInstructionsOrCreateProposal({
+      provider,
+      instructions: instrs,
+      walletSigner: wallet,
+      signers: [],
+      govProgramId,
+      proposalName: `Create Makers`,
+      votingMint: councilKeypair.publicKey,
+    });
+  } else {
+    for(const instrs of instructions) {
+      await sendInstructions(
+        provider,
+        instrs,
+        []
+      )
+    }
+  }
 }
 
 run()

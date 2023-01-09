@@ -61,7 +61,7 @@ export async function onboardIotHotspot({
       iotInfo: info,
       merkleTree: treeId,
       maker,
-      authority: makerAcc?.authority
+      issuingAuthority: makerAcc?.authority
     })
     .remainingAccounts(
       proof.map((p) => {
