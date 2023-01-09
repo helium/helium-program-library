@@ -67,32 +67,22 @@ export const initTestDataCredits = async (
 
 export const initTestRewardableEntityConfig = async (
   program: Program<HeliumEntityManager>,
-  provider: anchor.AnchorProvider,
   subDao: PublicKey,
-  dcMint?: PublicKey
+  settings: any = {
+    iotConfig: {
+      minGain: 10,
+      maxGain: 150,
+      fullLocationStakingFee: toBN(1000000, 0),
+      dataonlyLocationStakingFee: toBN(500000, 0),
+    } as any,
+  }
 ): Promise<{
   rewardableEntityConfig: PublicKey;
 }> => {
-  if (!dcMint) {
-    dcMint = await createMint(
-      provider,
-      6,
-      provider.wallet.publicKey,
-      provider.wallet.publicKey
-    );
-  }
-
   const method = await program.methods
     .initializeRewardableEntityConfigV0({
       symbol: random(), // symbol is unique would need to restart localnet everytime
-      settings: {
-        iotConfig: {
-          minGain: 10,
-          maxGain: 150,
-          fullLocationStakingFee: toBN(1000000, 0),
-          dataonlyLocationStakingFee: toBN(500000, 0),
-        } as any,
-      },
+      settings,
     })
     .accounts({
       subDao,
@@ -286,9 +276,7 @@ export const initWorld = async (
 
   const rewardableEntityConfig = await initTestRewardableEntityConfig(
     hemProgram,
-    provider,
     subDao.subDao,
-    dataCredits.dcMint
   );
 
   const maker = await initTestMaker(

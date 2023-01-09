@@ -6,8 +6,10 @@ import { heliumEntityManagerResolvers } from "./resolvers";
 export * from "./pdas";
 export * from "./resolvers";
 export * from "./constants";
-export { updateMetadata } from "./functions/updateMetadata";
+export { updateIotMetadata } from "./functions/updateIotMetadata";
+export { updateMobileMetadata } from "./functions/updateMobileMetadata";
 export { onboardIotHotspot } from "./functions/onboardIotHotspot";
+export { onboardMobileHotspot } from "./functions/onboardMobileHotspot";
 
 export const init = async (
   provider: AnchorProvider,

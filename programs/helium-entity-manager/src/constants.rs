@@ -1,1 +1,1 @@
-pub static IOT_METADATA_URL: &str = "https://iot-metadata.oracle.test-helium.com";
+pub static HOTSPOT_METADATA_URL: &str = "https://metadata.oracle.test-helium.com";

@@ -25,21 +25,21 @@ use shared_utils::*;
 use spl_account_compression::program::SplAccountCompression;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct OnboardIotHotspotArgsV0 {
+pub struct OnboardMobileHotspotArgsV0 {
   pub metadata: MetadataArgs,
   pub root: [u8; 32],
   pub index: u32,
 }
 
 fn hotspot_key(uri: &str) -> &str {
-  // Expect something like https://metadata.oracle.test-helium.com/:eccCompact
+  // Expect something like https://mobile-metadata.oracle.test-helium.com/:eccCompact
   // So just take the id after the last slash
   uri.split('/').last().unwrap()
 }
 
 #[derive(Accounts)]
-#[instruction(args: OnboardIotHotspotArgsV0)]
-pub struct OnboardIotHotspotV0<'info> {
+#[instruction(args: OnboardMobileHotspotArgsV0)]
+pub struct OnboardMobileHotspotV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   pub dc_fee_payer: Signer<'info>,
@@ -47,15 +47,15 @@ pub struct OnboardIotHotspotV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 60 + size_of::<IotHotspotInfoV0>(),
+    space = 60 + size_of::<MobileHotspotInfoV0>(),
     seeds = [
-      b"iot_info", 
+      b"mobile_info", 
       rewardable_entity_config.key().as_ref(),
       &hash(hotspot_key(&args.metadata.uri[..]).as_bytes()).to_bytes()
     ],
     bump,
   )]
-  pub iot_info: Box<Account<'info, IotHotspotInfoV0>>,
+  pub mobile_info: Box<Account<'info, MobileHotspotInfoV0>>,
   #[account(mut)]
   pub hotspot_owner: Signer<'info>,
   /// CHECK: The merkle tree
@@ -112,7 +112,7 @@ pub struct OnboardIotHotspotV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-impl<'info> OnboardIotHotspotV0<'info> {
+impl<'info> OnboardMobileHotspotV0<'info> {
   pub fn burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, BurnWithoutTrackingV0<'info>> {
     let cpi_accounts = BurnWithoutTrackingV0 {
       burn_accounts: BurnCommonV0 {
@@ -131,8 +131,8 @@ impl<'info> OnboardIotHotspotV0<'info> {
 }
 
 pub fn handler<'info>(
-  ctx: Context<'_, '_, '_, 'info, OnboardIotHotspotV0<'info>>,
-  args: OnboardIotHotspotArgsV0,
+  ctx: Context<'_, '_, '_, 'info, OnboardMobileHotspotV0<'info>>,
+  args: OnboardMobileHotspotArgsV0,
 ) -> Result<()> {
   let key = hotspot_key(&args.metadata.uri[..]);
 
@@ -170,13 +170,11 @@ pub fn handler<'info>(
     },
   )?;
 
-  ctx.accounts.iot_info.set_inner(IotHotspotInfoV0 {
+  ctx.accounts.mobile_info.set_inner(MobileHotspotInfoV0 {
     asset: asset_id,
     hotspot_key: key.to_string(),
-    bump_seed: ctx.bumps["iot_info"],
+    bump_seed: ctx.bumps["mobile_info"],
     location: None,
-    elevation: None,
-    gain: None,
     is_full_hotspot: true,
     num_location_asserts: 0,
   });

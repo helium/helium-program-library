@@ -1,7 +1,7 @@
 use std::cmp::min;
 
 use crate::state::*;
-use crate::{constants::IOT_METADATA_URL, error::ErrorCode};
+use crate::{constants::HOTSPOT_METADATA_URL, error::ErrorCode};
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
@@ -116,7 +116,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
   let metadata = MetadataArgs {
     name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("{}/{}", IOT_METADATA_URL, args.entity_key),
+    uri: format!("{}/{}", HOTSPOT_METADATA_URL, args.entity_key),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi

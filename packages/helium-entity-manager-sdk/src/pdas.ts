@@ -53,6 +53,24 @@ export const iotInfoKey = (
   );
 };
 
+export const mobileInfoKey = (
+  rewardableEntityConfig: PublicKey,
+  hotspotKey: string,
+  programId: PublicKey = PROGRAM_ID
+) => {
+  let hexString = sha256(hotspotKey).toString(hex);
+  let seed = Uint8Array.from(Buffer.from(hexString, "hex"));
+
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("mobile_info", "utf-8"),
+      rewardableEntityConfig.toBuffer(),
+      seed,
+    ],
+    programId
+  );
+};
+
 export const collectionMetadataKey = (
   collection: PublicKey,
   programId: PublicKey = TOKEN_METADATA_PROGRAM_ID

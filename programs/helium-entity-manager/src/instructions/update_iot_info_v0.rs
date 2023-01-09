@@ -28,7 +28,7 @@ pub struct UpdateIotInfoArgsV0 {
 }
 
 impl ConfigSettingsV0 {
-  pub fn is_valid(self, args: UpdateIotInfoArgsV0) -> bool {
+  pub fn is_valid_iot(self, args: UpdateIotInfoArgsV0) -> bool {
     match (args.gain, self) {
       (
         Some(gain),
@@ -70,7 +70,7 @@ pub struct UpdateIotInfoV0<'info> {
 
   #[account(
     has_one = sub_dao,
-    constraint = rewardable_entity_config.settings.is_valid(args)
+    constraint = rewardable_entity_config.settings.is_valid_iot(args)
   )]
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
   #[account(

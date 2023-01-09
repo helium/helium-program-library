@@ -51,6 +51,13 @@ pub mod helium_entity_manager {
     onboard_iot_hotspot_v0::handler(ctx, args)
   }
 
+  pub fn onboard_mobile_hotspot_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, OnboardMobileHotspotV0<'info>>,
+    args: OnboardMobileHotspotArgsV0,
+  ) -> Result<()> {
+    onboard_mobile_hotspot_v0::handler(ctx, args)
+  }
+
   pub fn update_rewardable_entity_config_v0(
     ctx: Context<UpdateRewardableEntityConfigV0>,
     args: UpdateRewardableEntityConfigArgsV0,
@@ -71,5 +78,12 @@ pub mod helium_entity_manager {
     args: UpdateIotInfoArgsV0,
   ) -> Result<()> {
     update_iot_info_v0::handler(ctx, args)
+  }
+
+  pub fn update_mobile_info_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, UpdateMobileInfoV0<'info>>,
+    args: UpdateMobileInfoArgsV0,
+  ) -> Result<()> {
+    update_mobile_info_v0::handler(ctx, args)
   }
 }

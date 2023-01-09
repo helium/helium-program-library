@@ -80,6 +80,8 @@ const merkleSizes = [
   [3, 8, 0],
   [5, 8, 2],
   [14, 64, 11],
+  // [16, 64, 13],
+  // [18, 64, 15],
   [20, 64, 17],
   [24, 64, 17],
 ];
@@ -113,6 +115,32 @@ async function run() {
   const hemProgram = await initHem(provider);
   const hsdProgram = await initHsd(provider);
   const conn = provider.connection;
+
+        console.log(
+          humanReadable(
+            new anchor.BN(
+              (
+                await Promise.all(
+                  makers.map(async ({ name, address, count }) => {
+                    const [size, buffer, canopy] = merkleSizes.find(
+                      ([height]) => Math.pow(2, height) > count * 2
+                    );
+                    const space = getConcurrentMerkleTreeAccountSize(
+                      size,
+                      buffer,
+                      canopy
+                    );
+                    return await provider.connection.getMinimumBalanceForRentExemption(
+                      space
+                    );
+                  })
+                )
+              ).reduce((acc, a) => acc + a)
+            ),
+            9
+          )
+        );
+
 
   const subdaoMint = new PublicKey(argv.subdaoMint);
   const subdao = (await subDaoKey(subdaoMint))[0];
@@ -155,7 +183,7 @@ async function run() {
             Solana addr: ${makerAuthority.toBase58()}.
             Size: ${size}, buffer: ${buffer}, canopy: ${canopy}. 
             Space: ${space} bytes
-            Cost: ~${humanReadable(new anchor.BN(rent), 8)} Sol
+            Cost: ~${humanReadable(new anchor.BN(rent), 9)} Sol
             `
           );
 

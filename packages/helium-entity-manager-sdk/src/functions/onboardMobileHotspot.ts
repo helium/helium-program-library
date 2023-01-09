@@ -1,27 +1,24 @@
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
-import { BN, Program } from "@project-serum/anchor";
+import { Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { iotInfoKey } from "../pdas";
+import { mobileInfoKey } from "../pdas";
+import { assetToMetadataArgs } from "../utils";
 
-export async function updateMetadata({
+export async function onboardMobileHotspot({
   program,
   rewardableEntityConfig,
   assetId,
-  location,
-  elevation,
-  gain,
+  maker,
   assetEndpoint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
 }: {
   program: Program<HeliumEntityManager>;
-  location: BN | null;
-  elevation: number | null;
-  gain: number | null;
   assetId: PublicKey;
   rewardableEntityConfig: PublicKey;
   assetEndpoint?: string;
+  maker: PublicKey;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
   getAssetProofFn?: (
     url: string,
@@ -38,21 +35,21 @@ export async function updateMetadata({
   if (!assetProof) {
     throw new Error("No asset proof with ID " + assetId.toBase58());
   }
-  const { root, proof, leaf, treeId, nodeIndex } = assetProof;
+  const { root, proof, treeId, nodeIndex } = assetProof;
   const {
     ownership: { owner },
     content: { json_uri: uri },
   } = asset;
   const eccCompact = uri.split("/").slice(-1)[0];
 
-  const [info] = iotInfoKey(rewardableEntityConfig, eccCompact);
+  const [info] = mobileInfoKey(rewardableEntityConfig, eccCompact);
 
+  const makerAcc = await program.account.makerV0.fetchNullable(maker);
+
+  const anchorMetadata = assetToMetadataArgs(asset);
   return program.methods
-    .updateIotInfoV0({
-      location,
-      elevation,
-      gain,
-      hash: leaf.toBuffer().toJSON().data,
+    .onboardMobileHotspotV0({
+      metadata: anchorMetadata,
       root: root.toBuffer().toJSON().data,
       index: nodeIndex,
     })
@@ -60,8 +57,10 @@ export async function updateMetadata({
       // hotspot: assetId,
       rewardableEntityConfig,
       hotspotOwner: owner,
-      iotInfo: info,
+      mobileInfo: info,
       merkleTree: treeId,
+      maker,
+      issuingAuthority: makerAcc?.issuingAuthority,
     })
     .remainingAccounts(
       proof.map((p) => {

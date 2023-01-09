@@ -80,8 +80,6 @@ pub struct MobileHotspotInfoV0 {
   pub bump_seed: u8,
 
   pub location: Option<u64>,
-  pub elevation: Option<i32>,
-  pub gain: Option<i32>,
   pub is_full_hotspot: bool,
   pub num_location_asserts: u16,
 }
