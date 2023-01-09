@@ -112,7 +112,12 @@ describe("helium-entity-manager", () => {
     const account = await hemProgram.account.makerV0.fetch(maker);
 
     expect(account.collection.toBase58()).eq(collection.toBase58());
-    expect(account.authority.toBase58()).eq(makerKeypair.publicKey.toBase58());
+    expect(account.issuingAuthority.toBase58()).eq(
+      makerKeypair.publicKey.toBase58()
+    );
+    expect(account.updateAuthority.toBase58()).eq(
+      makerKeypair.publicKey.toBase58()
+    );
   });
 
   describe("with maker and data credits", () => {
@@ -244,7 +249,7 @@ describe("helium-entity-manager", () => {
         .accounts({
           maker,
           recipient: hotspotOwner.publicKey,
-          authority: makerKeypair.publicKey,
+          issuingAuthority: makerKeypair.publicKey,
         })
         .signers([makerKeypair])
         .rpc({ skipPreflight: true });
@@ -300,7 +305,7 @@ describe("helium-entity-manager", () => {
           .accounts({
             maker,
             recipient: hotspotOwner.publicKey,
-            authority: makerKeypair.publicKey,
+            issuingAuthority: makerKeypair.publicKey,
           })
           .signers([makerKeypair])
           .rpc({ skipPreflight: true });
@@ -329,17 +334,23 @@ describe("helium-entity-manager", () => {
       it("updates maker", async () => {
         await hemProgram.methods
           .updateMakerV0({
-            authority: PublicKey.default,
+            updateAuthority: PublicKey.default,
+            issuingAuthority: PublicKey.default,
           })
           .accounts({
             maker,
-            authority: makerKeypair.publicKey
+            updateAuthority: makerKeypair.publicKey,
           })
           .signers([makerKeypair])
           .rpc();
 
         const acc = await hemProgram.account.makerV0.fetch(maker);
-        expect(acc.authority.toBase58()).to.eq(PublicKey.default.toBase58());
+        expect(acc.issuingAuthority.toBase58()).to.eq(
+          PublicKey.default.toBase58()
+        );
+        expect(acc.updateAuthority.toBase58()).to.eq(
+          PublicKey.default.toBase58()
+        );
       });
 
       it("changes the metadata", async () => {

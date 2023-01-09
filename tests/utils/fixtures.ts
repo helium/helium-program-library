@@ -1,4 +1,4 @@
-import { HNT_PYTH_PRICE_FEED, toBN } from "@helium/spl-utils";
+import { HNT_PYTH_PRICE_FEED, sendInstructions, toBN } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { SystemProgram, Keypair, PublicKey } from "@solana/web3.js";
@@ -125,45 +125,50 @@ export const initTestMaker = async (
   const name = random(10);
 
   const maker = makerKey(name)[0];
-  const setTreeMethod = program.methods
-    .setMakerTreeV0({
-      maxDepth: 3,
-      maxBufferSize: 8,
-    })
-    .accounts({ maker, merkleTree: merkle.publicKey })
-  const method = await program.methods
+  const createMerkle = SystemProgram.createAccount({
+    fromPubkey: provider.wallet.publicKey,
+    newAccountPubkey: merkle.publicKey,
+    lamports: await provider.connection.getMinimumBalanceForRentExemption(
+      space
+    ),
+    space: space,
+    programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  });
+  const { pubkeys: { collection }, instruction: initialize } = await program.methods
     .initializeMakerV0({
       updateAuthority: makerKeypair.publicKey,
       issuingAuthority: makerKeypair.publicKey,
       name,
       metadataUrl: DEFAULT_METADATA_URL,
     })
-    .preInstructions([
-      SystemProgram.createAccount({
-        fromPubkey: provider.wallet.publicKey,
-        newAccountPubkey: merkle.publicKey,
-        lamports: await provider.connection.getMinimumBalanceForRentExemption(
-          space
-        ),
-        space: space,
-        programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-      }),
-      await setTreeMethod.instruction(),
-    ])
-    .postInstructions([
-      await program.methods
-        .approveMakerV0()
-        .accounts({
-          rewardableEntityConfig,
-          maker,
-        })
-        .instruction(),
-    ])
-    .signers([merkle]);
+    .prepare();
+  const {
+    pubkeys: { treeAuthority },
+    instruction: setTree,
+  } = await program.methods
+    .setMakerTreeV0({
+      maxDepth: 3,
+      maxBufferSize: 8,
+    })
+    .accounts({
+      maker,
+      merkleTree: merkle.publicKey,
+      updateAuthority: makerKeypair.publicKey,
+    })
+    .prepare();
+  const approve = await program.methods
+    .approveMakerV0()
+    .accounts({
+      rewardableEntityConfig,
+      maker,
+    })
+    .instruction();
 
-  const { treeAuthority } = await setTreeMethod.pubkeys();
-  const { collection } = await method.pubkeys();
-  await method.rpc({ skipPreflight: true });
+  await sendInstructions(
+    provider,
+    [createMerkle, initialize, setTree, approve],
+    [merkle, makerKeypair]
+  );
 
   return {
     maker: maker!,
