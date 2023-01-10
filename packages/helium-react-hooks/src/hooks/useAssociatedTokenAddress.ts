@@ -28,7 +28,9 @@ export function useAssociatedTokenAddress(
   wallet: PublicKey | undefined | null,
   mint: PublicKey | undefined | null
 ): AssocState {
-  const { result, loading } = useAsync(fetch, [wallet, mint]);
+  const { result, loading } = useAsync(async () => {
+    return fetch(wallet, mint)
+  }, [])
 
   return { result, loading };
 }
