@@ -26,22 +26,19 @@ export function useAssociatedTokenAccount(
   const { info: associatedAccount, loading: loading2 } = useTokenAccount(
     associatedTokenAddress
   );
-  const { info: account, loading: loading3 } = useTokenAccount(
-    associatedTokenAddress || undefined
-  );
 
   const result = useMemo(() => {
-    if (account?.mint === mint) {
+    if (associatedAccount?.mint === mint) {
       // The passed value is the ata
-      return account;
+      return associatedAccount;
     } else {
       return associatedAccount;
     }
-  }, [associatedAccount, account, mint]);
+  }, [associatedAccount, associatedAccount, mint]);
 
   return {
     associatedAccount: result,
-    loading: loading || loading2 || loading3,
+    loading: loading || loading2,
     associatedAccountKey: associatedTokenAddress,
   };
 }
