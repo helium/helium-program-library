@@ -16,18 +16,21 @@ const fetch = async (
     return undefined;
   }
 
-  return getAssociatedTokenAddress(
+  const associatedTokenAddress = await getAssociatedTokenAddress(
     mint,
     wallet,
-    true
-  );
+    true,
+  )
+  return associatedTokenAddress
 };
 
 export function useAssociatedTokenAddress(
   wallet: PublicKey | undefined | null,
   mint: PublicKey | undefined | null
 ): AssocState {
-  const { result, loading } = useAsync(fetch, [wallet, mint]);
+  const { result, loading } = useAsync(async () => {
+    return fetch(wallet, mint)
+  }, [mint?.toBase58(), wallet?.toBase58()])
 
   return { result, loading };
 }
