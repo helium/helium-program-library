@@ -30,7 +30,7 @@ export function useAssociatedTokenAddress(
 ): AssocState {
   const { result, loading } = useAsync(async () => {
     return fetch(wallet, mint)
-  }, [])
+  }, [mint?.toBase58(), wallet?.toBase58()])
 
   return { result, loading };
 }
