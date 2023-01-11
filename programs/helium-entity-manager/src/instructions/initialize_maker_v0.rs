@@ -9,7 +9,7 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use mpl_token_metadata::state::{DataV2, CollectionDetails};
+use mpl_token_metadata::state::{CollectionDetails, DataV2};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeMakerArgsV0 {
