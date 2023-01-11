@@ -9,7 +9,7 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use mpl_token_metadata::state::DataV2;
+use mpl_token_metadata::state::{DataV2, CollectionDetails};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeMakerArgsV0 {
@@ -122,7 +122,7 @@ pub fn handler(ctx: Context<InitializeMakerV0>, args: InitializeMakerArgsV0) -> 
     },
     true,
     true,
-    None,
+    Some(CollectionDetails::V1 { size: 0 }),
   )?;
 
   create_master_edition_v3(
