@@ -188,7 +188,7 @@ async function run() {
           );
 
           if (space > 10000000) {
-            throw new Error("Space more than 10mb");
+            throw new Error(`Space ${space} more than 10mb for tree ${size}, ${buffer}, ${canopy}}`);
           }
 
           const authority = (

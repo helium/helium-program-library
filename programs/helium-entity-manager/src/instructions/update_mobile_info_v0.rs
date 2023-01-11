@@ -27,10 +27,7 @@ pub struct UpdateMobileInfoArgsV0 {
 
 impl ConfigSettingsV0 {
   pub fn is_valid_mobile(self, _: UpdateMobileInfoArgsV0) -> bool {
-    match self {
-      ConfigSettingsV0::MobileConfig { .. } => true,
-      _ => false,
-    }
+    matches!(self, ConfigSettingsV0::MobileConfig { .. })
   }
 }
 
