@@ -15,7 +15,7 @@ use circuit_breaker::{
   ThresholdType as CBThresholdType,
   WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
 };
-use clockwork_sdk::{cpi::thread_create, state::Trigger, utils::PAYER_PUBKEY, ThreadProgram};
+use clockwork_sdk::{cpi::thread_create, state::Trigger, ThreadProgram};
 use shared_utils::resize_to_fit;
 use switchboard_v2::AggregatorAccountData;
 use time::OffsetDateTime;
@@ -23,7 +23,6 @@ use treasury_management::{
   cpi::{accounts::InitializeTreasuryManagementV0, initialize_treasury_management_v0},
   Curve as TreasuryCurve, InitializeTreasuryManagementArgsV0, TreasuryManagement,
 };
-use voter_stake_registry::state::Registrar;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub enum Curve {
@@ -61,10 +60,8 @@ pub struct InitializeSubDaoArgsV0 {
 pub struct InitializeSubDaoV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub registrar: AccountLoader<'info, Registrar>,
   #[account(
     mut,
-    has_one = registrar,
     has_one = authority,
     has_one = hnt_mint
   )]
@@ -160,50 +157,12 @@ pub fn create_end_epoch_cron(curr_ts: i64, offset: u64) -> String {
 }
 
 fn construct_kickoff_ix(ctx: &Context<InitializeSubDaoV0>, epoch: u64) -> Option<Instruction> {
-  // get epoch info accounts needed
-  let dao_key = ctx.accounts.dao.key();
-  let dao_ei_seeds: &[&[u8]] = &[
-    "dao_epoch_info".as_bytes(),
-    dao_key.as_ref(),
-    &epoch.to_le_bytes(),
-  ];
-  let prev_dao_ei_seeds: &[&[u8]] = &[
-    "dao_epoch_info".as_bytes(),
-    dao_key.as_ref(),
-    &(epoch - 1).to_le_bytes(),
-  ];
-  let dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
-  let prev_dao_epoch_info = Pubkey::find_program_address(prev_dao_ei_seeds, &crate::id()).0;
-
-  let sub_dao_key = ctx.accounts.sub_dao.key();
-  let sub_dao_ei_seeds: &[&[u8]] = &[
-    "sub_dao_epoch_info".as_bytes(),
-    sub_dao_key.as_ref(),
-    &epoch.to_le_bytes(),
-  ];
-  let sub_dao_epoch_info = Pubkey::find_program_address(sub_dao_ei_seeds, &crate::id()).0;
-
   // build clockwork kickoff ix
   let accounts = vec![
-    AccountMeta::new(PAYER_PUBKEY, true),
-    AccountMeta::new_readonly(ctx.accounts.registrar.key(), false),
     AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.sub_dao.key(), false),
     AccountMeta::new_readonly(ctx.accounts.hnt_mint.key(), false),
-    AccountMeta::new(ctx.accounts.sub_dao.key(), false),
     AccountMeta::new_readonly(ctx.accounts.active_device_aggregator.key(), false),
-    AccountMeta::new_readonly(
-      ctx
-        .accounts
-        .active_device_aggregator
-        .load()
-        .ok()
-        .unwrap()
-        .history_buffer,
-      false,
-    ),
-    AccountMeta::new_readonly(prev_dao_epoch_info, false),
-    AccountMeta::new(dao_epoch_info, false),
-    AccountMeta::new(sub_dao_epoch_info, false),
     AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
     AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
     AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),

@@ -2,7 +2,7 @@ use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrAr
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
-use clockwork_sdk::{self, state::ThreadResponse, utils::PAYER_PUBKEY, ThreadProgram};
+use clockwork_sdk::{self, state::ThreadResponse, ThreadProgram};
 use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
 use switchboard_v2::{AggregatorAccountData, AggregatorHistoryBuffer};
 use voter_stake_registry::state::Registrar;
@@ -119,57 +119,6 @@ fn construct_next_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> Inst
   }
 }
 
-fn construct_kickoff_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> Instruction {
-  // get epoch info accounts needed
-  let dao_key = ctx.accounts.dao.key();
-  let dao_ei_seeds: &[&[u8]] = &[
-    "dao_epoch_info".as_bytes(),
-    dao_key.as_ref(),
-    &epoch.to_le_bytes(),
-  ];
-  let prev_dao_ei_seeds: &[&[u8]] = &[
-    "dao_epoch_info".as_bytes(),
-    dao_key.as_ref(),
-    &(epoch - 1).to_le_bytes(),
-  ];
-  let dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
-  let prev_dao_epoch_info = Pubkey::find_program_address(prev_dao_ei_seeds, &crate::id()).0;
-  let sub_dao_key = ctx.accounts.sub_dao.key();
-  let sub_dao_ei_seeds: &[&[u8]] = &[
-    "sub_dao_epoch_info".as_bytes(),
-    sub_dao_key.as_ref(),
-    &epoch.to_le_bytes(),
-  ];
-  let sub_dao_epoch_info = Pubkey::find_program_address(sub_dao_ei_seeds, &crate::id()).0;
-
-  // build clockwork kickoff ix
-  let accounts = vec![
-    AccountMeta::new(PAYER_PUBKEY, true),
-    AccountMeta::new_readonly(ctx.accounts.registrar.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.hnt_mint.key(), false),
-    AccountMeta::new(ctx.accounts.sub_dao.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.active_device_aggregator.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.history_buffer.key(), false),
-    AccountMeta::new(prev_dao_epoch_info, false),
-    AccountMeta::new(dao_epoch_info, false),
-    AccountMeta::new(sub_dao_epoch_info, false),
-    AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
-    AccountMeta::new(ctx.accounts.thread.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.clockwork.key(), false),
-  ];
-  Instruction {
-    program_id: crate::ID,
-    accounts,
-    data: crate::instruction::CalculateUtilityScoreV0 {
-      args: CalculateUtilityScoreArgsV0 { epoch },
-    }
-    .data(),
-  }
-}
-
 pub fn handler(
   ctx: Context<CalculateUtilityScoreV0>,
   args: CalculateUtilityScoreArgsV0,
@@ -184,6 +133,7 @@ pub fn handler(
   if ctx.accounts.prev_dao_epoch_info.lamports() > 0 {
     let info: Account<DaoEpochInfoV0> = Account::try_from(&ctx.accounts.prev_dao_epoch_info)?;
     prev_supply = info.current_hnt_supply;
+    assert!(info.epoch == ctx.accounts.dao_epoch_info.epoch - 1);
   }
 
   ctx.accounts.dao_epoch_info.total_rewards = ctx
@@ -336,13 +286,9 @@ pub fn handler(
       .unwrap();
   }
 
-  let kickoff_ix = construct_kickoff_ix(&ctx, epoch);
   let next_ix = construct_next_ix(&ctx, epoch);
-
-  // kickoff ix is using the epoch infos for current epoch. calls part one after this epoch is over
-  // next ix is using the epoch infos for previous epoch, which is being processed in the current clockwork thread. calls issue_rewards
   Ok(ThreadResponse {
-    kickoff_instruction: Some(kickoff_ix.into()),
+    kickoff_instruction: None,
     next_instruction: Some(next_ix.into()),
   })
 }

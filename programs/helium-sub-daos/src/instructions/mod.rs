@@ -1,4 +1,5 @@
 pub mod calculate_utility_score_v0;
+pub mod clockwork_kickoff_v0;
 pub mod delegation;
 pub mod initialize_dao_v0;
 pub mod initialize_sub_dao_v0;
@@ -8,6 +9,7 @@ pub mod reset_clockwork_thread_v0;
 pub mod track_dc_burn_v0;
 
 pub use calculate_utility_score_v0::*;
+pub use clockwork_kickoff_v0::*;
 pub use delegation::*;
 pub use initialize_dao_v0::*;
 pub use initialize_sub_dao_v0::*;
