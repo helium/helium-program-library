@@ -1,4 +1,4 @@
-import { HNT_PYTH_PRICE_FEED, toBN } from "@helium/spl-utils";
+import { HNT_PYTH_PRICE_FEED, sendInstructions, toBN } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { SystemProgram, Keypair, PublicKey } from "@solana/web3.js";
@@ -12,6 +12,7 @@ import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import { ThresholdType } from "../../packages/circuit-breaker-sdk/src"
 import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { makerKey } from "../../packages/helium-entity-manager-sdk/src";
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =
@@ -64,93 +65,108 @@ export const initTestDataCredits = async (
   return { dcKey, hntMint, hntBal, dcMint, dcBal };
 };
 
-export const initTestHotspotConfig = async (
+export const initTestRewardableEntityConfig = async (
+  program: Program<HeliumEntityManager>,
+  subDao: PublicKey,
+  settings: any = {
+    iotConfig: {
+      minGain: 10,
+      maxGain: 150,
+      fullLocationStakingFee: toBN(1000000, 0),
+      dataonlyLocationStakingFee: toBN(500000, 0),
+    } as any,
+  }
+): Promise<{
+  rewardableEntityConfig: PublicKey;
+}> => {
+  const method = await program.methods
+    .initializeRewardableEntityConfigV0({
+      symbol: random(), // symbol is unique would need to restart localnet everytime
+      settings,
+    })
+    .accounts({
+      subDao,
+    })
+
+  const { rewardableEntityConfig } = await method.pubkeys();
+  await method.rpc({ skipPreflight: true });
+
+  return {
+    rewardableEntityConfig: rewardableEntityConfig!,
+  };
+};
+
+export const initTestMaker = async (
   program: Program<HeliumEntityManager>,
   provider: anchor.AnchorProvider,
-  subDao: PublicKey,
-  dcMint?: PublicKey
+  rewardableEntityConfig: PublicKey,
 ): Promise<{
+  authority: PublicKey;
+  makerKeypair: Keypair;
   collection: PublicKey;
-  hotspotConfig: PublicKey;
+  maker: PublicKey;
+  merkle: PublicKey;
+  treeAuthority: PublicKey;
 }> => {
-  if (!dcMint) {
-    dcMint = await createMint(
-      provider,
-      6,
-      provider.wallet.publicKey,
-      provider.wallet.publicKey
-    );
-  }
-
+  const makerKeypair = Keypair.generate();
   const merkle = Keypair.generate();
   // Testing -- small tree
   const space = getConcurrentMerkleTreeAccountSize(3, 8);
-  const method = await program.methods
-    .initializeHotspotConfigV0({
-      name: "Helium Network Hotspots",
-      symbol: random(), // symbol is unique would need to restart localnet everytime
+  const name = random(10);
+
+  const maker = makerKey(name)[0];
+  const createMerkle = SystemProgram.createAccount({
+    fromPubkey: provider.wallet.publicKey,
+    newAccountPubkey: merkle.publicKey,
+    lamports: await provider.connection.getMinimumBalanceForRentExemption(
+      space
+    ),
+    space: space,
+    programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  });
+  const { pubkeys: { collection }, instruction: initialize } = await program.methods
+    .initializeMakerV0({
+      updateAuthority: makerKeypair.publicKey,
+      issuingAuthority: makerKeypair.publicKey,
+      name,
       metadataUrl: DEFAULT_METADATA_URL,
-      settings: {
-        iotConfig: {
-          minGain: 10,
-          maxGain: 150,
-          fullLocationStakingFee: toBN(1000000, 0),
-          dataonlyLocationStakingFee: toBN(500000, 0),
-        } as any,
-      },
+    })
+    .prepare();
+  const {
+    pubkeys: { treeAuthority },
+    instruction: setTree,
+  } = await program.methods
+    .setMakerTreeV0({
       maxDepth: 3,
       maxBufferSize: 8,
     })
     .accounts({
-      subDao,
+      maker,
       merkleTree: merkle.publicKey,
+      updateAuthority: makerKeypair.publicKey,
     })
-    .preInstructions([
-      SystemProgram.createAccount({
-        fromPubkey: provider.wallet.publicKey,
-        newAccountPubkey: merkle.publicKey,
-        lamports: await provider.connection.getMinimumBalanceForRentExemption(
-          space
-        ),
-        space: space,
-        programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-      }),
-    ])
-    .signers([merkle]);
-
-  const { collection, hotspotConfig } = await method.pubkeys();
-  await method.rpc();
-
-  return {
-    collection: collection!,
-    hotspotConfig: hotspotConfig!,
-  };
-};
-
-export const initTestHotspotIssuer = async (
-  program: Program<HeliumEntityManager>,
-  provider: anchor.AnchorProvider,
-  hotspotConfig: PublicKey,
-): Promise<{
-  hotspotIssuer: PublicKey;
-  makerKeypair: Keypair;
-}> => {
-  const makerKeypair = Keypair.generate();
-  const method = await program.methods
-    .initializeHotspotIssuerV0({
-      maker: makerKeypair.publicKey,
-      authority: provider.wallet.publicKey,
-    })
+    .prepare();
+  const approve = await program.methods
+    .approveMakerV0()
     .accounts({
-      hotspotConfig,
-    });
+      rewardableEntityConfig,
+      maker,
+    })
+    .instruction();
 
-  const { hotspotIssuer } = await method.pubkeys();
-  await method.rpc({ skipPreflight: true });
+  await sendInstructions(
+    provider,
+    [createMerkle, initialize, setTree, approve],
+    [merkle, makerKeypair]
+  );
 
   return {
-    hotspotIssuer: hotspotIssuer!,
+    maker: maker!,
     makerKeypair,
+    collection: collection!,
+    authority: makerKeypair.publicKey,
+    merkle: merkle.publicKey,
+    treeAuthority: treeAuthority!
   };
 };
 
@@ -207,7 +223,7 @@ export const initWorld = async (
   registrar?: PublicKey,
   hntMint?: PublicKey
 ): Promise<{
-  dao: { mint: PublicKey; dao: PublicKey; };
+  dao: { mint: PublicKey; dao: PublicKey };
   subDao: {
     mint: PublicKey;
     subDao: PublicKey;
@@ -222,16 +238,24 @@ export const initWorld = async (
     dcMint: PublicKey;
     dcBal: number;
   };
-  hotspotConfig: {
-    collection: PublicKey;
-    hotspotConfig: PublicKey;
+  rewardableEntityConfig: {
+    rewardableEntityConfig: PublicKey;
   };
-  issuer: {
-    hotspotIssuer: PublicKey;
+  maker: {
+    maker: PublicKey;
+    collection: PublicKey;
+    authority: PublicKey;
     makerKeypair: Keypair;
+    merkle: PublicKey;
+    treeAuthority: PublicKey;
   };
 }> => {
-  const dataCredits = await initTestDataCredits(dcProgram, provider, undefined, hntMint);
+  const dataCredits = await initTestDataCredits(
+    dcProgram,
+    provider,
+    undefined,
+    hntMint
+  );
 
   const dao = await initTestDao(
     hsdProgram,
@@ -250,24 +274,22 @@ export const initWorld = async (
     subDaoEpochRewards
   );
 
-  const hotspotConfig = await initTestHotspotConfig(
+  const rewardableEntityConfig = await initTestRewardableEntityConfig(
     hemProgram,
-    provider,
     subDao.subDao,
-    dataCredits.dcMint
   );
 
-  const issuer = await initTestHotspotIssuer(
+  const maker = await initTestMaker(
     hemProgram,
     provider,
-    hotspotConfig.hotspotConfig,
+    rewardableEntityConfig.rewardableEntityConfig
   );
 
   return {
     dao,
     subDao,
     dataCredits,
-    hotspotConfig,
-    issuer,
+    rewardableEntityConfig,
+    maker,
   };
 };

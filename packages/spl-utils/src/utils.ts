@@ -62,8 +62,9 @@ export function humanReadableBigint(bigint: bigint, decimals: number, round: num
   return numberWithCommas(roundToDecimals(toNumber(bigint, decimals), round));
 }
 
-export function humanReadable(bn: BN, mint: Mint): string {
+export function humanReadable(bn: BN, decimalsOrMint: Mint | number): string {
   return numberWithCommas(
-    roundToDecimals(toNumber(bn, mint), mint.decimals)
+    roundToDecimals(toNumber(bn, decimalsOrMint), typeof decimalsOrMint == "number" ? decimalsOrMint : decimalsOrMint.decimals)
   );
 }
+

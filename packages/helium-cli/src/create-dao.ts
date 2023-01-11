@@ -167,6 +167,7 @@ async function run() {
   const govProgramId = new PublicKey(argv.govProgramId);
   const councilKeypair = await loadKeypair(argv.councilKeypair);
   const councilWallet = new PublicKey(argv.councilWallet);
+  const me = provider.wallet.publicKey;
 
   console.log("HNT", hntKeypair.publicKey.toBase58());
   console.log("HST", hstKeypair.publicKey.toBase58());
@@ -383,7 +384,7 @@ async function run() {
   if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
-        authority: argv.noGovernance ? provider.wallet.publicKey : governance,
+        authority: argv.noGovernance ? me : governance,
         config: {
           windowSizeSeconds: new anchor.BN(60 * 60),
           thresholdType: ThresholdType.Absolute as never,

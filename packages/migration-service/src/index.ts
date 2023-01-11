@@ -90,6 +90,12 @@ server.get<{
         [userWallet, limit || 200, offset || 0]
       )
     ).rows;
+    const luts = (
+      await client.query(
+        "SELECT * FROM lookup_tables",
+        []
+      )
+    ).rows.map(row => row.pubkey);
     const recentBlockhash = (await provider.connection.getLatestBlockhash())
       .blockhash;
 
@@ -117,7 +123,6 @@ server.get<{
               id,
             }: {
               id: number;
-              lookup_table: string;
               compiled: Buffer;
               proof: string[];
             },
@@ -170,11 +175,16 @@ server.get<{
     ).filter((v) => Boolean(v && v.transaction));
 
     if (asExecuteTxs.length > 0) {
-      const lookupTableAcc = (
-        await provider.connection.getAddressLookupTable(
-          new PublicKey(results[0].lookup_table)
+      const lookupTableAccs = await Promise.all(
+        luts.map(
+          async (lut) =>
+            (
+              await provider.connection.getAddressLookupTable(
+                new PublicKey(lut)
+              )
+            ).value
         )
-      ).value;
+      );
       return {
         count: Number(
           (
@@ -185,10 +195,10 @@ server.get<{
           ).rows[0].count
         ),
         transactions: await Promise.all(
-          asExecuteTxs.map((val, idx) => {
+          asExecuteTxs.map((val) => {
             const { transaction: tx, id } = val;
             const ret = new VersionedTransaction(
-              tx.compileToV0Message([lookupTableAcc])
+              tx.compileToV0Message(lookupTableAccs)
             );
 
             try {

@@ -69,7 +69,7 @@ export class DatabaseMock implements Database {
       console.error("No asset found", assetId.toBase58())
       return "0"
     }
-    const eccCompact = asset.content.uri.split("/").slice(-1)[0] as string;
+    const eccCompact = asset.content.json_uri.split("/").slice(-1)[0] as string;
     try {
     const pubkey = Address.fromB58(eccCompact);
       return Math.floor(
