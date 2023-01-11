@@ -7,6 +7,7 @@ pub mod error;
 pub mod instructions;
 pub mod state;
 pub mod token_metadata;
+pub(crate) mod utils;
 
 pub use instructions::*;
 pub use state::*;

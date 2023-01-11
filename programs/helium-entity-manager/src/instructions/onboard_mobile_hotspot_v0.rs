@@ -3,6 +3,7 @@ use std::mem::size_of;
 use crate::{
   state::*,
   token_metadata::{hash_creators, hash_metadata, MetadataArgs},
+  utils::hotspot_key,
 };
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
@@ -29,12 +30,6 @@ pub struct OnboardMobileHotspotArgsV0 {
   pub metadata: MetadataArgs,
   pub root: [u8; 32],
   pub index: u32,
-}
-
-fn hotspot_key(uri: &str) -> &str {
-  // Expect something like https://mobile-metadata.oracle.test-helium.com/:eccCompact
-  // So just take the id after the last slash
-  uri.split('/').last().unwrap()
 }
 
 #[derive(Accounts)]
