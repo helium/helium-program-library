@@ -18,39 +18,29 @@ use shared_utils::*;
 use spl_account_compression::program::SplAccountCompression;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct UpdateIotInfoArgsV0 {
+pub struct UpdateMobileInfoArgsV0 {
   pub location: Option<u64>,
-  pub elevation: Option<i32>,
-  pub gain: Option<i32>,
   pub hash: [u8; 32],
   pub root: [u8; 32],
   pub index: u32,
 }
 
 impl ConfigSettingsV0 {
-  pub fn is_valid_iot(self, args: UpdateIotInfoArgsV0) -> bool {
-    match (args.gain, self) {
-      (
-        Some(gain),
-        ConfigSettingsV0::IotConfig {
-          max_gain, min_gain, ..
-        },
-      ) => gain <= max_gain && gain >= min_gain,
-      _ => true,
-    }
+  pub fn is_valid_mobile(self, _: UpdateMobileInfoArgsV0) -> bool {
+    matches!(self, ConfigSettingsV0::MobileConfig { .. })
   }
 }
 
 #[derive(Accounts)]
-#[instruction(args: UpdateIotInfoArgsV0)]
-pub struct UpdateIotInfoV0<'info> {
+#[instruction(args: UpdateMobileInfoArgsV0)]
+pub struct UpdateMobileInfoV0<'info> {
   pub payer: Signer<'info>,
   pub dc_fee_payer: Signer<'info>,
   #[account(
     mut,
-    constraint = iot_info.asset == get_asset_id(&merkle_tree.key(), u64::try_from(args.index).unwrap())
+    constraint = mobile_info.asset == get_asset_id(&merkle_tree.key(), u64::try_from(args.index).unwrap())
   )]
-  pub iot_info: Box<Account<'info, IotHotspotInfoV0>>,
+  pub mobile_info: Box<Account<'info, MobileHotspotInfoV0>>,
   #[account(mut)]
   pub hotspot_owner: Signer<'info>,
   /// CHECK: The merkle tree
@@ -70,7 +60,7 @@ pub struct UpdateIotInfoV0<'info> {
 
   #[account(
     has_one = sub_dao,
-    constraint = rewardable_entity_config.settings.is_valid_iot(args)
+    constraint = rewardable_entity_config.settings.is_valid_mobile(args)
   )]
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
   #[account(
@@ -105,7 +95,7 @@ pub struct UpdateIotInfoV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-impl<'info> UpdateIotInfoV0<'info> {
+impl<'info> UpdateMobileInfoV0<'info> {
   pub fn burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, BurnWithoutTrackingV0<'info>> {
     let cpi_accounts = BurnWithoutTrackingV0 {
       burn_accounts: BurnCommonV0 {
@@ -124,8 +114,8 @@ impl<'info> UpdateIotInfoV0<'info> {
 }
 
 pub fn handler<'info>(
-  ctx: Context<'_, '_, '_, 'info, UpdateIotInfoV0<'info>>,
-  args: UpdateIotInfoArgsV0,
+  ctx: Context<'_, '_, '_, 'info, UpdateMobileInfoV0<'info>>,
+  args: UpdateMobileInfoArgsV0,
 ) -> Result<()> {
   verify_compressed_nft(VerifyCompressedNftArgs {
     hash: args.hash,
@@ -140,7 +130,7 @@ pub fn handler<'info>(
 
   if let (
     Some(location),
-    ConfigSettingsV0::IotConfig {
+    ConfigSettingsV0::MobileConfig {
       full_location_staking_fee,
       dataonly_location_staking_fee,
       ..
@@ -150,13 +140,13 @@ pub fn handler<'info>(
     ctx.accounts.rewardable_entity_config.settings,
   ) {
     let mut dc_fee: u64 = dataonly_location_staking_fee;
-    if ctx.accounts.iot_info.is_full_hotspot {
+    if ctx.accounts.mobile_info.is_full_hotspot {
       dc_fee = full_location_staking_fee;
     }
 
-    ctx.accounts.iot_info.num_location_asserts = ctx
+    ctx.accounts.mobile_info.num_location_asserts = ctx
       .accounts
-      .iot_info
+      .mobile_info
       .num_location_asserts
       .checked_add(1)
       .unwrap();
@@ -166,14 +156,8 @@ pub fn handler<'info>(
       ctx.accounts.burn_ctx(),
       BurnWithoutTrackingArgsV0 { amount: dc_fee },
     )?;
-    ctx.accounts.iot_info.location = Some(location);
+    ctx.accounts.mobile_info.location = Some(location);
   }
 
-  if args.elevation.is_some() {
-    ctx.accounts.iot_info.elevation = args.elevation;
-  }
-  if args.gain.is_some() {
-    ctx.accounts.iot_info.gain = args.gain;
-  }
   Ok(())
 }

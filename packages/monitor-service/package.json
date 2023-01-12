@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "Prometheus monitoring of important accounts on Solana",
   "repository": {
     "type": "git",
@@ -32,10 +32,10 @@
     "dev": "npx ts-node --project tsconfig.cjs.json src/index.ts"
   },
   "dependencies": {
-    "@helium/circuit-breaker-sdk": "^0.0.13",
-    "@helium/helium-sub-daos-sdk": "^0.0.13",
-    "@helium/idls": "^0.0.13",
-    "@helium/spl-utils": "^0.0.13",
+    "@helium/circuit-breaker-sdk": "^0.0.14",
+    "@helium/helium-sub-daos-sdk": "^0.0.14",
+    "@helium/idls": "^0.0.14",
+    "@helium/spl-utils": "^0.0.14",
     "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
     "@project-serum/anchor": "0.26.0",
     "@solana/spl-token": "^0.3.6",

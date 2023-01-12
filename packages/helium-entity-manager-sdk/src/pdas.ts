@@ -1,17 +1,18 @@
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
-import sha256 from "crypto-js/sha256";
-import hex from "crypto-js/enc-hex";
+import crypto from "crypto";
+// @ts-ignore
+import bs58 from "bs58";
 
-export const hotspotConfigKey = (
+export const rewardableEntityConfigKey = (
   subDao: PublicKey,
   symbol: string,
   programId: PublicKey = PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
     [
-      Buffer.from("hotspot_config", "utf-8"),
+      Buffer.from("rewardable_entity_config", "utf-8"),
       subDao.toBuffer(),
       Buffer.from(symbol, "utf-8"),
     ],
@@ -19,39 +20,64 @@ export const hotspotConfigKey = (
   );
 
 export const hotspotCollectionKey = (
-  subDao: PublicKey,
-  symbol: string,
-  programId: PublicKey = PROGRAM_ID
-) =>
-  PublicKey.findProgramAddressSync(
-    [Buffer.from("collection", "utf-8"), subDao.toBuffer(), Buffer.from(symbol, "utf-8")],
-    programId
-  );
-
-export const hotspotIssuerKey = (
-  hotspotConfig: PublicKey,
   maker: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
+    [Buffer.from("collection", "utf-8"), maker.toBuffer()],
+    programId
+  );
+
+export const makerKey = (
+  name: String,
+  programId: PublicKey = PROGRAM_ID
+) =>
+  PublicKey.findProgramAddressSync(
     [
-      Buffer.from("hotspot_issuer", "utf-8"),
-      hotspotConfig.toBuffer(),
-      maker.toBuffer(),
+      Buffer.from("maker", "utf-8"),
+      Buffer.from(name, "utf-8"),
     ],
     programId
   );
 
-export const iotInfoKey = (
-  hotspotConfig: PublicKey,
-  hotspotKey: string,
+export const keyToAssetKey = async (
+  dao: PublicKey,
+  entityKey: Buffer | string,
   programId: PublicKey = PROGRAM_ID
 ) => {
-  let hexString = sha256(hotspotKey).toString(hex)
-  let seed = Uint8Array.from(Buffer.from(hexString, "hex"));
+  if (typeof entityKey === "string") {
+    entityKey = Buffer.from(bs58.decode(entityKey));
+  }
+  const hash = await crypto.subtle.digest("SHA-256", entityKey);
 
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("iot_info", "utf-8"), hotspotConfig.toBuffer(), seed],
+    [Buffer.from("key_to_asset", "utf-8"), dao.toBuffer(), Buffer.from(hash)],
+    programId
+  );
+};
+
+export const iotInfoKey = (
+  rewardableEntityConfig: PublicKey,
+  assetId: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+) => {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("iot_info", "utf-8"), rewardableEntityConfig.toBuffer(), assetId.toBuffer()],
+    programId
+  );
+};
+
+export const mobileInfoKey = (
+  rewardableEntityConfig: PublicKey,
+  assetId: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+) => {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("mobile_info", "utf-8"),
+      rewardableEntityConfig.toBuffer(),
+      assetId.toBuffer(),
+    ],
     programId
   );
 };

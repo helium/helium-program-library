@@ -1,3 +1,4 @@
+import { Creator, Uses } from "@metaplex-foundation/mpl-bubblegum";
 import { PublicKey } from "@solana/web3.js";
 import axios from "axios";
 // @ts-ignore
@@ -26,6 +27,17 @@ export type Asset = {
   ownership: {
     owner: PublicKey;
   };
+  royalty: {
+    basis_points: number;
+    primary_sale_happened: boolean;
+  };
+  mutable: boolean;
+  supply: {
+    edition_nonce: number | null;
+  };
+  grouping?: PublicKey;
+  uses?: Uses;
+  creators: Creator[];
 };
 
 export async function getAsset(
@@ -53,6 +65,7 @@ function toAsset(result: any): Asset {
   return {
     ...result,
     id: new PublicKey(result.id),
+    grouping: result.grouping && new PublicKey(result.grouping),
     compression: {
       ...result.compression,
       dataHash:

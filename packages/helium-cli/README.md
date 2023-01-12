@@ -10,12 +10,18 @@ Now, go approve and run all commands in realms.
 Now, create a maker. Note that this will need to be done for each maker.
 
 ```
-npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u https://api.devnet.solana.com -n IOT --subdaoMint $(solana address -k keypairs/iot.json) --makerKey 13EYmQgDF1ScLxXfugVrFCa3HiJUALwsaLBHJpTsXx1KP6UncH7
 
-npx ts-node --project tsconfig.cjs.json src/mint-dc.ts -u https://api.devnet.solana.com --destination 3ZwL45WPyjKg3GejkGTbP6kMCQcr73qkVCdQL3Afb3Cx --numHnt 10000 --dcKey $(solana address -k keypairs/dc.json)
+npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u http://127.0.0.1:8899 --symbol IOT --subdaoMint $(solana address -k keypairs/iot.json) --fromFile makers.json
+
+```
+
+Now, fund any maker wallets
+
+```
+npx ts-node --project tsconfig.cjs.json src/mint-dc.ts -u https://api.devnet.solana.com --destination maker_address --numHnt 10000 --dcKey $(solana address -k keypairs/dc.json)
 
 # If needed, fund the maker wallet
-solana transfer -u devnet 3ZwL45WPyjKg3GejkGTbP6kMCQcr73qkVCdQL3Afb3Cx 1 --allow-unfunded-recipient 
+solana transfer -u devnet maker_address 1 --allow-unfunded-recipient 
 ```
 
 Now, go approve and run maker create in realms
