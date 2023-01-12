@@ -1,10 +1,8 @@
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
-import { Asset, getAsset, getAssetProof, AssetProof } from "@helium/spl-utils";
-import { BN, Idl, Program } from "@project-serum/anchor";
+import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
+import { Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
-import Address from "@helium/address";
 import { iotInfoKey } from "../pdas";
-import { assetToMetadataArgs } from "../utils";
 
 export async function onboardIotHotspot({
   program,
@@ -39,18 +37,14 @@ export async function onboardIotHotspot({
   const { root, proof, leaf, treeId, nodeIndex } = assetProof;
   const {
     ownership: { owner },
-    content: { json_uri: uri },
   } = asset;
-  const eccCompact = uri.split("/").slice(-1)[0];
-
-  const [info] = iotInfoKey(rewardableEntityConfig, eccCompact);
+  const [info] = iotInfoKey(rewardableEntityConfig, assetId);
 
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
-  const anchorMetadata = assetToMetadataArgs(asset);
   return program.methods
     .onboardIotHotspotV0({
-      metadata: anchorMetadata,
+      hash: leaf.toBuffer().toJSON().data,
       root: root.toBuffer().toJSON().data,
       index: nodeIndex,
     })
@@ -61,7 +55,7 @@ export async function onboardIotHotspot({
       iotInfo: info,
       merkleTree: treeId,
       maker,
-      issuingAuthority: makerAcc?.issuingAuthority
+      issuingAuthority: makerAcc?.issuingAuthority,
     })
     .remainingAccounts(
       proof.map((p) => {

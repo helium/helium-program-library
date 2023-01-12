@@ -18,7 +18,7 @@ use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct GenesisIssueHotspotArgsV0 {
-  pub hotspot_key: String,
+  pub entity_key: Vec<u8>,
   pub location: Option<u64>,
   pub elevation: Option<i32>,
   pub gain: Option<i32>,
@@ -53,11 +53,22 @@ pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     init,
     payer = lazy_signer,
+    space = 1 + std::mem::size_of::<KeyToAssetV0>() + args.entity_key.len(),
+    seeds = [
+      "key_to_asset".as_bytes(),
+      &hash(&args.entity_key[..]).to_bytes()
+    ],
+    bump
+  )]
+  pub key_to_asset: Box<Account<'info, KeyToAssetV0>>,
+  #[account(
+    init,
+    payer = lazy_signer,
     space = 8 + 60 + std::mem::size_of::<IotHotspotInfoV0>(),
     seeds = [
       "iot_info".as_bytes(),
       rewardable_entity_config.key().as_ref(),
-      &hash(args.hotspot_key.as_bytes()).to_bytes()
+      get_asset_id(&merkle_tree.key(), tree_authority.num_minted.into()).as_ref()
     ],
     bump
   )]
@@ -116,8 +127,12 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,
   );
-  let animal_name: AnimalName = args
-    .hotspot_key
+  let key_str = bs58::encode(args
+    .entity_key.clone()
+  )
+    .into_string();
+
+  let animal_name: AnimalName = key_str
     .parse()
     .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
 
@@ -133,7 +148,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     symbol: String::from("HOTSPOT"),
     uri: format!(
       "https://metadata.oracle.test-helium.com/{}",
-      args.hotspot_key
+      key_str
     ),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
@@ -156,9 +171,14 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     metadata,
   )?;
 
+  ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
+    entity_key: args.entity_key,
+    asset: asset_id,
+    bump_seed: ctx.bumps["key_to_asset"]
+  });
+
   ctx.accounts.info.set_inner(IotHotspotInfoV0 {
     asset: asset_id,
-    hotspot_key: args.hotspot_key,
     location: args.location,
     bump_seed: ctx.bumps["info"],
     elevation: args.elevation,

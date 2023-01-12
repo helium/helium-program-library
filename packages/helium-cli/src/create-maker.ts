@@ -57,7 +57,7 @@ const yarg = yargs(hideBin(process.argv)).options({
     required: false,
   },
   makerCount: {
-    alias: "m",
+    alias: "c",
     type: "number",
     describe: "Estimated number of hotspots this maker will have",
     required: false,
@@ -88,7 +88,6 @@ const merkleSizes = [
 
 async function run() {
   const argv = await yarg.argv;
-  console.log(argv.url);
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
@@ -114,6 +113,7 @@ async function run() {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hemProgram = await initHem(provider);
   const hsdProgram = await initHsd(provider);
+  console.log(makers);
   const conn = provider.connection;
 
         console.log(

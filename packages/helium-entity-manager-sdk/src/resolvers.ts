@@ -5,9 +5,10 @@ import {
   heliumCommonResolver,
   resolveIndividual,
 } from "@helium/spl-utils";
-import { iotInfoKey, mobileInfoKey } from "./pdas";
+import { iotInfoKey, keyToAssetKey, mobileInfoKey } from "./pdas";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
+import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 
 export const heliumEntityManagerResolvers = combineResolvers(
   heliumCommonResolver,
@@ -17,15 +18,27 @@ export const heliumEntityManagerResolvers = combineResolvers(
     mint: "collection",
     owner: "maker",
   }),
+  resolveIndividual(async ({ path, args }) => {
+    if (
+      path[path.length - 1] === "keyToAsset" &&
+      args[args.length - 1].entityKey
+    ) {
+      return (await keyToAssetKey(args[args.length - 1].entityKey))[0];
+    }
+  }),
   resolveIndividual(async ({ path, args, provider, accounts }) => {
     if (
       path[path.length - 1] === "iotInfo" &&
-      args[args.length - 1].metadata &&
+      args[args.length - 1].index &&
+      accounts.merkleTree &&
       accounts.rewardableEntityConfig
     ) {
       return iotInfoKey(
         accounts.rewardableEntityConfig as PublicKey,
-        args[args.length - 1].metadata.uri.split("/").slice(-1)[0]
+        await getLeafAssetId(
+          accounts.merkleTree as PublicKey,
+          args[args.length - 1].index
+        )
       )[0];
     } else if (path[path.length - 1] === "recipient") {
       // @ts-ignore
@@ -35,12 +48,16 @@ export const heliumEntityManagerResolvers = combineResolvers(
   resolveIndividual(async ({ path, args, provider, accounts }) => {
     if (
       path[path.length - 1] === "mobileInfo" &&
-      args[args.length - 1].metadata &&
+      args[args.length - 1].index &&
+      accounts.merkleTree &&
       accounts.rewardableEntityConfig
     ) {
       return mobileInfoKey(
         accounts.rewardableEntityConfig as PublicKey,
-        args[args.length - 1].metadata.uri.split("/").slice(-1)[0]
+        await getLeafAssetId(
+          accounts.merkleTree as PublicKey,
+          args[args.length - 1].index
+        )
       )[0];
     } else if (path[path.length - 1] === "recipient") {
       // @ts-ignore

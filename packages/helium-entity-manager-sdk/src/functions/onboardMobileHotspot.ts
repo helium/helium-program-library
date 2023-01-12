@@ -3,7 +3,6 @@ import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { mobileInfoKey } from "../pdas";
-import { assetToMetadataArgs } from "../utils";
 
 export async function onboardMobileHotspot({
   program,
@@ -35,21 +34,18 @@ export async function onboardMobileHotspot({
   if (!assetProof) {
     throw new Error("No asset proof with ID " + assetId.toBase58());
   }
-  const { root, proof, treeId, nodeIndex } = assetProof;
+  const { root, proof, treeId, nodeIndex, leaf } = assetProof;
   const {
     ownership: { owner },
-    content: { json_uri: uri },
   } = asset;
-  const eccCompact = uri.split("/").slice(-1)[0];
 
-  const [info] = mobileInfoKey(rewardableEntityConfig, eccCompact);
+  const [info] = mobileInfoKey(rewardableEntityConfig, assetId);
 
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
-  const anchorMetadata = assetToMetadataArgs(asset);
   return program.methods
     .onboardMobileHotspotV0({
-      metadata: anchorMetadata,
+      hash: leaf.toBuffer().toJSON().data,
       root: root.toBuffer().toJSON().data,
       index: nodeIndex,
     })

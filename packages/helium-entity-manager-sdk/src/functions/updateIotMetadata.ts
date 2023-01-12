@@ -41,11 +41,9 @@ export async function updateIotMetadata({
   const { root, proof, leaf, treeId, nodeIndex } = assetProof;
   const {
     ownership: { owner },
-    content: { json_uri: uri },
   } = asset;
-  const eccCompact = uri.split("/").slice(-1)[0];
 
-  const [info] = iotInfoKey(rewardableEntityConfig, eccCompact);
+  const [info] = iotInfoKey(rewardableEntityConfig, assetId);
 
   return program.methods
     .updateIotInfoV0({

@@ -257,7 +257,7 @@ describe("helium-entity-manager", () => {
     it("issues a mobile hotspot", async () => {
       await hemProgram.methods
         .issueEntityV0({
-          entityKey: ecc,
+          entityKey: Buffer.from(bs58.decode(ecc)),
         })
         .accounts({
           maker,
@@ -284,14 +284,14 @@ describe("helium-entity-manager", () => {
       const mobileInfoAcc = await hemProgram.account.mobileHotspotInfoV0.fetch(
         mobileInfo!
       );
-      expect(mobileInfoAcc.hotspotKey).to.eq(ecc);
+      expect(Boolean(mobileInfoAcc)).to.be.true;
     });
 
     describe("with hotspot", () => {
       beforeEach(async () => {
         await hemProgram.methods
           .issueEntityV0({
-            entityKey: ecc,
+            entityKey: Buffer.from(bs58.decode(ecc)),
           })
           .accounts({
             maker,
@@ -468,7 +468,7 @@ describe("helium-entity-manager", () => {
     it("issues an iot hotspot", async () => {
       await hemProgram.methods
         .issueEntityV0({
-          entityKey: ecc,
+          entityKey: Buffer.from(bs58.decode(ecc)),
         })
         .accounts({
           maker,
@@ -495,7 +495,7 @@ describe("helium-entity-manager", () => {
       const iotInfoAccount = await hemProgram.account.iotHotspotInfoV0.fetch(
         iotInfo!
       );
-      expect(iotInfoAccount.hotspotKey).to.eq(ecc);
+      expect(Boolean(iotInfoAccount)).to.be.true;
     });
 
     it("updates entity config", async () => {
@@ -523,7 +523,7 @@ describe("helium-entity-manager", () => {
       beforeEach(async () => {
         await hemProgram.methods
           .issueEntityV0({
-            entityKey: ecc,
+            entityKey: Buffer.from(bs58.decode(ecc)),
           })
           .accounts({
             maker,

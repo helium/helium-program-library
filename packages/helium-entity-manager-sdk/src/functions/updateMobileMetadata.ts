@@ -37,11 +37,9 @@ export async function updateMobileMetadata({
   const { root, proof, leaf, treeId, nodeIndex } = assetProof;
   const {
     ownership: { owner },
-    content: { json_uri: uri },
   } = asset;
-  const eccCompact = uri.split("/").slice(-1)[0];
 
-  const [info] = mobileInfoKey(rewardableEntityConfig, eccCompact);
+  const [info] = mobileInfoKey(rewardableEntityConfig, assetId);
 
   return program.methods
     .updateMobileInfoV0({

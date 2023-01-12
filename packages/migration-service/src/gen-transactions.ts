@@ -2,9 +2,11 @@ import Address from "@helium/address";
 import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
 import { mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
 import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
+import bs58 from "bs58";
 import {
   init as initHem,
   iotInfoKey,
+  keyToAssetKey,
   makerKey,
   PROGRAM_ID as HEM_PROGRAM_ID,
   rewardableEntityConfigKey,
@@ -376,7 +378,7 @@ async function run() {
 
           return hemProgramNoResolve.methods
             .genesisIssueHotspotV0({
-              hotspotKey: hotspot.address,
+              entityKey: Buffer.from(bs58.decode(hotspot.address)),
               location:
                 hotspot.location != null && hotspot.location != "null"
                   ? new BN(hotspot.location)
@@ -403,6 +405,7 @@ async function run() {
               systemProgram: SystemProgram.programId,
               rewardableEntityConfig: iotRewardableEntityConfig,
               maker: hotspotPubkeysForMaker.maker,
+              keyToAsset: keyToAssetKey(hotspot.address)[0],
               recipient: solAddress,
               info: iotInfoKey(iotRewardableEntityConfig, hotspot.address)[0],
               lazySigner,

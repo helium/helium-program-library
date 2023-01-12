@@ -1,8 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
-import sha256 from "crypto-js/sha256";
-import hex from "crypto-js/enc-hex";
+import crypto from "crypto";
 
 export const rewardableEntityConfigKey = (
   subDao: PublicKey,
@@ -39,33 +38,39 @@ export const makerKey = (
     programId
   );
 
-export const iotInfoKey = (
-  rewardableEntityConfig: PublicKey,
-  hotspotKey: string,
+export const keyToAssetKey = async (
+  entityKey: Buffer,
   programId: PublicKey = PROGRAM_ID
 ) => {
-  let hexString = sha256(hotspotKey).toString(hex)
-  let seed = Uint8Array.from(Buffer.from(hexString, "hex"));
+  const hash = await crypto.subtle.digest("SHA-256", entityKey);
 
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("iot_info", "utf-8"), rewardableEntityConfig.toBuffer(), seed],
+    [Buffer.from("key_to_asset", "utf-8"), Buffer.from(hash)],
+    programId
+  );
+}
+
+export const iotInfoKey = (
+  rewardableEntityConfig: PublicKey,
+  assetId: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+) => {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("iot_info", "utf-8"), rewardableEntityConfig.toBuffer(), assetId.toBuffer()],
     programId
   );
 };
 
 export const mobileInfoKey = (
   rewardableEntityConfig: PublicKey,
-  hotspotKey: string,
+  assetId: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ) => {
-  let hexString = sha256(hotspotKey).toString(hex);
-  let seed = Uint8Array.from(Buffer.from(hexString, "hex"));
-
   return PublicKey.findProgramAddressSync(
     [
       Buffer.from("mobile_info", "utf-8"),
       rewardableEntityConfig.toBuffer(),
-      seed,
+      assetId.toBuffer(),
     ],
     programId
   );

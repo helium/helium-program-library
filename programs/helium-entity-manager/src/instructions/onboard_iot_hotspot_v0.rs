@@ -2,11 +2,8 @@ use std::mem::size_of;
 
 use crate::{
   state::*,
-  token_metadata::{hash_creators, hash_metadata, MetadataArgs},
-  utils::hotspot_key,
 };
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
@@ -21,13 +18,13 @@ use data_credits::{
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
 
-use mpl_bubblegum::{state::leaf_schema::LeafSchema, utils::get_asset_id};
+use mpl_bubblegum::{utils::get_asset_id};
 use shared_utils::*;
 use spl_account_compression::program::SplAccountCompression;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct OnboardIotHotspotArgsV0 {
-  pub metadata: MetadataArgs,
+  pub hash: [u8; 32],
   pub root: [u8; 32],
   pub index: u32,
 }
@@ -46,7 +43,7 @@ pub struct OnboardIotHotspotV0<'info> {
     seeds = [
       b"iot_info", 
       rewardable_entity_config.key().as_ref(),
-      &hash(hotspot_key(&args.metadata.uri[..]).as_bytes()).to_bytes()
+      get_asset_id(&merkle_tree.key(), args.index.into()).as_ref(),
     ],
     bump,
   )]
@@ -129,25 +126,9 @@ pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, OnboardIotHotspotV0<'info>>,
   args: OnboardIotHotspotArgsV0,
 ) -> Result<()> {
-  let key = hotspot_key(&args.metadata.uri[..]);
-
-  let asset_id = get_asset_id(
-    &ctx.accounts.merkle_tree.key(),
-    u64::try_from(args.index).unwrap(),
-  );
-  let data_hash = hash_metadata(&args.metadata)?;
-  let creator_hash = hash_creators(&args.metadata.creators)?;
-  let leaf = LeafSchema::new_v0(
-    asset_id,
-    ctx.accounts.hotspot_owner.key(),
-    ctx.accounts.hotspot_owner.key(),
-    args.index.into(),
-    data_hash,
-    creator_hash,
-  );
-
+  let asset_id = get_asset_id(&ctx.accounts.merkle_tree.key(), args.index.into());
   verify_compressed_nft(VerifyCompressedNftArgs {
-    hash: leaf.to_node(),
+    hash: args.hash,
     root: args.root,
     index: args.index,
     compression_program: ctx.accounts.compression_program.to_account_info(),
@@ -167,7 +148,6 @@ pub fn handler<'info>(
 
   ctx.accounts.iot_info.set_inner(IotHotspotInfoV0 {
     asset: asset_id,
-    hotspot_key: key.to_string(),
     bump_seed: ctx.bumps["iot_info"],
     location: None,
     elevation: None,

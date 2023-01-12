@@ -58,10 +58,16 @@ pub struct MakerApprovalV0 {
 
 #[account]
 #[derive(Default)]
+pub struct KeyToAssetV0 {
+  pub entity_key: Vec<u8>,
+  pub asset: Pubkey,
+  pub bump_seed: u8,
+}
+
+#[account]
+#[derive(Default)]
 pub struct IotHotspotInfoV0 {
   pub asset: Pubkey,
-  pub hotspot_key: String,
-
   pub bump_seed: u8,
 
   pub location: Option<u64>,
@@ -75,8 +81,6 @@ pub struct IotHotspotInfoV0 {
 #[derive(Default)]
 pub struct MobileHotspotInfoV0 {
   pub asset: Pubkey,
-  pub hotspot_key: String,
-
   pub bump_seed: u8,
 
   pub location: Option<u64>,

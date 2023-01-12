@@ -3,10 +3,12 @@ use std::cmp::min;
 use crate::state::*;
 use crate::{constants::HOTSPOT_METADATA_URL, error::ErrorCode};
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::hash::hash;
 use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
 use mpl_bubblegum::state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion};
 use mpl_bubblegum::state::{metaplex_adapter::TokenStandard, TreeConfig};
+use mpl_bubblegum::utils::get_asset_id;
 use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
   program::Bubblegum,
@@ -15,7 +17,7 @@ use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueEntityArgsV0 {
-  pub entity_key: String,
+  pub entity_key: Vec<u8>,
 }
 
 #[derive(Accounts)]
@@ -47,6 +49,17 @@ pub struct IssueEntityV0<'info> {
     has_one = merkle_tree,
   )]
   pub maker: Box<Account<'info, MakerV0>>,
+  #[account(
+    init,
+    payer = payer,
+    space = 1 + std::mem::size_of::<KeyToAssetV0>() + args.entity_key.len(),
+    seeds = [
+      "key_to_asset".as_bytes(),
+      &hash(&args.entity_key[..]).to_bytes()
+    ],
+    bump
+  )]
+  pub key_to_asset: Box<Account<'info, KeyToAssetV0>>,
   #[account(
       mut,
       seeds = [merkle_tree.key().as_ref()],
@@ -101,8 +114,11 @@ impl<'info> IssueEntityV0<'info> {
 }
 
 pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<()> {
-  let animal_name: AnimalName = args
-    .entity_key
+    let key_str = bs58::encode(args
+    .entity_key.clone()
+  )
+    .into_string();
+  let animal_name: AnimalName = key_str
     .parse()
     .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
 
@@ -111,12 +127,13 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
     ctx.accounts.maker.name.as_bytes(),
     &[ctx.accounts.maker.bump_seed],
   ]];
+  let asset_id = get_asset_id(&ctx.accounts.merkle_tree.key(), ctx.accounts.tree_authority.num_minted);
 
   let name = animal_name.to_string();
   let metadata = MetadataArgs {
     name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("{}/{}", HOTSPOT_METADATA_URL, args.entity_key),
+    uri: format!("{}/{}", HOTSPOT_METADATA_URL, key_str),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
@@ -138,6 +155,12 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
       .with_signer(maker_seeds),
     metadata,
   )?;
+
+  ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
+    entity_key: args.entity_key,
+    asset: asset_id,
+    bump_seed: ctx.bumps["key_to_asset"]
+  });
 
   Ok(())
 }
