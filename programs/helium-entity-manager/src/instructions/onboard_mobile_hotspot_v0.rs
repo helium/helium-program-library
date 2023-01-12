@@ -1,6 +1,6 @@
 use std::mem::size_of;
 
-use crate::{state::*};
+use crate::state::*;
 use anchor_lang::prelude::*;
 
 use anchor_spl::{
@@ -17,7 +17,7 @@ use data_credits::{
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
 
-use mpl_bubblegum::{utils::get_asset_id};
+use mpl_bubblegum::utils::get_asset_id;
 use shared_utils::*;
 use spl_account_compression::program::SplAccountCompression;
 

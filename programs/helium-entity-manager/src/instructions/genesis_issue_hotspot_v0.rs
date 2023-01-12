@@ -143,7 +143,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
   let metadata = MetadataArgs {
     name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("https://metadata.oracle.test-helium.com/{}", key_str),
+    uri: format!("{}/{}", HOTSPOT_METADATA_URL, key_str),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
