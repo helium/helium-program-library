@@ -1,8 +1,8 @@
 use std::mem::size_of;
 
-use crate::{state::*, utils::hotspot_key};
+use crate::{state::*};
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
+
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
@@ -17,7 +17,7 @@ use data_credits::{
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
 
-use mpl_bubblegum::{state::leaf_schema::LeafSchema, utils::get_asset_id};
+use mpl_bubblegum::{utils::get_asset_id};
 use shared_utils::*;
 use spl_account_compression::program::SplAccountCompression;
 

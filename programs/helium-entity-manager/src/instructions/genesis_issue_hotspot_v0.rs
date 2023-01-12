@@ -68,7 +68,7 @@ pub struct GenesisIssueHotspotV0<'info> {
     seeds = [
       "iot_info".as_bytes(),
       rewardable_entity_config.key().as_ref(),
-      get_asset_id(&merkle_tree.key(), tree_authority.num_minted.into()).as_ref()
+      get_asset_id(&merkle_tree.key(), tree_authority.num_minted).as_ref()
     ],
     bump
   )]
