@@ -1,6 +1,6 @@
-use crate::{circuit_breaker::*, current_epoch, next_epoch_ts};
+use crate::{circuit_breaker::*, next_epoch_ts};
 use crate::{state::*, EPOCH_LENGTH};
-use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
+use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::{set_authority, Mint, SetAuthority, Token, TokenAccount};
@@ -15,6 +15,7 @@ use circuit_breaker::{
   ThresholdType as CBThresholdType,
   WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
 };
+use clockwork_sdk::utils::anchor_sighash;
 use clockwork_sdk::{cpi::thread_create, state::Trigger, ThreadProgram};
 use shared_utils::resize_to_fit;
 use switchboard_v2::AggregatorAccountData;
@@ -148,15 +149,16 @@ pub struct InitializeSubDaoV0<'info> {
   pub clockwork: Program<'info, ThreadProgram>,
 }
 
+// returns a cron that starts at <offset> past the end of the current epoch and triggers at the same time daily.
 pub fn create_end_epoch_cron(curr_ts: i64, offset: u64) -> String {
   let next_epoch = next_epoch_ts(curr_ts) + offset;
   let dt = OffsetDateTime::from_unix_timestamp(next_epoch.try_into().unwrap())
     .ok()
     .unwrap();
-  format!("0 {:?} {:?} * * * *", dt.minute(), dt.hour(),)
+  format!("0 {:?} {:?} * * * *", dt.minute(), dt.hour())
 }
 
-fn construct_kickoff_ix(ctx: &Context<InitializeSubDaoV0>, epoch: u64) -> Option<Instruction> {
+fn construct_kickoff_ix(ctx: &Context<InitializeSubDaoV0>) -> Option<Instruction> {
   // build clockwork kickoff ix
   let accounts = vec![
     AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
@@ -172,10 +174,7 @@ fn construct_kickoff_ix(ctx: &Context<InitializeSubDaoV0>, epoch: u64) -> Option
   Some(Instruction {
     program_id: crate::ID,
     accounts,
-    data: crate::instruction::CalculateUtilityScoreV0 {
-      args: crate::CalculateUtilityScoreArgsV0 { epoch },
-    }
-    .data(),
+    data: anchor_sighash("clockwork_kickoff_v0").to_vec(),
   })
 }
 
@@ -310,8 +309,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     &ctx.accounts.system_program.to_account_info(),
     &ctx.accounts.sub_dao,
   )?;
-  let epoch = current_epoch(curr_ts);
-  let kickoff_ix = construct_kickoff_ix(&ctx, epoch).unwrap();
+  let kickoff_ix = construct_kickoff_ix(&ctx).unwrap();
   let cron = create_end_epoch_cron(curr_ts, 60 * 5);
   // initialize thread
   thread_create(

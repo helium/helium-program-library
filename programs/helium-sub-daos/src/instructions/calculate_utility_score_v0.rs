@@ -81,7 +81,7 @@ fn construct_next_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> Inst
       "mint_windowed_breaker".as_bytes(),
       ctx.accounts.dao.hnt_mint.as_ref(),
     ],
-    &crate::id(),
+    &ctx.accounts.circuit_breaker_program.key(),
   )
   .0;
   let dnt_circuit_breaker = Pubkey::find_program_address(
@@ -89,7 +89,7 @@ fn construct_next_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> Inst
       "mint_windowed_breaker".as_bytes(),
       ctx.accounts.sub_dao.dnt_mint.as_ref(),
     ],
-    &crate::id(),
+    &ctx.accounts.circuit_breaker_program.key(),
   )
   .0;
   // issue rewards ix
@@ -147,6 +147,7 @@ pub fn handler(
       ctx.accounts.dao.net_emissions_cap,
     ))
     .unwrap();
+  ctx.accounts.dao_epoch_info.epoch = args.epoch;
 
   ctx.accounts.dao_epoch_info.current_hnt_supply = curr_supply
     .checked_add(ctx.accounts.dao_epoch_info.total_rewards)
@@ -286,7 +287,7 @@ pub fn handler(
       .unwrap();
   }
 
-  let next_ix = construct_next_ix(&ctx, epoch);
+  let next_ix = construct_next_ix(&ctx, args.epoch);
   Ok(ThreadResponse {
     kickoff_instruction: None,
     next_instruction: Some(next_ix.into()),
