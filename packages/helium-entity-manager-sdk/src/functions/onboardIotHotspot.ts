@@ -1,6 +1,7 @@
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
+import { ConcurrentMerkleTreeAccount } from "@solana/spl-account-compression";
 import { PublicKey } from "@solana/web3.js";
 import { iotInfoKey, keyToAssetKey } from "../pdas";
 
@@ -46,6 +47,12 @@ export async function onboardIotHotspot({
 
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
+  const canopy = await(
+    await ConcurrentMerkleTreeAccount.fromAccountAddress(
+      program.provider.connection,
+      treeId
+    )
+  ).getCanopyDepth();
   const keyToAsset = (
     await keyToAssetKey(dao, json_uri.split("/").slice(-1)[0])
   )[0];
@@ -67,7 +74,7 @@ export async function onboardIotHotspot({
       keyToAsset,
     })
     .remainingAccounts(
-      proof.map((p) => {
+      proof.slice(0, proof.length - canopy).map((p) => {
         return {
           pubkey: p,
           isWritable: false,

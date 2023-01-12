@@ -1,6 +1,7 @@
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
+import { ConcurrentMerkleTreeAccount } from "@solana/spl-account-compression";
 import { PublicKey } from "@solana/web3.js";
 import { keyToAssetKey, mobileInfoKey } from "../pdas";
 
@@ -43,7 +44,12 @@ export async function onboardMobileHotspot({
   } = asset;
 
   const [info] = mobileInfoKey(rewardableEntityConfig, assetId);
-
+  const canopy = await(
+    await ConcurrentMerkleTreeAccount.fromAccountAddress(
+      program.provider.connection,
+      treeId
+    )
+  ).getCanopyDepth();
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
   return program.methods
@@ -66,7 +72,7 @@ export async function onboardMobileHotspot({
       )[0],
     })
     .remainingAccounts(
-      proof.map((p) => {
+      proof.slice(0, proof.length - canopy).map((p) => {
         return {
           pubkey: p,
           isWritable: false,

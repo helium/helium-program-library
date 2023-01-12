@@ -1,6 +1,7 @@
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
 import { BN, Program } from "@project-serum/anchor";
+import { ConcurrentMerkleTreeAccount } from "@solana/spl-account-compression";
 import { PublicKey } from "@solana/web3.js";
 import { iotInfoKey, mobileInfoKey } from "../pdas";
 
@@ -38,7 +39,12 @@ export async function updateMobileMetadata({
   const {
     ownership: { owner },
   } = asset;
-
+  const canopy = await(
+    await ConcurrentMerkleTreeAccount.fromAccountAddress(
+      program.provider.connection,
+      treeId
+    )
+  ).getCanopyDepth();
   const [info] = mobileInfoKey(rewardableEntityConfig, assetId);
 
   return program.methods
@@ -55,7 +61,7 @@ export async function updateMobileMetadata({
       merkleTree: treeId,
     })
     .remainingAccounts(
-      proof.map((p) => {
+      proof.slice(0, proof.length - canopy).map((p) => {
         return {
           pubkey: p,
           isWritable: false,
