@@ -1,6 +1,16 @@
 #!/bin/bash
 
-./scripts/init-idls.sh
+CLUSTER=$1
+
+if [ "$CLUSTER" == "mainnet" ]; then
+    CLUSTER_URL='https://api.mainnet-beta.solana.com'    
+elif [ "$CLUSTER" == "devnet" ]; then
+    CLUSTER_URL='https://api.devnet.solana.com'
+else
+    CLUSTER_URL='http://127.0.0.1:8899'
+    ./scripts/init-idls.sh
+fi
+
 
 # create keypairs if they don't exist
 KEYPAIRS=( 'hnt.json' 'hst.json' 'dc.json' 'mobile.json' 'iot.json' 'council.json' 'aggregator.json' 'merkle.json' 'oracle.json' )

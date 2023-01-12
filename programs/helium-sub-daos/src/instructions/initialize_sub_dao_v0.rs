@@ -1,6 +1,6 @@
-use crate::{circuit_breaker::*, current_epoch, next_epoch_ts};
+use crate::{circuit_breaker::*, next_epoch_ts};
 use crate::{state::*, EPOCH_LENGTH};
-use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
+use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::{set_authority, Mint, SetAuthority, Token, TokenAccount};
@@ -15,7 +15,8 @@ use circuit_breaker::{
   ThresholdType as CBThresholdType,
   WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
 };
-use clockwork_sdk::{cpi::thread_create, state::Trigger, utils::PAYER_PUBKEY, ThreadProgram};
+use clockwork_sdk::utils::anchor_sighash;
+use clockwork_sdk::{cpi::thread_create, state::Trigger, ThreadProgram};
 use shared_utils::resize_to_fit;
 use switchboard_v2::AggregatorAccountData;
 use time::OffsetDateTime;
@@ -148,12 +149,33 @@ pub struct InitializeSubDaoV0<'info> {
   pub clockwork: Program<'info, ThreadProgram>,
 }
 
-fn create_end_epoch_cron(curr_ts: i64, offset: u64) -> String {
+// returns a cron that starts at <offset> past the end of the current epoch and triggers at the same time daily.
+pub fn create_end_epoch_cron(curr_ts: i64, offset: u64) -> String {
   let next_epoch = next_epoch_ts(curr_ts) + offset;
   let dt = OffsetDateTime::from_unix_timestamp(next_epoch.try_into().unwrap())
     .ok()
     .unwrap();
-  format!("0 {:?} {:?} * * * *", dt.minute(), dt.hour(),)
+  format!("0 {:?} {:?} * * * *", dt.minute(), dt.hour())
+}
+
+fn construct_kickoff_ix(ctx: &Context<InitializeSubDaoV0>) -> Option<Instruction> {
+  // build clockwork kickoff ix
+  let accounts = vec![
+    AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.sub_dao.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.hnt_mint.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.active_device_aggregator.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
+    AccountMeta::new(ctx.accounts.thread.key(), false),
+    AccountMeta::new_readonly(ctx.accounts.clockwork.key(), false),
+  ];
+  Some(Instruction {
+    program_id: crate::ID,
+    accounts,
+    data: anchor_sighash("clockwork_kickoff_v0").to_vec(),
+  })
 }
 
 impl<'info> InitializeSubDaoV0<'info> {
@@ -287,46 +309,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     &ctx.accounts.system_program.to_account_info(),
     &ctx.accounts.sub_dao,
   )?;
-
-  // get epoch info accounts needed
-  let epoch = current_epoch(curr_ts);
-  let dao_key = ctx.accounts.dao.key();
-  let dao_ei_seeds: &[&[u8]] = &[
-    "dao_epoch_info".as_bytes(),
-    dao_key.as_ref(),
-    &epoch.to_le_bytes(),
-  ];
-  let dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
-  let sub_dao_key = ctx.accounts.sub_dao.key();
-  let sub_dao_ei_seeds: &[&[u8]] = &[
-    "sub_dao_epoch_info".as_bytes(),
-    sub_dao_key.as_ref(),
-    &epoch.to_le_bytes(),
-  ];
-  let sub_dao_epoch_info = Pubkey::find_program_address(sub_dao_ei_seeds, &crate::id()).0;
-
-  // build clockwork kickoff ix
-  let accounts = vec![
-    AccountMeta::new(PAYER_PUBKEY, true),
-    AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
-    AccountMeta::new(ctx.accounts.sub_dao.key(), false),
-    AccountMeta::new(dao_epoch_info, false),
-    AccountMeta::new(sub_dao_epoch_info, false),
-    AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
-    AccountMeta::new(ctx.accounts.thread.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.clockwork.key(), false),
-  ];
-  let kickoff_ix = Instruction {
-    program_id: crate::ID,
-    accounts,
-    data: crate::instruction::CalculateUtilityScoreV0 {
-      args: crate::CalculateUtilityScoreArgsV0 { epoch },
-    }
-    .data(),
-  };
-
+  let kickoff_ix = construct_kickoff_ix(&ctx).unwrap();
   let cron = create_end_epoch_cron(curr_ts, 60 * 5);
   // initialize thread
   thread_create(

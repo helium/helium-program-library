@@ -39,7 +39,10 @@ pub mod helium_sub_daos {
     calculate_utility_score_v0::handler(ctx, args)
   }
 
-  pub fn issue_rewards_v0(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<()> {
+  pub fn issue_rewards_v0(
+    ctx: Context<IssueRewardsV0>,
+    args: IssueRewardsArgsV0,
+  ) -> Result<ThreadResponse> {
     issue_rewards_v0::handler(ctx, args)
   }
 
@@ -65,5 +68,13 @@ pub mod helium_sub_daos {
 
   pub fn reset_lockup_v0(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<()> {
     reset_lockup_v0::handler(ctx, args)
+  }
+
+  pub fn reset_clockwork_thread_v0(ctx: Context<ResetClockworkThreadV0>) -> Result<()> {
+    reset_clockwork_thread_v0::handler(ctx)
+  }
+
+  pub fn clockwork_kickoff_v0(ctx: Context<ClockworkKickoffV0>) -> Result<ThreadResponse> {
+    clockwork_kickoff_v0::handler(ctx)
   }
 }
