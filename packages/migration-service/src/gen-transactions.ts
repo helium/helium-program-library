@@ -405,8 +405,9 @@ async function run() {
               systemProgram: SystemProgram.programId,
               rewardableEntityConfig: iotRewardableEntityConfig,
               maker: hotspotPubkeysForMaker.maker,
-              keyToAsset: keyToAssetKey(hotspot.address)[0],
+              keyToAsset: keyToAssetKey(dao, hotspot.address)[0],
               recipient: solAddress,
+              dao,
               info: iotInfoKey(iotRewardableEntityConfig, hotspot.address)[0],
               lazySigner,
             })

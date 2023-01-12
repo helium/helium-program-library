@@ -117,7 +117,7 @@ impl<'info> IssueEntityV0<'info> {
 }
 
 pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<()> {
-  let key_str = bs58::encode(args.entity_key.clone()).into_string();
+  let key_str = bs58::encode(args.entity_key).into_string();
   let animal_name: AnimalName = key_str
     .parse()
     .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
