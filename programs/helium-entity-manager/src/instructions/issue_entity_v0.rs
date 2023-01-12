@@ -114,10 +114,7 @@ impl<'info> IssueEntityV0<'info> {
 }
 
 pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<()> {
-    let key_str = bs58::encode(args
-    .entity_key.clone()
-  )
-    .into_string();
+  let key_str = bs58::encode(args.entity_key.clone()).into_string();
   let animal_name: AnimalName = key_str
     .parse()
     .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
@@ -127,7 +124,10 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
     ctx.accounts.maker.name.as_bytes(),
     &[ctx.accounts.maker.bump_seed],
   ]];
-  let asset_id = get_asset_id(&ctx.accounts.merkle_tree.key(), ctx.accounts.tree_authority.num_minted);
+  let asset_id = get_asset_id(
+    &ctx.accounts.merkle_tree.key(),
+    ctx.accounts.tree_authority.num_minted,
+  );
 
   let name = animal_name.to_string();
   let metadata = MetadataArgs {
@@ -159,7 +159,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
   ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
     entity_key: args.entity_key,
     asset: asset_id,
-    bump_seed: ctx.bumps["key_to_asset"]
+    bump_seed: ctx.bumps["key_to_asset"],
   });
 
   Ok(())

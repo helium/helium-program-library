@@ -1,9 +1,6 @@
 use std::mem::size_of;
 
-use crate::{
-  state::*,
-  utils::hotspot_key,
-};
+use crate::{state::*, utils::hotspot_key};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_spl::{

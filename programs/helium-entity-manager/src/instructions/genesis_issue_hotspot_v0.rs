@@ -127,10 +127,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,
   );
-  let key_str = bs58::encode(args
-    .entity_key.clone()
-  )
-    .into_string();
+  let key_str = bs58::encode(args.entity_key.clone()).into_string();
 
   let animal_name: AnimalName = key_str
     .parse()
@@ -146,10 +143,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
   let metadata = MetadataArgs {
     name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
-    uri: format!(
-      "https://metadata.oracle.test-helium.com/{}",
-      key_str
-    ),
+    uri: format!("https://metadata.oracle.test-helium.com/{}", key_str),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
@@ -174,7 +168,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
   ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
     entity_key: args.entity_key,
     asset: asset_id,
-    bump_seed: ctx.bumps["key_to_asset"]
+    bump_seed: ctx.bumps["key_to_asset"],
   });
 
   ctx.accounts.info.set_inner(IotHotspotInfoV0 {

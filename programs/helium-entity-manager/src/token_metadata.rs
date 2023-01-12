@@ -1,7 +1,4 @@
-use anchor_lang::{
-  prelude::*,
-  solana_program,
-};
+use anchor_lang::{prelude::*, solana_program};
 use anchor_spl::metadata::CreateMetadataAccountsV3;
 use mpl_token_metadata::{
   state::{CollectionDetails, DataV2},
