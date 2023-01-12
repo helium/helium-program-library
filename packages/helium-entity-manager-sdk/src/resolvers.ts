@@ -18,12 +18,13 @@ export const heliumEntityManagerResolvers = combineResolvers(
     mint: "collection",
     owner: "maker",
   }),
-  resolveIndividual(async ({ path, args }) => {
+  resolveIndividual(async ({ path, args, accounts }) => {
     if (
       path[path.length - 1] === "keyToAsset" &&
-      args[args.length - 1].entityKey
+      args[args.length - 1].entityKey &&
+      accounts.dao
     ) {
-      return (await keyToAssetKey(args[args.length - 1].entityKey))[0];
+      return (await keyToAssetKey(accounts.dao as PublicKey, args[args.length - 1].entityKey))[0];
     }
   }),
   resolveIndividual(async ({ path, args, provider, accounts }) => {

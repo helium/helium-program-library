@@ -6,6 +6,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
+use helium_sub_daos::DaoV0;
 use mpl_bubblegum::state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion};
 use mpl_bubblegum::state::{metaplex_adapter::TokenStandard, TreeConfig};
 use mpl_bubblegum::utils::get_asset_id;
@@ -49,12 +50,14 @@ pub struct IssueEntityV0<'info> {
     has_one = merkle_tree,
   )]
   pub maker: Box<Account<'info, MakerV0>>,
+  pub dao: Box<Account<'info, DaoV0>>,
   #[account(
     init,
     payer = payer,
-    space = 1 + std::mem::size_of::<KeyToAssetV0>(),
+    space = 8 + std::mem::size_of::<KeyToAssetV0>(),
     seeds = [
       "key_to_asset".as_bytes(),
+      dao.key().as_ref(),
       &hash(&args.entity_key[..]).to_bytes()
     ],
     bump
@@ -158,6 +161,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
 
   ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
     asset: asset_id,
+    dao: ctx.accounts.dao.key(),
     bump_seed: ctx.bumps["key_to_asset"],
   });
 

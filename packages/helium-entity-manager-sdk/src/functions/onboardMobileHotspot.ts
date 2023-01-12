@@ -2,13 +2,14 @@ import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manage
 import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { mobileInfoKey } from "../pdas";
+import { keyToAssetKey, mobileInfoKey } from "../pdas";
 
 export async function onboardMobileHotspot({
   program,
   rewardableEntityConfig,
   assetId,
   maker,
+  dao,
   assetEndpoint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
@@ -18,6 +19,7 @@ export async function onboardMobileHotspot({
   rewardableEntityConfig: PublicKey;
   assetEndpoint?: string;
   maker: PublicKey;
+  dao: PublicKey;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
   getAssetProofFn?: (
     url: string,
@@ -37,6 +39,7 @@ export async function onboardMobileHotspot({
   const { root, proof, treeId, nodeIndex, leaf } = assetProof;
   const {
     ownership: { owner },
+    content: { json_uri }
   } = asset;
 
   const [info] = mobileInfoKey(rewardableEntityConfig, assetId);
@@ -56,7 +59,11 @@ export async function onboardMobileHotspot({
       mobileInfo: info,
       merkleTree: treeId,
       maker,
+      dao,
       issuingAuthority: makerAcc?.issuingAuthority,
+      keyToAsset: (
+        await keyToAssetKey(dao, json_uri.split("/").slice(-1)[0])
+      )[0],
     })
     .remainingAccounts(
       proof.map((p) => {

@@ -4,27 +4,19 @@ import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { Asset, AssetProof, toBN } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import { ComputeBudgetProgram, PublicKey, Keypair } from "@solana/web3.js";
+import { Keypair, PublicKey } from "@solana/web3.js";
 import chai from "chai";
 import {
-  updateIotMetadata,
   init as initHeliumEntityManager,
   onboardIotHotspot,
-  onboardMobileHotspot,
-  updateMobileMetadata,
+  onboardMobileHotspot, updateIotMetadata, updateMobileMetadata
 } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import {
-  DC_FEE,
-  ensureHSDIdl,
-  ensureDCIdl,
-  initTestRewardableEntityConfig,
-  initTestMaker,
-  initWorld,
-  initTestDataCredits,
+  DC_FEE, ensureDCIdl, ensureHSDIdl, initTestDataCredits, initTestMaker, initTestRewardableEntityConfig
 } from "./utils/fixtures";
 // @ts-ignore
 import bs58 from "bs58";
@@ -32,15 +24,15 @@ const { expect } = chai;
 // @ts-ignore
 import animalHash from "angry-purple-tiger";
 
-import { BN } from "bn.js";
-import chaiAsPromised from "chai-as-promised";
-import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
 import {
   computeCompressedNFTHash,
   getLeafAssetId,
   TokenProgramVersion,
-  TokenStandard,
+  TokenStandard
 } from "@metaplex-foundation/mpl-bubblegum";
+import { BN } from "bn.js";
+import chaiAsPromised from "chai-as-promised";
+import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
 
 chai.use(chaiAsPromised);
 
@@ -54,6 +46,7 @@ describe("helium-entity-manager", () => {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
 
+  let dao: PublicKey;
   let subDao: PublicKey;
   let dcMint: PublicKey;
 
@@ -82,14 +75,14 @@ describe("helium-entity-manager", () => {
 
     const dataCredits = await initTestDataCredits(dcProgram, provider);
     dcMint = dataCredits.dcMint;
-    const dao = await initTestDao(
+    ({ dao } = await initTestDao(
       hsdProgram,
       provider,
       100,
       me,
       dataCredits.dcMint
-    );
-    ({ subDao } = await initTestSubdao(hsdProgram, provider, me, dao.dao));
+    ));
+    ({ subDao } = await initTestSubdao(hsdProgram, provider, me, dao));
   });
 
   it("initializes a rewardable entity config", async () => {
@@ -263,6 +256,7 @@ describe("helium-entity-manager", () => {
           maker,
           recipient: hotspotOwner.publicKey,
           issuingAuthority: makerKeypair.publicKey,
+          dao
         })
         .signers([makerKeypair])
         .rpc({ skipPreflight: true });
@@ -272,6 +266,7 @@ describe("helium-entity-manager", () => {
           program: hemProgram,
           assetId: hotspot,
           maker,
+          dao,
           rewardableEntityConfig,
           getAssetFn,
           getAssetProofFn,
@@ -295,6 +290,7 @@ describe("helium-entity-manager", () => {
           })
           .accounts({
             maker,
+            dao,
             recipient: hotspotOwner.publicKey,
             issuingAuthority: makerKeypair.publicKey,
           })
@@ -306,6 +302,7 @@ describe("helium-entity-manager", () => {
             program: hemProgram,
             assetId: hotspot,
             maker,
+            dao,
             rewardableEntityConfig,
             getAssetFn,
             getAssetProofFn,
@@ -472,6 +469,7 @@ describe("helium-entity-manager", () => {
         })
         .accounts({
           maker,
+          dao,
           recipient: hotspotOwner.publicKey,
           issuingAuthority: makerKeypair.publicKey,
         })
@@ -483,6 +481,7 @@ describe("helium-entity-manager", () => {
           program: hemProgram,
           assetId: hotspot,
           maker,
+          dao,
           rewardableEntityConfig,
           getAssetFn,
           getAssetProofFn,
@@ -527,6 +526,7 @@ describe("helium-entity-manager", () => {
           })
           .accounts({
             maker,
+            dao,
             recipient: hotspotOwner.publicKey,
             issuingAuthority: makerKeypair.publicKey,
           })
@@ -538,6 +538,7 @@ describe("helium-entity-manager", () => {
             program: hemProgram,
             assetId: hotspot,
             maker,
+            dao,
             rewardableEntityConfig,
             getAssetFn,
             getAssetProofFn,

@@ -79,6 +79,11 @@ pub struct OnboardIotHotspotV0<'info> {
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
     has_one = dao,
+    constraint = get_asset_id(&merkle_tree.key(), args.index.into()) == key_to_asset.asset,
+  )]
+  pub key_to_asset: Box<Account<'info, KeyToAssetV0>>,
+  #[account(
+    has_one = dao,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(mut)]
