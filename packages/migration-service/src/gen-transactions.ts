@@ -1,22 +1,21 @@
 import Address from "@helium/address";
 import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
-import { Keypair as HeliumKeypair } from "@helium/crypto";
-import {
-  hotspotConfigKey,
-  init as initHem,
-  iotInfoKey,
-  PROGRAM_ID as HEM_PROGRAM_ID,
-} from "@helium/helium-entity-manager-sdk";
-import {
-  init as initVsr,
-  registrarKey,
-  PROGRAM_ID as VSR_PROGRAM_ID,
-} from "@helium/voter-stake-registry-sdk";
-import * as Collections from "typescript-collections";
-import { init as initHsd } from "@helium/helium-sub-daos-sdk";
-import { subDaoKey, daoKey } from "@helium/helium-sub-daos-sdk";
 import { mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
 import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
+import bs58 from "bs58";
+import {
+  init as initHem,
+  iotInfoKey,
+  keyToAssetKey,
+  makerKey,
+  PROGRAM_ID as HEM_PROGRAM_ID,
+  rewardableEntityConfigKey,
+} from "@helium/helium-entity-manager-sdk";
+import {
+  daoKey,
+  init as initHsd,
+  subDaoKey,
+} from "@helium/helium-sub-daos-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import {
   compile,
@@ -26,9 +25,20 @@ import {
   PROGRAM_ID as LAZY_PROGRAM_ID,
 } from "@helium/lazy-transactions-sdk";
 import { AccountFetchCache, chunks, sendInstructions } from "@helium/spl-utils";
+import {
+  init as initVsr,
+  PROGRAM_ID as VSR_PROGRAM_ID,
+} from "@helium/voter-stake-registry-sdk";
+import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
+import { PROGRAM_ID as TOKEN_METATDATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
-import format from "pg-format";
 import { Program } from "@project-serum/anchor";
+import { ASSOCIATED_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
+import {
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  SPL_NOOP_PROGRAM_ID,
+} from "@solana/spl-account-compression";
+import { TreeNode } from "@solana/spl-account-compression/dist/types/merkle-tree";
 import {
   ACCOUNT_SIZE,
   createAssociatedTokenAccountIdempotentInstruction,
@@ -50,10 +60,10 @@ import cliProgress from "cli-progress";
 import fs from "fs";
 import os from "os";
 import { Client } from "pg";
+import format from "pg-format";
+import * as Collections from "typescript-collections";
 import yargs from "yargs/yargs";
 import { compress } from "./utils";
-import { ASSOCIATED_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
-import { TreeNode } from "@solana/spl-account-compression/dist/types/merkle-tree";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -116,6 +126,11 @@ const yarg = yargs(hideBin(process.argv)).options({
     alias: "s",
     default: "./export.json",
   },
+  makers: {
+    type: "string",
+    alias: "m",
+    default: "../helium-cli/makers.json",
+  },
   progress: {
     type: "boolean",
     alias: "-p",
@@ -168,18 +183,78 @@ async function run() {
   const hst = new PublicKey(argv.hst);
 
   const iotSubdao = (await subDaoKey(iot))[0];
-  const hsConfigKey = (await hotspotConfigKey(iotSubdao, "IOT"))[0];
+  const mobileSubdao = (await subDaoKey(mobile))[0];
+  const hsConfigKey = (await rewardableEntityConfigKey(iotSubdao, "IOT"))[0];
 
-  const hotspotPubkeys = await hemProgram.methods
-    .issueIotHotspotV0({
-      hotspotKey: (await HeliumKeypair.makeRandom()).address.b58,
-      isFullHotspot: true,
-    })
-    .accounts({
-      recipient: provider.wallet.publicKey,
-      hotspotConfig: hsConfigKey,
-    })
-    .pubkeys();
+  const makers: { name: string; address: string }[] = JSON.parse(
+    fs.readFileSync(argv.makers).toString()
+  );
+
+  const iotRewardableEntityConfig = rewardableEntityConfigKey(
+    iotSubdao,
+    "IOT"
+  )[0];
+  const mobileRewardableEntityConfig = rewardableEntityConfigKey(
+    mobile,
+    "MOBILE"
+  )[0];
+  const hotspotPubkeys: Record<
+    string,
+    {
+      id: string;
+      maker: PublicKey;
+      makerAuthority: PublicKey;
+      collection: PublicKey;
+      collectionMetadata: PublicKey;
+      collectionMasterEdition: PublicKey;
+      treeAuthority: PublicKey;
+      merkleTree: PublicKey;
+    }
+  > = (
+    await Promise.all(
+      makers.map(async (maker) => {
+        const helAddr = Address.fromB58(maker.address);
+        const solAddr = new PublicKey(helAddr.publicKey);
+        const makerKeyp = makerKey(maker.name)[0];
+
+        const makerAcc = await hemProgram.account.makerV0.fetch(makerKeyp);
+        const merkleTree = makerAcc.merkleTree;
+
+        return {
+          id: maker.address,
+          maker: makerKeyp,
+          makerAuthority: solAddr,
+          collection: makerAcc.collection,
+          collectionMetadata: PublicKey.findProgramAddressSync(
+            [
+              Buffer.from("metadata", "utf-8"),
+              TOKEN_METATDATA_PROGRAM_ID.toBuffer(),
+              makerAcc.collection.toBuffer(),
+            ],
+            TOKEN_METATDATA_PROGRAM_ID
+          )[0],
+          collectionMasterEdition: PublicKey.findProgramAddressSync(
+            [
+              Buffer.from("metadata", "utf-8"),
+              TOKEN_METATDATA_PROGRAM_ID.toBuffer(),
+              makerAcc.collection.toBuffer(),
+              Buffer.from("edition", "utf-8"),
+            ],
+            TOKEN_METATDATA_PROGRAM_ID
+          )[0],
+          treeAuthority: PublicKey.findProgramAddressSync(
+            [merkleTree.toBuffer()],
+            BUBBLEGUM_PROGRAM_ID
+          )[0],
+          merkleTree,
+        };
+      })
+    )
+  ).reduce((acc, cur) => {
+    acc[cur.id] = cur;
+    return acc;
+  }, {});
+
   const lazySigner = lazySignerKey(argv.name)[0];
 
   const dataCredits = dataCreditsKey(dc)[0];
@@ -189,50 +264,10 @@ async function run() {
   const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
   const registrar = daoAcc.registrar;
 
-  // Create a lookup table of used pubkeys
-  const [sig, lut] = await AddressLookupTableProgram.createLookupTable({
-    authority: provider.wallet.publicKey,
-    payer: provider.wallet.publicKey,
-    recentSlot: await provider.connection.getSlot(),
-  });
-  const addAddressesInstruction =
-    await AddressLookupTableProgram.extendLookupTable({
-      payer: provider.wallet.publicKey,
-      authority: provider.wallet.publicKey,
-      lookupTable: lut,
-      addresses: [
-        hotspotPubkeys.collection,
-        hotspotPubkeys.collectionMetadata,
-        hotspotPubkeys.collectionMasterEdition,
-        hotspotPubkeys.treeAuthority,
-        hotspotPubkeys.merkleTree,
-        hotspotPubkeys.bubblegumSigner,
-        hotspotPubkeys.tokenMetadataProgram,
-        hotspotPubkeys.logWrapper,
-        hotspotPubkeys.bubblegumProgram,
-        hotspotPubkeys.compressionProgram,
-        hotspotPubkeys.systemProgram,
-        hotspotPubkeys.hotspotConfig,
-        hst,
-        dao,
-        subDao,
-        registrar,
-        lazyTransactionsKey(argv.name)[0],
-        LAZY_PROGRAM_ID,
-        lazySigner,
-        HEM_PROGRAM_ID,
-        dc,
-        hnt,
-        mobile,
-        new PublicKey(argv.payer),
-        ASSOCIATED_PROGRAM_ID,
-        TOKEN_PROGRAM_ID,
-        SYSVAR_RENT_PUBKEY,
-        VSR_PROGRAM_ID,
-      ],
-    });
-  await sendInstructions(provider, [sig, addAddressesInstruction], []);
-  console.log("Created lookup table", lut.toBase58());
+  const bubblegumSigner = PublicKey.findProgramAddressSync(
+    [Buffer.from("collection_cpi", "utf-8")],
+    BUBBLEGUM_PROGRAM_ID
+  )[0];
 
   const state = JSON.parse(fs.readFileSync(argv.state).toString());
   const accounts = state.accounts as Record<string, any>;
@@ -299,6 +334,7 @@ async function run() {
 
   const routers = new Set(Object.keys(state.routers));
 
+  const bobcat = makers.find(maker => maker.name === "Bobcat") // TODO: For testing only until we get maker names
   /// Iterate through accounts in order so we don't create 1mm promises.
   for (const [address, account] of Object.entries(accounts)) {
     const solAddress = toSolana(address);
@@ -337,10 +373,12 @@ async function run() {
       const hotspotIxs = await Promise.all(
         (account.hotspots || []).map(async (hotspot) => {
           totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
+          const makerId = hotspot.maker || bobcat.address;
+          const hotspotPubkeysForMaker = hotspotPubkeys[makerId];
 
           return hemProgramNoResolve.methods
             .genesisIssueHotspotV0({
-              hotspotKey: hotspot.address,
+              entityKey: Buffer.from(bs58.decode(hotspot.address)),
               location:
                 hotspot.location != null && hotspot.location != "null"
                   ? new BN(hotspot.location)
@@ -353,23 +391,24 @@ async function run() {
                 : 0,
             })
             .accountsStrict({
-              collection: hotspotPubkeys.collection,
-              collectionMetadata: hotspotPubkeys.collectionMetadata,
-              collectionMasterEdition: hotspotPubkeys.collectionMasterEdition,
-              treeAuthority: hotspotPubkeys.treeAuthority,
-              merkleTree: hotspotPubkeys.merkleTree,
-              bubblegumSigner: hotspotPubkeys.bubblegumSigner,
-              tokenMetadataProgram: hotspotPubkeys.tokenMetadataProgram,
-              logWrapper: hotspotPubkeys.logWrapper,
-              bubblegumProgram: hotspotPubkeys.bubblegumProgram,
-              compressionProgram: hotspotPubkeys.compressionProgram,
-              systemProgram: hotspotPubkeys.systemProgram,
-              hotspotConfig: hotspotPubkeys.hotspotConfig,
+              collection: hotspotPubkeysForMaker.collection,
+              collectionMetadata: hotspotPubkeysForMaker.collectionMetadata,
+              collectionMasterEdition:
+                hotspotPubkeysForMaker.collectionMasterEdition,
+              treeAuthority: hotspotPubkeysForMaker.treeAuthority,
+              merkleTree: hotspotPubkeysForMaker.merkleTree,
+              bubblegumSigner,
+              tokenMetadataProgram: TOKEN_METATDATA_PROGRAM_ID,
+              logWrapper: SPL_NOOP_PROGRAM_ID,
+              bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
+              compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+              systemProgram: SystemProgram.programId,
+              rewardableEntityConfig: iotRewardableEntityConfig,
+              maker: hotspotPubkeysForMaker.maker,
+              keyToAsset: keyToAssetKey(dao, hotspot.address)[0],
               recipient: solAddress,
-              info: iotInfoKey(
-                hotspotPubkeys.hotspotConfig,
-                hotspot.address
-              )[0],
+              dao,
+              info: iotInfoKey(iotRewardableEntityConfig, hotspot.address)[0],
               lazySigner,
             })
             .instruction();
@@ -522,8 +561,7 @@ async function run() {
     flatTransactions
   );
 
-
-  console.log("Extending merkle tree with cached nodes")
+  console.log("Extending merkle tree with cached nodes");
   let rootNode = merkleTree.leaves[0];
   while (typeof rootNode.parent !== "undefined") {
     rootNode = rootNode.parent;
@@ -543,32 +581,84 @@ async function run() {
     queue.enqueue(top.left);
     queue.enqueue(top.right);
   }
-  for (const nodes of chunks(cachedNodes, 5)) {
-    const instruction =
-      await AddressLookupTableProgram.extendLookupTable({
+  const addresses = [
+    ...Object.values(hotspotPubkeys).flatMap(({ id, ...rest }) => Object.values(rest)),
+    TOKEN_METATDATA_PROGRAM_ID,
+    SPL_NOOP_PROGRAM_ID,
+    SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+    SystemProgram.programId,
+    bubblegumSigner,
+    hst,
+    dao,
+    subDao,
+    registrar,
+    lazyTransactionsKey(argv.name)[0],
+    LAZY_PROGRAM_ID,
+    lazySigner,
+    HEM_PROGRAM_ID,
+    dc,
+    hnt,
+    mobile,
+    new PublicKey(argv.payer),
+    ASSOCIATED_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    SYSVAR_RENT_PUBKEY,
+    VSR_PROGRAM_ID,
+    BUBBLEGUM_PROGRAM_ID,
+  ];
+  const lutAddrs = [...addresses, ...cachedNodes];
+  const luts = [];
+  for (const lutChunk of chunks(lutAddrs, 256)) {
+    const [sig, lut] = await AddressLookupTableProgram.createLookupTable({
+      authority: provider.wallet.publicKey,
+      payer: provider.wallet.publicKey,
+      recentSlot: await provider.connection.getSlot(),
+    });
+    await sendInstructions(provider, [sig], []);
+    luts.push(lut);
+    console.log("Created lookup table", lut.toBase58());
+    for (const nodes of chunks(lutChunk, 5)) {
+      const instruction = await AddressLookupTableProgram.extendLookupTable({
         payer: provider.wallet.publicKey,
         authority: provider.wallet.publicKey,
         lookupTable: lut,
-        addresses: nodes
+        addresses: nodes,
       });
-    await sendInstructions(provider, [instruction], []);
+      await sendInstructions(provider, [instruction], []);
+    }
   }
-    
 
   console.log("Creating tables");
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS lookup_tables (
+      id INTEGER PRIMARY KEY NOT NULL,
+      pubkey VARCHAR(66) NOT NULL
+    )
+  `);
   await client.query(`
     CREATE TABLE IF NOT EXISTS transactions (
       id INTEGER PRIMARY KEY NOT NULL,
       wallet VARCHAR(66) NOT NULL,
       compiled bytea NOT NULL,
       proof jsonb NOT NULL,
-      lookup_table VARCHAR(66) NOT NULL,
       is_router BOOLEAN NOT NULL DEFAULT FALSE
     )
   `);
   await client.query(`
     CREATE INDEX IF NOT EXISTS transactions_wallet_idx ON transactions(wallet)
   `);
+
+  const lutQuery = format(
+    `
+        INSERT INTO lookup_tables(
+          id, pubkey
+        )
+        VALUES %L
+      `,
+    luts.map((lut, idx) => [idx, lut.toBase58()])
+  );
+  await client.query(lutQuery);
+
   /// 10k txns at time
   let progIdx = 0;
   const chunkSize = 10000;
@@ -584,7 +674,6 @@ async function run() {
           .getProof(compiledTransaction.index, false, -1, false, false)
           .proof.map((p) => p.toString("hex"))
       ),
-      lut.toBase58(),
       routers.has(txIdsToWallet[compiledTransaction.index]),
     ];
   });
@@ -605,7 +694,7 @@ async function run() {
         const query = format(
           `
         INSERT INTO transactions(
-          id, wallet, compiled, proof, lookup_table, is_router
+          id, wallet, compiled, proof, is_router
         )
         VALUES %L
       `,
@@ -613,11 +702,11 @@ async function run() {
         );
         await client.query(query);
         progIdx += chunkSize;
-        pgProgress.update(progIdx);
+        pgProgress && pgProgress.update(progIdx);
       }
     })
   );
-  pgProgress.stop();
+  pgProgress && pgProgress.stop();
 
   const ltKey = lazyTransactionsKey(argv.name)[0];
   if (await provider.connection.getAccountInfo(ltKey)) {

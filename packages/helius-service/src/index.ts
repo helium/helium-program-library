@@ -28,8 +28,8 @@ server.post('/', async (request, reply) => {
   const instructions = tx.message.instructions;
   try {
     // get relevant idl ixs
-    const issueIotHotspotIx = hemProgram.idl.instructions.find(
-      (x) => x.name === "issueIotHotspotV0"
+    const onboardHotspotIx = hemProgram.idl.instructions.find(
+      (x) => x.name === "onboardIotHotspotV0"
     )!;
     const genesisIssueIx = hemProgram.idl.instructions.find(
       (x) => x.name === "genesisIssueHotspotV0"
@@ -39,8 +39,8 @@ server.post('/', async (request, reply) => {
     )!;
     
     // get relevant indices
-    const issueInfoIdx = issueIotHotspotIx.accounts.findIndex(
-      (x) => x.name === "info"
+    const issueInfoIdx = onboardHotspotIx.accounts.findIndex(
+      (x) => x.name === "iotInfo"
     )!
     const genesisIssueInfoIdx = genesisIssueIx.accounts.findIndex(
       (x) => x.name === "info"
@@ -55,9 +55,15 @@ server.post('/', async (request, reply) => {
         hemProgram.coder.instruction as BorshInstructionCoder
       ).decode(ix.data);
       const args = (decoded.data as any).args;
-      if (decoded.name == "issueIotHotspotV0" || decoded.name == "genesisIssueHotspotV0") {
+      if (
+        decoded.name == "onboardIotHotspotV0" ||
+        decoded.name == "genesisIssueHotspotV0"
+      ) {
         // Create a new hotspot with no location, elevation or gain metadata
-        let idx = decoded.name == "issueIotHotspotV0" ? issueInfoIdx : genesisIssueInfoIdx;
+        let idx =
+          decoded.name == "onboardIotHotspotV0"
+            ? issueInfoIdx
+            : genesisIssueInfoIdx;
         let infoKey = tx.message.accountKeys[ix.accounts[idx]];
         let info = await hemProgram.account.iotHotspotInfoV0.fetch(infoKey);
         const hotspotData = {
@@ -70,8 +76,13 @@ server.post('/', async (request, reply) => {
         console.log(hotspotData);
         await Hotspot.create(hotspotData);
       } else if (decoded.name == "updateIotInfoV0") {
-        const asset = getLeafAssetId(tx.message.accountKeys[ix.accounts[treeIdx]], args.index);
-        const hotspot = await Hotspot.findOne({ where: { asset: asset.toString() } });
+        const asset = getLeafAssetId(
+          tx.message.accountKeys[ix.accounts[treeIdx]],
+          args.index
+        );
+        const hotspot = await Hotspot.findOne({
+          where: { asset: asset.toString() },
+        });
 
         // Update the hotspot's location, elevation and gain
         if (args.location) {

@@ -1,6 +1,6 @@
 import { thresholdPercent, ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
-  hotspotConfigKey,
+  rewardableEntityConfigKey,
   init as initHem,
 } from "@helium/helium-entity-manager-sdk";
 import {
@@ -343,6 +343,7 @@ async function run() {
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
+  const me = provider.wallet.publicKey;
   const governance = await PublicKey.findProgramAddressSync(
     [
       Buffer.from("account-governance", "utf-8"),
@@ -524,7 +525,7 @@ async function run() {
     const initSubdaoMethod = await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
         dcBurnAuthority: new PublicKey(argv.dcBurnAuthority),
-        authority: argv.noGovernance ? provider.wallet.publicKey : governance,
+        authority: argv.noGovernance ? me : governance,
         emissionSchedule: emissionSchedule(argv.startEpochRewards),
         // Linear curve
         treasuryCurve: {
@@ -587,7 +588,7 @@ async function run() {
     );
   }
 
-  const hsConfigKey = (await hotspotConfigKey(subdao, name.toUpperCase()))[0];
+  const hsConfigKey = (await rewardableEntityConfigKey(subdao, name.toUpperCase()))[0];
   if (!(await provider.connection.getAccountInfo(hsConfigKey)) && !argv.noHotspots) {
     const instructions: TransactionInstruction[] = [];
     console.log(`Initalizing ${name} HotspotConfig`);
@@ -615,12 +616,8 @@ async function run() {
 
     instructions.push(
       await hemProgram.methods
-        .initializeHotspotConfigV0({
-          name: `${name} Hotspot Collection`,
+        .initializeRewardableEntityConfigV0({
           symbol: name.toUpperCase(),
-          metadataUrl: `${
-            argv.bucket
-          }/${name.toLocaleLowerCase()}_collection.json`,
           settings: {
             iotConfig: {
               minGain: 10,
@@ -629,14 +626,11 @@ async function run() {
               dataonlyLocationStakingFee: toBN(500000, 0),
             } as any,
           },
-          maxDepth: 26,
-          maxBufferSize: 1024,
         })
         .accounts({
-          merkleTree: merkle.publicKey,
           subDao: subdao,
-          payer: nativeTreasury,
-          authority: governance,
+          payer: argv.noGovernance ? me : nativeTreasury,
+          authority: argv.noGovernance ? me : governance,
         })
         .signers([merkle])
         .instruction()
