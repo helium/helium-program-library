@@ -53,7 +53,7 @@ pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     init,
     payer = lazy_signer,
-    space = 1 + std::mem::size_of::<KeyToAssetV0>() + args.entity_key.len(),
+    space = 1 + std::mem::size_of::<KeyToAssetV0>(),
     seeds = [
       "key_to_asset".as_bytes(),
       &hash(&args.entity_key[..]).to_bytes()
@@ -166,7 +166,6 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
   )?;
 
   ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
-    entity_key: args.entity_key,
     asset: asset_id,
     bump_seed: ctx.bumps["key_to_asset"],
   });

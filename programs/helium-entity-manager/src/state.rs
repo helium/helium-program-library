@@ -59,7 +59,6 @@ pub struct MakerApprovalV0 {
 #[account]
 #[derive(Default)]
 pub struct KeyToAssetV0 {
-  pub entity_key: Vec<u8>,
   pub asset: Pubkey,
   pub bump_seed: u8,
 }
