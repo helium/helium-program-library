@@ -157,8 +157,13 @@ pub fn handler(
     return Err(error!(ErrorCode::EpochNotOver));
   }
 
+  let next_ix = construct_next_ix(&ctx, args.epoch);
   if !TESTING && ctx.accounts.sub_dao_epoch_info.utility_score.is_some() {
-    return Err(error!(ErrorCode::UtilityScoreAlreadyCalculated));
+    msg!("Utility score has already been calculated, exiting");
+    return Ok(ThreadResponse {
+      kickoff_instruction: None,
+      next_instruction: Some(next_ix.into()),
+    });
   }
 
   if curr_ts < ctx.accounts.dao.emission_schedule[0].start_unix_time {
@@ -287,7 +292,6 @@ pub fn handler(
       .unwrap();
   }
 
-  let next_ix = construct_next_ix(&ctx, args.epoch);
   Ok(ThreadResponse {
     kickoff_instruction: None,
     next_instruction: Some(next_ix.into()),
