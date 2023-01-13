@@ -249,6 +249,15 @@ async function run() {
           );
         }
         instructions.push(...[create, setTree].filter(truthy));
+      } else {
+        instructions.push(
+          await hemProgram.methods.updateMakerV0({
+            issuingAuthority: makerAuthority,
+            updateAuthority: authority
+          })
+          .accounts({ maker })
+          .instruction()
+        )
       }
 
       let approve;
@@ -264,6 +273,7 @@ async function run() {
           .instruction();
         instructions.push(approve);
       }
+      
 
       return instructions;
     })
