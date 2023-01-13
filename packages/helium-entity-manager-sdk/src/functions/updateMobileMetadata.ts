@@ -13,8 +13,12 @@ export async function updateMobileMetadata({
   assetEndpoint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
+  dcFeePayer,
+  payer,
 }: {
   program: Program<HeliumEntityManager>;
+  payer?: PublicKey;
+  dcFeePayer?: PublicKey;
   location: BN | null;
   assetId: PublicKey;
   rewardableEntityConfig: PublicKey;
@@ -39,7 +43,7 @@ export async function updateMobileMetadata({
   const {
     ownership: { owner },
   } = asset;
-  const canopy = await(
+  const canopy = await (
     await ConcurrentMerkleTreeAccount.fromAccountAddress(
       program.provider.connection,
       treeId
@@ -55,6 +59,8 @@ export async function updateMobileMetadata({
       index: nodeIndex,
     })
     .accounts({
+      dcFeePayer,
+      payer,
       rewardableEntityConfig,
       hotspotOwner: owner,
       mobileInfo: info,

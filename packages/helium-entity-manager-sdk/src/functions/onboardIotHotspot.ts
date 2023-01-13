@@ -13,6 +13,8 @@ export async function onboardIotHotspot({
   maker,
   dao,
   assetEndpoint,
+  dcFeePayer,
+  payer,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
 }: {
@@ -20,6 +22,8 @@ export async function onboardIotHotspot({
   assetId: PublicKey;
   rewardableEntityConfig: PublicKey;
   assetEndpoint?: string;
+  payer?: PublicKey;
+  dcFeePayer?: PublicKey;
   maker: PublicKey;
   dao: PublicKey;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
@@ -41,13 +45,13 @@ export async function onboardIotHotspot({
   const { root, proof, leaf, treeId, nodeIndex } = assetProof;
   const {
     ownership: { owner },
-    content: { json_uri }
+    content: { json_uri },
   } = asset;
   const [info] = iotInfoKey(rewardableEntityConfig, assetId);
 
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
-  const canopy = await(
+  const canopy = await (
     await ConcurrentMerkleTreeAccount.fromAccountAddress(
       program.provider.connection,
       treeId
@@ -64,6 +68,8 @@ export async function onboardIotHotspot({
     })
     .accounts({
       // hotspot: assetId,
+      payer,
+      dcFeePayer,
       rewardableEntityConfig,
       hotspotOwner: owner,
       iotInfo: info,

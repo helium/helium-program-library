@@ -11,11 +11,15 @@ export async function onboardMobileHotspot({
   assetId,
   maker,
   dao,
+  payer,
+  dcFeePayer,
   assetEndpoint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
 }: {
   program: Program<HeliumEntityManager>;
+  payer?: PublicKey;
+  dcFeePayer?: PublicKey;
   assetId: PublicKey;
   rewardableEntityConfig: PublicKey;
   assetEndpoint?: string;
@@ -40,11 +44,11 @@ export async function onboardMobileHotspot({
   const { root, proof, treeId, nodeIndex, leaf } = assetProof;
   const {
     ownership: { owner },
-    content: { json_uri }
+    content: { json_uri },
   } = asset;
 
   const [info] = mobileInfoKey(rewardableEntityConfig, assetId);
-  const canopy = await(
+  const canopy = await (
     await ConcurrentMerkleTreeAccount.fromAccountAddress(
       program.provider.connection,
       treeId
@@ -60,6 +64,8 @@ export async function onboardMobileHotspot({
     })
     .accounts({
       // hotspot: assetId,
+      dcFeePayer,
+      payer,
       rewardableEntityConfig,
       hotspotOwner: owner,
       mobileInfo: info,

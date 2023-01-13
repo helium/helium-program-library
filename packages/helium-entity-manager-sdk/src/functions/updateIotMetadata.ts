@@ -13,10 +13,14 @@ export async function updateIotMetadata({
   elevation,
   gain,
   assetEndpoint,
+  payer,
+  dcFeePayer,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
 }: {
   program: Program<HeliumEntityManager>;
+  payer?: PublicKey;
+  dcFeePayer?: PublicKey;
   location: BN | null;
   elevation: number | null;
   gain: number | null;
@@ -45,7 +49,7 @@ export async function updateIotMetadata({
   } = asset;
 
   const [info] = iotInfoKey(rewardableEntityConfig, assetId);
-  const canopy = await(
+  const canopy = await (
     await ConcurrentMerkleTreeAccount.fromAccountAddress(
       program.provider.connection,
       treeId
@@ -62,6 +66,8 @@ export async function updateIotMetadata({
     })
     .accounts({
       // hotspot: assetId,
+      payer,
+      dcFeePayer,
       rewardableEntityConfig,
       hotspotOwner: owner,
       iotInfo: info,
