@@ -8,7 +8,7 @@ use anchor_spl::token::Mint;
 #[derive(Accounts)]
 pub struct ConfigureVotingMintV0<'info> {
   #[account(mut, has_one = realm_authority)]
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
   pub realm_authority: Signer<'info>,
 
   /// Tokens of this mint will produce vote weight
@@ -109,7 +109,7 @@ pub fn handler(ctx: Context<ConfigureVotingMintV0>, args: ConfigureVotingMintArg
     VsrError::LockupSaturationMustBePositive
   );
 
-  let registrar = &mut ctx.accounts.registrar.load_mut()?;
+  let registrar = &mut ctx.accounts.registrar;
   let mint = ctx.accounts.mint.key();
   let idx = idx as usize;
 

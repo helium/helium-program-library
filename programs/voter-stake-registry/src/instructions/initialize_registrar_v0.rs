@@ -4,6 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use spl_governance::state::realm;
 use std::mem::size_of;
+use shared_utils::resize_to_fit;
 
 #[derive(Accounts)]
 pub struct InitializeRegistrarV0<'info> {
@@ -16,7 +17,7 @@ pub struct InitializeRegistrarV0<'info> {
         payer = payer,
         space = 8 + size_of::<Registrar>() + 60
     )]
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
 
   /// An spl-governance realm
   ///
@@ -53,7 +54,7 @@ pub struct InitializeRegistrarArgsV0 {
 /// To use the registrar, call ConfigVotingMint to register token mints that may be
 /// used for voting.
 pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArgsV0) -> Result<()> {
-  let registrar = &mut ctx.accounts.registrar.load_init()?;
+  let registrar = &mut ctx.accounts.registrar;
   registrar.bump = *ctx.bumps.get("registrar").unwrap();
   registrar.governance_program_id = ctx.accounts.governance_program_id.key();
   registrar.realm = ctx.accounts.realm.key();
@@ -61,6 +62,16 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
   registrar.realm_authority = ctx.accounts.realm_authority.key();
   registrar.time_offset = 0;
   registrar.position_update_authority = args.position_update_authority;
+  registrar.voting_mints = vec![VotingMintConfigV0 {
+    mint: Pubkey::default(),
+    digit_shift: 0,
+    locked_vote_weight_scaled_factor: 0,
+    minimum_required_lockup_secs: 0,
+    max_extra_lockup_vote_weight_scaled_factor: 0,
+    genesis_vote_power_multiplier: 0,
+    genesis_vote_power_multiplier_expiration_ts: 0,
+    lockup_saturation_secs: 0,
+  }; 4];
 
   // Verify that "realm_authority" is the expected authority on "realm"
   // and that the mint matches one of the realm mints too.
@@ -75,6 +86,12 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
     ctx.accounts.realm_authority.key(),
     VsrError::InvalidRealmAuthority
   );
+
+  resize_to_fit(
+    &ctx.accounts.payer.to_account_info(),
+    &ctx.accounts.system_program.to_account_info(),
+    registrar,
+  )?;
 
   Ok(())
 }

@@ -20,7 +20,7 @@ pub struct TrackDcBurnV0<'info> {
     init_if_needed,
     payer = account_payer,
     space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(registrar.load()?.clock_unix_timestamp()).to_le_bytes()],
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(registrar.clock_unix_timestamp()).to_le_bytes()],
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
@@ -29,7 +29,7 @@ pub struct TrackDcBurnV0<'info> {
     has_one = dao
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
   #[account(
     has_one = dc_mint,
     has_one = registrar,
@@ -48,7 +48,7 @@ pub struct TrackDcBurnV0<'info> {
 }
 
 pub fn handler(ctx: Context<TrackDcBurnV0>, args: TrackDcBurnArgsV0) -> Result<()> {
-  let curr_ts = ctx.accounts.registrar.load()?.clock_unix_timestamp();
+  let curr_ts = ctx.accounts.registrar.clock_unix_timestamp();
   ctx.accounts.sub_dao_epoch_info.epoch = current_epoch(curr_ts);
   update_subdao_vehnt(
     &mut ctx.accounts.sub_dao,

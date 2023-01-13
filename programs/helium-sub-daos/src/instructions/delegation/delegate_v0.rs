@@ -28,7 +28,7 @@ pub struct DelegateV0<'info> {
   pub position_token_account: Box<Account<'info, TokenAccount>>,
   #[account(mut)]
   pub position_authority: Signer<'info>,
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
   #[account(
     has_one = registrar,
   )]
@@ -42,7 +42,7 @@ pub struct DelegateV0<'info> {
     init_if_needed,
     payer = payer,
     space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(registrar.load()?.clock_unix_timestamp()).to_le_bytes()],
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(registrar.clock_unix_timestamp()).to_le_bytes()],
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
@@ -71,7 +71,7 @@ pub struct DelegateV0<'info> {
 pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
   // load the vehnt information
   let position = &mut ctx.accounts.position;
-  let registrar = &ctx.accounts.registrar.load()?;
+  let registrar = &ctx.accounts.registrar;
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
   let available_vehnt = position.voting_power(voting_mint_config, curr_ts)?;
