@@ -40,7 +40,7 @@ pub fn resolve_vote_weight(
   let voting_mint_config =
     &registrar.voting_mints[usize::from(position_acc.voting_mint_config_idx)];
 
-  position_acc.voting_power(&voting_mint_config, registrar.clock_unix_timestamp())
+  position_acc.voting_power(voting_mint_config, registrar.clock_unix_timestamp())
 }
 
 pub fn get_vote_record_address(
