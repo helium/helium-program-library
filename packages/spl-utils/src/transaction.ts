@@ -64,7 +64,9 @@ export async function sendInstructions(
   if (signers.length > 0) {
     tx.partialSign(...signers);
   }
-  tx = await provider.wallet.signTransaction(tx);
+  if (tx.signatures.some(sig => sig.publicKey.equals(provider.wallet.publicKey))) {
+    tx = await provider.wallet.signTransaction(tx);
+  }
 
   try {
     const { txid } = await sendAndConfirmWithRetry(

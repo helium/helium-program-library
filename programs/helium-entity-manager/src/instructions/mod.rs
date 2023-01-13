@@ -10,6 +10,7 @@ pub mod update_iot_info_v0;
 pub mod update_maker_v0;
 pub mod update_mobile_info_v0;
 pub mod update_rewardable_entity_config_v0;
+pub mod update_maker_tree_v0;
 
 pub use approve_maker_v0::*;
 pub use genesis_issue_hotspot_v0::*;
@@ -23,3 +24,4 @@ pub use update_iot_info_v0::*;
 pub use update_maker_v0::*;
 pub use update_mobile_info_v0::*;
 pub use update_rewardable_entity_config_v0::*;
+pub use update_maker_tree_v0::*;
