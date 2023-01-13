@@ -2,7 +2,8 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 use mpl_bubblegum::{
   cpi::{accounts::CreateTree, create_tree},
-  program::Bubblegum, state::TreeConfig,
+  program::Bubblegum,
+  state::TreeConfig,
 };
 use spl_account_compression::{program::SplAccountCompression, Noop};
 
@@ -17,9 +18,7 @@ pub struct UpdateMakerTreeArgsV0 {
 pub struct UpdateMakerTreeV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  #[account(
-    mut,
-  )]
+  #[account(mut)]
   pub maker: Box<Account<'info, MakerV0>>,
   #[account(
     mut,

@@ -73,7 +73,10 @@ pub mod helium_entity_manager {
     set_maker_tree_v0::handler(ctx, args)
   }
 
-  pub fn update_maker_tree_v0(ctx: Context<UpdateMakerTreeV0>, args: UpdateMakerTreeArgsV0) -> Result<()> {
+  pub fn update_maker_tree_v0(
+    ctx: Context<UpdateMakerTreeV0>,
+    args: UpdateMakerTreeArgsV0,
+  ) -> Result<()> {
     update_maker_tree_v0::handler(ctx, args)
   }
 
