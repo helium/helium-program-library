@@ -40,6 +40,12 @@ export const makerKey = (
     programId
   );
 
+export const makerApprovalKey = (rewardableEntityConfig: PublicKey, maker: PublicKey, programId: PublicKey = PROGRAM_ID) =>
+  PublicKey.findProgramAddressSync(
+    [Buffer.from("maker_approval", "utf-8"), rewardableEntityConfig.toBuffer(), maker.toBuffer()],
+    programId
+  );
+
 export const keyToAssetKey = async (
   dao: PublicKey,
   entityKey: Buffer | string,
