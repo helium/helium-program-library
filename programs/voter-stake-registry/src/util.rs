@@ -37,7 +37,8 @@ pub fn resolve_vote_weight(
 
   unique_nft_mints.push(token_account_acc.mint);
 
-  let voting_mint_config = &registrar.voting_mints[usize::from(position_acc.voting_mint_config_idx)];
+  let voting_mint_config =
+    &registrar.voting_mints[usize::from(position_acc.voting_mint_config_idx)];
 
   position_acc.voting_power(&voting_mint_config, registrar.clock_unix_timestamp())
 }
