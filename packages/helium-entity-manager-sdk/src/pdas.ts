@@ -5,6 +5,16 @@ import crypto from "crypto";
 // @ts-ignore
 import bs58 from "bs58";
 
+async function hashAnyhere(input: Buffer) {
+  /// @ts-ignore
+  if (typeof window != "undefined") {
+    return crypto.subtle.digest("SHA-256", input);
+  } else {
+    const { createHash } = await import("crypto");
+    return createHash("sha256").update(input).digest()
+  }
+}
+
 export const rewardableEntityConfigKey = (
   subDao: PublicKey,
   symbol: string,
@@ -54,7 +64,7 @@ export const keyToAssetKey = async (
   if (typeof entityKey === "string") {
     entityKey = Buffer.from(bs58.decode(entityKey));
   }
-  const hash = await crypto.subtle.digest("SHA-256", entityKey);
+  const hash = await hashAnyhere(entityKey);
 
   return PublicKey.findProgramAddressSync(
     [Buffer.from("key_to_asset", "utf-8"), dao.toBuffer(), Buffer.from(hash)],
