@@ -74,7 +74,11 @@ pub mod helium_sub_daos {
     reset_clockwork_thread_v0::handler(ctx)
   }
 
-  pub fn clockwork_kickoff_v0(ctx: Context<ClockworkKickoffV0>) -> Result<ThreadResponse> {
-    clockwork_kickoff_v0::handler(ctx)
+  pub fn sub_dao_kickoff_v0(ctx: Context<SubDaoKickoffV0>) -> Result<ThreadResponse> {
+    sub_dao_kickoff_v0::handler(ctx)
+  }
+
+  pub fn dao_kickoff_v0(ctx: Context<DaoKickoffV0>) -> Result<ThreadResponse> {
+    dao_kickoff_v0::handler(ctx)
   }
 }

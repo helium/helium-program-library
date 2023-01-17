@@ -2,7 +2,7 @@ use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrAr
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
-use clockwork_sdk::{self, state::ThreadResponse, ThreadProgram};
+use clockwork_sdk::{self, state::ThreadResponse};
 use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
 use switchboard_v2::{AggregatorAccountData, AggregatorHistoryBuffer};
 use voter_stake_registry::state::Registrar;
@@ -63,16 +63,6 @@ pub struct CalculateUtilityScoreV0<'info> {
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
-
-  /// CHECK: address checked
-  #[account(
-    mut,
-    seeds = [b"thread", sub_dao.key().as_ref(), b"end-epoch"],
-    seeds::program = clockwork.key(),
-    bump
-  )]
-  pub thread: AccountInfo<'info>,
-  pub clockwork: Program<'info, ThreadProgram>,
 }
 
 fn construct_next_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> Instruction {
@@ -133,7 +123,6 @@ pub fn handler(
   if ctx.accounts.prev_dao_epoch_info.lamports() > 0 {
     let info: Account<DaoEpochInfoV0> = Account::try_from(&ctx.accounts.prev_dao_epoch_info)?;
     prev_supply = info.current_hnt_supply;
-    assert!(info.epoch == ctx.accounts.dao_epoch_info.epoch - 1);
   }
 
   ctx.accounts.dao_epoch_info.total_rewards = ctx

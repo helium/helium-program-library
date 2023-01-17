@@ -168,6 +168,7 @@ async function run() {
   const councilKeypair = await loadKeypair(argv.councilKeypair);
   const councilWallet = new PublicKey(argv.councilWallet);
   const me = provider.wallet.publicKey;
+  const dao = daoKey(hntKeypair.publicKey)[0];
 
   console.log("HNT", hntKeypair.publicKey.toBase58());
   console.log("HST", hstKeypair.publicKey.toBase58());
@@ -175,6 +176,20 @@ async function run() {
   console.log("GOV PID", govProgramId.toBase58());
   console.log("COUNCIL", councilKeypair.publicKey.toBase58());
   console.log("COUNCIL WALLET", councilWallet.toBase58());
+
+  const thread = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("thread", "utf8"),
+      dao.toBuffer(),
+      Buffer.from("end-epoch", "utf8"),
+    ],
+    new PublicKey(
+      "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
+    )
+  )[0];
+
+  console.log("DAO", dao.toString());
+  console.log("THREAD", thread.toString());
 
   const conn = provider.connection;
 
@@ -297,7 +312,6 @@ async function run() {
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
-  const dao = (await daoKey(hntKeypair.publicKey))[0];
   const governance = PublicKey.findProgramAddressSync(
     [
       Buffer.from("account-governance", "utf-8"),
@@ -433,6 +447,7 @@ async function run() {
       .accounts({
         dcMint: dcKeypair.publicKey,
         hntMint: hntKeypair.publicKey,
+        thread,
         // TODO: Create actual HST pool
         hstPool: await getAssociatedTokenAddress(
           hntKeypair.publicKey,
@@ -442,6 +457,7 @@ async function run() {
       })
       .rpc({ skipPreflight: true });
   }
+  
 }
 
 run()
