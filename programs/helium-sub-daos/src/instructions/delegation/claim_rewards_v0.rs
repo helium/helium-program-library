@@ -38,7 +38,7 @@ pub struct ClaimRewardsV0<'info> {
   pub position_token_account: Box<Account<'info, TokenAccount>>,
   #[account(mut)]
   pub position_authority: Signer<'info>,
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
   #[account(
     has_one = registrar
   )]
@@ -109,7 +109,7 @@ impl<'info> ClaimRewardsV0<'info> {
 pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result<()> {
   // load the vehnt information
   let position = &mut ctx.accounts.position;
-  let registrar = &ctx.accounts.registrar.load()?;
+  let registrar = &ctx.accounts.registrar;
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
 
   let delegated_position = &mut ctx.accounts.delegated_position;

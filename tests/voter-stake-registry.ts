@@ -32,18 +32,19 @@ import {
   withSignOffProposal,
   YesNoVote,
 } from "@solana/spl-governance";
-import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 import {
-  Keypair,
-  PublicKey, TransactionInstruction
-} from "@solana/web3.js";
+  createAssociatedTokenAccountInstruction,
+  createTransferInstruction,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
+import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import chai, { expect } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import {
   init,
   nftVoteRecordKey,
   positionKey,
-  PROGRAM_ID
+  PROGRAM_ID,
 } from "../packages/voter-stake-registry-sdk/src";
 import { getUnixTimestamp } from "./utils/solana";
 import { SPL_GOVERNANCE_PID } from "./utils/vsr";
@@ -55,6 +56,8 @@ const MAX_LOCKUP = MIN_LOCKUP * 8;
 const SCALE = 100;
 const GENESIS_MULTIPLIER = 3;
 const SECS_PER_DAY = 60 * 60 * 24;
+type VotingMintConfig =
+  anchor.IdlTypes<VoterStakeRegistry>["VotingMintConfigV0"];
 
 describe("voter-stake-registry", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -64,6 +67,7 @@ describe("voter-stake-registry", () => {
   let hntMint: PublicKey;
   let realm: PublicKey;
   let programVersion: number;
+  let oneWeekFromNow: number;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
 
@@ -119,7 +123,7 @@ describe("voter-stake-registry", () => {
       pubkeys: { registrar: rkey },
     } = await program.methods
       .initializeRegistrarV0({
-        positionUpdateAuthority: null
+        positionUpdateAuthority: null,
       })
       .accounts({
         realm: realm,
@@ -130,7 +134,8 @@ describe("voter-stake-registry", () => {
     instructions.push(createRegistrar);
 
     // Configure voting mint
-    const oneWeekFromNow = Number(await getUnixTimestamp(provider)) + 60 * 60 * 24 * 7;
+    oneWeekFromNow =
+      Number(await getUnixTimestamp(provider)) + 60 * 60 * 24 * 7;
     instructions.push(
       await program.methods
         .configureVotingMintV0({
@@ -213,6 +218,33 @@ describe("voter-stake-registry", () => {
 
     return { position, mint: mintKeypair.publicKey };
   }
+
+  it("should configure a votingMint correctly", async () => {
+    const registrarAcc = await program.account.registrar.fetch(registrar);
+    const votingMint0 = (
+      registrarAcc.votingMints as VotingMintConfig[]
+    )[0] as VotingMintConfig;
+
+    expect(votingMint0.digitShift).to.eq(0);
+    expect(
+      votingMint0.lockedVoteWeightScaledFactor.eq(new anchor.BN(1_000_000_000))
+    ).to.eq(true);
+    expect(
+      votingMint0.minimumRequiredLockupSecs.eq(new anchor.BN(MIN_LOCKUP))
+    ).to.eq(true);
+    expect(
+      votingMint0.maxExtraLockupVoteWeightScaledFactor.eq(new anchor.BN(SCALE))
+    ).to.eq(true);
+    expect(votingMint0.genesisVotePowerMultiplier).to.eq(GENESIS_MULTIPLIER);
+    expect(
+      votingMint0.genesisVotePowerMultiplierExpirationTs.eq(
+        new anchor.BN(oneWeekFromNow)
+      )
+    ).to.eq(true);
+    expect(
+      votingMint0.lockupSaturationSecs.eq(new anchor.BN(MAX_LOCKUP))
+    ).to.eq(true);
+  });
 
   it("should allow me to create a position and deposit tokens", async () => {
     const { mint, position } = await createAndDeposit(10, 183);

@@ -5272,6 +5272,7 @@ dependencies = [
  "log",
  "mpl-token-metadata 1.4.3",
  "serde",
+ "shared-utils",
  "solana-banks-client",
  "solana-logger",
  "solana-program",
