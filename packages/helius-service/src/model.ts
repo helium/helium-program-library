@@ -12,10 +12,10 @@ export class Hotspot extends Model {}
 Hotspot.init({
   asset: {
     type: STRING,
+    primaryKey: true,
   },
   hotspot_key: {
     type: STRING,
-    primaryKey: true,
   },
   location: {
     type: STRING,
