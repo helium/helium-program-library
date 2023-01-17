@@ -1,9 +1,8 @@
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
-import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
-import { ConcurrentMerkleTreeAccount } from "@solana/spl-account-compression";
 import { PublicKey } from "@solana/web3.js";
 import { keyToAssetKey, mobileInfoKey } from "../pdas";
+import { proofArgsAndAccounts, ProofArgsAndAccountsArgs } from "./proofArgsAndAccounts";
 
 export async function onboardMobileHotspot({
   program,
@@ -13,63 +12,43 @@ export async function onboardMobileHotspot({
   dao,
   payer,
   dcFeePayer,
-  assetEndpoint,
-  getAssetFn = getAsset,
-  getAssetProofFn = getAssetProof,
+  ...rest
 }: {
   program: Program<HeliumEntityManager>;
   payer?: PublicKey;
   dcFeePayer?: PublicKey;
   assetId: PublicKey;
   rewardableEntityConfig: PublicKey;
-  assetEndpoint?: string;
   maker: PublicKey;
   dao: PublicKey;
-  getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
-  getAssetProofFn?: (
-    url: string,
-    assetId: PublicKey
-  ) => Promise<AssetProof | undefined>;
-}) {
-  // @ts-ignore
-  const endpoint = assetEndpoint || program.provider.connection._rpcEndpoint;
-  const asset = await getAssetFn(endpoint, assetId);
-  if (!asset) {
-    throw new Error("No asset with ID " + assetId.toBase58());
-  }
-  const assetProof = await getAssetProofFn(endpoint, assetId);
-  if (!assetProof) {
-    throw new Error("No asset proof with ID " + assetId.toBase58());
-  }
-  const { root, proof, treeId, nodeIndex, leaf } = assetProof;
+} & Omit<ProofArgsAndAccountsArgs, "connection">) {
   const {
-    ownership: { owner },
-    content: { json_uri },
-  } = asset;
+    asset: {
+      content: { json_uri },
+      ownership: { owner },
+    },
+    args,
+    accounts,
+    remainingAccounts,
+  } = await proofArgsAndAccounts({
+    connection: program.provider.connection,
+    assetId,
+    ...rest,
+  });
 
   const [info] = mobileInfoKey(rewardableEntityConfig, assetId);
-  const canopy = await (
-    await ConcurrentMerkleTreeAccount.fromAccountAddress(
-      program.provider.connection,
-      treeId
-    )
-  ).getCanopyDepth();
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
   return program.methods
-    .onboardMobileHotspotV0({
-      hash: leaf.toBuffer().toJSON().data,
-      root: root.toBuffer().toJSON().data,
-      index: nodeIndex,
-    })
+    .onboardMobileHotspotV0(args)
     .accounts({
       // hotspot: assetId,
+      ...accounts,
       dcFeePayer,
       payer,
       rewardableEntityConfig,
       hotspotOwner: owner,
       mobileInfo: info,
-      merkleTree: treeId,
       maker,
       dao,
       issuingAuthority: makerAcc?.issuingAuthority,
@@ -77,13 +56,5 @@ export async function onboardMobileHotspot({
         await keyToAssetKey(dao, json_uri.split("/").slice(-1)[0])
       )[0],
     })
-    .remainingAccounts(
-      proof.slice(0, proof.length - canopy).map((p) => {
-        return {
-          pubkey: p,
-          isWritable: false,
-          isSigner: false,
-        };
-      })
-    );
+    .remainingAccounts(remainingAccounts);
 }

@@ -50,6 +50,11 @@ export async function getAsset(
       method: "get_asset",
       id: "rpd-op-123",
       params: [assetId.toBase58()],
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
     });
     const result = response.data.result;
     if (result) {
@@ -68,6 +73,7 @@ function toAsset(result: any): Asset {
     grouping: result.grouping && new PublicKey(result.grouping),
     compression: {
       ...result.compression,
+      leafId: result.compression.leaf_id,
       dataHash:
         result.compression.data_hash ??
         base58.decode(result.compression.data_hash),
@@ -96,6 +102,11 @@ export async function getAssetProof(
       method: "get_asset_proof",
       id: "rpd-op-123",
       params: [assetId.toBase58()],
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
     });
     const result = response.data.result;
     if (result) {
@@ -139,6 +150,11 @@ export async function getAssetsByOwner(
       method: "get_assets_by_owner",
       id: "rpd-op-123",
       params: [wallet, sortBy, limit, page, before, after],
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
     });
 
     return response.data.result?.items.map(toAsset);
