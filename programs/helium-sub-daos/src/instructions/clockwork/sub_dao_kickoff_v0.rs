@@ -2,11 +2,11 @@ use crate::{current_epoch, state::*};
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
-use clockwork_sdk::{self, state::ThreadResponse, utils::PAYER_PUBKEY, ThreadProgram};
+use clockwork_sdk::{self, state::ThreadResponse, utils::PAYER_PUBKEY};
 use switchboard_v2::AggregatorAccountData;
 
 #[derive(Accounts)]
-pub struct ClockworkKickoffV0<'info> {
+pub struct SubDaoKickoffV0<'info> {
   #[account(
     has_one = hnt_mint
   )]
@@ -22,19 +22,9 @@ pub struct ClockworkKickoffV0<'info> {
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
-
-  /// CHECK: handled by thread_create
-  #[account(
-    mut,
-    seeds = [b"thread", sub_dao.key().as_ref(), b"end-epoch"],
-    seeds::program = clockwork.key(),
-    bump
-  )]
-  pub thread: AccountInfo<'info>,
-  pub clockwork: Program<'info, ThreadProgram>,
 }
 
-fn construct_next_ix(ctx: &Context<ClockworkKickoffV0>, epoch: u64) -> Option<Instruction> {
+fn construct_next_ix(ctx: &Context<SubDaoKickoffV0>, epoch: u64) -> Option<Instruction> {
   // get epoch info accounts needed
   let dao_key = ctx.accounts.dao.key();
   let dao_ei_seeds: &[&[u8]] = &[
@@ -82,8 +72,6 @@ fn construct_next_ix(ctx: &Context<ClockworkKickoffV0>, epoch: u64) -> Option<In
     AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
     AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
     AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
-    AccountMeta::new(ctx.accounts.thread.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.clockwork.key(), false),
   ];
   Some(Instruction {
     program_id: crate::ID,
@@ -96,7 +84,7 @@ fn construct_next_ix(ctx: &Context<ClockworkKickoffV0>, epoch: u64) -> Option<In
 }
 
 /// This instruction is responsible for deriving the calculate utility score ix
-pub fn handler(ctx: Context<ClockworkKickoffV0>) -> Result<ThreadResponse> {
+pub fn handler(ctx: Context<SubDaoKickoffV0>) -> Result<ThreadResponse> {
   let curr_ts = Clock::get()?.unix_timestamp;
   let epoch = current_epoch(curr_ts) - 1; // operate calculations on previous epoch
   let calculate_utility_ix = construct_next_ix(&ctx, epoch).unwrap();

@@ -168,13 +168,11 @@ fn construct_kickoff_ix(ctx: &Context<InitializeSubDaoV0>) -> Option<Instruction
     AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
     AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
     AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
-    AccountMeta::new(ctx.accounts.thread.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.clockwork.key(), false),
   ];
   Some(Instruction {
     program_id: crate::ID,
     accounts,
-    data: anchor_sighash("clockwork_kickoff_v0").to_vec(),
+    data: anchor_sighash("sub_dao_kickoff_v0").to_vec(),
   })
 }
 
