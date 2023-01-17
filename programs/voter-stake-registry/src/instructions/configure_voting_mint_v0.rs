@@ -134,7 +134,7 @@ pub fn handler(ctx: Context<ConfigureVotingMintV0>, args: ConfigureVotingMintArg
       VsrError::VotingMintConfiguredWithDifferentIndex
     ),
     Err(_) => require!(
-      !registrar.voting_mints.get(idx).is_some(),
+      registrar.voting_mints.get(idx).is_none(),
       VsrError::VotingMintConfigIndexAlreadyInUse
     ),
   };
