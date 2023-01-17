@@ -447,7 +447,6 @@ async function run() {
       .accounts({
         dcMint: dcKeypair.publicKey,
         hntMint: hntKeypair.publicKey,
-        thread,
         // TODO: Create actual HST pool
         hstPool: await getAssociatedTokenAddress(
           hntKeypair.publicKey,
@@ -456,6 +455,15 @@ async function run() {
         ),
       })
       .rpc({ skipPreflight: true });
+
+    console.log("Transfering sol to thread")
+    await sendInstructions(provider, [
+      SystemProgram.transfer({
+        fromPubkey: provider.wallet.publicKey,
+        toPubkey: thread,
+        lamports: BigInt(toBN(0.1, 9).toString()),
+      }),
+    ]);
   }
   
 }
