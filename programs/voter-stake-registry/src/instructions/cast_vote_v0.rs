@@ -27,7 +27,7 @@ pub struct CastVoteArgsV0 {
 #[derive(Accounts)]
 #[instruction(args: CastVoteArgsV0)]
 pub struct CastVoteV0<'info> {
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
 
   #[account(
     init_if_needed,
@@ -40,7 +40,7 @@ pub struct CastVoteV0<'info> {
 
   // TokenOwnerRecord of the voter who casts the vote
   #[account(
-      owner = registrar.load()?.governance_program_id
+      owner = registrar.governance_program_id
     )]
   /// CHECK: Owned by spl-governance instance specified in registrar.governance_program_id
   pub voter_token_owner_record: UncheckedAccount<'info>,
@@ -65,8 +65,8 @@ pub fn handler<'a, 'b, 'c, 'info>(
   let voter_weight_record = &mut ctx.accounts.voter_weight_record;
 
   voter_weight_record.governing_token_owner = args.owner;
-  voter_weight_record.realm = registrar.load()?.realm;
-  voter_weight_record.governing_token_mint = registrar.load()?.realm_governing_token_mint;
+  voter_weight_record.realm = registrar.realm;
+  voter_weight_record.governing_token_mint = registrar.realm_governing_token_mint;
 
   let mut voter_weight = 0_u64;
 
@@ -76,7 +76,7 @@ pub fn handler<'a, 'b, 'c, 'info>(
   let rent = Rent::get()?;
 
   let governing_token_owner = resolve_governing_token_owner(
-    &registrar.load()?,
+    registrar,
     &ctx.accounts.voter_token_owner_record,
     &ctx.accounts.voter_authority,
     voter_weight_record,
@@ -86,7 +86,7 @@ pub fn handler<'a, 'b, 'c, 'info>(
 
   for (token_account, position, nft_vote_record_info) in ctx.remaining_accounts.iter().tuples() {
     let nft_vote_weight = resolve_vote_weight(
-      registrar.load()?,
+      registrar,
       &args.owner,
       token_account,
       position,

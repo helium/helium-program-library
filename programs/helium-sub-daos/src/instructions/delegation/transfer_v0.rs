@@ -13,7 +13,7 @@ use voter_stake_registry::{
 
 #[derive(Accounts)]
 pub struct TransferV0<'info> {
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
   #[account(
     has_one = registrar,
     seeds = ["dao".as_bytes(), deposit_mint.key().as_ref()],

@@ -3193,7 +3193,22 @@
     "@solana/web3.js" "^1.50.1"
     js-sha3 "^0.8.0"
 
-"@metaplex-foundation/mpl-token-metadata@^2.2.3", "@metaplex-foundation/mpl-token-metadata@^2.3.3":
+"@metaplex-foundation/mpl-bubblegum@^0.6.0":
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/@metaplex-foundation/mpl-bubblegum/-/mpl-bubblegum-0.6.0.tgz#81e84076d021f0f3aa553b14eaece976719c110d"
+  integrity sha512-gGm8AVTP5FkrkU9s4LrSbeJczeVoyfYiqMQdDRoPEnydP6T2fGUQdPxVLFY7kdHJyp0r3UY+WVAS8hLisveSHg==
+  dependencies:
+    "@metaplex-foundation/beet" "0.7.1"
+    "@metaplex-foundation/beet-solana" "0.4.0"
+    "@metaplex-foundation/cusper" "^0.0.2"
+    "@metaplex-foundation/mpl-token-metadata" "^2.5.2"
+    "@solana/spl-account-compression" "^0.1.4"
+    "@solana/spl-token" "^0.1.8"
+    "@solana/web3.js" "^1.50.1"
+    bn.js "^5.2.0"
+    js-sha3 "^0.8.0"
+
+"@metaplex-foundation/mpl-token-metadata@^2.2.3", "@metaplex-foundation/mpl-token-metadata@^2.3.3", "@metaplex-foundation/mpl-token-metadata@^2.5.2":
   version "2.5.2"
   resolved "https://registry.yarnpkg.com/@metaplex-foundation/mpl-token-metadata/-/mpl-token-metadata-2.5.2.tgz#ec84464e2bf65bf491abdc71c3882e5973dd9978"
   integrity sha512-lAjQjj2gGtyLq8MOkp4tWZSC5DK9NWgPd3EoH0KQ9gMs3sKIJRik0CBaZg+JA0uLwzkiErY2Izus4vbWtRADJQ==
@@ -4639,6 +4654,16 @@
   version "0.1.4"
   resolved "https://registry.yarnpkg.com/@solana/spl-account-compression/-/spl-account-compression-0.1.4.tgz#a401d7c47b3d960d00ea18fe1b423877fb3dc380"
   integrity sha512-y4kD1Ecw1R4qjp0A0SouV2GxKSIbffVo17kROJh/gt9zzGyROQ10KL5pPpirEJ1Yj7GjIjF8MiFxKBGm+Jrygw==
+  dependencies:
+    "@metaplex-foundation/beet" "^0.7.1"
+    "@metaplex-foundation/beet-solana" "^0.4.0"
+    bn.js "^5.2.1"
+    borsh "^0.7.0"
+
+"@solana/spl-account-compression@^0.1.5":
+  version "0.1.5"
+  resolved "https://registry.yarnpkg.com/@solana/spl-account-compression/-/spl-account-compression-0.1.5.tgz#81f7bbd1120bf211ed2091b44b9f030fd08bf2d3"
+  integrity sha512-ZrJNrc4fqxJtqOjws6fEeMKhiA/ile9aDP83mutee3MVxN2cloL9xVHb3p2g3JuNCw4jb+AClZt0JbLCthz47w==
   dependencies:
     "@metaplex-foundation/beet" "^0.7.1"
     "@metaplex-foundation/beet-solana" "^0.4.0"

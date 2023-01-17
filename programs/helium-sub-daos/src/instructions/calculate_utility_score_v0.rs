@@ -19,7 +19,7 @@ pub const TESTING: bool = std::option_env!("TESTING").is_some();
 pub struct CalculateUtilityScoreV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
   #[account(
     has_one = registrar,
     has_one = hnt_mint
@@ -123,7 +123,7 @@ pub fn handler(
   ctx: Context<CalculateUtilityScoreV0>,
   args: CalculateUtilityScoreArgsV0,
 ) -> Result<ThreadResponse> {
-  let curr_ts = ctx.accounts.registrar.load()?.clock_unix_timestamp();
+  let curr_ts = ctx.accounts.registrar.clock_unix_timestamp();
   let epoch = current_epoch(curr_ts);
 
   // Set total rewards, accounting for net emmissions by counting

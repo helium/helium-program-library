@@ -23,7 +23,7 @@ impl Default for VoterWeightAction {
 pub struct UpdateVoterWeightRecordV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
 
   #[account(
     init_if_needed,
@@ -66,7 +66,7 @@ pub fn handler(
 
   for (token_account, position) in ctx.remaining_accounts.iter().tuples() {
     let nft_vote_weight = resolve_vote_weight(
-      registrar.load()?,
+      registrar,
       &governing_token_owner,
       token_account,
       position,
@@ -79,9 +79,9 @@ pub fn handler(
   let voter_weight_record = &mut ctx.accounts.voter_weight_record;
 
   voter_weight_record.governing_token_owner = args.owner;
-  voter_weight_record.realm = registrar.load()?.realm;
+  voter_weight_record.realm = registrar.realm;
   voter_weight_record.voter_weight = voter_weight;
-  voter_weight_record.governing_token_mint = registrar.load()?.realm_governing_token_mint;
+  voter_weight_record.governing_token_mint = registrar.realm_governing_token_mint;
 
   // Record is only valid as of the current slot
   voter_weight_record.voter_weight_expiry = Some(Clock::get()?.slot);
