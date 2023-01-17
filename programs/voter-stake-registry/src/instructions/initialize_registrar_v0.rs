@@ -9,7 +9,7 @@ use std::mem::size_of;
 pub struct InitializeRegistrarV0<'info> {
   /// The voting registrar. There can only be a single registrar
   /// per governance realm and governing mint.
-#[account(
+  #[account(
     init,
     seeds = [realm.key().as_ref(), b"registrar".as_ref(), realm_governing_token_mint.key().as_ref()],
     bump,

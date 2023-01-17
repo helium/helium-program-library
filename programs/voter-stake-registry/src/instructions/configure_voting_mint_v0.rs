@@ -122,7 +122,7 @@ pub fn handler(ctx: Context<ConfigureVotingMintV0>, args: ConfigureVotingMintArg
   require_gte!(
     registrar.voting_mints.len(),
     idx,
-    VsrError::OutOfBoundsVotingMintConfigIndex    
+    VsrError::OutOfBoundsVotingMintConfigIndex
   );
 
   // Either it's reconfiguring an existing mint with the correct index,
@@ -136,10 +136,10 @@ pub fn handler(ctx: Context<ConfigureVotingMintV0>, args: ConfigureVotingMintArg
     Err(_) => require!(
       !registrar.voting_mints.get(idx).is_some(),
       VsrError::VotingMintConfigIndexAlreadyInUse
-    )
+    ),
   };
 
-  // Update or append votingMint    
+  // Update or append votingMint
   match registrar.voting_mints.get(idx) {
     Some(_) => {
       registrar.voting_mints[idx] = VotingMintConfigV0 {
@@ -152,19 +152,17 @@ pub fn handler(ctx: Context<ConfigureVotingMintV0>, args: ConfigureVotingMintArg
         genesis_vote_power_multiplier_expiration_ts,
         lockup_saturation_secs,
       }
-    },
-    None => {
-      registrar.voting_mints.push(VotingMintConfigV0 {
-        mint,
-        digit_shift,
-        locked_vote_weight_scaled_factor,
-        minimum_required_lockup_secs,
-        max_extra_lockup_vote_weight_scaled_factor,
-        genesis_vote_power_multiplier,
-        genesis_vote_power_multiplier_expiration_ts,
-        lockup_saturation_secs,
-      })
     }
+    None => registrar.voting_mints.push(VotingMintConfigV0 {
+      mint,
+      digit_shift,
+      locked_vote_weight_scaled_factor,
+      minimum_required_lockup_secs,
+      max_extra_lockup_vote_weight_scaled_factor,
+      genesis_vote_power_multiplier,
+      genesis_vote_power_multiplier_expiration_ts,
+      lockup_saturation_secs,
+    }),
   }
 
   // Check for overflow in vote weight
