@@ -2,7 +2,6 @@ use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
-use shared_utils::resize_to_fit;
 use spl_governance::state::realm;
 use std::mem::size_of;
 
@@ -10,13 +9,13 @@ use std::mem::size_of;
 pub struct InitializeRegistrarV0<'info> {
   /// The voting registrar. There can only be a single registrar
   /// per governance realm and governing mint.
-  #[account(
-        init,
-        seeds = [realm.key().as_ref(), b"registrar".as_ref(), realm_governing_token_mint.key().as_ref()],
-        bump,
-        payer = payer,
-        space = 8 + size_of::<Registrar>() + 60
-    )]
+#[account(
+    init,
+    seeds = [realm.key().as_ref(), b"registrar".as_ref(), realm_governing_token_mint.key().as_ref()],
+    bump,
+    payer = payer,
+    space = 8 + size_of::<Registrar>() + 60
+  )]
   pub registrar: Box<Account<'info, Registrar>>,
 
   /// An spl-governance realm
@@ -37,7 +36,6 @@ pub struct InitializeRegistrarV0<'info> {
 
   #[account(mut)]
   pub payer: Signer<'info>,
-
   pub system_program: Program<'info, System>,
 }
 
@@ -62,19 +60,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
   registrar.realm_authority = ctx.accounts.realm_authority.key();
   registrar.time_offset = 0;
   registrar.position_update_authority = args.position_update_authority;
-  registrar.voting_mints = vec![
-    VotingMintConfigV0 {
-      mint: Pubkey::default(),
-      digit_shift: 0,
-      locked_vote_weight_scaled_factor: 0,
-      minimum_required_lockup_secs: 0,
-      max_extra_lockup_vote_weight_scaled_factor: 0,
-      genesis_vote_power_multiplier: 0,
-      genesis_vote_power_multiplier_expiration_ts: 0,
-      lockup_saturation_secs: 0,
-    };
-    4
-  ];
+  registrar.voting_mints = Vec::new();
 
   // Verify that "realm_authority" is the expected authority on "realm"
   // and that the mint matches one of the realm mints too.
@@ -89,12 +75,6 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
     ctx.accounts.realm_authority.key(),
     VsrError::InvalidRealmAuthority
   );
-
-  resize_to_fit(
-    &ctx.accounts.payer.to_account_info(),
-    &ctx.accounts.system_program.to_account_info(),
-    registrar,
-  )?;
 
   Ok(())
 }

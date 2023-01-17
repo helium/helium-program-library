@@ -15,9 +15,7 @@ pub struct Registrar {
   pub time_offset: i64,
   /// Allows a program to wrap updates to the position (transfer or reset lockup)
   pub position_update_authority: Option<Pubkey>,
-
   /// Storage for voting mints and their configuration.
-  /// The length should be adjusted for one's use case.
   pub voting_mints: Vec<VotingMintConfigV0>,
 
   pub bump: u8,

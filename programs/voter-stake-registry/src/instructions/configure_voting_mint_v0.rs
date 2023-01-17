@@ -2,6 +2,7 @@ use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
+use shared_utils::resize_to_fit;
 
 // Remaining accounts must be all the token mints that have registered
 // as voting mints, including the newly registered one.
@@ -13,6 +14,10 @@ pub struct ConfigureVotingMintV0<'info> {
 
   /// Tokens of this mint will produce vote weight
   pub mint: Account<'info, Mint>,
+
+  #[account(mut)]
+  pub payer: Signer<'info>,
+  pub system_program: Program<'info, System>,
   // This instruction expects that all voting mint addresses, including a
   // newly registered one, are passed in ctx.remainingAccounts.
 }
@@ -113,10 +118,11 @@ pub fn handler(ctx: Context<ConfigureVotingMintV0>, args: ConfigureVotingMintArg
   let mint = ctx.accounts.mint.key();
   let idx = idx as usize;
 
-  require_gt!(
+  // index must exist or be next configurable index
+  require_gte!(
     registrar.voting_mints.len(),
     idx,
-    VsrError::OutOfBoundsVotingMintConfigIndex
+    VsrError::OutOfBoundsVotingMintConfigIndex    
   );
 
   // Either it's reconfiguring an existing mint with the correct index,
@@ -128,24 +134,47 @@ pub fn handler(ctx: Context<ConfigureVotingMintV0>, args: ConfigureVotingMintArg
       VsrError::VotingMintConfiguredWithDifferentIndex
     ),
     Err(_) => require!(
-      !registrar.voting_mints[idx].in_use(),
+      !registrar.voting_mints.get(idx).is_some(),
       VsrError::VotingMintConfigIndexAlreadyInUse
-    ),
+    )
   };
 
-  registrar.voting_mints[idx] = VotingMintConfigV0 {
-    mint,
-    digit_shift,
-    locked_vote_weight_scaled_factor,
-    minimum_required_lockup_secs,
-    max_extra_lockup_vote_weight_scaled_factor,
-    genesis_vote_power_multiplier,
-    genesis_vote_power_multiplier_expiration_ts,
-    lockup_saturation_secs,
-  };
+  // Update or append votingMint    
+  match registrar.voting_mints.get(idx) {
+    Some(_) => {
+      registrar.voting_mints[idx] = VotingMintConfigV0 {
+        mint,
+        digit_shift,
+        locked_vote_weight_scaled_factor,
+        minimum_required_lockup_secs,
+        max_extra_lockup_vote_weight_scaled_factor,
+        genesis_vote_power_multiplier,
+        genesis_vote_power_multiplier_expiration_ts,
+        lockup_saturation_secs,
+      }
+    },
+    None => {
+      registrar.voting_mints.push(VotingMintConfigV0 {
+        mint,
+        digit_shift,
+        locked_vote_weight_scaled_factor,
+        minimum_required_lockup_secs,
+        max_extra_lockup_vote_weight_scaled_factor,
+        genesis_vote_power_multiplier,
+        genesis_vote_power_multiplier_expiration_ts,
+        lockup_saturation_secs,
+      })
+    }
+  }
 
   // Check for overflow in vote weight
   registrar.max_vote_weight(ctx.remaining_accounts)?;
+
+  resize_to_fit(
+    &ctx.accounts.payer.to_account_info(),
+    &ctx.accounts.system_program.to_account_info(),
+    &ctx.accounts.registrar,
+  )?;
 
   Ok(())
 }
