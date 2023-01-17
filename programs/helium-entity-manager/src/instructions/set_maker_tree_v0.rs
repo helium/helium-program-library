@@ -46,7 +46,7 @@ pub fn handler(ctx: Context<SetMakerTreeV0>, args: SetMakerTreeArgsV0) -> Result
   let signer_seeds: &[&[&[u8]]] = &[&[
     b"maker",
     ctx.accounts.maker.name.as_bytes(),
-    &[ctx.bumps["maker"]],
+    &[ctx.accounts.maker.bump_seed],
   ]];
 
   create_tree(
