@@ -64,7 +64,7 @@ export async function sendInstructions(
   if (signers.length > 0) {
     tx.partialSign(...signers);
   }
-  if (tx.instructions.some(ix => ix.keys.some(key => key.isSigner && key.pubkey.equals(provider.wallet.publicKey)))) {
+  if (tx.feePayer.equals(provider.wallet.publicKey) || tx.instructions.some(ix => ix.keys.some(key => key.isSigner && key.pubkey.equals(provider.wallet.publicKey)))) {
     tx = await provider.wallet.signTransaction(tx);
   }
 

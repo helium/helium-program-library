@@ -90,9 +90,6 @@ pub fn handler(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result
   )?;
 
   ctx.accounts.dao_epoch_info.done_issuing_hst_pool = true;
-  ctx.accounts.dao_epoch_info.bump_seed = ctx.bumps["dao_epoch_info"];
-  ctx.accounts.dao_epoch_info.dao = ctx.accounts.dao.key();
-  ctx.accounts.dao_epoch_info.epoch = args.epoch;
 
   Ok(())
 }
