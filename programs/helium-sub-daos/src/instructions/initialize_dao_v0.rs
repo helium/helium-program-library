@@ -65,24 +65,27 @@ pub struct InitializeDaoV0<'info> {
   pub clockwork: Program<'info, ThreadProgram>,
 }
 
-fn construct_kickoff_ix(ctx: &Context<InitializeDaoV0>) -> Option<Instruction> {
+pub fn construct_dao_kickoff_ix(
+  dao: Pubkey,
+  hnt_mint: Pubkey,
+  hst_pool: Pubkey,
+  token_program: Pubkey,
+  circuit_breaker_program: Pubkey,
+) -> Option<Instruction> {
   let hnt_circuit_breaker = Pubkey::find_program_address(
-    &[
-      "mint_windowed_breaker".as_bytes(),
-      ctx.accounts.dao.hnt_mint.as_ref(),
-    ],
-    &ctx.accounts.circuit_breaker_program.key(),
+    &["mint_windowed_breaker".as_bytes(), hnt_mint.as_ref()],
+    &circuit_breaker_program,
   )
   .0;
 
   // build clockwork kickoff ix
   let accounts = vec![
-    AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
+    AccountMeta::new_readonly(dao, false),
     AccountMeta::new_readonly(hnt_circuit_breaker, false),
-    AccountMeta::new_readonly(ctx.accounts.hnt_mint.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.hst_pool.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
+    AccountMeta::new_readonly(hnt_mint, false),
+    AccountMeta::new_readonly(hst_pool, false),
+    AccountMeta::new_readonly(token_program, false),
+    AccountMeta::new_readonly(circuit_breaker_program, false),
   ];
   Some(Instruction {
     program_id: crate::ID,
@@ -146,7 +149,14 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
   });
 
   let curr_ts = Clock::get()?.unix_timestamp;
-  let kickoff_ix = construct_kickoff_ix(&ctx).unwrap();
+  let kickoff_ix = construct_dao_kickoff_ix(
+    ctx.accounts.dao.key(),
+    ctx.accounts.dao.hnt_mint,
+    ctx.accounts.hst_pool.key(),
+    ctx.accounts.token_program.key(),
+    ctx.accounts.circuit_breaker_program.key(),
+  )
+  .unwrap();
   let cron = create_end_epoch_cron(curr_ts, 60 * 5);
 
   // initialize thread
