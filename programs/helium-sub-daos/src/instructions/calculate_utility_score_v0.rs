@@ -159,7 +159,7 @@ pub fn handler(
     return Err(error!(ErrorCode::EpochToEarly));
   }
 
-  ctx.accounts.sub_dao_epoch_info.epoch = epoch;
+  ctx.accounts.sub_dao_epoch_info.epoch = args.epoch;
   let epoch_end_ts = ctx.accounts.sub_dao_epoch_info.end_ts();
   update_subdao_vehnt(
     &mut ctx.accounts.sub_dao,

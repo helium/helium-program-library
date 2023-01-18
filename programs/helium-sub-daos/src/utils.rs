@@ -39,6 +39,14 @@ pub fn update_subdao_vehnt(
     return Ok(());
   }
 
+  msg!(
+    "Current vehnt is {} with last updated of {}. Fast forwarding to {} at fall rate {}",
+    sub_dao.vehnt_delegated,
+    sub_dao.vehnt_last_calculated_ts,
+    curr_ts,
+    sub_dao.vehnt_fall_rate
+  );
+
   // If last calculated was more than an epoch ago
   let epoch_start = curr_epoch_info.start_ts();
   if epoch_start
@@ -48,13 +56,7 @@ pub fn update_subdao_vehnt(
   {
     return Err(error!(ErrorCode::MustCalculateVehntLinearly));
   }
-  msg!(
-    "Current vehnt is {} with last updated of {}. Fast forwarding to {} at fall rate {}",
-    sub_dao.vehnt_delegated,
-    sub_dao.vehnt_last_calculated_ts,
-    curr_ts,
-    sub_dao.vehnt_fall_rate
-  );
+
   // Step 1. Update veHNT up to the point that this epoch starts
   if epoch_start > sub_dao.vehnt_last_calculated_ts {
     let fall = sub_dao
