@@ -334,9 +334,12 @@ async function run() {
 
   const routers = new Set(Object.keys(state.routers));
 
-  const bobcat = makers.find(maker => maker.name === "Bobcat") // TODO: For testing only until we get maker names
+  // TODO: Onboard to mobile if they were from either of these makers
+  const bobcat5G = makers.find((maker) => maker.name === "Bobcat 5G");
+  const freedomFi = makers.find((maker) => maker.name === "FreedomFi");
   /// Iterate through accounts in order so we don't create 1mm promises.
-  for (const [address, account] of Object.entries(accounts)) {
+  for (const [address, account] of Object.entries(accounts).slice(0, 10000)) {
+    console.log(account);
     const solAddress = toSolana(address);
     const isRouter = routers.has(address);
 
@@ -373,7 +376,14 @@ async function run() {
       const hotspotIxs = await Promise.all(
         (account.hotspots || []).map(async (hotspot) => {
           totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
-          const makerId = hotspot.maker || bobcat.address;
+          const makerId =
+            hotspot.maker ||
+            new Address(
+              0,
+              0,
+              ED25519_KEY_TYPE,
+              provider.wallet.publicKey.toBuffer()
+            ).b58; // Default (fallthrough) maker
           const hotspotPubkeysForMaker = hotspotPubkeys[makerId];
 
           return hemProgramNoResolve.methods

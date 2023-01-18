@@ -511,7 +511,7 @@ async function run() {
         console.log("Created active device aggregator", agg.publicKey.toBase58());
         await AggregatorHistoryBuffer.create(switchboard, {
           aggregatorAccount: agg,
-          maxSamples: 24 * 7,
+          maxSamples: 24 * 31, // Give us a month of active device data. If we fail to run end epoch, RIP.
         });
         aggregatorKey = agg.publicKey;
       }
@@ -590,19 +590,30 @@ async function run() {
   if (!(await provider.connection.getAccountInfo(hsConfigKey)) && !argv.noHotspots) {
     const instructions: TransactionInstruction[] = [];
     console.log(`Initalizing ${name} RewardableEntityConfig`);
+    let settings;
+    if (name.toUpperCase() == "IOT") {
+      settings = {
+        iotConfig: {
+          minGain: 10,
+          maxGain: 150,
+          fullLocationStakingFee: toBN(1000000, 0),
+          dataonlyLocationStakingFee: toBN(500000, 0),
+        } as any,
+      }
+    } else {
+      settings = {
+        mobileConfig: {
+          fullLocationStakingFee: toBN(1000000, 0),
+          dataonlyLocationStakingFee: toBN(500000, 0),
+        }
+      }
+    }
 
     instructions.push(
       await hemProgram.methods
         .initializeRewardableEntityConfigV0({
           symbol: name.toUpperCase(),
-          settings: {
-            iotConfig: {
-              minGain: 10,
-              maxGain: 150,
-              fullLocationStakingFee: toBN(1000000, 0),
-              dataonlyLocationStakingFee: toBN(500000, 0),
-            } as any,
-          },
+          settings
         })
         .accounts({
           subDao: subdao,

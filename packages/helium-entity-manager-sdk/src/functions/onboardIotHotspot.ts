@@ -36,7 +36,7 @@ export async function onboardIotHotspot({
     ...rest,
   });
 
-  const [info] = iotInfoKey(rewardableEntityConfig, assetId);
+  const [info] = await iotInfoKey(rewardableEntityConfig, json_uri.split("/").slice(-1)[0]);
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
   const keyToAsset = (
