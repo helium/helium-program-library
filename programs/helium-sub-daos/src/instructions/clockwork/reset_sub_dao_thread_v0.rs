@@ -1,10 +1,10 @@
-use crate::{construct_sub_dao_kickoff_ix, create_end_epoch_cron, state::*};
+use crate::{construct_sub_dao_kickoff_ix, state::*};
 use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
 use circuit_breaker::CircuitBreaker;
 use clockwork_sdk::{
   cpi::thread_update,
-  state::{Thread, ThreadSettings, Trigger},
+  state::{Thread, ThreadSettings},
   ThreadProgram,
 };
 
@@ -47,9 +47,6 @@ pub fn handler(ctx: Context<ResetSubDaoThreadV0>) -> Result<()> {
     ctx.accounts.circuit_breaker_program.key(),
   )
   .unwrap();
-  let curr_ts = Clock::get()?.unix_timestamp;
-
-  let cron = create_end_epoch_cron(curr_ts, 60 * 5);
 
   let signer_seeds: &[&[&[u8]]] = &[&[
     "sub_dao".as_bytes(),
@@ -70,10 +67,7 @@ pub fn handler(ctx: Context<ResetSubDaoThreadV0>) -> Result<()> {
       fee: None,
       kickoff_instruction: Some(kickoff_ix.into()),
       rate_limit: None,
-      trigger: Some(Trigger::Cron {
-        schedule: cron,
-        skippable: false,
-      }),
+      trigger: None,
     },
   )?;
   Ok(())

@@ -229,6 +229,25 @@ async function run() {
   console.log("DAO", dao.toString());
   console.log("SUBDAO", subdao.toString());
   const daoAcc = await heliumSubDaosProgram.account.daoV0.fetch(dao);
+
+  const thread = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("thread", "utf8"),
+      subdao.toBuffer(),
+      Buffer.from("end-epoch", "utf8"),
+    ],
+    new PublicKey(
+      "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
+    )
+  )[0];
+  if (exists(conn, subdao)) {
+    const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
+    
+    console.log(
+      `Subdao exists. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}. Thread: ${thread.toString()}`
+    );
+    return;
+  }
   const [lazyDist] = await lazyDistributorKey(subdaoKeypair.publicKey);
   const rewardsEscrow = await getAssociatedTokenAddress(
     subdaoKeypair.publicKey,
@@ -452,16 +471,6 @@ async function run() {
       .rpc({ skipPreflight: true });
   }
 
-  const thread = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("thread", "utf8"),
-      subdao.toBuffer(),
-      Buffer.from("end-epoch", "utf8"),
-    ],
-    new PublicKey(
-      "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
-    )
-  )[0];
   if (!(await exists(conn, subdao))) {
     let aggregatorKey = new PublicKey("GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"); // value cloned from mainnet to localnet
     if (!isLocalhost(provider)) {
@@ -576,14 +585,6 @@ async function run() {
         lamports: BigInt(toBN(0.1, 9).toString()),
       }),
     ]);
-    
-    
-  } else {
-    const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
-    
-    console.log(
-      `Subdao exits. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}. Thread: ${thread.toString()}`
-    );
   }
 
   const hsConfigKey = (await rewardableEntityConfigKey(subdao, name.toUpperCase()))[0];
