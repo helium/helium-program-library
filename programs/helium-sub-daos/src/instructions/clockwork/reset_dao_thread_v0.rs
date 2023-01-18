@@ -14,6 +14,7 @@ pub struct ResetDaoThreadV0<'info> {
   pub authority: Signer<'info>,
 
   #[account(
+    mut,
     seeds = ["dao".as_bytes(), dao.hnt_mint.as_ref()],
     bump=dao.bump_seed,
     has_one = authority,
