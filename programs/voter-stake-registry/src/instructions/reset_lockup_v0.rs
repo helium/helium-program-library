@@ -6,10 +6,10 @@ use anchor_spl::token::TokenAccount;
 
 #[derive(Accounts)]
 pub struct ResetLockupV0<'info> {
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
   /// CHECK: Checked conditionally based on registrar
   #[account(
-    constraint = registrar.load()?.position_update_authority.map(|k|
+    constraint = registrar.position_update_authority.map(|k|
       k == *position_update_authority.key
     ).unwrap_or(true) @ VsrError::UnauthorizedPositionUpdateAuthority,
   )]
@@ -44,7 +44,7 @@ pub struct ResetLockupArgsV0 {
 pub fn handler(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<()> {
   let ResetLockupArgsV0 { kind, periods } = args;
 
-  let registrar = &ctx.accounts.registrar.load()?;
+  let registrar = &ctx.accounts.registrar;
   let position = &mut ctx.accounts.position;
   let curr_ts = registrar.clock_unix_timestamp();
 

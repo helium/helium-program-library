@@ -32,6 +32,7 @@ pub struct OnboardIotHotspotArgsV0 {
 pub struct OnboardIotHotspotV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
+  #[account(mut)]
   pub dc_fee_payer: Signer<'info>,
   pub issuing_authority: Signer<'info>,
   #[account(

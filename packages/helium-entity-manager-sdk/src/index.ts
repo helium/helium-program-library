@@ -10,6 +10,7 @@ export { updateIotMetadata } from "./functions/updateIotMetadata";
 export { updateMobileMetadata } from "./functions/updateMobileMetadata";
 export { onboardIotHotspot } from "./functions/onboardIotHotspot";
 export { onboardMobileHotspot } from "./functions/onboardMobileHotspot";
+export { proofArgsAndAccounts } from "./functions/proofArgsAndAccounts";
 
 export const init = async (
   provider: AnchorProvider,

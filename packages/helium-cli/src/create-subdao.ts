@@ -211,7 +211,6 @@ async function run() {
 
   const wallet = loadKeypair(argv.wallet);
   const aggKeypair = await loadKeypair(argv.aggregatorKeypair);
-  const merkle = await loadKeypair(argv.merkleKeypair);
   const subdaoKeypair = await loadKeypair(argv.subdaoKeypair);
   const oracleKeypair = await loadKeypair(argv.oracleKeypair);
   const oracleKey = oracleKeypair.publicKey;
@@ -309,36 +308,35 @@ async function run() {
         })
         .instruction()
     );
+    console.log("Configuring VSR voting mint at [0]");
+    instructions.push(
+      await heliumVsrProgram.methods
+        .configureVotingMintV0({
+          idx: 0, // idx
+          digitShift: 0, // digit shift
+          lockedVoteWeightScaledFactor: new anchor.BN(1_000_000_000),
+          minimumRequiredLockupSecs: new anchor.BN(MIN_LOCKUP),
+          maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE),
+          genesisVotePowerMultiplier: 0,
+          genesisVotePowerMultiplierExpirationTs: new anchor.BN(
+            Number(await getUnixTimestamp(provider))
+          ),
+          lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
+        })
+        .accounts({
+          registrar,
+          mint: subdaoKeypair.publicKey,
+        })
+        .remainingAccounts([
+          {
+            pubkey: subdaoKeypair.publicKey,
+            isSigner: false,
+            isWritable: false,
+          },
+        ])
+        .instruction()
+    );
   }
-
-  console.log("Configuring VSR voting mint at [0]");
-  instructions.push(
-    await heliumVsrProgram.methods
-      .configureVotingMintV0({
-        idx: 0, // idx
-        digitShift: 0, // digit shift
-        lockedVoteWeightScaledFactor: new anchor.BN(1_000_000_000),
-        minimumRequiredLockupSecs: new anchor.BN(MIN_LOCKUP),
-        maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE),
-        genesisVotePowerMultiplier: 0,
-        genesisVotePowerMultiplierExpirationTs: new anchor.BN(
-          Number(await getUnixTimestamp(provider))
-        ),
-        lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
-      })
-      .accounts({
-        registrar,
-        mint: subdaoKeypair.publicKey,
-      })
-      .remainingAccounts([
-        {
-          pubkey: subdaoKeypair.publicKey,
-          isSigner: false,
-          isWritable: false,
-        },
-      ])
-      .instruction()
-  );
 
   await sendInstructions(provider, instructions, []);
   instructions = [];
@@ -591,28 +589,7 @@ async function run() {
   const hsConfigKey = (await rewardableEntityConfigKey(subdao, name.toUpperCase()))[0];
   if (!(await provider.connection.getAccountInfo(hsConfigKey)) && !argv.noHotspots) {
     const instructions: TransactionInstruction[] = [];
-    console.log(`Initalizing ${name} HotspotConfig`);
-
-    // Create a merkle account and assign it to compression
-    if (!(await exists(conn, merkle.publicKey))) {
-      const space = getConcurrentMerkleTreeAccountSize(26, 1024);
-      await sendInstructions(
-        provider,
-        [
-          SystemProgram.createAccount({
-            fromPubkey: provider.wallet.publicKey,
-            newAccountPubkey: merkle.publicKey,
-            lamports:
-              await provider.connection.getMinimumBalanceForRentExemption(
-                space
-              ),
-            space: space,
-            programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-          }),
-        ],
-        [merkle]
-      );
-    }
+    console.log(`Initalizing ${name} RewardableEntityConfig`);
 
     instructions.push(
       await hemProgram.methods
@@ -632,16 +609,16 @@ async function run() {
           payer: argv.noGovernance ? me : nativeTreasury,
           authority: argv.noGovernance ? me : governance,
         })
-        .signers([merkle])
         .instruction()
     );
+
     await sendInstructionsOrCreateProposal({
       provider,
       instructions,
       walletSigner: wallet,
       signers: [],
       govProgramId,
-      proposalName: `Create ${name} HotspotConfig`,
+      proposalName: `Create ${name} RewardableEntityConfig`,
       votingMint: councilKeypair.publicKey,
     });
   }

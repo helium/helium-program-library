@@ -13,7 +13,7 @@ pub struct WithdrawArgsV0 {
 #[derive(Accounts)]
 #[instruction(args: WithdrawArgsV0)]
 pub struct WithdrawV0<'info> {
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
 
   #[account(
     mut,
@@ -22,7 +22,7 @@ pub struct WithdrawV0<'info> {
     constraint = position.num_active_votes == 0,
     has_one = registrar,
     has_one = mint,
-    constraint = position.amount_unlocked(registrar.load()?.clock_unix_timestamp()) >= args.amount @ VsrError::InsufficientUnlockedTokens
+    constraint = position.amount_unlocked(registrar.clock_unix_timestamp()) >= args.amount @ VsrError::InsufficientUnlockedTokens
   )]
   pub position: Box<Account<'info, PositionV0>>,
   pub mint: Box<Account<'info, Mint>>,
@@ -74,7 +74,7 @@ pub fn handler(ctx: Context<WithdrawV0>, args: WithdrawArgsV0) -> Result<()> {
   token::transfer(ctx.accounts.transfer_ctx().with_signer(&[seeds]), amount)?;
 
   let position = &mut ctx.accounts.position;
-  let registrar = &ctx.accounts.registrar.load()?;
+  let registrar = &ctx.accounts.registrar;
 
   let mint_idx = registrar.voting_mint_config_index(ctx.accounts.destination.mint)?;
 

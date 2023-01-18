@@ -15,7 +15,7 @@ use std::mem::size_of;
 
 #[derive(Accounts)]
 pub struct InitializePositionV0<'info> {
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
 
   // checking the PDA address it just an extra precaution,
   // the other constraints must be exhaustive
@@ -103,12 +103,12 @@ impl Default for LockupKind {
 /// - `periods`: How long to lock up, depending on `kind`. See LockupKind::period_secs()
 pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV0) -> Result<()> {
   // Load accounts.
-  let registrar = &ctx.accounts.registrar.load()?;
+  let registrar = &ctx.accounts.registrar;
 
   // Get the exchange rate entry associated with this deposit.
   let mint_idx = registrar.voting_mint_config_index(ctx.accounts.deposit_mint.key())?;
   // Get the mint config associated with this deposit.
-  let mint_config = registrar.voting_mints[mint_idx];
+  let mint_config = &registrar.voting_mints[mint_idx];
 
   let curr_ts = registrar.clock_unix_timestamp();
   let start_ts = curr_ts;

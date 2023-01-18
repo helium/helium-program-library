@@ -8,10 +8,10 @@ use anchor_spl::token::TokenAccount;
 
 #[derive(Accounts)]
 pub struct TransferV0<'info> {
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
   /// CHECK: Checked conditionally based on registrar
   #[account(
-    constraint = registrar.load()?.position_update_authority.map(|k|
+    constraint = registrar.position_update_authority.map(|k|
       k == *position_update_authority.key
     ).unwrap_or(true) @ VsrError::UnauthorizedPositionUpdateAuthority,
   )]
@@ -72,7 +72,7 @@ pub struct TransferArgsV0 {
 ///   change the whole position to "cliff")
 pub fn handler(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
   let TransferArgsV0 { amount } = args;
-  let registrar = &ctx.accounts.registrar.load()?;
+  let registrar = &ctx.accounts.registrar;
   let source_position = &mut ctx.accounts.source_position;
   let target_position = &mut ctx.accounts.target_position;
   let curr_ts = registrar.clock_unix_timestamp();
@@ -87,7 +87,7 @@ pub fn handler(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
     .unwrap();
 
   // Check target compatibility
-  let config = registrar.voting_mints[usize::from(source_mint_idx)];
+  let config = &registrar.voting_mints[usize::from(source_mint_idx)];
   let mint_id = config.mint;
   require_eq!(
     ctx.accounts.deposit_mint.key(),

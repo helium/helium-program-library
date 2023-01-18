@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.0.17",
+  "version": "0.0.19",
   "description": "Interface to the data-credits smart contract",
   "repository": {
     "type": "git",
@@ -31,10 +31,10 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@helium/circuit-breaker-sdk": "^0.0.17",
-    "@helium/helium-sub-daos-sdk": "^0.0.17",
-    "@helium/idls": "^0.0.17",
-    "@helium/spl-utils": "^0.0.17",
+    "@helium/circuit-breaker-sdk": "^0.0.19",
+    "@helium/helium-sub-daos-sdk": "^0.0.19",
+    "@helium/idls": "^0.0.19",
+    "@helium/spl-utils": "^0.0.19",
     "@project-serum/anchor": "0.26.0",
     "@solana/spl-token": "^0.3.6",
     "bn.js": "^5.2.0",
