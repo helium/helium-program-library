@@ -33,7 +33,7 @@ pub struct GenesisIssueHotspotArgsV0 {
 pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     mut,
-    seeds = [b"lazy_signer", b"testhelium10"],
+    seeds = [b"lazy_signer", b"testhelium12"],
     seeds::program = lazy_transactions::ID,
     bump,
   )]
@@ -56,7 +56,7 @@ pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     init,
     payer = lazy_signer,
-    space = 8 + std::mem::size_of::<KeyToAssetV0>(),
+    space = 8 + std::mem::size_of::<KeyToAssetV0>() + 8 * args.entity_key.len(),
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
