@@ -6,7 +6,7 @@ import {
   init as initLazy
 } from "@helium/lazy-distributor-sdk";
 import * as anchor from "@project-serum/anchor";
-import { ComputeBudgetProgram } from "@solana/web3.js";
+import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
 import axios from "axios";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -24,14 +24,13 @@ const yarg = yargs(hideBin(process.argv)).options({
     default: "http://127.0.0.1:8899",
     describe: "The solana url",
   },
-  hntKeypair: {
+  hntMint: {
     type: "string",
-    describe: "Keypair of the HNT token. Only used if --resetDaoThread flag is set",
-    default: `${__dirname}/../keypairs/hnt.json`,
+    describe: "Mint of the HNT token. Only used if --resetDaoThread flag is set",
   },
-  subdaoKeypair: {
+  dntMint: {
     type: "string",
-    describe: "Keypair of the subdao token. Only used if --resetSubDaoThread flag is set",
+    describe: "Mint of the subdao token. Only used if --resetSubDaoThread flag is set",
   },
   resetDaoThread: {
     type: "boolean",
@@ -51,16 +50,16 @@ async function run() {
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
-  if (argv.resetSubDaoThread && !argv.subdaoKeypair) {
-    console.log("provide subdao keypair");
+  if (argv.resetSubDaoThread && !argv.dntMint) {
+    console.log("dnt mint not provided");
     return;
   }
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hsdProgram = await initDao(provider);
   if (argv.resetDaoThread) {
     console.log("resetting dao thread")
-    const hntKeypair = loadKeypair(argv.hntKeypair);
-    const dao = daoKey(hntKeypair.publicKey)[0];
+    const hntMint = new PublicKey(argv.hntMint);
+    const dao = daoKey(hntMint)[0];
 
     await hsdProgram.methods.resetDaoThreadV0().accounts({
       dao,
@@ -69,8 +68,8 @@ async function run() {
 
   if (argv.resetSubDaoThread) {
     console.log("resetting subdao thread");
-    const dntKeypair = loadKeypair(argv.subdaoKeypair);
-    const subDao = subDaoKey(dntKeypair.publicKey)[0];
+    const dntMint = new PublicKey(argv.dntMint);
+    const subDao = subDaoKey(dntMint)[0];
 
     await hsdProgram.methods.resetSubDaoThreadV0().accounts({
       subDao,
