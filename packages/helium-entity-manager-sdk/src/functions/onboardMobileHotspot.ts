@@ -3,12 +3,14 @@ import { Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { keyToAssetKey, mobileInfoKey } from "../pdas";
 import { proofArgsAndAccounts, ProofArgsAndAccountsArgs } from "./proofArgsAndAccounts";
+import BN from "bn.js";
 
 export async function onboardMobileHotspot({
   program,
   rewardableEntityConfig,
   assetId,
   maker,
+  location,
   dao,
   payer,
   dcFeePayer,
@@ -18,6 +20,7 @@ export async function onboardMobileHotspot({
   payer?: PublicKey;
   dcFeePayer?: PublicKey;
   assetId: PublicKey;
+  location?: BN;
   rewardableEntityConfig: PublicKey;
   maker: PublicKey;
   dao: PublicKey;
@@ -36,11 +39,17 @@ export async function onboardMobileHotspot({
     ...rest,
   });
 
-  const [info] = await mobileInfoKey(rewardableEntityConfig, json_uri.split("/").slice(-1)[0]);
+  const [info] = await mobileInfoKey(
+    rewardableEntityConfig,
+    json_uri.split("/").slice(-1)[0]
+  );
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
   return program.methods
-    .onboardMobileHotspotV0(args)
+    .onboardMobileHotspotV0({
+      ...args,
+      location: typeof location == "undefined" ? null : location,
+    })
     .accounts({
       // hotspot: assetId,
       ...accounts,
