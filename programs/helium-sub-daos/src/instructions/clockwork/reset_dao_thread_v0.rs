@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
 use circuit_breaker::CircuitBreaker;
 use clockwork_sdk::{
-  cpi::thread_update,
+  cpi::{thread_stop, thread_update},
   state::{Thread, ThreadSettings, Trigger},
   ThreadProgram,
 };
@@ -53,6 +53,15 @@ pub fn handler(ctx: Context<ResetDaoThreadV0>) -> Result<()> {
     ctx.accounts.dao.hnt_mint.as_ref(),
     &[ctx.accounts.dao.bump_seed],
   ]];
+
+  thread_stop(CpiContext::new_with_signer(
+    ctx.accounts.clockwork.to_account_info(),
+    clockwork_sdk::cpi::ThreadStop {
+      authority: ctx.accounts.dao.to_account_info(),
+      thread: ctx.accounts.thread.to_account_info(),
+    },
+    signer_seeds,
+  ))?;
   thread_update(
     CpiContext::new_with_signer(
       ctx.accounts.clockwork.to_account_info(),

@@ -192,6 +192,10 @@ async function run() {
   console.log("THREAD", thread.toString());
 
   const conn = provider.connection;
+  if (await exists(conn, dao)) {
+    console.log("Dao already exists");
+    return;
+  }
 
   await createAndMint({
     provider,
