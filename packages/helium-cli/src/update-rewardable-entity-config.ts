@@ -72,13 +72,13 @@ async function run() {
   const conn = provider.connection;
   const subdaoMint = new PublicKey(argv.subdaoMint);
   const subdao = (await subDaoKey(subdaoMint))[0];
-  const hsConfigKey = (
+  const rewardableConfigKey = (
     await rewardableEntityConfigKey(subdao, name.toUpperCase())
   )[0];
   const govProgramId = new PublicKey(argv.govProgramId);
-  const hsConfigAcc = await hemProgram.account.rewardableEntityConfigV0.fetch(subdao);
+  const rewardableConfigAcc = await hemProgram.account.rewardableEntityConfigV0.fetch(rewardableConfigKey);
   const authorityAcc = await provider.connection.getAccountInfo(
-    hsConfigAcc.authority
+    rewardableConfigAcc.authority
   );
   let payer = provider.wallet.publicKey;
   const isGov = authorityAcc != null && authorityAcc.owner.equals(govProgramId);
@@ -101,13 +101,15 @@ async function run() {
       },
     };
   }
+  
+  console.log(settings);
 
   const instructions = [
     await hemProgram.methods.updateRewardableEntityConfigV0({
       settings,
-      newAuthority: hsConfigAcc.authority,
+      newAuthority: rewardableConfigAcc.authority,
     }).accounts({
-      rewardableEntityConfig: hsConfigKey,
+      rewardableEntityConfig: rewardableConfigKey,
     })
     .instruction(),
   ];

@@ -506,6 +506,7 @@ describe("helium-entity-manager", () => {
       await hemProgram.methods
         .updateRewardableEntityConfigV0({
           newAuthority: PublicKey.default,
+          settings: null
         })
         .accounts({
           rewardableEntityConfig,

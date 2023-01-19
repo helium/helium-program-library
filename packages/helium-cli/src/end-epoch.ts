@@ -55,36 +55,57 @@ async function run() {
     const epoch = currentEpoch(targetTs);
     console.log(epoch.toNumber(), targetTs.toNumber())
     for (const subDao of subdaos) {
-      await heliumSubDaosProgram.methods
-        .calculateUtilityScoreV0({
-          epoch,
-        })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-        ])
-        .accounts({
-          subDao: subDao.publicKey,
-        })
-        .rpc({ skipPreflight: true });
+      try {
+        await heliumSubDaosProgram.methods
+          .calculateUtilityScoreV0({
+            epoch,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+          ])
+          .accounts({
+            subDao: subDao.publicKey,
+          })
+          .rpc({ skipPreflight: true });
+      } catch (e: any) {
+        console.log(`Failed to calculate utility score for ${subDao.account.dntMint.toBase58()}: ${e.message}`)
+      }
     }
     for (const subDao of subdaos) {
+      try {
+        await heliumSubDaosProgram.methods
+          .issueRewardsV0({
+            epoch,
+          })
+          .accounts({
+            subDao: subDao.publicKey,
+          })
+          .rpc({ skipPreflight: true });
+      } catch (e: any) {
+        console.log(
+          `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${
+            e.message
+          }`
+        );
+      }
+    }
+    try {
       await heliumSubDaosProgram.methods
-        .issueRewardsV0({
+        .issueHstPoolV0({
           epoch,
         })
         .accounts({
-          subDao: subDao.publicKey,
+          dao,
         })
         .rpc({ skipPreflight: true });
+    } catch (e: any) {
+      console.log(
+        `Failed to issue hst pool: ${
+          e.message
+        }`
+      );
     }
-    await heliumSubDaosProgram.methods
-      .issueHstPoolV0({
-        epoch
-      })
-      .accounts({
-        dao,
-      })
-      .rpc({ skipPreflight: true });
+    
     targetTs = targetTs.add(new BN(EPOCH_LENGTH));
   }
 }
