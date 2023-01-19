@@ -36,7 +36,7 @@ export async function onboardMobileHotspot({
     ...rest,
   });
 
-  const [info] = mobileInfoKey(rewardableEntityConfig, assetId);
+  const [info] = await mobileInfoKey(rewardableEntityConfig, json_uri.split("/").slice(-1)[0]);
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
   return program.methods

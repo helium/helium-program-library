@@ -54,7 +54,7 @@ pub struct IssueEntityV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 8 + std::mem::size_of::<KeyToAssetV0>(),
+    space = 8 + std::mem::size_of::<KeyToAssetV0>() + (8 * args.entity_key.len()),
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
@@ -117,7 +117,7 @@ impl<'info> IssueEntityV0<'info> {
 }
 
 pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<()> {
-  let key_str = bs58::encode(args.entity_key).into_string();
+  let key_str = bs58::encode(args.entity_key.clone()).into_string();
   let animal_name: AnimalName = key_str
     .parse()
     .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
@@ -162,6 +162,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
   ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
     asset: asset_id,
     dao: ctx.accounts.dao.key(),
+    entity_key: args.entity_key,
     bump_seed: ctx.bumps["key_to_asset"],
   });
 

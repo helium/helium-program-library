@@ -1,7 +1,7 @@
 use std::mem::size_of;
 
 use crate::state::*;
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::hash::hash};
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
@@ -42,7 +42,7 @@ pub struct OnboardIotHotspotV0<'info> {
     seeds = [
       b"iot_info", 
       rewardable_entity_config.key().as_ref(),
-      get_asset_id(&merkle_tree.key(), args.index.into()).as_ref(),
+      &hash(&key_to_asset.entity_key[..]).to_bytes()
     ],
     bump,
   )]

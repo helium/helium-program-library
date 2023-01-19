@@ -9,6 +9,7 @@ import {
   keyToAssetKey,
   makerKey,
   PROGRAM_ID as HEM_PROGRAM_ID,
+  PROGRAM_ID,
   rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
 import {
@@ -16,6 +17,7 @@ import {
   init as initHsd,
   subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
+import crypto from "crypto";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import {
   compile,
@@ -189,6 +191,13 @@ async function run() {
   const makers: { name: string; address: string }[] = JSON.parse(
     fs.readFileSync(argv.makers).toString()
   );
+  // Append a special fallthrough maker for hotspots that don't have a maker
+  const solAddr = provider.wallet.publicKey;
+  const helAddr = new Address(0, 0, ED25519_KEY_TYPE, solAddr.toBuffer());
+  makers.push({
+    name: "Migrated Helium Hotspot",
+    address: helAddr.b58,
+  });
 
   const iotRewardableEntityConfig = rewardableEntityConfigKey(
     iotSubdao,
@@ -334,9 +343,13 @@ async function run() {
 
   const routers = new Set(Object.keys(state.routers));
 
-  const bobcat = makers.find(maker => maker.name === "Bobcat") // TODO: For testing only until we get maker names
+  let missingMakers = 0;
+
+  // TODO: Onboard to mobile if they were from either of these makers
+  const bobcat5G = makers.find((maker) => maker.name === "Bobcat 5G");
+  const freedomFi = makers.find((maker) => maker.name === "FreedomFi");
   /// Iterate through accounts in order so we don't create 1mm promises.
-  for (const [address, account] of Object.entries(accounts)) {
+  for (const [address, account] of Object.entries(accounts).slice(0, 10000)) {
     const solAddress = toSolana(address);
     const isRouter = routers.has(address);
 
@@ -373,12 +386,37 @@ async function run() {
       const hotspotIxs = await Promise.all(
         (account.hotspots || []).map(async (hotspot) => {
           totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
-          const makerId = hotspot.maker || bobcat.address;
+          const makerId =
+            hotspot.maker ||
+            helAddr.b58; // Default (fallthrough) maker
+
+          if (!hotspot.maker) {
+            missingMakers++;
+          }
           const hotspotPubkeysForMaker = hotspotPubkeys[makerId];
+
+          const bufferKey = Buffer.from(bs58.decode(hotspot.address));
+          const hash = crypto.createHash("sha256").update(bufferKey).digest();
+          const iotInfo = PublicKey.findProgramAddressSync(
+            [
+              Buffer.from("iot_info", "utf-8"),
+              iotRewardableEntityConfig.toBuffer(),
+              Buffer.from(hash),
+            ],
+            PROGRAM_ID
+          )[0];
+          const keyToAsset = PublicKey.findProgramAddressSync(
+            [
+              Buffer.from("key_to_asset", "utf-8"),
+              dao.toBuffer(),
+              Buffer.from(hash),
+            ],
+            PROGRAM_ID
+          )[0];
 
           return hemProgramNoResolve.methods
             .genesisIssueHotspotV0({
-              entityKey: Buffer.from(bs58.decode(hotspot.address)),
+              entityKey: bufferKey,
               location:
                 hotspot.location != null && hotspot.location != "null"
                   ? new BN(hotspot.location)
@@ -405,10 +443,10 @@ async function run() {
               systemProgram: SystemProgram.programId,
               rewardableEntityConfig: iotRewardableEntityConfig,
               maker: hotspotPubkeysForMaker.maker,
-              keyToAsset: keyToAssetKey(dao, hotspot.address)[0],
+              keyToAsset,
               recipient: solAddress,
               dao,
-              info: iotInfoKey(iotRewardableEntityConfig, hotspot.address)[0],
+              info: iotInfo,
               lazySigner,
             })
             .instruction();
@@ -582,7 +620,9 @@ async function run() {
     queue.enqueue(top.right);
   }
   const addresses = [
-    ...Object.values(hotspotPubkeys).flatMap(({ id, ...rest }) => Object.values(rest)),
+    ...Object.values(hotspotPubkeys).flatMap(({ id, ...rest }) =>
+      Object.values(rest)
+    ),
     TOKEN_METATDATA_PROGRAM_ID,
     SPL_NOOP_PROGRAM_ID,
     SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
@@ -753,6 +793,7 @@ async function run() {
     DC: ${unresolvedBalances.dc.toString()}
     STAKED HNT: ${unresolvedBalances.stakedHnt.toString()}
     MOBILE: ${unresolvedBalances.mobile.toString()}
+    MAKERS: ${missingMakers}
   `);
   console.log(`Router:
     HNT: ${routerBalances.hnt.toString()}

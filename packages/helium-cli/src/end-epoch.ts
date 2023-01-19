@@ -1,15 +1,15 @@
 import {
-  init as initDao, subDaoKey
+  currentEpoch,
+  daoKey,
+  EPOCH_LENGTH,
+  init as initDao
 } from "@helium/helium-sub-daos-sdk";
-import {
-  init as initLazy
-} from "@helium/lazy-distributor-sdk";
 import * as anchor from "@project-serum/anchor";
-import { ComputeBudgetProgram } from "@solana/web3.js";
-import axios from "axios";
+import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
+import { BN } from "bn.js";
+import b58 from "bs58";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -23,15 +23,13 @@ const yarg = yargs(hideBin(process.argv)).options({
     default: "http://127.0.0.1:8899",
     describe: "The solana url",
   },
-  oracleUrl: {
-    alias: "o",
-    default: "http://localhost:8080",
-    describe: "The oracle url",
-  },
-  mobileKeypair: {
+  hntMint: {
     type: "string",
-    describe: "Keypair of the Mobile token",
-    default: "./keypairs/mobile.json",
+    describe: "Mint of the HNT token",
+  },
+  from: {
+    type: "number",
+    describe: "The timestamp to start ending epochs from",
   },
 });
 
@@ -43,35 +41,73 @@ async function run() {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const heliumSubDaosProgram = await initDao(provider);
-  const lazyDistributorProgram = await initLazy(provider);
-  const epochs = await heliumSubDaosProgram.account.subDaoEpochInfoV0.all()
-  const epoch = epochs[epochs.length - 1].account.epoch
+  const hntMint = new PublicKey(argv.hntMint);
+  const dao = await daoKey(hntMint)[0];
+  const subdaos = await heliumSubDaosProgram.account.subDaoV0.all([{
+    memcmp: {
+      offset: 8,
+      bytes: b58.encode(dao.toBuffer()),
+    }
+  }]);
+  let targetTs = argv.from ? new BN(argv.from) : subdaos[0].account.vehntLastCalculatedTs;
 
-  const mobileKeypair = await loadKeypair(argv.mobileKeypair);
-
-  const mobileSubdao = (await subDaoKey(mobileKeypair.publicKey))[0];
-
-  await heliumSubDaosProgram.methods
-    .calculateUtilityScoreV0({
-      epoch,
-    })
-    .preInstructions([
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-    ])
-    .accounts({
-      subDao: mobileSubdao,
-    })
-    .rpc({ skipPreflight: true });
-  await heliumSubDaosProgram.methods
-    .issueRewardsV0({
-      epoch,
-    })
-    .accounts({
-      subDao: mobileSubdao,
-    })
-    .rpc({ skipPreflight: true });
-
-  await axios.post(`${argv.oracleUrl}/endepoch`)
+  while (targetTs.toNumber() < new Date().valueOf() / 1000) {
+    const epoch = currentEpoch(targetTs);
+    console.log(epoch.toNumber(), targetTs.toNumber())
+    for (const subDao of subdaos) {
+      try {
+        await heliumSubDaosProgram.methods
+          .calculateUtilityScoreV0({
+            epoch,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+          ])
+          .accounts({
+            subDao: subDao.publicKey,
+          })
+          .rpc({ skipPreflight: true });
+      } catch (e: any) {
+        console.log(`Failed to calculate utility score for ${subDao.account.dntMint.toBase58()}: ${e.message}`)
+      }
+    }
+    for (const subDao of subdaos) {
+      try {
+        await heliumSubDaosProgram.methods
+          .issueRewardsV0({
+            epoch,
+          })
+          .accounts({
+            subDao: subDao.publicKey,
+          })
+          .rpc({ skipPreflight: true });
+      } catch (e: any) {
+        console.log(
+          `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${
+            e.message
+          }`
+        );
+      }
+    }
+    try {
+      await heliumSubDaosProgram.methods
+        .issueHstPoolV0({
+          epoch,
+        })
+        .accounts({
+          dao,
+        })
+        .rpc({ skipPreflight: true });
+    } catch (e: any) {
+      console.log(
+        `Failed to issue hst pool: ${
+          e.message
+        }`
+      );
+    }
+    
+    targetTs = targetTs.add(new BN(EPOCH_LENGTH));
+  }
 }
 
 run()

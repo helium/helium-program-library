@@ -61,6 +61,7 @@ pub struct MakerApprovalV0 {
 pub struct KeyToAssetV0 {
   pub dao: Pubkey,
   pub asset: Pubkey,
+  pub entity_key: Vec<u8>,
   pub bump_seed: u8,
 }
 

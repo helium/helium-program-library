@@ -11,7 +11,7 @@ async function hashAnyhere(input: Buffer) {
     return crypto.subtle.digest("SHA-256", input);
   } else {
     const { createHash } = await import("crypto");
-    return createHash("sha256").update(input).digest()
+    return createHash("sha256").update(input).digest();
   }
 }
 
@@ -38,21 +38,23 @@ export const hotspotCollectionKey = (
     programId
   );
 
-export const makerKey = (
-  name: String,
+export const makerKey = (name: String, programId: PublicKey = PROGRAM_ID) =>
+  PublicKey.findProgramAddressSync(
+    [Buffer.from("maker", "utf-8"), Buffer.from(name, "utf-8")],
+    programId
+  );
+
+export const makerApprovalKey = (
+  rewardableEntityConfig: PublicKey,
+  maker: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
     [
-      Buffer.from("maker", "utf-8"),
-      Buffer.from(name, "utf-8"),
+      Buffer.from("maker_approval", "utf-8"),
+      rewardableEntityConfig.toBuffer(),
+      maker.toBuffer(),
     ],
-    programId
-  );
-
-export const makerApprovalKey = (rewardableEntityConfig: PublicKey, maker: PublicKey, programId: PublicKey = PROGRAM_ID) =>
-  PublicKey.findProgramAddressSync(
-    [Buffer.from("maker_approval", "utf-8"), rewardableEntityConfig.toBuffer(), maker.toBuffer()],
     programId
   );
 
@@ -72,27 +74,41 @@ export const keyToAssetKey = async (
   );
 };
 
-export const iotInfoKey = (
+export const iotInfoKey = async (
   rewardableEntityConfig: PublicKey,
-  assetId: PublicKey,
+  entityKey: Buffer | string,
   programId: PublicKey = PROGRAM_ID
 ) => {
+  if (typeof entityKey === "string") {
+    entityKey = Buffer.from(bs58.decode(entityKey));
+  }
+  const hash = await hashAnyhere(entityKey);
+
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("iot_info", "utf-8"), rewardableEntityConfig.toBuffer(), assetId.toBuffer()],
+    [
+      Buffer.from("iot_info", "utf-8"),
+      rewardableEntityConfig.toBuffer(),
+      Buffer.from(hash),
+    ],
     programId
   );
 };
 
-export const mobileInfoKey = (
+export const mobileInfoKey = async (
   rewardableEntityConfig: PublicKey,
-  assetId: PublicKey,
+  entityKey: Buffer | string,
   programId: PublicKey = PROGRAM_ID
 ) => {
+  if (typeof entityKey === "string") {
+    entityKey = Buffer.from(bs58.decode(entityKey));
+  }
+  const hash = await hashAnyhere(entityKey);
+
   return PublicKey.findProgramAddressSync(
     [
       Buffer.from("mobile_info", "utf-8"),
       rewardableEntityConfig.toBuffer(),
-      assetId.toBuffer(),
+      Buffer.from(hash),
     ],
     programId
   );
