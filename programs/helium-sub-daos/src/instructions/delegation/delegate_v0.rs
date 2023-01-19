@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 
 use voter_stake_registry::{
-  state::{LockupKind, PositionV0, Registrar},
+  state::{LockupKind, PositionV0, Registrar, VotingMintConfigV0},
   VoterStakeRegistry,
 };
 
@@ -54,6 +54,26 @@ pub struct DelegateV0<'info> {
     bump,
   )]
   pub closing_time_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
+  #[account(
+    init_if_needed,
+    payer = payer,
+    space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
+    seeds = [
+      "sub_dao_epoch_info".as_bytes(), 
+      sub_dao.key().as_ref(), 
+      &current_epoch(
+        // Avoid passing an extra account if the end is 0 (no genesis on this position).
+        // Pass instead closing time epoch info, txn account deduplication will reduce the overall tx size
+        if position.genesis_end < registrar.clock_unix_timestamp() {
+          position.lockup.end_ts
+        } else {
+          position.genesis_end
+        }
+      ).to_le_bytes()
+    ],
+    bump,
+  )]
+  pub genesis_end_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
 
   #[account(
     init,
@@ -74,16 +94,17 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
   let registrar = &ctx.accounts.registrar;
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
-  let available_vehnt = position.voting_power(voting_mint_config, curr_ts)?;
-
-  let seconds_left = position.lockup.seconds_left(curr_ts);
-  let future_ts = curr_ts
-    .checked_add(seconds_left.try_into().unwrap())
-    .unwrap();
-  let future_vehnt = position.voting_power(voting_mint_config, future_ts)?;
-
-  let fall_rate = calculate_fall_rate(available_vehnt, future_vehnt, seconds_left).unwrap();
-
+  let VehntInfo {
+    has_genesis,
+    vehnt_at_curr_ts,
+    pre_genesis_end_fall_rate,
+    post_genesis_end_fall_rate,
+    genesis_end_fall_rate_correction,
+    genesis_end_vehnt_correction,
+    end_fall_rate_correction,
+    end_vehnt_correction
+  } = caclulate_vhnt_info(curr_ts, position, voting_mint_config)?;
+  
   let curr_epoch = current_epoch(curr_ts);
 
   let sub_dao = &mut ctx.accounts.sub_dao;
@@ -95,29 +116,38 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
 
   sub_dao.vehnt_delegated = sub_dao
     .vehnt_delegated
-    .checked_add(available_vehnt)
+    .checked_add(vehnt_at_curr_ts)
     .unwrap();
-  sub_dao.vehnt_fall_rate = sub_dao.vehnt_fall_rate.checked_add(fall_rate).unwrap();
+  sub_dao.vehnt_fall_rate = if has_genesis {
+    sub_dao.vehnt_fall_rate.checked_add(pre_genesis_end_fall_rate).unwrap()
+  } else {
+    sub_dao.vehnt_fall_rate.checked_add(post_genesis_end_fall_rate).unwrap()
+  };
 
-  if position.lockup.kind == LockupKind::Cliff {
-    let closing_info = &mut ctx.accounts.closing_time_sub_dao_epoch_info;
-    let vehnt_at_closing_epoch_start =
-      position.voting_power(voting_mint_config, closing_info.start_ts())?;
-    closing_info.vehnt_in_closing_positions = closing_info
-      .vehnt_in_closing_positions
-      .checked_add(vehnt_at_closing_epoch_start)
-      .unwrap();
-    closing_info.fall_rates_from_closing_positions = closing_info
-      .fall_rates_from_closing_positions
-      .checked_add(fall_rate)
-      .unwrap();
-  }
+  ctx.accounts.closing_time_sub_dao_epoch_info.fall_rates_from_closing_positions = ctx.accounts.closing_time_sub_dao_epoch_info
+    .fall_rates_from_closing_positions
+    .checked_add(end_fall_rate_correction)
+    .unwrap();
+
+  ctx.accounts.closing_time_sub_dao_epoch_info.vehnt_in_closing_positions = ctx.accounts.closing_time_sub_dao_epoch_info
+    .vehnt_in_closing_positions
+    .checked_add(end_vehnt_correction)
+    .unwrap();
+
+  ctx.accounts.genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions = ctx.accounts.genesis_end_sub_dao_epoch_info
+    .fall_rates_from_closing_positions
+    .checked_add(genesis_end_fall_rate_correction)
+    .unwrap();
+
+  ctx.accounts.genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = ctx.accounts.genesis_end_sub_dao_epoch_info
+    .vehnt_in_closing_positions
+    .checked_add(genesis_end_vehnt_correction)
+    .unwrap();
 
   delegated_position.purged = false;
   delegated_position.start_ts = curr_ts;
   delegated_position.hnt_amount = position.amount_deposited_native;
   delegated_position.last_claimed_epoch = curr_epoch;
-  delegated_position.fall_rate = fall_rate;
   delegated_position.sub_dao = ctx.accounts.sub_dao.key();
   delegated_position.mint = ctx.accounts.mint.key();
   delegated_position.position = ctx.accounts.position.key();

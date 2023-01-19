@@ -1,4 +1,4 @@
-use crate::{current_epoch, state::*, update_subdao_vehnt};
+use crate::{current_epoch, state::*, update_subdao_vehnt, VehntInfo, caclulate_vhnt_info};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 
@@ -55,6 +55,34 @@ pub struct CloseDelegationV0<'info> {
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
+    #[account(
+    init_if_needed,
+    payer = payer,
+    space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(position.lockup.end_ts).to_le_bytes()],
+    bump,
+  )]
+  pub closing_time_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
+  #[account(
+    init_if_needed,
+    payer = payer,
+    space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
+    seeds = [
+      "sub_dao_epoch_info".as_bytes(), 
+      sub_dao.key().as_ref(), 
+      &current_epoch(
+        // Avoid passing an extra account if the end is 0 (no genesis on this position).
+        // Pass instead closing time epoch info, txn account deduplication will reduce the overall tx size
+        if position.genesis_end < registrar.clock_unix_timestamp() {
+          position.lockup.end_ts
+        } else {
+          position.genesis_end
+        }
+      ).to_le_bytes()
+    ],
+    bump,
+  )]
+  pub genesis_end_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
 
   pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
@@ -66,7 +94,17 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   let registrar = &ctx.accounts.registrar;
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
-  let available_vehnt = position.voting_power(voting_mint_config, curr_ts)?;
+  let vehnt_at_curr_ts = position.voting_power(voting_mint_config, curr_ts)?;
+
+  let VehntInfo {
+    pre_genesis_end_fall_rate,
+    post_genesis_end_fall_rate,
+    genesis_end_fall_rate_correction,
+    genesis_end_vehnt_correction,
+    end_fall_rate_correction,
+    end_vehnt_correction,
+    ..
+  } = caclulate_vhnt_info(ctx.accounts.delegated_position.start_ts, position, voting_mint_config)?;
 
   // don't allow unstake without claiming available rewards
   let curr_epoch = current_epoch(curr_ts);
@@ -79,6 +117,27 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
 
   update_subdao_vehnt(sub_dao, &mut ctx.accounts.sub_dao_epoch_info, curr_ts)?;
 
+  // Update the ending epochs with this new info
+  ctx.accounts.closing_time_sub_dao_epoch_info.fall_rates_from_closing_positions = ctx.accounts.closing_time_sub_dao_epoch_info
+    .fall_rates_from_closing_positions
+    .checked_sub(end_fall_rate_correction)
+    .unwrap();
+
+  ctx.accounts.closing_time_sub_dao_epoch_info.vehnt_in_closing_positions = ctx.accounts.closing_time_sub_dao_epoch_info
+    .vehnt_in_closing_positions
+    .checked_sub(end_vehnt_correction)
+    .unwrap();
+
+  ctx.accounts.genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions = ctx.accounts.genesis_end_sub_dao_epoch_info
+    .fall_rates_from_closing_positions
+    .checked_sub(genesis_end_fall_rate_correction)
+    .unwrap();
+
+  ctx.accounts.genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = ctx.accounts.genesis_end_sub_dao_epoch_info
+    .vehnt_in_closing_positions
+    .checked_sub(genesis_end_vehnt_correction)
+    .unwrap();
+
   // Only subtract from the stake if the position ends after the end of this epoch. Otherwise,
   // the position was already purged due to the sub_dao_epoch_info closing info logic.
   if position.lockup.end_ts >= ctx.accounts.sub_dao_epoch_info.end_ts()
@@ -87,20 +146,24 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
     msg!(
       "Current vehnt {}, removing {}",
       sub_dao.vehnt_delegated,
-      available_vehnt
+      vehnt_at_curr_ts
     );
     // remove this stake information from the subdao
     sub_dao.vehnt_delegated = sub_dao
       .vehnt_delegated
-      .checked_sub(available_vehnt)
+      .checked_sub(vehnt_at_curr_ts)
       .unwrap();
 
     sub_dao.vehnt_fall_rate = sub_dao
       .vehnt_fall_rate
-      .checked_sub(delegated_position.fall_rate)
+      .checked_sub(if curr_ts >= position.genesis_end {
+        post_genesis_end_fall_rate
+      } else {
+        pre_genesis_end_fall_rate
+      })
       .unwrap();
   }
-  // Unless the position was staked during this epoch, remove it.
+  // Unless the position was staked before this epoch, remove it.
   if current_epoch(delegated_position.start_ts) < curr_epoch {
     let vehnt_at_start = position.voting_power(
       voting_mint_config,

@@ -1,6 +1,7 @@
 use crate::{error::ErrorCode, state::*};
 use anchor_lang::prelude::*;
 use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
+use voter_stake_registry::state::{VotingMintConfigV0, PositionV0, LockupKind};
 use std::convert::TryInto;
 use time::{Duration, OffsetDateTime};
 
@@ -152,9 +153,108 @@ pub fn create_cron(execution_ts: i64, offset: i64) -> String {
 pub const FALL_RATE_FACTOR: u128 = 1_000_000_000_000;
 
 pub fn calculate_fall_rate(curr_vp: u64, future_vp: u64, num_seconds: u64) -> Option<u128> {
+  if num_seconds == 0 {
+    return Some(0)
+  }
+
   let diff: u128 = u128::from(curr_vp.checked_sub(future_vp).unwrap())
     .checked_mul(FALL_RATE_FACTOR)
     .unwrap(); // add decimals of precision for fall rate calculation
 
   diff.checked_div(num_seconds.into())
 }
+
+
+pub struct VehntInfo {
+  pub has_genesis: bool,
+  pub vehnt_at_curr_ts: u64,
+  pub pre_genesis_end_fall_rate: u128,
+  pub post_genesis_end_fall_rate: u128,
+  pub genesis_end_vehnt_correction: u64,
+  pub genesis_end_fall_rate_correction: u128,
+  pub end_vehnt_correction: u64,
+  pub end_fall_rate_correction: u128,
+}
+pub fn caclulate_vhnt_info(
+  curr_ts: i64,
+  position: &PositionV0,
+  voting_mint_config: &VotingMintConfigV0,
+) -> Result<VehntInfo> {
+  let vehnt_at_curr_ts = position.voting_power(voting_mint_config, curr_ts)?;
+
+  let has_genesis = position.genesis_end >= curr_ts;
+  let seconds_to_genesis = if has_genesis {
+    u64::try_from(position.genesis_end.checked_sub(curr_ts).unwrap()).unwrap()
+  } else {
+    0
+  };
+  let seconds_from_genesis_to_end = if has_genesis {
+    u64::try_from(position.lockup.end_ts.checked_sub(position.genesis_end).unwrap()).unwrap()
+  } else {
+    position.lockup.seconds_left(curr_ts)
+  };
+  let vehnt_at_genesis_end = position.voting_power(voting_mint_config, curr_ts.checked_add(i64::try_from(seconds_to_genesis).unwrap()).unwrap())?;
+  let vehnt_at_position_end = position.voting_power(voting_mint_config, position.lockup.end_ts)?;
+
+  let pre_genesis_end_fall_rate = calculate_fall_rate(vehnt_at_curr_ts, vehnt_at_genesis_end, seconds_to_genesis).unwrap();
+  let post_genesis_end_fall_rate = calculate_fall_rate(vehnt_at_genesis_end, vehnt_at_position_end, seconds_from_genesis_to_end).unwrap();
+
+  let mut genesis_end_vehnt_correction = 0;
+  let mut genesis_end_fall_rate_correction = 0;
+  if has_genesis {
+    let genesis_end_epoch_start_ts = i64::try_from(current_epoch(position.genesis_end)).unwrap();
+    if position.lockup.kind == LockupKind::Cliff {
+      genesis_end_fall_rate_correction = pre_genesis_end_fall_rate
+        .checked_sub(post_genesis_end_fall_rate)
+        .unwrap();
+    }
+
+    // Subtract the genesis bonus from the vehnt. 
+    // When we do this, we're overcorrecting because the fall rate (corrected to post-genesis)
+    // is also taking off vehnt for the time period between closing info start and genesis end.
+    // So add that fall rate back in.
+    genesis_end_vehnt_correction = position
+      .voting_power(voting_mint_config, genesis_end_epoch_start_ts)?
+      .checked_sub(
+        position.voting_power(voting_mint_config, position.genesis_end)?
+      )
+      .unwrap()
+      // Correction factor
+      .checked_add(
+        u64::try_from(
+          pre_genesis_end_fall_rate
+          .checked_mul(
+            u128::try_from(position.genesis_end.checked_sub(genesis_end_epoch_start_ts).unwrap()).unwrap()
+          )
+          .unwrap()
+          .checked_div(1000000000000_u128) 
+          .unwrap()
+        ).unwrap()
+      )
+      .unwrap();
+  }
+
+  let mut end_fall_rate_correction = 0;
+  let mut end_vehnt_correction = 0;
+  if position.lockup.kind == LockupKind::Cliff {
+    let end_epoch_start_ts = i64::try_from(current_epoch(position.lockup.end_ts)).unwrap();
+    let vehnt_at_closing_epoch_start =
+      position.voting_power(voting_mint_config, end_epoch_start_ts)?;
+
+    end_vehnt_correction = vehnt_at_closing_epoch_start;
+    end_fall_rate_correction = post_genesis_end_fall_rate;
+  }
+
+
+  Ok(VehntInfo {
+    has_genesis,
+    pre_genesis_end_fall_rate,
+    post_genesis_end_fall_rate,
+    vehnt_at_curr_ts,
+    genesis_end_fall_rate_correction,
+    genesis_end_vehnt_correction,
+    end_fall_rate_correction,
+    end_vehnt_correction,
+  })
+}
+
