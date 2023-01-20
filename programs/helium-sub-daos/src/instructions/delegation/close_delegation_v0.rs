@@ -187,9 +187,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
       vehnt_at_curr_ts
     );
     // remove this stake information from the subdao
-    sub_dao.vehnt_delegated = sub_dao
-      .vehnt_delegated
-      .saturating_sub(vehnt_at_curr_ts);
+    sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.saturating_sub(vehnt_at_curr_ts);
 
     sub_dao.vehnt_fall_rate = sub_dao
       .vehnt_fall_rate

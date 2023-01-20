@@ -153,9 +153,11 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
       ctx.accounts.sub_dao.dnt_mint.as_ref(),
       &[ctx.accounts.sub_dao.bump_seed],
     ]]),
-    // Due to rounding down of vehnt fall rates it's possible the vehnt on the dao does not exactly match the 
+    // Due to rounding down of vehnt fall rates it's possible the vehnt on the dao does not exactly match the
     // vehnt remaining. It could be off by a little bit of dust.
-    TransferArgsV0 { amount: std::cmp::min(rewards, amount_left) },
+    TransferArgsV0 {
+      amount: std::cmp::min(rewards, amount_left),
+    },
   )?;
   Ok(())
 }
