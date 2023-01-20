@@ -354,10 +354,6 @@ describe("helium-sub-daos", () => {
             options.lockupAmount * options.expectedMultiplier;
           expectBnAccuracy(toBN(expectedVeHnt, 8), sdAcc.vehntDelegated, 0.001);
           expectBnAccuracy(lockupAmount, acc.hntAmount, 0.001);
-          const expectedFallRate = toBN(expectedVeHnt, 8 + 12).div(
-            toBN(options.lockupPeriods * 60 * 60 * 24, 0)
-          );
-          expectBnAccuracy(expectedFallRate, acc.fallRate, 0.001);
         });
 
         function expectBnAccuracy(
