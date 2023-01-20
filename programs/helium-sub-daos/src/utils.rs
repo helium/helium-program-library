@@ -262,20 +262,19 @@ pub fn caclulate_vhnt_info(
       // Correction factor
       .checked_sub(
         u64::try_from(
-          apply_fall_rate_factor(
-            post_genesis_end_fall_rate
-              .checked_mul(
-                u128::try_from(
-                  position
-                    .genesis_end
-                    .checked_sub(genesis_end_epoch_start_ts)
-                    .unwrap(),
-                )
-                .unwrap(),
+          post_genesis_end_fall_rate
+            .checked_mul(
+              u128::try_from(
+                position
+                  .genesis_end
+                  .checked_sub(genesis_end_epoch_start_ts)
+                  .unwrap(),
               )
               .unwrap(),
-          )
-          .unwrap(),
+            )
+            .unwrap()
+            .checked_div(FALL_RATE_FACTOR)
+            .unwrap(),
         )
         .unwrap(),
       )
