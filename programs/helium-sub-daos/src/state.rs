@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use spl_governance_tools::account::AccountMaxSize;
 
 use crate::EPOCH_LENGTH;
 
@@ -154,6 +155,12 @@ pub struct SubDaoEpochInfoV0 {
   pub initialized: bool,
 }
 
+impl AccountMaxSize for SubDaoEpochInfoV0 {
+  fn get_max_size(&self) -> Option<usize> {
+    Some(60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>())
+  }
+}
+
 impl SubDaoEpochInfoV0 {
   pub fn start_ts(&self) -> i64 {
     i64::try_from(self.epoch).unwrap() * EPOCH_LENGTH
@@ -174,7 +181,7 @@ pub struct SubDaoV0 {
   pub delegator_pool: Pubkey, // Pool of DNT tokens which veHNT delegators can claim from
   pub vehnt_delegated: u64,
   pub vehnt_last_calculated_ts: i64,
-  pub vehnt_fall_rate: u128, // the vehnt amount that the position decays by per second, with 12 decimals of extra precision
+  pub vehnt_fall_rate: u128, // the vehnt amount that the position decays by per second, with 15 decimals of extra precision
   pub authority: Pubkey,
   pub active_device_aggregator: Pubkey,
   pub dc_burn_authority: Pubkey, // Authority to burn data delegated data credits

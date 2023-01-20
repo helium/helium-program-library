@@ -1,9 +1,9 @@
-use crate::{error::ErrorCode, state::*};
+use crate::{error::ErrorCode, state::*, TESTING};
 use anchor_lang::prelude::*;
 use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
-use voter_stake_registry::state::{VotingMintConfigV0, PositionV0, LockupKind};
 use std::convert::TryInto;
 use time::{Duration, OffsetDateTime};
+use voter_stake_registry::state::{LockupKind, PositionV0, VotingMintConfigV0};
 
 pub trait OrArithError<T> {
   fn or_arith_error(self) -> Result<T>;
@@ -54,23 +54,27 @@ pub fn update_subdao_vehnt(
     .checked_sub(sub_dao.vehnt_last_calculated_ts)
     .unwrap()
     > EPOCH_LENGTH
+    && !TESTING
+  // Allow this check to be bypassed when testing so we can run
+  // checks against this method without having to update _every_ epoch
   {
     return Err(error!(ErrorCode::MustCalculateVehntLinearly));
   }
 
   // Step 1. Update veHNT up to the point that this epoch starts
   if epoch_start > sub_dao.vehnt_last_calculated_ts {
-    let fall = sub_dao
-      .vehnt_fall_rate
-      .checked_mul(
-        u128::try_from(epoch_start)
-          .unwrap()
-          .checked_sub(u128::try_from(sub_dao.vehnt_last_calculated_ts).unwrap())
-          .unwrap(),
-      )
-      .unwrap()
-      .checked_div(FALL_RATE_FACTOR)
-      .unwrap();
+    let fall = apply_fall_rate_factor(
+      sub_dao
+        .vehnt_fall_rate
+        .checked_mul(
+          u128::try_from(epoch_start)
+            .unwrap()
+            .checked_sub(u128::try_from(sub_dao.vehnt_last_calculated_ts).unwrap())
+            .unwrap(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
 
     sub_dao.vehnt_delegated = sub_dao
       .vehnt_delegated
@@ -103,32 +107,31 @@ pub fn update_subdao_vehnt(
 
     sub_dao.vehnt_delegated = sub_dao
       .vehnt_delegated
-      .checked_sub(curr_epoch_info.vehnt_in_closing_positions)
-      .unwrap();
+      .saturating_sub(curr_epoch_info.vehnt_in_closing_positions);
     // Since this has already been applied, set to 0
     curr_epoch_info.fall_rates_from_closing_positions = 0;
     curr_epoch_info.vehnt_in_closing_positions = 0;
   }
 
   // Step 3. Update veHNT up to now (from start of epoch) using the current fall rate. At this point, closing positions are effectively ignored.
-  let fall = sub_dao
-    .vehnt_fall_rate
-    .checked_mul(
-      u128::try_from(curr_ts)
-        .unwrap()
-        .checked_sub(
-          u128::try_from(std::cmp::max(sub_dao.vehnt_last_calculated_ts, epoch_start)).unwrap(),
-        )
-        .unwrap(),
-    )
-    .unwrap()
-    .checked_div(FALL_RATE_FACTOR)
-    .unwrap();
+  let fall = apply_fall_rate_factor(
+    sub_dao
+      .vehnt_fall_rate
+      .checked_mul(
+        u128::try_from(curr_ts)
+          .unwrap()
+          .checked_sub(
+            u128::try_from(std::cmp::max(sub_dao.vehnt_last_calculated_ts, epoch_start)).unwrap(),
+          )
+          .unwrap(),
+      )
+      .unwrap(),
+  )
+  .unwrap();
 
   sub_dao.vehnt_delegated = sub_dao
     .vehnt_delegated
-    .checked_sub(u64::try_from(fall).unwrap())
-    .unwrap();
+    .saturating_sub(u64::try_from(fall).unwrap());
   sub_dao.vehnt_last_calculated_ts = curr_ts;
 
   Ok(())
@@ -150,21 +153,28 @@ pub fn create_cron(execution_ts: i64, offset: i64) -> String {
   )
 }
 
-pub const FALL_RATE_FACTOR: u128 = 1_000_000_000_000;
+pub const FALL_RATE_FACTOR: u128 = 1_000_000_000_000_000;
 
 pub fn calculate_fall_rate(curr_vp: u64, future_vp: u64, num_seconds: u64) -> Option<u128> {
   if num_seconds == 0 {
-    return Some(0)
+    return Some(0);
   }
 
   let diff: u128 = u128::from(curr_vp.checked_sub(future_vp).unwrap())
     .checked_mul(FALL_RATE_FACTOR)
     .unwrap(); // add decimals of precision for fall rate calculation
 
-  diff.checked_div(num_seconds.into())
+  // diff / num_seconds but rounded to the ceil. That way we always underestimate the amount of veHNT
+  // using the fall rate, which means we never end up with leftover vehnt that can't be accounted for
+  (diff
+    .checked_add(num_seconds.into())
+    .unwrap()
+    .checked_sub(1)
+    .unwrap())
+  .checked_div(num_seconds.into())
 }
 
-
+#[derive(Debug)]
 pub struct VehntInfo {
   pub has_genesis: bool,
   pub vehnt_at_curr_ts: u64,
@@ -184,52 +194,90 @@ pub fn caclulate_vhnt_info(
 
   let has_genesis = position.genesis_end >= curr_ts;
   let seconds_to_genesis = if has_genesis {
-    u64::try_from(position.genesis_end.checked_sub(curr_ts).unwrap()).unwrap()
+    u64::try_from(
+      position
+        .genesis_end
+        .checked_sub(curr_ts)
+        .unwrap()
+        // Genesis end is inclusive (the genesis will go away at exactly genesis end), so subtract 1 second
+        // We want to calculate the fall rates before genesis ends
+        .checked_sub(1)
+        .unwrap(),
+    )
+    .unwrap()
   } else {
     0
   };
   let seconds_from_genesis_to_end = if has_genesis {
-    u64::try_from(position.lockup.end_ts.checked_sub(position.genesis_end).unwrap()).unwrap()
+    u64::try_from(
+      position
+        .lockup
+        .end_ts
+        .checked_sub(position.genesis_end)
+        .unwrap(),
+    )
+    .unwrap()
   } else {
     position.lockup.seconds_left(curr_ts)
   };
-  let vehnt_at_genesis_end = position.voting_power(voting_mint_config, curr_ts.checked_add(i64::try_from(seconds_to_genesis).unwrap()).unwrap())?;
+  // One second before genesis end, the last moment we have the multiplier
+  let vehnt_at_genesis_end = position.voting_power(
+    voting_mint_config,
+    curr_ts
+      .checked_add(i64::try_from(seconds_to_genesis).unwrap())
+      .unwrap(),
+  )?;
+  let vehnt_at_genesis_end_exact =
+    position.voting_power(voting_mint_config, position.genesis_end)?;
   let vehnt_at_position_end = position.voting_power(voting_mint_config, position.lockup.end_ts)?;
 
-  let pre_genesis_end_fall_rate = calculate_fall_rate(vehnt_at_curr_ts, vehnt_at_genesis_end, seconds_to_genesis).unwrap();
-  let post_genesis_end_fall_rate = calculate_fall_rate(vehnt_at_genesis_end, vehnt_at_position_end, seconds_from_genesis_to_end).unwrap();
+  let pre_genesis_end_fall_rate =
+    calculate_fall_rate(vehnt_at_curr_ts, vehnt_at_genesis_end, seconds_to_genesis).unwrap();
+  let post_genesis_end_fall_rate = calculate_fall_rate(
+    vehnt_at_genesis_end_exact,
+    vehnt_at_position_end,
+    seconds_from_genesis_to_end,
+  )
+  .unwrap();
 
   let mut genesis_end_vehnt_correction = 0;
   let mut genesis_end_fall_rate_correction = 0;
   if has_genesis {
-    let genesis_end_epoch_start_ts = i64::try_from(current_epoch(position.genesis_end)).unwrap();
+    let genesis_end_epoch_start_ts =
+      i64::try_from(current_epoch(position.genesis_end)).unwrap() * EPOCH_LENGTH;
     if position.lockup.kind == LockupKind::Cliff {
       genesis_end_fall_rate_correction = pre_genesis_end_fall_rate
         .checked_sub(post_genesis_end_fall_rate)
         .unwrap();
     }
 
-    // Subtract the genesis bonus from the vehnt. 
+    // Subtract the genesis bonus from the vehnt.
     // When we do this, we're overcorrecting because the fall rate (corrected to post-genesis)
     // is also taking off vehnt for the time period between closing info start and genesis end.
     // So add that fall rate back in.
     genesis_end_vehnt_correction = position
       .voting_power(voting_mint_config, genesis_end_epoch_start_ts)?
-      .checked_sub(
-        position.voting_power(voting_mint_config, position.genesis_end)?
-      )
+      .checked_sub(vehnt_at_genesis_end_exact)
       .unwrap()
       // Correction factor
-      .checked_add(
+      .checked_sub(
         u64::try_from(
-          pre_genesis_end_fall_rate
-          .checked_mul(
-            u128::try_from(position.genesis_end.checked_sub(genesis_end_epoch_start_ts).unwrap()).unwrap()
+          apply_fall_rate_factor(
+            post_genesis_end_fall_rate
+              .checked_mul(
+                u128::try_from(
+                  position
+                    .genesis_end
+                    .checked_sub(genesis_end_epoch_start_ts)
+                    .unwrap(),
+                )
+                .unwrap(),
+              )
+              .unwrap(),
           )
-          .unwrap()
-          .checked_div(1000000000000_u128) 
-          .unwrap()
-        ).unwrap()
+          .unwrap(),
+        )
+        .unwrap(),
       )
       .unwrap();
   }
@@ -237,14 +285,14 @@ pub fn caclulate_vhnt_info(
   let mut end_fall_rate_correction = 0;
   let mut end_vehnt_correction = 0;
   if position.lockup.kind == LockupKind::Cliff {
-    let end_epoch_start_ts = i64::try_from(current_epoch(position.lockup.end_ts)).unwrap();
+    let end_epoch_start_ts =
+      i64::try_from(current_epoch(position.lockup.end_ts)).unwrap() * EPOCH_LENGTH;
     let vehnt_at_closing_epoch_start =
       position.voting_power(voting_mint_config, end_epoch_start_ts)?;
 
     end_vehnt_correction = vehnt_at_closing_epoch_start;
     end_fall_rate_correction = post_genesis_end_fall_rate;
   }
-
 
   Ok(VehntInfo {
     has_genesis,
@@ -258,3 +306,12 @@ pub fn caclulate_vhnt_info(
   })
 }
 
+fn apply_fall_rate_factor(item: u128) -> Option<u128> {
+  // Always take the ceil of this calculation so we round towards faster fall rates.
+  (item
+    .checked_add(FALL_RATE_FACTOR)
+    .unwrap()
+    .checked_sub(1)
+    .unwrap())
+  .checked_div(FALL_RATE_FACTOR)
+}
