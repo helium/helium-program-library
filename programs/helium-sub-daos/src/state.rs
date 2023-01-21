@@ -179,9 +179,9 @@ pub struct SubDaoV0 {
   pub treasury: Pubkey,       // Treasury of HNT
   pub rewards_escrow: Pubkey, // Escrow account for DNT rewards
   pub delegator_pool: Pubkey, // Pool of DNT tokens which veHNT delegators can claim from
-  pub vehnt_delegated: u64,
+  pub vehnt_delegated: u128, // the total amount of vehnt delegated to this subdao, with 12 decimals of extra precision
   pub vehnt_last_calculated_ts: i64,
-  pub vehnt_fall_rate: u128, // the vehnt amount that the position decays by per second, with 15 decimals of extra precision
+  pub vehnt_fall_rate: u128, // the vehnt amount that the position decays by per second, with 12 decimals of extra precision
   pub authority: Pubkey,
   pub active_device_aggregator: Pubkey,
   pub dc_burn_authority: Pubkey, // Authority to burn data delegated data credits

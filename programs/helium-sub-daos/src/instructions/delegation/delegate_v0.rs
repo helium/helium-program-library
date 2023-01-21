@@ -119,7 +119,11 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
 
   sub_dao.vehnt_delegated = sub_dao
     .vehnt_delegated
-    .checked_add(vehnt_at_curr_ts)
+    .checked_add(
+      u128::from(vehnt_at_curr_ts)
+        .checked_mul(FALL_RATE_FACTOR)
+        .unwrap(),
+    )
     .unwrap();
   sub_dao.vehnt_fall_rate = if has_genesis {
     sub_dao

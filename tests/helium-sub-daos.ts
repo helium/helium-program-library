@@ -366,7 +366,7 @@ describe("helium-sub-daos", () => {
 
           const expectedVeHnt =
             options.lockupAmount * options.expectedMultiplier;
-          expectBnAccuracy(toBN(expectedVeHnt, 8), sdAcc.vehntDelegated, 0.001);
+          expectBnAccuracy(toBN(expectedVeHnt, 8).mul(new BN("1000000000000")), sdAcc.vehntDelegated, 0.001);
           expectBnAccuracy(lockupAmount, acc.hntAmount, 0.001);
         });
 
@@ -853,12 +853,12 @@ describe("helium-sub-daos", () => {
             ((1464 * EPOCH_LENGTH - timeStaked) / (1464 * EPOCH_LENGTH)),
           8
         );
-        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.within(
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
           // Fall rates aren't a perfect measurement, we divide the total fall of the position by
           // the total time staked. Imagine the total fall was 1 and the total time was 3. We would have
           // a fall rate of 0.3333333333333333 and could never have enough decimals to represent it
-          expected - 0.0000001,
-          expected
+          expected,
+          0.0000001
         );
 
         console.log("Checking genesis end");
@@ -874,9 +874,9 @@ describe("helium-sub-daos", () => {
             ((1464 * EPOCH_LENGTH - timeStaked) / (1464 * EPOCH_LENGTH)),
           8
         )
-        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.within(
-          expected - 0.0000001,
-          expected
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
+          expected,
+          0.0000001
         );
 
         console.log("Checking after genesis end");
@@ -891,9 +891,9 @@ describe("helium-sub-daos", () => {
             ((1464 * EPOCH_LENGTH - timeStaked) / (1464 * EPOCH_LENGTH)),
           8
         );
-        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.within(
-          expected - 0.0000001,
-          expected
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
+          expected,
+          0.0000001
         );
 
         console.log("Checking at expiry");
@@ -910,9 +910,9 @@ describe("helium-sub-daos", () => {
               ((1464 * EPOCH_LENGTH - timeStaked) / (1464 * EPOCH_LENGTH)),
             8
           )
-        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.within(
-          expected - 0.0000001,
-          expected
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
+          expected,
+          0.0000001
         );
 
         console.log("Checking after expiry");
@@ -921,7 +921,11 @@ describe("helium-sub-daos", () => {
         subDaoEpochInfo = await getCurrEpochInfo();
         currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
         timeStaked = currTime - stakeTime.toNumber();
-        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.eq(0);
+        console.log(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8));
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
+          0,
+          0.0000001
+        );
       });
     });
   });

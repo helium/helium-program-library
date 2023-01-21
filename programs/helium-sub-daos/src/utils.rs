@@ -63,23 +63,17 @@ pub fn update_subdao_vehnt(
 
   // Step 1. Update veHNT up to the point that this epoch starts
   if epoch_start > sub_dao.vehnt_last_calculated_ts {
-    let fall = apply_fall_rate_factor(
-      sub_dao
-        .vehnt_fall_rate
-        .checked_mul(
-          u128::try_from(epoch_start)
-            .unwrap()
-            .checked_sub(u128::try_from(sub_dao.vehnt_last_calculated_ts).unwrap())
-            .unwrap(),
-        )
-        .unwrap(),
-    )
-    .unwrap();
-
-    sub_dao.vehnt_delegated = sub_dao
-      .vehnt_delegated
-      .checked_sub(u64::try_from(fall).unwrap())
+    let fall = sub_dao
+      .vehnt_fall_rate
+      .checked_mul(
+        u128::try_from(epoch_start)
+          .unwrap()
+          .checked_sub(u128::try_from(sub_dao.vehnt_last_calculated_ts).unwrap())
+          .unwrap(),
+      )
       .unwrap();
+
+    sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.checked_sub(fall).unwrap();
   }
 
   // If sub dao epoch info account was just created, log the vehnt
@@ -88,7 +82,8 @@ pub fn update_subdao_vehnt(
       "Setting vehnt_at_epoch_start to {}",
       sub_dao.vehnt_delegated
     );
-    curr_epoch_info.vehnt_at_epoch_start = sub_dao.vehnt_delegated;
+    curr_epoch_info.vehnt_at_epoch_start =
+      u64::try_from(apply_fall_rate_factor(sub_dao.vehnt_delegated).unwrap()).unwrap();
   }
 
   // Step 2. Update fall rate according to this epoch's closed position corrections
@@ -105,33 +100,30 @@ pub fn update_subdao_vehnt(
       .checked_sub(curr_epoch_info.fall_rates_from_closing_positions)
       .unwrap();
 
-    sub_dao.vehnt_delegated = sub_dao
-      .vehnt_delegated
-      .saturating_sub(curr_epoch_info.vehnt_in_closing_positions);
+    sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.saturating_sub(
+      u128::from(curr_epoch_info.vehnt_in_closing_positions)
+        .checked_mul(FALL_RATE_FACTOR)
+        .unwrap(),
+    );
     // Since this has already been applied, set to 0
     curr_epoch_info.fall_rates_from_closing_positions = 0;
     curr_epoch_info.vehnt_in_closing_positions = 0;
   }
 
   // Step 3. Update veHNT up to now (from start of epoch) using the current fall rate. At this point, closing positions are effectively ignored.
-  let fall = apply_fall_rate_factor(
-    sub_dao
-      .vehnt_fall_rate
-      .checked_mul(
-        u128::try_from(curr_ts)
-          .unwrap()
-          .checked_sub(
-            u128::try_from(std::cmp::max(sub_dao.vehnt_last_calculated_ts, epoch_start)).unwrap(),
-          )
-          .unwrap(),
-      )
-      .unwrap(),
-  )
-  .unwrap();
+  let fall = sub_dao
+    .vehnt_fall_rate
+    .checked_mul(
+      u128::try_from(curr_ts)
+        .unwrap()
+        .checked_sub(
+          u128::try_from(std::cmp::max(sub_dao.vehnt_last_calculated_ts, epoch_start)).unwrap(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
 
-  sub_dao.vehnt_delegated = sub_dao
-    .vehnt_delegated
-    .saturating_sub(u64::try_from(fall).unwrap());
+  sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.saturating_sub(fall);
   sub_dao.vehnt_last_calculated_ts = curr_ts;
 
   Ok(())
@@ -153,7 +145,7 @@ pub fn create_cron(execution_ts: i64, offset: i64) -> String {
   )
 }
 
-pub const FALL_RATE_FACTOR: u128 = 1_000_000_000_000_000;
+pub const FALL_RATE_FACTOR: u128 = 1_000_000_000_000;
 
 pub fn calculate_fall_rate(curr_vp: u64, future_vp: u64, num_seconds: u64) -> Option<u128> {
   if num_seconds == 0 {
@@ -305,12 +297,23 @@ pub fn caclulate_vhnt_info(
   })
 }
 
+// Use bankers rounding
 fn apply_fall_rate_factor(item: u128) -> Option<u128> {
-  // Always take the ceil of this calculation so we round towards faster fall rates.
-  (item
-    .checked_add(FALL_RATE_FACTOR)
-    .unwrap()
-    .checked_sub(1)
-    .unwrap())
-  .checked_div(FALL_RATE_FACTOR)
+  let fall_rate_sub_one = FALL_RATE_FACTOR / 10;
+  let lsb = item.checked_div(fall_rate_sub_one).unwrap() % 10;
+  let round_divide = item.checked_div(FALL_RATE_FACTOR).unwrap();
+  let last_seen_bit = round_divide % 10;
+  if lsb > 5 {
+    // Take the ceil
+    round_divide.checked_add(1)
+  } else if lsb < 5 {
+    Some(round_divide)
+  } else {
+    // bankers round
+    if last_seen_bit % 2 == 0 {
+      Some(round_divide)
+    } else {
+      round_divide.checked_add(1)
+    }
+  }
 }
