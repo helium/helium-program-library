@@ -1,5 +1,6 @@
 use crate::{
-  caclulate_vhnt_info, current_epoch, id, state::*, update_subdao_vehnt, VehntInfo, TESTING, FALL_RATE_FACTOR,
+  caclulate_vhnt_info, current_epoch, id, state::*, update_subdao_vehnt, VehntInfo,
+  FALL_RATE_FACTOR, TESTING,
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
@@ -187,7 +188,11 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
       vehnt_at_curr_ts
     );
     // remove this stake information from the subdao
-    sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.saturating_sub(u128::from(vehnt_at_curr_ts).checked_mul(FALL_RATE_FACTOR).unwrap());
+    sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.saturating_sub(
+      u128::from(vehnt_at_curr_ts)
+        .checked_mul(FALL_RATE_FACTOR)
+        .unwrap(),
+    );
 
     sub_dao.vehnt_fall_rate = sub_dao
       .vehnt_fall_rate
