@@ -30,7 +30,7 @@ treasury-management = { path = "../treasury-management", features = ["cpi"] }
 clockwork-sdk = { version = "1.4.0" }
 time = "0.3.17"
 switchboard-v2 = { version = "0.1.17" }
-spl-governance-tools=  "0.1.3"
+spl-governance-tools = "0.1.3"
 
 [dev-dependencies]
 rust_decimal = "=1.26.0"

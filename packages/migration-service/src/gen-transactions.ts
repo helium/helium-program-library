@@ -8,6 +8,7 @@ import {
   iotInfoKey,
   keyToAssetKey,
   makerKey,
+  mobileInfoKey,
   PROGRAM_ID as HEM_PROGRAM_ID,
   PROGRAM_ID,
   rewardableEntityConfigKey,
@@ -186,7 +187,6 @@ async function run() {
 
   const iotSubdao = (await subDaoKey(iot))[0];
   const mobileSubdao = (await subDaoKey(mobile))[0];
-  const hsConfigKey = (await rewardableEntityConfigKey(iotSubdao, "IOT"))[0];
 
   const makers: { name: string; address: string }[] = JSON.parse(
     fs.readFileSync(argv.makers).toString()
@@ -204,7 +204,7 @@ async function run() {
     "IOT"
   )[0];
   const mobileRewardableEntityConfig = rewardableEntityConfigKey(
-    mobile,
+    mobileSubdao,
     "MOBILE"
   )[0];
   const hotspotPubkeys: Record<
@@ -332,6 +332,10 @@ async function run() {
   const infoRent = await provider.connection.getMinimumBalanceForRentExemption(
     32 + 32 + 1 + 8 + 4 + 4 + 1 + 60
   );
+  const keyToAssetRent =
+    await provider.connection.getMinimumBalanceForRentExemption(
+      32 + 32 + 33 * 8 + 8 + 1
+    );
   const PER_TX = 0.000005;
   const dustAmount =
     PER_TX * 100 * LAMPORTS_PER_SOL +
@@ -349,7 +353,7 @@ async function run() {
   const bobcat5G = makers.find((maker) => maker.name === "Bobcat 5G");
   const freedomFi = makers.find((maker) => maker.name === "FreedomFi");
   /// Iterate through accounts in order so we don't create 1mm promises.
-  for (const [address, account] of Object.entries(accounts).slice(0, 10000)) {
+  for (const [address, account] of Object.entries(accounts)) {
     const solAddress = toSolana(address);
     const isRouter = routers.has(address);
 
@@ -385,15 +389,21 @@ async function run() {
       // Create hotspots
       const hotspotIxs = await Promise.all(
         (account.hotspots || []).map(async (hotspot) => {
-          totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
-          const makerId =
-            hotspot.maker ||
-            helAddr.b58; // Default (fallthrough) maker
+          totalBalances.sol = totalBalances.sol
+            .add(new BN(infoRent))
+            .add(new BN(keyToAssetRent));
+          const makerId = hotspot.maker || helAddr.b58; // Default (fallthrough) maker
 
           if (!hotspot.maker) {
             missingMakers++;
           }
-          const hotspotPubkeysForMaker = hotspotPubkeys[makerId];
+          if (hotspot.maker_name == "Maker Integration Tests") {
+            return
+          }
+            const hotspotPubkeysForMaker = hotspotPubkeys[makerId];
+          if (!hotspotPubkeysForMaker) {
+            throw new Error(`Maker not found for hotspot ${JSON.stringify(hotspot, null, 2)}`);
+          }
 
           const bufferKey = Buffer.from(bs58.decode(hotspot.address));
           const hash = crypto.createHash("sha256").update(bufferKey).digest();
@@ -413,6 +423,31 @@ async function run() {
             ],
             PROGRAM_ID
           )[0];
+          let remainingAccounts = [];
+          // Onboard to mobile if this is also a mobile hotspot
+          if (makerId == bobcat5G.address || makerId == freedomFi.address) {
+            totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
+            const mobileInfo = PublicKey.findProgramAddressSync(
+              [
+                Buffer.from("mobile_info", "utf-8"),
+                mobileRewardableEntityConfig.toBuffer(),
+                Buffer.from(hash),
+              ],
+              PROGRAM_ID
+            )[0];
+            remainingAccounts.push(
+              {
+                pubkey: mobileRewardableEntityConfig,
+                isSigner: false,
+                isWritable: false,
+              },
+              {
+                pubkey: mobileInfo,
+                isWritable: true,
+                isSigner: false,
+              }
+            );
+          }
 
           return hemProgramNoResolve.methods
             .genesisIssueHotspotV0({
@@ -449,6 +484,7 @@ async function run() {
               info: iotInfo,
               lazySigner,
             })
+            .remainingAccounts(remainingAccounts)
             .instruction();
         })
       );
@@ -626,6 +662,7 @@ async function run() {
     TOKEN_METATDATA_PROGRAM_ID,
     SPL_NOOP_PROGRAM_ID,
     SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+    mobileRewardableEntityConfig,
     SystemProgram.programId,
     bubblegumSigner,
     hst,

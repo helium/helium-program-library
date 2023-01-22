@@ -191,7 +191,6 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
           "sub_dao_epoch_info".as_bytes(),
           sub_dao.key().as_ref(),
           &genesis_end_epoch.to_le_bytes(),
-          &[ctx.bumps["genesis_end_sub_dao_epoch_info"]],
         ],
         &id(),
         &ctx.accounts.system_program.to_account_info(),

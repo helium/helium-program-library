@@ -37,7 +37,7 @@ npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-
     -rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com \
     --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n Mobile --subdaoKeypair packages/helium-cli/keypairs/mobile.json \
     --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Mobile $RND" \
-    --dcBurnAuthority $(solana address)  --noHotspots --noGovernance -u $CLUSTER_URL
+    --dcBurnAuthority $(solana address)  --noGovernance -u $CLUSTER_URL
 
 
 # save the keypairs as environment variables (used by other packages)

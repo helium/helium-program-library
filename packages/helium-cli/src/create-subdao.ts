@@ -240,7 +240,7 @@ async function run() {
       "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
     )
   )[0];
-  if (exists(conn, subdao)) {
+  if (await exists(conn, subdao)) {
     const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
     
     console.log(
