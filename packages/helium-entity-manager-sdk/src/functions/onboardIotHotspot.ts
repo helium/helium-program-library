@@ -1,5 +1,6 @@
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { Program } from "@project-serum/anchor";
+import BN from "bn.js";
 import { PublicKey } from "@solana/web3.js";
 import { iotInfoKey, keyToAssetKey } from "../pdas";
 import { proofArgsAndAccounts, ProofArgsAndAccountsArgs } from "./proofArgsAndAccounts";
@@ -13,6 +14,9 @@ export async function onboardIotHotspot({
   dao,
   dcFeePayer,
   payer,
+  location,
+  elevation,
+  gain,
   ...rest
 }: {
   program: Program<HeliumEntityManager>;
@@ -20,6 +24,9 @@ export async function onboardIotHotspot({
   payer?: PublicKey;
   dcFeePayer?: PublicKey;
   maker: PublicKey;
+  location?: BN;
+  elevation?: number;
+  gain?: number;
   dao: PublicKey;
 } & Omit<ProofArgsAndAccountsArgs, "connection">) {
   const {
@@ -36,14 +43,22 @@ export async function onboardIotHotspot({
     ...rest,
   });
 
-  const [info] = await iotInfoKey(rewardableEntityConfig, json_uri.split("/").slice(-1)[0]);
+  const [info] = await iotInfoKey(
+    rewardableEntityConfig,
+    json_uri.split("/").slice(-1)[0]
+  );
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
   const keyToAsset = (
     await keyToAssetKey(dao, json_uri.split("/").slice(-1)[0])
   )[0];
   return program.methods
-    .onboardIotHotspotV0(args)
+    .onboardIotHotspotV0({
+      ...args,
+      location: typeof location == "undefined" ? null : location,
+      elevation: typeof elevation == "undefined" ? null : elevation,
+      gain: typeof gain == "undefined" ? null : gain,
+    })
     .accounts({
       // hotspot: assetId,
       ...accounts,
