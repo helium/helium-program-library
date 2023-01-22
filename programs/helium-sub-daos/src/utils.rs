@@ -1,7 +1,7 @@
 use crate::{error::ErrorCode, state::*, TESTING};
 use anchor_lang::prelude::*;
 use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
-use std::convert::TryInto;
+use std::{convert::TryInto, cmp::Ordering};
 use time::{Duration, OffsetDateTime};
 use voter_stake_registry::state::{LockupKind, PositionV0, VotingMintConfigV0};
 
@@ -303,17 +303,16 @@ fn apply_fall_rate_factor(item: u128) -> Option<u128> {
   let lsb = item.checked_div(fall_rate_sub_one).unwrap() % 10;
   let round_divide = item.checked_div(FALL_RATE_FACTOR).unwrap();
   let last_seen_bit = round_divide % 10;
-  if lsb > 5 {
-    // Take the ceil
-    round_divide.checked_add(1)
-  } else if lsb < 5 {
-    Some(round_divide)
-  } else {
+  match lsb.cmp(&5) {
+    Ordering::Equal => {
     // bankers round
-    if last_seen_bit % 2 == 0 {
-      Some(round_divide)
-    } else {
-      round_divide.checked_add(1)
+      if last_seen_bit % 2 == 0 {
+        Some(round_divide)
+      } else {
+        round_divide.checked_add(1)
+      }
     }
+    Ordering::Less => Some(round_divide),
+    Ordering::Greater => round_divide.checked_add(1),
   }
 }
