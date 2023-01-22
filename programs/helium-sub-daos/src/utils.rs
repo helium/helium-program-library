@@ -1,7 +1,7 @@
 use crate::{error::ErrorCode, state::*, TESTING};
 use anchor_lang::prelude::*;
 use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
-use std::{convert::TryInto, cmp::Ordering};
+use std::{cmp::Ordering, convert::TryInto};
 use time::{Duration, OffsetDateTime};
 use voter_stake_registry::state::{LockupKind, PositionV0, VotingMintConfigV0};
 
@@ -305,7 +305,7 @@ fn apply_fall_rate_factor(item: u128) -> Option<u128> {
   let last_seen_bit = round_divide % 10;
   match lsb.cmp(&5) {
     Ordering::Equal => {
-    // bankers round
+      // bankers round
       if last_seen_bit % 2 == 0 {
         Some(round_divide)
       } else {
