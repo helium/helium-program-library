@@ -23,3 +23,4 @@ anchor-lang = { version = "0.26.0", features = ["init-if-needed"] }
 anchor-spl = "0.26.0"
 spl-account-compression = { git = "https://github.com/ChewingGlass/solana-program-library", branch = "feature/anchor-26", version="0.1.5", features = ["cpi"] }
 uint = "0.9"
+mpl-token-metadata = { version = "1.6.4", path = "../../deps/metaplex-program-library/token-metadata/program", features = ["no-entrypoint"] }

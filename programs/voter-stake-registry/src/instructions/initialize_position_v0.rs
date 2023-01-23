@@ -1,21 +1,59 @@
 use crate::error::*;
 use crate::position_seeds;
+use crate::registrar_seeds;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::metadata::{
-  create_master_edition_v3, create_metadata_accounts_v3, CreateMasterEditionV3,
-  CreateMetadataAccountsV3, Metadata,
+  create_master_edition_v3, 
+  verify_sized_collection_item,
+  CreateMasterEditionV3,
+  CreateMetadataAccountsV3, 
+  VerifySizedCollectionItem,
+  Metadata, 
 };
 use anchor_spl::token;
 use anchor_spl::token::{Mint, MintTo, Token, TokenAccount};
+use mpl_token_metadata::state::Collection;
 use mpl_token_metadata::state::DataV2;
 use std::convert::TryFrom;
 use std::mem::size_of;
+use shared_utils::{ create_metadata_accounts_v3 };
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct InitializePositionArgsV0 {
+  pub kind: LockupKind,
+  pub periods: u32,
+}
+
+impl Default for LockupKind {
+  fn default() -> Self {
+    LockupKind::None
+  }
+}
 
 #[derive(Accounts)]
 pub struct InitializePositionV0<'info> {
+  #[account(
+    has_one = collection
+  )]
   pub registrar: Box<Account<'info, Registrar>>,
+  pub collection: Box<Account<'info, Mint>>,
+  /// CHECK: Handled by cpi
+  #[account(
+    mut,
+    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), registrar.collection.as_ref()],
+    seeds::program = token_metadata_program.key(),
+    bump,
+  )]
+  pub collection_metadata: UncheckedAccount<'info>,
+  /// CHECK: Handled By cpi account
+  #[account(
+    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), registrar.collection.as_ref(), "edition".as_bytes()],
+    seeds::program = token_metadata_program.key(),
+    bump,
+  )]
+  pub collection_master_edition: UncheckedAccount<'info>,  
 
   // checking the PDA address it just an extra precaution,
   // the other constraints must be exhaustive
@@ -81,15 +119,14 @@ pub struct InitializePositionV0<'info> {
   pub rent: Sysvar<'info, Rent>,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct InitializePositionArgsV0 {
-  pub kind: LockupKind,
-  pub periods: u32,
-}
-
-impl Default for LockupKind {
-  fn default() -> Self {
-    LockupKind::None
+impl<'info> InitializePositionV0<'info> {
+  fn mint_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintTo<'info>> {
+    let cpi_accounts = MintTo {
+      mint: self.mint.to_account_info(),
+      to: self.position_token_account.to_account_info(),
+      authority: self.position.to_account_info(),
+    };
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 }
 
@@ -119,6 +156,7 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
   } else {
     0
   };
+
   ctx.accounts.position.set_inner(PositionV0 {
     registrar: ctx.accounts.registrar.key(),
     mint: ctx.accounts.mint.key(),
@@ -139,19 +177,8 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
   }
 
   let signer_seeds: &[&[&[u8]]] = &[position_seeds!(ctx.accounts.position)];
-
-  token::mint_to(
-    CpiContext::new_with_signer(
-      ctx.accounts.token_program.to_account_info(),
-      MintTo {
-        mint: ctx.accounts.mint.to_account_info(),
-        to: ctx.accounts.position_token_account.to_account_info(),
-        authority: ctx.accounts.position.to_account_info(),
-      },
-      signer_seeds,
-    ),
-    1,
-  )?;
+  
+  token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
 
   create_metadata_accounts_v3(
     CpiContext::new_with_signer(
@@ -180,7 +207,10 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
       ),
       seller_fee_basis_points: 0,
       creators: None,
-      collection: None,
+      collection: Some(Collection {
+        key: ctx.accounts.registrar.collection.key(),
+        verified: false // Verified in cpi
+      }),
       uses: None,
     },
     true,
@@ -210,6 +240,23 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
     ),
     Some(0),
   )?;
+
+  let verify_signer_seeds: &[&[&[u8]]] = &[registrar_seeds!(ctx.accounts.registrar)];
+
+  verify_sized_collection_item(CpiContext::new_with_signer(
+    ctx.accounts.token_metadata_program.to_account_info().clone(),
+    VerifySizedCollectionItem { 
+      payer: ctx.accounts.payer.to_account_info().clone(), 
+      metadata: ctx.accounts.metadata.to_account_info().clone(), 
+      collection_authority: ctx.accounts.registrar.to_account_info().clone(), 
+      collection_mint: ctx.accounts.collection.to_account_info().clone(),
+      collection_metadata: ctx.accounts.collection_metadata.to_account_info().clone(), 
+      collection_master_edition: ctx.accounts.collection_master_edition.to_account_info().clone(), 
+    }, 
+    verify_signer_seeds
+  ), 
+  None
+)?;
 
   Ok(())
 }
