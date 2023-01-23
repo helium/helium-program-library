@@ -7,7 +7,7 @@ use anchor_lang::solana_program::hash::hash;
 use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
 use helium_sub_daos::DaoV0;
-use mpl_bubblegum::state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion};
+use mpl_bubblegum::state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion, Creator};
 use mpl_bubblegum::state::{metaplex_adapter::TokenStandard, TreeConfig};
 use mpl_bubblegum::utils::get_asset_id;
 use mpl_bubblegum::{
@@ -50,6 +50,12 @@ pub struct IssueEntityV0<'info> {
     has_one = merkle_tree,
   )]
   pub maker: Box<Account<'info, MakerV0>>,
+  /// CHECK: Signs as a verified creator to make searching easier
+  #[account(
+    seeds = [b"entity_creator", dao.key().as_ref()],
+    bump,
+  )]
+  pub entity_creator: UncheckedAccount<'info>,
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
     init,
@@ -147,15 +153,29 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
     token_standard: Some(TokenStandard::NonFungible),
     uses: None,
     token_program_version: TokenProgramVersion::Original,
-    creators: vec![],
+    creators: vec![Creator {
+      address: ctx.accounts.entity_creator.key(),
+      verified: true,
+      share: 100,
+    }],
     seller_fee_basis_points: 0,
   };
-
+  let entity_creator_seeds : &[&[&[u8]]]= &[&[
+    b"entity_creator",
+    ctx.accounts.dao.to_account_info().key.as_ref(),
+    &[ctx.bumps["entity_creator"]],
+  ]];
+  let mut creator = ctx.accounts.entity_creator.to_account_info();
+  creator.is_signer = true;
   mint_to_collection_v1(
     ctx
       .accounts
       .mint_to_collection_ctx()
-      .with_signer(maker_seeds),
+      .with_remaining_accounts(vec![creator])
+      .with_signer(&[
+        maker_seeds[0],
+        entity_creator_seeds[0]
+      ]),
     metadata,
   )?;
 
