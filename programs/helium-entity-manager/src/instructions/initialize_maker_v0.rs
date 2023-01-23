@@ -1,6 +1,6 @@
 use crate::error::ErrorCode;
 use crate::state::*;
-use crate::token_metadata::create_metadata_accounts_v3;
+use shared_utils::{ create_metadata_accounts_v3 };
 use anchor_lang::prelude::*;
 use anchor_spl::metadata::{
   create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
