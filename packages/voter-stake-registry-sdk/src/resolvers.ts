@@ -2,7 +2,7 @@ import {
   ataResolver,
   combineResolvers,
   heliumCommonResolver,
-  resolveIndividual
+  resolveIndividual,
 } from "@helium/spl-utils";
 import { AnchorProvider } from "@project-serum/anchor";
 import { getAccount } from "@solana/spl-token";
@@ -15,6 +15,12 @@ export * from "./resolvers";
 
 export const vsrResolvers = combineResolvers(
   heliumCommonResolver,
+  ataResolver({
+    instruction: "initializeRegistrarV0",
+    account: "tokenAccount",
+    mint: "collection",
+    owner: "registrar",
+  }),
   ataResolver({
     instruction: "initializePositionV0",
     account: "vault",
@@ -77,7 +83,8 @@ export const vsrResolvers = combineResolvers(
     if (path[path.length - 1] === "recipient") {
       // @ts-ignore
       return provider.wallet.publicKey;
-    } if (path[path.length - 1] === "solDestination") {
+    }
+    if (path[path.length - 1] === "solDestination") {
       // @ts-ignore
       return provider.wallet.publicKey;
     } else if (
@@ -100,9 +107,14 @@ export const vsrResolvers = combineResolvers(
           acct.owner
         )[0];
       }
-    } else if (path[path.length - 1] === "positionUpdateAuthority" && accounts.registrar) {
+    } else if (
+      path[path.length - 1] === "positionUpdateAuthority" &&
+      accounts.registrar
+    ) {
       const vsr = await init(provider as AnchorProvider);
-      const reg = await vsr.account.registrar.fetch(accounts.registrar as PublicKey);
+      const reg = await vsr.account.registrar.fetch(
+        accounts.registrar as PublicKey
+      );
       // @ts-ignore
       return reg.positionUpdateAuthority || provider.wallet.publicKey;
     }
