@@ -193,7 +193,7 @@ pub fn handler<'info>(
 
   // The remaining account should be the mobile info if this
   // is a mobile hotspot as well
-  if ctx.remaining_accounts.len() > 0 {
+  if !ctx.remaining_accounts.is_empty() {
     let mobile_rewardable_entity_config = &ctx.remaining_accounts[0];
     let account_info: &AccountInfo<'info> = &ctx.remaining_accounts[1];
     let hash = hash(&args.entity_key).to_bytes();
