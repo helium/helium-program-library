@@ -10,8 +10,8 @@ use anchor_lang::solana_program::system_instruction::{self, create_account};
 use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
 use helium_sub_daos::DaoV0;
-use mpl_bubblegum::state::metaplex_adapter::{TokenStandard, Creator};
 use mpl_bubblegum::state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion};
+use mpl_bubblegum::state::metaplex_adapter::{Creator, TokenStandard};
 use mpl_bubblegum::utils::get_asset_id;
 use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
@@ -176,7 +176,7 @@ pub fn handler<'info>(
     }],
     seller_fee_basis_points: 0,
   };
-  let entity_creator_seeds : &[&[&[u8]]]= &[&[
+  let entity_creator_seeds: &[&[&[u8]]] = &[&[
     b"entity_creator",
     ctx.accounts.dao.to_account_info().key.as_ref(),
     &[ctx.bumps["entity_creator"]],
@@ -188,10 +188,7 @@ pub fn handler<'info>(
       .accounts
       .mint_to_collection_ctx()
       .with_remaining_accounts(vec![creator])
-      .with_signer(&[
-        maker_seeds[0],
-        entity_creator_seeds[0]
-      ]),
+      .with_signer(&[maker_seeds[0], entity_creator_seeds[0]]),
     metadata,
   )?;
 
