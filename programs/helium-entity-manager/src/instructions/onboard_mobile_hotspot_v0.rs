@@ -26,6 +26,7 @@ pub struct OnboardMobileHotspotArgsV0 {
   pub hash: [u8; 32],
   pub root: [u8; 32],
   pub index: u32,
+  pub location: Option<u64>,
 }
 
 #[derive(Accounts)]
@@ -147,21 +148,35 @@ pub fn handler<'info>(
     proof_accounts: ctx.remaining_accounts.to_vec(),
   })?;
 
-  // burn the dc tokens
-  burn_without_tracking_v0(
-    ctx.accounts.burn_ctx(),
-    BurnWithoutTrackingArgsV0 {
-      amount: ctx.accounts.sub_dao.onboarding_dc_fee,
-    },
-  )?;
-
+  let mut dc_fee = ctx.accounts.sub_dao.onboarding_dc_fee;
   ctx.accounts.mobile_info.set_inner(MobileHotspotInfoV0 {
     asset: asset_id,
     bump_seed: ctx.bumps["mobile_info"],
-    location: None,
+    location: args.location,
     is_full_hotspot: true,
     num_location_asserts: 0,
   });
+
+  if let ConfigSettingsV0::IotConfig {
+    full_location_staking_fee,
+    ..
+  } = ctx.accounts.rewardable_entity_config.settings
+  {
+    dc_fee = full_location_staking_fee.checked_add(dc_fee).unwrap();
+
+    ctx.accounts.mobile_info.num_location_asserts = ctx
+      .accounts
+      .mobile_info
+      .num_location_asserts
+      .checked_add(1)
+      .unwrap();
+  }
+
+  // burn the dc tokens
+  burn_without_tracking_v0(
+    ctx.accounts.burn_ctx(),
+    BurnWithoutTrackingArgsV0 { amount: dc_fee },
+  )?;
 
   Ok(())
 }
