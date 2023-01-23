@@ -3,8 +3,8 @@ pub mod error;
 pub mod precise_number;
 pub mod resize_to_fit;
 pub mod signed_precise_number;
-pub mod uint;
 pub mod token_metadata;
+pub mod uint;
 
 pub use crate::uint::*;
 pub use compressed_nfts::*;

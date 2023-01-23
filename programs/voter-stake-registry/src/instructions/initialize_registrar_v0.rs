@@ -2,16 +2,16 @@ use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::metadata::{
-  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata
+  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
 };
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
 use mpl_token_metadata::state::{CollectionDetails, DataV2};
+use shared_utils::create_metadata_accounts_v3;
 use spl_governance::state::realm;
 use std::mem::size_of;
-use shared_utils::{ create_metadata_accounts_v3 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Default, Clone)]
 pub struct InitializeRegistrarArgsV0 {
@@ -62,7 +62,7 @@ pub struct InitializeRegistrarV0<'info> {
     associated_token::mint = collection,
     associated_token::authority = registrar,
   )]
-  pub token_account: Box<Account<'info, TokenAccount>>,  
+  pub token_account: Box<Account<'info, TokenAccount>>,
 
   /// An spl-governance realm
   ///
@@ -82,8 +82,8 @@ pub struct InitializeRegistrarV0<'info> {
 
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub token_metadata_program: Program<'info, Metadata>,  
-  pub associated_token_program: Program<'info, AssociatedToken>,  
+  pub token_metadata_program: Program<'info, Metadata>,
+  pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub rent: Sysvar<'info, Rent>,
@@ -109,17 +109,26 @@ impl<'info> InitializeRegistrarV0<'info> {
 /// used for voting.
 pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArgsV0) -> Result<()> {
   let signer_seeds: &[&[&[u8]]] = &[&[
-    ctx.accounts.realm.to_account_info().key.as_ref(), 
-    b"registrar", 
-    ctx.accounts.realm_governing_token_mint.to_account_info().key.as_ref(), 
-    &[ctx.bumps["registrar"]
-  ]]];
+    ctx.accounts.realm.to_account_info().key.as_ref(),
+    b"registrar",
+    ctx
+      .accounts
+      .realm_governing_token_mint
+      .to_account_info()
+      .key
+      .as_ref(),
+    &[ctx.bumps["registrar"]],
+  ]];
 
   token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
 
   create_metadata_accounts_v3(
     CpiContext::new_with_signer(
-      ctx.accounts.token_metadata_program.to_account_info().clone(),
+      ctx
+        .accounts
+        .token_metadata_program
+        .to_account_info()
+        .clone(),
       CreateMetadataAccountsV3 {
         metadata: ctx.accounts.metadata.to_account_info().clone(),
         mint: ctx.accounts.collection.to_account_info().clone(),
@@ -137,7 +146,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
       uri: format!(
         "https://vsr-metadata.test-helium.com/{}",
         ctx.accounts.realm_governing_token_mint.key()
-      ),      
+      ),
       seller_fee_basis_points: 0,
       creators: None,
       collection: None,
@@ -146,11 +155,15 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
     true,
     true,
     Some(CollectionDetails::V1 { size: 0 }),
-  )?;  
+  )?;
 
   create_master_edition_v3(
     CpiContext::new_with_signer(
-      ctx.accounts.token_metadata_program.to_account_info().clone(),
+      ctx
+        .accounts
+        .token_metadata_program
+        .to_account_info()
+        .clone(),
       CreateMasterEditionV3 {
         edition: ctx.accounts.master_edition.to_account_info().clone(),
         mint: ctx.accounts.collection.to_account_info().clone(),
@@ -165,7 +178,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
       signer_seeds,
     ),
     Some(0),
-  )?;  
+  )?;
 
   ctx.accounts.registrar.set_inner(Registrar {
     realm: ctx.accounts.realm.key(),
@@ -177,7 +190,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
     position_update_authority: args.position_update_authority,
     governance_program_id: ctx.accounts.governance_program_id.key(),
     bump_seed: ctx.bumps["registrar"],
-    collection_bump_seed: ctx.bumps["collection"]
+    collection_bump_seed: ctx.bumps["collection"],
   });
 
   // Verify that "realm_authority" is the expected authority on "realm"
@@ -185,7 +198,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
   let realm = realm::get_realm_data_for_governing_token_mint(
     &ctx.accounts.governance_program_id.key(),
     &ctx.accounts.realm.to_account_info(),
-    &ctx.accounts.realm_governing_token_mint.key()
+    &ctx.accounts.realm_governing_token_mint.key(),
   )?;
 
   require_keys_eq!(

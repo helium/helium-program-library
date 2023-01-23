@@ -5,20 +5,16 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::metadata::{
-  create_master_edition_v3, 
-  verify_sized_collection_item,
-  CreateMasterEditionV3,
-  CreateMetadataAccountsV3, 
-  VerifySizedCollectionItem,
-  Metadata, 
+  create_master_edition_v3, verify_sized_collection_item, CreateMasterEditionV3,
+  CreateMetadataAccountsV3, Metadata, VerifySizedCollectionItem,
 };
 use anchor_spl::token;
 use anchor_spl::token::{Mint, MintTo, Token, TokenAccount};
 use mpl_token_metadata::state::Collection;
 use mpl_token_metadata::state::DataV2;
+use shared_utils::create_metadata_accounts_v3;
 use std::convert::TryFrom;
 use std::mem::size_of;
-use shared_utils::{ create_metadata_accounts_v3 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializePositionArgsV0 {
@@ -53,7 +49,7 @@ pub struct InitializePositionV0<'info> {
     seeds::program = token_metadata_program.key(),
     bump,
   )]
-  pub collection_master_edition: UncheckedAccount<'info>,  
+  pub collection_master_edition: UncheckedAccount<'info>,
 
   // checking the PDA address it just an extra precaution,
   // the other constraints must be exhaustive
@@ -177,7 +173,7 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
   }
 
   let signer_seeds: &[&[&[u8]]] = &[position_seeds!(ctx.accounts.position)];
-  
+
   token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
 
   create_metadata_accounts_v3(
@@ -209,7 +205,7 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
       creators: None,
       collection: Some(Collection {
         key: ctx.accounts.registrar.collection.key(),
-        verified: false // Verified in cpi
+        verified: false, // Verified in cpi
       }),
       uses: None,
     },
@@ -243,20 +239,29 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
 
   let verify_signer_seeds: &[&[&[u8]]] = &[registrar_seeds!(ctx.accounts.registrar)];
 
-  verify_sized_collection_item(CpiContext::new_with_signer(
-    ctx.accounts.token_metadata_program.to_account_info().clone(),
-    VerifySizedCollectionItem { 
-      payer: ctx.accounts.payer.to_account_info().clone(), 
-      metadata: ctx.accounts.metadata.to_account_info().clone(), 
-      collection_authority: ctx.accounts.registrar.to_account_info().clone(), 
-      collection_mint: ctx.accounts.collection.to_account_info().clone(),
-      collection_metadata: ctx.accounts.collection_metadata.to_account_info().clone(), 
-      collection_master_edition: ctx.accounts.collection_master_edition.to_account_info().clone(), 
-    }, 
-    verify_signer_seeds
-  ), 
-  None
-)?;
+  verify_sized_collection_item(
+    CpiContext::new_with_signer(
+      ctx
+        .accounts
+        .token_metadata_program
+        .to_account_info()
+        .clone(),
+      VerifySizedCollectionItem {
+        payer: ctx.accounts.payer.to_account_info().clone(),
+        metadata: ctx.accounts.metadata.to_account_info().clone(),
+        collection_authority: ctx.accounts.registrar.to_account_info().clone(),
+        collection_mint: ctx.accounts.collection.to_account_info().clone(),
+        collection_metadata: ctx.accounts.collection_metadata.to_account_info().clone(),
+        collection_master_edition: ctx
+          .accounts
+          .collection_master_edition
+          .to_account_info()
+          .clone(),
+      },
+      verify_signer_seeds,
+    ),
+    None,
+  )?;
 
   Ok(())
 }

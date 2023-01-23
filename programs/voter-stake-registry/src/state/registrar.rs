@@ -20,7 +20,7 @@ pub struct Registrar {
   pub collection: Pubkey, // The metaplex collection to be issued for positions
 
   pub bump_seed: u8,
-  pub collection_bump_seed: u8
+  pub collection_bump_seed: u8,
 }
 
 impl Registrar {

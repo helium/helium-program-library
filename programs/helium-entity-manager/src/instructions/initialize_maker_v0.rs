@@ -1,6 +1,5 @@
 use crate::error::ErrorCode;
 use crate::state::*;
-use shared_utils::{ create_metadata_accounts_v3 };
 use anchor_lang::prelude::*;
 use anchor_spl::metadata::{
   create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
@@ -10,6 +9,7 @@ use anchor_spl::{
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
 use mpl_token_metadata::state::{CollectionDetails, DataV2};
+use shared_utils::create_metadata_accounts_v3;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeMakerArgsV0 {
