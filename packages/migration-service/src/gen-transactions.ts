@@ -4,6 +4,7 @@ import { mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
 import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
 import bs58 from "bs58";
 import {
+  entityCreatorKey,
   init as initHem,
   iotInfoKey,
   keyToAssetKey,
@@ -269,6 +270,7 @@ async function run() {
   const dataCredits = dataCreditsKey(dc)[0];
   const dcCircuitBreaker = mintWindowedBreakerKey(dc)[0];
   const dao = daoKey(hnt)[0];
+  const entityCreator = entityCreatorKey(dao)[0];
   const subDao = subDaoKey(iot)[0];
   const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
   const registrar = daoAcc.registrar;
@@ -464,6 +466,7 @@ async function run() {
                 : 0,
             })
             .accountsStrict({
+              entityCreator,
               collection: hotspotPubkeysForMaker.collection,
               collectionMetadata: hotspotPubkeysForMaker.collectionMetadata,
               collectionMasterEdition:
@@ -664,6 +667,7 @@ async function run() {
     SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
     mobileRewardableEntityConfig,
     SystemProgram.programId,
+    entityCreator,
     bubblegumSigner,
     hst,
     dao,
