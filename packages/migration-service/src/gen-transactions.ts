@@ -27,7 +27,7 @@ import {
   lazyTransactionsKey,
   PROGRAM_ID as LAZY_PROGRAM_ID,
 } from "@helium/lazy-transactions-sdk";
-import { AccountFetchCache, chunks, sendInstructions } from "@helium/spl-utils";
+import { AccountFetchCache, chunks, sendInstructions, truthy } from "@helium/spl-utils";
 import {
   init as initVsr,
   PROGRAM_ID as VSR_PROGRAM_ID,
@@ -387,7 +387,7 @@ async function run() {
       txIdsToWallet[txIdx++] = address;
     } else if (solAddress) {
       // Create hotspots
-      const hotspotIxs = await Promise.all(
+      const hotspotIxs = (await Promise.all(
         (account.hotspots || []).map(async (hotspot) => {
           totalBalances.sol = totalBalances.sol
             .add(new BN(infoRent))
@@ -487,7 +487,7 @@ async function run() {
             .remainingAccounts(remainingAccounts)
             .instruction();
         })
-      );
+      )).filter(truthy);
 
       const tokenIxs = [];
       const hntBal = new BN(account.hnt);
