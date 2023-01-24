@@ -26,6 +26,7 @@ export async function updateIotMetadata({
 } & Omit<ProofArgsAndAccountsArgs, "connection">) {
   const {
     asset: {
+      content: { json_uri },
       ownership: { owner },
     },
     args,
@@ -37,7 +38,7 @@ export async function updateIotMetadata({
     ...rest,
   });
 
-  const [info] = iotInfoKey(rewardableEntityConfig, assetId);
+  const [info] = await iotInfoKey(rewardableEntityConfig, json_uri.split("/").slice(-1)[0]);
 
   return program.methods
     .updateIotInfoV0({

@@ -33,7 +33,7 @@ pub struct GenesisIssueHotspotArgsV0 {
 pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     mut,
-    seeds = [b"lazy_signer", b"testhelium10"],
+    seeds = [b"lazy_signer", b"testhelium12"],
     seeds::program = lazy_transactions::ID,
     bump,
   )]
@@ -56,7 +56,7 @@ pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     init,
     payer = lazy_signer,
-    space = 8 + std::mem::size_of::<KeyToAssetV0>(),
+    space = 8 + std::mem::size_of::<KeyToAssetV0>() + 8 * args.entity_key.len(),
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
@@ -72,7 +72,7 @@ pub struct GenesisIssueHotspotV0<'info> {
     seeds = [
       "iot_info".as_bytes(),
       rewardable_entity_config.key().as_ref(),
-      get_asset_id(&merkle_tree.key(), tree_authority.num_minted).as_ref()
+      &hash(&args.entity_key[..]).to_bytes()
     ],
     bump
   )]
@@ -171,6 +171,7 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
 
   ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
     asset: asset_id,
+    entity_key: args.entity_key,
     dao: ctx.accounts.dao.key(),
     bump_seed: ctx.bumps["key_to_asset"],
   });

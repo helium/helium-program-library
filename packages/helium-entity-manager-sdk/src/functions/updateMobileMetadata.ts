@@ -33,7 +33,7 @@ export async function updateMobileMetadata({
     assetId,
     ...rest,
   });
-  const [info] = mobileInfoKey(rewardableEntityConfig, assetId);
+  const [info] = await mobileInfoKey(rewardableEntityConfig, json_uri.split("/").slice(-1)[0]);
 
   return program.methods
     .updateMobileInfoV0({

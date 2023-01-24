@@ -3,16 +3,24 @@ npx ts-node --project tsconfig.cjs.json src/create-dao.ts -u https://api.devnet.
 
 npx ts-node --project tsconfig.cjs.json src/create-subdao.ts -u https://api.devnet.solana.com -rewardsOracleUrl https://iot-oracle.oracle.test-helium.com --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n IOT --subdaoKeypair keypairs/iot.json --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "Helium IOT Test5" --dcBurnAuthority $(solana address)
 
- npx ts-node --project tsconfig.cjs.json src/create-subdao.ts -u https://api.devnet.solana.com -rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n Mobile --subdaoKeypair keypairs/mobile.json --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Helium Mobile Test5" --dcBurnAuthority $(solana address)  --noHotspots
+ npx ts-node --project tsconfig.cjs.json src/create-subdao.ts -u https://api.devnet.solana.com -rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n Mobile --subdaoKeypair keypairs/mobile.json --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Helium Mobile Test5" --dcBurnAuthority $(solana address)
 ```
 Now, go approve and run all commands in realms.
 
-Now, create a maker. Note that this will need to be done for each maker.
+Now create iot makers:
 
 ```
 
 npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u http://127.0.0.1:8899 --symbol IOT --subdaoMint $(solana address -k keypairs/iot.json) --fromFile makers.json
 
+```
+
+Next, create mobile makers:
+
+```
+npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u http://127.0.0.1:8899 --symbol MOBILE --subdaoMint $(solana address -k keypairs/mobile.json) -n FreedomFi -c 9443 -m 13y2EqUUzyQhQGtDSoXktz8m5jHNSiwAKLTYnHNxZq2uH5GGGym
+
+npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u http://127.0.0.1:8899 --symbol MOBILE --subdaoMint $(solana address -k keypairs/mobile.json) -n "Bobcat 5G" -c 378 -m 14gqqPV2HEs4PCNNUacKVG7XeAhCUkN553NcBVw4xfwSFcCjhXv
 ```
 
 Now, fund any maker wallets

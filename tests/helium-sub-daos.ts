@@ -616,8 +616,6 @@ describe("helium-sub-daos", () => {
                 .accounts({
                   subDao,
                   dao,
-                  thread,
-                  clockwork: THREAD_PID,
                 })
                 .rpc({ skipPreflight: true });
             });

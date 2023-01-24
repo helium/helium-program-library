@@ -1,7 +1,7 @@
 use std::mem::size_of;
 
 use crate::state::*;
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::hash::hash};
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
@@ -25,6 +25,9 @@ pub struct OnboardIotHotspotArgsV0 {
   pub hash: [u8; 32],
   pub root: [u8; 32],
   pub index: u32,
+  pub location: Option<u64>,
+  pub elevation: Option<i32>,
+  pub gain: Option<i32>,
 }
 
 #[derive(Accounts)]
@@ -42,7 +45,7 @@ pub struct OnboardIotHotspotV0<'info> {
     seeds = [
       b"iot_info", 
       rewardable_entity_config.key().as_ref(),
-      get_asset_id(&merkle_tree.key(), args.index.into()).as_ref(),
+      &hash(&key_to_asset.entity_key[..]).to_bytes()
     ],
     bump,
   )]
@@ -142,23 +145,38 @@ pub fn handler<'info>(
     proof_accounts: ctx.remaining_accounts.to_vec(),
   })?;
 
-  // burn the dc tokens
-  burn_without_tracking_v0(
-    ctx.accounts.burn_ctx(),
-    BurnWithoutTrackingArgsV0 {
-      amount: ctx.accounts.sub_dao.onboarding_dc_fee,
-    },
-  )?;
+  let mut dc_fee = ctx.accounts.sub_dao.onboarding_dc_fee;
 
   ctx.accounts.iot_info.set_inner(IotHotspotInfoV0 {
     asset: asset_id,
     bump_seed: ctx.bumps["iot_info"],
-    location: None,
-    elevation: None,
-    gain: None,
+    location: args.location,
+    elevation: args.elevation,
+    gain: args.gain,
     is_full_hotspot: true,
     num_location_asserts: 0,
   });
+
+  if let ConfigSettingsV0::IotConfig {
+    full_location_staking_fee,
+    ..
+  } = ctx.accounts.rewardable_entity_config.settings
+  {
+    dc_fee = full_location_staking_fee.checked_add(dc_fee).unwrap();
+
+    ctx.accounts.iot_info.num_location_asserts = ctx
+      .accounts
+      .iot_info
+      .num_location_asserts
+      .checked_add(1)
+      .unwrap();
+  }
+
+  // burn the dc tokens
+  burn_without_tracking_v0(
+    ctx.accounts.burn_ctx(),
+    BurnWithoutTrackingArgsV0 { amount: dc_fee },
+  )?;
 
   Ok(())
 }

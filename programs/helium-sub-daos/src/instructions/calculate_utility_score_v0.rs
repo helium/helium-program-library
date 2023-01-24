@@ -87,7 +87,7 @@ pub fn handler(
     .get_emissions_at(Clock::get()?.unix_timestamp)
     .unwrap()
     .checked_add(std::cmp::min(
-      curr_supply.checked_sub(prev_supply).unwrap(),
+      prev_supply.checked_sub(curr_supply).unwrap(),
       ctx.accounts.dao.net_emissions_cap,
     ))
     .unwrap();
@@ -109,7 +109,7 @@ pub fn handler(
     return Err(error!(ErrorCode::EpochToEarly));
   }
 
-  ctx.accounts.sub_dao_epoch_info.epoch = epoch;
+  ctx.accounts.sub_dao_epoch_info.epoch = args.epoch;
   let epoch_end_ts = ctx.accounts.sub_dao_epoch_info.end_ts();
   update_subdao_vehnt(
     &mut ctx.accounts.sub_dao,

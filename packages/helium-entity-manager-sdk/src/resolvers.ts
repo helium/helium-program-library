@@ -8,7 +8,13 @@ import {
 import { iotInfoKey, keyToAssetKey, mobileInfoKey } from "./pdas";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
+import {
+  HeliumEntityManager,
+  IDL,
+} from "@helium/idls/lib/types/helium_entity_manager";
+import { PROGRAM_ID } from "./constants";
+import { Program } from "@project-serum/anchor";
+import { init } from "./init";
 
 export const heliumEntityManagerResolvers = combineResolvers(
   heliumCommonResolver,
@@ -24,7 +30,12 @@ export const heliumEntityManagerResolvers = combineResolvers(
       args[args.length - 1].entityKey &&
       accounts.dao
     ) {
-      return (await keyToAssetKey(accounts.dao as PublicKey, args[args.length - 1].entityKey))[0];
+      return (
+        await keyToAssetKey(
+          accounts.dao as PublicKey,
+          args[args.length - 1].entityKey
+        )
+      )[0];
     }
   }),
   resolveIndividual(async ({ path, args, provider, accounts }) => {
@@ -32,13 +43,17 @@ export const heliumEntityManagerResolvers = combineResolvers(
       path[path.length - 1] === "iotInfo" &&
       args[args.length - 1].index &&
       accounts.merkleTree &&
-      accounts.rewardableEntityConfig
+      accounts.keyToAsset
     ) {
-      return iotInfoKey(
-        accounts.rewardableEntityConfig as PublicKey,
-        await getLeafAssetId(
-          accounts.merkleTree as PublicKey,
-          args[args.length - 1].index
+      // @ts-ignore
+      const program = await init(provider);
+      const keyToAssetAcc = await program.account.keyToAssetV0.fetch(
+        accounts.keyToAsset as PublicKey
+      );
+      return (
+        await iotInfoKey(
+          accounts.rewardableEntityConfig as PublicKey,
+          keyToAssetAcc.entityKey
         )
       )[0];
     } else if (path[path.length - 1] === "recipient") {
@@ -53,11 +68,15 @@ export const heliumEntityManagerResolvers = combineResolvers(
       accounts.merkleTree &&
       accounts.rewardableEntityConfig
     ) {
-      return mobileInfoKey(
-        accounts.rewardableEntityConfig as PublicKey,
-        await getLeafAssetId(
-          accounts.merkleTree as PublicKey,
-          args[args.length - 1].index
+      // @ts-ignore
+      const program = await init(provider);
+      const keyToAssetAcc = await program.account.keyToAssetV0.fetch(
+        accounts.keyToAsset as PublicKey
+      );
+      return (
+        await mobileInfoKey(
+          accounts.rewardableEntityConfig as PublicKey,
+          keyToAssetAcc.entityKey
         )
       )[0];
     } else if (path[path.length - 1] === "recipient") {
