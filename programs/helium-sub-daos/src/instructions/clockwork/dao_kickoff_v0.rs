@@ -12,7 +12,6 @@ pub struct DaoKickoffV0<'info> {
   )]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
-    mut,
     seeds = ["mint_windowed_breaker".as_bytes(), hnt_mint.key().as_ref()],
     seeds::program = circuit_breaker_program.key(),
     bump = hnt_circuit_breaker.bump_seed
@@ -34,7 +33,7 @@ fn construct_next_ix(ctx: &Context<DaoKickoffV0>, epoch: u64) -> Option<Instruct
   ];
   let dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
 
-  // build calculate utility score ix
+  // build issue hst pool ix
   let accounts = vec![
     AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
     AccountMeta::new(dao_epoch_info, false),
@@ -47,8 +46,8 @@ fn construct_next_ix(ctx: &Context<DaoKickoffV0>, epoch: u64) -> Option<Instruct
   Some(Instruction {
     program_id: crate::ID,
     accounts,
-    data: crate::instruction::CalculateUtilityScoreV0 {
-      args: crate::CalculateUtilityScoreArgsV0 { epoch },
+    data: crate::instruction::IssueHstPoolV0 {
+      args: crate::IssueHstPoolArgsV0 { epoch },
     }
     .data(),
   })

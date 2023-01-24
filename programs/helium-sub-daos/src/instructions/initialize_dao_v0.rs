@@ -57,7 +57,7 @@ pub struct InitializeDaoV0<'info> {
   /// CHECK: handled by thread_create
   #[account(
     mut,
-    seeds = [b"thread", dao.key().as_ref(), b"end-epoch"],
+    seeds = [b"thread", dao.key().as_ref(), b"issue_hst"],
     seeds::program = clockwork.key(),
     bump
   )]
@@ -176,7 +176,7 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
       },
       signer_seeds,
     ),
-    "end-epoch".to_string(),
+    "issue_hst".to_string(),
     kickoff_ix.into(),
     Trigger::Cron {
       schedule: cron,

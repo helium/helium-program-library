@@ -59,3 +59,19 @@ export function stakePositionKey(
     programId
   );
 }
+
+const THREAD_PID = new PublicKey("3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv");
+export function threadKey(
+  authority: PublicKey,
+  threadId: "calculate" | "issue" | "issue_hst",
+  programId: PublicKey = THREAD_PID
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("thread", "utf8"),
+      authority.toBuffer(),
+      Buffer.from(threadId, "utf8"),
+    ],
+    programId
+  )
+}
