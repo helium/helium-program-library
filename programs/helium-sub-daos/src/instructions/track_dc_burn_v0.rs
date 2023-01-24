@@ -5,7 +5,7 @@ use anchor_spl::token::Mint;
 use std::str::FromStr;
 use voter_stake_registry::state::Registrar;
 
-pub const DC_KEY: &str = "credacwrBVewZAgCwNgowCSMbCiepuesprUWPBeLTSg";
+pub const DC_KEY: &str = "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TrackDcBurnArgsV0 {

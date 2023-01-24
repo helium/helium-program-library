@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("treaRzaa4b98D1NQMQdQXzBupbgWhyJ2e1pXhJzkTwU");
+declare_id!("treaf4wWBBty3fHdyBpo35Mz84M8k3heKXmjmi9vFt5");
 
 pub mod circuit_breaker;
 pub mod curve;

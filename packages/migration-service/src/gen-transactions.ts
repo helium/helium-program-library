@@ -2,36 +2,29 @@ import Address from "@helium/address";
 import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
 import { mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
 import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
-import bs58 from "bs58";
 import {
   entityCreatorKey,
-  init as initHem,
-  iotInfoKey,
-  keyToAssetKey,
-  makerKey,
-  mobileInfoKey,
-  PROGRAM_ID as HEM_PROGRAM_ID,
+  init as initHem, makerKey, PROGRAM_ID as HEM_PROGRAM_ID,
   PROGRAM_ID,
-  rewardableEntityConfigKey,
+  rewardableEntityConfigKey
 } from "@helium/helium-entity-manager-sdk";
 import {
   daoKey,
   init as initHsd,
-  subDaoKey,
+  subDaoKey
 } from "@helium/helium-sub-daos-sdk";
-import crypto from "crypto";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import {
   compile,
   init,
   lazySignerKey,
   lazyTransactionsKey,
-  PROGRAM_ID as LAZY_PROGRAM_ID,
+  PROGRAM_ID as LAZY_PROGRAM_ID
 } from "@helium/lazy-transactions-sdk";
 import { AccountFetchCache, chunks, sendInstructions, truthy } from "@helium/spl-utils";
 import {
   init as initVsr,
-  PROGRAM_ID as VSR_PROGRAM_ID,
+  PROGRAM_ID as VSR_PROGRAM_ID
 } from "@helium/voter-stake-registry-sdk";
 import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
 import { PROGRAM_ID as TOKEN_METATDATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
@@ -40,7 +33,7 @@ import { Program } from "@project-serum/anchor";
 import { ASSOCIATED_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-  SPL_NOOP_PROGRAM_ID,
+  SPL_NOOP_PROGRAM_ID
 } from "@solana/spl-account-compression";
 import { TreeNode } from "@solana/spl-account-compression/dist/types/merkle-tree";
 import {
@@ -49,19 +42,19 @@ import {
   createInitializeMintInstruction,
   createTransferInstruction,
   getAssociatedTokenAddressSync,
-  TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
 import {
-  AddressLookupTableProgram,
-  Keypair,
-  LAMPORTS_PER_SOL,
+  AddressLookupTableProgram, LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
-  TransactionInstruction,
+  TransactionInstruction
 } from "@solana/web3.js";
 import { BN } from "bn.js";
+import bs58 from "bs58";
 import cliProgress from "cli-progress";
+import crypto from "crypto";
 import fs from "fs";
 import os from "os";
 import { Client } from "pg";
@@ -275,6 +268,25 @@ async function run() {
   const subDao = subDaoKey(iot)[0];
   const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
   const registrar = daoAcc.registrar;
+  const registrarAcc = await vsrProgram.account.registrar.fetch(registrar);
+  const registrarCollection = registrarAcc.collection;
+  const registrarCollectionMetadata = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("metadata", "utf-8"),
+      TOKEN_METATDATA_PROGRAM_ID.toBuffer(),
+      registrarCollection.toBuffer(),
+    ],
+    TOKEN_METATDATA_PROGRAM_ID
+  )[0];
+  const registrarCollectionMasterEdition = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("metadata", "utf-8"),
+      TOKEN_METATDATA_PROGRAM_ID.toBuffer(),
+      registrarCollection.toBuffer(),
+      Buffer.from("edition", "utf-8"),
+    ],
+    TOKEN_METATDATA_PROGRAM_ID
+  )[0];
 
   const bubblegumSigner = PublicKey.findProgramAddressSync(
     [Buffer.from("collection_cpi", "utf-8")],
@@ -358,7 +370,7 @@ async function run() {
   const freedomFi = makers.find((maker) => maker.name === "FreedomFi");
   let positionIndex = 0;
   /// Iterate through accounts in order so we don't create 1mm promises.
-  for (const [address, account] of Object.entries(accounts).slice(0, 10000)) {
+  for (const [address, account] of Object.entries(accounts)) {
     const solAddress = toSolana(address);
     const isRouter = routers.has(address);
 
@@ -543,7 +555,6 @@ async function run() {
 
       const stakedHnt = new BN(account.staked_hnt);
       const stakedInstructions = [];
-      const stakedPdas = [];
       if (stakedHnt.gt(new BN(0))) {
         const indexBuf = Buffer.alloc(4);
         indexBuf.writeUint32LE(positionIndex++);
@@ -556,9 +567,9 @@ async function run() {
           pda,
           LAZY_PROGRAM_ID
         )
-        stakedPdas.push(
+        const stakedPdas = [
           [...pda, Buffer.from([bump])],
-        )
+        ]
 
         const {
           instruction: createPosition,
@@ -574,6 +585,9 @@ async function run() {
             depositMint: hnt,
             recipient: solAddress,
             payer: lazySigner,
+            collection: registrarCollection,
+            collectionMetadata: registrarCollectionMetadata,
+            collectionMasterEdition: registrarCollectionMasterEdition,
           })
           .prepare();
         const depositPosition = await vsrProgram.methods
@@ -590,28 +604,35 @@ async function run() {
 
         totalBalances.stakedHnt = totalBalances.stakedHnt.add(stakedHnt);
         stakedInstructions.push(
-          SystemProgram.createAccount({
-            fromPubkey: lazySigner,
-            newAccountPubkey: mintAddress,
-            space: 82,
-            lamports:
-              ataRent,
-            programId: TOKEN_PROGRAM_ID,
-          }),
-          createInitializeMintInstruction(
-            mintAddress,
-            0,
-            position,
-            position
-          ),
-          createPosition,
-          depositPosition
+          {
+            instructions: [
+              SystemProgram.createAccount({
+                fromPubkey: lazySigner,
+                newAccountPubkey: mintAddress,
+                space: 82,
+                lamports: ataRent,
+                programId: TOKEN_PROGRAM_ID,
+              }),
+              createInitializeMintInstruction(
+                mintAddress,
+                0,
+                position,
+                position
+              ),
+              createPosition,
+            ],
+            signerSeeds: stakedPdas
+          },
+          {
+            instructions: [depositPosition],
+            signerSeeds: []
+          }
         );
       }
 
       const ixnGroups = [
         { instructions: tokenIxs, signerSeeds: [] },
-        { instructions: stakedInstructions, signerSeeds: stakedPdas },
+        ...stakedInstructions,
         ...chunks(hotspotIxs, 1).map(chunk => ({ instructions: chunk, signerSeeds: [] })),
       ].filter((ixGroup) => ixGroup.instructions.length > 0);
 
@@ -704,6 +725,9 @@ async function run() {
     SystemProgram.programId,
     entityCreator,
     bubblegumSigner,
+    registrarCollection,
+    registrarCollectionMetadata,
+    registrarCollectionMasterEdition,
     hst,
     dao,
     subDao,
