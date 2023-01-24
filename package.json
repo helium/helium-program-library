@@ -19,7 +19,7 @@
   "dependencies": {
     "@coral-xyz/borsh": "^0.2.6",
     "@helium/crypto": "^4.6.2",
-    "@metaplex-foundation/mpl-bubblegum": "^0.3.0",
+    "@metaplex-foundation/mpl-bubblegum": "^0.6.2",
     "@project-serum/anchor": "0.26.0",
     "@pythnetwork/client": "^2.8.0",
     "@solana/spl-account-compression": "^0.1.4",

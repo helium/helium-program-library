@@ -1,9 +1,8 @@
+import { resolveIndividual } from "@helium/spl-utils";
 import {
   computeCompressedNFTHash,
-  getLeafAssetId,
-  TokenProgramVersion,
-  TokenStandard,
-  PROGRAM_ID as BUBBLEGUM_PROGRAM_ID
+  getLeafAssetId, PROGRAM_ID as BUBBLEGUM_PROGRAM_ID, TokenProgramVersion,
+  TokenStandard
 } from "@metaplex-foundation/mpl-bubblegum";
 import { Metadata, PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@project-serum/anchor";
@@ -11,11 +10,10 @@ import { Program } from "@project-serum/anchor";
 import {
   ConcurrentMerkleTreeAccount,
   getConcurrentMerkleTreeAccountSize,
-  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID
 } from "@solana/spl-account-compression";
-import { MerkleTree } from "../../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
-import { resolveIndividual } from "@helium/spl-utils";
+import { MerkleTree } from "../../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
 import { Bubblegum as MplBubblegum, IDL as BubblegumIdl } from "./bubblegum";
 
 export async function createCompressionNft({

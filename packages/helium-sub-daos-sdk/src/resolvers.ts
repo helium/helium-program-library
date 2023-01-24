@@ -6,7 +6,7 @@ import {
 } from "@helium/spl-utils";
 import { treasuryManagementResolvers } from "@helium/treasury-management-sdk";
 import { init, PROGRAM_ID as VSR_PROGRAM_ID, vsrResolvers } from "@helium/voter-stake-registry-sdk";
-import { AnchorProvider } from "@project-serum/anchor";
+import { AnchorProvider, Provider } from "@project-serum/anchor";
 import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { EPOCH_LENGTH, PROGRAM_ID } from "./constants";
 import { daoEpochInfoKey, subDaoEpochInfoKey } from "./pdas";
@@ -59,13 +59,56 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
         ...path.slice(0, path.length - 1),
         "position",
       ]) as PublicKey;
-      const positionAcc = await program.account.positionV0.fetch(
+      const positionAcc = position && await program.account.positionV0.fetch(
         position
       );
       if (positionAcc) {
         const [key] = await subDaoEpochInfoKey(
           subDao,
           positionAcc.lockup.endTs,
+        );
+
+        return key;
+      }
+    }
+  }
+);
+
+async function getSolanaUnixTimestamp(provider: Provider): Promise<bigint> {
+  const clock = await provider.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+  const unixTime = clock!.data.readBigInt64LE(8 * 4);
+  return unixTime;
+}
+
+
+export const genesisEndEpochInfoResolver = resolveIndividual(
+  async ({ provider, path, accounts }) => {
+    if (path[path.length - 1] === "genesisEndSubDaoEpochInfo") {
+      const program = await init(provider as AnchorProvider, VSR_PROGRAM_ID);
+
+      const subDao = get(accounts, [
+        ...path.slice(0, path.length - 1),
+        "subDao",
+      ]) as PublicKey;
+      const position = get(accounts, [
+        ...path.slice(0, path.length - 1),
+        "position",
+      ]) as PublicKey;
+      const registrar = get(accounts, [
+        ...path.slice(0, path.length - 1),
+        "registrar",
+      ]) as PublicKey;
+      const positionAcc = position && await program.account.positionV0.fetch(position);
+      const registrarAcc = registrar && await program.account.registrar.fetch(registrar);
+      if (positionAcc && registrarAcc) {
+        const currTs = Number(await getSolanaUnixTimestamp(provider)) + registrarAcc.timeOffset.toNumber();
+        const ts =
+          positionAcc.genesisEnd.toNumber() < currTs
+            ? positionAcc.lockup.endTs.toNumber()
+            : positionAcc.genesisEnd;
+        const [key] = await subDaoEpochInfoKey(
+          subDao,
+          ts
         );
 
         return key;
@@ -89,6 +132,7 @@ export const heliumSubDaosResolvers = combineResolvers(
   heliumCommonResolver,
   subDaoEpochInfoResolver,
   heliumSubDaosProgramResolver,
+  genesisEndEpochInfoResolver,
   closingTimeEpochInfoResolver,
   treasuryManagementResolvers,
   ataResolver({
@@ -118,7 +162,10 @@ export const heliumSubDaosResolvers = combineResolvers(
     if (path[path.length - 1] == "clockwork") {
       return THREAD_PID;
     } else if (path[path.length - 1] == "prevDaoEpochInfo" && accounts.dao) {
-      return daoEpochInfoKey(accounts.dao as PublicKey, (args[0].epoch.toNumber() - 1) * EPOCH_LENGTH)[0]
+      return daoEpochInfoKey(
+        accounts.dao as PublicKey,
+        (args[0].epoch.toNumber() - 1) * EPOCH_LENGTH
+      )[0];
     }
   }),
   vsrResolvers

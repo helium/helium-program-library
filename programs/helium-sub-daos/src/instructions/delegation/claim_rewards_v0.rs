@@ -136,11 +136,6 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued
   );
 
-  // Invariant check, they should never have more vehnt than the total vehnt at epoch start
-  require_gte!(
-    ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start,
-    delegated_vehnt_at_epoch,
-  );
   // calculate the position's share of that epoch's rewards
   // rewards = staking_rewards_issued * staked_vehnt_at_epoch / total_vehnt
   let rewards = delegated_vehnt_at_epoch
@@ -151,13 +146,18 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
 
   delegated_position.last_claimed_epoch = epoch;
 
+  let amount_left = ctx.accounts.delegator_pool.amount;
   transfer_v0(
     ctx.accounts.transfer_ctx().with_signer(&[&[
       b"sub_dao",
       ctx.accounts.sub_dao.dnt_mint.as_ref(),
       &[ctx.accounts.sub_dao.bump_seed],
     ]]),
-    TransferArgsV0 { amount: rewards },
+    // Due to rounding down of vehnt fall rates it's possible the vehnt on the dao does not exactly match the
+    // vehnt remaining. It could be off by a little bit of dust.
+    TransferArgsV0 {
+      amount: std::cmp::min(rewards, amount_left),
+    },
   )?;
   Ok(())
 }

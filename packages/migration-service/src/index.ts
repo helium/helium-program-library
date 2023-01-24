@@ -121,22 +121,46 @@ server.get<{
               proof,
               compiled,
               id,
+              signers: signersRaw
             }: {
               id: number;
               compiled: Buffer;
               proof: string[];
+              signers: Buffer
             },
             idx
           ) => {
             const hasRun = blocksExist[idx];
             const compiledTx = decompress(compiled);
             const block = blockKey(lazyTransactions, id)[0];
+            let signers: Buffer[][] = [];
+
+            let offset = 0;
+            let currSigner = 0;
+            while (offset < signersRaw.length) {
+              let curr = signersRaw.subarray(offset, signersRaw.length);
+              const length = curr.readUInt8();
+              console.log(length);
+              signers[currSigner] = [];
+
+              offset += 1; // Account for the readUint we're about to do
+              for (let i = 0; i < length; i++) {
+                curr = signersRaw.subarray(offset, signersRaw.length);
+                let length = curr.readUInt8();
+                offset += 1;
+                offset += length;
+                signers[currSigner].push(curr.subarray(1, 1 + length));
+              }
+
+              currSigner += 1;
+            }
 
             if (!hasRun) {
               const ix = await program.methods
                 .executeTransactionV0({
                   instructions: compiledTx.instructions,
                   index: compiledTx.index,
+                  signerSeeds: signers
                 })
                 .accountsStrict({
                   payer: provider.wallet.publicKey,
@@ -162,7 +186,7 @@ server.get<{
                   recentBlockhash,
                   instructions: [
                     ComputeBudgetProgram.setComputeUnitLimit({
-                      units: 350000,
+                      units: 400000,
                     }),
                     ix,
                   ],
