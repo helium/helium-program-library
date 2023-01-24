@@ -46,6 +46,7 @@ import { TreeNode } from "@solana/spl-account-compression/dist/types/merkle-tree
 import {
   ACCOUNT_SIZE,
   createAssociatedTokenAccountIdempotentInstruction,
+  createInitializeMintInstruction,
   createTransferInstruction,
   getAssociatedTokenAddressSync,
   TOKEN_PROGRAM_ID,
@@ -347,6 +348,7 @@ async function run() {
   let txIdx = 0;
   const txIdsToWallet = {};
 
+
   const routers = new Set(Object.keys(state.routers));
 
   let missingMakers = 0;
@@ -354,8 +356,9 @@ async function run() {
   // TODO: Onboard to mobile if they were from either of these makers
   const bobcat5G = makers.find((maker) => maker.name === "Bobcat 5G");
   const freedomFi = makers.find((maker) => maker.name === "FreedomFi");
+  let positionIndex = 0;
   /// Iterate through accounts in order so we don't create 1mm promises.
-  for (const [address, account] of Object.entries(accounts)) {
+  for (const [address, account] of Object.entries(accounts).slice(0, 10000)) {
     const solAddress = toSolana(address);
     const isRouter = routers.has(address);
 
@@ -384,7 +387,7 @@ async function run() {
 
       transactionsByWallet.push({
         solAddress,
-        transactions: [[instruction]],
+        transactions: [{ instructions: [instruction], signerSeeds: [] }],
       });
       txIdsToWallet[txIdx++] = address;
     } else if (solAddress) {
@@ -539,9 +542,24 @@ async function run() {
       totalBalances.sol = totalBalances.sol.add(dustAmountBn);
 
       const stakedHnt = new BN(account.staked_hnt);
-      const mintKeypair = Keypair.generate();
       const stakedInstructions = [];
+      const stakedPdas = [];
       if (stakedHnt.gt(new BN(0))) {
+        const indexBuf = Buffer.alloc(4);
+        indexBuf.writeUint32LE(positionIndex++);
+        const pda = [
+          Buffer.from("user", "utf-8"), 
+          Buffer.from(argv.name, "utf-8"),
+          indexBuf
+        ];
+        const [mintAddress, bump] = PublicKey.findProgramAddressSync(
+          pda,
+          LAZY_PROGRAM_ID
+        )
+        stakedPdas.push(
+          [...pda, Buffer.from([bump])],
+        )
+
         const {
           instruction: createPosition,
           pubkeys: { position },
@@ -552,7 +570,7 @@ async function run() {
           })
           .accounts({
             registrar,
-            mint: mintKeypair.publicKey,
+            mint: mintAddress,
             depositMint: hnt,
             recipient: solAddress,
             payer: lazySigner,
@@ -571,14 +589,31 @@ async function run() {
           .instruction();
 
         totalBalances.stakedHnt = totalBalances.stakedHnt.add(stakedHnt);
-        stakedInstructions.push(createPosition, depositPosition);
+        stakedInstructions.push(
+          SystemProgram.createAccount({
+            fromPubkey: lazySigner,
+            newAccountPubkey: mintAddress,
+            space: 82,
+            lamports:
+              ataRent,
+            programId: TOKEN_PROGRAM_ID,
+          }),
+          createInitializeMintInstruction(
+            mintAddress,
+            0,
+            position,
+            position
+          ),
+          createPosition,
+          depositPosition
+        );
       }
 
       const ixnGroups = [
-        tokenIxs,
-        stakedInstructions,
-        ...chunks(hotspotIxs, 1),
-      ].filter((ixGroup) => ixGroup.length > 0);
+        { instructions: tokenIxs, signerSeeds: [] },
+        { instructions: stakedInstructions, signerSeeds: stakedPdas },
+        ...chunks(hotspotIxs, 1).map(chunk => ({ instructions: chunk, signerSeeds: [] })),
+      ].filter((ixGroup) => ixGroup.instructions.length > 0);
 
       transactionsByWallet.push({
         solAddress,
@@ -722,6 +757,7 @@ async function run() {
       wallet VARCHAR(66) NOT NULL,
       compiled bytea NOT NULL,
       proof jsonb NOT NULL,
+      signers bytea,
       is_router BOOLEAN NOT NULL DEFAULT FALSE
     )
   `);
@@ -755,6 +791,17 @@ async function run() {
           .getProof(compiledTransaction.index, false, -1, false, false)
           .proof.map((p) => p.toString("hex"))
       ),
+      // Compress seeds as [len, bytes]
+      compiledTransaction.signerSeeds.reduce((acc, seeds) => {
+        return Buffer.concat([
+          acc,
+          Buffer.from([seeds.length]),
+          seeds.reduce(
+            (acc, s) => Buffer.concat([acc, Buffer.from([s.length]), s]),
+            Buffer.from([])
+          ),
+        ]);
+      }, Buffer.from([])),
       routers.has(txIdsToWallet[compiledTransaction.index]),
     ];
   });
@@ -775,7 +822,7 @@ async function run() {
         const query = format(
           `
         INSERT INTO transactions(
-          id, wallet, compiled, proof, is_router
+          id, wallet, compiled, proof, signers, is_router
         )
         VALUES %L
       `,
