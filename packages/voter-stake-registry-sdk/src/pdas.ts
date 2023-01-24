@@ -16,7 +16,7 @@ export const registrarKey = (
     programId
   );
 
-export const positionCollectionKey = (
+export const registrarCollectionKey = (
   registrar: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ) =>
