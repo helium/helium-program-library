@@ -120,7 +120,7 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
 
   let signer_addresses = signers
     .iter()
-    .map(|s| Pubkey::create_program_address(s, &ctx.program_id).unwrap())
+    .map(|s| Pubkey::create_program_address(s, ctx.program_id).unwrap())
     .collect::<std::collections::HashSet<Pubkey>>();
   for ix in args.instructions {
     let mut accounts = Vec::new();
