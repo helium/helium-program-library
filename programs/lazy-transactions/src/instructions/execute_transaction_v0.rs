@@ -101,15 +101,12 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
 
   let prefix: Vec<&[u8]> = vec![b"user", ctx.accounts.lazy_transactions.name.as_bytes()];
   // Need to convert to &[&[u8]] because invoke_signed expects that
-  let signers_inner_u8: Vec<Vec<&[u8]>> = args.signer_seeds
+  let signers_inner_u8: Vec<Vec<&[u8]>> = args
+    .signer_seeds
     .iter()
     .map(|s| {
       let mut clone = prefix.clone();
-      clone.extend(s
-        .iter()
-        .map(|v| v.as_slice())
-        .collect::<Vec<&[u8]>>()
-      );
+      clone.extend(s.iter().map(|v| v.as_slice()).collect::<Vec<&[u8]>>());
 
       clone
     })
@@ -133,7 +130,9 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
       accounts.push(acct.clone());
       account_infos.push(AccountMeta {
         pubkey: acct.key(),
-        is_signer: acct.key() == ctx.accounts.lazy_signer.key() || acct.is_signer || signer_addresses.contains(&acct.key()),
+        is_signer: acct.key() == ctx.accounts.lazy_signer.key()
+          || acct.is_signer
+          || signer_addresses.contains(&acct.key()),
         is_writable: acct.is_writable,
       })
     }
