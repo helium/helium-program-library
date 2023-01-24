@@ -64,6 +64,7 @@ describe("voter-stake-registry", () => {
 
   let program: Program<VoterStakeRegistry>;
   let registrar: PublicKey;
+  let collection: PublicKey;
   let hntMint: PublicKey;
   let realm: PublicKey;
   let programVersion: number;
@@ -120,7 +121,7 @@ describe("voter-stake-registry", () => {
 
     const {
       instruction: createRegistrar,
-      pubkeys: { registrar: rkey },
+      pubkeys: { registrar: rkey, collection: ckey },
     } = await program.methods
       .initializeRegistrarV0({
         positionUpdateAuthority: null,
@@ -131,6 +132,7 @@ describe("voter-stake-registry", () => {
       })
       .prepare();
     registrar = rkey!;
+    collection = ckey!;
     instructions.push(createRegistrar);
 
     // Configure voting mint
@@ -191,6 +193,7 @@ describe("voter-stake-registry", () => {
         })
         .accounts({
           // lock for 6 months
+          collection,
           registrar,
           mint: mintKeypair.publicKey,
           depositMint: hntMint,
