@@ -38,14 +38,14 @@ pub struct InitializePositionV0<'info> {
   /// CHECK: Handled by cpi
   #[account(
     mut,
-    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), registrar.collection.as_ref()],
+    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), collection.key().as_ref()],
     seeds::program = token_metadata_program.key(),
     bump,
   )]
   pub collection_metadata: UncheckedAccount<'info>,
   /// CHECK: Handled By cpi account
   #[account(
-    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), registrar.collection.as_ref(), "edition".as_bytes()],
+    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), collection.key().as_ref(), "edition".as_bytes()],
     seeds::program = token_metadata_program.key(),
     bump,
   )]

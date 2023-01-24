@@ -19,6 +19,8 @@ pub struct BurnNft<'info> {
   pub spl_token: AccountInfo<'info>,
   /// CHECK: Checked with cpi  
   pub edition: AccountInfo<'info>,
+  /// CHECK: Checked with cpi
+  pub collection_metadata: AccountInfo<'info>
 }
 
 pub fn burn_nft<'a, 'b, 'c, 'info>(
@@ -32,7 +34,7 @@ pub fn burn_nft<'a, 'b, 'c, 'info>(
     *ctx.accounts.token.key,
     *ctx.accounts.edition.key,
     *ctx.accounts.spl_token.key,
-    None,
+    Some(*ctx.accounts.collection_metadata.key),
   );
 
   solana_program::program::invoke_signed(
@@ -45,6 +47,7 @@ pub fn burn_nft<'a, 'b, 'c, 'info>(
       ctx.accounts.edition.clone(),
       ctx.program.clone(),
       ctx.accounts.spl_token.clone(),
+      ctx.accounts.collection_metadata.clone()
     ],
     ctx.signer_seeds,
   )
@@ -64,10 +67,24 @@ pub struct ClosePositionV0<'info> {
     bump = position.bump_seed,
     close = sol_destination,
     has_one = mint,
+    has_one = registrar,
     constraint = position.amount_deposited_native == 0,
     constraint = position.num_active_votes == 0,
   )]
   pub position: Box<Account<'info, PositionV0>>,
+  #[account(
+    has_one = collection
+  )]
+  pub registrar: Box<Account<'info, Registrar>>,
+  pub collection: Box<Account<'info, Mint>>,
+  /// CHECK: Handled by cpi
+  #[account(
+    mut,
+    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), collection.key().as_ref()],
+    seeds::program = token_metadata_program.key(),
+    bump,
+  )]
+  pub collection_metadata: UncheckedAccount<'info>,  
   #[account(mut)]
   pub mint: Box<Account<'info, Mint>>,
   #[account(
@@ -117,6 +134,7 @@ pub fn handler(ctx: Context<ClosePositionV0>) -> Result<()> {
         .clone(),
       spl_token: ctx.accounts.token_program.to_account_info().clone(),
       edition: ctx.accounts.master_edition.to_account_info().clone(),
+      collection_metadata: ctx.accounts.collection_metadata.to_account_info().clone()
     },
   ))?;
   Ok(())
