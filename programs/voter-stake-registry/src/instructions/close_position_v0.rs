@@ -20,7 +20,7 @@ pub struct BurnNft<'info> {
   /// CHECK: Checked with cpi  
   pub edition: AccountInfo<'info>,
   /// CHECK: Checked with cpi
-  pub collection_metadata: AccountInfo<'info>
+  pub collection_metadata: AccountInfo<'info>,
 }
 
 pub fn burn_nft<'a, 'b, 'c, 'info>(
@@ -47,7 +47,7 @@ pub fn burn_nft<'a, 'b, 'c, 'info>(
       ctx.accounts.edition.clone(),
       ctx.program.clone(),
       ctx.accounts.spl_token.clone(),
-      ctx.accounts.collection_metadata.clone()
+      ctx.accounts.collection_metadata.clone(),
     ],
     ctx.signer_seeds,
   )
@@ -84,7 +84,7 @@ pub struct ClosePositionV0<'info> {
     seeds::program = token_metadata_program.key(),
     bump,
   )]
-  pub collection_metadata: UncheckedAccount<'info>,  
+  pub collection_metadata: UncheckedAccount<'info>,
   #[account(mut)]
   pub mint: Box<Account<'info, Mint>>,
   #[account(
@@ -134,7 +134,7 @@ pub fn handler(ctx: Context<ClosePositionV0>) -> Result<()> {
         .clone(),
       spl_token: ctx.accounts.token_program.to_account_info().clone(),
       edition: ctx.accounts.master_edition.to_account_info().clone(),
-      collection_metadata: ctx.accounts.collection_metadata.to_account_info().clone()
+      collection_metadata: ctx.accounts.collection_metadata.to_account_info().clone(),
     },
   ))?;
   Ok(())
