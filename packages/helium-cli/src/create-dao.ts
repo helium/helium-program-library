@@ -1,5 +1,5 @@
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
-import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
+import { dataCreditsKey, init as initDc, PROGRAM_ID } from "@helium/data-credits-sdk";
 import { daoKey, init as initDao } from "@helium/helium-sub-daos-sdk";
 import { init as initLazy } from "@helium/lazy-distributor-sdk";
 import {
@@ -399,6 +399,7 @@ async function run() {
   await sendInstructions(provider, instructions, []);
 
   const dcKey = (await dataCreditsKey(dcKeypair.publicKey))[0];
+  console.log("dcpid", PROGRAM_ID.toBase58())
   if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({

@@ -11,16 +11,14 @@ Now create iot makers:
 
 ```
 
-npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u http://127.0.0.1:8899 --symbol IOT --subdaoMint $(solana address -k keypairs/iot.json) --fromFile makers.json
+npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u https://api.devnet.solana.com --symbol IOT --subdaoMint $(solana address -k keypairs/iot.json) --fromFile makers.json
 
 ```
 
 Next, create mobile makers:
 
 ```
-npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u http://127.0.0.1:8899 --symbol MOBILE --subdaoMint $(solana address -k keypairs/mobile.json) -n FreedomFi -c 9443 -m 13y2EqUUzyQhQGtDSoXktz8m5jHNSiwAKLTYnHNxZq2uH5GGGym
-
-npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u http://127.0.0.1:8899 --symbol MOBILE --subdaoMint $(solana address -k keypairs/mobile.json) -n "Bobcat 5G" -c 378 -m 14gqqPV2HEs4PCNNUacKVG7XeAhCUkN553NcBVw4xfwSFcCjhXv
+npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u https://api.devnet.solana.com --symbol MOBILE --subdaoMint $(solana address -k keypairs/mobile.json) --fromFile makers-mobile.json
 ```
 
 Now, fund any maker wallets

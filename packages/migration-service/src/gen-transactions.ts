@@ -619,13 +619,12 @@ async function run() {
                 position,
                 position
               ),
-              createPosition,
             ],
-            signerSeeds: stakedPdas
+            signerSeeds: stakedPdas,
           },
           {
-            instructions: [depositPosition],
-            signerSeeds: []
+            instructions: [createPosition, depositPosition],
+            signerSeeds: [],
           }
         );
       }
