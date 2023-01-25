@@ -82,7 +82,7 @@ pub struct IssueRewardsV0<'info> {
 
   #[account(
     mut,
-    seeds = [b"thread", dao.key().as_ref(), b"issue"],
+    seeds = [b"thread", sub_dao.key().as_ref(), b"issue"],
     seeds::program = clockwork.key(),
     bump
   )]

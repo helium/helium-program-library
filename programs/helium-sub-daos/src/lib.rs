@@ -74,10 +74,6 @@ pub mod helium_sub_daos {
     calculate_kickoff_v0::handler(ctx)
   }
 
-  pub fn issue_hst_kickoff_v0(ctx: Context<IssueHstKickoffV0>) -> Result<ThreadResponse> {
-    issue_hst_kickoff_v0::handler(ctx)
-  }
-
   pub fn reset_dao_thread_v0(ctx: Context<ResetDaoThreadV0>) -> Result<()> {
     reset_dao_thread_v0::handler(ctx)
   }

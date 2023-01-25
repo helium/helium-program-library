@@ -241,3 +241,39 @@ pub fn construct_issue_rewards_ix(
     .data(),
   }
 }
+
+pub fn construct_issue_hst_ix(
+  dao: Pubkey,
+  hnt_circuit_breaker: Pubkey,
+  hnt_mint: Pubkey,
+  hst_pool: Pubkey,
+  system_program: Pubkey,
+  token_program: Pubkey,
+  circuit_breaker_program: Pubkey,
+  thread: Pubkey,
+  clockwork_program: Pubkey,
+  dao_epoch_info: Pubkey,
+  epoch: u64,
+) -> Option<Instruction> {
+  // build issue hst pool ix
+  let accounts = vec![
+    AccountMeta::new_readonly(dao, false),
+    AccountMeta::new(dao_epoch_info, false),
+    AccountMeta::new(hnt_circuit_breaker, false),
+    AccountMeta::new(hnt_mint, false),
+    AccountMeta::new(hst_pool, false),
+    AccountMeta::new_readonly(system_program, false),
+    AccountMeta::new_readonly(token_program, false),
+    AccountMeta::new_readonly(circuit_breaker_program, false),
+    AccountMeta::new(thread, false),
+    AccountMeta::new_readonly(clockwork_program, false),
+  ];
+  Some(Instruction {
+    program_id: crate::ID,
+    accounts,
+    data: crate::instruction::IssueHstPoolV0 {
+      args: crate::IssueHstPoolArgsV0 { epoch },
+    }
+    .data(),
+  })
+}

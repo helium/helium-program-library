@@ -1,5 +1,5 @@
-use crate::{create_end_epoch_cron, state::*, EPOCH_LENGTH};
-use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
+use crate::{construct_issue_hst_ix, current_epoch, state::*, EPOCH_LENGTH};
+use anchor_lang::prelude::*;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::{set_authority, SetAuthority, TokenAccount};
 use anchor_spl::token::{Mint, Token};
@@ -8,7 +8,6 @@ use circuit_breaker::{
   CircuitBreaker, InitializeMintWindowedBreakerArgsV0,
 };
 use circuit_breaker::{ThresholdType, WindowedCircuitBreakerConfigV0};
-use clockwork_sdk::utils::anchor_sighash;
 use clockwork_sdk::{cpi::thread_create, state::Trigger, ThreadProgram};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -63,35 +62,6 @@ pub struct InitializeDaoV0<'info> {
   )]
   pub thread: AccountInfo<'info>,
   pub clockwork: Program<'info, ThreadProgram>,
-}
-
-pub fn construct_issue_hst_kickoff_ix(
-  dao: Pubkey,
-  hnt_mint: Pubkey,
-  hst_pool: Pubkey,
-  token_program: Pubkey,
-  circuit_breaker_program: Pubkey,
-) -> Option<Instruction> {
-  let hnt_circuit_breaker = Pubkey::find_program_address(
-    &["mint_windowed_breaker".as_bytes(), hnt_mint.as_ref()],
-    &circuit_breaker_program,
-  )
-  .0;
-
-  // build clockwork kickoff ix
-  let accounts = vec![
-    AccountMeta::new_readonly(dao, false),
-    AccountMeta::new_readonly(hnt_circuit_breaker, false),
-    AccountMeta::new_readonly(hnt_mint, false),
-    AccountMeta::new_readonly(hst_pool, false),
-    AccountMeta::new_readonly(token_program, false),
-    AccountMeta::new_readonly(circuit_breaker_program, false),
-  ];
-  Some(Instruction {
-    program_id: crate::ID,
-    accounts,
-    data: anchor_sighash("issue_hst_kickoff_v0").to_vec(),
-  })
 }
 
 pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Result<()> {
@@ -149,15 +119,30 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
   });
 
   let curr_ts = Clock::get()?.unix_timestamp;
-  let kickoff_ix = construct_issue_hst_kickoff_ix(
+  let epoch = current_epoch(curr_ts);
+
+  let dao_key = ctx.accounts.dao.key();
+  let dao_ei_seeds: &[&[u8]] = &[
+    "dao_epoch_info".as_bytes(),
+    dao_key.as_ref(),
+    &epoch.to_le_bytes(),
+  ];
+  let dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
+
+  let kickoff_ix = construct_issue_hst_ix(
     ctx.accounts.dao.key(),
+    ctx.accounts.hnt_circuit_breaker.key(),
     ctx.accounts.dao.hnt_mint,
     ctx.accounts.hst_pool.key(),
+    ctx.accounts.system_program.key(),
     ctx.accounts.token_program.key(),
     ctx.accounts.circuit_breaker_program.key(),
+    ctx.accounts.thread.key(),
+    ctx.accounts.clockwork.key(),
+    dao_epoch_info,
+    epoch,
   )
   .unwrap();
-  let cron = create_end_epoch_cron(curr_ts, 60 * 5);
 
   // initialize thread
   let signer_seeds: &[&[&[u8]]] = &[&[
@@ -178,9 +163,10 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
     ),
     "issue_hst".to_string(),
     kickoff_ix.into(),
-    Trigger::Cron {
-      schedule: cron,
-      skippable: false,
+    Trigger::Account {
+      address: dao_epoch_info,
+      offset: 8,
+      size: 1,
     },
   )?;
 

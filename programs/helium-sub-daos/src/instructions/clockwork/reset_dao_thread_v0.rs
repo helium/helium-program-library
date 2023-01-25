@@ -1,7 +1,7 @@
-use crate::{construct_issue_hst_kickoff_ix, create_end_epoch_cron, state::*};
+use crate::{construct_issue_hst_ix, create_end_epoch_cron, current_epoch, state::*};
 use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
-use circuit_breaker::CircuitBreaker;
+use circuit_breaker::{CircuitBreaker, MintWindowedCircuitBreakerV0};
 use clockwork_sdk::{
   cpi::{thread_stop, thread_update},
   state::{Thread, ThreadSettings, Trigger},
@@ -23,6 +23,14 @@ pub struct ResetDaoThreadV0<'info> {
 
   #[account(
     mut,
+    seeds = ["mint_windowed_breaker".as_bytes(), dao.hnt_mint.as_ref()],
+    seeds::program = circuit_breaker_program.key(),
+    bump = hnt_circuit_breaker.bump_seed
+  )]
+  pub hnt_circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
+
+  #[account(
+    mut,
     seeds = [b"thread", dao.key().as_ref(), b"end-epoch"],
     seeds::program = clockwork.key(),
     bump
@@ -36,12 +44,29 @@ pub struct ResetDaoThreadV0<'info> {
 }
 
 pub fn handler(ctx: Context<ResetDaoThreadV0>) -> Result<()> {
-  let kickoff_ix = construct_issue_hst_kickoff_ix(
+  let curr_ts = Clock::get()?.unix_timestamp;
+  let epoch = current_epoch(curr_ts);
+
+  let dao_key = ctx.accounts.dao.key();
+  let dao_ei_seeds: &[&[u8]] = &[
+    "dao_epoch_info".as_bytes(),
+    dao_key.as_ref(),
+    &epoch.to_le_bytes(),
+  ];
+  let dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
+
+  let kickoff_ix = construct_issue_hst_ix(
     ctx.accounts.dao.key(),
+    ctx.accounts.hnt_circuit_breaker.key(),
     ctx.accounts.dao.hnt_mint,
     ctx.accounts.dao.hst_pool,
+    ctx.accounts.system_program.key(),
     ctx.accounts.token_program.key(),
     ctx.accounts.circuit_breaker_program.key(),
+    ctx.accounts.thread.key(),
+    ctx.accounts.clockwork.key(),
+    dao_epoch_info,
+    epoch,
   )
   .unwrap();
 
