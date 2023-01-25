@@ -1,4 +1,4 @@
-use crate::{construct_dao_kickoff_ix, create_end_epoch_cron, state::*};
+use crate::{construct_issue_hst_kickoff_ix, create_end_epoch_cron, state::*};
 use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
 use circuit_breaker::CircuitBreaker;
@@ -36,7 +36,7 @@ pub struct ResetDaoThreadV0<'info> {
 }
 
 pub fn handler(ctx: Context<ResetDaoThreadV0>) -> Result<()> {
-  let kickoff_ix = construct_dao_kickoff_ix(
+  let kickoff_ix = construct_issue_hst_kickoff_ix(
     ctx.accounts.dao.key(),
     ctx.accounts.dao.hnt_mint,
     ctx.accounts.dao.hst_pool,

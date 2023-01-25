@@ -65,7 +65,7 @@ pub struct InitializeDaoV0<'info> {
   pub clockwork: Program<'info, ThreadProgram>,
 }
 
-pub fn construct_dao_kickoff_ix(
+pub fn construct_issue_hst_kickoff_ix(
   dao: Pubkey,
   hnt_mint: Pubkey,
   hst_pool: Pubkey,
@@ -90,7 +90,7 @@ pub fn construct_dao_kickoff_ix(
   Some(Instruction {
     program_id: crate::ID,
     accounts,
-    data: anchor_sighash("dao_kickoff_v0").to_vec(),
+    data: anchor_sighash("issue_hst_kickoff_v0").to_vec(),
   })
 }
 
@@ -149,7 +149,7 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
   });
 
   let curr_ts = Clock::get()?.unix_timestamp;
-  let kickoff_ix = construct_dao_kickoff_ix(
+  let kickoff_ix = construct_issue_hst_kickoff_ix(
     ctx.accounts.dao.key(),
     ctx.accounts.dao.hnt_mint,
     ctx.accounts.hst_pool.key(),

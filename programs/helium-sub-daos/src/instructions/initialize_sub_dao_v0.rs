@@ -1,5 +1,5 @@
 use crate::{circuit_breaker::*, construct_issue_rewards_ix, current_epoch, next_epoch_ts};
-use crate::{construct_sub_dao_kickoff_ix, state::*, EPOCH_LENGTH};
+use crate::{construct_calculate_kickoff_ix, state::*, EPOCH_LENGTH};
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
@@ -296,7 +296,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     &ctx.accounts.system_program.to_account_info(),
     &ctx.accounts.sub_dao,
   )?;
-  let calculate_kickoff_ix = construct_sub_dao_kickoff_ix(
+  let calculate_kickoff_ix = construct_calculate_kickoff_ix(
     ctx.accounts.dao.key(),
     ctx.accounts.sub_dao.key(),
     ctx.accounts.hnt_mint.key(),
@@ -351,16 +351,18 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
   let issue_ix = construct_issue_rewards_ix(
     ctx.accounts.dao.key(),
     ctx.accounts.sub_dao.key(),
-    ctx.accounts.hnt_mint.key(),
-    ctx.accounts.dnt_mint.key(),
-    ctx.accounts.treasury.key(),
-    ctx.accounts.rewards_escrow.key(),
-    ctx.accounts.delegator_pool.key(),
+    ctx.accounts.dao.hnt_mint,
+    ctx.accounts.sub_dao.dnt_mint,
+    ctx.accounts.sub_dao.treasury,
+    ctx.accounts.sub_dao.rewards_escrow,
+    ctx.accounts.sub_dao.delegator_pool,
     ctx.accounts.system_program.key(),
     ctx.accounts.token_program.key(),
     ctx.accounts.circuit_breaker_program.key(),
     dao_epoch_info,
     sub_dao_epoch_info,
+    ctx.accounts.issue_thread.key(),
+    ctx.accounts.clockwork.key(),
     epoch,
   );
   thread_create(

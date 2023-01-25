@@ -70,12 +70,12 @@ pub mod helium_sub_daos {
     reset_lockup_v0::handler(ctx, args)
   }
 
-  pub fn sub_dao_kickoff_v0(ctx: Context<SubDaoKickoffV0>) -> Result<ThreadResponse> {
-    sub_dao_kickoff_v0::handler(ctx)
+  pub fn calculate_kickoff_v0(ctx: Context<CalculateKickoffV0>) -> Result<ThreadResponse> {
+    calculate_kickoff_v0::handler(ctx)
   }
 
-  pub fn dao_kickoff_v0(ctx: Context<DaoKickoffV0>) -> Result<ThreadResponse> {
-    dao_kickoff_v0::handler(ctx)
+  pub fn issue_hst_kickoff_v0(ctx: Context<IssueHstKickoffV0>) -> Result<ThreadResponse> {
+    issue_hst_kickoff_v0::handler(ctx)
   }
 
   pub fn reset_dao_thread_v0(ctx: Context<ResetDaoThreadV0>) -> Result<()> {

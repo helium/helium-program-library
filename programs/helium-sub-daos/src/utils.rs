@@ -20,7 +20,7 @@ impl OrArithError<SignedPreciseNumber> for Option<SignedPreciseNumber> {
   }
 }
 
-pub const EPOCH_LENGTH: i64 = 60 * 60;
+pub const EPOCH_LENGTH: i64 = 24 * 60 * 60;
 
 pub fn current_epoch(unix_timestamp: i64) -> u64 {
   (unix_timestamp / (EPOCH_LENGTH)).try_into().unwrap()
@@ -159,7 +159,7 @@ pub fn calculate_fall_rate(curr_vp: u64, future_vp: u64, num_seconds: u64) -> Op
   diff.checked_div(num_seconds.into())
 }
 
-pub fn construct_sub_dao_kickoff_ix(
+pub fn construct_calculate_kickoff_ix(
   dao: Pubkey,
   sub_dao: Pubkey,
   hnt_mint: Pubkey,
@@ -181,7 +181,7 @@ pub fn construct_sub_dao_kickoff_ix(
   Some(Instruction {
     program_id: crate::ID,
     accounts,
-    data: anchor_sighash("sub_dao_kickoff_v0").to_vec(),
+    data: anchor_sighash("calculate_kickoff_v0").to_vec(),
   })
 }
 
@@ -198,6 +198,8 @@ pub fn construct_issue_rewards_ix(
   circuit_breaker_program: Pubkey,
   dao_epoch_info: Pubkey,
   sub_dao_epoch_info: Pubkey,
+  issue_thread: Pubkey,
+  clockwork_program: Pubkey,
   epoch: u64,
 ) -> Instruction {
   let hnt_circuit_breaker = Pubkey::find_program_address(
@@ -227,6 +229,8 @@ pub fn construct_issue_rewards_ix(
     AccountMeta::new_readonly(system_program, false),
     AccountMeta::new_readonly(token_program, false),
     AccountMeta::new_readonly(circuit_breaker_program, false),
+    AccountMeta::new(issue_thread, false),
+    AccountMeta::new_readonly(clockwork_program, false),
   ];
   Instruction {
     program_id: crate::ID,

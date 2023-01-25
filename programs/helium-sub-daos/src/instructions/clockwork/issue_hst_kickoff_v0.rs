@@ -5,7 +5,7 @@ use circuit_breaker::{CircuitBreaker, MintWindowedCircuitBreakerV0};
 use clockwork_sdk::{self, state::ThreadResponse};
 
 #[derive(Accounts)]
-pub struct DaoKickoffV0<'info> {
+pub struct IssueHstKickoffV0<'info> {
   #[account(
     has_one = hnt_mint,
     has_one = hst_pool
@@ -23,7 +23,7 @@ pub struct DaoKickoffV0<'info> {
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
 }
 
-fn construct_next_ix(ctx: &Context<DaoKickoffV0>, epoch: u64) -> Option<Instruction> {
+fn construct_next_ix(ctx: &Context<IssueHstKickoffV0>, epoch: u64) -> Option<Instruction> {
   // get epoch info accounts needed
   let dao_key = ctx.accounts.dao.key();
   let dao_ei_seeds: &[&[u8]] = &[
@@ -53,7 +53,7 @@ fn construct_next_ix(ctx: &Context<DaoKickoffV0>, epoch: u64) -> Option<Instruct
   })
 }
 
-pub fn handler(ctx: Context<DaoKickoffV0>) -> Result<ThreadResponse> {
+pub fn handler(ctx: Context<IssueHstKickoffV0>) -> Result<ThreadResponse> {
   let curr_ts = Clock::get()?.unix_timestamp;
   let epoch = current_epoch(curr_ts) - 1; // operate calculations on previous epoch
   let issue_hst_ix = construct_next_ix(&ctx, epoch).unwrap();
