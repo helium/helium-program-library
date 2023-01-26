@@ -13,5 +13,15 @@ export * from "./utils";
 export * from "./token";
 export * from "./constants";
 
-export type { AssetProof, Asset, AssetsByOwnerOpts } from "./mplAssetAPI";
-export { getAsset, getAssetProof, getAssetsByOwner } from "./mplAssetAPI";
+export type {
+  AssetProof,
+  Asset,
+  AssetsByOwnerOpts,
+  SearchAssetsOpts,
+} from "./mplAssetAPI";
+export {
+  getAsset,
+  getAssetProof,
+  getAssetsByOwner,
+  searchAssets,
+} from "./mplAssetAPI";

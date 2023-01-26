@@ -2,9 +2,8 @@ import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
 import { ConcurrentMerkleTreeAccount } from "@solana/spl-account-compression";
 import { Connection, PublicKey, AccountMeta } from "@solana/web3.js";
 
-
 export type ProofArgsAndAccountsArgs = {
-  connection: Connection,
+  connection: Connection;
   assetId: PublicKey;
   assetEndpoint?: string;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
@@ -26,8 +25,8 @@ export async function proofArgsAndAccounts({
     hash: number[];
     root: number[];
     index: number;
-  },
-  remainingAccounts: AccountMeta[]
+  };
+  remainingAccounts: AccountMeta[];
 }> {
   // @ts-ignore
   const endpoint = assetEndpoint || connection._rpcEndpoint;
@@ -44,10 +43,7 @@ export async function proofArgsAndAccounts({
   } = asset;
   const { root, proof, leaf, treeId } = assetProof;
   const canopy = await (
-    await ConcurrentMerkleTreeAccount.fromAccountAddress(
-      connection,
-      treeId
-    )
+    await ConcurrentMerkleTreeAccount.fromAccountAddress(connection, treeId)
   ).getCanopyDepth();
 
   return {
