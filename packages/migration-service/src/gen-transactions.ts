@@ -755,7 +755,7 @@ async function run() {
   });
   await client.connect();
 
-  const flatTransactions = packTransactions([...hotspotIxs, ...accountIxs]);
+  const flatTransactions = packTransactions([...accountIxs, ...hotspotIxs]);
   console.log("Compiling merkle tree");
   const { merkleTree, compiledTransactions } = compile(
     lazySigner,

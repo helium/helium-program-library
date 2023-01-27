@@ -86,11 +86,6 @@ async function run() {
       describe: "Keypair of the Data Credit token",
       default: `${__dirname}/../keypairs/dc.json`,
     },
-    makerKeypair: {
-      type: "string",
-      describe: "Keypair of a maker",
-      default: `${os.homedir()}/.config/solana/id.json`,
-    },
     numHnt: {
       type: "number",
       describe:
@@ -256,7 +251,7 @@ async function run() {
       new GoverningTokenConfigAccountArgs({
         // community token config
         voterWeightAddin: heliumVsrProgram.programId,
-        maxVoterWeightAddin: undefined,
+        maxVoterWeightAddin: heliumVsrProgram.programId,
         tokenType: GoverningTokenType.Liquid,
       }),
       new GoverningTokenConfigAccountArgs({

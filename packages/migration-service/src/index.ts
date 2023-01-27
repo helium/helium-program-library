@@ -270,7 +270,7 @@ server.get<{
   try {
     const results = (
       await client.query(
-        "SELECT * FROM transactions ORDER BY ID ASC LIMIT $1 OFFSET $2",
+        "SELECT * FROM transactions ORDER BY is_router DESC, ID ASC LIMIT $1 OFFSET $2",
         [limit || 200, offset || 0]
       )
     ).rows;
