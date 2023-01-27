@@ -12,5 +12,5 @@ pub enum ErrorCode {
   ToCreateSerializeFailed,
 
   #[msg("Invalid canopy length")]
-  CanopyLengthMismatch
+  CanopyLengthMismatch,
 }
