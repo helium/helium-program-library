@@ -143,7 +143,7 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
             currSigner += 1;
           }
 
-          if (!hasRun) {
+          if (!hasRun && compiledTx.instructions.length > 0) {
             const ix = await program.methods
               .executeTransactionV0({
                 instructions: compiledTx.instructions,

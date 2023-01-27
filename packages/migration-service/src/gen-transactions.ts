@@ -1141,7 +1141,7 @@ const baseTxSize =
   32 + // block
   32 + // compute budget
   62 + // signature
-  5 * 32 // Leave room for proofs
+  3 * 32 // Leave room for proofs
 
 // Naive packing, just stack them on top of each other until size or compute too high.
 function packTransactions(instructions: EnrichedIxGroup[]): TransactionsReturn[] {
@@ -1167,14 +1167,14 @@ function packTransactions(instructions: EnrichedIxGroup[]): TransactionsReturn[]
     } else {
       txs.push(currTx);
       currTx = {
-        size: baseTxSize,
-        compute: 0,
-        wallets: new Set<string>(),
-        instructions: [],
-        signerSeeds: [],
+        size: baseTxSize + ix.size,
+        compute: ix.compute,
+        wallets: new Set(ix.wallet),
+        instructions: ix.instructions,
+        signerSeeds: ix.signerSeeds,
       };
     }
   }
-  if (txs[txs.length] !== currTx) txs.push(currTx);
+  if (txs[txs.length - 1] !== currTx) txs.push(currTx);
   return txs;
 }
