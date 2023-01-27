@@ -62,7 +62,12 @@ server.get("/top-wallets", async () => {
   try {
     const results = (
       await client.query(
-        "SELECT wallet, count(*) FROM transactions GROUP BY wallet ORDER BY count DESC"
+        `SELECT wallet_transactions.wallet, count(*)
+         FROM transactions 
+         JOIN wallet_transactions ON transactions.id = wallet_transactions.txid
+         GROUP BY wallet_transactions.wallet
+         ORDER BY count DESC
+        `
       )
     ).rows.map((row) => ({ ...row, count: Number(row.count) }));
 
@@ -205,6 +210,7 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
           console.error("Failed to serialize tx with id", id);
           PublicKey.prototype.toString = PublicKey.prototype.toBase58;
           console.error(ret);
+          console.error(ret.message.addressTableLookups);
           throw e;
         }
       })
@@ -223,7 +229,12 @@ server.get<{
   try {
     const results = (
       await client.query(
-        "SELECT * FROM transactions WHERE wallet = $1 LIMIT $2 OFFSET $3",
+        `SELECT * FROM transactions
+        JOIN wallet_transactions ON transactions.id = wallet_transactions.txid
+        WHERE wallet_transactions.wallet = $1
+        LIMIT $2
+        OFFSET $3
+        `,
         [userWallet, limit || 200, offset || 0]
       )
     ).rows;
@@ -236,7 +247,7 @@ server.get<{
       count: Number(
         (
           await client.query(
-            "SELECT count(*) FROM transactions WHERE wallet = $1",
+            "SELECT count(*) FROM wallet_transactions WHERE wallet = $1",
             [userWallet]
           )
         ).rows[0].count
