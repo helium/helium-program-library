@@ -14,6 +14,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use solana_client::{
   rpc_client::RpcClient,
+  rpc_config::RpcSendTransactionConfig,
   tpu_client::{TpuClient, TpuClientConfig, TpuSenderError},
 };
 use solana_sdk::{
@@ -71,7 +72,7 @@ struct Args {
   wallet: Option<String>,
   /// Whether to migrate all at once
   #[arg(short, long, action)]
-  all: bool
+  all: bool,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -136,7 +137,7 @@ async fn run_transactions(
   NUM_TOTAL.inc_by(total_transactions as u64);
 
   if args.all {
-    let limit = 500;
+    let limit = 1000;
     let mut offset = 0;
     loop {
       let url = format!(
@@ -170,7 +171,7 @@ async fn run_transactions(
   } else {
     for wallet in wallets {
       println!("Migrating wallet {}", wallet);
-      let limit = 500;
+      let limit = 1000;
       let mut offset = 0;
       loop {
         let url = format!(
@@ -204,7 +205,6 @@ async fn run_transactions(
       NUM_WALLETS.inc()
     }
   }
-
 }
 
 async fn metrics_handler() -> Result<impl Reply, Rejection> {
@@ -247,6 +247,9 @@ pub fn send_and_confirm_messages_with_spinner(
   tpu_client: &TpuClient,
   messages: &Vec<Vec<u8>>,
 ) -> Result<Vec<Option<TransactionError>>, TpuSenderError> {
+  if messages.is_empty() {
+    return Ok(vec![]);
+  }
   let progress_bar = ProgressBar::new(42);
   progress_bar.set_style(
     ProgressStyle::default_spinner()
@@ -285,7 +288,20 @@ pub fn send_and_confirm_messages_with_spinner(
     if Instant::now().duration_since(last_resend) > TRANSACTION_RESEND_INTERVAL {
       for (index, (_i, transaction, deser)) in pending_transactions.values().enumerate() {
         if !tpu_client.send_wire_transaction(transaction.clone()) {
-          let _result = rpc_client.send_transaction(deser);
+          if let Err(err) = rpc_client.send_transaction_with_config(
+            deser,
+            RpcSendTransactionConfig {
+              skip_preflight: true,
+              ..RpcSendTransactionConfig::default()
+            },
+          ) {
+            confirmed_transactions += 1;
+            FAILED_TX.inc();
+            progress_bar.println(format!(
+              "Failed transaction: {} {:?}",
+              deser.signatures[0], err
+            ));
+          }
         }
         set_message_for_confirmed_transactions(
           &progress_bar,

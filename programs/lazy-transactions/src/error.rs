@@ -10,4 +10,7 @@ pub enum ErrorCode {
 
   #[msg("Failed to serialize ToCreate")]
   ToCreateSerializeFailed,
+
+  #[msg("Invalid canopy length")]
+  CanopyLengthMismatch
 }

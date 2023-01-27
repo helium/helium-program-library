@@ -1,4 +1,4 @@
-use crate::state::*;
+use crate::{state::*, id, canopy::check_canopy_bytes};
 use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -6,6 +6,7 @@ pub struct InitializeLazyTransactionsArgsV0 {
   pub root: [u8; 32],
   pub name: String,
   pub authority: Pubkey,
+  pub max_depth: u32,
 }
 
 #[derive(Accounts)]
@@ -21,6 +22,12 @@ pub struct InitializeLazyTransactionsV0<'info> {
     bump,
   )]
   pub lazy_transactions: Box<Account<'info, LazyTransactionsV0>>,
+  /// CHECK: Account to store the canopy, the size will determine the size of the canopy
+  #[account(
+    owner = id(),
+    constraint = check_canopy_bytes(&canopy.data.borrow()).is_ok(),
+  )]
+  pub canopy: AccountInfo<'info>,
   pub system_program: Program<'info, System>,
 }
 
@@ -35,6 +42,8 @@ pub fn handler(
       root: args.root,
       name: args.name,
       authority: args.authority,
+      canopy: ctx.accounts.canopy.key(),
+      max_depth: args.max_depth,
       bump_seed: ctx.bumps["lazy_transactions"],
     });
 

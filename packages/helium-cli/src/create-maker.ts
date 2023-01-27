@@ -120,7 +120,7 @@ async function run() {
     makers.push({
       name: "Migrated Helium Hotspot",
       address: helAddr.b58,
-      count: 5000,
+      count: 50000,
     });
   }
 

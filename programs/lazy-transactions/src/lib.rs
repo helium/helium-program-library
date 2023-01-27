@@ -6,6 +6,7 @@ pub mod error;
 pub mod instructions;
 pub mod merkle_proof;
 pub mod state;
+pub mod canopy;
 
 pub use instructions::*;
 pub use state::*;
@@ -37,5 +38,12 @@ pub mod lazy_transactions {
     args: UpdateLazyTransactionsArgsV0,
   ) -> Result<()> {
     update_lazy_transactions_v0::handler(ctx, args)
+  }
+
+  pub fn set_canopy_v0(
+    ctx: Context<SetCanopyV0>,
+    args: SetCanopyArgsV0,
+  ) -> Result<()> {
+    set_canopy_v0::handler(ctx, args)
   }
 }

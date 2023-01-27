@@ -1,3 +1,6 @@
+use std::borrow::Borrow;
+
+use crate::canopy::fill_in_proof_from_canopy;
 use crate::error::ErrorCode;
 use crate::{merkle_proof::verify, state::*};
 use anchor_lang::{prelude::*, solana_program, solana_program::instruction::Instruction};
@@ -28,7 +31,12 @@ pub struct ExecuteTransactionArgsV0 {
 pub struct ExecuteTransactionV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
+  #[account(
+    has_one = canopy
+  )]
   pub lazy_transactions: Account<'info, LazyTransactionsV0>,
+  /// CHECK: Verified by has one
+  pub canopy: UncheckedAccount<'info>,
   #[account(
     mut,
     seeds = ["lazy_signer".as_bytes(), lazy_transactions.name.as_bytes()],
@@ -56,10 +64,17 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
     .unwrap())
   .into();
 
-  let proof = ctx.remaining_accounts[(largest_acct_idx + 1)..]
+  let mut proof = ctx.remaining_accounts[(largest_acct_idx + 1)..]
     .iter()
     .map(|a| a.key.to_bytes())
     .collect::<Vec<_>>();
+
+  fill_in_proof_from_canopy(
+    ctx.accounts.canopy.try_borrow_data()?.as_ref(),
+    ctx.accounts.lazy_transactions.max_depth,
+    args.index,
+    &mut proof,
+  )?;
 
   let accts = ctx.remaining_accounts[..(largest_acct_idx + 1)]
     .iter()

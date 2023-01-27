@@ -6,16 +6,16 @@ import {
   blockKey,
   init,
   lazySignerKey,
-  lazyTransactionsKey,
+  lazyTransactionsKey
 } from "@helium/lazy-transactions-sdk";
-import { chunks, truthy } from "@helium/spl-utils";
+import { chunks } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
 import {
   ComputeBudgetProgram,
   PublicKey,
   SystemProgram,
   TransactionMessage,
-  VersionedTransaction,
+  VersionedTransaction
 } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { Pool } from "pg";
@@ -92,6 +92,7 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
       )
     )
   ).flat();
+  const lazyTxns = await program.account.lazyTransactionsV0.fetch(lazyTransactions);
 
   const asExecuteTxs: { id: number; transaction: TransactionMessage }[] = (
     await Promise.all(
@@ -102,11 +103,13 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
             compiled,
             id,
             signers: signersRaw,
+            compute
           }: {
             id: number;
             compiled: Buffer;
             proof: string[];
             signers: Buffer;
+            compute: number;
           },
           idx
         ) => {
@@ -145,6 +148,7 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
               .accountsStrict({
                 payer: provider.wallet.publicKey,
                 lazyTransactions,
+                canopy: lazyTxns.canopy,
                 lazySigner,
                 block,
                 systemProgram: SystemProgram.programId,
@@ -166,7 +170,7 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
                 recentBlockhash,
                 instructions: [
                   ComputeBudgetProgram.setComputeUnitLimit({
-                    units: 400000,
+                    units: compute,
                   }),
                   ix,
                 ],
@@ -255,7 +259,7 @@ server.get<{
   try {
     const results = (
       await client.query(
-        "SELECT * FROM transactions LIMIT $1 OFFSET $2",
+        "SELECT * FROM transactions ORDER BY ID ASC LIMIT $1 OFFSET $2",
         [limit || 200, offset || 0]
       )
     ).rows;

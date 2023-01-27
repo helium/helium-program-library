@@ -4,27 +4,31 @@ import { mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
 import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
 import {
   entityCreatorKey,
-  init as initHem, makerKey, PROGRAM_ID as HEM_PROGRAM_ID,
+  init as initHem,
+  makerKey,
+  PROGRAM_ID as HEM_PROGRAM_ID,
   PROGRAM_ID,
-  rewardableEntityConfigKey
+  rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
 import {
   daoKey,
   init as initHsd,
-  subDaoKey
+  subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import {
   compile,
+  fillCanopy,
+  getCanopySize,
   init,
   lazySignerKey,
   lazyTransactionsKey,
-  PROGRAM_ID as LAZY_PROGRAM_ID
+  PROGRAM_ID as LAZY_PROGRAM_ID,
 } from "@helium/lazy-transactions-sdk";
-import { AccountFetchCache, chunks, sendInstructions, truthy } from "@helium/spl-utils";
+import { chunks, sendInstructions, truthy } from "@helium/spl-utils";
 import {
   init as initVsr,
-  PROGRAM_ID as VSR_PROGRAM_ID
+  PROGRAM_ID as VSR_PROGRAM_ID,
 } from "@helium/voter-stake-registry-sdk";
 import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
 import { PROGRAM_ID as TOKEN_METATDATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
@@ -33,7 +37,7 @@ import { Program } from "@project-serum/anchor";
 import { ASSOCIATED_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-  SPL_NOOP_PROGRAM_ID
+  SPL_NOOP_PROGRAM_ID,
 } from "@solana/spl-account-compression";
 import { TreeNode } from "@solana/spl-account-compression/dist/types/merkle-tree";
 import {
@@ -42,14 +46,16 @@ import {
   createInitializeMintInstruction,
   createTransferInstruction,
   getAssociatedTokenAddressSync,
-  TOKEN_PROGRAM_ID
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import {
-  AddressLookupTableProgram, LAMPORTS_PER_SOL,
+  AddressLookupTableProgram,
+  Keypair,
+  LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
-  TransactionInstruction
+  TransactionInstruction,
 } from "@solana/web3.js";
 import { BN } from "bn.js";
 import bs58 from "bs58";
@@ -61,6 +67,7 @@ import { Client } from "pg";
 import format from "pg-format";
 import * as Collections from "typescript-collections";
 import yargs from "yargs/yargs";
+import { loadKeypair } from "./solana";
 import { compress } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
@@ -154,12 +161,6 @@ async function run() {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
-  // For efficiency
-  new AccountFetchCache({
-    connection: provider.connection,
-    extendConnection: true,
-    commitment: "confirmed",
-  });
 
   const hemProgram = await initHem(provider);
   const lazyTransactionsProgram = await init(provider);
@@ -360,7 +361,6 @@ async function run() {
   let txIdx = 0;
   const txIdsToWallet = {};
 
-
   const routers = new Set(Object.keys(state.routers));
 
   let missingMakers = 0;
@@ -404,108 +404,116 @@ async function run() {
       txIdsToWallet[txIdx++] = address;
     } else if (solAddress) {
       // Create hotspots
-      const hotspotIxs = (await Promise.all(
-        (account.hotspots || []).map(async (hotspot) => {
-          totalBalances.sol = totalBalances.sol
-            .add(new BN(infoRent))
-            .add(new BN(keyToAssetRent));
-          const makerId = hotspot.maker || helAddr.b58; // Default (fallthrough) maker
+      const hotspotIxs = (
+        await Promise.all(
+          (account.hotspots || []).map(async (hotspot) => {
+            totalBalances.sol = totalBalances.sol
+              .add(new BN(infoRent))
+              .add(new BN(keyToAssetRent));
+            const makerId = hotspot.maker || helAddr.b58; // Default (fallthrough) maker
 
-          if (!hotspot.maker) {
-            missingMakers++;
-          }
-          if (hotspot.maker_name == "Maker Integration Tests") {
-            return
-          }
+            if (!hotspot.maker) {
+              missingMakers++;
+            }
+            if (hotspot.maker_name == "Maker Integration Tests") {
+              return;
+            }
             const hotspotPubkeysForMaker = hotspotPubkeys[makerId];
-          if (!hotspotPubkeysForMaker) {
-            throw new Error(`Maker not found for hotspot ${JSON.stringify(hotspot, null, 2)}`);
-          }
+            if (!hotspotPubkeysForMaker) {
+              throw new Error(
+                `Maker not found for hotspot ${JSON.stringify(
+                  hotspot,
+                  null,
+                  2
+                )}`
+              );
+            }
 
-          const bufferKey = Buffer.from(bs58.decode(hotspot.address));
-          const hash = crypto.createHash("sha256").update(bufferKey).digest();
-          const iotInfo = PublicKey.findProgramAddressSync(
-            [
-              Buffer.from("iot_info", "utf-8"),
-              iotRewardableEntityConfig.toBuffer(),
-              Buffer.from(hash),
-            ],
-            PROGRAM_ID
-          )[0];
-          const keyToAsset = PublicKey.findProgramAddressSync(
-            [
-              Buffer.from("key_to_asset", "utf-8"),
-              dao.toBuffer(),
-              Buffer.from(hash),
-            ],
-            PROGRAM_ID
-          )[0];
-          let remainingAccounts = [];
-          // Onboard to mobile if this is also a mobile hotspot
-          if (makerId == bobcat5G.address || makerId == freedomFi.address) {
-            totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
-            const mobileInfo = PublicKey.findProgramAddressSync(
+            const bufferKey = Buffer.from(bs58.decode(hotspot.address));
+            const hash = crypto.createHash("sha256").update(bufferKey).digest();
+            const iotInfo = PublicKey.findProgramAddressSync(
               [
-                Buffer.from("mobile_info", "utf-8"),
-                mobileRewardableEntityConfig.toBuffer(),
+                Buffer.from("iot_info", "utf-8"),
+                iotRewardableEntityConfig.toBuffer(),
                 Buffer.from(hash),
               ],
               PROGRAM_ID
             )[0];
-            remainingAccounts.push(
-              {
-                pubkey: mobileRewardableEntityConfig,
-                isSigner: false,
-                isWritable: false,
-              },
-              {
-                pubkey: mobileInfo,
-                isWritable: true,
-                isSigner: false,
-              }
-            );
-          }
+            const keyToAsset = PublicKey.findProgramAddressSync(
+              [
+                Buffer.from("key_to_asset", "utf-8"),
+                dao.toBuffer(),
+                Buffer.from(hash),
+              ],
+              PROGRAM_ID
+            )[0];
+            let remainingAccounts = [];
+            // Onboard to mobile if this is also a mobile hotspot
+            if (makerId == bobcat5G.address || makerId == freedomFi.address) {
+              totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
+              const mobileInfo = PublicKey.findProgramAddressSync(
+                [
+                  Buffer.from("mobile_info", "utf-8"),
+                  mobileRewardableEntityConfig.toBuffer(),
+                  Buffer.from(hash),
+                ],
+                PROGRAM_ID
+              )[0];
+              remainingAccounts.push(
+                {
+                  pubkey: mobileRewardableEntityConfig,
+                  isSigner: false,
+                  isWritable: false,
+                },
+                {
+                  pubkey: mobileInfo,
+                  isWritable: true,
+                  isSigner: false,
+                }
+              );
+            }
 
-          return hemProgramNoResolve.methods
-            .genesisIssueHotspotV0({
-              entityKey: bufferKey,
-              location:
-                hotspot.location != null && hotspot.location != "null"
-                  ? new BN(hotspot.location)
-                  : null,
-              gain: hotspot.gain,
-              elevation: hotspot.altitude,
-              isFullHotspot: !hotspot.dataonly,
-              numLocationAsserts: hotspot.nonce
-                ? new BN(hotspot.nonce).toNumber()
-                : 0,
-            })
-            .accountsStrict({
-              entityCreator,
-              collection: hotspotPubkeysForMaker.collection,
-              collectionMetadata: hotspotPubkeysForMaker.collectionMetadata,
-              collectionMasterEdition:
-                hotspotPubkeysForMaker.collectionMasterEdition,
-              treeAuthority: hotspotPubkeysForMaker.treeAuthority,
-              merkleTree: hotspotPubkeysForMaker.merkleTree,
-              bubblegumSigner,
-              tokenMetadataProgram: TOKEN_METATDATA_PROGRAM_ID,
-              logWrapper: SPL_NOOP_PROGRAM_ID,
-              bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
-              compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-              systemProgram: SystemProgram.programId,
-              rewardableEntityConfig: iotRewardableEntityConfig,
-              maker: hotspotPubkeysForMaker.maker,
-              keyToAsset,
-              recipient: solAddress,
-              dao,
-              info: iotInfo,
-              lazySigner,
-            })
-            .remainingAccounts(remainingAccounts)
-            .instruction();
-        })
-      )).filter(truthy);
+            return hemProgramNoResolve.methods
+              .genesisIssueHotspotV0({
+                entityKey: bufferKey,
+                location:
+                  hotspot.location != null && hotspot.location != "null"
+                    ? new BN(hotspot.location)
+                    : null,
+                gain: hotspot.gain,
+                elevation: hotspot.altitude,
+                isFullHotspot: !hotspot.dataonly,
+                numLocationAsserts: hotspot.nonce
+                  ? new BN(hotspot.nonce).toNumber()
+                  : 0,
+              })
+              .accountsStrict({
+                entityCreator,
+                collection: hotspotPubkeysForMaker.collection,
+                collectionMetadata: hotspotPubkeysForMaker.collectionMetadata,
+                collectionMasterEdition:
+                  hotspotPubkeysForMaker.collectionMasterEdition,
+                treeAuthority: hotspotPubkeysForMaker.treeAuthority,
+                merkleTree: hotspotPubkeysForMaker.merkleTree,
+                bubblegumSigner,
+                tokenMetadataProgram: TOKEN_METATDATA_PROGRAM_ID,
+                logWrapper: SPL_NOOP_PROGRAM_ID,
+                bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
+                compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+                systemProgram: SystemProgram.programId,
+                rewardableEntityConfig: iotRewardableEntityConfig,
+                maker: hotspotPubkeysForMaker.maker,
+                keyToAsset,
+                recipient: solAddress,
+                dao,
+                info: iotInfo,
+                lazySigner,
+              })
+              .remainingAccounts(remainingAccounts)
+              .instruction();
+          })
+        )
+      ).filter(truthy);
 
       const tokenIxs = [];
       const hntBal = new BN(account.hnt);
@@ -559,17 +567,15 @@ async function run() {
         const indexBuf = Buffer.alloc(4);
         indexBuf.writeUint32LE(positionIndex++);
         const pda = [
-          Buffer.from("user", "utf-8"), 
+          Buffer.from("user", "utf-8"),
           Buffer.from(argv.name, "utf-8"),
-          indexBuf
+          indexBuf,
         ];
         const [mintAddress, bump] = PublicKey.findProgramAddressSync(
           pda,
           LAZY_PROGRAM_ID
-        )
-        const stakedPdas = [
-          [...pda, Buffer.from([bump])],
-        ]
+        );
+        const stakedPdas = [[...pda, Buffer.from([bump])]];
 
         const {
           instruction: createPosition,
@@ -603,36 +609,32 @@ async function run() {
           .instruction();
 
         totalBalances.stakedHnt = totalBalances.stakedHnt.add(stakedHnt);
-        stakedInstructions.push(
-          {
-            instructions: [
-              SystemProgram.createAccount({
-                fromPubkey: lazySigner,
-                newAccountPubkey: mintAddress,
-                space: 82,
-                lamports: ataRent,
-                programId: TOKEN_PROGRAM_ID,
-              }),
-              createInitializeMintInstruction(
-                mintAddress,
-                0,
-                position,
-                position
-              ),
-            ],
-            signerSeeds: stakedPdas,
-          },
-          {
-            instructions: [createPosition, depositPosition],
-            signerSeeds: [],
-          }
-        );
+        stakedInstructions.push({
+          instructions: [
+            SystemProgram.createAccount({
+              fromPubkey: lazySigner,
+              newAccountPubkey: mintAddress,
+              space: 82,
+              lamports: ataRent,
+              programId: TOKEN_PROGRAM_ID,
+            }),
+            createInitializeMintInstruction(mintAddress, 0, position, position),
+            createPosition,
+            depositPosition,
+          ],
+          signerSeeds: stakedPdas,
+          compute: 400000,
+        });
       }
 
       const ixnGroups = [
-        { instructions: tokenIxs, signerSeeds: [] },
+        { instructions: tokenIxs, signerSeeds: [], compute: 200000 },
         ...stakedInstructions,
-        ...chunks(hotspotIxs, 1).map(chunk => ({ instructions: chunk, signerSeeds: [] })),
+        ...chunks(hotspotIxs, 3).map((chunk) => ({
+          instructions: chunk,
+          signerSeeds: [],
+          compute: Math.min(400000 * chunk.length, 1000000),
+        })),
       ].filter((ixGroup) => ixGroup.instructions.length > 0);
 
       transactionsByWallet.push({
@@ -693,30 +695,20 @@ async function run() {
     flatTransactions
   );
 
-  console.log("Extending merkle tree with cached nodes");
-  let rootNode = merkleTree.leaves[0];
-  while (typeof rootNode.parent !== "undefined") {
-    rootNode = rootNode.parent;
+  const canopyPath = `../helium-cli/keypairs/canopy.json`;
+  let canopy;
+  if (fs.existsSync(canopyPath)) {
+    canopy = loadKeypair(canopyPath);
+  } else {
+    canopy = Keypair.generate();
+    fs.writeFileSync(canopyPath, JSON.stringify(Array.from(canopy.secretKey)));
   }
 
-  let numCachedNodes = 128; // Cache 128 nodes in the lookup table (7 levels) to reduce the size of tx
-  const cachedNodes: PublicKey[] = [];
-  const queue = new Collections.Queue<TreeNode>();
-  queue.enqueue(rootNode);
-  while (cachedNodes.length < numCachedNodes) {
-    const top = queue.dequeue();
-    if (!top.left || !top.right) {
-      break;
-    }
-    cachedNodes.push(new PublicKey(top.left.node));
-    cachedNodes.push(new PublicKey(top.right.node));
-    queue.enqueue(top.left);
-    queue.enqueue(top.right);
-  }
   const addresses = [
     ...Object.values(hotspotPubkeys).flatMap(({ id, ...rest }) =>
       Object.values(rest)
     ),
+    canopy.publicKey,
     TOKEN_METATDATA_PROGRAM_ID,
     SPL_NOOP_PROGRAM_ID,
     SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
@@ -745,7 +737,7 @@ async function run() {
     VSR_PROGRAM_ID,
     BUBBLEGUM_PROGRAM_ID,
   ];
-  const lutAddrs = [...addresses, ...cachedNodes];
+  const lutAddrs = [...addresses];
   const luts = [];
   for (const lutChunk of chunks(lutAddrs, 256)) {
     const [sig, lut] = await AddressLookupTableProgram.createLookupTable({
@@ -756,7 +748,7 @@ async function run() {
     await sendInstructions(provider, [sig], []);
     luts.push(lut);
     console.log("Created lookup table", lut.toBase58());
-    for (const nodes of chunks(lutChunk, 5)) {
+    for (const nodes of chunks(lutChunk, 20)) {
       const instruction = await AddressLookupTableProgram.extendLookupTable({
         payer: provider.wallet.publicKey,
         authority: provider.wallet.publicKey,
@@ -766,6 +758,11 @@ async function run() {
       await sendInstructions(provider, [instruction], []);
     }
   }
+
+  const canopyDepth = Math.min(17, merkleTree.depth - 1);
+  console.log(
+    `Merkle tree depth: ${merkleTree.depth - 1}, canopy depth: ${canopyDepth}`
+  );
 
   console.log("Creating tables");
   await client.query(`
@@ -781,6 +778,7 @@ async function run() {
       compiled bytea NOT NULL,
       proof jsonb NOT NULL,
       signers bytea,
+      compute integer NOT NULL,
       is_router BOOLEAN NOT NULL DEFAULT FALSE
     )
   `);
@@ -804,15 +802,20 @@ async function run() {
   const chunkSize = 10000;
   const parallelism = 8;
   console.log("Compiling rows");
-  const rows = compiledTransactions.map((compiledTransaction) => {
+  const rows = compiledTransactions.map((compiledTransaction, index) => {
+    const proof = merkleTree.getProof(
+      compiledTransaction.index,
+      false,
+      -1,
+      false,
+      false
+    ).proof;
     return [
       compiledTransaction.index,
       txIdsToWallet[compiledTransaction.index],
       compress(compiledTransaction),
       JSON.stringify(
-        merkleTree
-          .getProof(compiledTransaction.index, false, -1, false, false)
-          .proof.map((p) => p.toString("hex"))
+        proof.slice(0, proof.length - canopyDepth).map((p) => p.toString("hex"))
       ),
       // Compress seeds as [len, bytes]
       compiledTransaction.signerSeeds.reduce((acc, seeds) => {
@@ -825,6 +828,7 @@ async function run() {
           ),
         ]);
       }, Buffer.from([])),
+      flatTransactions[index].compute || 200000,
       routers.has(txIdsToWallet[compiledTransaction.index]),
     ];
   });
@@ -845,7 +849,7 @@ async function run() {
         const query = format(
           `
         INSERT INTO transactions(
-          id, wallet, compiled, proof, signers, is_router
+          id, wallet, compiled, proof, signers, compute, is_router
         )
         VALUES %L
       `,
@@ -870,14 +874,46 @@ async function run() {
         lazyTransactions: ltKey,
       })
       .rpc({ skipPreflight: true });
+    await fillCanopy({
+      program: lazyTransactionsProgram,
+      lazyTransactions: ltKey,
+      merkleTree,
+      cacheDepth: canopyDepth,
+      showProgress: argv.progress,
+    });
   } else {
+    const canopySize = getCanopySize(canopyDepth);
+    const canopyRent =
+      await provider.connection.getMinimumBalanceForRentExemption(canopySize);
     await lazyTransactionsProgram.methods
       .initializeLazyTransactionsV0({
         root: merkleTree.getRoot().toJSON().data,
         name: argv.name,
         authority: provider.wallet.publicKey,
+        maxDepth: merkleTree.depth - 1,
       })
+      .accounts({
+        canopy: canopy.publicKey,
+      })
+      .preInstructions([
+        SystemProgram.createAccount({
+          fromPubkey: provider.wallet.publicKey,
+          newAccountPubkey: canopy.publicKey,
+          space: canopySize,
+          lamports: canopyRent,
+          programId: lazyTransactionsProgram.programId,
+        }),
+      ])
+      .signers([canopy])
       .rpc({ skipPreflight: true });
+
+    await fillCanopy({
+      program: lazyTransactionsProgram,
+      lazyTransactions: ltKey,
+      merkleTree,
+      cacheDepth: canopyDepth,
+      showProgress: argv.progress,
+    });
   }
 
   console.log(
