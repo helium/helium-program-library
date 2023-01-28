@@ -411,22 +411,26 @@ async function run() {
     VSR_PROGRAM_ID,
     BUBBLEGUM_PROGRAM_ID,
   ];
-  const lutAddrsSet = new Set(lutAddrs.map(addr => addr.toBase58()));
-  function size(ix: TransactionInstruction): number {
+  const lutAddrsSet = new Set(lutAddrs.map((addr) => addr.toBase58()));
+  function accountSize(ix: TransactionInstruction): number {
     return (
-      ix.data.length +
       ix.keys.reduce(
-        (acc, account) => acc + (lutAddrsSet.has(account.pubkey.toBase58()) ? 2 : 33),
+        (acc, account) =>
+          acc + (lutAddrsSet.has(account.pubkey.toBase58()) ? 2 : 33),
         0
-      ) + 
+      ) +
       1 + //  program_id_index
       1 + // accounts len
       1 + // data len
       10 // Extra space just to make sure we fit
     );
   }
+  function size(ix: TransactionInstruction): number {
+    return ix.data.length + accountSize(ix);
+  }
 
   console.log("Creating hotspot instructions...");
+  let cachedAccountSize;
   for (const [hotspotKey, hotspot] of hotspots) {
     const solAddress = toSolana(hotspot.owner);
     totalBalances.sol = totalBalances.sol
@@ -530,11 +534,12 @@ async function run() {
 
       txIdx++;
       hotspotProgress && hotspotProgress.update(txIdx);
+      cachedAccountSize = cachedAccountSize || accountSize(ix);
       hotspotIxs.push({
         instructions: [ix],
         signerSeeds: [] as Buffer[][],
         compute: 350000,
-        size: size(ix),
+        size: cachedAccountSize + ix.data.length,
         wallet: solAddress.toBase58(),
       });
     }
@@ -552,7 +557,7 @@ async function run() {
     progress.start(Object.keys(accounts).length, 0);
   }
   let positionIndex = 0;
-  console.log("Creating account instructions...")
+  console.log("Creating account instructions...");
   const accountIxs: EnrichedIxGroup[] = [];
   /// Iterate through accounts in order so we don't create 1mm promises.
   for (const [address, account] of Object.entries(accounts)) {
@@ -709,7 +714,7 @@ async function run() {
         accountIxs.push({
           instructions: [createIx, initMint, createPosition, depositPosition],
           wallet: solAddress.toBase58(),
-          compute: 10000 + 10000 + 214747 + 100000,
+          compute: 1000000,
           size: 1000, //size(createIx), make this tx appear massive so that nothing else gets put with it or we overflow memory
           signerSeeds: stakedPdas,
         });
@@ -892,16 +897,6 @@ async function run() {
   );
   pgProgressTransactions && pgProgressTransactions.stop();
 
-  let pgProgressWallets;
-  console.log("Inserting wallet transaction mapping");
-  if (argv.progress) {
-    pgProgressWallets = new cliProgress.SingleBar(
-      {},
-      cliProgress.Presets.shades_classic
-    );
-    pgProgressWallets.start(flatTransactions.length, 0);
-  }
-
   const walletRows = compiledTransactions
     .map((compiledTransaction, index) => {
       return [...flatTransactions[index].wallets].map((wallet) => [
@@ -910,6 +905,17 @@ async function run() {
       ]);
     })
     .flat();
+  let pgProgressWallets;
+  console.log("Inserting wallet transaction mapping");
+  let walletProgIdx = 0;
+  if (argv.progress) {
+    pgProgressWallets = new cliProgress.SingleBar(
+      {},
+      cliProgress.Presets.shades_classic
+    );
+    pgProgressWallets.start(walletRows.length, 0);
+  }
+
   await Promise.all(
     chunks(chunks(walletRows, chunkSize), parallelism).map(async (chunk) => {
       for (const c of chunk) {
@@ -923,8 +929,8 @@ async function run() {
           c
         );
         await client.query(query);
-        progIdx += chunkSize;
-        pgProgressWallets && pgProgressWallets.update(progIdx);
+        walletProgIdx += chunkSize;
+        pgProgressWallets && pgProgressWallets.update(walletProgIdx);
       }
     })
   );
@@ -1030,7 +1036,7 @@ async function run() {
       getAssociatedTokenAddressSync(hnt, me),
       getAssociatedTokenAddressSync(hnt, lazySigner, true),
       me,
-      BigInt(totalBalances.hnt.toString())
+      BigInt(totalBalances.hnt.add(totalBalances.stakedHnt).toString())
     ),
     await createAssociatedTokenAccountIdempotentInstruction(
       me,
@@ -1129,22 +1135,24 @@ type TransactionsReturn = LazyTransaction & {
   compute: number;
   wallets: Set<string>;
 };
-const baseTxSize = 
+const baseTxSize =
   32 + // recent blockhash
   12 + // header
   3 + // Array lengths
   8 + // descriminator
   1 + // signer seeds size
-  4 + // 
+  4 + //
   32 + // program id
   32 + // payer signer
   32 + // block
   32 + // compute budget
   62 + // signature
-  3 * 32 // Leave room for proofs
+  3 * 32; // Leave room for proofs
 
 // Naive packing, just stack them on top of each other until size or compute too high.
-function packTransactions(instructions: EnrichedIxGroup[]): TransactionsReturn[] {
+function packTransactions(
+  instructions: EnrichedIxGroup[]
+): TransactionsReturn[] {
   const txs = [];
   let currTx: TransactionsReturn = {
     size: baseTxSize,
@@ -1172,9 +1180,13 @@ function packTransactions(instructions: EnrichedIxGroup[]): TransactionsReturn[]
         wallets: new Set(ix.wallet),
         instructions: ix.instructions,
         signerSeeds: ix.signerSeeds,
+        isRouter: ix.isRouter,
       };
     }
   }
-  if (txs[txs.length - 1] !== currTx) txs.push(currTx);
+
+  // Always push last one.
+  txs.push(currTx);
+
   return txs;
 }

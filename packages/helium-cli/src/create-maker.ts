@@ -184,7 +184,7 @@ async function run() {
       }
 
       let merkle: Keypair;
-      const merklePath = `./keypairs/merkle-${address}.json`;
+      const merklePath = `${__dirname}/../keypairs/merkle-${address}.json`;
       if (fs.existsSync(merklePath)) {
         merkle = loadKeypair(merklePath);
       } else {
