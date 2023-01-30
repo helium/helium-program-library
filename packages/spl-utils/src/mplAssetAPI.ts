@@ -124,20 +124,19 @@ export async function getAssetProof(
   }
 }
 
-
 export type AssetsByOwnerOpts = {
-  sortBy?: any;
+  sortBy?: { sortBy: "created"; sortDirection: "asc" | "desc" };
   limit?: number;
   page?: number;
   before?: string;
   after?: string;
-}
+};
 
 export async function getAssetsByOwner(
   url: string,
   wallet: string,
   {
-    sortBy = "created",
+    sortBy = { sortBy: "created", sortDirection: "asc" },
     limit = 50,
     page = 0,
     before = "",
@@ -164,3 +163,46 @@ export async function getAssetsByOwner(
   }
 }
 
+export type SearchAssetsOpts = {
+  sortBy?: { sortBy: "created"; sortDirection: "asc" | "desc" };
+  page?: number;
+  ownerAddress: string;
+  creatorAddress: string;
+  creatorVerified?: boolean;
+} & { [key: string]: unknown };
+
+export async function searchAssets(
+  url: string,
+  {
+    ownerAddress,
+    creatorAddress,
+    creatorVerified = true,
+    sortBy = { sortBy: "created", sortDirection: "asc" },
+    page = 0,
+  }: SearchAssetsOpts
+): Promise<Asset[]> {
+  try {
+    const response = await axios.post(url, {
+      jsonrpc: "2.0",
+      method: "search_assets",
+      id: "get-assets-op-1",
+      params: {
+        ownerAddress,
+        page,
+        creatorAddress,
+        creatorVerified,
+        sortBy,
+      },
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    });
+
+    return response.data.result?.items.map(toAsset);
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+}
