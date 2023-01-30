@@ -39,7 +39,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   govProgramId: {
     type: "string",
     describe: "Pubkey of the GOV program",
-    default: "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw",
+    default: "hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC",
   },
   fromFile: {
     describe: "Load makers from a json file and create in bulk",
