@@ -13,7 +13,7 @@ import {
 } from "@helium/lazy-distributor-sdk";
 import { sendAndConfirmWithRetry } from "@helium/spl-utils";
 import Address from "@helium/address";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";

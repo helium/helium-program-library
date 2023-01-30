@@ -1,5 +1,5 @@
 import { lazySignerKey } from "@helium/lazy-transactions-sdk";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import axios from "axios";
 import os from "os";
 import yargs from "yargs/yargs";

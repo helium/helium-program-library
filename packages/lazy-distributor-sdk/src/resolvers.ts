@@ -8,7 +8,7 @@ import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { circuitBreakerResolvers } from "@helium/circuit-breaker-sdk";
 import { compressedRecipientKey, recipientKey } from "./pdas";
-import { Accounts } from "@project-serum/anchor";
+import { Accounts } from "@coral-xyz/anchor";
 
 export const lazyDistributorResolvers = combineResolvers(
   resolveIndividual(async ({ path }) => {

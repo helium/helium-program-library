@@ -7,7 +7,7 @@ import {
 import {
   Asset, AssetsByOwnerOpts, getAssetsByOwner, MOBILE_MINT, toNumber, truthy
 } from "@helium/spl-utils";
-import { Program } from "@project-serum/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { getMint } from "@solana/spl-token";
 import { Connection, PublicKey } from "@solana/web3.js";
 import BN from "bn.js";

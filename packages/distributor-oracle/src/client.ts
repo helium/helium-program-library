@@ -1,4 +1,4 @@
-import { AnchorProvider, Program, BN } from "@project-serum/anchor";
+import { AnchorProvider, Program, BN } from "@coral-xyz/anchor";
 import {
   TransactionInstruction,
   PublicKey,

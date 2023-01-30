@@ -8,7 +8,7 @@ import {
 } from "@helium/helium-entity-manager-sdk";
 import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { humanReadable, sendInstructions, truthy } from "@helium/spl-utils";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import {
   getConcurrentMerkleTreeAccountSize,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,

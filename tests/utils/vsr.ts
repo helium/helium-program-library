@@ -6,7 +6,7 @@ import {
   toBN,
   truthy,
 } from "@helium/spl-utils";
-import { AnchorProvider, BN, Program, web3 } from "@project-serum/anchor";
+import { AnchorProvider, BN, Program, web3 } from "@coral-xyz/anchor";
 import {
   getGovernanceProgramVersion,
   MintMaxVoteWeightSource,

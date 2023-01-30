@@ -4,8 +4,8 @@ import {
   sendInstructions,
 } from "@helium/spl-utils";
 import { SystemProgram, PublicKey, Keypair } from "@solana/web3.js";
-import * as anchor from "@project-serum/anchor";
-import { Program } from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { expect } from "chai";
 import {
   TOKEN_PROGRAM_ID,

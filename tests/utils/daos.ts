@@ -1,5 +1,5 @@
-import * as anchor from "@project-serum/anchor";
-import { BN } from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
+import { BN } from "@coral-xyz/anchor";
 import { Keypair, ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { createAtaAndMint, createMint, toBN } from "@helium/spl-utils";

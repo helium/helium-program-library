@@ -1,5 +1,5 @@
 import { AccountFetchCache } from "@helium/spl-utils";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import { Keypair } from "@solana/web3.js";
 import fs from "fs";
 import { SOLANA_URL } from "./env";

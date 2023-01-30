@@ -5,7 +5,7 @@ import {
 import {
   init as initLazy
 } from "@helium/lazy-distributor-sdk";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
 import axios from "axios";
 import os from "os";

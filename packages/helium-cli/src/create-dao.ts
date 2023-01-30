@@ -6,7 +6,7 @@ import {
   registrarKey,
   init as initVsr,
 } from "@helium/voter-stake-registry-sdk";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import {
   Connection,
   PublicKey,

@@ -1,4 +1,4 @@
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 
 export function combineResolvers<T extends anchor.Idl>(
   ...resolvers: anchor.CustomAccountResolver<T>[]

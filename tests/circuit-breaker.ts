@@ -1,7 +1,7 @@
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { createAtaAndMint, createMint } from "@helium/spl-utils";
-import * as anchor from "@project-serum/anchor";
-import { Program } from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
 import {
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,

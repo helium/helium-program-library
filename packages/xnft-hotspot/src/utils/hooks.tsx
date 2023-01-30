@@ -1,6 +1,6 @@
 import * as client from "@helium/distributor-oracle";
 import { init } from "@helium/lazy-distributor-sdk";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { useEffect, useState } from "react";
 import { useAsyncCallback } from "react-async-hook";

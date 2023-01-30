@@ -14,7 +14,7 @@ import {
   getProvider,
   Program,
   setProvider,
-} from "@project-serum/anchor";
+} from "@coral-xyz/anchor";
 import {
   Keypair,
   PublicKey,
