@@ -14,6 +14,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use solana_client::{
   rpc_client::RpcClient,
+  rpc_config::RpcSendTransactionConfig,
   tpu_client::{TpuClient, TpuClientConfig, TpuSenderError},
 };
 use solana_sdk::{
@@ -69,6 +70,9 @@ fn register_custom_metrics() {
 struct Args {
   #[arg(short, long)]
   wallet: Option<String>,
+  /// Whether to migrate all at once
+  #[arg(short, long, action)]
+  all: bool,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -132,14 +136,13 @@ async fn run_transactions(
   WALLETS_TOTAL.inc_by(total_wallets as u64);
   NUM_TOTAL.inc_by(total_transactions as u64);
 
-  for wallet in wallets {
-    println!("Migrating wallet {}", wallet);
-    let limit = 500;
+  if args.all {
+    let limit = 1000;
     let mut offset = 0;
     loop {
       let url = format!(
-        "{}/migrate/{}?limit={}&offset={}",
-        migration_url, wallet, limit, offset
+        "{}/migrate?limit={}&offset={}",
+        migration_url, limit, offset
       );
       println!("{}", url);
       let response = client
@@ -165,7 +168,42 @@ async fn run_transactions(
       }
       NUM_SENT.inc_by(response.transactions.len() as u64);
     }
-    NUM_WALLETS.inc()
+  } else {
+    for wallet in wallets {
+      println!("Migrating wallet {}", wallet);
+      let limit = 1000;
+      let mut offset = 0;
+      loop {
+        let url = format!(
+          "{}/migrate/{}?limit={}&offset={}",
+          migration_url, wallet, limit, offset
+        );
+        println!("{}", url);
+        let response = client
+          .get(url.as_str())
+          .send()
+          .await
+          .unwrap()
+          .json::<TransactionResponse>()
+          .await
+          .unwrap();
+
+        if offset > response.count {
+          break;
+        }
+
+        let result = send_and_confirm_messages_with_spinner(
+          rpc_client.clone(),
+          &tpu_client,
+          &response.transactions,
+        );
+        if result.is_ok() {
+          offset += limit;
+        }
+        NUM_SENT.inc_by(response.transactions.len() as u64);
+      }
+      NUM_WALLETS.inc()
+    }
   }
 }
 
@@ -209,6 +247,9 @@ pub fn send_and_confirm_messages_with_spinner(
   tpu_client: &TpuClient,
   messages: &Vec<Vec<u8>>,
 ) -> Result<Vec<Option<TransactionError>>, TpuSenderError> {
+  if messages.is_empty() {
+    return Ok(vec![]);
+  }
   let progress_bar = ProgressBar::new(42);
   progress_bar.set_style(
     ProgressStyle::default_spinner()
@@ -247,7 +288,20 @@ pub fn send_and_confirm_messages_with_spinner(
     if Instant::now().duration_since(last_resend) > TRANSACTION_RESEND_INTERVAL {
       for (index, (_i, transaction, deser)) in pending_transactions.values().enumerate() {
         if !tpu_client.send_wire_transaction(transaction.clone()) {
-          let _result = rpc_client.send_transaction(deser).unwrap();
+          if let Err(err) = rpc_client.send_transaction_with_config(
+            deser,
+            RpcSendTransactionConfig {
+              skip_preflight: true,
+              ..RpcSendTransactionConfig::default()
+            },
+          ) {
+            confirmed_transactions += 1;
+            FAILED_TX.inc();
+            progress_bar.println(format!(
+              "Failed transaction: {} {:?}",
+              deser.signatures[0], err
+            ));
+          }
         }
         set_message_for_confirmed_transactions(
           &progress_bar,

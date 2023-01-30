@@ -15,7 +15,7 @@ pub struct UpdateLazyTransactionsV0<'info> {
     mut,
     has_one = authority
   )]
-  pub lazy_transactions: Box<Account<'info, LazyTransactionsV0>>,
+  pub lazy_transactions: Account<'info, LazyTransactionsV0>,
 }
 
 /// NOTE: This is a dangerous operation, as index markers will be preserved.

@@ -7,7 +7,7 @@ import {
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import axios from "axios";
 import { recipientKey } from "@helium/lazy-distributor-sdk";
-import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
 import { compressedRecipientKey } from "@helium/lazy-distributor-sdk";
 import { distributeCompressionRewards } from "@helium/lazy-distributor-sdk";
@@ -49,7 +49,7 @@ export async function formTransaction({
   wallet = provider.wallet.publicKey,
   skipOracleSign = false,
   getAssetFn = getAsset,
-  getAssetProofFn = getAssetProof
+  getAssetProofFn = getAssetProof,
 }: {
   program: Program<LazyDistributor>;
   provider: AnchorProvider;
@@ -59,7 +59,10 @@ export async function formTransaction({
   wallet?: PublicKey;
   skipOracleSign?: boolean;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
-  getAssetProofFn?: (url: string, assetId: PublicKey) => Promise<AssetProof | undefined>;
+  getAssetProofFn?: (
+    url: string,
+    assetId: PublicKey
+  ) => Promise<AssetProof | undefined>;
 }) {
   // @ts-ignore
   const asset = await getAssetFn(provider.connection._rpcEndpoint, hotspot);

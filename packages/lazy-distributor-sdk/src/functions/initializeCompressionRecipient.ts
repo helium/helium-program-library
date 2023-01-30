@@ -1,8 +1,6 @@
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { AssetProof, getAssetProof } from "@helium/spl-utils";
-import {
-  Idl, Program
-} from "@project-serum/anchor";
+import { Idl, Program } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 
 export async function initializeCompressionRecipient({
@@ -17,7 +15,10 @@ export async function initializeCompressionRecipient({
   assetId: PublicKey;
   lazyDistributor: PublicKey;
   owner?: PublicKey;
-  getAssetProofFn?: (url: string, assetId: PublicKey) => Promise<AssetProof | undefined>;
+  getAssetProofFn?: (
+    url: string,
+    assetId: PublicKey
+  ) => Promise<AssetProof | undefined>;
 }) {
   // @ts-ignore
   const endpoint = program.provider.connection._rpcEndpoint;

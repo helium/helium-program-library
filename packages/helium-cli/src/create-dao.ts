@@ -1,6 +1,6 @@
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
-import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
 import { daoKey, init as initDao, threadKey } from "@helium/helium-sub-daos-sdk";
+import { dataCreditsKey, init as initDc, PROGRAM_ID } from "@helium/data-credits-sdk";
 import { init as initLazy } from "@helium/lazy-distributor-sdk";
 import {
   registrarKey,
@@ -85,11 +85,6 @@ async function run() {
       type: "string",
       describe: "Keypair of the Data Credit token",
       default: `${__dirname}/../keypairs/dc.json`,
-    },
-    makerKeypair: {
-      type: "string",
-      describe: "Keypair of a maker",
-      default: `${os.homedir()}/.config/solana/id.json`,
     },
     numHnt: {
       type: "number",
@@ -247,7 +242,7 @@ async function run() {
       new GoverningTokenConfigAccountArgs({
         // community token config
         voterWeightAddin: heliumVsrProgram.programId,
-        maxVoterWeightAddin: undefined,
+        maxVoterWeightAddin: heliumVsrProgram.programId,
         tokenType: GoverningTokenType.Liquid,
       }),
       new GoverningTokenConfigAccountArgs({
@@ -390,6 +385,7 @@ async function run() {
   await sendInstructions(provider, instructions, []);
 
   const dcKey = (await dataCreditsKey(dcKeypair.publicKey))[0];
+  console.log("dcpid", PROGRAM_ID.toBase58())
   if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
