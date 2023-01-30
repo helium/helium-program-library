@@ -3,7 +3,7 @@ import {
   createMint,
   sendInstructions,
 } from "@helium/spl-utils";
-import { SystemProgram, PublicKey } from "@solana/web3.js";
+import { SystemProgram, PublicKey, Keypair } from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { expect } from "chai";
@@ -20,9 +20,12 @@ import {
   lazyTransactionsKey,
   PROGRAM_ID,
   lazySignerKey,
+  fillCanopy,
+  getCanopySize,
 } from "../packages/lazy-transactions-sdk/src";
 import { LazyTransactions } from "../target/types/lazy_transactions";
 import { random } from "./utils/string";
+import { sleep } from "@switchboard-xyz/common";
 
 describe("lazy-transactions", () => {
   // Configure the client to use the local cluster.
@@ -96,24 +99,43 @@ describe("lazy-transactions", () => {
       // Include an irrelevant signer seeds just to make sure tx succeeds with it
       { instructions, signerSeeds: [mintSignerSeeds] },
       { instructions, signerSeeds: [] },
-      { instructions: createMintIxns, signerSeeds: [mintSignerSeeds] }
+      { instructions: createMintIxns, signerSeeds: [mintSignerSeeds] },
     ]);
+    const canopy = Keypair.generate();
+    const canopySize = getCanopySize(merkleTree.depth - 1);
+    const canopyRent = await provider.connection.getMinimumBalanceForRentExemption(canopySize)
     await program.methods
       .initializeLazyTransactionsV0({
         root: merkleTree.getRoot().toJSON().data,
         name,
         authority: me,
+        maxDepth: merkleTree.depth - 1,
       })
+      .accounts({
+        canopy: canopy.publicKey
+      })
+      .preInstructions([
+        SystemProgram.createAccount({
+          fromPubkey: me,
+          newAccountPubkey: canopy.publicKey,
+          space: canopySize,
+          lamports: canopyRent,
+          programId: program.programId
+        }),
+      ])
+      .signers([canopy])
       .rpc({ skipPreflight: true });
+    
+    await fillCanopy({
+      program,
+      lazyTransactions,
+      merkleTree,
+      cacheDepth: merkleTree.depth - 1
+    });
+    await sleep(2000);
+    const data = await provider.connection.getAccountInfo(canopy.publicKey);
 
-    const accounts = [
-      ...compiledTransactions[0].accounts,
-      ...merkleTree.getProof(0).proof.map((p) => ({
-        pubkey: new PublicKey(p),
-        isWritable: false,
-        isSigner: false,
-      })),
-    ];
+    const accounts = compiledTransactions[0].accounts;
 
     /// Ensure we fail if you execute the wrong tx
     try {
@@ -167,14 +189,7 @@ describe("lazy-transactions", () => {
         signerSeeds: compiledTransactions[2].signerSeeds,
       })
       .accounts({ lazyTransactions })
-      .remainingAccounts([
-        ...compiledTransactions[2].accounts,
-        ...merkleTree.getProof(2).proof.map((p) => ({
-          pubkey: new PublicKey(p),
-          isWritable: false,
-          isSigner: false,
-        })),
-      ])
+      .remainingAccounts(compiledTransactions[2].accounts)
       .rpc({ skipPreflight: true });
 
     /// Ensure we fail executing the same tx twice

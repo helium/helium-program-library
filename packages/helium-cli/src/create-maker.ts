@@ -120,7 +120,7 @@ async function run() {
     makers.push({
       name: "Migrated Helium Hotspot",
       address: helAddr.b58,
-      count: 5000,
+      count: 50000,
     });
   }
 
@@ -184,7 +184,7 @@ async function run() {
       }
 
       let merkle: Keypair;
-      const merklePath = `./keypairs/merkle-${address}.json`;
+      const merklePath = `${__dirname}/../keypairs/merkle-${address}.json`;
       if (fs.existsSync(merklePath)) {
         merkle = loadKeypair(merklePath);
       } else {
