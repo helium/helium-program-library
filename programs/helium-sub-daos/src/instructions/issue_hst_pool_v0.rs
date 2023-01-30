@@ -20,6 +20,7 @@ pub struct IssueHstPoolArgsV0 {
 #[instruction(args: IssueHstPoolArgsV0)]
 pub struct IssueHstPoolV0<'info> {
   #[account(
+    mut,
     has_one = hnt_mint,
     has_one = hst_pool
   )]

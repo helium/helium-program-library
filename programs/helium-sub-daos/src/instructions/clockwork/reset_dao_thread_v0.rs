@@ -31,7 +31,7 @@ pub struct ResetDaoThreadV0<'info> {
 
   #[account(
     mut,
-    seeds = [b"thread", dao.key().as_ref(), b"end-epoch"],
+    seeds = [b"thread", dao.key().as_ref(), b"issue_hst"],
     seeds::program = clockwork.key(),
     bump
   )]

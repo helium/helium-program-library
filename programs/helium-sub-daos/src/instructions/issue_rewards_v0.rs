@@ -28,6 +28,7 @@ pub struct IssueRewardsV0<'info> {
   )]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
+    mut,
     has_one = dao,
     has_one = treasury,
     has_one = dnt_mint,
