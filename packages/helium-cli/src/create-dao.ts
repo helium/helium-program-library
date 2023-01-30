@@ -6,7 +6,7 @@ import {
   registrarKey,
   init as initVsr,
 } from "@helium/voter-stake-registry-sdk";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import {
   Connection,
   PublicKey,
@@ -113,7 +113,7 @@ async function run() {
     govProgramId: {
       type: "string",
       describe: "Pubkey of the GOV program",
-      default: "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw",
+      default: "hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC",
     },
     realmName: {
       type: "string",

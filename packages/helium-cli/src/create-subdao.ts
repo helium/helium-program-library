@@ -19,8 +19,8 @@ import {
 } from "@helium/voter-stake-registry-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";
-import * as anchor from "@project-serum/anchor";
-import { idlAddress } from "@project-serum/anchor/dist/cjs/idl";
+import * as anchor from "@coral-xyz/anchor";
+import { idlAddress } from "@coral-xyz/anchor/dist/cjs/idl";
 import {
   getConcurrentMerkleTreeAccountSize,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
@@ -177,7 +177,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   govProgramId: {
     type: "string",
     describe: "Pubkey of the GOV program",
-    default: "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw",
+    default: "hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC",
   },
   councilKeypair: {
     type: "string",

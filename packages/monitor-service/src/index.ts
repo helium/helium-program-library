@@ -4,7 +4,7 @@ import {
 import { daoKey, init as hsdInit, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import fastify from "fastify";
 import { HNT_MINT, MOBILE_MINT } from "./env";
 import { register } from "./metrics";

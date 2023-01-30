@@ -4,7 +4,7 @@ import {
   heliumCommonResolver,
   resolveIndividual,
 } from "@helium/spl-utils";
-import { AnchorProvider } from "@project-serum/anchor";
+import { AnchorProvider } from "@coral-xyz/anchor";
 import { getAccount } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { init } from ".";

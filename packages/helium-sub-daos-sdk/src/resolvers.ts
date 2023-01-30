@@ -6,7 +6,7 @@ import {
 } from "@helium/spl-utils";
 import { treasuryManagementResolvers } from "@helium/treasury-management-sdk";
 import { init, PROGRAM_ID as VSR_PROGRAM_ID, vsrResolvers } from "@helium/voter-stake-registry-sdk";
-import { AnchorProvider, Provider } from "@project-serum/anchor";
+import { AnchorProvider, Provider } from "@coral-xyz/anchor";
 import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { EPOCH_LENGTH, PROGRAM_ID } from "./constants";
 import { daoEpochInfoKey, subDaoEpochInfoKey } from "./pdas";

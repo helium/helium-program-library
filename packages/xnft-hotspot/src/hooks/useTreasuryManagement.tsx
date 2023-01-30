@@ -1,7 +1,7 @@
 import { UseAccountState, useIdlAccount } from "@helium/helium-react-hooks";
 import { IDL } from "@helium/idls/lib/esm/treasury_management";
 import { TreasuryManagement as TreasuryManagementType } from "@helium/idls/lib/types/treasury_management";
-import { IdlAccounts } from "@project-serum/anchor";
+import { IdlAccounts } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 
 export type TreasuryManagement =

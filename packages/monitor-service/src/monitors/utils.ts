@@ -2,7 +2,7 @@ import {
   SYSVAR_CLOCK_PUBKEY
 } from "@solana/web3.js";
 import { provider } from "../solana";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import BN from "bn.js";
 
 export async function getUnixTimestamp(): Promise<bigint> {

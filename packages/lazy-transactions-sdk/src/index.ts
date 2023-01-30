@@ -1,6 +1,6 @@
 import { LazyTransactions } from "@helium/idls/lib/types/lazy_transactions";
-import { AnchorProvider, Idl, Program, IdlTypes, getProvider } from "@project-serum/anchor";
-import { IdlCoder } from "@project-serum/anchor/dist/cjs/coder/borsh/idl";
+import { AnchorProvider, Idl, Program, IdlTypes, getProvider } from "@coral-xyz/anchor";
+import { IdlCoder } from "@coral-xyz/anchor/dist/cjs/coder/borsh/idl";
 import {
   TransactionInstruction,
   PublicKey,

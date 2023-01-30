@@ -1,5 +1,5 @@
 import { UseAccountState, useAccount } from "./useAccount";
-import { BorshAccountsCoder, Idl, IdlAccounts } from "@project-serum/anchor";
+import { BorshAccountsCoder, Idl, IdlAccounts } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { useMemo } from "react";
 import { TypedAccountParser } from "@helium/spl-utils";

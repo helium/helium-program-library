@@ -1,5 +1,5 @@
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { AnchorProvider, Idl, Program } from "@project-serum/anchor";
+import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { lazyDistributorResolvers } from "./resolvers";

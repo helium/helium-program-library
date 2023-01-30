@@ -1,4 +1,4 @@
-import { AnchorProvider, Program, Idl } from "@project-serum/anchor";
+import { AnchorProvider, Program, Idl } from "@coral-xyz/anchor";
 import {
   Commitment,
   Connection,
