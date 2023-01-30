@@ -1,4 +1,6 @@
-use crate::{current_epoch, error::ErrorCode, state::*, OrArithError, TESTING};
+use crate::{
+  construct_issue_rewards_ix, current_epoch, error::ErrorCode, state::*, OrArithError, TESTING,
+};
 use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
@@ -6,7 +8,11 @@ use circuit_breaker::{
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use clockwork_sdk::state::ThreadResponse;
+use clockwork_sdk::{
+  cpi::thread_update,
+  state::{Thread, ThreadResponse, ThreadSettings, Trigger},
+  ThreadProgram,
+};
 use shared_utils::precise_number::{InnerUint, PreciseNumber};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -22,6 +28,7 @@ pub struct IssueRewardsV0<'info> {
   )]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
+    mut,
     has_one = dao,
     has_one = treasury,
     has_one = dnt_mint,
@@ -73,6 +80,15 @@ pub struct IssueRewardsV0<'info> {
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
+
+  #[account(
+    mut,
+    seeds = [b"thread", sub_dao.key().as_ref(), b"issue"],
+    seeds::program = clockwork.key(),
+    bump
+  )]
+  pub thread: Account<'info, Thread>,
+  pub clockwork: Program<'info, ThreadProgram>,
 }
 
 fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
@@ -220,6 +236,73 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued = delegation_rewards_amount;
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
+
+  // update thread to point at next epoch
+  let next_epoch = args.epoch + 1;
+  let dao_epoch_info = Pubkey::find_program_address(
+    &[
+      "dao_epoch_info".as_bytes(),
+      ctx.accounts.dao.key().as_ref(),
+      &next_epoch.to_le_bytes(),
+    ],
+    &crate::id(),
+  )
+  .0;
+
+  let sub_dao_epoch_info = Pubkey::find_program_address(
+    &[
+      "sub_dao_epoch_info".as_bytes(),
+      ctx.accounts.sub_dao.key().as_ref(),
+      &next_epoch.to_le_bytes(),
+    ],
+    &crate::id(),
+  )
+  .0;
+
+  let issue_ix = construct_issue_rewards_ix(
+    ctx.accounts.dao.key(),
+    ctx.accounts.sub_dao.key(),
+    ctx.accounts.dao.hnt_mint,
+    ctx.accounts.sub_dao.dnt_mint,
+    ctx.accounts.sub_dao.treasury,
+    ctx.accounts.sub_dao.rewards_escrow,
+    ctx.accounts.sub_dao.delegator_pool,
+    ctx.accounts.system_program.key(),
+    ctx.accounts.token_program.key(),
+    ctx.accounts.circuit_breaker_program.key(),
+    dao_epoch_info,
+    sub_dao_epoch_info,
+    ctx.accounts.thread.key(),
+    ctx.accounts.clockwork.key(),
+    next_epoch,
+  );
+
+  let signer_seeds: &[&[&[u8]]] = &[&[
+    "sub_dao".as_bytes(),
+    ctx.accounts.sub_dao.dnt_mint.as_ref(),
+    &[ctx.accounts.sub_dao.bump_seed],
+  ]];
+  thread_update(
+    CpiContext::new_with_signer(
+      ctx.accounts.clockwork.to_account_info(),
+      clockwork_sdk::cpi::ThreadUpdate {
+        authority: ctx.accounts.sub_dao.to_account_info(),
+        thread: ctx.accounts.thread.to_account_info(),
+        system_program: ctx.accounts.system_program.to_account_info(),
+      },
+      signer_seeds,
+    ),
+    ThreadSettings {
+      fee: None,
+      kickoff_instruction: Some(issue_ix.into()),
+      rate_limit: None,
+      trigger: Some(Trigger::Account {
+        address: dao_epoch_info,
+        offset: 8,
+        size: 1,
+      }),
+    },
+  )?;
 
   Ok(ThreadResponse {
     kickoff_instruction: None,

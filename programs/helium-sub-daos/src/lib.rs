@@ -35,7 +35,7 @@ pub mod helium_sub_daos {
   pub fn calculate_utility_score_v0(
     ctx: Context<CalculateUtilityScoreV0>,
     args: CalculateUtilityScoreArgsV0,
-  ) -> Result<ThreadResponse> {
+  ) -> Result<()> {
     calculate_utility_score_v0::handler(ctx, args)
   }
 
@@ -70,12 +70,8 @@ pub mod helium_sub_daos {
     reset_lockup_v0::handler(ctx, args)
   }
 
-  pub fn sub_dao_kickoff_v0(ctx: Context<SubDaoKickoffV0>) -> Result<ThreadResponse> {
-    sub_dao_kickoff_v0::handler(ctx)
-  }
-
-  pub fn dao_kickoff_v0(ctx: Context<DaoKickoffV0>) -> Result<ThreadResponse> {
-    dao_kickoff_v0::handler(ctx)
+  pub fn calculate_kickoff_v0(ctx: Context<CalculateKickoffV0>) -> Result<ThreadResponse> {
+    calculate_kickoff_v0::handler(ctx)
   }
 
   pub fn reset_dao_thread_v0(ctx: Context<ResetDaoThreadV0>) -> Result<()> {

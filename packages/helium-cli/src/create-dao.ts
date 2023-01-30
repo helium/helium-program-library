@@ -1,6 +1,6 @@
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
+import { daoKey, init as initDao, threadKey } from "@helium/helium-sub-daos-sdk";
 import { dataCreditsKey, init as initDc, PROGRAM_ID } from "@helium/data-credits-sdk";
-import { daoKey, init as initDao } from "@helium/helium-sub-daos-sdk";
 import { init as initLazy } from "@helium/lazy-distributor-sdk";
 import {
   registrarKey,
@@ -172,16 +172,7 @@ async function run() {
   console.log("COUNCIL", councilKeypair.publicKey.toBase58());
   console.log("COUNCIL WALLET", councilWallet.toBase58());
 
-  const thread = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("thread", "utf8"),
-      dao.toBuffer(),
-      Buffer.from("end-epoch", "utf8"),
-    ],
-    new PublicKey(
-      "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
-    )
-  )[0];
+  const thread = threadKey(dao, "issue_hst")[0];
 
   console.log("DAO", dao.toString());
   console.log("THREAD", thread.toString());
