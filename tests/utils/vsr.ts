@@ -20,12 +20,13 @@ export const SPL_GOVERNANCE_PID = new PublicKey(
 );
 
 export async function initVsr(
-  program: Program<VoterStakeRegistry>, 
-  provider: AnchorProvider, 
-  me: PublicKey, 
+  program: Program<VoterStakeRegistry>,
+  provider: AnchorProvider,
+  me: PublicKey,
   hntMint: PublicKey,
   positionUpdateAuthority: PublicKey,
-  minLockupSeconds:number = 15811200 // 6 months
+  minLockupSeconds: number = 15811200, // 6 months
+  genesisVotePowerMultiplierExpirationTs = 1
 ) {
   const programVersion = await getGovernanceProgramVersion(
     program.provider.connection,
@@ -49,12 +50,14 @@ export async function initVsr(
     new BN(1)
   );
 
-  const createRegistrar = program.methods.initializeRegistrarV0({
-    positionUpdateAuthority
-  }).accounts({
-    realm: realmPk,
-    realmGoverningTokenMint: hntMint,
-  });
+  const createRegistrar = program.methods
+    .initializeRegistrarV0({
+      positionUpdateAuthority,
+    })
+    .accounts({
+      realm: realmPk,
+      realmGoverningTokenMint: hntMint,
+    });
   instructions.push(await createRegistrar.instruction());
   const { registrar } = await createRegistrar.pubkeys();
 
@@ -68,7 +71,8 @@ export async function initVsr(
         minimumRequiredLockupSecs: new BN(minLockupSeconds), // min lockup seconds
         maxExtraLockupVoteWeightScaledFactor: new BN(100), // scaled factor
         genesisVotePowerMultiplier: 3,
-        genesisVotePowerMultiplierExpirationTs: new BN(1),
+        genesisVotePowerMultiplierExpirationTs:
+          new BN(genesisVotePowerMultiplierExpirationTs),
         lockupSaturationSecs: new BN(15811200 * 8), // 4 years
       })
       .accounts({
@@ -99,7 +103,7 @@ export async function createPosition(
   provider: AnchorProvider,
   registrar: PublicKey,
   hntMint: PublicKey,
-  options: { lockupPeriods: number; lockupAmount: number },
+  options: { lockupPeriods: number; lockupAmount: number; kind?: any },
   positionKp?: Keypair
 ) {
   let positionOwner = positionKp?.publicKey || provider.wallet.publicKey;
@@ -119,7 +123,7 @@ export async function createPosition(
   instructions.push(
     await program.methods
       .initializePositionV0({
-        kind: { cliff: {} },
+        kind: typeof options.kind == "undefined" ? { cliff: {} } : options.kind,
         periods: options.lockupPeriods,
       })
       .accounts({

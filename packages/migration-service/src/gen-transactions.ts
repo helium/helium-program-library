@@ -2,34 +2,29 @@ import Address from "@helium/address";
 import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
 import { mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
 import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
-import bs58 from "bs58";
 import {
-  init as initHem,
-  iotInfoKey,
-  keyToAssetKey,
-  makerKey,
-  PROGRAM_ID as HEM_PROGRAM_ID,
+  entityCreatorKey,
+  init as initHem, makerKey, PROGRAM_ID as HEM_PROGRAM_ID,
   PROGRAM_ID,
-  rewardableEntityConfigKey,
+  rewardableEntityConfigKey
 } from "@helium/helium-entity-manager-sdk";
 import {
   daoKey,
   init as initHsd,
-  subDaoKey,
+  subDaoKey
 } from "@helium/helium-sub-daos-sdk";
-import crypto from "crypto";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import {
   compile,
   init,
   lazySignerKey,
   lazyTransactionsKey,
-  PROGRAM_ID as LAZY_PROGRAM_ID,
+  PROGRAM_ID as LAZY_PROGRAM_ID
 } from "@helium/lazy-transactions-sdk";
-import { AccountFetchCache, chunks, sendInstructions } from "@helium/spl-utils";
+import { AccountFetchCache, chunks, sendInstructions, truthy } from "@helium/spl-utils";
 import {
   init as initVsr,
-  PROGRAM_ID as VSR_PROGRAM_ID,
+  PROGRAM_ID as VSR_PROGRAM_ID
 } from "@helium/voter-stake-registry-sdk";
 import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
 import { PROGRAM_ID as TOKEN_METATDATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
@@ -38,27 +33,28 @@ import { Program } from "@project-serum/anchor";
 import { ASSOCIATED_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-  SPL_NOOP_PROGRAM_ID,
+  SPL_NOOP_PROGRAM_ID
 } from "@solana/spl-account-compression";
 import { TreeNode } from "@solana/spl-account-compression/dist/types/merkle-tree";
 import {
   ACCOUNT_SIZE,
   createAssociatedTokenAccountIdempotentInstruction,
+  createInitializeMintInstruction,
   createTransferInstruction,
   getAssociatedTokenAddressSync,
-  TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
 import {
-  AddressLookupTableProgram,
-  Keypair,
-  LAMPORTS_PER_SOL,
+  AddressLookupTableProgram, LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
-  TransactionInstruction,
+  TransactionInstruction
 } from "@solana/web3.js";
 import { BN } from "bn.js";
+import bs58 from "bs58";
 import cliProgress from "cli-progress";
+import crypto from "crypto";
 import fs from "fs";
 import os from "os";
 import { Client } from "pg";
@@ -186,7 +182,6 @@ async function run() {
 
   const iotSubdao = (await subDaoKey(iot))[0];
   const mobileSubdao = (await subDaoKey(mobile))[0];
-  const hsConfigKey = (await rewardableEntityConfigKey(iotSubdao, "IOT"))[0];
 
   const makers: { name: string; address: string }[] = JSON.parse(
     fs.readFileSync(argv.makers).toString()
@@ -204,7 +199,7 @@ async function run() {
     "IOT"
   )[0];
   const mobileRewardableEntityConfig = rewardableEntityConfigKey(
-    mobile,
+    mobileSubdao,
     "MOBILE"
   )[0];
   const hotspotPubkeys: Record<
@@ -269,9 +264,29 @@ async function run() {
   const dataCredits = dataCreditsKey(dc)[0];
   const dcCircuitBreaker = mintWindowedBreakerKey(dc)[0];
   const dao = daoKey(hnt)[0];
+  const entityCreator = entityCreatorKey(dao)[0];
   const subDao = subDaoKey(iot)[0];
   const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
   const registrar = daoAcc.registrar;
+  const registrarAcc = await vsrProgram.account.registrar.fetch(registrar);
+  const registrarCollection = registrarAcc.collection;
+  const registrarCollectionMetadata = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("metadata", "utf-8"),
+      TOKEN_METATDATA_PROGRAM_ID.toBuffer(),
+      registrarCollection.toBuffer(),
+    ],
+    TOKEN_METATDATA_PROGRAM_ID
+  )[0];
+  const registrarCollectionMasterEdition = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("metadata", "utf-8"),
+      TOKEN_METATDATA_PROGRAM_ID.toBuffer(),
+      registrarCollection.toBuffer(),
+      Buffer.from("edition", "utf-8"),
+    ],
+    TOKEN_METATDATA_PROGRAM_ID
+  )[0];
 
   const bubblegumSigner = PublicKey.findProgramAddressSync(
     [Buffer.from("collection_cpi", "utf-8")],
@@ -332,6 +347,10 @@ async function run() {
   const infoRent = await provider.connection.getMinimumBalanceForRentExemption(
     32 + 32 + 1 + 8 + 4 + 4 + 1 + 60
   );
+  const keyToAssetRent =
+    await provider.connection.getMinimumBalanceForRentExemption(
+      32 + 32 + 33 * 8 + 8 + 1
+    );
   const PER_TX = 0.000005;
   const dustAmount =
     PER_TX * 100 * LAMPORTS_PER_SOL +
@@ -341,6 +360,7 @@ async function run() {
   let txIdx = 0;
   const txIdsToWallet = {};
 
+
   const routers = new Set(Object.keys(state.routers));
 
   let missingMakers = 0;
@@ -348,8 +368,9 @@ async function run() {
   // TODO: Onboard to mobile if they were from either of these makers
   const bobcat5G = makers.find((maker) => maker.name === "Bobcat 5G");
   const freedomFi = makers.find((maker) => maker.name === "FreedomFi");
+  let positionIndex = 0;
   /// Iterate through accounts in order so we don't create 1mm promises.
-  for (const [address, account] of Object.entries(accounts).slice(0, 10000)) {
+  for (const [address, account] of Object.entries(accounts)) {
     const solAddress = toSolana(address);
     const isRouter = routers.has(address);
 
@@ -378,22 +399,28 @@ async function run() {
 
       transactionsByWallet.push({
         solAddress,
-        transactions: [[instruction]],
+        transactions: [{ instructions: [instruction], signerSeeds: [] }],
       });
       txIdsToWallet[txIdx++] = address;
     } else if (solAddress) {
       // Create hotspots
-      const hotspotIxs = await Promise.all(
+      const hotspotIxs = (await Promise.all(
         (account.hotspots || []).map(async (hotspot) => {
-          totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
-          const makerId =
-            hotspot.maker ||
-            helAddr.b58; // Default (fallthrough) maker
+          totalBalances.sol = totalBalances.sol
+            .add(new BN(infoRent))
+            .add(new BN(keyToAssetRent));
+          const makerId = hotspot.maker || helAddr.b58; // Default (fallthrough) maker
 
           if (!hotspot.maker) {
             missingMakers++;
           }
-          const hotspotPubkeysForMaker = hotspotPubkeys[makerId];
+          if (hotspot.maker_name == "Maker Integration Tests") {
+            return
+          }
+            const hotspotPubkeysForMaker = hotspotPubkeys[makerId];
+          if (!hotspotPubkeysForMaker) {
+            throw new Error(`Maker not found for hotspot ${JSON.stringify(hotspot, null, 2)}`);
+          }
 
           const bufferKey = Buffer.from(bs58.decode(hotspot.address));
           const hash = crypto.createHash("sha256").update(bufferKey).digest();
@@ -413,6 +440,31 @@ async function run() {
             ],
             PROGRAM_ID
           )[0];
+          let remainingAccounts = [];
+          // Onboard to mobile if this is also a mobile hotspot
+          if (makerId == bobcat5G.address || makerId == freedomFi.address) {
+            totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
+            const mobileInfo = PublicKey.findProgramAddressSync(
+              [
+                Buffer.from("mobile_info", "utf-8"),
+                mobileRewardableEntityConfig.toBuffer(),
+                Buffer.from(hash),
+              ],
+              PROGRAM_ID
+            )[0];
+            remainingAccounts.push(
+              {
+                pubkey: mobileRewardableEntityConfig,
+                isSigner: false,
+                isWritable: false,
+              },
+              {
+                pubkey: mobileInfo,
+                isWritable: true,
+                isSigner: false,
+              }
+            );
+          }
 
           return hemProgramNoResolve.methods
             .genesisIssueHotspotV0({
@@ -429,6 +481,7 @@ async function run() {
                 : 0,
             })
             .accountsStrict({
+              entityCreator,
               collection: hotspotPubkeysForMaker.collection,
               collectionMetadata: hotspotPubkeysForMaker.collectionMetadata,
               collectionMasterEdition:
@@ -449,9 +502,10 @@ async function run() {
               info: iotInfo,
               lazySigner,
             })
+            .remainingAccounts(remainingAccounts)
             .instruction();
         })
-      );
+      )).filter(truthy);
 
       const tokenIxs = [];
       const hntBal = new BN(account.hnt);
@@ -500,9 +554,23 @@ async function run() {
       totalBalances.sol = totalBalances.sol.add(dustAmountBn);
 
       const stakedHnt = new BN(account.staked_hnt);
-      const mintKeypair = Keypair.generate();
       const stakedInstructions = [];
       if (stakedHnt.gt(new BN(0))) {
+        const indexBuf = Buffer.alloc(4);
+        indexBuf.writeUint32LE(positionIndex++);
+        const pda = [
+          Buffer.from("user", "utf-8"), 
+          Buffer.from(argv.name, "utf-8"),
+          indexBuf
+        ];
+        const [mintAddress, bump] = PublicKey.findProgramAddressSync(
+          pda,
+          LAZY_PROGRAM_ID
+        )
+        const stakedPdas = [
+          [...pda, Buffer.from([bump])],
+        ]
+
         const {
           instruction: createPosition,
           pubkeys: { position },
@@ -513,10 +581,13 @@ async function run() {
           })
           .accounts({
             registrar,
-            mint: mintKeypair.publicKey,
+            mint: mintAddress,
             depositMint: hnt,
             recipient: solAddress,
             payer: lazySigner,
+            collection: registrarCollection,
+            collectionMetadata: registrarCollectionMetadata,
+            collectionMasterEdition: registrarCollectionMasterEdition,
           })
           .prepare();
         const depositPosition = await vsrProgram.methods
@@ -532,14 +603,38 @@ async function run() {
           .instruction();
 
         totalBalances.stakedHnt = totalBalances.stakedHnt.add(stakedHnt);
-        stakedInstructions.push(createPosition, depositPosition);
+        stakedInstructions.push(
+          {
+            instructions: [
+              SystemProgram.createAccount({
+                fromPubkey: lazySigner,
+                newAccountPubkey: mintAddress,
+                space: 82,
+                lamports: ataRent,
+                programId: TOKEN_PROGRAM_ID,
+              }),
+              createInitializeMintInstruction(
+                mintAddress,
+                0,
+                position,
+                position
+              ),
+              createPosition,
+            ],
+            signerSeeds: stakedPdas
+          },
+          {
+            instructions: [depositPosition],
+            signerSeeds: []
+          }
+        );
       }
 
       const ixnGroups = [
-        tokenIxs,
-        stakedInstructions,
-        ...chunks(hotspotIxs, 1),
-      ].filter((ixGroup) => ixGroup.length > 0);
+        { instructions: tokenIxs, signerSeeds: [] },
+        ...stakedInstructions,
+        ...chunks(hotspotIxs, 1).map(chunk => ({ instructions: chunk, signerSeeds: [] })),
+      ].filter((ixGroup) => ixGroup.instructions.length > 0);
 
       transactionsByWallet.push({
         solAddress,
@@ -626,8 +721,13 @@ async function run() {
     TOKEN_METATDATA_PROGRAM_ID,
     SPL_NOOP_PROGRAM_ID,
     SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+    mobileRewardableEntityConfig,
     SystemProgram.programId,
+    entityCreator,
     bubblegumSigner,
+    registrarCollection,
+    registrarCollectionMetadata,
+    registrarCollectionMasterEdition,
     hst,
     dao,
     subDao,
@@ -681,6 +781,7 @@ async function run() {
       wallet VARCHAR(66) NOT NULL,
       compiled bytea NOT NULL,
       proof jsonb NOT NULL,
+      signers bytea,
       is_router BOOLEAN NOT NULL DEFAULT FALSE
     )
   `);
@@ -714,6 +815,17 @@ async function run() {
           .getProof(compiledTransaction.index, false, -1, false, false)
           .proof.map((p) => p.toString("hex"))
       ),
+      // Compress seeds as [len, bytes]
+      compiledTransaction.signerSeeds.reduce((acc, seeds) => {
+        return Buffer.concat([
+          acc,
+          Buffer.from([seeds.length]),
+          seeds.reduce(
+            (acc, s) => Buffer.concat([acc, Buffer.from([s.length]), s]),
+            Buffer.from([])
+          ),
+        ]);
+      }, Buffer.from([])),
       routers.has(txIdsToWallet[compiledTransaction.index]),
     ];
   });
@@ -734,7 +846,7 @@ async function run() {
         const query = format(
           `
         INSERT INTO transactions(
-          id, wallet, compiled, proof, is_router
+          id, wallet, compiled, proof, signers, is_router
         )
         VALUES %L
       `,

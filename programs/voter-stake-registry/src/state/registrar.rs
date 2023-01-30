@@ -17,8 +17,10 @@ pub struct Registrar {
   pub position_update_authority: Option<Pubkey>,
   /// Storage for voting mints and their configuration.
   pub voting_mints: Vec<VotingMintConfigV0>,
+  pub collection: Pubkey, // The metaplex collection to be issued for positions
 
-  pub bump: u8,
+  pub bump_seed: u8,
+  pub collection_bump_seed: u8,
 }
 
 impl Registrar {
@@ -97,7 +99,7 @@ macro_rules! registrar_seeds {
       $registrar.realm.as_ref(),
       b"registrar".as_ref(),
       $registrar.realm_governing_token_mint.as_ref(),
-      &[$registrar.bump],
+      &[$registrar.bump_seed],
     ]
   };
 }

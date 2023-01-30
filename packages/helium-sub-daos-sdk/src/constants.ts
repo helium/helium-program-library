@@ -2,7 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 
 export const PROGRAM_ID = new PublicKey(
-  "hdaojPkgSD8bciDc1w2Z4kXFFibCXngJiw2GRpEL7Wf"
+  "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR"
 );
 
 export const EPOCH_LENGTH = 60 * 60 * 24;

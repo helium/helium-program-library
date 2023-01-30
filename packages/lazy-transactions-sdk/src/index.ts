@@ -32,9 +32,11 @@ export async function init(
 
 export function getAccounts(
   lazySigner: PublicKey,
-  instructions: TransactionInstruction[]
+  instructions: TransactionInstruction[],
+  mapToNonSigners: PublicKey[]
 ): AccountMeta[] {
   const accounts: Record<string, AccountMeta> = {};
+  const nonSigners = new Set(mapToNonSigners.map(s => s.toBase58()));
 
   instructions.forEach((ix) => {
     accounts[ix.programId.toBase58()] ||= {
@@ -48,6 +50,8 @@ export function getAccounts(
       accounts[pubkey] = accounts[pubkey] || key;
       // Always not a signer if it's lazy transactions (will cpi sign)
       accounts[pubkey].isSigner = isLazyTransactions
+        ? false
+        : nonSigners.has(pubkey)
         ? false
         : accounts[pubkey].isSigner || key.isSigner;
       // Always writable if it's lazy transactions.
@@ -78,7 +82,7 @@ export function getCompiledInstructions(
   })
 }
 
-export type CompiledTransaction = { accounts: AccountMeta[], instructions: CompiledInstruction[], index: number };
+export type CompiledTransaction = { accounts: AccountMeta[], instructions: CompiledInstruction[], index: number, signerSeeds: Buffer[][] };
 
 const CompiledInstructionDef: any = {
   name: "CompiledInstruction",
@@ -101,12 +105,12 @@ const CompiledInstructionDef: any = {
   },
 };
 export const compiledIxLayout: Layout = IdlCoder.typeDefLayout(CompiledInstructionDef);
-export function numBytes(compiledIx: CompiledInstruction): number {
+export function numBytesCompiledTx(compiledIx: CompiledInstruction): number {
   return 1 + 4 * 2 + compiledIx.accounts.length + compiledIx.data.length
 }
 
 export function ixToBin(ct: CompiledInstruction): Buffer {
-  const ixBuffer = Buffer.alloc(numBytes(ct));
+  const ixBuffer = Buffer.alloc(numBytesCompiledTx(ct));
   compiledIxLayout.encode(ct, ixBuffer);
   return ixBuffer
 }
@@ -120,22 +124,33 @@ export function toLeaf(compiledTransaction: CompiledTransaction): Buffer {
   const accountBuffer = Buffer.concat(compiledTransaction.accounts.map(account => account.pubkey.toBuffer()))
   const indexBuffer = Buffer.alloc(4);
   indexBuffer.writeUInt32LE(compiledTransaction.index);
-  const bytes = Buffer.concat([accountBuffer, ixBuffer, indexBuffer])
+  const toCreate = compiledTransaction.signerSeeds.reduce(
+    (acc, curr) => Buffer.concat([acc, Buffer.concat(curr)]),
+    Buffer.from([])
+  );
+  const bytes = Buffer.concat([accountBuffer, ixBuffer, toCreate, indexBuffer])
   return Buffer.from(keccak_256.digest(bytes))
 }
 
+
+export type LazyTransaction = { instructions: TransactionInstruction[]; signerSeeds: Buffer[][] };
 export function compile(
   lazySigner: PublicKey,
-  transactions: TransactionInstruction[][],
+  transactions: LazyTransaction[],
+  programId: PublicKey = PROGRAM_ID
 ): { 
   merkleTree: MerkleTree,
   compiledTransactions: CompiledTransaction[] 
 } {
-  const compiledTransactions = transactions.map((instructions, index) => {
-    const accounts = getAccounts(lazySigner, instructions);
-    const compiledInstructions = getCompiledInstructions(accounts, instructions);
+  const compiledTransactions = transactions.map((tx, index) => {
+    const mapToNonSigners = tx.signerSeeds.map(seeds => {
+      return PublicKey.createProgramAddressSync(seeds, programId)
+    });
+    const accounts = getAccounts(lazySigner, tx.instructions, mapToNonSigners);
+    const compiledInstructions = getCompiledInstructions(accounts, tx.instructions);
     return {
       instructions: compiledInstructions,
+      signerSeeds: tx.signerSeeds.map(ss => ss.slice(2)),
       accounts,
       index
     }

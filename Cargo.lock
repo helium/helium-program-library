@@ -1657,6 +1657,7 @@ dependencies = [
  "mpl-token-metadata 1.6.4",
  "rust_decimal",
  "shared-utils",
+ "spl-governance-tools",
  "switchboard-v2",
  "time 0.3.17",
  "treasury-management",
@@ -3504,6 +3505,7 @@ version = "0.0.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "mpl-token-metadata 1.6.4",
  "spl-account-compression 0.1.5",
  "uint",
 ]
@@ -5270,7 +5272,7 @@ dependencies = [
  "env_logger",
  "itertools",
  "log",
- "mpl-token-metadata 1.4.3",
+ "mpl-token-metadata 1.6.4",
  "serde",
  "shared-utils",
  "solana-banks-client",

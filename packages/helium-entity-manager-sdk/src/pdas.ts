@@ -15,6 +15,12 @@ async function hashAnyhere(input: Buffer) {
   }
 }
 
+export const entityCreatorKey = (
+  dao: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+) => 
+  PublicKey.findProgramAddressSync([Buffer.from("entity_creator", "utf-8"), dao.toBuffer()], programId);
+
 export const rewardableEntityConfigKey = (
   subDao: PublicKey,
   symbol: string,

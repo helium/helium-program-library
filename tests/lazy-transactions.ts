@@ -8,9 +8,11 @@ import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { expect } from "chai";
 import {
+  TOKEN_PROGRAM_ID,
   createTransferInstruction,
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
+  createInitializeMintInstruction,
 } from "@solana/spl-token";
 import {
   init,
@@ -66,10 +68,35 @@ describe("lazy-transactions", () => {
       createTransferInstruction(lazySignerAta, myAta, lazySigner, 10),
     ];
 
+    const mintSeeds = [Buffer.from("user", "utf-8"), Buffer.from(name, "utf-8"), Buffer.from("mint" + name, "utf-8")];
+    const [mintKey, mintBump] = PublicKey.findProgramAddressSync(mintSeeds, program.programId);
+    const createMintIxns = [
+      SystemProgram.createAccount({
+        fromPubkey: lazySigner,
+        newAccountPubkey: mintKey,
+        space: 82,
+        lamports: await provider.connection.getMinimumBalanceForRentExemption(
+          82
+        ),
+        programId: TOKEN_PROGRAM_ID,
+      }),
+      createInitializeMintInstruction(
+        mintKey,
+        0,
+        me,
+        me
+      )
+    ];
+    const mintSignerSeeds = [
+      ...mintSeeds,
+      Buffer.from([mintBump]),
+    ];
     // Execute instructions via lazy transactions
     const { merkleTree, compiledTransactions } = compile(lazySigner, [
-      instructions,
-      instructions,
+      // Include an irrelevant signer seeds just to make sure tx succeeds with it
+      { instructions, signerSeeds: [mintSignerSeeds] },
+      { instructions, signerSeeds: [] },
+      { instructions: createMintIxns, signerSeeds: [mintSignerSeeds] }
     ]);
     await program.methods
       .initializeLazyTransactionsV0({
@@ -91,14 +118,25 @@ describe("lazy-transactions", () => {
     /// Ensure we fail if you execute the wrong tx
     try {
       const bogus = [
-        createAssociatedTokenAccountInstruction(lazySigner, myAta, me, mint),
-        createTransferInstruction(lazySignerAta, myAta, lazySigner, 1000),
+        {
+          instructions: [
+            createAssociatedTokenAccountInstruction(
+              lazySigner,
+              myAta,
+              me,
+              mint
+            ),
+            createTransferInstruction(lazySignerAta, myAta, lazySigner, 1000),
+          ],
+          signerSeeds: []
+        },
       ];
-      const { compiledTransactions: badTransactions } = compile(lazySigner, [bogus]);
+      const { compiledTransactions: badTransactions } = compile(lazySigner, bogus);
       await program.methods
         .executeTransactionV0({
           instructions: badTransactions[0].instructions,
           index: badTransactions[0].index,
+          signerSeeds: badTransactions[0].signerSeeds,
         })
         .accounts({ lazyTransactions })
         .remainingAccounts(accounts)
@@ -109,15 +147,35 @@ describe("lazy-transactions", () => {
       expect(e.toString()).to.not.include("Should have failed");
     }
 
+    // Successful tx
     await program.methods
       .executeTransactionV0({
         instructions: compiledTransactions[0].instructions,
         index: compiledTransactions[0].index,
+        signerSeeds: compiledTransactions[0].signerSeeds,
       })
       .accounts({ lazyTransactions })
       .remainingAccounts(accounts)
       .rpc({ skipPreflight: true });
 
+
+    // Execute a tx with a pda
+    await program.methods
+      .executeTransactionV0({
+        instructions: compiledTransactions[2].instructions,
+        index: compiledTransactions[2].index,
+        signerSeeds: compiledTransactions[2].signerSeeds,
+      })
+      .accounts({ lazyTransactions })
+      .remainingAccounts([
+        ...compiledTransactions[2].accounts,
+        ...merkleTree.getProof(2).proof.map((p) => ({
+          pubkey: new PublicKey(p),
+          isWritable: false,
+          isSigner: false,
+        })),
+      ])
+      .rpc({ skipPreflight: true });
 
     /// Ensure we fail executing the same tx twice
     try {
@@ -125,6 +183,7 @@ describe("lazy-transactions", () => {
         .executeTransactionV0({
           instructions: compiledTransactions[0].instructions,
           index: compiledTransactions[0].index,
+          signerSeeds: compiledTransactions[0].signerSeeds,
         })
         .accounts({ lazyTransactions })
         .remainingAccounts(accounts)

@@ -2,14 +2,13 @@ use anchor_lang::prelude::*;
 pub use instructions::*;
 
 pub mod error;
-pub mod events;
 pub mod governance;
 pub mod instructions;
 pub mod state;
 pub mod util;
 
 // The program address.
-declare_id!("hvsrY9UBtHhYRvstM2BWCsni81kevfn7B2DEhYbGA1a");
+declare_id!("hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8");
 
 #[derive(Clone)]
 pub struct VoterStakeRegistry;

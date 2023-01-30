@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use clockwork_sdk::state::ThreadResponse;
 
-declare_id!("hdaojPkgSD8bciDc1w2Z4kXFFibCXngJiw2GRpEL7Wf");
+declare_id!("hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR");
 
 pub mod circuit_breaker;
 pub mod error;

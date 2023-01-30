@@ -77,7 +77,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
   noHotspots: {
     type: "boolean",
-    default: false
+    default: false,
   },
   url: {
     alias: "u",
@@ -186,9 +186,10 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
   noGovernance: {
     type: "boolean",
-    describe: "If this is set, governance will be skipped. Ensure that you also included --noGovernance when running create-dao",
+    describe:
+      "If this is set, governance will be skipped. Ensure that you also included --noGovernance when running create-dao",
     default: false,
-  }
+  },
 });
 
 const MIN_LOCKUP = 15811200; // 6 months
@@ -233,9 +234,10 @@ async function run() {
 
   const calculateThread = threadKey(subdao, "calculate")[0];
   const issueThread = threadKey(subdao, "issue")[0];
+
   if (await exists(conn, subdao)) {
     const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
-    
+
     console.log(
       `Subdao exists. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}`
     );
@@ -365,10 +367,7 @@ async function run() {
     govProgramId
   )[0];
   const nativeTreasury = await PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("native-treasury", "utf-8"),
-      governance.toBuffer(),
-    ],
+    [Buffer.from("native-treasury", "utf-8"), governance.toBuffer()],
     govProgramId
   )[0];
   console.log(
@@ -467,7 +466,9 @@ async function run() {
   }
 
   if (!(await exists(conn, subdao))) {
-    let aggregatorKey = new PublicKey("GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"); // value cloned from mainnet to localnet
+    let aggregatorKey = new PublicKey(
+      "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
+    ); // value cloned from mainnet to localnet
     if (!isLocalhost(provider)) {
       console.log("Initializing switchboard oracle");
       const switchboard = await SwitchboardProgram.load(
@@ -512,7 +513,10 @@ async function run() {
             },
           ],
         });
-        console.log("Created active device aggregator", agg.publicKey.toBase58());
+        console.log(
+          "Created active device aggregator",
+          agg.publicKey.toBase58()
+        );
         await AggregatorHistoryBuffer.create(switchboard, {
           aggregatorAccount: agg,
           maxSamples: 24 * 31, // Give us a month of active device data. If we fail to run end epoch, RIP.
@@ -520,7 +524,7 @@ async function run() {
         aggregatorKey = agg.publicKey;
       }
     }
-    
+
     const instructions: TransactionInstruction[] = [];
 
     console.log(`Initializing ${name} SubDAO`);
@@ -556,11 +560,11 @@ async function run() {
       })
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-      ])
+      ]);
     if (argv.noGovernance) {
       await initSubdaoMethod.rpc({ skipPreflight: true });
     } else {
-      instructions.push(await initSubdaoMethod.instruction())
+      instructions.push(await initSubdaoMethod.instruction());
       await sendInstructionsOrCreateProposal({
         provider,
         instructions,
@@ -587,8 +591,13 @@ async function run() {
     ]);
   }
 
-  const hsConfigKey = (await rewardableEntityConfigKey(subdao, name.toUpperCase()))[0];
-  if (!(await provider.connection.getAccountInfo(hsConfigKey)) && !argv.noHotspots) {
+  const hsConfigKey = (
+    await rewardableEntityConfigKey(subdao, name.toUpperCase())
+  )[0];
+  if (
+    !(await provider.connection.getAccountInfo(hsConfigKey)) &&
+    !argv.noHotspots
+  ) {
     const instructions: TransactionInstruction[] = [];
     console.log(`Initalizing ${name} RewardableEntityConfig`);
     let settings;
@@ -600,21 +609,21 @@ async function run() {
           fullLocationStakingFee: toBN(1000000, 0),
           dataonlyLocationStakingFee: toBN(500000, 0),
         } as any,
-      }
+      };
     } else {
       settings = {
         mobileConfig: {
           fullLocationStakingFee: toBN(1000000, 0),
           dataonlyLocationStakingFee: toBN(500000, 0),
-        }
-      }
+        },
+      };
     }
 
     instructions.push(
       await hemProgram.methods
         .initializeRewardableEntityConfigV0({
           symbol: name.toUpperCase(),
-          settings
+          settings,
         })
         .accounts({
           subDao: subdao,
