@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-
 use crate::canopy::fill_in_proof_from_canopy;
 use crate::error::ErrorCode;
 use crate::{merkle_proof::verify, state::*};
