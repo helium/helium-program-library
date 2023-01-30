@@ -14,6 +14,12 @@
       "path": "./packages/helium-react-hooks"
     },
     {
+      "path": "./packages/hotspot-utils"
+    },
+    {
+      "path": "./packages/currency-utils"
+    },
+    {
       "path": "./packages/voter-stake-registry-sdk"
     },
     {
@@ -24,7 +30,7 @@
     },
     {
       "path": "./packages/monitor-service"
-    }, 
+    },
     {
       "path": "./packages/migration-service"
     },
@@ -45,6 +51,6 @@
     },
     {
       "path": "./packages/circuit-breaker-sdk"
-    }, 
+    }
   ]
 }

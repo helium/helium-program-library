@@ -1,12 +1,11 @@
 use anchor_lang::prelude::*;
 
-declare_id!("hemABtqNUst4MmqsVcuN217ZzBspENbGt9uueSe5jts");
+declare_id!("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8");
 
 pub mod constants;
 pub mod error;
 pub mod instructions;
 pub mod state;
-pub mod token_metadata;
 
 pub use instructions::*;
 pub use state::*;
@@ -37,8 +36,8 @@ pub mod helium_entity_manager {
     issue_entity_v0::handler(ctx, args)
   }
 
-  pub fn genesis_issue_hotspot_v0(
-    ctx: Context<GenesisIssueHotspotV0>,
+  pub fn genesis_issue_hotspot_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, GenesisIssueHotspotV0<'info>>,
     args: GenesisIssueHotspotArgsV0,
   ) -> Result<()> {
     genesis_issue_hotspot_v0::handler(ctx, args)
@@ -71,6 +70,13 @@ pub mod helium_entity_manager {
 
   pub fn set_maker_tree_v0(ctx: Context<SetMakerTreeV0>, args: SetMakerTreeArgsV0) -> Result<()> {
     set_maker_tree_v0::handler(ctx, args)
+  }
+
+  pub fn update_maker_tree_v0(
+    ctx: Context<UpdateMakerTreeV0>,
+    args: UpdateMakerTreeArgsV0,
+  ) -> Result<()> {
+    update_maker_tree_v0::handler(ctx, args)
   }
 
   pub fn update_iot_info_v0<'info>(

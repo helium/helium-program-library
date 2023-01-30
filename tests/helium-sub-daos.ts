@@ -1,5 +1,5 @@
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
-import { daoKey } from "@helium/helium-sub-daos-sdk";
+import { daoKey, EPOCH_LENGTH } from "@helium/helium-sub-daos-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
@@ -7,8 +7,10 @@ import {
   createAtaAndMint,
   createAtaAndTransfer,
   createMint,
+  roundToDecimals,
   sendInstructions,
   toBN,
+  toNumber,
 } from "@helium/spl-utils";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
@@ -28,6 +30,7 @@ import { init as issuerInit } from "../packages/helium-entity-manager-sdk/src";
 import {
   currentEpoch,
   heliumSubDaosResolvers,
+  subDaoEpochInfoKey,
 } from "../packages/helium-sub-daos-sdk/src";
 import { init as vsrInit } from "../packages/voter-stake-registry-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
@@ -155,6 +158,7 @@ describe("helium-sub-daos", () => {
     let dcMint: PublicKey;
     let rewardsEscrow: PublicKey;
     let minLockupSeconds = 15811200; // 6 months
+    let genesisVotePowerMultiplierExpirationTs = 1;
     let initialSupply = toBN(10000000000, 8);
 
     async function burnDc(
@@ -200,16 +204,18 @@ describe("helium-sub-daos", () => {
         positionAuthorityKp.publicKey,
         LAMPORTS_PER_SOL
       );
-          console.log(minLockupSeconds);
+      console.log(
+        `Min lockup: ${minLockupSeconds}, genesis: ${genesisVotePowerMultiplierExpirationTs}`
+      );
 
-      
       ({ registrar } = await initVsr(
         vsrProgram,
         provider,
         me,
         hntMint,
         daoKey(hntMint)[0],
-        minLockupSeconds
+        minLockupSeconds,
+        genesisVotePowerMultiplierExpirationTs
       ));
       ({
         dataCredits: { dcMint },
@@ -228,11 +234,23 @@ describe("helium-sub-daos", () => {
       hstPool = (await program.account.daoV0.fetch(dao)).hstPool;
     });
 
-    it("resets the clockwork thread", async() => {
-      await program.methods.resetClockworkThreadV0().accounts({
-        subDao,
-      }).rpc({ skipPreflight: true })
-    })
+    it("resets the subdao clockwork thread", async () => {
+      await program.methods
+        .resetSubDaoThreadV0()
+        .accounts({
+          subDao,
+        })
+        .rpc({ skipPreflight: true });
+    });
+
+    it("resets the dao clockwork thread", async () => {
+      await program.methods
+        .resetDaoThreadV0()
+        .accounts({
+          dao,
+        })
+        .rpc({ skipPreflight: true });
+    });
 
     it("allows tracking dc spend", async () => {
       const { subDaoEpochInfo } = await burnDc(10);
@@ -247,6 +265,7 @@ describe("helium-sub-daos", () => {
     describe("with no min lockup", () => {
       before(() => {
         minLockupSeconds = 0;
+        genesisVotePowerMultiplierExpirationTs = 1;
       });
 
       beforeEach(async () => {
@@ -314,6 +333,7 @@ describe("helium-sub-daos", () => {
       describe("vehnt tests - " + name, () => {
         before(() => {
           minLockupSeconds = 15811200; // 6 months
+          genesisVotePowerMultiplierExpirationTs = 1;
         });
         beforeEach(async () => {
           ({ position, vault } = await createPosition(
@@ -337,7 +357,7 @@ describe("helium-sub-daos", () => {
             })
             .signers([positionAuthorityKp]);
           const { delegatedPosition } = await method.pubkeys();
-          await method.rpc();
+          await method.rpc({ skipPreflight: true });
 
           const acc = await program.account.delegatedPositionV0.fetch(
             delegatedPosition!
@@ -346,12 +366,8 @@ describe("helium-sub-daos", () => {
 
           const expectedVeHnt =
             options.lockupAmount * options.expectedMultiplier;
-          expectBnAccuracy(toBN(expectedVeHnt, 8), sdAcc.vehntDelegated, 0.001);
+          expectBnAccuracy(toBN(expectedVeHnt, 8).mul(new BN("1000000000000")), sdAcc.vehntDelegated, 0.001);
           expectBnAccuracy(lockupAmount, acc.hntAmount, 0.001);
-          const expectedFallRate = toBN(expectedVeHnt, 8 + 12).div(
-            toBN(options.lockupPeriods * 60 * 60 * 24, 0)
-          );
-          expectBnAccuracy(expectedFallRate, acc.fallRate, 0.001);
         });
 
         function expectBnAccuracy(
@@ -437,7 +453,9 @@ describe("helium-sub-daos", () => {
             Math.pow(16, 1 / 4) *
             (options.lockupAmount * options.expectedMultiplier);
 
-          expect(daoInfo.totalRewards.toString()).to.eq(EPOCH_REWARDS.toString());
+          expect(daoInfo.totalRewards.toString()).to.eq(
+            EPOCH_REWARDS.toString()
+          );
           expect(daoInfo.currentHntSupply.toString()).to.eq(
             new BN(supply.toString()).add(new BN(EPOCH_REWARDS)).toString()
           );
@@ -582,10 +600,10 @@ describe("helium-sub-daos", () => {
 
             beforeEach(async () => {
               await vsrProgram.methods
-                    .setTimeOffsetV0(new BN(1 * 60 * 60 * 24))
-                    .accounts({ registrar })
-                    .rpc({ skipPreflight: true });
-                    
+                .setTimeOffsetV0(new BN(1 * 60 * 60 * 24))
+                .accounts({ registrar })
+                .rpc({ skipPreflight: true });
+
               ({ subDaoEpochInfo } = await burnDc(1600000));
               epoch = (
                 await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
@@ -610,8 +628,6 @@ describe("helium-sub-daos", () => {
                 .accounts({
                   subDao,
                   dao,
-                  thread,
-                  clockwork: THREAD_PID,
                 })
                 .rpc({ skipPreflight: true });
             });
@@ -705,6 +721,211 @@ describe("helium-sub-daos", () => {
             });
           });
         });
+      });
+    });
+
+    describe("with genesis config", () => {
+      before(async () => {
+        minLockupSeconds = 15811200; // 6 months
+        const currTs = Number(await getUnixTimestamp(provider));
+        genesisVotePowerMultiplierExpirationTs = currTs + 60 * 60 * 24 * 7; // 7 days from now
+      });
+
+      it("correctly adjusts total vehnt at epoch start with changing genesis positions", async () => {
+        ({ position, vault } = await createPosition(
+          vsrProgram,
+          provider,
+          registrar,
+          hntMint,
+          // max lockup
+          {
+            lockupPeriods: 1464,
+            lockupAmount: 100,
+            kind: { constant: {} },
+          },
+          positionAuthorityKp
+        ));
+        program.methods
+          .delegateV0()
+          .accounts({
+            position,
+            subDao,
+            positionAuthority: positionAuthorityKp.publicKey,
+          })
+          .signers([positionAuthorityKp])
+          .rpc({ skipPreflight: true });
+
+        // Burn dc to cause an update to subdao epoch info
+        await burnDc(1);
+
+        let offset = 0;
+        async function getCurrEpochInfo() {
+          const unixTime = Number(await getUnixTimestamp(provider)) + offset;
+          return await program.account.subDaoEpochInfoV0.fetch(
+            subDaoEpochInfoKey(subDao, unixTime)[0]
+          );
+        }
+
+        async function ffwd(amount: number) {
+          offset = amount;
+          await vsrProgram.methods
+            .setTimeOffsetV0(new BN(offset))
+            .accounts({ registrar })
+            .rpc({ skipPreflight: true });
+        }
+
+        // Start off the epoch with 0 vehnt since we staked at the start of the epoch
+        let subDaoEpochInfo = await getCurrEpochInfo();
+        expect(subDaoEpochInfo.vehntAtEpochStart.toNumber()).to.eq(0);
+
+        // Fast forward to a later epoch before genesis end
+        await ffwd(EPOCH_LENGTH * 10);
+        // Burn dc to cause an update to subdao epoch info
+        await burnDc(1);
+        subDaoEpochInfo = await getCurrEpochInfo();
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.eq(300 * 100);
+
+        // Switch to a cliff vest (start cooldown)
+        const {
+          pubkeys: { genesisEndSubDaoEpochInfo },
+        } = await program.methods
+          .closeDelegationV0()
+          .accounts({
+            position,
+            subDao,
+            positionAuthority: positionAuthorityKp.publicKey,
+          })
+          .signers([positionAuthorityKp])
+          .rpcAndKeys({ skipPreflight: true });
+        await program.methods
+          .resetLockupV0({
+            kind: { cliff: {} },
+            periods: 1464,
+          })
+          .accounts({
+            dao,
+            position: position,
+            positionAuthority: positionAuthorityKp.publicKey,
+          })
+          .signers([positionAuthorityKp])
+          .rpc({ skipPreflight: true });
+        let subDaoAcc = await program.account.subDaoV0.fetch(subDao);
+        expect(subDaoAcc.vehntDelegated.toNumber()).to.eq(0);
+        expect(subDaoAcc.vehntFallRate.toNumber()).to.eq(0);
+        const genesisEndEpoch = await program.account.subDaoEpochInfoV0.fetch(
+          genesisEndSubDaoEpochInfo!
+        );
+        expect(genesisEndEpoch.vehntInClosingPositions.toNumber()).to.eq(0);
+        expect(genesisEndEpoch.fallRatesFromClosingPositions.toNumber()).to.eq(
+          0
+        );
+
+        const {
+          pubkeys: {
+            genesisEndSubDaoEpochInfo: finalGenesisEndSubDaoEpochInfo,
+          },
+        } = await program.methods
+          .delegateV0()
+          .accounts({
+            position,
+            subDao,
+            positionAuthority: positionAuthorityKp.publicKey,
+          })
+          .signers([positionAuthorityKp])
+          .rpcAndKeys({ skipPreflight: true });
+        console.log(
+          "Final end epoch subdao epoch info",
+          finalGenesisEndSubDaoEpochInfo!.toBase58()
+        );
+        let positionAcc = await vsrProgram.account.positionV0.fetch(position);
+        const stakeTime = positionAcc.lockup.startTs;
+
+        console.log("Checking before genesis end");
+        await ffwd(EPOCH_LENGTH * 20);
+        await burnDc(1);
+        subDaoEpochInfo = await getCurrEpochInfo();
+        let currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
+        let timeStaked = currTime - stakeTime.toNumber();
+        let expected = roundToDecimals(
+          3 *
+            100 *
+            100 *
+            ((1464 * EPOCH_LENGTH - timeStaked) / (1464 * EPOCH_LENGTH)),
+          8
+        );
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
+          // Fall rates aren't a perfect measurement, we divide the total fall of the position by
+          // the total time staked. Imagine the total fall was 1 and the total time was 3. We would have
+          // a fall rate of 0.3333333333333333 and could never have enough decimals to represent it
+          expected,
+          0.0000001
+        );
+
+        console.log("Checking genesis end");
+        await ffwd(EPOCH_LENGTH * 1464);
+        await burnDc(1);
+        subDaoEpochInfo = await getCurrEpochInfo();
+        currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
+        timeStaked = currTime - stakeTime.toNumber();
+        expected = roundToDecimals(
+          3 *
+            100 *
+            100 *
+            ((1464 * EPOCH_LENGTH - timeStaked) / (1464 * EPOCH_LENGTH)),
+          8
+        )
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
+          expected,
+          0.0000001
+        );
+
+        console.log("Checking after genesis end");
+        await ffwd(EPOCH_LENGTH * 1466);
+        await burnDc(1);
+        subDaoEpochInfo = await getCurrEpochInfo();
+        currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
+        timeStaked = currTime - stakeTime.toNumber();
+        expected = roundToDecimals(
+          100 *
+            100 *
+            ((1464 * EPOCH_LENGTH - timeStaked) / (1464 * EPOCH_LENGTH)),
+          8
+        );
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
+          expected,
+          0.0000001
+        );
+
+        console.log("Checking at expiry");
+        const unixTime = Number(await getUnixTimestamp(provider));
+        const expiryOffset = (stakeTime.toNumber() + (EPOCH_LENGTH * 1464)) - unixTime;
+        await ffwd(expiryOffset);
+        await burnDc(1);
+        subDaoEpochInfo = await getCurrEpochInfo();
+        currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
+        timeStaked = currTime - stakeTime.toNumber();
+        expected = roundToDecimals(
+            100 *
+              100 *
+              ((1464 * EPOCH_LENGTH - timeStaked) / (1464 * EPOCH_LENGTH)),
+            8
+          )
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
+          expected,
+          0.0000001
+        );
+
+        console.log("Checking after expiry");
+        await ffwd(expiryOffset + EPOCH_LENGTH * 2);
+        await burnDc(1);
+        subDaoEpochInfo = await getCurrEpochInfo();
+        currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
+        timeStaked = currTime - stakeTime.toNumber();
+        console.log(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8));
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
+          0,
+          0.0000001
+        );
       });
     });
   });

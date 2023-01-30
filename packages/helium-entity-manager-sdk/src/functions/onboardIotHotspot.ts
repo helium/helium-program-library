@@ -1,9 +1,9 @@
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
-import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
 import { Program } from "@project-serum/anchor";
-import { ConcurrentMerkleTreeAccount } from "@solana/spl-account-compression";
+import BN from "bn.js";
 import { PublicKey } from "@solana/web3.js";
 import { iotInfoKey, keyToAssetKey } from "../pdas";
+import { proofArgsAndAccounts, ProofArgsAndAccountsArgs } from "./proofArgsAndAccounts";
 
 
 export async function onboardIotHotspot({
@@ -12,80 +12,65 @@ export async function onboardIotHotspot({
   assetId,
   maker,
   dao,
-  assetEndpoint,
   dcFeePayer,
   payer,
-  getAssetFn = getAsset,
-  getAssetProofFn = getAssetProof,
+  location,
+  elevation,
+  gain,
+  ...rest
 }: {
   program: Program<HeliumEntityManager>;
-  assetId: PublicKey;
   rewardableEntityConfig: PublicKey;
-  assetEndpoint?: string;
   payer?: PublicKey;
   dcFeePayer?: PublicKey;
   maker: PublicKey;
+  location?: BN;
+  elevation?: number;
+  gain?: number;
   dao: PublicKey;
-  getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
-  getAssetProofFn?: (
-    url: string,
-    assetId: PublicKey
-  ) => Promise<AssetProof | undefined>;
-}) {
-  // @ts-ignore
-  const endpoint = assetEndpoint || program.provider.connection._rpcEndpoint;
-  const asset = await getAssetFn(endpoint, assetId);
-  if (!asset) {
-    throw new Error("No asset with ID " + assetId.toBase58());
-  }
-  const assetProof = await getAssetProofFn(endpoint, assetId);
-  if (!assetProof) {
-    throw new Error("No asset proof with ID " + assetId.toBase58());
-  }
-  const { root, proof, leaf, treeId, nodeIndex } = assetProof;
+} & Omit<ProofArgsAndAccountsArgs, "connection">) {
   const {
-    ownership: { owner },
-    content: { json_uri },
-  } = asset;
-  const [info] = iotInfoKey(rewardableEntityConfig, assetId);
+    asset: {
+      content: { json_uri },
+      ownership: { owner },
+    },
+    args,
+    accounts,
+    remainingAccounts,
+  } = await proofArgsAndAccounts({
+    connection: program.provider.connection,
+    assetId,
+    ...rest,
+  });
 
+  const [info] = await iotInfoKey(
+    rewardableEntityConfig,
+    json_uri.split("/").slice(-1)[0]
+  );
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
-  const canopy = await (
-    await ConcurrentMerkleTreeAccount.fromAccountAddress(
-      program.provider.connection,
-      treeId
-    )
-  ).getCanopyDepth();
   const keyToAsset = (
     await keyToAssetKey(dao, json_uri.split("/").slice(-1)[0])
   )[0];
   return program.methods
     .onboardIotHotspotV0({
-      hash: leaf.toBuffer().toJSON().data,
-      root: root.toBuffer().toJSON().data,
-      index: nodeIndex,
+      ...args,
+      location: typeof location == "undefined" ? null : location,
+      elevation: typeof elevation == "undefined" ? null : elevation,
+      gain: typeof gain == "undefined" ? null : gain,
     })
     .accounts({
       // hotspot: assetId,
+      ...accounts,
       payer,
       dcFeePayer,
       rewardableEntityConfig,
       hotspotOwner: owner,
       iotInfo: info,
-      merkleTree: treeId,
       maker,
       dao,
       issuingAuthority: makerAcc?.issuingAuthority,
       keyToAsset,
     })
-    .remainingAccounts(
-      proof.slice(0, proof.length - canopy).map((p) => {
-        return {
-          pubkey: p,
-          isWritable: false,
-          isSigner: false,
-        };
-      })
-    );
+    .remainingAccounts(remainingAccounts);
 }

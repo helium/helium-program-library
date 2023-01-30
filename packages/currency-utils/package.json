@@ -1,0 +1,35 @@
+{
+  "name": "@helium/currency-utils",
+  "version": "0.0.24",
+  "description": "Currency utilities",
+  "homepage": "https://github.com/helium/helium-program-library#readme",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "license": "Apache-2.0",
+  "main": "./lib/cjs/index.js",
+  "module": "./lib/esm/src/index.js",
+  "types": "./lib/types/src/index.d.ts",
+  "sideEffects": false,
+  "files": [
+    "lib"
+  ],
+  "exports": {
+    "import": "./lib/esm/src/index.js",
+    "require": "./lib/cjs/index.js",
+    "types": "./lib/types/src/index.d.ts"
+  },
+  "scripts": {
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
+    "clean": "npx shx mkdir -p lib && npx shx rm -rf lib",
+    "package": "npx shx mkdir -p lib/cjs lib/esm",
+    "prebuild": "npm run clean && npm run package"
+  },
+  "dependencies": {
+    "@pythnetwork/client": "^2.12.0",
+    "@solana/spl-token": "^0.3.7",
+    "@solana/web3.js": "^1.73.0"
+  }
+}

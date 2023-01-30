@@ -19,28 +19,26 @@ use spl_governance_tools::account::dispose_account;
 /// to supply the required VoteWeightRecord and delete relevant NftVoteRecords
 #[derive(Accounts)]
 pub struct RelinquishVoteV0<'info> {
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
 
   #[account(
         mut,
-        constraint = voter_weight_record.realm == registrar.load()?.realm,
-        constraint = voter_weight_record.governing_token_mint == registrar.load()?.realm_governing_token_mint
+        constraint = voter_weight_record.realm == registrar.realm,
+        constraint = voter_weight_record.governing_token_mint == registrar.realm_governing_token_mint
     )]
   pub voter_weight_record: Account<'info, VoterWeightRecord>,
 
   /// CHECK: Owned by spl-governance instance specified in registrar.governance_program_id
   /// Governance account the Proposal is for
-  #[account(owner = registrar.load()?.governance_program_id)]
+  #[account(owner = registrar.governance_program_id)]
   pub governance: UncheckedAccount<'info>,
 
   /// CHECK: Owned by spl-governance instance specified in registrar.governance_program_id
-  #[account(owner = registrar.load()?.governance_program_id)]
+  #[account(owner = registrar.governance_program_id)]
   pub proposal: UncheckedAccount<'info>,
 
   /// TokenOwnerRecord of the voter who cast the original vote
-  #[account(
-            owner = registrar.load()?.governance_program_id
-         )]
+  #[account(owner = registrar.governance_program_id)]
   /// CHECK: Owned by spl-governance instance specified in registrar.governance_program_id
   pub voter_token_owner_record: UncheckedAccount<'info>,
 
@@ -60,11 +58,11 @@ pub struct RelinquishVoteV0<'info> {
 }
 
 pub fn handler(ctx: Context<RelinquishVoteV0>) -> Result<()> {
-  let registrar = ctx.accounts.registrar.load()?;
+  let registrar = &ctx.accounts.registrar;
   let voter_weight_record = &mut ctx.accounts.voter_weight_record;
 
   let governing_token_owner = resolve_governing_token_owner(
-    &registrar,
+    registrar,
     &ctx.accounts.voter_token_owner_record,
     &ctx.accounts.voter_authority,
     voter_weight_record,

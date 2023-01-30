@@ -1,12 +1,10 @@
-use std::cell::Ref;
-
 use crate::error::*;
 use crate::state::voting_mint_config::VotingMintConfigV0;
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 
 /// Instance of a voting rights distributor.
-#[account(zero_copy)]
+#[account]
 #[derive(Default)]
 pub struct Registrar {
   pub governance_program_id: Pubkey,
@@ -17,12 +15,12 @@ pub struct Registrar {
   pub time_offset: i64,
   /// Allows a program to wrap updates to the position (transfer or reset lockup)
   pub position_update_authority: Option<Pubkey>,
-
   /// Storage for voting mints and their configuration.
-  /// The length should be adjusted for one's use case.
-  pub voting_mints: [VotingMintConfigV0; 4],
+  pub voting_mints: Vec<VotingMintConfigV0>,
+  pub collection: Pubkey, // The metaplex collection to be issued for positions
 
-  pub bump: u8,
+  pub bump_seed: u8,
+  pub collection_bump_seed: u8,
 }
 
 impl Registrar {
@@ -70,7 +68,7 @@ impl Registrar {
 // 1) asserts it matches the given Registrar and VoterWeightRecord
 // 2) asserts governing_token_owner or its delegate is a signer
 pub fn resolve_governing_token_owner(
-  registrar: &Ref<Registrar>,
+  registrar: &Registrar,
   voter_token_owner_record_info: &AccountInfo,
   voter_authority_info: &AccountInfo,
   voter_weight_record: &VoterWeightRecord,
@@ -101,7 +99,7 @@ macro_rules! registrar_seeds {
       $registrar.realm.as_ref(),
       b"registrar".as_ref(),
       $registrar.realm_governing_token_mint.as_ref(),
-      &[$registrar.bump],
+      &[$registrar.bump_seed],
     ]
   };
 }

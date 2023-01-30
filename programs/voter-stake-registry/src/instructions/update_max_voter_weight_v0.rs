@@ -10,8 +10,8 @@ pub struct UpdateMaxVoterWeightV0<'info> {
   #[account(
         init_if_needed,
         seeds = [ b"max-voter-weight-record".as_ref(),
-                registrar.load()?.realm.as_ref(),
-                registrar.load()?.realm_governing_token_mint.as_ref()],
+                registrar.realm.as_ref(),
+                registrar.realm_governing_token_mint.as_ref()],
         bump,
         payer = payer,
         space = MaxVoterWeightRecord::get_space()
@@ -20,7 +20,7 @@ pub struct UpdateMaxVoterWeightV0<'info> {
   #[account(
       has_one = realm_governing_token_mint
     )]
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
   pub realm_governing_token_mint: Account<'info, Mint>,
 
   #[account(mut)]
@@ -32,7 +32,7 @@ pub struct UpdateMaxVoterWeightV0<'info> {
 pub fn handler(ctx: Context<UpdateMaxVoterWeightV0>) -> Result<()> {
   let max_voter_weight_record = &mut ctx.accounts.max_voter_weight_record;
 
-  let registrar = ctx.accounts.registrar.load()?;
+  let registrar = &ctx.accounts.registrar;
   max_voter_weight_record.realm = registrar.realm;
   max_voter_weight_record.governing_token_mint = registrar.realm_governing_token_mint;
 

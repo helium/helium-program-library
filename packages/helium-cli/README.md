@@ -3,16 +3,22 @@ npx ts-node --project tsconfig.cjs.json src/create-dao.ts -u https://api.devnet.
 
 npx ts-node --project tsconfig.cjs.json src/create-subdao.ts -u https://api.devnet.solana.com -rewardsOracleUrl https://iot-oracle.oracle.test-helium.com --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n IOT --subdaoKeypair keypairs/iot.json --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "Helium IOT Test5" --dcBurnAuthority $(solana address)
 
- npx ts-node --project tsconfig.cjs.json src/create-subdao.ts -u https://api.devnet.solana.com -rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n Mobile --subdaoKeypair keypairs/mobile.json --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Helium Mobile Test5" --dcBurnAuthority $(solana address)  --noHotspots
+ npx ts-node --project tsconfig.cjs.json src/create-subdao.ts -u https://api.devnet.solana.com -rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n Mobile --subdaoKeypair keypairs/mobile.json --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Helium Mobile Test5" --dcBurnAuthority $(solana address)
 ```
 Now, go approve and run all commands in realms.
 
-Now, create a maker. Note that this will need to be done for each maker.
+Now create iot makers:
 
 ```
 
-npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u http://127.0.0.1:8899 --symbol IOT --subdaoMint $(solana address -k keypairs/iot.json) --fromFile makers.json
+npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u https://api.devnet.solana.com --symbol IOT --subdaoMint $(solana address -k keypairs/iot.json) --fromFile makers.json
 
+```
+
+Next, create mobile makers:
+
+```
+npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u https://api.devnet.solana.com --symbol MOBILE --subdaoMint $(solana address -k keypairs/mobile.json) --fromFile makers-mobile.json
 ```
 
 Now, fund any maker wallets
@@ -30,7 +36,7 @@ Now, go approve and run maker create in realms
 ```
  cd ../migration-service
 
- node --max_old_space_size=16000 lib/cjs/gen-transactions.js --mobile $(solana address -k ../helium-cli/keypairs/mobile.json) --hnt $(solana address -k ../helium-cli/keypairs/hnt.json) --dc $(solana address -k ../helium-cli/keypairs/dc.json) --iot $(solana address -k ../helium-cli/keypairs/iot.json) --hst $(solana address -k ../helium-cli/keypairs/hst.json) -n testhelium4 -u https://api.devnet.solana.com -p --payer $(solana address) --pgPort 5432 --pgDatabase migration
+node --max_old_space_size=16000 lib/cjs/gen-transactions.js --mobile $(solana address -k ../helium-cli/keypairs/mobile.json) --hnt $(solana address -k ../helium-cli/keypairs/hnt.json) --dc $(solana address -k ../helium-cli/keypairs/dc.json) --iot $(solana address -k ../helium-cli/keypairs/iot.json) --hst $(solana address -k ../helium-cli/keypairs/hst.json) -n testhelium12 -u http://127.0.0.1:8899 --payer $(solana address) --pgPort 5432 --pgDatabase migration --makers ../helium-cli/makers.json -p
 ```
 
 At this point, go and update all lazy signers with the value from -n (ie tessthelium4)

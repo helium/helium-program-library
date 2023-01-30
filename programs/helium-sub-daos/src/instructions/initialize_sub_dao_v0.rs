@@ -158,23 +158,29 @@ pub fn create_end_epoch_cron(curr_ts: i64, offset: u64) -> String {
   format!("0 {:?} {:?} * * * *", dt.minute(), dt.hour())
 }
 
-fn construct_kickoff_ix(ctx: &Context<InitializeSubDaoV0>) -> Option<Instruction> {
+pub fn construct_sub_dao_kickoff_ix(
+  dao: Pubkey,
+  sub_dao: Pubkey,
+  hnt_mint: Pubkey,
+  active_device_aggregator: Pubkey,
+  system_program: Pubkey,
+  token_program: Pubkey,
+  circuit_breaker_program: Pubkey,
+) -> Option<Instruction> {
   // build clockwork kickoff ix
   let accounts = vec![
-    AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.sub_dao.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.hnt_mint.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.active_device_aggregator.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
-    AccountMeta::new(ctx.accounts.thread.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.clockwork.key(), false),
+    AccountMeta::new_readonly(dao, false),
+    AccountMeta::new_readonly(sub_dao, false),
+    AccountMeta::new_readonly(hnt_mint, false),
+    AccountMeta::new_readonly(active_device_aggregator, false),
+    AccountMeta::new_readonly(system_program, false),
+    AccountMeta::new_readonly(token_program, false),
+    AccountMeta::new_readonly(circuit_breaker_program, false),
   ];
   Some(Instruction {
     program_id: crate::ID,
     accounts,
-    data: anchor_sighash("clockwork_kickoff_v0").to_vec(),
+    data: anchor_sighash("sub_dao_kickoff_v0").to_vec(),
   })
 }
 
@@ -309,7 +315,16 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     &ctx.accounts.system_program.to_account_info(),
     &ctx.accounts.sub_dao,
   )?;
-  let kickoff_ix = construct_kickoff_ix(&ctx).unwrap();
+  let kickoff_ix = construct_sub_dao_kickoff_ix(
+    ctx.accounts.dao.key(),
+    ctx.accounts.sub_dao.key(),
+    ctx.accounts.hnt_mint.key(),
+    ctx.accounts.active_device_aggregator.key(),
+    ctx.accounts.system_program.key(),
+    ctx.accounts.token_program.key(),
+    ctx.accounts.circuit_breaker_program.key(),
+  )
+  .unwrap();
   let cron = create_end_epoch_cron(curr_ts, 60 * 5);
   // initialize thread
   thread_create(

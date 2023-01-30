@@ -6,16 +6,17 @@ import {
   blockKey,
   init,
   lazySignerKey,
-  lazyTransactionsKey,
+  lazyTransactionsKey
 } from "@helium/lazy-transactions-sdk";
-import { chunks, truthy } from "@helium/spl-utils";
+import { chunks } from "@helium/spl-utils";
+import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, transferInstructionData } from "@solana/spl-token";
 import { Program } from "@project-serum/anchor";
 import {
   ComputeBudgetProgram,
   PublicKey,
   SystemProgram,
   TransactionMessage,
-  VersionedTransaction,
+  VersionedTransaction
 } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { Pool } from "pg";
@@ -62,7 +63,12 @@ server.get("/top-wallets", async () => {
   try {
     const results = (
       await client.query(
-        "SELECT wallet, count(*) FROM transactions GROUP BY wallet ORDER BY count DESC"
+        `SELECT wallet_transactions.wallet, count(*)
+         FROM transactions 
+         JOIN wallet_transactions ON transactions.id = wallet_transactions.txid
+         GROUP BY wallet_transactions.wallet
+         ORDER BY count DESC
+        `
       )
     ).rows.map((row) => ({ ...row, count: Number(row.count) }));
 
@@ -75,6 +81,156 @@ server.get("/top-wallets", async () => {
   }
 });
 
+async function getTransactions(results: any[], luts: any[]): Promise<Array<number[]>> {
+  const recentBlockhash = (await provider.connection.getLatestBlockhash())
+    .blockhash;
+
+  console.log(`Found ${results.length} transactions to migrate}`);
+  const blocks = results.map((r) => blockKey(lazyTransactions, r.id)[0]);
+  const blocksExist = (
+    await Promise.all(
+      chunks(blocks, 100).map(
+        async (chunk) =>
+          await provider.connection.getMultipleAccountsInfo(
+            chunk as PublicKey[],
+            "confirmed"
+          )
+      )
+    )
+  ).flat();
+  const lazyTxns = await program.account.lazyTransactionsV0.fetch(lazyTransactions);
+
+  const asExecuteTxs: { id: number; transaction: TransactionMessage }[] = (
+    await Promise.all(
+      results.map(
+        async (
+          {
+            proof,
+            compiled,
+            id,
+            signers: signersRaw,
+            compute
+          }: {
+            id: number;
+            compiled: Buffer;
+            proof: string[];
+            signers: Buffer;
+            compute: number;
+          },
+          idx
+        ) => {
+          const hasRun = blocksExist[idx];
+          const compiledTx = decompress(compiled);
+          const block = blockKey(lazyTransactions, id)[0];
+          let signers: Buffer[][] = [];
+
+          let offset = 0;
+          let currSigner = 0;
+          while (offset < signersRaw.length) {
+            let curr = signersRaw.subarray(offset, signersRaw.length);
+            const length = curr.readUInt8();
+            console.log(length);
+            signers[currSigner] = [];
+
+            offset += 1; // Account for the readUint we're about to do
+            for (let i = 0; i < length; i++) {
+              curr = signersRaw.subarray(offset, signersRaw.length);
+              let length = curr.readUInt8();
+              offset += 1;
+              offset += length;
+              signers[currSigner].push(curr.subarray(1, 1 + length));
+            }
+
+            currSigner += 1;
+          }
+
+          if (!hasRun && compiledTx.instructions.length > 0) {
+            const ix = await program.methods
+              .executeTransactionV0({
+                instructions: compiledTx.instructions,
+                index: compiledTx.index,
+                signerSeeds: signers,
+              })
+              .accountsStrict({
+                payer: provider.wallet.publicKey,
+                lazyTransactions,
+                canopy: lazyTxns.canopy,
+                lazySigner,
+                block,
+                systemProgram: SystemProgram.programId,
+              })
+              .remainingAccounts([
+                ...compiledTx.accounts,
+                ...proof.map((p) => ({
+                  pubkey: new PublicKey(Buffer.from(p, "hex")),
+                  isWritable: false,
+                  isSigner: false,
+                })),
+              ])
+              .instruction();
+    // console.log(compiledTx.accounts);
+    // console.log(compiledTx.instructions);
+    compiledTx.instructions.forEach(i => {
+      const pid = compiledTx.accounts[i.programIdIndex].pubkey;
+      if (pid.equals(ASSOCIATED_TOKEN_PROGRAM_ID)) {
+        console.log("mint", compiledTx.accounts[i.accounts[3]].pubkey);
+      } else if (pid.equals(TOKEN_PROGRAM_ID)) {
+      // console.log(compiledTx.accounts[i.accounts[1]].pubkey);
+      console.log(transferInstructionData.decode(i.data));
+      }
+
+    })
+
+            return {
+              id,
+              transaction: new TransactionMessage({
+                payerKey: provider.wallet.publicKey,
+                recentBlockhash,
+                instructions: [
+                  ComputeBudgetProgram.setComputeUnitLimit({
+                    units: compute,
+                  }),
+                  ix,
+                ],
+              }),
+            };
+          }
+        }
+      )
+    )
+  ).filter((v) => Boolean(v && v.transaction));
+
+  if (asExecuteTxs.length > 0) {
+    const lookupTableAccs = await Promise.all(
+      luts.map(
+        async (lut) =>
+          (
+            await provider.connection.getAddressLookupTable(new PublicKey(lut))
+          ).value
+      )
+    );
+    return await Promise.all(
+      asExecuteTxs.map((val) => {
+        const { transaction: tx, id } = val;
+        const ret = new VersionedTransaction(
+          tx.compileToV0Message(lookupTableAccs)
+        );
+
+        try {
+          ret.sign([wallet]);
+          return Buffer.from(ret.serialize()).toJSON().data;
+        } catch (e: any) {
+          console.error("Failed to serialize tx with id", id);
+          PublicKey.prototype.toString = PublicKey.prototype.toBase58;
+          console.error(ret);
+          console.error(ret.message.addressTableLookups);
+          throw e;
+        }
+      })
+    );
+  }
+}
+
 server.get<{
   Querystring: { limit?: number; offset?: number };
   Params: { wallet: string };
@@ -86,137 +242,65 @@ server.get<{
   try {
     const results = (
       await client.query(
-        "SELECT * FROM transactions WHERE wallet = $1 LIMIT $2 OFFSET $3",
+        `SELECT * FROM transactions
+        JOIN wallet_transactions ON transactions.id = wallet_transactions.txid
+        WHERE wallet_transactions.wallet = $1
+        LIMIT $2
+        OFFSET $3
+        `,
         [userWallet, limit || 200, offset || 0]
       )
     ).rows;
     const luts = (
-      await client.query(
-        "SELECT * FROM lookup_tables",
-        []
-      )
-    ).rows.map(row => row.pubkey);
-    const recentBlockhash = (await provider.connection.getLatestBlockhash())
-      .blockhash;
-
-    console.log(`Found ${results.length} transactions to migrate}`);
-    const blocks = results.map((r) => blockKey(lazyTransactions, r.id)[0]);
-    const blocksExist = (
-      await Promise.all(
-        chunks(blocks, 100).map(
-          async (chunk) =>
-            await provider.connection.getMultipleAccountsInfo(
-              chunk as PublicKey[],
-              "confirmed"
-            )
-        )
-      )
-    ).flat();
-
-    const asExecuteTxs: { id: number; transaction: TransactionMessage }[] = (
-      await Promise.all(
-        results.map(
-          async (
-            {
-              proof,
-              compiled,
-              id,
-            }: {
-              id: number;
-              compiled: Buffer;
-              proof: string[];
-            },
-            idx
-          ) => {
-            const hasRun = blocksExist[idx];
-            const compiledTx = decompress(compiled);
-            const block = blockKey(lazyTransactions, id)[0];
-
-            if (!hasRun) {
-              const ix = await program.methods
-                .executeTransactionV0({
-                  instructions: compiledTx.instructions,
-                  index: compiledTx.index,
-                })
-                .accountsStrict({
-                  payer: provider.wallet.publicKey,
-                  lazyTransactions,
-                  lazySigner,
-                  block,
-                  systemProgram: SystemProgram.programId,
-                })
-                .remainingAccounts([
-                  ...compiledTx.accounts,
-                  ...proof.map((p) => ({
-                    pubkey: new PublicKey(Buffer.from(p, "hex")),
-                    isWritable: false,
-                    isSigner: false,
-                  })),
-                ])
-                .instruction();
-
-              return {
-                id,
-                transaction: new TransactionMessage({
-                  payerKey: provider.wallet.publicKey,
-                  recentBlockhash,
-                  instructions: [
-                    ComputeBudgetProgram.setComputeUnitLimit({
-                      units: 350000,
-                    }),
-                    ix,
-                  ],
-                }),
-              };
-            }
-          }
-        )
-      )
-    ).filter((v) => Boolean(v && v.transaction));
-
-    if (asExecuteTxs.length > 0) {
-      const lookupTableAccs = await Promise.all(
-        luts.map(
-          async (lut) =>
-            (
-              await provider.connection.getAddressLookupTable(
-                new PublicKey(lut)
-              )
-            ).value
-        )
-      );
-      return {
-        count: Number(
-          (
-            await client.query(
-              "SELECT count(*) FROM transactions WHERE wallet = $1",
-              [userWallet]
-            )
-          ).rows[0].count
-        ),
-        transactions: await Promise.all(
-          asExecuteTxs.map((val) => {
-            const { transaction: tx, id } = val;
-            const ret = new VersionedTransaction(
-              tx.compileToV0Message(lookupTableAccs)
-            );
-
-            try {
-              ret.sign([wallet]);
-              return Buffer.from(ret.serialize()).toJSON().data;
-            } catch (e: any) {
-              console.error("Failed to serialize tx with id", id);
-              PublicKey.prototype.toString = PublicKey.prototype.toBase58;
-              console.error(ret);
-              throw e;
-            }
-          })
-        ),
-      };
-    }
+      await client.query("SELECT * FROM lookup_tables", [])
+    ).rows.map((row) => row.pubkey);
+    const transactions = await getTransactions(results, luts);
     return {
-      transactions: [],
-      count: 0,
+      transactions: transactions || [],
+      count: Number(
+        (
+          await client.query(
+            "SELECT count(*) FROM wallet_transactions WHERE wallet = $1",
+            [userWallet]
+          )
+        ).rows[0].count
+      ),
+    };
+  } catch (e: any) {
+    console.error(e);
+    throw e;
+  } finally {
+    await client.release();
+  }
+});
+
+server.get<{
+  Querystring: { limit?: number; offset?: number };
+}>("/migrate", async (request, reply) => {
+  const { limit, offset } = request.query;
+  const client = await pool.connect();
+
+  try {
+    const results = (
+      await client.query(
+        "SELECT * FROM transactions ORDER BY is_router DESC, ID ASC LIMIT $1 OFFSET $2",
+        [limit || 200, offset || 0]
+      )
+    ).rows;
+    const luts = (
+      await client.query("SELECT * FROM lookup_tables", [])
+    ).rows.map((row) => row.pubkey);
+    const transactions = await getTransactions(results, luts);
+    return {
+      transactions: transactions || [],
+      count: Number(
+        (
+          await client.query(
+            "SELECT count(*) FROM transactions",
+            []
+          )
+        ).rows[0].count
+      ),
     };
   } catch (e: any) {
     console.error(e);

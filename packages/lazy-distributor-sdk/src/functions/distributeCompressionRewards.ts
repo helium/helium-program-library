@@ -15,7 +15,10 @@ export async function distributeCompressionRewards<IDL extends Idl>({
   lazyDistributor: PublicKey;
   owner?: PublicKey;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
-  getAssetProofFn?: (url: string, assetId: PublicKey) => Promise<AssetProof | undefined>;
+  getAssetProofFn?: (
+    url: string,
+    assetId: PublicKey
+  ) => Promise<AssetProof | undefined>;
 }) {
   // @ts-ignore
   const endpoint = program.provider.connection._rpcEndpoint;
@@ -28,7 +31,9 @@ export async function distributeCompressionRewards<IDL extends Idl>({
     throw new Error("No asset proof with ID " + assetId.toBase58());
   }
   const { root, proof, leaf, treeId, nodeIndex } = assetProof;
-  const { ownership: { owner } } = asset;
+  const {
+    ownership: { owner },
+  } = asset;
 
   return program.methods
     .distributeCompressionRewardsV0({

@@ -37,11 +37,12 @@ pub struct GenesisIssueDelegatedDataCreditsV0<'info> {
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
   #[account(
     mut,
-    seeds = [b"lazy_signer", b"testhelium10"],
+    seeds = [b"lazy_signer", b"testhelium12"],
     seeds::program = lazy_transactions::ID,
     bump,
   )]
   pub lazy_signer: Signer<'info>,
+  #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,
   /// CHECK: Verified by cpi
   #[account(

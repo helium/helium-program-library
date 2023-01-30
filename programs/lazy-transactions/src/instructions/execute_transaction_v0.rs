@@ -1,3 +1,4 @@
+use crate::canopy::fill_in_proof_from_canopy;
 use crate::error::ErrorCode;
 use crate::{merkle_proof::verify, state::*};
 use anchor_lang::{prelude::*, solana_program, solana_program::instruction::Instruction};
@@ -15,6 +16,11 @@ pub struct CompiledInstruction {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ExecuteTransactionArgsV0 {
   pub instructions: Vec<CompiledInstruction>,
+  /// Additional signer seeds. Should include bump
+  /// Note that these seeds will be prefixed with "user", lazy_transactions.name
+  /// and the bump you pass and account should be consistent with this. But to save space
+  /// in the instruction, they should be ommitted here. See tests for examples
+  pub signer_seeds: Vec<Vec<Vec<u8>>>,
   pub index: u32,
 }
 
@@ -23,7 +29,12 @@ pub struct ExecuteTransactionArgsV0 {
 pub struct ExecuteTransactionV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
+  #[account(
+    has_one = canopy
+  )]
   pub lazy_transactions: Account<'info, LazyTransactionsV0>,
+  /// CHECK: Verified by has one
+  pub canopy: UncheckedAccount<'info>,
   #[account(
     mut,
     seeds = ["lazy_signer".as_bytes(), lazy_transactions.name.as_bytes()],
@@ -51,10 +62,17 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
     .unwrap())
   .into();
 
-  let proof = ctx.remaining_accounts[(largest_acct_idx + 1)..]
+  let mut proof = ctx.remaining_accounts[(largest_acct_idx + 1)..]
     .iter()
     .map(|a| a.key.to_bytes())
     .collect::<Vec<_>>();
+
+  fill_in_proof_from_canopy(
+    ctx.accounts.canopy.try_borrow_data()?.as_ref(),
+    ctx.accounts.lazy_transactions.max_depth,
+    args.index,
+    &mut proof,
+  )?;
 
   let accts = ctx.remaining_accounts[..(largest_acct_idx + 1)]
     .iter()
@@ -70,7 +88,13 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
     .collect::<Result<Vec<Vec<u8>>>>()
     .unwrap();
 
-  let all_vecs = [accts, ixs, vec![args.index.to_le_bytes().to_vec()]].concat();
+  let all_vecs = [
+    accts,
+    ixs,
+    args.signer_seeds.clone().into_iter().flatten().collect(),
+    vec![args.index.to_le_bytes().to_vec()],
+  ]
+  .concat();
   let to_hash: &[&[u8]] = &all_vecs
     .iter()
     .map(|v| v.as_slice())
@@ -82,6 +106,35 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
     return Err(error!(ErrorCode::InvalidData));
   };
 
+  let lazy_signer_seeds: &[&[u8]] = &[
+    b"lazy_signer",
+    ctx.accounts.lazy_transactions.name.as_bytes(),
+    &[ctx.bumps["lazy_signer"]],
+  ];
+
+  let prefix: Vec<&[u8]> = vec![b"user", ctx.accounts.lazy_transactions.name.as_bytes()];
+  // Need to convert to &[&[u8]] because invoke_signed expects that
+  let signers_inner_u8: Vec<Vec<&[u8]>> = args
+    .signer_seeds
+    .iter()
+    .map(|s| {
+      let mut clone = prefix.clone();
+      clone.extend(s.iter().map(|v| v.as_slice()).collect::<Vec<&[u8]>>());
+
+      clone
+    })
+    .collect();
+  let mut signers = signers_inner_u8
+    .iter()
+    .map(|s| s.as_slice())
+    .collect::<Vec<&[&[u8]]>>();
+
+  signers.extend(vec![lazy_signer_seeds]);
+
+  let signer_addresses = signers
+    .iter()
+    .map(|s| Pubkey::create_program_address(s, ctx.program_id).unwrap())
+    .collect::<std::collections::HashSet<Pubkey>>();
   for ix in args.instructions {
     let mut accounts = Vec::new();
     let mut account_infos = Vec::new();
@@ -90,7 +143,9 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
       accounts.push(acct.clone());
       account_infos.push(AccountMeta {
         pubkey: acct.key(),
-        is_signer: acct.key() == ctx.accounts.lazy_signer.key() || acct.is_signer,
+        is_signer: acct.key() == ctx.accounts.lazy_signer.key()
+          || acct.is_signer
+          || signer_addresses.contains(&acct.key()),
         is_writable: acct.is_writable,
       })
     }
@@ -101,11 +156,7 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
         data: ix.data,
       },
       accounts.as_slice(),
-      &[&[
-        b"lazy_signer",
-        ctx.accounts.lazy_transactions.name.as_bytes(),
-        &[ctx.bumps["lazy_signer"]],
-      ]],
+      &signers,
     )?;
   }
 

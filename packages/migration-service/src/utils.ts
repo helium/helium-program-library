@@ -3,7 +3,7 @@ import {
   ixToBin,
   ixFromBin,
   compiledIxLayout,
-  numBytes,
+  numBytesCompiledTx,
 } from "@helium/lazy-transactions-sdk";
 import { PublicKey } from "@solana/web3.js";
 import fs from "fs";
@@ -39,7 +39,7 @@ export function compress(ct: CompiledTransaction): Buffer {
     4 +
     ct.accounts.length * (32 + 2) +
     ct.instructions.reduce((acc, ix) => {
-      return acc + numBytes(ix);
+      return acc + numBytesCompiledTx(ix);
     }, 0);
   const buf = Buffer.alloc(len);
   schema.encode(ct, buf);

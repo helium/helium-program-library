@@ -1,5 +1,5 @@
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
-import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
+import { dataCreditsKey, init as initDc, PROGRAM_ID } from "@helium/data-credits-sdk";
 import { daoKey, init as initDao } from "@helium/helium-sub-daos-sdk";
 import { init as initLazy } from "@helium/lazy-distributor-sdk";
 import {
@@ -86,11 +86,6 @@ async function run() {
       describe: "Keypair of the Data Credit token",
       default: `${__dirname}/../keypairs/dc.json`,
     },
-    makerKeypair: {
-      type: "string",
-      describe: "Keypair of a maker",
-      default: `${os.homedir()}/.config/solana/id.json`,
-    },
     numHnt: {
       type: "number",
       describe:
@@ -168,6 +163,7 @@ async function run() {
   const councilKeypair = await loadKeypair(argv.councilKeypair);
   const councilWallet = new PublicKey(argv.councilWallet);
   const me = provider.wallet.publicKey;
+  const dao = daoKey(hntKeypair.publicKey)[0];
 
   console.log("HNT", hntKeypair.publicKey.toBase58());
   console.log("HST", hstKeypair.publicKey.toBase58());
@@ -176,7 +172,25 @@ async function run() {
   console.log("COUNCIL", councilKeypair.publicKey.toBase58());
   console.log("COUNCIL WALLET", councilWallet.toBase58());
 
+  const thread = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("thread", "utf8"),
+      dao.toBuffer(),
+      Buffer.from("end-epoch", "utf8"),
+    ],
+    new PublicKey(
+      "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
+    )
+  )[0];
+
+  console.log("DAO", dao.toString());
+  console.log("THREAD", thread.toString());
+
   const conn = provider.connection;
+  if (await exists(conn, dao)) {
+    console.log("Dao already exists");
+    return;
+  }
 
   await createAndMint({
     provider,
@@ -237,7 +251,7 @@ async function run() {
       new GoverningTokenConfigAccountArgs({
         // community token config
         voterWeightAddin: heliumVsrProgram.programId,
-        maxVoterWeightAddin: undefined,
+        maxVoterWeightAddin: heliumVsrProgram.programId,
         tokenType: GoverningTokenType.Liquid,
       }),
       new GoverningTokenConfigAccountArgs({
@@ -297,7 +311,6 @@ async function run() {
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
-  const dao = (await daoKey(hntKeypair.publicKey))[0];
   const governance = PublicKey.findProgramAddressSync(
     [
       Buffer.from("account-governance", "utf-8"),
@@ -381,6 +394,7 @@ async function run() {
   await sendInstructions(provider, instructions, []);
 
   const dcKey = (await dataCreditsKey(dcKeypair.publicKey))[0];
+  console.log("dcpid", PROGRAM_ID.toBase58())
   if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
@@ -441,7 +455,17 @@ async function run() {
         ),
       })
       .rpc({ skipPreflight: true });
+
+    console.log("Transfering sol to thread")
+    await sendInstructions(provider, [
+      SystemProgram.transfer({
+        fromPubkey: provider.wallet.publicKey,
+        toPubkey: thread,
+        lamports: BigInt(toBN(0.1, 9).toString()),
+      }),
+    ]);
   }
+  
 }
 
 run()

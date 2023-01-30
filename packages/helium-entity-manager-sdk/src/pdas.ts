@@ -5,6 +5,22 @@ import crypto from "crypto";
 // @ts-ignore
 import bs58 from "bs58";
 
+async function hashAnyhere(input: Buffer) {
+  /// @ts-ignore
+  if (typeof window != "undefined") {
+    return crypto.subtle.digest("SHA-256", input);
+  } else {
+    const { createHash } = await import("crypto");
+    return createHash("sha256").update(input).digest();
+  }
+}
+
+export const entityCreatorKey = (
+  dao: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+) => 
+  PublicKey.findProgramAddressSync([Buffer.from("entity_creator", "utf-8"), dao.toBuffer()], programId);
+
 export const rewardableEntityConfigKey = (
   subDao: PublicKey,
   symbol: string,
@@ -28,14 +44,22 @@ export const hotspotCollectionKey = (
     programId
   );
 
-export const makerKey = (
-  name: String,
+export const makerKey = (name: String, programId: PublicKey = PROGRAM_ID) =>
+  PublicKey.findProgramAddressSync(
+    [Buffer.from("maker", "utf-8"), Buffer.from(name, "utf-8")],
+    programId
+  );
+
+export const makerApprovalKey = (
+  rewardableEntityConfig: PublicKey,
+  maker: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
     [
-      Buffer.from("maker", "utf-8"),
-      Buffer.from(name, "utf-8"),
+      Buffer.from("maker_approval", "utf-8"),
+      rewardableEntityConfig.toBuffer(),
+      maker.toBuffer(),
     ],
     programId
   );
@@ -48,7 +72,7 @@ export const keyToAssetKey = async (
   if (typeof entityKey === "string") {
     entityKey = Buffer.from(bs58.decode(entityKey));
   }
-  const hash = await crypto.subtle.digest("SHA-256", entityKey);
+  const hash = await hashAnyhere(entityKey);
 
   return PublicKey.findProgramAddressSync(
     [Buffer.from("key_to_asset", "utf-8"), dao.toBuffer(), Buffer.from(hash)],
@@ -56,27 +80,41 @@ export const keyToAssetKey = async (
   );
 };
 
-export const iotInfoKey = (
+export const iotInfoKey = async (
   rewardableEntityConfig: PublicKey,
-  assetId: PublicKey,
+  entityKey: Buffer | string,
   programId: PublicKey = PROGRAM_ID
 ) => {
+  if (typeof entityKey === "string") {
+    entityKey = Buffer.from(bs58.decode(entityKey));
+  }
+  const hash = await hashAnyhere(entityKey);
+
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("iot_info", "utf-8"), rewardableEntityConfig.toBuffer(), assetId.toBuffer()],
+    [
+      Buffer.from("iot_info", "utf-8"),
+      rewardableEntityConfig.toBuffer(),
+      Buffer.from(hash),
+    ],
     programId
   );
 };
 
-export const mobileInfoKey = (
+export const mobileInfoKey = async (
   rewardableEntityConfig: PublicKey,
-  assetId: PublicKey,
+  entityKey: Buffer | string,
   programId: PublicKey = PROGRAM_ID
 ) => {
+  if (typeof entityKey === "string") {
+    entityKey = Buffer.from(bs58.decode(entityKey));
+  }
+  const hash = await hashAnyhere(entityKey);
+
   return PublicKey.findProgramAddressSync(
     [
       Buffer.from("mobile_info", "utf-8"),
       rewardableEntityConfig.toBuffer(),
-      assetId.toBuffer(),
+      Buffer.from(hash),
     ],
     programId
   );

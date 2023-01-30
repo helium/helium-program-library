@@ -76,7 +76,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
   noHotspots: {
     type: "boolean",
-    default: false
+    default: false,
   },
   url: {
     alias: "u",
@@ -185,9 +185,10 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
   noGovernance: {
     type: "boolean",
-    describe: "If this is set, governance will be skipped. Ensure that you also included --noGovernance when running create-dao",
+    describe:
+      "If this is set, governance will be skipped. Ensure that you also included --noGovernance when running create-dao",
     default: false,
-  }
+  },
 });
 
 const MIN_LOCKUP = 15811200; // 6 months
@@ -211,7 +212,6 @@ async function run() {
 
   const wallet = loadKeypair(argv.wallet);
   const aggKeypair = await loadKeypair(argv.aggregatorKeypair);
-  const merkle = await loadKeypair(argv.merkleKeypair);
   const subdaoKeypair = await loadKeypair(argv.subdaoKeypair);
   const oracleKeypair = await loadKeypair(argv.oracleKeypair);
   const oracleKey = oracleKeypair.publicKey;
@@ -230,6 +230,23 @@ async function run() {
   console.log("DAO", dao.toString());
   console.log("SUBDAO", subdao.toString());
   const daoAcc = await heliumSubDaosProgram.account.daoV0.fetch(dao);
+
+  const thread = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("thread", "utf8"),
+      subdao.toBuffer(),
+      Buffer.from("end-epoch", "utf8"),
+    ],
+    new PublicKey("3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv")
+  )[0];
+  if (await exists(conn, subdao)) {
+    const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
+
+    console.log(
+      `Subdao exists. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}. Thread: ${thread.toString()}`
+    );
+    return;
+  }
   const [lazyDist] = await lazyDistributorKey(subdaoKeypair.publicKey);
   const rewardsEscrow = await getAssociatedTokenAddress(
     subdaoKeypair.publicKey,
@@ -309,36 +326,35 @@ async function run() {
         })
         .instruction()
     );
+    console.log("Configuring VSR voting mint at [0]");
+    instructions.push(
+      await heliumVsrProgram.methods
+        .configureVotingMintV0({
+          idx: 0, // idx
+          digitShift: 0, // digit shift
+          lockedVoteWeightScaledFactor: new anchor.BN(1_000_000_000),
+          minimumRequiredLockupSecs: new anchor.BN(MIN_LOCKUP),
+          maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE),
+          genesisVotePowerMultiplier: 0,
+          genesisVotePowerMultiplierExpirationTs: new anchor.BN(
+            Number(await getUnixTimestamp(provider))
+          ),
+          lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
+        })
+        .accounts({
+          registrar,
+          mint: subdaoKeypair.publicKey,
+        })
+        .remainingAccounts([
+          {
+            pubkey: subdaoKeypair.publicKey,
+            isSigner: false,
+            isWritable: false,
+          },
+        ])
+        .instruction()
+    );
   }
-
-  console.log("Configuring VSR voting mint at [0]");
-  instructions.push(
-    await heliumVsrProgram.methods
-      .configureVotingMintV0({
-        idx: 0, // idx
-        digitShift: 0, // digit shift
-        lockedVoteWeightScaledFactor: new anchor.BN(1_000_000_000),
-        minimumRequiredLockupSecs: new anchor.BN(MIN_LOCKUP),
-        maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE),
-        genesisVotePowerMultiplier: 0,
-        genesisVotePowerMultiplierExpirationTs: new anchor.BN(
-          Number(await getUnixTimestamp(provider))
-        ),
-        lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
-      })
-      .accounts({
-        registrar,
-        mint: subdaoKeypair.publicKey,
-      })
-      .remainingAccounts([
-        {
-          pubkey: subdaoKeypair.publicKey,
-          isSigner: false,
-          isWritable: false,
-        },
-      ])
-      .instruction()
-  );
 
   await sendInstructions(provider, instructions, []);
   instructions = [];
@@ -353,10 +369,7 @@ async function run() {
     govProgramId
   )[0];
   const nativeTreasury = await PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("native-treasury", "utf-8"),
-      governance.toBuffer(),
-    ],
+    [Buffer.from("native-treasury", "utf-8"), governance.toBuffer()],
     govProgramId
   )[0];
   console.log(
@@ -454,18 +467,10 @@ async function run() {
       .rpc({ skipPreflight: true });
   }
 
-  const thread = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("thread", "utf8"),
-      subdao.toBuffer(),
-      Buffer.from("end-epoch", "utf8"),
-    ],
-    new PublicKey(
-      "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
-    )
-  )[0];
   if (!(await exists(conn, subdao))) {
-    let aggregatorKey = new PublicKey("GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"); // value cloned from mainnet to localnet
+    let aggregatorKey = new PublicKey(
+      "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
+    ); // value cloned from mainnet to localnet
     if (!isLocalhost(provider)) {
       console.log("Initializing switchboard oracle");
       const switchboard = await SwitchboardProgram.load(
@@ -510,15 +515,18 @@ async function run() {
             },
           ],
         });
-        console.log("Created active device aggregator", agg.publicKey.toBase58());
+        console.log(
+          "Created active device aggregator",
+          agg.publicKey.toBase58()
+        );
         await AggregatorHistoryBuffer.create(switchboard, {
           aggregatorAccount: agg,
-          maxSamples: 24 * 7,
+          maxSamples: 24 * 31, // Give us a month of active device data. If we fail to run end epoch, RIP.
         });
         aggregatorKey = agg.publicKey;
       }
     }
-    
+
     const instructions: TransactionInstruction[] = [];
 
     console.log(`Initializing ${name} SubDAO`);
@@ -554,11 +562,11 @@ async function run() {
       })
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-      ])
+      ]);
     if (argv.noGovernance) {
       await initSubdaoMethod.rpc({ skipPreflight: true });
     } else {
-      instructions.push(await initSubdaoMethod.instruction())
+      instructions.push(await initSubdaoMethod.instruction());
       await sendInstructionsOrCreateProposal({
         provider,
         instructions,
@@ -570,7 +578,7 @@ async function run() {
       });
     }
 
-    console.log("Transfering sol to thread")
+    console.log("Transfering sol to thread");
     await sendInstructions(provider, [
       SystemProgram.transfer({
         fromPubkey: provider.wallet.publicKey,
@@ -578,70 +586,57 @@ async function run() {
         lamports: BigInt(toBN(0.1, 9).toString()),
       }),
     ]);
-    
-    
-  } else {
-    const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
-    
-    console.log(
-      `Subdao exits. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}. Thread: ${thread.toString()}`
-    );
   }
 
-  const hsConfigKey = (await rewardableEntityConfigKey(subdao, name.toUpperCase()))[0];
-  if (!(await provider.connection.getAccountInfo(hsConfigKey)) && !argv.noHotspots) {
+  const hsConfigKey = (
+    await rewardableEntityConfigKey(subdao, name.toUpperCase())
+  )[0];
+  if (
+    !(await provider.connection.getAccountInfo(hsConfigKey)) &&
+    !argv.noHotspots
+  ) {
     const instructions: TransactionInstruction[] = [];
-    console.log(`Initalizing ${name} HotspotConfig`);
-
-    // Create a merkle account and assign it to compression
-    if (!(await exists(conn, merkle.publicKey))) {
-      const space = getConcurrentMerkleTreeAccountSize(26, 1024);
-      await sendInstructions(
-        provider,
-        [
-          SystemProgram.createAccount({
-            fromPubkey: provider.wallet.publicKey,
-            newAccountPubkey: merkle.publicKey,
-            lamports:
-              await provider.connection.getMinimumBalanceForRentExemption(
-                space
-              ),
-            space: space,
-            programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-          }),
-        ],
-        [merkle]
-      );
+    console.log(`Initalizing ${name} RewardableEntityConfig`);
+    let settings;
+    if (name.toUpperCase() == "IOT") {
+      settings = {
+        iotConfig: {
+          minGain: 10,
+          maxGain: 150,
+          fullLocationStakingFee: toBN(1000000, 0),
+          dataonlyLocationStakingFee: toBN(500000, 0),
+        } as any,
+      };
+    } else {
+      settings = {
+        mobileConfig: {
+          fullLocationStakingFee: toBN(1000000, 0),
+          dataonlyLocationStakingFee: toBN(500000, 0),
+        },
+      };
     }
 
     instructions.push(
       await hemProgram.methods
         .initializeRewardableEntityConfigV0({
           symbol: name.toUpperCase(),
-          settings: {
-            iotConfig: {
-              minGain: 10,
-              maxGain: 150,
-              fullLocationStakingFee: toBN(1000000, 0),
-              dataonlyLocationStakingFee: toBN(500000, 0),
-            } as any,
-          },
+          settings,
         })
         .accounts({
           subDao: subdao,
           payer: argv.noGovernance ? me : nativeTreasury,
           authority: argv.noGovernance ? me : governance,
         })
-        .signers([merkle])
         .instruction()
     );
+
     await sendInstructionsOrCreateProposal({
       provider,
       instructions,
       walletSigner: wallet,
       signers: [],
       govProgramId,
-      proposalName: `Create ${name} HotspotConfig`,
+      proposalName: `Create ${name} RewardableEntityConfig`,
       votingMint: councilKeypair.publicKey,
     });
   }

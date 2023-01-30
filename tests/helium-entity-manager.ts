@@ -7,6 +7,7 @@ import { Program } from "@project-serum/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import chai from "chai";
 import {
+  entityCreatorKey,
   init as initHeliumEntityManager,
   onboardIotHotspot,
   onboardMobileHotspot, updateIotMetadata, updateMobileMetadata
@@ -190,7 +191,13 @@ describe("helium-entity-manager", () => {
           key: hotspotCollection,
           verified: true,
         },
-        creators: [],
+        creators: [
+          {
+            address: entityCreatorKey(dao)[0],
+            verified: true,
+            share: 100
+          },
+        ],
         sellerFeeBasisPoints: 0,
         primarySaleHappened: true,
         isMutable: true,
@@ -405,7 +412,13 @@ describe("helium-entity-manager", () => {
           key: hotspotCollection,
           verified: true,
         },
-        creators: [],
+        creators: [
+          {
+            address: entityCreatorKey(dao)[0],
+            verified: true,
+            share: 100,
+          },
+        ],
         sellerFeeBasisPoints: 0,
         primarySaleHappened: true,
         isMutable: true,
@@ -506,6 +519,7 @@ describe("helium-entity-manager", () => {
       await hemProgram.methods
         .updateRewardableEntityConfigV0({
           newAuthority: PublicKey.default,
+          settings: null
         })
         .accounts({
           rewardableEntityConfig,

@@ -6,7 +6,7 @@ use anchor_spl::token::{self, Token, TokenAccount};
 
 #[derive(Accounts)]
 pub struct DepositV0<'info> {
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
 
   #[account(
     mut,
@@ -67,7 +67,7 @@ pub fn handler(ctx: Context<DepositV0>, args: DepositArgsV0) -> Result<()> {
   // Deposit tokens into the vault and increase the lockup amount too.
   token::transfer(ctx.accounts.transfer_ctx(), amount)?;
 
-  let registrar = &ctx.accounts.registrar.load()?;
+  let registrar = &ctx.accounts.registrar;
   let position = &mut ctx.accounts.position;
 
   position.amount_deposited_native = position
@@ -84,8 +84,7 @@ pub fn handler(ctx: Context<DepositV0>, args: DepositArgsV0) -> Result<()> {
   );
 
   let curr_ts = registrar.clock_unix_timestamp();
-
-  let config = registrar.voting_mints[mint_idx];
+  let config = &registrar.voting_mints[mint_idx];
 
   require!(
     curr_ts >= position.genesis_end

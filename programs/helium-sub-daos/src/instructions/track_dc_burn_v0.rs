@@ -5,7 +5,7 @@ use anchor_spl::token::Mint;
 use std::str::FromStr;
 use voter_stake_registry::state::Registrar;
 
-pub const DC_KEY: &str = "credacwrBVewZAgCwNgowCSMbCiepuesprUWPBeLTSg";
+pub const DC_KEY: &str = "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TrackDcBurnArgsV0 {
@@ -20,7 +20,7 @@ pub struct TrackDcBurnV0<'info> {
     init_if_needed,
     payer = account_payer,
     space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(registrar.load()?.clock_unix_timestamp()).to_le_bytes()],
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(registrar.clock_unix_timestamp()).to_le_bytes()],
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
@@ -29,7 +29,7 @@ pub struct TrackDcBurnV0<'info> {
     has_one = dao
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
-  pub registrar: AccountLoader<'info, Registrar>,
+  pub registrar: Box<Account<'info, Registrar>>,
   #[account(
     has_one = dc_mint,
     has_one = registrar,
@@ -48,13 +48,18 @@ pub struct TrackDcBurnV0<'info> {
 }
 
 pub fn handler(ctx: Context<TrackDcBurnV0>, args: TrackDcBurnArgsV0) -> Result<()> {
-  let curr_ts = ctx.accounts.registrar.load()?.clock_unix_timestamp();
+  let curr_ts = ctx.accounts.registrar.clock_unix_timestamp();
   ctx.accounts.sub_dao_epoch_info.epoch = current_epoch(curr_ts);
-  update_subdao_vehnt(
+  if let Err(e) = update_subdao_vehnt(
     &mut ctx.accounts.sub_dao,
     &mut ctx.accounts.sub_dao_epoch_info,
     curr_ts,
-  )?;
+  ) {
+    // This shouldn't usually happen, but failure can occur
+    // if subdao epoch info isn't updated linearly. Dc burns should still be tracked
+    // in this scenario.
+    msg!("Failed to update sub_dao vehnt: {:?}", e);
+  };
 
   ctx.accounts.sub_dao_epoch_info.initialized = true;
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();

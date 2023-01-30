@@ -3,21 +3,23 @@ import dotenv from "dotenv";
 import express, { Application, Request, Response } from "express";
 dotenv.config();
 // @ts-ignore
-import {
-  init as initHeliumEntityManager
-} from "@helium/helium-entity-manager-sdk";
+import { init as initHeliumEntityManager } from "@helium/helium-entity-manager-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { init, PROGRAM_ID } from "@helium/lazy-distributor-sdk";
 import { Asset, getAsset } from "@helium/spl-utils";
 import {
   AnchorProvider,
-  BorshInstructionCoder, getProvider, Program,
-  setProvider
+  BorshInstructionCoder,
+  getProvider,
+  Program,
+  setProvider,
 } from "@project-serum/anchor";
 import {
-  Keypair, PublicKey,
-  Transaction, TransactionInstruction
+  Keypair,
+  PublicKey,
+  Transaction,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import bodyParser from "body-parser";
 import cors from "cors";
@@ -29,7 +31,7 @@ export interface Database {
   endEpoch: () => Promise<{
     [key: string]: number;
   }>;
-  reset: () => void
+  reset: () => void;
 }
 
 export class DatabaseMock implements Database {
@@ -46,7 +48,10 @@ export class DatabaseMock implements Database {
 
   constructor(
     readonly issuanceProgram: Program<HeliumEntityManager>,
-    readonly getAssetFn: (url: string, asset: PublicKey) => Promise<Asset | undefined> = getAsset
+    readonly getAssetFn: (
+      url: string,
+      asset: PublicKey
+    ) => Promise<Asset | undefined> = getAsset
   ) {
     this.inMemHash = {
       totalClicks: 0,
@@ -59,19 +64,22 @@ export class DatabaseMock implements Database {
       totalClicks: 0,
       lifetimeRewards: 0,
       byHotspot: {},
-    }
-  };
+    };
+  }
 
   async getCurrentRewards(assetId: PublicKey) {
-    // @ts-ignore
-    const asset = await this.getAssetFn(this.issuanceProgram.provider.connection._rpcEndpoint, assetId);
+    const asset = await this.getAssetFn(
+      // @ts-ignore
+      this.issuanceProgram.provider.connection._rpcEndpoint,
+      assetId
+    );
     if (!asset) {
-      console.error("No asset found", assetId.toBase58())
-      return "0"
+      console.error("No asset found", assetId.toBase58());
+      return "0";
     }
     const eccCompact = asset.content.json_uri.split("/").slice(-1)[0] as string;
     try {
-    const pubkey = Address.fromB58(eccCompact);
+      const pubkey = Address.fromB58(eccCompact);
       return Math.floor(
         (this.inMemHash.byHotspot[pubkey.b58]?.lifetimeRewards || 0) *
           Math.pow(10, 8)
@@ -140,7 +148,7 @@ export class OracleServer {
   constructor(
     public program: Program<LazyDistributor>,
     private oracle: Keypair,
-    public db: Database,
+    public db: Database
   ) {
     const app = express();
     app.use(cors());
@@ -168,8 +176,8 @@ export class OracleServer {
     this.app.post("/hotspots", this.incrementHotspotRewardsHandler.bind(this));
     this.app.post("/endepoch", this.endEpochHandler.bind(this));
     this.app.get("/reset", (req: Request, res: Response) => {
-      this.db.reset()
-      res.json({ ok: true })
+      this.db.reset();
+      res.json({ ok: true });
     });
   }
 
@@ -225,7 +233,10 @@ export class OracleServer {
 
     // validate only interacts with LD program and only calls setCurrentRewards and distributeRewards
     const setRewardIxs: TransactionInstruction[] = [];
-    let recipientToLazyDistToMint: Record<string, Record<string, PublicKey>> = {};
+    let recipientToLazyDistToMint: Record<
+      string,
+      Record<string, PublicKey>
+    > = {};
     const initRecipientTx = this.program.idl.instructions.find(
       (x) => x.name === "initializeRecipientV0"
     )!;
@@ -234,10 +245,10 @@ export class OracleServer {
     )!;
     const mintIdx = initRecipientTx.accounts.findIndex(
       (x) => x.name === "mint"
-    )!
+    )!;
     const recipientIdxInitRecipient = initRecipientTx.accounts.findIndex(
       (x) => x.name === "recipient"
-    )!
+    )!;
     for (const ix of tx.instructions) {
       if (!ix.programId.equals(PROGRAM_ID)) {
         res.status(400).json({ error: "Invalid instructions in transaction" });
@@ -257,12 +268,14 @@ export class OracleServer {
         return;
       }
       if (decoded.name === "setCurrentRewardsV0") setRewardIxs.push(ix);
-      
+
       if (decoded.name === "initializeRecipientV0") {
-        const recipient = ix.keys[recipientIdxInitRecipient].pubkey.toBase58()
+        const recipient = ix.keys[recipientIdxInitRecipient].pubkey.toBase58();
         recipientToLazyDistToMint[recipient] ||= {};
-        const lazyDist = ix.keys[lazyDistributorIdxInitRecipient].pubkey.toBase58()
-        recipientToLazyDistToMint[recipient][lazyDist] = ix.keys[mintIdx].pubkey;
+        const lazyDist =
+          ix.keys[lazyDistributorIdxInitRecipient].pubkey.toBase58();
+        recipientToLazyDistToMint[recipient][lazyDist] =
+          ix.keys[mintIdx].pubkey;
       }
     }
 
@@ -290,15 +303,17 @@ export class OracleServer {
 
         const recipient = ix.keys[recipientIdx].pubkey;
         const lazyDist = ix.keys[lazyDistIdx].pubkey;
-        let mint = (recipientToLazyDistToMint[recipient.toBase58()] || {})[lazyDist.toBase58()];
+        let mint = (recipientToLazyDistToMint[recipient.toBase58()] || {})[
+          lazyDist.toBase58()
+        ];
         if (!mint) {
-          const recipientAcc = await this.program.account.recipientV0.fetch(recipient);
+          const recipientAcc = await this.program.account.recipientV0.fetch(
+            recipient
+          );
           mint = recipientAcc.asset;
         }
 
-        const currentRewards = await this.db.getCurrentRewards(
-          mint,
-        );
+        const currentRewards = await this.db.getCurrentRewards(mint);
         // @ts-ignore
         if (decoded.data.args.currentRewards.toNumber() > currentRewards) {
           res.status(400).json({ error: "Invalid amount" });

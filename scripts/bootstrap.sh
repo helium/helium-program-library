@@ -21,24 +21,30 @@ for f in "${KEYPAIRS[@]}"; do
     fi
 done
 
-RANDOM=$(openssl rand -hex 20)
-echo "Using $RANDOM for dao names"
+RND=$RANDOM
+echo "Using $RND for dao names"
 
 # init the dao and subdaos
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-dao.ts \
-    --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium $RANDOM" --noGovernance
+    --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium $RND" --noGovernance -u $CLUSTER_URL
 
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-subdao.ts \
     -rewardsOracleUrl https://iot-oracle.oracle.test-helium.com \
     --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n IOT --subdaoKeypair packages/helium-cli/keypairs/iot.json \
-    --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "IOT $RANDOM" --dcBurnAuthority $(solana address) --noGovernance
+    --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "IOT $RND" --dcBurnAuthority $(solana address) --noGovernance -u $CLUSTER_URL
 
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-subdao.ts \
     -rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com \
     --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n Mobile --subdaoKeypair packages/helium-cli/keypairs/mobile.json \
-    --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Mobile $RANDOM" \
-    --dcBurnAuthority $(solana address)  --noHotspots --noGovernance
+    --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Mobile $RND" \
+    --dcBurnAuthority $(solana address)  --noGovernance -u $CLUSTER_URL
 
+if test -f "./packages/helium-cli/makers.json"; then
+  npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-maker.ts -u $CLUSTER --symbol IOT --subdaoMint $(solana address -k packages/helium-cli/keypairs/iot.json) --fromFile packages/helium-cli/makers.json --councilKeypair ./packages/helium-cli/keypairs/council.json
+fi
+if test -f "./packages/helium-cli/makers-mobile.json"; then
+  npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-maker.ts -u $CLUSTER --symbol MOBILE --subdaoMint $(solana address -k packages/helium-cli/keypairs/mobile.json) --fromFile packages/helium-cli/makers-mobile.json --councilKeypair ./packages/helium-cli/keypairs/council.json
+fi
 
 # save the keypairs as environment variables (used by other packages)
 export DC_MINT=$(solana address -k ./packages/helium-cli/keypairs/dc.json)

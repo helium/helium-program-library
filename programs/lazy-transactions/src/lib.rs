@@ -1,7 +1,8 @@
 use anchor_lang::prelude::*;
 
-declare_id!("1atNarMiQ8RMLkcTwqHHUESs2f4SB3uouPKFLbXcMwE");
+declare_id!("1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h");
 
+pub mod canopy;
 pub mod error;
 pub mod instructions;
 pub mod merkle_proof;
@@ -37,5 +38,9 @@ pub mod lazy_transactions {
     args: UpdateLazyTransactionsArgsV0,
   ) -> Result<()> {
     update_lazy_transactions_v0::handler(ctx, args)
+  }
+
+  pub fn set_canopy_v0(ctx: Context<SetCanopyV0>, args: SetCanopyArgsV0) -> Result<()> {
+    set_canopy_v0::handler(ctx, args)
   }
 }

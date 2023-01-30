@@ -44,7 +44,9 @@ impl ConfigSettingsV0 {
 #[derive(Accounts)]
 #[instruction(args: UpdateIotInfoArgsV0)]
 pub struct UpdateIotInfoV0<'info> {
+  #[account(mut)]
   pub payer: Signer<'info>,
+  #[account(mut)]
   pub dc_fee_payer: Signer<'info>,
   #[account(
     mut,

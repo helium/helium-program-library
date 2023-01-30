@@ -2,14 +2,16 @@ use std::cmp::min;
 
 use crate::constants::HOTSPOT_METADATA_URL;
 use crate::error::ErrorCode;
-use crate::state::*;
+use crate::{id, state::*};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
+use anchor_lang::solana_program::program::{invoke, invoke_signed};
+use anchor_lang::solana_program::system_instruction::{self, create_account};
 use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
 use helium_sub_daos::DaoV0;
-use mpl_bubblegum::state::metaplex_adapter::TokenStandard;
 use mpl_bubblegum::state::metaplex_adapter::{Collection, MetadataArgs, TokenProgramVersion};
+use mpl_bubblegum::state::metaplex_adapter::{Creator, TokenStandard};
 use mpl_bubblegum::utils::get_asset_id;
 use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
@@ -33,7 +35,7 @@ pub struct GenesisIssueHotspotArgsV0 {
 pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     mut,
-    seeds = [b"lazy_signer", b"testhelium10"],
+    seeds = [b"lazy_signer", b"testhelium12"],
     seeds::program = lazy_transactions::ID,
     bump,
   )]
@@ -52,11 +54,17 @@ pub struct GenesisIssueHotspotV0<'info> {
   /// CHECK: We trust the lazy signer, don't need to verify this account, it's just used in the seeds of iot info.
   /// Not passing it as an arg because lookup table will compress this to 1 byte.
   pub rewardable_entity_config: UncheckedAccount<'info>,
+  /// CHECK: Signs as a verified creator to make searching easier
+  #[account(
+    seeds = [b"entity_creator", dao.key().as_ref()],
+    bump,
+  )]
+  pub entity_creator: UncheckedAccount<'info>,
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
     init,
     payer = lazy_signer,
-    space = 8 + std::mem::size_of::<KeyToAssetV0>(),
+    space = 8 + std::mem::size_of::<KeyToAssetV0>() + 8 * args.entity_key.len(),
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
@@ -72,7 +80,7 @@ pub struct GenesisIssueHotspotV0<'info> {
     seeds = [
       "iot_info".as_bytes(),
       rewardable_entity_config.key().as_ref(),
-      get_asset_id(&merkle_tree.key(), tree_authority.num_minted).as_ref()
+      &hash(&args.entity_key[..]).to_bytes()
     ],
     bump
   )]
@@ -126,7 +134,10 @@ impl<'info> GenesisIssueHotspotV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArgsV0) -> Result<()> {
+pub fn handler<'info>(
+  ctx: Context<'_, '_, '_, 'info, GenesisIssueHotspotV0<'info>>,
+  args: GenesisIssueHotspotArgsV0,
+) -> Result<()> {
   let asset_id = get_asset_id(
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,
@@ -158,19 +169,32 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     token_standard: Some(TokenStandard::NonFungible),
     uses: None,
     token_program_version: TokenProgramVersion::Original,
-    creators: vec![],
+    creators: vec![Creator {
+      address: ctx.accounts.entity_creator.key(),
+      verified: true,
+      share: 100,
+    }],
     seller_fee_basis_points: 0,
   };
+  let entity_creator_seeds: &[&[&[u8]]] = &[&[
+    b"entity_creator",
+    ctx.accounts.dao.to_account_info().key.as_ref(),
+    &[ctx.bumps["entity_creator"]],
+  ]];
+  let mut creator = ctx.accounts.entity_creator.to_account_info();
+  creator.is_signer = true;
   mint_to_collection_v1(
     ctx
       .accounts
       .mint_to_collection_ctx()
-      .with_signer(maker_seeds),
+      .with_remaining_accounts(vec![creator])
+      .with_signer(&[maker_seeds[0], entity_creator_seeds[0]]),
     metadata,
   )?;
 
   ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
     asset: asset_id,
+    entity_key: args.entity_key.clone(),
     dao: ctx.accounts.dao.key(),
     bump_seed: ctx.bumps["key_to_asset"],
   });
@@ -184,6 +208,93 @@ pub fn handler(ctx: Context<GenesisIssueHotspotV0>, args: GenesisIssueHotspotArg
     is_full_hotspot: args.is_full_hotspot,
     num_location_asserts: args.num_location_asserts,
   });
+
+  // The remaining account should be the mobile info if this
+  // is a mobile hotspot as well
+  if !ctx.remaining_accounts.is_empty() {
+    let mobile_rewardable_entity_config = &ctx.remaining_accounts[0];
+    let account_info: &AccountInfo<'info> = &ctx.remaining_accounts[1];
+    let hash = hash(&args.entity_key).to_bytes();
+    let seeds = &[
+      b"mobile_info",
+      mobile_rewardable_entity_config.key.as_ref(),
+      &hash,
+    ];
+    let (address, bump_seed) = Pubkey::find_program_address(seeds, &id());
+    require_eq!(address, account_info.key());
+
+    let serialized_data = MobileHotspotInfoV0 {
+      asset: asset_id,
+      location: args.location,
+      num_location_asserts: args.num_location_asserts,
+      is_full_hotspot: args.is_full_hotspot,
+      bump_seed,
+    }
+    .try_to_vec()?;
+    let account_size = serialized_data.len();
+
+    let mut signers_seeds = seeds.to_vec();
+    let bump = &[bump_seed];
+    signers_seeds.push(bump);
+
+    let rent = Rent::get()?;
+    let total_lamports = rent.minimum_balance(account_size);
+    let payer_info = ctx.accounts.lazy_signer.to_account_info();
+    let system_info = ctx.accounts.system_program.to_account_info();
+
+    // If the account has some lamports already it can't be created using create_account instruction
+    // Anybody can send lamports to a PDA and by doing so create the account and perform DoS attack by blocking create_account
+    if account_info.lamports() > 0 {
+      let top_up_lamports = total_lamports.saturating_sub(account_info.lamports());
+
+      if top_up_lamports > 0 {
+        invoke(
+          &system_instruction::transfer(payer_info.key, account_info.key, top_up_lamports),
+          &[
+            payer_info.clone(),
+            account_info.clone(),
+            system_info.clone(),
+          ],
+        )?;
+      }
+
+      invoke_signed(
+        &system_instruction::allocate(account_info.key, account_size as u64),
+        &[account_info.clone(), system_info.clone()],
+        &[&signers_seeds[..]],
+      )?;
+
+      invoke_signed(
+        &system_instruction::assign(account_info.key, &id()),
+        &[account_info.clone(), system_info.clone()],
+        &[&signers_seeds[..]],
+      )?;
+    } else {
+      // If the PDA doesn't exist use create_account to use lower compute budget
+      let create_account_instruction = create_account(
+        payer_info.key,
+        account_info.key,
+        total_lamports,
+        account_size as u64,
+        &id(),
+      );
+
+      invoke_signed(
+        &create_account_instruction,
+        &[
+          payer_info.clone(),
+          account_info.clone(),
+          system_info.clone(),
+        ],
+        &[&signers_seeds[..]],
+      )?;
+    }
+
+    account_info
+      .data
+      .borrow_mut()
+      .copy_from_slice(&serialized_data);
+  }
 
   Ok(())
 }

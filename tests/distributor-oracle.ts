@@ -126,7 +126,7 @@ describe('distributor-oracle', () => {
 
   it('should provide the current rewards for a hotspot', async () => {
     const res = await chai.request(oracleServer.app)
-      .get('/?assetId=hdaojPkgSD8bciDc1w2Z4kXFFibCXngJiw2GRpEL7Wf')
+      .get('/?assetId=hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR')
 
     assert.equal(res.status, 200);
     assert.typeOf(res.body, 'object');

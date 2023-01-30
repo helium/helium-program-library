@@ -593,18 +593,18 @@ dependencies = [
 
 [[package]]
 name = "bytemuck"
-version = "1.12.3"
+version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aaa3a8d9a1ca92e282c96a32d6511b695d7d994d1d102ba85d279f9b2756947f"
+checksum = "c041d3eab048880cb0b86b256447da3f18859a163c3b8d8893f4e6368abe6393"
 dependencies = [
  "bytemuck_derive",
 ]
 
 [[package]]
 name = "bytemuck_derive"
-version = "1.3.0"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fe233b960f12f8007e3db2d136e3cb1c291bfd7396e384ee76025fc1a3932b4"
+checksum = "1aca418a974d83d40a0c1f0c5cba6ff4bc28d8df099109ca459a2118d40b6322"
 dependencies = [
  "proc-macro2 1.0.49",
  "quote 1.0.23",
@@ -1657,6 +1657,7 @@ dependencies = [
  "mpl-token-metadata 1.6.4",
  "rust_decimal",
  "shared-utils",
+ "spl-governance-tools",
  "switchboard-v2",
  "time 0.3.17",
  "treasury-management",
@@ -1981,6 +1982,8 @@ version = "0.0.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "bytemuck",
+ "spl-concurrent-merkle-tree 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -3504,6 +3507,7 @@ version = "0.0.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "mpl-token-metadata 1.6.4",
  "spl-account-compression 0.1.5",
  "uint",
 ]
@@ -4460,6 +4464,17 @@ dependencies = [
 [[package]]
 name = "spl-concurrent-merkle-tree"
 version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b8518df14b19ada73c6bd15ee344de8ab720580fb2df0029342f9a772e2392d"
+dependencies = [
+ "bytemuck",
+ "solana-program",
+ "thiserror",
+]
+
+[[package]]
+name = "spl-concurrent-merkle-tree"
+version = "0.1.2"
 source = "git+https://github.com/ChewingGlass/solana-program-library?branch=feature/anchor-26#e6db7bcf6da7b41c3ab250a0c8489ea50d511a90"
 dependencies = [
  "bytemuck",
@@ -5270,8 +5285,9 @@ dependencies = [
  "env_logger",
  "itertools",
  "log",
- "mpl-token-metadata 1.4.3",
+ "mpl-token-metadata 1.6.4",
  "serde",
+ "shared-utils",
  "solana-banks-client",
  "solana-logger",
  "solana-program",
