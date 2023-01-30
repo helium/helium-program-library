@@ -1,6 +1,6 @@
 {
   "name": "@helium/hotspot-utils",
-  "version": "0.0.23",
+  "version": "0.0.24",
   "description": "Utils for hotspot interaction",
   "homepage": "https://github.com/helium/helium-program-library#readme",
   "publishConfig": {
