@@ -5,7 +5,9 @@ use anchor_lang::prelude::*;
 pub struct LazyTransactionsV0 {
   pub root: [u8; 32],
   pub name: String,
+  pub max_depth: u32,
   pub authority: Pubkey,
+  pub canopy: Pubkey,
   pub bump_seed: u8,
 }
 

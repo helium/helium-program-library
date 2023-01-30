@@ -42,6 +42,7 @@ pub struct GenesisIssueDelegatedDataCreditsV0<'info> {
     bump,
   )]
   pub lazy_signer: Signer<'info>,
+  #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,
   /// CHECK: Verified by cpi
   #[account(
