@@ -343,7 +343,7 @@ async function run() {
         }),
         minCommunityTokensToCreateProposal: new anchor.BN("100000000000000"),
         minInstructionHoldUpTime: 0,
-        maxVotingTime: getTimestampFromDays(30),
+        maxVotingTime: getTimestampFromDays(7),
         communityVoteTipping: VoteTipping.Strict,
         councilVoteTipping: VoteTipping.Early,
         minCouncilTokensToCreateProposal: new anchor.BN(1),
@@ -400,8 +400,10 @@ async function run() {
         hntMint: hntKeypair.publicKey,
         dcMint: dcKeypair.publicKey,
         hntPriceOracle: new PublicKey(
-          isLocalhost(provider) ? "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB" : "CqFJLrT4rSpA46RQkVYWn8tdBDuQ7p7RXcp6Um76oaph"
-        ) // TODO: Replace with HNT price feed,
+          isLocalhost(provider)
+            ? "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB"
+            : "6Eg8YdfFJQF2HHonzPUBSCCmyUEhrStg9VBLK957sBe6"
+        ), // TODO: Replace with HNT price feed,
       })
       .rpc({ skipPreflight: true });
   }

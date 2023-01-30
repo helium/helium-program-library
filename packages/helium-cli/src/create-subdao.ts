@@ -399,7 +399,7 @@ async function run() {
         }),
         minCommunityTokensToCreateProposal: new anchor.BN(1),
         minInstructionHoldUpTime: 0,
-        maxVotingTime: getTimestampFromDays(30),
+        maxVotingTime: getTimestampFromDays(7),
         communityVoteTipping: VoteTipping.Strict,
         councilVoteTipping: VoteTipping.Early,
         minCouncilTokensToCreateProposal: new anchor.BN(1),
