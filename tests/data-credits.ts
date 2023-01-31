@@ -1,7 +1,7 @@
-import { Keypair as HeliumKeypair } from "@helium/crypto";
-import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
+import { Keypair as HeliumKeypair } from "@helium/crypto";
+import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import { parsePriceData } from "@pythnetwork/client";
 import {
   createAssociatedTokenAccountIdempotentInstruction, getAccount,
@@ -18,7 +18,7 @@ import {
 } from "../packages/data-credits-sdk/src";
 import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
 import * as hsd from "../packages/helium-sub-daos-sdk/src";
-import { HNT_PYTH_PRICE_FEED, toBN, toNumber } from "../packages/spl-utils/src";
+import { toBN, toNumber } from "../packages/spl-utils/src";
 import * as vsr from "../packages/voter-stake-registry-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
@@ -126,7 +126,9 @@ describe("data-credits", () => {
         hntMint,
         dcMint,
         payer: me,
-        hntPriceOracle: HNT_PYTH_PRICE_FEED,
+        hntPriceOracle: new PublicKey(
+          "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB"
+        ),
       });
     dcKey = (await method.pubkeys()).dataCredits!;
     await method.rpc({
@@ -213,7 +215,7 @@ describe("data-credits", () => {
         await getAssociatedTokenAddress(hntMint, me)
       );
       const pythData = (await provider.connection.getAccountInfo(
-        HNT_PYTH_PRICE_FEED
+        new PublicKey("JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB")
       ))!.data;
       const price = parsePriceData(pythData);
       const approxEndBal =

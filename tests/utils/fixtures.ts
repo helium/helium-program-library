@@ -1,18 +1,17 @@
-import { HNT_PYTH_PRICE_FEED, sendInstructions, toBN } from "@helium/spl-utils";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { SystemProgram, Keypair, PublicKey } from "@solana/web3.js";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { createAtaAndMint, createMint, sendInstructions, toBN } from "@helium/spl-utils";
+import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
+import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { execSync } from "child_process";
+import { ThresholdType } from "../../packages/circuit-breaker-sdk/src";
+import { makerKey } from "../../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../../target/types/data_credits";
-import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { HeliumEntityManager } from "../../target/types/helium_entity_manager";
+import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
-import { createAtaAndMint, createMint } from "@helium/spl-utils";
-import { ThresholdType } from "../../packages/circuit-breaker-sdk/src"
-import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
-import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
-import { makerKey } from "../../packages/helium-entity-manager-sdk/src";
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =
@@ -56,7 +55,13 @@ export const initTestDataCredits = async (
         threshold: new anchor.BN("10000000000000000000"),
       },
     })
-    .accounts({ hntMint, dcMint, hntPriceOracle: HNT_PYTH_PRICE_FEED });
+    .accounts({
+      hntMint,
+      dcMint,
+      hntPriceOracle: new PublicKey(
+        "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB"
+      ),
+    });
 
   const dcKey = (await initDataCredits.pubkeys()).dataCredits!;
 
