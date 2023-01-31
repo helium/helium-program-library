@@ -178,10 +178,6 @@ async function run() {
   console.log("THREAD", thread.toString());
 
   const conn = provider.connection;
-  if (await exists(conn, dao)) {
-    console.log("Dao already exists");
-    return;
-  }
 
   await createAndMint({
     provider,
@@ -225,7 +221,8 @@ async function run() {
     [Buffer.from("governance", "utf-8"), Buffer.from(realmName, "utf-8")],
     govProgramId
   )[0];
-  console.log(realm.toString());
+
+  console.log("Realm, ", realm.toBase58());
   if (!(await exists(conn, realm))) {
     console.log("Initializing Realm");
     await withCreateRealm(
@@ -440,6 +437,7 @@ async function run() {
       .accounts({
         dcMint: dcKeypair.publicKey,
         hntMint: hntKeypair.publicKey,
+        thread,
         // TODO: Create actual HST pool
         hstPool: await getAssociatedTokenAddress(
           hntKeypair.publicKey,

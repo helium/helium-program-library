@@ -137,7 +137,7 @@ async function run() {
   const authorityAcc = await provider.connection.getAccountInfo(
     subdaoAcc.authority
   );
-  let payer = provider.wallet.publicKey;
+  let   payer = provider.wallet.publicKey;
   const isGov = authorityAcc != null && authorityAcc.owner.equals(govProgramId);
   if (isGov) {
     const nativeTreasury = await PublicKey.findProgramAddressSync(
@@ -242,7 +242,7 @@ async function run() {
             issuingAuthority: makerAuthority,
             updateAuthority: authority,
           })
-          .accounts({ maker })
+          .accounts({ maker, updateAuthority: authority })
           .instruction()
       );
     }

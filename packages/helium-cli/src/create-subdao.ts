@@ -282,6 +282,7 @@ async function run() {
     [Buffer.from("governance", "utf-8"), Buffer.from(realmName, "utf-8")],
     govProgramId
   )[0];
+  console.log("Realm, ", realm.toBase58());
   if (!(await exists(conn, realm))) {
     console.log("Initializing Realm");
     await withCreateRealm(
@@ -656,9 +657,9 @@ function emissionSchedule(
   startEpochRewards: number
 ): { startUnixTime: anchor.BN; emissionsPerEpoch: anchor.BN }[] {
   const now = new Date().getDate() / 1000;
-  // Do 6 years out, halving every  years
+  // Do 2 years out, halving every  years
   // Any larger and it wont fit in a tx
-  return new Array(3).fill(0).map((_, twoYear) => {
+  return new Array(1).fill(0).map((_, twoYear) => {
     return {
       startUnixTime: new anchor.BN(twoYear * 2 * 31557600 + now), // 2 years in seconds
       emissionsPerEpoch: toBN(

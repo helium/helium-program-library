@@ -77,7 +77,7 @@ async function run() {
       dcMint: dcKey,
       recipient: destination,
     })
-    .rpc();
+    .rpc({ skipPreflight: true });
   const postBalance = (
     await provider.connection.getTokenAccountBalance(destAta, "confirmed")
   ).value.uiAmount;
