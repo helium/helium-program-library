@@ -3,7 +3,7 @@ import {init, PROGRAM_ID} from "@helium/helium-entity-manager-sdk";
 import { AnchorProvider, BN, BorshInstructionCoder, Program } from '@project-serum/anchor';
 import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
 import { Keypair, PublicKey } from '@solana/web3.js';
-import { sequelize, Hotspot } from './model';
+import { sequelize, Entity, IotMetadata, MobileMetadata } from './model';
 import { instructionParser } from './parser';
 
 // sync the model with the database
@@ -39,10 +39,7 @@ server.post('/', async (request, reply) => {
         continue;
       }
       const method = instructionParser[decoded.name];
-      const assetId = await method.getAssetId(hemProgram, tx, ix);
-      const hotspotKey = await method.getHotspotKey(hemProgram, tx, ix, args);
-      const hotspotData = method.getHotspotData(assetId, hotspotKey, args);
-      await Hotspot.upsert(hotspotData);
+      await method.parseAndWrite(hemProgram, tx, ix, args);
     }
     // send a response to the client
     reply.send({

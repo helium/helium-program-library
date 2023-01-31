@@ -1,14 +1,20 @@
-import fastify from 'fastify';
-import {init, PROGRAM_ID} from "@helium/helium-entity-manager-sdk";
-import { AnchorProvider, BN, BorshInstructionCoder, Instruction, Program } from '@project-serum/anchor';
+import { Program } from '@project-serum/anchor';
 import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
-import { Keypair, PublicKey } from '@solana/web3.js';
-import { sequelize, Hotspot } from './model';
+import { PublicKey } from '@solana/web3.js';
+import { Entity, IotMetadata, MobileMetadata } from './model';
 
 type Parser = {
-  getAssetId: (program: Program<HeliumEntityManager>, tx: any, ix: any) => Promise<PublicKey>,
-  getHotspotKey: (program: Program<HeliumEntityManager>, tx: any, ix: any, args: any) => Promise<string>,
-  getHotspotData: (assetId: PublicKey, hotspotKey: string, args: any) => any,
+  parseAndWrite: (program: Program<HeliumEntityManager>, tx: any, ix: any, args: any) => Promise<void>,
+}
+
+function findAccountKey(program: Program<HeliumEntityManager>, tx: any, ix: any, ixName: string, accName: string): PublicKey | null {
+  const idlIx = program.idl.instructions.find(
+    (x) => x.name === ixName
+  )!;
+  const accIdx = idlIx.accounts.findIndex(
+    (x) => x.name === accName
+  )!;
+  return tx.message.accountKeys[ix.accounts[accIdx]];
 }
 
 async function getAssetIdFromInfo(program: Program<HeliumEntityManager>, tx: any, ix: any, ixName: string): Promise<PublicKey | null> {
@@ -17,7 +23,7 @@ async function getAssetIdFromInfo(program: Program<HeliumEntityManager>, tx: any
   )!;
   const infoIdx = idlIx.accounts.findIndex(
     (x) => x.name === "info" || x.name === "iotInfo" || x.name === "mobileInfo"
-  )!
+  )!;
   let infoKey = tx.message.accountKeys[ix.accounts[infoIdx]];
   let infoName = idlIx.accounts[infoIdx].name;
   let info;
@@ -29,106 +35,97 @@ async function getAssetIdFromInfo(program: Program<HeliumEntityManager>, tx: any
   return info.asset;
 }
 
+async function getHotspotKeyFromKeyToAsset(program: Program<HeliumEntityManager>, tx: any, ix: any, ixName: string): Promise<string | null> {
+  let keyToAssetKey = findAccountKey(program, tx, ix, ixName, "keyToAsset")!;
+  let keyToAsset = await program.account.keyToAssetV0.fetch(keyToAssetKey);
+  return keyToAsset.entityKey.toString();
+}
+
 export const instructionParser: Record<string, Parser>  = {
   "onboardIotHotspotV0": {
-    async getAssetId(program, tx, ix) {
-      return await getAssetIdFromInfo(program, tx, ix, "onboardIotHotspotV0");
-    },
-    async getHotspotKey(program, tx, ix, args) {
-      return args.hotspotKey;
-    },
-    getHotspotData(assetId, hotspotKey, args) {
-      return {
-        asset: assetId.toString(),
-        hotspot_key: hotspotKey,
-        location: null,
-        elevation: null,
-        gain: null,
-      };
-    },
+    async parseAndWrite(program, tx, ix, args) {
+      const assetId = await getAssetIdFromInfo(program, tx, ix, "onboardIotHotspotV0");
+      // hotspot key already indexed in issueEntity
+      await IotMetadata.create({
+        assetId: assetId.toString(),
+        location: args.location ? `${args.location}` : null,
+        elevation: args.elevation,
+        gain: args.gain,
+      });
+    }
   },
   "onboardMobileHotspotV0": {
-    async getAssetId(program, tx, ix) {
-      return await getAssetIdFromInfo(program, tx, ix, "onboardMobileHotspotV0");
-    },
-    async getHotspotKey(program, tx, ix, args) {
-      return args.hotspotKey;
-    },
-    getHotspotData(assetId, hotspotKey, args) {
-      return {
-        asset: assetId.toString(),
-        hotspot_key: hotspotKey,
-        location: null,
-        elevation: null,
-        gain: null,
-      };
-    },
+    async parseAndWrite(program, tx, ix, args) {
+      const assetId = await getAssetIdFromInfo(program, tx, ix, "onboardMobileHotspotV0");
+      // hostpost key already indexed in issueEntity
+      await MobileMetadata.create({
+        assetId: assetId.toString(),
+        location: args.location ? `${args.location}` : null,
+      });
+    }
   },
   "genesisIssueHotspotV0": {
-    async getAssetId(program, tx, ix) {
-      return await getAssetIdFromInfo(program, tx, ix, "genesisIssueHotspotV0");
-    },
-    async getHotspotKey(program, tx, ix, args) {
-      return args.hotspotKey;
-    },
-    getHotspotData(assetId, hotspotKey, args) {
-      return {
-        asset: assetId.toString(),
-        hotspot_key: hotspotKey,
-        location: null,
-        elevation: null,
-        gain: null,
-      };
-    },
+    async parseAndWrite(program, tx, ix, args) {
+      const assetId = await getAssetIdFromInfo(program, tx, ix, "genesisIssueHotspotV0");
+      const hotspotKey = await getHotspotKeyFromKeyToAsset(program, tx, ix, "genesisIssueHotspotV0");
+      const makerKey = findAccountKey(program, tx, ix, "genesisIssueHotspotV0", "maker");
+      await Entity.create({
+        assetId: assetId.toString(),
+        hotspotKey: hotspotKey,
+        maker: makerKey.toString(),
+      });
+
+      await IotMetadata.create({
+        assetId: assetId.toString(),
+        location: args.location ? `${args.location}` : null,
+        elevation: args.elevation,
+        gain: args.gain,
+      });
+
+      const idlIx = program.idl.instructions.find(
+        (x) => x.name === "genesisIssueHotspotV0"
+      )!;
+      const isMobile = ix.accounts.length() > idlIx.accounts.length
+      if (isMobile) {
+        await MobileMetadata.create({
+          assetId: assetId.toString(),
+          location: args.location ? `${args.location}` : null,
+        })
+      }
+    }
   },
   "issueEntityV0": {
-    async getAssetId(program, tx, ix) {
-      return await getAssetIdFromInfo(program, tx, ix, "issueEntityV0");
-    },
-    async getHotspotKey(program, tx, ix, args) {
-      return args.entityKey;
-    },
-    getHotspotData(assetId, hotspotKey, args) {
-      return {
-        asset: assetId.toString(),
-        hotspot_key: hotspotKey,
-        location: null,
-        elevation: null,
-        gain: null,
-      };
-    },
+    async parseAndWrite(program, tx, ix, args) {
+      const assetId = await getAssetIdFromInfo(program, tx, ix, "issueEntityV0");
+      const hotspotKey = await getHotspotKeyFromKeyToAsset(program, tx, ix, "issueEntityV0");
+      const makerKey = findAccountKey(program, tx, ix, "genesisIssueHotspotV0", "maker");
+      await Entity.create({
+        assetId: assetId.toString(),
+        hotspotKey,
+        maker: makerKey.toString(),
+      })
+    }
   },
   "updateIotInfoV0": {
-    async getAssetId(program, tx, ix) {
-      return await getAssetIdFromInfo(program, tx, ix, "updateIotInfoV0");
-    },
-    async getHotspotKey(program, tx, ix, args) {
-      return null
-    },
-    getHotspotData(assetId, hotspotKey, args) {
-      return {
-        asset: assetId.toString(),
+    async parseAndWrite(program, tx, ix, args) {
+      const assetId = await getAssetIdFromInfo(program, tx, ix, "updateIotInfoV0");
+      await IotMetadata.update({
         ...(args.location && {location: args.location}),
         ...(args.elevation && {elevation: args.elevation}),
         ...(args.gain && {gain: args.gain}),
-      };
-    },
+      }, {
+        where: {assetId: assetId.toString()}
+      });
+    }
   },
   "updateMobileInfoV0": {
-    async getAssetId(program, tx, ix) {
-      return await getAssetIdFromInfo(program, tx, ix, "updateMobileInfoV0");
-    },
-    async getHotspotKey(program, tx, ix, args) {
-      return null;
-    },
-    getHotspotData(assetId, hotspotKey, args) {
-      return {
-        asset: assetId.toString(),
+    async parseAndWrite(program, tx, ix, args) {
+      const assetId = await getAssetIdFromInfo(program, tx, ix, "updateMobileInfoV0");
+      await MobileMetadata.update({
         ...(args.location && {location: args.location}),
-        ...(args.elevation && {elevation: args.elevation}),
-        ...(args.gain && {gain: args.gain}),
-
-      };
-    },
+      }, {
+        where: {assetId: assetId.toString()}
+      });
+    }
   }
 }
