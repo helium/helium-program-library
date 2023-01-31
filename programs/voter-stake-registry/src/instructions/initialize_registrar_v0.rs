@@ -143,10 +143,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
     DataV2 {
       name: String::from("Voting Escrow Collection"),
       symbol: String::from("VSR"),
-      uri: format!(
-        "https://vsr-metadata.test-helium.com/{}",
-        ctx.accounts.realm_governing_token_mint.key()
-      ),
+      uri: "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/vsr.json".to_string(),
       seller_fee_basis_points: 0,
       creators: None,
       collection: None,
