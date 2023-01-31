@@ -1,4 +1,4 @@
-import { Provider } from "@project-serum/anchor";
+import { Provider } from "@coral-xyz/anchor";
 import { SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 
 export async function getUnixTimestamp(provider: Provider): Promise<bigint> {

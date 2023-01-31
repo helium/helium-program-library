@@ -1,4 +1,4 @@
-import { AnchorProvider, Provider } from "@project-serum/anchor";
+import { AnchorProvider, Provider } from "@coral-xyz/anchor";
 import React, { useContext, useState, useCallback } from "react";
 
 export const NotificationContext =

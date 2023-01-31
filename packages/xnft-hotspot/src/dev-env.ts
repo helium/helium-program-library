@@ -1,6 +1,6 @@
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import * as ld from "@helium/lazy-distributor-sdk";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import {
   createMint,
   createNft,

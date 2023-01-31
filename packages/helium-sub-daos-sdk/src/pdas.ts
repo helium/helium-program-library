@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { BN } from "@project-serum/anchor";
+import { BN } from "@coral-xyz/anchor";
 import { currentEpoch, PROGRAM_ID } from "./constants";
 
 export function subDaoEpochInfoKey(
@@ -58,4 +58,20 @@ export function stakePositionKey(
     Buffer.from("stake_position", "utf-8"), position.toBuffer()], 
     programId
   );
+}
+
+const THREAD_PID = new PublicKey("3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv");
+export function threadKey(
+  authority: PublicKey,
+  threadId: "calculate" | "issue" | "issue_hst",
+  programId: PublicKey = THREAD_PID
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("thread", "utf8"),
+      authority.toBuffer(),
+      Buffer.from(threadId, "utf8"),
+    ],
+    programId
+  )
 }

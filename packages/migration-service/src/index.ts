@@ -10,7 +10,7 @@ import {
 } from "@helium/lazy-transactions-sdk";
 import { chunks } from "@helium/spl-utils";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, transferInstructionData } from "@solana/spl-token";
-import { Program } from "@project-serum/anchor";
+import { Program } from "@coral-xyz/anchor";
 import {
   ComputeBudgetProgram,
   PublicKey,

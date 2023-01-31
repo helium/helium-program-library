@@ -29,7 +29,7 @@ import {
   humanReadableBigint,
   amountAsNum,
 } from "@helium/spl-utils";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import classnames from "classnames";
 import { useStyledTitle } from "../../../utils/hooks";
 import { useNotification } from "../../../contexts/notification";

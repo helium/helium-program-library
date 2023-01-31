@@ -1,7 +1,7 @@
 import { ThresholdType } from '@helium/circuit-breaker-sdk';
 import { Asset, createAtaAndMint, createMint, createNft, sendAndConfirmWithRetry } from '@helium/spl-utils';
-import * as anchor from "@project-serum/anchor";
-import { BN, Program } from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
+import { BN, Program } from "@coral-xyz/anchor";
 import {
   Keypair, PublicKey, SystemProgram, Transaction
 } from "@solana/web3.js";

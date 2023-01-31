@@ -1,6 +1,6 @@
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { AssetProof, getAssetProof } from "@helium/spl-utils";
-import { Idl, Program } from "@project-serum/anchor";
+import { Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 
 export async function initializeCompressionRecipient({

@@ -1,6 +1,6 @@
 import fastify from 'fastify';
 import {init, PROGRAM_ID} from "@helium/helium-entity-manager-sdk";
-import { AnchorProvider, BN, BorshInstructionCoder, Program } from '@project-serum/anchor';
+import { AnchorProvider, BN, BorshInstructionCoder, Program } from '@coral-xyz/anchor';
 import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { sequelize, Entity, IotMetadata, MobileMetadata } from './model';

@@ -13,7 +13,7 @@ import {
   IDL,
 } from "@helium/idls/lib/types/helium_entity_manager";
 import { PROGRAM_ID } from "./constants";
-import { Program } from "@project-serum/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { init } from "./init";
 
 export const heliumEntityManagerResolvers = combineResolvers(

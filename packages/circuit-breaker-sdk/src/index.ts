@@ -1,5 +1,5 @@
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
-import { AnchorProvider, Idl, Program } from "@project-serum/anchor";
+import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import { PROGRAM_ID } from "./constants";

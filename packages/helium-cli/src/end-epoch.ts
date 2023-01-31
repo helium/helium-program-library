@@ -4,7 +4,7 @@ import {
   EPOCH_LENGTH,
   init as initDao
 } from "@helium/helium-sub-daos-sdk";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
 import b58 from "bs58";

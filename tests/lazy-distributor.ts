@@ -2,8 +2,8 @@ import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
   Asset, createAtaAndMint, createMint, createNft, sendInstructions
 } from "@helium/spl-utils";
-import * as anchor from "@project-serum/anchor";
-import { Program } from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { assert, expect } from "chai";
 import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";

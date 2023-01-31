@@ -103,6 +103,7 @@ pub struct DaoV0 {
 #[account]
 #[derive(Default)]
 pub struct DaoEpochInfoV0 {
+  pub done_calculating_scores: bool, // don't insert state before this, clockwork reads from offset
   pub epoch: u64,
   pub dao: Pubkey,
   pub total_rewards: u64,

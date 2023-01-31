@@ -8,7 +8,7 @@ import {
   createCreateMetadataAccountV3Instruction,
   PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import {
   AccountMetaData,
   getGovernanceProgramVersion,
@@ -217,11 +217,11 @@ export async function sendInstructionsOrCreateProposal({
     )
   ).map((k) => new PublicKey(k));
   
-  // console.log(
-  //   instructions.map((ix) =>
-  //     ix.keys.filter((k) => k.isSigner).map((k) => k.pubkey.toBase58())
-  //   )
-  // );
+  console.log(
+    instructions.map((ix) =>
+      ix.keys.filter((k) => k.isSigner).map((k) => k.pubkey.toBase58())
+    )
+  );
 
   const wallet = provider.wallet;
   // Missing signer, must be gov

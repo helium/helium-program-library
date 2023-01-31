@@ -1,14 +1,18 @@
 import { PublicKey } from "@solana/web3.js";
 
-export const DC_MINT = new PublicKey("8po3rj3xE1wo5y38zW8gH2ZoTZzqowMAuD1ugBpUKj32");
+export const DC_MINT = new PublicKey("dc5Zu977Zan2BFt7iLxCCUoyPvxpxZGYK23d6GYZXq7");
 
-export const HNT_MINT = new PublicKey("BJUtKj5M6w69N3vcZP6n1DUVUsZSVvNRPoeqkToXEYhp");
+export const HNT_MINT = new PublicKey("hntv1Vf5ZBG777xAHqHUTFS8UZBTNUN22MBnYramPFk");
 
 export const MOBILE_MINT = new PublicKey(
-  "8K38wjyEXdUX8w6GPida3X9BQhcSJ9fnVjRyUaotkqAs"
+  "mb1eaxqRn3VMUuA9MC1hXiNFG7hnJHfF8Cvq7vfYH4y"
 );
+
+export const IOT_MINT = new PublicKey(
+  "iotfeTXUVZKZvmFCTTHrgmep94seQJurjvMgKuqpHyx"
+)
 
 // TODO: Replace with actual HNT feed
 export const HNT_PYTH_PRICE_FEED = new PublicKey(
-  "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB"
+  "6Eg8YdfFJQF2HHonzPUBSCCmyUEhrStg9VBLK957sBe6"
 );

@@ -1,6 +1,6 @@
 import { HNT_PYTH_PRICE_FEED, sendInstructions, toBN } from "@helium/spl-utils";
-import * as anchor from "@project-serum/anchor";
-import { Program } from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { SystemProgram, Keypair, PublicKey } from "@solana/web3.js";
 import { execSync } from "child_process";
 import { DataCredits } from "../../target/types/data_credits";

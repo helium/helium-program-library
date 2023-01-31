@@ -1,7 +1,7 @@
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { createAtaAndMint, createMint } from "@helium/spl-utils";
-import * as anchor from "@project-serum/anchor";
-import { Program } from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { parsePriceData } from "@pythnetwork/client";
 import {
   createAssociatedTokenAccountIdempotentInstruction, getAccount,

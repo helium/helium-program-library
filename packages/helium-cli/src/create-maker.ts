@@ -8,7 +8,7 @@ import {
 } from "@helium/helium-entity-manager-sdk";
 import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { humanReadable, sendInstructions, truthy } from "@helium/spl-utils";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import {
   getConcurrentMerkleTreeAccountSize,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
@@ -39,7 +39,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   govProgramId: {
     type: "string",
     describe: "Pubkey of the GOV program",
-    default: "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw",
+    default: "hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC",
   },
   fromFile: {
     describe: "Load makers from a json file and create in bulk",
@@ -137,7 +137,7 @@ async function run() {
   const authorityAcc = await provider.connection.getAccountInfo(
     subdaoAcc.authority
   );
-  let payer = provider.wallet.publicKey;
+  let   payer = provider.wallet.publicKey;
   const isGov = authorityAcc != null && authorityAcc.owner.equals(govProgramId);
   if (isGov) {
     const nativeTreasury = await PublicKey.findProgramAddressSync(
@@ -242,7 +242,7 @@ async function run() {
             issuingAuthority: makerAuthority,
             updateAuthority: authority,
           })
-          .accounts({ maker })
+          .accounts({ maker, updateAuthority: authority })
           .instruction()
       );
     }

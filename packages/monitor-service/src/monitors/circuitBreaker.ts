@@ -4,7 +4,7 @@ import {
 } from "@helium/circuit-breaker-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { toNumber } from "@helium/spl-utils";
-import { Program } from "@project-serum/anchor";
+import { Program } from "@coral-xyz/anchor";
 import {
   getAccount,
   getMint,

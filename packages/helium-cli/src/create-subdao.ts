@@ -7,6 +7,7 @@ import {
   daoKey,
   init as initDao,
   subDaoKey,
+  threadKey,
 } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
@@ -18,8 +19,8 @@ import {
 } from "@helium/voter-stake-registry-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";
-import * as anchor from "@project-serum/anchor";
-import { idlAddress } from "@project-serum/anchor/dist/cjs/idl";
+import * as anchor from "@coral-xyz/anchor";
+import { idlAddress } from "@coral-xyz/anchor/dist/cjs/idl";
 import {
   getConcurrentMerkleTreeAccountSize,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
@@ -176,7 +177,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   govProgramId: {
     type: "string",
     describe: "Pubkey of the GOV program",
-    default: "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw",
+    default: "hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC",
   },
   councilKeypair: {
     type: "string",
@@ -231,20 +232,17 @@ async function run() {
   console.log("SUBDAO", subdao.toString());
   const daoAcc = await heliumSubDaosProgram.account.daoV0.fetch(dao);
 
-  const thread = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("thread", "utf8"),
-      subdao.toBuffer(),
-      Buffer.from("end-epoch", "utf8"),
-    ],
-    new PublicKey("3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv")
-  )[0];
+  const calculateThread = threadKey(subdao, "calculate")[0];
+  const issueThread = threadKey(subdao, "issue")[0];
+
   if (await exists(conn, subdao)) {
     const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
 
     console.log(
-      `Subdao exists. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}. Thread: ${thread.toString()}`
+      `Subdao exists. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}`
     );
+    console.log("Calculate thread", calculateThread.toString());
+    console.log("Issue thread", issueThread.toString());
     return;
   }
   const [lazyDist] = await lazyDistributorKey(subdaoKeypair.publicKey);
@@ -284,6 +282,7 @@ async function run() {
     [Buffer.from("governance", "utf-8"), Buffer.from(realmName, "utf-8")],
     govProgramId
   )[0];
+  console.log("Realm, ", realm.toBase58());
   if (!(await exists(conn, realm))) {
     console.log("Initializing Realm");
     await withCreateRealm(
@@ -401,7 +400,7 @@ async function run() {
         }),
         minCommunityTokensToCreateProposal: new anchor.BN(1),
         minInstructionHoldUpTime: 0,
-        maxVotingTime: getTimestampFromDays(30),
+        maxVotingTime: getTimestampFromDays(7),
         communityVoteTipping: VoteTipping.Strict,
         councilVoteTipping: VoteTipping.Early,
         minCouncilTokensToCreateProposal: new anchor.BN(1),
@@ -578,11 +577,16 @@ async function run() {
       });
     }
 
-    console.log("Transfering sol to thread");
+    console.log("Transfering sol to threads")
     await sendInstructions(provider, [
       SystemProgram.transfer({
         fromPubkey: provider.wallet.publicKey,
-        toPubkey: thread,
+        toPubkey: calculateThread,
+        lamports: BigInt(toBN(0.1, 9).toString()),
+      }),
+      SystemProgram.transfer({
+        fromPubkey: provider.wallet.publicKey,
+        toPubkey: issueThread,
         lamports: BigInt(toBN(0.1, 9).toString()),
       }),
     ]);
@@ -653,9 +657,9 @@ function emissionSchedule(
   startEpochRewards: number
 ): { startUnixTime: anchor.BN; emissionsPerEpoch: anchor.BN }[] {
   const now = new Date().getDate() / 1000;
-  // Do 6 years out, halving every  years
+  // Do 2 years out, halving every  years
   // Any larger and it wont fit in a tx
-  return new Array(3).fill(0).map((_, twoYear) => {
+  return new Array(1).fill(0).map((_, twoYear) => {
     return {
       startUnixTime: new anchor.BN(twoYear * 2 * 31557600 + now), // 2 years in seconds
       emissionsPerEpoch: toBN(

@@ -8,7 +8,7 @@ import {
 } from "@helium/helium-entity-manager-sdk";
 import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { humanReadable, sendInstructions, toBN, truthy } from "@helium/spl-utils";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import {
   getConcurrentMerkleTreeAccountSize,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
@@ -50,7 +50,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   govProgramId: {
     type: "string",
     describe: "Pubkey of the GOV program",
-    default: "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw",
+    default: "hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC",
   },
   councilPubkey: {
     type: "string",

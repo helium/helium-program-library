@@ -1,6 +1,6 @@
 import React, { FC, useEffect } from "react";
 import { Text, View, Button, usePublicKey, useConnection } from "react-xnft";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import { init } from "@helium/lazy-distributor-sdk";
 import * as client from "@helium/distributor-oracle";

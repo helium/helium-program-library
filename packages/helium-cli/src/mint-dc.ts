@@ -1,6 +1,6 @@
 import { init as initDc } from "@helium/data-credits-sdk";
 import { toBN } from "@helium/spl-utils";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import { createAssociatedTokenAccountIdempotent, createAssociatedTokenAccountIdempotentInstruction, getAssociatedTokenAddress, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import os from "os";
@@ -77,7 +77,7 @@ async function run() {
       dcMint: dcKey,
       recipient: destination,
     })
-    .rpc();
+    .rpc({ skipPreflight: true });
   const postBalance = (
     await provider.connection.getTokenAccountBalance(destAta, "confirmed")
   ).value.uiAmount;

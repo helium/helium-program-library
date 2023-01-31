@@ -1,8 +1,7 @@
 use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError};
-use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
+use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
-use clockwork_sdk::{self, state::ThreadResponse};
 use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
 use switchboard_v2::{AggregatorAccountData, AggregatorHistoryBuffer};
 use voter_stake_registry::state::Registrar;
@@ -65,54 +64,10 @@ pub struct CalculateUtilityScoreV0<'info> {
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
 }
 
-fn construct_next_ix(ctx: &Context<CalculateUtilityScoreV0>, epoch: u64) -> Instruction {
-  let hnt_circuit_breaker = Pubkey::find_program_address(
-    &[
-      "mint_windowed_breaker".as_bytes(),
-      ctx.accounts.dao.hnt_mint.as_ref(),
-    ],
-    &ctx.accounts.circuit_breaker_program.key(),
-  )
-  .0;
-  let dnt_circuit_breaker = Pubkey::find_program_address(
-    &[
-      "mint_windowed_breaker".as_bytes(),
-      ctx.accounts.sub_dao.dnt_mint.as_ref(),
-    ],
-    &ctx.accounts.circuit_breaker_program.key(),
-  )
-  .0;
-  // issue rewards ix
-  let accounts = vec![
-    AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.sub_dao.key(), false),
-    AccountMeta::new(ctx.accounts.dao_epoch_info.key(), false), // use the current epoch infos
-    AccountMeta::new(ctx.accounts.sub_dao_epoch_info.key(), false),
-    AccountMeta::new(hnt_circuit_breaker, false),
-    AccountMeta::new(dnt_circuit_breaker, false),
-    AccountMeta::new(ctx.accounts.dao.hnt_mint, false),
-    AccountMeta::new(ctx.accounts.sub_dao.dnt_mint, false),
-    AccountMeta::new(ctx.accounts.sub_dao.treasury, false),
-    AccountMeta::new(ctx.accounts.sub_dao.rewards_escrow, false),
-    AccountMeta::new(ctx.accounts.sub_dao.delegator_pool, false),
-    AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
-  ];
-  Instruction {
-    program_id: crate::ID,
-    accounts,
-    data: crate::instruction::IssueRewardsV0 {
-      args: crate::IssueRewardsArgsV0 { epoch },
-    }
-    .data(),
-  }
-}
-
 pub fn handler(
   ctx: Context<CalculateUtilityScoreV0>,
   args: CalculateUtilityScoreArgsV0,
-) -> Result<ThreadResponse> {
+) -> Result<()> {
   let curr_ts = ctx.accounts.registrar.clock_unix_timestamp();
   let epoch = current_epoch(curr_ts);
 
@@ -146,13 +101,8 @@ pub fn handler(
     return Err(error!(ErrorCode::EpochNotOver));
   }
 
-  let next_ix = construct_next_ix(&ctx, args.epoch);
   if !TESTING && ctx.accounts.sub_dao_epoch_info.utility_score.is_some() {
-    msg!("Utility score has already been calculated, exiting");
-    return Ok(ThreadResponse {
-      kickoff_instruction: None,
-      next_instruction: Some(next_ix.into()),
-    });
+    return Err(error!(ErrorCode::UtilityScoreAlreadyCalculated));
   }
 
   if curr_ts < ctx.accounts.dao.emission_schedule[0].start_unix_time {
@@ -186,14 +136,14 @@ pub fn handler(
     .or_arith_error()?;
 
   let history_buffer = AggregatorHistoryBuffer::new(&ctx.accounts.history_buffer)?;
-  let total_devices_u64 = u64::try_from(
-    history_buffer
-      .lower_bound(epoch_end_ts)
-      .unwrap()
-      .value
-      .mantissa,
-  )
-  .unwrap();
+
+  let total_devices_opt = history_buffer.lower_bound(epoch_end_ts);
+  let total_devices_u64: u64;
+  if let Some(total_devices_row) = total_devices_opt {
+    total_devices_u64 = u64::try_from(total_devices_row.value.mantissa).unwrap();
+  } else {
+    total_devices_u64 = 0;
+  }
 
   msg!(
     "Total devices: {}. Dc burned: {}.",
@@ -281,8 +231,9 @@ pub fn handler(
       .unwrap();
   }
 
-  Ok(ThreadResponse {
-    kickoff_instruction: None,
-    next_instruction: Some(next_ix.into()),
-  })
+  if ctx.accounts.dao_epoch_info.num_utility_scores_calculated >= ctx.accounts.dao.num_sub_daos {
+    ctx.accounts.dao_epoch_info.done_calculating_scores = true;
+  }
+
+  Ok(())
 }

@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.0.24",
+  "version": "0.0.26",
   "description": "Interface to the helium-entity-manager smart contract",
   "repository": {
     "type": "git",
@@ -31,13 +31,13 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "0.26.0",
     "@helium/address": "^4.6.2",
-    "@helium/helium-sub-daos-sdk": "^0.0.24",
-    "@helium/idls": "^0.0.24",
-    "@helium/spl-utils": "^0.0.24",
+    "@helium/helium-sub-daos-sdk": "^0.0.26",
+    "@helium/idls": "^0.0.26",
+    "@helium/spl-utils": "^0.0.26",
     "@metaplex-foundation/mpl-bubblegum": "^0.6.2",
     "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
-    "@project-serum/anchor": "0.26.0",
     "@solana/spl-account-compression": "^0.1.5",
     "@solana/spl-token": "^0.3.6",
     "bn.js": "^5.2.0",

@@ -1,5 +1,5 @@
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
-import { Program } from "@project-serum/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { keyToAssetKey, mobileInfoKey } from "../pdas";
 import { proofArgsAndAccounts, ProofArgsAndAccountsArgs } from "./proofArgsAndAccounts";
