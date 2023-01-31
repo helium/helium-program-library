@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "description": "Oracle server for the lazy distributor",
   "repository": {
     "type": "git",
@@ -36,10 +36,10 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.26.0",
     "@helium/address": "^4.6.2",
-    "@helium/helium-entity-manager-sdk": "^0.0.25",
-    "@helium/idls": "^0.0.25",
-    "@helium/lazy-distributor-sdk": "^0.0.25",
-    "@helium/spl-utils": "^0.0.25",
+    "@helium/helium-entity-manager-sdk": "^0.0.26",
+    "@helium/idls": "^0.0.26",
+    "@helium/lazy-distributor-sdk": "^0.0.26",
+    "@helium/spl-utils": "^0.0.26",
     "axios": "^0.27.2",
     "bn.js": "^5.2.0",
     "cors": "^2.8.5",
