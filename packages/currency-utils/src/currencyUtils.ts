@@ -12,14 +12,16 @@ export const getBalance = async ({
 }: {
   connection: Connection;
   pubKey: PublicKey;
-  mint: string;
+  mint: PublicKey;
 }) => {
-  const acct = await getAccount(
-    connection,
-    getAssociatedTokenAddressSync(new PublicKey(mint), pubKey)
-  );
+  try {
+    const address = getAssociatedTokenAddressSync(mint, pubKey, true);
+    const acct = await getAccount(connection, address);
 
-  return Number(acct.amount);
+    return acct.amount;
+  } catch {
+    return BigInt(0);
+  }
 };
 
 export const getOraclePrice = async ({
