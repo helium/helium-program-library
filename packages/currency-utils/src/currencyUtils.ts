@@ -20,7 +20,7 @@ export const getBalance = async ({
 
     return acct.amount;
   } catch {
-    return 0n;
+    return BigInt(0);
   }
 };
 
