@@ -375,7 +375,7 @@ pub fn construct_issue_rewards_ix(
   // issue rewards ix
   let accounts = vec![
     AccountMeta::new_readonly(dao, false),
-    AccountMeta::new_readonly(sub_dao, false),
+    AccountMeta::new(sub_dao, false),
     AccountMeta::new(dao_epoch_info, false), // use the current epoch infos
     AccountMeta::new(sub_dao_epoch_info, false),
     AccountMeta::new(hnt_circuit_breaker, false),
@@ -416,7 +416,7 @@ pub fn construct_issue_hst_ix(
 ) -> Option<Instruction> {
   // build issue hst pool ix
   let accounts = vec![
-    AccountMeta::new_readonly(dao, false),
+    AccountMeta::new(dao, false),
     AccountMeta::new(dao_epoch_info, false),
     AccountMeta::new(hnt_circuit_breaker, false),
     AccountMeta::new(hnt_mint, false),
