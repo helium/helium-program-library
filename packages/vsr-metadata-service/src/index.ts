@@ -37,7 +37,7 @@ server.get<{ Params: { mintKey: string } }>("/:mintKey", async (request, reply) 
     name,
     description: `Voting Escrow Token Position of ${uiAmount} tokens locked until ${lockEndDate} with kind ${kind}`,
     image:
-      "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/hotspot.png",
+      "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/vsr.png",
     attributes: [
       { trait_type: "registrar", value: positionAcc.registrar.toBase58() },
       { trait_type: "amount_deposited_native", value: positionAcc.amountDepositedNative.toString() },
