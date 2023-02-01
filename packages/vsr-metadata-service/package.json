@@ -1,0 +1,58 @@
+{
+  "name": "@helium/vsr-metadata-service",
+  "private": true,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "license": "Apache-2.0",
+  "version": "0.0.26",
+  "description": "Mint metadata of vsr positions",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HeliumFoundation/helium-program-libary"
+  },
+  "main": "./lib/cjs/index.js",
+  "module": "./lib/esm/src/index.js",
+  "types": "./lib/types/src/index.d.ts",
+  "sideEffects": false,
+  "files": [
+    "lib"
+  ],
+  "exports": {
+    "import": "./lib/esm/src/index.js",
+    "require": "./lib/cjs/index.js",
+    "types": "./lib/types/src/index.d.ts"
+  },
+  "scripts": {
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
+    "build": "tsc -p tsconfig.json",
+    "start": "node lib/esm/index.js",
+    "dev": "npx ts-node --project tsconfig.cjs.json src/index.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "0.26.0",
+    "@fastify/cors": "^8.1.1",
+    "@helium/address": "^4.6.2",
+    "@helium/voter-stake-registry-sdk": "^0.0.26",
+    "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
+    "@solana/spl-token": "^0.3.6",
+    "@solana/web3.js": "^1.43.4",
+    "axios": "^1.1.3",
+    "bn.js": "^5.2.0",
+    "bs58": "^4.0.1",
+    "fastify": "^4.9.2"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.1.1",
+    "git-format-staged": "^2.1.3",
+    "ts-loader": "^9.2.3",
+    "ts-node": "^10.9.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^4.8.4",
+    "yarn": "^1.22.18"
+  },
+  "keywords": [],
+  "author": ""
+}

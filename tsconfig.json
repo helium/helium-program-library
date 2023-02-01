@@ -29,6 +29,9 @@
       "path": "./packages/metadata-service"
     },
     {
+      "path": "./packages/vsr-metadata-service"
+    },
+    {
       "path": "./packages/monitor-service"
     },
     {
