@@ -47,7 +47,7 @@ export const instructionParser: Record<string, Parser>  = {
       const hotspotKey = (await getKeysFromKeyToAsset(program, tx, ix, "onboardIotHotspotV0"))[1];
       await IotMetadata.upsert({
         hotspotKey,
-        location: args.location ? `${args.location}` : null,
+        location: args.location ? args.location.toString() : null,
         elevation: args.elevation,
         gain: args.gain,
       });
@@ -59,7 +59,7 @@ export const instructionParser: Record<string, Parser>  = {
 
       await MobileMetadata.upsert({
         hotspotKey,
-        location: args.location ? `${args.location}` : null,
+        location: args.location ? args.location.toString() : null,
       });
     }
   },
@@ -75,7 +75,7 @@ export const instructionParser: Record<string, Parser>  = {
 
       await IotMetadata.upsert({
         hotspotKey,
-        location: args.location ? `${args.location}` : null,
+        location: args.location ? args.location.toString() : null,
         elevation: args.elevation,
         gain: args.gain,
       });
@@ -88,7 +88,7 @@ export const instructionParser: Record<string, Parser>  = {
       if (isMobile) {
         await MobileMetadata.upsert({
           hotspotKey,
-          location: args.location ? `${args.location}` : null,
+          location: args.location ? args.location.toString() : null,
         })
       }
     }
@@ -113,7 +113,7 @@ export const instructionParser: Record<string, Parser>  = {
         }
       });
       await IotMetadata.update({
-        ...(args.location && {location: args.location}),
+        ...(args.location && {location: args.location.toString()}),
         ...(args.elevation && {elevation: args.elevation}),
         ...(args.gain && {gain: args.gain}),
       }, {
@@ -131,7 +131,7 @@ export const instructionParser: Record<string, Parser>  = {
       });
       
       await MobileMetadata.update({
-        ...(args.location && {location: args.location}),
+        ...(args.location && {location: args.location.toString()}),
       }, {
         where: {hotspotKey: record.getDataValue("hotspotKey")}
       });

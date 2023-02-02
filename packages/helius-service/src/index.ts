@@ -4,7 +4,6 @@ import { AnchorProvider, BN, BorshInstructionCoder, Program } from '@coral-xyz/a
 import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
 import { sequelize } from './model';
 import { findAccountKey, instructionParser } from './parser';
-import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import { PublicKey } from '@solana/web3.js';
 
@@ -22,14 +21,13 @@ let hemProgram: Program<HeliumEntityManager>;
 
 server.post('/', async (request, reply) => {
   let tx = request.body[0].transaction;
-  //@ts-ignore
+  // testing code for localnet txs
   // let sig = request.body.sig;
   // let tx = (await hemProgram.provider.connection.getTransaction(sig, {commitment: 'finalized'}))!.transaction;
   const instructions = tx.message.instructions;
   try {
     // iterate through instructions and update/create db rows
     for (const ix of instructions) {
-      console.log(ix)
       let decoded = (
         hemProgram.coder.instruction as BorshInstructionCoder
       ).decode(ix.data, "hex");
@@ -40,7 +38,6 @@ server.post('/', async (request, reply) => {
           hemProgram.coder.instruction as BorshInstructionCoder
         ).decode(ix.data, "base58");
       }
-      console.log(decoded);
       if (!decoded || !(decoded.name in instructionParser)) {
         continue;
       }
