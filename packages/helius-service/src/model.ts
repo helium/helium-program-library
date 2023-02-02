@@ -9,11 +9,11 @@ export const sequelize = new Sequelize('database', 'postgres', 'postgres', {
 
 export class Entity extends Model {}
 Entity.init({
-  assetId: {
+  hotspotKey: {
     type: STRING,
     primaryKey: true,
   },
-  hotspotKey: {
+  assetId: {
     type: STRING,
   },
   maker: {
@@ -23,7 +23,7 @@ Entity.init({
 
 export class IotMetadata extends Model {}
 IotMetadata.init({
-  assetId: {
+  hotspotKey: {
     type: STRING,
     primaryKey: true,
   },
@@ -40,7 +40,7 @@ IotMetadata.init({
 
 export class MobileMetadata extends Model {}
 MobileMetadata.init({
-  assetId: {
+  hotspotKey: {
     type: STRING,
     primaryKey: true,
   },

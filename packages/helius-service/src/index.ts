@@ -2,53 +2,70 @@ import fastify from 'fastify';
 import {init, PROGRAM_ID} from "@helium/helium-entity-manager-sdk";
 import { AnchorProvider, BN, BorshInstructionCoder, Program } from '@coral-xyz/anchor';
 import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
-import { Keypair, PublicKey } from '@solana/web3.js';
-import { sequelize, Entity, IotMetadata, MobileMetadata } from './model';
-import { instructionParser } from './parser';
+import { sequelize } from './model';
+import { findAccountKey, instructionParser } from './parser';
+import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
+import { daoKey } from "@helium/helium-sub-daos-sdk";
+import { PublicKey } from '@solana/web3.js';
 
 // sync the model with the database
 sequelize.sync()
   .then(() => {
-    console.log('Hotspot table synced');
+    console.log('Tables synced');
   })
   .catch(error => {
-    console.error('Error syncing Hotspot table:', error);
+    console.error('Error syncing tables:', error);
   });
 
-function getLeafAssetId(tree: PublicKey, leafIndex: BN): PublicKey {
-  const [assetId] = PublicKey.findProgramAddressSync(
-    [Buffer.from('asset', 'utf8'), tree.toBuffer(), Uint8Array.from(leafIndex.toArray('le', 8))],
-    new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"),
-  );
-  return assetId;
-}
 const server = fastify();
 let hemProgram: Program<HeliumEntityManager>;
 
 server.post('/', async (request, reply) => {
   let tx = request.body[0].transaction;
+  //@ts-ignore
+  // let sig = request.body.sig;
+  // let tx = (await hemProgram.provider.connection.getTransaction(sig, {commitment: 'finalized'}))!.transaction;
   const instructions = tx.message.instructions;
   try {
     // iterate through instructions and update/create db rows
     for (const ix of instructions) {
+      console.log(ix)
       let decoded = (
         hemProgram.coder.instruction as BorshInstructionCoder
-      ).decode(ix.data);
-      const args = (decoded.data as any).args;
-      if (!(decoded.name in instructionParser)) {
+      ).decode(ix.data, "hex");
+
+      // if hex decode didn't succeed, try decoding as base58
+      if (!decoded) {
+        decoded = (
+          hemProgram.coder.instruction as BorshInstructionCoder
+        ).decode(ix.data, "base58");
+      }
+      console.log(decoded);
+      if (!decoded || !(decoded.name in instructionParser)) {
         continue;
       }
+      const args = (decoded.data as any).args;
+ 
       const method = instructionParser[decoded.name];
-      await method.parseAndWrite(hemProgram, tx, ix, args);
+      //@ts-ignore
+      const ixDaoKey = findAccountKey(hemProgram, tx, ix, decoded.name, "dao")
+      // ignore txs relating to other daos
+      if (!ixDaoKey.equals(daoKey(new PublicKey(process.env.HNT_MINT))[0])) {
+        continue;
+      }
+      //@ts-ignore
+      await method.parseAndWrite(hemProgram, tx, ix, args); 
+      console.log("wrote successfully");
     }
     // send a response to the client
     reply.send({
-      message: 'POST request received'
+      message: 'Success'
     });
   } catch(err) {
     reply.status(500).send({
       message: 'Request failed'
     });
+    console.error(err);
   }
 });
 
