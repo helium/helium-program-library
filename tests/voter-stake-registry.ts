@@ -36,6 +36,7 @@ import {
   createAssociatedTokenAccountInstruction,
   createTransferInstruction,
   getAssociatedTokenAddress,
+  getAccount,
 } from "@solana/spl-token";
 import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import chai, { expect } from "chai";
@@ -260,10 +261,10 @@ describe("voter-stake-registry", () => {
     expect(positionAccount.registrar.toBase58()).to.eq(registrar.toBase58());
     expect(positionAccount.numActiveVotes).to.eq(0);
 
-    const bal = await provider.connection.getTokenAccountBalance(
-      await getAssociatedTokenAddress(mint, me)
-    );
-    expect(bal.value.uiAmount).to.eq(1);
+    const nftAtaKey = await getAssociatedTokenAddress(mint, me);
+    const nftAtaAcc = await getAccount(provider.connection, nftAtaKey);
+    expect(nftAtaAcc.isFrozen).to.be.true;
+    expect(nftAtaAcc.amount.toString()).to.eq('1');
   });
 
   describe("with proposal", async () => {

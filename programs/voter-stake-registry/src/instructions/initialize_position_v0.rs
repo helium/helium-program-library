@@ -9,6 +9,7 @@ use anchor_spl::metadata::{
   CreateMetadataAccountsV3, Metadata, VerifySizedCollectionItem,
 };
 use anchor_spl::token;
+use anchor_spl::token::FreezeAccount;
 use anchor_spl::token::{Mint, MintTo, Token, TokenAccount};
 use mpl_token_metadata::state::Collection;
 use mpl_token_metadata::state::DataV2;
@@ -124,6 +125,15 @@ impl<'info> InitializePositionV0<'info> {
     };
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
+
+  fn freeze_ctx(&self) -> CpiContext<'_, '_, '_, 'info, FreezeAccount<'info>> {
+    let cpi_accounts = FreezeAccount {
+      account: self.position_token_account.to_account_info(),
+      mint: self.mint.to_account_info(),
+      authority: self.position.to_account_info(),
+    };
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+  }
 }
 
 /// Initializes a new deposit entry.
@@ -175,6 +185,8 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
   let signer_seeds: &[&[&[u8]]] = &[position_seeds!(ctx.accounts.position)];
 
   token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
+
+  token::freeze_account(ctx.accounts.freeze_ctx().with_signer(signer_seeds))?;
 
   create_metadata_accounts_v3(
     CpiContext::new_with_signer(
