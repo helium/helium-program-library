@@ -25,7 +25,8 @@ pub struct SetCanopyV0<'info> {
 /// NOTE: This is a dangerous operation, as index markers will be preserved.
 pub fn handler(ctx: Context<SetCanopyV0>, args: SetCanopyArgsV0) -> Result<()> {
   let mut data = ctx.accounts.canopy.try_borrow_mut_data()?;
-  data[(args.offset + 1) as usize..(args.offset + 1) as usize + args.bytes.len()].copy_from_slice(&args.bytes);
+  data[(args.offset + 1) as usize..(args.offset + 1) as usize + args.bytes.len()]
+    .copy_from_slice(&args.bytes);
 
   Ok(())
 }
