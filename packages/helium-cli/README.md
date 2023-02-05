@@ -1,3 +1,6 @@
+First, brick the genesis transactions. This keeps someone from front-running the genesis transaction lazy signer.
+
+
 ```
 npx ts-node --project tsconfig.cjs.json src/create-dao.ts -u https://api.devnet.solana.com --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium Test5"
 
@@ -32,13 +35,14 @@ solana transfer -u devnet maker_address 1 --allow-unfunded-recipient
 
 Now, go approve and run maker create in realms
 
+Now,migrate to a `-n` that nobody knows you're using. This will ensure nobody can frontrun
 
 ```
  cd ../migration-service
 
-node --max_old_space_size=16000 lib/cjs/gen-transactions.js --mobile $(solana address -k ../helium-cli/keypairs/mobile.json) --hnt $(solana address -k ../helium-cli/keypairs/hnt.json) --dc $(solana address -k ../helium-cli/keypairs/dc.json) --iot $(solana address -k ../helium-cli/keypairs/iot.json) --hst $(solana address -k ../helium-cli/keypairs/hst.json) -n testhelium12 -u http://127.0.0.1:8899 --payer $(solana address) --pgPort 5432 --pgDatabase migration --makers ../helium-cli/makers.json -p
+node --max_old_space_size=16000 lib/cjs/gen-transactions.js --mobile $(solana address -k ../helium-cli/keypairs/mobile.json) --hnt $(solana address -k ../helium-cli/keypairs/hnt.json) --dc $(solana address -k ../helium-cli/keypairs/dc.json) --iot $(solana address -k ../helium-cli/keypairs/iot.json) --hst $(solana address -k ../helium-cli/keypairs/hst.json) -n devnethelium -u http://127.0.0.1:8899 --payer $(solana address) --pgPort 5432 --pgDatabase migration --makers ../helium-cli/makers.json -p
 ```
 
-At this point, go and update all lazy signers with the value from -n (ie tessthelium4)
+At this point, go and update all lazy signers with the value from -n (ie devnethelium), and unbrick the genesis endpoints.
 
 Must also then go update all state in the cluster

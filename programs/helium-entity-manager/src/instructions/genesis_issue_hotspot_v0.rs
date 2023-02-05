@@ -35,7 +35,7 @@ pub struct GenesisIssueHotspotArgsV0 {
 pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     mut,
-    seeds = [b"lazy_signer", b"testhelium12"],
+    seeds = [b"lazy_signer", b"devnethelium4"],
     seeds::program = lazy_transactions::ID,
     bump,
   )]
@@ -76,7 +76,7 @@ pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     init,
     payer = lazy_signer,
-    space = 8 + 60 + std::mem::size_of::<IotHotspotInfoV0>(),
+    space = IOT_HOTSPOT_INFO_SIZE,
     seeds = [
       "iot_info".as_bytes(),
       rewardable_entity_config.key().as_ref(),
@@ -231,7 +231,7 @@ pub fn handler<'info>(
       bump_seed,
     }
     .try_to_vec()?;
-    let account_size = serialized_data.len();
+    let account_size = MOBILE_HOTSPOT_INFO_SIZE;
 
     let mut signers_seeds = seeds.to_vec();
     let bump = &[bump_seed];
