@@ -203,11 +203,7 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
         ctx.accounts.mint.key()
       ),
       seller_fee_basis_points: 0,
-      creators: Some(vec![Creator {
-        address: ctx.accounts.registrar.collection.key(),
-        verified: true,
-        share: 100,
-      }]),
+      creators: Some(vec![]),
       collection: Some(Collection {
         key: ctx.accounts.registrar.collection.key(),
         verified: false, // Verified in cpi
