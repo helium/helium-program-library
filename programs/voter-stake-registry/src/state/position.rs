@@ -78,13 +78,15 @@ impl PositionV0 {
     amount_deposited_native: u64,
   ) -> Result<u64> {
     let locked_vote_weight = voting_mint_config.locked_vote_weight(amount_deposited_native)?;
+    let max_locked_vote_weight =
+      voting_mint_config.max_extra_lockup_vote_weight(amount_deposited_native)?;
 
     let voting_power_locked = self.voting_power_locked(
       curr_ts,
       voting_mint_config.minimum_required_lockup_secs,
       locked_vote_weight,
       voting_mint_config.lockup_saturation_secs,
-      voting_mint_config.max_extra_lockup_vote_weight_scaled_factor,
+      max_locked_vote_weight,
       voting_mint_config.genesis_vote_power_multiplier,
     )?;
 
@@ -98,10 +100,10 @@ impl PositionV0 {
     minimum_required_lockup_secs: u64,
     locked_vote_weight: u64,
     lockup_saturation_secs: u64,
-    max_extra_lockup_vote_weight_scaled_factor: u64,
+    max_locked_vote_weight: u64,
     genesis_vote_power_multiplier: u8,
   ) -> Result<u64> {
-    if self.lockup.expired(curr_ts) || (locked_vote_weight == 0) {
+    if self.lockup.expired(curr_ts) || (max_locked_vote_weight == 0) {
       return Ok(0);
     }
 
@@ -112,7 +114,7 @@ impl PositionV0 {
         minimum_required_lockup_secs,
         locked_vote_weight,
         lockup_saturation_secs,
-        max_extra_lockup_vote_weight_scaled_factor,
+        max_locked_vote_weight,
         genesis_vote_power_multiplier,
       ),
       LockupKind::Constant => self.voting_power_cliff(
@@ -120,7 +122,7 @@ impl PositionV0 {
         minimum_required_lockup_secs,
         locked_vote_weight,
         lockup_saturation_secs,
-        max_extra_lockup_vote_weight_scaled_factor,
+        max_locked_vote_weight,
         genesis_vote_power_multiplier,
       ),
     }
@@ -132,7 +134,7 @@ impl PositionV0 {
     minimum_required_lockup_secs: u64,
     locked_vote_weight: u64,
     lockup_saturation_secs: u64,
-    max_extra_lockup_vote_weight_scaled_factor: u64,
+    max_locked_vote_weight: u64,
     genesis_vote_power_multiplier: u8,
   ) -> Result<u64> {
     let remaining = min(self.lockup.seconds_left(curr_ts), lockup_saturation_secs);
@@ -176,14 +178,11 @@ impl PositionV0 {
       .unwrap()
       .checked_div(total_seconds as u128)
       .unwrap();
+
     let second_arg = (locked_vote_weight as u128)
       .checked_mul(seconds_passsed_min_lockup_initial as u128)
       .unwrap()
-      .checked_mul(
-        max_extra_lockup_vote_weight_scaled_factor
-          .checked_sub(1)
-          .unwrap() as u128,
-      )
+      .checked_mul(max_locked_vote_weight.checked_sub(1).unwrap() as u128)
       .unwrap()
       .checked_mul(remaining as u128)
       .unwrap()

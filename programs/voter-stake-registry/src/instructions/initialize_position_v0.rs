@@ -11,6 +11,7 @@ use anchor_spl::metadata::{
 use anchor_spl::token;
 use anchor_spl::token::{Mint, MintTo, Token, TokenAccount};
 use mpl_token_metadata::state::Collection;
+use mpl_token_metadata::state::Creator;
 use mpl_token_metadata::state::DataV2;
 use shared_utils::create_metadata_accounts_v3;
 use std::convert::TryFrom;
@@ -202,7 +203,11 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
         ctx.accounts.mint.key()
       ),
       seller_fee_basis_points: 0,
-      creators: None,
+      creators: Some(vec![Creator {
+        address: ctx.accounts.registrar.key(),
+        verified: true,
+        share: 100,
+      }]),
       collection: Some(Collection {
         key: ctx.accounts.registrar.collection.key(),
         verified: false, // Verified in cpi

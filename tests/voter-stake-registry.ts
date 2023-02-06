@@ -143,9 +143,9 @@ describe("voter-stake-registry", () => {
         .configureVotingMintV0({
           idx: 0, // idx
           digitShift: 0, // digit shift
-          lockedVoteWeightScaledFactor: new anchor.BN(1_000_000_000),
+          lockedVoteWeightScaledFactor: new anchor.BN(1 * 1e8),
           minimumRequiredLockupSecs: new anchor.BN(MIN_LOCKUP),
-          maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE),
+          maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE * 1e9),
           genesisVotePowerMultiplier: GENESIS_MULTIPLIER,
           genesisVotePowerMultiplierExpirationTs: new anchor.BN(oneWeekFromNow),
           lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
@@ -230,13 +230,13 @@ describe("voter-stake-registry", () => {
 
     expect(votingMint0.digitShift).to.eq(0);
     expect(
-      votingMint0.lockedVoteWeightScaledFactor.eq(new anchor.BN(1_000_000_000))
+      votingMint0.lockedVoteWeightScaledFactor.eq(new anchor.BN(1 * 1e9))
     ).to.eq(true);
     expect(
       votingMint0.minimumRequiredLockupSecs.eq(new anchor.BN(MIN_LOCKUP))
     ).to.eq(true);
     expect(
-      votingMint0.maxExtraLockupVoteWeightScaledFactor.eq(new anchor.BN(SCALE))
+      votingMint0.maxExtraLockupVoteWeightScaledFactor.eq(new anchor.BN(SCALE * 1e9))
     ).to.eq(true);
     expect(votingMint0.genesisVotePowerMultiplier).to.eq(GENESIS_MULTIPLIER);
     expect(
@@ -387,12 +387,16 @@ describe("voter-stake-registry", () => {
 
     let voteTestCases = [
       {
-        name: "genesis constant (within genesis)",
-        lockupAmount: 10000,
-        periods: 200,
+        name: "genesis constant 1 position (within genesis)",
         delay: 0, // days
         fastForward: 60, // days
-        kind: { constant: {} },
+        positions: [
+          {
+            lockupAmount: 10000,
+            periods: 200,
+            kind: { constant: {} },
+          },
+        ],
         expectedVeHnt:
           10000 *
           GENESIS_MULTIPLIER *
@@ -401,12 +405,16 @@ describe("voter-stake-registry", () => {
               (MAX_LOCKUP - MIN_LOCKUP)),
       },
       {
-        name: "genesis cliff (within genesis)",
-        lockupAmount: 10000,
-        periods: 200,
+        name: "genesis cliff 1 position (within genesis)",
         delay: 0, // days
         fastForward: 60, // days
-        kind: { cliff: {} },
+        positions: [
+          {
+            lockupAmount: 10000,
+            periods: 200,
+            kind: { cliff: {} },
+          },
+        ],
         expectedVeHnt:
           10000 *
           GENESIS_MULTIPLIER *
@@ -416,12 +424,16 @@ describe("voter-stake-registry", () => {
           ((200 - 60) / 200),
       },
       {
-        name: "genesis constant (outside of genesis)",
-        lockupAmount: 10000,
-        periods: 200,
+        name: "constant 1 positon (outside of genesis)",
         delay: 0, // days
         fastForward: 201, // days
-        kind: { constant: {} },
+        positions: [
+          {
+            lockupAmount: 10000,
+            periods: 200,
+            kind: { constant: {} },
+          },
+        ],
         expectedVeHnt:
           10000 *
           (1 +
@@ -429,18 +441,45 @@ describe("voter-stake-registry", () => {
               (MAX_LOCKUP - MIN_LOCKUP)),
       },
       {
-        name: "cliff (outside genesis)",
-        lockupAmount: 10000,
-        periods: 200,
+        name: "cliff 1 position (outside genesis)",
         delay: 7, // days
         fastForward: 60, // days
-        kind: { cliff: {} },
+        positions: [
+          {
+            lockupAmount: 10000,
+            periods: 200,
+            kind: { cliff: {} },
+          },
+        ],
         expectedVeHnt:
           10000 *
           (1 +
             ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
               (MAX_LOCKUP - MIN_LOCKUP)) *
           ((200 - 60) / 200),
+      },
+      {
+        name: "mix 2 positions (outside of genesis)",
+        delay: 0, // days
+        fastForward: 201, // days
+        positions: [
+          {
+            lockupAmount: 10000,
+            periods: 200,
+            kind: { cliff: {} },
+          },
+          {
+            lockupAmount: 10000,
+            periods: 200,
+            kind: { constant: {} },
+          },
+        ],
+        expectedVeHnt:
+          2 *
+          (10000 *
+            (1 +
+              ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
+                (MAX_LOCKUP - MIN_LOCKUP))),
       },
     ];
     voteTestCases.forEach((testCase) => {
@@ -452,12 +491,18 @@ describe("voter-stake-registry", () => {
           .rpc();
 
         const instructions: TransactionInstruction[] = [];
-        const { position, mint } = await createAndDeposit(
-          testCase.lockupAmount,
-          testCase.periods,
-          testCase.kind,
-          depositor
-        );
+        const positions: { position: PublicKey; mint: PublicKey }[] =
+          await Promise.all(
+            testCase.positions.map((position) =>
+              createAndDeposit(
+                position.lockupAmount,
+                position.periods,
+                position.kind,
+                depositor
+              )
+            )
+          );
+
         await program.methods
           .setTimeOffsetV0(
             new anchor.BN(
@@ -496,26 +541,32 @@ describe("voter-stake-registry", () => {
             voterAuthority: depositor.publicKey,
             voterTokenOwnerRecord: tokenOwnerRecord,
           })
-          .remainingAccounts([
-            {
-              pubkey: await getAssociatedTokenAddress(
-                mint,
-                depositor.publicKey
-              ),
-              isSigner: false,
-              isWritable: false,
-            },
-            {
-              pubkey: position,
-              isSigner: false,
-              isWritable: true,
-            },
-            {
-              pubkey: await nftVoteRecordKey(proposal, mint)[0],
-              isSigner: false,
-              isWritable: true,
-            },
-          ])
+          .remainingAccounts(
+            (
+              await Promise.all(
+                positions.map(async ({ position, mint }) => [
+                  {
+                    pubkey: await getAssociatedTokenAddress(
+                      mint,
+                      depositor.publicKey
+                    ),
+                    isSigner: false,
+                    isWritable: false,
+                  },
+                  {
+                    pubkey: position,
+                    isSigner: false,
+                    isWritable: true,
+                  },
+                  {
+                    pubkey: nftVoteRecordKey(proposal, mint)[0],
+                    isSigner: false,
+                    isWritable: true,
+                  },
+                ])
+              )
+            ).flat()
+          )
           .prepare();
         instructions.push(instruction);
 
