@@ -116,9 +116,6 @@ pub enum VsrError {
   // 6037 / 0x1795
   #[msg("")]
   InvalidTimestampArguments,
-  // 6038 / 0x1796
-  #[msg("")]
-  DepositLockupLessThanVotingMintConfigMinRequired,
 
   #[msg("Cast vote is not allowed on update_voter_weight_record_v0 endpoint")]
   CastVoteIsNotAllowed,

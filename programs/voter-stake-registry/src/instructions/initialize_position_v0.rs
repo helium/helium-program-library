@@ -1,4 +1,3 @@
-use crate::error::*;
 use crate::position_seeds;
 use crate::registrar_seeds;
 use crate::state::*;
@@ -11,7 +10,6 @@ use anchor_spl::metadata::{
 use anchor_spl::token;
 use anchor_spl::token::{Mint, MintTo, Token, TokenAccount};
 use mpl_token_metadata::state::Collection;
-use mpl_token_metadata::state::Creator;
 use mpl_token_metadata::state::DataV2;
 use shared_utils::create_metadata_accounts_v3;
 use std::convert::TryFrom;
@@ -165,14 +163,6 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
     num_active_votes: 0,
   });
 
-  if args.kind != LockupKind::None {
-    require_gte!(
-      ctx.accounts.position.lockup.total_seconds(),
-      mint_config.minimum_required_lockup_secs,
-      VsrError::DepositLockupLessThanVotingMintConfigMinRequired
-    );
-  }
-
   let signer_seeds: &[&[&[u8]]] = &[position_seeds!(ctx.accounts.position)];
 
   token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
@@ -203,11 +193,7 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
         ctx.accounts.mint.key()
       ),
       seller_fee_basis_points: 0,
-      creators: Some(vec![Creator {
-        address: ctx.accounts.registrar.key(),
-        verified: true,
-        share: 100,
-      }]),
+      creators: None,
       collection: Some(Collection {
         key: ctx.accounts.registrar.collection.key(),
         verified: false, // Verified in cpi

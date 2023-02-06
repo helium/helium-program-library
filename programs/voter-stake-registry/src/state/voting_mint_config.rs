@@ -14,14 +14,10 @@ pub struct VotingMintConfigV0 {
   /// Mint for this entry.
   pub mint: Pubkey,
 
-  /// Vote weight factor for all funds in the account when locked up
-  /// for minimum_required_lockup_secs, must be >= 0
+  /// Vote weight factor for all funds in the account, no matter if locked or not.
   ///
-  /// In 1/SCALED_FACTOR_BASE units.    
-  pub locked_vote_weight_scaled_factor: u64,
-
-  /// Number of seconds of lockup needed to reach the locked_baseline_vote_weight_scaled_factor.
-  pub minimum_required_lockup_secs: u64,
+  /// In 1/SCALED_FACTOR_BASE units.
+  pub baseline_vote_weight_scaled_factor: u64,
 
   /// Maximum extra vote weight factor for lockups.
   ///
@@ -77,12 +73,14 @@ impl VotingMintConfigV0 {
     compute().ok_or_else(|| error!(VsrError::VoterWeightOverflow))
   }
 
-  /// The vote weight a deposit of a number of locked native tokens should have
-  /// when locked for minimum_required_lockup_secs
-  pub fn locked_vote_weight(&self, amount_native: u64) -> Result<u64> {
+  /// The vote weight a deposit of a number of native tokens should have.
+  ///
+  /// This vote_weight is a component for all funds in a voter account, no
+  /// matter if locked up or not.///
+  pub fn baseline_vote_weight(&self, amount_native: u64) -> Result<u64> {
     Self::apply_factor(
       self.digit_shift_native(amount_native)?,
-      self.locked_vote_weight_scaled_factor,
+      self.baseline_vote_weight_scaled_factor,
     )
   }
 

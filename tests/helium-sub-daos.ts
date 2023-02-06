@@ -214,7 +214,6 @@ describe("helium-sub-daos", () => {
         me,
         hntMint,
         daoKey(hntMint)[0],
-        minLockupSeconds,
         genesisVotePowerMultiplierExpirationTs
       ));
       ({

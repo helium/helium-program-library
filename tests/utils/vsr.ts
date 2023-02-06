@@ -25,7 +25,6 @@ export async function initVsr(
   me: PublicKey,
   hntMint: PublicKey,
   positionUpdateAuthority: PublicKey,
-  minLockupSeconds: number = 15811200, // 6 months
   genesisVotePowerMultiplierExpirationTs = 1
 ) {
   const programVersion = await getGovernanceProgramVersion(
@@ -67,12 +66,12 @@ export async function initVsr(
       .configureVotingMintV0({
         idx: 0, // idx
         digitShift: 0, // digit shift
-        lockedVoteWeightScaledFactor: new BN(1_000_000_000), // locked vote weight scaled factor
-        minimumRequiredLockupSecs: new BN(minLockupSeconds), // min lockup seconds
-        maxExtraLockupVoteWeightScaledFactor: new BN(100), // scaled factor
+        baselineVoteWeightScaledFactor: new BN(0 * 1e9),
+        maxExtraLockupVoteWeightScaledFactor: new BN(100 * 1e9), // scaled factor
         genesisVotePowerMultiplier: 3,
-        genesisVotePowerMultiplierExpirationTs:
-          new BN(genesisVotePowerMultiplierExpirationTs),
+        genesisVotePowerMultiplierExpirationTs: new BN(
+          genesisVotePowerMultiplierExpirationTs
+        ),
         lockupSaturationSecs: new BN(15811200 * 8), // 4 years
       })
       .accounts({

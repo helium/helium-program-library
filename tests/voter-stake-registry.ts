@@ -51,11 +51,12 @@ import { SPL_GOVERNANCE_PID } from "./utils/vsr";
 
 chai.use(chaiAsPromised);
 
-const MIN_LOCKUP = 15811200; // 6 months
-const MAX_LOCKUP = MIN_LOCKUP * 8;
+const SECS_PER_DAY = 60 * 60 * 24;
+const SECS_PER_YEAR = 365 * SECS_PER_DAY;
+const MAX_LOCKUP = 4 * SECS_PER_YEAR;
+const BASELINE = 0;
 const SCALE = 100;
 const GENESIS_MULTIPLIER = 3;
-const SECS_PER_DAY = 60 * 60 * 24;
 type VotingMintConfig =
   anchor.IdlTypes<VoterStakeRegistry>["VotingMintConfigV0"];
 
@@ -79,7 +80,7 @@ describe("voter-stake-registry", () => {
       anchor.workspace.VoterStakeRegistry.idl
     );
     hntMint = await createMint(provider, 8, me, me);
-    await createAtaAndMint(provider, hntMint, toBN(10000000000, 8));
+    await createAtaAndMint(provider, hntMint, toBN(223000000, 8));
     programVersion = await getGovernanceProgramVersion(
       program.provider.connection,
       SPL_GOVERNANCE_PID
@@ -143,8 +144,7 @@ describe("voter-stake-registry", () => {
         .configureVotingMintV0({
           idx: 0, // idx
           digitShift: 0, // digit shift
-          lockedVoteWeightScaledFactor: new anchor.BN(1 * 1e8),
-          minimumRequiredLockupSecs: new anchor.BN(MIN_LOCKUP),
+          baselineVoteWeightScaledFactor: new anchor.BN(BASELINE * 1e9),
           maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE * 1e9),
           genesisVotePowerMultiplier: GENESIS_MULTIPLIER,
           genesisVotePowerMultiplierExpirationTs: new anchor.BN(oneWeekFromNow),
@@ -230,13 +230,14 @@ describe("voter-stake-registry", () => {
 
     expect(votingMint0.digitShift).to.eq(0);
     expect(
-      votingMint0.lockedVoteWeightScaledFactor.eq(new anchor.BN(1 * 1e9))
+      votingMint0.baselineVoteWeightScaledFactor.eq(
+        new anchor.BN(BASELINE * 1e9)
+      )
     ).to.eq(true);
     expect(
-      votingMint0.minimumRequiredLockupSecs.eq(new anchor.BN(MIN_LOCKUP))
-    ).to.eq(true);
-    expect(
-      votingMint0.maxExtraLockupVoteWeightScaledFactor.eq(new anchor.BN(SCALE * 1e9))
+      votingMint0.maxExtraLockupVoteWeightScaledFactor.eq(
+        new anchor.BN(SCALE * 1e9)
+      )
     ).to.eq(true);
     expect(votingMint0.genesisVotePowerMultiplier).to.eq(GENESIS_MULTIPLIER);
     expect(
@@ -397,12 +398,7 @@ describe("voter-stake-registry", () => {
             kind: { constant: {} },
           },
         ],
-        expectedVeHnt:
-          10000 *
-          GENESIS_MULTIPLIER *
-          (1 +
-            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
-              (MAX_LOCKUP - MIN_LOCKUP)),
+        expectedVeHnt: 10000 * GENESIS_MULTIPLIER * (BASELINE + 1 * MAX_LOCKUP),
       },
       {
         name: "genesis cliff 1 position (within genesis)",
@@ -418,10 +414,7 @@ describe("voter-stake-registry", () => {
         expectedVeHnt:
           10000 *
           GENESIS_MULTIPLIER *
-          (1 +
-            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
-              (MAX_LOCKUP - MIN_LOCKUP)) *
-          ((200 - 60) / 200),
+          (BASELINE + ((200 - 60) / 200) * MAX_LOCKUP),
       },
       {
         name: "constant 1 positon (outside of genesis)",
@@ -434,11 +427,7 @@ describe("voter-stake-registry", () => {
             kind: { constant: {} },
           },
         ],
-        expectedVeHnt:
-          10000 *
-          (1 +
-            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
-              (MAX_LOCKUP - MIN_LOCKUP)),
+        expectedVeHnt: 10000 * (BASELINE + 1 * MAX_LOCKUP),
       },
       {
         name: "cliff 1 position (outside genesis)",
@@ -451,12 +440,7 @@ describe("voter-stake-registry", () => {
             kind: { cliff: {} },
           },
         ],
-        expectedVeHnt:
-          10000 *
-          (1 +
-            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
-              (MAX_LOCKUP - MIN_LOCKUP)) *
-          ((200 - 60) / 200),
+        expectedVeHnt: 10000 * (BASELINE + ((200 - 60) / 200) * MAX_LOCKUP),
       },
       {
         name: "mix 2 positions (outside of genesis)",
@@ -474,12 +458,7 @@ describe("voter-stake-registry", () => {
             kind: { constant: {} },
           },
         ],
-        expectedVeHnt:
-          2 *
-          (10000 *
-            (1 +
-              ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
-                (MAX_LOCKUP - MIN_LOCKUP))),
+        expectedVeHnt: 2 * (10000 * (BASELINE + 1 * MAX_LOCKUP)),
       },
     ];
     voteTestCases.forEach((testCase) => {
@@ -723,7 +702,7 @@ describe("voter-stake-registry", () => {
         try {
           await sendInstructions(provider, instructions);
         } catch (e: any) {
-          expect(e.InstructionError[1].Custom).to.eq(6045);
+          expect(e.InstructionError[1].Custom).to.eq(6044);
         }
       });
 
@@ -812,7 +791,7 @@ describe("voter-stake-registry", () => {
         try {
           await sendInstructions(provider, instructions, [voter]);
         } catch (e: any) {
-          expect(e.InstructionError[1].Custom).to.eq(6045);
+          expect(e.InstructionError[1].Custom).to.eq(6044);
         }
       });
 
@@ -873,7 +852,7 @@ describe("voter-stake-registry", () => {
             })
             .rpc()
         ).to.eventually.be.rejectedWith(
-          "AnchorError caused by account: source_position. Error Code: ActiveVotesExist. Error Number: 6056. Error Message: Cannot change a position while active votes exist."
+          "AnchorError caused by account: source_position. Error Code: ActiveVotesExist. Error Number: 6055. Error Message: Cannot change a position while active votes exist."
         );
       });
     });
