@@ -48,6 +48,11 @@ impl Registrar {
         if !voting_mint_config.in_use() {
           return Ok(sum);
         }
+        let genesis_multiplier = if voting_mint_config.genesis_vote_power_multiplier > 0 {
+          voting_mint_config.genesis_vote_power_multiplier
+        } else {
+          1
+        };
         let mint_account = mint_accounts
           .iter()
           .find(|a| a.key() == voting_mint_config.mint)
@@ -58,6 +63,9 @@ impl Registrar {
           .ok_or_else(|| error!(VsrError::VoterWeightOverflow))?;
         sum = sum
           .checked_add(voting_mint_config.max_extra_lockup_vote_weight(mint.supply)?)
+          .ok_or_else(|| error!(VsrError::VoterWeightOverflow))?;
+        sum = sum
+          .checked_mul(genesis_multiplier as u64)
           .ok_or_else(|| error!(VsrError::VoterWeightOverflow))?;
         Ok(sum)
       })

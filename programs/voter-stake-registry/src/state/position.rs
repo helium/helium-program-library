@@ -82,16 +82,11 @@ impl PositionV0 {
       VsrError::InternalErrorBadLockupVoteWeight
     );
 
-    Ok(
-      u64::try_from(
-        baseline_vote_weight
-          .checked_add(locked_vote_weight)
-          .unwrap()
-          .checked_mul(genesis_multiplier as u64)
-          .unwrap(),
-      )
-      .unwrap(),
-    )
+    baseline_vote_weight
+      .checked_add(locked_vote_weight)
+      .unwrap()
+      .checked_mul(genesis_multiplier as u64)
+      .ok_or_else(|| error!(VsrError::VoterWeightOverflow))
   }
 
   /// Vote power contribution from locked funds only.
