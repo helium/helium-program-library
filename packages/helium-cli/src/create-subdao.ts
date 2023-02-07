@@ -193,7 +193,10 @@ const yarg = yargs(hideBin(process.argv)).options({
 });
 
 const MIN_LOCKUP = 15811200; // 6 months
-const MAX_LOCKUP = MIN_LOCKUP * 8;
+const SECS_PER_DAY = 60 * 60 * 24;
+const SECS_PER_YEAR = 365 * SECS_PER_DAY;
+const MAX_LOCKUP = 4 * SECS_PER_YEAR;
+const BASELINE = 0;
 const SCALE = 100;
 
 async function run() {
@@ -331,9 +334,8 @@ async function run() {
         .configureVotingMintV0({
           idx: 0, // idx
           digitShift: 0, // digit shift
-          lockedVoteWeightScaledFactor: new anchor.BN(1_000_000_000),
-          minimumRequiredLockupSecs: new anchor.BN(MIN_LOCKUP),
-          maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE),
+          baselineVoteWeightScaledFactor: new anchor.BN(BASELINE * 1e9),
+          maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE * 1e9),
           genesisVotePowerMultiplier: 0,
           genesisVotePowerMultiplierExpirationTs: new anchor.BN(
             Number(await getUnixTimestamp(provider))
@@ -577,7 +579,7 @@ async function run() {
       });
     }
 
-    console.log("Transfering sol to threads")
+    console.log("Transfering sol to threads");
     await sendInstructions(provider, [
       SystemProgram.transfer({
         fromPubkey: provider.wallet.publicKey,
