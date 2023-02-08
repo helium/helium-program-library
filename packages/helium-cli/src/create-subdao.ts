@@ -333,7 +333,7 @@ async function run() {
       await heliumVsrProgram.methods
         .configureVotingMintV0({
           idx: 0, // idx
-          digitShift: 0, // digit shift
+          digitShift: -2, // digit shift
           baselineVoteWeightScaledFactor: new anchor.BN(BASELINE * 1e9),
           maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE * 1e9),
           genesisVotePowerMultiplier: 0,
