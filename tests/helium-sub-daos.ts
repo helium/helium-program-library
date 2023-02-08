@@ -159,7 +159,7 @@ describe("helium-sub-daos", () => {
     let rewardsEscrow: PublicKey;
     let minLockupSeconds = 15811200; // 6 months
     let genesisVotePowerMultiplierExpirationTs = 1;
-    let initialSupply = toBN(223000000, 8);
+    let initialSupply = toBN(200_000_000_000, 8);
 
     async function burnDc(
       amount: number
@@ -191,12 +191,12 @@ describe("helium-sub-daos", () => {
 
     beforeEach(async () => {
       positionAuthorityKp = Keypair.generate();
-      hntMint = await createMint(provider, 8, me, me);
+      hntMint = await createMint(provider, 6, me, me);
       await createAtaAndMint(provider, hntMint, initialSupply);
       await createAtaAndTransfer(
         provider,
         hntMint,
-        toBN(1000, 8),
+        toBN(1000, 6),
         me,
         positionAuthorityKp.publicKey
       );
@@ -214,7 +214,9 @@ describe("helium-sub-daos", () => {
         me,
         hntMint,
         daoKey(hntMint)[0],
-        genesisVotePowerMultiplierExpirationTs
+        genesisVotePowerMultiplierExpirationTs,
+        0,
+        -1
       ));
       ({
         dataCredits: { dcMint },
@@ -365,7 +367,11 @@ describe("helium-sub-daos", () => {
 
           const expectedVeHnt =
             options.lockupAmount * options.expectedMultiplier;
-          expectBnAccuracy(toBN(expectedVeHnt, 8).mul(new BN("1000000000000")), sdAcc.vehntDelegated, 0.001);
+          expectBnAccuracy(
+            toBN(expectedVeHnt, 8).mul(new BN("1000000000000")),
+            sdAcc.vehntDelegated,
+            0.001
+          );
           expectBnAccuracy(lockupAmount, acc.hntAmount, 0.001);
         });
 
@@ -872,7 +878,7 @@ describe("helium-sub-daos", () => {
             100 *
             ((1464 * EPOCH_LENGTH - timeStaked) / (1464 * EPOCH_LENGTH)),
           8
-        )
+        );
         expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
           expected,
           0.0000001
@@ -897,18 +903,19 @@ describe("helium-sub-daos", () => {
 
         console.log("Checking at expiry");
         const unixTime = Number(await getUnixTimestamp(provider));
-        const expiryOffset = (stakeTime.toNumber() + (EPOCH_LENGTH * 1464)) - unixTime;
+        const expiryOffset =
+          stakeTime.toNumber() + EPOCH_LENGTH * 1464 - unixTime;
         await ffwd(expiryOffset);
         await burnDc(1);
         subDaoEpochInfo = await getCurrEpochInfo();
         currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
         timeStaked = currTime - stakeTime.toNumber();
         expected = roundToDecimals(
+          100 *
             100 *
-              100 *
-              ((1464 * EPOCH_LENGTH - timeStaked) / (1464 * EPOCH_LENGTH)),
-            8
-          )
+            ((1464 * EPOCH_LENGTH - timeStaked) / (1464 * EPOCH_LENGTH)),
+          8
+        );
         expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
           expected,
           0.0000001
