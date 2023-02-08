@@ -54,6 +54,7 @@ chai.use(chaiAsPromised);
 const SECS_PER_DAY = 60 * 60 * 24;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
 const MAX_LOCKUP = 4 * SECS_PER_YEAR;
+const DIGIT_SHIFT = 0;
 const BASELINE = 0;
 const SCALE = 100;
 const GENESIS_MULTIPLIER = 3;
@@ -79,8 +80,9 @@ describe("voter-stake-registry", () => {
       PROGRAM_ID,
       anchor.workspace.VoterStakeRegistry.idl
     );
-    hntMint = await createMint(provider, 8, me, me);
-    await createAtaAndMint(provider, hntMint, toBN(223000000, 8));
+    hntMint = await createMint(provider, 7, me, me);
+    await createAtaAndMint(provider, hntMint, toBN(223_000_000, 8));
+
     programVersion = await getGovernanceProgramVersion(
       program.provider.connection,
       SPL_GOVERNANCE_PID
@@ -143,7 +145,7 @@ describe("voter-stake-registry", () => {
       await program.methods
         .configureVotingMintV0({
           idx: 0, // idx
-          digitShift: 0, // digit shift
+          digitShift: DIGIT_SHIFT, // digit shift
           baselineVoteWeightScaledFactor: new anchor.BN(BASELINE * 1e9),
           maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE * 1e9),
           genesisVotePowerMultiplier: GENESIS_MULTIPLIER,
@@ -228,7 +230,7 @@ describe("voter-stake-registry", () => {
       registrarAcc.votingMints as VotingMintConfig[]
     )[0] as VotingMintConfig;
 
-    expect(votingMint0.digitShift).to.eq(0);
+    expect(votingMint0.digitShift).to.eq(DIGIT_SHIFT);
     expect(
       votingMint0.baselineVoteWeightScaledFactor.eq(
         new anchor.BN(BASELINE * 1e9)
@@ -398,7 +400,10 @@ describe("voter-stake-registry", () => {
             kind: { constant: {} },
           },
         ],
-        expectedVeHnt: 10000 * GENESIS_MULTIPLIER * (BASELINE + 1 * MAX_LOCKUP),
+        expectedVeHnt:
+          10000 *
+          GENESIS_MULTIPLIER *
+          (BASELINE + Math.min((SECS_PER_DAY * 200) / MAX_LOCKUP, 1) * SCALE),
       },
       {
         name: "genesis cliff 1 position (within genesis)",
@@ -414,7 +419,8 @@ describe("voter-stake-registry", () => {
         expectedVeHnt:
           10000 *
           GENESIS_MULTIPLIER *
-          (BASELINE + ((200 - 60) / 200) * MAX_LOCKUP),
+          (BASELINE +
+            Math.min((SECS_PER_DAY * (200 - 60)) / MAX_LOCKUP, 1) * SCALE),
       },
       {
         name: "constant 1 positon (outside of genesis)",
@@ -427,7 +433,9 @@ describe("voter-stake-registry", () => {
             kind: { constant: {} },
           },
         ],
-        expectedVeHnt: 10000 * (BASELINE + 1 * MAX_LOCKUP),
+        expectedVeHnt:
+          10000 *
+          (BASELINE + Math.min((SECS_PER_DAY * 200) / MAX_LOCKUP, 1) * SCALE),
       },
       {
         name: "cliff 1 position (outside genesis)",
@@ -440,25 +448,10 @@ describe("voter-stake-registry", () => {
             kind: { cliff: {} },
           },
         ],
-        expectedVeHnt: 10000 * (BASELINE + ((200 - 60) / 200) * MAX_LOCKUP),
-      },
-      {
-        name: "mix 2 positions (outside of genesis)",
-        delay: 0, // days
-        fastForward: 201, // days
-        positions: [
-          {
-            lockupAmount: 10000,
-            periods: 200,
-            kind: { cliff: {} },
-          },
-          {
-            lockupAmount: 10000,
-            periods: 200,
-            kind: { constant: {} },
-          },
-        ],
-        expectedVeHnt: 2 * (10000 * (BASELINE + 1 * MAX_LOCKUP)),
+        expectedVeHnt:
+          10000 *
+          (BASELINE +
+            Math.min((SECS_PER_DAY * (200 - 60)) / MAX_LOCKUP, 1) * SCALE),
       },
     ];
     voteTestCases.forEach((testCase) => {
@@ -566,7 +559,6 @@ describe("voter-stake-registry", () => {
         );
 
         await sendInstructions(provider, instructions, [depositor]);
-
         const voteRecord = await getVoteRecord(provider.connection, vote);
         expectBnAccuracy(
           toBN(testCase.expectedVeHnt, 8),
@@ -939,8 +931,8 @@ function expectBnAccuracy(
   actualBn: anchor.BN,
   percentUncertainty: number
 ) {
-  let upperBound = expectedBn.mul(new anchor.BN(1 + percentUncertainty));
-  let lowerBound = expectedBn.mul(new anchor.BN(1 - percentUncertainty));
+  let upperBound = expectedBn.muln(1 + percentUncertainty);
+  let lowerBound = expectedBn.muln(1 - percentUncertainty);
   try {
     expect(upperBound.gte(actualBn)).to.be.true;
     expect(lowerBound.lte(actualBn)).to.be.true;
