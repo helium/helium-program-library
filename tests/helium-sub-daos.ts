@@ -159,7 +159,7 @@ describe("helium-sub-daos", () => {
     let rewardsEscrow: PublicKey;
     let minLockupSeconds = 15811200; // 6 months
     let genesisVotePowerMultiplierExpirationTs = 1;
-    let initialSupply = toBN(200_000_000_000, 8);
+    let initialSupply = toBN(200_000_000_000, 6);
 
     async function burnDc(
       amount: number
