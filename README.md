@@ -8,6 +8,32 @@ A collection of solana programs used for Helium's Solana integration
 
 ```mermaid
 flowchart TD
+  hotspot[[Hotspots]]
+  ingest[[Packet Router]]
+  s3[[S3 Storage]]
+  verify[Verifier]
+  rewards[Rewards]
+  oracle_rds[[Oracle RDS]]
+  rewards_oracle[[Rewards Oracle]]
+  solana[[Solana]]
+  oui[[OUI]]
+  iot[[Iot Devices]]
+
+
+  hotspot --> ingest
+  ingest --> s3
+  s3 --> verify
+  verify --valid packets--> s3
+  s3 --> rewards
+  rewards --> oracle_rds
+  oracle_rds --> rewards_oracle
+  rewards_oracle --Hotspot Lifetime Rewards--> solana
+  ingest --> oui
+  iot --> hotspot
+```
+
+```mermaid
+flowchart TD
   maker[Maker App]
   onboarding[Onboarding Server]
   crank(((Rewards Crank)))

@@ -57,7 +57,7 @@ async function run() {
     password: argv.pgPassword,
     host: argv.pgHost,
     database: argv.pgDatabase,
-    port: argv.pgPort,
+    port: Number(argv.pgPort),
     // ssl: {
     //   rejectUnauthorized: false,
     // },
@@ -111,7 +111,9 @@ async function run() {
   await bulkSendTransactions(provider, txs, (prog) =>
     progress && progress.update(prog.totalProgress)
   );
-  progress && progress.stop();
+  if (progress) {
+    progress.stop();
+  }
 }
 
 run()

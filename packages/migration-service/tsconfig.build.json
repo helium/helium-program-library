@@ -2,26 +2,22 @@
   "compilerOptions": {
     "target": "ES2016",
     "module": "CommonJS",
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
-    "allowSyntheticDefaultImports": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "composite": true,
-    "forceConsistentCasingInFileNames": true,
-    "isolatedModules": false,
     "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "noEmitOnError": true,
+    "resolveJsonModule": true,
+    "stripInternal": true,
     "skipLibCheck": true,
+    "noEmit": false,
+    "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
     "typeRoots": ["node_modules/@types"],
-    "strict": true,
+    "strict": false,
     "paths": {
       "@/*": ["*"]
     },
-    "outDir": "lib",
+    "outDir": "lib"
   },
-  "include": ["src"],
+  "include": ["src"]
 }
