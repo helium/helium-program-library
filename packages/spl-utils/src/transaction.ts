@@ -3,6 +3,7 @@ import {
   Commitment,
   Connection,
   Finality,
+  ParsedTransactionWithMeta,
   PublicKey,
   RpcResponseAndContext,
   SendOptions,
@@ -605,11 +606,14 @@ const MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS = 200;
 async function getAllTxns(
   connection: Connection,
   txids: string[]
-): Promise<(TransactionResponse | null)[]> {
+): Promise<(ParsedTransactionWithMeta | null)[]> {
   return (
     await Promise.all(
       chunks(txids, MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS).map((txids) =>
-        connection.getTransactions(txids, "confirmed")
+        connection.getParsedTransactions(txids, {
+          maxSupportedTransactionVersion: 0,
+          commitment: "confirmed",
+        })
       )
     )
   ).flat();
