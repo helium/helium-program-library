@@ -192,8 +192,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
 });
 
-const MIN_LOCKUP = 15811200; // 6 months
-const SECS_PER_DAY = 60 * 60 * 24;
+const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
 const MAX_LOCKUP = 4 * SECS_PER_YEAR;
 const BASELINE = 0;
@@ -333,7 +332,7 @@ async function run() {
       await heliumVsrProgram.methods
         .configureVotingMintV0({
           idx: 0, // idx
-          digitShift: -2, // digit shift
+          digitShift: -1, // digit shift
           baselineVoteWeightScaledFactor: new anchor.BN(BASELINE * 1e9),
           maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE * 1e9),
           genesisVotePowerMultiplier: 0,

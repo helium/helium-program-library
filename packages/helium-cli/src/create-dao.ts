@@ -56,7 +56,7 @@ const { hideBin } = require("yargs/helpers");
 
 const HNT_EPOCH_REWARDS = 10000000000;
 const MOBILE_EPOCH_REWARDS = 5000000000;
-const SECS_PER_DAY = 60 * 60 * 24;
+const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
 const MAX_LOCKUP = 4 * SECS_PER_YEAR;
 const BASELINE = 0;

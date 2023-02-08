@@ -51,7 +51,7 @@ import { SPL_GOVERNANCE_PID } from "./utils/vsr";
 
 chai.use(chaiAsPromised);
 
-const SECS_PER_DAY = 60 * 60 * 24;
+const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
 const MAX_LOCKUP = 4 * SECS_PER_YEAR;
 const DIGIT_SHIFT = 0;
@@ -80,7 +80,7 @@ describe("voter-stake-registry", () => {
       PROGRAM_ID,
       anchor.workspace.VoterStakeRegistry.idl
     );
-    hntMint = await createMint(provider, 7, me, me);
+    hntMint = await createMint(provider, 8, me, me);
     await createAtaAndMint(provider, hntMint, toBN(223_000_000, 8));
 
     programVersion = await getGovernanceProgramVersion(
@@ -388,6 +388,18 @@ describe("voter-stake-registry", () => {
       await sendInstructions(provider, instructions);
     });
 
+    const applyDigitShift = (amountNative: number, digitShift: number) => {
+      let val = 0;
+
+      if (digitShift < 0) {
+        val = amountNative / 10 ** digitShift;
+      } else {
+        val = amountNative * 10 ** digitShift;
+      }
+
+      return val;
+    };
+
     let voteTestCases = [
       {
         name: "genesis constant 1 position (within genesis)",
@@ -401,8 +413,8 @@ describe("voter-stake-registry", () => {
           },
         ],
         expectedVeHnt:
-          10000 *
-          GENESIS_MULTIPLIER *
+          applyDigitShift(10000, DIGIT_SHIFT) *
+          (GENESIS_MULTIPLIER || 1) *
           (BASELINE + Math.min((SECS_PER_DAY * 200) / MAX_LOCKUP, 1) * SCALE),
       },
       {
@@ -417,8 +429,8 @@ describe("voter-stake-registry", () => {
           },
         ],
         expectedVeHnt:
-          10000 *
-          GENESIS_MULTIPLIER *
+          applyDigitShift(10000, DIGIT_SHIFT) *
+          (GENESIS_MULTIPLIER || 1) *
           (BASELINE +
             Math.min((SECS_PER_DAY * (200 - 60)) / MAX_LOCKUP, 1) * SCALE),
       },
@@ -434,7 +446,7 @@ describe("voter-stake-registry", () => {
           },
         ],
         expectedVeHnt:
-          10000 *
+          applyDigitShift(10000, DIGIT_SHIFT) *
           (BASELINE + Math.min((SECS_PER_DAY * 200) / MAX_LOCKUP, 1) * SCALE),
       },
       {
@@ -449,7 +461,7 @@ describe("voter-stake-registry", () => {
           },
         ],
         expectedVeHnt:
-          10000 *
+          applyDigitShift(10000, DIGIT_SHIFT) *
           (BASELINE +
             Math.min((SECS_PER_DAY * (200 - 60)) / MAX_LOCKUP, 1) * SCALE),
       },
@@ -926,11 +938,11 @@ describe("voter-stake-registry", () => {
   });
 });
 
-function expectBnAccuracy(
+const expectBnAccuracy = (
   expectedBn: anchor.BN,
   actualBn: anchor.BN,
   percentUncertainty: number
-) {
+) => {
   let upperBound = expectedBn.muln(1 + percentUncertainty);
   let lowerBound = expectedBn.muln(1 - percentUncertainty);
   try {
@@ -945,4 +957,4 @@ function expectBnAccuracy(
     );
     throw e;
   }
-}
+};
