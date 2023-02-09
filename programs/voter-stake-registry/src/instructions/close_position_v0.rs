@@ -23,8 +23,8 @@ pub struct BurnNft<'info> {
   pub collection_metadata: AccountInfo<'info>,
 }
 
-pub fn burn_nft<'a, 'b, 'c, 'info>(
-  ctx: CpiContext<'a, 'b, 'c, 'info, BurnNft<'info>>,
+pub fn burn_nft<'info>(
+  ctx: CpiContext<'_, '_, '_, 'info, BurnNft<'info>>,
 ) -> Result<()> {
   let ix = mpl_token_metadata::instruction::burn_nft(
     mpl_token_metadata::ID,
