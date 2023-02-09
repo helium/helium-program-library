@@ -1625,6 +1625,11 @@
   dependencies:
     "@chakra-ui/utils" "1.10.4"
 
+"@coral-xyz/anchor-cli@^0.26.0":
+  version "0.26.0"
+  resolved "https://registry.yarnpkg.com/@coral-xyz/anchor-cli/-/anchor-cli-0.26.0.tgz#edc70f1a159fe71f7c41c80ca80eaf901e76bd15"
+  integrity sha512-j+Q/zuT9+taoQ/w7Jxm6R5qBUlalzIMQsDwV2tYwOMbkq2B2muEsCI0weaFxiJsZZO98U3BQTuprPQGdC6PZWQ==
+
 "@coral-xyz/anchor@0.26.0", "@coral-xyz/anchor@^0.26", "@coral-xyz/anchor@^0.26.0":
   version "0.26.0"
   resolved "https://registry.yarnpkg.com/@coral-xyz/anchor/-/anchor-0.26.0.tgz#c8e4f7177e93441afd030f22d777d54d0194d7d1"

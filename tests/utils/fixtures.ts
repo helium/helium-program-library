@@ -186,12 +186,12 @@ export async function ensureDCIdl(dcProgram: Program<DataCredits>) {
   try {
     execSync(
       `anchor idl init --filepath ${__dirname}/../../target/idl/data_credits.json ${dcProgram.programId}`,
-      { stdio: "inherit" }
+      { stdio: "inherit", shell: "/bin/bash" }
     );
   } catch {
     execSync(
       `anchor idl upgrade --filepath ${__dirname}/../../target/idl/data_credits.json ${dcProgram.programId}`,
-      { stdio: "inherit" }
+      { stdio: "inherit", shell: "/bin/bash" }
     );
   }
 }
@@ -200,12 +200,12 @@ export async function ensureHSDIdl(hsdProgram: Program<HeliumSubDaos>) {
   try {
     execSync(
       `anchor idl init --filepath ${__dirname}/../../target/idl/helium_sub_daos.json ${hsdProgram.programId}`,
-      { stdio: "inherit" }
+      { stdio: "inherit", shell: "/bin/bash" }
     );
   } catch {
     execSync(
       `anchor idl upgrade --filepath ${__dirname}/../../target/idl/helium_sub_daos.json ${hsdProgram.programId}`,
-      { stdio: "inherit" }
+      { stdio: "inherit", shell: "/bin/bash" }
     );
   }
 }
@@ -214,12 +214,12 @@ export async function ensureVSRIdl(vsrProgram: Program<VoterStakeRegistry>) {
   try {
     execSync(
       `anchor idl init --filepath ${__dirname}/../../target/idl/voter_stake_registry.json ${vsrProgram.programId}`,
-      { stdio: "inherit" }
+      { stdio: "inherit", shell: "/bin/bash" }
     );
   } catch {
     execSync(
       `anchor idl upgrade --filepath ${__dirname}/../../target/idl/voter_stake_registry.json ${vsrProgram.programId}`,
-      { stdio: "inherit" }
+      { stdio: "inherit", shell: "/bin/bash" }
     );
   }
 }
