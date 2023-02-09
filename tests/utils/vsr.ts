@@ -13,7 +13,12 @@ import {
   withCreateRealm,
 } from "@solana/spl-governance";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
-import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
+import {
+  Keypair,
+  PublicKey,
+  TransactionInstruction,
+  ComputeBudgetProgram,
+} from "@solana/web3.js";
 import { positionKey } from "../../packages/voter-stake-registry-sdk/src";
 export const SPL_GOVERNANCE_PID = new PublicKey(
   "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S"
@@ -107,7 +112,9 @@ export async function createPosition(
   positionKp?: Keypair
 ) {
   let positionOwner = positionKp?.publicKey || provider.wallet.publicKey;
-  const instructions: TransactionInstruction[] = [];
+  const instructions: TransactionInstruction[] = [
+    ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+  ];
   const mintKeypair = Keypair.generate();
   // create deposit entry
   const position = positionKey(mintKeypair.publicKey)[0];
