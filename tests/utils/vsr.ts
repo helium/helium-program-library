@@ -1,6 +1,5 @@
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import {
-  createAtaAndTransfer,
   createMintInstructions,
   sendInstructions,
   toBN,

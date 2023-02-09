@@ -157,9 +157,8 @@ describe("helium-sub-daos", () => {
     let hstPool: PublicKey;
     let dcMint: PublicKey;
     let rewardsEscrow: PublicKey;
-    let minLockupSeconds = 15811200; // 6 months
     let genesisVotePowerMultiplierExpirationTs = 1;
-    let initialSupply = toBN(200_000_000_000, 6);
+    let initialSupply = toBN(223_000_000, 8);
 
     async function burnDc(
       amount: number
@@ -191,12 +190,12 @@ describe("helium-sub-daos", () => {
 
     beforeEach(async () => {
       positionAuthorityKp = Keypair.generate();
-      hntMint = await createMint(provider, 6, me, me);
+      hntMint = await createMint(provider, 8, me, me);
       await createAtaAndMint(provider, hntMint, initialSupply);
       await createAtaAndTransfer(
         provider,
         hntMint,
-        toBN(1000, 6),
+        toBN(1000, 8),
         me,
         positionAuthorityKp.publicKey
       );
@@ -204,9 +203,7 @@ describe("helium-sub-daos", () => {
         positionAuthorityKp.publicKey,
         LAMPORTS_PER_SOL
       );
-      console.log(
-        `Min lockup: ${minLockupSeconds}, genesis: ${genesisVotePowerMultiplierExpirationTs}`
-      );
+      console.log(`Genesis: ${genesisVotePowerMultiplierExpirationTs}`);
 
       ({ registrar } = await initVsr(
         vsrProgram,
@@ -214,9 +211,7 @@ describe("helium-sub-daos", () => {
         me,
         hntMint,
         daoKey(hntMint)[0],
-        genesisVotePowerMultiplierExpirationTs,
-        0,
-        -1
+        genesisVotePowerMultiplierExpirationTs
       ));
       ({
         dataCredits: { dcMint },
@@ -263,9 +258,8 @@ describe("helium-sub-daos", () => {
       expect(epochInfo.dcBurned.toNumber()).eq(toBN(10, 0).toNumber());
     });
 
-    describe("with no min lockup", () => {
+    describe("with position", () => {
       before(() => {
-        minLockupSeconds = 0;
         genesisVotePowerMultiplierExpirationTs = 1;
       });
 
@@ -333,7 +327,6 @@ describe("helium-sub-daos", () => {
     vehntOptions.forEach(function ({ name, options }) {
       describe("vehnt tests - " + name, () => {
         before(() => {
-          minLockupSeconds = 15811200; // 6 months
           genesisVotePowerMultiplierExpirationTs = 1;
         });
         beforeEach(async () => {
@@ -380,8 +373,8 @@ describe("helium-sub-daos", () => {
           actualBn: anchor.BN,
           percentUncertainty: number
         ) {
-          let upperBound = expectedBn.mul(new BN(1 + percentUncertainty));
-          let lowerBound = expectedBn.mul(new BN(1 - percentUncertainty));
+          let upperBound = expectedBn.muln(1 + percentUncertainty);
+          let lowerBound = expectedBn.muln(1 - percentUncertainty);
           try {
             expect(upperBound.gte(actualBn)).to.be.true;
             expect(lowerBound.lte(actualBn)).to.be.true;
@@ -731,7 +724,6 @@ describe("helium-sub-daos", () => {
 
     describe("with genesis config", () => {
       before(async () => {
-        minLockupSeconds = 15811200; // 6 months
         const currTs = Number(await getUnixTimestamp(provider));
         genesisVotePowerMultiplierExpirationTs = currTs + 60 * 60 * 24 * 7; // 7 days from now
       });
