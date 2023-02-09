@@ -290,11 +290,7 @@ pub fn handler<'info>(
       )?;
     }
 
-    account_info
-      .data
-      .borrow_mut()
-      [..serialized_data.len()]
-      .copy_from_slice(&serialized_data);
+    account_info.data.borrow_mut()[..serialized_data.len()].copy_from_slice(&serialized_data);
   }
 
   Ok(())

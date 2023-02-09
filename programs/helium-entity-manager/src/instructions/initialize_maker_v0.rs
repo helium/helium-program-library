@@ -95,7 +95,12 @@ pub fn handler(ctx: Context<InitializeMakerV0>, args: InitializeMakerArgsV0) -> 
     ErrorCode::InvalidStringLength
   );
 
-  let signer_seeds: &[&[&[u8]]] = &[&[b"maker", ctx.accounts.dao.to_account_info().key.as_ref(), args.name.as_bytes(), &[ctx.bumps["maker"]]]];
+  let signer_seeds: &[&[&[u8]]] = &[&[
+    b"maker",
+    ctx.accounts.dao.to_account_info().key.as_ref(),
+    args.name.as_bytes(),
+    &[ctx.bumps["maker"]],
+  ]];
 
   token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
 
@@ -155,7 +160,7 @@ pub fn handler(ctx: Context<InitializeMakerV0>, args: InitializeMakerArgsV0) -> 
     /// Initialized via set_maker_tree
     bump_seed: ctx.bumps["maker"],
     collection_bump_seed: ctx.bumps["collection"],
-    dao: ctx.accounts.dao.key()
+    dao: ctx.accounts.dao.key(),
   });
 
   Ok(())
