@@ -47,12 +47,12 @@ const yarg = yargs(hideBin(process.argv)).options({
   govProgramId: {
     type: "string",
     describe: "Pubkey of the GOV program",
-    default: "hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC",
+    default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
   },
   councilKey: {
     type: "string",
     describe: "Key of gov council token",
-    default: "hcoundzQUs5cgasSXwPsjKyDbWG5PwqQ8iMARKTV5Wc",
+    default: "counKsk72Jgf9b3aqyuQpFf12ktLdJbbuhnoSxxQoMJ",
   },
   executeProposal: {
     type: "boolean",

@@ -35,7 +35,7 @@ pub struct GenesisIssueHotspotArgsV0 {
 pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     mut,
-    seeds = [b"lazy_signer", b"devnethelium4"],
+    seeds = [b"lazy_signer", b"devnethelium5"],
     seeds::program = lazy_transactions::ID,
     bump,
   )]
@@ -293,6 +293,7 @@ pub fn handler<'info>(
     account_info
       .data
       .borrow_mut()
+      [..serialized_data.len()]
       .copy_from_slice(&serialized_data);
   }
 

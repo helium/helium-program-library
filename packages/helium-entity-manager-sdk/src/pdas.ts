@@ -44,9 +44,9 @@ export const hotspotCollectionKey = (
     programId
   );
 
-export const makerKey = (name: String, programId: PublicKey = PROGRAM_ID) =>
+export const makerKey = (dao: PublicKey, name: String, programId: PublicKey = PROGRAM_ID) =>
   PublicKey.findProgramAddressSync(
-    [Buffer.from("maker", "utf-8"), Buffer.from(name, "utf-8")],
+    [Buffer.from("maker", "utf-8"), dao.toBuffer(), Buffer.from(name, "utf-8")],
     programId
   );
 

@@ -14,7 +14,12 @@ import {
   getConcurrentMerkleTreeAccountSize,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
 } from "@solana/spl-account-compression";
-import { Keypair, PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
+import {
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import fs from "fs";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -44,7 +49,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   govProgramId: {
     type: "string",
     describe: "Pubkey of the GOV program",
-    default: "hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC",
+    default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
   },
   fromFile: {
     describe: "Load makers from a json file and create in bulk",
@@ -78,7 +83,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   councilKey: {
     type: "string",
     describe: "Key of gov council token",
-    default: "hcoundzQUs5cgasSXwPsjKyDbWG5PwqQ8iMARKTV5Wc",
+    default: "counKsk72Jgf9b3aqyuQpFf12ktLdJbbuhnoSxxQoMJ",
   },
 });
 
@@ -145,8 +150,8 @@ async function run() {
   const authorityAcc = await provider.connection.getAccountInfo(
     subdaoAcc.authority
   );
-  let   subdaoPayer = provider.wallet.publicKey;
-  let   daoPayer = provider.wallet.publicKey;
+  let subdaoPayer = provider.wallet.publicKey;
+  let daoPayer = provider.wallet.publicKey;
   const isGov = authorityAcc != null && authorityAcc.owner.equals(govProgramId);
   if (isGov) {
     const nativeTreasury = await PublicKey.findProgramAddressSync(
@@ -182,11 +187,23 @@ async function run() {
       ([height]) => Math.pow(2, height) > count * 2
     );
     const space = getConcurrentMerkleTreeAccountSize(size, buffer, canopy);
-    const maker = await makerKey(name)[0];
+    const maker = await makerKey(subdaoAcc.dao, name)[0];
     const rent = await provider.connection.getMinimumBalanceForRentExemption(
       space
     );
     totalSol += rent;
+
+    let merkle: Keypair;
+    const merklePath = `${__dirname}/../keypairs/merkle-${address}.json`;
+    if (fs.existsSync(merklePath)) {
+      merkle = loadKeypair(merklePath);
+    } else {
+      merkle = Keypair.generate();
+      fs.writeFileSync(
+        merklePath,
+        JSON.stringify(Array.from(merkle.secretKey))
+      );
+    }
 
     if (!(await exists(conn, maker))) {
       console.log(
@@ -205,28 +222,17 @@ async function run() {
         );
       }
 
-      let merkle: Keypair;
-      const merklePath = `${__dirname}/../keypairs/merkle-${address}.json`;
-      if (fs.existsSync(merklePath)) {
-        merkle = loadKeypair(merklePath);
-      } else {
-        merkle = Keypair.generate();
-        fs.writeFileSync(
-          merklePath,
-          JSON.stringify(Array.from(merkle.secretKey))
-        );
-      }
-
       const create = await hemProgram.methods
         .initializeMakerV0({
           name,
           metadataUrl: "todo",
           issuingAuthority: makerAuthority,
-          updateAuthority
+          updateAuthority,
         })
         .accounts({
           maker,
           payer: daoPayer,
+          dao: subdaoAcc.dao,
         })
         .instruction();
 
@@ -235,7 +241,12 @@ async function run() {
           maxDepth: size,
           maxBufferSize: buffer,
         })
-        .accounts({ maker, merkleTree: merkle.publicKey, payer: daoPayer, updateAuthority })
+        .accounts({
+          maker,
+          merkleTree: merkle.publicKey,
+          payer: daoPayer,
+          updateAuthority,
+        })
         .instruction();
 
       if (!(await exists(conn, merkle.publicKey))) {
@@ -259,16 +270,48 @@ async function run() {
       innerCreateInstrs.push(...[create, setTree].filter(truthy));
     } else {
       const makerAcc = await hemProgram.account.makerV0.fetch(maker);
-      if (updateAuthority.equals(makerAcc.updateAuthority)) {
-        innerCreateInstrs.push(
-          await hemProgram.methods
-            .updateMakerV0({
-              issuingAuthority: makerAuthority,
-              updateAuthority,
-            })
-            .accounts({ maker, updateAuthority })
-            .instruction()
-        );
+      innerCreateInstrs.push(
+        await hemProgram.methods
+          .updateMakerV0({
+            issuingAuthority: makerAuthority,
+            updateAuthority,
+          })
+          .accounts({ maker, updateAuthority: makerAcc.updateAuthority })
+          .instruction()
+      );
+
+      if (makerAcc.merkleTree.equals(SystemProgram.programId)) {
+        const setTree = await hemProgram.methods
+          .setMakerTreeV0({
+            maxDepth: size,
+            maxBufferSize: buffer,
+          })
+          .accounts({
+            maker,
+            merkleTree: merkle.publicKey,
+            payer: daoPayer,
+            updateAuthority,
+          })
+          .instruction();
+        if (!(await exists(conn, merkle.publicKey))) {
+          await sendInstructions(
+            provider,
+            [
+              SystemProgram.createAccount({
+                fromPubkey: provider.wallet.publicKey,
+                newAccountPubkey: merkle.publicKey,
+                lamports:
+                  await provider.connection.getMinimumBalanceForRentExemption(
+                    space
+                  ),
+                space: space,
+                programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+              }),
+            ],
+            [merkle]
+          );
+        }
+        innerCreateInstrs.push(setTree);
       }
     }
     createInstructions.push(innerCreateInstrs);
@@ -276,7 +319,9 @@ async function run() {
     const innerApproveInstrs = [];
     let approve;
     if (!(await exists(conn, makerApprovalKey(entityConfigKey, maker)[0]))) {
-      const authority = (await hemProgram.account.rewardableEntityConfigV0.fetch(entityConfigKey)).authority
+      const authority = (
+        await hemProgram.account.rewardableEntityConfigV0.fetch(entityConfigKey)
+      ).authority;
       approve = await hemProgram.methods
         .approveMakerV0()
         .accounts({
@@ -306,7 +351,7 @@ async function run() {
       govProgramId,
       proposalName: `Create Makers`,
       votingMint: councilKey,
-      executeProposal: argv.executeProposal
+      executeProposal: argv.executeProposal,
     });
   } else {
     for (const instrs of [...createInstructions, ...approveInstructions]) {

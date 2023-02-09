@@ -74,7 +74,7 @@ address = "E7p5KFo8kKCDm6BUnWtnVFkQSYh6ZA6xaGAuvpv8NXTa"
 program = "./deps/clockwork/lib/clockwork_webhook_program.so"
 
 [[test.validator.clone]]
-address = "hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC" # spl governance program
+address = "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S" # spl governance program
 
 [[test.validator.clone]]
 address = "ENmcpFCpxN1CqyUjuog9yyUVfdXBKF3LVCwLr7grJZpk" # required by spl governance 

@@ -16,7 +16,7 @@ import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { positionKey } from "../../packages/voter-stake-registry-sdk/src";
 export const SPL_GOVERNANCE_PID = new PublicKey(
-  "hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC"
+  "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S"
 );
 
 export async function initVsr(

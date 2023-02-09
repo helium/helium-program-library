@@ -46,6 +46,7 @@ pub struct MakerV0 {
   pub collection: Pubkey, // The metaplex collection to be issued
   pub merkle_tree: Pubkey,
   pub collection_bump_seed: u8,
+  pub dao: Pubkey,
 }
 
 #[account]

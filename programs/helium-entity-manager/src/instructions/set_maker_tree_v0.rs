@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::state::*;
 use anchor_lang::prelude::*;
 use mpl_bubblegum::{
@@ -45,6 +47,7 @@ pub struct SetMakerTreeV0<'info> {
 pub fn handler(ctx: Context<SetMakerTreeV0>, args: SetMakerTreeArgsV0) -> Result<()> {
   let signer_seeds: &[&[&[u8]]] = &[&[
     b"maker",
+    ctx.accounts.maker.dao.as_ref(),
     ctx.accounts.maker.name.as_bytes(),
     &[ctx.accounts.maker.bump_seed],
   ]];
@@ -68,6 +71,5 @@ pub fn handler(ctx: Context<SetMakerTreeV0>, args: SetMakerTreeArgsV0) -> Result
     None,
   )?;
   ctx.accounts.maker.merkle_tree = ctx.accounts.merkle_tree.key();
-
   Ok(())
 }

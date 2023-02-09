@@ -105,6 +105,7 @@ export const initTestMaker = async (
   program: Program<HeliumEntityManager>,
   provider: anchor.AnchorProvider,
   rewardableEntityConfig: PublicKey,
+  dao: PublicKey
 ): Promise<{
   authority: PublicKey;
   makerKeypair: Keypair;
@@ -119,7 +120,7 @@ export const initTestMaker = async (
   const space = getConcurrentMerkleTreeAccountSize(3, 8);
   const name = random(10);
 
-  const maker = makerKey(name)[0];
+  const maker = makerKey(dao, name)[0];
   const createMerkle = SystemProgram.createAccount({
     fromPubkey: provider.wallet.publicKey,
     newAccountPubkey: merkle.publicKey,
@@ -129,12 +130,18 @@ export const initTestMaker = async (
     space: space,
     programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   });
-  const { pubkeys: { collection }, instruction: initialize } = await program.methods
+  const {
+    pubkeys: { collection },
+    instruction: initialize,
+  } = await program.methods
     .initializeMakerV0({
       updateAuthority: makerKeypair.publicKey,
       issuingAuthority: makerKeypair.publicKey,
       name,
       metadataUrl: DEFAULT_METADATA_URL,
+    })
+    .accounts({
+      dao,
     })
     .prepare();
   const {
@@ -287,7 +294,8 @@ export const initWorld = async (
   const maker = await initTestMaker(
     hemProgram,
     provider,
-    rewardableEntityConfig.rewardableEntityConfig
+    rewardableEntityConfig.rewardableEntityConfig,
+    dao.dao
   );
 
   return {

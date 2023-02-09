@@ -3,7 +3,6 @@ import {
   Commitment,
   Connection,
   Finality,
-  ParsedTransactionWithMeta,
   PublicKey,
   RpcResponseAndContext,
   SendOptions,
@@ -14,6 +13,7 @@ import {
   TransactionInstruction,
   TransactionResponse,
   TransactionSignature,
+  VersionedTransactionResponse,
 } from "@solana/web3.js";
 import { chunks } from "./accountFetchCache";
 import bs58 from "bs58";
@@ -463,7 +463,7 @@ export async function bulkSendTransactions(
   provider: Provider,
   txs: Transaction[],
   onProgress?: (status: Status) => void,
-  triesRemaining: number = 5 // Number of blockhashes to try resending txs with before giving up
+  triesRemaining: number = 10 // Number of blockhashes to try resending txs with before giving up
 ): Promise<string[]> {
   let ret = [];
 
@@ -513,7 +513,7 @@ export async function bulkSendTransactions(
       triesRemaining--;
       if (triesRemaining <= 0) {
         throw new Error(
-          `Failed to submit all txs after ${triesRemaining} blockhashes expired`
+          `Failed to submit all txs after blockhashes expired`
         );
       }
     }
@@ -606,11 +606,11 @@ const MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS = 200;
 async function getAllTxns(
   connection: Connection,
   txids: string[]
-): Promise<(ParsedTransactionWithMeta | null)[]> {
+): Promise<(VersionedTransactionResponse | null)[]> {
   return (
     await Promise.all(
       chunks(txids, MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS).map((txids) =>
-        connection.getParsedTransactions(txids, {
+        connection.getTransactions(txids, {
           maxSupportedTransactionVersion: 0,
           commitment: "confirmed",
         })

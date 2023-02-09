@@ -190,6 +190,7 @@ async function run() {
   const hnt = new PublicKey(argv.hnt);
   const hst = new PublicKey(argv.hst);
 
+  const dao = daoKey(hnt)[0];
   const iotSubdao = (await subDaoKey(iot))[0];
   const mobileSubdao = (await subDaoKey(mobile))[0];
 
@@ -217,7 +218,7 @@ async function run() {
   for (const maker of makers) {
     const helAddr = Address.fromB58(maker.address);
     const solAddr = new PublicKey(helAddr.publicKey);
-    const makerKeyp = makerKey(maker.name)[0];
+    const makerKeyp = makerKey(dao, maker.name)[0];
 
     const makerAcc = await hemProgram.account.makerV0.fetch(makerKeyp);
     const merkleTree = makerAcc.merkleTree;
@@ -272,7 +273,6 @@ async function run() {
 
   const dataCredits = dataCreditsKey(dc)[0];
   const dcCircuitBreaker = mintWindowedBreakerKey(dc)[0];
-  const dao = daoKey(hnt)[0];
   const entityCreator = entityCreatorKey(dao)[0];
   const subDao = subDaoKey(iot)[0];
   const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
@@ -631,7 +631,9 @@ async function run() {
       const tokenIxs = [];
       const hntBal = new BN(account.hnt);
       const dcBal = new BN(account.dc);
-      const mobileBal = new BN(account.mobile);
+      // Helium uses 8 decimals, we use 6
+      const digitShift = new BN(100);
+      const mobileBal = new BN(account.mobile).div(digitShift);
       const hstBal = new BN(account.hst);
       const zero = new BN(0);
       if (hntBal.gt(zero)) {
@@ -1075,17 +1077,6 @@ async function run() {
     MOBILE: ${routerBalances.mobile.toString()}
   `);
 
-  console.log("Filling canopy, this may fail. Then use fill-canopy script");
-  await fillCanopy({
-    program: lazyTransactionsProgram,
-    lazyTransactions: ltKey,
-    merkleTree,
-    cacheDepth: canopyDepth,
-    showProgress: argv.progress,
-  });
-
-  const finish = new Date().valueOf();
-
   console.log("Loading up lazy signer with hnt, dc, mobile...");
   const me = provider.wallet.publicKey;
   const transfers = [
@@ -1140,6 +1131,17 @@ async function run() {
   ];
   await sendInstructions(provider, transfers);
 
+  console.log("Filling canopy, this may fail. Then use fill-canopy script");
+  await fillCanopy({
+    program: lazyTransactionsProgram,
+    lazyTransactions: ltKey,
+    merkleTree,
+    cacheDepth: canopyDepth,
+    showProgress: argv.progress,
+  });
+
+  const finish = new Date().valueOf();
+  
   console.log(`Finished in ${finish - start}ms`);
 }
 

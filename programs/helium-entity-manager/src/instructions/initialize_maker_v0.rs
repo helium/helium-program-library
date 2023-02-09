@@ -8,6 +8,7 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
+use helium_sub_daos::DaoV0;
 use mpl_token_metadata::state::{CollectionDetails, DataV2};
 use shared_utils::create_metadata_accounts_v3;
 
@@ -28,10 +29,11 @@ pub struct InitializeMakerV0<'info> {
     init,
     payer = payer,
     space = 60 + std::mem::size_of::<MakerV0>(),
-    seeds = ["maker".as_bytes(), args.name.as_bytes()],
+    seeds = ["maker".as_bytes(), dao.key().as_ref(), args.name.as_bytes()],
     bump,
   )]
   pub maker: Box<Account<'info, MakerV0>>,
+  pub dao: Box<Account<'info, DaoV0>>,
   #[account(
     init,
     payer = payer,
@@ -93,7 +95,7 @@ pub fn handler(ctx: Context<InitializeMakerV0>, args: InitializeMakerArgsV0) -> 
     ErrorCode::InvalidStringLength
   );
 
-  let signer_seeds: &[&[&[u8]]] = &[&[b"maker", args.name.as_bytes(), &[ctx.bumps["maker"]]]];
+  let signer_seeds: &[&[&[u8]]] = &[&[b"maker", ctx.accounts.dao.to_account_info().key.as_ref(), args.name.as_bytes(), &[ctx.bumps["maker"]]]];
 
   token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
 
@@ -153,6 +155,7 @@ pub fn handler(ctx: Context<InitializeMakerV0>, args: InitializeMakerArgsV0) -> 
     /// Initialized via set_maker_tree
     bump_seed: ctx.bumps["maker"],
     collection_bump_seed: ctx.bumps["collection"],
+    dao: ctx.accounts.dao.key()
   });
 
   Ok(())
