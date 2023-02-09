@@ -323,7 +323,8 @@ describe("helium-sub-daos", () => {
           delay: 15000,
           lockupPeriods: 183 * 4,
           lockupAmount: 50,
-          expectedMultiplier: 1 + ((183 * 4 - 183) / (365 * 4 - 183)) * 99,
+          expectedMultiplier:
+            Math.min((SECS_PER_DAY * 183 * 4) / MAX_LOCKUP, 1) * SCALE,
         },
       },
       // { name: "Case 3", options: {delay: 45000, lockupPeriods: 183*8, lockupAmount: 100, delegateAmount: 10000} },
