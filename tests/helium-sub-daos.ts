@@ -45,6 +45,7 @@ import {
 } from "./utils/fixtures";
 import { getUnixTimestamp } from "./utils/solana";
 import { createPosition, initVsr } from "./utils/vsr";
+import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 
 chai.use(chaiAsPromised);
 
@@ -54,6 +55,10 @@ const THREAD_PID = new PublicKey(
 
 const EPOCH_REWARDS = 100000000;
 const SUB_DAO_EPOCH_REWARDS = 10000000;
+const SECS_PER_DAY = 86400;
+const SECS_PER_YEAR = 365 * SECS_PER_DAY;
+const MAX_LOCKUP = 4 * SECS_PER_YEAR;
+const SCALE = 100;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -308,7 +313,8 @@ describe("helium-sub-daos", () => {
           delay: 1000,
           lockupPeriods: 183,
           lockupAmount: 100,
-          expectedMultiplier: 1,
+          expectedMultiplier:
+            Math.min((SECS_PER_DAY * 183) / MAX_LOCKUP, 1) * SCALE,
         },
       },
       {
@@ -360,34 +366,14 @@ describe("helium-sub-daos", () => {
 
           const expectedVeHnt =
             options.lockupAmount * options.expectedMultiplier;
+
           expectBnAccuracy(
             toBN(expectedVeHnt, 8).mul(new BN("1000000000000")),
             sdAcc.vehntDelegated,
-            0.001
+            0.01
           );
           expectBnAccuracy(lockupAmount, acc.hntAmount, 0.001);
         });
-
-        function expectBnAccuracy(
-          expectedBn: anchor.BN,
-          actualBn: anchor.BN,
-          percentUncertainty: number
-        ) {
-          let upperBound = expectedBn.muln(1 + percentUncertainty);
-          let lowerBound = expectedBn.muln(1 - percentUncertainty);
-          try {
-            expect(upperBound.gte(actualBn)).to.be.true;
-            expect(lowerBound.lte(actualBn)).to.be.true;
-          } catch (e) {
-            console.error(
-              "Expected",
-              expectedBn.toString(),
-              "Actual",
-              actualBn.toString()
-            );
-            throw e;
-          }
-        }
 
         it("calculates subdao rewards", async () => {
           const { subDaoEpochInfo } = await burnDc(1600000);

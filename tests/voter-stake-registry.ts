@@ -48,6 +48,7 @@ import {
 } from "../packages/voter-stake-registry-sdk/src";
 import { getUnixTimestamp } from "./utils/solana";
 import { SPL_GOVERNANCE_PID } from "./utils/vsr";
+import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 
 chai.use(chaiAsPromised);
 
@@ -937,24 +938,3 @@ describe("voter-stake-registry", () => {
     });
   });
 });
-
-const expectBnAccuracy = (
-  expectedBn: anchor.BN,
-  actualBn: anchor.BN,
-  percentUncertainty: number
-) => {
-  let upperBound = expectedBn.muln(1 + percentUncertainty);
-  let lowerBound = expectedBn.muln(1 - percentUncertainty);
-  try {
-    expect(upperBound.gte(actualBn)).to.be.true;
-    expect(lowerBound.lte(actualBn)).to.be.true;
-  } catch (e) {
-    console.error(
-      "Expected",
-      expectedBn.toString(),
-      "Actual",
-      actualBn.toString()
-    );
-    throw e;
-  }
-};
