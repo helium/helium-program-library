@@ -133,7 +133,6 @@ describe("lazy-transactions", () => {
       cacheDepth: merkleTree.depth - 1
     });
     await sleep(2000);
-    const data = await provider.connection.getAccountInfo(canopy.publicKey);
 
     const accounts = compiledTransactions[0].accounts;
 

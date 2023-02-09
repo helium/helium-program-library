@@ -1,6 +1,6 @@
 {
   "name": "@helium/spl-utils",
-  "version": "0.0.26",
+  "version": "0.0.29",
   "description": "Utils shared across spl suite",
   "publishConfig": {
     "access": "public",
@@ -37,7 +37,7 @@
     "@solana/web3.js": "^1.43.4",
     "bn.js": "^5.2.0",
     "borsh": "^0.7.0",
-    "bs58": "^4.0.1"
+    "bs58": "^5.0.0"
   },
   "devDependencies": {
     "git-format-staged": "^2.1.3",

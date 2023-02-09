@@ -17,7 +17,7 @@ export const heliumCommonResolver = resolveIndividual(async ({ path }) => {
     case "logWrapper":
       return new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
     case "governanceProgramId":
-      return new PublicKey("hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC");
+      return new PublicKey("hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S");
     case "voterStakeRegistryProgramId":
       return new PublicKey("hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8");
     case "vsrProgram":

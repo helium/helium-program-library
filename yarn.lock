@@ -1625,6 +1625,11 @@
   dependencies:
     "@chakra-ui/utils" "1.10.4"
 
+"@coral-xyz/anchor-cli@^0.26.0":
+  version "0.26.0"
+  resolved "https://registry.yarnpkg.com/@coral-xyz/anchor-cli/-/anchor-cli-0.26.0.tgz#edc70f1a159fe71f7c41c80ca80eaf901e76bd15"
+  integrity sha512-j+Q/zuT9+taoQ/w7Jxm6R5qBUlalzIMQsDwV2tYwOMbkq2B2muEsCI0weaFxiJsZZO98U3BQTuprPQGdC6PZWQ==
+
 "@coral-xyz/anchor@0.26.0", "@coral-xyz/anchor@^0.26", "@coral-xyz/anchor@^0.26.0":
   version "0.26.0"
   resolved "https://registry.yarnpkg.com/@coral-xyz/anchor/-/anchor-0.26.0.tgz#c8e4f7177e93441afd030f22d777d54d0194d7d1"
@@ -5311,6 +5316,20 @@
   resolved "https://registry.yarnpkg.com/@types/parse-json/-/parse-json-4.0.0.tgz#2f8bb441434d163b35fb8ffdccd7138927ffb8c0"
   integrity sha512-//oorEZjL6sbPcKUaCdIGlIUeH26mgzimjBB77G6XRgnDl/L5wOnpyBGRe/Mmf5CVW3PwEBE1NjiMZ/ssFh4wA==
 
+"@types/pg-format@^1.0.2":
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/@types/pg-format/-/pg-format-1.0.2.tgz#3c63fcb3723a6888c8fad740866b1061634d037e"
+  integrity sha512-D3MEO6u3BObw3G4Xewjdx05MF5v/fiog78CedtrXe8BhONM8GvUz2dPfLWtI0BPRBoRd6anPHXe+sbrPReZouQ==
+
+"@types/pg@^8.6.6":
+  version "8.6.6"
+  resolved "https://registry.yarnpkg.com/@types/pg/-/pg-8.6.6.tgz#21cdf873a3e345a6e78f394677e3b3b1b543cb80"
+  integrity sha512-O2xNmXebtwVekJDD+02udOncjVcMZQuTEQEMpKJ0ZRf5E7/9JJX3izhKUcUifBkyKpljyUM6BTgy2trmviKlpw==
+  dependencies:
+    "@types/node" "*"
+    pg-protocol "*"
+    pg-types "^2.2.0"
+
 "@types/prettier@^2.1.5":
   version "2.7.2"
   resolved "https://registry.yarnpkg.com/@types/prettier/-/prettier-2.7.2.tgz#6c2324641cc4ba050a8c710b2b251b377581fbf0"
@@ -5501,6 +5520,13 @@
   version "17.0.20"
   resolved "https://registry.yarnpkg.com/@types/yargs/-/yargs-17.0.20.tgz#107f0fcc13bd4a524e352b41c49fe88aab5c54d5"
   integrity sha512-eknWrTHofQuPk2iuqDm1waA7V6xPlbgBoaaXEgYkClhLOnB0TtbW+srJaOToAgawPxPlHQzwypFA2bhZaUGP5A==
+  dependencies:
+    "@types/yargs-parser" "*"
+
+"@types/yargs@^17.0.22":
+  version "17.0.22"
+  resolved "https://registry.yarnpkg.com/@types/yargs/-/yargs-17.0.22.tgz#7dd37697691b5f17d020f3c63e7a45971ff71e9a"
+  integrity sha512-pet5WJ9U8yPVRhkwuEIp5ktAeAqRZOq4UdAyWLWzxbtpyXnzbtLdKiXAjJzi/KLmPGS9wk86lUFWZFN6sISo4g==
   dependencies:
     "@types/yargs-parser" "*"
 
@@ -13530,12 +13556,12 @@ pg-pool@^3.5.2:
   resolved "https://registry.yarnpkg.com/pg-pool/-/pg-pool-3.5.2.tgz#ed1bed1fb8d79f1c6fd5fb1c99e990fbf9ddf178"
   integrity sha512-His3Fh17Z4eg7oANLob6ZvH8xIVen3phEZh2QuyrIl4dQSDVEabNducv6ysROKpDNPSD+12tONZVWfSgMvDD9w==
 
-pg-protocol@^1.6.0:
+pg-protocol@*, pg-protocol@^1.6.0:
   version "1.6.0"
   resolved "https://registry.yarnpkg.com/pg-protocol/-/pg-protocol-1.6.0.tgz#4c91613c0315349363af2084608db843502f8833"
   integrity sha512-M+PDm637OY5WM307051+bsDia5Xej6d9IR4GwJse1qA1DIhiKlksvrneZOYQq42OM+spubpcNYEo2FcKQrDk+Q==
 
-pg-types@^2.1.0:
+pg-types@^2.1.0, pg-types@^2.2.0:
   version "2.2.0"
   resolved "https://registry.yarnpkg.com/pg-types/-/pg-types-2.2.0.tgz#2d0250d636454f7cfa3b6ae0382fdfa8063254a3"
   integrity sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==

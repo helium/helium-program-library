@@ -110,7 +110,8 @@ describe("helium-entity-manager", () => {
     const { maker, collection, makerKeypair } = await initTestMaker(
       hemProgram,
       provider,
-      rewardableEntityConfig
+      rewardableEntityConfig,
+      dao
     );
 
     const account = await hemProgram.account.makerV0.fetch(maker);
@@ -160,10 +161,11 @@ describe("helium-entity-manager", () => {
       const makerConf = await initTestMaker(
         hemProgram,
         provider,
-        rewardableEntityConfig
+        rewardableEntityConfig,
+        dao
       );
 
-      await initTestMaker(hemProgram, provider, rewardableEntityConfig);
+      await initTestMaker(hemProgram, provider, rewardableEntityConfig, dao);
 
       await dcProgram.methods
         .mintDataCreditsV0({
@@ -186,7 +188,7 @@ describe("helium-entity-manager", () => {
       metadata = {
         name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
         symbol: "HOTSPOT",
-        uri: `https://metadata.oracle.test-helium.com/${ecc}`,
+        uri: `https://entities.nft.test-helium.com/${ecc}`,
         collection: {
           key: hotspotCollection,
           verified: true,
@@ -382,10 +384,11 @@ describe("helium-entity-manager", () => {
       const makerConf = await initTestMaker(
         hemProgram,
         provider,
-        rewardableEntityConfig
+        rewardableEntityConfig,
+        dao
       );
 
-      await initTestMaker(hemProgram, provider, rewardableEntityConfig);
+      await initTestMaker(hemProgram, provider, rewardableEntityConfig, dao);
 
       await dcProgram.methods
         .mintDataCreditsV0({
@@ -407,7 +410,7 @@ describe("helium-entity-manager", () => {
       metadata = {
         name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
         symbol: "HOTSPOT",
-        uri: `https://metadata.oracle.test-helium.com/${ecc}`,
+        uri: `https://entities.nft.test-helium.com/${ecc}`,
         collection: {
           key: hotspotCollection,
           verified: true,

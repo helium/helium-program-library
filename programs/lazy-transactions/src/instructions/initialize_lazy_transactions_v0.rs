@@ -24,8 +24,10 @@ pub struct InitializeLazyTransactionsV0<'info> {
   pub lazy_transactions: Box<Account<'info, LazyTransactionsV0>>,
   /// CHECK: Account to store the canopy, the size will determine the size of the canopy
   #[account(
+    mut,
     owner = id(),
-    constraint = check_canopy_bytes(&canopy.data.borrow()).is_ok(),
+    constraint = canopy.data.borrow()[0] == 0,
+    constraint = check_canopy_bytes(&canopy.data.borrow()[1..]).is_ok(),
   )]
   pub canopy: AccountInfo<'info>,
   pub system_program: Program<'info, System>,
@@ -35,6 +37,9 @@ pub fn handler(
   ctx: Context<InitializeLazyTransactionsV0>,
   args: InitializeLazyTransactionsArgsV0,
 ) -> Result<()> {
+  let mut data = ctx.accounts.canopy.try_borrow_mut_data()?;
+  data[0] = 1;
+
   ctx
     .accounts
     .lazy_transactions
