@@ -1,15 +1,11 @@
-use crate::{construct_issue_hst_ix, current_epoch, error::ErrorCode, state::*, TESTING};
+use crate::{current_epoch, error::ErrorCode, state::*, TESTING};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
-use clockwork_sdk::{
-  cpi::thread_update,
-  state::{Thread, ThreadSettings, Trigger},
-  ThreadProgram,
-};
+use clockwork_sdk::state::{AutomationResponse, Trigger};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHstPoolArgsV0 {
@@ -48,15 +44,6 @@ pub struct IssueHstPoolV0<'info> {
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
-
-  #[account(
-    mut,
-    seeds = [b"thread", dao.key().as_ref(), b"issue_hst"],
-    seeds::program = clockwork.key(),
-    bump
-  )]
-  pub thread: Account<'info, Thread>,
-  pub clockwork: Program<'info, ThreadProgram>,
 }
 
 impl<'info> IssueHstPoolV0<'info> {
@@ -73,7 +60,10 @@ impl<'info> IssueHstPoolV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result<()> {
+pub fn handler(
+  ctx: Context<IssueHstPoolV0>,
+  args: IssueHstPoolArgsV0,
+) -> Result<AutomationResponse> {
   let curr_ts = Clock::get()?.unix_timestamp;
   let epoch = current_epoch(curr_ts);
 
@@ -107,7 +97,7 @@ pub fn handler(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result
   ctx.accounts.dao_epoch_info.done_issuing_hst_pool = true;
 
   // update thread to point at next epoch
-  let next_epoch = args.epoch + 1;
+  let next_epoch = current_epoch(curr_ts);
 
   let dao_key = ctx.accounts.dao.key();
   let dao_ei_seeds: &[&[u8]] = &[
@@ -116,46 +106,13 @@ pub fn handler(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result
     &next_epoch.to_le_bytes(),
   ];
   let next_dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
-  let issue_ix = construct_issue_hst_ix(
-    ctx.accounts.dao.key(),
-    ctx.accounts.hnt_circuit_breaker.key(),
-    ctx.accounts.hnt_mint.key(),
-    ctx.accounts.hst_pool.key(),
-    ctx.accounts.system_program.key(),
-    ctx.accounts.token_program.key(),
-    ctx.accounts.circuit_breaker_program.key(),
-    ctx.accounts.thread.key(),
-    ctx.accounts.clockwork.key(),
-    next_dao_epoch_info,
-    next_epoch,
-  )
-  .unwrap();
 
-  let signer_seeds: &[&[&[u8]]] = &[&[
-    "dao".as_bytes(),
-    ctx.accounts.dao.hnt_mint.as_ref(),
-    &[ctx.accounts.dao.bump_seed],
-  ]];
-  thread_update(
-    CpiContext::new_with_signer(
-      ctx.accounts.clockwork.to_account_info(),
-      clockwork_sdk::cpi::ThreadUpdate {
-        authority: ctx.accounts.dao.to_account_info(),
-        thread: ctx.accounts.thread.to_account_info(),
-        system_program: ctx.accounts.system_program.to_account_info(),
-      },
-      signer_seeds,
-    ),
-    ThreadSettings {
-      fee: None,
-      kickoff_instruction: Some(issue_ix.into()),
-      rate_limit: None,
-      trigger: Some(Trigger::Account {
-        address: next_dao_epoch_info,
-        offset: 8,
-        size: 1,
-      }),
-    },
-  )?;
-  Ok(())
+  Ok(AutomationResponse {
+    next_instruction: None,
+    trigger: Some(Trigger::Account {
+      address: next_dao_epoch_info,
+      offset: 8,
+      size: 1,
+    }),
+  })
 }

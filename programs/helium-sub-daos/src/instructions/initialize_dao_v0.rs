@@ -1,5 +1,6 @@
-use crate::{construct_issue_hst_ix, current_epoch, state::*, EPOCH_LENGTH};
+use crate::{construct_issue_hst_kickoff_ix, current_epoch, state::*, EPOCH_LENGTH};
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::native_token::LAMPORTS_PER_SOL;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::{set_authority, SetAuthority, TokenAccount};
 use anchor_spl::token::{Mint, Token};
@@ -8,7 +9,7 @@ use circuit_breaker::{
   CircuitBreaker, InitializeMintWindowedBreakerArgsV0,
 };
 use circuit_breaker::{ThresholdType, WindowedCircuitBreakerConfigV0};
-use clockwork_sdk::{cpi::thread_create, state::Trigger, ThreadProgram};
+use clockwork_sdk::{cpi::automation_create, state::Trigger, AutomationProgram};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDaoArgsV0 {
@@ -53,15 +54,15 @@ pub struct InitializeDaoV0<'info> {
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
 
-  /// CHECK: handled by thread_create
+  /// CHECK: handled by automation_create
   #[account(
     mut,
-    seeds = [b"thread", dao.key().as_ref(), b"issue_hst"],
+    seeds = [b"automation", dao.key().as_ref(), b"issue_hst"],
     seeds::program = clockwork.key(),
     bump
   )]
-  pub thread: AccountInfo<'info>,
-  pub clockwork: Program<'info, ThreadProgram>,
+  pub automation: AccountInfo<'info>,
+  pub clockwork: Program<'info, AutomationProgram>,
 }
 
 pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Result<()> {
@@ -129,40 +130,34 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
   ];
   let dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
 
-  let kickoff_ix = construct_issue_hst_ix(
+  let kickoff_ix = construct_issue_hst_kickoff_ix(
     ctx.accounts.dao.key(),
-    ctx.accounts.hnt_circuit_breaker.key(),
-    ctx.accounts.dao.hnt_mint,
-    ctx.accounts.hst_pool.key(),
+    ctx.accounts.hnt_mint.key(),
     ctx.accounts.system_program.key(),
     ctx.accounts.token_program.key(),
     ctx.accounts.circuit_breaker_program.key(),
-    ctx.accounts.thread.key(),
-    ctx.accounts.clockwork.key(),
-    dao_epoch_info,
-    epoch,
-  )
-  .unwrap();
+  );
 
-  // initialize thread
+  // initialize automation
   let signer_seeds: &[&[&[u8]]] = &[&[
     "dao".as_bytes(),
     ctx.accounts.hnt_mint.to_account_info().key.as_ref(),
     &[ctx.bumps["dao"]],
   ]];
-  thread_create(
+  automation_create(
     CpiContext::new_with_signer(
       ctx.accounts.clockwork.to_account_info(),
-      clockwork_sdk::cpi::ThreadCreate {
+      clockwork_sdk::cpi::AutomationCreate {
         authority: ctx.accounts.dao.to_account_info(),
         payer: ctx.accounts.payer.to_account_info(),
-        thread: ctx.accounts.thread.to_account_info(),
+        automation: ctx.accounts.automation.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
       },
       signer_seeds,
     ),
-    "issue_hst".to_string(),
-    kickoff_ix.into(),
+    LAMPORTS_PER_SOL / 100,
+    "issue_hst".to_string().as_bytes().to_vec(),
+    vec![kickoff_ix.into()],
     Trigger::Account {
       address: dao_epoch_info,
       offset: 8,
