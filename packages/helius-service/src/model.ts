@@ -1,10 +1,17 @@
 import {Sequelize, STRING, INTEGER, Model, INET} from 'sequelize';
 
 // initialize sequelize
-export const sequelize = new Sequelize('database', 'postgres', 'postgres', {
+export const sequelize = new Sequelize('oracle', 'oracle_admin', 'password', {
   host: 'localhost',
   dialect: 'postgres',
+  port: 5433,
   logging: false,
+  dialectOptions: {
+      "ssl": {
+        "require": false,
+        "rejectUnauthorized": false
+      }
+    }
 });
 
 export class Entity extends Model {}
@@ -19,7 +26,7 @@ Entity.init({
   maker: {
     type: STRING,
   }
-}, { sequelize, modelName: 'entity'})
+}, { sequelize, modelName: 'entities', underscored: true})
 
 export class IotMetadata extends Model {}
 IotMetadata.init({
@@ -36,7 +43,7 @@ IotMetadata.init({
   gain: {
     type: INTEGER,
   }
-}, { sequelize, modelName: 'iotmetadata'});
+}, { sequelize, underscored: true, modelName: 'iot_metadata'});
 
 export class MobileMetadata extends Model {}
 MobileMetadata.init({
@@ -47,4 +54,4 @@ MobileMetadata.init({
   location: {
     type: STRING,
   }
-}, { sequelize, modelName: "mobilemetadata"})
+}, { sequelize, underscored: true, modelName: "mobile_metadata"})

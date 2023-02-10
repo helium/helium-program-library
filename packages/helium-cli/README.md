@@ -50,9 +50,20 @@ Must also then go update all state in the cluster
 Now, dump the local migration db and port it to the prod db:
 
 ```
+ssh -i ~/bastion -L localhost:5433:oracle-rds.cf49lv1xslmw.us-east-1.rds.amazonaws.com:5432 ubuntu@52.5.106.80
+```
+
+```
 docker run -e PGPASSWORD=postgres postgres:latest pg_dump -h host.docker.internal -U postgres migration > ~/devnet-dump.sql
 ```
 
 ```
  psql -U web_admin -p 5433 -h localhost -d migration -f ~/devnet-dump.sql -W
  ```
+
+You must also populate the iot and mobile metadata databases. Switch the port forward to the oracle db. Then:
+
+```
+$: cd ../helius-service
+$: env ANCHOR_WALLET=/path/to/.config/solana/id.json yarn run seed-db -f ../migration-service/export.json
+```
