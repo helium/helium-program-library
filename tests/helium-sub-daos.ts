@@ -433,7 +433,6 @@ describe("helium-sub-daos", () => {
           expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
 
           const supply = (await getMint(provider.connection, hntMint)).supply;
-
           const totalUtility =
             Math.sqrt(currentActiveDeviceCount * 50) *
             Math.pow(16, 1 / 4) *
