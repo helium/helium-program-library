@@ -140,7 +140,7 @@ pub fn handler(
   let total_devices_opt = history_buffer.lower_bound(epoch_end_ts);
   let total_devices_u64: u64;
   if let Some(total_devices_row) = total_devices_opt {
-    total_devices_u64 = u64::try_from(total_devices_row.value.mantissa).unwrap();
+    total_devices_u64 = total_devices_row.value.try_into().unwrap();
   } else {
     total_devices_u64 = 0;
   }

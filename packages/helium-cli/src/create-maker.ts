@@ -7,17 +7,24 @@ import {
   makerApprovalKey,
 } from "@helium/helium-entity-manager-sdk";
 import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import { humanReadable, sendInstructions, truthy } from "@helium/spl-utils";
 import * as anchor from "@coral-xyz/anchor";
 import {
   getConcurrentMerkleTreeAccountSize,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
 } from "@solana/spl-account-compression";
-import { Keypair, PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
+import {
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import fs from "fs";
 import os from "os";
 import yargs from "yargs/yargs";
 import { exists, loadKeypair, sendInstructionsOrCreateProposal } from "./utils";
+import { program } from "@coral-xyz/anchor/dist/cjs/native/system";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -25,6 +32,9 @@ const yarg = yargs(hideBin(process.argv)).options({
     alias: "k",
     describe: "Anchor wallet keypair",
     default: `${os.homedir()}/.config/solana/id.json`,
+  },
+  executeProposal: {
+    type: "boolean",
   },
   url: {
     alias: "u",
@@ -39,7 +49,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   govProgramId: {
     type: "string",
     describe: "Pubkey of the GOV program",
-    default: "hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC",
+    default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
   },
   fromFile: {
     describe: "Load makers from a json file and create in bulk",
@@ -68,12 +78,12 @@ const yarg = yargs(hideBin(process.argv)).options({
     alias: "s",
     type: "string",
     required: true,
-    describe: " The symbol of the entity config",
+    describe: "The symbol of the entity config",
   },
-  councilKeypair: {
+  councilKey: {
     type: "string",
-    describe: "Keypair of gov council token",
-    default: "./keypairs/council.json",
+    describe: "Key of gov council token",
+    default: "counKsk72Jgf9b3aqyuQpFf12ktLdJbbuhnoSxxQoMJ",
   },
 });
 
@@ -98,7 +108,7 @@ async function run() {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const wallet = loadKeypair(argv.wallet);
   const govProgramId = new PublicKey(argv.govProgramId);
-  const councilKeypair = await loadKeypair(argv.councilKeypair);
+  const councilKey = new PublicKey(argv.councilKey);
   const provider = anchor.getProvider() as anchor.AnchorProvider;
 
   const name = argv.name;
@@ -126,6 +136,7 @@ async function run() {
 
   const hemProgram = await initHem(provider);
   const hsdProgram = await initHsd(provider);
+  const vsrProgram = await initVsr(provider);
   const conn = provider.connection;
   const subdaoMint = new PublicKey(argv.subdaoMint);
   const subdao = (await subDaoKey(subdaoMint))[0];
@@ -134,37 +145,65 @@ async function run() {
   )[0];
 
   const subdaoAcc = await hsdProgram.account.subDaoV0.fetch(subdao);
+  const dao = await hsdProgram.account.daoV0.fetch(subdaoAcc.dao);
+  const registrar = await vsrProgram.account.registrar.fetch(dao.registrar);
   const authorityAcc = await provider.connection.getAccountInfo(
     subdaoAcc.authority
   );
-  let   payer = provider.wallet.publicKey;
+  let subdaoPayer = provider.wallet.publicKey;
+  let daoPayer = provider.wallet.publicKey;
   const isGov = authorityAcc != null && authorityAcc.owner.equals(govProgramId);
   if (isGov) {
     const nativeTreasury = await PublicKey.findProgramAddressSync(
       [Buffer.from("native-treasury", "utf-8"), subdaoAcc.authority.toBuffer()],
       govProgramId
     )[0];
-    payer = nativeTreasury;
+    subdaoPayer = nativeTreasury;
+
+    const daoGovernance = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("account-governance", "utf-8"),
+        registrar.realm.toBuffer(),
+        subdaoAcc.dao.toBuffer(),
+      ],
+      govProgramId
+    )[0];
+    const daoNativeTreasury = PublicKey.findProgramAddressSync(
+      [Buffer.from("native-treasury", "utf-8"), daoGovernance.toBuffer()],
+      govProgramId
+    )[0];
+
+    daoPayer = daoNativeTreasury;
   }
 
-  const instructions: TransactionInstruction[][] = [];
+  const createInstructions: TransactionInstruction[][] = [];
+  const approveInstructions: TransactionInstruction[][] = [];
+  const updateAuthority = dao.authority;
   let totalSol = 0;
   for (const { name, address, count } of makers) {
-    const innerInstrs = [];
+    const innerCreateInstrs = [];
     const makerAuthority = new PublicKey(Address.fromB58(address).publicKey);
     const [size, buffer, canopy] = merkleSizes.find(
       ([height]) => Math.pow(2, height) > count * 2
     );
     const space = getConcurrentMerkleTreeAccountSize(size, buffer, canopy);
-    const maker = await makerKey(name)[0];
+    const maker = await makerKey(subdaoAcc.dao, name)[0];
     const rent = await provider.connection.getMinimumBalanceForRentExemption(
       space
     );
     totalSol += rent;
 
-    const authority = (
-      await hemProgram.account.rewardableEntityConfigV0.fetch(entityConfigKey)
-    ).authority;
+    let merkle: Keypair;
+    const merklePath = `${__dirname}/../keypairs/merkle-${address}.json`;
+    if (fs.existsSync(merklePath)) {
+      merkle = loadKeypair(merklePath);
+    } else {
+      merkle = Keypair.generate();
+      fs.writeFileSync(
+        merklePath,
+        JSON.stringify(Array.from(merkle.secretKey))
+      );
+    }
 
     if (!(await exists(conn, maker))) {
       console.log(
@@ -183,28 +222,17 @@ async function run() {
         );
       }
 
-      let merkle: Keypair;
-      const merklePath = `${__dirname}/../keypairs/merkle-${address}.json`;
-      if (fs.existsSync(merklePath)) {
-        merkle = loadKeypair(merklePath);
-      } else {
-        merkle = Keypair.generate();
-        fs.writeFileSync(
-          merklePath,
-          JSON.stringify(Array.from(merkle.secretKey))
-        );
-      }
-
       const create = await hemProgram.methods
         .initializeMakerV0({
           name,
           metadataUrl: "todo",
           issuingAuthority: makerAuthority,
-          updateAuthority: authority,
+          updateAuthority,
         })
         .accounts({
           maker,
-          payer,
+          payer: daoPayer,
+          dao: subdaoAcc.dao,
         })
         .instruction();
 
@@ -213,7 +241,12 @@ async function run() {
           maxDepth: size,
           maxBufferSize: buffer,
         })
-        .accounts({ maker, merkleTree: merkle.publicKey })
+        .accounts({
+          maker,
+          merkleTree: merkle.publicKey,
+          payer: daoPayer,
+          updateAuthority,
+        })
         .instruction();
 
       if (!(await exists(conn, merkle.publicKey))) {
@@ -221,7 +254,7 @@ async function run() {
           provider,
           [
             SystemProgram.createAccount({
-              fromPubkey: payer,
+              fromPubkey: provider.wallet.publicKey,
               newAccountPubkey: merkle.publicKey,
               lamports:
                 await provider.connection.getMinimumBalanceForRentExemption(
@@ -234,51 +267,94 @@ async function run() {
           [merkle]
         );
       }
-      innerInstrs.push(...[create, setTree].filter(truthy));
+      innerCreateInstrs.push(...[create, setTree].filter(truthy));
     } else {
-      innerInstrs.push(
+      const makerAcc = await hemProgram.account.makerV0.fetch(maker);
+      innerCreateInstrs.push(
         await hemProgram.methods
           .updateMakerV0({
             issuingAuthority: makerAuthority,
-            updateAuthority: authority,
+            updateAuthority,
           })
-          .accounts({ maker, updateAuthority: authority })
+          .accounts({ maker, updateAuthority: makerAcc.updateAuthority })
           .instruction()
       );
-    }
 
+      if (makerAcc.merkleTree.equals(SystemProgram.programId)) {
+        const setTree = await hemProgram.methods
+          .setMakerTreeV0({
+            maxDepth: size,
+            maxBufferSize: buffer,
+          })
+          .accounts({
+            maker,
+            merkleTree: merkle.publicKey,
+            payer: daoPayer,
+            updateAuthority,
+          })
+          .instruction();
+        if (!(await exists(conn, merkle.publicKey))) {
+          await sendInstructions(
+            provider,
+            [
+              SystemProgram.createAccount({
+                fromPubkey: provider.wallet.publicKey,
+                newAccountPubkey: merkle.publicKey,
+                lamports:
+                  await provider.connection.getMinimumBalanceForRentExemption(
+                    space
+                  ),
+                space: space,
+                programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+              }),
+            ],
+            [merkle]
+          );
+        }
+        innerCreateInstrs.push(setTree);
+      }
+    }
+    createInstructions.push(innerCreateInstrs);
+
+    const innerApproveInstrs = [];
     let approve;
     if (!(await exists(conn, makerApprovalKey(entityConfigKey, maker)[0]))) {
+      const authority = (
+        await hemProgram.account.rewardableEntityConfigV0.fetch(entityConfigKey)
+      ).authority;
       approve = await hemProgram.methods
         .approveMakerV0()
         .accounts({
           maker,
           rewardableEntityConfig: entityConfigKey,
           authority,
-          payer,
+          payer: subdaoPayer,
         })
         .instruction();
-      innerInstrs.push(approve);
+      innerApproveInstrs.push(approve);
     }
 
-    instructions.push(innerInstrs);
+    approveInstructions.push(innerApproveInstrs);
   }
 
   console.log("Total sol needed: ", humanReadable(new anchor.BN(totalSol), 9));
 
   if (isGov) {
-    const instrs = instructions.flat().filter(truthy);
+    // Approve instructions must execute after ALL create instructions
+    const instrs = createInstructions.flat().filter(truthy);
+    const approveInstrs = approveInstructions.flat().filter(truthy);
     await sendInstructionsOrCreateProposal({
       provider,
-      instructions: instrs,
+      instructions: [...instrs, ...approveInstrs],
       walletSigner: wallet,
       signers: [],
       govProgramId,
       proposalName: `Create Makers`,
-      votingMint: councilKeypair.publicKey,
+      votingMint: councilKey,
+      executeProposal: argv.executeProposal,
     });
   } else {
-    for (const instrs of instructions) {
+    for (const instrs of [...createInstructions, ...approveInstructions]) {
       await sendInstructions(provider, instrs, []);
     }
   }

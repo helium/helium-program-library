@@ -2,110 +2,67 @@ import fastify from 'fastify';
 import {init, PROGRAM_ID} from "@helium/helium-entity-manager-sdk";
 import { AnchorProvider, BN, BorshInstructionCoder, Program } from '@coral-xyz/anchor';
 import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
-import { Keypair, PublicKey } from '@solana/web3.js';
-import { sequelize, Hotspot } from './model';
+import { sequelize } from './model';
+import { findAccountKey, instructionParser } from './parser';
+import { daoKey } from "@helium/helium-sub-daos-sdk";
+import { PublicKey } from '@solana/web3.js';
 
 // sync the model with the database
 sequelize.sync()
   .then(() => {
-    console.log('Hotspot table synced');
+    console.log('Tables synced');
   })
   .catch(error => {
-    console.error('Error syncing Hotspot table:', error);
+    console.error('Error syncing tables:', error);
   });
 
-function getLeafAssetId(tree: PublicKey, leafIndex: BN): PublicKey {
-  const [assetId] = PublicKey.findProgramAddressSync(
-    [Buffer.from('asset', 'utf8'), tree.toBuffer(), Uint8Array.from(leafIndex.toArray('le', 8))],
-    new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"),
-  );
-  return assetId;
-}
 const server = fastify();
 let hemProgram: Program<HeliumEntityManager>;
+
 server.post('/', async (request, reply) => {
   let tx = request.body[0].transaction;
+  // testing code for localnet txs
+  // let sig = request.body.sig;
+  // let tx = (await hemProgram.provider.connection.getTransaction(sig, {commitment: 'finalized'}))!.transaction;
   const instructions = tx.message.instructions;
   try {
-    // get relevant idl ixs
-    const onboardHotspotIx = hemProgram.idl.instructions.find(
-      (x) => x.name === "onboardIotHotspotV0"
-    )!;
-    const genesisIssueIx = hemProgram.idl.instructions.find(
-      (x) => x.name === "genesisIssueHotspotV0"
-    )!;
-    const updateIotIx = hemProgram.idl.instructions.find(
-      (x) => x.name === "updateIotInfoV0"
-    )!;
-    
-    // get relevant indices
-    const issueInfoIdx = onboardHotspotIx.accounts.findIndex(
-      (x) => x.name === "iotInfo"
-    )!
-    const genesisIssueInfoIdx = genesisIssueIx.accounts.findIndex(
-      (x) => x.name === "info"
-    )!
-    const treeIdx = updateIotIx.accounts.findIndex(
-      (x) => x.name === "tree"
-    )!
-
     // iterate through instructions and update/create db rows
     for (const ix of instructions) {
       let decoded = (
         hemProgram.coder.instruction as BorshInstructionCoder
-      ).decode(ix.data);
-      const args = (decoded.data as any).args;
-      if (
-        decoded.name == "onboardIotHotspotV0" ||
-        decoded.name == "genesisIssueHotspotV0"
-      ) {
-        // Create a new hotspot with no location, elevation or gain metadata
-        let idx =
-          decoded.name == "onboardIotHotspotV0"
-            ? issueInfoIdx
-            : genesisIssueInfoIdx;
-        let infoKey = tx.message.accountKeys[ix.accounts[idx]];
-        let info = await hemProgram.account.iotHotspotInfoV0.fetch(infoKey);
-        const hotspotData = {
-          asset: info.asset,
-          hotspot_key: args.hotspotKey,
-          location: null,
-          elevation: null,
-          gain: null,
-        };
-        console.log(hotspotData);
-        await Hotspot.create(hotspotData);
-      } else if (decoded.name == "updateIotInfoV0") {
-        const asset = getLeafAssetId(
-          tx.message.accountKeys[ix.accounts[treeIdx]],
-          args.index
-        );
-        const hotspot = await Hotspot.findOne({
-          where: { asset: asset.toString() },
-        });
+      ).decode(ix.data, "hex");
 
-        // Update the hotspot's location, elevation and gain
-        if (args.location) {
-          hotspot.set("location", `${args.location}`);
-        }
-        if (args.elevation) {
-          hotspot.set("elevation", args.elevation);
-        }
-        if (args.gain) {
-          hotspot.set("gain", args.gain);
-        }
-
-        await hotspot.save();
+      // if hex decode didn't succeed, try decoding as base58
+      if (!decoded) {
+        decoded = (
+          hemProgram.coder.instruction as BorshInstructionCoder
+        ).decode(ix.data, "base58");
       }
+      if (!decoded || !(decoded.name in instructionParser)) {
+        continue;
+      }
+      const args = (decoded.data as any).args;
+ 
+      const method = instructionParser[decoded.name];
+      //@ts-ignore
+      const ixDaoKey = findAccountKey(hemProgram, tx, ix, decoded.name, "dao")
+      // ignore txs relating to other daos
+      if (!ixDaoKey.equals(daoKey(new PublicKey(process.env.HNT_MINT))[0])) {
+        continue;
+      }
+      //@ts-ignore
+      await method.parseAndWrite(hemProgram, tx, ix, args); 
+      console.log("wrote successfully");
     }
     // send a response to the client
     reply.send({
-      message: 'POST request received'
+      message: 'Success'
     });
   } catch(err) {
     reply.status(500).send({
       message: 'Request failed'
     });
+    console.error(err);
   }
 });
 
