@@ -1,7 +1,7 @@
 import BN from "bn.js";
 import { Mint } from "@solana/spl-token";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import Address from "@helium/address";
+import Address, { KeyTypes, NetTypes } from "@helium/address";
 
 export type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
 
@@ -93,4 +93,18 @@ export const heliumAddressToSolPublicKey = (heliumAddress: string) => {
 
 export const heliumAddressToSolAddress = (heliumAddress: string) => {
   return heliumAddressToSolPublicKey(heliumAddress).toBase58();
+};
+
+export const heliumAddressFromSolKey = (pubKey: PublicKey) => {
+  return new Address(
+    0,
+    NetTypes.MAINNET,
+    KeyTypes.ED25519_KEY_TYPE,
+    pubKey.toBuffer()
+  ).b58;
+};
+
+export const heliumAddressFromSolAddress = (solAddress: string) => {
+  const pubKey = new PublicKey(solAddress);
+  return heliumAddressFromSolKey(pubKey);
 };

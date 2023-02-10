@@ -105,6 +105,7 @@ export const initTestMaker = async (
   program: Program<HeliumEntityManager>,
   provider: anchor.AnchorProvider,
   rewardableEntityConfig: PublicKey,
+  dao: PublicKey
 ): Promise<{
   authority: PublicKey;
   makerKeypair: Keypair;
@@ -119,7 +120,7 @@ export const initTestMaker = async (
   const space = getConcurrentMerkleTreeAccountSize(3, 8);
   const name = random(10);
 
-  const maker = makerKey(name)[0];
+  const maker = makerKey(dao, name)[0];
   const createMerkle = SystemProgram.createAccount({
     fromPubkey: provider.wallet.publicKey,
     newAccountPubkey: merkle.publicKey,
@@ -129,12 +130,18 @@ export const initTestMaker = async (
     space: space,
     programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   });
-  const { pubkeys: { collection }, instruction: initialize } = await program.methods
+  const {
+    pubkeys: { collection },
+    instruction: initialize,
+  } = await program.methods
     .initializeMakerV0({
       updateAuthority: makerKeypair.publicKey,
       issuingAuthority: makerKeypair.publicKey,
       name,
       metadataUrl: DEFAULT_METADATA_URL,
+    })
+    .accounts({
+      dao,
     })
     .prepare();
   const {
@@ -179,12 +186,12 @@ export async function ensureDCIdl(dcProgram: Program<DataCredits>) {
   try {
     execSync(
       `anchor idl init --filepath ${__dirname}/../../target/idl/data_credits.json ${dcProgram.programId}`,
-      { stdio: "inherit" }
+      { stdio: "inherit", shell: "/bin/bash" }
     );
   } catch {
     execSync(
       `anchor idl upgrade --filepath ${__dirname}/../../target/idl/data_credits.json ${dcProgram.programId}`,
-      { stdio: "inherit" }
+      { stdio: "inherit", shell: "/bin/bash" }
     );
   }
 }
@@ -193,12 +200,12 @@ export async function ensureHSDIdl(hsdProgram: Program<HeliumSubDaos>) {
   try {
     execSync(
       `anchor idl init --filepath ${__dirname}/../../target/idl/helium_sub_daos.json ${hsdProgram.programId}`,
-      { stdio: "inherit" }
+      { stdio: "inherit", shell: "/bin/bash" }
     );
   } catch {
     execSync(
       `anchor idl upgrade --filepath ${__dirname}/../../target/idl/helium_sub_daos.json ${hsdProgram.programId}`,
-      { stdio: "inherit" }
+      { stdio: "inherit", shell: "/bin/bash" }
     );
   }
 }
@@ -207,12 +214,12 @@ export async function ensureVSRIdl(vsrProgram: Program<VoterStakeRegistry>) {
   try {
     execSync(
       `anchor idl init --filepath ${__dirname}/../../target/idl/voter_stake_registry.json ${vsrProgram.programId}`,
-      { stdio: "inherit" }
+      { stdio: "inherit", shell: "/bin/bash" }
     );
   } catch {
     execSync(
       `anchor idl upgrade --filepath ${__dirname}/../../target/idl/voter_stake_registry.json ${vsrProgram.programId}`,
-      { stdio: "inherit" }
+      { stdio: "inherit", shell: "/bin/bash" }
     );
   }
 }
@@ -287,7 +294,8 @@ export const initWorld = async (
   const maker = await initTestMaker(
     hemProgram,
     provider,
-    rewardableEntityConfig.rewardableEntityConfig
+    rewardableEntityConfig.rewardableEntityConfig,
+    dao.dao
   );
 
   return {

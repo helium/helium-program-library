@@ -132,6 +132,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
 
   let maker_seeds: &[&[&[u8]]] = &[&[
     b"maker",
+    ctx.accounts.maker.dao.as_ref(),
     ctx.accounts.maker.name.as_bytes(),
     &[ctx.accounts.maker.bump_seed],
   ]];
