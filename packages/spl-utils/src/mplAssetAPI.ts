@@ -166,6 +166,7 @@ export async function getAssetsByOwner(
 export type SearchAssetsOpts = {
   sortBy?: { sortBy: "created"; sortDirection: "asc" | "desc" };
   page?: number;
+  collection?: string;
   ownerAddress: string;
   creatorAddress: string;
   creatorVerified?: boolean;
@@ -174,11 +175,10 @@ export type SearchAssetsOpts = {
 export async function searchAssets(
   url: string,
   {
-    ownerAddress,
-    creatorAddress,
     creatorVerified = true,
     sortBy = { sortBy: "created", sortDirection: "asc" },
     page = 0,
+    ...rest
   }: SearchAssetsOpts
 ): Promise<Asset[]> {
   try {
@@ -187,11 +187,10 @@ export async function searchAssets(
       method: "search_assets",
       id: "get-assets-op-1",
       params: {
-        ownerAddress,
         page,
-        creatorAddress,
         creatorVerified,
         sortBy,
+        ...rest,
       },
       headers: {
         "Cache-Control": "no-cache",

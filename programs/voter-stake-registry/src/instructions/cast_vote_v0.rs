@@ -57,8 +57,8 @@ pub struct CastVoteV0<'info> {
 }
 
 /// Casts vote with the NFT
-pub fn handler<'a, 'b, 'c, 'info>(
-  ctx: Context<'a, 'b, 'c, 'info, CastVoteV0<'info>>,
+pub fn handler<'info>(
+  ctx: Context<'_, '_, '_, 'info, CastVoteV0<'info>>,
   args: CastVoteArgsV0,
 ) -> Result<()> {
   let registrar = &ctx.accounts.registrar;

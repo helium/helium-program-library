@@ -1,3 +1,4 @@
+import * as anchor from "@coral-xyz/anchor";
 import {
   createAtaAndMintInstructions,
   createMintInstructions,
@@ -8,22 +9,28 @@ import {
   createCreateMetadataAccountV3Instruction,
   PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
-import * as anchor from "@coral-xyz/anchor";
 import {
   AccountMetaData,
   getGovernanceProgramVersion,
+  getProposalTransactionAddress,
   getTokenOwnerRecordAddress,
   Governance,
   GovernanceAccountParser,
   InstructionData,
+  ProposalTransaction,
   Realm,
+  Vote,
   VoteType,
   withAddSignatory,
+  withCastVote,
   withCreateProposal,
   withCreateTokenOwnerRecord,
   withDepositGoverningTokens,
-  withInsertTransaction,
-  withSignOffProposal
+  withExecuteTransaction, withInsertTransaction,
+  withRelinquishVote,
+  withSignOffProposal,
+  withWithdrawGoverningTokens,
+  YesNoVote
 } from "@solana/spl-governance";
 import {
   AuthorityType,
@@ -33,11 +40,13 @@ import {
 import {
   AddressLookupTableProgram,
   Commitment,
+  ComputeBudgetProgram,
   Connection,
   Keypair,
   PublicKey,
   Signer,
-  SYSVAR_CLOCK_PUBKEY, TransactionInstruction,
+  SYSVAR_CLOCK_PUBKEY,
+  TransactionInstruction,
   TransactionMessage,
   VersionedTransaction
 } from "@solana/web3.js";
@@ -179,9 +188,8 @@ export function loadKeypair(keypair: string): Keypair {
 }
 
 export function isLocalhost(provider: anchor.AnchorProvider): boolean {
-  const ep = provider.connection.rpcEndpoint
+  const ep = provider.connection.rpcEndpoint;
   return ep.includes("127.0.0.1") || ep.includes("localhost");
-
 }
 
 export async function sendInstructionsOrCreateProposal({
@@ -194,8 +202,10 @@ export async function sendInstructionsOrCreateProposal({
   commitment = "confirmed",
   idlErrors = new Map(),
   votingMint,
+  executeProposal = false,
   walletSigner,
 }: {
+  executeProposal?: boolean;
   walletSigner?: Signer; // If we need to send a versioned tx, this signs as the wallet. Version tx not supported by Wallet interface yet
   provider: anchor.AnchorProvider;
   instructions: TransactionInstruction[];
@@ -209,20 +219,18 @@ export async function sendInstructionsOrCreateProposal({
 }): Promise<string> {
   PublicKey.prototype.toString = PublicKey.prototype.toBase58;
 
-  const signerKeys = Array.from(
-    new Set(
-      ...instructions.map((ix) =>
+  const signerSet = new Set(
+    instructions
+      .map((ix) =>
         ix.keys.filter((k) => k.isSigner).map((k) => k.pubkey.toBase58())
       )
-    )
-  ).map((k) => new PublicKey(k));
-  
-  console.log(
-    instructions.map((ix) =>
-      ix.keys.filter((k) => k.isSigner).map((k) => k.pubkey.toBase58())
-    )
+      .flat()
   );
+  const signerKeys = Array.from(
+    signerSet
+  ).map((k) => new PublicKey(k));
 
+  const nonMissingSignerIxs = instructions.filter(ix => !ix.keys.some(k => k.isSigner && !k.pubkey.equals(provider.wallet.publicKey)));
   const wallet = provider.wallet;
   // Missing signer, must be gov
   const missingSigs = (
@@ -238,14 +246,20 @@ export async function sendInstructionsOrCreateProposal({
           return {
             info,
             governanceKey,
+            nativeKey: PublicKey.findProgramAddressSync(
+              [
+                Buffer.from("native-treasury", "utf-8"),
+                governanceKey.toBuffer(),
+              ],
+              govProgramId
+            )[0],
           };
         })
     )
   ).filter((r) => r.info && r.info.owner.equals(govProgramId));
 
-  if (missingSigs[0]) {
+  for (const { governanceKey, info, nativeKey } of missingSigs) {
     const proposalIxns = [];
-    const { governanceKey, info } = missingSigs[0];
     const gov = GovernanceAccountParser(Governance)(
       governanceKey,
       info!
@@ -272,7 +286,10 @@ export async function sendInstructionsOrCreateProposal({
       govProgramId
     );
 
-    if (!(await provider.connection.getAccountInfo(tokenOwner))) {
+    const tokenOwnerExists = !!(await provider.connection.getAccountInfo(
+      tokenOwner
+    ));
+    if (!tokenOwnerExists) {
       await withCreateTokenOwnerRecord(
         proposalIxns,
         govProgramId,
@@ -282,17 +299,25 @@ export async function sendInstructionsOrCreateProposal({
         votingMint,
         wallet.publicKey
       );
+      
+    }
+
+    const acct = await getAssociatedTokenAddress(votingMint, wallet.publicKey);
+    const balance = new BN(
+      (await provider.connection.getTokenAccountBalance(acct)).value.amount
+    );
+    if (balance.gt(new BN(0))) {
       withDepositGoverningTokens(
         proposalIxns,
         govProgramId,
         version,
         realmKey,
-        await getAssociatedTokenAddress(votingMint, wallet.publicKey),
+        acct,
         votingMint,
         wallet.publicKey,
         wallet.publicKey,
         wallet.publicKey,
-        new BN(1)
+        balance
       );
     }
 
@@ -326,10 +351,14 @@ export async function sendInstructionsOrCreateProposal({
     );
 
     console.log(`Creating proposal ${proposalName}, ${proposal.toBase58()}`);
+
     await sendInstructions(provider, proposalIxns);
 
     let idx = 0;
-    for (const instruction of instructions) {
+    const relevantInstructions = instructions.filter((ix) =>
+      ix.keys.some((k) => (k.pubkey.equals(nativeKey) || k.pubkey.equals(governanceKey)) && k.isSigner)
+    );
+    for (const instruction of relevantInstructions) {
       const addTxIxns = [];
       await withInsertTransaction(
         addTxIxns,
@@ -418,7 +447,7 @@ export async function sendInstructionsOrCreateProposal({
     console.log(
       `Signing off on proposal ${proposalName}, ${proposal.toBase58()}`
     );
-    return await sendInstructions(
+    await sendInstructions(
       provider,
       signOffIxns,
       signers,
@@ -426,11 +455,103 @@ export async function sendInstructionsOrCreateProposal({
       commitment,
       idlErrors
     );
+
+    if (executeProposal) {
+      const voteYes = [];
+
+      const votingRecord = await withCastVote(
+        voteYes,
+        govProgramId,
+        version,
+        realmKey,
+        governanceKey,
+        proposal,
+        tokenOwner,
+        tokenOwner,
+        wallet.publicKey,
+        votingMint,
+        Vote.fromYesNoVote(YesNoVote.Yes),
+        wallet.publicKey
+      );
+
+      await sendInstructions(
+        provider,
+        voteYes,
+        signers,
+        payer,
+        commitment,
+        idlErrors
+      );
+
+      await sleep(5000) // wait past any hold up time
+      for (let idx = 0; idx < relevantInstructions.length; idx++) {
+        const executeIxns = [
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1000000 }),
+        ];
+        const transactionAddress = await getProposalTransactionAddress(
+          govProgramId,
+          version,
+          proposal,
+          0,
+          idx
+        );
+        const transactionInfo = await provider.connection.getAccountInfo(
+          transactionAddress
+        );
+        const transaction = GovernanceAccountParser(ProposalTransaction)(
+          governanceKey,
+          transactionInfo!
+        ).account;
+        await withExecuteTransaction(
+          executeIxns,
+          govProgramId,
+          version,
+          governanceKey,
+          proposal,
+          transactionAddress,
+          transaction.instructions
+        );
+        console.log(
+          `Executing txn ${idx} on proposal ${proposalName}, ${proposal.toBase58()}`
+        );
+        await sendInstructions(provider, executeIxns);
+      }
+      const relinquish = []
+      withRelinquishVote(
+        relinquish,
+        govProgramId,
+        version,
+        realmKey,
+        governanceKey,
+        proposal,
+        tokenOwner,
+        votingMint,
+        votingRecord,
+        wallet.publicKey,
+        wallet.publicKey
+      );
+      await sendInstructions(provider, relinquish);
+    }
+
+    if (balance.gt(new BN(0)) && executeProposal) {
+      const withdrawIxns = [];
+      
+      await withWithdrawGoverningTokens(
+        withdrawIxns,
+        govProgramId,
+        version,
+        realmKey,
+        await getAssociatedTokenAddress(votingMint, wallet.publicKey),
+        votingMint,
+        wallet.publicKey
+      );
+      await sendInstructions(provider, withdrawIxns);
+    }
   }
 
   return await sendInstructions(
     provider,
-    instructions,
+    nonMissingSignerIxs,
     signers,
     payer,
     commitment,

@@ -10,7 +10,7 @@ import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
 import axios from "axios";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair } from "./utils";
+import { loadKeypair, sendInstructionsOrCreateProposal } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -26,11 +26,13 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
   hntMint: {
     type: "string",
-    describe: "Mint of the HNT token. Only used if --resetDaoThread flag is set",
+    describe:
+      "Mint of the HNT token. Only used if --resetDaoThread flag is set",
   },
   dntMint: {
     type: "string",
-    describe: "Mint of the subdao token. Only used if --resetSubDaoThread flag is set",
+    describe:
+      "Mint of the subdao token. Only used if --resetSubDaoThread flag is set",
   },
   resetDaoThread: {
     type: "boolean",
@@ -41,7 +43,20 @@ const yarg = yargs(hideBin(process.argv)).options({
     type: "boolean",
     describe: "Reset the subdao clockwork thread",
     default: false,
-  }
+  },
+  govProgramId: {
+    type: "string",
+    describe: "Pubkey of the GOV program",
+    default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
+  },
+  councilKey: {
+    type: "string",
+    describe: "Key of gov council token",
+    default: "counKsk72Jgf9b3aqyuQpFf12ktLdJbbuhnoSxxQoMJ",
+  },
+  executeProposal: {
+    type: "boolean",
+  },
 });
 
 async function run() {
@@ -54,27 +69,45 @@ async function run() {
     console.log("dnt mint not provided");
     return;
   }
+  const councilKey = new PublicKey(argv.councilKey);
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hsdProgram = await initDao(provider);
+  const instructions = [];
   if (argv.resetDaoThread) {
     console.log("resetting dao thread")
     const hntMint = new PublicKey(argv.hntMint);
     const dao = daoKey(hntMint)[0];
+    const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
 
-    await hsdProgram.methods.resetDaoThreadV0().accounts({
+    instructions.push(await hsdProgram.methods.resetDaoThreadV0().accounts({
       dao,
-    }).rpc({ skipPreflight: true });
+      authority: daoAcc.authority
+    }).instruction());
   }
 
   if (argv.resetSubDaoThread) {
     console.log("resetting subdao thread");
     const dntMint = new PublicKey(argv.dntMint);
     const subDao = subDaoKey(dntMint)[0];
+    const subdaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
 
-    await hsdProgram.methods.resetSubDaoThreadV0().accounts({
+    instructions.push(await hsdProgram.methods.resetSubDaoThreadV0().accounts({
       subDao,
-    }).rpc({ skipPreflight: true });
+      authority: subdaoAcc.authority
+    }).instruction())
   }
+
+  const wallet = loadKeypair(argv.wallet);
+  await sendInstructionsOrCreateProposal({
+    provider,
+    instructions,
+    walletSigner: wallet,
+    signers: [],
+    govProgramId: new PublicKey(argv.govProgramId),
+    proposalName: `Reset Thread`,
+    votingMint: councilKey,
+    executeProposal: argv.executeProposal,
+  });
 }
 
 run()

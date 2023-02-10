@@ -1,5 +1,3 @@
-use std::mem::size_of;
-
 use crate::state::*;
 use anchor_lang::{prelude::*, solana_program::hash::hash};
 
@@ -40,7 +38,7 @@ pub struct OnboardMobileHotspotV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 60 + size_of::<MobileHotspotInfoV0>(),
+    space = MOBILE_HOTSPOT_INFO_SIZE,
     seeds = [
       b"mobile_info", 
       rewardable_entity_config.key().as_ref(),

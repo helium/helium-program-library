@@ -1,3 +1,6 @@
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
+import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
 import Address from "@helium/address";
 import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
 import { mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
@@ -19,6 +22,7 @@ import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manage
 import {
   compile,
   fillCanopy,
+  getCanopy,
   getCanopySize,
   init,
   lazySignerKey,
@@ -26,21 +30,17 @@ import {
   lazyTransactionsKey,
   PROGRAM_ID as LAZY_PROGRAM_ID,
 } from "@helium/lazy-transactions-sdk";
-import { chunks, sendInstructions, truthy } from "@helium/spl-utils";
+import { chunks, sendInstructions } from "@helium/spl-utils";
 import {
   init as initVsr,
   PROGRAM_ID as VSR_PROGRAM_ID,
 } from "@helium/voter-stake-registry-sdk";
 import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
 import { PROGRAM_ID as TOKEN_METATDATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
-import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   SPL_NOOP_PROGRAM_ID,
 } from "@solana/spl-account-compression";
-import { TreeNode } from "@solana/spl-account-compression/dist/types/merkle-tree";
 import {
   ACCOUNT_SIZE,
   createAssociatedTokenAccountIdempotentInstruction,
@@ -66,7 +66,6 @@ import fs from "fs";
 import os from "os";
 import { Client } from "pg";
 import format from "pg-format";
-import * as Collections from "typescript-collections";
 import yargs from "yargs/yargs";
 import { loadKeypair } from "./solana";
 import { compress } from "./utils";
@@ -191,6 +190,7 @@ async function run() {
   const hnt = new PublicKey(argv.hnt);
   const hst = new PublicKey(argv.hst);
 
+  const dao = daoKey(hnt)[0];
   const iotSubdao = (await subDaoKey(iot))[0];
   const mobileSubdao = (await subDaoKey(mobile))[0];
 
@@ -213,6 +213,45 @@ async function run() {
     mobileSubdao,
     "MOBILE"
   )[0];
+  const hotspotPubkeysRaw = [];
+
+  for (const maker of makers) {
+    const helAddr = Address.fromB58(maker.address);
+    const solAddr = new PublicKey(helAddr.publicKey);
+    const makerKeyp = makerKey(dao, maker.name)[0];
+
+    const makerAcc = await hemProgram.account.makerV0.fetch(makerKeyp);
+    const merkleTree = makerAcc.merkleTree;
+
+    hotspotPubkeysRaw.push({
+      id: maker.address,
+      maker: makerKeyp,
+      makerAuthority: solAddr,
+      collection: makerAcc.collection,
+      collectionMetadata: PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("metadata", "utf-8"),
+          TOKEN_METATDATA_PROGRAM_ID.toBuffer(),
+          makerAcc.collection.toBuffer(),
+        ],
+        TOKEN_METATDATA_PROGRAM_ID
+      )[0],
+      collectionMasterEdition: PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("metadata", "utf-8"),
+          TOKEN_METATDATA_PROGRAM_ID.toBuffer(),
+          makerAcc.collection.toBuffer(),
+          Buffer.from("edition", "utf-8"),
+        ],
+        TOKEN_METATDATA_PROGRAM_ID
+      )[0],
+      treeAuthority: PublicKey.findProgramAddressSync(
+        [merkleTree.toBuffer()],
+        BUBBLEGUM_PROGRAM_ID
+      )[0],
+      merkleTree,
+    });
+  }
   const hotspotPubkeys: Record<
     string,
     {
@@ -225,47 +264,7 @@ async function run() {
       treeAuthority: PublicKey;
       merkleTree: PublicKey;
     }
-  > = (
-    await Promise.all(
-      makers.map(async (maker) => {
-        const helAddr = Address.fromB58(maker.address);
-        const solAddr = new PublicKey(helAddr.publicKey);
-        const makerKeyp = makerKey(maker.name)[0];
-
-        const makerAcc = await hemProgram.account.makerV0.fetch(makerKeyp);
-        const merkleTree = makerAcc.merkleTree;
-
-        return {
-          id: maker.address,
-          maker: makerKeyp,
-          makerAuthority: solAddr,
-          collection: makerAcc.collection,
-          collectionMetadata: PublicKey.findProgramAddressSync(
-            [
-              Buffer.from("metadata", "utf-8"),
-              TOKEN_METATDATA_PROGRAM_ID.toBuffer(),
-              makerAcc.collection.toBuffer(),
-            ],
-            TOKEN_METATDATA_PROGRAM_ID
-          )[0],
-          collectionMasterEdition: PublicKey.findProgramAddressSync(
-            [
-              Buffer.from("metadata", "utf-8"),
-              TOKEN_METATDATA_PROGRAM_ID.toBuffer(),
-              makerAcc.collection.toBuffer(),
-              Buffer.from("edition", "utf-8"),
-            ],
-            TOKEN_METATDATA_PROGRAM_ID
-          )[0],
-          treeAuthority: PublicKey.findProgramAddressSync(
-            [merkleTree.toBuffer()],
-            BUBBLEGUM_PROGRAM_ID
-          )[0],
-          merkleTree,
-        };
-      })
-    )
-  ).reduce((acc, cur) => {
+  > = hotspotPubkeysRaw.reduce((acc, cur) => {
     acc[cur.id] = cur;
     return acc;
   }, {});
@@ -274,7 +273,6 @@ async function run() {
 
   const dataCredits = dataCreditsKey(dc)[0];
   const dcCircuitBreaker = mintWindowedBreakerKey(dc)[0];
-  const dao = daoKey(hnt)[0];
   const entityCreator = entityCreatorKey(dao)[0];
   const subDao = subDaoKey(iot)[0];
   const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
@@ -308,6 +306,8 @@ async function run() {
   const accounts = state.accounts as Record<string, any>;
   const hotspots = Object.entries(state.hotspots) as [string, any][];
 
+  const blockhash = await provider.connection.getLatestBlockhash();
+
   // Keep track of balances so we can send that balance to the lazy signer
   const totalBalances = {
     hnt: new BN(0),
@@ -337,12 +337,43 @@ async function run() {
   const ataRent = await provider.connection.getMinimumBalanceForRentExemption(
     ACCOUNT_SIZE
   );
-  const infoRent = await provider.connection.getMinimumBalanceForRentExemption(
-    32 + 32 + 1 + 8 + 4 + 4 + 1 + 60
-  );
+  const iotInfoRent =
+    await provider.connection.getMinimumBalanceForRentExemption(
+      8 +
+        32 + // asset
+        1 + // bump
+        1 +
+        8 + // location
+        1 +
+        4 + // elevation
+        1 +
+        4 + // gain
+        1 + // is full hotspot
+        2 + // num location assers
+        60 // pad
+    );
+  const mobileInfoRent =
+    await provider.connection.getMinimumBalanceForRentExemption(
+      8 +
+        32 + // asset
+        1 + // bump
+        1 +
+        8 + // location
+        1 +
+        4 + // elevation
+        1 +
+        4 + // gain
+        1 + // is full hotspot
+        2 + // num location assers
+        60 // pad
+    );
   const keyToAssetRent =
     await provider.connection.getMinimumBalanceForRentExemption(
-      32 + 32 + 33 * 8 + 8 + 1
+      8 +
+        32 + // dao
+        32 + // asset
+        33 + // entity key
+        1 // bump seed
     );
   const PER_TX = 0.000005;
   const dustAmount =
@@ -434,7 +465,7 @@ async function run() {
   for (const [hotspotKey, hotspot] of hotspots) {
     const solAddress = toSolana(hotspot.owner);
     totalBalances.sol = totalBalances.sol
-      .add(new BN(infoRent))
+      .add(new BN(iotInfoRent))
       .add(new BN(keyToAssetRent));
     const makerId = hotspot.maker || helAddr.b58; // Default (fallthrough) maker
 
@@ -470,7 +501,7 @@ async function run() {
       let remainingAccounts = [];
       // Onboard to mobile if this is also a mobile hotspot
       if (makerId == bobcat5G.address || makerId == freedomFi.address) {
-        totalBalances.sol = totalBalances.sol.add(new BN(infoRent));
+        totalBalances.sol = totalBalances.sol.add(new BN(mobileInfoRent));
         const mobileInfo = PublicKey.findProgramAddressSync(
           [
             Buffer.from("mobile_info", "utf-8"),
@@ -561,7 +592,7 @@ async function run() {
   const accountIxs: EnrichedIxGroup[] = [];
   /// Iterate through accounts in order so we don't create 1mm promises.
   for (const [address, account] of Object.entries(accounts)) {
-    const solAddress = toSolana(address);
+    const solAddress: PublicKey | undefined = toSolana(address);
     const isRouter = routers.has(address);
 
     if (isRouter) {
@@ -600,7 +631,9 @@ async function run() {
       const tokenIxs = [];
       const hntBal = new BN(account.hnt);
       const dcBal = new BN(account.dc);
-      const mobileBal = new BN(account.mobile);
+      // Helium uses 8 decimals, we use 6
+      const digitShift = new BN(100);
+      const mobileBal = new BN(account.mobile).div(digitShift);
       const hstBal = new BN(account.hst);
       const zero = new BN(0);
       if (hntBal.gt(zero)) {
@@ -753,7 +786,7 @@ async function run() {
     password: argv.pgPassword,
     host: argv.pgHost,
     database: argv.pgDatabase,
-    port: argv.pgPort,
+    port: Number(argv.pgPort),
     // ssl: {
     //   rejectUnauthorized: false,
     // },
@@ -793,11 +826,69 @@ async function run() {
     `Merkle tree depth: ${merkleTree.depth - 1}, canopy depth: ${canopyDepth}`
   );
 
+  console.log("Creating tree");
+  const canopySize = getCanopySize(canopyDepth);
+  const canopyRent =
+    await provider.connection.getMinimumBalanceForRentExemption(canopySize);
+  const canopyAcc = await provider.connection.getAccountInfo(canopy.publicKey);
+  if (!canopyAcc) {
+    await sendInstructions(
+      provider,
+      [
+        SystemProgram.createAccount({
+          fromPubkey: provider.wallet.publicKey,
+          newAccountPubkey: canopy.publicKey,
+          space: canopySize,
+          lamports: canopyRent,
+          programId: lazyTransactionsProgram.programId,
+        }),
+      ],
+      [canopy]
+    );
+  }
+  const ltKey = lazyTransactionsKey(argv.name)[0];
+  if (await provider.connection.getAccountInfo(ltKey)) {
+    await lazyTransactionsProgram.methods
+      .updateLazyTransactionsV0({
+        root: merkleTree.getRoot().toJSON().data,
+        authority: provider.wallet.publicKey,
+      })
+      .accounts({
+        lazyTransactions: ltKey,
+        canopy: canopy.publicKey,
+      })
+      .rpc({ skipPreflight: true });
+  } else {
+    await lazyTransactionsProgram.methods
+      .initializeLazyTransactionsV0({
+        root: merkleTree.getRoot().toJSON().data,
+        name: argv.name,
+        authority: provider.wallet.publicKey,
+        maxDepth: merkleTree.depth - 1,
+      })
+      .accounts({
+        canopy: canopy.publicKey,
+      })
+      .rpc({ skipPreflight: true });
+  }
+
+  console.log(
+    `Created lazy transactions ${lazyTransactionsKey(argv.name)[0]} ${
+      argv.name
+    }`
+  );
+
   console.log("Creating tables");
   await client.query(`
     CREATE TABLE IF NOT EXISTS lookup_tables (
       id INTEGER PRIMARY KEY NOT NULL,
       pubkey VARCHAR(66) NOT NULL
+    )
+  `);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS canopy (
+      id INTEGER PRIMARY KEY NOT NULL,
+      bytes bytea NOT NULL
     )
   `);
   await client.query(`
@@ -897,11 +988,11 @@ async function run() {
   );
   pgProgressTransactions && pgProgressTransactions.stop();
 
-  const walletRows = compiledTransactions
-    .map((compiledTransaction, index) => {
-      return [...flatTransactions[index].wallets].map((wallet) => [
+  const walletRows = flatTransactions
+    .map((flatTransaction, index) => {
+      return Array.from(flatTransaction.wallets).map((wallet) => [
         wallet,
-        compiledTransaction.index,
+        index,
       ]);
     })
     .flat();
@@ -936,63 +1027,27 @@ async function run() {
   );
   pgProgressWallets && pgProgressWallets.stop();
 
-  const ltKey = lazyTransactionsKey(argv.name)[0];
-  if (await provider.connection.getAccountInfo(ltKey)) {
-    await lazyTransactionsProgram.methods
-      .updateLazyTransactionsV0({
-        root: merkleTree.getRoot().toJSON().data,
-        authority: provider.wallet.publicKey,
-      })
-      .accounts({
-        lazyTransactions: ltKey,
-      })
-      .rpc({ skipPreflight: true });
-    await fillCanopy({
-      program: lazyTransactionsProgram,
-      lazyTransactions: ltKey,
-      merkleTree,
-      cacheDepth: canopyDepth,
-      showProgress: argv.progress,
-    });
-  } else {
-    const canopySize = getCanopySize(canopyDepth);
-    const canopyRent =
-      await provider.connection.getMinimumBalanceForRentExemption(canopySize);
-    await lazyTransactionsProgram.methods
-      .initializeLazyTransactionsV0({
-        root: merkleTree.getRoot().toJSON().data,
-        name: argv.name,
-        authority: provider.wallet.publicKey,
-        maxDepth: merkleTree.depth - 1,
-      })
-      .accounts({
-        canopy: canopy.publicKey,
-      })
-      .preInstructions([
-        SystemProgram.createAccount({
-          fromPubkey: provider.wallet.publicKey,
-          newAccountPubkey: canopy.publicKey,
-          space: canopySize,
-          lamports: canopyRent,
-          programId: lazyTransactionsProgram.programId,
-        }),
-      ])
-      .signers([canopy])
-      .rpc({ skipPreflight: true });
+  console.log("inserting canopy");
+  const canopyRows = getCanopy({
+    merkleTree,
+    cacheDepth: canopyDepth,
+  }).map((canopy, index) => [index, canopy.node]);
 
-    await fillCanopy({
-      program: lazyTransactionsProgram,
-      lazyTransactions: ltKey,
-      merkleTree,
-      cacheDepth: canopyDepth,
-      showProgress: argv.progress,
-    });
-  }
-
-  console.log(
-    `Created lazy transactions ${lazyTransactionsKey(argv.name)[0]} ${
-      argv.name
-    }`
+  await Promise.all(
+    chunks(chunks(canopyRows, chunkSize), parallelism).map(async (chunk) => {
+      for (const c of chunk) {
+        const query = format(
+          `
+          INSERT INTO canopy(
+            id, bytes
+          )
+          VALUES %L
+        `,
+          c
+        );
+        await client.query(query);
+      }
+    })
   );
 
   console.log(`Lazy transactions signer ${lazySigner} needs:
@@ -1021,7 +1076,6 @@ async function run() {
     STAKED HNT: ${routerBalances.stakedHnt.toString()}
     MOBILE: ${routerBalances.mobile.toString()}
   `);
-  const finish = new Date().valueOf();
 
   console.log("Loading up lazy signer with hnt, dc, mobile...");
   const me = provider.wallet.publicKey;
@@ -1077,6 +1131,17 @@ async function run() {
   ];
   await sendInstructions(provider, transfers);
 
+  console.log("Filling canopy, this may fail. Then use fill-canopy script");
+  await fillCanopy({
+    program: lazyTransactionsProgram,
+    lazyTransactions: ltKey,
+    merkleTree,
+    cacheDepth: canopyDepth,
+    showProgress: argv.progress,
+  });
+
+  const finish = new Date().valueOf();
+  
   console.log(`Finished in ${finish - start}ms`);
 }
 
@@ -1177,7 +1242,7 @@ function packTransactions(
       currTx = {
         size: baseTxSize + ix.size,
         compute: ix.compute,
-        wallets: new Set(ix.wallet),
+        wallets: new Set([ix.wallet]),
         instructions: ix.instructions,
         signerSeeds: ix.signerSeeds,
         isRouter: ix.isRouter,

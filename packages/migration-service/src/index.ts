@@ -168,18 +168,6 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
                 })),
               ])
               .instruction();
-    // console.log(compiledTx.accounts);
-    // console.log(compiledTx.instructions);
-    compiledTx.instructions.forEach(i => {
-      const pid = compiledTx.accounts[i.programIdIndex].pubkey;
-      if (pid.equals(ASSOCIATED_TOKEN_PROGRAM_ID)) {
-        console.log("mint", compiledTx.accounts[i.accounts[3]].pubkey);
-      } else if (pid.equals(TOKEN_PROGRAM_ID)) {
-      // console.log(compiledTx.accounts[i.accounts[1]].pubkey);
-      console.log(transferInstructionData.decode(i.data));
-      }
-
-    })
 
             return {
               id,

@@ -25,21 +25,21 @@ impl anchor_lang::Id for TreasuryManagement {
 pub mod treasury_management {
   use super::*;
 
-  pub fn initialize_treasury_management_v0<'info>(
-    ctx: Context<InitializeTreasuryManagementV0<'info>>,
+  pub fn initialize_treasury_management_v0(
+    ctx: Context<InitializeTreasuryManagementV0>,
     args: InitializeTreasuryManagementArgsV0,
   ) -> Result<()> {
     initialize_treasury_management_v0::handler(ctx, args)
   }
 
-  pub fn update_treasury_management_v0<'info>(
-    ctx: Context<UpdateTreasuryManagementV0<'info>>,
+  pub fn update_treasury_management_v0(
+    ctx: Context<UpdateTreasuryManagementV0>,
     args: UpdateTreasuryManagementArgsV0,
   ) -> Result<()> {
     update_treasury_management_v0::handler(ctx, args)
   }
 
-  pub fn redeem_v0<'info>(ctx: Context<RedeemV0<'info>>, args: RedeemArgsV0) -> Result<()> {
+  pub fn redeem_v0(ctx: Context<RedeemV0>, args: RedeemArgsV0) -> Result<()> {
     redeem_v0::handler(ctx, args)
   }
 }

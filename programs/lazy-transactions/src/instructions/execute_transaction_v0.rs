@@ -68,7 +68,7 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
     .collect::<Vec<_>>();
 
   fill_in_proof_from_canopy(
-    ctx.accounts.canopy.try_borrow_data()?.as_ref(),
+    &ctx.accounts.canopy.try_borrow_data()?[1..],
     ctx.accounts.lazy_transactions.max_depth,
     args.index,
     &mut proof,

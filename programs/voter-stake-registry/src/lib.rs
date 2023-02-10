@@ -123,8 +123,8 @@ pub mod voter_stake_registry {
     instructions::set_time_offset_v0::handler(ctx, time_offset)
   }
 
-  pub fn cast_vote_v0<'a, 'b, 'c, 'info>(
-    ctx: Context<'a, 'b, 'c, 'info, CastVoteV0<'info>>,
+  pub fn cast_vote_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, CastVoteV0<'info>>,
     args: CastVoteArgsV0,
   ) -> Result<()> {
     instructions::cast_vote_v0::handler(ctx, args)
