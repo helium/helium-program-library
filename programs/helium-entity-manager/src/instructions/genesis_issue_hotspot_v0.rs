@@ -150,6 +150,7 @@ pub fn handler<'info>(
 
   let maker_seeds: &[&[&[u8]]] = &[&[
     b"maker",
+    ctx.accounts.maker.dao.as_ref(),
     ctx.accounts.maker.name.as_bytes(),
     &[ctx.accounts.maker.bump_seed],
   ]];
