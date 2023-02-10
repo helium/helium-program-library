@@ -1,58 +1,7 @@
-use crate::state::*;
+use crate::{position_seeds, state::*};
 use anchor_lang::prelude::*;
 use anchor_spl::metadata::Metadata;
-use anchor_spl::token::Mint;
-use anchor_spl::token::Token;
-use anchor_spl::token::TokenAccount;
-
-#[derive(Accounts)]
-pub struct BurnNft<'info> {
-  /// CHECK: Checked with cpi
-  pub metadata: AccountInfo<'info>,
-  /// CHECK: Checked with cpi  
-  pub owner: AccountInfo<'info>,
-  /// CHECK: Checked with cpi  
-  pub mint: AccountInfo<'info>,
-  /// CHECK: Checked with cpi  
-  pub token: AccountInfo<'info>,
-  /// CHECK: Checked with cpi  
-  pub spl_token: AccountInfo<'info>,
-  /// CHECK: Checked with cpi  
-  pub edition: AccountInfo<'info>,
-  /// CHECK: Checked with cpi
-  pub collection_metadata: AccountInfo<'info>,
-}
-
-pub fn burn_nft<'a, 'b, 'c, 'info>(
-  ctx: CpiContext<'a, 'b, 'c, 'info, BurnNft<'info>>,
-) -> Result<()> {
-  let ix = mpl_token_metadata::instruction::burn_nft(
-    mpl_token_metadata::ID,
-    *ctx.accounts.metadata.key,
-    *ctx.accounts.owner.key,
-    *ctx.accounts.mint.key,
-    *ctx.accounts.token.key,
-    *ctx.accounts.edition.key,
-    *ctx.accounts.spl_token.key,
-    Some(*ctx.accounts.collection_metadata.key),
-  );
-
-  solana_program::program::invoke_signed(
-    &ix,
-    &[
-      ctx.accounts.metadata.clone(),
-      ctx.accounts.mint.clone(),
-      ctx.accounts.owner.clone(),
-      ctx.accounts.token.clone(),
-      ctx.accounts.edition.clone(),
-      ctx.program.clone(),
-      ctx.accounts.spl_token.clone(),
-      ctx.accounts.collection_metadata.clone(),
-    ],
-    ctx.signer_seeds,
-  )
-  .map_err(|e| e.into())
-}
+use anchor_spl::token::{self, Burn, Mint, ThawAccount, Token, TokenAccount};
 
 #[derive(Accounts)]
 pub struct ClosePositionV0<'info> {
@@ -95,14 +44,6 @@ pub struct ClosePositionV0<'info> {
   )]
   /// CHECK: Checked by cpi
   pub metadata: UncheckedAccount<'info>,
-  /// CHECK: Handled by cpi
-  #[account(
-    mut,
-    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), mint.key().as_ref(), "edition".as_bytes()],
-    seeds::program = token_metadata_program.key(),
-    bump,
-  )]
-  pub master_edition: UncheckedAccount<'info>,
   #[account(
     mut,
     token::mint = mint,
@@ -117,25 +58,29 @@ pub struct ClosePositionV0<'info> {
 
 /// Close an empty position
 pub fn handler(ctx: Context<ClosePositionV0>) -> Result<()> {
-  burn_nft(CpiContext::new(
-    ctx
-      .accounts
-      .token_metadata_program
-      .to_account_info()
-      .clone(),
-    BurnNft {
-      metadata: ctx.accounts.metadata.to_account_info().clone(),
-      owner: ctx.accounts.position_authority.to_account_info().clone(),
-      mint: ctx.accounts.mint.to_account_info().clone(),
-      token: ctx
-        .accounts
-        .position_token_account
-        .to_account_info()
-        .clone(),
-      spl_token: ctx.accounts.token_program.to_account_info().clone(),
-      edition: ctx.accounts.master_edition.to_account_info().clone(),
-      collection_metadata: ctx.accounts.collection_metadata.to_account_info().clone(),
-    },
-  ))?;
+  let signer_seeds: &[&[&[u8]]] = &[position_seeds!(ctx.accounts.position)];
+  token::thaw_account(
+    CpiContext::new(
+      ctx.accounts.token_program.to_account_info(),
+      ThawAccount {
+        account: ctx.accounts.position_token_account.to_account_info(),
+        mint: ctx.accounts.mint.to_account_info(),
+        authority: ctx.accounts.position.to_account_info(),
+      },
+    )
+    .with_signer(signer_seeds),
+  )?;
+
+  token::burn(
+    CpiContext::new(
+      ctx.accounts.token_program.to_account_info(),
+      Burn {
+        mint: ctx.accounts.mint.to_account_info(),
+        from: ctx.accounts.position_token_account.to_account_info(),
+        authority: ctx.accounts.position_authority.to_account_info(),
+      },
+    ),
+    1,
+  )?;
   Ok(())
 }
