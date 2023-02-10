@@ -1,4 +1,4 @@
-import { AnchorProvider, Program, Idl } from "@coral-xyz/anchor";
+import { AnchorProvider, Program, Provider } from "@coral-xyz/anchor";
 import {
   Commitment,
   Connection,
@@ -11,8 +11,12 @@ import {
   SimulatedTransactionResponse,
   Transaction,
   TransactionInstruction,
+  TransactionResponse,
   TransactionSignature,
+  VersionedTransactionResponse,
 } from "@solana/web3.js";
+import { chunks } from "./accountFetchCache";
+import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
 
 async function sleep(ms: number): Promise<void> {
@@ -56,7 +60,7 @@ export async function sendInstructions(
 
   let tx = new Transaction();
   tx.recentBlockhash = (
-    await provider.connection.getRecentBlockhash()
+    await provider.connection.getLatestBlockhash()
   ).blockhash;
   tx.feePayer = payer || provider.wallet.publicKey;
   tx.add(...instructions);
@@ -106,7 +110,7 @@ export async function sendMultipleInstructions(
   idlErrors: Map<number, string> = new Map()
 ): Promise<Iterable<string>> {
   const recentBlockhash = (
-    await provider.connection.getRecentBlockhash("confirmed")
+    await provider.connection.getLatestBlockhash("confirmed")
   ).blockhash;
 
   const ixAndSigners = instructionGroups
@@ -227,6 +231,8 @@ export async function executeBig<Output>(
 function getUnixTime(): number {
   return new Date().valueOf() / 1000;
 }
+
+const SEND_TRANSACTION_INTERVAL = 10;
 
 export const awaitTransactionSignatureConfirmation = async (
   txid: TransactionSignature,
@@ -431,4 +437,184 @@ export function stringToTransaction(solanaTransaction: string) {
 
 export function bufferToTransaction(solanaTransaction: Buffer) {
   return Transaction.from(solanaTransaction);
+}
+
+async function withRetries<A>(
+  tries: number,
+  input: () => Promise<A>
+): Promise<A> {
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await input();
+    } catch (e) {
+      console.log(`Retrying ${i}...`, e);
+    }
+  }
+  throw new Error("Failed after retries")
+}
+
+type Status = {
+  totalProgress: number;
+  currentBatchProgress: number;
+  currentBatchSize: number;
+};
+const TX_BATCH_SIZE = 200;
+export async function bulkSendTransactions(
+  provider: Provider,
+  txs: Transaction[],
+  onProgress?: (status: Status) => void,
+  triesRemaining: number = 10 // Number of blockhashes to try resending txs with before giving up
+): Promise<string[]> {
+  let ret = [];
+
+  // attempt to chunk by blockhash bounds (so signing doesn't take too long)
+  for (let chunk of chunks(txs, TX_BATCH_SIZE)) {
+    const thisRet = [];
+    // Continually send in bulk while resetting blockhash until we send them all
+    while (true) {
+      const recentBlockhash = await withRetries(5, () =>
+        provider.connection.getLatestBlockhash("confirmed")
+      );
+      const signedTxs = await Promise.all(
+        chunk.map(async (tx) => {
+          tx.recentBlockhash = recentBlockhash.blockhash;
+
+          // @ts-ignore
+          const signed = await provider.wallet.signTransaction(tx);
+          tx.signatures[0].signature;
+          return signed;
+        })
+      );
+      const txsWithSigs = signedTxs.map((tx, index) => {
+        return {
+          transaction: chunk[index],
+          sig: bs58.encode(tx.signatures[0].signature),
+        };
+      });
+      const confirmedTxs = await bulkSendRawTransactions(
+        provider.connection,
+        signedTxs.map((s) => s.serialize()),
+        ({ totalProgress, ...rest }) =>
+          onProgress &&
+          onProgress({ ...rest, totalProgress: totalProgress + ret.length }),
+        recentBlockhash.lastValidBlockHeight
+      );
+      thisRet.push(...confirmedTxs);
+      if (confirmedTxs.length == signedTxs.length) {
+        break;
+      }
+
+      const retSet = new Set(thisRet);
+
+      chunk = txsWithSigs
+        .filter(({ sig }) => !retSet.has(sig))
+        .map(({ transaction }) => transaction);
+
+      triesRemaining--;
+      if (triesRemaining <= 0) {
+        throw new Error(
+          `Failed to submit all txs after blockhashes expired`
+        );
+      }
+    }
+    ret.push(...thisRet);
+  }
+
+  return ret;
+}
+
+// Returns the list of succesfully sent txns
+// NOTE: The return signatures are ordered by confirmation, not by order they are passed
+// This list should be in order. Seom txns may fail
+// due to blockhash exp
+export async function bulkSendRawTransactions(
+  connection: Connection,
+  txs: Buffer[],
+  onProgress?: (status: Status) => void,
+  lastValidBlockHeight?: number
+): Promise<string[]> {
+  const txBatchSize = TX_BATCH_SIZE;
+  let totalProgress = 0;
+  const ret = [];
+  if (!lastValidBlockHeight) {
+    const blockhash = await withRetries(5, () =>
+      connection.getLatestBlockhash("confirmed")
+    );
+    lastValidBlockHeight = blockhash.lastValidBlockHeight;
+  }
+
+  for (let chunk of chunks(txs, txBatchSize)) {
+    let currentBatchProgress = 0;
+
+    let pendingCount = txs.length;
+    let txids: string[] = [];
+    let lastRetry = 0;
+
+    while (pendingCount > 0) {
+      if (
+        (await withRetries(5, () => connection.getBlockHeight())) >
+        lastValidBlockHeight
+      ) {
+        return ret;
+      }
+
+      // only resend txs every 4s
+      if (lastRetry < new Date().valueOf() - 4 * 1000) {
+        lastRetry = new Date().valueOf();
+        txids = [];
+        for (const tx of chunk) {
+          const txid = await connection.sendRawTransaction(tx, {
+            skipPreflight: true,
+          });
+          txids.push(txid);
+        }
+      }
+
+      const statuses = await getAllTxns(connection, txids);
+      const completed = statuses.filter((status) => status !== null);
+      totalProgress += completed.length;
+      currentBatchProgress += completed.length;
+      onProgress &&
+        onProgress({
+          totalProgress: totalProgress,
+          currentBatchProgress: currentBatchProgress,
+          currentBatchSize: txBatchSize,
+        });
+      const failures = completed
+        .map((status) => status !== null && status.meta?.err)
+        .filter(truthy);
+
+      if (failures.length > 0) {
+        console.error(failures);
+        throw new Error("Failed to run txs");
+      }
+      pendingCount -= completed.length;
+      chunk = chunk.filter((_, index) => statuses[index] === null);
+      ret.push(
+        ...completed
+          .map((status, idx) => (status ? txids[idx] : null))
+          .filter(truthy)
+      );
+      await sleep(1000); // Wait one seconds before querying again
+    }
+  }
+
+  return ret;
+}
+
+const MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS = 200;
+async function getAllTxns(
+  connection: Connection,
+  txids: string[]
+): Promise<(VersionedTransactionResponse | null)[]> {
+  return (
+    await Promise.all(
+      chunks(txids, MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS).map((txids) =>
+        connection.getTransactions(txids, {
+          maxSupportedTransactionVersion: 0,
+          commitment: "confirmed",
+        })
+      )
+    )
+  ).flat();
 }

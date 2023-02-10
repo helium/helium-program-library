@@ -74,7 +74,7 @@ address = "E7p5KFo8kKCDm6BUnWtnVFkQSYh6ZA6xaGAuvpv8NXTa"
 program = "./deps/clockwork/lib/clockwork_webhook_program.so"
 
 [[test.validator.clone]]
-address = "hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC" # spl governance program
+address = "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S" # spl governance program
 
 [[test.validator.clone]]
 address = "ENmcpFCpxN1CqyUjuog9yyUVfdXBKF3LVCwLr7grJZpk" # required by spl governance 
@@ -91,11 +91,11 @@ address = "SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f"
 [[test.validator.clone]]
 address = "E3cqnoFvTeKKNsGmC8YitpMjo2E39hwfoyt2Aiem7dCb"
 
-# Switchboard aggregator history
+# Switchboard aggregator
 [[test.validator.clone]]
 address = "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
 
-# Switchboard aggregator
+# Switchboard aggregator history
 [[test.validator.clone]]
 address = "Fi8vncGpNKbq62gPo56G4toCehWNy77GgqGkTaAF5Lkk"
 

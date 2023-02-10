@@ -13,7 +13,7 @@ import { MerkleTree, TreeNode } from "./merkleTree";
 import { keccak_256 } from "js-sha3";
 // @ts-ignore
 import { Layout } from "buffer-layout";
-import { chunks, truthy } from "@helium/spl-utils";
+import { chunks, bulkSendTransactions } from "@helium/spl-utils";
 import cliProgress from "cli-progress";
 import * as Collections from "typescript-collections";
 
@@ -153,22 +153,16 @@ export function toLeaf(compiledTransaction: CompiledTransaction): Buffer {
 }
 
 export function getCanopySize(canopyDepth: number): number {
-  return Math.max(((1 << (canopyDepth + 1)) - 2) * 32, 0);
+  return 1 + Math.max(((1 << (canopyDepth + 1)) - 2) * 32, 0);
 }
 
-export async function fillCanopy({
-  program,
-  lazyTransactions,
+export function getCanopy({
   merkleTree,
   cacheDepth,
-  showProgress = false,
 }: {
-  program: Program<LazyTransactions>;
-  lazyTransactions: PublicKey;
   merkleTree: MerkleTree;
   cacheDepth: number;
-  showProgress?: boolean;
-}): Promise<void> {
+}): TreeNode[] {
   let curr = merkleTree.leaves[0];
   while (curr.parent) {
     curr = curr.parent;
@@ -186,7 +180,8 @@ export async function fillCanopy({
 
     if (curr.left) {
       q.enqueue(curr.left);
-    } else if (curr.level >= 1) { // add dummy leaves
+    } else if (curr.level >= 1) {
+      // add dummy leaves
       q.enqueue({
         node: Buffer.alloc(32),
         left: undefined,
@@ -194,7 +189,7 @@ export async function fillCanopy({
         parent: curr,
         level: curr.level - 1,
         id: 0,
-      })
+      });
     }
 
     if (curr.right) {
@@ -213,6 +208,26 @@ export async function fillCanopy({
     canopy.push(curr);
   }
   canopy.shift(); // remove root
+  return canopy;
+};
+
+export async function fillCanopy({
+  program,
+  lazyTransactions,
+  merkleTree,
+  cacheDepth,
+  showProgress = false,
+}: {
+  program: Program<LazyTransactions>;
+  lazyTransactions: PublicKey;
+  merkleTree: MerkleTree;
+  cacheDepth: number;
+  showProgress?: boolean;
+}): Promise<void> {
+  const canopy = getCanopy({
+    merkleTree,
+    cacheDepth
+  })
 
   // Write 30 leaves at a time
   const lazyTransactionsAcc = await program.account.lazyTransactionsV0.fetch(
@@ -220,7 +235,7 @@ export async function fillCanopy({
   );
   const chunkSize = 30;
   const canopyChunks = chunks(canopy, chunkSize);
-  let progress;
+  let progress: cliProgress.SingleBar;
   if (showProgress) {
     console.log("Setting canopy");
     progress = new cliProgress.SingleBar(
@@ -252,65 +267,11 @@ export async function fillCanopy({
   );
 
   // Bulk send txs
-  const txBatchSize = 200;
-  for (let chunk of chunks(txs, txBatchSize)) {
-    let pendingCount = txBatchSize;
-    let txids: string[] = [];
-    let lastRetry = 0;
-    let recentBlockhash = (
-      await program.provider.connection.getLatestBlockhash()
-    );
-    while (pendingCount > 0) {
-      const blockHeight = await program.provider.connection.getBlockHeight();
-      if (blockHeight <= recentBlockhash.lastValidBlockHeight) {
-        recentBlockhash = (
-          await program.provider.connection.getLatestBlockhash()
-        );
-      }
-      // only resend txs every 4s
-      if (lastRetry < new Date().valueOf() - 4 * 1000) {
-        lastRetry = new Date().valueOf();
-        txids = await Promise.all(
-          chunk.map(async (tx) => {
-            tx.recentBlockhash = recentBlockhash.blockhash;
-            // @ts-ignore
-            const signed = await program.provider.wallet.signTransaction(tx);
-            return await program.provider.connection.sendRawTransaction(
-              signed.serialize(),
-              {skipPreflight: true}
-            );
-          })
-        );
-      }
-
-      const statuses = await getAllTxns(program.provider.connection, txids);
-      const completed = statuses.filter((status) => status !== null);
-      const failures = completed
-        .map((status) => status !== null && status.meta?.err)
-        .filter(truthy);
-      if (failures.length > 0) {
-        console.error(failures);
-        throw new Error("Failed to fill canopy");
-      }
-      pendingCount -= completed.length;
-      chunk = chunk.filter((_, index) => !statuses[index]);
-    }
-    progress && progress.increment(txBatchSize * chunkSize);
-  }
-}
-
-const MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS = 256;
-async function getAllTxns(
-  connection: Connection,
-  txids: string[]
-): Promise<(TransactionResponse | null)[]> {
-  return (
-    await Promise.all(
-      chunks(txids, MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS).map((txids) =>
-        connection.getTransactions(txids, "confirmed")
-      )
-    )
-  ).flat();
+  await bulkSendTransactions(
+    program.provider,
+    txs,
+    ({ totalProgress }) => progress && progress.update(totalProgress * chunkSize)
+  )
 }
 
 export type LazyTransaction = {

@@ -1,60 +1,42 @@
+import * as anchor from "@coral-xyz/anchor";
 import { thresholdPercent, ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
-  rewardableEntityConfigKey,
-  init as initHem,
+  init as initHem, rewardableEntityConfigKey
 } from "@helium/helium-entity-manager-sdk";
 import {
   daoKey,
   init as initDao,
   subDaoKey,
-  threadKey,
+  threadKey
 } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
-  lazyDistributorKey,
+  lazyDistributorKey
 } from "@helium/lazy-distributor-sdk";
-import {
-  registrarKey,
-  init as initVsr,
-} from "@helium/voter-stake-registry-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";
-import * as anchor from "@coral-xyz/anchor";
-import { idlAddress } from "@coral-xyz/anchor/dist/cjs/idl";
 import {
-  getConcurrentMerkleTreeAccountSize,
-  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-} from "@solana/spl-account-compression";
+  init as initVsr, registrarKey
+} from "@helium/voter-stake-registry-sdk";
+import {
+  getGovernanceProgramVersion, getTokenOwnerRecordAddress, GovernanceConfig,
+  GoverningTokenConfigAccountArgs, GoverningTokenType, MintMaxVoteWeightSource, SetRealmAuthorityAction, VoteThreshold,
+  VoteThresholdType,
+  VoteTipping, withCreateGovernance, withCreateRealm, withSetRealmAuthority
+} from "@solana/spl-governance";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
   Cluster,
-  ComputeBudgetProgram,
-  Keypair,
-  PublicKey,
+  ComputeBudgetProgram, PublicKey,
   SystemProgram,
-  TransactionInstruction,
+  TransactionInstruction
 } from "@solana/web3.js";
 import { OracleJob } from "@switchboard-xyz/common";
 import {
   AggregatorHistoryBuffer,
   QueueAccount,
-  SwitchboardProgram,
+  SwitchboardProgram
 } from "@switchboard-xyz/solana.js";
-import {
-  getGovernanceProgramVersion,
-  MintMaxVoteWeightSource,
-  withCreateRealm,
-  GoverningTokenType,
-  VoteThreshold,
-  VoteThresholdType,
-  VoteTipping,
-  GovernanceConfig,
-  GoverningTokenConfigAccountArgs,
-  withCreateGovernance,
-  withSetRealmAuthority,
-  SetRealmAuthorityAction,
-  getTokenOwnerRecordAddress,
-} from "@solana/spl-governance";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
@@ -64,7 +46,7 @@ import {
   getUnixTimestamp,
   isLocalhost,
   loadKeypair,
-  sendInstructionsOrCreateProposal,
+  sendInstructionsOrCreateProposal
 } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
@@ -109,6 +91,9 @@ const yarg = yargs(hideBin(process.argv)).options({
     type: "string",
     describe: "Keypair of the subdao token",
     required: true,
+  },
+  executeProposal: {
+    type: "boolean",
   },
   numTokens: {
     type: "number",
@@ -169,6 +154,10 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "The switchboard network",
     default: "devnet",
   },
+  decimals: {
+    type: "number",
+    default: 6
+  },
   startEpochRewards: {
     type: "number",
     describe: "The starting epoch rewards (yearly)",
@@ -177,7 +166,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   govProgramId: {
     type: "string",
     describe: "Pubkey of the GOV program",
-    default: "hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC",
+    default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
   },
   councilKeypair: {
     type: "string",
@@ -266,6 +255,7 @@ async function run() {
     provider,
     mintKeypair: subdaoKeypair,
     amount: argv.numTokens,
+    decimals: argv.decimals,
     metadataUrl: `${argv.bucket}/${name.toLowerCase()}.json`,
     mintAuthority: daoAcc.authority,
     freezeAuthority: daoAcc.authority,
@@ -537,7 +527,7 @@ async function run() {
         // Linear curve
         treasuryCurve: {
           exponentialCurveV0: {
-            k: toU128(1),
+            k: toU128(0),
           },
         } as any,
         // 20% in a day
@@ -574,6 +564,7 @@ async function run() {
         govProgramId,
         proposalName: `Create ${name} SubDAO`,
         votingMint: councilKeypair.publicKey,
+        executeProposal: argv.executeProposal,
       });
     }
 
@@ -642,6 +633,7 @@ async function run() {
       govProgramId,
       proposalName: `Create ${name} RewardableEntityConfig`,
       votingMint: councilKeypair.publicKey,
+      executeProposal: argv.executeProposal,
     });
   }
 }

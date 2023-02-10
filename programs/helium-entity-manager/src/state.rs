@@ -46,6 +46,7 @@ pub struct MakerV0 {
   pub collection: Pubkey, // The metaplex collection to be issued
   pub merkle_tree: Pubkey,
   pub collection_bump_seed: u8,
+  pub dao: Pubkey,
 }
 
 #[account]
@@ -77,6 +78,15 @@ pub struct IotHotspotInfoV0 {
   pub is_full_hotspot: bool,
   pub num_location_asserts: u16,
 }
+pub const IOT_HOTSPOT_INFO_SIZE: usize = 8 +
+    32 + // asset
+    1 + // bump
+    1 + 8 + // location
+    1 + 4 + // elevation
+    1 + 4 +// gain
+    1 + // is full hotspot
+    2 + // num location assers
+    60; // pad
 
 #[account]
 #[derive(Default)]
@@ -88,3 +98,10 @@ pub struct MobileHotspotInfoV0 {
   pub is_full_hotspot: bool,
   pub num_location_asserts: u16,
 }
+pub const MOBILE_HOTSPOT_INFO_SIZE: usize = 8 +
+    32 + // asset
+    1 + // bump
+    1 + 8 + // location
+    1 + // is full hotspot
+    2 + // num location assers
+    60; // pad
