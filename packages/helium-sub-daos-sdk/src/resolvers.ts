@@ -24,8 +24,8 @@ export const subDaoEpochInfoResolver = resolveIndividual(
         registrar = await vsr.account.registrar.fetch(accounts.registrar as PublicKey);
       } catch (e: any) {
         // ignore. It's fine, we just won't use time offset which is only used in testing cases
+        console.error(e)
       }
-      
       const clock = await provider.connection.getAccountInfo(
         SYSVAR_CLOCK_PUBKEY
       );
