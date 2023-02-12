@@ -2,12 +2,12 @@ use crate::{
   construct_calculate_kickoff_ix, construct_issue_rewards_kickoff_ix, create_end_epoch_cron,
   current_epoch, state::*,
 };
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::native_token::LAMPORTS_PER_SOL};
 use anchor_spl::token::Token;
 use circuit_breaker::CircuitBreaker;
 use clockwork_sdk::{
-  cpi::{automation_reset, automation_update},
-  state::{Automation, AutomationSettings, Trigger},
+  cpi::{automation_create, automation_reset, automation_update},
+  state::{AutomationSettings, Trigger},
   AutomationProgram,
 };
 
@@ -24,20 +24,22 @@ pub struct ResetSubDaoAutomationV0<'info> {
     has_one = dao,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
+  ///CHECK: seeds checked
   #[account(
     mut,
     seeds = [b"automation", sub_dao.key().as_ref(), b"calculate"],
     seeds::program = clockwork.key(),
     bump
   )]
-  pub calculate_automation: Account<'info, Automation>,
+  pub calculate_automation: AccountInfo<'info>,
+  ///CHECK: seeds checked
   #[account(
     mut,
     seeds = [b"automation", sub_dao.key().as_ref(), b"issue"],
     seeds::program = clockwork.key(),
     bump
   )]
-  pub issue_automation: Account<'info, Automation>,
+  pub issue_automation: AccountInfo<'info>,
   pub clockwork: Program<'info, AutomationProgram>,
 
   pub system_program: Program<'info, System>,
@@ -66,35 +68,59 @@ pub fn handler(ctx: Context<ResetSubDaoAutomationV0>) -> Result<()> {
   ]];
 
   // reset calculate automation
-  automation_reset(CpiContext::new_with_signer(
-    ctx.accounts.clockwork.to_account_info(),
-    clockwork_sdk::cpi::AutomationReset {
-      authority: ctx.accounts.sub_dao.to_account_info(),
-      automation: ctx.accounts.calculate_automation.to_account_info(),
-    },
-    signer_seeds,
-  ))?;
-  automation_update(
-    CpiContext::new_with_signer(
-      ctx.accounts.clockwork.to_account_info(),
-      clockwork_sdk::cpi::AutomationUpdate {
-        authority: ctx.accounts.sub_dao.to_account_info(),
-        automation: ctx.accounts.calculate_automation.to_account_info(),
-        system_program: ctx.accounts.system_program.to_account_info(),
-      },
-      signer_seeds,
-    ),
-    AutomationSettings {
-      name: None,
-      fee: None,
-      instructions: Some(vec![calculate_ix.into()]),
-      rate_limit: None,
-      trigger: Some(Trigger::Cron {
+  if ctx.accounts.calculate_automation.data_is_empty()
+    && ctx.accounts.calculate_automation.lamports() == 0
+  {
+    automation_create(
+      CpiContext::new_with_signer(
+        ctx.accounts.clockwork.to_account_info(),
+        clockwork_sdk::cpi::AutomationCreate {
+          authority: ctx.accounts.sub_dao.to_account_info(),
+          payer: ctx.accounts.authority.to_account_info(),
+          automation: ctx.accounts.calculate_automation.to_account_info(),
+          system_program: ctx.accounts.system_program.to_account_info(),
+        },
+        signer_seeds,
+      ),
+      LAMPORTS_PER_SOL / 100,
+      "calculate".as_bytes().to_vec(),
+      vec![calculate_ix.into()],
+      Trigger::Cron {
         schedule: cron,
         skippable: false,
-      }),
-    },
-  )?;
+      },
+    )?;
+  } else {
+    automation_reset(CpiContext::new_with_signer(
+      ctx.accounts.clockwork.to_account_info(),
+      clockwork_sdk::cpi::AutomationReset {
+        authority: ctx.accounts.sub_dao.to_account_info(),
+        automation: ctx.accounts.calculate_automation.to_account_info(),
+      },
+      signer_seeds,
+    ))?;
+    automation_update(
+      CpiContext::new_with_signer(
+        ctx.accounts.clockwork.to_account_info(),
+        clockwork_sdk::cpi::AutomationUpdate {
+          authority: ctx.accounts.sub_dao.to_account_info(),
+          automation: ctx.accounts.calculate_automation.to_account_info(),
+          system_program: ctx.accounts.system_program.to_account_info(),
+        },
+        signer_seeds,
+      ),
+      AutomationSettings {
+        name: None,
+        fee: None,
+        instructions: Some(vec![calculate_ix.into()]),
+        rate_limit: None,
+        trigger: Some(Trigger::Cron {
+          schedule: cron,
+          skippable: false,
+        }),
+      },
+    )?;
+  }
 
   // reset the issue automation
   let epoch = current_epoch(curr_ts);
@@ -117,35 +143,61 @@ pub fn handler(ctx: Context<ResetSubDaoAutomationV0>) -> Result<()> {
     ctx.accounts.token_program.key(),
     ctx.accounts.circuit_breaker_program.key(),
   );
-  automation_reset(CpiContext::new_with_signer(
-    ctx.accounts.clockwork.to_account_info(),
-    clockwork_sdk::cpi::AutomationReset {
-      authority: ctx.accounts.sub_dao.to_account_info(),
-      automation: ctx.accounts.issue_automation.to_account_info(),
-    },
-    signer_seeds,
-  ))?;
-  automation_update(
-    CpiContext::new_with_signer(
-      ctx.accounts.clockwork.to_account_info(),
-      clockwork_sdk::cpi::AutomationUpdate {
-        authority: ctx.accounts.sub_dao.to_account_info(),
-        automation: ctx.accounts.issue_automation.to_account_info(),
-        system_program: ctx.accounts.system_program.to_account_info(),
-      },
-      signer_seeds,
-    ),
-    AutomationSettings {
-      name: None,
-      fee: None,
-      instructions: Some(vec![issue_ix.into()]),
-      rate_limit: None,
-      trigger: Some(Trigger::Account {
+
+  if ctx.accounts.issue_automation.data_is_empty() && ctx.accounts.issue_automation.lamports() == 0
+  {
+    automation_create(
+      CpiContext::new_with_signer(
+        ctx.accounts.clockwork.to_account_info(),
+        clockwork_sdk::cpi::AutomationCreate {
+          authority: ctx.accounts.sub_dao.to_account_info(),
+          payer: ctx.accounts.authority.to_account_info(),
+          automation: ctx.accounts.issue_automation.to_account_info(),
+          system_program: ctx.accounts.system_program.to_account_info(),
+        },
+        signer_seeds,
+      ),
+      LAMPORTS_PER_SOL / 100,
+      "issue".as_bytes().to_vec(),
+      vec![issue_ix.into()],
+      Trigger::Account {
         address: dao_epoch_info,
         offset: 8,
         size: 1,
-      }),
-    },
-  )?;
+      },
+    )?;
+  } else {
+    automation_reset(CpiContext::new_with_signer(
+      ctx.accounts.clockwork.to_account_info(),
+      clockwork_sdk::cpi::AutomationReset {
+        authority: ctx.accounts.sub_dao.to_account_info(),
+        automation: ctx.accounts.issue_automation.to_account_info(),
+      },
+      signer_seeds,
+    ))?;
+    automation_update(
+      CpiContext::new_with_signer(
+        ctx.accounts.clockwork.to_account_info(),
+        clockwork_sdk::cpi::AutomationUpdate {
+          authority: ctx.accounts.sub_dao.to_account_info(),
+          automation: ctx.accounts.issue_automation.to_account_info(),
+          system_program: ctx.accounts.system_program.to_account_info(),
+        },
+        signer_seeds,
+      ),
+      AutomationSettings {
+        name: None,
+        fee: None,
+        instructions: Some(vec![issue_ix.into()]),
+        rate_limit: None,
+        trigger: Some(Trigger::Account {
+          address: dao_epoch_info,
+          offset: 8,
+          size: 1,
+        }),
+      },
+    )?;
+  }
+
   Ok(())
 }
