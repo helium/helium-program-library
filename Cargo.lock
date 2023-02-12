@@ -1648,7 +1648,7 @@ dependencies = [
  "helium-sub-daos",
  "lazy-transactions",
  "mpl-bubblegum",
- "mpl-token-metadata 1.6.4",
+ "mpl-token-metadata 1.8.3",
  "shared-utils",
  "spl-account-compression 0.1.5",
 ]
@@ -1661,7 +1661,7 @@ dependencies = [
  "anchor-spl",
  "circuit-breaker",
  "clockwork-sdk",
- "mpl-token-metadata 1.6.4",
+ "mpl-token-metadata 1.8.3",
  "rust_decimal",
  "shared-utils",
  "spl-governance-tools",
@@ -1978,7 +1978,7 @@ dependencies = [
  "anchor-spl",
  "circuit-breaker",
  "mpl-bubblegum",
- "mpl-token-metadata 1.6.4",
+ "mpl-token-metadata 1.8.3",
  "shared-utils",
  "spl-account-compression 0.1.5",
 ]
@@ -2238,11 +2238,29 @@ version = "0.6.0"
 dependencies = [
  "anchor-lang",
  "bytemuck",
- "mpl-token-metadata 1.6.4",
+ "mpl-token-metadata 1.8.3",
  "solana-program",
  "spl-account-compression 0.1.6",
  "spl-associated-token-account",
  "spl-token",
+]
+
+[[package]]
+name = "mpl-token-auth-rules"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a69803fbfbc4bb0327de86f49d2639692c7c60276cb87d6cced84bb8189f2000"
+dependencies = [
+ "borsh",
+ "mpl-token-metadata-context-derive 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-derive",
+ "num-traits",
+ "rmp-serde",
+ "serde",
+ "shank",
+ "solana-program",
+ "solana-zk-token-sdk",
+ "thiserror",
 ]
 
 [[package]]
@@ -2265,11 +2283,12 @@ dependencies = [
 
 [[package]]
 name = "mpl-token-metadata"
-version = "1.6.4"
+version = "1.8.3"
 dependencies = [
  "arrayref",
  "borsh",
- "mpl-token-vault",
+ "mpl-token-auth-rules",
+ "mpl-token-metadata-context-derive 0.2.1",
  "mpl-utils",
  "num-derive",
  "num-traits",
@@ -2278,6 +2297,24 @@ dependencies = [
  "spl-associated-token-account",
  "spl-token",
  "thiserror",
+]
+
+[[package]]
+name = "mpl-token-metadata-context-derive"
+version = "0.2.1"
+dependencies = [
+ "quote 1.0.23",
+ "syn 1.0.107",
+]
+
+[[package]]
+name = "mpl-token-metadata-context-derive"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12989bc45715b0ee91944855130131479f9c772e198a910c3eb0ea327d5bffc3"
+dependencies = [
+ "quote 1.0.23",
+ "syn 1.0.107",
 ]
 
 [[package]]
@@ -2296,9 +2333,7 @@ dependencies = [
 
 [[package]]
 name = "mpl-utils"
-version = "0.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "330468b3ea93d306ed5ae5e389b0b64cfbc43fcd29a4eeae74e20f13c979e7a5"
+version = "0.1.0"
 dependencies = [
  "arrayref",
  "borsh",
@@ -2595,6 +2630,12 @@ dependencies = [
  "smallvec",
  "windows-sys 0.42.0",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d01a5bd0424d00070b0098dd17ebca6f961a959dead1dbcbbbc1d1cd8d3deeba"
 
 [[package]]
 name = "pbkdf2"
@@ -3113,6 +3154,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "rmp"
+version = "0.8.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44519172358fd6d58656c86ab8e7fbc9e1490c3e8f14d35ed78ca0dd07403c9f"
+dependencies = [
+ "byteorder",
+ "num-traits",
+ "paste",
+]
+
+[[package]]
+name = "rmp-serde"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5b13be192e0220b8afb7222aa5813cb62cc269ebb5cac346ca6487681d2913e"
+dependencies = [
+ "byteorder",
+ "rmp",
+ "serde",
+]
+
+[[package]]
 name = "rpassword"
 version = "6.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3514,7 +3577,7 @@ version = "0.0.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
- "mpl-token-metadata 1.6.4",
+ "mpl-token-metadata 1.8.3",
  "spl-account-compression 0.1.5",
  "uint",
 ]
@@ -5292,7 +5355,7 @@ dependencies = [
  "env_logger",
  "itertools",
  "log",
- "mpl-token-metadata 1.6.4",
+ "mpl-token-metadata 1.8.3",
  "serde",
  "shared-utils",
  "solana-banks-client",
