@@ -9,7 +9,7 @@ import { toU128 } from "../../packages/treasury-management-sdk/src";
 import { DC_FEE } from "./fixtures";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 
-const THREAD_PID = new PublicKey("3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv");
+const AUTOMATION_PID = new PublicKey("auto5LqrhPVVt34PDu3dPwJhRisGoFA6dYpxRn29n1k");
 
 export async function initTestDao(
   program: anchor.Program<HeliumSubDaos>,

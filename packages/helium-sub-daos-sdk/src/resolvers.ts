@@ -11,8 +11,8 @@ import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { EPOCH_LENGTH, PROGRAM_ID } from "./constants";
 import { daoEpochInfoKey, subDaoEpochInfoKey } from "./pdas";
 
-const THREAD_PID = new PublicKey(
-  "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
+const AUTOMATION_PID = new PublicKey(
+  "auto5LqrhPVVt34PDu3dPwJhRisGoFA6dYpxRn29n1k"
 );
 
 export const subDaoEpochInfoResolver = resolveIndividual(
@@ -160,7 +160,7 @@ export const heliumSubDaosResolvers = combineResolvers(
   }),
   resolveIndividual(async ({ args, path, accounts }) => {
     if (path[path.length - 1] == "clockwork") {
-      return THREAD_PID;
+      return AUTOMATION_PID;
     } else if (path[path.length - 1] == "prevDaoEpochInfo" && accounts.dao) {
       return daoEpochInfoKey(
         accounts.dao as PublicKey,

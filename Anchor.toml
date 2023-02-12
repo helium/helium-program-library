@@ -66,8 +66,8 @@ address = "F8dKseqmBoAkHx3c58Lmb9TgJv5qeTf3BbtZZSEzYvUa"
 program = "./deps/clockwork/lib/clockwork_network_program.so"
 
 [[test.genesis]]
-address = "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
-program = "./deps/clockwork/lib/clockwork_thread_program.so"
+address = "auto5LqrhPVVt34PDu3dPwJhRisGoFA6dYpxRn29n1k"
+program = "./deps/clockwork/lib/clockwork_automation_program.so"
 
 [[test.genesis]]
 address = "E7p5KFo8kKCDm6BUnWtnVFkQSYh6ZA6xaGAuvpv8NXTa"

@@ -60,17 +60,17 @@ export function stakePositionKey(
   );
 }
 
-const THREAD_PID = new PublicKey("3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv");
-export function threadKey(
+const AUTOMATION_PID = new PublicKey("auto5LqrhPVVt34PDu3dPwJhRisGoFA6dYpxRn29n1k");
+export function automationKey(
   authority: PublicKey,
-  threadId: "calculate" | "issue" | "issue_hst",
-  programId: PublicKey = THREAD_PID
+  automationId: "calculate" | "issue" | "issue_hst",
+  programId: PublicKey = AUTOMATION_PID
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [
-      Buffer.from("thread", "utf8"),
+      Buffer.from("automation", "utf8"),
       authority.toBuffer(),
-      Buffer.from(threadId, "utf8"),
+      Buffer.from(automationId, "utf8"),
     ],
     programId
   )

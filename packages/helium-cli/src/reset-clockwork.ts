@@ -27,21 +27,21 @@ const yarg = yargs(hideBin(process.argv)).options({
   hntMint: {
     type: "string",
     describe:
-      "Mint of the HNT token. Only used if --resetDaoThread flag is set",
+      "Mint of the HNT token. Only used if --resetDaoAutomation flag is set",
   },
   dntMint: {
     type: "string",
     describe:
-      "Mint of the subdao token. Only used if --resetSubDaoThread flag is set",
+      "Mint of the subdao token. Only used if --resetSubDaoAutomation flag is set",
   },
-  resetDaoThread: {
+  resetDaoAutomation: {
     type: "boolean",
-    describe: "Reset the dao clockwork thread",
+    describe: "Reset the dao clockwork automation",
     default: false,
   },
-  resetSubDaoThread: {
+  resetSubDaoAutomation: {
     type: "boolean",
-    describe: "Reset the subdao clockwork thread",
+    describe: "Reset the subdao clockwork automation",
     default: false,
   },
   govProgramId: {
@@ -65,7 +65,7 @@ async function run() {
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
-  if (argv.resetSubDaoThread && !argv.dntMint) {
+  if (argv.resetSubDaoAutomation && !argv.dntMint) {
     console.log("dnt mint not provided");
     return;
   }
@@ -73,25 +73,25 @@ async function run() {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hsdProgram = await initDao(provider);
   const instructions = [];
-  if (argv.resetDaoThread) {
-    console.log("resetting dao thread")
+  if (argv.resetDaoAutomation) {
+    console.log("resetting dao automation")
     const hntMint = new PublicKey(argv.hntMint);
     const dao = daoKey(hntMint)[0];
     const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
 
-    instructions.push(await hsdProgram.methods.resetDaoThreadV0().accounts({
+    instructions.push(await hsdProgram.methods.resetDaoAutomationV0().accounts({
       dao,
       authority: daoAcc.authority
     }).instruction());
   }
 
-  if (argv.resetSubDaoThread) {
-    console.log("resetting subdao thread");
+  if (argv.resetSubDaoAutomation) {
+    console.log("resetting subdao automation");
     const dntMint = new PublicKey(argv.dntMint);
     const subDao = subDaoKey(dntMint)[0];
     const subdaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
 
-    instructions.push(await hsdProgram.methods.resetSubDaoThreadV0().accounts({
+    instructions.push(await hsdProgram.methods.resetSubDaoAutomationV0().accounts({
       subDao,
       authority: subdaoAcc.authority
     }).instruction())
@@ -104,7 +104,7 @@ async function run() {
     walletSigner: wallet,
     signers: [],
     govProgramId: new PublicKey(argv.govProgramId),
-    proposalName: `Reset Thread`,
+    proposalName: `Reset Automation`,
     votingMint: councilKey,
     executeProposal: argv.executeProposal,
   });

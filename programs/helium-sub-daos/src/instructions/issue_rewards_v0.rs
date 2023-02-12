@@ -225,7 +225,7 @@ pub fn handler(
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 
-  // update thread to point at next epoch
+  // update automation to point at next epoch
   let next_epoch = current_epoch(curr_ts);
   let dao_epoch_info = Pubkey::find_program_address(
     &[

@@ -31,13 +31,7 @@ fn construct_issue_rewards_ix(ctx: &Context<IssueRewardsKickoffV0>, epoch: u64) 
     dao_key.as_ref(),
     &epoch.to_le_bytes(),
   ];
-  let prev_dao_ei_seeds: &[&[u8]] = &[
-    "dao_epoch_info".as_bytes(),
-    dao_key.as_ref(),
-    &(epoch - 1).to_le_bytes(),
-  ];
   let dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
-  let prev_dao_epoch_info = Pubkey::find_program_address(prev_dao_ei_seeds, &crate::id()).0;
 
   let sub_dao_key = ctx.accounts.sub_dao.key();
   let sub_dao_ei_seeds: &[&[u8]] = &[

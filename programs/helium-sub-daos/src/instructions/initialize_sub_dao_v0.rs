@@ -307,7 +307,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     ctx.accounts.circuit_breaker_program.key(),
   );
   let cron = create_end_epoch_cron(curr_ts, 60 * 5);
-  // initialize calculate thread
+  // initialize calculate automation
   automation_create(
     CpiContext::new_with_signer(
       ctx.accounts.clockwork.to_account_info(),
@@ -333,16 +333,6 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     &[
       "dao_epoch_info".as_bytes(),
       ctx.accounts.dao.key().as_ref(),
-      &epoch.to_le_bytes(),
-    ],
-    &crate::id(),
-  )
-  .0;
-
-  let sub_dao_epoch_info = Pubkey::find_program_address(
-    &[
-      "sub_dao_epoch_info".as_bytes(),
-      ctx.accounts.sub_dao.key().as_ref(),
       &epoch.to_le_bytes(),
     ],
     &crate::id(),

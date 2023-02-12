@@ -7,7 +7,7 @@ import {
   daoKey,
   init as initDao,
   subDaoKey,
-  threadKey
+  automationKey,
 } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
@@ -221,8 +221,8 @@ async function run() {
   console.log("SUBDAO", subdao.toString());
   const daoAcc = await heliumSubDaosProgram.account.daoV0.fetch(dao);
 
-  const calculateThread = threadKey(subdao, "calculate")[0];
-  const issueThread = threadKey(subdao, "issue")[0];
+  const calculateAutomation = automationKey(subdao, "calculate")[0];
+  const issueAutomation = automationKey(subdao, "issue")[0];
 
   if (await exists(conn, subdao)) {
     const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
@@ -230,8 +230,8 @@ async function run() {
     console.log(
       `Subdao exists. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}`
     );
-    console.log("Calculate thread", calculateThread.toString());
-    console.log("Issue thread", issueThread.toString());
+    console.log("Calculate automation", calculateAutomation.toString());
+    console.log("Issue automation", issueAutomation.toString());
     return;
   }
   const [lazyDist] = await lazyDistributorKey(subdaoKeypair.publicKey);
@@ -567,20 +567,6 @@ async function run() {
         executeProposal: argv.executeProposal,
       });
     }
-
-    console.log("Transfering sol to threads")
-    await sendInstructions(provider, [
-      SystemProgram.transfer({
-        fromPubkey: provider.wallet.publicKey,
-        toPubkey: calculateThread,
-        lamports: BigInt(toBN(0.1, 9).toString()),
-      }),
-      SystemProgram.transfer({
-        fromPubkey: provider.wallet.publicKey,
-        toPubkey: issueThread,
-        lamports: BigInt(toBN(0.1, 9).toString()),
-      }),
-    ]);
   }
 
   const hsConfigKey = (

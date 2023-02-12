@@ -1,4 +1,4 @@
-use crate::{construct_issue_hst_kickoff_ix, create_end_epoch_cron, current_epoch, state::*};
+use crate::{construct_issue_hst_kickoff_ix, create_end_epoch_cron, state::*};
 use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
 use circuit_breaker::{CircuitBreaker, MintWindowedCircuitBreakerV0};
@@ -9,7 +9,6 @@ use clockwork_sdk::{
 };
 
 #[derive(Accounts)]
-#[instruction()]
 pub struct ResetDaoAutomationV0<'info> {
   pub authority: Signer<'info>,
 
@@ -44,17 +43,6 @@ pub struct ResetDaoAutomationV0<'info> {
 }
 
 pub fn handler(ctx: Context<ResetDaoAutomationV0>) -> Result<()> {
-  let curr_ts = Clock::get()?.unix_timestamp;
-  let epoch = current_epoch(curr_ts);
-
-  let dao_key = ctx.accounts.dao.key();
-  let dao_ei_seeds: &[&[u8]] = &[
-    "dao_epoch_info".as_bytes(),
-    dao_key.as_ref(),
-    &epoch.to_le_bytes(),
-  ];
-  let dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
-
   let kickoff_ix = construct_issue_hst_kickoff_ix(
     ctx.accounts.dao.key(),
     ctx.accounts.dao.hnt_mint,

@@ -14,10 +14,15 @@ clockwork localnet \
   --bpf-program noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV deps/solana-program-library/account-compression/target/deploy/spl_noop.so \
   --bpf-program cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK deps/solana-program-library/account-compression/target/deploy/spl_account_compression.so \
   --url https://api.mainnet-beta.solana.com \
-  --clone hgovTx6UB2QovqMvVuRXsgLsDw8xcS9R3BeWMjR5hgC \
+  --clone hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S \
   --clone ENmcpFCpxN1CqyUjuog9yyUVfdXBKF3LVCwLr7grJZpk \
   --clone JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB \
   --clone SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f \
   --clone E3cqnoFvTeKKNsGmC8YitpMjo2E39hwfoyt2Aiem7dCb \
   --clone GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR \
-  --clone Fi8vncGpNKbq62gPo56G4toCehWNy77GgqGkTaAF5Lkk
+  --clone Fi8vncGpNKbq62gPo56G4toCehWNy77GgqGkTaAF5Lkk \
+  --clone G9kgMJSeBy5Uhj3NJjL6kveyiepLAESybcB3zgdfw8ER \
+  --clone 7nYabs9dUhvxYwdTnrWVBL9MYviKSfrEbdWCUbcnwkpF
+
+## bpf programs are copied directly from anchor.toml
+## clones are also copied directly from anchor.toml, but some additional clones are needed for program accounts

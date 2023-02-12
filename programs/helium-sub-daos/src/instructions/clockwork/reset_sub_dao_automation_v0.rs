@@ -12,7 +12,6 @@ use clockwork_sdk::{
 };
 
 #[derive(Accounts)]
-#[instruction()]
 pub struct ResetSubDaoAutomationV0<'info> {
   #[account(mut)]
   pub authority: Signer<'info>,
@@ -97,22 +96,12 @@ pub fn handler(ctx: Context<ResetSubDaoAutomationV0>) -> Result<()> {
     },
   )?;
 
-  // reset the issue thread
+  // reset the issue automation
   let epoch = current_epoch(curr_ts);
   let dao_epoch_info = Pubkey::find_program_address(
     &[
       "dao_epoch_info".as_bytes(),
       ctx.accounts.dao.key().as_ref(),
-      &epoch.to_le_bytes(),
-    ],
-    &crate::id(),
-  )
-  .0;
-
-  let sub_dao_epoch_info = Pubkey::find_program_address(
-    &[
-      "sub_dao_epoch_info".as_bytes(),
-      ctx.accounts.sub_dao.key().as_ref(),
       &epoch.to_le_bytes(),
     ],
     &crate::id(),

@@ -96,7 +96,7 @@ pub fn handler(
 
   ctx.accounts.dao_epoch_info.done_issuing_hst_pool = true;
 
-  // update thread to point at next epoch
+  // update automation to point at next epoch
   let next_epoch = current_epoch(curr_ts);
 
   let dao_key = ctx.accounts.dao.key();

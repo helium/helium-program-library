@@ -1,5 +1,5 @@
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
-import { daoKey, init as initDao, threadKey } from "@helium/helium-sub-daos-sdk";
+import { daoKey, init as initDao, automationKey } from "@helium/helium-sub-daos-sdk";
 import { dataCreditsKey, init as initDc, PROGRAM_ID } from "@helium/data-credits-sdk";
 import { init as initLazy } from "@helium/lazy-distributor-sdk";
 import {
@@ -172,10 +172,10 @@ async function run() {
   console.log("COUNCIL", councilKeypair.publicKey.toBase58());
   console.log("COUNCIL WALLET", councilWallet.toBase58());
 
-  const thread = threadKey(dao, "issue_hst")[0];
+  const automation = automationKey(dao, "issue_hst")[0];
 
   console.log("DAO", dao.toString());
-  console.log("THREAD", thread.toString());
+  console.log("AUTOMATION", automation.toString());
 
   const conn = provider.connection;
 
@@ -213,7 +213,8 @@ async function run() {
   let instructions: TransactionInstruction[] = [];
   const govProgramVersion = await getGovernanceProgramVersion(
     conn,
-    govProgramId
+    govProgramId,
+    isLocalhost(provider) ? "localnet" : undefined,
   );
 
   const realmName = argv.realmName;
@@ -437,7 +438,7 @@ async function run() {
       .accounts({
         dcMint: dcKeypair.publicKey,
         hntMint: hntKeypair.publicKey,
-        thread,
+        automation,
         // TODO: Create actual HST pool
         hstPool: await getAssociatedTokenAddress(
           hntKeypair.publicKey,
@@ -446,15 +447,6 @@ async function run() {
         ),
       })
       .rpc({ skipPreflight: true });
-
-    console.log("Transfering sol to thread")
-    await sendInstructions(provider, [
-      SystemProgram.transfer({
-        fromPubkey: provider.wallet.publicKey,
-        toPubkey: thread,
-        lamports: BigInt(toBN(0.1, 9).toString()),
-      }),
-    ]);
   }
   
 }
