@@ -83,7 +83,7 @@ function toAsset(result: any): Asset {
       assetHash:
         result.compression.asset_hash ??
         base58.decode(result.compression.asset_hash),
-      tree: result.compression.tree ?? base58.decode(result.compression.tree),
+      tree: result.compression.tree ?? new PublicKey(result.compression.tree),
     },
     ownership: {
       ...result.ownership,
