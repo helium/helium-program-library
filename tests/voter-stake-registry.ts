@@ -676,24 +676,9 @@ describe("voter-stake-registry", () => {
         }
       });
 
-      it("should not allow me to vote twice after transferring", async () => {
+      it("doesn't allow transferring", async () => {
         const voter = Keypair.generate();
         const instructions: TransactionInstruction[] = [];
-        const tokenOwnerRecord2 = await getTokenOwnerRecordAddress(
-          SPL_GOVERNANCE_PID,
-          realm,
-          hntMint,
-          voter.publicKey
-        );
-        await withCreateTokenOwnerRecord(
-          instructions,
-          SPL_GOVERNANCE_PID,
-          programVersion,
-          realm,
-          voter.publicKey,
-          hntMint,
-          me
-        );
         instructions.push(
           createAssociatedTokenAccountInstruction(
             me,
@@ -709,59 +694,11 @@ describe("voter-stake-registry", () => {
           )
         );
 
-        const {
-          pubkeys: { voterWeightRecord },
-          instruction,
-        } = await program.methods
-          .castVoteV0({
-            proposal,
-            owner: voter.publicKey,
-          })
-          .accounts({
-            registrar,
-            voterAuthority: voter.publicKey,
-            voterTokenOwnerRecord: tokenOwnerRecord2,
-          })
-          .remainingAccounts([
-            {
-              pubkey: await getAssociatedTokenAddress(mint, voter.publicKey),
-              isSigner: false,
-              isWritable: false,
-            },
-            {
-              pubkey: position,
-              isSigner: false,
-              isWritable: true,
-            },
-            {
-              pubkey: await nftVoteRecordKey(proposal, mint)[0],
-              isSigner: false,
-              isWritable: true,
-            },
-          ])
-          .prepare();
-        instructions.push(instruction);
-
-        await withCastVote(
-          instructions,
-          SPL_GOVERNANCE_PID,
-          programVersion,
-          realm,
-          governance,
-          proposal,
-          proposalOwner,
-          tokenOwnerRecord2,
-          voter.publicKey,
-          hntMint,
-          Vote.fromYesNoVote(YesNoVote.No),
-          me,
-          voterWeightRecord
-        );
-
         try {
-          await sendInstructions(provider, instructions, [voter]);
+          await sendInstructions(provider, instructions);
         } catch (e: any) {
-          expect(e.InstructionError[1].Custom).to.eq(6045);
+          console.log(e);
+          expect(e.InstructionError[1].Custom).to.eq(17);
         }
       });
 
