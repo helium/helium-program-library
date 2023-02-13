@@ -62,7 +62,10 @@ pub mod helium_sub_daos {
     transfer_v0::handler(ctx, args)
   }
 
-  pub fn issue_hst_pool_v0(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result<()> {
+  pub fn issue_hst_pool_v0(
+    ctx: Context<IssueHstPoolV0>,
+    args: IssueHstPoolArgsV0,
+  ) -> Result<ThreadResponse> {
     issue_hst_pool_v0::handler(ctx, args)
   }
 
@@ -72,6 +75,14 @@ pub mod helium_sub_daos {
 
   pub fn calculate_kickoff_v0(ctx: Context<CalculateKickoffV0>) -> Result<ThreadResponse> {
     calculate_kickoff_v0::handler(ctx)
+  }
+
+  pub fn issue_rewards_kickoff_v0(ctx: Context<IssueRewardsKickoffV0>) -> Result<ThreadResponse> {
+    issue_rewards_kickoff_v0::handler(ctx)
+  }
+
+  pub fn issue_hst_kickoff_v0(ctx: Context<IssueHstKickoffV0>) -> Result<ThreadResponse> {
+    issue_hst_kickoff_v0::handler(ctx)
   }
 
   pub fn reset_dao_thread_v0(ctx: Context<ResetDaoThreadV0>) -> Result<()> {

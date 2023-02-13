@@ -7,7 +7,7 @@ import {
   daoKey,
   init as initDao,
   subDaoKey,
-  threadKey
+  threadKey,
 } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
@@ -568,20 +568,6 @@ async function run() {
         executeProposal: argv.executeProposal,
       });
     }
-
-    console.log("Transfering sol to threads");
-    await sendInstructions(provider, [
-      SystemProgram.transfer({
-        fromPubkey: provider.wallet.publicKey,
-        toPubkey: calculateThread,
-        lamports: BigInt(toBN(0.1, 9).toString()),
-      }),
-      SystemProgram.transfer({
-        fromPubkey: provider.wallet.publicKey,
-        toPubkey: issueThread,
-        lamports: BigInt(toBN(0.1, 9).toString()),
-      }),
-    ]);
   }
 
   const hsConfigKey = (

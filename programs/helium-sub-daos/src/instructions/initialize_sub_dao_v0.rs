@@ -1,6 +1,7 @@
-use crate::{circuit_breaker::*, construct_issue_rewards_ix, current_epoch, next_epoch_ts};
+use crate::{circuit_breaker::*, construct_issue_rewards_kickoff_ix, current_epoch, next_epoch_ts};
 use crate::{construct_calculate_kickoff_ix, state::*, EPOCH_LENGTH};
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::native_token::LAMPORTS_PER_SOL;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::{set_authority, Mint, SetAuthority, Token, TokenAccount};
@@ -304,8 +305,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     ctx.accounts.system_program.key(),
     ctx.accounts.token_program.key(),
     ctx.accounts.circuit_breaker_program.key(),
-  )
-  .unwrap();
+  );
   let cron = create_end_epoch_cron(curr_ts, 60 * 5);
   // initialize calculate thread
   thread_create(
@@ -319,8 +319,9 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
       },
       signer_seeds,
     ),
-    "calculate".to_string(),
-    calculate_kickoff_ix.into(),
+    LAMPORTS_PER_SOL / 100,
+    "calculate".as_bytes().to_vec(),
+    vec![calculate_kickoff_ix.into()],
     Trigger::Cron {
       schedule: cron,
       skippable: false,
@@ -338,33 +339,16 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
   )
   .0;
 
-  let sub_dao_epoch_info = Pubkey::find_program_address(
-    &[
-      "sub_dao_epoch_info".as_bytes(),
-      ctx.accounts.sub_dao.key().as_ref(),
-      &epoch.to_le_bytes(),
-    ],
-    &crate::id(),
-  )
-  .0;
-
-  let issue_ix = construct_issue_rewards_ix(
+  let issue_kickoff_ix = construct_issue_rewards_kickoff_ix(
     ctx.accounts.dao.key(),
     ctx.accounts.sub_dao.key(),
-    ctx.accounts.dao.hnt_mint,
-    ctx.accounts.sub_dao.dnt_mint,
-    ctx.accounts.sub_dao.treasury,
-    ctx.accounts.sub_dao.rewards_escrow,
-    ctx.accounts.sub_dao.delegator_pool,
+    ctx.accounts.hnt_mint.key(),
+    ctx.accounts.dnt_mint.key(),
     ctx.accounts.system_program.key(),
     ctx.accounts.token_program.key(),
     ctx.accounts.circuit_breaker_program.key(),
-    dao_epoch_info,
-    sub_dao_epoch_info,
-    ctx.accounts.issue_thread.key(),
-    ctx.accounts.clockwork.key(),
-    epoch,
   );
+
   thread_create(
     CpiContext::new_with_signer(
       ctx.accounts.clockwork.to_account_info(),
@@ -376,8 +360,9 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
       },
       signer_seeds,
     ),
-    "issue".to_string(),
-    issue_ix.into(),
+    LAMPORTS_PER_SOL / 100,
+    "issue".as_bytes().to_vec(),
+    vec![issue_kickoff_ix.into()],
     Trigger::Account {
       address: dao_epoch_info,
       offset: 8,

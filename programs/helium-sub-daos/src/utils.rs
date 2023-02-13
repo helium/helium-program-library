@@ -1,6 +1,5 @@
 use crate::{error::ErrorCode, state::*, TESTING};
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
-use clockwork_sdk::utils::anchor_sighash;
 use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
 use std::{cmp::Ordering, convert::TryInto};
 use time::{Duration, OffsetDateTime};
@@ -326,113 +325,65 @@ pub fn construct_calculate_kickoff_ix(
   system_program: Pubkey,
   token_program: Pubkey,
   circuit_breaker_program: Pubkey,
-) -> Option<Instruction> {
-  // build clockwork kickoff ix
-  let accounts = vec![
-    AccountMeta::new_readonly(dao, false),
-    AccountMeta::new_readonly(sub_dao, false),
-    AccountMeta::new_readonly(hnt_mint, false),
-    AccountMeta::new_readonly(active_device_aggregator, false),
-    AccountMeta::new_readonly(system_program, false),
-    AccountMeta::new_readonly(token_program, false),
-    AccountMeta::new_readonly(circuit_breaker_program, false),
-  ];
-  Some(Instruction {
+) -> Instruction {
+  Instruction {
     program_id: crate::ID,
-    accounts,
-    data: anchor_sighash("calculate_kickoff_v0").to_vec(),
-  })
+    accounts: crate::accounts::CalculateKickoffV0 {
+      dao,
+      sub_dao,
+      hnt_mint,
+      active_device_aggregator,
+      system_program,
+      token_program,
+      circuit_breaker_program,
+    }
+    .to_account_metas(Some(true)),
+    data: crate::instruction::CalculateKickoffV0 {}.data(),
+  }
 }
 
-pub fn construct_issue_rewards_ix(
+pub fn construct_issue_rewards_kickoff_ix(
   dao: Pubkey,
   sub_dao: Pubkey,
   hnt_mint: Pubkey,
   dnt_mint: Pubkey,
-  treasury: Pubkey,
-  rewards_escrow: Pubkey,
-  delegator_pool: Pubkey,
   system_program: Pubkey,
   token_program: Pubkey,
   circuit_breaker_program: Pubkey,
-  dao_epoch_info: Pubkey,
-  sub_dao_epoch_info: Pubkey,
-  issue_thread: Pubkey,
-  clockwork_program: Pubkey,
-  epoch: u64,
 ) -> Instruction {
-  let hnt_circuit_breaker = Pubkey::find_program_address(
-    &["mint_windowed_breaker".as_bytes(), hnt_mint.as_ref()],
-    &circuit_breaker_program.key(),
-  )
-  .0;
-  let dnt_circuit_breaker = Pubkey::find_program_address(
-    &["mint_windowed_breaker".as_bytes(), dnt_mint.as_ref()],
-    &circuit_breaker_program.key(),
-  )
-  .0;
-
-  // issue rewards ix
-  let accounts = vec![
-    AccountMeta::new_readonly(dao, false),
-    AccountMeta::new(sub_dao, false),
-    AccountMeta::new(dao_epoch_info, false), // use the current epoch infos
-    AccountMeta::new(sub_dao_epoch_info, false),
-    AccountMeta::new(hnt_circuit_breaker, false),
-    AccountMeta::new(dnt_circuit_breaker, false),
-    AccountMeta::new(hnt_mint, false),
-    AccountMeta::new(dnt_mint, false),
-    AccountMeta::new(treasury, false),
-    AccountMeta::new(rewards_escrow, false),
-    AccountMeta::new(delegator_pool, false),
-    AccountMeta::new_readonly(system_program, false),
-    AccountMeta::new_readonly(token_program, false),
-    AccountMeta::new_readonly(circuit_breaker_program, false),
-    AccountMeta::new(issue_thread, false),
-    AccountMeta::new_readonly(clockwork_program, false),
-  ];
   Instruction {
     program_id: crate::ID,
-    accounts,
-    data: crate::instruction::IssueRewardsV0 {
-      args: crate::IssueRewardsArgsV0 { epoch },
+    accounts: crate::accounts::IssueRewardsKickoffV0 {
+      dao,
+      sub_dao,
+      hnt_mint,
+      dnt_mint,
+      system_program,
+      token_program,
+      circuit_breaker_program,
     }
-    .data(),
+    .to_account_metas(Some(true)),
+    data: crate::instruction::IssueRewardsKickoffV0 {}.data(),
   }
 }
 
-pub fn construct_issue_hst_ix(
+pub fn construct_issue_hst_kickoff_ix(
   dao: Pubkey,
-  hnt_circuit_breaker: Pubkey,
   hnt_mint: Pubkey,
-  hst_pool: Pubkey,
   system_program: Pubkey,
   token_program: Pubkey,
   circuit_breaker_program: Pubkey,
-  thread: Pubkey,
-  clockwork_program: Pubkey,
-  dao_epoch_info: Pubkey,
-  epoch: u64,
-) -> Option<Instruction> {
-  // build issue hst pool ix
-  let accounts = vec![
-    AccountMeta::new(dao, false),
-    AccountMeta::new(dao_epoch_info, false),
-    AccountMeta::new(hnt_circuit_breaker, false),
-    AccountMeta::new(hnt_mint, false),
-    AccountMeta::new(hst_pool, false),
-    AccountMeta::new_readonly(system_program, false),
-    AccountMeta::new_readonly(token_program, false),
-    AccountMeta::new_readonly(circuit_breaker_program, false),
-    AccountMeta::new(thread, false),
-    AccountMeta::new_readonly(clockwork_program, false),
-  ];
-  Some(Instruction {
+) -> Instruction {
+  Instruction {
     program_id: crate::ID,
-    accounts,
-    data: crate::instruction::IssueHstPoolV0 {
-      args: crate::IssueHstPoolArgsV0 { epoch },
+    accounts: crate::accounts::IssueHstKickoffV0 {
+      dao,
+      hnt_mint,
+      system_program,
+      token_program,
+      circuit_breaker_program,
     }
-    .data(),
-  })
+    .to_account_metas(Some(true)),
+    data: crate::instruction::IssueHstKickoffV0 {}.data(),
+  }
 }

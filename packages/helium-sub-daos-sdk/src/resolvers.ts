@@ -11,8 +11,8 @@ import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { EPOCH_LENGTH, PROGRAM_ID } from "./constants";
 import { daoEpochInfoKey, subDaoEpochInfoKey } from "./pdas";
 
-const THREAD_PID = new PublicKey(
-  "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
+const AUTOMATION_PID = new PublicKey(
+  "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
 );
 
 export const subDaoEpochInfoResolver = resolveIndividual(
@@ -24,8 +24,8 @@ export const subDaoEpochInfoResolver = resolveIndividual(
         registrar = await vsr.account.registrar.fetch(accounts.registrar as PublicKey);
       } catch (e: any) {
         // ignore. It's fine, we just won't use time offset which is only used in testing cases
+        console.error(e)
       }
-      
       const clock = await provider.connection.getAccountInfo(
         SYSVAR_CLOCK_PUBKEY
       );
@@ -160,7 +160,7 @@ export const heliumSubDaosResolvers = combineResolvers(
   }),
   resolveIndividual(async ({ args, path, accounts }) => {
     if (path[path.length - 1] == "clockwork") {
-      return THREAD_PID;
+      return AUTOMATION_PID;
     } else if (path[path.length - 1] == "prevDaoEpochInfo" && accounts.dao) {
       return daoEpochInfoKey(
         accounts.dao as PublicKey,
