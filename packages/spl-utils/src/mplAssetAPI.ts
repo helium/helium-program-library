@@ -26,6 +26,7 @@ export type Asset = {
   };
   ownership: {
     owner: PublicKey;
+    delegate: PublicKey;
   };
   royalty: {
     basis_points: number;
@@ -75,19 +76,20 @@ function toAsset(result: any): Asset {
       ...result.compression,
       leafId: result.compression.leaf_id,
       dataHash:
-        result.compression.data_hash ??
+        result.compression.data_hash &&
         base58.decode(result.compression.data_hash),
       creatorHash:
-        result.compression.creator_hash ??
+        result.compression.creator_hash &&
         base58.decode(result.compression.creator_hash),
       assetHash:
-        result.compression.asset_hash ??
+        result.compression.asset_hash &&
         base58.decode(result.compression.asset_hash),
-      tree: result.compression.tree ?? base58.decode(result.compression.tree),
+      tree: result.compression.tree && new PublicKey(result.compression.tree),
     },
     ownership: {
       ...result.ownership,
-      owner: result.ownership.owner ?? new PublicKey(result.ownership.owner),
+      delegate: result.ownership.delegate && new PublicKey(result.ownership.delegate),
+      owner: result.ownership.owner && new PublicKey(result.ownership.owner),
     },
   };
 }

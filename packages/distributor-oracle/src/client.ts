@@ -48,6 +48,7 @@ export async function formTransaction({
   lazyDistributor,
   wallet = provider.wallet.publicKey,
   skipOracleSign = false,
+  assetEndpoint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
 }: {
@@ -57,6 +58,7 @@ export async function formTransaction({
   hotspot: PublicKey;
   lazyDistributor: PublicKey;
   wallet?: PublicKey;
+  assetEndpoint?: string;
   skipOracleSign?: boolean;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
   getAssetProofFn?: (
@@ -65,7 +67,7 @@ export async function formTransaction({
   ) => Promise<AssetProof | undefined>;
 }) {
   // @ts-ignore
-  const asset = await getAssetFn(provider.connection._rpcEndpoint, hotspot);
+  const asset = await getAssetFn(assetEndpoint || provider.connection._rpcEndpoint, hotspot);
   if (!asset) {
     throw new Error("No asset with ID " + hotspot.toBase58());
   }
@@ -131,6 +133,7 @@ export async function formTransaction({
         lazyDistributor,
         getAssetFn,
         getAssetProofFn,
+        assetEndpoint,
       })
     ).instruction();
     tx.add(distributeIx);

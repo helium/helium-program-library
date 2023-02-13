@@ -2,16 +2,19 @@ import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { Asset, getAsset, getAssetProof, AssetProof } from "@helium/spl-utils";
 import { Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
+import { ConcurrentMerkleTreeAccount } from "@solana/spl-account-compression";
 
 export async function distributeCompressionRewards<IDL extends Idl>({
   program,
   assetId,
   lazyDistributor,
+  assetEndpoint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
 }: {
   program: Program<LazyDistributor>;
   assetId: PublicKey;
+  assetEndpoint?: string;
   lazyDistributor: PublicKey;
   owner?: PublicKey;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
@@ -21,7 +24,7 @@ export async function distributeCompressionRewards<IDL extends Idl>({
   ) => Promise<AssetProof | undefined>;
 }) {
   // @ts-ignore
-  const endpoint = program.provider.connection._rpcEndpoint;
+  const endpoint = assetEndpoint || program.provider.connection._rpcEndpoint;
   const asset = await getAssetFn(endpoint, assetId);
   if (!asset) {
     throw new Error("No asset with ID " + assetId.toBase58());
@@ -34,6 +37,10 @@ export async function distributeCompressionRewards<IDL extends Idl>({
   const {
     ownership: { owner },
   } = asset;
+
+  const canopy = await (
+    await ConcurrentMerkleTreeAccount.fromAccountAddress(program.provider.connection, treeId)
+  ).getCanopyDepth();
 
   return program.methods
     .distributeCompressionRewardsV0({
@@ -49,7 +56,7 @@ export async function distributeCompressionRewards<IDL extends Idl>({
       merkleTree: treeId,
     })
     .remainingAccounts(
-      proof.map((p) => {
+      proof.slice(0, proof.length - canopy).map((p) => {
         return {
           pubkey: p,
           isWritable: false,
