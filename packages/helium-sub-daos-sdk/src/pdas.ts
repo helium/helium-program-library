@@ -60,11 +60,11 @@ export function stakePositionKey(
   );
 }
 
-const THREAD_PID = new PublicKey("3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv");
+const CLOCKWORK_PID = new PublicKey("CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh");
 export function threadKey(
   authority: PublicKey,
   threadId: "calculate" | "issue" | "issue_hst",
-  programId: PublicKey = THREAD_PID
+  programId: PublicKey = CLOCKWORK_PID
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [
