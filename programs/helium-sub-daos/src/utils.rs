@@ -1,6 +1,5 @@
 use crate::{error::ErrorCode, state::*, TESTING};
-use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
-use clockwork_sdk::utils::anchor_sighash;
+use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
 use std::{cmp::Ordering, convert::TryInto};
 use time::{Duration, OffsetDateTime};
@@ -327,20 +326,18 @@ pub fn construct_calculate_kickoff_ix(
   token_program: Pubkey,
   circuit_breaker_program: Pubkey,
 ) -> Instruction {
-  // build clockwork kickoff ix
-  let accounts = vec![
-    AccountMeta::new_readonly(dao, false),
-    AccountMeta::new_readonly(sub_dao, false),
-    AccountMeta::new_readonly(hnt_mint, false),
-    AccountMeta::new_readonly(active_device_aggregator, false),
-    AccountMeta::new_readonly(system_program, false),
-    AccountMeta::new_readonly(token_program, false),
-    AccountMeta::new_readonly(circuit_breaker_program, false),
-  ];
   Instruction {
     program_id: crate::ID,
-    accounts,
-    data: anchor_sighash("calculate_kickoff_v0").to_vec(),
+    accounts: crate::accounts::CalculateKickoffV0 {
+      dao,
+      sub_dao,
+      hnt_mint,
+      active_device_aggregator,
+      system_program,
+      token_program,
+      circuit_breaker_program
+    }.to_account_metas(Some(true)),
+    data: crate::instruction::CalculateKickoffV0 {}.data()
   }
 }
 
@@ -353,20 +350,18 @@ pub fn construct_issue_rewards_kickoff_ix(
   token_program: Pubkey,
   circuit_breaker_program: Pubkey,
 ) -> Instruction {
-  // build clockwork kickoff ix
-  let accounts = vec![
-    AccountMeta::new_readonly(dao, false),
-    AccountMeta::new_readonly(sub_dao, false),
-    AccountMeta::new_readonly(hnt_mint, false),
-    AccountMeta::new_readonly(dnt_mint, false),
-    AccountMeta::new_readonly(system_program, false),
-    AccountMeta::new_readonly(token_program, false),
-    AccountMeta::new_readonly(circuit_breaker_program, false),
-  ];
   Instruction {
     program_id: crate::ID,
-    accounts,
-    data: anchor_sighash("issue_rewards_kickoff_v0").to_vec(),
+    accounts: crate::accounts::IssueRewardsKickoffV0 {
+      dao,
+      sub_dao,
+      hnt_mint,
+      dnt_mint,
+      system_program,
+      token_program,
+      circuit_breaker_program
+    }.to_account_metas(Some(true)),
+    data: crate::instruction::IssueRewardsKickoffV0 {}.data(),
   }
 }
 
@@ -377,17 +372,15 @@ pub fn construct_issue_hst_kickoff_ix(
   token_program: Pubkey,
   circuit_breaker_program: Pubkey,
 ) -> Instruction {
-  // build clockwork kickoff ix
-  let accounts = vec![
-    AccountMeta::new_readonly(dao, false),
-    AccountMeta::new_readonly(hnt_mint, false),
-    AccountMeta::new_readonly(system_program, false),
-    AccountMeta::new_readonly(token_program, false),
-    AccountMeta::new_readonly(circuit_breaker_program, false),
-  ];
   Instruction {
     program_id: crate::ID,
-    accounts,
-    data: anchor_sighash("issue_hst_kickoff_v0").to_vec(),
+    accounts: crate::accounts::IssueHstKickoffV0 {
+      dao,
+      hnt_mint,
+      system_program,
+      token_program,
+      circuit_breaker_program
+    }.to_account_metas(Some(true)),
+    data: crate::instruction::IssueHstKickoffV0 {}.data(),
   }
 }

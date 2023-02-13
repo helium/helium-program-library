@@ -6,13 +6,13 @@ use anchor_lang::{prelude::*, solana_program::native_token::LAMPORTS_PER_SOL};
 use anchor_spl::token::Token;
 use circuit_breaker::CircuitBreaker;
 use clockwork_sdk::{
-  cpi::{automation_create, automation_reset, automation_update},
-  state::{AutomationSettings, Trigger},
-  AutomationProgram,
+  cpi::{thread_create, thread_reset, thread_update},
+  state::{ThreadSettings, Trigger},
+  ThreadProgram,
 };
 
 #[derive(Accounts)]
-pub struct ResetSubDaoAutomationV0<'info> {
+pub struct ResetSubDaoThreadV0<'info> {
   #[account(mut)]
   pub authority: Signer<'info>,
 
@@ -27,27 +27,27 @@ pub struct ResetSubDaoAutomationV0<'info> {
   ///CHECK: seeds checked
   #[account(
     mut,
-    seeds = [b"automation", sub_dao.key().as_ref(), b"calculate"],
+    seeds = [b"thread", sub_dao.key().as_ref(), b"calculate"],
     seeds::program = clockwork.key(),
     bump
   )]
-  pub calculate_automation: AccountInfo<'info>,
+  pub calculate_thread: AccountInfo<'info>,
   ///CHECK: seeds checked
   #[account(
     mut,
-    seeds = [b"automation", sub_dao.key().as_ref(), b"issue"],
+    seeds = [b"thread", sub_dao.key().as_ref(), b"issue"],
     seeds::program = clockwork.key(),
     bump
   )]
-  pub issue_automation: AccountInfo<'info>,
-  pub clockwork: Program<'info, AutomationProgram>,
+  pub issue_thread: AccountInfo<'info>,
+  pub clockwork: Program<'info, ThreadProgram>,
 
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
 }
 
-pub fn handler(ctx: Context<ResetSubDaoAutomationV0>) -> Result<()> {
+pub fn handler(ctx: Context<ResetSubDaoThreadV0>) -> Result<()> {
   let calculate_ix = construct_calculate_kickoff_ix(
     ctx.accounts.dao.key(),
     ctx.accounts.sub_dao.key(),
@@ -67,17 +67,17 @@ pub fn handler(ctx: Context<ResetSubDaoAutomationV0>) -> Result<()> {
     &[ctx.accounts.sub_dao.bump_seed],
   ]];
 
-  // reset calculate automation
-  if ctx.accounts.calculate_automation.data_is_empty()
-    && ctx.accounts.calculate_automation.lamports() == 0
+  // reset calculate thread
+  if ctx.accounts.calculate_thread.data_is_empty()
+    && ctx.accounts.calculate_thread.lamports() == 0
   {
-    automation_create(
+    thread_create(
       CpiContext::new_with_signer(
         ctx.accounts.clockwork.to_account_info(),
-        clockwork_sdk::cpi::AutomationCreate {
+        clockwork_sdk::cpi::ThreadCreate {
           authority: ctx.accounts.sub_dao.to_account_info(),
           payer: ctx.accounts.authority.to_account_info(),
-          automation: ctx.accounts.calculate_automation.to_account_info(),
+          thread: ctx.accounts.calculate_thread.to_account_info(),
           system_program: ctx.accounts.system_program.to_account_info(),
         },
         signer_seeds,
@@ -91,25 +91,25 @@ pub fn handler(ctx: Context<ResetSubDaoAutomationV0>) -> Result<()> {
       },
     )?;
   } else {
-    automation_reset(CpiContext::new_with_signer(
+    thread_reset(CpiContext::new_with_signer(
       ctx.accounts.clockwork.to_account_info(),
-      clockwork_sdk::cpi::AutomationReset {
+      clockwork_sdk::cpi::ThreadReset {
         authority: ctx.accounts.sub_dao.to_account_info(),
-        automation: ctx.accounts.calculate_automation.to_account_info(),
+        thread: ctx.accounts.calculate_thread.to_account_info(),
       },
       signer_seeds,
     ))?;
-    automation_update(
+    thread_update(
       CpiContext::new_with_signer(
         ctx.accounts.clockwork.to_account_info(),
-        clockwork_sdk::cpi::AutomationUpdate {
+        clockwork_sdk::cpi::ThreadUpdate {
           authority: ctx.accounts.sub_dao.to_account_info(),
-          automation: ctx.accounts.calculate_automation.to_account_info(),
+          thread: ctx.accounts.calculate_thread.to_account_info(),
           system_program: ctx.accounts.system_program.to_account_info(),
         },
         signer_seeds,
       ),
-      AutomationSettings {
+      ThreadSettings {
         name: None,
         fee: None,
         instructions: Some(vec![calculate_ix.into()]),
@@ -122,7 +122,7 @@ pub fn handler(ctx: Context<ResetSubDaoAutomationV0>) -> Result<()> {
     )?;
   }
 
-  // reset the issue automation
+  // reset the issue thread
   let epoch = current_epoch(curr_ts);
   let dao_epoch_info = Pubkey::find_program_address(
     &[
@@ -144,15 +144,15 @@ pub fn handler(ctx: Context<ResetSubDaoAutomationV0>) -> Result<()> {
     ctx.accounts.circuit_breaker_program.key(),
   );
 
-  if ctx.accounts.issue_automation.data_is_empty() && ctx.accounts.issue_automation.lamports() == 0
+  if ctx.accounts.issue_thread.data_is_empty() && ctx.accounts.issue_thread.lamports() == 0
   {
-    automation_create(
+    thread_create(
       CpiContext::new_with_signer(
         ctx.accounts.clockwork.to_account_info(),
-        clockwork_sdk::cpi::AutomationCreate {
+        clockwork_sdk::cpi::ThreadCreate {
           authority: ctx.accounts.sub_dao.to_account_info(),
           payer: ctx.accounts.authority.to_account_info(),
-          automation: ctx.accounts.issue_automation.to_account_info(),
+          thread: ctx.accounts.issue_thread.to_account_info(),
           system_program: ctx.accounts.system_program.to_account_info(),
         },
         signer_seeds,
@@ -167,25 +167,25 @@ pub fn handler(ctx: Context<ResetSubDaoAutomationV0>) -> Result<()> {
       },
     )?;
   } else {
-    automation_reset(CpiContext::new_with_signer(
+    thread_reset(CpiContext::new_with_signer(
       ctx.accounts.clockwork.to_account_info(),
-      clockwork_sdk::cpi::AutomationReset {
+      clockwork_sdk::cpi::ThreadReset {
         authority: ctx.accounts.sub_dao.to_account_info(),
-        automation: ctx.accounts.issue_automation.to_account_info(),
+        thread: ctx.accounts.issue_thread.to_account_info(),
       },
       signer_seeds,
     ))?;
-    automation_update(
+    thread_update(
       CpiContext::new_with_signer(
         ctx.accounts.clockwork.to_account_info(),
-        clockwork_sdk::cpi::AutomationUpdate {
+        clockwork_sdk::cpi::ThreadUpdate {
           authority: ctx.accounts.sub_dao.to_account_info(),
-          automation: ctx.accounts.issue_automation.to_account_info(),
+          thread: ctx.accounts.issue_thread.to_account_info(),
           system_program: ctx.accounts.system_program.to_account_info(),
         },
         signer_seeds,
       ),
-      AutomationSettings {
+      ThreadSettings {
         name: None,
         fee: None,
         instructions: Some(vec![issue_ix.into()]),

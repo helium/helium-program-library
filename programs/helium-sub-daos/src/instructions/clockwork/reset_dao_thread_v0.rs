@@ -3,13 +3,13 @@ use anchor_lang::{prelude::*, solana_program::native_token::LAMPORTS_PER_SOL};
 use anchor_spl::token::Token;
 use circuit_breaker::{CircuitBreaker, MintWindowedCircuitBreakerV0};
 use clockwork_sdk::{
-  cpi::{automation_create, automation_reset, automation_update},
-  state::{AutomationSettings, Trigger},
-  AutomationProgram,
+  cpi::{thread_create, thread_reset, thread_update},
+  state::{ThreadSettings, Trigger},
+  ThreadProgram,
 };
 
 #[derive(Accounts)]
-pub struct ResetDaoAutomationV0<'info> {
+pub struct ResetDaoThreadV0<'info> {
   pub authority: Signer<'info>,
 
   #[account(
@@ -30,19 +30,19 @@ pub struct ResetDaoAutomationV0<'info> {
   ///CHECK: seeds checked
   #[account(
     mut,
-    seeds = [b"automation", dao.key().as_ref(), b"issue_hst"],
+    seeds = [b"thread", dao.key().as_ref(), b"issue_hst"],
     seeds::program = clockwork.key(),
     bump
   )]
-  pub automation: AccountInfo<'info>,
-  pub clockwork: Program<'info, AutomationProgram>,
+  pub thread: AccountInfo<'info>,
+  pub clockwork: Program<'info, ThreadProgram>,
 
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
 }
 
-pub fn handler(ctx: Context<ResetDaoAutomationV0>) -> Result<()> {
+pub fn handler(ctx: Context<ResetDaoThreadV0>) -> Result<()> {
   let kickoff_ix = construct_issue_hst_kickoff_ix(
     ctx.accounts.dao.key(),
     ctx.accounts.dao.hnt_mint,
@@ -68,14 +68,14 @@ pub fn handler(ctx: Context<ResetDaoAutomationV0>) -> Result<()> {
     &[ctx.accounts.dao.bump_seed],
   ]];
 
-  if ctx.accounts.automation.data_is_empty() && ctx.accounts.automation.lamports() == 0 {
-    automation_create(
+  if ctx.accounts.thread.data_is_empty() && ctx.accounts.thread.lamports() == 0 {
+    thread_create(
       CpiContext::new_with_signer(
         ctx.accounts.clockwork.to_account_info(),
-        clockwork_sdk::cpi::AutomationCreate {
+        clockwork_sdk::cpi::ThreadCreate {
           authority: ctx.accounts.dao.to_account_info(),
           payer: ctx.accounts.authority.to_account_info(),
-          automation: ctx.accounts.automation.to_account_info(),
+          thread: ctx.accounts.thread.to_account_info(),
           system_program: ctx.accounts.system_program.to_account_info(),
         },
         signer_seeds,
@@ -90,25 +90,25 @@ pub fn handler(ctx: Context<ResetDaoAutomationV0>) -> Result<()> {
       },
     )?;
   } else {
-    automation_reset(CpiContext::new_with_signer(
+    thread_reset(CpiContext::new_with_signer(
       ctx.accounts.clockwork.to_account_info(),
-      clockwork_sdk::cpi::AutomationReset {
+      clockwork_sdk::cpi::ThreadReset {
         authority: ctx.accounts.dao.to_account_info(),
-        automation: ctx.accounts.automation.to_account_info(),
+        thread: ctx.accounts.thread.to_account_info(),
       },
       signer_seeds,
     ))?;
-    automation_update(
+    thread_update(
       CpiContext::new_with_signer(
         ctx.accounts.clockwork.to_account_info(),
-        clockwork_sdk::cpi::AutomationUpdate {
+        clockwork_sdk::cpi::ThreadUpdate {
           authority: ctx.accounts.dao.to_account_info(),
-          automation: ctx.accounts.automation.to_account_info(),
+          thread: ctx.accounts.thread.to_account_info(),
           system_program: ctx.accounts.system_program.to_account_info(),
         },
         signer_seeds,
       ),
-      AutomationSettings {
+      ThreadSettings {
         name: None,
         fee: None,
         instructions: Some(vec![kickoff_ix.into()]),

@@ -2,7 +2,7 @@ use crate::{current_epoch, state::*};
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
-use clockwork_sdk::{self, state::AutomationResponse};
+use clockwork_sdk::{self, state::ThreadResponse};
 
 #[derive(Accounts)]
 pub struct IssueHstKickoffV0<'info> {
@@ -36,20 +36,18 @@ fn construct_issue_hst_ix(ctx: &Context<IssueHstKickoffV0>, epoch: u64) -> Instr
   )
   .0;
 
-  // build issue hst pool ix
-  let accounts = vec![
-    AccountMeta::new(ctx.accounts.dao.key(), false),
-    AccountMeta::new(dao_epoch_info, false),
-    AccountMeta::new(hnt_circuit_breaker, false),
-    AccountMeta::new(ctx.accounts.hnt_mint.key(), false),
-    AccountMeta::new(ctx.accounts.dao.hst_pool, false),
-    AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
-  ];
   Instruction {
     program_id: crate::ID,
-    accounts,
+    accounts: crate::accounts::IssueHstPoolV0 {
+      dao: ctx.accounts.dao.key(),
+      dao_epoch_info: dao_epoch_info,
+      hnt_circuit_breaker: hnt_circuit_breaker,
+      hnt_mint: ctx.accounts.hnt_mint.key(),
+      hst_pool: ctx.accounts.dao.hst_pool,
+      system_program: ctx.accounts.system_program.key(),
+      token_program: ctx.accounts.token_program.key(),
+      circuit_breaker_program: ctx.accounts.circuit_breaker_program.key(),
+    }.to_account_metas(Some(true)),
     data: crate::instruction::IssueHstPoolV0 {
       args: crate::IssueHstPoolArgsV0 { epoch },
     }
@@ -57,12 +55,12 @@ fn construct_issue_hst_ix(ctx: &Context<IssueHstKickoffV0>, epoch: u64) -> Instr
   }
 }
 
-pub fn handler(ctx: Context<IssueHstKickoffV0>) -> Result<AutomationResponse> {
+pub fn handler(ctx: Context<IssueHstKickoffV0>) -> Result<ThreadResponse> {
   let curr_ts = Clock::get()?.unix_timestamp;
   let epoch = current_epoch(curr_ts) - 1; // operate calculations on previous epoch
   let issue_hst_ix = construct_issue_hst_ix(&ctx, epoch);
-  Ok(AutomationResponse {
-    next_instruction: Some(issue_hst_ix.into()),
+  Ok(ThreadResponse {
+    dynamic_instruction: Some(issue_hst_ix.into()),
     trigger: None,
   })
 }

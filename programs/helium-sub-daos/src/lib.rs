@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use clockwork_sdk::state::AutomationResponse;
+use clockwork_sdk::state::ThreadResponse;
 
 declare_id!("hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR");
 
@@ -42,7 +42,7 @@ pub mod helium_sub_daos {
   pub fn issue_rewards_v0(
     ctx: Context<IssueRewardsV0>,
     args: IssueRewardsArgsV0,
-  ) -> Result<AutomationResponse> {
+  ) -> Result<ThreadResponse> {
     issue_rewards_v0::handler(ctx, args)
   }
 
@@ -65,7 +65,7 @@ pub mod helium_sub_daos {
   pub fn issue_hst_pool_v0(
     ctx: Context<IssueHstPoolV0>,
     args: IssueHstPoolArgsV0,
-  ) -> Result<AutomationResponse> {
+  ) -> Result<ThreadResponse> {
     issue_hst_pool_v0::handler(ctx, args)
   }
 
@@ -73,25 +73,25 @@ pub mod helium_sub_daos {
     reset_lockup_v0::handler(ctx, args)
   }
 
-  pub fn calculate_kickoff_v0(ctx: Context<CalculateKickoffV0>) -> Result<AutomationResponse> {
+  pub fn calculate_kickoff_v0(ctx: Context<CalculateKickoffV0>) -> Result<ThreadResponse> {
     calculate_kickoff_v0::handler(ctx)
   }
 
   pub fn issue_rewards_kickoff_v0(
     ctx: Context<IssueRewardsKickoffV0>,
-  ) -> Result<AutomationResponse> {
+  ) -> Result<ThreadResponse> {
     issue_rewards_kickoff_v0::handler(ctx)
   }
 
-  pub fn issue_hst_kickoff_v0(ctx: Context<IssueHstKickoffV0>) -> Result<AutomationResponse> {
+  pub fn issue_hst_kickoff_v0(ctx: Context<IssueHstKickoffV0>) -> Result<ThreadResponse> {
     issue_hst_kickoff_v0::handler(ctx)
   }
 
-  pub fn reset_dao_automation_v0(ctx: Context<ResetDaoAutomationV0>) -> Result<()> {
-    reset_dao_automation_v0::handler(ctx)
+  pub fn reset_dao_thread_v0(ctx: Context<ResetDaoThreadV0>) -> Result<()> {
+    reset_dao_thread_v0::handler(ctx)
   }
 
-  pub fn reset_sub_dao_automation_v0(ctx: Context<ResetSubDaoAutomationV0>) -> Result<()> {
-    reset_sub_dao_automation_v0::handler(ctx)
+  pub fn reset_sub_dao_thread_v0(ctx: Context<ResetSubDaoThreadV0>) -> Result<()> {
+    reset_sub_dao_thread_v0::handler(ctx)
   }
 }

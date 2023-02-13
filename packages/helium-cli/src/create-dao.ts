@@ -1,5 +1,5 @@
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
-import { daoKey, init as initDao, automationKey } from "@helium/helium-sub-daos-sdk";
+import { daoKey, init as initDao, threadKey } from "@helium/helium-sub-daos-sdk";
 import { dataCreditsKey, init as initDc, PROGRAM_ID } from "@helium/data-credits-sdk";
 import { init as initLazy } from "@helium/lazy-distributor-sdk";
 import {
@@ -172,10 +172,10 @@ async function run() {
   console.log("COUNCIL", councilKeypair.publicKey.toBase58());
   console.log("COUNCIL WALLET", councilWallet.toBase58());
 
-  const automation = automationKey(dao, "issue_hst")[0];
+  const thread = threadKey(dao, "issue_hst")[0];
 
   console.log("DAO", dao.toString());
-  console.log("AUTOMATION", automation.toString());
+  console.log("AUTOMATION", thread.toString());
 
   const conn = provider.connection;
 
@@ -438,7 +438,7 @@ async function run() {
       .accounts({
         dcMint: dcKeypair.publicKey,
         hntMint: hntKeypair.publicKey,
-        automation,
+        thread,
         // TODO: Create actual HST pool
         hstPool: await getAssociatedTokenAddress(
           hntKeypair.publicKey,

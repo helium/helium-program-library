@@ -2,7 +2,7 @@ use crate::{current_epoch, state::*};
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
-use clockwork_sdk::{self, state::AutomationResponse, utils::PAYER_PUBKEY};
+use clockwork_sdk::{self, state::ThreadResponse, utils::PAYER_PUBKEY};
 use switchboard_v2::AggregatorAccountData;
 
 #[derive(Accounts)]
@@ -49,33 +49,29 @@ fn construct_next_ix(ctx: &Context<CalculateKickoffV0>, epoch: u64) -> Option<In
   let sub_dao_epoch_info = Pubkey::find_program_address(sub_dao_ei_seeds, &crate::id()).0;
 
   // build calculate utility score ix
-  let accounts = vec![
-    AccountMeta::new(PAYER_PUBKEY, true),
-    AccountMeta::new_readonly(ctx.accounts.dao.registrar, false),
-    AccountMeta::new_readonly(ctx.accounts.dao.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.hnt_mint.key(), false),
-    AccountMeta::new(ctx.accounts.sub_dao.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.active_device_aggregator.key(), false),
-    AccountMeta::new_readonly(
-      ctx
+  Some(Instruction {
+    program_id: crate::ID,
+    accounts: crate::accounts::CalculateUtilityScoreV0 {
+      payer: PAYER_PUBKEY,
+      registrar: ctx.accounts.dao.registrar,
+      dao: ctx.accounts.dao.key(),
+      hnt_mint: ctx.accounts.hnt_mint.key(),
+      sub_dao: sub_dao_key,
+      active_device_aggregator: ctx.accounts.active_device_aggregator.key(),
+      history_buffer: ctx
         .accounts
         .active_device_aggregator
         .load()
         .ok()
         .unwrap()
         .history_buffer,
-      false,
-    ),
-    AccountMeta::new_readonly(prev_dao_epoch_info, false),
-    AccountMeta::new(dao_epoch_info, false),
-    AccountMeta::new(sub_dao_epoch_info, false),
-    AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.token_program.key(), false),
-    AccountMeta::new_readonly(ctx.accounts.circuit_breaker_program.key(), false),
-  ];
-  Some(Instruction {
-    program_id: crate::ID,
-    accounts,
+      prev_dao_epoch_info,
+      dao_epoch_info,
+      sub_dao_epoch_info,
+      system_program: ctx.accounts.system_program.key(),
+      token_program: ctx.accounts.token_program.key(),
+      circuit_breaker_program: ctx.accounts.circuit_breaker_program.key(),
+    }.to_account_metas(Some(true)),
     data: crate::instruction::CalculateUtilityScoreV0 {
       args: crate::CalculateUtilityScoreArgsV0 { epoch },
     }
@@ -84,12 +80,12 @@ fn construct_next_ix(ctx: &Context<CalculateKickoffV0>, epoch: u64) -> Option<In
 }
 
 /// This instruction is responsible for deriving the calculate utility score ix
-pub fn handler(ctx: Context<CalculateKickoffV0>) -> Result<AutomationResponse> {
+pub fn handler(ctx: Context<CalculateKickoffV0>) -> Result<ThreadResponse> {
   let curr_ts = Clock::get()?.unix_timestamp;
   let epoch = current_epoch(curr_ts) - 1; // operate calculations on previous epoch
   let calculate_utility_ix = construct_next_ix(&ctx, epoch).unwrap();
-  Ok(AutomationResponse {
-    next_instruction: Some(calculate_utility_ix.into()),
+  Ok(ThreadResponse {
+    dynamic_instruction: Some(calculate_utility_ix.into()),
     trigger: None,
   })
 }

@@ -9,7 +9,7 @@ use circuit_breaker::{
   CircuitBreaker, InitializeMintWindowedBreakerArgsV0,
 };
 use circuit_breaker::{ThresholdType, WindowedCircuitBreakerConfigV0};
-use clockwork_sdk::{cpi::automation_create, state::Trigger, AutomationProgram};
+use clockwork_sdk::{cpi::thread_create, state::Trigger, ThreadProgram};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDaoArgsV0 {
@@ -54,15 +54,15 @@ pub struct InitializeDaoV0<'info> {
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
 
-  /// CHECK: handled by automation_create
+  /// CHECK: handled by thread_create
   #[account(
     mut,
-    seeds = [b"automation", dao.key().as_ref(), b"issue_hst"],
+    seeds = [b"thread", dao.key().as_ref(), b"issue_hst"],
     seeds::program = clockwork.key(),
     bump
   )]
-  pub automation: AccountInfo<'info>,
-  pub clockwork: Program<'info, AutomationProgram>,
+  pub thread: AccountInfo<'info>,
+  pub clockwork: Program<'info, ThreadProgram>,
 }
 
 pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Result<()> {
@@ -138,19 +138,19 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
     ctx.accounts.circuit_breaker_program.key(),
   );
 
-  // initialize automation
+  // initialize thread
   let signer_seeds: &[&[&[u8]]] = &[&[
     "dao".as_bytes(),
     ctx.accounts.hnt_mint.to_account_info().key.as_ref(),
     &[ctx.bumps["dao"]],
   ]];
-  automation_create(
+  thread_create(
     CpiContext::new_with_signer(
       ctx.accounts.clockwork.to_account_info(),
-      clockwork_sdk::cpi::AutomationCreate {
+      clockwork_sdk::cpi::ThreadCreate {
         authority: ctx.accounts.dao.to_account_info(),
         payer: ctx.accounts.payer.to_account_info(),
-        automation: ctx.accounts.automation.to_account_info(),
+        thread: ctx.accounts.thread.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
       },
       signer_seeds,

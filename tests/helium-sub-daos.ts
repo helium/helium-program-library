@@ -49,7 +49,7 @@ import { createPosition, initVsr } from "./utils/vsr";
 chai.use(chaiAsPromised);
 
 const AUTOMATION_PID = new PublicKey(
-  "auto5LqrhPVVt34PDu3dPwJhRisGoFA6dYpxRn29n1k"
+  "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
 );
 
 const EPOCH_REWARDS = 100000000;
@@ -234,18 +234,18 @@ describe("helium-sub-daos", () => {
       hstPool = (await program.account.daoV0.fetch(dao)).hstPool;
     });
 
-    it("resets the subdao clockwork automation", async () => {
+    it("resets the subdao clockwork thread", async () => {
       await program.methods
-        .resetSubDaoAutomationV0()
+        .resetSubDaoThreadV0()
         .accounts({
           subDao,
         })
         .rpc({ skipPreflight: true });
     });
 
-    it("resets the dao clockwork automation", async () => {
+    it("resets the dao clockwork thread", async () => {
       await program.methods
-        .resetDaoAutomationV0()
+        .resetDaoThreadV0()
         .accounts({
           dao,
         })
@@ -609,9 +609,9 @@ describe("helium-sub-daos", () => {
                 await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
               ).epoch;
 
-              const automation = PublicKey.findProgramAddressSync(
+              const thread = PublicKey.findProgramAddressSync(
                 [
-                  Buffer.from("automation", "utf8"),
+                  Buffer.from("thread", "utf8"),
                   subDao.toBuffer(),
                   Buffer.from("end-epoch", "utf8"),
                 ],

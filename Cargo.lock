@@ -763,9 +763,53 @@ dependencies = [
 ]
 
 [[package]]
-name = "clockwork-automation-program"
-version = "1.4.2"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#d65778cc210163db0712516d11521f9f4d19bbf5"
+name = "clockwork-cron"
+version = "2.0.0-alpha"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#2e2d70a34ab5209be50da9ac2a3940a5564e322a"
+dependencies = [
+ "chrono",
+ "nom",
+ "once_cell",
+]
+
+[[package]]
+name = "clockwork-macros"
+version = "2.0.0-alpha"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#2e2d70a34ab5209be50da9ac2a3940a5564e322a"
+dependencies = [
+ "anchor-syn",
+ "proc-macro2 1.0.49",
+ "quote 1.0.23",
+ "syn 1.0.107",
+]
+
+[[package]]
+name = "clockwork-network-program"
+version = "2.0.0-alpha"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#2e2d70a34ab5209be50da9ac2a3940a5564e322a"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "clockwork-macros",
+ "clockwork-utils",
+]
+
+[[package]]
+name = "clockwork-sdk"
+version = "2.0.0-alpha"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#2e2d70a34ab5209be50da9ac2a3940a5564e322a"
+dependencies = [
+ "anchor-lang",
+ "chrono",
+ "clockwork-thread-program",
+ "nom",
+ "once_cell",
+]
+
+[[package]]
+name = "clockwork-thread-program"
+version = "2.0.0-alpha"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#2e2d70a34ab5209be50da9ac2a3940a5564e322a"
 dependencies = [
  "anchor-lang",
  "chrono",
@@ -778,52 +822,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "clockwork-cron"
-version = "1.4.2"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#d65778cc210163db0712516d11521f9f4d19bbf5"
-dependencies = [
- "chrono",
- "nom",
- "once_cell",
-]
-
-[[package]]
-name = "clockwork-macros"
-version = "1.4.0"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#d65778cc210163db0712516d11521f9f4d19bbf5"
-dependencies = [
- "proc-macro2 1.0.49",
- "quote 1.0.23",
- "syn 1.0.107",
-]
-
-[[package]]
-name = "clockwork-network-program"
-version = "1.4.2"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#d65778cc210163db0712516d11521f9f4d19bbf5"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "clockwork-macros",
- "clockwork-utils",
-]
-
-[[package]]
-name = "clockwork-sdk"
-version = "1.4.2"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#d65778cc210163db0712516d11521f9f4d19bbf5"
-dependencies = [
- "anchor-lang",
- "chrono",
- "clockwork-automation-program",
- "nom",
- "once_cell",
-]
-
-[[package]]
 name = "clockwork-utils"
-version = "1.4.2"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#d65778cc210163db0712516d11521f9f4d19bbf5"
+version = "2.0.0-alpha"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#2e2d70a34ab5209be50da9ac2a3940a5564e322a"
 dependencies = [
  "anchor-lang",
  "base64 0.13.1",

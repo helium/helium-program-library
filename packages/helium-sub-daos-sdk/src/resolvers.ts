@@ -12,7 +12,7 @@ import { EPOCH_LENGTH, PROGRAM_ID } from "./constants";
 import { daoEpochInfoKey, subDaoEpochInfoKey } from "./pdas";
 
 const AUTOMATION_PID = new PublicKey(
-  "auto5LqrhPVVt34PDu3dPwJhRisGoFA6dYpxRn29n1k"
+  "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
 );
 
 export const subDaoEpochInfoResolver = resolveIndividual(

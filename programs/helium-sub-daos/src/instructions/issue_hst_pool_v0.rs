@@ -5,7 +5,7 @@ use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
-use clockwork_sdk::state::{AutomationResponse, Trigger};
+use clockwork_sdk::state::{ThreadResponse, Trigger};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHstPoolArgsV0 {
@@ -63,7 +63,7 @@ impl<'info> IssueHstPoolV0<'info> {
 pub fn handler(
   ctx: Context<IssueHstPoolV0>,
   args: IssueHstPoolArgsV0,
-) -> Result<AutomationResponse> {
+) -> Result<ThreadResponse> {
   let curr_ts = Clock::get()?.unix_timestamp;
   let epoch = current_epoch(curr_ts);
 
@@ -96,7 +96,7 @@ pub fn handler(
 
   ctx.accounts.dao_epoch_info.done_issuing_hst_pool = true;
 
-  // update automation to point at next epoch
+  // update thread to point at next epoch
   let next_epoch = current_epoch(curr_ts);
 
   let dao_key = ctx.accounts.dao.key();
@@ -107,8 +107,8 @@ pub fn handler(
   ];
   let next_dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
 
-  Ok(AutomationResponse {
-    next_instruction: None,
+  Ok(ThreadResponse {
+    dynamic_instruction: None,
     trigger: Some(Trigger::Account {
       address: next_dao_epoch_info,
       offset: 8,

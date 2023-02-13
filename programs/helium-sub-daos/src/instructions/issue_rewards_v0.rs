@@ -6,7 +6,7 @@ use circuit_breaker::{
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use clockwork_sdk::state::{AutomationResponse, Trigger};
+use clockwork_sdk::state::{ThreadResponse, Trigger};
 use shared_utils::precise_number::{InnerUint, PreciseNumber};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -123,7 +123,7 @@ impl<'info> IssueRewardsV0<'info> {
 pub fn handler(
   ctx: Context<IssueRewardsV0>,
   args: IssueRewardsArgsV0,
-) -> Result<AutomationResponse> {
+) -> Result<ThreadResponse> {
   let curr_ts = Clock::get()?.unix_timestamp;
   let epoch = current_epoch(curr_ts);
 
@@ -225,7 +225,7 @@ pub fn handler(
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 
-  // update automation to point at next epoch
+  // update thread to point at next epoch
   let next_epoch = current_epoch(curr_ts);
   let dao_epoch_info = Pubkey::find_program_address(
     &[
@@ -237,8 +237,8 @@ pub fn handler(
   )
   .0;
 
-  Ok(AutomationResponse {
-    next_instruction: None,
+  Ok(ThreadResponse {
+    dynamic_instruction: None,
     trigger: Some(Trigger::Account {
       address: dao_epoch_info,
       offset: 8,

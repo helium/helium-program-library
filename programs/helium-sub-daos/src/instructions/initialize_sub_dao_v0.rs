@@ -16,7 +16,7 @@ use circuit_breaker::{
   ThresholdType as CBThresholdType,
   WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
 };
-use clockwork_sdk::{cpi::automation_create, state::Trigger, AutomationProgram};
+use clockwork_sdk::{cpi::thread_create, state::Trigger, ThreadProgram};
 use shared_utils::resize_to_fit;
 use switchboard_v2::AggregatorAccountData;
 use time::OffsetDateTime;
@@ -138,23 +138,23 @@ pub struct InitializeSubDaoV0<'info> {
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub associated_token_program: Program<'info, AssociatedToken>,
 
-  /// CHECK: handled by automation_create
+  /// CHECK: handled by thread_create
   #[account(
     mut,
-    seeds = [b"automation", sub_dao.key().as_ref(), b"calculate"],
+    seeds = [b"thread", sub_dao.key().as_ref(), b"calculate"],
     seeds::program = clockwork.key(),
     bump
   )]
-  pub calculate_automation: AccountInfo<'info>,
-  /// CHECK: handled by automation_create
+  pub calculate_thread: AccountInfo<'info>,
+  /// CHECK: handled by thread_create
   #[account(
     mut,
-    seeds = [b"automation", sub_dao.key().as_ref(), b"issue"],
+    seeds = [b"thread", sub_dao.key().as_ref(), b"issue"],
     seeds::program = clockwork.key(),
     bump
   )]
-  pub issue_automation: AccountInfo<'info>,
-  pub clockwork: Program<'info, AutomationProgram>,
+  pub issue_thread: AccountInfo<'info>,
+  pub clockwork: Program<'info, ThreadProgram>,
 }
 
 // returns a cron that starts at <offset> past the end of the current epoch and triggers at the same time daily.
@@ -307,14 +307,14 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     ctx.accounts.circuit_breaker_program.key(),
   );
   let cron = create_end_epoch_cron(curr_ts, 60 * 5);
-  // initialize calculate automation
-  automation_create(
+  // initialize calculate thread
+  thread_create(
     CpiContext::new_with_signer(
       ctx.accounts.clockwork.to_account_info(),
-      clockwork_sdk::cpi::AutomationCreate {
+      clockwork_sdk::cpi::ThreadCreate {
         authority: ctx.accounts.sub_dao.to_account_info(),
         payer: ctx.accounts.payer.to_account_info(),
-        automation: ctx.accounts.calculate_automation.to_account_info(),
+        thread: ctx.accounts.calculate_thread.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
       },
       signer_seeds,
@@ -349,13 +349,13 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     ctx.accounts.circuit_breaker_program.key(),
   );
 
-  automation_create(
+  thread_create(
     CpiContext::new_with_signer(
       ctx.accounts.clockwork.to_account_info(),
-      clockwork_sdk::cpi::AutomationCreate {
+      clockwork_sdk::cpi::ThreadCreate {
         authority: ctx.accounts.sub_dao.to_account_info(),
         payer: ctx.accounts.payer.to_account_info(),
-        automation: ctx.accounts.issue_automation.to_account_info(),
+        thread: ctx.accounts.issue_thread.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
       },
       signer_seeds,
