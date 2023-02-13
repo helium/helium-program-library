@@ -175,7 +175,7 @@ async function run() {
   const thread = threadKey(dao, "issue_hst")[0];
 
   console.log("DAO", dao.toString());
-  console.log("THREAD", thread.toString());
+  console.log("AUTOMATION", thread.toString());
 
   const conn = provider.connection;
 
@@ -213,7 +213,8 @@ async function run() {
   let instructions: TransactionInstruction[] = [];
   const govProgramVersion = await getGovernanceProgramVersion(
     conn,
-    govProgramId
+    govProgramId,
+    isLocalhost(provider) ? "localnet" : undefined,
   );
 
   const realmName = argv.realmName;
@@ -446,15 +447,6 @@ async function run() {
         ),
       })
       .rpc({ skipPreflight: true });
-
-    console.log("Transfering sol to thread")
-    await sendInstructions(provider, [
-      SystemProgram.transfer({
-        fromPubkey: provider.wallet.publicKey,
-        toPubkey: thread,
-        lamports: BigInt(toBN(0.1, 9).toString()),
-      }),
-    ]);
   }
   
 }

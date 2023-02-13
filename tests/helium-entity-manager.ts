@@ -4,7 +4,7 @@ import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { Asset, AssetProof, toBN } from "@helium/spl-utils";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
 import chai from "chai";
 import {
   entityCreatorKey,
@@ -261,11 +261,14 @@ describe("helium-entity-manager", () => {
         .issueEntityV0({
           entityKey: Buffer.from(bs58.decode(ecc)),
         })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+        ])
         .accounts({
           maker,
           recipient: hotspotOwner.publicKey,
           issuingAuthority: makerKeypair.publicKey,
-          dao
+          dao,
         })
         .signers([makerKeypair])
         .rpc({ skipPreflight: true });
@@ -297,6 +300,9 @@ describe("helium-entity-manager", () => {
           .issueEntityV0({
             entityKey: Buffer.from(bs58.decode(ecc)),
           })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+          ])
           .accounts({
             maker,
             dao,
@@ -483,6 +489,9 @@ describe("helium-entity-manager", () => {
         .issueEntityV0({
           entityKey: Buffer.from(bs58.decode(ecc)),
         })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+        ])
         .accounts({
           maker,
           dao,
@@ -541,6 +550,9 @@ describe("helium-entity-manager", () => {
           .issueEntityV0({
             entityKey: Buffer.from(bs58.decode(ecc)),
           })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+          ])
           .accounts({
             maker,
             dao,

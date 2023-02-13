@@ -1,5 +1,6 @@
-use crate::{construct_issue_hst_ix, current_epoch, state::*, EPOCH_LENGTH};
+use crate::{construct_issue_hst_kickoff_ix, current_epoch, state::*, EPOCH_LENGTH};
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::native_token::LAMPORTS_PER_SOL;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::{set_authority, SetAuthority, TokenAccount};
 use anchor_spl::token::{Mint, Token};
@@ -129,20 +130,13 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
   ];
   let dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
 
-  let kickoff_ix = construct_issue_hst_ix(
+  let kickoff_ix = construct_issue_hst_kickoff_ix(
     ctx.accounts.dao.key(),
-    ctx.accounts.hnt_circuit_breaker.key(),
-    ctx.accounts.dao.hnt_mint,
-    ctx.accounts.hst_pool.key(),
+    ctx.accounts.hnt_mint.key(),
     ctx.accounts.system_program.key(),
     ctx.accounts.token_program.key(),
     ctx.accounts.circuit_breaker_program.key(),
-    ctx.accounts.thread.key(),
-    ctx.accounts.clockwork.key(),
-    dao_epoch_info,
-    epoch,
-  )
-  .unwrap();
+  );
 
   // initialize thread
   let signer_seeds: &[&[&[u8]]] = &[&[
@@ -161,8 +155,9 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
       },
       signer_seeds,
     ),
-    "issue_hst".to_string(),
-    kickoff_ix.into(),
+    LAMPORTS_PER_SOL / 100,
+    "issue_hst".to_string().as_bytes().to_vec(),
+    vec![kickoff_ix.into()],
     Trigger::Account {
       address: dao_epoch_info,
       offset: 8,

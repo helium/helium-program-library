@@ -1,15 +1,14 @@
-use crate::{construct_issue_hst_ix, create_end_epoch_cron, current_epoch, state::*};
-use anchor_lang::prelude::*;
+use crate::{construct_issue_hst_kickoff_ix, current_epoch, state::*};
+use anchor_lang::{prelude::*, solana_program::native_token::LAMPORTS_PER_SOL};
 use anchor_spl::token::Token;
 use circuit_breaker::{CircuitBreaker, MintWindowedCircuitBreakerV0};
 use clockwork_sdk::{
-  cpi::{thread_stop, thread_update},
-  state::{Thread, ThreadSettings, Trigger},
+  cpi::{thread_create, thread_reset, thread_update},
+  state::{ThreadSettings, Trigger},
   ThreadProgram,
 };
 
 #[derive(Accounts)]
-#[instruction()]
 pub struct ResetDaoThreadV0<'info> {
   pub authority: Signer<'info>,
 
@@ -28,14 +27,14 @@ pub struct ResetDaoThreadV0<'info> {
     bump = hnt_circuit_breaker.bump_seed
   )]
   pub hnt_circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
-
+  ///CHECK: seeds checked
   #[account(
     mut,
     seeds = [b"thread", dao.key().as_ref(), b"issue_hst"],
     seeds::program = clockwork.key(),
     bump
   )]
-  pub thread: Account<'info, Thread>,
+  pub thread: AccountInfo<'info>,
   pub clockwork: Program<'info, ThreadProgram>,
 
   pub system_program: Program<'info, System>,
@@ -44,6 +43,14 @@ pub struct ResetDaoThreadV0<'info> {
 }
 
 pub fn handler(ctx: Context<ResetDaoThreadV0>) -> Result<()> {
+  let kickoff_ix = construct_issue_hst_kickoff_ix(
+    ctx.accounts.dao.key(),
+    ctx.accounts.dao.hnt_mint,
+    ctx.accounts.system_program.key(),
+    ctx.accounts.token_program.key(),
+    ctx.accounts.circuit_breaker_program.key(),
+  );
+
   let curr_ts = Clock::get()?.unix_timestamp;
   let epoch = current_epoch(curr_ts);
 
@@ -55,57 +62,65 @@ pub fn handler(ctx: Context<ResetDaoThreadV0>) -> Result<()> {
   ];
   let dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
 
-  let kickoff_ix = construct_issue_hst_ix(
-    ctx.accounts.dao.key(),
-    ctx.accounts.hnt_circuit_breaker.key(),
-    ctx.accounts.dao.hnt_mint,
-    ctx.accounts.dao.hst_pool,
-    ctx.accounts.system_program.key(),
-    ctx.accounts.token_program.key(),
-    ctx.accounts.circuit_breaker_program.key(),
-    ctx.accounts.thread.key(),
-    ctx.accounts.clockwork.key(),
-    dao_epoch_info,
-    epoch,
-  )
-  .unwrap();
-
-  let curr_ts = Clock::get()?.unix_timestamp;
-  let cron = create_end_epoch_cron(curr_ts, 60 * 5);
-
   let signer_seeds: &[&[&[u8]]] = &[&[
     "dao".as_bytes(),
     ctx.accounts.dao.hnt_mint.as_ref(),
     &[ctx.accounts.dao.bump_seed],
   ]];
 
-  thread_stop(CpiContext::new_with_signer(
-    ctx.accounts.clockwork.to_account_info(),
-    clockwork_sdk::cpi::ThreadStop {
-      authority: ctx.accounts.dao.to_account_info(),
-      thread: ctx.accounts.thread.to_account_info(),
-    },
-    signer_seeds,
-  ))?;
-  thread_update(
-    CpiContext::new_with_signer(
+  if ctx.accounts.thread.data_is_empty() && ctx.accounts.thread.lamports() == 0 {
+    thread_create(
+      CpiContext::new_with_signer(
+        ctx.accounts.clockwork.to_account_info(),
+        clockwork_sdk::cpi::ThreadCreate {
+          authority: ctx.accounts.dao.to_account_info(),
+          payer: ctx.accounts.authority.to_account_info(),
+          thread: ctx.accounts.thread.to_account_info(),
+          system_program: ctx.accounts.system_program.to_account_info(),
+        },
+        signer_seeds,
+      ),
+      LAMPORTS_PER_SOL / 100,
+      "issue_hst".to_string().as_bytes().to_vec(),
+      vec![kickoff_ix.into()],
+      Trigger::Account {
+        address: dao_epoch_info,
+        offset: 8,
+        size: 1,
+      },
+    )?;
+  } else {
+    thread_reset(CpiContext::new_with_signer(
       ctx.accounts.clockwork.to_account_info(),
-      clockwork_sdk::cpi::ThreadUpdate {
+      clockwork_sdk::cpi::ThreadReset {
         authority: ctx.accounts.dao.to_account_info(),
         thread: ctx.accounts.thread.to_account_info(),
-        system_program: ctx.accounts.system_program.to_account_info(),
       },
       signer_seeds,
-    ),
-    ThreadSettings {
-      fee: None,
-      kickoff_instruction: Some(kickoff_ix.into()),
-      rate_limit: None,
-      trigger: Some(Trigger::Cron {
-        schedule: cron,
-        skippable: false,
-      }),
-    },
-  )?;
+    ))?;
+    thread_update(
+      CpiContext::new_with_signer(
+        ctx.accounts.clockwork.to_account_info(),
+        clockwork_sdk::cpi::ThreadUpdate {
+          authority: ctx.accounts.dao.to_account_info(),
+          thread: ctx.accounts.thread.to_account_info(),
+          system_program: ctx.accounts.system_program.to_account_info(),
+        },
+        signer_seeds,
+      ),
+      ThreadSettings {
+        name: None,
+        fee: None,
+        instructions: Some(vec![kickoff_ix.into()]),
+        rate_limit: None,
+        trigger: Some(Trigger::Account {
+          address: dao_epoch_info,
+          offset: 8,
+          size: 1,
+        }),
+      },
+    )?;
+  }
+
   Ok(())
 }

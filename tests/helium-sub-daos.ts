@@ -48,8 +48,8 @@ import { createPosition, initVsr } from "./utils/vsr";
 
 chai.use(chaiAsPromised);
 
-const THREAD_PID = new PublicKey(
-  "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv"
+const AUTOMATION_PID = new PublicKey(
+  "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
 );
 
 const EPOCH_REWARDS = 100000000;
@@ -615,7 +615,7 @@ describe("helium-sub-daos", () => {
                   subDao.toBuffer(),
                   Buffer.from("end-epoch", "utf8"),
                 ],
-                THREAD_PID
+                AUTOMATION_PID
               )[0];
 
               await program.methods
