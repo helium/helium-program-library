@@ -5,10 +5,10 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::metadata::{
-  create_master_edition_v3, verify_sized_collection_item, CreateMasterEditionV3,
-  CreateMetadataAccountsV3, Metadata, VerifySizedCollectionItem,
+  verify_sized_collection_item, CreateMetadataAccountsV3, Metadata, VerifySizedCollectionItem,
 };
 use anchor_spl::token;
+use anchor_spl::token::FreezeAccount;
 use anchor_spl::token::{Mint, MintTo, Token, TokenAccount};
 use mpl_token_metadata::state::Collection;
 use mpl_token_metadata::state::DataV2;
@@ -77,14 +77,6 @@ pub struct InitializePositionV0<'info> {
   )]
   /// CHECK: Checked by cpi
   pub metadata: UncheckedAccount<'info>,
-  /// CHECK: Handled by cpi
-  #[account(
-    mut,
-    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), mint.key().as_ref(), "edition".as_bytes()],
-    seeds::program = token_metadata_program.key(),
-    bump,
-  )]
-  pub master_edition: UncheckedAccount<'info>,
   #[account(
     init_if_needed,
     payer = payer,
@@ -120,6 +112,15 @@ impl<'info> InitializePositionV0<'info> {
     let cpi_accounts = MintTo {
       mint: self.mint.to_account_info(),
       to: self.position_token_account.to_account_info(),
+      authority: self.position.to_account_info(),
+    };
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+  }
+
+  fn freeze_ctx(&self) -> CpiContext<'_, '_, '_, 'info, FreezeAccount<'info>> {
+    let cpi_accounts = FreezeAccount {
+      account: self.position_token_account.to_account_info(),
+      mint: self.mint.to_account_info(),
       authority: self.position.to_account_info(),
     };
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
@@ -176,6 +177,8 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
 
   token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
 
+  token::freeze_account(ctx.accounts.freeze_ctx().with_signer(signer_seeds))?;
+
   create_metadata_accounts_v3(
     CpiContext::new_with_signer(
       ctx
@@ -212,29 +215,6 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
     true,
     true,
     None,
-  )?;
-
-  create_master_edition_v3(
-    CpiContext::new_with_signer(
-      ctx
-        .accounts
-        .token_metadata_program
-        .to_account_info()
-        .clone(),
-      CreateMasterEditionV3 {
-        edition: ctx.accounts.master_edition.to_account_info().clone(),
-        mint: ctx.accounts.mint.to_account_info().clone(),
-        update_authority: ctx.accounts.position.to_account_info().clone(),
-        mint_authority: ctx.accounts.position.to_account_info().clone(),
-        metadata: ctx.accounts.metadata.to_account_info().clone(),
-        payer: ctx.accounts.payer.to_account_info().clone(),
-        token_program: ctx.accounts.token_program.to_account_info().clone(),
-        system_program: ctx.accounts.system_program.to_account_info().clone(),
-        rent: ctx.accounts.rent.to_account_info().clone(),
-      },
-      signer_seeds,
-    ),
-    Some(0),
   )?;
 
   let verify_signer_seeds: &[&[&[u8]]] = &[registrar_seeds!(ctx.accounts.registrar)];
