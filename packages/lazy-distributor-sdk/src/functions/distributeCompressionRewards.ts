@@ -8,11 +8,13 @@ export async function distributeCompressionRewards<IDL extends Idl>({
   program,
   assetId,
   lazyDistributor,
+  assetEndpoint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
 }: {
   program: Program<LazyDistributor>;
   assetId: PublicKey;
+  assetEndpoint?: string;
   lazyDistributor: PublicKey;
   owner?: PublicKey;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
@@ -22,7 +24,7 @@ export async function distributeCompressionRewards<IDL extends Idl>({
   ) => Promise<AssetProof | undefined>;
 }) {
   // @ts-ignore
-  const endpoint = program.provider.connection._rpcEndpoint;
+  const endpoint = assetEndpoint || program.provider.connection._rpcEndpoint;
   const asset = await getAssetFn(endpoint, assetId);
   if (!asset) {
     throw new Error("No asset with ID " + assetId.toBase58());
