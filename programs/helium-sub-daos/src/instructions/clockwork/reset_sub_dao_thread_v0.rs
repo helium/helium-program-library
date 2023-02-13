@@ -68,8 +68,7 @@ pub fn handler(ctx: Context<ResetSubDaoThreadV0>) -> Result<()> {
   ]];
 
   // reset calculate thread
-  if ctx.accounts.calculate_thread.data_is_empty()
-    && ctx.accounts.calculate_thread.lamports() == 0
+  if ctx.accounts.calculate_thread.data_is_empty() && ctx.accounts.calculate_thread.lamports() == 0
   {
     thread_create(
       CpiContext::new_with_signer(
@@ -144,8 +143,7 @@ pub fn handler(ctx: Context<ResetSubDaoThreadV0>) -> Result<()> {
     ctx.accounts.circuit_breaker_program.key(),
   );
 
-  if ctx.accounts.issue_thread.data_is_empty() && ctx.accounts.issue_thread.lamports() == 0
-  {
+  if ctx.accounts.issue_thread.data_is_empty() && ctx.accounts.issue_thread.lamports() == 0 {
     thread_create(
       CpiContext::new_with_signer(
         ctx.accounts.clockwork.to_account_info(),

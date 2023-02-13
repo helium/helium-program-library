@@ -335,9 +335,10 @@ pub fn construct_calculate_kickoff_ix(
       active_device_aggregator,
       system_program,
       token_program,
-      circuit_breaker_program
-    }.to_account_metas(Some(true)),
-    data: crate::instruction::CalculateKickoffV0 {}.data()
+      circuit_breaker_program,
+    }
+    .to_account_metas(Some(true)),
+    data: crate::instruction::CalculateKickoffV0 {}.data(),
   }
 }
 
@@ -359,8 +360,9 @@ pub fn construct_issue_rewards_kickoff_ix(
       dnt_mint,
       system_program,
       token_program,
-      circuit_breaker_program
-    }.to_account_metas(Some(true)),
+      circuit_breaker_program,
+    }
+    .to_account_metas(Some(true)),
     data: crate::instruction::IssueRewardsKickoffV0 {}.data(),
   }
 }
@@ -379,8 +381,9 @@ pub fn construct_issue_hst_kickoff_ix(
       hnt_mint,
       system_program,
       token_program,
-      circuit_breaker_program
-    }.to_account_metas(Some(true)),
+      circuit_breaker_program,
+    }
+    .to_account_metas(Some(true)),
     data: crate::instruction::IssueHstKickoffV0 {}.data(),
   }
 }

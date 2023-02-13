@@ -71,7 +71,8 @@ fn construct_next_ix(ctx: &Context<CalculateKickoffV0>, epoch: u64) -> Option<In
       system_program: ctx.accounts.system_program.key(),
       token_program: ctx.accounts.token_program.key(),
       circuit_breaker_program: ctx.accounts.circuit_breaker_program.key(),
-    }.to_account_metas(Some(true)),
+    }
+    .to_account_metas(Some(true)),
     data: crate::instruction::CalculateUtilityScoreV0 {
       args: crate::CalculateUtilityScoreArgsV0 { epoch },
     }

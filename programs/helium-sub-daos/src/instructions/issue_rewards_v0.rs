@@ -120,10 +120,7 @@ impl<'info> IssueRewardsV0<'info> {
   }
 }
 
-pub fn handler(
-  ctx: Context<IssueRewardsV0>,
-  args: IssueRewardsArgsV0,
-) -> Result<ThreadResponse> {
+pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<ThreadResponse> {
   let curr_ts = Clock::get()?.unix_timestamp;
   let epoch = current_epoch(curr_ts);
 

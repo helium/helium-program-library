@@ -77,9 +77,7 @@ pub mod helium_sub_daos {
     calculate_kickoff_v0::handler(ctx)
   }
 
-  pub fn issue_rewards_kickoff_v0(
-    ctx: Context<IssueRewardsKickoffV0>,
-  ) -> Result<ThreadResponse> {
+  pub fn issue_rewards_kickoff_v0(ctx: Context<IssueRewardsKickoffV0>) -> Result<ThreadResponse> {
     issue_rewards_kickoff_v0::handler(ctx)
   }
 

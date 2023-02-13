@@ -60,10 +60,7 @@ impl<'info> IssueHstPoolV0<'info> {
   }
 }
 
-pub fn handler(
-  ctx: Context<IssueHstPoolV0>,
-  args: IssueHstPoolArgsV0,
-) -> Result<ThreadResponse> {
+pub fn handler(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result<ThreadResponse> {
   let curr_ts = Clock::get()?.unix_timestamp;
   let epoch = current_epoch(curr_ts);
 
