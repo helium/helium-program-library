@@ -40,8 +40,8 @@ fn construct_issue_hst_ix(ctx: &Context<IssueHstKickoffV0>, epoch: u64) -> Instr
     program_id: crate::ID,
     accounts: crate::accounts::IssueHstPoolV0 {
       dao: ctx.accounts.dao.key(),
-      dao_epoch_info: dao_epoch_info,
-      hnt_circuit_breaker: hnt_circuit_breaker,
+      dao_epoch_info,
+      hnt_circuit_breaker,
       hnt_mint: ctx.accounts.hnt_mint.key(),
       hst_pool: ctx.accounts.dao.hst_pool,
       system_program: ctx.accounts.system_program.key(),
