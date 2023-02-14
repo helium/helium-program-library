@@ -10,7 +10,7 @@ import {
   Program,
   setProvider
 } from "@coral-xyz/anchor";
-import { init as initHeliumEntityManager, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
+import { entityCreatorKey, init as initHeliumEntityManager, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import {
   HeliumEntityManager
@@ -31,6 +31,7 @@ import { Reward } from "./model";
 
 const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
 const DAO = daoKey(HNT)[0];
+const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
 export interface Database {
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
@@ -58,9 +59,11 @@ export class PgDatabase implements Database {
       return "0";
     }
     const eccCompact = asset.content.json_uri.split("/").slice(-1)[0] as string;
-    const [key] = await keyToAssetKey(DAO, eccCompact)
-    const keyToAsset = await this.issuanceProgram.account.keyToAssetV0.fetch(key);
-    expect(keyToAsset.asset.toBase58()).to.equal(assetId.toBase58());
+    // Verify the creator is our entity creator, otherwise they could just
+    // pass in any NFT with this ecc compact to collect rewards
+    if (!asset.creators[0].verified || !asset.creators[0].address.equals(ENTITY_CREATOR)) {
+      throw new Error("Not a valid rewardable entity")
+    }
     const reward = await Reward.findByPk(eccCompact) as Reward;
 
     // TODO: Remove when 6 decimals
