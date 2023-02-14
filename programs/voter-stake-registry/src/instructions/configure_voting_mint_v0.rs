@@ -26,8 +26,7 @@ pub struct ConfigureVotingMintV0<'info> {
 pub struct ConfigureVotingMintArgsV0 {
   pub idx: u16,
   pub digit_shift: i8,
-  pub locked_vote_weight_scaled_factor: u64,
-  pub minimum_required_lockup_secs: u64,
+  pub baseline_vote_weight_scaled_factor: u64,
   pub max_extra_lockup_vote_weight_scaled_factor: u64,
   pub genesis_vote_power_multiplier: u8,
   pub genesis_vote_power_multiplier_expiration_ts: i64,
@@ -40,31 +39,23 @@ pub struct ConfigureVotingMintArgsV0 {
 ///
 /// * `idx`: index of the rate to be set
 /// * `digit_shift`: how many digits to shift the native token amount, see below
-/// * `locked_vote_weight_scaled_factor`: vote weight factor for all funds in vault, in 1/1e9 units
+/// * `baseline_vote_weight_scaled_factor`: vote weight factor for all funds in vault, in 1/1e9 units
 /// * `max_extra_lockup_vote_weight_scaled_factor`: max extra weight for lockups, in 1/1e9 units
 /// * `lockup_saturation_secs`: lockup duration at which the full vote weight
 ///   bonus is given to locked up deposits
-/// * `minimum_required_lockup_secs` - The minimum required lockup, at which point 1 token = 1 vote
+/// * `genesis_vote_power_multiplier`: multiplier given to vote_weight if before
+///   `genesis_vote_power_multiplier_expiration_ts`
 ///
 /// This instruction can be called several times for the same mint and index to
 /// change the voting mint configuration.
 ///
-/// The vote weight for `amount` of native tokens will be one of these
-///
-/// With min_lockup_saturation_secs == 0
+/// The vote weight for `amount` of native tokens will be
 /// ```
 /// vote_weight =
 ///     amount * 10^(digit_shift)
-///            * (locked_vote_weight_scaled_factor/1e9
+///            * genesis_vote_power_multiplier
+///            * (baseline_vote_weight_scaled_factor/1e9
 ///               + lockup_duration_factor * max_extra_lockup_vote_weight_scaled_factor/1e9)
-/// ```
-///
-/// With min_lockup_saturation_secs > 0 && lockup.total_seconds == min_lockup_saturation_secs
-/// ```
-/// vote_weight =
-///     amount * 10^(digit_shift)
-///            * (locked_vote_weight_scaled_factor/1e9
-///               + lockup_duration_factor * min_lockup_vote_weight_scaled_factor/1e9)
 /// ```
 /// where lockup_duration_factor is a value between 0 and 1, depending on how long
 /// the amount is locked up. It is 1 when the lockup duration is greater or equal
@@ -74,7 +65,7 @@ pub struct ConfigureVotingMintArgsV0 {
 /// u64 limit! There is a check based on the supply of all configured mints, but
 /// do your own checking too.
 ///
-/// If you use a single mint, prefer digit_shift=0 and locked_vote_weight_scaled_factor +
+/// If you use a single mint, prefer digit_shift=0 and baseline_vote_weight_scaled_factor +
 /// max_extra_lockup_vote_weight_scaled_factor <= 1e9. That way you won't have issues with overflow no
 /// matter the size of the mint's supply.
 ///
@@ -84,8 +75,8 @@ pub struct ConfigureVotingMintArgsV0 {
 ///
 /// Example: If you have token A with 6 decimals and token B with 9 decimals, you
 /// could set up:
-///    * A with digit_shift=0,  locked_vote_weight_scaled_factor=2e9, max_extra_lockup_vote_weight_scaled_factor=0
-///    * B with digit_shift=-3, locked_vote_weight_scaled_factor=1e9, max_extra_lockup_vote_weight_scaled_factor=1e9
+///    * A with digit_shift=0,  baseline_vote_weight_scaled_factor=2e9, max_extra_lockup_vote_weight_scaled_factor=0
+///    * B with digit_shift=-3, baseline_vote_weight_scaled_factor=1e9, max_extra_lockup_vote_weight_scaled_factor=1e9
 ///
 /// That would make 1.0 decimaled tokens of A as valuable as 2.0 decimaled tokens
 /// of B when unlocked. B tokens could be locked up to double their vote weight. As
@@ -93,16 +84,15 @@ pub struct ConfigureVotingMintArgsV0 {
 ///
 /// Note that in this example, you need 1000 native B tokens before receiving 1
 /// unit of vote weight. If the supplies were significantly lower, you could use
-///    * A with digit_shift=3, locked_vote_weight_scaled_factor=2e9, max_extra_lockup_vote_weight_scaled_factor=0
-///    * B with digit_shift=0, locked_vote_weight_scaled_factor=1e9, max_extra_lockup_vote_weight_scaled_factor=1e9
+///    * A with digit_shift=3, baseline_vote_weight_scaled_factor=2e9, max_extra_lockup_vote_weight_scaled_factor=0
+///    * B with digit_shift=0, baseline_vote_weight_scaled_factor=1e9, max_extra_lockup_vote_weight_scaled_factor=1e9
 /// to not lose precision on B tokens.
 ///
 pub fn handler(ctx: Context<ConfigureVotingMintV0>, args: ConfigureVotingMintArgsV0) -> Result<()> {
   let ConfigureVotingMintArgsV0 {
     idx,
     digit_shift,
-    locked_vote_weight_scaled_factor,
-    minimum_required_lockup_secs,
+    baseline_vote_weight_scaled_factor,
     max_extra_lockup_vote_weight_scaled_factor,
     genesis_vote_power_multiplier,
     genesis_vote_power_multiplier_expiration_ts,
@@ -145,19 +135,18 @@ pub fn handler(ctx: Context<ConfigureVotingMintV0>, args: ConfigureVotingMintArg
       registrar.voting_mints[idx] = VotingMintConfigV0 {
         mint,
         digit_shift,
-        locked_vote_weight_scaled_factor,
-        minimum_required_lockup_secs,
+        baseline_vote_weight_scaled_factor,
         max_extra_lockup_vote_weight_scaled_factor,
         genesis_vote_power_multiplier,
         genesis_vote_power_multiplier_expiration_ts,
         lockup_saturation_secs,
       }
     }
+
     None => registrar.voting_mints.push(VotingMintConfigV0 {
       mint,
       digit_shift,
-      locked_vote_weight_scaled_factor,
-      minimum_required_lockup_secs,
+      baseline_vote_weight_scaled_factor,
       max_extra_lockup_vote_weight_scaled_factor,
       genesis_vote_power_multiplier,
       genesis_vote_power_multiplier_expiration_ts,

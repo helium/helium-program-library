@@ -1,6 +1,14 @@
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
-import { daoKey, init as initDao, threadKey } from "@helium/helium-sub-daos-sdk";
-import { dataCreditsKey, init as initDc, PROGRAM_ID } from "@helium/data-credits-sdk";
+import {
+  daoKey,
+  init as initDao,
+  threadKey,
+} from "@helium/helium-sub-daos-sdk";
+import {
+  dataCreditsKey,
+  init as initDc,
+  PROGRAM_ID,
+} from "@helium/data-credits-sdk";
 import { init as initLazy } from "@helium/lazy-distributor-sdk";
 import {
   registrarKey,
@@ -48,8 +56,10 @@ const { hideBin } = require("yargs/helpers");
 
 const HNT_EPOCH_REWARDS = 10000000000;
 const MOBILE_EPOCH_REWARDS = 5000000000;
-const MIN_LOCKUP = 15811200; // 6 months
-const MAX_LOCKUP = MIN_LOCKUP * 8;
+const SECS_PER_DAY = 86400;
+const SECS_PER_YEAR = 365 * SECS_PER_DAY;
+const MAX_LOCKUP = 4 * SECS_PER_YEAR;
+const BASELINE = 0;
 const SCALE = 100;
 const GENESIS_MULTIPLIER = 3;
 async function exists(
@@ -140,9 +150,10 @@ async function run() {
     },
     noGovernance: {
       type: "boolean",
-      describe: "If this is set, your wallet will be the dao authority instead of the governance",
+      describe:
+        "If this is set, your wallet will be the dao authority instead of the governance",
       default: false,
-    }
+    },
   });
 
   const argv = await yarg.argv;
@@ -274,9 +285,8 @@ async function run() {
       .configureVotingMintV0({
         idx: 0, // idx
         digitShift: 0, // digit shift
-        lockedVoteWeightScaledFactor: new anchor.BN(1_000_000_000),
-        minimumRequiredLockupSecs: new anchor.BN(MIN_LOCKUP),
-        maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE),
+        baselineVoteWeightScaledFactor: new anchor.BN(BASELINE * 1e9),
+        maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE * 1e9),
         genesisVotePowerMultiplier: GENESIS_MULTIPLIER,
         genesisVotePowerMultiplierExpirationTs: new anchor.BN(
           Number(await getUnixTimestamp(provider)) + getTimestampFromDays(7)
@@ -317,7 +327,7 @@ async function run() {
   );
   const balance = await provider.connection.getAccountInfo(nativeTreasury);
   if (!balance) {
-    console.log("Transfering 1 sol to governance treasury for subdao creation")
+    console.log("Transfering 1 sol to governance treasury for subdao creation");
     await sendInstructions(provider, [
       SystemProgram.transfer({
         fromPubkey: provider.wallet.publicKey,
@@ -383,7 +393,7 @@ async function run() {
   await sendInstructions(provider, instructions, []);
 
   const dcKey = (await dataCreditsKey(dcKeypair.publicKey))[0];
-  console.log("dcpid", PROGRAM_ID.toBase58())
+  console.log("dcpid", PROGRAM_ID.toBase58());
   if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
@@ -430,7 +440,11 @@ async function run() {
       .preInstructions([
         createAssociatedTokenAccountIdempotentInstruction(
           provider.wallet.publicKey,
-          await getAssociatedTokenAddress(hntKeypair.publicKey, governance, true),
+          await getAssociatedTokenAddress(
+            hntKeypair.publicKey,
+            governance,
+            true
+          ),
           governance,
           hntKeypair.publicKey
         ),
@@ -448,7 +462,6 @@ async function run() {
       })
       .rpc({ skipPreflight: true });
   }
-  
 }
 
 run()

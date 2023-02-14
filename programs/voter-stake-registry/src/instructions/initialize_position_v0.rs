@@ -1,4 +1,3 @@
-use crate::error::*;
 use crate::position_seeds;
 use crate::registrar_seeds;
 use crate::state::*;
@@ -164,14 +163,6 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
     genesis_end,
     num_active_votes: 0,
   });
-
-  if args.kind != LockupKind::None {
-    require_gte!(
-      ctx.accounts.position.lockup.total_seconds(),
-      mint_config.minimum_required_lockup_secs,
-      VsrError::DepositLockupLessThanVotingMintConfigMinRequired
-    );
-  }
 
   let signer_seeds: &[&[&[u8]]] = &[position_seeds!(ctx.accounts.position)];
 

@@ -44,11 +44,8 @@ export function toBN(
   if (BN.isBN(numberOrBn)) {
     return numberOrBn;
   } else {
-    return new BN(
-      Math.ceil(Number(numberOrBn) * Math.pow(10, decimals)).toLocaleString(
-        "fullwide",
-        { useGrouping: false }
-      )
+    return new BN(Number(Math.ceil(Number(numberOrBn)))).mul(
+      new BN(Math.pow(10, decimals))
     );
   }
 }

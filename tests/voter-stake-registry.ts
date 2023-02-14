@@ -48,14 +48,17 @@ import {
 } from "../packages/voter-stake-registry-sdk/src";
 import { getUnixTimestamp } from "./utils/solana";
 import { SPL_GOVERNANCE_PID } from "./utils/vsr";
+import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 
 chai.use(chaiAsPromised);
 
-const MIN_LOCKUP = 15811200; // 6 months
-const MAX_LOCKUP = MIN_LOCKUP * 8;
+const SECS_PER_DAY = 86400;
+const SECS_PER_YEAR = 365 * SECS_PER_DAY;
+const MAX_LOCKUP = 4 * SECS_PER_YEAR;
+const DIGIT_SHIFT = 0;
+const BASELINE = 0;
 const SCALE = 100;
 const GENESIS_MULTIPLIER = 3;
-const SECS_PER_DAY = 60 * 60 * 24;
 type VotingMintConfig =
   anchor.IdlTypes<VoterStakeRegistry>["VotingMintConfigV0"];
 
@@ -79,7 +82,8 @@ describe("voter-stake-registry", () => {
       anchor.workspace.VoterStakeRegistry.idl
     );
     hntMint = await createMint(provider, 8, me, me);
-    await createAtaAndMint(provider, hntMint, toBN(10000000000, 8));
+    await createAtaAndMint(provider, hntMint, toBN(223_000_000, 8));
+
     programVersion = await getGovernanceProgramVersion(
       program.provider.connection,
       SPL_GOVERNANCE_PID
@@ -142,10 +146,9 @@ describe("voter-stake-registry", () => {
       await program.methods
         .configureVotingMintV0({
           idx: 0, // idx
-          digitShift: 0, // digit shift
-          lockedVoteWeightScaledFactor: new anchor.BN(1_000_000_000),
-          minimumRequiredLockupSecs: new anchor.BN(MIN_LOCKUP),
-          maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE),
+          digitShift: DIGIT_SHIFT, // digit shift
+          baselineVoteWeightScaledFactor: new anchor.BN(BASELINE * 1e9),
+          maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE * 1e9),
           genesisVotePowerMultiplier: GENESIS_MULTIPLIER,
           genesisVotePowerMultiplierExpirationTs: new anchor.BN(oneWeekFromNow),
           lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
@@ -228,15 +231,16 @@ describe("voter-stake-registry", () => {
       registrarAcc.votingMints as VotingMintConfig[]
     )[0] as VotingMintConfig;
 
-    expect(votingMint0.digitShift).to.eq(0);
+    expect(votingMint0.digitShift).to.eq(DIGIT_SHIFT);
     expect(
-      votingMint0.lockedVoteWeightScaledFactor.eq(new anchor.BN(1_000_000_000))
+      votingMint0.baselineVoteWeightScaledFactor.eq(
+        new anchor.BN(BASELINE * 1e9)
+      )
     ).to.eq(true);
     expect(
-      votingMint0.minimumRequiredLockupSecs.eq(new anchor.BN(MIN_LOCKUP))
-    ).to.eq(true);
-    expect(
-      votingMint0.maxExtraLockupVoteWeightScaledFactor.eq(new anchor.BN(SCALE))
+      votingMint0.maxExtraLockupVoteWeightScaledFactor.eq(
+        new anchor.BN(SCALE * 1e9)
+      )
     ).to.eq(true);
     expect(votingMint0.genesisVotePowerMultiplier).to.eq(GENESIS_MULTIPLIER);
     expect(
@@ -385,62 +389,82 @@ describe("voter-stake-registry", () => {
       await sendInstructions(provider, instructions);
     });
 
+    const applyDigitShift = (amountNative: number, digitShift: number) => {
+      let val = 0;
+
+      if (digitShift < 0) {
+        val = amountNative / 10 ** digitShift;
+      } else {
+        val = amountNative * 10 ** digitShift;
+      }
+
+      return val;
+    };
+
     let voteTestCases = [
       {
-        name: "genesis constant (within genesis)",
-        lockupAmount: 10000,
-        periods: 200,
+        name: "genesis constant 1 position (within genesis)",
         delay: 0, // days
         fastForward: 60, // days
-        kind: { constant: {} },
+        positions: [
+          {
+            lockupAmount: 10000,
+            periods: 200,
+            kind: { constant: {} },
+          },
+        ],
         expectedVeHnt:
-          10000 *
-          GENESIS_MULTIPLIER *
-          (1 +
-            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
-              (MAX_LOCKUP - MIN_LOCKUP)),
+          applyDigitShift(10000, DIGIT_SHIFT) *
+          (GENESIS_MULTIPLIER || 1) *
+          (BASELINE + Math.min((SECS_PER_DAY * 200) / MAX_LOCKUP, 1) * SCALE),
       },
       {
-        name: "genesis cliff (within genesis)",
-        lockupAmount: 10000,
-        periods: 200,
+        name: "genesis cliff 1 position (within genesis)",
         delay: 0, // days
         fastForward: 60, // days
-        kind: { cliff: {} },
+        positions: [
+          {
+            lockupAmount: 10000,
+            periods: 200,
+            kind: { cliff: {} },
+          },
+        ],
         expectedVeHnt:
-          10000 *
-          GENESIS_MULTIPLIER *
-          (1 +
-            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
-              (MAX_LOCKUP - MIN_LOCKUP)) *
-          ((200 - 60) / 200),
+          applyDigitShift(10000, DIGIT_SHIFT) *
+          (GENESIS_MULTIPLIER || 1) *
+          (BASELINE +
+            Math.min((SECS_PER_DAY * (200 - 60)) / MAX_LOCKUP, 1) * SCALE),
       },
       {
-        name: "genesis constant (outside of genesis)",
-        lockupAmount: 10000,
-        periods: 200,
+        name: "constant 1 positon (outside of genesis)",
         delay: 0, // days
         fastForward: 201, // days
-        kind: { constant: {} },
+        positions: [
+          {
+            lockupAmount: 10000,
+            periods: 200,
+            kind: { constant: {} },
+          },
+        ],
         expectedVeHnt:
-          10000 *
-          (1 +
-            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
-              (MAX_LOCKUP - MIN_LOCKUP)),
+          applyDigitShift(10000, DIGIT_SHIFT) *
+          (BASELINE + Math.min((SECS_PER_DAY * 200) / MAX_LOCKUP, 1) * SCALE),
       },
       {
-        name: "cliff (outside genesis)",
-        lockupAmount: 10000,
-        periods: 200,
+        name: "cliff 1 position (outside genesis)",
         delay: 7, // days
         fastForward: 60, // days
-        kind: { cliff: {} },
+        positions: [
+          {
+            lockupAmount: 10000,
+            periods: 200,
+            kind: { cliff: {} },
+          },
+        ],
         expectedVeHnt:
-          10000 *
-          (1 +
-            ((SCALE - 1) * (SECS_PER_DAY * 200 - MIN_LOCKUP)) /
-              (MAX_LOCKUP - MIN_LOCKUP)) *
-          ((200 - 60) / 200),
+          applyDigitShift(10000, DIGIT_SHIFT) *
+          (BASELINE +
+            Math.min((SECS_PER_DAY * (200 - 60)) / MAX_LOCKUP, 1) * SCALE),
       },
     ];
     voteTestCases.forEach((testCase) => {
@@ -452,12 +476,18 @@ describe("voter-stake-registry", () => {
           .rpc();
 
         const instructions: TransactionInstruction[] = [];
-        const { position, mint } = await createAndDeposit(
-          testCase.lockupAmount,
-          testCase.periods,
-          testCase.kind,
-          depositor
-        );
+        const positions: { position: PublicKey; mint: PublicKey }[] =
+          await Promise.all(
+            testCase.positions.map((position) =>
+              createAndDeposit(
+                position.lockupAmount,
+                position.periods,
+                position.kind,
+                depositor
+              )
+            )
+          );
+
         await program.methods
           .setTimeOffsetV0(
             new anchor.BN(
@@ -496,26 +526,32 @@ describe("voter-stake-registry", () => {
             voterAuthority: depositor.publicKey,
             voterTokenOwnerRecord: tokenOwnerRecord,
           })
-          .remainingAccounts([
-            {
-              pubkey: await getAssociatedTokenAddress(
-                mint,
-                depositor.publicKey
-              ),
-              isSigner: false,
-              isWritable: false,
-            },
-            {
-              pubkey: position,
-              isSigner: false,
-              isWritable: true,
-            },
-            {
-              pubkey: await nftVoteRecordKey(proposal, mint)[0],
-              isSigner: false,
-              isWritable: true,
-            },
-          ])
+          .remainingAccounts(
+            (
+              await Promise.all(
+                positions.map(async ({ position, mint }) => [
+                  {
+                    pubkey: await getAssociatedTokenAddress(
+                      mint,
+                      depositor.publicKey
+                    ),
+                    isSigner: false,
+                    isWritable: false,
+                  },
+                  {
+                    pubkey: position,
+                    isSigner: false,
+                    isWritable: true,
+                  },
+                  {
+                    pubkey: nftVoteRecordKey(proposal, mint)[0],
+                    isSigner: false,
+                    isWritable: true,
+                  },
+                ])
+              )
+            ).flat()
+          )
           .prepare();
         instructions.push(instruction);
 
@@ -536,7 +572,6 @@ describe("voter-stake-registry", () => {
         );
 
         await sendInstructions(provider, instructions, [depositor]);
-
         const voteRecord = await getVoteRecord(provider.connection, vote);
         expectBnAccuracy(
           toBN(testCase.expectedVeHnt, 8),
@@ -672,7 +707,7 @@ describe("voter-stake-registry", () => {
         try {
           await sendInstructions(provider, instructions);
         } catch (e: any) {
-          expect(e.InstructionError[1].Custom).to.eq(6045);
+          expect(e.InstructionError[1].Custom).to.eq(6044);
         }
       });
 
@@ -759,7 +794,7 @@ describe("voter-stake-registry", () => {
             })
             .rpc()
         ).to.eventually.be.rejectedWith(
-          "AnchorError caused by account: source_position. Error Code: ActiveVotesExist. Error Number: 6056. Error Message: Cannot change a position while active votes exist."
+          "AnchorError caused by account: source_position. Error Code: ActiveVotesExist. Error Number: 6055. Error Message: Cannot change a position while active votes exist."
         );
       });
     });
@@ -840,24 +875,3 @@ describe("voter-stake-registry", () => {
     });
   });
 });
-
-function expectBnAccuracy(
-  expectedBn: anchor.BN,
-  actualBn: anchor.BN,
-  percentUncertainty: number
-) {
-  let upperBound = expectedBn.mul(new anchor.BN(1 + percentUncertainty));
-  let lowerBound = expectedBn.mul(new anchor.BN(1 - percentUncertainty));
-  try {
-    expect(upperBound.gte(actualBn)).to.be.true;
-    expect(lowerBound.lte(actualBn)).to.be.true;
-  } catch (e) {
-    console.error(
-      "Expected",
-      expectedBn.toString(),
-      "Actual",
-      actualBn.toString()
-    );
-    throw e;
-  }
-}
