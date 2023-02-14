@@ -36,6 +36,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.26.0",
     "@helium/address": "^4.6.2",
+    "@helium/helium-sub-daos-sdk": "^0.0.31",
     "@helium/helium-entity-manager-sdk": "^0.0.31",
     "@helium/idls": "^0.0.31",
     "@helium/lazy-distributor-sdk": "^0.0.31",

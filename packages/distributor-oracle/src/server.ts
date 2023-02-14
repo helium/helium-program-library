@@ -1,34 +1,41 @@
-import Address from "@helium/address";
 import dotenv from "dotenv";
 import express, { Application, Request, Response } from "express";
 dotenv.config();
 // @ts-ignore
-import { init as initHeliumEntityManager } from "@helium/helium-entity-manager-sdk";
-import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
-import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { init, PROGRAM_ID } from "@helium/lazy-distributor-sdk";
-import { Asset, getAsset } from "@helium/spl-utils";
 import {
   AnchorProvider,
+  BN,
   BorshInstructionCoder,
   getProvider,
   Program,
-  setProvider,
+  setProvider
 } from "@coral-xyz/anchor";
+import { init as initHeliumEntityManager, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
+import { daoKey } from "@helium/helium-sub-daos-sdk";
+import {
+  HeliumEntityManager
+} from "@helium/idls/lib/types/helium_entity_manager";
+import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
+import { init, PROGRAM_ID } from "@helium/lazy-distributor-sdk";
+import { AccountFetchCache, Asset, getAsset, HNT_MINT } from "@helium/spl-utils";
 import {
   Keypair,
   PublicKey,
   Transaction,
-  TransactionInstruction,
+  TransactionInstruction
 } from "@solana/web3.js";
 import bodyParser from "body-parser";
 import cors from "cors";
 import fs from "fs";
 import { Reward } from "./model";
 
+const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
+const DAO = daoKey(HNT)[0];
+
 export interface Database {
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
 }
+
 
 export class PgDatabase implements Database {
   constructor(
@@ -51,9 +58,13 @@ export class PgDatabase implements Database {
       return "0";
     }
     const eccCompact = asset.content.json_uri.split("/").slice(-1)[0] as string;
+    const [key] = await keyToAssetKey(DAO, eccCompact)
+    const keyToAsset = await this.issuanceProgram.account.keyToAssetV0.fetch(key);
+    expect(keyToAsset.asset.toBase58()).to.equal(assetId.toBase58());
     const reward = await Reward.findByPk(eccCompact) as Reward;
 
-    return reward?.rewards || "0";
+    // TODO: Remove when 6 decimals
+    return new BN(reward?.rewards).div(new BN(100)).toString() || "0";
   };
 }
 
@@ -254,6 +265,12 @@ export class OracleServer {
       oracleKeypair,
       new PgDatabase(hemProgram)
     );
+    // For performance
+    new AccountFetchCache({
+      connection: provider.connection,
+      commitment: "confirmed",
+      extendConnection: true,
+    });
     server.start();
   }
 })();
