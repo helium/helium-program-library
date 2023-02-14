@@ -67,3 +67,7 @@ You must also populate the iot and mobile metadata databases. Switch the port fo
 $: cd ../helius-service
 $: env ANCHOR_WALLET=/path/to/.config/solana/id.json yarn run seed-db -f ../migration-service/export.json
 ```
+
+
+Make sure to mint an epoch of IOT/MOBILE and put in rewards pool
+

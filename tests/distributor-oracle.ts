@@ -1,5 +1,5 @@
 import { ThresholdType } from '@helium/circuit-breaker-sdk';
-import { Asset, createAtaAndMint, createMint, createNft, sendAndConfirmWithRetry } from '@helium/spl-utils';
+import { Asset, createAtaAndMint, createMint, createNft, getAsset, sendAndConfirmWithRetry } from '@helium/spl-utils';
 import * as anchor from "@coral-xyz/anchor";
 import { BN, Program } from "@coral-xyz/anchor";
 import {
@@ -9,7 +9,7 @@ import chai, { assert } from 'chai';
 import chaiHttp from "chai-http";
 import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
 import * as client from '../packages/distributor-oracle/src/client';
-import { DatabaseMock, OracleServer } from '../packages/distributor-oracle/src/server';
+import { Database, OracleServer } from '../packages/distributor-oracle/src/server';
 import {
   init as initIss
 } from "../packages/helium-entity-manager-sdk/src";
@@ -21,9 +21,117 @@ import {
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { createCompressionNft } from './utils/compression';
+import Address from "@helium/address";
 
 
 chai.use(chaiHttp);
+
+
+export class DatabaseMock implements Database {
+  inMemHash: {
+    totalClicks: number;
+    lifetimeRewards: number;
+    byHotspot: {
+      [key: string]: {
+        totalClicks: number;
+        lifetimeRewards: number;
+      };
+    };
+  };
+
+  constructor(
+    readonly issuanceProgram: Program<HeliumEntityManager>,
+    readonly getAssetFn: (
+      url: string,
+      asset: PublicKey
+    ) => Promise<Asset | undefined> = getAsset
+  ) {
+    this.inMemHash = {
+      totalClicks: 0,
+      lifetimeRewards: 0,
+      byHotspot: {},
+    };
+  }
+  reset() {
+    this.inMemHash = {
+      totalClicks: 0,
+      lifetimeRewards: 0,
+      byHotspot: {},
+    };
+  }
+
+  async getCurrentRewards(assetId: PublicKey) {
+    const asset = await this.getAssetFn(
+      // @ts-ignore
+      this.issuanceProgram.provider.connection._rpcEndpoint,
+      assetId
+    );
+    if (!asset) {
+      console.error("No asset found", assetId.toBase58());
+      return "0";
+    }
+    const eccCompact = asset.content.json_uri.split("/").slice(-1)[0] as string;
+    try {
+      const pubkey = Address.fromB58(eccCompact);
+      return Math.floor(
+        (this.inMemHash.byHotspot[pubkey.b58]?.lifetimeRewards || 0) *
+          Math.pow(10, 8)
+      ).toString();
+    } catch (err) {
+      console.error("Mint with error: ", asset.toString());
+      console.error(err);
+      return "0";
+    }
+  }
+
+  async incrementHotspotRewards(hotspotKey: string) {
+    this.inMemHash = {
+      ...this.inMemHash,
+      totalClicks: this.inMemHash.totalClicks + 1,
+      byHotspot: {
+        ...this.inMemHash.byHotspot,
+        [hotspotKey]: {
+          totalClicks:
+            (this.inMemHash.byHotspot[hotspotKey]?.totalClicks || 0) + 1,
+          lifetimeRewards:
+            this.inMemHash.byHotspot[hotspotKey]?.lifetimeRewards || 0,
+        },
+      },
+    };
+  }
+
+  async endEpoch() {
+    const rewardablePercentageByHotspot: { [key: string]: number } = {};
+    const { totalClicks, byHotspot } = this.inMemHash;
+    const clickRewardsDiff = totalClicks;
+    const maxEpochRewards = +(process.env.EPOCH_MAX_REWARDS || 50);
+
+    if (maxEpochRewards > 0) {
+      for (const [key, value] of Object.entries(byHotspot)) {
+        const diff = value.totalClicks;
+        let awardedAmount =
+          diff <= 0 ? 0 : (diff / clickRewardsDiff) * maxEpochRewards;
+
+        rewardablePercentageByHotspot[key] = awardedAmount;
+
+        this.inMemHash = {
+          totalClicks: 0,
+          lifetimeRewards: this.inMemHash.lifetimeRewards + awardedAmount,
+          byHotspot: {
+            ...this.inMemHash.byHotspot,
+            [key]: {
+              totalClicks: 0,
+              lifetimeRewards:
+                this.inMemHash.byHotspot[key].lifetimeRewards + awardedAmount,
+            },
+          },
+        };
+      }
+    }
+
+    return rewardablePercentageByHotspot;
+  }
+}
 
 describe('distributor-oracle', () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));

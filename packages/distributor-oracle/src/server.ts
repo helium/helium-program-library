@@ -1,51 +1,44 @@
-import Address from "@helium/address";
 import dotenv from "dotenv";
 import express, { Application, Request, Response } from "express";
 dotenv.config();
 // @ts-ignore
-import { init as initHeliumEntityManager } from "@helium/helium-entity-manager-sdk";
-import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
-import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { init, PROGRAM_ID } from "@helium/lazy-distributor-sdk";
-import { Asset, getAsset } from "@helium/spl-utils";
 import {
   AnchorProvider,
+  BN,
   BorshInstructionCoder,
   getProvider,
   Program,
-  setProvider,
+  setProvider
 } from "@coral-xyz/anchor";
+import { entityCreatorKey, init as initHeliumEntityManager, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
+import { daoKey } from "@helium/helium-sub-daos-sdk";
+import {
+  HeliumEntityManager
+} from "@helium/idls/lib/types/helium_entity_manager";
+import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
+import { init, PROGRAM_ID } from "@helium/lazy-distributor-sdk";
+import { AccountFetchCache, Asset, getAsset, HNT_MINT } from "@helium/spl-utils";
 import {
   Keypair,
   PublicKey,
   Transaction,
-  TransactionInstruction,
+  TransactionInstruction
 } from "@solana/web3.js";
 import bodyParser from "body-parser";
 import cors from "cors";
 import fs from "fs";
+import { Reward } from "./model";
+
+const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
+const DAO = daoKey(HNT)[0];
+const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
 export interface Database {
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
-  incrementHotspotRewards: (hotspotKey: string) => Promise<void>;
-  endEpoch: () => Promise<{
-    [key: string]: number;
-  }>;
-  reset: () => void;
 }
 
-export class DatabaseMock implements Database {
-  inMemHash: {
-    totalClicks: number;
-    lifetimeRewards: number;
-    byHotspot: {
-      [key: string]: {
-        totalClicks: number;
-        lifetimeRewards: number;
-      };
-    };
-  };
 
+export class PgDatabase implements Database {
   constructor(
     readonly issuanceProgram: Program<HeliumEntityManager>,
     readonly getAssetFn: (
@@ -53,24 +46,12 @@ export class DatabaseMock implements Database {
       asset: PublicKey
     ) => Promise<Asset | undefined> = getAsset
   ) {
-    this.inMemHash = {
-      totalClicks: 0,
-      lifetimeRewards: 0,
-      byHotspot: {},
-    };
-  }
-  reset() {
-    this.inMemHash = {
-      totalClicks: 0,
-      lifetimeRewards: 0,
-      byHotspot: {},
-    };
   }
 
   async getCurrentRewards(assetId: PublicKey) {
     const asset = await this.getAssetFn(
       // @ts-ignore
-      this.issuanceProgram.provider.connection._rpcEndpoint,
+      process.env.ASSET_API_URL || this.issuanceProgram.provider.connection._rpcEndpoint,
       assetId
     );
     if (!asset) {
@@ -78,66 +59,16 @@ export class DatabaseMock implements Database {
       return "0";
     }
     const eccCompact = asset.content.json_uri.split("/").slice(-1)[0] as string;
-    try {
-      const pubkey = Address.fromB58(eccCompact);
-      return Math.floor(
-        (this.inMemHash.byHotspot[pubkey.b58]?.lifetimeRewards || 0) *
-          Math.pow(10, 8)
-      ).toString();
-    } catch (err) {
-      console.error("Mint with error: ", asset.toString());
-      console.error(err);
-      return "0";
+    // Verify the creator is our entity creator, otherwise they could just
+    // pass in any NFT with this ecc compact to collect rewards
+    if (!asset.creators[0].verified || !asset.creators[0].address.equals(ENTITY_CREATOR)) {
+      throw new Error("Not a valid rewardable entity")
     }
-  }
+    const reward = await Reward.findByPk(eccCompact) as Reward;
 
-  async incrementHotspotRewards(hotspotKey: string) {
-    this.inMemHash = {
-      ...this.inMemHash,
-      totalClicks: this.inMemHash.totalClicks + 1,
-      byHotspot: {
-        ...this.inMemHash.byHotspot,
-        [hotspotKey]: {
-          totalClicks:
-            (this.inMemHash.byHotspot[hotspotKey]?.totalClicks || 0) + 1,
-          lifetimeRewards:
-            this.inMemHash.byHotspot[hotspotKey]?.lifetimeRewards || 0,
-        },
-      },
-    };
-  }
-
-  async endEpoch() {
-    const rewardablePercentageByHotspot: { [key: string]: number } = {};
-    const { totalClicks, byHotspot } = this.inMemHash;
-    const clickRewardsDiff = totalClicks;
-    const maxEpochRewards = +(process.env.EPOCH_MAX_REWARDS || 50);
-
-    if (maxEpochRewards > 0) {
-      for (const [key, value] of Object.entries(byHotspot)) {
-        const diff = value.totalClicks;
-        let awardedAmount =
-          diff <= 0 ? 0 : (diff / clickRewardsDiff) * maxEpochRewards;
-
-        rewardablePercentageByHotspot[key] = awardedAmount;
-
-        this.inMemHash = {
-          totalClicks: 0,
-          lifetimeRewards: this.inMemHash.lifetimeRewards + awardedAmount,
-          byHotspot: {
-            ...this.inMemHash.byHotspot,
-            [key]: {
-              totalClicks: 0,
-              lifetimeRewards:
-                this.inMemHash.byHotspot[key].lifetimeRewards + awardedAmount,
-            },
-          },
-        };
-      }
-    }
-
-    return rewardablePercentageByHotspot;
-  }
+    // TODO: Remove when 6 decimals
+    return new BN(reward?.rewards).div(new BN(100)).toString() || "0";
+  };
 }
 
 export class OracleServer {
@@ -173,33 +104,6 @@ export class OracleServer {
       res.json({ ok: true })
     );
     this.app.post("/", this.signTransactionHandler.bind(this));
-    this.app.post("/hotspots", this.incrementHotspotRewardsHandler.bind(this));
-    this.app.post("/endepoch", this.endEpochHandler.bind(this));
-    this.app.get("/reset", (req: Request, res: Response) => {
-      this.db.reset();
-      res.json({ ok: true });
-    });
-  }
-
-  private async endEpochHandler(reg: Request, res: Response) {
-    const percentageOfRewardsByHotspot = await this.db.endEpoch();
-
-    res.json({
-      success: true,
-      distributionByHotspot: percentageOfRewardsByHotspot,
-    });
-  }
-
-  private async incrementHotspotRewardsHandler(req: Request, res: Response) {
-    const hotspotStr = req.body.hotspotKey;
-    if (!hotspotStr) {
-      res.status(400).json({ error: "No hotspot key provided" });
-      return;
-    }
-
-    await this.db.incrementHotspotRewards(hotspotStr);
-
-    res.json({ success: true });
   }
 
   private async getCurrentRewardsHandler(req: Request, res: Response) {
@@ -362,8 +266,14 @@ export class OracleServer {
     const server = new OracleServer(
       program,
       oracleKeypair,
-      new DatabaseMock(hemProgram)
+      new PgDatabase(hemProgram)
     );
+    // For performance
+    new AccountFetchCache({
+      connection: provider.connection,
+      commitment: "confirmed",
+      extendConnection: true,
+    });
     server.start();
   }
 })();
