@@ -765,7 +765,7 @@ dependencies = [
 [[package]]
 name = "clockwork-cron"
 version = "2.0.0-alpha"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#2e2d70a34ab5209be50da9ac2a3940a5564e322a"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#e478a9a30f4a5a60e80e414f6c943803f28e5b7e"
 dependencies = [
  "chrono",
  "nom",
@@ -775,7 +775,7 @@ dependencies = [
 [[package]]
 name = "clockwork-macros"
 version = "2.0.0-alpha"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#2e2d70a34ab5209be50da9ac2a3940a5564e322a"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#e478a9a30f4a5a60e80e414f6c943803f28e5b7e"
 dependencies = [
  "anchor-syn",
  "proc-macro2 1.0.49",
@@ -786,7 +786,7 @@ dependencies = [
 [[package]]
 name = "clockwork-network-program"
 version = "2.0.0-alpha"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#2e2d70a34ab5209be50da9ac2a3940a5564e322a"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#e478a9a30f4a5a60e80e414f6c943803f28e5b7e"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -797,7 +797,7 @@ dependencies = [
 [[package]]
 name = "clockwork-sdk"
 version = "2.0.0-alpha"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#2e2d70a34ab5209be50da9ac2a3940a5564e322a"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#e478a9a30f4a5a60e80e414f6c943803f28e5b7e"
 dependencies = [
  "anchor-lang",
  "chrono",
@@ -809,7 +809,7 @@ dependencies = [
 [[package]]
 name = "clockwork-thread-program"
 version = "2.0.0-alpha"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#2e2d70a34ab5209be50da9ac2a3940a5564e322a"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#e478a9a30f4a5a60e80e414f6c943803f28e5b7e"
 dependencies = [
  "anchor-lang",
  "chrono",
@@ -824,7 +824,7 @@ dependencies = [
 [[package]]
 name = "clockwork-utils"
 version = "2.0.0-alpha"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#2e2d70a34ab5209be50da9ac2a3940a5564e322a"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#e478a9a30f4a5a60e80e414f6c943803f28e5b7e"
 dependencies = [
  "anchor-lang",
  "base64 0.13.1",

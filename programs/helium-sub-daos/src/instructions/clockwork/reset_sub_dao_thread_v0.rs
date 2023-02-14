@@ -15,6 +15,8 @@ use clockwork_sdk::{
 pub struct ResetSubDaoThreadV0<'info> {
   #[account(mut)]
   pub authority: Signer<'info>,
+  #[account(mut)]
+  pub thread_payer: Signer<'info>,
 
   pub dao: Box<Account<'info, DaoV0>>,
 
@@ -75,7 +77,7 @@ pub fn handler(ctx: Context<ResetSubDaoThreadV0>) -> Result<()> {
         ctx.accounts.clockwork.to_account_info(),
         clockwork_sdk::cpi::ThreadCreate {
           authority: ctx.accounts.sub_dao.to_account_info(),
-          payer: ctx.accounts.authority.to_account_info(),
+          payer: ctx.accounts.thread_payer.to_account_info(),
           thread: ctx.accounts.calculate_thread.to_account_info(),
           system_program: ctx.accounts.system_program.to_account_info(),
         },
@@ -149,7 +151,7 @@ pub fn handler(ctx: Context<ResetSubDaoThreadV0>) -> Result<()> {
         ctx.accounts.clockwork.to_account_info(),
         clockwork_sdk::cpi::ThreadCreate {
           authority: ctx.accounts.sub_dao.to_account_info(),
-          payer: ctx.accounts.authority.to_account_info(),
+          payer: ctx.accounts.thread_payer.to_account_info(),
           thread: ctx.accounts.issue_thread.to_account_info(),
           system_program: ctx.accounts.system_program.to_account_info(),
         },

@@ -11,6 +11,8 @@ use clockwork_sdk::{
 #[derive(Accounts)]
 pub struct ResetDaoThreadV0<'info> {
   pub authority: Signer<'info>,
+  #[account(mut)]
+  pub thread_payer: Signer<'info>,
 
   #[account(
     mut,
@@ -74,7 +76,7 @@ pub fn handler(ctx: Context<ResetDaoThreadV0>) -> Result<()> {
         ctx.accounts.clockwork.to_account_info(),
         clockwork_sdk::cpi::ThreadCreate {
           authority: ctx.accounts.dao.to_account_info(),
-          payer: ctx.accounts.authority.to_account_info(),
+          payer: ctx.accounts.thread_payer.to_account_info(),
           thread: ctx.accounts.thread.to_account_info(),
           system_program: ctx.accounts.system_program.to_account_info(),
         },

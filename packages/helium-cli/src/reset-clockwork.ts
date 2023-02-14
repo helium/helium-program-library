@@ -64,6 +64,7 @@ async function run() {
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
+  const govProgramId = new PublicKey(argv.govProgramId);
 
   if (argv.resetSubDaoThread && !argv.dntMint) {
     console.log("dnt mint not provided");
@@ -90,11 +91,25 @@ async function run() {
     const dntMint = new PublicKey(argv.dntMint);
     const subDao = subDaoKey(dntMint)[0];
     const subdaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
-
-    instructions.push(await hsdProgram.methods.resetSubDaoThreadV0().accounts({
-      subDao,
-      authority: subdaoAcc.authority
-    }).instruction())
+    const authorityAcc = await provider.connection.getAccountInfo(
+      subdaoAcc.authority
+    );
+    const isGov =
+      authorityAcc != null && authorityAcc.owner.equals(govProgramId);
+    const nativeTreasury = await PublicKey.findProgramAddressSync(
+      [Buffer.from("native-treasury", "utf-8"), subdaoAcc.authority.toBuffer()],
+      govProgramId
+    )[0];
+    instructions.push(
+      await hsdProgram.methods
+        .resetSubDaoThreadV0()
+        .accounts({
+          subDao,
+          authority: subdaoAcc.authority,
+          threadPayer: isGov ? nativeTreasury : provider.wallet.publicKey,
+        })
+        .instruction()
+    );
   }
 
   const wallet = loadKeypair(argv.wallet);

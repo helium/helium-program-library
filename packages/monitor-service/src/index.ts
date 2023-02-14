@@ -6,7 +6,7 @@ import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
 import * as anchor from "@coral-xyz/anchor";
 import fastify from "fastify";
-import { HNT_MINT, MOBILE_MINT } from "./env";
+import { HNT_MINT, MOBILE_MINT, IOT_MINT } from "./env";
 import { register } from "./metrics";
 import { monitorBalance } from "./monitors/balance";
 import { monitorAccountCircuitBreaker, monitorMintCircuitBreaker } from "./monitors/circuitBreaker";
@@ -31,26 +31,48 @@ async function run() {
       await subDaoKey(MOBILE_MINT)
     )[0]
   );
+  const iot = await hsdProgram.account.subDaoV0.fetch(
+    (
+      await subDaoKey(IOT_MINT)
+    )[0]
+  );
   const hntMint = dao.hntMint;
   const dcMint = dao.dcMint;
+  const iotMint = iot.dntMint;
+  const iotTreasury = iot.treasury;
+  const iotRewardsEscrow = iot.rewardsEscrow;
   const mobileMint = mobile.dntMint;
   const mobileTreasury = mobile.treasury;
   const mobileRewardsEscrow = mobile.rewardsEscrow;
 
   await monitorSupply(hntMint, "hnt");
   await monitorSupply(dcMint, "dc");
+  await monitorSupply(iotMint, "iot");
   await monitorSupply(mobileMint, "mobile");
   await monitorMintCircuitBreaker(cbProgram, hntMint, "hnt_mint");
   await monitorMintCircuitBreaker(cbProgram, dcMint, "dc_mint");
+  await monitorMintCircuitBreaker(cbProgram, iotMint, "iot_mint");
   await monitorMintCircuitBreaker(cbProgram, mobileMint, "mobile_mint");
 
+  await monitorBalance(iotTreasury, "iot_treasury");
   await monitorBalance(mobileTreasury, "mobile_treasury");
+  await monitorBalance(iotRewardsEscrow, "iot_rewards_escrow");
   await monitorBalance(mobileRewardsEscrow, "mobile_rewards_escrow");
 
   await monitorAccountCircuitBreaker(
     cbProgram,
     mobileTreasury,
     "mobile_treasury"
+  );
+  await monitorAccountCircuitBreaker(
+    cbProgram,
+    iotTreasury,
+    "iot_treasury"
+  );
+  await monitorAccountCircuitBreaker(
+    cbProgram,
+    iotRewardsEscrow,
+    "iot_rewards_escrow"
   );
   await monitorAccountCircuitBreaker(
     cbProgram,

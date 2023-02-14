@@ -13,3 +13,8 @@ fi
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/reset-clockwork.ts \
     --dntMint $(solana address -k packages/helium-cli/keypairs/mobile.json) -u $CLUSTER_URL --resetDaoThread --resetSubDaoThread \
     --hntMint $(solana address -k packages/helium-cli/keypairs/hnt.json)
+
+npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/reset-clockwork.ts \
+    --dntMint $(solana address -k packages/helium-cli/keypairs/iot.json) -u $CLUSTER_URL --resetSubDaoThread \
+    --hntMint $(solana address -k packages/helium-cli/keypairs/hnt.json)
+

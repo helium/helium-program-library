@@ -9,7 +9,10 @@ process.env.ANCHOR_WALLET =
 export const SOLANA_URL = process.env.SOLANA_URL || "http://127.0.0.1:8899";
 export const HNT_MINT = process.env.HNT_MINT
   ? new PublicKey(process.env.HNT_MINT)
-  : new PublicKey("hntg4GdrpMBW8bqs4R2om4stE6uScPRhPKWAarzoWKP");
+  : new PublicKey("hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux");
 export const MOBILE_MINT = process.env.MOBILE_MINT
   ? new PublicKey(process.env.MOBILE_MINT)
-  : new PublicKey("mob1r1x3raXXoH42RZwxTxgbAuKkBQzTAQqSjkUdZbd");
+  : new PublicKey("mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6");
+export const IOT_MINT = process.env.IOT_MINT
+  ? new PublicKey(process.env.IOT_MINT)
+  : new PublicKey("iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9fns");
