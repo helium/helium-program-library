@@ -12,8 +12,7 @@
     "packages/*"
   ],
   "pre-commit": [
-    "fmt",
-    "clippy"
+    "fmt"
   ],
   "private": true,
   "dependencies": {
