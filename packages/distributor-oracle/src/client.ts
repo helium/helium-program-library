@@ -40,6 +40,34 @@ export async function getCurrentRewards(
   });
 }
 
+export type BulkRewards = {
+  currentRewards: Record<string, string>;
+  oracleKey: PublicKey;
+};
+export async function getBulkRewards(
+  program: Program<LazyDistributor>,
+  lazyDistributor: PublicKey,
+  entityKeys: string[]
+): Promise<BulkRewards[]> {
+  const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(
+    lazyDistributor
+  );
+
+  const results = await Promise.all(
+    // @ts-ignore
+    lazyDistributorAcc.oracles.map((x: any) =>
+      axios.post(`${x.url}/bulk-rewards`, { entityKeys })
+    )
+  );
+  return results.map((x: any, idx: number) => {
+    return {
+      currentRewards: x.data.currentRewards,
+      // @ts-ignore
+      oracleKey: lazyDistributorAcc.oracles[idx].oracle,
+    };
+  });
+}
+
 export async function formTransaction({
   program,
   provider,

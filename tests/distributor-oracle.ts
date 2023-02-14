@@ -52,6 +52,7 @@ export class DatabaseMock implements Database {
       byHotspot: {},
     };
   }
+  getBulkRewards: (entityKeys: string[]) => Promise<Record<string, string>>;
   reset() {
     this.inMemHash = {
       totalClicks: 0,
@@ -177,7 +178,7 @@ describe('distributor-oracle', () => {
       PROGRAM_ID,
       anchor.workspace.HeliumEntityManager.idl
     );
-    oracleServer = new OracleServer(program, oracle, new DatabaseMock(issuanceProgram, getAssetFn));
+    oracleServer = new OracleServer(program, issuanceProgram, oracle, new DatabaseMock(issuanceProgram, getAssetFn));
     oracleServer.start();
   });
 

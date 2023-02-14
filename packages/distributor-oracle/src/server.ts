@@ -26,6 +26,7 @@ import {
 } from "@solana/web3.js";
 import bodyParser from "body-parser";
 import cors from "cors";
+import { Op } from "sequelize";
 import fs from "fs";
 import { Reward } from "./model";
 
@@ -35,6 +36,7 @@ const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
 export interface Database {
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
+  getBulkRewards: (entityKeys: string[]) => Promise<Record<string, string>>;
 }
 
 
@@ -46,6 +48,21 @@ export class PgDatabase implements Database {
       asset: PublicKey
     ) => Promise<Asset | undefined> = getAsset
   ) {
+  }
+
+  async getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
+    const rewards = await Reward.findAll({
+      where: {
+        address: {
+          [Op.in]: entityKeys
+        }
+      }
+    })
+
+    return rewards.map(rew => [rew.address, rew.rewards]).reduce((acc, [key, val]) => {
+      acc[key] = val;
+      return acc;
+    }, {} as Record<string, string>)
   }
 
   async getCurrentRewards(assetId: PublicKey) {
@@ -61,7 +78,7 @@ export class PgDatabase implements Database {
     const eccCompact = asset.content.json_uri.split("/").slice(-1)[0] as string;
     // Verify the creator is our entity creator, otherwise they could just
     // pass in any NFT with this ecc compact to collect rewards
-    if (!asset.creators[0].verified || !asset.creators[0].address.equals(ENTITY_CREATOR)) {
+    if (!asset.creators[0].verified || !new PublicKey(asset.creators[0].address).equals(ENTITY_CREATOR)) {
       throw new Error("Not a valid rewardable entity")
     }
     const reward = await Reward.findByPk(eccCompact) as Reward;
@@ -78,6 +95,7 @@ export class OracleServer {
 
   constructor(
     public program: Program<LazyDistributor>,
+    public hemProgram: Program<HeliumEntityManager>,
     private oracle: Keypair,
     public db: Database
   ) {
@@ -99,6 +117,7 @@ export class OracleServer {
   }
 
   private addRoutes() {
+    this.app.post("/bulk-rewards", this.getAllRewardsHandler.bind(this));
     this.app.get("/", this.getCurrentRewardsHandler.bind(this));
     this.app.get("/health", (req: Request, res: Response) =>
       res.json({ ok: true })
@@ -107,10 +126,17 @@ export class OracleServer {
   }
 
   private async getCurrentRewardsHandler(req: Request, res: Response) {
-    const assetId = req.query.assetId;
-    if (!assetId) {
-      res.status(400).json({ error: "No asset id provided" });
+    let assetId = req.query.assetId as string;
+    let entityKey = req.query.entityKey as string;
+    if (!assetId && !entityKey) {
+      res.status(400).json({ error: "Must provide either `entityKey` or `assetId` parameter" });
       return;
+    }
+
+    if (entityKey) {
+      const [key] = await keyToAssetKey(DAO, entityKey as string);
+      const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(key);
+      assetId = keyToAsset.asset.toBase58();
     }
     let asset: PublicKey;
     try {
@@ -122,6 +148,20 @@ export class OracleServer {
 
     const currentRewards = await this.db.getCurrentRewards(asset);
 
+    res.json({
+      currentRewards,
+    });
+  }
+
+  private async getAllRewardsHandler(req: Request, res: Response) {
+    const entityKeys: string[] = req.body.entityKeys;
+
+    if (!entityKeys) {
+      res.status(400).json({ error: "No entityKeys field" });
+      return;
+    }
+
+    const currentRewards = await this.db.getBulkRewards(entityKeys);
     res.json({
       currentRewards,
     });
@@ -265,6 +305,7 @@ export class OracleServer {
     const hemProgram = await initHeliumEntityManager(provider);
     const server = new OracleServer(
       program,
+      hemProgram,
       oracleKeypair,
       new PgDatabase(hemProgram)
     );
