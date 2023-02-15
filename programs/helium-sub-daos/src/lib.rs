@@ -28,6 +28,14 @@ pub mod helium_sub_daos {
     initialize_sub_dao_v0::handler(ctx, args)
   }
 
+  pub fn update_dao_v0(ctx: Context<UpdateDaoV0>, args: UpdateDaoArgsV0) -> Result<()> {
+    update_dao_v0::handler(ctx, args)
+  }
+
+  pub fn update_sub_dao_v0(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result<()> {
+    update_sub_dao_v0::handler(ctx, args)
+  }
+
   pub fn track_dc_burn_v0(ctx: Context<TrackDcBurnV0>, args: TrackDcBurnArgsV0) -> Result<()> {
     track_dc_burn_v0::handler(ctx, args)
   }

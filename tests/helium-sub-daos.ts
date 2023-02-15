@@ -236,6 +236,35 @@ describe("helium-sub-daos", () => {
       hstPool = (await program.account.daoV0.fetch(dao)).hstPool;
     });
 
+    it("updates the dao", async () => {
+      const newAuth = Keypair.generate().publicKey;
+      await program.methods.updateDaoV0({
+        authority: newAuth,
+        emissionSchedule: null,
+        hstEmissionSchedule: null,
+      }).accounts({
+        dao,
+      }).rpc({skipPreflight: true});
+
+      const daoAcc = await program.account.daoV0.fetch(dao);
+      expect(daoAcc.authority.toString()).to.eq(newAuth.toString());
+    })
+
+    it("updates the subdao", async () => {
+      const newAuth = Keypair.generate().publicKey;
+      await program.methods.updateSubDaoV0({
+        authority: newAuth,
+        dcBurnAuthority: null,
+        emissionSchedule: null,
+        onboardingDcFee: null
+      }).accounts({
+        subDao,
+      }).rpc({skipPreflight: true});
+
+      const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
+      expect(subDaoAcc.authority.toString()).to.eq(newAuth.toString());
+    })
+
     it("resets the subdao clockwork thread", async () => {
       await program.methods
         .resetSubDaoThreadV0()
