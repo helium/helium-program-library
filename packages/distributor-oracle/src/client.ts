@@ -1,8 +1,8 @@
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
-import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { compressedRecipientKey, distributeCompressionRewards, recipientKey } from "@helium/lazy-distributor-sdk";
-import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
 import { init, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
+import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
+import { compressedRecipientKey, distributeCompressionRewards, initializeCompressionRecipient, recipientKey } from "@helium/lazy-distributor-sdk";
+import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
   PublicKey,
@@ -175,13 +175,27 @@ export async function formTransaction({
   );
 
   if (!(await provider.connection.getAccountInfo(recipient))) {
-    const initRecipientIx = await program.methods
-      .initializeRecipientV0()
-      .accounts({
-        lazyDistributor,
-        mint: hotspot,
-      })
-      .instruction();
+    let initRecipientIx;
+    if (asset.compression.compressed) {
+      initRecipientIx = await(
+        await initializeCompressionRecipient({
+          program,
+          assetId: hotspot,
+          lazyDistributor,
+          assetEndpoint,
+          owner: wallet,
+          getAssetProofFn,
+        })
+      ).instruction();
+    } else {
+      initRecipientIx = await program.methods
+        .initializeRecipientV0()
+        .accounts({
+          lazyDistributor,
+          mint: hotspot,
+        })
+        .instruction();
+    }
 
     tx.add(initRecipientIx);
   }

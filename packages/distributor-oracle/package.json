@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.26.0",
+    "@fastify/cors": "^8.1.1",
     "@helium/address": "^4.6.2",
     "@helium/helium-entity-manager-sdk": "^0.0.33",
     "@helium/helium-sub-daos-sdk": "^0.0.33",
@@ -47,7 +48,7 @@
     "bn.js": "^5.2.0",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
-    "express": "^4.18.1",
+    "fastify": "^4.9.2",
     "ky": "^0.31.4",
     "pg": "^8.9.0",
     "sequelize": "^6.28.0",

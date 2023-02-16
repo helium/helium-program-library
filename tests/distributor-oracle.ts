@@ -22,6 +22,8 @@ import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { createCompressionNft } from './utils/compression';
 import Address from "@helium/address";
+import { compressedRecipientKey, recipientKey } from '@helium/lazy-distributor-sdk';
+import { getLeafAssetId } from '@metaplex-foundation/mpl-bubblegum';
 
 
 chai.use(chaiHttp);
@@ -52,7 +54,11 @@ export class DatabaseMock implements Database {
       byHotspot: {},
     };
   }
-  getBulkRewards: (entityKeys: string[]) => Promise<Record<string, string>>;
+
+  getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
+    return Promise.resolve({})
+  }
+
   reset() {
     this.inMemHash = {
       totalClicks: 0,
@@ -149,7 +155,7 @@ describe('distributor-oracle', () => {
   let merkle = Keypair.generate();
   let merkleTree: MerkleTree;  
   const uri =
-    "https://mobile-metadata.test-helium.com/112UE9mbEB4NWHgdutev5PXTszp1V8HwBptwNMDQVc6fAyu34Tz4s";
+    "https://mobile-metadata.test-helium.com/13CGbZcFcAXkDqvACAKdWRdt5gdMEz8mbZC8nc4HGqZozyFYxSP";
   const getAssetFn = async () =>
     ({
       compression: { compressed: true, tree: merkle.publicKey, leafId: 0 },
@@ -179,11 +185,11 @@ describe('distributor-oracle', () => {
       anchor.workspace.HeliumEntityManager.idl
     );
     oracleServer = new OracleServer(program, issuanceProgram, oracle, new DatabaseMock(issuanceProgram, getAssetFn));
-    oracleServer.start();
+    await oracleServer.start();
   });
 
-  after(function () {
-    oracleServer.close();
+  after(async function () {
+    await oracleServer.close();
   });
 
   beforeEach(async () => {
@@ -221,20 +227,11 @@ describe('distributor-oracle', () => {
     await createAtaAndMint(provider, rewardsMint, 1000000000000, ld);
     lazyDistributor = ld!;
     await method.rpc({ skipPreflight: true });
-    
-    const method2 = await initializeCompressionRecipient({
-      program,
-      assetId: asset,
-      lazyDistributor,
-      owner: me,
-      getAssetProofFn,
-    });
-    recipient = (await method2.pubkeys()).recipient!;
-    await method2.rpc({ skipPreflight: true })
+    recipient = compressedRecipientKey(lazyDistributor, merkle.publicKey, 0)[0]
   });
 
   it('should provide the current rewards for a hotspot', async () => {
-    const res = await chai.request(oracleServer.app)
+    const res = await chai.request(oracleServer.server)
       .get('/?assetId=hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR')
 
     assert.equal(res.status, 200);
@@ -261,7 +258,7 @@ describe('distributor-oracle', () => {
     const tx = await provider.wallet.signTransaction(unsigned);
     const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
 
-    const res = await chai.request(oracleServer.app)
+    const res = await chai.request(oracleServer.server)
       .post('/')
       .send({ transaction: serializedTx })
 
@@ -302,7 +299,7 @@ describe('distributor-oracle', () => {
 
       const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
 
-      const res = await chai.request(oracleServer.app)
+      const res = await chai.request(oracleServer.server)
         .post('/')
         .send({ transaction: serializedTx })
 
@@ -338,7 +335,7 @@ describe('distributor-oracle', () => {
 
       const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
 
-      const res = await chai.request(oracleServer.app)
+      const res = await chai.request(oracleServer.server)
         .post('/')
         .send({ transaction: serializedTx })
 
@@ -367,7 +364,7 @@ describe('distributor-oracle', () => {
 
       const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
 
-      const res = await chai.request(oracleServer.app)
+      const res = await chai.request(oracleServer.server)
         .post('/')
         .send({ transaction: serializedTx })
 
