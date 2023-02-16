@@ -15,8 +15,8 @@ import {
   HeliumEntityManager
 } from "@helium/idls/lib/types/helium_entity_manager";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { init, PROGRAM_ID } from "@helium/lazy-distributor-sdk";
-import { AccountFetchCache, Asset, getAsset, HNT_MINT } from "@helium/spl-utils";
+import { init, lazyDistributorKey, PROGRAM_ID } from "@helium/lazy-distributor-sdk";
+import { AccountFetchCache, Asset, getAsset, HNT_MINT, IOT_MINT } from "@helium/spl-utils";
 import {
   Keypair,
   PublicKey,
@@ -35,8 +35,12 @@ import cors from "@fastify/cors";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 
 const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
+const DNT = process.env.DNT_MINT
+  ? new PublicKey(process.env.DNT_MINT)
+  : IOT_MINT;
 const DAO = daoKey(HNT)[0];
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
+const LAZY_DISTRIBUTOR = lazyDistributorKey(DNT)[0];
 
 export interface Database {
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
@@ -227,6 +231,7 @@ export class OracleServer {
     const recipientIdxInitCompressionRecipient = initCompressionRecipientTx.accounts.findIndex(
       (x) => x.name === "recipient"
     )!;
+
     for (const ix of tx.instructions) {
       if (!ix.programId.equals(PROGRAM_ID)) {
         res.status(400).send({ error: "Invalid instructions in transaction" });
@@ -246,6 +251,7 @@ export class OracleServer {
         res.status(400).send({ error: "Invalid instructions in transaction" });
         return;
       }
+
       if (decoded.name === "setCurrentRewardsV0") setRewardIxs.push(ix);
 
       // Since recipient wont exist to fetch to get the mint id, grab it from the init recipient ix
@@ -298,6 +304,11 @@ export class OracleServer {
 
         const recipient = ix.keys[recipientIdx].pubkey;
         const lazyDist = ix.keys[lazyDistIdx].pubkey;
+
+        if (!lazyDist.equals(LAZY_DISTRIBUTOR)) {
+          res.status(400).send({ error: "Invalid lazy distributor" });
+        }
+
         let mint = (recipientToLazyDistToMint[recipient.toBase58()] || {})[
           lazyDist.toBase58()
         ];

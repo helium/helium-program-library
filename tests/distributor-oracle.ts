@@ -1,7 +1,9 @@
-import { ThresholdType } from '@helium/circuit-breaker-sdk';
-import { Asset, createAtaAndMint, createMint, createNft, getAsset, sendAndConfirmWithRetry } from '@helium/spl-utils';
 import * as anchor from "@coral-xyz/anchor";
 import { BN, Program } from "@coral-xyz/anchor";
+import Address from "@helium/address";
+import { ThresholdType } from '@helium/circuit-breaker-sdk';
+import { recipientKey } from '@helium/lazy-distributor-sdk';
+import { Asset, createAtaAndMint, createMint, getAsset, sendAndConfirmWithRetry } from '@helium/spl-utils';
 import {
   Keypair, PublicKey, SystemProgram, Transaction
 } from "@solana/web3.js";
@@ -14,16 +16,11 @@ import {
   init as initIss
 } from "../packages/helium-entity-manager-sdk/src";
 import {
-  init,
-  initializeCompressionRecipient,
-  PROGRAM_ID
+  init, PROGRAM_ID
 } from "../packages/lazy-distributor-sdk/src";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { createCompressionNft } from './utils/compression';
-import Address from "@helium/address";
-import { compressedRecipientKey, recipientKey } from '@helium/lazy-distributor-sdk';
-import { getLeafAssetId } from '@metaplex-foundation/mpl-bubblegum';
 
 
 chai.use(chaiHttp);
@@ -227,7 +224,7 @@ describe('distributor-oracle', () => {
     await createAtaAndMint(provider, rewardsMint, 1000000000000, ld);
     lazyDistributor = ld!;
     await method.rpc({ skipPreflight: true });
-    recipient = compressedRecipientKey(lazyDistributor, merkle.publicKey, 0)[0]
+    recipient = recipientKey(lazyDistributor, asset)[0]
   });
 
   it('should provide the current rewards for a hotspot', async () => {

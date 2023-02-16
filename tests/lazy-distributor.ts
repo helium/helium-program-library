@@ -141,6 +141,13 @@ describe("lazy-distributor", () => {
         program,
         assetId: asset,
         lazyDistributor,
+        getAssetFn: async () => {
+          return {
+            compression: {
+              leafId: 0,
+            }
+          } as Asset
+        },
         getAssetProofFn: async () => {
           return {
             root: new PublicKey(proof.root),
@@ -174,6 +181,13 @@ describe("lazy-distributor", () => {
           program,
           assetId: asset,
           lazyDistributor,
+          getAssetFn: async () => {
+            return {
+              compression: {
+                leafId: 0,
+              },
+            } as Asset;
+          },
           getAssetProofFn: async () => {
             return {
               root: new PublicKey(proof.root),
@@ -221,7 +235,7 @@ describe("lazy-distributor", () => {
           .rpc({ skipPreflight: true });
 
         const proof = merkleTree.getProof(0);
-        const getAssetFn = async () => ({ ownership: { owner: me } } as Asset);
+        const getAssetFn = async () => ({ ownership: { owner: me }, compression: { leafId: 0 } } as Asset);
         const getAssetProofFn = async () => {
           return {
             root: new PublicKey(proof.root),
