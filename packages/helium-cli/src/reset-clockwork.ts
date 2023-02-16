@@ -1,10 +1,9 @@
 import {
   daoKey,
-  init as initDao, subDaoKey
+  init as initDao,
+  subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
-import {
-  init as initLazy
-} from "@helium/lazy-distributor-sdk";
+import { init as initLazy } from "@helium/lazy-distributor-sdk";
 import * as anchor from "@coral-xyz/anchor";
 import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
 import axios from "axios";
@@ -70,20 +69,26 @@ async function run() {
     console.log("dnt mint not provided");
     return;
   }
+
   const councilKey = new PublicKey(argv.councilKey);
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hsdProgram = await initDao(provider);
   const instructions = [];
   if (argv.resetDaoThread) {
-    console.log("resetting dao thread")
+    console.log("resetting dao thread");
     const hntMint = new PublicKey(argv.hntMint);
     const dao = daoKey(hntMint)[0];
     const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
 
-    instructions.push(await hsdProgram.methods.resetDaoThreadV0().accounts({
-      dao,
-      authority: daoAcc.authority
-    }).instruction());
+    instructions.push(
+      await hsdProgram.methods
+        .resetDaoThreadV0()
+        .accounts({
+          dao,
+          authority: daoAcc.authority,
+        })
+        .instruction()
+    );
   }
 
   if (argv.resetSubDaoThread) {
