@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.0.34",
+  "version": "0.0.35",
   "description": "Interface to the lazy-distributor smart contract",
   "repository": {
     "type": "git",
@@ -32,8 +32,8 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.26.0",
-    "@helium/circuit-breaker-sdk": "^0.0.34",
-    "@helium/spl-utils": "^0.0.34",
+    "@helium/circuit-breaker-sdk": "^0.0.35",
+    "@helium/spl-utils": "^0.0.35",
     "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
     "@solana/spl-token": "^0.3.6",
     "bn.js": "^5.2.0",
