@@ -558,3 +558,16 @@ export async function sendInstructionsOrCreateProposal({
     idlErrors
   );
 }
+
+export async function parseEmissionsSchedule(filepath: string) {
+  const json = JSON.parse(fs.readFileSync(filepath).toString());
+  const schedule = json.map((x) => {
+    const extra = "percent" in x ? {percent: x.percent} : "emissionsPerEpoch" in x ? {emissionsPerEpoch: new anchor.BN(x.emissionsPerEpoch)} : null;
+    if (!extra || !("startUnixTime" in x)) throw new Error("json format incorrect");
+    return {
+      startUnixTime: new anchor.BN(x.startUnixTime),
+      ...extra
+    }
+  });
+  return schedule;
+}
