@@ -1,5 +1,6 @@
 import {
   currentEpoch,
+  daoEpochInfoKey,
   daoKey,
   EPOCH_LENGTH,
   init as initDao
@@ -54,56 +55,68 @@ async function run() {
   while (targetTs.toNumber() < new Date().valueOf() / 1000) {
     const epoch = currentEpoch(targetTs);
     console.log(epoch.toNumber(), targetTs.toNumber())
-    for (const subDao of subdaos) {
-      try {
-        await heliumSubDaosProgram.methods
-          .calculateUtilityScoreV0({
-            epoch,
-          })
-          .preInstructions([
-            ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-          ])
-          .accounts({
-            subDao: subDao.publicKey,
-          })
-          .rpc({ skipPreflight: true });
-      } catch (e: any) {
-        console.log(`Failed to calculate utility score for ${subDao.account.dntMint.toBase58()}: ${e.message}`)
+    const daoEpochInfo =
+      await heliumSubDaosProgram.account.daoEpochInfoV0.fetch(
+        daoEpochInfoKey(dao, targetTs)[0]
+      );
+    if (!daoEpochInfo.doneCalculatingScores) {
+      for (const subDao of subdaos) {
+        try {
+          await heliumSubDaosProgram.methods
+            .calculateUtilityScoreV0({
+              epoch,
+            })
+            .preInstructions([
+              ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+            ])
+            .accounts({
+              subDao: subDao.publicKey,
+            })
+            .rpc({ skipPreflight: true });
+        } catch (e: any) {
+          console.log(
+            `Failed to calculate utility score for ${subDao.account.dntMint.toBase58()}: ${
+              e.message
+            }`
+          );
+        }
       }
     }
-    for (const subDao of subdaos) {
-      try {
-        await heliumSubDaosProgram.methods
-          .issueRewardsV0({
-            epoch,
-          })
-          .accounts({
-            subDao: subDao.publicKey,
-          })
-          .rpc({ skipPreflight: true });
-      } catch (e: any) {
-        console.log(
-          `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${
-            e.message
-          }`
-        );
+    if (!daoEpochInfo.doneIssuingRewards) {
+      for (const subDao of subdaos) {
+        try {
+          await heliumSubDaosProgram.methods
+            .issueRewardsV0({
+              epoch,
+            })
+            .accounts({
+              subDao: subDao.publicKey,
+            })
+            .rpc({ skipPreflight: true });
+        } catch (e: any) {
+          console.log(
+            `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${
+              e.message
+            }`
+          );
+        }
       }
+
+        
     }
     try {
-      await heliumSubDaosProgram.methods
-        .issueHstPoolV0({
-          epoch,
-        })
-        .accounts({
-          dao,
-        })
-        .rpc({ skipPreflight: true });
+      if (!daoEpochInfo.doneIssuingHstPool) {
+        await heliumSubDaosProgram.methods
+          .issueHstPoolV0({
+            epoch,
+          })
+          .accounts({
+            dao,
+          })
+          .rpc({ skipPreflight: true });
+      }
     } catch (e: any) {
-      console.log(
-        `Failed to issue hst pool: ${
-          e.message
-        }`
-      );
+      console.log(`Failed to issue hst pool: ${e.message}`);
     }
     
     targetTs = targetTs.add(new BN(EPOCH_LENGTH));
