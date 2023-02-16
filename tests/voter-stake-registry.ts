@@ -780,7 +780,8 @@ describe("voter-stake-registry", () => {
             .instruction()
         );
         await sendInstructions(provider, instructions);
-        await program.account.positionV0.fetch(position);
+        const positionAcc = await program.account.positionV0.fetch(position);
+        expect(positionAcc.numActiveVotes).to.equal(0);
       });
 
       it("should not allow me to move tokens to another position while vote is active", async () => {
