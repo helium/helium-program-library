@@ -1,6 +1,6 @@
 {
   "name": "@helium/currency-utils",
-  "version": "0.0.35",
+  "version": "0.0.36",
   "description": "Currency utilities",
   "homepage": "https://github.com/helium/helium-program-library#readme",
   "publishConfig": {
