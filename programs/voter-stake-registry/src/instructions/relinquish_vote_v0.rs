@@ -133,21 +133,20 @@ pub fn handler(ctx: Context<RelinquishVoteV0>) -> Result<()> {
 
     dispose_account(nft_vote_record_info, &ctx.accounts.beneficiary)?;
 
-    let position_acc = &mut PositionV0::try_deserialize(&mut position.data.borrow().as_ref())?;
+    let position_acc: &mut Account<PositionV0> = &mut Account::try_from(position)?;
     require!(
       position_acc.mint == nft_vote_record.nft_mint,
       VsrError::InvalidMintForPosition
     );
 
     position_acc.num_active_votes -= 1;
-    position_acc.serialize(&mut *position.try_borrow_mut_data()?)?;
+    position_acc.exit(&crate::ID)?;
     require!(position.is_writable, VsrError::PositionNotWritable);
   }
 
   // Reset VoterWeightRecord and set expiry to expired to prevent it from being used
   voter_weight_record.voter_weight = 0;
   voter_weight_record.voter_weight_expiry = Some(0);
-
   voter_weight_record.weight_action_target = None;
 
   Ok(())
