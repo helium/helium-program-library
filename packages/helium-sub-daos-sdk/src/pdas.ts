@@ -50,12 +50,12 @@ export function subDaoKey(
   );
 }
 
-export function stakePositionKey(
+export function delegatedPositionKey(
   position: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync([
-    Buffer.from("stake_position", "utf-8"), position.toBuffer()], 
+    Buffer.from("delegated_position", "utf-8"), position.toBuffer()], 
     programId
   );
 }
