@@ -56,10 +56,10 @@ async function run() {
     const epoch = currentEpoch(targetTs);
     console.log(epoch.toNumber(), targetTs.toNumber())
     const daoEpochInfo =
-      await heliumSubDaosProgram.account.daoEpochInfoV0.fetch(
+      await heliumSubDaosProgram.account.daoEpochInfoV0.fetchNullable(
         daoEpochInfoKey(dao, targetTs)[0]
       );
-    if (!daoEpochInfo.doneCalculatingScores) {
+    if (!daoEpochInfo?.doneCalculatingScores) {
       for (const subDao of subdaos) {
         try {
           await heliumSubDaosProgram.methods
@@ -82,7 +82,7 @@ async function run() {
         }
       }
     }
-    if (!daoEpochInfo.doneIssuingRewards) {
+    if (!daoEpochInfo?.doneIssuingRewards) {
       for (const subDao of subdaos) {
         try {
           await heliumSubDaosProgram.methods
@@ -105,7 +105,7 @@ async function run() {
         
     }
     try {
-      if (!daoEpochInfo.doneIssuingHstPool) {
+      if (!daoEpochInfo?.doneIssuingHstPool) {
         await heliumSubDaosProgram.methods
           .issueHstPoolV0({
             epoch,

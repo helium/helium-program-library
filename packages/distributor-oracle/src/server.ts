@@ -35,12 +35,8 @@ import cors from "@fastify/cors";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 
 const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
-const DNT = process.env.DNT_MINT
-  ? new PublicKey(process.env.DNT_MINT)
-  : IOT_MINT;
 const DAO = daoKey(HNT)[0];
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
-const LAZY_DISTRIBUTOR = lazyDistributorKey(DNT)[0];
 
 export interface Database {
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
@@ -106,7 +102,8 @@ export class OracleServer {
     public program: Program<LazyDistributor>,
     public hemProgram: Program<HeliumEntityManager>,
     private oracle: Keypair,
-    public db: Database
+    public db: Database,
+    readonly lazyDistributor: PublicKey
   ) {
     const server: FastifyInstance = Fastify({
       logger: true,
@@ -305,7 +302,7 @@ export class OracleServer {
         const recipient = ix.keys[recipientIdx].pubkey;
         const lazyDist = ix.keys[lazyDistIdx].pubkey;
 
-        if (!lazyDist.equals(LAZY_DISTRIBUTOR)) {
+        if (!lazyDist.equals(this.lazyDistributor)) {
           res.status(400).send({ error: "Invalid lazy distributor" });
         }
 
@@ -365,11 +362,16 @@ export class OracleServer {
     );
     const program = await init(provider);
     const hemProgram = await initHeliumEntityManager(provider);
+    const DNT = process.env.DNT_MINT
+      ? new PublicKey(process.env.DNT_MINT)
+      : IOT_MINT;
+    const LAZY_DISTRIBUTOR = lazyDistributorKey(DNT)[0];
     const server = new OracleServer(
       program,
       hemProgram,
       oracleKeypair,
-      new PgDatabase(hemProgram)
+      new PgDatabase(hemProgram),
+      LAZY_DISTRIBUTOR
     );
     // For performance
     new AccountFetchCache({
