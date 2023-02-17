@@ -83,7 +83,7 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
       config: WindowedCircuitBreakerConfigV0 {
         // No more than 5 epochs worth can be distributed. We should be distributing once per epoch so this
         // should never get triggered.
-        window_size_seconds: 5 * u64::try_from(EPOCH_LENGTH).unwrap(),
+        window_size_seconds: u64::try_from(EPOCH_LENGTH).unwrap(),
         threshold_type: ThresholdType::Absolute,
         threshold: 5
           * args
