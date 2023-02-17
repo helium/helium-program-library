@@ -1,31 +1,36 @@
-import { ThresholdType } from '@helium/circuit-breaker-sdk';
-import { Asset, createAtaAndMint, createMint, createNft, getAsset, sendAndConfirmWithRetry } from '@helium/spl-utils';
 import * as anchor from "@coral-xyz/anchor";
 import { BN, Program } from "@coral-xyz/anchor";
+import Address from "@helium/address";
+import { ThresholdType } from "@helium/circuit-breaker-sdk";
+import { recipientKey } from "@helium/lazy-distributor-sdk";
 import {
-  Keypair, PublicKey, SystemProgram, Transaction
+  Asset,
+  createAtaAndMint,
+  createMint,
+  getAsset,
+  sendAndConfirmWithRetry,
+} from "@helium/spl-utils";
+import {
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  Transaction,
 } from "@solana/web3.js";
-import chai, { assert } from 'chai';
+import chai, { assert } from "chai";
 import chaiHttp from "chai-http";
 import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
-import * as client from '../packages/distributor-oracle/src/client';
-import { Database, OracleServer } from '../packages/distributor-oracle/src/server';
+import * as client from "../packages/distributor-oracle/src/client";
 import {
-  init as initIss
-} from "../packages/helium-entity-manager-sdk/src";
-import {
-  init,
-  initializeCompressionRecipient,
-  PROGRAM_ID
-} from "../packages/lazy-distributor-sdk/src";
+  Database,
+  OracleServer,
+} from "../packages/distributor-oracle/src/server";
+import { init as initIss } from "../packages/helium-entity-manager-sdk/src";
+import { init, PROGRAM_ID } from "../packages/lazy-distributor-sdk/src";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { LazyDistributor } from "../target/types/lazy_distributor";
-import { createCompressionNft } from './utils/compression';
-import Address from "@helium/address";
-
+import { createCompressionNft } from "./utils/compression";
 
 chai.use(chaiHttp);
-
 
 export class DatabaseMock implements Database {
   inMemHash: {
@@ -52,6 +57,11 @@ export class DatabaseMock implements Database {
       byHotspot: {},
     };
   }
+
+  getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
+    return Promise.resolve({});
+  }
+
   reset() {
     this.inMemHash = {
       totalClicks: 0,
@@ -133,7 +143,7 @@ export class DatabaseMock implements Database {
   }
 }
 
-describe('distributor-oracle', () => {
+describe("distributor-oracle", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
   let program: Program<LazyDistributor>;
   let issuanceProgram: Program<HeliumEntityManager>;
@@ -146,9 +156,9 @@ describe('distributor-oracle', () => {
   let recipient: PublicKey;
   let asset: PublicKey;
   let merkle = Keypair.generate();
-  let merkleTree: MerkleTree;  
+  let merkleTree: MerkleTree;
   const uri =
-    "https://mobile-metadata.test-helium.com/112UE9mbEB4NWHgdutev5PXTszp1V8HwBptwNMDQVc6fAyu34Tz4s";
+    "https://mobile-metadata.test-helium.com/13CGbZcFcAXkDqvACAKdWRdt5gdMEz8mbZC8nc4HGqZozyFYxSP";
   const getAssetFn = async () =>
     ({
       compression: { compressed: true, tree: merkle.publicKey, leafId: 0 },
@@ -177,15 +187,6 @@ describe('distributor-oracle', () => {
       PROGRAM_ID,
       anchor.workspace.HeliumEntityManager.idl
     );
-    oracleServer = new OracleServer(program, oracle, new DatabaseMock(issuanceProgram, getAssetFn));
-    oracleServer.start();
-  });
-
-  after(function () {
-    oracleServer.close();
-  });
-
-  beforeEach(async () => {
     ({ asset, merkleTree } = await createCompressionNft({
       provider,
       recipient: me,
@@ -215,33 +216,39 @@ describe('distributor-oracle', () => {
         rewardsMint,
       });
 
-
     const { lazyDistributor: ld } = await method.pubkeys();
     await createAtaAndMint(provider, rewardsMint, 1000000000000, ld);
     lazyDistributor = ld!;
     await method.rpc({ skipPreflight: true });
-    
-    const method2 = await initializeCompressionRecipient({
+    recipient = recipientKey(lazyDistributor, asset)[0];
+    oracleServer = new OracleServer(
       program,
-      assetId: asset,
-      lazyDistributor,
-      owner: me,
-      getAssetProofFn,
-    });
-    recipient = (await method2.pubkeys()).recipient!;
-    await method2.rpc({ skipPreflight: true })
+      issuanceProgram,
+      oracle,
+      new DatabaseMock(issuanceProgram, getAssetFn),
+      lazyDistributor
+    );
+    await oracleServer.start();
   });
 
-  it('should provide the current rewards for a hotspot', async () => {
-    const res = await chai.request(oracleServer.app)
-      .get('/?assetId=hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR')
+  after(async function () {
+    await oracleServer.close();
+  });
+
+  it("should provide the current rewards for a hotspot", async () => {
+    const res = await chai
+      .request(oracleServer.server)
+      .get("/?assetId=hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR");
 
     assert.equal(res.status, 200);
-    assert.typeOf(res.body, 'object');
-    assert.equal(res.body.currentRewards, await oracleServer.db.getCurrentRewards(asset))
+    assert.typeOf(res.body, "object");
+    assert.equal(
+      res.body.currentRewards,
+      await oracleServer.db.getCurrentRewards(asset)
+    );
   });
 
-  it('should sign and execute properly formed transactions', async () => {
+  it("should sign and execute properly formed transactions", async () => {
     const unsigned = await client.formTransaction({
       program,
       provider,
@@ -258,11 +265,15 @@ describe('distributor-oracle', () => {
       skipOracleSign: true,
     });
     const tx = await provider.wallet.signTransaction(unsigned);
-    const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
+    const serializedTx = tx.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    });
 
-    const res = await chai.request(oracleServer.app)
-      .post('/')
-      .send({ transaction: serializedTx })
+    const res = await chai
+      .request(oracleServer.server)
+      .post("/")
+      .send({ transaction: serializedTx });
 
     assert.hasAllKeys(res.body, ["transaction", "success"]);
     const signedTx = Transaction.from(res.body.transaction.data);
@@ -272,24 +283,29 @@ describe('distributor-oracle', () => {
       {
         skipPreflight: true,
       },
-      "confirmed",
+      "confirmed"
     );
 
     const recipientAcc = await program.account.recipientV0.fetch(recipient);
-    assert.equal(recipientAcc.totalRewards.toNumber(), Number(await oracleServer.db.getCurrentRewards(asset)))
+    assert.equal(
+      recipientAcc.totalRewards.toNumber(),
+      Number(await oracleServer.db.getCurrentRewards(asset))
+    );
   });
 
-  describe('Transaction validation tests', () => {
+  describe("Transaction validation tests", () => {
     it("doesn't sign if setRewards value is incorrect", async () => {
       const ix = await program.methods
         .setCurrentRewardsV0({
-          currentRewards: new BN(await oracleServer.db.getCurrentRewards(asset) + 1000),
+          currentRewards: new BN(
+            (await oracleServer.db.getCurrentRewards(asset)) + 1000
+          ),
           oracleIndex: 0,
         })
         .accounts({
           lazyDistributor,
           recipient,
-          oracle: oracle.publicKey
+          oracle: oracle.publicKey,
         })
         .instruction();
       let tx = new Transaction();
@@ -297,28 +313,34 @@ describe('distributor-oracle', () => {
       tx.recentBlockhash = (
         await provider.connection.getLatestBlockhash()
       ).blockhash;
-      tx.feePayer = provider.wallet.publicKey
+      tx.feePayer = provider.wallet.publicKey;
 
-      const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
+      const serializedTx = tx.serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      });
 
-      const res = await chai.request(oracleServer.app)
-        .post('/')
-        .send({ transaction: serializedTx })
+      const res = await chai
+        .request(oracleServer.server)
+        .post("/")
+        .send({ transaction: serializedTx });
 
       assert.equal(Object.keys(res.body).length, 1);
       assert("error" in res.body);
-    })
+    });
 
     it("doesn't sign if unauthorised instructions are included", async () => {
       const ix = await program.methods
         .setCurrentRewardsV0({
-          currentRewards: new BN(await oracleServer.db.getCurrentRewards(asset)),
+          currentRewards: new BN(
+            await oracleServer.db.getCurrentRewards(asset)
+          ),
           oracleIndex: 0,
         })
         .accounts({
           lazyDistributor,
           recipient,
-          oracle: oracle.publicKey
+          oracle: oracle.publicKey,
         })
         .instruction();
       let tx = new Transaction();
@@ -328,33 +350,39 @@ describe('distributor-oracle', () => {
           fromPubkey: oracle.publicKey,
           toPubkey: me,
           lamports: 100000000,
-        }),
-      )
+        })
+      );
       tx.recentBlockhash = (
         await provider.connection.getLatestBlockhash()
       ).blockhash;
-      tx.feePayer = provider.wallet.publicKey
+      tx.feePayer = provider.wallet.publicKey;
 
-      const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
+      const serializedTx = tx.serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      });
 
-      const res = await chai.request(oracleServer.app)
-        .post('/')
-        .send({ transaction: serializedTx })
+      const res = await chai
+        .request(oracleServer.server)
+        .post("/")
+        .send({ transaction: serializedTx });
 
       assert.equal(Object.keys(res.body).length, 1);
       assert("error" in res.body);
-    })
+    });
 
     it("doesn't sign if oracle is set as the fee payer", async () => {
       const ix = await program.methods
         .setCurrentRewardsV0({
-          currentRewards: new BN(await oracleServer.db.getCurrentRewards(asset)),
+          currentRewards: new BN(
+            await oracleServer.db.getCurrentRewards(asset)
+          ),
           oracleIndex: 0,
         })
         .accounts({
           lazyDistributor,
           recipient,
-          oracle: oracle.publicKey
+          oracle: oracle.publicKey,
         })
         .instruction();
       let tx = new Transaction();
@@ -364,15 +392,18 @@ describe('distributor-oracle', () => {
       ).blockhash;
       tx.feePayer = oracle.publicKey;
 
-      const serializedTx = tx.serialize({ requireAllSignatures: false, verifySignatures: false});
+      const serializedTx = tx.serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      });
 
-      const res = await chai.request(oracleServer.app)
-        .post('/')
-        .send({ transaction: serializedTx })
+      const res = await chai
+        .request(oracleServer.server)
+        .post("/")
+        .send({ transaction: serializedTx });
 
-        assert.equal(Object.keys(res.body).length, 1);
-        assert("error" in res.body);
-    })
-  })
-
+      assert.equal(Object.keys(res.body).length, 1);
+      assert("error" in res.body);
+    });
+  });
 });

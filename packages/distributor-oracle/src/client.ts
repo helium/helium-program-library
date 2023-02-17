@@ -1,16 +1,14 @@
-import { AnchorProvider, Program, BN } from "@coral-xyz/anchor";
-import {
-  TransactionInstruction,
-  PublicKey,
-  Transaction,
-} from "@solana/web3.js";
+import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
+import { init, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import axios from "axios";
-import { recipientKey } from "@helium/lazy-distributor-sdk";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { distributeCompressionRewards, initializeCompressionRecipient, recipientKey } from "@helium/lazy-distributor-sdk";
 import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
-import { compressedRecipientKey } from "@helium/lazy-distributor-sdk";
-import { distributeCompressionRewards } from "@helium/lazy-distributor-sdk";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
+import {
+  PublicKey,
+  Transaction, TransactionInstruction
+} from "@solana/web3.js";
+import axios from "axios";
 
 export type Reward = {
   currentRewards: string;
@@ -39,6 +37,76 @@ export async function getCurrentRewards(
     };
   });
 }
+
+export type BulkRewards = {
+  currentRewards: Record<string, string>;
+  oracleKey: PublicKey;
+};
+export async function getBulkRewards(
+  program: Program<LazyDistributor>,
+  lazyDistributor: PublicKey,
+  entityKeys: string[]
+): Promise<BulkRewards[]> {
+  const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(
+    lazyDistributor
+  );
+
+  const results = await Promise.all(
+    // @ts-ignore
+    lazyDistributorAcc.oracles.map((x: any) =>
+      axios.post(`${x.url}/bulk-rewards`, { entityKeys })
+    )
+  );
+  return results.map((x: any, idx: number) => {
+    return {
+      currentRewards: x.data.currentRewards,
+      // @ts-ignore
+      oracleKey: lazyDistributorAcc.oracles[idx].oracle,
+    };
+  });
+}
+
+export async function getPendingRewards(
+  program: Program<LazyDistributor>,
+  lazyDistributor: PublicKey,
+  dao: PublicKey,
+  entityKeys: string[],
+): Promise<Record<string, string>> {
+  const oracleRewards = await getBulkRewards(
+    program,
+    lazyDistributor,
+    entityKeys
+  );
+
+  const hemProgram = await init(program.provider as AnchorProvider);
+  const withRecipients = await Promise.all(entityKeys.map(async entityKey => {
+    const keyToAssetK = keyToAssetKey(dao, entityKey)[0];
+    const keyToAsset = await hemProgram.account.keyToAssetV0.fetch(keyToAssetK);
+    const recipient = recipientKey(lazyDistributor, keyToAsset.asset)[0];
+    const recipientAcc = await program.account.recipientV0.fetchNullable(recipient);
+
+    return {
+      entityKey,
+      recipientAcc,
+    };
+  }))
+
+  return withRecipients.reduce((acc, { entityKey, recipientAcc }) => {
+    const sortedOracleRewards = oracleRewards
+      .map((rew) => rew.currentRewards[entityKey] || new BN(0))
+      .sort((a, b) => new BN(a).sub(new BN(b)).toNumber());
+
+    const oracleMedian = new BN(
+      sortedOracleRewards[Math.floor(sortedOracleRewards.length / 2)]
+    );
+
+    const subbed = oracleMedian.sub(recipientAcc?.totalRewards || new BN(0));
+    acc[entityKey] = subbed.toString()
+
+    return acc;
+  }, {} as Record<string, string>);
+}
+
 
 export async function formTransaction({
   program,
@@ -72,17 +140,46 @@ export async function formTransaction({
     throw new Error("No asset with ID " + hotspot.toBase58());
   }
 
-  const recipient = asset.compression.compressed
-    ? compressedRecipientKey(
-        lazyDistributor,
-        asset.compression.tree!,
-        asset.compression.leafId!
-      )[0]
-    : recipientKey(lazyDistributor, hotspot)[0];
+  const recipient = recipientKey(lazyDistributor, hotspot)[0];
   const lazyDistributorAcc = (await program.account.lazyDistributorV0.fetch(
     lazyDistributor
   ))!;
   const rewardsMint = lazyDistributorAcc.rewardsMint!;
+
+  let tx = new Transaction();
+
+  const destinationAccount = await getAssociatedTokenAddress(
+    rewardsMint,
+    asset.ownership.owner,
+    true
+  );
+
+  if (!(await provider.connection.getAccountInfo(recipient))) {
+    let initRecipientIx;
+    if (asset.compression.compressed) {
+      initRecipientIx = await(
+        await initializeCompressionRecipient({
+          program,
+          assetId: hotspot,
+          lazyDistributor,
+          assetEndpoint,
+          owner: wallet,
+          getAssetFn: () => Promise.resolve(asset), // cache result so we don't hit again
+          getAssetProofFn,
+        })
+      ).instruction();
+    } else {
+      initRecipientIx = await program.methods
+        .initializeRecipientV0()
+        .accounts({
+          lazyDistributor,
+          mint: hotspot,
+        })
+        .instruction();
+    }
+
+    tx.add(initRecipientIx);
+  }
 
   const ixPromises = rewards.map((x, idx) => {
     return program.methods
@@ -98,25 +195,6 @@ export async function formTransaction({
       .instruction();
   });
   const ixs = await Promise.all(ixPromises);
-  let tx = new Transaction();
-
-  const destinationAccount = await getAssociatedTokenAddress(
-    rewardsMint,
-    asset.ownership.owner,
-    true
-  );
-
-  if (!(await provider.connection.getAccountInfo(recipient))) {
-    const initRecipientIx = await program.methods
-      .initializeRecipientV0()
-      .accounts({
-        lazyDistributor,
-        mint: hotspot,
-      })
-      .instruction();
-
-    tx.add(initRecipientIx);
-  }
   tx.add(...ixs);
 
   tx.recentBlockhash = (
@@ -126,12 +204,12 @@ export async function formTransaction({
   tx.feePayer = wallet ? wallet : provider.wallet.publicKey;
 
   if (asset.compression.compressed) {
-    const distributeIx = await (
+    const distributeIx = await(
       await distributeCompressionRewards({
         program,
         assetId: hotspot,
         lazyDistributor,
-        getAssetFn,
+        getAssetFn: () => Promise.resolve(asset), // cache result so we don't hit again
         getAssetProofFn,
         assetEndpoint,
       })

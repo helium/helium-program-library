@@ -33,11 +33,11 @@ export async function distributeCompressionRewards<IDL extends Idl>({
   if (!assetProof) {
     throw new Error("No asset proof with ID " + assetId.toBase58());
   }
-  const { root, proof, leaf, treeId, nodeIndex } = assetProof;
+  const { root, proof, leaf, treeId } = assetProof;
   const {
     ownership: { owner },
+    compression: { leafId },
   } = asset;
-
   const canopy = await (
     await ConcurrentMerkleTreeAccount.fromAccountAddress(program.provider.connection, treeId)
   ).getCanopyDepth();
@@ -46,7 +46,7 @@ export async function distributeCompressionRewards<IDL extends Idl>({
     .distributeCompressionRewardsV0({
       hash: leaf.toBuffer().toJSON().data,
       root: root.toBuffer().toJSON().data,
-      index: nodeIndex,
+      index: leafId!,
     })
     .accounts({
       common: {

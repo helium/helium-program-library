@@ -7,8 +7,10 @@ import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mp
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { circuitBreakerResolvers } from "@helium/circuit-breaker-sdk";
-import { compressedRecipientKey, recipientKey } from "./pdas";
+import { recipientKey } from "./pdas";
 import { Accounts } from "@coral-xyz/anchor";
+import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
+import { BN } from "bn.js";
 
 export const lazyDistributorResolvers = combineResolvers(
   resolveIndividual(async ({ path }) => {
@@ -70,10 +72,9 @@ export const lazyDistributorResolvers = combineResolvers(
       common.lazyDistributor &&
       !common.recipient
     ) {
-      common.recipient = compressedRecipientKey(
+      common.recipient = recipientKey(
         common.lazyDistributor as PublicKey,
-        accounts.merkleTree as PublicKey,
-        args[2]
+        await getLeafAssetId(accounts.merkleTree as PublicKey, new BN(args[0].index)),
       )[0];
       resolved++;
     }

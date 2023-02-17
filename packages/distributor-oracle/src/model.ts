@@ -43,6 +43,7 @@ const sequelize = new Sequelize({
 });
 
 export class Reward extends Model {
+  declare address: string;
   declare rewards: string;
 }
 Reward.init(

@@ -27,7 +27,11 @@ pub struct InitializeCompressionRecipientV0<'info> {
     init,
     payer = payer,
     space = 60 + std::mem::size_of::<RecipientV0>(),
-    seeds = ["recipient".as_bytes(), lazy_distributor.key().as_ref(), merkle_tree.key().as_ref(), &args.index.to_le_bytes()],
+    seeds = [
+      "recipient".as_bytes(), 
+      lazy_distributor.key().as_ref(),
+      get_asset_id(&merkle_tree.key(), args.index.into()).as_ref()
+    ],
     bump,
   )]
   pub recipient: Box<Account<'info, RecipientV0>>,

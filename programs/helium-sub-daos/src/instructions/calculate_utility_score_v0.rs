@@ -87,7 +87,7 @@ pub fn handler(
     .get_emissions_at(Clock::get()?.unix_timestamp)
     .unwrap()
     .checked_add(std::cmp::min(
-      prev_supply.checked_sub(curr_supply).unwrap(),
+      prev_supply.saturating_sub(curr_supply),
       ctx.accounts.dao.net_emissions_cap,
     ))
     .unwrap();

@@ -1,7 +1,8 @@
 use super::common::*;
+use crate::error::ErrorCode;
 use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
-use mpl_bubblegum::{program::Bubblegum, state::TreeConfig};
+use mpl_bubblegum::{program::Bubblegum, state::TreeConfig, utils::get_asset_id};
 use shared_utils::*;
 use spl_account_compression::program::SplAccountCompression;
 
@@ -42,6 +43,12 @@ pub fn handler<'info>(
     delegate: ctx.accounts.common.owner.key(),
     proof_accounts: ctx.remaining_accounts.to_vec(),
   })?;
+
+  require_eq!(
+    ctx.accounts.common.recipient.asset,
+    get_asset_id(&ctx.accounts.merkle_tree.key(), args.index.into()),
+    ErrorCode::InvalidAsset
+  );
 
   distribute_impl(&mut ctx.accounts.common)
 }
