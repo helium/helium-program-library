@@ -49,7 +49,7 @@ import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 
 chai.use(chaiAsPromised);
 
-const AUTOMATION_PID = new PublicKey(
+const THREAD_PID = new PublicKey(
   "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
 );
 
@@ -629,7 +629,7 @@ describe("helium-sub-daos", () => {
                   subDao.toBuffer(),
                   Buffer.from("end-epoch", "utf8"),
                 ],
-                AUTOMATION_PID
+                THREAD_PID
               )[0];
 
               await program.methods

@@ -1,4 +1,5 @@
 import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { init as initHem, rewardableEntityConfigKey } from "@helium/helium-entity-manager-sdk";
 import * as anchor from "@coral-xyz/anchor";
 import {
   PublicKey,
@@ -24,6 +25,12 @@ const yarg = yargs(hideBin(process.argv)).options({
     required: true,
     type: "string",
     describe: "DNT mint of the subdao to be updated",
+  },
+  name: {
+    alias: "n",
+    type: "string",
+    required: true,
+    describe: "The name of the entity config",
   },
   newAuthority: {
     required: false,
@@ -63,15 +70,27 @@ async function run() {
   const govProgramId = new PublicKey(argv.govProgramId);
   const councilKey = new PublicKey(argv.councilKey);
   const program = await initHsd(provider);
+  const hemProgram = await initHem(provider);
 
   const instructions = [];
+
+  const subDao = subDaoKey(new PublicKey(argv.dntMint))[0];
+  if (argv.newAuthority) {
+    const config = rewardableEntityConfigKey(subDao, argv.name.toUpperCase())[0]
+    instructions.push(await hemProgram.methods.updateRewardableEntityConfigV0({
+      newAuthority: new PublicKey(argv.newAuthority),
+      settings: null,
+    }).accounts({
+      rewardableEntityConfig: config
+    }).instruction());
+  }
   instructions.push(await program.methods.updateSubDaoV0({
-    authority: new PublicKey(argv.newAuthority),
+    authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
     emissionSchedule: argv.newEmissionsSchedulePath ? parseEmissionsSchedule(argv.newEmissionsSchedulePath) : null,
     dcBurnAuthority: null,
     onboardingDcFee: null,
   }).accounts({
-    subDao: subDaoKey(new PublicKey(argv.dntMint))[0],
+    subDao,
   }).instruction());
 
   await sendInstructionsOrCreateProposal({
