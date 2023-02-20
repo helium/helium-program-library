@@ -12,6 +12,12 @@ export const sequelize = new Sequelize({
   dialectModule: pg,
   username: process.env.PGUSER,
   database: process.env.PGDATABASE,
+  pool: {
+    max: 5,
+    min: 0,
+    acquire: 30000,
+    idle: 10000
+  },
   hooks: {
     beforeConnect: async (config: any) => {
       const isRds = host.includes("rds.amazonaws.com");
