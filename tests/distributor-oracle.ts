@@ -58,6 +58,10 @@ export class DatabaseMock implements Database {
     };
   }
 
+  async getActiveDevices(): Promise<number> {
+    return 0
+  }
+
   getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
     return Promise.resolve({});
   }

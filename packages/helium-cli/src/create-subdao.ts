@@ -7,7 +7,7 @@ import {
   daoKey,
   init as initDao,
   subDaoKey,
-  threadKey,
+  threadKey
 } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
@@ -26,21 +26,15 @@ import {
 } from "@solana/spl-governance";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
-  Cluster,
   ComputeBudgetProgram, PublicKey,
   SystemProgram,
   TransactionInstruction
 } from "@solana/web3.js";
-import { OracleJob } from "@switchboard-xyz/common";
-import {
-  AggregatorHistoryBuffer,
-  QueueAccount,
-  SwitchboardProgram
-} from "@switchboard-xyz/solana.js";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
   createAndMint,
+  createSwitchboardAggregator,
   exists,
   getTimestampFromDays,
   getUnixTimestamp,
@@ -463,58 +457,15 @@ async function run() {
     ); // value cloned from mainnet to localnet
     if (!isLocalhost(provider)) {
       console.log("Initializing switchboard oracle");
-      const switchboard = await SwitchboardProgram.load(
-        argv.switchboardNetwork as Cluster,
-        provider.connection,
-        wallet
-      );
-      const queueAccount = new QueueAccount(
-        switchboard,
-        new PublicKey(argv.queue)
-      );
-      const agg = aggKeypair.publicKey;
-      if (!(await exists(conn, agg))) {
-        const [agg, _] = await queueAccount.createFeed({
-          keypair: aggKeypair,
-          batchSize: 3,
-          minRequiredOracleResults: 2,
-          minRequiredJobResults: 1,
-          minUpdateDelaySeconds: 60 * 60, // hourly
-          fundAmount: 0.2,
-          enable: true,
-          crankPubkey: new PublicKey(argv.crank),
-          jobs: [
-            {
-              data: OracleJob.encodeDelimited(
-                OracleJob.fromObject({
-                  tasks: [
-                    {
-                      httpTask: {
-                        url:
-                          argv.activeDeviceOracleUrl + "/" + name.toLowerCase(),
-                      },
-                    },
-                    {
-                      jsonParseTask: {
-                        path: "$.count",
-                      },
-                    },
-                  ],
-                })
-              ).finish(),
-            },
-          ],
-        });
-        console.log(
-          "Created active device aggregator",
-          agg.publicKey.toBase58()
-        );
-        await AggregatorHistoryBuffer.create(switchboard, {
-          aggregatorAccount: agg,
-          maxSamples: 24 * 31, // Give us a month of active device data. If we fail to run end epoch, RIP.
-        });
-        aggregatorKey = agg.publicKey;
-      }
+      aggregatorKey = await createSwitchboardAggregator({
+        crank: new PublicKey(argv.crank),
+        queue: new PublicKey(argv.queue),
+        wallet,
+        provider, 
+        aggKeypair,
+        url: argv.activeDeviceOracleUrl,
+        switchboardNetwork: argv.switchboardNetwork
+      })
     }
 
     const instructions: TransactionInstruction[] = [];
