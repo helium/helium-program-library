@@ -29,7 +29,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   name: {
     alias: "n",
     type: "string",
-    required: true,
+    required: false,
     describe: "The name of the entity config",
   },
   newAuthority: {
@@ -43,6 +43,11 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Path to file that contains the new emissions schedule",
     type: "string",
     default: null,
+  },
+  newActiveDeviceAggregator: {
+    required: false,
+    default: null,
+    type: "string"
   },
   govProgramId: {
     type: "string",
@@ -75,23 +80,35 @@ async function run() {
   const instructions = [];
 
   const subDao = subDaoKey(new PublicKey(argv.dntMint))[0];
+  const subdaoAcc = await program.account.subDaoV0.fetch(subDao);
   if (argv.newAuthority) {
+    if (!argv.name) {
+      throw new Error("--name is required")
+    }
+    
     const config = rewardableEntityConfigKey(subDao, argv.name.toUpperCase())[0]
-    instructions.push(await hemProgram.methods.updateRewardableEntityConfigV0({
-      newAuthority: new PublicKey(argv.newAuthority),
-      settings: null,
-    }).accounts({
-      rewardableEntityConfig: config
-    }).instruction());
+    instructions.push(
+      await hemProgram.methods
+        .updateRewardableEntityConfigV0({
+          newAuthority: new PublicKey(argv.newAuthority),
+          settings: null,
+        })
+        .accounts({
+          rewardableEntityConfig: config,
+          authority: subdaoAcc.authority
+        })
+        .instruction()
+    );
   }
   instructions.push(await program.methods.updateSubDaoV0({
     authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
     emissionSchedule: argv.newEmissionsSchedulePath ? parseEmissionsSchedule(argv.newEmissionsSchedulePath) : null,
     dcBurnAuthority: null,
     onboardingDcFee: null,
-    activeDeviceAggregator: null
+    activeDeviceAggregator: argv.newActiveDeviceAggregator ? new PublicKey(argv.newActiveDeviceAggregator) : null,
   }).accounts({
     subDao,
+    authority: subdaoAcc.authority,
   }).instruction());
 
   await sendInstructionsOrCreateProposal({
