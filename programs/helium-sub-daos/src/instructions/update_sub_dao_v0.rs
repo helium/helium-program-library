@@ -1,6 +1,5 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateSubDaoArgsV0 {
