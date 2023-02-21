@@ -23,8 +23,33 @@ import { Pool } from "pg";
 import { LAZY_TRANSACTIONS_NAME } from "./env";
 import { provider, wallet } from "./solana";
 import { decompress } from "./utils";
+import AWS from "aws-sdk";
 
-const pool = new Pool();
+const host = process.env.PGHOST || "localhost";
+const isRds = host.includes("rds.amazonaws.com");
+const port = Number(process.env.PGPORT) || 5432;
+const pool = new Pool({
+  password: async () => {
+    let password = process.env.PGPASSWORD;
+    if (isRds && !password) {
+      const signer = new AWS.RDS.Signer({
+        region: process.env.AWS_REGION,
+        hostname: process.env.PGHOST,
+        port,
+        username: process.env.PGUSER,
+      });
+      password = await new Promise((resolve, reject) =>
+        signer.getAuthToken({}, (err, token) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve(token);
+        })
+      );
+    }
+    return password;
+  },
+});
 
 const lazySigner = lazySignerKey(LAZY_TRANSACTIONS_NAME)[0];
 const lazyTransactions = lazyTransactionsKey(LAZY_TRANSACTIONS_NAME)[0];

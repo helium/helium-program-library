@@ -4,7 +4,7 @@ import * as pg from "pg";
 
 const host = process.env.PGHOST || "localhost";
 const port = Number(process.env.PGPORT) || 5432;
-const sequelize = new Sequelize({
+export const sequelize = new Sequelize({
   host: host,
   dialect: "postgres",
   port: port,
@@ -12,6 +12,12 @@ const sequelize = new Sequelize({
   dialectModule: pg,
   username: process.env.PGUSER,
   database: process.env.PGDATABASE,
+  pool: {
+    max: 5,
+    min: 0,
+    acquire: 30000,
+    idle: 10000
+  },
   hooks: {
     beforeConnect: async (config: any) => {
       const isRds = host.includes("rds.amazonaws.com");

@@ -43,11 +43,12 @@
     "@solana/spl-token": "0.3.5",
     "@solana/web3.js": "^1.43.4",
     "angry-purple-tiger": "^1.0.5",
+    "aws-sdk": "^2.1318.0",
     "axios": "^1.1.3",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1",
     "fastify": "^4.9.2",
-    "pg": "^8.8.0",
+    "pg": "^8.9.0",
     "sequelize": "^6.27.0"
   },
   "devDependencies": {
