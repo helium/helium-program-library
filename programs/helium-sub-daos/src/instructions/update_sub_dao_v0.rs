@@ -44,6 +44,6 @@ pub fn handler(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result
   if let Some(active_device_aggregator) = args.active_device_aggregator {
     ctx.accounts.sub_dao.active_device_aggregator = active_device_aggregator;
   }
-  
+
   Ok(())
 }
