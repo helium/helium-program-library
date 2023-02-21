@@ -51,6 +51,7 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import { BN } from "bn.js";
+import Squads from "@sqds/sdk";
 
 const { hideBin } = require("yargs/helpers");
 
@@ -148,9 +149,14 @@ async function run() {
         "Number of Gov Council tokens to pre mint before assigning authority to dao",
       default: 10,
     },
-    authority: {
+    multisig: {
       type: "string",
-      describe: "The authority for the dao. Uses your wallet by default.",
+      describe: "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority"
+    },
+    authorityIndex: {
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
+      default: 1,
     }
   });
 
@@ -173,7 +179,6 @@ async function run() {
   const dcKeypair = loadKeypair(argv.dcKeypair);
   const me = provider.wallet.publicKey;
   const dao = daoKey(hntKeypair.publicKey)[0];
-  const authority = argv.authority ? new PublicKey(argv.authority) : me;
 
   console.log("HNT", hntKeypair.publicKey.toBase58());
   console.log("HST", hstKeypair.publicKey.toBase58());
@@ -188,6 +193,13 @@ async function run() {
   console.log("THREAD", thread.toString());
 
   const conn = provider.connection;
+
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, provider.wallet);
+  let authority = provider.wallet.publicKey;
+  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisig) {
+    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  }
 
   await createAndMint({
     provider,

@@ -27,10 +27,11 @@ import {
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
   Cluster,
-  ComputeBudgetProgram, PublicKey,
+  ComputeBudgetProgram, Keypair, PublicKey,
   SystemProgram,
   TransactionInstruction
 } from "@solana/web3.js";
+import Squads from "@sqds/sdk";
 import { OracleJob } from "@switchboard-xyz/common";
 import {
   AggregatorHistoryBuffer,
@@ -46,7 +47,8 @@ import {
   getUnixTimestamp,
   isLocalhost,
   loadKeypair,
-  sendInstructionsOrCreateProposal
+  sendInstructionsOrCreateProposal,
+  sendInstructionsOrSquads
 } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
@@ -92,7 +94,7 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Keypair of the subdao token",
     required: true,
   },
-  executeProposal: {
+  executeTransaction: {
     type: "boolean",
   },
   numTokens: {
@@ -173,10 +175,15 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Keypair of gov council token",
     default: `${__dirname}/../keypairs/council.json`,
   },
-  authority: {
+  multisig: {
     type: "string",
-    describe: "The authority for the dao. Uses your wallet by default.",
+    describe: "Address of the squads multisig for subdao authority. If not provided, your wallet will be the authority"
   },
+  authorityIndex: {
+    type: "number",
+    describe: "Authority index for squads. Defaults to 1",
+    default: 1,
+  }
 });
 
 const SECS_PER_DAY = 86400;
@@ -209,7 +216,6 @@ async function run() {
   const govProgramId = new PublicKey(argv.govProgramId);
   const councilKeypair = await loadKeypair(argv.councilKeypair);
   const me = provider.wallet.publicKey;
-  const authority = argv.authority ? new PublicKey(argv.authority) : me;
 
   console.log("Subdao mint", subdaoKeypair.publicKey.toBase58());
   console.log("GOV PID", govProgramId.toBase58());
@@ -226,6 +232,12 @@ async function run() {
   const calculateThread = threadKey(subdao, "calculate")[0];
   const issueThread = threadKey(subdao, "issue")[0];
 
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, provider.wallet);
+  let authority = provider.wallet.publicKey;
+  const multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisig) {
+    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  }
   if (await exists(conn, subdao)) {
     const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
 
@@ -527,15 +539,13 @@ async function run() {
         .instruction()
     );
 
-    await sendInstructionsOrCreateProposal({
+    await sendInstructionsOrSquads({
       provider,
       instructions,
-      walletSigner: wallet,
-      signers: [],
-      govProgramId,
-      proposalName: `Create ${name} RewardableEntityConfig`,
-      votingMint: councilKeypair.publicKey,
-      executeProposal: argv.executeProposal,
+      squads,
+      executeTransaction: true,
+      multisig,
+      authorityIndex: argv.authorityIndex,
     });
   }
 }

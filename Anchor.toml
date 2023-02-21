@@ -99,6 +99,10 @@ address = "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
 [[test.validator.clone]]
 address = "Fi8vncGpNKbq62gPo56G4toCehWNy77GgqGkTaAF5Lkk"
 
+# Squads multisig program
+[[test.validator.clone]]
+address = "SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu"
+
 # [[test.validator.clone]]
 # address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 

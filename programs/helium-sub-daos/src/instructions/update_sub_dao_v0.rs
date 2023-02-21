@@ -28,11 +28,13 @@ pub struct UpdateSubDaoV0<'info> {
     bump = sub_dao.bump_seed,
     has_one = authority,
     has_one = dnt_mint,
+    has_one = treasury,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   pub authority: Signer<'info>,
 
   pub dnt_mint: Box<Account<'info, Mint>>,
+  pub treasury: Box<Account<'info, TreasuryManagementV0>>,
 
   #[account(
     mut,
@@ -41,8 +43,6 @@ pub struct UpdateSubDaoV0<'info> {
     bump
   )]
   pub dnt_circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
-  #[account(mut)]
-  pub treasury: Box<Account<'info, TreasuryManagementV0>>,
   #[account(
     mut,
     seeds = ["account_windowed_breaker".as_bytes(), treasury.key().as_ref()],
