@@ -89,6 +89,7 @@ async function run() {
     emissionSchedule: argv.newEmissionsSchedulePath ? parseEmissionsSchedule(argv.newEmissionsSchedulePath) : null,
     dcBurnAuthority: null,
     onboardingDcFee: null,
+    activeDeviceAggregator: null
   }).accounts({
     subDao,
   }).instruction());

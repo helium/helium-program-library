@@ -123,7 +123,6 @@ const yarg = yargs(hideBin(process.argv)).options({
   aggregatorKeypair: {
     type: "string",
     describe: "Keypair of the aggregtor",
-    default: `${__dirname}/../keypairs/aggregator.json`,
   },
   merkleKeypair: {
     type: "string",
@@ -208,7 +207,9 @@ async function run() {
   const heliumVsrProgram = await initVsr(provider);
 
   const wallet = loadKeypair(argv.wallet);
-  const aggKeypair = await loadKeypair(argv.aggregatorKeypair);
+  const aggKeypair = await loadKeypair(
+    argv.aggregatorKeypair || `${__dirname}/../keypairs/aggregator-${name}.json`
+  );
   const subdaoKeypair = await loadKeypair(argv.subdaoKeypair);
   const oracleKeypair = await loadKeypair(argv.oracleKeypair);
   const oracleKey = oracleKeypair.publicKey;

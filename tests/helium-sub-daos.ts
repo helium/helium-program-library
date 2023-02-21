@@ -252,14 +252,18 @@ describe("helium-sub-daos", () => {
 
     it("updates the subdao", async () => {
       const newAuth = Keypair.generate().publicKey;
-      await program.methods.updateSubDaoV0({
-        authority: newAuth,
-        dcBurnAuthority: null,
-        emissionSchedule: null,
-        onboardingDcFee: null
-      }).accounts({
-        subDao,
-      }).rpc({skipPreflight: true});
+      await program.methods
+        .updateSubDaoV0({
+          authority: newAuth,
+          dcBurnAuthority: null,
+          emissionSchedule: null,
+          onboardingDcFee: null,
+          activeDeviceAggregator: null,
+        })
+        .accounts({
+          subDao,
+        })
+        .rpc({ skipPreflight: true });
 
       const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
       expect(subDaoAcc.authority.toString()).to.eq(newAuth.toString());
