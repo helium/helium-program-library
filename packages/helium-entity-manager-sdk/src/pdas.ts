@@ -1,19 +1,9 @@
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
-import crypto from "crypto";
+import { sha256 } from "js-sha256";
 // @ts-ignore
 import bs58 from "bs58";
-
-async function hashAnyhere(input: Buffer) {
-  /// @ts-ignore
-  if (typeof window != "undefined") {
-    return crypto.subtle.digest("SHA-256", input);
-  } else {
-    const { createHash } = await import("crypto");
-    return createHash("sha256").update(input).digest();
-  }
-}
 
 export const entityCreatorKey = (
   dao: PublicKey,
@@ -64,7 +54,7 @@ export const makerApprovalKey = (
     programId
   );
 
-export const keyToAssetKey = async (
+export const keyToAssetKey = (
   dao: PublicKey,
   entityKey: Buffer | string,
   programId: PublicKey = PROGRAM_ID
@@ -72,15 +62,15 @@ export const keyToAssetKey = async (
   if (typeof entityKey === "string") {
     entityKey = Buffer.from(bs58.decode(entityKey));
   }
-  const hash = await hashAnyhere(entityKey);
+  const hash = sha256(entityKey);
 
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("key_to_asset", "utf-8"), dao.toBuffer(), Buffer.from(hash)],
+    [Buffer.from("key_to_asset", "utf-8"), dao.toBuffer(), Buffer.from(hash, "hex")],
     programId
   );
 };
 
-export const iotInfoKey = async (
+export const iotInfoKey = (
   rewardableEntityConfig: PublicKey,
   entityKey: Buffer | string,
   programId: PublicKey = PROGRAM_ID
@@ -88,13 +78,13 @@ export const iotInfoKey = async (
   if (typeof entityKey === "string") {
     entityKey = Buffer.from(bs58.decode(entityKey));
   }
-  const hash = await hashAnyhere(entityKey);
+  const hash = sha256(entityKey);
 
   return PublicKey.findProgramAddressSync(
     [
       Buffer.from("iot_info", "utf-8"),
       rewardableEntityConfig.toBuffer(),
-      Buffer.from(hash),
+      Buffer.from(hash, "hex"),
     ],
     programId
   );
@@ -108,13 +98,13 @@ export const mobileInfoKey = async (
   if (typeof entityKey === "string") {
     entityKey = Buffer.from(bs58.decode(entityKey));
   }
-  const hash = await hashAnyhere(entityKey);
+  const hash = sha256(entityKey);
 
   return PublicKey.findProgramAddressSync(
     [
       Buffer.from("mobile_info", "utf-8"),
       rewardableEntityConfig.toBuffer(),
-      Buffer.from(hash),
+      Buffer.from(hash, "hex"),
     ],
     programId
   );

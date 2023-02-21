@@ -61,6 +61,20 @@ export const voterWeightRecordKey = (
     programId
   );
 
+export const maxVoterWeightRecordKey = (
+  realm: PublicKey,
+  realmGoverningMint: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+) =>
+  PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("max-voter-weight-record", "utf-8"),
+      realm.toBuffer(),
+      realmGoverningMint.toBuffer(),
+    ],
+    programId
+  );
+
 export const nftVoteRecordKey = (
   proposal: PublicKey,
   mint: PublicKey,

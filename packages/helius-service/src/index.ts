@@ -1,11 +1,11 @@
-import fastify from 'fastify';
-import {init, PROGRAM_ID} from "@helium/helium-entity-manager-sdk";
-import { AnchorProvider, BN, BorshInstructionCoder, Program } from '@coral-xyz/anchor';
+import { AnchorProvider, BorshInstructionCoder, Program } from '@coral-xyz/anchor';
+import { init } from "@helium/helium-entity-manager-sdk";
+import { daoKey } from "@helium/helium-sub-daos-sdk";
 import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
+import { PublicKey } from '@solana/web3.js';
+import fastify from 'fastify';
 import { sequelize } from './model';
 import { findAccountKey, instructionParser } from './parser';
-import { daoKey } from "@helium/helium-sub-daos-sdk";
-import { PublicKey } from '@solana/web3.js';
 
 // sync the model with the database
 sequelize.sync()

@@ -1,3 +1,5 @@
+import { Program } from "@coral-xyz/anchor";
+
 export * from "./constants";
 export { onboardIotHotspot } from "./functions/onboardIotHotspot";
 export { onboardMobileHotspot } from "./functions/onboardMobileHotspot";
