@@ -13,7 +13,7 @@ fi
 
 
 # create keypairs if they don't exist
-KEYPAIRS=( 'hnt.json' 'hst.json' 'dc.json' 'mobile.json' 'iot.json' 'council.json' 'aggregator.json' 'merkle.json' 'oracle.json' )
+KEYPAIRS=( 'hnt.json' 'hst.json' 'dc.json' 'mobile.json' 'iot.json' 'council.json' 'aggregator-IOT.json' 'aggregator-MOBILE.json' 'merkle.json' 'oracle.json' )
 for f in "${KEYPAIRS[@]}"; do
 	if [ ! -f "./packages/helium-cli/keypairs/$f" ]; then
         echo "$f keypair doesn't exist, creating it"

@@ -54,7 +54,7 @@ export const createTransferCompressedCollectableTxn = async ({
 
   const assProof = await getAssetProof(url, collectable.id);
   if (!assProof) {
-    throw new Error("");
+    throw new Error("Asset not found");
   }
 
   const treeAuthority = await getBubblegumAuthorityPDA(

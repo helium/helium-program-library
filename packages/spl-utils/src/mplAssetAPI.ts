@@ -48,9 +48,9 @@ export async function getAsset(
   try {
     const response = await axios.post(url, {
       jsonrpc: "2.0",
-      method: "get_asset",
+      method: "getAsset",
       id: "rpd-op-123",
-      params: [assetId.toBase58()],
+      params: { id: assetId.toBase58() },
       headers: {
         "Cache-Control": "no-cache",
         Pragma: "no-cache",
@@ -101,9 +101,9 @@ export async function getAssetProof(
   try {
     const response = await axios.post(url, {
       jsonrpc: "2.0",
-      method: "get_asset_proof",
+      method: "getAssetProof",
       id: "rpd-op-123",
-      params: [assetId.toBase58()],
+      params: { id: assetId.toBase58() },
       headers: {
         "Cache-Control": "no-cache",
         Pragma: "no-cache",
@@ -148,7 +148,7 @@ export async function getAssetsByOwner(
   try {
     const response = await axios.post(url, {
       jsonrpc: "2.0",
-      method: "get_assets_by_owner",
+      method: "getAssetsByOwner",
       id: "rpd-op-123",
       params: [wallet, sortBy, limit, page, before, after],
       headers: {
@@ -186,7 +186,7 @@ export async function searchAssets(
   try {
     const response = await axios.post(url, {
       jsonrpc: "2.0",
-      method: "search_assets",
+      method: "searchAssets",
       id: "get-assets-op-1",
       params: {
         page,

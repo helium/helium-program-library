@@ -46,6 +46,9 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "The switchboard network",
     default: "devnet",
   },
+  authority: {
+    type: "string",
+  }
 });
 
 async function run() {
@@ -69,6 +72,7 @@ async function run() {
     aggKeypair,
     url: argv.activeDeviceOracleUrl,
     switchboardNetwork: argv.switchboardNetwork,
+    authority: argv.authority ? new PublicKey(argv.authority) : wallet.publicKey,
   });
 }
 

@@ -1,32 +1,14 @@
 import * as anchor from "@coral-xyz/anchor";
-import { sendInstructions, toBN } from "@helium/spl-utils";
-import {
-  getGovernanceProgramVersion,
-  getTokenOwnerRecordAddress
-} from "@solana/spl-governance";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
-import {
-  Cluster,
-  ComputeBudgetProgram,
-  Keypair,
-  PublicKey, TransactionInstruction
-} from "@solana/web3.js";
-import { OracleJob } from "@switchboard-xyz/common";
-import {
-  AggregatorHistoryBuffer,
-  QueueAccount,
-  SwitchboardProgram
-} from "@switchboard-xyz/solana.js";
 import {
   createAtaAndMintInstructions,
-  createMintInstructions
+  createMintInstructions, sendInstructions, toBN
 } from "@helium/spl-utils";
 import {
   createCreateMetadataAccountV3Instruction,
   PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
 import {
-  AccountMetaData, getProposalTransactionAddress, Governance,
+  AccountMetaData, getGovernanceProgramVersion, getProposalTransactionAddress, getTokenOwnerRecordAddress, Governance,
   GovernanceAccountParser,
   InstructionData,
   ProposalTransaction,
@@ -47,15 +29,21 @@ import {
 } from "@solana/spl-governance";
 import {
   AuthorityType,
-  createSetAuthorityInstruction
+  createSetAuthorityInstruction, getAssociatedTokenAddress
 } from "@solana/spl-token";
 import {
-  AddressLookupTableProgram,
-  Commitment, Connection, Signer,
-  SYSVAR_CLOCK_PUBKEY, TransactionMessage,
+  AddressLookupTableProgram, Cluster, Commitment, ComputeBudgetProgram, Connection, Keypair,
+  PublicKey, Signer,
+  SYSVAR_CLOCK_PUBKEY, TransactionInstruction, TransactionMessage,
   VersionedTransaction
 } from "@solana/web3.js";
-import { sleep } from "@switchboard-xyz/common";
+import Squads from "@sqds/sdk";
+import { OracleJob, sleep } from "@switchboard-xyz/common";
+import {
+  AggregatorHistoryBuffer,
+  QueueAccount,
+  SwitchboardProgram
+} from "@switchboard-xyz/solana.js";
 import { BN } from "bn.js";
 import fs from "fs";
 import fetch from "node-fetch";
@@ -578,7 +566,9 @@ export async function createSwitchboardAggregator({
   wallet,
   crank,
   queue,
+  authority
 }: {
+  authority: PublicKey;
   switchboardNetwork: string;
   wallet: Keypair;
   crank: PublicKey;
@@ -625,6 +615,10 @@ export async function createSwitchboardAggregator({
         },
       ],
     });
+    await agg.setAuthority({
+      newAuthority: authority,
+      authority: aggKeypair,
+    });
     console.log("Created active device aggregator", agg.publicKey.toBase58());
     await AggregatorHistoryBuffer.create(switchboard, {
       aggregatorAccount: agg,
@@ -633,4 +627,84 @@ export async function createSwitchboardAggregator({
   }
 
   return aggKeypair.publicKey;
+}
+
+export async function sendInstructionsOrSquads({
+  provider,
+  instructions,
+  signers = [],
+  payer = provider.wallet.publicKey,
+  commitment = "confirmed",
+  idlErrors = new Map(),
+  executeTransaction = false,
+  squads,
+  multisig,
+  authorityIndex,
+}: {
+  executeTransaction?: boolean; // Will execute the transaction immediately. Only works if the squads multisig is only 1 wallet threshold or signers is complete
+  provider: anchor.AnchorProvider;
+  instructions: TransactionInstruction[];
+  signers?: Signer[];
+  payer?: PublicKey;
+  commitment?: Commitment;
+  idlErrors?: Map<number, string>;
+  squads: Squads;
+  multisig: PublicKey;
+  authorityIndex: number;
+}): Promise<string> {
+  const signerSet = new Set(
+    instructions
+      .map((ix) =>
+        ix.keys.filter((k) => k.isSigner).map((k) => k.pubkey.toBase58())
+      )
+      .flat()
+  );
+  const signerKeys = Array.from(
+    signerSet
+  ).map((k) => new PublicKey(k));
+
+  const nonMissingSignerIxs = instructions.filter(ix => !ix.keys.some(k => k.isSigner && !k.pubkey.equals(provider.wallet.publicKey)));
+  const squadsSignatures = signerKeys.filter((k) =>
+    !k.equals(provider.wallet.publicKey) &&
+    !signers.some((s) => s.publicKey.equals(k))
+  );
+
+  if (squadsSignatures.length == 0) {
+    return await sendInstructions(
+      provider,
+      nonMissingSignerIxs,
+      signers,
+      payer,
+      commitment,
+      idlErrors
+    );
+  }
+
+  if (squadsSignatures.length >= 2) {
+    throw new Error("Too many missing signatures");
+  }
+
+  const tx = await squads.createTransaction(multisig, authorityIndex);
+  for (const ix of instructions) {
+    await squads.addInstruction(tx.publicKey, ix);
+  }
+
+  await squads.activateTransaction(tx.publicKey);
+  if (executeTransaction) {
+    await squads.approveTransaction(tx.publicKey);
+    await squads.executeTransaction(tx.publicKey, provider.wallet.publicKey, signers);
+  }
+}
+
+export async function parseEmissionsSchedule(filepath: string) {
+  const json = JSON.parse(fs.readFileSync(filepath).toString());
+  const schedule = json.map((x) => {
+    const extra = "percent" in x ? {percent: x.percent} : "emissionsPerEpoch" in x ? {emissionsPerEpoch: new anchor.BN(x.emissionsPerEpoch)} : null;
+    if (!extra || !("startUnixTime" in x)) throw new Error("json format incorrect");
+    return {
+      startUnixTime: new anchor.BN(x.startUnixTime),
+      ...extra
+    }
+  });
+  return schedule;
 }
