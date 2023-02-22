@@ -47,6 +47,7 @@
     "@solana/spl-governance": "^0.3.18",
     "@solana/spl-token": "^0.3.6",
     "@solana/web3.js": "^1.66.2",
+    "@sqds/sdk": "^2.0.3",
     "@switchboard-xyz/common": "^2.1.7",
     "@switchboard-xyz/solana.js": "^2.0.7",
     "axios": "^1.1.3",

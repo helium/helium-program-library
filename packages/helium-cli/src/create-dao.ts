@@ -51,6 +51,7 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import { BN } from "bn.js";
+import Squads from "@sqds/sdk";
 
 const { hideBin } = require("yargs/helpers");
 
@@ -148,12 +149,15 @@ async function run() {
         "Number of Gov Council tokens to pre mint before assigning authority to dao",
       default: 10,
     },
-    noGovernance: {
-      type: "boolean",
-      describe:
-        "If this is set, your wallet will be the dao authority instead of the governance",
-      default: false,
+    multisig: {
+      type: "string",
+      describe: "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority"
     },
+    authorityIndex: {
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
+      default: 1,
+    }
   });
 
   const argv = await yarg.argv;
@@ -163,16 +167,16 @@ async function run() {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const dataCreditsProgram = await initDc(provider);
-  const lazyDistributorProgram = await initLazy(provider);
   const heliumSubDaosProgram = await initDao(provider);
   const heliumVsrProgram = await initVsr(provider);
 
-  const hntKeypair = await loadKeypair(argv.hntKeypair);
-  const hstKeypair = await loadKeypair(argv.hstKeypair);
-  const dcKeypair = await loadKeypair(argv.dcKeypair);
   const govProgramId = new PublicKey(argv.govProgramId);
   const councilKeypair = await loadKeypair(argv.councilKeypair);
   const councilWallet = new PublicKey(argv.councilWallet);
+
+  const hntKeypair = loadKeypair(argv.hntKeypair);
+  const hstKeypair = loadKeypair(argv.hstKeypair);
+  const dcKeypair = loadKeypair(argv.dcKeypair);
   const me = provider.wallet.publicKey;
   const dao = daoKey(hntKeypair.publicKey)[0];
 
@@ -186,9 +190,16 @@ async function run() {
   const thread = threadKey(dao, "issue_hst")[0];
 
   console.log("DAO", dao.toString());
-  console.log("AUTOMATION", thread.toString());
+  console.log("THREAD", thread.toString());
 
   const conn = provider.connection;
+
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, provider.wallet);
+  let authority = provider.wallet.publicKey;
+  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisig) {
+    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  }
 
   await createAndMint({
     provider,
@@ -307,97 +318,28 @@ async function run() {
       .instruction()
   );
 
-  await sendInstructions(provider, instructions, []);
-  instructions = [];
-
-  const governance = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("account-governance", "utf-8"),
-      realm.toBuffer(),
-      dao.toBuffer(),
-    ],
-    govProgramId
-  )[0];
-  const nativeTreasury = PublicKey.findProgramAddressSync(
-    [Buffer.from("native-treasury", "utf-8"), governance.toBuffer()],
-    govProgramId
-  )[0];
-  console.log(
-    `Using governance treasury ${nativeTreasury.toBase58()} as authority`
-  );
-  const balance = await provider.connection.getAccountInfo(nativeTreasury);
-  if (!balance) {
-    console.log("Transfering 1 sol to governance treasury for subdao creation");
-    await sendInstructions(provider, [
-      SystemProgram.transfer({
-        fromPubkey: provider.wallet.publicKey,
-        toPubkey: nativeTreasury,
-        lamports: BigInt(toBN(1, 9).toString()),
-      }),
-    ]);
-  }
-  if (!(await exists(conn, governance))) {
-    console.log(`Initializing Governance on Realm: ${realmName}`);
-    await withCreateGovernance(
-      instructions,
-      govProgramId,
-      govProgramVersion,
-      realm,
-      dao,
-      new GovernanceConfig({
-        communityVoteThreshold: new VoteThreshold({
-          type: VoteThresholdType.YesVotePercentage,
-          value: 60,
-        }),
-        minCommunityTokensToCreateProposal: new anchor.BN("100000000000000"),
-        minInstructionHoldUpTime: 0,
-        maxVotingTime: getTimestampFromDays(7),
-        communityVoteTipping: VoteTipping.Strict,
-        councilVoteTipping: VoteTipping.Early,
-        minCouncilTokensToCreateProposal: new anchor.BN(1),
-        councilVoteThreshold: new VoteThreshold({
-          type: VoteThresholdType.YesVotePercentage,
-          value: 50,
-        }),
-        councilVetoVoteThreshold: new VoteThreshold({
-          type: VoteThresholdType.YesVotePercentage,
-          value: 50,
-        }),
-        communityVetoVoteThreshold: new VoteThreshold({
-          type: VoteThresholdType.Disabled,
-        }),
-        votingCoolOffTime: 0,
-        depositExemptProposalCount: 20,
-      }),
-      await getTokenOwnerRecordAddress(
-        govProgramId,
-        realm,
-        hntKeypair.publicKey,
-        provider.wallet.publicKey
-      ),
-      provider.wallet.publicKey,
-      provider.wallet.publicKey
-    );
-
+  if (!authority.equals(me)) {
     withSetRealmAuthority(
       instructions,
       govProgramId,
       govProgramVersion,
       realm,
       provider.wallet.publicKey,
-      governance,
+      authority,
       SetRealmAuthorityAction.SetChecked
     );
   }
+  
 
   await sendInstructions(provider, instructions, []);
+  instructions = [];
 
   const dcKey = (await dataCreditsKey(dcKeypair.publicKey))[0];
   console.log("dcpid", PROGRAM_ID.toBase58());
   if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
-        authority: argv.noGovernance ? me : governance,
+        authority,
         config: {
           windowSizeSeconds: new anchor.BN(60 * 60),
           thresholdType: ThresholdType.Absolute as never,
@@ -421,7 +363,7 @@ async function run() {
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         registrar: registrar,
-        authority: argv.noGovernance ? provider.wallet.publicKey : governance,
+        authority,
         netEmissionsCap: toBN(34.24, 8),
         // TODO: Emissions and net emissions schedule for hnt
         hstEmissionSchedule: [
@@ -437,18 +379,6 @@ async function run() {
           },
         ],
       })
-      .preInstructions([
-        createAssociatedTokenAccountIdempotentInstruction(
-          provider.wallet.publicKey,
-          await getAssociatedTokenAddress(
-            hntKeypair.publicKey,
-            governance,
-            true
-          ),
-          governance,
-          hntKeypair.publicKey
-        ),
-      ])
       .accounts({
         dcMint: dcKeypair.publicKey,
         hntMint: hntKeypair.publicKey,
@@ -456,7 +386,7 @@ async function run() {
         // TODO: Create actual HST pool
         hstPool: await getAssociatedTokenAddress(
           hntKeypair.publicKey,
-          governance,
+          authority,
           true
         ),
       })

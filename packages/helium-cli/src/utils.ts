@@ -54,6 +54,7 @@ import { sleep } from "@switchboard-xyz/common";
 import { BN } from "bn.js";
 import fs from "fs";
 import fetch from "node-fetch";
+import Squads from "@sqds/sdk";
 
 const SECONDS_PER_DAY = 86400;
 
@@ -557,4 +558,84 @@ export async function sendInstructionsOrCreateProposal({
     commitment,
     idlErrors
   );
+}
+
+export async function sendInstructionsOrSquads({
+  provider,
+  instructions,
+  signers = [],
+  payer = provider.wallet.publicKey,
+  commitment = "confirmed",
+  idlErrors = new Map(),
+  executeTransaction = false,
+  squads,
+  multisig,
+  authorityIndex,
+}: {
+  executeTransaction?: boolean; // Will execute the transaction immediately. Only works if the squads multisig is only 1 wallet threshold or signers is complete
+  provider: anchor.AnchorProvider;
+  instructions: TransactionInstruction[];
+  signers?: Signer[];
+  payer?: PublicKey;
+  commitment?: Commitment;
+  idlErrors?: Map<number, string>;
+  squads: Squads;
+  multisig: PublicKey;
+  authorityIndex: number;
+}): Promise<string> {
+  const signerSet = new Set(
+    instructions
+      .map((ix) =>
+        ix.keys.filter((k) => k.isSigner).map((k) => k.pubkey.toBase58())
+      )
+      .flat()
+  );
+  const signerKeys = Array.from(
+    signerSet
+  ).map((k) => new PublicKey(k));
+
+  const nonMissingSignerIxs = instructions.filter(ix => !ix.keys.some(k => k.isSigner && !k.pubkey.equals(provider.wallet.publicKey)));
+  const squadsSignatures = signerKeys.filter((k) =>
+    !k.equals(provider.wallet.publicKey) &&
+    !signers.some((s) => s.publicKey.equals(k))
+  );
+
+  if (squadsSignatures.length == 0) {
+    return await sendInstructions(
+      provider,
+      nonMissingSignerIxs,
+      signers,
+      payer,
+      commitment,
+      idlErrors
+    );
+  }
+
+  if (squadsSignatures.length >= 2) {
+    throw new Error("Too many missing signatures");
+  }
+
+  const tx = await squads.createTransaction(multisig, authorityIndex);
+  for (const ix of instructions) {
+    await squads.addInstruction(tx.publicKey, ix);
+  }
+
+  await squads.activateTransaction(tx.publicKey);
+  if (executeTransaction) {
+    await squads.approveTransaction(tx.publicKey);
+    await squads.executeTransaction(tx.publicKey, provider.wallet.publicKey, signers);
+  }
+}
+
+export async function parseEmissionsSchedule(filepath: string) {
+  const json = JSON.parse(fs.readFileSync(filepath).toString());
+  const schedule = json.map((x) => {
+    const extra = "percent" in x ? {percent: x.percent} : "emissionsPerEpoch" in x ? {emissionsPerEpoch: new anchor.BN(x.emissionsPerEpoch)} : null;
+    if (!extra || !("startUnixTime" in x)) throw new Error("json format incorrect");
+    return {
+      startUnixTime: new anchor.BN(x.startUnixTime),
+      ...extra
+    }
+  });
+  return schedule;
 }

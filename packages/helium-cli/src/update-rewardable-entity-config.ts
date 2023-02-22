@@ -1,28 +1,16 @@
-import Address from "@helium/address";
-import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
 import {
   init as initHem,
-  makerKey,
   rewardableEntityConfigKey,
-  makerApprovalKey,
 } from "@helium/helium-entity-manager-sdk";
-import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
-import { humanReadable, sendInstructions, toBN, truthy } from "@helium/spl-utils";
+import { subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { sendInstructions, toBN } from "@helium/spl-utils";
 import * as anchor from "@coral-xyz/anchor";
 import {
-  getConcurrentMerkleTreeAccountSize,
-  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-} from "@solana/spl-account-compression";
-import {
-  Keypair,
   PublicKey,
-  SystemProgram,
-  TransactionInstruction,
 } from "@solana/web3.js";
-import fs from "fs";
 import os from "os";
 import yargs from "yargs/yargs";
-import { exists, loadKeypair, sendInstructionsOrCreateProposal } from "./utils";
+import { loadKeypair, sendInstructionsOrCreateProposal } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({

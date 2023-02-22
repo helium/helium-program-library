@@ -27,16 +27,18 @@ import {
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
   Cluster,
-  ComputeBudgetProgram, PublicKey,
+  ComputeBudgetProgram, Keypair, PublicKey,
   SystemProgram,
   TransactionInstruction
 } from "@solana/web3.js";
+import Squads from "@sqds/sdk";
 import { OracleJob } from "@switchboard-xyz/common";
 import {
   AggregatorHistoryBuffer,
   QueueAccount,
   SwitchboardProgram
 } from "@switchboard-xyz/solana.js";
+import { AggregatorAccount } from "@switchboard-xyz/switchboard-v2";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
@@ -46,7 +48,8 @@ import {
   getUnixTimestamp,
   isLocalhost,
   loadKeypair,
-  sendInstructionsOrCreateProposal
+  sendInstructionsOrCreateProposal,
+  sendInstructionsOrSquads
 } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
@@ -92,7 +95,7 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Keypair of the subdao token",
     required: true,
   },
-  executeProposal: {
+  executeTransaction: {
     type: "boolean",
   },
   numTokens: {
@@ -121,7 +124,6 @@ const yarg = yargs(hideBin(process.argv)).options({
   aggregatorKeypair: {
     type: "string",
     describe: "Keypair of the aggregtor",
-    default: `${__dirname}/../keypairs/aggregator.json`,
   },
   merkleKeypair: {
     type: "string",
@@ -173,12 +175,15 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Keypair of gov council token",
     default: `${__dirname}/../keypairs/council.json`,
   },
-  noGovernance: {
-    type: "boolean",
-    describe:
-      "If this is set, governance will be skipped. Ensure that you also included --noGovernance when running create-dao",
-    default: false,
+  multisig: {
+    type: "string",
+    describe: "Address of the squads multisig for subdao authority. If not provided, your wallet will be the authority"
   },
+  authorityIndex: {
+    type: "number",
+    describe: "Authority index for squads. Defaults to 1",
+    default: 1,
+  }
 });
 
 const SECS_PER_DAY = 86400;
@@ -203,13 +208,16 @@ async function run() {
   const heliumVsrProgram = await initVsr(provider);
 
   const wallet = loadKeypair(argv.wallet);
-  const aggKeypair = await loadKeypair(argv.aggregatorKeypair);
+  const aggKeypair = await loadKeypair(
+    argv.aggregatorKeypair || `${__dirname}/../keypairs/aggregator-${name}.json`
+  );
   const subdaoKeypair = await loadKeypair(argv.subdaoKeypair);
   const oracleKeypair = await loadKeypair(argv.oracleKeypair);
   const oracleKey = oracleKeypair.publicKey;
   const rewardsOracleUrl = argv.rewardsOracleUrl;
   const govProgramId = new PublicKey(argv.govProgramId);
   const councilKeypair = await loadKeypair(argv.councilKeypair);
+  const me = provider.wallet.publicKey;
 
   console.log("Subdao mint", subdaoKeypair.publicKey.toBase58());
   console.log("GOV PID", govProgramId.toBase58());
@@ -226,6 +234,12 @@ async function run() {
   const calculateThread = threadKey(subdao, "calculate")[0];
   const issueThread = threadKey(subdao, "issue")[0];
 
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, provider.wallet);
+  let authority = provider.wallet.publicKey;
+  const multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisig) {
+    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  }
   if (await exists(conn, subdao)) {
     const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
 
@@ -349,76 +363,7 @@ async function run() {
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
-  const me = provider.wallet.publicKey;
-  const governance = await PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("account-governance", "utf-8"),
-      realm.toBuffer(),
-      subdao.toBuffer(),
-    ],
-    govProgramId
-  )[0];
-  const nativeTreasury = await PublicKey.findProgramAddressSync(
-    [Buffer.from("native-treasury", "utf-8"), governance.toBuffer()],
-    govProgramId
-  )[0];
-  console.log(
-    `Using governance treasury ${nativeTreasury.toBase58()} as authority`
-  );
-  const balance = await provider.connection.getAccountInfo(nativeTreasury);
-  if (!balance) {
-    console.log("Transfering 1 sol to governance treasury for subdao creation");
-    await sendInstructions(provider, [
-      SystemProgram.transfer({
-        fromPubkey: provider.wallet.publicKey,
-        toPubkey: nativeTreasury,
-        lamports: BigInt(toBN(1, 9).toString()),
-      }),
-    ]);
-  }
-  if (!(await exists(conn, governance))) {
-    console.log(`Initializing Governance on Realm: ${realmName}`);
-    await withCreateGovernance(
-      instructions,
-      govProgramId,
-      govProgramVersion,
-      realm,
-      subdao,
-      new GovernanceConfig({
-        communityVoteThreshold: new VoteThreshold({
-          type: VoteThresholdType.YesVotePercentage,
-          value: 60,
-        }),
-        minCommunityTokensToCreateProposal: new anchor.BN(1),
-        minInstructionHoldUpTime: 0,
-        maxVotingTime: getTimestampFromDays(7),
-        communityVoteTipping: VoteTipping.Strict,
-        councilVoteTipping: VoteTipping.Early,
-        minCouncilTokensToCreateProposal: new anchor.BN(1),
-        councilVoteThreshold: new VoteThreshold({
-          type: VoteThresholdType.YesVotePercentage,
-          value: 50,
-        }),
-        councilVetoVoteThreshold: new VoteThreshold({
-          type: VoteThresholdType.YesVotePercentage,
-          value: 50,
-        }),
-        communityVetoVoteThreshold: new VoteThreshold({
-          type: VoteThresholdType.Disabled,
-        }),
-        votingCoolOffTime: 0,
-        depositExemptProposalCount: 10,
-      }),
-      await getTokenOwnerRecordAddress(
-        govProgramId,
-        realm,
-        subdaoKeypair.publicKey,
-        provider.wallet.publicKey
-      ),
-      provider.wallet.publicKey,
-      provider.wallet.publicKey
-    );
-
+  if (!authority.equals(me)) {
     withSetRealmAuthority(
       instructions,
       govProgramId,
@@ -505,6 +450,11 @@ async function run() {
             },
           ],
         });
+
+        await agg.setAuthority({
+          newAuthority: authority,
+          authority: aggKeypair,
+        });
         console.log(
           "Created active device aggregator",
           agg.publicKey.toBase58()
@@ -517,13 +467,11 @@ async function run() {
       }
     }
 
-    const instructions: TransactionInstruction[] = [];
-
     console.log(`Initializing ${name} SubDAO`);
     const initSubdaoMethod = await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
         dcBurnAuthority: new PublicKey(argv.dcBurnAuthority),
-        authority: argv.noGovernance ? me : governance,
+        authority,
         emissionSchedule: emissionSchedule(argv.startEpochRewards),
         // Linear curve
         treasuryCurve: {
@@ -553,21 +501,7 @@ async function run() {
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
       ]);
-    if (argv.noGovernance) {
-      await initSubdaoMethod.rpc({ skipPreflight: true });
-    } else {
-      instructions.push(await initSubdaoMethod.instruction());
-      await sendInstructionsOrCreateProposal({
-        provider,
-        instructions,
-        walletSigner: wallet,
-        signers: [],
-        govProgramId,
-        proposalName: `Create ${name} SubDAO`,
-        votingMint: councilKeypair.publicKey,
-        executeProposal: argv.executeProposal,
-      });
-    }
+    await initSubdaoMethod.rpc({ skipPreflight: true });
   }
 
   const hsConfigKey = (
@@ -606,21 +540,19 @@ async function run() {
         })
         .accounts({
           subDao: subdao,
-          payer: argv.noGovernance ? me : nativeTreasury,
-          authority: argv.noGovernance ? me : governance,
+          payer: me,
+          authority,
         })
         .instruction()
     );
 
-    await sendInstructionsOrCreateProposal({
+    await sendInstructionsOrSquads({
       provider,
       instructions,
-      walletSigner: wallet,
-      signers: [],
-      govProgramId,
-      proposalName: `Create ${name} RewardableEntityConfig`,
-      votingMint: councilKeypair.publicKey,
-      executeProposal: argv.executeProposal,
+      squads,
+      executeTransaction: true,
+      multisig,
+      authorityIndex: argv.authorityIndex,
     });
   }
 }
