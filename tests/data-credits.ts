@@ -198,10 +198,11 @@ describe("data-credits", () => {
       ({ subDao } = await initTestSubdao(hsdProgram, provider, me, dao));
     });
 
-    it("mints some data credits", async () => {
+    it("mints some data credits with hnt amount", async () => {
       await program.methods
         .mintDataCreditsV0({
           hntAmount: new BN(1 * 10 ** 8),
+          dcAmount: null,
         })
         .accounts({ dcMint })
         .rpc({ skipPreflight: true });
@@ -225,6 +226,36 @@ describe("data-credits", () => {
         approxEndBal + 1
       );
       expect(hntBal.value.uiAmount).to.eq(startHntBal - 1);
+    });
+
+    it("mints some data credits with dc amount", async () => {
+      await program.methods
+        .mintDataCreditsV0({
+          hntAmount: null,
+          dcAmount: new BN(10**5),
+        })
+        .accounts({ dcMint })
+        .rpc({ skipPreflight: true });
+
+      const dcAta = await getAssociatedTokenAddress(dcMint, me);
+      const dcAtaAcc = await getAccount(provider.connection, dcAta);
+
+      assert(dcAtaAcc.isFrozen);
+      const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
+      const hntBal = await provider.connection.getTokenAccountBalance(
+        await getAssociatedTokenAddress(hntMint, me)
+      );
+      const pythData = (await provider.connection.getAccountInfo(
+        new PublicKey("JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB")
+      ))!.data;
+      const price = parsePriceData(pythData);
+      const approxEndBal =
+        startHntBal + Math.floor(price.emaPrice.value / 10 ** 5);
+      expect(hntBal.value.uiAmount).to.be.within(
+        approxEndBal - 1,
+        approxEndBal + 1
+      );
+      expect(dcBal.value.uiAmount).to.eq(startDcBal + 10**5);
     });
 
     it("burns some data credits", async () => {

@@ -141,6 +141,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
     .ok_or_else(|| error!(DataCreditsErrors::PythPriceNotFound))?;
 
   // price * hnt_amount / 10^(8 + expo - 5)
+  // dc_amount / price / 10^(8 + expo - 5)
   let price_expo = -hnt_price.expo;
   let right_shift = 8 + price_expo - 5;
   let normalize = 10_u64
@@ -168,7 +169,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
       )
       .map_err(|_| error!(DataCreditsErrors::ArithmeticError))?;
 
-      (hnt_amount, hnt_amount)
+      (hnt_amount, dc_amount)
     }
     (None, None) => {
       return Err(error!(DataCreditsErrors::InvalidArgs));

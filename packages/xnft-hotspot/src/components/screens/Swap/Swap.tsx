@@ -68,6 +68,7 @@ async function mintDataCredits(
   const tx = await program.methods
     .mintDataCreditsV0({
       hntAmount: new anchor.BN(amount),
+      dcAmount: null,
     })
     .accounts({ dcMint: DC_MINT })
     .transaction();

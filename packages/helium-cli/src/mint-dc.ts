@@ -64,6 +64,7 @@ async function run() {
   await dataCreditsProgram.methods
     .mintDataCreditsV0({
       hntAmount: toBN(argv.numHnt, 8),
+      dcAmount: null
     })
     .preInstructions([
       await createAssociatedTokenAccountIdempotentInstruction(
