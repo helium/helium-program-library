@@ -23,8 +23,8 @@ import {
 import fs from "fs";
 import os from "os";
 import yargs from "yargs/yargs";
-import { exists, loadKeypair, sendInstructionsOrCreateProposal } from "./utils";
-import { program } from "@coral-xyz/anchor/dist/cjs/native/system";
+import { exists, loadKeypair, sendInstructionsOrSquads } from "./utils";
+import Squads from "@sqds/sdk";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -33,7 +33,7 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Anchor wallet keypair",
     default: `${os.homedir()}/.config/solana/id.json`,
   },
-  executeProposal: {
+  executeTransaction: {
     type: "boolean",
   },
   url: {
@@ -85,6 +85,15 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Key of gov council token",
     default: "counKsk72Jgf9b3aqyuQpFf12ktLdJbbuhnoSxxQoMJ",
   },
+  multisig: {
+    type: "string",
+    describe: "Address of the squads multisig to be authority. If not provided, your wallet will be the authority"
+  },
+  authorityIndex: {
+    type: "number",
+    describe: "Authority index for squads. Defaults to 1",
+    default: 1,
+  }
 });
 
 // Goal = 3 proof nodes needed
@@ -146,34 +155,15 @@ async function run() {
 
   const subdaoAcc = await hsdProgram.account.subDaoV0.fetch(subdao);
   const dao = await hsdProgram.account.daoV0.fetch(subdaoAcc.dao);
-  const registrar = await vsrProgram.account.registrar.fetch(dao.registrar);
-  const authorityAcc = await provider.connection.getAccountInfo(
-    subdaoAcc.authority
-  );
   let subdaoPayer = provider.wallet.publicKey;
   let daoPayer = provider.wallet.publicKey;
-  const isGov = authorityAcc != null && authorityAcc.owner.equals(govProgramId);
-  if (isGov) {
-    const nativeTreasury = await PublicKey.findProgramAddressSync(
-      [Buffer.from("native-treasury", "utf-8"), subdaoAcc.authority.toBuffer()],
-      govProgramId
-    )[0];
-    subdaoPayer = nativeTreasury;
-
-    const daoGovernance = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("account-governance", "utf-8"),
-        registrar.realm.toBuffer(),
-        subdaoAcc.dao.toBuffer(),
-      ],
-      govProgramId
-    )[0];
-    const daoNativeTreasury = PublicKey.findProgramAddressSync(
-      [Buffer.from("native-treasury", "utf-8"), daoGovernance.toBuffer()],
-      govProgramId
-    )[0];
-
-    daoPayer = daoNativeTreasury;
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, provider.wallet);
+  let authority = provider.wallet.publicKey;
+  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisig) {
+    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+    subdaoPayer = authority;
+    daoPayer = authority;
   }
 
   const createInstructions: TransactionInstruction[][] = [];
@@ -339,19 +329,18 @@ async function run() {
 
   console.log("Total sol needed: ", humanReadable(new anchor.BN(totalSol), 9));
 
-  if (isGov) {
+  if (multisig) {
     // Approve instructions must execute after ALL create instructions
     const instrs = createInstructions.flat().filter(truthy);
     const approveInstrs = approveInstructions.flat().filter(truthy);
-    await sendInstructionsOrCreateProposal({
+    await sendInstructionsOrSquads({
       provider,
       instructions: [...instrs, ...approveInstrs],
-      walletSigner: wallet,
       signers: [],
-      govProgramId,
-      proposalName: `Create Makers`,
-      votingMint: councilKey,
-      executeProposal: argv.executeProposal,
+      executeTransaction: argv.executeTransaction,
+      squads,
+      multisig,
+      authorityIndex: argv.authorityIndex,
     });
   } else {
     for (const instrs of [...createInstructions, ...approveInstructions]) {
