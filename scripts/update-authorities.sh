@@ -14,7 +14,7 @@ npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-
     --hntMint $(solana address -k packages/helium-cli/keypairs/hnt.json) -u $CLUSTER_URL --newAuthority $2
 
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/update-subdao.ts \
-    --dntMint $(solana address -k packages/helium-cli/keypairs/mobile.json) -u $CLUSTER_URL --newAuthority $2 --name IOT
+    --dntMint $(solana address -k packages/helium-cli/keypairs/mobile.json) -u $CLUSTER_URL --newAuthority $2 --name MOBILE
 
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/update-subdao.ts \
-    --dntMint $(solana address -k packages/helium-cli/keypairs/iot.json) -u $CLUSTER_URL --newAuthority $2 --name MOBILE
+    --dntMint $(solana address -k packages/helium-cli/keypairs/iot.json) -u $CLUSTER_URL --newAuthority $2 --name IOT

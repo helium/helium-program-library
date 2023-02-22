@@ -6,6 +6,8 @@ import {
 import os from "os";
 import yargs from "yargs/yargs";
 import { loadKeypair, parseEmissionsSchedule, sendInstructionsOrCreateProposal } from "./utils";
+import { mintWindowedBreakerKey, accountWindowedBreakerKey, init as initCb } from "@helium/circuit-breaker-sdk"
+
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -69,13 +71,28 @@ async function run() {
   const govProgramId = new PublicKey(argv.govProgramId);
   const councilKey = new PublicKey(argv.councilKey);
   const program = await initHsd(provider);
+  const cbProgram = await initCb(provider);
+
   const instructions = [];
+
+  const hntMint = new PublicKey(argv.hntMint);
+  if (argv.newAuthority) {
+    const hntCircuitBreaker = mintWindowedBreakerKey(hntMint)[0]
+    const hntCbAcc = await cbProgram.account.mintWindowedCircuitBreakerV0.fetch(hntCircuitBreaker);
+    instructions.push(await cbProgram.methods.updateMintWindowedBreakerV0({
+      newAuthority: new PublicKey(argv.newAuthority),
+      config: null,
+    }).accounts({
+      circuitBreaker: hntCircuitBreaker,
+      authority: hntCbAcc.authority,
+    }).instruction());
+  }
   instructions.push(await program.methods.updateDaoV0({
     authority: new PublicKey(argv.newAuthority),
     emissionSchedule: argv.newEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newEmissionsSchedulePath) : null,
     hstEmissionSchedule: argv.newHstEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newHstEmissionsSchedulePath) : null,
   }).accounts({
-    dao: daoKey(new PublicKey(argv.hntMint))[0],
+    dao: daoKey(hntMint)[0],
   }).instruction());
 
   await sendInstructionsOrCreateProposal({

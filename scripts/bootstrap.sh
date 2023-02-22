@@ -13,7 +13,7 @@ fi
 
 
 # create keypairs if they don't exist
-KEYPAIRS=( 'hnt.json' 'hst.json' 'dc.json' 'mobile.json' 'iot.json' 'council.json' 'aggregator.json' 'merkle.json' 'oracle.json' )
+KEYPAIRS=( 'hnt.json' 'hst.json' 'dc.json' 'mobile.json' 'iot.json' 'council.json' 'aggregator-IOT.json' 'aggregator-MOBILE.json' 'merkle.json' 'oracle.json' )
 for f in "${KEYPAIRS[@]}"; do
 	if [ ! -f "./packages/helium-cli/keypairs/$f" ]; then
         echo "$f keypair doesn't exist, creating it"
@@ -33,18 +33,18 @@ npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-
     --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n IOT --subdaoKeypair packages/helium-cli/keypairs/iot.json \
     --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "IOT $RND" --dcBurnAuthority $(solana address) --noGovernance -u $CLUSTER_URL
 
-npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-subdao.ts \
-    -rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com \
-    --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n Mobile --subdaoKeypair packages/helium-cli/keypairs/mobile.json \
-    --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Mobile $RND" \
-    --dcBurnAuthority $(solana address)  --noGovernance -u $CLUSTER_URL
+# npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-subdao.ts \
+#     -rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com \
+#     --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n Mobile --subdaoKeypair packages/helium-cli/keypairs/mobile.json \
+#     --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Mobile $RND" \
+#     --dcBurnAuthority $(solana address)  --noGovernance -u $CLUSTER_URL
 
-if test -f "./packages/helium-cli/makers.json"; then
-  npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-maker.ts -u $CLUSTER --symbol IOT --subdaoMint $(solana address -k packages/helium-cli/keypairs/iot.json) --fromFile packages/helium-cli/makers.json --councilKeypair ./packages/helium-cli/keypairs/council.json
-fi
-if test -f "./packages/helium-cli/makers-mobile.json"; then
-  npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-maker.ts -u $CLUSTER --symbol MOBILE --subdaoMint $(solana address -k packages/helium-cli/keypairs/mobile.json) --fromFile packages/helium-cli/makers-mobile.json --councilKeypair ./packages/helium-cli/keypairs/council.json
-fi
+# if test -f "./packages/helium-cli/makers.json"; then
+#   npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-maker.ts -u $CLUSTER --symbol IOT --subdaoMint $(solana address -k packages/helium-cli/keypairs/iot.json) --fromFile packages/helium-cli/makers.json --councilKeypair ./packages/helium-cli/keypairs/council.json
+# fi
+# if test -f "./packages/helium-cli/makers-mobile.json"; then
+#   npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-maker.ts -u $CLUSTER --symbol MOBILE --subdaoMint $(solana address -k packages/helium-cli/keypairs/mobile.json) --fromFile packages/helium-cli/makers-mobile.json --councilKeypair ./packages/helium-cli/keypairs/council.json
+# fi
 
 # save the keypairs as environment variables (used by other packages)
 export DC_MINT=$(solana address -k ./packages/helium-cli/keypairs/dc.json)

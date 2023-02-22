@@ -40,7 +40,7 @@ build-account-compression = "pushd deps/solana-program-library/account-compressi
 build-clockwork = "pushd deps/clockwork && ./scripts/build-all.sh . && popd"
 
 [test]
-startup_wait = 15000
+startup_wait = 20000
 
 [test.validator]
 url = "https://api.mainnet-beta.solana.com"
