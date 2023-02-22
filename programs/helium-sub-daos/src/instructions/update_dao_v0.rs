@@ -22,6 +22,10 @@ pub struct UpdateDaoV0<'info> {
 }
 
 pub fn handler(ctx: Context<UpdateDaoV0>, args: UpdateDaoArgsV0) -> Result<()> {
+  if let Some(new_authority) = args.authority {
+    ctx.accounts.dao.authority = new_authority;
+  }
+
   if let Some(emission_schedule) = args.emission_schedule {
     ctx.accounts.dao.emission_schedule = emission_schedule;
   }
