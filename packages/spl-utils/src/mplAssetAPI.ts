@@ -50,7 +50,7 @@ export async function getAsset(
       jsonrpc: "2.0",
       method: "getAsset",
       id: "rpd-op-123",
-      params: [assetId.toBase58()],
+      params: { id: assetId.toBase58() },
       headers: {
         "Cache-Control": "no-cache",
         Pragma: "no-cache",
@@ -103,7 +103,7 @@ export async function getAssetProof(
       jsonrpc: "2.0",
       method: "getAssetProof",
       id: "rpd-op-123",
-      params: [assetId.toBase58()],
+      params: { id: assetId.toBase58() },
       headers: {
         "Cache-Control": "no-cache",
         Pragma: "no-cache",
