@@ -38,6 +38,7 @@ import {
   QueueAccount,
   SwitchboardProgram
 } from "@switchboard-xyz/solana.js";
+import { AggregatorAccount } from "@switchboard-xyz/switchboard-v2";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
@@ -448,6 +449,11 @@ async function run() {
               ).finish(),
             },
           ],
+        });
+
+        await agg.setAuthority({
+          newAuthority: authority,
+          authority: aggKeypair,
         });
         console.log(
           "Created active device aggregator",

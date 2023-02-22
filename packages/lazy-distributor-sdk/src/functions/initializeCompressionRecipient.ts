@@ -50,7 +50,7 @@ export async function initializeCompressionRecipient({
     )
   ).getCanopyDepth();
 
-  const recipient = recipientKey(lazyDistributor, await getLeafAssetId(treeId, new BN(leafId!)))[0]
+  const recipient = recipientKey(lazyDistributor, assetId)[0]
 
   return program.methods
     .initializeCompressionRecipientV0({

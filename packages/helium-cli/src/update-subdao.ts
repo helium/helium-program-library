@@ -2,12 +2,15 @@ import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { init as initHem, rewardableEntityConfigKey } from "@helium/helium-entity-manager-sdk";
 import * as anchor from "@coral-xyz/anchor";
 import {
+  Cluster,
   PublicKey,
 } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrCreateProposal } from "./utils";
+import { isLocalhost, loadKeypair, sendInstructionsOrCreateProposal } from "./utils";
 import { parseEmissionsSchedule } from "./utils";
+import { mintWindowedBreakerKey, accountWindowedBreakerKey, init as initCb } from "@helium/circuit-breaker-sdk"
+import { AggregatorAccount, SwitchboardProgram } from "@switchboard-xyz/solana.js";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -67,6 +70,11 @@ const yarg = yargs(hideBin(process.argv)).options({
   executeProposal: {
     type: "boolean",
   },
+  switchboardNetwork: {
+    type: "string",
+    describe: "The switchboard network",
+    default: "devnet",
+  },
 });
 
 
@@ -81,17 +89,19 @@ async function run() {
   const councilKey = new PublicKey(argv.councilKey);
   const program = await initHsd(provider);
   const hemProgram = await initHem(provider);
+  const cbProgram = await initCb(provider);
 
   const instructions = [];
 
   const subDao = subDaoKey(new PublicKey(argv.dntMint))[0];
-  const subdaoAcc = await program.account.subDaoV0.fetch(subDao);
+  const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
   if (argv.newAuthority) {
     if (!argv.name) {
       throw new Error("--name is required")
     }
-
-    const config = rewardableEntityConfigKey(subDao, argv.name.toUpperCase())[0]
+    // update entity config auth
+    const config = rewardableEntityConfigKey(subDao, argv.name.toUpperCase())[0];
+    const configAcc = await hemProgram.account.rewardableEntityConfigV0.fetch(config);
     instructions.push(
       await hemProgram.methods
         .updateRewardableEntityConfigV0({
@@ -100,11 +110,66 @@ async function run() {
         })
         .accounts({
           rewardableEntityConfig: config,
-          authority: subdaoAcc.authority
+          authority: configAcc.authority,
         })
         .instruction()
     );
+
+    // update dnt cb auth
+    const dntCircuitBreaker = mintWindowedBreakerKey(subDaoAcc.dntMint)[0];
+    const dntCbAcc = await cbProgram.account.mintWindowedCircuitBreakerV0.fetch(dntCircuitBreaker);
+    instructions.push(
+      await cbProgram.methods.updateMintWindowedBreakerV0({
+        newAuthority: new PublicKey(argv.newAuthority),
+        config: null,
+      }).accounts({
+        circuitBreaker: dntCircuitBreaker,
+        authority: dntCbAcc.authority,
+      }).instruction()
+    );
+
+    // update treasury cb auth
+    const treasuryCircuitBreaker = accountWindowedBreakerKey(subDaoAcc.treasury)[0];
+    const treasuryCbAcc = await cbProgram.account.accountWindowedCircuitBreakerV0.fetch(treasuryCircuitBreaker);
+    instructions.push(
+      await cbProgram.methods.updateAccountWindowedBreakerV0({
+        newAuthority: new PublicKey(argv.newAuthority),
+        config: null,
+      }).accounts({
+        circuitBreaker: treasuryCircuitBreaker,
+        authority: treasuryCbAcc.authority,
+      }).instruction()
+    );
+
+    // update agg auth
+    if (!isLocalhost(provider)) {
+      const aggKeypair = loadKeypair(
+        `${__dirname}/../keypairs/aggregator-${argv.name}.json`
+      );
+      const switchboard = await SwitchboardProgram.load(
+        argv.switchboardNetwork as Cluster,
+        provider.connection,
+        wallet
+      );
+      const [agg, aggData] = (await AggregatorAccount.load(switchboard, subDaoAcc.activeDeviceAggregator));
+      if (aggData.authority.equals(aggKeypair.publicKey)) {
+        instructions.push(
+          agg.setAuthorityInstruction(
+            provider.wallet.publicKey,
+            {newAuthority: new PublicKey(argv.newAuthority), authority: aggKeypair}
+          )
+        );
+      } else {
+        instructions.push(
+          agg.setAuthorityInstruction(
+            aggData.authority, // payer needs to be the same as the old authority
+            {newAuthority: new PublicKey(argv.newAuthority)}
+          )
+        )
+      }
+    }
   }
+  
   instructions.push(
     await program.methods
       .updateSubDaoV0({
@@ -112,8 +177,8 @@ async function run() {
         emissionSchedule: argv.newEmissionsSchedulePath
           ? parseEmissionsSchedule(argv.newEmissionsSchedulePath)
           : null,
-        dcBurnAuthority: argv.dcBurnAuthorityr
-          ? new PublicKey(argv.dcBurnAuthority)
+        dcBurnAuthority: argv.newDcBurnAuthority
+          ? new PublicKey(argv.newDcBurnAuthority)
           : null,
         onboardingDcFee: null,
         activeDeviceAggregator: argv.newActiveDeviceAggregator
@@ -122,7 +187,7 @@ async function run() {
       })
       .accounts({
         subDao,
-        authority: subdaoAcc.authority,
+        authority: subDaoAcc.authority,
       })
       .instruction()
   );
