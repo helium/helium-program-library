@@ -249,6 +249,8 @@ export class OracleServer {
         return;
       }
 
+      console.log(decoded.name)
+
       if (decoded.name === "setCurrentRewardsV0") setRewardIxs.push(ix);
 
       // Since recipient wont exist to fetch to get the mint id, grab it from the init recipient ix
@@ -304,15 +306,26 @@ export class OracleServer {
 
         if (!lazyDist.equals(this.lazyDistributor)) {
           res.status(400).send({ error: "Invalid lazy distributor" });
+          return;
         }
 
         let mint = (recipientToLazyDistToMint[recipient.toBase58()] || {})[
           lazyDist.toBase58()
         ];
         if (!mint) {
-          const recipientAcc = await this.program.account.recipientV0.fetch(
+          const recipientAcc = await this.program.account.recipientV0.fetchNullable(
             recipient
           );
+          if (!recipientAcc) {
+            console.error(recipientToLazyDistToMint);
+            res
+              .status(400)
+              .send({
+                error: "Recipient doesn't exist",
+                recipientToLazyDistToMint,
+              });
+            return;
+          }
           mint = recipientAcc.asset;
         }
 
