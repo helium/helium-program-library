@@ -166,7 +166,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
           .checked_mul(10_u128.pow(price_expo.try_into().unwrap()))
           .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
           .checked_div(u128::try_from(hnt_price.price).unwrap())
-          .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
+          .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?,
       )
       .map_err(|_| error!(DataCreditsErrors::ArithmeticError))?;
 
