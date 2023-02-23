@@ -14,40 +14,63 @@ let HNT_MINT_DECIMALS: number;
 let IOT_MINT_DECIMALS: number;
 let MOBILE_MINT_DECIMALS: number;
 
-const walletLastAccessedMap = new Map<string, number>();
-const ipLastAccessedMap = new Map<string, number>();
+const window = 30 * 1000; // 30 seconds
+const rateLimit = {
+  "hnt": {
+    wallet: new Map<string, number>(),
+    ip: new Map<string, number>(),
+  },
+  "iot": {
+    wallet: new Map<string, number>(),
+    ip: new Map<string, number>(),
+  },
+  "mobile": {
+    wallet: new Map<string, number>(),
+    ip: new Map<string, number>(),
+  }
+}
+type RateLimitTracker = {
+  wallet: Map<string, number>;
+  ip: Map<string, number>;
+}
+function isRateLimited(request: any, walletStr: string, rateLimitTracker: RateLimitTracker): boolean {
+  // Check if the wallet has been accessed within the rate limit window
+  const walletLastAccessed = rateLimitTracker.wallet.get(walletStr);
+  const now = Date.now();
+  if (walletLastAccessed && now - walletLastAccessed < window) {
+    return true;
+  }
+  rateLimitTracker.wallet.set(walletStr, now);
 
-server.get('/faucet', {
+  // Check if the IP needs to be rate limited
+  const ip = (request.headers['x-real-ip'] // nginx
+    || request.headers['x-client-ip'] // apache
+    || request.ip).toString() // fallback to default
+  const ipLastAccessed = rateLimitTracker.ip.get(ip);
+  if (ipLastAccessed && now - ipLastAccessed < window) {
+    return true;
+  }
+  rateLimitTracker.ip.set(ip, now);
+
+  return false;
+}
+
+server.get('/hnt', {
   handler: async (request, reply) => {
     //@ts-ignore
     const walletStr = request.query.wallet as string;
     try {
+      //@ts-ignore
+      const amount = Number(request.query.amount) || 1;
       const wallet = new PublicKey(walletStr);
 
-      // Check if the wallet has been accessed within the rate limit window
-      const lastAccessed = walletLastAccessedMap.get(walletStr);
-      const now = Date.now();
-      if (lastAccessed && now - lastAccessed < 5 * 60 * 1000) {
+      const limit = isRateLimited(request, walletStr, rateLimit.hnt);
+      if (limit) {
         reply.code(429).send('Too Many Requests');
         return;
       }
-      walletLastAccessedMap.set(walletStr, now);
-
-      // Check if the IP needs to be rate limited
-      const ip = (request.headers['x-real-ip'] // nginx
-        || request.headers['x-client-ip'] // apache
-        || request.ip).toString() // fallback to default
-      const ipLastAccessed = ipLastAccessedMap.get(ip);
-      if (ipLastAccessed && now - ipLastAccessed < 5 * 60 * 1000) {
-        reply.code(429).send('Too Many Requests');
-        return;
-      }
-      ipLastAccessedMap.set(ip, now);
   
-      // transfer some of each helium token
-      await createAtaAndTransfer(provider, HNT_MINT, toBN(1, HNT_MINT_DECIMALS), provider.wallet.publicKey, wallet);
-      await createAtaAndTransfer(provider, IOT_MINT, toBN(1, IOT_MINT_DECIMALS), provider.wallet.publicKey, wallet);
-      await createAtaAndTransfer(provider, MOBILE_MINT, toBN(1, MOBILE_MINT_DECIMALS), provider.wallet.publicKey, wallet);
+      await createAtaAndTransfer(provider, HNT_MINT, toBN(amount, HNT_MINT_DECIMALS), provider.wallet.publicKey, wallet);
 
       reply.status(200).send({
         message: "Airdrop sent",
@@ -58,7 +81,64 @@ server.get('/faucet', {
         message: 'Request failed'
       });
     }
-    
+  },
+});
+
+server.get('/iot', {
+  handler: async (request, reply) => {
+    //@ts-ignore
+    const walletStr = request.query.wallet as string;
+    try {
+      //@ts-ignore
+      const amount = Number(request.query.amount) || 1;
+      const wallet = new PublicKey(walletStr);
+
+      const limit = isRateLimited(request, walletStr, rateLimit.iot);
+      if (limit) {
+        reply.code(429).send('Too Many Requests');
+        return;
+      }
+
+      await createAtaAndTransfer(provider, IOT_MINT, toBN(amount, IOT_MINT_DECIMALS), provider.wallet.publicKey, wallet);
+
+      reply.status(200).send({
+        message: "Airdrop sent",
+      })
+    } catch (err) {
+      console.error(err);
+      reply.status(500).send({
+        message: 'Request failed'
+      });
+    }
+  },
+});
+
+server.get('/mobile', {
+  handler: async (request, reply) => {
+    //@ts-ignore
+    const walletStr = request.query.wallet as string;
+    try {
+      //@ts-ignore
+      const amount = Number(request.query.amount) || 1;
+      const wallet = new PublicKey(walletStr);
+
+      const limit = isRateLimited(request, walletStr, rateLimit.mobile);
+      if (limit) {
+        reply.code(429).send('Too Many Requests');
+        return;
+      }
+  
+      await createAtaAndTransfer(provider, MOBILE_MINT, toBN(amount, MOBILE_MINT_DECIMALS), provider.wallet.publicKey, wallet);
+
+      reply.status(200).send({
+        message: "Airdrop sent",
+      })
+    } catch (err) {
+      console.error(err);
+      reply.status(500).send({
+        message: 'Request failed'
+      });
+    }
   },
 });
 
