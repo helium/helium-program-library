@@ -31,12 +31,12 @@ npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-subdao.ts \
     -rewardsOracleUrl https://iot-oracle.oracle.test-helium.com \
     --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n IOT --subdaoKeypair packages/helium-cli/keypairs/iot.json \
-    --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "IOT $RND" --dcBurnAuthority $(solana address) --noGovernance -u $CLUSTER_URL
+    --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "IOT $RND" --dcBurnAuthority $(solana address) --noGovernance -u $CLUSTER_URL --decimals 8
 
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-subdao.ts \
     -rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com \
-    --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n Mobile --subdaoKeypair packages/helium-cli/keypairs/mobile.json \
-    --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Mobile $RND" \
+    --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n MOBILE --subdaoKeypair packages/helium-cli/keypairs/mobile.json \
+    --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Mobile $RND" --decimals 6 \
     --dcBurnAuthority $(solana address)  --noGovernance -u $CLUSTER_URL
 
 if test -f "./packages/helium-cli/makers.json"; then
