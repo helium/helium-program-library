@@ -1,4 +1,5 @@
 use std::ops::Div;
+use std::ops::Mul;
 
 use crate::errors::*;
 use crate::DataCreditsV0;
@@ -141,7 +142,6 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
     .ok_or_else(|| error!(DataCreditsErrors::PythPriceNotFound))?;
 
   // price * hnt_amount / 10^(8 + expo - 5)
-  // dc_amount / price / 10^(8 + expo - 5)
   let price_expo = -hnt_price.expo;
   let right_shift = 8 + price_expo - 5;
   let normalize = 10_u64
@@ -163,9 +163,10 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
     (None, Some(dc_amount)) => {
       let hnt_amount = u64::try_from(
         u128::from(dc_amount)
+          .checked_mul(10_u128.pow(price_expo.try_into().unwrap()))
+          .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
           .checked_div(u128::try_from(hnt_price.price).unwrap())
           .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
-          .div(u128::from(normalize)),
       )
       .map_err(|_| error!(DataCreditsErrors::ArithmeticError))?;
 

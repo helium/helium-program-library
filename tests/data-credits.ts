@@ -250,11 +250,8 @@ describe("data-credits", () => {
       ))!.data;
       const price = parsePriceData(pythData);
       const approxEndBal =
-        startHntBal + Math.floor(price.emaPrice.value / 10 ** 5);
-      expect(hntBal.value.uiAmount).to.be.within(
-        approxEndBal - 1,
-        approxEndBal + 1
-      );
+        startHntBal - Math.floor(10 ** 5 / price.emaPrice.value) * 10**-8;
+      expect(hntBal.value.uiAmount).to.eq(approxEndBal);
       expect(dcBal.value.uiAmount).to.eq(startDcBal + 10**5);
     });
 
