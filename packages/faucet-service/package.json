@@ -37,6 +37,7 @@
     "@fastify/cors": "^8.1.1",
     "@helium/idls": "^0.0.40",
     "@helium/spl-utils": "^0.0.41",
+    "@metaplex-foundation/mpl-token-metadata": "^2.8.4",
     "@solana/web3.js": "^1.43.4",
     "angry-purple-tiger": "^1.0.5",
     "axios": "^1.1.3",

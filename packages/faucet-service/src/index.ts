@@ -5,7 +5,7 @@ import { createAtaAndTransfer, toBN } from "@helium/spl-utils";
 import { getMint } from "@solana/spl-token";
 
 const server = fastify({ logger: true });
-anchor.setProvider(anchor.AnchorProvider.local());
+anchor.setProvider(anchor.AnchorProvider.local(process.env.SOLANA_URL));
 const provider = anchor.getProvider() as anchor.AnchorProvider;
 const HNT_MINT = new PublicKey(process.env.HNT_MINT!);
 const IOT_MINT = new PublicKey(process.env.IOT_MINT!);
@@ -55,10 +55,13 @@ function isRateLimited(request: any, walletStr: string, rateLimitTracker: RateLi
   return false;
 }
 
-server.get('/hnt', {
+server.get("/health", async () => {
+  return { ok: true };
+});
+
+server.get<{Params: { wallet: string } }>('/hnt/:wallet', {
   handler: async (request, reply) => {
-    //@ts-ignore
-    const walletStr = request.query.wallet as string;
+    const walletStr = request.params.wallet;
     try {
       //@ts-ignore
       const amount = Number(request.query.amount) || 1;
@@ -89,69 +92,81 @@ server.get('/hnt', {
   },
 });
 
-server.get('/iot', {
+server.get<{ Params: { wallet: string } }>("/iot/:wallet", {
   handler: async (request, reply) => {
-    //@ts-ignore
-    const walletStr = request.query.wallet as string;
+    const walletStr = request.params.wallet;
+
     try {
       //@ts-ignore
       const amount = Number(request.query.amount) || 1;
       const wallet = new PublicKey(walletStr);
 
       if (amount > 10) {
-        reply.code(403).send('Must be less than 10');
+        reply.code(403).send("Must be less than 10");
         return;
       }
 
       const limit = isRateLimited(request, walletStr, rateLimit.iot);
       if (limit) {
-        reply.code(429).send('Too Many Requests');
+        reply.code(429).send("Too Many Requests");
         return;
       }
 
-      await createAtaAndTransfer(provider, IOT_MINT, toBN(amount, IOT_MINT_DECIMALS), provider.wallet.publicKey, wallet);
+      await createAtaAndTransfer(
+        provider,
+        IOT_MINT,
+        toBN(amount, IOT_MINT_DECIMALS),
+        provider.wallet.publicKey,
+        wallet
+      );
 
       reply.status(200).send({
         message: "Airdrop sent",
-      })
+      });
     } catch (err) {
       console.error(err);
       reply.status(500).send({
-        message: 'Request failed'
+        message: "Request failed",
       });
     }
   },
 });
 
-server.get('/mobile', {
+server.get<{ Params: { wallet: string } }>("/mobile/:wallet", {
   handler: async (request, reply) => {
-    //@ts-ignore
-    const walletStr = request.query.wallet as string;
+    const walletStr = request.params.wallet;
+
     try {
       //@ts-ignore
       const amount = Number(request.query.amount) || 1;
       const wallet = new PublicKey(walletStr);
 
       if (amount > 10) {
-        reply.code(403).send('Must be less than 10');
+        reply.code(403).send("Must be less than 10");
         return;
       }
 
       const limit = isRateLimited(request, walletStr, rateLimit.mobile);
       if (limit) {
-        reply.code(429).send('Too Many Requests');
+        reply.code(429).send("Too Many Requests");
         return;
       }
-  
-      await createAtaAndTransfer(provider, MOBILE_MINT, toBN(amount, MOBILE_MINT_DECIMALS), provider.wallet.publicKey, wallet);
+
+      await createAtaAndTransfer(
+        provider,
+        MOBILE_MINT,
+        toBN(amount, MOBILE_MINT_DECIMALS),
+        provider.wallet.publicKey,
+        wallet
+      );
 
       reply.status(200).send({
         message: "Airdrop sent",
-      })
+      });
     } catch (err) {
       console.error(err);
       reply.status(500).send({
-        message: 'Request failed'
+        message: "Request failed",
       });
     }
   },
