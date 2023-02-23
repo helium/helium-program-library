@@ -64,6 +64,11 @@ server.get('/hnt', {
       const amount = Number(request.query.amount) || 1;
       const wallet = new PublicKey(walletStr);
 
+      if (amount > 10) {
+        reply.code(403).send('Must be less than 10');
+        return;
+      }
+
       const limit = isRateLimited(request, walletStr, rateLimit.hnt);
       if (limit) {
         reply.code(429).send('Too Many Requests');
@@ -93,6 +98,11 @@ server.get('/iot', {
       const amount = Number(request.query.amount) || 1;
       const wallet = new PublicKey(walletStr);
 
+      if (amount > 10) {
+        reply.code(403).send('Must be less than 10');
+        return;
+      }
+
       const limit = isRateLimited(request, walletStr, rateLimit.iot);
       if (limit) {
         reply.code(429).send('Too Many Requests');
@@ -121,6 +131,11 @@ server.get('/mobile', {
       //@ts-ignore
       const amount = Number(request.query.amount) || 1;
       const wallet = new PublicKey(walletStr);
+
+      if (amount > 10) {
+        reply.code(403).send('Must be less than 10');
+        return;
+      }
 
       const limit = isRateLimited(request, walletStr, rateLimit.mobile);
       if (limit) {
