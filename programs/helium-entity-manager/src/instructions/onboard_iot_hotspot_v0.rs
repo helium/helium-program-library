@@ -156,8 +156,8 @@ pub fn handler<'info>(
   });
 
   if args.location.is_some() {
-    if let ConfigSettingsV0::IotConfig { 
-      full_location_staking_fee, 
+    if let ConfigSettingsV0::IotConfig {
+      full_location_staking_fee,
       ..
     } = ctx.accounts.rewardable_entity_config.settings
     {
