@@ -1,5 +1,6 @@
 use crate::state::*;
 use anchor_lang::{prelude::*, solana_program::hash::hash};
+
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
@@ -144,7 +145,6 @@ pub fn handler<'info>(
   })?;
 
   let mut dc_fee = ctx.accounts.sub_dao.onboarding_dc_fee;
-
   ctx.accounts.iot_info.set_inner(IotHotspotInfoV0 {
     asset: asset_id,
     bump_seed: ctx.bumps["iot_info"],

@@ -2,7 +2,10 @@ import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manage
 import { BN, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { iotInfoKey } from "../pdas";
-import { proofArgsAndAccounts, ProofArgsAndAccountsArgs } from "./proofArgsAndAccounts";
+import {
+  proofArgsAndAccounts,
+  ProofArgsAndAccountsArgs,
+} from "./proofArgsAndAccounts";
 
 export async function updateIotMetadata({
   program,
@@ -11,8 +14,8 @@ export async function updateIotMetadata({
   location,
   elevation,
   gain,
-  payer,
   dcFeePayer,
+  payer,
   ...rest
 }: {
   program: Program<HeliumEntityManager>;
@@ -38,20 +41,23 @@ export async function updateIotMetadata({
     ...rest,
   });
 
-  const [info] = await iotInfoKey(rewardableEntityConfig, json_uri.split("/").slice(-1)[0]);
+  const [info] = await iotInfoKey(
+    rewardableEntityConfig,
+    json_uri.split("/").slice(-1)[0]
+  );
 
   return program.methods
     .updateIotInfoV0({
       location,
       elevation,
       gain,
-      ...args
+      ...args,
     })
     .accounts({
       // hotspot: assetId,
       ...accounts,
-      payer,
       dcFeePayer,
+      payer,
       rewardableEntityConfig,
       hotspotOwner: owner,
       iotInfo: info,

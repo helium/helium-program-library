@@ -2,7 +2,10 @@ import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manage
 import { Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { keyToAssetKey, mobileInfoKey } from "../pdas";
-import { proofArgsAndAccounts, ProofArgsAndAccountsArgs } from "./proofArgsAndAccounts";
+import {
+  proofArgsAndAccounts,
+  ProofArgsAndAccountsArgs,
+} from "./proofArgsAndAccounts";
 import BN from "bn.js";
 
 export async function onboardMobileHotspot({

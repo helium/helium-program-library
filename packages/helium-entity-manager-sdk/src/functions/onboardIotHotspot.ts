@@ -3,8 +3,10 @@ import { Program } from "@coral-xyz/anchor";
 import BN from "bn.js";
 import { PublicKey } from "@solana/web3.js";
 import { iotInfoKey, keyToAssetKey } from "../pdas";
-import { proofArgsAndAccounts, ProofArgsAndAccountsArgs } from "./proofArgsAndAccounts";
-
+import {
+  proofArgsAndAccounts,
+  ProofArgsAndAccountsArgs,
+} from "./proofArgsAndAccounts";
 
 export async function onboardIotHotspot({
   program,
@@ -49,9 +51,6 @@ export async function onboardIotHotspot({
   );
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
-  const keyToAsset = (
-    await keyToAssetKey(dao, json_uri.split("/").slice(-1)[0])
-  )[0];
   return program.methods
     .onboardIotHotspotV0({
       ...args,
@@ -62,15 +61,17 @@ export async function onboardIotHotspot({
     .accounts({
       // hotspot: assetId,
       ...accounts,
-      payer,
       dcFeePayer,
+      payer,
       rewardableEntityConfig,
       hotspotOwner: owner,
       iotInfo: info,
       maker,
       dao,
       issuingAuthority: makerAcc?.issuingAuthority,
-      keyToAsset,
+      keyToAsset: (
+        await keyToAssetKey(dao, json_uri.split("/").slice(-1)[0])
+      )[0],
     })
     .remainingAccounts(remainingAccounts);
 }
