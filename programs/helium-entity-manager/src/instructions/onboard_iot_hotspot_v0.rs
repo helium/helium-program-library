@@ -148,28 +148,32 @@ pub fn handler<'info>(
   ctx.accounts.iot_info.set_inner(IotHotspotInfoV0 {
     asset: asset_id,
     bump_seed: ctx.bumps["iot_info"],
-    location: args.location,
+    location: None,
     elevation: args.elevation,
     gain: args.gain,
     is_full_hotspot: true,
     num_location_asserts: 0,
   });
 
-  if args.location.is_some() {
-    if let ConfigSettingsV0::IotConfig {
+  if let (
+    Some(location),
+    ConfigSettingsV0::IotConfig {
       full_location_staking_fee,
       ..
-    } = ctx.accounts.rewardable_entity_config.settings
-    {
-      dc_fee = full_location_staking_fee.checked_add(dc_fee).unwrap();
+    },
+  ) = (
+    args.location,
+    ctx.accounts.rewardable_entity_config.settings,
+  ) {
+    dc_fee = full_location_staking_fee.checked_add(dc_fee).unwrap();
 
-      ctx.accounts.iot_info.num_location_asserts = ctx
-        .accounts
-        .iot_info
-        .num_location_asserts
-        .checked_add(1)
-        .unwrap();
-    }
+    ctx.accounts.iot_info.location = Some(location);
+    ctx.accounts.iot_info.num_location_asserts = ctx
+      .accounts
+      .iot_info
+      .num_location_asserts
+      .checked_add(1)
+      .unwrap();
   }
 
   // burn the dc tokens
