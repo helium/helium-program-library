@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.26.0",
+    "@helium/helium-entity-manager-sdk": "^0.0.40",
     "@helium/helium-sub-daos-sdk": "^0.0.40",
     "@helium/idls": "^0.0.40",
     "@helium/spl-utils": "^0.0.40",
