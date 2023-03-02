@@ -1,5 +1,4 @@
 use std::ops::Div;
-use std::ops::Mul;
 
 use crate::errors::*;
 use crate::DataCreditsV0;
