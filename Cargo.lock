@@ -764,8 +764,8 @@ dependencies = [
 
 [[package]]
 name = "clockwork-cron"
-version = "2.0.0-alpha"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#e478a9a30f4a5a60e80e414f6c943803f28e5b7e"
+version = "2.0.1"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#40b9538080abb3417464157f34dbdedf7f11d017"
 dependencies = [
  "chrono",
  "nom",
@@ -773,31 +773,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "clockwork-macros"
-version = "2.0.0-alpha"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#e478a9a30f4a5a60e80e414f6c943803f28e5b7e"
-dependencies = [
- "anchor-syn",
- "proc-macro2 1.0.49",
- "quote 1.0.23",
- "syn 1.0.107",
-]
-
-[[package]]
 name = "clockwork-network-program"
-version = "2.0.0-alpha"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#e478a9a30f4a5a60e80e414f6c943803f28e5b7e"
+version = "2.0.1"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#40b9538080abb3417464157f34dbdedf7f11d017"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
- "clockwork-macros",
  "clockwork-utils",
 ]
 
 [[package]]
 name = "clockwork-sdk"
-version = "2.0.0-alpha"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#e478a9a30f4a5a60e80e414f6c943803f28e5b7e"
+version = "2.0.1"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#40b9538080abb3417464157f34dbdedf7f11d017"
 dependencies = [
  "anchor-lang",
  "chrono",
@@ -808,13 +796,12 @@ dependencies = [
 
 [[package]]
 name = "clockwork-thread-program"
-version = "2.0.0-alpha"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#e478a9a30f4a5a60e80e414f6c943803f28e5b7e"
+version = "2.0.1"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#40b9538080abb3417464157f34dbdedf7f11d017"
 dependencies = [
  "anchor-lang",
  "chrono",
  "clockwork-cron",
- "clockwork-macros",
  "clockwork-network-program",
  "clockwork-utils",
  "static-pubkey",
@@ -823,8 +810,8 @@ dependencies = [
 
 [[package]]
 name = "clockwork-utils"
-version = "2.0.0-alpha"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#e478a9a30f4a5a60e80e414f6c943803f28e5b7e"
+version = "2.0.1"
+source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#40b9538080abb3417464157f34dbdedf7f11d017"
 dependencies = [
  "anchor-lang",
  "base64 0.13.1",
