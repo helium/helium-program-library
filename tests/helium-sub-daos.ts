@@ -171,6 +171,7 @@ describe("helium-sub-daos", () => {
       await dcProgram.methods
         .mintDataCreditsV0({
           hntAmount: toBN(amount, 8),
+          dcAmount: null
         })
         .accounts({ dcMint })
         .rpc({ skipPreflight: true });

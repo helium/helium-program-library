@@ -50,7 +50,12 @@ const yarg = yargs(hideBin(process.argv)).options({
   newActiveDeviceAggregator: {
     required: false,
     default: null,
-    type: "string"
+    type: "string",
+  },
+  newDcBurnAuthority: {
+    required: false,
+    default: null,
+    type: "string",
   },
   govProgramId: {
     type: "string",
@@ -165,16 +170,27 @@ async function run() {
     }
   }
   
-  instructions.push(await program.methods.updateSubDaoV0({
-    authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
-    emissionSchedule: argv.newEmissionsSchedulePath ? parseEmissionsSchedule(argv.newEmissionsSchedulePath) : null,
-    dcBurnAuthority: null,
-    onboardingDcFee: null,
-    activeDeviceAggregator: argv.newActiveDeviceAggregator ? new PublicKey(argv.newActiveDeviceAggregator) : null,
-  }).accounts({
-    subDao,
-    authority: subDaoAcc.authority,
-  }).instruction());
+  instructions.push(
+    await program.methods
+      .updateSubDaoV0({
+        authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
+        emissionSchedule: argv.newEmissionsSchedulePath
+          ? parseEmissionsSchedule(argv.newEmissionsSchedulePath)
+          : null,
+        dcBurnAuthority: argv.newDcBurnAuthority
+          ? new PublicKey(argv.newDcBurnAuthority)
+          : null,
+        onboardingDcFee: null,
+        activeDeviceAggregator: argv.newActiveDeviceAggregator
+          ? new PublicKey(argv.newActiveDeviceAggregator)
+          : null,
+      })
+      .accounts({
+        subDao,
+        authority: subDaoAcc.authority,
+      })
+      .instruction()
+  );
 
   await sendInstructionsOrCreateProposal({
     provider,

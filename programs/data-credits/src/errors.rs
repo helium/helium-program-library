@@ -17,4 +17,7 @@ pub enum DataCreditsErrors {
 
   #[msg("Arithmetic error")]
   ArithmeticError,
+
+  #[msg("Invalid arguments")]
+  InvalidArgs,
 }
