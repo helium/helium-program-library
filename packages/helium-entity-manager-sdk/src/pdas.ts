@@ -90,7 +90,7 @@ export const iotInfoKey = (
   );
 };
 
-export const mobileInfoKey = async (
+export const mobileInfoKey = (
   rewardableEntityConfig: PublicKey,
   entityKey: Buffer | string,
   programId: PublicKey = PROGRAM_ID

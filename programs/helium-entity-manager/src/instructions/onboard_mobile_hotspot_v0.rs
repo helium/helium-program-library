@@ -150,18 +150,24 @@ pub fn handler<'info>(
   ctx.accounts.mobile_info.set_inner(MobileHotspotInfoV0 {
     asset: asset_id,
     bump_seed: ctx.bumps["mobile_info"],
-    location: args.location,
+    location: None,
     is_full_hotspot: true,
     num_location_asserts: 0,
   });
 
-  if let ConfigSettingsV0::IotConfig {
-    full_location_staking_fee,
-    ..
-  } = ctx.accounts.rewardable_entity_config.settings
-  {
+  if let (
+    Some(location),
+    ConfigSettingsV0::MobileConfig {
+      full_location_staking_fee,
+      ..
+    },
+  ) = (
+    args.location,
+    ctx.accounts.rewardable_entity_config.settings,
+  ) {
     dc_fee = full_location_staking_fee.checked_add(dc_fee).unwrap();
 
+    ctx.accounts.mobile_info.location = Some(location);
     ctx.accounts.mobile_info.num_location_asserts = ctx
       .accounts
       .mobile_info

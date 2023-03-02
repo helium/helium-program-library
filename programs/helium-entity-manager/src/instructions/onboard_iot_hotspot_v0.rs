@@ -1,5 +1,6 @@
 use crate::state::*;
 use anchor_lang::{prelude::*, solana_program::hash::hash};
+
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
@@ -144,24 +145,29 @@ pub fn handler<'info>(
   })?;
 
   let mut dc_fee = ctx.accounts.sub_dao.onboarding_dc_fee;
-
   ctx.accounts.iot_info.set_inner(IotHotspotInfoV0 {
     asset: asset_id,
     bump_seed: ctx.bumps["iot_info"],
-    location: args.location,
+    location: None,
     elevation: args.elevation,
     gain: args.gain,
     is_full_hotspot: true,
     num_location_asserts: 0,
   });
 
-  if let ConfigSettingsV0::IotConfig {
-    full_location_staking_fee,
-    ..
-  } = ctx.accounts.rewardable_entity_config.settings
-  {
+  if let (
+    Some(location),
+    ConfigSettingsV0::IotConfig {
+      full_location_staking_fee,
+      ..
+    },
+  ) = (
+    args.location,
+    ctx.accounts.rewardable_entity_config.settings,
+  ) {
     dc_fee = full_location_staking_fee.checked_add(dc_fee).unwrap();
 
+    ctx.accounts.iot_info.location = Some(location);
     ctx.accounts.iot_info.num_location_asserts = ctx
       .accounts
       .iot_info
