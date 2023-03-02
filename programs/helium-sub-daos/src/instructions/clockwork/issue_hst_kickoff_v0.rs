@@ -63,5 +63,6 @@ pub fn handler(ctx: Context<IssueHstKickoffV0>) -> Result<ThreadResponse> {
   Ok(ThreadResponse {
     dynamic_instruction: Some(issue_hst_ix.into()),
     trigger: None,
+    close_to: None,
   })
 }

@@ -111,5 +111,6 @@ pub fn handler(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result
       offset: 8,
       size: 1,
     }),
+    close_to: None,
   })
 }
