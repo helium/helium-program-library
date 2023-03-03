@@ -27,7 +27,7 @@ voter-stake-registry = { path = "../voter-stake-registry", features = ["no-entry
 shared-utils = { path = "../shared-utils" }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }
-clockwork-sdk = { git = "https://github.com/clockwork-xyz/clockwork", branch = "main", version="2.0.0-alpha" }
+clockwork-sdk = { git = "https://github.com/clockwork-xyz/clockwork", branch = "main", version="2.0.1" }
 
 time = "0.3.17"
 switchboard-v2 = { version = "0.1.17" }

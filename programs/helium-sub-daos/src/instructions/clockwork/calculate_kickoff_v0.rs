@@ -88,5 +88,6 @@ pub fn handler(ctx: Context<CalculateKickoffV0>) -> Result<ThreadResponse> {
   Ok(ThreadResponse {
     dynamic_instruction: Some(calculate_utility_ix.into()),
     trigger: None,
+    close_to: None,
   })
 }

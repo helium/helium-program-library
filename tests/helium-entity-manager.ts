@@ -170,6 +170,7 @@ describe("helium-entity-manager", () => {
       await dcProgram.methods
         .mintDataCreditsV0({
           hntAmount: toBN(startDcBal, 8),
+          dcAmount: null
         })
         .accounts({ dcMint: dcMint })
         .rpc({ skipPreflight: true });
@@ -329,6 +330,7 @@ describe("helium-entity-manager", () => {
         await dcProgram.methods
           .mintDataCreditsV0({
             hntAmount: toBN(startDcBal, 8),
+            dcAmount: null,
           })
           .accounts({ dcMint, recipient: hotspotOwner.publicKey })
           .rpc();
@@ -399,6 +401,7 @@ describe("helium-entity-manager", () => {
       await dcProgram.methods
         .mintDataCreditsV0({
           hntAmount: toBN(startDcBal, 8),
+          dcAmount: null,
         })
         .accounts({ dcMint: dcMint })
         .rpc({ skipPreflight: true });
@@ -579,6 +582,7 @@ describe("helium-entity-manager", () => {
         await dcProgram.methods
           .mintDataCreditsV0({
             hntAmount: toBN(startDcBal, 8),
+            dcAmount: null,
           })
           .accounts({ dcMint, recipient: hotspotOwner.publicKey })
           .rpc();

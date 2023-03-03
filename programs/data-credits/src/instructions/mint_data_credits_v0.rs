@@ -15,7 +15,8 @@ use pyth_sdk_solana::load_price_feed_from_account_info;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MintDataCreditsArgsV0 {
-  hnt_amount: u64,
+  hnt_amount: Option<u64>,
+  dc_amount: Option<u64>,
 }
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
@@ -41,7 +42,6 @@ pub struct MintDataCreditsV0<'info> {
   #[account(
     mut,
     constraint = burner.mint == hnt_mint.key(),
-    constraint = burner.amount >= args.hnt_amount,
     has_one = owner,
   )]
   pub burner: Box<Account<'info, TokenAccount>>,
@@ -124,9 +124,6 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
     &[ctx.accounts.data_credits.data_credits_bump],
   ]];
 
-  // burn the hnt tokens
-  token::burn(ctx.accounts.burn_ctx(), args.hnt_amount)?;
-
   // unfreeze the recipient_token_account if necessary
   if ctx.accounts.recipient_token_account.is_frozen() {
     token::thaw_account(ctx.accounts.thaw_ctx().with_signer(signer_seeds))?;
@@ -150,13 +147,40 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
     .checked_pow(u32::try_from(right_shift).unwrap())
     .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?;
 
-  let dc_amount = u64::try_from(
-    u128::from(args.hnt_amount)
-      .checked_mul(u128::try_from(hnt_price.price).unwrap())
-      .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
-      .div(u128::from(normalize)),
-  )
-  .map_err(|_| error!(DataCreditsErrors::ArithmeticError))?;
+  let (hnt_amount, dc_amount) = match (args.hnt_amount, args.dc_amount) {
+    (Some(hnt_amount), None) => {
+      let dc_amount = u64::try_from(
+        u128::from(hnt_amount)
+          .checked_mul(u128::try_from(hnt_price.price).unwrap())
+          .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
+          .div(u128::from(normalize)),
+      )
+      .map_err(|_| error!(DataCreditsErrors::ArithmeticError))?;
+
+      (hnt_amount, dc_amount)
+    }
+    (None, Some(dc_amount)) => {
+      let hnt_amount = u64::try_from(
+        u128::from(dc_amount)
+          .checked_mul(10_u128.pow(price_expo.try_into().unwrap()))
+          .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
+          .checked_div(u128::try_from(hnt_price.price).unwrap())
+          .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?,
+      )
+      .map_err(|_| error!(DataCreditsErrors::ArithmeticError))?;
+
+      (hnt_amount, dc_amount)
+    }
+    (None, None) => {
+      return Err(error!(DataCreditsErrors::InvalidArgs));
+    }
+    (Some(_), Some(_)) => {
+      return Err(error!(DataCreditsErrors::InvalidArgs));
+    }
+  };
+
+  // burn the hnt tokens
+  token::burn(ctx.accounts.burn_ctx(), hnt_amount)?;
 
   msg!(
     "HNT Price is {} * 10^{}, issuing {} data credits",

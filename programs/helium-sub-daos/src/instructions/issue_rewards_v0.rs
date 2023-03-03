@@ -241,5 +241,6 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
       offset: 8,
       size: 1,
     }),
+    close_to: None,
   })
 }

@@ -141,7 +141,7 @@ pub fn handler<'info>(
   })?;
 
   if let (
-    Some(location),
+    Some(new_location),
     ConfigSettingsV0::IotConfig {
       full_location_staking_fee,
       dataonly_location_staking_fee,
@@ -151,29 +151,35 @@ pub fn handler<'info>(
     args.location,
     ctx.accounts.rewardable_entity_config.settings,
   ) {
-    let mut dc_fee: u64 = dataonly_location_staking_fee;
-    if ctx.accounts.iot_info.is_full_hotspot {
-      dc_fee = full_location_staking_fee;
+    if ctx.accounts.iot_info.location.is_none()
+      || (ctx.accounts.iot_info.location.is_some()
+        && ctx.accounts.iot_info.location != Some(new_location))
+    {
+      let mut dc_fee: u64 = dataonly_location_staking_fee;
+      if ctx.accounts.iot_info.is_full_hotspot {
+        dc_fee = full_location_staking_fee;
+      }
+
+      ctx.accounts.iot_info.num_location_asserts = ctx
+        .accounts
+        .iot_info
+        .num_location_asserts
+        .checked_add(1)
+        .unwrap();
+
+      // burn the dc tokens
+      burn_without_tracking_v0(
+        ctx.accounts.burn_ctx(),
+        BurnWithoutTrackingArgsV0 { amount: dc_fee },
+      )?;
+      ctx.accounts.iot_info.location = Some(new_location);
     }
-
-    ctx.accounts.iot_info.num_location_asserts = ctx
-      .accounts
-      .iot_info
-      .num_location_asserts
-      .checked_add(1)
-      .unwrap();
-
-    // burn the dc tokens
-    burn_without_tracking_v0(
-      ctx.accounts.burn_ctx(),
-      BurnWithoutTrackingArgsV0 { amount: dc_fee },
-    )?;
-    ctx.accounts.iot_info.location = Some(location);
   }
 
   if args.elevation.is_some() {
     ctx.accounts.iot_info.elevation = args.elevation;
   }
+
   if args.gain.is_some() {
     ctx.accounts.iot_info.gain = args.gain;
   }

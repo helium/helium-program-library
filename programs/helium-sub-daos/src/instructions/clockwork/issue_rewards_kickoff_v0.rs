@@ -91,5 +91,6 @@ pub fn handler(ctx: Context<IssueRewardsKickoffV0>) -> Result<ThreadResponse> {
   Ok(ThreadResponse {
     dynamic_instruction: Some(issue_rewards_ix.into()),
     trigger: None,
+    close_to: None,
   })
 }
