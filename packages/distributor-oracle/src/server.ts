@@ -41,6 +41,7 @@ const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 export interface Database {
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
   getBulkRewards: (entityKeys: string[]) => Promise<Record<string, string>>;
+  getActiveDevices(): Promise<number>;
 }
 
 
@@ -52,6 +53,16 @@ export class PgDatabase implements Database {
       asset: PublicKey
     ) => Promise<Asset | undefined> = getAsset
   ) {
+  }
+
+  getActiveDevices(): Promise<number> {
+    return Reward.count({
+      where: {
+        lastReward: {
+          [Op.gte]: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30) // Active within the last 30 days
+        }
+      }
+    })
   }
 
   async getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
@@ -121,8 +132,8 @@ export class OracleServer {
 
   public async start() {
     this.server = await this.app.listen({
-      port: this.port, 
-      host: "0.0.0.0"
+      port: this.port,
+      host: "0.0.0.0",
     });
     console.log(`Oracle server listening on port ${this.port}`);
   }
@@ -132,6 +143,7 @@ export class OracleServer {
   }
 
   private addRoutes() {
+    this.app.get("/active-devices", this.getActiveDevicesHandler.bind(this));
     this.app.post("/bulk-rewards", this.getAllRewardsHandler.bind(this));
     this.app.get<{ Querystring: { assetId?: string; entityKey?: string } }>(
       "/",
@@ -140,18 +152,31 @@ export class OracleServer {
     this.app.post("/", this.signTransactionHandler.bind(this));
   }
 
+  private async getActiveDevicesHandler(
+    req: FastifyRequest<{
+      Querystring: { assetId?: string; entityKey?: string };
+    }>,
+    res: FastifyReply
+  ) {
+    const count = await this.db.getActiveDevices();
+
+    res.send({
+      count
+    });
+  }
+
   private async getCurrentRewardsHandler(
-    req: FastifyRequest<{ Querystring: { assetId?: string; entityKey?: string } }>,
+    req: FastifyRequest<{
+      Querystring: { assetId?: string; entityKey?: string };
+    }>,
     res: FastifyReply
   ) {
     let assetId = req.query.assetId as string;
     let entityKey = req.query.entityKey as string;
     if (!assetId && !entityKey) {
-      res
-        .status(400)
-        .send({
-          error: "Must provide either `entityKey` or `assetId` parameter",
-        });
+      res.status(400).send({
+        error: "Must provide either `entityKey` or `assetId` parameter",
+      });
       return;
     }
 
@@ -175,7 +200,10 @@ export class OracleServer {
     });
   }
 
-  private async getAllRewardsHandler(req: FastifyRequest<{ Body: { entityKeys: string[] } }>, res: FastifyReply) {
+  private async getAllRewardsHandler(
+    req: FastifyRequest<{ Body: { entityKeys: string[] } }>,
+    res: FastifyReply
+  ) {
     const entityKeys: string[] = req.body.entityKeys;
 
     if (!entityKeys) {
@@ -189,7 +217,10 @@ export class OracleServer {
     });
   }
 
-  private async signTransactionHandler(req: FastifyRequest<{ Body: { transaction: { data: number[] }  } }>, res: FastifyReply) {
+  private async signTransactionHandler(
+    req: FastifyRequest<{ Body: { transaction: { data: number[] } } }>,
+    res: FastifyReply
+  ) {
     if (!req.body.transaction) {
       res.status(400).send({ error: "No transaction field" });
       return;
@@ -212,9 +243,10 @@ export class OracleServer {
     const lazyDistributorIdxInitRecipient = initRecipientTx.accounts.findIndex(
       (x) => x.name === "lazyDistributor"
     )!;
-    const lazyDistributorIdxInitCompressionRecipient = initCompressionRecipientTx.accounts.findIndex(
-      (x) => x.name === "lazyDistributor"
-    )!;
+    const lazyDistributorIdxInitCompressionRecipient =
+      initCompressionRecipientTx.accounts.findIndex(
+        (x) => x.name === "lazyDistributor"
+      )!;
     const mintIdx = initRecipientTx.accounts.findIndex(
       (x) => x.name === "mint"
     )!;
@@ -225,9 +257,10 @@ export class OracleServer {
     const recipientIdxInitRecipient = initRecipientTx.accounts.findIndex(
       (x) => x.name === "recipient"
     )!;
-    const recipientIdxInitCompressionRecipient = initCompressionRecipientTx.accounts.findIndex(
-      (x) => x.name === "recipient"
-    )!;
+    const recipientIdxInitCompressionRecipient =
+      initCompressionRecipientTx.accounts.findIndex(
+        (x) => x.name === "recipient"
+      )!;
 
     for (const ix of tx.instructions) {
       if (!ix.programId.equals(PROGRAM_ID)) {
@@ -273,9 +306,11 @@ export class OracleServer {
         const merkleTree =
           ix.keys[merkleTreeIdxInitCompressionRecipient].pubkey;
 
-        const index = (decoded.data as any).args.index
-        recipientToLazyDistToMint[recipient][lazyDist] =
-          (await getLeafAssetId(merkleTree, new BN(index)));
+        const index = (decoded.data as any).args.index;
+        recipientToLazyDistToMint[recipient][lazyDist] = await getLeafAssetId(
+          merkleTree,
+          new BN(index)
+        );
       }
     }
 

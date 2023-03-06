@@ -1,20 +1,14 @@
 import * as anchor from "@coral-xyz/anchor";
 import {
   createAtaAndMintInstructions,
-  createMintInstructions,
-  sendInstructions,
-  toBN
+  createMintInstructions, sendInstructions, toBN
 } from "@helium/spl-utils";
 import {
   createCreateMetadataAccountV3Instruction,
   PROGRAM_ID as METADATA_PROGRAM_ID
 } from "@metaplex-foundation/mpl-token-metadata";
 import {
-  AccountMetaData,
-  getGovernanceProgramVersion,
-  getProposalTransactionAddress,
-  getTokenOwnerRecordAddress,
-  Governance,
+  AccountMetaData, getGovernanceProgramVersion, getProposalTransactionAddress, getTokenOwnerRecordAddress, Governance,
   GovernanceAccountParser,
   InstructionData,
   ProposalTransaction,
@@ -26,7 +20,8 @@ import {
   withCreateProposal,
   withCreateTokenOwnerRecord,
   withDepositGoverningTokens,
-  withExecuteTransaction, withInsertTransaction,
+  withExecuteTransaction,
+  withInsertTransaction,
   withRelinquishVote,
   withSignOffProposal,
   withWithdrawGoverningTokens,
@@ -34,27 +29,24 @@ import {
 } from "@solana/spl-governance";
 import {
   AuthorityType,
-  createSetAuthorityInstruction,
-  getAssociatedTokenAddress
+  createSetAuthorityInstruction, getAssociatedTokenAddress
 } from "@solana/spl-token";
 import {
-  AddressLookupTableProgram,
-  Commitment,
-  ComputeBudgetProgram,
-  Connection,
-  Keypair,
-  PublicKey,
-  Signer,
-  SYSVAR_CLOCK_PUBKEY,
-  TransactionInstruction,
-  TransactionMessage,
+  AddressLookupTableProgram, Cluster, Commitment, ComputeBudgetProgram, Connection, Keypair,
+  PublicKey, Signer,
+  SYSVAR_CLOCK_PUBKEY, TransactionInstruction, TransactionMessage,
   VersionedTransaction
 } from "@solana/web3.js";
-import { sleep } from "@switchboard-xyz/common";
+import Squads from "@sqds/sdk";
+import { OracleJob, sleep } from "@switchboard-xyz/common";
+import {
+  AggregatorHistoryBuffer,
+  QueueAccount,
+  SwitchboardProgram
+} from "@switchboard-xyz/solana.js";
 import { BN } from "bn.js";
 import fs from "fs";
 import fetch from "node-fetch";
-import Squads from "@sqds/sdk";
 
 const SECONDS_PER_DAY = 86400;
 
@@ -227,11 +219,14 @@ export async function sendInstructionsOrCreateProposal({
       )
       .flat()
   );
-  const signerKeys = Array.from(
-    signerSet
-  ).map((k) => new PublicKey(k));
+  const signerKeys = Array.from(signerSet).map((k) => new PublicKey(k));
 
-  const nonMissingSignerIxs = instructions.filter(ix => !ix.keys.some(k => k.isSigner && !k.pubkey.equals(provider.wallet.publicKey)));
+  const nonMissingSignerIxs = instructions.filter(
+    (ix) =>
+      !ix.keys.some(
+        (k) => k.isSigner && !k.pubkey.equals(provider.wallet.publicKey)
+      )
+  );
   const wallet = provider.wallet;
   // Missing signer, must be gov
   const missingSigs = (
@@ -300,7 +295,6 @@ export async function sendInstructionsOrCreateProposal({
         votingMint,
         wallet.publicKey
       );
-      
     }
 
     const acct = await getAssociatedTokenAddress(votingMint, wallet.publicKey);
@@ -357,7 +351,11 @@ export async function sendInstructionsOrCreateProposal({
 
     let idx = 0;
     const relevantInstructions = instructions.filter((ix) =>
-      ix.keys.some((k) => (k.pubkey.equals(nativeKey) || k.pubkey.equals(governanceKey)) && k.isSigner)
+      ix.keys.some(
+        (k) =>
+          (k.pubkey.equals(nativeKey) || k.pubkey.equals(governanceKey)) &&
+          k.isSigner
+      )
     );
     for (const instruction of relevantInstructions) {
       const addTxIxns = [];
@@ -484,7 +482,7 @@ export async function sendInstructionsOrCreateProposal({
         idlErrors
       );
 
-      await sleep(5000) // wait past any hold up time
+      await sleep(5000); // wait past any hold up time
       for (let idx = 0; idx < relevantInstructions.length; idx++) {
         const executeIxns = [
           ComputeBudgetProgram.setComputeUnitLimit({ units: 1000000 }),
@@ -517,7 +515,7 @@ export async function sendInstructionsOrCreateProposal({
         );
         await sendInstructions(provider, executeIxns);
       }
-      const relinquish = []
+      const relinquish = [];
       withRelinquishVote(
         relinquish,
         govProgramId,
@@ -536,7 +534,7 @@ export async function sendInstructionsOrCreateProposal({
 
     if (balance.gt(new BN(0)) && executeProposal) {
       const withdrawIxns = [];
-      
+
       await withWithdrawGoverningTokens(
         withdrawIxns,
         govProgramId,
@@ -558,6 +556,77 @@ export async function sendInstructionsOrCreateProposal({
     commitment,
     idlErrors
   );
+}
+
+export async function createSwitchboardAggregator({
+  provider,
+  aggKeypair,
+  url,
+  switchboardNetwork,
+  wallet,
+  crank,
+  queue,
+  authority
+}: {
+  authority: PublicKey;
+  switchboardNetwork: string;
+  wallet: Keypair;
+  crank: PublicKey;
+  queue: PublicKey;
+  provider: anchor.AnchorProvider;
+  aggKeypair: Keypair;
+  url: string;
+}) {
+  const switchboard = await SwitchboardProgram.load(
+    switchboardNetwork as Cluster,
+    provider.connection,
+    wallet
+  );
+  const queueAccount = new QueueAccount(switchboard, queue);
+  const agg = aggKeypair.publicKey;
+  if (!(await exists(provider.connection, agg))) {
+    const [agg, _] = await queueAccount.createFeed({
+      keypair: aggKeypair,
+      batchSize: 3,
+      minRequiredOracleResults: 2,
+      minRequiredJobResults: 1,
+      minUpdateDelaySeconds: 60 * 60, // hourly
+      fundAmount: 0.2,
+      enable: true,
+      crankPubkey: crank,
+      jobs: [
+        {
+          data: OracleJob.encodeDelimited(
+            OracleJob.fromObject({
+              tasks: [
+                {
+                  httpTask: {
+                    url,
+                  },
+                },
+                {
+                  jsonParseTask: {
+                    path: "$.count",
+                  },
+                },
+              ],
+            })
+          ).finish(),
+        },
+      ],
+    });
+    await agg.setAuthority({
+      newAuthority: authority,
+      authority: aggKeypair,
+    });
+    console.log("Created active device aggregator", agg.publicKey.toBase58());
+    await AggregatorHistoryBuffer.create(switchboard, {
+      aggregatorAccount: agg,
+      maxSamples: 24 * 31, // Give us a month of active device data. If we fail to run end epoch, RIP.
+    });
+  }
+
+  return aggKeypair.publicKey;
 }
 
 export async function sendInstructionsOrSquads({
