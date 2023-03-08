@@ -34,7 +34,6 @@ pub fn handler(ctx: Context<UpdateDaoV0>, args: UpdateDaoArgsV0) -> Result<()> {
     ctx.accounts.dao.hst_emission_schedule = hst_emission_schedule;
   }
 
-
   if let Some(emission_schedule) = args.emission_schedule {
     ctx.accounts.dao.emission_schedule = emission_schedule;
 

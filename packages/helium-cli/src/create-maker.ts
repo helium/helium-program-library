@@ -164,6 +164,7 @@ async function run() {
     authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
     subdaoPayer = authority;
     daoPayer = authority;
+    console.log("SQUAD AUTH", authority.toBase58());
   }
 
   const createInstructions: TransactionInstruction[][] = [];

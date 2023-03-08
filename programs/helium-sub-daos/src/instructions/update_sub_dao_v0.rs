@@ -15,7 +15,8 @@ pub struct UpdateSubDaoArgsV0 {
 #[instruction(args: UpdateSubDaoArgsV0)]
 pub struct UpdateSubDaoV0<'info> {
   #[account(mut)]
-  pub payer: Signer<'info>,  #[account(
+  pub payer: Signer<'info>,
+  #[account(
     mut,
     seeds = ["sub_dao".as_bytes(), sub_dao.dnt_mint.key().as_ref()],
     bump = sub_dao.bump_seed,
