@@ -301,10 +301,10 @@ describe("voter-stake-registry", () => {
           voterWeightAction: {
             createProposal: {},
           },
-          owner: me,
         })
         .accounts({
           registrar,
+          owner: me
         })
         .remainingAccounts([
           {
