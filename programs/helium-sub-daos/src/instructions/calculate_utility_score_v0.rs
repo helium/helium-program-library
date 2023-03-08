@@ -1,5 +1,5 @@
 use crate::{
-  current_epoch, error::ErrorCode, next_epoch_ts, state::*, update_subdao_vehnt, OrArithError,
+  current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError,
   EPOCH_LENGTH,
 };
 use anchor_lang::prelude::*;
