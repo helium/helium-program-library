@@ -31,3 +31,9 @@ shared-utils = { path = "../shared-utils" }
 data-credits = { path = "../data-credits", features = ["cpi"] }
 helium-sub-daos = { path = "../helium-sub-daos", features = ["cpi"] }
 lazy-transactions = { path = "../lazy-transactions", features = ["cpi"] }
+getrandom = { version = "0.2.8", features = ["custom"] }
+# helium-crypto = { git = "https://github.com/helium/helium-crypto-rs.git", branch = "madninja/bump_deps", version = "0.6.8" }
+# helium-crypto = { path = "../../../helium-crypto-rs" }
+# ed25519 = "2.1.0"
+p256 = { version = "0.10.1", features = ["ecdsa"] }
+ed25519-compact = "2.0.4"
