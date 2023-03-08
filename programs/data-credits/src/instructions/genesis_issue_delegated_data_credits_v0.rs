@@ -20,7 +20,7 @@ pub struct GenesisIssueDelegatedDataCreditsV0<'info> {
   #[account(
     init,
     payer = lazy_signer,
-    space = 60 + std::mem::size_of::<DataCreditsV0>(),
+    space = 8 + 60 + std::mem::size_of::<DataCreditsV0>(),
     seeds = [
       "delegated_data_credits".as_bytes(),
       sub_dao.key().as_ref(),

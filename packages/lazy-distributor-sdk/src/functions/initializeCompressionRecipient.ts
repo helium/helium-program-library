@@ -54,7 +54,8 @@ export async function initializeCompressionRecipient({
 
   return program.methods
     .initializeCompressionRecipientV0({
-      hash: leaf.toBuffer().toJSON().data,
+      dataHash: asset.compression.dataHash!.toJSON().data,
+      creatorHash: asset.compression.creatorHash!.toJSON().data,
       root: root.toBuffer().toJSON().data,
       index: leafId!,
     })
@@ -63,7 +64,7 @@ export async function initializeCompressionRecipient({
       merkleTree: treeId,
       owner: owner,
       delegate: owner,
-      recipient
+      recipient,
     })
     .remainingAccounts(
       proof.slice(0, proof.length - canopy).map((p) => {

@@ -27,6 +27,8 @@ import animalHash from "angry-purple-tiger";
 
 import {
   computeCompressedNFTHash,
+  computeCreatorHash,
+  computeDataHash,
   getLeafAssetId,
   TokenProgramVersion,
   TokenStandard
@@ -186,6 +188,13 @@ describe("helium-entity-manager", () => {
 
       const leaves = Array(2 ** 3).fill(Buffer.alloc(32));
 
+      const creators = [
+        {
+          address: entityCreatorKey(dao)[0],
+          verified: true,
+          share: 100,
+        },
+      ];
       metadata = {
         name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
         symbol: "HOTSPOT",
@@ -194,13 +203,7 @@ describe("helium-entity-manager", () => {
           key: hotspotCollection,
           verified: true,
         },
-        creators: [
-          {
-            address: entityCreatorKey(dao)[0],
-            verified: true,
-            share: 100
-          },
-        ],
+        creators,
         sellerFeeBasisPoints: 0,
         primarySaleHappened: true,
         isMutable: true,
@@ -244,6 +247,8 @@ describe("helium-entity-manager", () => {
           compression: {
             compressed: true,
             eligible: true,
+            dataHash: computeDataHash(metadata),
+            creatorHash: computeCreatorHash(creators)
           },
         } as Asset);
       getAssetProofFn = async () => {
@@ -416,6 +421,13 @@ describe("helium-entity-manager", () => {
       hotspot = await getLeafAssetId(merkle, new BN(0));
 
       const leaves = Array(2 ** 3).fill(Buffer.alloc(32));
+      const creators = [
+        {
+          address: entityCreatorKey(dao)[0],
+          verified: true,
+          share: 100,
+        },
+      ];
       metadata = {
         name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
         symbol: "HOTSPOT",
@@ -424,13 +436,7 @@ describe("helium-entity-manager", () => {
           key: hotspotCollection,
           verified: true,
         },
-        creators: [
-          {
-            address: entityCreatorKey(dao)[0],
-            verified: true,
-            share: 100,
-          },
-        ],
+        creators,
         sellerFeeBasisPoints: 0,
         primarySaleHappened: true,
         isMutable: true,
@@ -474,6 +480,8 @@ describe("helium-entity-manager", () => {
           compression: {
             compressed: true,
             eligible: true,
+            dataHash: computeDataHash(metadata),
+            creatorHash: computeCreatorHash(creators),
           },
         } as Asset);
       getAssetProofFn = async () => {

@@ -28,7 +28,7 @@ pub struct InitializeMakerV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 60 + std::mem::size_of::<MakerV0>(),
+    space = 8 + 60 + std::mem::size_of::<MakerV0>(),
     seeds = ["maker".as_bytes(), dao.key().as_ref(), args.name.as_bytes()],
     bump,
   )]

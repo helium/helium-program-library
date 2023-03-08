@@ -62,6 +62,7 @@ pub struct InitializePositionV0<'info> {
   pub position: Box<Account<'info, PositionV0>>,
   #[account(
     mut,
+    constraint = mint.supply == 0,
     mint::decimals = 0,
     mint::authority = position,
     mint::freeze_authority = position,

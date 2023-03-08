@@ -10,4 +10,7 @@ pub enum ErrorCode {
 
   #[msg("Provided asset was invalid")]
   InvalidAsset,
+
+  #[msg("Oracle index was out of range")]
+  InvalidOracleIndex,
 }
