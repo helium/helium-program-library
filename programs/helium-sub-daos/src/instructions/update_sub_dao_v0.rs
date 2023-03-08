@@ -1,5 +1,6 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
+use shared_utils::resize_to_fit;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateSubDaoArgsV0 {
@@ -13,7 +14,8 @@ pub struct UpdateSubDaoArgsV0 {
 #[derive(Accounts)]
 #[instruction(args: UpdateSubDaoArgsV0)]
 pub struct UpdateSubDaoV0<'info> {
-  #[account(
+  #[account(mut)]
+  pub payer: Signer<'info>,  #[account(
     mut,
     seeds = ["sub_dao".as_bytes(), sub_dao.dnt_mint.key().as_ref()],
     bump = sub_dao.bump_seed,
@@ -21,15 +23,12 @@ pub struct UpdateSubDaoV0<'info> {
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   pub authority: Signer<'info>,
+  pub system_program: Program<'info, System>,
 }
 
 pub fn handler(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result<()> {
   if let Some(new_authority) = args.authority {
     ctx.accounts.sub_dao.authority = new_authority;
-  }
-
-  if let Some(emission_schedule) = args.emission_schedule {
-    ctx.accounts.sub_dao.emission_schedule = emission_schedule;
   }
 
   if let Some(onboarding_dc_fee) = args.onboarding_dc_fee {
@@ -42,6 +41,16 @@ pub fn handler(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result
 
   if let Some(active_device_aggregator) = args.active_device_aggregator {
     ctx.accounts.sub_dao.active_device_aggregator = active_device_aggregator;
+  }
+
+  if let Some(emission_schedule) = args.emission_schedule {
+    ctx.accounts.sub_dao.emission_schedule = emission_schedule;
+
+    resize_to_fit(
+      &ctx.accounts.payer.to_account_info(),
+      &ctx.accounts.system_program.to_account_info(),
+      &ctx.accounts.sub_dao,
+    )?;
   }
 
   Ok(())
