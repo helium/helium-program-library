@@ -1,15 +1,14 @@
+import * as anchor from "@coral-xyz/anchor";
 import {
   daoKey,
   init as initDao,
-  subDaoKey,
+  subDaoKey
 } from "@helium/helium-sub-daos-sdk";
-import { init as initLazy } from "@helium/lazy-distributor-sdk";
-import * as anchor from "@coral-xyz/anchor";
-import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
-import axios from "axios";
+import { PublicKey } from "@solana/web3.js";
+import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrCreateProposal } from "./utils";
+import { sendInstructionsOrSquads } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -43,19 +42,19 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Reset the subdao clockwork thread",
     default: false,
   },
-  govProgramId: {
-    type: "string",
-    describe: "Pubkey of the GOV program",
-    default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
-  },
-  councilKey: {
-    type: "string",
-    describe: "Key of gov council token",
-    default: "counKsk72Jgf9b3aqyuQpFf12ktLdJbbuhnoSxxQoMJ",
-  },
-  executeProposal: {
+  executeTransaction: {
     type: "boolean",
   },
+  multisig: {
+    type: "string",
+    describe:
+      "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+  },
+  authorityIndex: {
+    type: "number",
+    describe: "Authority index for squads. Defaults to 1",
+    default: 1,
+  }
 });
 
 async function run() {
@@ -74,6 +73,12 @@ async function run() {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hsdProgram = await initDao(provider);
   const instructions = [];
+
+  const squads = Squads.endpoint(
+    process.env.ANCHOR_PROVIDER_URL,
+    provider.wallet
+  );
+  
   if (argv.resetDaoThread) {
     console.log("resetting dao thread");
     const hntMint = new PublicKey(argv.hntMint);
@@ -117,16 +122,14 @@ async function run() {
     );
   }
 
-  const wallet = loadKeypair(argv.wallet);
-  await sendInstructionsOrCreateProposal({
+  await sendInstructionsOrSquads({
     provider,
     instructions,
-    walletSigner: wallet,
+    executeTransaction: argv.executeTransaction,
+    squads,
+    multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
+    authorityIndex: argv.authorityIndex,
     signers: [],
-    govProgramId: new PublicKey(argv.govProgramId),
-    proposalName: `Reset Thread`,
-    votingMint: councilKey,
-    executeProposal: argv.executeProposal,
   });
 }
 

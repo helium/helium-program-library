@@ -649,9 +649,20 @@ export async function sendInstructionsOrSquads({
   commitment?: Commitment;
   idlErrors?: Map<number, string>;
   squads: Squads;
-  multisig: PublicKey;
+  multisig?: PublicKey;
   authorityIndex: number;
 }): Promise<string> {
+  if (!multisig) {
+    return await sendInstructions(
+      provider,
+      instructions,
+      signers,
+      payer,
+      commitment,
+      idlErrors
+    )
+  }
+
   const signerSet = new Set(
     instructions
       .map((ix) =>

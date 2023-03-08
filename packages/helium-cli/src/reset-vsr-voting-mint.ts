@@ -2,17 +2,16 @@ import * as anchor from "@coral-xyz/anchor";
 import {
   daoKey,
   init as initDao,
-  subDaoKey,
+  subDaoKey
 } from "@helium/helium-sub-daos-sdk";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@solana/web3.js";
+import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
   getTimestampFromDays,
-  getUnixTimestamp,
-  loadKeypair,
-  sendInstructionsOrCreateProposal,
+  getUnixTimestamp, sendInstructionsOrSquads
 } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
@@ -47,19 +46,19 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Reset the subdao voting mint",
     default: false,
   },
-  govProgramId: {
-    type: "string",
-    describe: "Pubkey of the GOV program",
-    default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
-  },
-  councilKey: {
-    type: "string",
-    describe: "Key of gov council token",
-    default: "counKsk72Jgf9b3aqyuQpFf12ktLdJbbuhnoSxxQoMJ",
-  },
-  executeProposal: {
+  executeTransaction: {
     type: "boolean",
   },
+  multisig: {
+    type: "string",
+    describe:
+      "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+  },
+  authorityIndex: {
+    type: "number",
+    describe: "Authority index for squads. Defaults to 1",
+    default: 1,
+  }
 });
 
 const SECS_PER_DAY = 86400;
@@ -84,6 +83,11 @@ async function run() {
   const now = Number(await getUnixTimestamp(provider));
   const in7Days = now + getTimestampFromDays(7);
   const instructions = [];
+
+  const squads = Squads.endpoint(
+    process.env.ANCHOR_PROVIDER_URL,
+    provider.wallet
+  );
 
   if (argv.resetDaoVotingMint) {
     console.log("resetting dao votingMint");
@@ -149,16 +153,14 @@ async function run() {
     );
   }
 
-  const wallet = loadKeypair(argv.wallet);
-  await sendInstructionsOrCreateProposal({
+  await sendInstructionsOrSquads({
     provider,
     instructions,
-    walletSigner: wallet,
+    executeTransaction: argv.executeTransaction,
+    squads,
+    multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
+    authorityIndex: argv.authorityIndex,
     signers: [],
-    govProgramId: new PublicKey(argv.govProgramId),
-    proposalName: `Reset Voting Mint Config`,
-    votingMint: councilKey,
-    executeProposal: argv.executeProposal,
   });
 }
 

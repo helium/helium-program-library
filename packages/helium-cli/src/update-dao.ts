@@ -1,12 +1,13 @@
-import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
 import * as anchor from "@coral-xyz/anchor";
+import { init as initCb, mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
+import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
 import {
-  PublicKey,
+  PublicKey
 } from "@solana/web3.js";
+import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, parseEmissionsSchedule, sendInstructionsOrCreateProposal } from "./utils";
-import { mintWindowedBreakerKey, accountWindowedBreakerKey, init as initCb } from "@helium/circuit-breaker-sdk"
+import { loadKeypair, parseEmissionsSchedule, sendInstructionsOrSquads } from "./utils";
 
 
 const { hideBin } = require("yargs/helpers");
@@ -44,18 +45,18 @@ const yarg = yargs(hideBin(process.argv)).options({
     type: "string",
     default: null,
   },
-  govProgramId: {
-    type: "string",
-    describe: "Pubkey of the GOV program",
-    default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
-  },
-  councilKey: {
-    type: "string",
-    describe: "Key of gov council token",
-    default: "counKsk72Jgf9b3aqyuQpFf12ktLdJbbuhnoSxxQoMJ",
-  },
-  executeProposal: {
+  executeTransaction: {
     type: "boolean",
+  },
+  multisig: {
+    type: "string",
+    describe:
+      "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+  },
+  authorityIndex: {
+    type: "number",
+    describe: "Authority index for squads. Defaults to 1",
+    default: 1,
   },
 });
 
@@ -76,6 +77,8 @@ async function run() {
   const instructions = [];
 
   const hntMint = new PublicKey(argv.hntMint);
+  const dao = daoKey(hntMint)[0];
+  const daoAcc = await program.account.daoV0.fetch(dao);
   if (argv.newAuthority) {
     const hntCircuitBreaker = mintWindowedBreakerKey(hntMint)[0]
     const hntCbAcc = await cbProgram.account.mintWindowedCircuitBreakerV0.fetch(hntCircuitBreaker);
@@ -92,17 +95,22 @@ async function run() {
     emissionSchedule: argv.newEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newEmissionsSchedulePath) : null,
     hstEmissionSchedule: argv.newHstEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newHstEmissionsSchedulePath) : null,
   }).accounts({
-    dao: daoKey(hntMint)[0],
+    dao,
+    authority: daoAcc.authority,
   }).instruction());
 
-  await sendInstructionsOrCreateProposal({
+  const squads = Squads.endpoint(
+    process.env.ANCHOR_PROVIDER_URL,
+    provider.wallet
+  );
+  await sendInstructionsOrSquads({
     provider,
     instructions,
-    walletSigner: wallet,
-    govProgramId,
-    proposalName: "Update Dao",
-    votingMint: councilKey,
-    executeProposal: argv.executeProposal,
+    executeTransaction: argv.executeTransaction,
+    squads,
+    multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
+    authorityIndex: argv.authorityIndex,
+    signers: [],
   });
 }
 
