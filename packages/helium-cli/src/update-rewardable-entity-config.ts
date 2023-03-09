@@ -1,16 +1,17 @@
-import {
-  init as initHem,
-  rewardableEntityConfigKey,
-} from "@helium/helium-entity-manager-sdk";
-import { subDaoKey } from "@helium/helium-sub-daos-sdk";
-import { sendInstructions, toBN } from "@helium/spl-utils";
 import * as anchor from "@coral-xyz/anchor";
 import {
-  PublicKey,
+  init as initHem,
+  rewardableEntityConfigKey
+} from "@helium/helium-entity-manager-sdk";
+import { subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { toBN } from "@helium/spl-utils";
+import {
+  PublicKey
 } from "@solana/web3.js";
+import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrCreateProposal } from "./utils";
+import { loadKeypair, sendInstructionsOrSquads } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -35,15 +36,18 @@ const yarg = yargs(hideBin(process.argv)).options({
     required: true,
     describe: "The name of the entity config",
   },
-  govProgramId: {
-    type: "string",
-    describe: "Pubkey of the GOV program",
-    default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
+  executeTransaction: {
+    type: "boolean",
   },
-  councilPubkey: {
+  multisig: {
     type: "string",
-    describe: "Pubkey of gov council",
-    requred: false
+    describe:
+      "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+  },
+  authorityIndex: {
+    type: "number",
+    describe: "Authority index for squads. Defaults to 1",
+    default: 1,
   },
 });
 
@@ -63,13 +67,12 @@ async function run() {
   const rewardableConfigKey = (
     await rewardableEntityConfigKey(subdao, name.toUpperCase())
   )[0];
-  const govProgramId = new PublicKey(argv.govProgramId);
   const rewardableConfigAcc = await hemProgram.account.rewardableEntityConfigV0.fetch(rewardableConfigKey);
-  const authorityAcc = await provider.connection.getAccountInfo(
-    rewardableConfigAcc.authority
-  );
   let payer = provider.wallet.publicKey;
-  const isGov = authorityAcc != null && authorityAcc.owner.equals(govProgramId);
+  const squads = Squads.endpoint(
+    process.env.ANCHOR_PROVIDER_URL,
+    provider.wallet
+  );
 
   let settings;
   if (name.toUpperCase() == "IOT") {
@@ -93,29 +96,26 @@ async function run() {
   console.log(settings);
 
   const instructions = [
-    await hemProgram.methods.updateRewardableEntityConfigV0({
-      settings,
-      newAuthority: rewardableConfigAcc.authority,
-    }).accounts({
-      rewardableEntityConfig: rewardableConfigKey,
-    })
-    .instruction(),
+    await hemProgram.methods
+      .updateRewardableEntityConfigV0({
+        settings,
+        newAuthority: rewardableConfigAcc.authority,
+      })
+      .accounts({
+        rewardableEntityConfig: rewardableConfigKey,
+      })
+      .instruction(),
   ];
 
-  if (isGov) {
-    const instrs = instructions;
-    await sendInstructionsOrCreateProposal({
-      provider,
-      instructions: instrs,
-      walletSigner: wallet,
-      signers: [],
-      govProgramId,
-      proposalName: `Create Makers`,
-      votingMint: new PublicKey(argv.councilPubkey)
-    });
-  } else {
-    await sendInstructions(provider, instructions, []);
-  }
+  await sendInstructionsOrSquads({
+    provider,
+    instructions,
+    executeTransaction: argv.executeTransaction,
+    squads,
+    multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
+    authorityIndex: argv.authorityIndex,
+    signers: [],
+  });
 }
 
 run()

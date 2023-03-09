@@ -1,10 +1,11 @@
 import * as anchor from "@coral-xyz/anchor";
 import { init } from "@helium/circuit-breaker-sdk";
 import { PublicKey } from "@solana/web3.js";
+import Squads from "@sqds/sdk";
 import { BN } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrCreateProposal } from "./utils";
+import { sendInstructionsOrSquads } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -21,27 +22,26 @@ const yarg = yargs(hideBin(process.argv)).options({
   circuitBreaker: {
     type: "string",
     required: true,
-    describe:
-      "Circuit breaker account",
+    describe: "Circuit breaker account",
   },
   windowSizeSeconds: {
     type: "number",
   },
   threshold: {
-    type: "number"
+    type: "number",
   },
-  govProgramId: {
-    type: "string",
-    describe: "Pubkey of the GOV program",
-    default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
-  },
-  councilKey: {
-    type: "string",
-    describe: "Key of gov council token",
-    default: "counKsk72Jgf9b3aqyuQpFf12ktLdJbbuhnoSxxQoMJ",
-  },
-  executeProposal: {
+  executeTransaction: {
     type: "boolean",
+  },
+  multisig: {
+    type: "string",
+    describe:
+      "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+  },
+  authorityIndex: {
+    type: "number",
+    describe: "Authority index for squads. Defaults to 1",
+    default: 1,
   },
 });
 
@@ -74,16 +74,18 @@ async function run() {
     .instruction()
   )
 
-  const wallet = loadKeypair(argv.wallet);
-  await sendInstructionsOrCreateProposal({
+  const squads = Squads.endpoint(
+    process.env.ANCHOR_PROVIDER_URL,
+    provider.wallet
+  );
+  await sendInstructionsOrSquads({
     provider,
     instructions,
-    walletSigner: wallet,
+    executeTransaction: argv.executeTransaction,
+    squads,
+    multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
+    authorityIndex: argv.authorityIndex,
     signers: [],
-    govProgramId: new PublicKey(argv.govProgramId),
-    proposalName: `Update circuit breaker config`,
-    votingMint: councilKey,
-    executeProposal: argv.executeProposal,
   });
 }
 
