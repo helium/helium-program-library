@@ -76,7 +76,6 @@ async function run() {
     return;
   }
 
-  const councilKey = new PublicKey(argv.councilKey);
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hsdProgram = await initDao(provider);
   const hvsrProgram = await initVsr(provider);

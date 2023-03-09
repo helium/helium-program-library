@@ -85,8 +85,6 @@ async function run() {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const wallet = loadKeypair(argv.wallet);
   const provider = anchor.getProvider() as anchor.AnchorProvider;
-  const govProgramId = new PublicKey(argv.govProgramId);
-  const councilKey = new PublicKey(argv.councilKey);
   const program = await initHsd(provider);
   const hemProgram = await initHem(provider);
   const cbProgram = await initCb(provider);

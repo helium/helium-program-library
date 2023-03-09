@@ -18,6 +18,12 @@ export const sequelize = new Sequelize({
     acquire: 30000,
     idle: 10000
   },
+  dialectOptions: {
+          ssl: {
+            require: false,
+            rejectUnauthorized: false,
+          },
+        },
   hooks: {
     beforeConnect: async (config: any) => {
       const isRds = host.includes("rds.amazonaws.com");
