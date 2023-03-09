@@ -225,6 +225,32 @@ describe("voter-stake-registry", () => {
     return { position, mint: mintKeypair.publicKey };
   }
 
+  it("should create a maxVoterWeightRecord correctly", async () => {
+    const instructions: TransactionInstruction[] = [];
+
+    const {
+      pubkeys: { maxVoterWeightRecord },
+      instruction,
+    } = await program.methods
+      .updateMaxVoterWeightV0()
+      .accounts({
+        registrar,
+      })
+      .prepare();
+    instructions.push(instruction);
+
+    await sendInstructions(provider, instructions, []);
+    const maxVoterWeightAcc = await program.account.maxVoterWeightRecord.fetch(
+      maxVoterWeightRecord!
+    );
+
+    expectBnAccuracy(
+      toBN((223_000_000 * SCALE) * GENESIS_MULTIPLIER, 8),
+      maxVoterWeightAcc.maxVoterWeight,
+      0.0001
+    );
+  });
+
   it("should configure a votingMint correctly", async () => {
     const registrarAcc = await program.account.registrar.fetch(registrar);
     const votingMint0 = (
