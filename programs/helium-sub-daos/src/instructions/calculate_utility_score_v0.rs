@@ -1,6 +1,5 @@
 use crate::{
-  current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError,
-  EPOCH_LENGTH,
+  current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError, EPOCH_LENGTH,
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
