@@ -74,6 +74,9 @@ impl GetEmissions for Vec<EmissionScheduleItem> {
           low = middle + 1;
         } else {
           // move left side
+          if middle == 0 {
+            break;
+          }
           high = middle - 1;
         }
       } else {

@@ -74,6 +74,11 @@ pub fn distribute_impl(ctx: &mut DistributeRewardsCommonV0) -> Result<()> {
     .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
   recipient.total_rewards = median;
 
+  if ctx.recipient.current_config_version != ctx.lazy_distributor.version {
+    ctx.recipient.current_config_version = ctx.lazy_distributor.version;
+    ctx.recipient.current_rewards = vec![None; ctx.lazy_distributor.oracles.len()];
+  }
+
   transfer_v0(
     CpiContext::new_with_signer(
       ctx.token_program.to_account_info().clone(),

@@ -161,11 +161,13 @@ describe("distributor-oracle", () => {
   let asset: PublicKey;
   let merkle = Keypair.generate();
   let merkleTree: MerkleTree;
+  let dataHash: Buffer;
+  let creatorHash: Buffer;
   const uri =
     "https://mobile-metadata.test-helium.com/13CGbZcFcAXkDqvACAKdWRdt5gdMEz8mbZC8nc4HGqZozyFYxSP";
   const getAssetFn = async () =>
     ({
-      compression: { compressed: true, tree: merkle.publicKey, leafId: 0 },
+      compression: { compressed: true, tree: merkle.publicKey, leafId: 0, dataHash, creatorHash },
       ownership: { owner: me },
       content: { json_uri: uri },
     } as Asset);
@@ -191,7 +193,7 @@ describe("distributor-oracle", () => {
       PROGRAM_ID,
       anchor.workspace.HeliumEntityManager.idl
     );
-    ({ asset, merkleTree } = await createCompressionNft({
+    ({ asset, merkleTree, dataHash, creatorHash } = await createCompressionNft({
       provider,
       recipient: me,
       merkle,

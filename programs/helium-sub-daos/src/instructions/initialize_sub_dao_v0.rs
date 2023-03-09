@@ -198,6 +198,37 @@ impl<'info> InitializeSubDaoV0<'info> {
 
 pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -> Result<()> {
   let curr_ts = Clock::get()?.unix_timestamp;
+
+  let signer_seeds: &[&[&[u8]]] = &[&[
+    "sub_dao".as_bytes(),
+    ctx.accounts.dnt_mint.to_account_info().key.as_ref(),
+    &[ctx.bumps["sub_dao"]],
+  ]];
+  initialize_treasury_management_v0(
+    CpiContext::new(
+      ctx.accounts.treasury_management_program.to_account_info(),
+      InitializeTreasuryManagementV0 {
+        payer: ctx.accounts.payer.to_account_info(),
+        treasury_management: ctx.accounts.treasury_management.to_account_info(),
+        treasury_mint: ctx.accounts.hnt_mint.to_account_info(),
+        mint_authority: ctx.accounts.dnt_mint_authority.to_account_info(),
+        supply_mint: ctx.accounts.dnt_mint.to_account_info(),
+        circuit_breaker: ctx.accounts.treasury_circuit_breaker.to_account_info(),
+        treasury: ctx.accounts.treasury.to_account_info(),
+        system_program: ctx.accounts.system_program.to_account_info(),
+        circuit_breaker_program: ctx.accounts.circuit_breaker_program.to_account_info(),
+        associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
+        token_program: ctx.accounts.token_program.to_account_info(),
+      },
+    ),
+    InitializeTreasuryManagementArgsV0 {
+      authority: ctx.accounts.sub_dao.key(),
+      curve: args.treasury_curve.into(),
+      freeze_unix_time: i64::MAX,
+      window_config: args.treasury_window_config.into(),
+    },
+  )?;
+
   initialize_mint_windowed_breaker_v0(
     ctx.accounts.initialize_dnt_mint_breaker_ctx(),
     InitializeMintWindowedBreakerArgsV0 {
@@ -213,11 +244,6 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     },
   )?;
 
-  let signer_seeds: &[&[&[u8]]] = &[&[
-    "sub_dao".as_bytes(),
-    ctx.accounts.dnt_mint.to_account_info().key.as_ref(),
-    &[ctx.bumps["sub_dao"]],
-  ]];
   initialize_account_windowed_breaker_v0(
     ctx
       .accounts
@@ -248,30 +274,6 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     ),
     AuthorityType::FreezeAccount,
     Some(ctx.accounts.sub_dao.key()),
-  )?;
-
-  initialize_treasury_management_v0(
-    CpiContext::new(
-      ctx.accounts.treasury_management_program.to_account_info(),
-      InitializeTreasuryManagementV0 {
-        payer: ctx.accounts.payer.to_account_info(),
-        treasury_management: ctx.accounts.treasury_management.to_account_info(),
-        treasury_mint: ctx.accounts.hnt_mint.to_account_info(),
-        supply_mint: ctx.accounts.dnt_mint.to_account_info(),
-        circuit_breaker: ctx.accounts.treasury_circuit_breaker.to_account_info(),
-        treasury: ctx.accounts.treasury.to_account_info(),
-        system_program: ctx.accounts.system_program.to_account_info(),
-        circuit_breaker_program: ctx.accounts.circuit_breaker_program.to_account_info(),
-        associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
-        token_program: ctx.accounts.token_program.to_account_info(),
-      },
-    ),
-    InitializeTreasuryManagementArgsV0 {
-      authority: ctx.accounts.sub_dao.key(),
-      curve: args.treasury_curve.into(),
-      freeze_unix_time: i64::MAX,
-      window_config: args.treasury_window_config.into(),
-    },
   )?;
 
   ctx.accounts.dao.num_sub_daos += 1;

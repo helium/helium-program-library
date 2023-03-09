@@ -199,6 +199,7 @@ async function run() {
       .accounts({
         subDao,
         authority: subDaoAcc.authority,
+        payer: subDaoAcc.authority,
       })
       .instruction()
   );

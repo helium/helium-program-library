@@ -1,4 +1,6 @@
-use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError};
+use crate::{
+  current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError, EPOCH_LENGTH,
+};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
@@ -68,8 +70,8 @@ pub fn handler(
   ctx: Context<CalculateUtilityScoreV0>,
   args: CalculateUtilityScoreArgsV0,
 ) -> Result<()> {
-  let curr_ts = ctx.accounts.registrar.clock_unix_timestamp();
-  let epoch = current_epoch(curr_ts);
+  let end_of_epoch_ts = i64::try_from(args.epoch + 1).unwrap() * EPOCH_LENGTH;
+  let curr_epoch = current_epoch(Clock::get()?.unix_timestamp);
 
   // Set total rewards, accounting for net emmissions by counting
   // burned hnt since last supply setting.
@@ -84,7 +86,7 @@ pub fn handler(
     .accounts
     .dao
     .emission_schedule
-    .get_emissions_at(Clock::get()?.unix_timestamp)
+    .get_emissions_at(end_of_epoch_ts)
     .unwrap()
     .checked_add(std::cmp::min(
       prev_supply.saturating_sub(curr_supply),
@@ -97,7 +99,7 @@ pub fn handler(
     .checked_add(ctx.accounts.dao_epoch_info.total_rewards)
     .unwrap();
 
-  if !TESTING && args.epoch >= epoch {
+  if !TESTING && args.epoch >= curr_epoch {
     return Err(error!(ErrorCode::EpochNotOver));
   }
 
@@ -105,7 +107,7 @@ pub fn handler(
     return Err(error!(ErrorCode::UtilityScoreAlreadyCalculated));
   }
 
-  if curr_ts < ctx.accounts.dao.emission_schedule[0].start_unix_time {
+  if end_of_epoch_ts < ctx.accounts.dao.emission_schedule[0].start_unix_time {
     return Err(error!(ErrorCode::EpochToEarly));
   }
 

@@ -33,7 +33,11 @@ pub struct InitializeTreasuryManagementV0<'info> {
   // HNT
   pub treasury_mint: Box<Account<'info, Mint>>,
   // IOT, MOBILE, etc
+  #[account(
+    constraint = supply_mint.mint_authority.unwrap() == *mint_authority.key,
+  )]
   pub supply_mint: Box<Account<'info, Mint>>,
+  pub mint_authority: Signer<'info>,
   /// CHECK: Verified by cpi to init
   #[account(
     mut,

@@ -9,7 +9,6 @@ use itertools::Itertools;
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateVoterWeightRecordArgsV0 {
   voter_weight_action: VoterWeightAction,
-  owner: Pubkey,
 }
 
 impl Default for VoterWeightAction {
@@ -29,10 +28,11 @@ pub struct UpdateVoterWeightRecordV0<'info> {
     init_if_needed,
     payer = payer,
     space = 8 + size_of::<VoterWeightRecord>(),
-    seeds = [registrar.key().as_ref(), b"voter-weight-record".as_ref(), args.owner.as_ref()],
+    seeds = [registrar.key().as_ref(), b"voter-weight-record".as_ref(), owner.key().as_ref()],
     bump,
   )]
   pub voter_weight_record: Account<'info, VoterWeightRecord>,
+  pub owner: Signer<'info>,
   pub system_program: Program<'info, System>,
 }
 
@@ -48,7 +48,7 @@ pub fn handler(
 ) -> Result<()> {
   let voter_weight_action = args.voter_weight_action;
   let registrar = &ctx.accounts.registrar;
-  let governing_token_owner = args.owner;
+  let governing_token_owner = ctx.accounts.owner.key();
 
   match voter_weight_action {
     // voter_weight for CastVote action can't be evaluated using this instruction
@@ -78,7 +78,7 @@ pub fn handler(
 
   let voter_weight_record = &mut ctx.accounts.voter_weight_record;
 
-  voter_weight_record.governing_token_owner = args.owner;
+  voter_weight_record.governing_token_owner = ctx.accounts.owner.key();
   voter_weight_record.realm = registrar.realm;
   voter_weight_record.voter_weight = voter_weight;
   voter_weight_record.governing_token_mint = registrar.realm_governing_token_mint;

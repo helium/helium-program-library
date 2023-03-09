@@ -27,6 +27,12 @@ pub struct WindowedCircuitBreakerConfigV0 {
   pub threshold: u64,
 }
 
+impl WindowedCircuitBreakerConfigV0 {
+  pub fn is_valid(&self) -> bool {
+    self.window_size_seconds > 0
+  }
+}
+
 #[account]
 #[derive(Default)]
 pub struct MintWindowedCircuitBreakerV0 {

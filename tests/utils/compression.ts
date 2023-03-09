@@ -1,6 +1,8 @@
 import { resolveIndividual } from "@helium/spl-utils";
 import {
   computeCompressedNFTHash,
+  computeCreatorHash,
+  computeDataHash,
   getLeafAssetId, PROGRAM_ID as BUBBLEGUM_PROGRAM_ID, TokenProgramVersion,
   TokenStandard
 } from "@metaplex-foundation/mpl-bubblegum";
@@ -34,6 +36,8 @@ export async function createCompressionNft({
   collectionKey: PublicKey | undefined;
   merkleTree: MerkleTree;
   metadata: any;
+  creatorHash: Buffer;
+  dataHash: Buffer;
 }> {
   const bubblegum = new Program<MplBubblegum>(
     BubblegumIdl as MplBubblegum,
@@ -167,5 +171,7 @@ export async function createCompressionNft({
     collectionKey,
     metadata,
     merkleTree,
+    creatorHash: computeCreatorHash([]),
+    dataHash: computeDataHash(metadata),
   };
 }

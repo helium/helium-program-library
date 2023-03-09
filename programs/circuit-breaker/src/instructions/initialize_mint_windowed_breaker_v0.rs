@@ -3,6 +3,7 @@ use anchor_spl::token::{
   set_authority, spl_token::instruction::AuthorityType, Mint, SetAuthority, Token,
 };
 
+use crate::errors::ErrorCode;
 use crate::{MintWindowedCircuitBreakerV0, WindowV0, WindowedCircuitBreakerConfigV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -19,7 +20,7 @@ pub struct InitializeMintWindowedBreakerV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 60 + std::mem::size_of::<MintWindowedCircuitBreakerV0>(),
+    space = 8 + 60 + std::mem::size_of::<MintWindowedCircuitBreakerV0>(),
     seeds = ["mint_windowed_breaker".as_bytes(), mint.key().as_ref()],
     bump
   )]
@@ -36,6 +37,8 @@ pub fn handler(
   ctx: Context<InitializeMintWindowedBreakerV0>,
   args: InitializeMintWindowedBreakerArgsV0,
 ) -> Result<()> {
+  require!(args.config.is_valid(), ErrorCode::InvalidConfig);
+
   ctx
     .accounts
     .circuit_breaker

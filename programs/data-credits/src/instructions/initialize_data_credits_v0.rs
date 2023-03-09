@@ -23,7 +23,7 @@ pub struct InitializeDataCreditsV0<'info> {
   #[account(
     init, // prevents from reinit attack
     payer = payer,
-    space = 60 + std::mem::size_of::<DataCreditsV0>(),
+    space = 8 + 60 + std::mem::size_of::<DataCreditsV0>(),
     seeds = ["dc".as_bytes(), dc_mint.key().as_ref()],
     bump,
   )]

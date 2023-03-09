@@ -17,7 +17,7 @@ pub struct InitializeLazyTransactionsV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 60 + std::mem::size_of::<LazyTransactionsV0>(),
+    space = 8 + 60 + std::mem::size_of::<LazyTransactionsV0>(),
     seeds = ["lazy_transactions".as_bytes(), args.name.as_bytes()],
     bump,
   )]
