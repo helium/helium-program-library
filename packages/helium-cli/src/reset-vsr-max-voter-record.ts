@@ -97,7 +97,7 @@ async function run() {
   }
 
   if (argv.resetSubDaoRecord) {
-    console.log("resetting subdao maxVoterWeightRecordt");
+    console.log("resetting subdao maxVoterWeightRecord");
     const dntMint = new PublicKey(argv.dntMint);
     const subDao = subDaoKey(dntMint)[0];
     const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
