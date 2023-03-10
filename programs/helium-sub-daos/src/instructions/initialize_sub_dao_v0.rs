@@ -308,7 +308,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     ctx.accounts.token_program.key(),
     ctx.accounts.circuit_breaker_program.key(),
   );
-  let cron = create_end_epoch_cron(curr_ts, 60 * 5);
+  let cron = create_end_epoch_cron(curr_ts, 5);
   // initialize calculate thread
   thread_create(
     CpiContext::new_with_signer(
@@ -326,7 +326,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     vec![calculate_kickoff_ix.into()],
     Trigger::Cron {
       schedule: cron,
-      skippable: false,
+      skippable: true,
     },
   )?;
 
