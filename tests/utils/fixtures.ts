@@ -1,8 +1,16 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
-import { createAtaAndMint, createMint, sendInstructions, toBN } from "@helium/spl-utils";
-import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
+import {
+  createAtaAndMint,
+  createMint,
+  sendInstructions,
+  toBN,
+} from "@helium/spl-utils";
+import {
+  getConcurrentMerkleTreeAccountSize,
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+} from "@solana/spl-account-compression";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { execSync } from "child_process";
 import { ThresholdType } from "../../packages/circuit-breaker-sdk/src";
@@ -23,7 +31,7 @@ export const initTestDataCredits = async (
   program: Program<DataCredits>,
   provider: anchor.AnchorProvider,
   startingHntbal?: number,
-  hntMint?: PublicKey,
+  hntMint?: PublicKey
 ): Promise<{
   dcKey: PublicKey;
   hntMint: PublicKey;
@@ -91,7 +99,7 @@ export const initTestRewardableEntityConfig = async (
     })
     .accounts({
       subDao,
-    })
+    });
 
   const { rewardableEntityConfig } = await method.pubkeys();
   await method.rpc({ skipPreflight: true });
@@ -178,7 +186,7 @@ export const initTestMaker = async (
     collection: collection!,
     authority: makerKeypair.publicKey,
     merkle: merkle.publicKey,
-    treeAuthority: treeAuthority!
+    treeAuthority: treeAuthority!,
   };
 };
 
@@ -224,7 +232,6 @@ export async function ensureVSRIdl(vsrProgram: Program<VoterStakeRegistry>) {
   }
 }
 
-
 export const initWorld = async (
   provider: anchor.AnchorProvider,
   hemProgram: Program<HeliumEntityManager>,
@@ -233,6 +240,7 @@ export const initWorld = async (
   epochRewards?: number,
   subDaoEpochRewards?: number,
   registrar?: PublicKey,
+  subDaoRegistrar?: PublicKey,
   hntMint?: PublicKey
 ): Promise<{
   dao: { mint: PublicKey; dao: PublicKey };
@@ -283,12 +291,13 @@ export const initWorld = async (
     provider,
     provider.wallet.publicKey,
     dao.dao,
-    subDaoEpochRewards
+    subDaoEpochRewards,
+    subDaoRegistrar
   );
 
   const rewardableEntityConfig = await initTestRewardableEntityConfig(
     hemProgram,
-    subDao.subDao,
+    subDao.subDao
   );
 
   const maker = await initTestMaker(
