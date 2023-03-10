@@ -46,7 +46,7 @@ pub fn handler(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result
   }
 
   if let Some(emission_schedule) = args.emission_schedule {
-    ctx.accounts.sub_dao.emission_schedule = emission_schedule;    
+    ctx.accounts.sub_dao.emission_schedule = emission_schedule;
   }
 
   if let Some(registrar) = args.registrar {
