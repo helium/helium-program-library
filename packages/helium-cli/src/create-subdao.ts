@@ -358,6 +358,17 @@ async function run() {
         ])
         .instruction()
     );
+
+    console.log("Creating max voter record");
+    instructions.push(
+      await heliumVsrProgram.methods
+        .updateMaxVoterWeightV0()
+        .accounts({
+          registrar,
+          realmGoverningTokenMint: subdaoKeypair.publicKey,
+        })
+        .instruction()
+    );
   }
 
   await sendInstructions(provider, instructions, []);
