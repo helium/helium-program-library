@@ -6,7 +6,7 @@ use shared_utils::resize_to_fit;
 pub struct RepairRegistrarArgsV0 {
   pub collection: Pubkey,
   pub bump_seed: u8,
-  pub collection_bump_seed: u8
+  pub collection_bump_seed: u8,
 }
 
 #[derive(Accounts)]
@@ -33,5 +33,5 @@ pub fn handler(ctx: Context<RepairRegistrarV0>, args: RepairRegistrarArgsV0) -> 
     &ctx.accounts.registrar,
   )?;
 
-  Ok(())  
+  Ok(())
 }

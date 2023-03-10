@@ -135,8 +135,8 @@ pub mod voter_stake_registry {
   }
 
   pub fn repair_registrar_v0(
-    ctx: Context<RepairRegistrarV0>, 
-    args: RepairRegistrarArgsV0
+    ctx: Context<RepairRegistrarV0>,
+    args: RepairRegistrarArgsV0,
   ) -> Result<()> {
     instructions::repair_registrar_v0::handler(ctx, args)
   }

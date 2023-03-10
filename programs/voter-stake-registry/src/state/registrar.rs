@@ -20,7 +20,7 @@ pub struct Registrar {
   pub bump_seed: u8,
   pub collection_bump_seed: u8,
   /// Reserved space for future versions
-  pub reserved: [u8; 8],  
+  pub reserved: [u8; 8],
   pub voting_mints: Vec<VotingMintConfigV0>,
 }
 
