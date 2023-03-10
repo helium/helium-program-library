@@ -179,7 +179,6 @@ impl SubDaoEpochInfoV0 {
 #[derive(Default)]
 pub struct SubDaoV0 {
   pub dao: Pubkey,
-  pub registrar: Pubkey,      // vsr registrar
   pub dnt_mint: Pubkey,       // Mint of the subdao token
   pub treasury: Pubkey,       // Treasury of HNT
   pub rewards_escrow: Pubkey, // Escrow account for DNT rewards
@@ -193,4 +192,5 @@ pub struct SubDaoV0 {
   pub onboarding_dc_fee: u64,
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub bump_seed: u8,
+  pub registrar: Pubkey,      // vsr registrar
 }
