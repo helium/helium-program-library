@@ -9,11 +9,7 @@ import { PublicKey } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import {
-  getTimestampFromDays,
-  getUnixTimestamp,
-  sendInstructionsOrSquads,
-} from "./utils";
+import { sendInstructionsOrSquads } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -30,21 +26,21 @@ const yarg = yargs(hideBin(process.argv)).options({
   hntMint: {
     type: "string",
     describe:
-      "Mint of the HNT token. Only used if --resetDaoVotingMint flag is set",
+      "Mint of the HNT token. Only used if --resetDaoRecord flag is set",
   },
   dntMint: {
     type: "string",
     describe:
-      "Mint of the subdao token. Only used if --resetSubDaoVotingMint flag is set",
+      "Mint of the subdao token. Only used if --resetSubDaoRecord flag is set",
   },
-  resetDaoVotingMint: {
+  resetDaoRecord: {
     type: "boolean",
-    describe: "Reset the dao voting mint",
+    describe: "Reset the dao max vote weight record",
     default: false,
   },
-  resetSubDaoVotingMint: {
+  resetSubDaoRecord: {
     type: "boolean",
-    describe: "Reset the subdao voting mint",
+    describe: "Reset the subdao max vote weight record",
     default: false,
   },
   executeTransaction: {
@@ -62,17 +58,13 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
 });
 
-const SECS_PER_DAY = 86400;
-const SECS_PER_YEAR = 365 * SECS_PER_DAY;
-const MAX_LOCKUP = 4 * SECS_PER_YEAR;
-
 async function run() {
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
-  if (argv.resetSubDaoVotingMint && !argv.dntMint) {
+  if (argv.resetSubDaoRecord && !argv.dntMint) {
     console.log("dnt mint not provided");
     return;
   }
@@ -80,8 +72,6 @@ async function run() {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hsdProgram = await initDao(provider);
   const hvsrProgram = await initVsr(provider);
-  const now = Number(await getUnixTimestamp(provider));
-  const in7Days = now + getTimestampFromDays(7);
   const instructions = [];
 
   const squads = Squads.endpoint(
@@ -89,66 +79,36 @@ async function run() {
     provider.wallet
   );
 
-  if (argv.resetDaoVotingMint) {
-    console.log("resetting dao votingMint");
+  if (argv.resetDaoRecord) {
+    console.log("resetting dao maxVoterWeightRecord");
     const hntMint = new PublicKey(argv.hntMint);
     const dao = daoKey(hntMint)[0];
     const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
 
     instructions.push(
       await hvsrProgram.methods
-        .configureVotingMintV0({
-          idx: 0,
-          digitShift: 0,
-          baselineVoteWeightScaledFactor: new anchor.BN(0 * 1e9),
-          maxExtraLockupVoteWeightScaledFactor: new anchor.BN(100 * 1e9),
-          lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
-          genesisVotePowerMultiplier: 3,
-          genesisVotePowerMultiplierExpirationTs: new anchor.BN(in7Days),
-        })
+        .updateMaxVoterWeightV0()
         .accounts({
           registrar: daoAcc.registrar,
-          mint: hntMint,
+          realmGoverningTokenMint: hntMint,
         })
-        .remainingAccounts([
-          {
-            pubkey: hntMint,
-            isSigner: false,
-            isWritable: false,
-          },
-        ])
         .instruction()
     );
   }
 
-  if (argv.resetSubDaoVotingMint) {
-    console.log("resetting subdao votingMint");
+  if (argv.resetSubDaoRecord) {
+    console.log("resetting subdao maxVoterWeightRecordt");
     const dntMint = new PublicKey(argv.dntMint);
     const subDao = subDaoKey(dntMint)[0];
-    const subdaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
+    const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
 
     instructions.push(
       await hvsrProgram.methods
-        .configureVotingMintV0({
-          idx: 0,
-          digitShift: -1,
-          baselineVoteWeightScaledFactor: new anchor.BN(0 * 1e9),
-          maxExtraLockupVoteWeightScaledFactor: new anchor.BN(100 * 1e9),
-          lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
-          genesisVotePowerMultiplier: 1,
-          genesisVotePowerMultiplierExpirationTs: new anchor.BN(now),
-        })
+        .updateMaxVoterWeightV0()
         .accounts({
-          registrar: subdaoAcc.registrar,
-          mint: dntMint,
+          registrar: subDaoAcc.registrar,
+          realmGoverningTokenMint: dntMint,
         })
-        .remainingAccounts([
-          {
-            pubkey: dntMint,
-            isSigner: false,
-            isWritable: false,
-          },
-        ])
         .instruction()
     );
   }
