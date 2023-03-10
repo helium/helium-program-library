@@ -244,6 +244,12 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
   }
 }
 
+server.post<{
+  Body: { from: string; to: string; attestation: string };
+}>("/ledger/migrate", async (request, reply) => {
+
+})
+
 server.get<{
   Querystring: { limit?: number; offset?: number };
   Params: { wallet: string };

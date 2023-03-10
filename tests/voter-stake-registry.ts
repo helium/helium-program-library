@@ -36,6 +36,7 @@ import {
   createAssociatedTokenAccountInstruction,
   createTransferInstruction,
   getAssociatedTokenAddress,
+  getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import chai, { expect } from "chai";
@@ -49,6 +50,7 @@ import {
 import { getUnixTimestamp } from "./utils/solana";
 import { SPL_GOVERNANCE_PID } from "./utils/vsr";
 import { expectBnAccuracy } from "./utils/expectBnAccuracy";
+import { loadKeypair } from "../packages/migration-service/src/solana";
 
 chai.use(chaiAsPromised);
 
@@ -852,6 +854,28 @@ describe("voter-stake-registry", () => {
       await program.methods.closePositionV0().accounts({ position }).rpc();
       expect(await program.account.positionV0.fetchNullable(position)).to.be
         .null;
+    });
+
+    it("allows transfers for ledger users", async () => {
+      const approver = loadKeypair(__dirname + "/approver-test.json");
+      const to = Keypair.generate();
+
+      const positionAccount = await program.account.positionV0.fetch(position);
+      const mint = positionAccount.mint;
+
+      await program.methods
+        .ledgerTransferPositionV0()
+        .accounts({
+          to: to.publicKey,
+          position,
+          mint,
+          approver: approver.publicKey,
+        })
+        .signers([approver, to])
+        .rpc({ skipPreflight: true });
+
+      const toBalance = await provider.connection.getTokenAccountBalance(getAssociatedTokenAddressSync(mint, to.publicKey));
+      expect(toBalance.value.uiAmount).to.equal(1);
     });
 
     it("should not allow me to withdraw a position before lockup", async () => {
