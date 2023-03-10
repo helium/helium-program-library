@@ -240,8 +240,8 @@ export const initWorld = async (
   epochRewards?: number,
   subDaoEpochRewards?: number,
   registrar?: PublicKey,
-  subDaoRegistrar?: PublicKey,
-  hntMint?: PublicKey
+  hntMint?: PublicKey,
+  subDaoRegistrar?: PublicKey
 ): Promise<{
   dao: { mint: PublicKey; dao: PublicKey };
   subDao: {
