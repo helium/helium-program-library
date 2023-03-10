@@ -133,4 +133,11 @@ pub mod voter_stake_registry {
   pub fn relinquish_vote_v0(ctx: Context<RelinquishVoteV0>) -> Result<()> {
     instructions::relinquish_vote_v0::handler(ctx)
   }
+
+  pub fn repair_registrar_v0(
+    ctx: Context<RepairRegistrarV0>, 
+    args: RepairRegistrarArgsV0
+  ) -> Result<()> {
+    instructions::repair_registrar_v0::handler(ctx, args)
+  }
 }
