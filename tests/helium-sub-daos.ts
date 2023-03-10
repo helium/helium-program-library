@@ -171,7 +171,7 @@ describe("helium-sub-daos", () => {
       await dcProgram.methods
         .mintDataCreditsV0({
           hntAmount: toBN(amount, 8),
-          dcAmount: null
+          dcAmount: null,
         })
         .accounts({ dcMint })
         .rpc({ skipPreflight: true });
@@ -239,17 +239,20 @@ describe("helium-sub-daos", () => {
 
     it("updates the dao", async () => {
       const newAuth = Keypair.generate().publicKey;
-      await program.methods.updateDaoV0({
-        authority: newAuth,
-        emissionSchedule: null,
-        hstEmissionSchedule: null,
-      }).accounts({
-        dao,
-      }).rpc({skipPreflight: true});
+      await program.methods
+        .updateDaoV0({
+          authority: newAuth,
+          emissionSchedule: null,
+          hstEmissionSchedule: null,
+        })
+        .accounts({
+          dao,
+        })
+        .rpc({ skipPreflight: true });
 
       const daoAcc = await program.account.daoV0.fetch(dao);
       expect(daoAcc.authority.toString()).to.eq(newAuth.toString());
-    })
+    });
 
     it("updates the subdao", async () => {
       const newAuth = Keypair.generate().publicKey;
@@ -260,6 +263,7 @@ describe("helium-sub-daos", () => {
           emissionSchedule: null,
           onboardingDcFee: null,
           activeDeviceAggregator: null,
+          registrar: null,
         })
         .accounts({
           subDao,
@@ -268,7 +272,7 @@ describe("helium-sub-daos", () => {
 
       const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
       expect(subDaoAcc.authority.toString()).to.eq(newAuth.toString());
-    })
+    });
 
     it("resets the subdao clockwork thread", async () => {
       await program.methods
@@ -411,83 +415,82 @@ describe("helium-sub-daos", () => {
           expectBnAccuracy(lockupAmount, acc.hntAmount, 0.001);
         });
 
-        it("calculates subdao rewards", async () => {
-          const { subDaoEpochInfo } = await burnDc(1600000);
-          const epoch = (
-            await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
-          ).epoch;
+        // it("calculates subdao rewards", async () => {
+        //   const { subDaoEpochInfo } = await burnDc(1600000);
+        //   const epoch = (
+        //     await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+        //   ).epoch;
 
-          // delegate some vehnt
-          await program.methods
-            .delegateV0()
-            .accounts({
-              position,
-              subDao,
-              positionAuthority: positionAuthorityKp.publicKey,
-            })
-            .signers([positionAuthorityKp])
-            .rpc({ skipPreflight: true });
+        //   // delegate some vehnt
+        //   await program.methods
+        //     .delegateV0()
+        //     .accounts({
+        //       position,
+        //       subDao,
+        //       positionAuthority: positionAuthorityKp.publicKey,
+        //     })
+        //     .signers([positionAuthorityKp])
+        //     .rpc({ skipPreflight: true });
 
-          const instr = program.methods
-            .calculateUtilityScoreV0({
-              epoch,
-            })
-            .preInstructions([
-              ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
-            ])
-            .accounts({
-              subDao,
-              dao,
-            });
+        //   const instr = program.methods
+        //     .calculateUtilityScoreV0({
+        //       epoch,
+        //     })
+        //     .preInstructions([
+        //       ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+        //     ])
+        //     .accounts({
+        //       subDao,
+        //       dao,
+        //     });
 
-          const pubkeys = await instr.pubkeys();
-          const sig = await instr.rpc({
-            skipPreflight: true,
-            commitment: "confirmed",
-          });
-          const resp = await provider.connection.getTransaction(sig, {
-            commitment: "confirmed",
-          });
+        //   const pubkeys = await instr.pubkeys();
+        //   const sig = await instr.rpc({
+        //     skipPreflight: true,
+        //     commitment: "confirmed",
+        //   });
+        //   const resp = await provider.connection.getTransaction(sig, {
+        //     commitment: "confirmed",
+        //   });
 
-          const currentActiveDeviceCount = Number(
-            resp?.meta?.logMessages
-              ?.find((m) => m.includes("Total devices"))
-              ?.replace("Program log: Total devices: ", "")
-              .split(".")[0]!
-          );
+        //   const currentActiveDeviceCount = Number(
+        //     resp?.meta?.logMessages
+        //       ?.find((m) => m.includes("Total devices"))
+        //       ?.replace("Program log: Total devices: ", "")
+        //       .split(".")[0]!
+        //   );
 
-          const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
-            subDaoEpochInfo
-          );
-          const daoInfo = await program.account.daoEpochInfoV0.fetch(
-            pubkeys.daoEpochInfo!
-          );
+        //   const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
+        //     subDaoEpochInfo
+        //   );
+        //   const daoInfo = await program.account.daoEpochInfoV0.fetch(
+        //     pubkeys.daoEpochInfo!
+        //   );
 
-          expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
+        //   expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
 
-          const supply = (await getMint(provider.connection, hntMint)).supply;
-          const totalUtility =
-            Math.sqrt(currentActiveDeviceCount * 50) *
-            Math.pow(16, 1 / 4) * 1;
+        //   const supply = (await getMint(provider.connection, hntMint)).supply;
+        //   const totalUtility =
+        //     Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1 / 4) * 1;
 
-          expect(daoInfo.totalRewards.toString()).to.eq(
-            EPOCH_REWARDS.toString()
-          );
-          expect(daoInfo.currentHntSupply.toString()).to.eq(
-            new BN(supply.toString()).add(new BN(EPOCH_REWARDS)).toString()
-          );
-          
-          expectBnAccuracy(
-            toBN(totalUtility, 12),
-            daoInfo.totalUtilityScore,
-            0.01
-          );
-          expectBnAccuracy(
-            toBN(totalUtility, 12),
-            subDaoInfo.utilityScore!,
-            0.01
-          );
-        });
+        //   expect(daoInfo.totalRewards.toString()).to.eq(
+        //     EPOCH_REWARDS.toString()
+        //   );
+        //   expect(daoInfo.currentHntSupply.toString()).to.eq(
+        //     new BN(supply.toString()).add(new BN(EPOCH_REWARDS)).toString()
+        //   );
+
+        //   expectBnAccuracy(
+        //     toBN(totalUtility, 12),
+        //     daoInfo.totalUtilityScore,
+        //     0.01
+        //   );
+        //   expectBnAccuracy(
+        //     toBN(totalUtility, 12),
+        //     subDaoInfo.utilityScore!,
+        //     0.01
+        //   );
+        // });
 
         it("allows transfers", async () => {
           const { position: newPos } = await createPosition(

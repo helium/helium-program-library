@@ -1,29 +1,39 @@
 import * as anchor from "@coral-xyz/anchor";
 import { thresholdPercent, ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
-  init as initHem, rewardableEntityConfigKey
+  init as initHem,
+  rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
 import {
   daoKey,
   init as initDao,
   subDaoKey,
-  threadKey
+  threadKey,
 } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
-  lazyDistributorKey
+  lazyDistributorKey,
 } from "@helium/lazy-distributor-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";
 import {
-  init as initVsr, registrarKey
+  init as initVsr,
+  registrarKey,
 } from "@helium/voter-stake-registry-sdk";
 import {
-  getGovernanceProgramVersion, GoverningTokenConfigAccountArgs, GoverningTokenType, MintMaxVoteWeightSource, SetRealmAuthorityAction, withCreateRealm, withSetRealmAuthority
+  getGovernanceProgramVersion,
+  GoverningTokenConfigAccountArgs,
+  GoverningTokenType,
+  MintMaxVoteWeightSource,
+  SetRealmAuthorityAction,
+  withCreateRealm,
+  withSetRealmAuthority,
 } from "@solana/spl-governance";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
-  ComputeBudgetProgram, PublicKey, TransactionInstruction
+  ComputeBudgetProgram,
+  PublicKey,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
@@ -31,9 +41,11 @@ import yargs from "yargs/yargs";
 import {
   createAndMint,
   createSwitchboardAggregator,
-  exists, getUnixTimestamp,
+  exists,
+  getUnixTimestamp,
   isLocalhost,
-  loadKeypair, sendInstructionsOrSquads
+  loadKeypair,
+  sendInstructionsOrSquads,
 } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
@@ -142,7 +154,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
   decimals: {
     type: "number",
-    default: 6
+    default: 6,
   },
   startEpochRewards: {
     type: "number",
@@ -161,13 +173,14 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
   multisig: {
     type: "string",
-    describe: "Address of the squads multisig for subdao authority. If not provided, your wallet will be the authority"
+    describe:
+      "Address of the squads multisig for subdao authority. If not provided, your wallet will be the authority",
   },
   authorityIndex: {
     type: "number",
     describe: "Authority index for squads. Defaults to 1",
     default: 1,
-  }
+  },
 });
 
 const SECS_PER_DAY = 86400;
@@ -218,7 +231,10 @@ async function run() {
   const calculateThread = threadKey(subdao, "calculate")[0];
   const issueThread = threadKey(subdao, "issue")[0];
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, provider.wallet);
+  const squads = Squads.endpoint(
+    process.env.ANCHOR_PROVIDER_URL,
+    provider.wallet
+  );
   let authority = provider.wallet.publicKey;
   const multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
   if (multisig) {
@@ -396,17 +412,18 @@ async function run() {
         crank: new PublicKey(argv.crank),
         queue: new PublicKey(argv.queue),
         wallet,
-        provider, 
+        provider,
         aggKeypair,
         url: argv.activeDeviceOracleUrl,
         switchboardNetwork: argv.switchboardNetwork,
-        authority
-      })
+        authority,
+      });
     }
 
     console.log(`Initializing ${name} SubDAO`);
     const initSubdaoMethod = await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
+        registrar: registrar,
         dcBurnAuthority: new PublicKey(argv.dcBurnAuthority),
         authority,
         emissionSchedule: emissionSchedule(argv.startEpochRewards),
