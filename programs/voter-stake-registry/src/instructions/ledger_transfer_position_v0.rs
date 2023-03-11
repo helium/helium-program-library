@@ -24,11 +24,11 @@ pub struct LedgerTransferPositionV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
 
-  #[account(mut)]
+  #[account(has_one = mint)]
   pub position: Box<Account<'info, PositionV0>>,
   #[account(
     mut,
-    constraint = mint.supply == 0,
+    constraint = mint.supply == 1,
     mint::decimals = 0,
     mint::authority = position,
     mint::freeze_authority = position,

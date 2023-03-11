@@ -255,6 +255,7 @@ describe("voter-stake-registry", () => {
 
   it("should configure a votingMint correctly", async () => {
     const registrarAcc = await program.account.registrar.fetch(registrar);
+    console.log(registrarAcc.collection.toBase58());
     const votingMint0 = (
       registrarAcc.votingMints as VotingMintConfig[]
     )[0] as VotingMintConfig;

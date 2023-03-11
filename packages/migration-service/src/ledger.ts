@@ -85,7 +85,7 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
     }
   }
 
-  
+
 }
 
 const mapProof = (assetProof: AssetProof): AccountMeta[] => {
