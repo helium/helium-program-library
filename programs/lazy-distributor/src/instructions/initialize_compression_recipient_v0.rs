@@ -6,7 +6,8 @@ use spl_account_compression::program::SplAccountCompression;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeCompressionRecipientArgsV0 {
-  pub hash: [u8; 32],
+  pub data_hash: [u8; 32],
+  pub creator_hash: [u8; 32],
   pub root: [u8; 32],
   pub index: u32,
 }
@@ -26,7 +27,7 @@ pub struct InitializeCompressionRecipientV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 60 + std::mem::size_of::<RecipientV0>(),
+    space = 8 + 60 + std::mem::size_of::<RecipientV0>(),
     seeds = [
       "recipient".as_bytes(), 
       lazy_distributor.key().as_ref(),
@@ -57,7 +58,8 @@ pub fn handler<'info>(
   args: InitializeCompressionRecipientArgsV0,
 ) -> Result<()> {
   verify_compressed_nft(VerifyCompressedNftArgs {
-    hash: args.hash,
+    data_hash: args.data_hash,
+    creator_hash: args.creator_hash,
     root: args.root,
     index: args.index,
     compression_program: ctx.accounts.compression_program.to_account_info(),

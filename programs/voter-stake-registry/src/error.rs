@@ -157,4 +157,6 @@ pub enum VsrError {
   ActiveVotesExist,
   #[msg("Position update authority must sign off on this transaction")]
   UnauthorizedPositionUpdateAuthority,
+  #[msg("Cannot transfer to the same position")]
+  SamePosition,
 }

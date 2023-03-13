@@ -44,7 +44,8 @@ export async function distributeCompressionRewards<IDL extends Idl>({
 
   return program.methods
     .distributeCompressionRewardsV0({
-      hash: leaf.toBuffer().toJSON().data,
+      dataHash: asset.compression.dataHash!.toJSON().data,
+      creatorHash: asset.compression.creatorHash!.toJSON().data,
       root: root.toBuffer().toJSON().data,
       index: leafId!,
     })

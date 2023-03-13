@@ -74,6 +74,9 @@ impl GetEmissions for Vec<EmissionScheduleItem> {
           low = middle + 1;
         } else {
           // move left side
+          if middle == 0 {
+            break;
+          }
           high = middle - 1;
         }
       } else {
@@ -189,4 +192,5 @@ pub struct SubDaoV0 {
   pub onboarding_dc_fee: u64,
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub bump_seed: u8,
+  pub registrar: Pubkey, // vsr registrar
 }

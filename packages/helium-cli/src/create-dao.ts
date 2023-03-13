@@ -151,13 +151,14 @@ async function run() {
     },
     multisig: {
       type: "string",
-      describe: "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority"
+      describe:
+        "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority",
     },
     authorityIndex: {
       type: "number",
       describe: "Authority index for squads. Defaults to 1",
       default: 1,
-    }
+    },
   });
 
   const argv = await yarg.argv;
@@ -194,7 +195,10 @@ async function run() {
 
   const conn = provider.connection;
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, provider.wallet);
+  const squads = Squads.endpoint(
+    process.env.ANCHOR_PROVIDER_URL,
+    provider.wallet
+  );
   let authority = provider.wallet.publicKey;
   let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
   if (multisig) {
@@ -236,7 +240,7 @@ async function run() {
   const govProgramVersion = await getGovernanceProgramVersion(
     conn,
     govProgramId,
-    isLocalhost(provider) ? "localnet" : undefined,
+    isLocalhost(provider) ? "localnet" : undefined
   );
 
   const realmName = argv.realmName;
@@ -318,6 +322,17 @@ async function run() {
       .instruction()
   );
 
+  console.log("Creating max voter record");
+  instructions.push(
+    await heliumVsrProgram.methods
+      .updateMaxVoterWeightV0()
+      .accounts({
+        registrar,
+        realmGoverningTokenMint: hntKeypair.publicKey,
+      })
+      .instruction()
+  );
+
   if (!authority.equals(me)) {
     withSetRealmAuthority(
       instructions,
@@ -329,7 +344,6 @@ async function run() {
       SetRealmAuthorityAction.SetChecked
     );
   }
-  
 
   await sendInstructions(provider, instructions, []);
   instructions = [];

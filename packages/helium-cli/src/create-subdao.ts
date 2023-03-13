@@ -1,7 +1,8 @@
 import * as anchor from "@coral-xyz/anchor";
 import { thresholdPercent, ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
-  init as initHem, rewardableEntityConfigKey
+  init as initHem,
+  rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
 import {
   daoKey,
@@ -11,45 +12,40 @@ import {
 } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
-  lazyDistributorKey
+  lazyDistributorKey,
 } from "@helium/lazy-distributor-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";
 import {
-  init as initVsr, registrarKey
+  init as initVsr,
+  registrarKey,
 } from "@helium/voter-stake-registry-sdk";
 import {
-  getGovernanceProgramVersion, getTokenOwnerRecordAddress, GovernanceConfig,
-  GoverningTokenConfigAccountArgs, GoverningTokenType, MintMaxVoteWeightSource, SetRealmAuthorityAction, VoteThreshold,
-  VoteThresholdType,
-  VoteTipping, withCreateGovernance, withCreateRealm, withSetRealmAuthority
+  getGovernanceProgramVersion,
+  GoverningTokenConfigAccountArgs,
+  GoverningTokenType,
+  MintMaxVoteWeightSource,
+  SetRealmAuthorityAction,
+  withCreateRealm,
+  withSetRealmAuthority,
 } from "@solana/spl-governance";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
-  Cluster,
-  ComputeBudgetProgram, Keypair, PublicKey,
-  SystemProgram,
-  TransactionInstruction
+  ComputeBudgetProgram,
+  PublicKey,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
-import { OracleJob } from "@switchboard-xyz/common";
-import {
-  AggregatorHistoryBuffer,
-  QueueAccount,
-  SwitchboardProgram
-} from "@switchboard-xyz/solana.js";
-import { AggregatorAccount } from "@switchboard-xyz/switchboard-v2";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
   createAndMint,
+  createSwitchboardAggregator,
   exists,
-  getTimestampFromDays,
   getUnixTimestamp,
   isLocalhost,
   loadKeypair,
-  sendInstructionsOrCreateProposal,
-  sendInstructionsOrSquads
+  sendInstructionsOrSquads,
 } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
@@ -158,7 +154,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
   decimals: {
     type: "number",
-    default: 6
+    default: 6,
   },
   startEpochRewards: {
     type: "number",
@@ -177,13 +173,14 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
   multisig: {
     type: "string",
-    describe: "Address of the squads multisig for subdao authority. If not provided, your wallet will be the authority"
+    describe:
+      "Address of the squads multisig for subdao authority. If not provided, your wallet will be the authority",
   },
   authorityIndex: {
     type: "number",
     describe: "Authority index for squads. Defaults to 1",
     default: 1,
-  }
+  },
 });
 
 const SECS_PER_DAY = 86400;
@@ -234,7 +231,10 @@ async function run() {
   const calculateThread = threadKey(subdao, "calculate")[0];
   const issueThread = threadKey(subdao, "issue")[0];
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, provider.wallet);
+  const squads = Squads.endpoint(
+    process.env.ANCHOR_PROVIDER_URL,
+    provider.wallet
+  );
   let authority = provider.wallet.publicKey;
   const multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
   if (multisig) {
@@ -358,6 +358,17 @@ async function run() {
         ])
         .instruction()
     );
+
+    console.log("Creating max voter record");
+    instructions.push(
+      await heliumVsrProgram.methods
+        .updateMaxVoterWeightV0()
+        .accounts({
+          registrar,
+          realmGoverningTokenMint: subdaoKeypair.publicKey,
+        })
+        .instruction()
+    );
   }
 
   await sendInstructions(provider, instructions, []);
@@ -408,68 +419,22 @@ async function run() {
     ); // value cloned from mainnet to localnet
     if (!isLocalhost(provider)) {
       console.log("Initializing switchboard oracle");
-      const switchboard = await SwitchboardProgram.load(
-        argv.switchboardNetwork as Cluster,
-        provider.connection,
-        wallet
-      );
-      const queueAccount = new QueueAccount(
-        switchboard,
-        new PublicKey(argv.queue)
-      );
-      const agg = aggKeypair.publicKey;
-      if (!(await exists(conn, agg))) {
-        const [agg, _] = await queueAccount.createFeed({
-          keypair: aggKeypair,
-          batchSize: 3,
-          minRequiredOracleResults: 2,
-          minRequiredJobResults: 1,
-          minUpdateDelaySeconds: 60 * 60, // hourly
-          fundAmount: 0.2,
-          enable: true,
-          crankPubkey: new PublicKey(argv.crank),
-          jobs: [
-            {
-              data: OracleJob.encodeDelimited(
-                OracleJob.fromObject({
-                  tasks: [
-                    {
-                      httpTask: {
-                        url:
-                          argv.activeDeviceOracleUrl + "/" + name.toLowerCase(),
-                      },
-                    },
-                    {
-                      jsonParseTask: {
-                        path: "$.count",
-                      },
-                    },
-                  ],
-                })
-              ).finish(),
-            },
-          ],
-        });
-
-        await agg.setAuthority({
-          newAuthority: authority,
-          authority: aggKeypair,
-        });
-        console.log(
-          "Created active device aggregator",
-          agg.publicKey.toBase58()
-        );
-        await AggregatorHistoryBuffer.create(switchboard, {
-          aggregatorAccount: agg,
-          maxSamples: 24 * 31, // Give us a month of active device data. If we fail to run end epoch, RIP.
-        });
-        aggregatorKey = agg.publicKey;
-      }
+      aggregatorKey = await createSwitchboardAggregator({
+        crank: new PublicKey(argv.crank),
+        queue: new PublicKey(argv.queue),
+        wallet,
+        provider,
+        aggKeypair,
+        url: argv.activeDeviceOracleUrl,
+        switchboardNetwork: argv.switchboardNetwork,
+        authority,
+      });
     }
 
     console.log(`Initializing ${name} SubDAO`);
     const initSubdaoMethod = await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
+        registrar: registrar,
         dcBurnAuthority: new PublicKey(argv.dcBurnAuthority),
         authority,
         emissionSchedule: emissionSchedule(argv.startEpochRewards),

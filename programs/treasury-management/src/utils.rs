@@ -49,7 +49,9 @@ fn get_u128_pow_10(decimals: u8) -> u128 {
 pub fn precise_supply_amt(amt: u64, mint: &Mint) -> PreciseNumber {
   PreciseNumber {
     value: InnerUint::from(amt)
-      .checked_mul(InnerUint::from(get_u128_pow_10(12_u8 - mint.decimals)))
+      .checked_mul(InnerUint::from(get_u128_pow_10(
+        12_u8.checked_sub(mint.decimals).unwrap(),
+      )))
       .unwrap()
       .checked_mul(InnerUint::from(1_000_000u64)) // Add 6 precision
       .unwrap(),

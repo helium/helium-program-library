@@ -7,4 +7,7 @@ pub enum ErrorCode {
 
   #[msg("Error in arithmetic")]
   ArithmeticError,
+
+  #[msg("Invalid config")]
+  InvalidConfig,
 }

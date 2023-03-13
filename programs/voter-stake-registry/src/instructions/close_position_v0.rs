@@ -21,29 +21,9 @@ pub struct ClosePositionV0<'info> {
     constraint = position.num_active_votes == 0,
   )]
   pub position: Box<Account<'info, PositionV0>>,
-  #[account(
-    has_one = collection
-  )]
   pub registrar: Box<Account<'info, Registrar>>,
-  pub collection: Box<Account<'info, Mint>>,
-  /// CHECK: Handled by cpi
-  #[account(
-    mut,
-    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), collection.key().as_ref()],
-    seeds::program = token_metadata_program.key(),
-    bump,
-  )]
-  pub collection_metadata: UncheckedAccount<'info>,
   #[account(mut)]
   pub mint: Box<Account<'info, Mint>>,
-  #[account(
-    mut,
-    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), mint.key().as_ref()],
-    seeds::program = token_metadata_program.key(),
-    bump,
-  )]
-  /// CHECK: Checked by cpi
-  pub metadata: UncheckedAccount<'info>,
   #[account(
     mut,
     token::mint = mint,

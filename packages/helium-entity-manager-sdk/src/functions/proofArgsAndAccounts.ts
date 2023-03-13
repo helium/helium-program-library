@@ -22,7 +22,8 @@ export async function proofArgsAndAccounts({
   accounts: Record<string, PublicKey>;
   asset: Asset;
   args: {
-    hash: number[];
+    dataHash: number[];
+    creatorHash: number[];
     root: number[];
     index: number;
   };
@@ -49,7 +50,8 @@ export async function proofArgsAndAccounts({
   return {
     asset,
     args: {
-      hash: leaf.toBuffer().toJSON().data,
+      dataHash: asset.compression.dataHash!.toJSON().data,
+      creatorHash: asset.compression.creatorHash!.toJSON().data,
       root: root.toBuffer().toJSON().data,
       index: leafId!,
     },

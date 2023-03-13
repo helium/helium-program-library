@@ -62,7 +62,7 @@ Reward.init(
       type: BIGINT,
     },
     lastReward: {
-      type: DATE,
+      type: 'TIMESTAMP',
     },
   },
   { sequelize, modelName: "reward_index", tableName: "reward_index", underscored: true, timestamps: false }

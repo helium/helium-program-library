@@ -24,7 +24,7 @@ pub struct InitializeRewardableEntityConfigV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 60 + std::mem::size_of::<RewardableEntityConfigV0>(),
+    space = 8 + 60 + std::mem::size_of::<RewardableEntityConfigV0>(),
     seeds = ["rewardable_entity_config".as_bytes(), sub_dao.key().as_ref(), args.symbol.as_bytes()],
     bump,
   )]

@@ -33,7 +33,10 @@ pub mod lazy_distributor {
     initialize_compression_recipient_v0::handler(ctx, args)
   }
 
-  pub fn set_current_rewards_v0(ctx: Context<SetRewardsV0>, args: SetRewardsArgsV0) -> Result<()> {
+  pub fn set_current_rewards_v0(
+    ctx: Context<SetCurrentRewardsV0>,
+    args: SetCurrentRewardsArgsV0,
+  ) -> Result<()> {
     set_current_rewards_v0::handler(ctx, args)
   }
 

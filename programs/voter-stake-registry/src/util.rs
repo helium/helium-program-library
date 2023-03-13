@@ -22,6 +22,11 @@ pub fn resolve_vote_weight(
 
   let position_acc = PositionV0::try_deserialize(&mut position.data.borrow().as_ref())?;
   require_eq!(*position.owner, crate::ID, VsrError::InvalidProgramId);
+  require_eq!(
+    position_acc.mint,
+    token_account_acc.mint,
+    VsrError::InvalidMint
+  );
 
   require_eq!(
     token_account_acc.owner,
@@ -31,7 +36,7 @@ pub fn resolve_vote_weight(
   require_eq!(token_account_acc.amount, 1, VsrError::InvalidMintAmount);
 
   require!(
-    !unique_nft_mints.contains(&token_account.key()),
+    !unique_nft_mints.contains(&token_account_acc.mint),
     VsrError::DuplicatedNftDetected
   );
 

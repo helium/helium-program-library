@@ -20,7 +20,8 @@ use spl_account_compression::program::SplAccountCompression;
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateMobileInfoArgsV0 {
   pub location: Option<u64>,
-  pub hash: [u8; 32],
+  pub data_hash: [u8; 32],
+  pub creator_hash: [u8; 32],
   pub root: [u8; 32],
   pub index: u32,
 }
@@ -118,13 +119,14 @@ pub fn handler<'info>(
   args: UpdateMobileInfoArgsV0,
 ) -> Result<()> {
   verify_compressed_nft(VerifyCompressedNftArgs {
-    hash: args.hash,
+    data_hash: args.data_hash,
+    creator_hash: args.creator_hash,
     root: args.root,
     index: args.index,
     compression_program: ctx.accounts.compression_program.to_account_info(),
     merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
-    owner: ctx.accounts.hotspot_owner.owner.key(),
-    delegate: ctx.accounts.hotspot_owner.owner.key(),
+    owner: ctx.accounts.hotspot_owner.key(),
+    delegate: ctx.accounts.hotspot_owner.key(),
     proof_accounts: ctx.remaining_accounts.to_vec(),
   })?;
 

@@ -6,6 +6,8 @@ import { PublicKey } from '@solana/web3.js';
 import fastify from 'fastify';
 import { sequelize } from './model';
 import { findAccountKey, instructionParser } from './parser';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 // sync the model with the database
 sequelize.sync()
@@ -20,6 +22,12 @@ const server = fastify();
 let hemProgram: Program<HeliumEntityManager>;
 
 server.post('/', async (request, reply) => {
+  if (request.headers.authorization != process.env.HELIUS_AUTH ) {
+    reply.status(403).send({
+      message: 'Invalid authorization'
+    });
+    return;
+  }
   let tx = request.body[0].transaction;
   // testing code for localnet txs
   // let sig = request.body.sig;

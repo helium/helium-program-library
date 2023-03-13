@@ -1,7 +1,9 @@
 use crate::error::*;
+use crate::position_seeds;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::token;
 use anchor_spl::token::Mint;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
@@ -22,7 +24,8 @@ pub struct TransferV0<'info> {
     bump = source_position.bump_seed,
     constraint = source_position.num_active_votes == 0 @ VsrError::ActiveVotesExist,
     has_one = registrar,
-    has_one = mint
+    has_one = mint,
+    constraint = source_position.key() != target_position.key() @ VsrError::SamePosition,
   )]
   pub source_position: Box<Account<'info, PositionV0>>,
   pub mint: Box<Account<'info, Mint>>,
@@ -58,6 +61,18 @@ pub struct TransferV0<'info> {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TransferArgsV0 {
   pub amount: u64,
+}
+
+impl<'info> TransferV0<'info> {
+  pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
+    let program = self.token_program.to_account_info();
+    let accounts = token::Transfer {
+      from: self.source_vault.to_account_info(),
+      to: self.target_vault.to_account_info(),
+      authority: self.source_position.to_account_info(),
+    };
+    CpiContext::new(program, accounts)
+  }
 }
 
 /// Transfers locked tokens from the source position to the target position.
@@ -121,5 +136,14 @@ pub fn handler(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
     .amount_deposited_native
     .checked_add(amount)
     .unwrap();
+
+  token::transfer(
+    ctx
+      .accounts
+      .transfer_ctx()
+      .with_signer(&[position_seeds!(ctx.accounts.source_position)]),
+    amount,
+  )?;
+
   Ok(())
 }

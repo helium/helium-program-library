@@ -24,7 +24,7 @@ pub struct InitializeLazyDistributorV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 60 + std::mem::size_of::<LazyDistributorV0>() + std::mem::size_of_val(&*args.oracles),
+    space = 8 + 60 + std::mem::size_of::<LazyDistributorV0>() + std::mem::size_of_val(&*args.oracles),
     seeds = ["lazy_distributor".as_bytes(), rewards_mint.key().as_ref()],
     bump,
   )]

@@ -1,9 +1,9 @@
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
   Asset, createAtaAndMint, createMint, createNft, sendInstructions
 } from "@helium/spl-utils";
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { assert, expect } from "chai";
 import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
@@ -75,12 +75,14 @@ describe("lazy-distributor", () => {
     let asset: PublicKey;
     let merkle = Keypair.generate();
     let merkleTree: MerkleTree;
+    let creatorHash: Buffer;
+    let dataHash: Buffer;
 
     beforeEach(async () => {
       const { mintKey } = await createNft(provider, me);
       mint = mintKey;
 
-      ({ asset, merkleTree } = await createCompressionNft({
+      ({ asset, merkleTree, creatorHash, dataHash } = await createCompressionNft({
         provider,
         recipient: me,
         merkle,
@@ -145,8 +147,10 @@ describe("lazy-distributor", () => {
           return {
             compression: {
               leafId: 0,
-            }
-          } as Asset
+              dataHash,
+              creatorHash
+            },
+          } as Asset;
         },
         getAssetProofFn: async () => {
           return {
@@ -185,6 +189,8 @@ describe("lazy-distributor", () => {
             return {
               compression: {
                 leafId: 0,
+                dataHash,
+                creatorHash
               },
             } as Asset;
           },
@@ -235,7 +241,7 @@ describe("lazy-distributor", () => {
           .rpc({ skipPreflight: true });
 
         const proof = merkleTree.getProof(0);
-        const getAssetFn = async () => ({ ownership: { owner: me }, compression: { leafId: 0 } } as Asset);
+        const getAssetFn = async () => ({ ownership: { owner: me }, compression: { leafId: 0, creatorHash, dataHash } } as Asset);
         const getAssetProofFn = async () => {
           return {
             root: new PublicKey(proof.root),

@@ -50,6 +50,7 @@ export const instructionParser: Record<string, Parser>  = {
         location: args.location ? args.location.toString() : null,
         elevation: args.elevation,
         gain: args.gain,
+        isFullHotspot: true,
       });
     }
   },
@@ -60,6 +61,7 @@ export const instructionParser: Record<string, Parser>  = {
       await MobileMetadata.upsert({
         hotspotKey,
         location: args.location ? args.location.toString() : null,
+        isFullHotspot: true,
       });
     }
   },
@@ -78,6 +80,7 @@ export const instructionParser: Record<string, Parser>  = {
         location: args.location ? args.location.toString() : null,
         elevation: args.elevation,
         gain: args.gain,
+        isFullHotspot: args.isFullHotspot,
       });
 
       const idlIx = program.idl.instructions.find(
@@ -89,6 +92,7 @@ export const instructionParser: Record<string, Parser>  = {
         await MobileMetadata.upsert({
           hotspotKey,
           location: args.location ? args.location.toString() : null,
+          isFullHotspot: args.isFullHotspot,
         })
       }
     }

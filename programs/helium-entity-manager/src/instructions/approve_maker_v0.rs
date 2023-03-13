@@ -16,7 +16,7 @@ pub struct ApproveMakerV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 60 + std::mem::size_of::<MakerApprovalV0>(),
+    space = 8 + 60 + std::mem::size_of::<MakerApprovalV0>(),
     seeds = ["maker_approval".as_bytes(), rewardable_entity_config.key().as_ref(), maker.key().as_ref()],
     bump,
   )]
