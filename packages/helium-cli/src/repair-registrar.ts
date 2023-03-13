@@ -34,6 +34,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   isDnt: {
     type: "boolean",
     require: true,
+    describe: "If the mint is a dnt token(subDao) this is true",
   },
   executeTransaction: {
     type: "boolean",
