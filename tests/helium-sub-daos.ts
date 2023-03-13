@@ -472,7 +472,6 @@ describe("helium-sub-daos", () => {
           const supply = (await getMint(provider.connection, hntMint)).supply;
           const totalUtility =
             Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1 / 4) * 1;
-          console.log(Math.sqrt(currentActiveDeviceCount * 50), )
           expect(daoInfo.totalRewards.toString()).to.eq(
             EPOCH_REWARDS.toString()
           );
