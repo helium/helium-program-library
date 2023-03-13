@@ -27,6 +27,10 @@ const yarg = yargs(hideBin(process.argv)).options({
     default: "http://127.0.0.1:8899",
     describe: "The solana url",
   },
+  isDao: {
+    type: "boolean",
+    require: true,
+  },
   mint: {
     type: "string",
     describe: "Mint of the dao/subDao",
@@ -52,7 +56,7 @@ const run = async () => {
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
-  if (argv.mint) {
+  if (!argv.mint) {
     console.log("mint not provided");
     return;
   }
@@ -67,14 +71,17 @@ const run = async () => {
   const instructions = [];
 
   console.log("reseting registrar");
+  const isDao = argv.isDao;
   const mint = new PublicKey(argv.mint);
-  const isDao = mint.equals(HNT_MINT);
   const [dao, daoBump] = isDao ? daoKey(mint) : subDaoKey(mint);
   const daoAcc = await (isDao
     ? hsdProgram.account.daoV0.fetch(dao)
     : hsdProgram.account.subDaoV0.fetch(dao));
 
   const [collection, collectionBump] = registrarCollectionKey(daoAcc.registrar);
+
+  console.log("collection", collection.toBase58());
+  console.log("dao", dao.toBase58());
 
   instructions.push(
     await hvsrProgram.methods
