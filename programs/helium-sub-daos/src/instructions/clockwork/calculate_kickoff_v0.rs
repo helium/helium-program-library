@@ -82,7 +82,7 @@ fn construct_next_ix(ctx: &Context<CalculateKickoffV0>, epoch: u64) -> Option<In
 
 /// This instruction is responsible for deriving the calculate utility score ix
 pub fn handler(ctx: Context<CalculateKickoffV0>) -> Result<ThreadResponse> {
-  let curr_ts = Clock::get()?.unix_timestamp;
+  let curr_ts = Clock::get()?.unix_timestamp + 1; // Ensure we don't land exactly on utc midnight
   let epoch = current_epoch(curr_ts) - 1; // operate calculations on previous epoch
   let calculate_utility_ix = construct_next_ix(&ctx, epoch).unwrap();
   Ok(ThreadResponse {
