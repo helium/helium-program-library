@@ -27,13 +27,13 @@ const yarg = yargs(hideBin(process.argv)).options({
     default: "http://127.0.0.1:8899",
     describe: "The solana url",
   },
-  isDao: {
-    type: "boolean",
-    require: true,
-  },
   mint: {
     type: "string",
     describe: "Mint of the dao/subDao",
+  },
+  isDnt: {
+    type: "boolean",
+    require: true,
   },
   executeTransaction: {
     type: "boolean",
@@ -71,12 +71,12 @@ const run = async () => {
   const instructions = [];
 
   console.log("reseting registrar");
-  const isDao = argv.isDao;
+  const isDnt = argv.isDnt;
   const mint = new PublicKey(argv.mint);
-  const [dao, daoBump] = isDao ? daoKey(mint) : subDaoKey(mint);
-  const daoAcc = await (isDao
-    ? hsdProgram.account.daoV0.fetch(dao)
-    : hsdProgram.account.subDaoV0.fetch(dao));
+  const [dao, daoBump] = isDnt ? subDaoKey(mint) : daoKey(mint);
+  const daoAcc = await (isDnt
+    ? hsdProgram.account.subDaoV0.fetch(dao)
+    : hsdProgram.account.daoV0.fetch(dao));
 
   const [collection, collectionBump] = registrarCollectionKey(daoAcc.registrar);
 
