@@ -209,12 +209,10 @@ describe("data-credits", () => {
 
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
       const dcAtaAcc = await getAccount(provider.connection, dcAta);
-
+      const hntAta = await getAssociatedTokenAddress(hntMint, me);
       assert(dcAtaAcc.isFrozen);
       const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
-      const hntBal = await provider.connection.getTokenAccountBalance(
-        await getAssociatedTokenAddress(hntMint, me)
-      );
+      const hntBal = await provider.connection.getTokenAccountBalance(hntAta);
       const pythData = (await provider.connection.getAccountInfo(
         new PublicKey("JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB")
       ))!.data;
@@ -229,10 +227,11 @@ describe("data-credits", () => {
     });
 
     it("mints some data credits with dc amount", async () => {
+      let dcAmount = 1428 * 10**5
       await program.methods
         .mintDataCreditsV0({
           hntAmount: null,
-          dcAmount: new BN(10**5),
+          dcAmount: new BN(dcAmount),
         })
         .accounts({ dcMint })
         .rpc({ skipPreflight: true });
@@ -249,10 +248,9 @@ describe("data-credits", () => {
         new PublicKey("JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB")
       ))!.data;
       const price = parsePriceData(pythData);
-      const approxEndBal =
-        startHntBal - Math.floor(10 ** 5 / price.emaPrice.value) * 10**-8;
-      expect(hntBal.value.uiAmount).to.eq(approxEndBal);
-      expect(dcBal.value.uiAmount).to.eq(startDcBal + 10**5);
+      const approxEndBal = startHntBal - (Math.floor(dcAmount * 10**11) / Number(price.emaPrice.valueComponent)) * 10**-hntDecimals;
+      expect(hntBal.value.uiAmount).to.be.within(approxEndBal * 0.999, approxEndBal * 1.001);
+      expect(dcBal.value.uiAmount).to.eq(startDcBal + dcAmount);
     });
 
     it("burns some data credits", async () => {

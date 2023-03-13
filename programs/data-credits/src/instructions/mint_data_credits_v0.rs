@@ -140,11 +140,15 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
     .get_ema_price_no_older_than(current_time, if TESTING { 6000000 } else { 10 * 60 })
     .ok_or_else(|| error!(DataCreditsErrors::PythPriceNotFound))?;
 
-  // price * hnt_amount / 10^(8 + expo - 5)
-  let price_expo = -hnt_price.expo;
-  let right_shift = 8 + price_expo - 5;
-  let normalize = 10_u64
-    .checked_pow(u32::try_from(right_shift).unwrap())
+  // dc_exponent = 5 since $1 = 10^5 DC
+  // expo is a negative number, i.e. normally -8 for 8 hnt decimals
+  // dc = (price * 10^expo) * (hnt_amount * 10^-hnt_decimals) * 10^dc_exponent
+  // dc = price * hnt_amount * 10^(expo - hnt_decimals + dc_exponent)
+  // dc = price * hnt_amount / 10^(hnt_decimals - expo - dc_exponent)
+  // hnt_amount = dc * 10^(hnt_decimals - expo - dc_exponent) / price
+  let exponent = i32::try_from(ctx.accounts.hnt_mint.decimals).unwrap() - hnt_price.expo - 5;
+  let decimals_factor = 10_u128
+    .checked_pow(u32::try_from(exponent).unwrap())
     .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?;
 
   let (hnt_amount, dc_amount) = match (args.hnt_amount, args.dc_amount) {
@@ -153,7 +157,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
         u128::from(hnt_amount)
           .checked_mul(u128::try_from(hnt_price.price).unwrap())
           .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
-          .div(u128::from(normalize)),
+          .div(decimals_factor),
       )
       .map_err(|_| error!(DataCreditsErrors::ArithmeticError))?;
 
@@ -162,7 +166,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
     (None, Some(dc_amount)) => {
       let hnt_amount = u64::try_from(
         u128::from(dc_amount)
-          .checked_mul(10_u128.pow(price_expo.try_into().unwrap()))
+          .checked_mul(decimals_factor)
           .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
           .checked_div(u128::try_from(hnt_price.price).unwrap())
           .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?,
@@ -190,7 +194,6 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
   );
 
   // mint the new tokens to recipient
-  // TODO needs to mint at an oracle provided rate to hnt
   mint_v0(
     ctx.accounts.mint_ctx().with_signer(signer_seeds),
     MintArgsV0 { amount: dc_amount },
