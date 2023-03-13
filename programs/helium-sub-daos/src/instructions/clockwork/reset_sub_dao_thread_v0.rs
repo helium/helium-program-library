@@ -61,7 +61,7 @@ pub fn handler(ctx: Context<ResetSubDaoThreadV0>) -> Result<()> {
   );
   let curr_ts = Clock::get()?.unix_timestamp;
 
-  let cron = create_end_epoch_cron(curr_ts, 60 * 5);
+  let cron = create_end_epoch_cron(curr_ts, 5);
 
   let signer_seeds: &[&[&[u8]]] = &[&[
     "sub_dao".as_bytes(),
@@ -88,7 +88,7 @@ pub fn handler(ctx: Context<ResetSubDaoThreadV0>) -> Result<()> {
       vec![calculate_ix.into()],
       Trigger::Cron {
         schedule: cron,
-        skippable: false,
+        skippable: true,
       },
     )?;
   } else {
@@ -117,7 +117,7 @@ pub fn handler(ctx: Context<ResetSubDaoThreadV0>) -> Result<()> {
         rate_limit: None,
         trigger: Some(Trigger::Cron {
           schedule: cron,
-          skippable: false,
+          skippable: true,
         }),
       },
     )?;

@@ -51,11 +51,13 @@ async function start() {
       location: hotspot[1].location,
       elevation: hotspot[1].altitude,
       gain: hotspot[1].gain,
+      isFullHotspot: !hotspot[1].dataonly
     })
     if (makerId == bobcat5G || makerId == freedomFi) {
       mobiles.push({
         hotspotKey: hotspot[0],
-        location: hotspot[1].location
+        location: hotspot[1].location,
+        isFullHotspot: !hotspot[1].dataonly
       })
     }
   }
