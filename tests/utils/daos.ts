@@ -3,13 +3,18 @@ import { BN } from "@coral-xyz/anchor";
 import { Keypair, ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { createAtaAndMint, createMint, toBN } from "@helium/spl-utils";
-import { getAssociatedTokenAddress, createAssociatedTokenAccountIdempotentInstruction } from "@solana/spl-token";
+import {
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountIdempotentInstruction,
+} from "@solana/spl-token";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { toU128 } from "../../packages/treasury-management-sdk/src";
 import { DC_FEE } from "./fixtures";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 
-const CLOCKWORK_PID = new PublicKey("CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh");
+const CLOCKWORK_PID = new PublicKey(
+  "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
+);
 
 export async function initTestDao(
   program: anchor.Program<HeliumSubDaos>,
@@ -50,12 +55,14 @@ export async function initTestDao(
         },
       ],
     })
-    .preInstructions([createAssociatedTokenAccountIdempotentInstruction(
-      me,
-      await getAssociatedTokenAddress(mint, me),
-      me,
-      mint
-    )])
+    .preInstructions([
+      createAssociatedTokenAccountIdempotentInstruction(
+        me,
+        await getAssociatedTokenAddress(mint, me),
+        me,
+        mint
+      ),
+    ])
     .accounts({
       hntMint: mint,
       dcMint,
@@ -75,7 +82,8 @@ export async function initTestSubdao(
   provider: anchor.AnchorProvider,
   authority: PublicKey,
   dao: PublicKey,
-  epochRewards?: number
+  epochRewards?: number,
+  registrar?: PublicKey
 ): Promise<{
   mint: PublicKey;
   subDao: PublicKey;
@@ -86,11 +94,17 @@ export async function initTestSubdao(
 }> {
   const daoAcc = await program.account.daoV0.fetch(dao);
   const dntMint = await createMint(provider, 8, authority, authority);
-  const rewardsEscrow = await createAtaAndMint(provider, dntMint, 0, provider.wallet.publicKey);
+  const rewardsEscrow = await createAtaAndMint(
+    provider,
+    dntMint,
+    0,
+    provider.wallet.publicKey
+  );
   const subDao = subDaoKey(dntMint)[0];
 
   const method = program.methods
     .initializeSubDaoV0({
+      registrar: registrar || Keypair.generate().publicKey,
       onboardingDcFee: toBN(DC_FEE, 0),
       authority: authority,
       emissionSchedule: [
@@ -123,7 +137,8 @@ export async function initTestSubdao(
         "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
       ), // Copied from mainnet to localnet
     });
-  const { treasury, treasuryCircuitBreaker, delegatorPool } = await method.pubkeys();
+  const { treasury, treasuryCircuitBreaker, delegatorPool } =
+    await method.pubkeys();
   await method.rpc();
   return {
     treasuryCircuitBreaker: treasuryCircuitBreaker!,

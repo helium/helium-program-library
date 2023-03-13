@@ -54,6 +54,7 @@ pub struct InitializeSubDaoArgsV0 {
   pub onboarding_dc_fee: u64,
   /// Authority to burn delegated data credits
   pub dc_burn_authority: Pubkey,
+  pub registrar: Pubkey,
 }
 
 #[derive(Accounts)]
@@ -287,6 +288,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     rewards_escrow: ctx.accounts.rewards_escrow.key(),
     authority: args.authority,
     emission_schedule: args.emission_schedule,
+    registrar: args.registrar,
     bump_seed: ctx.bumps["sub_dao"],
     vehnt_delegated: 0,
     vehnt_last_calculated_ts: Clock::get()?.unix_timestamp,
@@ -308,7 +310,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     ctx.accounts.token_program.key(),
     ctx.accounts.circuit_breaker_program.key(),
   );
-  let cron = create_end_epoch_cron(curr_ts, 60 * 5);
+  let cron = create_end_epoch_cron(curr_ts, 5);
   // initialize calculate thread
   thread_create(
     CpiContext::new_with_signer(
@@ -326,7 +328,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     vec![calculate_kickoff_ix.into()],
     Trigger::Cron {
       schedule: cron,
-      skippable: false,
+      skippable: true,
     },
   )?;
 

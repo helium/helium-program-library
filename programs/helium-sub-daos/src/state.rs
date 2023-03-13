@@ -192,4 +192,5 @@ pub struct SubDaoV0 {
   pub onboarding_dc_fee: u64,
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub bump_seed: u8,
+  pub registrar: Pubkey, // vsr registrar
 }

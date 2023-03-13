@@ -51,7 +51,6 @@ async function run() {
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
-  const councilKey = new PublicKey(argv.councilKey);
   const circuitBreakerKey = new PublicKey(argv.circuitBreaker)
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const circuitBreakerProgram = await init(provider);

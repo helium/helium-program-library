@@ -1,16 +1,28 @@
 import * as anchor from "@coral-xyz/anchor";
-import { accountWindowedBreakerKey, init as initCb, mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
-import { init as initHem, rewardableEntityConfigKey } from "@helium/helium-entity-manager-sdk";
-import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import {
-  Cluster,
-  PublicKey
-} from "@solana/web3.js";
+  accountWindowedBreakerKey,
+  init as initCb,
+  mintWindowedBreakerKey,
+} from "@helium/circuit-breaker-sdk";
+import {
+  init as initHem,
+  rewardableEntityConfigKey,
+} from "@helium/helium-entity-manager-sdk";
+import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { Cluster, PublicKey } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
-import { AggregatorAccount, SwitchboardProgram } from "@switchboard-xyz/solana.js";
+import {
+  AggregatorAccount,
+  SwitchboardProgram,
+} from "@switchboard-xyz/solana.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { isLocalhost, loadKeypair, parseEmissionsSchedule, sendInstructionsOrSquads } from "./utils";
+import {
+  isLocalhost,
+  loadKeypair,
+  parseEmissionsSchedule,
+  sendInstructionsOrSquads,
+} from "./utils";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -75,8 +87,13 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "The switchboard network",
     default: "devnet",
   },
+  registrar: {
+    type: "string",
+    required: false,
+    describe: "VSR Registrar of subdao",
+    default: null,
+  },
 });
-
 
 async function run() {
   const argv = await yarg.argv;
@@ -193,6 +210,7 @@ async function run() {
         activeDeviceAggregator: argv.newActiveDeviceAggregator
           ? new PublicKey(argv.newActiveDeviceAggregator)
           : null,
+        registrar: argv.registrar ? new PublicKey(argv.registrar) : null,
       })
       .accounts({
         subDao,

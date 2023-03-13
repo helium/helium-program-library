@@ -9,6 +9,7 @@ pub struct UpdateSubDaoArgsV0 {
   pub onboarding_dc_fee: Option<u64>,
   pub dc_burn_authority: Option<Pubkey>,
   pub active_device_aggregator: Option<Pubkey>,
+  pub registrar: Option<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -46,13 +47,17 @@ pub fn handler(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result
 
   if let Some(emission_schedule) = args.emission_schedule {
     ctx.accounts.sub_dao.emission_schedule = emission_schedule;
-
-    resize_to_fit(
-      &ctx.accounts.payer.to_account_info(),
-      &ctx.accounts.system_program.to_account_info(),
-      &ctx.accounts.sub_dao,
-    )?;
   }
+
+  if let Some(registrar) = args.registrar {
+    ctx.accounts.sub_dao.registrar = registrar;
+  }
+
+  resize_to_fit(
+    &ctx.accounts.payer.to_account_info(),
+    &ctx.accounts.system_program.to_account_info(),
+    &ctx.accounts.sub_dao,
+  )?;
 
   Ok(())
 }

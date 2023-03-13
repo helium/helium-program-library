@@ -1,6 +1,7 @@
 import {Sequelize, STRING, INTEGER, Model, INET} from 'sequelize';
 import AWS from "aws-sdk";
 import * as pg from "pg";
+import { BOOLEAN } from 'sequelize';
 
 const host = process.env.PGHOST || "localhost";
 const port = Number(process.env.PGPORT) || 5432;
@@ -18,6 +19,12 @@ export const sequelize = new Sequelize({
     acquire: 30000,
     idle: 10000
   },
+  dialectOptions: {
+          ssl: {
+            require: false,
+            rejectUnauthorized: false,
+          },
+        },
   hooks: {
     beforeConnect: async (config: any) => {
       const isRds = host.includes("rds.amazonaws.com");
@@ -78,6 +85,9 @@ IotMetadata.init({
   },
   gain: {
     type: INTEGER,
+  },
+  isFullHotspot: {
+    type: BOOLEAN,
   }
 }, { sequelize, underscored: true, modelName: 'iot_metadata'});
 
@@ -89,5 +99,8 @@ MobileMetadata.init({
   },
   location: {
     type: STRING,
+  },
+  isFullHotspot: {
+    type: BOOLEAN,
   }
 }, { sequelize, underscored: true, modelName: "mobile_metadata"})
