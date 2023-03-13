@@ -484,14 +484,14 @@ async function run() {
         iotConfig: {
           minGain: 10,
           maxGain: 150,
-          fullLocationStakingFee: toBN(1000000, 0),
+          fullLocationStakingFee: toBN(500000, 0),
           dataonlyLocationStakingFee: toBN(500000, 0),
         } as any,
       };
     } else {
       settings = {
         mobileConfig: {
-          fullLocationStakingFee: toBN(1000000, 0),
+          fullLocationStakingFee: toBN(500000, 0),
           dataonlyLocationStakingFee: toBN(500000, 0),
         },
       };
