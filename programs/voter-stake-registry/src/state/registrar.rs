@@ -19,8 +19,10 @@ pub struct Registrar {
   pub collection: Pubkey, // The metaplex collection to be issued for positions
   pub bump_seed: u8,
   pub collection_bump_seed: u8,
-  /// Reserved space for future versions
-  pub reserved: [u8; 8],
+
+  // Empty bytes for future upgrades.
+  pub reserved1: [u8; 4],
+  pub reserved2: [u64; 7], // split because `Default` does not support [u8; 60]
   pub voting_mints: Vec<VotingMintConfigV0>,
 }
 

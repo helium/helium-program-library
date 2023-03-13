@@ -188,7 +188,8 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
     governance_program_id: ctx.accounts.governance_program_id.key(),
     bump_seed: ctx.bumps["registrar"],
     collection_bump_seed: ctx.bumps["collection"],
-    reserved: [0; 8],
+    reserved1: [0; 4],
+    reserved2: [0; 7],
     voting_mints: Vec::new(),
   });
 

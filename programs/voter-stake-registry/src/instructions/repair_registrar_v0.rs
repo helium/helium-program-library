@@ -24,7 +24,8 @@ pub fn handler(ctx: Context<RepairRegistrarV0>, args: RepairRegistrarArgsV0) -> 
   ctx.accounts.registrar.collection = args.collection;
   ctx.accounts.registrar.bump_seed = args.bump_seed;
   ctx.accounts.registrar.collection_bump_seed = args.collection_bump_seed;
-  ctx.accounts.registrar.reserved = [0; 8];
+  ctx.accounts.registrar.reserved1 = [0; 4];
+  ctx.accounts.registrar.reserved2 = [0; 7];
   ctx.accounts.registrar.voting_mints = Vec::new();
 
   resize_to_fit(
