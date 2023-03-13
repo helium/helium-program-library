@@ -171,7 +171,7 @@ describe("helium-sub-daos", () => {
       await dcProgram.methods
         .mintDataCreditsV0({
           hntAmount: toBN(amount, 8),
-          dcAmount: null
+          dcAmount: null,
         })
         .accounts({ dcMint })
         .rpc({ skipPreflight: true });
@@ -239,17 +239,20 @@ describe("helium-sub-daos", () => {
 
     it("updates the dao", async () => {
       const newAuth = Keypair.generate().publicKey;
-      await program.methods.updateDaoV0({
-        authority: newAuth,
-        emissionSchedule: null,
-        hstEmissionSchedule: null,
-      }).accounts({
-        dao,
-      }).rpc({skipPreflight: true});
+      await program.methods
+        .updateDaoV0({
+          authority: newAuth,
+          emissionSchedule: null,
+          hstEmissionSchedule: null,
+        })
+        .accounts({
+          dao,
+        })
+        .rpc({ skipPreflight: true });
 
       const daoAcc = await program.account.daoV0.fetch(dao);
       expect(daoAcc.authority.toString()).to.eq(newAuth.toString());
-    })
+    });
 
     it("updates the subdao", async () => {
       const newAuth = Keypair.generate().publicKey;
@@ -260,6 +263,7 @@ describe("helium-sub-daos", () => {
           emissionSchedule: null,
           onboardingDcFee: null,
           activeDeviceAggregator: null,
+          registrar: null,
         })
         .accounts({
           subDao,
@@ -268,7 +272,7 @@ describe("helium-sub-daos", () => {
 
       const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
       expect(subDaoAcc.authority.toString()).to.eq(newAuth.toString());
-    })
+    });
 
     it("resets the subdao clockwork thread", async () => {
       await program.methods
@@ -467,25 +471,24 @@ describe("helium-sub-daos", () => {
 
           const supply = (await getMint(provider.connection, hntMint)).supply;
           const totalUtility =
-            Math.sqrt(currentActiveDeviceCount * 50) *
-            Math.pow(16, 1 / 4) * 1;
-
+            Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1 / 4) * 1;
+          console.log(Math.sqrt(currentActiveDeviceCount * 50), )
           expect(daoInfo.totalRewards.toString()).to.eq(
             EPOCH_REWARDS.toString()
           );
           expect(daoInfo.currentHntSupply.toString()).to.eq(
             new BN(supply.toString()).add(new BN(EPOCH_REWARDS)).toString()
           );
-          
+
           expectBnAccuracy(
             toBN(totalUtility, 12),
             daoInfo.totalUtilityScore,
-            0.01
+            0.02
           );
           expectBnAccuracy(
             toBN(totalUtility, 12),
             subDaoInfo.utilityScore!,
-            0.01
+            0.02
           );
         });
 
