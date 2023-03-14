@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "treasury_management"
 
 [features]
+devnet = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []

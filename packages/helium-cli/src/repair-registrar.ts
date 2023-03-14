@@ -1,14 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
-import { HNT_MINT } from "@helium/spl-utils";
+import {
+  daoKey, init as initHsd, subDaoKey
+} from "@helium/helium-sub-daos-sdk";
 import {
   init as initHvsr,
   registrarCollectionKey,
+  registrarKey
 } from "@helium/voter-stake-registry-sdk";
-import {
-  init as initHsd,
-  daoKey,
-  subDaoKey,
-} from "@helium/helium-sub-daos-sdk";
 import { PublicKey } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
@@ -49,6 +47,14 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Authority index for squads. Defaults to 1",
     default: 1,
   },
+  realm: {
+    type: "string",
+    require: true
+  },
+  realmAuthority: {
+    type: "string",
+    require: true
+  }
 });
 
 const run = async () => {
@@ -75,6 +81,8 @@ const run = async () => {
   const isDnt = argv.isDnt;
   const mint = new PublicKey(argv.mint);
   const [dao, daoBump] = isDnt ? subDaoKey(mint) : daoKey(mint);
+  const realm = new PublicKey(argv.realm);
+  const [reg, regBump] = registrarKey(realm, mint);
   const daoAcc = await (isDnt
     ? hsdProgram.account.subDaoV0.fetch(dao)
     : hsdProgram.account.daoV0.fetch(dao));
@@ -83,12 +91,21 @@ const run = async () => {
 
   console.log("collection", collection.toBase58());
   console.log("dao", dao.toBase58());
+  console.log("registrar", daoAcc.registrar.toBase58());
 
   instructions.push(
     await hvsrProgram.methods
       .repairRegistrarV0({
-        bumpSeed: daoBump,
+        governanceProgramId: new PublicKey(
+          "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S"
+        ),
+        realm,
+        realmGoverningTokenMint: mint,
+        realmAuthority: new PublicKey(argv.realmAuthority),
+        timeOffset: new anchor.BN(0),
+        positionUpdateAuthority: argv.isDnt ? null : dao,
         collection,
+        bumpSeed: regBump,
         collectionBumpSeed: collectionBump,
       })
       .accounts({
