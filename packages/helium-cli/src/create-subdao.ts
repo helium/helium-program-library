@@ -181,6 +181,12 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Authority index for squads. Defaults to 1",
     default: 1,
   },
+  delegatorRewardsPercent: {
+    type: "number",
+    required: false,
+    describe: "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 2 decimal places.",
+    default: 6,
+  }
 });
 
 const SECS_PER_DAY = 86400;
@@ -451,6 +457,7 @@ async function run() {
           threshold: thresholdPercent(20),
         },
         onboardingDcFee: toBN(4000000, 0), // $40 in dc
+        delegatorRewardsPercent: Math.floor(argv.delegatorRewardsPercent*100),
       })
       .accounts({
         dao,

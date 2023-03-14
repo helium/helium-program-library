@@ -124,6 +124,7 @@ export async function initTestSubdao(
         threshold: new anchor.BN("10000000000000000000"),
       },
       dcBurnAuthority: authority,
+      delegatorRewardsPercent: 600,
     })
     .preInstructions([
       ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),

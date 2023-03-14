@@ -55,6 +55,7 @@ pub struct InitializeSubDaoArgsV0 {
   /// Authority to burn delegated data credits
   pub dc_burn_authority: Pubkey,
   pub registrar: Pubkey,
+  pub delegator_rewards_percent: u16,
 }
 
 #[derive(Accounts)]
@@ -277,6 +278,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     Some(ctx.accounts.sub_dao.key()),
   )?;
 
+  assert!(args.delegator_rewards_percent < 10000);
   ctx.accounts.dao.num_sub_daos += 1;
   ctx.accounts.sub_dao.set_inner(SubDaoV0 {
     active_device_aggregator: ctx.accounts.active_device_aggregator.key(),
@@ -294,6 +296,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     vehnt_last_calculated_ts: Clock::get()?.unix_timestamp,
     vehnt_fall_rate: 0,
     delegator_pool: ctx.accounts.delegator_pool.key(),
+    delegator_rewards_percent: args.delegator_rewards_percent,
   });
 
   resize_to_fit(

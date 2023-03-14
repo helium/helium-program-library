@@ -10,6 +10,7 @@ pub struct UpdateSubDaoArgsV0 {
   pub dc_burn_authority: Option<Pubkey>,
   pub active_device_aggregator: Option<Pubkey>,
   pub registrar: Option<Pubkey>,
+  pub delegator_rewards_percent: Option<u16>,
 }
 
 #[derive(Accounts)]
@@ -51,6 +52,11 @@ pub fn handler(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result
 
   if let Some(registrar) = args.registrar {
     ctx.accounts.sub_dao.registrar = registrar;
+  }
+
+  if let Some(delegator_rewards_percent) = args.delegator_rewards_percent {
+    assert!(delegator_rewards_percent < 10000);
+    ctx.accounts.sub_dao.delegator_rewards_percent = delegator_rewards_percent;
   }
 
   resize_to_fit(
