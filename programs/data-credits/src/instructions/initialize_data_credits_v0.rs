@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::circuit_breaker::*;
 use crate::errors::*;
 use crate::state::*;
@@ -35,6 +37,7 @@ pub struct InitializeDataCreditsV0<'info> {
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
   /// CHECK: Checked via load call in handler
+  #[account(owner = Pubkey::from_str(PYTH_PROGRAM_ID).unwrap())]
   pub hnt_price_oracle: AccountInfo<'info>,
 
   pub hnt_mint: Box<Account<'info, Mint>>,

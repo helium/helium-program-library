@@ -177,7 +177,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
         u128::from(dc_amount)
           .checked_mul(decimals_factor)
           .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
-          .checked_div(u128::try_from(hnt_price.price).unwrap())
+          .checked_div(u128::try_from(hnt_price_with_conf).unwrap())
           .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?,
       )
       .map_err(|_| error!(DataCreditsErrors::ArithmeticError))?;
