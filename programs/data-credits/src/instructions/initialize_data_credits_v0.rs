@@ -11,6 +11,12 @@ use circuit_breaker::{
 };
 use pyth_sdk_solana::load_price_feed_from_account_info;
 
+#[cfg(feature = "devnet")]
+const PYTH_PROGRAM_ID: &str = "gSbePebfvPy7tRqimPoVecS2UsBvYv46ynrzWocc92s";
+
+#[cfg(not(feature = "devnet"))]
+const PYTH_PROGRAM_ID: &str = "FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH";
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDataCreditsArgsV0 {
   pub authority: Pubkey,
