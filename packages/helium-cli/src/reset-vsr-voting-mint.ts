@@ -108,6 +108,7 @@ async function run() {
         })
         .accounts({
           registrar: daoAcc.registrar,
+          realmAuthority: daoAcc.authority,
           mint: hntMint,
         })
         .remainingAccounts([
@@ -141,6 +142,7 @@ async function run() {
         .accounts({
           registrar: subdaoAcc.registrar,
           mint: dntMint,
+          realmAuthority: subdaoAcc.authority,
         })
         .remainingAccounts([
           {
