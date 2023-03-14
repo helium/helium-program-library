@@ -11,6 +11,7 @@ crate-type = ["cdylib", "lib"]
 name = "voter_stake_registry"
 
 [features]
+devnet = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
