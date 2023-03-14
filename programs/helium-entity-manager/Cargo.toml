@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "helium_entity_manager"
 
 [features]
+devnet = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
