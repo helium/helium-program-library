@@ -9,7 +9,7 @@ use itertools::Itertools;
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateVoterWeightRecordArgsV0 {
   voter_weight_action: VoterWeightAction,
-  owner: Pubkey
+  owner: Pubkey,
 }
 
 impl Default for VoterWeightAction {
@@ -69,24 +69,24 @@ pub fn handler(
     | VoterWeightAction::SignOffProposal => {}
   }
 
-  let registrar = &ctx.accounts.registrar;  
+  let registrar = &ctx.accounts.registrar;
   let voter_weight_record = &mut ctx.accounts.voter_weight_record;
 
   voter_weight_record.governing_token_owner = args.owner.key();
   voter_weight_record.realm = registrar.realm;
-  voter_weight_record.governing_token_mint = registrar.realm_governing_token_mint;  
+  voter_weight_record.governing_token_mint = registrar.realm_governing_token_mint;
 
   let mut voter_weight = 0u64;
 
   // Ensure all nfts are unique
-  let mut unique_nft_mints = vec![];  
+  let mut unique_nft_mints = vec![];
 
   let governing_token_owner = resolve_governing_token_owner(
     registrar,
     &ctx.accounts.voter_token_owner_record,
     &ctx.accounts.voter_authority,
     voter_weight_record,
-  )?;  
+  )?;
 
   require_eq!(governing_token_owner, args.owner, VsrError::InvalidOwner);
 
