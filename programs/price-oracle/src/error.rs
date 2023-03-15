@@ -10,4 +10,7 @@ pub enum ErrorCode {
 
   #[msg("Unable to update price")]
   InvalidPriceUpdate,
+
+  #[msg("Invalid argument")]
+  InvalidArgs,
 }

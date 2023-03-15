@@ -1,3 +1,4 @@
+use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
 
@@ -25,6 +26,21 @@ pub fn handler(
   ctx: Context<InitializePriceOracleV0>,
   args: InitializePriceOracleArgsV0,
 ) -> Result<()> {
+  for i in 0..args.oracles.len() {
+    require!(
+      args
+        .oracles
+        .get(i)
+        .unwrap()
+        .last_submitted_timestamp
+        .is_none(),
+      ErrorCode::InvalidArgs
+    );
+    require!(
+      args.oracles.get(i).unwrap().last_submitted_price.is_none(),
+      ErrorCode::InvalidArgs
+    );
+  }
   ctx.accounts.price_oracle.set_inner(PriceOracleV0 {
     num_oracles: args.oracles.len().try_into().unwrap(),
     oracles: args.oracles,
