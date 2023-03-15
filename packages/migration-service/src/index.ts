@@ -1,3 +1,4 @@
+import { Program } from "@coral-xyz/anchor";
 import cors from "@fastify/cors";
 import Address from "@helium/address";
 import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
@@ -9,8 +10,6 @@ import {
   lazyTransactionsKey
 } from "@helium/lazy-transactions-sdk";
 import { chunks } from "@helium/spl-utils";
-import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, transferInstructionData } from "@solana/spl-token";
-import { Program } from "@coral-xyz/anchor";
 import {
   ComputeBudgetProgram,
   PublicKey,
@@ -18,12 +17,13 @@ import {
   TransactionMessage,
   VersionedTransaction
 } from "@solana/web3.js";
+import AWS from "aws-sdk";
 import Fastify, { FastifyInstance } from "fastify";
 import { Pool } from "pg";
 import { LAZY_TRANSACTIONS_NAME } from "./env";
+import { getMigrateTransactions } from "./ledger";
 import { provider, wallet } from "./solana";
 import { decompress } from "./utils";
-import AWS from "aws-sdk";
 
 const host = process.env.PGHOST || "localhost";
 const isRds = host.includes("rds.amazonaws.com");
@@ -244,10 +244,19 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
   }
 }
 
+const ATTESTATION = "I attest that both the source and destination wallets are owned and controlled by the same individual or entity, and that I have legal authority to perform this transaction on behalf of that individual or entity."
 server.post<{
   Body: { from: string; to: string; attestation: string };
 }>("/ledger/migrate", async (request, reply) => {
+  const from = new PublicKey(request.body.from);
+  const to = new PublicKey(request.body.from);
+  if (request.body.attestation !== ATTESTATION) {
+    return reply.code(400).send({ error: "Invalid attestation" });
+  }
 
+  return (await getMigrateTransactions(from, to)).map(tx => 
+    Buffer.from(tx.serialize({ requireAllSignatures: false })).toJSON().data
+  )
 })
 
 server.get<{
