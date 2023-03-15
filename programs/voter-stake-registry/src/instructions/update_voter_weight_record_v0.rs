@@ -41,7 +41,7 @@ pub struct UpdateVoterWeightRecordV0<'info> {
   /// CHECK: Owned by spl-governance instance specified in registrar.governance_program_id
   pub voter_token_owner_record: UncheckedAccount<'info>,
 
-  /// Authority of the voter who casts the vote
+  /// Authority of the voter
   /// It can be either governing_token_owner or its delegate and must sign this instruction
   pub voter_authority: Signer<'info>,
 
@@ -72,7 +72,7 @@ pub fn handler(
   let registrar = &ctx.accounts.registrar;
   let voter_weight_record = &mut ctx.accounts.voter_weight_record;
 
-  voter_weight_record.governing_token_owner = args.owner.key();
+  voter_weight_record.governing_token_owner = args.owner;
   voter_weight_record.realm = registrar.realm;
   voter_weight_record.governing_token_mint = registrar.realm_governing_token_mint;
 
@@ -93,7 +93,7 @@ pub fn handler(
   for (token_account, position) in ctx.remaining_accounts.iter().tuples() {
     let nft_vote_weight = resolve_vote_weight(
       registrar,
-      &governing_token_owner,
+      &args.owner,
       token_account,
       position,
       &mut unique_nft_mints,
