@@ -193,5 +193,5 @@ pub struct SubDaoV0 {
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub bump_seed: u8,
   pub registrar: Pubkey,              // vsr registrar
-  pub delegator_rewards_percent: u16, // number between 0-10,000. The % of DNT rewards delegators receive with 2 decimal places of accuracy
+  pub delegator_rewards_percent: u64, // number between 0-10,000. The % of DNT rewards delegators receive with 2 decimal places of accuracy
 }

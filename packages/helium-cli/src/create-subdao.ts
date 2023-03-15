@@ -36,6 +36,7 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
+import { BN } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
@@ -183,9 +184,8 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
   delegatorRewardsPercent: {
     type: "number",
-    required: false,
+    required: true,
     describe: "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 2 decimal places.",
-    default: 6,
   }
 });
 
@@ -457,7 +457,7 @@ async function run() {
           threshold: thresholdPercent(20),
         },
         onboardingDcFee: toBN(4000000, 0), // $40 in dc
-        delegatorRewardsPercent: Math.floor(argv.delegatorRewardsPercent*100),
+        delegatorRewardsPercent: new BN(Math.floor(argv.delegatorRewardsPercent*Math.pow(10, 8))),
       })
       .accounts({
         dao,

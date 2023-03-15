@@ -221,7 +221,7 @@ async function run() {
           ? new PublicKey(argv.newActiveDeviceAggregator)
           : null,
         registrar: argv.registrar ? new PublicKey(argv.registrar) : null,
-        delegatorRewardsPercent: argv.delegatorRewardsPercent ? Math.floor(argv.delegatorRewardsPercent*100) : null,
+        delegatorRewardsPercent: argv.delegatorRewardsPercent ? Math.floor(argv.delegatorRewardsPercent*Math.pow(10, 8)) : null,
       })
       .accounts({
         subDao,
