@@ -29,7 +29,7 @@ pub struct UpdateVoterWeightRecordV0<'info> {
     init_if_needed,
     payer = payer,
     space = 8 + size_of::<VoterWeightRecord>(),
-    seeds = [registrar.key().as_ref(), b"voter-weight-record".as_ref(), args.owner.key().as_ref()],
+    seeds = [registrar.key().as_ref(), b"voter-weight-record".as_ref(), args.owner.as_ref()],
     bump,
   )]
   pub voter_weight_record: Account<'info, VoterWeightRecord>,
