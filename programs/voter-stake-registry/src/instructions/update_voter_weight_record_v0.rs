@@ -12,12 +12,6 @@ pub struct UpdateVoterWeightRecordArgsV0 {
   owner: Pubkey,
 }
 
-impl Default for VoterWeightAction {
-  fn default() -> Self {
-    VoterWeightAction::CreateProposal
-  }
-}
-
 #[derive(Accounts)]
 #[instruction(args: UpdateVoterWeightRecordArgsV0)]
 pub struct UpdateVoterWeightRecordV0<'info> {

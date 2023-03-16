@@ -8,7 +8,6 @@ use anchor_spl::token::FreezeAccount;
 use anchor_spl::token::ThawAccount;
 use anchor_spl::token::Transfer;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use std::mem::size_of;
 use std::str::FromStr;
 
 // In practice, this is the migration service which approves the legal attestation that
