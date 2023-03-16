@@ -7,8 +7,8 @@ import {
   createTransferInstruction,
 } from "@metaplex-foundation/mpl-bubblegum";
 import { ConcurrentMerkleTreeAccount, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID, SPL_NOOP_PROGRAM_ID } from "@solana/spl-account-compression";
-import { createTransferCheckedInstruction, createTransferInstruction as createTokenTransfer, getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
+import { createAssociatedTokenAccountIdempotent, createAssociatedTokenAccountIdempotentInstruction, createCloseAccountInstruction, createTransferCheckedInstruction, createTransferInstruction as createTokenTransfer, getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { AccountMeta, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
 import { provider } from "./solana";
 
 
@@ -76,47 +76,74 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
       const fromAta = getAssociatedTokenAddressSync(asset.id, from);
       const toAta = getAssociatedTokenAddressSync(asset.id, to);
       transferAssetIxns.push(
-        createTransferCheckedInstruction(
-          fromAta,
-          asset.id,
-          toAta,
+        createAssociatedTokenAccountIdempotentInstruction(
           from,
-          1,
-          0
+          toAta,
+          to,
+          asset.id
+        ),
+        createTransferCheckedInstruction(fromAta, asset.id, toAta, from, 1, 0)
+      );
+      transferAssetIxns.push(
+        createCloseAccountInstruction(
+          fromAta,
+          from,
+          from,
+          []
         )
       )
     }
   }
 
-  const transferPositionIxns = await Promise.all(positions.map(async position => {
-    return await vsrProgram.methods.ledgerTransferPositionV0()
-    .accounts({
-      to,
-      from,
-      mint: position.id,
-    })
-    .instruction()
-  }))
+  const transferPositionIxns = (await Promise.all(positions.map(async position => {
+    return [
+      await vsrProgram.methods
+        .ledgerTransferPositionV0()
+        .accounts({
+          to,
+          from,
+          mint: position.id,
+        })
+        .instruction(),
+      createCloseAccountInstruction(
+        getAssociatedTokenAddressSync(position.id, from),
+        from,
+        from,
+        []
+      ),
+    ];
+  }))).flat();
 
   const tokens = await provider.connection.getParsedTokenAccountsByOwner(from, {
     programId: TOKEN_PROGRAM_ID,
   });
 
-  const transferTokenInstructions = tokens.value.filter(token => !uniqueAssets.has(token.account.data.parsed.info.mint)).map(token => {
-    const mint = token.account.data.parsed.info.mint
+  const transferTokenInstructions = tokens.value.filter(token => !uniqueAssets.has(token.account.data.parsed.info.mint)).flatMap(token => {
+    const mint = new PublicKey(token.account.data.parsed.info.mint);
     const fromAta = token.pubkey;
     const toAta = getAssociatedTokenAddressSync(mint, to);
-    return createTokenTransfer(
-      fromAta,
-      toAta,
-      from,
-      token.account.data.parsed.info.tokenAmount.amount,
-    );
+    return [
+      createAssociatedTokenAccountIdempotentInstruction(
+        from,
+        toAta,
+        to,
+        mint
+      ),
+      createTokenTransfer(
+        fromAta,
+        toAta,
+        from,
+        token.account.data.parsed.info.tokenAmount.amount
+      ),
+      createCloseAccountInstruction(fromAta, from, from, []),
+    ];
   })
+
+  const lamports = await provider.connection.getBalance(from);
 
   const recentBlockhash = (await provider.connection.getLatestBlockhash()).blockhash
   const transactions: Transaction[] = [];
-  chunks(transferAssetIxns, 3).forEach((chunk) => {
+  chunks(transferAssetIxns, 4).forEach((chunk) => {
     const tx = new Transaction({
       feePayer: from,
       recentBlockhash,
@@ -133,14 +160,21 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
     tx.add(...transferAssetIxns);
     transactions.push(await provider.wallet.signTransaction(tx));
   }
-  if (transferTokenInstructions.length > 0) {
-    const tx = new Transaction({
-      feePayer: from,
-      recentBlockhash,
-    });
-    tx.add(...transferAssetIxns);
-    transactions.push(tx);
-  }
+
+  transferTokenInstructions.push(
+    SystemProgram.transfer({
+      fromPubkey: from,
+      toPubkey: to,
+      lamports: lamports - (transactions.length + 1) * 5000,
+    })
+  );
+
+  const tx = new Transaction({
+    feePayer: from,
+    recentBlockhash,
+  });
+  tx.add(...transferTokenInstructions);
+  transactions.push(tx);
 
   return transactions;
 }

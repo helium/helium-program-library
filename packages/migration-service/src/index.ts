@@ -249,7 +249,7 @@ server.post<{
   Body: { from: string; to: string; attestation: string };
 }>("/ledger/migrate", async (request, reply) => {
   const from = new PublicKey(request.body.from);
-  const to = new PublicKey(request.body.from);
+  const to = new PublicKey(request.body.to);
   if (request.body.attestation !== ATTESTATION) {
     return reply.code(400).send({ error: "Invalid attestation" });
   }
