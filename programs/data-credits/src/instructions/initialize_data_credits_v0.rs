@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::circuit_breaker::*;
 use crate::errors::*;
 use crate::state::*;
@@ -10,6 +12,12 @@ use circuit_breaker::{
   CircuitBreaker, InitializeMintWindowedBreakerArgsV0,
 };
 use pyth_sdk_solana::load_price_feed_from_account_info;
+
+#[cfg(feature = "devnet")]
+const PYTH_PROGRAM_ID: &str = "gSbePebfvPy7tRqimPoVecS2UsBvYv46ynrzWocc92s";
+
+#[cfg(not(feature = "devnet"))]
+const PYTH_PROGRAM_ID: &str = "FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDataCreditsArgsV0 {
@@ -29,6 +37,7 @@ pub struct InitializeDataCreditsV0<'info> {
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
   /// CHECK: Checked via load call in handler
+  #[account(owner = Pubkey::from_str(PYTH_PROGRAM_ID).unwrap())]
   pub hnt_price_oracle: AccountInfo<'info>,
 
   pub hnt_mint: Box<Account<'info, Mint>>,

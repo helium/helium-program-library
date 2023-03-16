@@ -61,6 +61,7 @@ pub struct OnboardMobileHotspotV0<'info> {
 
   #[account(
     has_one = sub_dao,
+    constraint = matches!(rewardable_entity_config.settings, ConfigSettingsV0::MobileConfig { .. })
   )]
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
   #[account(
