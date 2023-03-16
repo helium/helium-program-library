@@ -14,6 +14,12 @@
       "path": "../spl-utils"
     },
     {
+      "path": "../helium-entity-manager-sdk"
+    },
+    {
+      "path": "../helium-sub-daos-sdk"
+    },
+    {
       "path": "../helium-sub-daos-sdk"
     }
   ]
