@@ -44,9 +44,11 @@ export function toBN(
   if (BN.isBN(numberOrBn)) {
     return numberOrBn;
   } else {
-    return new BN(Number(Math.ceil(Number(numberOrBn)))).mul(
-      new BN(Math.pow(10, decimals))
-    );
+    return new BN(Number(Math.floor(Number(numberOrBn))))
+      .mul(new BN(Math.pow(10, decimals)))
+      .add(
+        new BN(Math.round((Number(numberOrBn) % 1) * Math.pow(10, decimals)))
+      );
   }
 }
 
