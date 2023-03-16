@@ -2,12 +2,6 @@
   "extends": "../../tsconfig.root.json",
   "references": [
     {
-      "path": "./tsconfig.cjs.json"
-    },
-    {
-      "path": "./tsconfig.esm.json"
-    },
-    {
       "path": "../idls"
     },
     {
@@ -21,6 +15,12 @@
     },
     {
       "path": "../helium-sub-daos-sdk"
+    },
+    {
+      "path": "./tsconfig.cjs.json"
+    },
+    {
+      "path": "./tsconfig.esm.json"
     }
   ]
 }
