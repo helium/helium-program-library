@@ -71,6 +71,14 @@ pub struct InitializePositionV0<'info> {
   )]
   /// CHECK: Checked by cpi
   pub metadata: UncheckedAccount<'info>,
+    /// CHECK: Handled by cpi
+  #[account(
+    mut,
+    seeds = ["metadata".as_bytes(), token_metadata_program.key().as_ref(), mint.key().as_ref(), "edition".as_bytes()],
+    seeds::program = token_metadata_program.key(),
+    bump,
+  )]
+  pub master_edition: UncheckedAccount<'info>,
   #[account(
     init_if_needed,
     payer = payer,
