@@ -45,9 +45,10 @@ pub struct ResetLockupV0<'info> {
 }
 
 #[repr(u8)]
-#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, AnchorSerialize, AnchorDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LockupKind {
   /// No lockup, tokens can be withdrawn as long as not engaged in a proposal.
+  #[default]
   None,
 
   /// Lock up for a number of days
@@ -65,12 +66,6 @@ impl From<LockupKind> for VsrLockupKind {
       LockupKind::Cliff => VsrLockupKind::Cliff,
       LockupKind::Constant => VsrLockupKind::Constant,
     }
-  }
-}
-
-impl Default for LockupKind {
-  fn default() -> Self {
-    LockupKind::None
   }
 }
 
