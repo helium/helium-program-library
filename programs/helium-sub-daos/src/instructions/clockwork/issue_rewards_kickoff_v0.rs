@@ -85,7 +85,7 @@ fn construct_issue_rewards_ix(ctx: &Context<IssueRewardsKickoffV0>, epoch: u64) 
 }
 
 pub fn handler(ctx: Context<IssueRewardsKickoffV0>) -> Result<ThreadResponse> {
-  let curr_ts = Clock::get()?.unix_timestamp;
+  let curr_ts = Clock::get()?.unix_timestamp + 1; // Ensure we don't land exactly on utc midnight
   let epoch = current_epoch(curr_ts) - 1; // operate calculations on previous epoch
   let issue_rewards_ix = construct_issue_rewards_ix(&ctx, epoch);
   Ok(ThreadResponse {

@@ -80,11 +80,6 @@ const yarg = yargs(hideBin(process.argv)).options({
     required: true,
     describe: "The symbol of the entity config",
   },
-  councilKey: {
-    type: "string",
-    describe: "Key of gov council token",
-    default: "counKsk72Jgf9b3aqyuQpFf12ktLdJbbuhnoSxxQoMJ",
-  },
   multisig: {
     type: "string",
     describe: "Address of the squads multisig to be authority. If not provided, your wallet will be the authority"
@@ -115,9 +110,6 @@ async function run() {
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
-  const wallet = loadKeypair(argv.wallet);
-  const govProgramId = new PublicKey(argv.govProgramId);
-  const councilKey = new PublicKey(argv.councilKey);
   const provider = anchor.getProvider() as anchor.AnchorProvider;
 
   const name = argv.name;

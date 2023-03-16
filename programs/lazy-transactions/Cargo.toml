@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "lazy_transactions"
 
 [features]
+devnet = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []

@@ -703,7 +703,8 @@ export async function sendInstructionsOrSquads({
   await squads.activateTransaction(tx.publicKey);
   if (executeTransaction) {
     await squads.approveTransaction(tx.publicKey);
-    await squads.executeTransaction(tx.publicKey, provider.wallet.publicKey, signers);
+    const ix = await squads.buildExecuteTransaction(tx.publicKey, provider.wallet.publicKey);
+    await sendInstructions(provider, [ix], signers);
   }
 }
 

@@ -77,13 +77,13 @@ function toAsset(result: any): Asset {
       leafId: result.compression.leaf_id,
       dataHash:
         result.compression.data_hash &&
-        base58.decode(result.compression.data_hash),
+        Buffer.from(base58.decode(result.compression.data_hash)),
       creatorHash:
         result.compression.creator_hash &&
-        base58.decode(result.compression.creator_hash),
+        Buffer.from(base58.decode(result.compression.creator_hash)),
       assetHash:
         result.compression.asset_hash &&
-        base58.decode(result.compression.asset_hash),
+        Buffer.from(base58.decode(result.compression.asset_hash)),
       tree: result.compression.tree && new PublicKey(result.compression.tree),
     },
     ownership: {

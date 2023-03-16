@@ -183,12 +183,14 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
     realm_governing_token_mint: ctx.accounts.realm_governing_token_mint.key(),
     realm_authority: ctx.accounts.realm_authority.key(),
     collection: ctx.accounts.collection.key(),
-    voting_mints: Vec::new(),
     time_offset: 0,
     position_update_authority: args.position_update_authority,
     governance_program_id: ctx.accounts.governance_program_id.key(),
     bump_seed: ctx.bumps["registrar"],
     collection_bump_seed: ctx.bumps["collection"],
+    reserved1: [0; 4],
+    reserved2: [0; 7],
+    voting_mints: Vec::new(),
   });
 
   // Verify that "realm_authority" is the expected authority on "realm"
