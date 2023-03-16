@@ -1,62 +1,41 @@
+import * as anchor from "@coral-xyz/anchor";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
-import {
-  daoKey,
-  init as initDao,
-  threadKey,
-} from "@helium/helium-sub-daos-sdk";
 import {
   dataCreditsKey,
   init as initDc,
-  PROGRAM_ID,
+  PROGRAM_ID
 } from "@helium/data-credits-sdk";
-import { init as initLazy } from "@helium/lazy-distributor-sdk";
 import {
-  registrarKey,
-  init as initVsr,
+  daoKey,
+  init as initDao,
+  threadKey
+} from "@helium/helium-sub-daos-sdk";
+import { sendInstructions, toBN } from "@helium/spl-utils";
+import {
+  init as initVsr, registrarKey
 } from "@helium/voter-stake-registry-sdk";
-import * as anchor from "@coral-xyz/anchor";
+import {
+  getGovernanceProgramVersion, GoverningTokenConfigAccountArgs, GoverningTokenType, MintMaxVoteWeightSource, SetRealmAuthorityAction, withCreateRealm, withSetRealmAuthority
+} from "@solana/spl-governance";
+import {
+  getAssociatedTokenAddress
+} from "@solana/spl-token";
 import {
   Connection,
-  PublicKey,
-  SystemProgram,
-  TransactionInstruction,
+  PublicKey, TransactionInstruction
 } from "@solana/web3.js";
-import {
-  getGovernanceProgramVersion,
-  MintMaxVoteWeightSource,
-  withCreateRealm,
-  GoverningTokenType,
-  VoteThreshold,
-  VoteThresholdType,
-  VoteTipping,
-  GovernanceConfig,
-  GoverningTokenConfigAccountArgs,
-  withCreateGovernance,
-  withSetRealmAuthority,
-  SetRealmAuthorityAction,
-  getTokenOwnerRecordAddress,
-} from "@solana/spl-governance";
+import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
   createAndMint,
   getTimestampFromDays,
-  getUnixTimestamp,
-  loadKeypair,
-  isLocalhost,
+  getUnixTimestamp, isLocalhost, loadKeypair
 } from "./utils";
-import { sendInstructions, toBN } from "@helium/spl-utils";
-import {
-  createAssociatedTokenAccountIdempotentInstruction,
-  getAssociatedTokenAddress,
-} from "@solana/spl-token";
-import { BN } from "bn.js";
-import Squads from "@sqds/sdk";
 
 const { hideBin } = require("yargs/helpers");
 
 const HNT_EPOCH_REWARDS = 10000000000;
-const MOBILE_EPOCH_REWARDS = 5000000000;
 const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
 const MAX_LOCKUP = 4 * SECS_PER_YEAR;
@@ -158,6 +137,10 @@ async function run() {
       type: "number",
       describe: "Authority index for squads. Defaults to 1",
       default: 1,
+    },
+    pythHntPriceFeed: {
+      type: "string",
+      default: "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm",
     },
   });
 
@@ -363,11 +346,7 @@ async function run() {
       .accounts({
         hntMint: hntKeypair.publicKey,
         dcMint: dcKeypair.publicKey,
-        hntPriceOracle: new PublicKey(
-          isLocalhost(provider)
-            ? "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB"
-            : "6Eg8YdfFJQF2HHonzPUBSCCmyUEhrStg9VBLK957sBe6"
-        ), // TODO: Replace with HNT price feed,
+        hntPriceOracle: new PublicKey(argv.pythHntPriceFeed),
       })
       .rpc({ skipPreflight: true });
   }
