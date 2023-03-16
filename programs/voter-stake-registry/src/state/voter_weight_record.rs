@@ -6,7 +6,7 @@ pub const DISCRIMINATOR_SIZE: usize = 8;
 
 /// VoterWeightAction enum as defined in spl-governance-addin-api
 /// It's redefined here for Anchor to export it to IDL
-#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, AnchorSerialize, AnchorDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VoterWeightAction {
   /// Cast vote for a proposal. Target: Proposal
   CastVote,
@@ -18,6 +18,7 @@ pub enum VoterWeightAction {
   CreateGovernance,
 
   /// Create a proposal for a governance. Target: Governance
+  #[default]
   CreateProposal,
 
   /// Signs off a proposal for a governance. Target: Proposal

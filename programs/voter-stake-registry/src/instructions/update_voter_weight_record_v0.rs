@@ -9,12 +9,7 @@ use itertools::Itertools;
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateVoterWeightRecordArgsV0 {
   voter_weight_action: VoterWeightAction,
-}
-
-impl Default for VoterWeightAction {
-  fn default() -> Self {
-    VoterWeightAction::CreateProposal
-  }
+  owner: Pubkey,
 }
 
 #[derive(Accounts)]
@@ -28,11 +23,22 @@ pub struct UpdateVoterWeightRecordV0<'info> {
     init_if_needed,
     payer = payer,
     space = 8 + size_of::<VoterWeightRecord>(),
-    seeds = [registrar.key().as_ref(), b"voter-weight-record".as_ref(), owner.key().as_ref()],
+    seeds = [registrar.key().as_ref(), b"voter-weight-record".as_ref(), args.owner.as_ref()],
     bump,
   )]
   pub voter_weight_record: Account<'info, VoterWeightRecord>,
-  pub owner: Signer<'info>,
+
+  // TokenOwnerRecord of the voter who casts the vote
+  #[account(
+      owner = registrar.governance_program_id
+    )]
+  /// CHECK: Owned by spl-governance instance specified in registrar.governance_program_id
+  pub voter_token_owner_record: UncheckedAccount<'info>,
+
+  /// Authority of the voter
+  /// It can be either governing_token_owner or its delegate and must sign this instruction
+  pub voter_authority: Signer<'info>,
+
   pub system_program: Program<'info, System>,
 }
 
@@ -47,8 +53,6 @@ pub fn handler(
   args: UpdateVoterWeightRecordArgsV0,
 ) -> Result<()> {
   let voter_weight_action = args.voter_weight_action;
-  let registrar = &ctx.accounts.registrar;
-  let governing_token_owner = ctx.accounts.owner.key();
 
   match voter_weight_action {
     // voter_weight for CastVote action can't be evaluated using this instruction
@@ -59,15 +63,31 @@ pub fn handler(
     | VoterWeightAction::SignOffProposal => {}
   }
 
+  let registrar = &ctx.accounts.registrar;
+  let voter_weight_record = &mut ctx.accounts.voter_weight_record;
+
+  voter_weight_record.governing_token_owner = args.owner;
+  voter_weight_record.realm = registrar.realm;
+  voter_weight_record.governing_token_mint = registrar.realm_governing_token_mint;
+
   let mut voter_weight = 0u64;
 
   // Ensure all nfts are unique
   let mut unique_nft_mints = vec![];
 
+  let governing_token_owner = resolve_governing_token_owner(
+    registrar,
+    &ctx.accounts.voter_token_owner_record,
+    &ctx.accounts.voter_authority,
+    voter_weight_record,
+  )?;
+
+  require_eq!(governing_token_owner, args.owner, VsrError::InvalidOwner);
+
   for (token_account, position) in ctx.remaining_accounts.iter().tuples() {
     let nft_vote_weight = resolve_vote_weight(
       registrar,
-      &governing_token_owner,
+      &args.owner,
       token_account,
       position,
       &mut unique_nft_mints,
@@ -76,12 +96,7 @@ pub fn handler(
     voter_weight = voter_weight.checked_add(nft_vote_weight).unwrap();
   }
 
-  let voter_weight_record = &mut ctx.accounts.voter_weight_record;
-
-  voter_weight_record.governing_token_owner = ctx.accounts.owner.key();
-  voter_weight_record.realm = registrar.realm;
   voter_weight_record.voter_weight = voter_weight;
-  voter_weight_record.governing_token_mint = registrar.realm_governing_token_mint;
 
   // Record is only valid as of the current slot
   voter_weight_record.voter_weight_expiry = Some(Clock::get()?.slot);

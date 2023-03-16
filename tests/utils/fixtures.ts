@@ -67,7 +67,7 @@ export const initTestDataCredits = async (
       hntMint,
       dcMint,
       hntPriceOracle: new PublicKey(
-        "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB"
+        "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"
       ),
     });
 

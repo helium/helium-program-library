@@ -323,7 +323,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
       },
       signer_seeds,
     ),
-    LAMPORTS_PER_SOL / 100,
+    LAMPORTS_PER_SOL,
     "calculate".as_bytes().to_vec(),
     vec![calculate_kickoff_ix.into()],
     Trigger::Cron {
@@ -364,7 +364,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
       },
       signer_seeds,
     ),
-    LAMPORTS_PER_SOL / 100,
+    LAMPORTS_PER_SOL,
     "issue".as_bytes().to_vec(),
     vec![issue_kickoff_ix.into()],
     Trigger::Account {

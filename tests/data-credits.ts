@@ -127,7 +127,7 @@ describe("data-credits", () => {
         dcMint,
         payer: me,
         hntPriceOracle: new PublicKey(
-          "JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB"
+          "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"
         ),
       });
     dcKey = (await method.pubkeys()).dataCredits!;
@@ -214,11 +214,12 @@ describe("data-credits", () => {
       const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
       const hntBal = await provider.connection.getTokenAccountBalance(hntAta);
       const pythData = (await provider.connection.getAccountInfo(
-        new PublicKey("JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB")
+        new PublicKey("7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm")
       ))!.data;
       const price = parsePriceData(pythData);
+      console.log(price)
       const approxEndBal =
-        startDcBal + Math.floor(price.emaPrice.value * 10 ** 5);
+        startDcBal + Math.floor((price.emaPrice.value - (price.emaConfidence!.value * 2)) * 10 ** 5);
       expect(dcBal.value.uiAmount).to.be.within(
         approxEndBal - 1,
         approxEndBal + 1
@@ -245,10 +246,10 @@ describe("data-credits", () => {
         await getAssociatedTokenAddress(hntMint, me)
       );
       const pythData = (await provider.connection.getAccountInfo(
-        new PublicKey("JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB")
+        new PublicKey("7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm")
       ))!.data;
       const price = parsePriceData(pythData);
-      const approxEndBal = startHntBal - (Math.floor(dcAmount * 10**11) / Number(price.emaPrice.valueComponent)) * 10**-hntDecimals;
+      const approxEndBal = startHntBal - (Math.floor(dcAmount * 10**11) / Number(price.emaPrice.valueComponent - (price.emaConfidence.valueComponent * BigInt(2)))) * 10**-hntDecimals;
       expect(hntBal.value.uiAmount).to.be.within(approxEndBal * 0.999, approxEndBal * 1.001);
       expect(dcBal.value.uiAmount).to.eq(startDcBal + dcAmount);
     });

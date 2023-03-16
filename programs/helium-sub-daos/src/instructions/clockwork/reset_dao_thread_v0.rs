@@ -82,7 +82,7 @@ pub fn handler(ctx: Context<ResetDaoThreadV0>) -> Result<()> {
         },
         signer_seeds,
       ),
-      LAMPORTS_PER_SOL / 100,
+      LAMPORTS_PER_SOL,
       "issue_hst".to_string().as_bytes().to_vec(),
       vec![kickoff_ix.into()],
       Trigger::Account {

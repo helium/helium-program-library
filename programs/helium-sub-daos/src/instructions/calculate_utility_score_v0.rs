@@ -172,7 +172,7 @@ pub fn handler(
       dc_burned
         .log()
         .or_arith_error()?
-        .checked_div(&FOUR_PREC.clone().signed())
+        .checked_div(&TWO_PREC.clone().signed())
         .or_arith_error()?
         .exp()
         .or_arith_error()?,
@@ -194,7 +194,7 @@ pub fn handler(
       devices_with_fee
         .log()
         .or_arith_error()?
-        .checked_div(&TWO_PREC.clone().signed())
+        .checked_div(&FOUR_PREC.clone().signed())
         .or_arith_error()?
         .exp()
         .or_arith_error()?,

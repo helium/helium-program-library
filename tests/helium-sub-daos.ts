@@ -470,8 +470,9 @@ describe("helium-sub-daos", () => {
           expect(daoInfo.numUtilityScoresCalculated).to.eq(1);
 
           const supply = (await getMint(provider.connection, hntMint)).supply;
+          const veHnt = toNumber(subDaoInfo.vehntAtEpochStart, 8);
           const totalUtility =
-            Math.sqrt(currentActiveDeviceCount * 50) * Math.pow(16, 1 / 4) * 1;
+            Math.max(veHnt, 1) * Math.pow(currentActiveDeviceCount * 50, 1 / 4) * Math.sqrt(16) * 1;
           expect(daoInfo.totalRewards.toString()).to.eq(
             EPOCH_REWARDS.toString()
           );
@@ -479,15 +480,16 @@ describe("helium-sub-daos", () => {
             new BN(supply.toString()).add(new BN(EPOCH_REWARDS)).toString()
           );
 
+          console.log(totalUtility, veHnt, currentActiveDeviceCount);
           expectBnAccuracy(
             toBN(totalUtility, 12),
             daoInfo.totalUtilityScore,
-            0.02
+            0.00000002
           );
           expectBnAccuracy(
             toBN(totalUtility, 12),
             subDaoInfo.utilityScore!,
-            0.02
+            0.00000002
           );
         });
 
