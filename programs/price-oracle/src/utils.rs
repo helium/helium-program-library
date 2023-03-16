@@ -24,5 +24,5 @@ pub fn calculate_current_price(oracles: &Vec<OracleV0>, curr_ts: i64) -> Option<
     prices[n / 2]
   };
 
-  return Some(median);
+  Some(median)
 }

@@ -15,8 +15,8 @@ pub fn handler(ctx: Context<UpdatePriceV0>) -> Result<()> {
   if let Some(curr_price) = curr_price_opt {
     ctx.accounts.price_oracle.current_price = Some(curr_price);
     ctx.accounts.price_oracle.last_calculated_timestamp = Some(curr_ts);
-    return Ok(());
+    Ok(())
   } else {
-    return Err(error!(ErrorCode::InvalidPriceUpdate));
+    Err(error!(ErrorCode::InvalidPriceUpdate))
   }
 }

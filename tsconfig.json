@@ -54,6 +54,9 @@
     },
     {
       "path": "./packages/circuit-breaker-sdk"
+    },
+    {
+      "path": "./packages/price-oracle-sdk"
     }
   ]
 }

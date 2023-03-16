@@ -41,6 +41,7 @@
     "@helium/helium-entity-manager-sdk": "^0.0.43",
     "@helium/helium-sub-daos-sdk": "^0.0.43",
     "@helium/lazy-distributor-sdk": "^0.0.43",
+    "@helium/price-oracle-sdk": "^0.0.43",
     "@helium/spl-utils": "^0.0.43",
     "@helium/treasury-management-sdk": "^0.0.43",
     "@solana/spl-account-compression": "^0.1.4",
