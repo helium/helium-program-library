@@ -247,7 +247,7 @@ describe("voter-stake-registry", () => {
     );
 
     expectBnAccuracy(
-      toBN((223_000_000 * SCALE) * GENESIS_MULTIPLIER, 8),
+      toBN(223_000_000 * SCALE * GENESIS_MULTIPLIER, 8),
       maxVoterWeightAcc.maxVoterWeight,
       0.0001
     );
@@ -327,13 +327,15 @@ describe("voter-stake-registry", () => {
         instruction,
       } = await program.methods
         .updateVoterWeightRecordV0({
+          owner: me,
           voterWeightAction: {
             createProposal: {},
           },
         })
         .accounts({
           registrar,
-          owner: me
+          voterAuthority: me,
+          voterTokenOwnerRecord: tokenOwnerRecord,
         })
         .remainingAccounts([
           {
