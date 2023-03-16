@@ -21,12 +21,6 @@ pub struct InitializePositionArgsV0 {
   pub periods: u32,
 }
 
-impl Default for LockupKind {
-  fn default() -> Self {
-    LockupKind::None
-  }
-}
-
 #[derive(Accounts)]
 pub struct InitializePositionV0<'info> {
   #[account(
