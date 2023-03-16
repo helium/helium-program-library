@@ -23,6 +23,17 @@ async function findBinancePrice(symbol: string): Promise<number> {
   }
 }
 
+async function findCoingeckoPrice(token: string): Promise<number> {
+  try {
+    const response = await axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${token}&vs_currencies=usd`);
+    const data = response.data;
+    return parseFloat(data[token]['usd']);
+  } catch (error) {
+    console.error(`Error fetching price for ${token}: ${error.message}`);
+    throw error;
+  }
+}
+
 async function run() {
   const yarg = yargs(hideBin(process.argv)).options({
     wallet: {
@@ -50,7 +61,13 @@ async function run() {
       required: false,
       describe: "If supplied, will try and find the binance price for this pair. E.g. 'HNTUSDT' will submit the binance HNT-USDT price",
       default: null,
-    }
+    },
+    useCoingeckoPrice: {
+      type: "string",
+      required: false,
+      describe: "If supplied, will try and find the coingecko price for this coin. E.g. 'helium' will submit the coingecko HNT price",
+      default: null,
+    },
   });
 
   const argv = await yarg.argv;
@@ -61,11 +78,14 @@ async function run() {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const program = await init(provider);
 
-  if (!argv.useBinancePrice && !argv.price) {
+  if (!argv.useBinancePrice && !argv.price && !argv.useCoingeckoPrice) {
     throw new Error("Need to supply a price")
   }
 
-  const price = argv.price ? argv.price : await findBinancePrice(argv.useBinancePrice);
+  const price = argv.price ? argv.price : 
+    argv.useCoingeckoPrice ? await findCoingeckoPrice(argv.useCoingeckoPrice) : 
+    argv.useBinancePrice ? await findBinancePrice(argv.useBinancePrice) : 
+    null;
 
   const priceOracle = new PublicKey(argv.priceOracle)
   const priceOracleAcc = await program.account.priceOracleV0.fetch(priceOracle);
