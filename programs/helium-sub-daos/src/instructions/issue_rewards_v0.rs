@@ -1,4 +1,4 @@
-use crate::{current_epoch, error::ErrorCode, state::*, OrArithError, TESTING};
+use crate::{current_epoch, error::ErrorCode, state::*, OrArithError, EPOCH_LENGTH, TESTING};
 use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
@@ -122,9 +122,10 @@ impl<'info> IssueRewardsV0<'info> {
 
 pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<ThreadResponse> {
   let curr_ts = Clock::get()?.unix_timestamp;
-  let epoch = current_epoch(curr_ts);
+  let epoch_curr_ts = current_epoch(curr_ts);
+  let end_of_epoch_ts = i64::try_from(args.epoch + 1).unwrap() * EPOCH_LENGTH;
 
-  if !TESTING && args.epoch >= epoch {
+  if !TESTING && args.epoch >= epoch_curr_ts {
     return Err(error!(ErrorCode::EpochNotOver));
   }
 
@@ -141,7 +142,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .accounts
     .dao
     .hst_emission_schedule
-    .get_percent_at(curr_ts)
+    .get_percent_at(end_of_epoch_ts)
     .unwrap();
   // Subdaos get the remainder after hst
   let emissions = 100_u64
@@ -223,7 +224,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 
   // update thread to point at next epoch
-  let next_epoch = current_epoch(curr_ts);
+  let next_epoch = args.epoch + 1;
   let dao_epoch_info = Pubkey::find_program_address(
     &[
       "dao_epoch_info".as_bytes(),
