@@ -1,12 +1,14 @@
 First, brick the genesis transactions. This keeps someone from front-running the genesis transaction lazy signer.
 
+Next, make sure startUnixTime in the emissions schedules is equal to the current time.
+
 
 ```
-npx ts-node --project tsconfig.cjs.json src/create-dao.ts -u https://api.devnet.solana.com --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium"
+npx ts-node --project tsconfig.cjs.json src/create-dao.ts -u https://api.devnet.solana.com --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium" --emissionSchedulePath emissions/hnt.json --hstEmissionSchedulePath emissions/hst.json
 
-npx ts-node --project tsconfig.cjs.json src/create-subdao.ts -u https://api.devnet.solana.com --rewardsOracleUrl https://iot-oracle.oracle.test-helium.com --activeDeviceOracleUrl https://iot-rewards.oracle.helium.io/active-devices -n IOT --subdaoKeypair keypairs/iot.json --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "Helium IOT" --dcBurnAuthority $(solana address) --executeProposal --switchboardNetwork devnet
+npx ts-node --project tsconfig.cjs.json src/create-subdao.ts -u https://api.devnet.solana.com --rewardsOracleUrl https://iot-oracle.oracle.test-helium.com --activeDeviceOracleUrl https://iot-rewards.oracle.helium.io/active-devices -n IOT --subdaoKeypair keypairs/iot.json --numTokens 100302580998  --emissionSchedulePath emissions/iot.json --realmName "Helium IOT" --dcBurnAuthority $(solana address) --executeProposal --switchboardNetwork devnet
 
- npx ts-node --project tsconfig.cjs.json src/create-subdao.ts -u https://api.devnet.solana.com --rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com --activeDeviceOracleUrl https://mobile-rewards.oracle.helium.io/active-devices -n Mobile --subdaoKeypair keypairs/mobile.json --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Helium Mobile" --dcBurnAuthority $(solana address) --executeProposal --switchboardNetwork devnet
+ npx ts-node --project tsconfig.cjs.json src/create-subdao.ts -u https://api.devnet.solana.com --rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com --activeDeviceOracleUrl https://mobile-rewards.oracle.helium.io/active-devices -n Mobile --subdaoKeypair keypairs/mobile.json --numTokens 100302580998 --emissionSchedulePath emissions/iot.json --realmName "Helium Mobile" --dcBurnAuthority $(solana address) --executeProposal --switchboardNetwork devnet
 ```
 Now, go approve and run all commands in realms.
 

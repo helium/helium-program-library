@@ -5,7 +5,7 @@ import Squads from "@sqds/sdk";
 import { BN } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { sendInstructionsOrSquads } from "./utils";
+import { sendInstructionsOrCreateProposal, sendInstructionsOrSquads } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -54,18 +54,19 @@ async function run() {
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
-  const circuitBreakerKey = new PublicKey(argv.circuitBreaker)
+  const circuitBreakerKey = new PublicKey(argv.circuitBreaker);
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const circuitBreakerProgram = await init(provider);
 
-  const instructions = []
-  const circuitBreaker = await circuitBreakerProgram.account.mintWindowedCircuitBreakerV0.fetch(circuitBreakerKey)
+  const instructions = [];
+  const circuitBreaker =
+    await circuitBreakerProgram.account.accountWindowedCircuitBreakerV0.fetch(
+      circuitBreakerKey
+    );
   instructions.push(
     await circuitBreakerProgram.methods
-      .updateMintWindowedBreakerV0({
-        newAuthority: argv.newAuthority
-          ? new PublicKey(argv.newAuthority)
-          : circuitBreaker.authority,
+      .updateAccountWindowedBreakerV0({
+        newAuthority: argv.newAuthority ? new PublicKey(argv.newAuthority) : circuitBreaker.authority,
         config: {
           windowSizeSeconds: argv.windowSizeSeconds
             ? new BN(argv.windowSizeSeconds)
