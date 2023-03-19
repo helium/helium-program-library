@@ -16,6 +16,7 @@
   ],
   "private": true,
   "dependencies": {
+    "@helium/transactions": "^3.38.0",
     "@coral-xyz/anchor": "0.26.0",
     "@coral-xyz/anchor-cli": "^0.26.0",
     "@coral-xyz/borsh": "^0.2.6",

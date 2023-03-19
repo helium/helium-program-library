@@ -6,6 +6,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
 import chai from "chai";
+import { AddGatewayV1 } from "@helium/transactions"
 import {
   entityCreatorKey,
   init as initHeliumEntityManager,
@@ -24,6 +25,8 @@ import bs58 from "bs58";
 const { expect } = chai;
 // @ts-ignore
 import animalHash from "angry-purple-tiger";
+import axios from "axios";
+import { helium } from "@helium/proto";
 
 import {
   computeCompressedNFTHash,
@@ -36,8 +39,15 @@ import {
 import { BN } from "bn.js";
 import chaiAsPromised from "chai-as-promised";
 import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
+import fs from "fs";
 
 chai.use(chaiAsPromised);
+
+function loadKeypair(keypair: string): Keypair {
+  return Keypair.fromSecretKey(
+    new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString()))
+  );
+}
 
 describe("helium-entity-manager", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -48,6 +58,9 @@ describe("helium-entity-manager", () => {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
+  const eccVerifier = loadKeypair(
+    __dirname + "/verifier-test.json"
+  );
 
   let dao: PublicKey;
   let subDao: PublicKey;
@@ -172,7 +185,7 @@ describe("helium-entity-manager", () => {
       await dcProgram.methods
         .mintDataCreditsV0({
           hntAmount: toBN(startDcBal, 8),
-          dcAmount: null
+          dcAmount: null,
         })
         .accounts({ dcMint: dcMint })
         .rpc({ skipPreflight: true });
@@ -248,7 +261,7 @@ describe("helium-entity-manager", () => {
             compressed: true,
             eligible: true,
             dataHash: computeDataHash(metadata),
-            creatorHash: computeCreatorHash(creators)
+            creatorHash: computeCreatorHash(creators),
           },
         } as Asset);
       getAssetProofFn = async () => {
@@ -261,6 +274,57 @@ describe("helium-entity-manager", () => {
         };
       };
     });
+
+    // Only uncomment this when you want to debug the sig verifier service locally.
+    // You can run it like:
+    // env ANCHOR_WALLET=path/to//helium-program-library/tests/verifier-test.json cargo run
+    // it("properly uses the sig verifier service", async () => {
+    //   const issueTx =
+    //     "CroBCiEB7UTmtDnUwT3fGbvn4ASvsi5n6wJiNTs/euxRYXFWiRASIQCIruPASTMtSA87u0hkkApMXY/q2cydP5We1vkyUj9fiSJGMEQCIA46K0Xug+nxpaLi9z25jEI5RtHmWTtvgZFOQBr06jzKAiBifpM+/m/k3SwDAES9FA9QqPv4ElDhh+zCqMbJ15DqYiohAfK7mMA4Bu0mM6e/N81WeNbTEFdgyo4A5g5MgsPQjMazOICS9AFA6PsD";
+    //   const txn = AddGatewayV1.fromString(issueTx);
+    //   const eccKey = txn.gateway?.b58;
+    //   // @ts-ignore
+    //   const addGateway = txn.toProto(true);
+    //   const serialized = helium.blockchain_txn_add_gateway_v1
+    //     .encode(addGateway)
+    //     .finish();
+
+    //   let tx = await hemProgram.methods
+    //     .issueEntityV0({
+    //       entityKey: Buffer.from(bs58.decode(eccKey)),
+    //     })
+    //     .preInstructions([
+    //       ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+    //     ])
+    //     .accounts({
+    //       maker,
+    //       recipient: hotspotOwner.publicKey,
+    //       issuingAuthority: makerKeypair.publicKey,
+    //       dao,
+    //       eccVerifier: eccVerifier.publicKey,
+    //     })
+    //     .signers([makerKeypair])
+    //     .transaction();
+    //   tx.recentBlockhash = (await provider.connection.getRecentBlockhash()).blockhash;
+    //   tx.feePayer = provider.wallet.publicKey;
+    //   tx.partialSign(makerKeypair)
+    //   tx = await provider.wallet.signTransaction(tx)
+
+    //   const { transaction } = (
+    //     await axios.post("http://localhost:8000/verify", {
+    //       transaction: tx
+    //         .serialize({
+    //           requireAllSignatures: false,
+    //         })
+    //         .toString("hex"),
+    //       msg: Buffer.from(serialized).toString("hex"),
+    //       signature:
+    //         Buffer.from(txn.gatewaySignature!).toString("hex"),
+    //     })
+    //   ).data;
+    //   const sig = await provider.connection.sendRawTransaction(Buffer.from(transaction, "hex"));
+    //   await provider.connection.confirmTransaction(sig)
+    // })
 
     it("issues a mobile hotspot", async () => {
       await hemProgram.methods
@@ -275,8 +339,9 @@ describe("helium-entity-manager", () => {
           recipient: hotspotOwner.publicKey,
           issuingAuthority: makerKeypair.publicKey,
           dao,
+          eccVerifier: eccVerifier.publicKey,
         })
-        .signers([makerKeypair])
+        .signers([makerKeypair, eccVerifier])
         .rpc({ skipPreflight: true });
 
       const method = (
@@ -314,8 +379,9 @@ describe("helium-entity-manager", () => {
             dao,
             recipient: hotspotOwner.publicKey,
             issuingAuthority: makerKeypair.publicKey,
+            eccVerifier: eccVerifier.publicKey,
           })
-          .signers([makerKeypair])
+          .signers([makerKeypair, eccVerifier])
           .rpc({ skipPreflight: true });
 
         const method = (
@@ -508,8 +574,9 @@ describe("helium-entity-manager", () => {
           dao,
           recipient: hotspotOwner.publicKey,
           issuingAuthority: makerKeypair.publicKey,
+          eccVerifier: eccVerifier.publicKey,
         })
-        .signers([makerKeypair])
+        .signers([makerKeypair, eccVerifier])
         .rpc({ skipPreflight: true });
 
       const method = (
@@ -569,8 +636,9 @@ describe("helium-entity-manager", () => {
             dao,
             recipient: hotspotOwner.publicKey,
             issuingAuthority: makerKeypair.publicKey,
+            eccVerifier: eccVerifier.publicKey,
           })
-          .signers([makerKeypair])
+          .signers([makerKeypair, eccVerifier])
           .rpc({ skipPreflight: true });
 
         const method = (
