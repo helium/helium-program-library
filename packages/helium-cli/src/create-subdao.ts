@@ -236,7 +236,8 @@ async function run() {
 
   const calculateThread = threadKey(subdao, "calculate")[0];
   const issueThread = threadKey(subdao, "issue")[0];
-
+  const emissionSchedule = await parseEmissionsSchedule(argv.emissionSchedulePath);
+  
   const squads = Squads.endpoint(
     process.env.ANCHOR_PROVIDER_URL,
     provider.wallet
@@ -409,7 +410,7 @@ async function run() {
         windowConfig: {
           windowSizeSeconds: new anchor.BN(24 * 60 * 60),
           thresholdType: ThresholdType.Absolute as never,
-          threshold: new anchor.BN(5 * argv.startEpochRewards),
+          threshold: new anchor.BN(emissionSchedule[0].emissionsPerEpoch).mul(new anchor.BN(5)),
         },
       })
       .accounts({
@@ -481,7 +482,7 @@ async function run() {
         await heliumSubDaosProgram.methods
           .updateSubDaoV0({
             authority,
-            emissionSchedule: parseEmissionsSchedule(argv.emissionSchedulePath),
+            emissionSchedule,
             dcBurnAuthority: null,
             onboardingDcFee: null,
             activeDeviceAggregator: null,
