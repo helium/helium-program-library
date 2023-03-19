@@ -525,7 +525,7 @@ async function run() {
     } else {
       settings = {
         mobileConfig: {
-          nStakingFee: toBN(1000000, 0),
+          fullLocationStakingFee: toBN(1000000, 0),
           dataonlyLocationStakingFee: toBN(500000, 0),
         },
       };
