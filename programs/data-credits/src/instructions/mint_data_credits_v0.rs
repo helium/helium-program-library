@@ -197,7 +197,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
 
   msg!(
     "HNT Price is {} * 10^{}, issuing {} data credits",
-    hnt_price.price,
+    hnt_price_with_conf,
     hnt_price.expo,
     dc_amount
   );

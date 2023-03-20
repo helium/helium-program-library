@@ -1,4 +1,4 @@
-use crate::{current_epoch, error::ErrorCode, state::*, TESTING};
+use crate::{current_epoch, error::ErrorCode, state::*, EPOCH_LENGTH, TESTING};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use circuit_breaker::{
@@ -62,9 +62,10 @@ impl<'info> IssueHstPoolV0<'info> {
 
 pub fn handler(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result<ThreadResponse> {
   let curr_ts = Clock::get()?.unix_timestamp;
-  let epoch = current_epoch(curr_ts);
+  let epoch_curr_ts = current_epoch(curr_ts);
+  let end_of_epoch_ts = i64::try_from(args.epoch + 1).unwrap() * EPOCH_LENGTH;
 
-  if !TESTING && args.epoch >= epoch {
+  if !TESTING && args.epoch >= epoch_curr_ts {
     return Err(error!(ErrorCode::EpochNotOver));
   }
 
@@ -73,7 +74,7 @@ pub fn handler(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result
     .accounts
     .dao
     .hst_emission_schedule
-    .get_percent_at(curr_ts)
+    .get_percent_at(end_of_epoch_ts)
     .unwrap();
   // Subdaos get the remainder after hst
   let emissions = u64::from(percent)
@@ -94,7 +95,7 @@ pub fn handler(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result
   ctx.accounts.dao_epoch_info.done_issuing_hst_pool = true;
 
   // update thread to point at next epoch
-  let next_epoch = current_epoch(curr_ts);
+  let next_epoch = args.epoch + 1;
 
   let dao_key = ctx.accounts.dao.key();
   let dao_ei_seeds: &[&[u8]] = &[
