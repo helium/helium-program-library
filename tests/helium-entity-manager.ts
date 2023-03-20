@@ -332,7 +332,7 @@ describe("helium-entity-manager", () => {
           entityKey: Buffer.from(bs58.decode(ecc)),
         })
         .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ])
         .accounts({
           maker,
