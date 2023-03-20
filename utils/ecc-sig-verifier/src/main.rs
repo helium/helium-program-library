@@ -8,6 +8,7 @@ use rocket::{
   serde::{json::Json, Deserialize, Serialize},
 };
 use solana_sdk::{bs58, signature::read_keypair_file, transaction::Transaction};
+use std::env;
 use std::str::FromStr;
 
 #[derive(Serialize)]
@@ -64,6 +65,7 @@ fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Sta
   let compute_ixn = &solana_txn.message.instructions[0];
   let compute_program_id = account_keys[compute_ixn.program_id_index as usize];
   if compute_program_id != Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap() {
+    error!("First instruction is not compute budget");
     return Err(Status::BadRequest);
   }
 
@@ -99,8 +101,11 @@ fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Sta
   })?;
 
   // Sign the solana transaction
-  let keypair = read_keypair_file(std::option_env!("ANCHOR_WALLET").unwrap_or("keypair.json"))
-    .map_err(|_| Status::BadRequest)?;
+  let keypair = read_keypair_file(env::var("ANCHOR_WALLET").unwrap_or("keypair.json".to_string()))
+    .map_err(|_| {
+      error!("failed to read keypair");
+      Status::InternalServerError
+    })?;
   solana_txn
     .try_partial_sign(&[&keypair], solana_txn.message.recent_blockhash)
     .map_err(|e| {
