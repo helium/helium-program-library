@@ -140,6 +140,15 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
     .get_ema_price_no_older_than(current_time, if TESTING { 6000000 } else { 10 * 60 })
     .ok_or_else(|| error!(DataCreditsErrors::PythPriceNotFound))?;
 
+  require_gt!(hnt_price.price, 0);
+
+  // Remove the confidence from the price to use the most conservative price
+  // https://docs.pyth.network/pythnet-price-feeds/best-practices
+  let hnt_price_with_conf = hnt_price
+    .price
+    .checked_sub(i64::try_from(hnt_price.conf.checked_mul(2).unwrap()).unwrap())
+    .unwrap();
+
   // dc_exponent = 5 since $1 = 10^5 DC
   // expo is a negative number, i.e. normally -8 for 8 hnt decimals
   // dc = (price * 10^expo) * (hnt_amount * 10^-hnt_decimals) * 10^dc_exponent
@@ -155,7 +164,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
     (Some(hnt_amount), None) => {
       let dc_amount = u64::try_from(
         u128::from(hnt_amount)
-          .checked_mul(u128::try_from(hnt_price.price).unwrap())
+          .checked_mul(u128::try_from(hnt_price_with_conf).unwrap())
           .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
           .div(decimals_factor),
       )
@@ -168,7 +177,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
         u128::from(dc_amount)
           .checked_mul(decimals_factor)
           .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
-          .checked_div(u128::try_from(hnt_price.price).unwrap())
+          .checked_div(u128::try_from(hnt_price_with_conf).unwrap())
           .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?,
       )
       .map_err(|_| error!(DataCreditsErrors::ArithmeticError))?;
@@ -188,7 +197,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
 
   msg!(
     "HNT Price is {} * 10^{}, issuing {} data credits",
-    hnt_price.price,
+    hnt_price_with_conf,
     hnt_price.expo,
     dc_amount
   );

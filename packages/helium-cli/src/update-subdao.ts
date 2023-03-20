@@ -211,7 +211,7 @@ async function run() {
       .updateSubDaoV0({
         authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
         emissionSchedule: argv.newEmissionsSchedulePath
-          ? parseEmissionsSchedule(argv.newEmissionsSchedulePath)
+          ? await parseEmissionsSchedule(argv.newEmissionsSchedulePath)
           : null,
         dcBurnAuthority: argv.newDcBurnAuthority
           ? new PublicKey(argv.newDcBurnAuthority)

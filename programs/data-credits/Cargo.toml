@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "data_credits"
 
 [features]
+devnet = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []

@@ -46,6 +46,7 @@ import {
   getUnixTimestamp,
   isLocalhost,
   loadKeypair,
+  parseEmissionsSchedule,
   sendInstructionsOrSquads,
 } from "./utils";
 
@@ -187,6 +188,11 @@ const yarg = yargs(hideBin(process.argv)).options({
     required: true,
     describe: "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 2 decimal places.",
   }
+  emissionSchedulePath: {
+    required: true,
+    describe: "Path to file that contains the dnt emissions schedule",
+    type: "string",
+  },
 });
 
 const SECS_PER_DAY = 86400;
@@ -236,7 +242,8 @@ async function run() {
 
   const calculateThread = threadKey(subdao, "calculate")[0];
   const issueThread = threadKey(subdao, "issue")[0];
-
+  const emissionSchedule = await parseEmissionsSchedule(argv.emissionSchedulePath);
+  
   const squads = Squads.endpoint(
     process.env.ANCHOR_PROVIDER_URL,
     provider.wallet
@@ -405,11 +412,11 @@ async function run() {
             url: rewardsOracleUrl,
           },
         ],
-        // 10 x epoch rewards in a 24 hour period
+        // 5 x epoch rewards in a 24 hour period
         windowConfig: {
           windowSizeSeconds: new anchor.BN(24 * 60 * 60),
           thresholdType: ThresholdType.Absolute as never,
-          threshold: new anchor.BN(10 * argv.startEpochRewards),
+          threshold: new anchor.BN(emissionSchedule[0].emissionsPerEpoch).mul(new anchor.BN(5)),
         },
       })
       .accounts({
@@ -443,7 +450,8 @@ async function run() {
         registrar: registrar,
         dcBurnAuthority: new PublicKey(argv.dcBurnAuthority),
         authority,
-        emissionSchedule: emissionSchedule(argv.startEpochRewards),
+        // Tx to large to do here, do it with update
+        emissionSchedule: [],
         // Linear curve
         treasuryCurve: {
           exponentialCurveV0: {
@@ -474,6 +482,32 @@ async function run() {
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
       ]);
     await initSubdaoMethod.rpc({ skipPreflight: true });
+    const { subDao } = await initSubdaoMethod.pubkeys();
+    await sendInstructionsOrSquads({
+      provider,
+      instructions: [
+        await heliumSubDaosProgram.methods
+          .updateSubDaoV0({
+            authority,
+            emissionSchedule,
+            dcBurnAuthority: null,
+            onboardingDcFee: null,
+            activeDeviceAggregator: null,
+            registrar: null,
+          })
+          .accounts({
+            subDao,
+            authority,
+            payer: authority,
+          })
+          .instruction(),
+      ],
+      executeTransaction: true,
+      squads,
+      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
+      authorityIndex: argv.authorityIndex,
+      signers: [],
+    });
   }
 
   const hsConfigKey = (
@@ -547,7 +581,7 @@ function emissionSchedule(
       startUnixTime: new anchor.BN(twoYear * 2 * 31557600 + now), // 2 years in seconds
       emissionsPerEpoch: toBN(
         startEpochRewards / Math.pow(2, twoYear) / (365.25 * 24), // Break into daily
-        8
+        6
       ),
     };
   });

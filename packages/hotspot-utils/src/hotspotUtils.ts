@@ -7,7 +7,13 @@ import {
   VersionedMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { Asset, AssetProof, getAssetProof } from "@helium/spl-utils";
+import {
+  Asset,
+  AssetProof,
+  getAssetProof,
+  IOT_MINT,
+  MOBILE_MINT,
+} from "@helium/spl-utils";
 import {
   PROGRAM_ID as BUBBLEGUM_PROGRAM_ID,
   createTransferInstruction,
@@ -17,6 +23,14 @@ import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   SPL_NOOP_PROGRAM_ID,
 } from "@solana/spl-account-compression";
+import { subDaoKey } from "@helium/helium-sub-daos-sdk";
+import {
+  iotInfoKey,
+  mobileInfoKey,
+  rewardableEntityConfigKey,
+} from "@helium/helium-entity-manager-sdk";
+import { Program } from "@coral-xyz/anchor";
+import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 
 const getBubblegumAuthorityPDA = async (merkleRollPubKey: PublicKey) => {
   const [bubblegumAuthorityPDAKey] = await PublicKey.findProgramAddress(
@@ -105,4 +119,33 @@ export const createTransferCompressedCollectableTxn = async ({
   return new VersionedTransaction(
     VersionedMessage.deserialize(messageV0.serialize())
   );
+};
+
+export const getHotspotDetails = async ({
+  hemProgram,
+  address,
+  type,
+}: {
+  hemProgram: Program<HeliumEntityManager>;
+  address: string;
+  type: "MOBILE" | "IOT";
+}) => {
+  const mint = type === "IOT" ? IOT_MINT : MOBILE_MINT;
+  const subDao = subDaoKey(mint)[0];
+
+  const configKey = rewardableEntityConfigKey(subDao, type);
+
+  const entityConfig =
+    await hemProgram.account.rewardableEntityConfigV0.fetchNullable(
+      configKey[0]
+    );
+  if (!entityConfig) return;
+
+  if (type === "IOT") {
+    const [info] = await iotInfoKey(configKey[0], address);
+    return hemProgram.account.iotHotspotInfoV0.fetch(info);
+  }
+
+  const [info] = await mobileInfoKey(configKey[0], address);
+  return hemProgram.account.mobileHotspotInfoV0.fetch(info);
 };
