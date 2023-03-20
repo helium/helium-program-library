@@ -494,6 +494,7 @@ async function run() {
             onboardingDcFee: null,
             activeDeviceAggregator: null,
             registrar: null,
+            delegatorRewardsPercent: null,
           })
           .accounts({
             subDao,

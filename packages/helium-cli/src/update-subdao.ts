@@ -15,6 +15,7 @@ import {
   AggregatorAccount,
   SwitchboardProgram,
 } from "@switchboard-xyz/solana.js";
+import { BN } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
@@ -221,7 +222,7 @@ async function run() {
           ? new PublicKey(argv.newActiveDeviceAggregator)
           : null,
         registrar: argv.registrar ? new PublicKey(argv.registrar) : null,
-        delegatorRewardsPercent: argv.delegatorRewardsPercent ? Math.floor(argv.delegatorRewardsPercent*Math.pow(10, 8)) : null,
+        delegatorRewardsPercent: argv.delegatorRewardsPercent ? new BN(Math.floor(argv.delegatorRewardsPercent*Math.pow(10, 8))) : null,
       })
       .accounts({
         subDao,
