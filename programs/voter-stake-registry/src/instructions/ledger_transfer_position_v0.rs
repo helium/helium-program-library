@@ -98,7 +98,7 @@ pub fn handler(ctx: Context<LedgerTransferPositionV0>) -> Result<()> {
   // Thaw the source
   token::thaw_account(ctx.accounts.thaw_ctx().with_signer(signer_seeds))?;
   // Transfer to dest
-  token::transfer(ctx.accounts.transfer_ctx().with_signer(signer_seeds), 1)?;
+  token::transfer(ctx.accounts.transfer_ctx(), 1)?;
   // Freeze the dest
   token::freeze_account(ctx.accounts.freeze_ctx().with_signer(signer_seeds))?;
 
