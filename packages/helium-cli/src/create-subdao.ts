@@ -187,7 +187,7 @@ const yarg = yargs(hideBin(process.argv)).options({
     type: "number",
     required: true,
     describe: "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 2 decimal places.",
-  }
+  },
   emissionSchedulePath: {
     required: true,
     describe: "Path to file that contains the dnt emissions schedule",
