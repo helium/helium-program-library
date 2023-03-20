@@ -278,53 +278,53 @@ describe("helium-entity-manager", () => {
     // Only uncomment this when you want to debug the sig verifier service locally.
     // You can run it like:
     // env ANCHOR_WALLET=path/to//helium-program-library/tests/verifier-test.json cargo run
-    // it("properly uses the sig verifier service", async () => {
-    //   const issueTx =
-    //     "CroBCiEB7UTmtDnUwT3fGbvn4ASvsi5n6wJiNTs/euxRYXFWiRASIQCIruPASTMtSA87u0hkkApMXY/q2cydP5We1vkyUj9fiSJGMEQCIA46K0Xug+nxpaLi9z25jEI5RtHmWTtvgZFOQBr06jzKAiBifpM+/m/k3SwDAES9FA9QqPv4ElDhh+zCqMbJ15DqYiohAfK7mMA4Bu0mM6e/N81WeNbTEFdgyo4A5g5MgsPQjMazOICS9AFA6PsD";
-    //   const txn = AddGatewayV1.fromString(issueTx);
-    //   const eccKey = txn.gateway?.b58;
-    //   // @ts-ignore
-    //   const addGateway = txn.toProto(true);
-    //   const serialized = helium.blockchain_txn_add_gateway_v1
-    //     .encode(addGateway)
-    //     .finish();
+    xit("properly uses the sig verifier service", async () => {
+      const issueTx =
+        "CroBCiEB7UTmtDnUwT3fGbvn4ASvsi5n6wJiNTs/euxRYXFWiRASIQCIruPASTMtSA87u0hkkApMXY/q2cydP5We1vkyUj9fiSJGMEQCIA46K0Xug+nxpaLi9z25jEI5RtHmWTtvgZFOQBr06jzKAiBifpM+/m/k3SwDAES9FA9QqPv4ElDhh+zCqMbJ15DqYiohAfK7mMA4Bu0mM6e/N81WeNbTEFdgyo4A5g5MgsPQjMazOICS9AFA6PsD";
+      const txn = AddGatewayV1.fromString(issueTx);
+      const eccKey = txn.gateway?.b58;
+      // @ts-ignore
+      const addGateway = txn.toProto(true);
+      const serialized = helium.blockchain_txn_add_gateway_v1
+        .encode(addGateway)
+        .finish();
 
-    //   let tx = await hemProgram.methods
-    //     .issueEntityV0({
-    //       entityKey: Buffer.from(bs58.decode(eccKey)),
-    //     })
-    //     .preInstructions([
-    //       ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-    //     ])
-    //     .accounts({
-    //       maker,
-    //       recipient: hotspotOwner.publicKey,
-    //       issuingAuthority: makerKeypair.publicKey,
-    //       dao,
-    //       eccVerifier: eccVerifier.publicKey,
-    //     })
-    //     .signers([makerKeypair])
-    //     .transaction();
-    //   tx.recentBlockhash = (await provider.connection.getRecentBlockhash()).blockhash;
-    //   tx.feePayer = provider.wallet.publicKey;
-    //   tx.partialSign(makerKeypair)
-    //   tx = await provider.wallet.signTransaction(tx)
+      let tx = await hemProgram.methods
+        .issueEntityV0({
+          entityKey: Buffer.from(bs58.decode(eccKey)),
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+        ])
+        .accounts({
+          maker,
+          recipient: hotspotOwner.publicKey,
+          issuingAuthority: makerKeypair.publicKey,
+          dao,
+          eccVerifier: eccVerifier.publicKey,
+        })
+        .signers([makerKeypair])
+        .transaction();
+      tx.recentBlockhash = (await provider.connection.getRecentBlockhash()).blockhash;
+      tx.feePayer = provider.wallet.publicKey;
+      tx.partialSign(makerKeypair)
+      tx = await provider.wallet.signTransaction(tx)
 
-    //   const { transaction } = (
-    //     await axios.post("http://localhost:8000/verify", {
-    //       transaction: tx
-    //         .serialize({
-    //           requireAllSignatures: false,
-    //         })
-    //         .toString("hex"),
-    //       msg: Buffer.from(serialized).toString("hex"),
-    //       signature:
-    //         Buffer.from(txn.gatewaySignature!).toString("hex"),
-    //     })
-    //   ).data;
-    //   const sig = await provider.connection.sendRawTransaction(Buffer.from(transaction, "hex"));
-    //   await provider.connection.confirmTransaction(sig)
-    // })
+      const { transaction } = (
+        await axios.post("http://localhost:8000/verify", {
+          transaction: tx
+            .serialize({
+              requireAllSignatures: false,
+            })
+            .toString("hex"),
+          msg: Buffer.from(serialized).toString("hex"),
+          signature:
+            Buffer.from(txn.gatewaySignature!).toString("hex"),
+        })
+      ).data;
+      const sig = await provider.connection.sendRawTransaction(Buffer.from(transaction, "hex"));
+      await provider.connection.confirmTransaction(sig)
+    })
 
     it("issues a mobile hotspot", async () => {
       await hemProgram.methods
