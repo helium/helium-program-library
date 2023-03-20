@@ -55,7 +55,7 @@ pub fn handler(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result
   }
 
   let max_percent = 100_u64
-    .checked_mul(10_u64.checked_pow(8_64).unwrap())
+    .checked_mul(10_u64.checked_pow(8_u32).unwrap())
     .unwrap();
   if let Some(delegator_rewards_percent) = args.delegator_rewards_percent {
     assert!(delegator_rewards_percent < max_percent);

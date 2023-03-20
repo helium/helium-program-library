@@ -281,7 +281,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
   assert!(
     args.delegator_rewards_percent
       < 100_u64
-        .checked_mul(10_u64.checked_pow(8_64).unwrap())
+        .checked_mul(10_u64.checked_pow(8_u32).unwrap())
         .unwrap()
   );
   ctx.accounts.dao.num_sub_daos += 1;

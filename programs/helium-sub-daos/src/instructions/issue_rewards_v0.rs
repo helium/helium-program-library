@@ -171,7 +171,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
 
   let delegators_present = ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start > 0;
   let max_percent = 100_u64
-    .checked_mul(10_u64.checked_pow(8_64).unwrap())
+    .checked_mul(10_u64.checked_pow(8_u32).unwrap())
     .unwrap();
   mint_v0(
     ctx.accounts.mint_dnt_emissions_ctx().with_signer(&[&[
@@ -181,7 +181,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     ]]),
     MintArgsV0 {
       amount: total_emissions
-        .checked_mul((max_percent - ctx.accounts.sub_dao.delegator_rewards_percent).into())
+        .checked_mul(max_percent - ctx.accounts.sub_dao.delegator_rewards_percent)
         .unwrap()
         .checked_div(max_percent) // 100% with 2 decimals accuracy
         .unwrap(), // send some dnt emissions to treasury
@@ -190,7 +190,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
 
   let delegation_rewards_amount = if delegators_present {
     total_emissions
-      .checked_mul(ctx.accounts.sub_dao.delegator_rewards_percent.into())
+      .checked_mul(ctx.accounts.sub_dao.delegator_rewards_percent)
       .unwrap()
       .checked_div(max_percent) // 100% with 2 decimals accuracy
       .unwrap()
