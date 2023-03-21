@@ -170,6 +170,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .unwrap();
 
   let delegators_present = ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start > 0;
+  let max_percent = 100_u64.checked_mul(10_0000000).unwrap();
   mint_v0(
     ctx.accounts.mint_dnt_emissions_ctx().with_signer(&[&[
       b"sub_dao",
@@ -178,33 +179,35 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     ]]),
     MintArgsV0 {
       amount: total_emissions
-        .checked_mul(94)
+        .checked_mul(max_percent - ctx.accounts.sub_dao.delegator_rewards_percent)
         .unwrap()
-        .checked_div(100)
-        .unwrap(), // 94% of emissions are sent to treasury
+        .checked_div(max_percent) // 100% with 2 decimals accuracy
+        .unwrap(), // send some dnt emissions to treasury
     },
   )?;
 
   let delegation_rewards_amount = if delegators_present {
     total_emissions
-      .checked_mul(6)
+      .checked_mul(ctx.accounts.sub_dao.delegator_rewards_percent)
       .unwrap()
-      .checked_div(100)
+      .checked_div(max_percent) // 100% with 8 decimals accuracy
       .unwrap()
   } else {
     0
   };
 
-  mint_v0(
-    ctx.accounts.mint_delegation_rewards_ctx().with_signer(&[&[
-      b"sub_dao",
-      ctx.accounts.dnt_mint.key().as_ref(),
-      &[ctx.accounts.sub_dao.bump_seed],
-    ]]),
-    MintArgsV0 {
-      amount: delegation_rewards_amount, // 6% of emissions are sent to delegation pool
-    },
-  )?;
+  if delegation_rewards_amount > 0 {
+    mint_v0(
+      ctx.accounts.mint_delegation_rewards_ctx().with_signer(&[&[
+        b"sub_dao",
+        ctx.accounts.dnt_mint.key().as_ref(),
+        &[ctx.accounts.sub_dao.bump_seed],
+      ]]),
+      MintArgsV0 {
+        amount: delegation_rewards_amount, // send some dnt emissions to delegation pool
+      },
+    )?;
+  }
 
   mint_v0(
     ctx.accounts.mint_treasury_emissions_ctx().with_signer(&[&[
