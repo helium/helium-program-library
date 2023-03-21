@@ -279,7 +279,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
   )?;
 
   require_gte!(
-    100_u64.checked_mul(10_00000000).unwrap(),
+    100_u64.checked_mul(10_0000000).unwrap(),
     args.delegator_rewards_percent,
   );
   ctx.accounts.dao.num_sub_daos += 1;
