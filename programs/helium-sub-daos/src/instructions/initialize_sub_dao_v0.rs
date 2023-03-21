@@ -278,11 +278,9 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     Some(ctx.accounts.sub_dao.key()),
   )?;
 
-  assert!(
-    args.delegator_rewards_percent
-      < 100_u64
-        .checked_mul(10_u64.checked_pow(8_u32).unwrap())
-        .unwrap()
+  require_gte!(
+    100_u64.checked_mul(100_00000000).unwrap(),
+    args.delegator_rewards_percent,
   );
   ctx.accounts.dao.num_sub_daos += 1;
   ctx.accounts.sub_dao.set_inner(SubDaoV0 {

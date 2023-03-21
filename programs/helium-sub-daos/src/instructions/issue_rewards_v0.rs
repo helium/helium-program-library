@@ -170,9 +170,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .unwrap();
 
   let delegators_present = ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start > 0;
-  let max_percent = 100_u64
-    .checked_mul(10_u64.checked_pow(8_u32).unwrap())
-    .unwrap();
+  let max_percent = 100_u64.checked_mul(100_00000000).unwrap();
   mint_v0(
     ctx.accounts.mint_dnt_emissions_ctx().with_signer(&[&[
       b"sub_dao",
@@ -192,7 +190,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     total_emissions
       .checked_mul(ctx.accounts.sub_dao.delegator_rewards_percent)
       .unwrap()
-      .checked_div(max_percent) // 100% with 2 decimals accuracy
+      .checked_div(max_percent) // 100% with 8 decimals accuracy
       .unwrap()
   } else {
     0

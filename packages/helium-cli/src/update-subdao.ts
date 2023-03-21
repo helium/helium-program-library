@@ -8,7 +8,7 @@ import {
   init as initHem,
   rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
-import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { init as initHsd, subDaoKey, delegatorRewardsPercent } from "@helium/helium-sub-daos-sdk";
 import { Cluster, PublicKey } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import {
@@ -97,7 +97,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   delegatorRewardsPercent: {
     type: "number",
     required: false,
-    describe: "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 2 decimal places.",
+    describe: "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
     default: null,
   }
 });
@@ -222,7 +222,7 @@ async function run() {
           ? new PublicKey(argv.newActiveDeviceAggregator)
           : null,
         registrar: argv.registrar ? new PublicKey(argv.registrar) : null,
-        delegatorRewardsPercent: argv.delegatorRewardsPercent ? new BN(Math.floor(argv.delegatorRewardsPercent*Math.pow(10, 8))) : null,
+        delegatorRewardsPercent: argv.delegatorRewardsPercent ? delegatorRewardsPercent(argv.delegatorRewardsPercent) : null,
       })
       .accounts({
         subDao,

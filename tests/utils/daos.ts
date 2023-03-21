@@ -10,7 +10,7 @@ import {
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { toU128 } from "../../packages/treasury-management-sdk/src";
 import { DC_FEE } from "./fixtures";
-import { subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { subDaoKey, delegatorRewardsPercent } from "@helium/helium-sub-daos-sdk";
 
 const CLOCKWORK_PID = new PublicKey(
   "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
@@ -124,7 +124,7 @@ export async function initTestSubdao(
         threshold: new anchor.BN("10000000000000000000"),
       },
       dcBurnAuthority: authority,
-      delegatorRewardsPercent: new BN(6 * Math.pow(10, 8)), // 6%
+      delegatorRewardsPercent: delegatorRewardsPercent(6), // 6%
     })
     .preInstructions([
       ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),

@@ -54,11 +54,9 @@ pub fn handler(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result
     ctx.accounts.sub_dao.registrar = registrar;
   }
 
-  let max_percent = 100_u64
-    .checked_mul(10_u64.checked_pow(8_u32).unwrap())
-    .unwrap();
+  let max_percent = 100_u64.checked_mul(100_00000000).unwrap();
   if let Some(delegator_rewards_percent) = args.delegator_rewards_percent {
-    assert!(delegator_rewards_percent < max_percent);
+    require_gte!(max_percent, delegator_rewards_percent);
     ctx.accounts.sub_dao.delegator_rewards_percent = delegator_rewards_percent;
   }
 

@@ -9,6 +9,7 @@ import {
   init as initDao,
   subDaoKey,
   threadKey,
+  delegatorRewardsPercent,
 } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
@@ -186,7 +187,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   delegatorRewardsPercent: {
     type: "number",
     required: true,
-    describe: "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 2 decimal places.",
+    describe: "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
   },
   emissionSchedulePath: {
     required: true,
@@ -465,7 +466,7 @@ async function run() {
           threshold: thresholdPercent(20),
         },
         onboardingDcFee: toBN(4000000, 0), // $40 in dc
-        delegatorRewardsPercent: new BN(Math.floor(argv.delegatorRewardsPercent*Math.pow(10, 8))),
+        delegatorRewardsPercent: delegatorRewardsPercent(argv.delegatorRewardsPercent),
       })
       .accounts({
         dao,
