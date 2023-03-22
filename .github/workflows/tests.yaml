@@ -83,9 +83,8 @@ jobs:
             echo "Waiting for local Anchor network to start..."
             sleep 5
           done
-      - run: yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 $TEST
+      - run: ANCHOR_WALLET=${HOME}/.config/solana/id.json yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 $TEST
         env:
           TESTING: true
           TEST: ${{ matrix.test }}
-          ANCHOR_WALLET: ~/.config/solana/id.json
           ANCHOR_PROVIDER_URL: http://localhost:8899
