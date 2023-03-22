@@ -10,6 +10,7 @@ pub struct UpdateSubDaoArgsV0 {
   pub dc_burn_authority: Option<Pubkey>,
   pub active_device_aggregator: Option<Pubkey>,
   pub registrar: Option<Pubkey>,
+  pub delegator_rewards_percent: Option<u64>,
 }
 
 #[derive(Accounts)]
@@ -51,6 +52,12 @@ pub fn handler(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result
 
   if let Some(registrar) = args.registrar {
     ctx.accounts.sub_dao.registrar = registrar;
+  }
+
+  let max_percent = 100_u64.checked_mul(10_0000000).unwrap();
+  if let Some(delegator_rewards_percent) = args.delegator_rewards_percent {
+    require_gte!(max_percent, delegator_rewards_percent);
+    ctx.accounts.sub_dao.delegator_rewards_percent = delegator_rewards_percent;
   }
 
   resize_to_fit(

@@ -3,7 +3,8 @@ import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
   dataCreditsKey,
   init as initDc,
-  PROGRAM_ID
+  PROGRAM_ID,
+  accountPayerKey,
 } from "@helium/data-credits-sdk";
 import {
   daoKey,
@@ -22,7 +23,8 @@ import {
 } from "@solana/spl-token";
 import {
   Connection,
-  PublicKey, TransactionInstruction
+  LAMPORTS_PER_SOL,
+  PublicKey, SystemProgram, Transaction, TransactionInstruction
 } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
@@ -339,7 +341,6 @@ async function run() {
       SetRealmAuthorityAction.SetChecked
     );
   }
-
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
@@ -361,6 +362,19 @@ async function run() {
         hntPriceOracle: new PublicKey(argv.pythHntPriceFeed),
       })
       .rpc({ skipPreflight: true });
+
+    let tx = new Transaction();
+    tx.add(
+      SystemProgram.transfer({
+        fromPubkey: provider.wallet.publicKey,
+        toPubkey: accountPayerKey()[0],
+        lamports: 5 * LAMPORTS_PER_SOL,
+      })
+    );
+    tx.recentBlockhash = (
+      await provider.connection.getLatestBlockhash()
+    ).blockhash;
+    tx.feePayer = provider.wallet.publicKey;
   }
 
   if (!(await exists(conn, dao))) {
