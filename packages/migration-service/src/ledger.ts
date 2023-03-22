@@ -114,11 +114,11 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
         .accounts({
           to,
           from,
-          mint: position.id,
+          mint: position,
         })
         .instruction(),
       createCloseAccountInstruction(
-        getAssociatedTokenAddressSync(position.id, from),
+        getAssociatedTokenAddressSync(position, from),
         from,
         from,
         []
@@ -159,13 +159,13 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
     tx.add(...chunk);
     transactions.push(tx);
   });
-  
-  if (transferPositionIxns.length > 0) {
+
+  for (const chunk of chunks(transferPositionIxns, 2)) {
     const tx = new Transaction({
       feePayer: from,
       recentBlockhash,
     });
-    tx.add(...transferAssetIxns);
+    tx.add(...chunk);
     transactions.push(await provider.wallet.signTransaction(tx));
   }
 

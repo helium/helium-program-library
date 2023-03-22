@@ -23,7 +23,11 @@ pub struct LedgerTransferPositionV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
 
-  #[account(has_one = mint)]
+  #[account(
+    has_one = mint,
+    seeds = [b"position".as_ref(), mint.key().as_ref()],
+    bump = position.bump_seed,
+  )]
   pub position: Box<Account<'info, PositionV0>>,
   #[account(
     mut,
