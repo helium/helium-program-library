@@ -63,11 +63,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ci_index: [0, 1, 2, 3, 4, 5, 6, 7, 8]
-        ci_total: [9]
+        test:
+          - tests/circuit-breaker.ts
+          - tests/data-credits.ts
+          - tests/distributor-oracle.ts
+          - tests/helium-entity-manager.ts
+          - tests/lazy-distributor.ts
+          - tests/lazy-transactions.ts
+          - tests/treasury-management.ts
+          - tests/voter-stake-registry.ts
     steps:
       - uses: actions/checkout@v3
-      - run:  find tests -name \*.ts | xargs anchor run --provider.cluster localnet --skip-build --run
+      - run: ~/.cargo/bin/anchor test --provider.cluster localnet --skip-build --provider.wallet ~/.config/solana/id.json --run $TEST
         env:
-          CI_TOTAL: ${{ matrix.ci_total }}
-          CI_INDEX: ${{ matrix.ci_index }}
+          TESTING: true
+          TEST: ${{ matrix.test }}
