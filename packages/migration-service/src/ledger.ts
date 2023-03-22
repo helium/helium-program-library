@@ -1,16 +1,12 @@
-import { daoKey, init } from "@helium/helium-sub-daos-sdk";
+import { AssetProof, chunks, getAssetProof, getAssetsByOwner } from "@helium/spl-utils";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
-import { AssetProof, chunks, getAssetProof, getAssetsByOwner, HNT_MINT } from "@helium/spl-utils";
-import { registrarCollectionKey } from "@helium/voter-stake-registry-sdk";
 import {
-  PROGRAM_ID as BUBBLEGUM_PROGRAM_ID,
-  createTransferInstruction,
+  createTransferInstruction, PROGRAM_ID as BUBBLEGUM_PROGRAM_ID
 } from "@metaplex-foundation/mpl-bubblegum";
 import { ConcurrentMerkleTreeAccount, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID, SPL_NOOP_PROGRAM_ID } from "@solana/spl-account-compression";
-import { createAssociatedTokenAccountIdempotent, createAssociatedTokenAccountIdempotentInstruction, createCloseAccountInstruction, createTransferCheckedInstruction, createTransferInstruction as createTokenTransfer, getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { createAssociatedTokenAccountIdempotentInstruction, createCloseAccountInstruction, createTransferCheckedInstruction, createTransferInstruction as createTokenTransfer, getAssociatedTokenAddressSync, getMint, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { AccountMeta, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
 import { provider } from "./solana";
-
 
 export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Promise<Transaction[]> {
   const assetApiUrl =
@@ -19,16 +15,10 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
   const assets = await getAssetsByOwner(assetApiUrl, from.toBase58());
 
   const uniqueAssets = new Set(assets.map(asset => asset.id.toBase58()));
-  const hsdProgram = await init(provider);
   const vsrProgram = await initVsr(provider);
 
-  const dao = await hsdProgram.account.daoV0.fetch(daoKey(HNT_MINT)[0]);
-  const positionCollection = registrarCollectionKey(dao.registrar)[0];
-  const positions = assets.filter(asset => asset.grouping && asset.grouping.equals(positionCollection));
-  const normalAssets = assets.filter(asset => !asset.grouping || !asset.grouping.equals(positionCollection));
-
   const transferAssetIxns: TransactionInstruction[] = [];
-  for (const asset of normalAssets) {
+  for (const asset of assets) {
     if (asset.compression.compressed) {
       const proof = await getAssetProof(assetApiUrl, asset.id);
       if (proof) {
@@ -95,6 +85,28 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
     }
   }
 
+  const tokensResponse = await provider.connection.getParsedTokenAccountsByOwner(
+    from,
+    {
+      programId: TOKEN_PROGRAM_ID,
+    }
+  );
+  const positions = [];
+  const tokens = [];
+  for (const token of tokensResponse.value) {
+    const mint = new PublicKey(token.account.data.parsed.info.mint);
+    const freezeAuth = (await getMint(provider.connection, mint))
+      .freezeAuthority;
+    const freezeAuthOwner = (
+      await provider.connection.getAccountInfo(freezeAuth)
+    ).owner;
+    if (freezeAuthOwner.equals(vsrProgram.programId)) {
+      positions.push(mint);
+    } else {
+      tokens.push(token);
+    }
+  }
+
   const transferPositionIxns = (await Promise.all(positions.map(async position => {
     return [
       await vsrProgram.methods
@@ -114,11 +126,7 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
     ];
   }))).flat();
 
-  const tokens = await provider.connection.getParsedTokenAccountsByOwner(from, {
-    programId: TOKEN_PROGRAM_ID,
-  });
-
-  const transferTokenInstructions = tokens.value.filter(token => !uniqueAssets.has(token.account.data.parsed.info.mint)).flatMap(token => {
+  const transferTokenInstructions = tokens.filter(token => !uniqueAssets.has(token.account.data.parsed.info.mint)).flatMap(token => {
     const mint = new PublicKey(token.account.data.parsed.info.mint);
     const fromAta = token.pubkey;
     const toAta = getAssociatedTokenAddressSync(mint, to);
