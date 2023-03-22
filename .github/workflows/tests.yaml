@@ -75,7 +75,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/
-      - run: ~/.cargo/bin/anchor test --provider.cluster localnet --skip-build --provider.wallet ~/.config/solana/id.json --run $TEST
+      - name: Start Anchor Localnet
+        run: ~/.cargo/bin/anchor localnet --skip-build --provider.wallet ~/.config/solana/id.json & sleep 10
+      - name: Wait for localnet to start
+        run: |
+          while [[ "$(curl -s http://localhost:8899/health)" != "ok" ]]; do
+            echo "Waiting for local Anchor network to start..."
+            sleep 5
+          done
+      - run: yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 $TEST
         env:
           TESTING: true
           TEST: ${{ matrix.test }}
