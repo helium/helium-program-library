@@ -3,7 +3,8 @@ import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
   dataCreditsKey,
   init as initDc,
-  PROGRAM_ID
+  PROGRAM_ID,
+  accountPayerKey,
 } from "@helium/data-credits-sdk";
 import {
   daoKey,
@@ -22,7 +23,8 @@ import {
 } from "@solana/spl-token";
 import {
   Connection,
-  PublicKey, TransactionInstruction
+  LAMPORTS_PER_SOL,
+  PublicKey, SystemProgram, Transaction, TransactionInstruction
 } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
@@ -30,7 +32,7 @@ import yargs from "yargs/yargs";
 import {
   createAndMint,
   getTimestampFromDays,
-  getUnixTimestamp, isLocalhost, loadKeypair
+  getUnixTimestamp, isLocalhost, loadKeypair, parseEmissionsSchedule, sendInstructionsOrSquads
 } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
@@ -99,6 +101,18 @@ async function run() {
       describe: "Bucket URL prefix holding all of the metadata jsons",
       default:
         "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib",
+    },
+    emissionSchedulePath: {
+      required: true,
+      describe: "Path to file that contains the hnt emissions schedule",
+      type: "string",
+      default: `${__dirname}/../emissions/hst.json`,
+    },
+    hstEmissionSchedulePath: {
+      required: true,
+      describe: "Path to file that contains the hst emissions schedule",
+      type: "string",
+      default: `${__dirname}/../emissions/hst.json`,
     },
     govProgramId: {
       type: "string",
@@ -327,7 +341,6 @@ async function run() {
       SetRealmAuthorityAction.SetChecked
     );
   }
-
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
@@ -349,6 +362,19 @@ async function run() {
         hntPriceOracle: new PublicKey(argv.pythHntPriceFeed),
       })
       .rpc({ skipPreflight: true });
+
+    let tx = new Transaction();
+    tx.add(
+      SystemProgram.transfer({
+        fromPubkey: provider.wallet.publicKey,
+        toPubkey: accountPayerKey()[0],
+        lamports: 5 * LAMPORTS_PER_SOL,
+      })
+    );
+    tx.recentBlockhash = (
+      await provider.connection.getLatestBlockhash()
+    ).blockhash;
+    tx.feePayer = provider.wallet.publicKey;
   }
 
   if (!(await exists(conn, dao))) {
@@ -358,19 +384,9 @@ async function run() {
         registrar: registrar,
         authority,
         netEmissionsCap: toBN(34.24, 8),
-        // TODO: Emissions and net emissions schedule for hnt
-        hstEmissionSchedule: [
-          {
-            startUnixTime: new anchor.BN(0),
-            percent: 32,
-          },
-        ],
-        emissionSchedule: [
-          {
-            startUnixTime: new anchor.BN(0),
-            emissionsPerEpoch: new anchor.BN(HNT_EPOCH_REWARDS),
-          },
-        ],
+        // Tx too large to do in initialize dao, so do it with update
+        hstEmissionSchedule: [],
+        emissionSchedule: [],
       })
       .accounts({
         dcMint: dcKeypair.publicKey,
@@ -384,6 +400,28 @@ async function run() {
         ),
       })
       .rpc({ skipPreflight: true });
+
+    await sendInstructionsOrSquads({
+      provider,
+      instructions: [
+        await heliumSubDaosProgram.methods
+          .updateDaoV0({
+            authority,
+            emissionSchedule: await parseEmissionsSchedule(argv.emissionSchedulePath),
+            hstEmissionSchedule:await parseEmissionsSchedule(argv.hstEmissionSchedulePath),
+          })
+          .accounts({
+            dao,
+            authority: authority,
+          })
+          .instruction(),
+      ],
+      executeTransaction: true,
+      squads,
+      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
+      authorityIndex: argv.authorityIndex,
+      signers: [],
+    });
   }
 }
 

@@ -88,7 +88,7 @@ async function run() {
     }).instruction());
   }
   instructions.push(await program.methods.updateDaoV0({
-    authority: new PublicKey(argv.newAuthority),
+    authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
     emissionSchedule: argv.newEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newEmissionsSchedulePath) : null,
     hstEmissionSchedule: argv.newHstEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newHstEmissionsSchedulePath) : null,
   }).accounts({

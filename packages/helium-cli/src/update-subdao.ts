@@ -8,13 +8,14 @@ import {
   init as initHem,
   rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
-import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { init as initHsd, subDaoKey, delegatorRewardsPercent } from "@helium/helium-sub-daos-sdk";
 import { Cluster, PublicKey } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import {
   AggregatorAccount,
   SwitchboardProgram,
 } from "@switchboard-xyz/solana.js";
+import { BN } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
@@ -93,6 +94,12 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "VSR Registrar of subdao",
     default: null,
   },
+  delegatorRewardsPercent: {
+    type: "number",
+    required: false,
+    describe: "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
+    default: null,
+  }
 });
 
 async function run() {
@@ -196,12 +203,16 @@ async function run() {
     }
   }
 
+  if (argv.delegatorRewardsPercent && (argv.delegatorRewardsPercent > 100 || argv.delegatorRewardsPercent < 0)) {
+    throw new Error("Delegator rewards percent must be between 0 and 100");
+  }
+
   instructions.push(
     await program.methods
       .updateSubDaoV0({
         authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
         emissionSchedule: argv.newEmissionsSchedulePath
-          ? parseEmissionsSchedule(argv.newEmissionsSchedulePath)
+          ? await parseEmissionsSchedule(argv.newEmissionsSchedulePath)
           : null,
         dcBurnAuthority: argv.newDcBurnAuthority
           ? new PublicKey(argv.newDcBurnAuthority)
@@ -211,6 +222,7 @@ async function run() {
           ? new PublicKey(argv.newActiveDeviceAggregator)
           : null,
         registrar: argv.registrar ? new PublicKey(argv.registrar) : null,
+        delegatorRewardsPercent: argv.delegatorRewardsPercent ? delegatorRewardsPercent(argv.delegatorRewardsPercent) : null,
       })
       .accounts({
         subDao,

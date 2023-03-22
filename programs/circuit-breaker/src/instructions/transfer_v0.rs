@@ -12,7 +12,7 @@ pub struct TransferArgsV0 {
 pub struct TransferV0<'info> {
   #[account(mut)]
   pub from: Account<'info, TokenAccount>,
-  #[account(mut)]
+  #[account(mut, constraint = from.key() != to.key())]
   pub to: Account<'info, TokenAccount>,
   pub owner: Signer<'info>,
   #[account(
