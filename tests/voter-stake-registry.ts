@@ -41,7 +41,6 @@ import {
 import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import chai, { expect } from "chai";
 import chaiAsPromised from "chai-as-promised";
-import { loadKeypair } from "../packages/migration-service/src/solana";
 import {
   init,
   nftVoteRecordKey,
@@ -51,6 +50,7 @@ import {
 import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 import { getUnixTimestamp } from "./utils/solana";
 import { SPL_GOVERNANCE_PID } from "./utils/vsr";
+import fs from "fs";
 
 chai.use(chaiAsPromised);
 
@@ -930,3 +930,9 @@ describe("voter-stake-registry", () => {
     });
   });
 });
+
+export function loadKeypair(keypair: string): Keypair {
+  return Keypair.fromSecretKey(
+    new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString()))
+  );
+}
