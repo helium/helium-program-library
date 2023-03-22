@@ -1,3 +1,5 @@
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import {
   createAtaAndMint,
@@ -5,10 +7,8 @@ import {
   createMintInstructions,
   sendInstructions,
   toBN,
-  truthy,
+  truthy
 } from "@helium/spl-utils";
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
 import {
   getGovernanceProgramVersion,
   getTokenOwnerRecordAddress,
@@ -30,27 +30,27 @@ import {
   withRelinquishVote,
   withSetRealmConfig,
   withSignOffProposal,
-  YesNoVote,
+  YesNoVote
 } from "@solana/spl-governance";
 import {
   createAssociatedTokenAccountInstruction,
   createTransferInstruction,
   getAssociatedTokenAddress,
-  getAssociatedTokenAddressSync,
+  getAssociatedTokenAddressSync
 } from "@solana/spl-token";
 import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import chai, { expect } from "chai";
 import chaiAsPromised from "chai-as-promised";
+import { loadKeypair } from "../packages/migration-service/src/solana";
 import {
   init,
   nftVoteRecordKey,
   positionKey,
-  PROGRAM_ID,
+  PROGRAM_ID
 } from "../packages/voter-stake-registry-sdk/src";
+import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 import { getUnixTimestamp } from "./utils/solana";
 import { SPL_GOVERNANCE_PID } from "./utils/vsr";
-import { expectBnAccuracy } from "./utils/expectBnAccuracy";
-import { loadKeypair } from "../packages/migration-service/src/solana";
 
 chai.use(chaiAsPromised);
 
