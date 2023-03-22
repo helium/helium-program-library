@@ -76,7 +76,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/
       - name: Start Anchor Localnet
-        run: ~/.cargo/bin/anchor localnet --skip-build --provider.wallet ~/.config/solana/id.json & sleep 10
+        run: ~/.cargo/bin/anchor localnet --skip-build --provider.wallet ~/.config/solana/id.json & sleep 2
       - name: Wait for localnet to start
         run: |
           while [[ "$(curl -s http://localhost:8899/health)" != "ok" ]]; do
@@ -87,3 +87,5 @@ jobs:
         env:
           TESTING: true
           TEST: ${{ matrix.test }}
+          ANCHOR_WALLET: ~/.config/solana/id.json
+          ANCHOR_PROVIDER_URL: http://localhost:8899
