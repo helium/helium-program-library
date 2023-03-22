@@ -74,6 +74,7 @@ jobs:
           - tests/voter-stake-registry.ts
     steps:
       - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-anchor/
       - run: ~/.cargo/bin/anchor test --provider.cluster localnet --skip-build --provider.wallet ~/.config/solana/id.json --run $TEST
         env:
           TESTING: true
