@@ -66,7 +66,7 @@ docker run -e PGPASSWORD=postgres postgres:latest pg_dump -h host.docker.interna
 You must also populate the iot and mobile metadata databases. Switch the port forward to the oracle db. Then:
 
 ```
-$: cd ../helius-service
+$: cd ../hotspot-data-sink
 $: env ANCHOR_WALLET=/path/to/.config/solana/id.json yarn run seed-db -f ../migration-service/export.json
 ```
 

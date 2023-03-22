@@ -1,5 +1,5 @@
 {
-  "name": "@helium/helius-service",
+  "name": "@helium/hotspot-data-sink",
   "private": true,
   "publishConfig": {
     "access": "public",
