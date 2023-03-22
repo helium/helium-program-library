@@ -22,7 +22,7 @@ server.get<{ Params: { eccCompact: string } }>("/:eccCompact", async (request, r
 
   return {
     name: digest,
-    description: "A hotspot NFT on Helium",
+    description: "A Hotspot NFT on Helium",
     image:
       "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/hotspot.png",
     attributes: [
