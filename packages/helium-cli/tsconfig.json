@@ -29,6 +29,9 @@
       "path": "../treasury-management-sdk"
     },
     {
+      "path": "../price-oracle-sdk"
+    },
+    {
       "path": "./tsconfig.cjs.json"
     },
     {
