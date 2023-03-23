@@ -1,3 +1,5 @@
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import {
   createAtaAndMint,
@@ -5,10 +7,8 @@ import {
   createMintInstructions,
   sendInstructions,
   toBN,
-  truthy,
+  truthy
 } from "@helium/spl-utils";
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
 import {
   getGovernanceProgramVersion,
   getTokenOwnerRecordAddress,
@@ -30,12 +30,13 @@ import {
   withRelinquishVote,
   withSetRealmConfig,
   withSignOffProposal,
-  YesNoVote,
+  YesNoVote
 } from "@solana/spl-governance";
 import {
   createAssociatedTokenAccountInstruction,
   createTransferInstruction,
   getAssociatedTokenAddress,
+  getAssociatedTokenAddressSync
 } from "@solana/spl-token";
 import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import chai, { expect } from "chai";
@@ -44,11 +45,12 @@ import {
   init,
   nftVoteRecordKey,
   positionKey,
-  PROGRAM_ID,
+  PROGRAM_ID
 } from "../packages/voter-stake-registry-sdk/src";
+import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 import { getUnixTimestamp } from "./utils/solana";
 import { SPL_GOVERNANCE_PID } from "./utils/vsr";
-import { expectBnAccuracy } from "./utils/expectBnAccuracy";
+import fs from "fs";
 
 chai.use(chaiAsPromised);
 
@@ -253,6 +255,7 @@ describe("voter-stake-registry", () => {
 
   it("should configure a votingMint correctly", async () => {
     const registrarAcc = await program.account.registrar.fetch(registrar);
+    console.log(registrarAcc.collection.toBase58());
     const votingMint0 = (
       registrarAcc.votingMints as VotingMintConfig[]
     )[0] as VotingMintConfig;
@@ -856,6 +859,28 @@ describe("voter-stake-registry", () => {
         .null;
     });
 
+    it("allows transfers for ledger users", async () => {
+      const approver = loadKeypair(__dirname + "/approver-test.json");
+      const to = Keypair.generate();
+
+      const positionAccount = await program.account.positionV0.fetch(position);
+      const mint = positionAccount.mint;
+
+      await program.methods
+        .ledgerTransferPositionV0()
+        .accounts({
+          to: to.publicKey,
+          position,
+          mint,
+          approver: approver.publicKey,
+        })
+        .signers([approver, to])
+        .rpc({ skipPreflight: true });
+
+      const toBalance = await provider.connection.getTokenAccountBalance(getAssociatedTokenAddressSync(mint, to.publicKey));
+      expect(toBalance.value.uiAmount).to.equal(1);
+    });
+
     it("should not allow me to withdraw a position before lockup", async () => {
       await expect(
         program.methods
@@ -905,3 +930,9 @@ describe("voter-stake-registry", () => {
     });
   });
 });
+
+export function loadKeypair(keypair: string): Keypair {
+  return Keypair.fromSecretKey(
+    new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString()))
+  );
+}

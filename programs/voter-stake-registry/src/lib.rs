@@ -133,4 +133,8 @@ pub mod voter_stake_registry {
   pub fn relinquish_vote_v0(ctx: Context<RelinquishVoteV0>) -> Result<()> {
     instructions::relinquish_vote_v0::handler(ctx)
   }
+
+  pub fn ledger_transfer_position_v0(ctx: Context<LedgerTransferPositionV0>) -> Result<()> {
+    instructions::ledger_transfer_position_v0::handler(ctx)
+  }
 }

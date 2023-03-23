@@ -16,5 +16,13 @@ runs:
     - run: yarn && ./node_modules/.bin/lerna bootstrap
       shell: bash
       if: steps.cache-typescript-node-modules.outputs.cache-hit != 'true'
+    - name: Cache Typescript Build
+      uses: actions/cache@v2
+      id: cache-typescript-build
+      with:
+        path: |
+          ./packages
+        key: deps-${{ runner.os }}-ts-build-${{ hashFiles('./packages/*/src/**/*') }}-${{ hashFiles('./yarn.lock') }}
     - run: yarn run build
+      if: steps.cache-typescript-build.outputs.cache-hit != 'true'
       shell: bash
