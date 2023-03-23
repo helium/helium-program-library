@@ -24,6 +24,11 @@ export const heliumEntityManagerResolvers = combineResolvers(
     mint: "collection",
     owner: "maker",
   }),
+  resolveIndividual(async ({ path }) => {
+    if (path[path.length - 1] === "eccVerifier") {
+      return new PublicKey("eccSAJM3tq7nQSpQTm8roxv4FPoipCkMsGizW2KBhqZ");
+    }
+  }),
   resolveIndividual(async ({ path, args, accounts }) => {
     if (
       path[path.length - 1] === "keyToAsset" &&

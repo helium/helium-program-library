@@ -1,4 +1,5 @@
 use std::cmp::min;
+use std::str::FromStr;
 
 use crate::state::*;
 use crate::{constants::HOTSPOT_METADATA_URL, error::ErrorCode};
@@ -23,11 +24,21 @@ pub struct IssueEntityArgsV0 {
   pub entity_key: Vec<u8>,
 }
 
+pub const TESTING: bool = std::option_env!("TESTING").is_some();
+
+pub const ECC_VERIFIER: &str = if TESTING {
+  "eccCd1PHAPSTNLUtDzihhPmFPTqGPQn7kgLyjf6dYTS"
+} else {
+  "eccSAJM3tq7nQSpQTm8roxv4FPoipCkMsGizW2KBhqZ"
+};
+
 #[derive(Accounts)]
 #[instruction(args: IssueEntityArgsV0)]
 pub struct IssueEntityV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
+  #[account(address = Pubkey::from_str(ECC_VERIFIER).unwrap())]
+  pub ecc_verifier: Signer<'info>,
   pub issuing_authority: Signer<'info>,
   pub collection: Box<Account<'info, Mint>>,
   /// CHECK: Handled by cpi
