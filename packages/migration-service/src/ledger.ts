@@ -67,7 +67,7 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
       const toAta = getAssociatedTokenAddressSync(asset.id, to);
       transferAssetIxns.push(
         createAssociatedTokenAccountIdempotentInstruction(
-          from,
+          provider.wallet.publicKey,
           toAta,
           to,
           asset.id
@@ -77,7 +77,7 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
       transferAssetIxns.push(
         createCloseAccountInstruction(
           fromAta,
-          from,
+          provider.wallet.publicKey,
           from,
           []
         )
@@ -114,12 +114,13 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
         .accounts({
           to,
           from,
+          payer: provider.wallet.publicKey,
           mint: position,
         })
         .instruction(),
       createCloseAccountInstruction(
         getAssociatedTokenAddressSync(position, from),
-        from,
+        provider.wallet.publicKey,
         from,
         []
       ),
@@ -132,7 +133,7 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
     const toAta = getAssociatedTokenAddressSync(mint, to);
     return [
       createAssociatedTokenAccountIdempotentInstruction(
-        from,
+        provider.wallet.publicKey,
         toAta,
         to,
         mint
@@ -143,7 +144,12 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
         from,
         token.account.data.parsed.info.tokenAmount.amount
       ),
-      createCloseAccountInstruction(fromAta, from, from, []),
+      createCloseAccountInstruction(
+        fromAta,
+        provider.wallet.publicKey,
+        from,
+        []
+      ),
     ];
   })
 
@@ -151,14 +157,14 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
 
   const recentBlockhash = (await provider.connection.getLatestBlockhash()).blockhash
   const transactions: Transaction[] = [];
-  chunks(transferAssetIxns, 4).forEach((chunk) => {
+  for (const chunk of chunks(transferPositionIxns, 4)) {
     const tx = new Transaction({
       feePayer: from,
       recentBlockhash,
     });
     tx.add(...chunk);
-    transactions.push(tx);
-  });
+    transactions.push(await provider.wallet.signTransaction(tx));
+  }
 
   for (const chunk of chunks(transferPositionIxns, 2)) {
     const tx = new Transaction({
@@ -182,7 +188,7 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
     recentBlockhash,
   });
   tx.add(...transferTokenInstructions);
-  transactions.push(tx);
+  transactions.push(await provider.wallet.signTransaction(tx));
 
   return transactions;
 }
