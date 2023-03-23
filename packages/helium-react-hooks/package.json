@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.0.43",
+  "version": "0.0.47-ledger.0",
   "description": "React hooks for helium",
   "repository": {
     "type": "git",
@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.26.0",
-    "@helium/spl-utils": "^0.0.43",
+    "@helium/spl-utils": "^0.0.47-ledger.0",
     "@solana/spl-token": "^0.3.6",
     "@solana/web3.js": "^1.66.2",
     "bs58": "^5.0.0",

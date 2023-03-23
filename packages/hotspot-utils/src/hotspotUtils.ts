@@ -51,7 +51,7 @@ const mapProof = (assetProof: AssetProof): AccountMeta[] => {
   }));
 };
 
-export const createTransferCompressedCollectableTxn = async ({
+export const createTransferInstructions = async ({
   collectable,
   owner,
   recipient,
@@ -63,7 +63,7 @@ export const createTransferCompressedCollectableTxn = async ({
   recipient: PublicKey;
   connection: Connection;
   url: string;
-}): Promise<VersionedTransaction | undefined> => {
+}) => {
   const instructions: TransactionInstruction[] = [];
 
   const assProof = await getAssetProof(url, collectable.id);
@@ -110,9 +110,21 @@ export const createTransferCompressedCollectableTxn = async ({
     )
   );
 
-  const { blockhash } = await connection.getLatestBlockhash();
+  return instructions;
+};
+
+export const createTransferCompressedCollectableTxn = async (opts: {
+  collectable: Asset;
+  owner: PublicKey;
+  recipient: PublicKey;
+  connection: Connection;
+  url: string;
+}): Promise<VersionedTransaction | undefined> => {
+  const instructions = await createTransferInstructions(opts);
+
+  const { blockhash } = await opts.connection.getLatestBlockhash();
   const messageV0 = new TransactionMessage({
-    payerKey: owner,
+    payerKey: opts.owner,
     recentBlockhash: blockhash,
     instructions,
   }).compileToLegacyMessage();

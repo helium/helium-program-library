@@ -3,6 +3,7 @@ import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { heliumSubDaosResolvers } from "./resolvers";
+import { BN } from "bn.js";
 
 export async function init(
   provider: AnchorProvider,
@@ -23,6 +24,10 @@ export async function init(
   ) as Program<HeliumSubDaos>;
 
   return program;
+}
+
+export function delegatorRewardsPercent(percent: number) {
+  return new BN(Math.floor(percent * Math.pow(10, 8)));
 }
 
 export * from "./constants";

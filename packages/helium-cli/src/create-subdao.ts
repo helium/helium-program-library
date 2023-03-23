@@ -9,6 +9,7 @@ import {
   init as initDao,
   subDaoKey,
   threadKey,
+  delegatorRewardsPercent,
 } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
@@ -36,6 +37,7 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
+import { BN } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
@@ -181,6 +183,11 @@ const yarg = yargs(hideBin(process.argv)).options({
     type: "number",
     describe: "Authority index for squads. Defaults to 1",
     default: 1,
+  },
+  delegatorRewardsPercent: {
+    type: "number",
+    required: true,
+    describe: "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
   },
   emissionSchedulePath: {
     required: true,
@@ -459,6 +466,7 @@ async function run() {
           threshold: thresholdPercent(20),
         },
         onboardingDcFee: toBN(4000000, 0), // $40 in dc
+        delegatorRewardsPercent: delegatorRewardsPercent(argv.delegatorRewardsPercent),
       })
       .accounts({
         dao,
@@ -487,6 +495,7 @@ async function run() {
             onboardingDcFee: null,
             activeDeviceAggregator: null,
             registrar: null,
+            delegatorRewardsPercent: null,
           })
           .accounts({
             subDao,
@@ -518,14 +527,14 @@ async function run() {
         iotConfig: {
           minGain: 10,
           maxGain: 150,
-          fullLocationStakingFee: toBN(1000000, 0),
+          fullLocationStakingFee: toBN(500000, 0),
           dataonlyLocationStakingFee: toBN(500000, 0),
         } as any,
       };
     } else {
       settings = {
         mobileConfig: {
-          fullLocationStakingFee: toBN(1000000, 0),
+          fullLocationStakingFee: toBN(500000, 0),
           dataonlyLocationStakingFee: toBN(500000, 0),
         },
       };

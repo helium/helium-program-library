@@ -1,0 +1,51 @@
+name: "Setup Anchor"
+description: "Setup Anchor"
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v2
+    - uses: ./.github/actions/setup/
+    - uses: ./.github/actions/setup-anchor/
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+    - uses: actions/cache@v2
+      name: Cache Cargo registry + index
+      id: cache-cargo-registry
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}-2
+    - uses: actions/cache@v2
+      name: Cache Builds
+      id: cache-cargo-builds
+      with:
+        path: |
+          ./target/
+        key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('./**/Cargo.lock') }}-target
+    - name: Cache Deps Builds
+      uses: actions/cache@v2
+      id: cache-cargo-deps-builds
+      with:
+        path: |
+          ./deps/metaplex-program-library
+          ./deps/solana-program-library
+          ./deps/helium-voter-stake-registry
+          ./deps/clockwork
+        key: deps-${{ runner.os }}-build-${{ hashFiles('./deps/**/Cargo.lock') }}
+    - run: ~/.cargo/bin/anchor run build-deps
+      shell: bash
+      if: steps.cache-cargo-deps-builds.outputs.cache-hit != 'true'
+    - name: Cache Anchor Build
+      uses: actions/cache@v2
+      id: cache-anchor-build
+      with:
+        path: |
+          ./target
+        key: deps-${{ runner.os }}-build-${{ hashFiles('./programs/**/*') }}
+    - run: TESTING=true ~/.cargo/bin/anchor build
+      if: steps.cache-anchor-build.outputs.cache-hit != 'true'
+      shell: bash
+    - uses: ./.github/actions/setup-ts/
