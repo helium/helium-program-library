@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "price_oracle"
 
 [features]
+devnet = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []

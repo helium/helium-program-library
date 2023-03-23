@@ -6,25 +6,34 @@ import {
   PROGRAM_ID,
   accountPayerKey,
 } from "@helium/data-credits-sdk";
+import { fanoutConfigKey } from "@helium/hydra-sdk";
 import {
   daoKey,
   init as initDao,
-  threadKey
+  threadKey,
 } from "@helium/helium-sub-daos-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import {
-  init as initVsr, registrarKey
+  init as initVsr,
+  registrarKey,
 } from "@helium/voter-stake-registry-sdk";
 import {
-  getGovernanceProgramVersion, GoverningTokenConfigAccountArgs, GoverningTokenType, MintMaxVoteWeightSource, SetRealmAuthorityAction, withCreateRealm, withSetRealmAuthority
+  getGovernanceProgramVersion,
+  GoverningTokenConfigAccountArgs,
+  GoverningTokenType,
+  MintMaxVoteWeightSource,
+  SetRealmAuthorityAction,
+  withCreateRealm,
+  withSetRealmAuthority,
 } from "@solana/spl-governance";
-import {
-  getAssociatedTokenAddress
-} from "@solana/spl-token";
+import { getAssociatedTokenAddress, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
   Connection,
   LAMPORTS_PER_SOL,
-  PublicKey, SystemProgram, Transaction, TransactionInstruction
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
@@ -32,7 +41,11 @@ import yargs from "yargs/yargs";
 import {
   createAndMint,
   getTimestampFromDays,
-  getUnixTimestamp, isLocalhost, loadKeypair, parseEmissionsSchedule, sendInstructionsOrSquads
+  getUnixTimestamp,
+  isLocalhost,
+  loadKeypair,
+  parseEmissionsSchedule,
+  sendInstructionsOrSquads,
 } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
@@ -68,11 +81,6 @@ async function run() {
       describe: "Keypair of the HNT token",
       default: `${__dirname}/../keypairs/hnt.json`,
     },
-    hstKeypair: {
-      type: "string",
-      describe: "Keypair of the HST token",
-      default: `${__dirname}/../keypairs/hst.json`,
-    },
     dcKeypair: {
       type: "string",
       describe: "Keypair of the Data Credit token",
@@ -82,12 +90,6 @@ async function run() {
       type: "number",
       describe:
         "Number of HNT tokens to pre mint before assigning authority to lazy distributor",
-      default: 0,
-    },
-    numHst: {
-      type: "number",
-      describe:
-        "Number of HST tokens to pre mint before assigning authority to lazy distributor",
       default: 0,
     },
     numDc: {
@@ -173,13 +175,11 @@ async function run() {
   const councilWallet = new PublicKey(argv.councilWallet);
 
   const hntKeypair = loadKeypair(argv.hntKeypair);
-  const hstKeypair = loadKeypair(argv.hstKeypair);
   const dcKeypair = loadKeypair(argv.dcKeypair);
   const me = provider.wallet.publicKey;
   const dao = daoKey(hntKeypair.publicKey)[0];
 
   console.log("HNT", hntKeypair.publicKey.toBase58());
-  console.log("HST", hstKeypair.publicKey.toBase58());
   console.log("DC", dcKeypair.publicKey.toBase58());
   console.log("GOV PID", govProgramId.toBase58());
   console.log("COUNCIL", councilKeypair.publicKey.toBase58());
@@ -207,13 +207,6 @@ async function run() {
     mintKeypair: hntKeypair,
     amount: argv.numHnt,
     metadataUrl: `${argv.bucket}/hnt.json`,
-  });
-
-  await createAndMint({
-    provider,
-    mintKeypair: hstKeypair,
-    amount: argv.numHst,
-    metadataUrl: `${argv.bucket}/hst.json`,
   });
 
   await createAndMint({
@@ -393,9 +386,9 @@ async function run() {
         hntMint: hntKeypair.publicKey,
         thread,
         // TODO: Create actual HST pool
-        hstPool: await getAssociatedTokenAddress(
+        hstPool: getAssociatedTokenAddressSync(
           hntKeypair.publicKey,
-          authority,
+          fanoutConfigKey("HST")[0],
           true
         ),
       })
@@ -407,8 +400,13 @@ async function run() {
         await heliumSubDaosProgram.methods
           .updateDaoV0({
             authority,
-            emissionSchedule: await parseEmissionsSchedule(argv.emissionSchedulePath),
-            hstEmissionSchedule:await parseEmissionsSchedule(argv.hstEmissionSchedulePath),
+            emissionSchedule: await parseEmissionsSchedule(
+              argv.emissionSchedulePath
+            ),
+            hstEmissionSchedule: await parseEmissionsSchedule(
+              argv.hstEmissionSchedulePath
+            ),
+            hstPool: null
           })
           .accounts({
             dao,
