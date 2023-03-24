@@ -226,17 +226,26 @@ async function run() {
           memberStakeAccount,
         })
         .rpc({ skipPreflight: true });
+    }
 
-      const memberHntAccount = await getAssociatedTokenAddressSync(
-        hnt,
-        solAddress,
-        true
-      );
-      const memberHstAccount = await getAssociatedTokenAddressSync(
-        hst,
-        solAddress,
-        true
-      );
+    // 2️⃣  Define a trigger condition.
+    const trigger = {
+      cron: {
+        schedule: "30 00 * * * * *",
+        skippable: true,
+      },
+    };
+
+    // 3️⃣ Create the thread.
+    const threadId = `${argv.name}-${solAddress.toBase58().slice(0, 8)}`;
+    const [thread] = threadKey(provider.wallet.publicKey, threadId);
+    console.log("Thread ID", threadId, thread.toBase58());
+    const memberHntAccount = await getAssociatedTokenAddressSync(
+      hnt,
+      solAddress,
+      true
+    );
+    if (!(await exists(provider.connection, memberHntAccount))) {
       await sendInstructions(provider, [
         createAssociatedTokenAccountIdempotentInstruction(
           provider.wallet.publicKey,
@@ -245,38 +254,29 @@ async function run() {
           hnt
         ),
       ]);
+    }
 
-      const distributeIx = await hydraProgram.methods
-        .processDistributeToken(true)
-        .accounts({
-          payer: new PublicKey("C1ockworkPayer11111111111111111111111111111"),
-          member: solAddress,
-          fanout: fanoutConfig,
-          holdingAccount: hntAccount,
-          fanoutForMint: fanoutConfigForMint,
-          fanoutMint: hnt,
-          fanoutMintMemberTokenAccount: memberHntAccount,
-          memberStakeAccount: memberStakeAccount,
-          membershipMint: hst,
-          fanoutForMintMembershipVoucher: membershipMintVoucherKey(
-            fanoutConfigForMint,
-            solAddress,
-            hnt
-          )[0],
-        })
-        .instruction();
-
-      // 2️⃣  Define a trigger condition.
-      const trigger = {
-        cron: {
-          schedule: "0 1 * * *",
-          skippable: true,
-        },
-      };
-
-      // 3️⃣ Create the thread.
-      const threadId = `${argv.name}-${solAddress.toBase58().slice(0, 8)}`;
-      console.log("Thread ID", threadId);
+    const distributeIx = await hydraProgram.methods
+      .processDistributeToken(true)
+      .accounts({
+        payer: new PublicKey("C1ockworkPayer11111111111111111111111111111"),
+        member: solAddress,
+        fanout: fanoutConfig,
+        holdingAccount: hntAccount,
+        fanoutForMint: fanoutConfigForMint,
+        fanoutMint: hnt,
+        fanoutMintMemberTokenAccount: memberHntAccount,
+        memberStakeAccount: memberStakeAccount,
+        membershipMint: hst,
+        fanoutForMintMembershipVoucher: membershipMintVoucherKey(
+          fanoutConfigForMint,
+          solAddress,
+          hnt
+        )[0],
+      })
+      .instruction();
+      
+    if (!(await exists(provider.connection, thread))) {
       const tx = await clockworkProvider.threadCreate(
         provider.wallet.publicKey, // authority
         threadId, // id
@@ -284,6 +284,10 @@ async function run() {
         trigger, // trigger
         anchor.web3.LAMPORTS_PER_SOL // amount
       );
+    } else {
+      await clockworkProvider.threadUpdate(provider.wallet.publicKey, thread, {
+        trigger,
+      });
     }
   }
 }
@@ -303,3 +307,21 @@ run()
     process.exit(1);
   })
   .then(() => process.exit());
+
+const CLOCKWORK_PID = new PublicKey(
+  "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
+);
+export function threadKey(
+  authority: PublicKey,
+  threadId: string,
+  programId: PublicKey = CLOCKWORK_PID
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("thread", "utf8"),
+      authority.toBuffer(),
+      Buffer.from(threadId, "utf8"),
+    ],
+    programId
+  );
+}
