@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { underscore } from "inflection";
-import { Sequelize, DataTypes, ModelAttributes, Model } from "sequelize";
+import { Sequelize, DataTypes } from "sequelize";
 
 const TypeMap = new Map<string, any>([
   ["publicKey", DataTypes.STRING],
@@ -14,20 +14,9 @@ const TypeMap = new Map<string, any>([
   ["u64", DataTypes.BIGINT.UNSIGNED],
 ]);
 
-// { defined: 'Lockup' }
-// { vec: { defined: 'VotingMintConfigV0' } }
-// { defined: 'VotingMintConfigV0' }
-// { option: { defined: 'VoterWeightAction' } }
-// { defined: 'VoterWeightAction' }
-const determineType = (
-  type: string | object,
-  determinedType: any = {
-    type: "unknown",
-    allowNull: false,
-  }
-): { type: "unknown" | any; allowNull: boolean } => {
+const determineType = (type: string | object): any => {
   if (typeof type === "string" && TypeMap.has(type)) {
-    determinedType.type = TypeMap.get(type);
+    return TypeMap.get(type);
   }
 
   if (typeof type === "object") {
@@ -36,17 +25,14 @@ const determineType = (
     if (key === "array" && Array.isArray(value)) {
       const [arrayType] = value;
       if (TypeMap.has(arrayType)) {
-        determinedType.type = DataTypes.ARRAY(TypeMap.get(arrayType));
+        return DataTypes.ARRAY(TypeMap.get(arrayType));
       }
     } else {
-      return determineType(value, {
-        type: determinedType.type,
-        allowNull: key === "option" ? true : false,
-      });
+      return determineType(value);
     }
   }
 
-  return determinedType;
+  return DataTypes.JSONB;
 };
 
 export const defineIdlModels = async ({
@@ -56,7 +42,7 @@ export const defineIdlModels = async ({
   idl: anchor.Idl;
   sequelize: Sequelize;
 }) => {
-  const { accounts, types } = idl;
+  const { accounts } = idl;
 
   for (const acc of accounts) {
     let schema: { [key: string]: any } = {};

@@ -1,5 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
-import { PublicKey } from "@solana/web3.js";
+import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
 import * as pg from "pg";
@@ -34,7 +34,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   address: {
     type: "string",
     describe: "Address of the account",
-    required: true,
+    required: false,
   },
   dbUrl: {
     type: "string",
@@ -63,13 +63,60 @@ async function run() {
   }
 
   const program = new anchor.Program(idl, programId, provider);
-  const acc = await program.account[camelize(argv.account, true)].fetchNullable(
-    argv.address
-  );
+  let individualAcc = null;
+  let accs: { publicKey: PublicKey; account: any }[] = [];
 
-  if (!acc) {
-    console.log("uanble to fetch account");
-    return;
+  if (argv.address) {
+    console.log(`fetching individual ${argv.account}`);
+    individualAcc = await program.account[
+      camelize(argv.account, true)
+    ].fetchNullable(argv.address);
+
+    if (!individualAcc) {
+      console.log(`unable to fetch ${argv.account}`);
+      return;
+    }
+  }
+
+  if (!argv.address) {
+    console.log(`fetching all ${argv.account}s`);
+    const filter: { offset?: number; bytes?: string; dataSize?: number } =
+      program.coder.accounts.memcmp(argv.account, undefined);
+    const coderFilters: GetProgramAccountsFilter[] = [];
+
+    if (filter?.offset != undefined && filter?.bytes != undefined) {
+      coderFilters.push({
+        memcmp: { offset: filter.offset, bytes: filter.bytes },
+      });
+    }
+
+    if (filter?.dataSize != undefined) {
+      coderFilters.push({ dataSize: filter.dataSize });
+    }
+
+    let resp = await provider.connection.getProgramAccounts(programId, {
+      commitment: provider.connection.commitment,
+      filters: [...coderFilters],
+    });
+
+    accs = resp
+      .map(({ pubkey, account }) => {
+        // ignore accounts we cant decode
+        try {
+          return {
+            publicKey: pubkey,
+            account: program.coder.accounts.decode(argv.account, account.data),
+          };
+        } catch (_e) {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    if (!accs.length) {
+      console.log(`unable to fetch ${argv.account}s`);
+      return;
+    }
   }
 
   console.log("setting up database connection");
@@ -88,18 +135,33 @@ async function run() {
   await sequelize.authenticate();
   console.log("connection has been established successfully.");
 
-  const { accounts, types } = idl;
-  console.log(JSON.stringify(accounts));
-  console.log(JSON.stringify(types));
-  // await defineIdlModels({ idl, sequelize });
-  // const model = sequelize.models[argv.account];
-  // await model.sync({ alter: true });
+  await defineIdlModels({ idl, sequelize });
+  const model = sequelize.models[argv.account];
+  await model.sync({ alter: true });
+  console.log("attempting to populate database");
 
-  // console.log("attempting to populate database");
-  // await model.upsert({
-  //   address: argv.address,
-  //   ...sanitizeAccount(acc),
-  // });
+  if (individualAcc) {
+    await model.upsert({
+      address: argv.address,
+      ...sanitizeAccount(individualAcc),
+    });
+  }
+
+  if (accs.length) {
+    await model.bulkCreate(
+      accs.map(({ publicKey, account }) => ({
+        address: publicKey.toBase58(),
+        ...sanitizeAccount(account),
+      })),
+      { updateOnDuplicate: ["address"] }
+    );
+  }
+
+  console.log(
+    `successfully populated database with ${
+      individualAcc ? 1 : accs.length
+    } records...`
+  );
 }
 
 run()
