@@ -5,6 +5,9 @@
       "path": "./packages/idls"
     },
     {
+      "path": "./packages/hydra-sdk"
+    },
+    {
       "path": "./packages/spl-utils"
     },
     {

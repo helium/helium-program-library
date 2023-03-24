@@ -7,6 +7,7 @@ pub struct UpdateDaoArgsV0 {
   pub authority: Option<Pubkey>,
   pub emission_schedule: Option<Vec<EmissionScheduleItem>>,
   pub hst_emission_schedule: Option<Vec<PercentItem>>,
+  pub hst_pool: Option<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -42,6 +43,10 @@ pub fn handler(ctx: Context<UpdateDaoV0>, args: UpdateDaoArgsV0) -> Result<()> {
       &ctx.accounts.system_program.to_account_info(),
       &ctx.accounts.dao,
     )?;
+  }
+
+  if let Some(hst_pool) = args.hst_pool {
+    ctx.accounts.dao.hst_pool = hst_pool;
   }
 
   Ok(())
