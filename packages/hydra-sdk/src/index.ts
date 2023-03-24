@@ -27,6 +27,7 @@ export async function init(
 }
 
 export { IDL } from "./hydra";
+
 export type { Hydra } from "./hydra";
 
 export * from "./constants";
