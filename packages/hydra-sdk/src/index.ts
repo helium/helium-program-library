@@ -26,6 +26,9 @@ export async function init(
   return program;
 }
 
+export { IDL } from "./hydra";
+export type { Hydra } from "./hydra";
+
 export * from "./constants";
 export * from "./pdas";
 export * from "./resolvers";
