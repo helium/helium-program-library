@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.0.48-hydra.0",
+  "version": "0.0.48-hydra.1",
   "description": "CLI to bootstrap the network",
   "repository": {
     "type": "git",
@@ -41,7 +41,7 @@
     "@helium/distributor-oracle": "^0.0.47",
     "@helium/helium-entity-manager-sdk": "^0.0.47",
     "@helium/helium-sub-daos-sdk": "^0.0.47",
-    "@helium/hydra-sdk": "^0.0.48-hydra.0",
+    "@helium/hydra-sdk": "^0.0.48-hydra.1",
     "@helium/lazy-distributor-sdk": "^0.0.47",
     "@helium/price-oracle-sdk": "^0.0.47",
     "@helium/spl-utils": "^0.0.47",
