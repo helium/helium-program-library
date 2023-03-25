@@ -1,6 +1,6 @@
 First, brick the genesis transactions. This keeps someone from front-running the genesis transaction lazy signer.
 
-Now, setup HST:
+Now, setup HST **using the migration service wallet**:
 
 ```
 npx ts-node --project tsconfig.cjs.json src/setup-hst -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --hnt $(solana address -k keypairs/hnt.json) --name "HST"

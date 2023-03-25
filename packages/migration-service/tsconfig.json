@@ -8,6 +8,9 @@
       "path": "../hydra-sdk"
     },
     {
+      "path": "../hydra-sdk"
+    },
+    {
       "path": "../circuit-breaker-sdk"
     },
     {

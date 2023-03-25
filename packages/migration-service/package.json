@@ -32,6 +32,7 @@
     "dev": "npx ts-node --project tsconfig.cjs.json src/index.ts"
   },
   "dependencies": {
+    "@clockwork-xyz/sdk": "^0.3.0",
     "@coral-xyz/anchor": "0.26.0",
     "@fastify/cors": "^8.1.1",
     "@helium/address": "^4.6.2",
@@ -41,6 +42,7 @@
     "@helium/distributor-oracle": "^0.0.47",
     "@helium/helium-entity-manager-sdk": "^0.0.47",
     "@helium/helium-sub-daos-sdk": "^0.0.47",
+    "@helium/hydra-sdk": "^0.0.48-hydra.1",
     "@helium/lazy-distributor-sdk": "^0.0.47",
     "@helium/lazy-transactions-sdk": "^0.0.47",
     "@helium/spl-utils": "^0.0.47",
