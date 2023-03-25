@@ -210,16 +210,21 @@ export async function getMigrateTransactions(
 
   1. Create HST ATA if it doesn't exist for `from` account
   2. Delete the thread if there is one
-  3. Unstake HST from the `from` account into `currAccountKey`
-  4. Stake HST from `currAccountKey` into the `to` accounts stake account
-  5. Create a thread for the `to` account
+  3. Create HNT ATA if it doesn't exist for `from` account
+  4. Create HNT ATA if it doesn't exist for `to` account
+  5. Calculate how much hnt will be distributed if we run the distribute command. Note that the distribute command _must_ be run before unstake.
+  6. Run a distribute on the existing fanout wallet in case there's any hnt in there
+  7. Unstake HST from the `from` account into `currAccountKey`
+  8. Send both the existing HNT in the `from` hnt ata and the distributed amount to the `to` hnt ata
+  7. Stake HST from `currAccountKey` into the `to` accounts stake account
+  8. Create a thread for the `to` account
+  9. Close the `from` hnt ata
   */
   const hntAccount = tokens
     .filter((token) => !uniqueAssets.has(token.account.data.parsed.info.mint))
     // We handle HNT separately since HST may be distributing to it
-    .find(
-      (token) =>
-        new PublicKey(token.account.data.parsed.info.mint).equals(HNT_MINT)
+    .find((token) =>
+      new PublicKey(token.account.data.parsed.info.mint).equals(HNT_MINT)
     );
 
   const fanoutConfig = fanoutConfigKey("HST")[0];
@@ -305,10 +310,14 @@ export async function getMigrateTransactions(
     const distributeAmount = totalInflow
       .sub(fanoutForMintMembershipVoucherAcc.lastInflow)
       .mul(new BN(stakeAccountBal.toString()))
-      .div(fanout.totalShares)
+      .div(fanout.totalShares);
 
-    const hntAlready = hntAccount ? new BN(hntAccount.account.data.parsed.info.tokenAmount.amount.toString()) : new BN(0);
-    const hntTotal = hntAlready.add(distributeAmount)
+    const hntAlready = hntAccount
+      ? new BN(
+          hntAccount.account.data.parsed.info.tokenAmount.amount.toString()
+        )
+      : new BN(0);
+    const hntTotal = hntAlready.add(distributeAmount);
 
     hydraIxns.push(
       // Give some lamports to cover rent of the stake account
@@ -511,7 +520,10 @@ export async function getMigrateTransactions(
     SystemProgram.transfer({
       fromPubkey: from,
       toPubkey: to,
-      lamports: lamports - (transactions.reduce((acc, tx) => acc + tx.signatures.length, 0) + 2) * 5000,
+      lamports:
+        lamports -
+        (transactions.reduce((acc, tx) => acc + tx.signatures.length, 0) + 2) *
+          5000,
     })
   );
 
@@ -529,10 +541,12 @@ export async function getMigrateTransactions(
     recentBlockhash,
   });
   tx.add(...transferTokenInstructions);
-  
+
   // Do not remove this line. Fun fact, tx.signatures will be empty unless you do this once.
-  tx.serialize({ requireAllSignatures: false })
-  if (tx.signatures.some(sig => sig.publicKey.equals(provider.wallet.publicKey))) {
+  tx.serialize({ requireAllSignatures: false });
+  if (
+    tx.signatures.some((sig) => sig.publicKey.equals(provider.wallet.publicKey))
+  ) {
     transactions.push(await provider.wallet.signTransaction(tx));
   } else {
     transactions.push(tx);
