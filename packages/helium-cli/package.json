@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.0.48",
+  "version": "0.0.49-fanout.0",
   "description": "CLI to bootstrap the network",
   "repository": {
     "type": "git",
@@ -39,7 +39,7 @@
     "@helium/crypto": "^4.6.2",
     "@helium/data-credits-sdk": "^0.0.48",
     "@helium/distributor-oracle": "^0.0.48",
-    "@helium/fanout-sdk": "^0.0.48",
+    "@helium/fanout-sdk": "^0.0.49-fanout.0",
     "@helium/helium-entity-manager-sdk": "^0.0.48",
     "@helium/helium-sub-daos-sdk": "^0.0.48",
     "@helium/lazy-distributor-sdk": "^0.0.48",
