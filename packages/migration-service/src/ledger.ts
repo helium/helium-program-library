@@ -257,21 +257,3 @@ const getBubblegumAuthorityPDA = async (merkleRollPubKey: PublicKey) => {
   );
   return bubblegumAuthorityPDAKey;
 };
-
-const CLOCKWORK_PID = new PublicKey(
-  "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
-);
-function threadKey(
-  authority: PublicKey,
-  threadId: string,
-  programId: PublicKey = CLOCKWORK_PID
-): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("thread", "utf8"),
-      authority.toBuffer(),
-      Buffer.from(threadId, "utf8"),
-    ],
-    programId
-  );
-}
