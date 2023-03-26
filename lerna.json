@@ -2,5 +2,5 @@
   "npmClient": "yarn",
   "packages": ["packages/*"],
   "useWorkspaces": true,
-  "version": "0.0.48-hydra.1"
+  "version": "0.0.47"
 }
