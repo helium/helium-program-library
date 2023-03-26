@@ -24,6 +24,8 @@ done
 RND=$RANDOM
 echo "Using $RND for dao names"
 
+npx ts-node --project tsconfig.cjs.json src/setup-hst -u $CLUSTER_URL --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --hnt $(solana address -k keypairs/hnt.json) --name "HST"
+
 # init the dao and subdaos
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-dao.ts \
     --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium $RND" -u $CLUSTER_URL

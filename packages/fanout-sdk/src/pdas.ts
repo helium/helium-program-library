@@ -2,11 +2,11 @@ import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 
 export function fanoutKey(
-  fanout: PublicKey,
+  name: string,
   programId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("fanout", "utf-8"), fanout.toBuffer()],
+    [Buffer.from("fanout", "utf-8"), Buffer.from(name, "utf-8")],
     programId
   );
 }

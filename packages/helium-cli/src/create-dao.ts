@@ -6,7 +6,7 @@ import {
   PROGRAM_ID,
   accountPayerKey,
 } from "@helium/data-credits-sdk";
-import { fanoutConfigKey } from "@helium/hydra-sdk";
+import { fanoutKey } from "@helium/fanout-sdk";
 import {
   daoKey,
   init as initDao,
@@ -388,7 +388,7 @@ async function run() {
         // TODO: Create actual HST pool
         hstPool: getAssociatedTokenAddressSync(
           hntKeypair.publicKey,
-          fanoutConfigKey("HST")[0],
+          fanoutKey("HST")[0],
           true
         ),
       })

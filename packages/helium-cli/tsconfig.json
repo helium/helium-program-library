@@ -8,6 +8,9 @@
       "path": "../idls"
     },
     {
+      "path": "../fanout-sdk"
+    },
+    {
       "path": "../distributor-oracle"
     },
     {
