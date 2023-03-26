@@ -20,3 +20,13 @@ export function membershipVoucherKey(
     programId
   );
 }
+
+export function membershipCollectionKey(
+  fanout: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("collection", "utf-8"), fanout.toBuffer()],
+    programId
+  );
+}
