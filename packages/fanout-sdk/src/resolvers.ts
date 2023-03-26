@@ -8,8 +8,14 @@ export const fanoutResolvers = combineResolvers(
   ataResolver({
     instruction: "initializeFanoutV0",
     account: "tokenAccount",
-    mint: "membershipMint",
+    mint: "fanoutMint",
     owner: "fanout",
+  }),
+  ataResolver({
+    instruction: "initializeFanoutV0",
+    account: "collectionAccount",
+    mint: "collection",
+    owner: "authority",
   }),
   ataResolver({
     instruction: "stakeV0",
@@ -19,9 +25,9 @@ export const fanoutResolvers = combineResolvers(
   }),
   ataResolver({
     instruction: "stakeV0",
-    account: "stakesAccount",
+    account: "stakeAccount",
     mint: "membershipMint",
-    owner: "fanout",
+    owner: "voucher",
   }),
   ataResolver({
     instruction: "stakeV0",
@@ -42,9 +48,15 @@ export const fanoutResolvers = combineResolvers(
     owner: "voucherAuthority",
   }),
   ataResolver({
-    instruction: "disributeV0",
+    instruction: "distributeV0",
     account: "receiptAccount",
     mint: "mint",
     owner: "owner",
   }),
+  ataResolver({
+    instruction: "distributeV0",
+    account: "toAccount",
+    mint: "fanoutMint",
+    owner: "owner",
+  })
 );

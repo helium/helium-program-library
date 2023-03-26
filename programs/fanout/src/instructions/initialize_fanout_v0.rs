@@ -11,7 +11,6 @@ use crate::FanoutV0;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeFanoutArgsV0 {
-  pub authority: Pubkey,
   pub name: String,
 }
 
@@ -20,6 +19,8 @@ pub struct InitializeFanoutArgsV0 {
 pub struct InitializeFanoutV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
+  /// CHECK: Deposit the collection
+  pub authority: AccountInfo<'info>,
 
   #[account(
     init,
@@ -32,11 +33,11 @@ pub struct InitializeFanoutV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    associated_token::mint = membership_mint,
+    associated_token::mint = fanout_mint,
     associated_token::authority = fanout,
   )]
   pub token_account: Box<Account<'info, TokenAccount>>,
-  pub membership_mint: Box<Account<'info, Mint>>,
+  pub fanout_mint: Box<Account<'info, Mint>>,
   #[account(
     init,
     payer = payer,
@@ -47,6 +48,14 @@ pub struct InitializeFanoutV0<'info> {
     bump
   )]
   pub collection: Box<Account<'info, Mint>>,
+  #[account(
+    init_if_needed,
+    payer = payer,
+    associated_token::mint = collection,
+    associated_token::authority = authority,
+  )]
+  pub collection_account: Box<Account<'info, TokenAccount>>,
+  pub membership_mint: Box<Account<'info, Mint>>,
   /// CHECK: Handled by cpi
   #[account(
     mut,
@@ -78,7 +87,7 @@ pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -
       ctx.accounts.token_program.to_account_info(),
       MintTo {
         mint: ctx.accounts.collection.to_account_info(),
-        to: ctx.accounts.token_account.to_account_info(),
+        to: ctx.accounts.collection_account.to_account_info(),
         authority: ctx.accounts.fanout.to_account_info(),
       },
       signer_seeds,
@@ -144,9 +153,10 @@ pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -
   )?;
 
   ctx.accounts.fanout.set_inner(FanoutV0 {
-    authority: args.authority,
+    authority: ctx.accounts.authority.key(),
     token_account: ctx.accounts.token_account.key(),
     membership_mint: ctx.accounts.membership_mint.key(),
+    fanout_mint: ctx.accounts.fanout_mint.key(),
     membership_collection: ctx.accounts.collection.key(),
     name: args.name,
     total_shares: ctx.accounts.membership_mint.supply,

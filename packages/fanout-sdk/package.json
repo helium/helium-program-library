@@ -33,6 +33,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "0.26.0",
     "@helium/spl-utils": "^0.0.47",
+    "@helium/idls": "^0.0.47",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },

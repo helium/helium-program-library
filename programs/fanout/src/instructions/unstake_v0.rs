@@ -1,7 +1,7 @@
 use crate::{state::*, voucher_seeds};
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Burn, CloseAccount, Mint, Token, TokenAccount, Transfer};
 
 #[derive(Accounts)]
 pub struct UnstakeV0<'info> {
@@ -15,6 +15,8 @@ pub struct UnstakeV0<'info> {
   // the other constraints must be exhaustive
   #[account(
     mut,
+    seeds = ["fanout_voucher".as_bytes(), mint.key().as_ref()],
+    bump = voucher.bump_seed,
     close = sol_destination,
     has_one = mint,
     has_one = fanout,
@@ -45,6 +47,7 @@ pub struct UnstakeV0<'info> {
     associated_token::authority = voucher_authority,
   )]
   pub to_account: Box<Account<'info, TokenAccount>>,
+  #[account(mut)]
   pub stake_account: Box<Account<'info, TokenAccount>>,
 
   pub token_program: Program<'info, Token>,
@@ -72,9 +75,31 @@ impl<'info> UnstakeV0<'info> {
       },
     )
   }
+
+  fn close_receipt_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CloseAccount<'info>> {
+    CpiContext::new(
+      self.token_program.to_account_info(),
+      CloseAccount {
+        account: self.receipt_account.to_account_info(),
+        destination: self.sol_destination.to_account_info(),
+        authority: self.voucher_authority.to_account_info(),
+      },
+    )
+  }
+
+  fn close_stake_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CloseAccount<'info>> {
+    CpiContext::new(
+      self.token_program.to_account_info(),
+      CloseAccount {
+        account: self.stake_account.to_account_info(),
+        destination: self.sol_destination.to_account_info(),
+        authority: self.voucher.to_account_info(),
+      },
+    )
+  }
 }
 
-/// Close an empty voucher
+/// CloseAccount an empty voucher
 pub fn handler(ctx: Context<UnstakeV0>) -> Result<()> {
   let signer_seeds: &[&[&[u8]]] = &[voucher_seeds!(ctx.accounts.voucher)];
   ctx.accounts.fanout.total_staked_shares = ctx
@@ -90,6 +115,8 @@ pub fn handler(ctx: Context<UnstakeV0>) -> Result<()> {
     ctx.accounts.stake_account.amount,
   )?;
   token::burn(ctx.accounts.burn_ctx(), 1)?;
+  token::close_account(ctx.accounts.close_receipt_ctx())?;
+  token::close_account(ctx.accounts.close_stake_ctx().with_signer(signer_seeds))?;
 
   Ok(())
 }

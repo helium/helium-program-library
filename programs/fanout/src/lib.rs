@@ -21,8 +21,8 @@ pub mod fanout {
     instructions::initialize_fanout_v0::handler(ctx, args)
   }
 
-  pub fn stake_v0(ctx: Context<StakeV0>) -> Result<()> {
-    instructions::stake_v0::handler(ctx)
+  pub fn stake_v0(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
+    instructions::stake_v0::handler(ctx, args)
   }
 
   pub fn unstake_v0(ctx: Context<UnstakeV0>) -> Result<()> {

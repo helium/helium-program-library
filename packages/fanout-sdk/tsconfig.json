@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.root.json",
   "references": [
     {
-      "path": "../spl-utils"
+      "path": "../idls"
     },
     {
       "path": "./tsconfig.cjs.json"

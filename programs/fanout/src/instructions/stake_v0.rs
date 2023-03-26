@@ -12,8 +12,14 @@ use shared_utils::create_metadata_accounts_v3;
 
 use crate::{fanout_seeds, voucher_seeds, FanoutV0, FanoutVoucherV0};
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct StakeArgsV0 {
+  pub amount: u64,
+}
+
 /// Stake an amount of membership tokens and receive a receipt NFT
 #[derive(Accounts)]
+#[instruction(args: StakeArgsV0)]
 pub struct StakeV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
@@ -58,7 +64,7 @@ pub struct StakeV0<'info> {
     init_if_needed,
     payer = payer,
     associated_token::mint = membership_mint,
-    associated_token::authority = fanout,
+    associated_token::authority = voucher,
   )]
   pub stake_account: Box<Account<'info, TokenAccount>>,
 
@@ -132,13 +138,13 @@ impl<'info> StakeV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<StakeV0>) -> Result<()> {
+pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
   // Create voucher
   ctx.accounts.voucher.set_inner(FanoutVoucherV0 {
     fanout: ctx.accounts.fanout.key(),
     mint: ctx.accounts.mint.key(),
     total_distributed: 0,
-    shares: ctx.accounts.from_account.amount,
+    shares: args.amount,
     stake_account: ctx.accounts.stake_account.key(),
     total_inflow: ctx.accounts.token_account.amount,
     total_dust: 0,
@@ -148,11 +154,11 @@ pub fn handler(ctx: Context<StakeV0>) -> Result<()> {
     .accounts
     .fanout
     .total_staked_shares
-    .checked_add(ctx.accounts.from_account.amount)
+    .checked_add(args.amount)
     .unwrap();
 
   // Stake tokens
-  token::transfer(ctx.accounts.stake_ctx(), ctx.accounts.from_account.amount)?;
+  token::transfer(ctx.accounts.stake_ctx(), args.amount)?;
 
   // Create receipt nft
   let signer_seeds: &[&[&[u8]]] = &[voucher_seeds!(ctx.accounts.voucher)];

@@ -5,6 +5,7 @@ use anchor_lang::prelude::*;
 pub struct FanoutV0 {
   pub authority: Pubkey,
   pub token_account: Pubkey,
+  pub fanout_mint: Pubkey,
   pub membership_mint: Pubkey,
   pub total_shares: u64,
   pub total_staked_shares: u64,

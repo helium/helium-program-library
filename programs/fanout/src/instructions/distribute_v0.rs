@@ -1,7 +1,10 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token::{self, Mint, Token, TokenAccount, Transfer},
+};
 
-use crate::{voucher_seeds, FanoutV0, FanoutVoucherV0};
+use crate::{fanout_seeds, FanoutV0, FanoutVoucherV0};
 
 #[derive(Accounts)]
 pub struct DistributeV0<'info> {
@@ -11,21 +14,23 @@ pub struct DistributeV0<'info> {
   #[account(
     mut,
     has_one = token_account,
+    has_one = fanout_mint,
   )]
   pub fanout: Box<Account<'info, FanoutV0>>,
-
+  pub fanout_mint: Box<Account<'info, Mint>>,
+  #[account(mut)]
   pub token_account: Box<Account<'info, TokenAccount>>,
-  #[account(
-    // You can distribute to another account, but only if you're the owner.
-    constraint = to_account.owner == owner.key() || owner.is_signer
-  )]
+  /// CHECK: Just verified on associated token and receipt
   pub owner: UncheckedAccount<'info>,
   #[account(
-    mut,
-    token::mint = token_account.mint
+    init_if_needed,
+    payer = payer,
+    associated_token::mint = fanout_mint,
+    associated_token::authority = owner,
   )]
   pub to_account: Box<Account<'info, TokenAccount>>,
   #[account(
+    mut,
     seeds = ["fanout_voucher".as_bytes(), mint.key().as_ref()],
     bump = voucher.bump_seed,
     has_one = mint
@@ -40,6 +45,8 @@ pub struct DistributeV0<'info> {
   )]
   pub receipt_account: Box<Account<'info, TokenAccount>>,
   pub token_program: Program<'info, Token>,
+  pub associated_token_program: Program<'info, AssociatedToken>,
+  pub system_program: Program<'info, System>,
 }
 
 impl<'info> DistributeV0<'info> {
@@ -47,7 +54,7 @@ impl<'info> DistributeV0<'info> {
     let cpi_accounts = Transfer {
       from: self.token_account.to_account_info(),
       to: self.to_account.to_account_info(),
-      authority: self.voucher.to_account_info(),
+      authority: self.fanout.to_account_info(),
     };
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
@@ -68,9 +75,23 @@ pub fn handler(ctx: Context<DistributeV0>) -> Result<()> {
     .checked_div(tss as u128)
     .unwrap() as u64;
 
+  ctx.accounts.fanout.total_inflow = ctx
+    .accounts
+    .fanout
+    .total_inflow
+    .checked_add(inflow)
+    .unwrap()
+    .checked_add(unstaked_correction)
+    .unwrap();
+
   let last_inflow = ctx.accounts.voucher.total_inflow;
   let total_shares = ctx.accounts.fanout.total_shares;
-  let inflow_diff = inflow.checked_sub(last_inflow).unwrap();
+  let inflow_diff = ctx
+    .accounts
+    .fanout
+    .total_inflow
+    .checked_sub(last_inflow)
+    .unwrap();
   let dist_amount = u128::from(inflow_diff)
     .checked_mul(TWELVE_PREC) // Add 12 precision on dust
     .unwrap()
@@ -97,11 +118,11 @@ pub fn handler(ctx: Context<DistributeV0>) -> Result<()> {
     .unwrap();
 
   let new_dust = dust + ctx.accounts.voucher.total_dust;
-  let whole_dust = dust
+  let whole_dust = new_dust
     .checked_div(u64::try_from(TWELVE_PREC).unwrap())
     .unwrap();
-  if whole_dust > 1 {
-    dist_amount_u64 += 1;
+  if whole_dust >= 1 {
+    dist_amount_u64 += whole_dust;
     ctx.accounts.voucher.total_dust = new_dust
       .checked_sub(u64::try_from(TWELVE_PREC).unwrap())
       .unwrap();
@@ -109,21 +130,19 @@ pub fn handler(ctx: Context<DistributeV0>) -> Result<()> {
     ctx.accounts.voucher.total_dust = new_dust;
   }
 
-  let signer_seeds: &[&[u8]] = voucher_seeds!(ctx.accounts.voucher);
+  let signer_seeds: &[&[u8]] = fanout_seeds!(ctx.accounts.fanout);
   token::transfer(
     ctx.accounts.transfer_ctx().with_signer(&[signer_seeds]),
     dist_amount_u64,
   )?;
 
+  ctx.accounts.fanout.last_snapshot_amount = curr_balance.checked_sub(dist_amount_u64).unwrap();
   ctx.accounts.voucher.total_inflow = ctx.accounts.fanout.total_inflow;
-  ctx.accounts.fanout.last_snapshot_amount = curr_balance;
-  ctx.accounts.fanout.total_inflow = ctx
+  ctx.accounts.voucher.total_distributed = ctx
     .accounts
-    .fanout
-    .total_inflow
-    .checked_add(inflow)
-    .unwrap()
-    .checked_add(unstaked_correction)
+    .voucher
+    .total_distributed
+    .checked_add(dist_amount_u64)
     .unwrap();
 
   Ok(())

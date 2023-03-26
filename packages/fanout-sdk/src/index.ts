@@ -2,8 +2,7 @@ import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { fanoutResolvers } from "./resolvers";
-import { BN } from "bn.js";
-import { Fanout } from "@helium/idls/lib/types/fanout";
+import { Fanout, IDL } from "@helium/idls/lib/types/fanout";
 
 export async function init(
   provider: AnchorProvider,
@@ -25,10 +24,6 @@ export async function init(
 
   return program;
 }
-
-export { IDL } from "./fanout";
-
-export type { Fanout } from "./fanout";
 
 export * from "./constants";
 export * from "./pdas";

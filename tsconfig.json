@@ -8,6 +8,9 @@
       "path": "./packages/hydra-sdk"
     },
     {
+      "path": "./packages/fanout-sdk"
+    },
+    {
       "path": "./packages/spl-utils"
     },
     {
