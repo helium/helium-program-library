@@ -31,8 +31,20 @@ export const fanoutResolvers = combineResolvers(
   }),
   ataResolver({
     instruction: "unstakeV0",
-    account: "receiptccount",
+    account: "receiptAccount",
     mint: "mint",
-    owner: "recipient",
-  })
+    owner: "voucherAuthority",
+  }),
+  ataResolver({
+    instruction: "unstakeV0",
+    account: "toAccount",
+    mint: "membershipMint",
+    owner: "voucherAuthority",
+  }),
+  ataResolver({
+    instruction: "disributeV0",
+    account: "receiptAccount",
+    mint: "mint",
+    owner: "owner",
+  }),
 );

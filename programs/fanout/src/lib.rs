@@ -25,15 +25,11 @@ pub mod fanout {
     instructions::stake_v0::handler(ctx)
   }
 
-  pub fn unstake_v0(
-    ctx: Context<UnstakeV0>,
-  ) -> Result<()> {
+  pub fn unstake_v0(ctx: Context<UnstakeV0>) -> Result<()> {
     instructions::unstake_v0::handler(ctx)
   }
 
-  pub fn distribute_v0(
-    ctx: Context<DistributeV0>,
-  ) -> Result<()> {
+  pub fn distribute_v0(ctx: Context<DistributeV0>) -> Result<()> {
     instructions::distribute_v0::handler(ctx)
   }
 }

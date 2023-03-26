@@ -33,9 +33,9 @@ pub struct UnstakeV0<'info> {
     mut,
     token::mint = mint,
     token::authority = voucher_authority,
-    constraint = voucher_token_account.amount > 0
+    constraint = receipt_account.amount > 0
   )]
-  pub voucher_token_account: Box<Account<'info, TokenAccount>>,
+  pub receipt_account: Box<Account<'info, TokenAccount>>,
   pub voucher_authority: Signer<'info>,
 
   #[account(
@@ -67,7 +67,7 @@ impl<'info> UnstakeV0<'info> {
       self.token_program.to_account_info(),
       Burn {
         mint: self.mint.to_account_info(),
-        from: self.voucher_token_account.to_account_info(),
+        from: self.receipt_account.to_account_info(),
         authority: self.voucher_authority.to_account_info(),
       },
     )
