@@ -183,12 +183,9 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
       signer_seeds,
     ),
     DataV2 {
-      name: format!("{} Receipt", ctx.accounts.fanout.name),
+      name: format!("Staked {}", ctx.accounts.fanout.name),
       symbol: String::from("FANOUT"),
-      uri: format!(
-        "https://fanout.nft.test-helium.com/{}",
-        ctx.accounts.mint.key()
-      ),
+      uri: format!("https://fanout.nft.helium.io/{}", ctx.accounts.mint.key()),
       seller_fee_basis_points: 0,
       creators: None,
       collection: Some(Collection {

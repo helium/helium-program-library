@@ -129,10 +129,7 @@ async function run() {
     provider.wallet,
     provider.connection
   );
-  const myHstAcct = getAssociatedTokenAddressSync(
-    hst,
-    provider.wallet.publicKey
-  );
+
   for (const [address, account] of Object.entries(accounts)) {
     if (!account.hst || account.hst === 0 || account.hst === "0") {
       continue;

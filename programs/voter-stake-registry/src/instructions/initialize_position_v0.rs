@@ -195,7 +195,7 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
       name: String::from("Voting Escrow Token Position"),
       symbol: String::from("VSR"),
       uri: format!(
-        "https://positions.nft.test-helium.com/{}",
+        "https://positions.nft.helium.io/{}",
         ctx.accounts.mint.key()
       ),
       seller_fee_basis_points: 0,
