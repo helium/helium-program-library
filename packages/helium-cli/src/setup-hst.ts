@@ -170,7 +170,7 @@ async function run() {
     // 2️⃣  Define a trigger condition.
     const trigger = {
       cron: {
-        schedule: "0 0 30 * * * *",
+        schedule: "0 30 0 * * * *",
         skippable: true,
       },
     };
