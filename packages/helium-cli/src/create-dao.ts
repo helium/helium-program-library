@@ -158,6 +158,17 @@ async function run() {
       type: "string",
       default: "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm",
     },
+    hstKeypair: {
+      type: "string",
+      describe: "Keypair of the HST token",
+      default: `${__dirname}/../keypairs/hst.json`,
+    },
+    numHst: {
+      type: "number",
+      describe:
+        "Number of HST tokens to pre mint before assigning authority to lazy distributor",
+      default: 0,
+    },
   });
 
   const argv = await yarg.argv;
@@ -176,6 +187,7 @@ async function run() {
 
   const hntKeypair = loadKeypair(argv.hntKeypair);
   const dcKeypair = loadKeypair(argv.dcKeypair);
+  const hstKeypair = loadKeypair(argv.hstKeypair);
   const me = provider.wallet.publicKey;
   const dao = daoKey(hntKeypair.publicKey)[0];
 
@@ -226,6 +238,14 @@ async function run() {
     to: councilWallet,
   });
 
+  await createAndMint({
+    provider,
+    mintKeypair: hstKeypair,
+    amount: argv.numHst,
+    metadataUrl: `${argv.bucket}/hst.json`,
+  });
+
+
   let instructions: TransactionInstruction[] = [];
   const govProgramVersion = await getGovernanceProgramVersion(
     conn,
@@ -266,6 +286,8 @@ async function run() {
         tokenType: GoverningTokenType.Liquid,
       })
     );
+    await sendInstructions(provider, instructions, []);
+    instructions = [];
   }
 
   const registrar = (await registrarKey(realm, hntKeypair.publicKey))[0];
@@ -282,6 +304,8 @@ async function run() {
         })
         .instruction()
     );
+    await sendInstructions(provider, instructions, []);
+    instructions = [];
   }
 
   console.log("Configuring VSR voting mint at [0]");
@@ -311,6 +335,8 @@ async function run() {
       ])
       .instruction()
   );
+  await sendInstructions(provider, instructions, []);
+  instructions = [];
 
   console.log("Creating max voter record");
   instructions.push(
@@ -322,6 +348,9 @@ async function run() {
       })
       .instruction()
   );
+  console.log(registrar.toString());
+  await sendInstructions(provider, instructions, []);
+  instructions = [];
 
   if (!authority.equals(me)) {
     withSetRealmAuthority(
@@ -372,14 +401,23 @@ async function run() {
 
   if (!(await exists(conn, dao))) {
     console.log("Initializing DAO");
+    const hstEmission = await parseEmissionsSchedule(
+      argv.hstEmissionSchedulePath
+    );
+    const hntEmission = await parseEmissionsSchedule(
+      argv.emissionSchedulePath
+    );
+    const currentTs = await getUnixTimestamp(provider);
+    const currentHstEmission = hstEmission[hstEmission.findIndex((x) => x.startUnixTime > currentTs) - 1];
+    const currentHntEmission = hntEmission[hntEmission.findIndex((x) => x.startUnixTime > currentTs) - 1];
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         registrar: registrar,
         authority,
         netEmissionsCap: toBN(34.24, 8),
         // Tx too large to do in initialize dao, so do it with update
-        hstEmissionSchedule: [],
-        emissionSchedule: [],
+        hstEmissionSchedule: [currentHstEmission],
+        emissionSchedule: [currentHntEmission],
       })
       .accounts({
         dcMint: dcKeypair.publicKey,
@@ -388,7 +426,7 @@ async function run() {
         // TODO: Create actual HST pool
         hstPool: getAssociatedTokenAddressSync(
           hntKeypair.publicKey,
-          fanoutConfigKey("HST")[0],
+          authority,
           true
         ),
       })
@@ -400,12 +438,8 @@ async function run() {
         await heliumSubDaosProgram.methods
           .updateDaoV0({
             authority,
-            emissionSchedule: await parseEmissionsSchedule(
-              argv.emissionSchedulePath
-            ),
-            hstEmissionSchedule: await parseEmissionsSchedule(
-              argv.hstEmissionSchedulePath
-            ),
+            emissionSchedule: hntEmission,
+            hstEmissionSchedule: hstEmission,
             hstPool: null
           })
           .accounts({
