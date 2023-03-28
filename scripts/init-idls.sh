@@ -8,5 +8,6 @@ anchor idl init circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g --filepath target/id
 anchor idl init hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8 --filepath target/idl/helium_entity_manager.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json
 anchor idl init treaf4wWBBty3fHdyBpo35Mz84M8k3heKXmjmi9vFt5 --filepath target/idl/treasury_management.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json
 anchor idl init 1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h --filepath target/idl/lazy_transactions.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json
+anchor idl init Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS --filepath target/idl/price_oracle.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json
 anchor idl init hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8 --filepath target/idl/voter_stake_registry.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json
 

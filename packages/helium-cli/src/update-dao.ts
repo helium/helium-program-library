@@ -45,6 +45,12 @@ const yarg = yargs(hideBin(process.argv)).options({
     type: "string",
     default: null,
   },
+  newHstPool: {
+    required: false,
+    describe: "New HST Pool",
+    type: "string",
+    default: null,
+  },
   executeTransaction: {
     type: "boolean",
   },
@@ -89,8 +95,9 @@ async function run() {
   }
   instructions.push(await program.methods.updateDaoV0({
     authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
-    emissionSchedule: argv.newEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newEmissionsSchedulePath) : null,
+    emissionSchedule: argv.knewEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newEmissionsSchedulePath) : null,
     hstEmissionSchedule: argv.newHstEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newHstEmissionsSchedulePath) : null,
+    hstPool: argv.newHstPool ? new PublicKey(argv.newHstPool) : null,
   }).accounts({
     dao,
     authority: daoAcc.authority,

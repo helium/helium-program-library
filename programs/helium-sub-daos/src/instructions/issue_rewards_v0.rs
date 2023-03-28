@@ -171,6 +171,16 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
 
   let delegators_present = ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start > 0;
   let max_percent = 100_u64.checked_mul(10_0000000).unwrap();
+  let dnt_emissions = (total_emissions as u128)
+    .checked_mul(u128::from(
+      max_percent - ctx.accounts.sub_dao.delegator_rewards_percent,
+    ))
+    .unwrap()
+    .checked_div(max_percent as u128) // 100% with 2 decimals accuracy
+    .unwrap()
+    .try_into()
+    .unwrap();
+  msg!("Minting {} DNT eissions to treasury", dnt_emissions);
   mint_v0(
     ctx.accounts.mint_dnt_emissions_ctx().with_signer(&[&[
       b"sub_dao",
@@ -178,23 +188,23 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
       &[ctx.accounts.sub_dao.bump_seed],
     ]]),
     MintArgsV0 {
-      amount: total_emissions
-        .checked_mul(max_percent - ctx.accounts.sub_dao.delegator_rewards_percent)
-        .unwrap()
-        .checked_div(max_percent) // 100% with 2 decimals accuracy
-        .unwrap(), // send some dnt emissions to treasury
+      amount: dnt_emissions, // send some dnt emissions to treasury
     },
   )?;
 
   let delegation_rewards_amount = if delegators_present {
-    total_emissions
-      .checked_mul(ctx.accounts.sub_dao.delegator_rewards_percent)
+    u128::from(total_emissions)
+      .checked_mul(ctx.accounts.sub_dao.delegator_rewards_percent as u128)
       .unwrap()
-      .checked_div(max_percent) // 100% with 8 decimals accuracy
+      .checked_div(max_percent as u128) // 100% with 8 decimals accuracy
+      .unwrap()
+      .try_into()
       .unwrap()
   } else {
     0
   };
+
+  msg!("Minting {} delegation rewards", delegation_rewards_amount);
 
   if delegation_rewards_amount > 0 {
     mint_v0(
@@ -209,6 +219,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     )?;
   }
 
+  msg!("Minting {} to treasury", rewards_amount);
   mint_v0(
     ctx.accounts.mint_treasury_emissions_ctx().with_signer(&[&[
       b"dao",

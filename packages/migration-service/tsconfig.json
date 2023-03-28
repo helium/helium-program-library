@@ -5,6 +5,9 @@
       "path": "../idls"
     },
     {
+      "path": "../hydra-sdk"
+    },
+    {
       "path": "../circuit-breaker-sdk"
     },
     {

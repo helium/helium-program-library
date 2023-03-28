@@ -1,5 +1,11 @@
 First, brick the genesis transactions. This keeps someone from front-running the genesis transaction lazy signer.
 
+Now, setup HST:
+
+```
+npx ts-node --project tsconfig.cjs.json src/setup-hst -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --hnt $(solana address -k keypairs/hnt.json) --name "HST"
+```
+
 Next, make sure startUnixTime in the emissions schedules is equal to the current time.
 
 

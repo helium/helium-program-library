@@ -329,6 +329,8 @@ async function run() {
         tokenType: GoverningTokenType.Liquid,
       })
     );
+    await sendInstructions(provider, instructions, []);
+    instructions = [];
   }
 
   const registrar = (await registrarKey(realm, subdaoKeypair.publicKey))[0];
@@ -372,6 +374,9 @@ async function run() {
         ])
         .instruction()
     );
+
+    await sendInstructions(provider, instructions, []);
+    instructions = [];
 
     console.log("Creating max voter record");
     instructions.push(
@@ -446,13 +451,16 @@ async function run() {
     }
 
     console.log(`Initializing ${name} SubDAO`);
+    const currentTs = await getUnixTimestamp(provider);
+    const currentHntEmission = emissionSchedule[emissionSchedule.findIndex((x) => x.startUnixTime > currentTs) - 1];
+
     const initSubdaoMethod = await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
         registrar: registrar,
         dcBurnAuthority: new PublicKey(argv.dcBurnAuthority),
         authority,
         // Tx to large to do here, do it with update
-        emissionSchedule: [],
+        emissionSchedule: [currentHntEmission],
         // Linear curve
         treasuryCurve: {
           exponentialCurveV0: {
@@ -527,14 +535,14 @@ async function run() {
         iotConfig: {
           minGain: 10,
           maxGain: 150,
-          fullLocationStakingFee: toBN(1000000, 0),
+          fullLocationStakingFee: toBN(500000, 0),
           dataonlyLocationStakingFee: toBN(500000, 0),
         } as any,
       };
     } else {
       settings = {
         mobileConfig: {
-          fullLocationStakingFee: toBN(1000000, 0),
+          fullLocationStakingFee: toBN(500000, 0),
           dataonlyLocationStakingFee: toBN(500000, 0),
         },
       };
@@ -571,20 +579,3 @@ run()
     process.exit(1);
   })
   .then(() => process.exit());
-
-function emissionSchedule(
-  startEpochRewards: number
-): { startUnixTime: anchor.BN; emissionsPerEpoch: anchor.BN }[] {
-  const now = new Date().getDate() / 1000;
-  // Do 2 years out, halving every  years
-  // Any larger and it wont fit in a tx
-  return new Array(1).fill(0).map((_, twoYear) => {
-    return {
-      startUnixTime: new anchor.BN(twoYear * 2 * 31557600 + now), // 2 years in seconds
-      emissionsPerEpoch: toBN(
-        startEpochRewards / Math.pow(2, twoYear) / (365.25 * 24), // Break into daily
-        6
-      ),
-    };
-  });
-}

@@ -5,6 +5,9 @@
       "path": "./packages/idls"
     },
     {
+      "path": "./packages/hydra-sdk"
+    },
+    {
       "path": "./packages/spl-utils"
     },
     {
@@ -51,6 +54,9 @@
     },
     {
       "path": "./packages/circuit-breaker-sdk"
+    },
+    {
+      "path": "./packages/price-oracle-sdk"
     },
     {
       "path": "./packages/hotspot-utils"

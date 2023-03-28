@@ -49,45 +49,42 @@ jobs:
           key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo test --lib
 
-  test-contracts:
-    name: Test Anchor Contracts
+  build:
+    name: Build Anchor
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
-      - uses: ./.github/actions/setup/
-      - uses: ./.github/actions/setup-anchor/
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - uses: actions/cache@v2
-        name: Cache Cargo registry + index
-        id: cache-cargo-registry
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}-2
-      - uses: actions/cache@v2
-        name: Cache Builds
-        id: cache-cargo-builds
-        with:
-          path: |
-            ./target/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('./**/Cargo.lock') }}-target
-      - name: Cache Deps Builds
-        uses: actions/cache@v2
-        id: cache-cargo-deps-builds
-        with:
-          path: |
-            ./deps/metaplex-program-library
-            ./deps/solana-program-library
-            ./deps/helium-voter-stake-registry
-            ./deps/clockwork
-          key: deps-${{ runner.os }}-build-${{ hashFiles('./deps/**/Cargo.lock') }}
-      - run: ~/.cargo/bin/anchor run build-deps
-        shell: bash
-        if: steps.cache-cargo-deps-builds.outputs.cache-hit != 'true'
-      - run: TESTING=true ~/.cargo/bin/anchor build
-      - uses: ./.github/actions/setup-ts/
-      - run: TESTING=true ~/.cargo/bin/anchor test --provider.cluster localnet --provider.wallet ~/.config/solana/id.json
+      - uses: ./.github/actions/build-anchor/
+
+  test-contracts:
+    needs: build
+    name: Test Anchor Contracts
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - tests/circuit-breaker.ts
+          - tests/data-credits.ts
+          - tests/distributor-oracle.ts
+          - tests/helium-entity-manager.ts
+          - tests/lazy-distributor.ts
+          - tests/lazy-transactions.ts
+          - tests/treasury-management.ts
+          - tests/voter-stake-registry.ts
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-anchor/
+      - name: Start Anchor Localnet
+        run: ~/.cargo/bin/anchor localnet --skip-build --provider.wallet ~/.config/solana/id.json & sleep 2
+      - name: Wait for localnet to start
+        run: |
+          while [[ "$(curl -s http://localhost:8899/health)" != "ok" ]]; do
+            echo "Waiting for local Anchor network to start..."
+            sleep 5
+          done
+      - run: ANCHOR_WALLET=${HOME}/.config/solana/id.json yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 $TEST
+        env:
+          TESTING: true
+          TEST: ${{ matrix.test }}
+          ANCHOR_PROVIDER_URL: http://localhost:8899

@@ -249,7 +249,7 @@ export const awaitTransactionSignatureConfirmation = async (
   };
   let subId = 0;
   status = await new Promise(async (resolve, reject) => {
-    setTimeout(() => {
+    const t = setTimeout(() => {
       if (done) {
         return;
       }
@@ -261,12 +261,12 @@ export const awaitTransactionSignatureConfirmation = async (
       subId = connection.onSignature(
         txid,
         (result: any, context: any) => {
-          done = true;
           status = {
             err: result.err,
             slot: context.slot,
             confirmations: 0,
           };
+          done = true
           if (result.err) {
             console.log("Rejected via websocket", result.err);
             reject(status);
@@ -277,8 +277,10 @@ export const awaitTransactionSignatureConfirmation = async (
         commitment
       );
     } catch (e) {
-      done = true;
       console.error("WS error in setup", txid, e);
+    } finally {
+      done = true
+      clearTimeout(t);
     }
     while (!done && queryStatus) {
       // eslint-disable-next-line no-loop-func

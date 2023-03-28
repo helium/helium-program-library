@@ -5,11 +5,11 @@ import {
   createAtaAndMint,
   createMint,
   sendInstructions,
-  toBN,
+  toBN
 } from "@helium/spl-utils";
 import {
   getConcurrentMerkleTreeAccountSize,
-  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID
 } from "@solana/spl-account-compression";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { execSync } from "child_process";

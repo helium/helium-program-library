@@ -79,6 +79,18 @@ export const vsrResolvers = combineResolvers(
     mint: "mint",
     owner: "recipient",
   }),
+  ataResolver({
+    instruction: "ledgerTransferPositionV0",
+    account: "toTokenAccount",
+    mint: "mint",
+    owner: "to"
+  }),
+  ataResolver({
+    instruction: "ledgerTransferPositionV0",
+    account: "fromTokenAccount",
+    mint: "mint",
+    owner: "from"
+  }),
   resolveIndividual(async ({ accounts, path, provider }) => {
     if (path[path.length - 1] === "recipient") {
       // @ts-ignore
