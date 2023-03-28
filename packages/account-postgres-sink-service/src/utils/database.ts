@@ -1,23 +1,17 @@
 import { Sequelize } from "sequelize";
 import AWS from "aws-sdk";
 import * as pg from "pg";
-import {
-  PG_HOST,
-  PG_PORT,
-  PG_DATABASE,
-  PG_USER,
-  PG_PASSWORD,
-  AWS_REGION,
-} from "../env";
 
+const host = process.env.PGHOST || "localhost";
+const port = Number(process.env.PGPORT) || 5432;
 const database = new Sequelize({
-  host: PG_HOST,
+  host: host,
   dialect: "postgres",
-  port: PG_PORT,
+  port: port,
   logging: false,
   dialectModule: pg,
-  username: PG_USER,
-  database: PG_DATABASE,
+  username: process.env.PGUSER,
+  database: process.env.PGDATABASE,
   pool: {
     max: 5,
     min: 0,
@@ -26,15 +20,15 @@ const database = new Sequelize({
   },
   hooks: {
     beforeConnect: async (config: any) => {
-      const isRds = PG_HOST.includes("rds.amazonaws.com");
+      const isRds = host.includes("rds.amazonaws.com");
 
-      let password = PG_PASSWORD;
+      let password = process.env.PGPASSWORD;
       if (isRds && !password) {
         const signer = new AWS.RDS.Signer({
-          region: AWS_REGION,
-          hostname: PG_HOST,
-          port: PG_PORT,
-          username: PG_USER,
+          region: process.env.AWS_REGION,
+          hostname: process.env.PGHOST,
+          port,
+          username: process.env.PGUSER,
         });
         password = await new Promise((resolve, reject) =>
           signer.getAuthToken({}, (err, token) => {
