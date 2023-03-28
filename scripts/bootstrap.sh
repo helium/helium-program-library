@@ -24,7 +24,7 @@ done
 RND=$RANDOM
 echo "Using $RND for dao names"
 
-npx ts-node --project tsconfig.cjs.json src/setup-hst -u $CLUSTER_URL --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --hnt $(solana address -k keypairs/hnt.json) --name "HST"
+npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/setup-hst -u $CLUSTER_URL --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --hnt $(solana address -k packages/helium-cli/keypairs/hnt.json) --name "HST"
 
 # init the dao and subdaos
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-dao.ts \
@@ -33,7 +33,7 @@ npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-subdao.ts \
     -rewardsOracleUrl https://iot-oracle.oracle.test-helium.com \
     --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n IOT --subdaoKeypair packages/helium-cli/keypairs/iot.json \
-    --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "IOT $RND" --dcBurnAuthority $(solana address) -u $CLUSTER_URL --decimals 8 --delegatorRewardsPercent 6 \
+    --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "IOT $RND" --dcBurnAuthority $(solana address) -u $CLUSTER_URL --decimals 6 --delegatorRewardsPercent 6 \
     --emissionSchedulePath ./packages/helium-cli/emissions/iot.json
 
 npx ts-node --project ./packages/helium-cli/tsconfig.cjs.json ./packages/helium-cli/src/create-subdao.ts \

@@ -341,6 +341,9 @@ async function run() {
         .initializeRegistrarV0({
           positionUpdateAuthority: null,
         })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+        ])
         .accounts({
           realm,
           realmGoverningTokenMint: subdaoKeypair.publicKey,

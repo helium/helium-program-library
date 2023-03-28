@@ -28,6 +28,7 @@ import {
 } from "@solana/spl-governance";
 import { getAssociatedTokenAddress, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
+  ComputeBudgetProgram,
   Connection,
   LAMPORTS_PER_SOL,
   PublicKey,
@@ -298,6 +299,9 @@ async function run() {
         .initializeRegistrarV0({
           positionUpdateAuthority: (await daoKey(hntKeypair.publicKey))[0],
         })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+        ])
         .accounts({
           realm,
           realmGoverningTokenMint: hntKeypair.publicKey,
