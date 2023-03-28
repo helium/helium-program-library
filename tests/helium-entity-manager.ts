@@ -188,7 +188,7 @@ describe("helium-entity-manager", () => {
           dcAmount: null,
         })
         .accounts({ dcMint: dcMint })
-        .rpc({ skipPreflight: true });
+        .rpc({ skipPreflight: false });
 
       maker = makerConf.maker;
       makerKeypair = makerConf.makerKeypair;
@@ -342,7 +342,7 @@ describe("helium-entity-manager", () => {
           eccVerifier: eccVerifier.publicKey,
         })
         .signers([makerKeypair, eccVerifier])
-        .rpc({ skipPreflight: true });
+        .rpc({ skipPreflight: false });
 
       const method = (
         await onboardMobileHotspot({
@@ -356,7 +356,7 @@ describe("helium-entity-manager", () => {
         })
       ).signers([makerKeypair, hotspotOwner]);
 
-      await method.rpc({ skipPreflight: true });
+      await method.rpc({ skipPreflight: false });
       const { mobileInfo } = await method.pubkeys();
 
       const mobileInfoAcc = await hemProgram.account.mobileHotspotInfoV0.fetch(
@@ -382,7 +382,7 @@ describe("helium-entity-manager", () => {
             eccVerifier: eccVerifier.publicKey,
           })
           .signers([makerKeypair, eccVerifier])
-          .rpc({ skipPreflight: true });
+          .rpc({ skipPreflight: false });
 
         const method = (
           await onboardMobileHotspot({
@@ -396,7 +396,7 @@ describe("helium-entity-manager", () => {
           })
         ).signers([makerKeypair, hotspotOwner]);
 
-        await method.rpc({ skipPreflight: true });
+        await method.rpc({ skipPreflight: false });
 
         await dcProgram.methods
           .mintDataCreditsV0({
@@ -422,7 +422,7 @@ describe("helium-entity-manager", () => {
         ).signers([hotspotOwner]);
 
         const info = (await method.pubkeys()).mobileInfo!;
-        await method.rpc({ skipPreflight: true });
+        await method.rpc({ skipPreflight: false });
 
         const storageAcc = await hemProgram.account.mobileHotspotInfoV0.fetch(
           info!
@@ -475,7 +475,7 @@ describe("helium-entity-manager", () => {
           dcAmount: null,
         })
         .accounts({ dcMint: dcMint })
-        .rpc({ skipPreflight: true });
+        .rpc({ skipPreflight: false });
 
       maker = makerConf.maker;
       makerKeypair = makerConf.makerKeypair;
@@ -577,7 +577,7 @@ describe("helium-entity-manager", () => {
           eccVerifier: eccVerifier.publicKey,
         })
         .signers([makerKeypair, eccVerifier])
-        .rpc({ skipPreflight: true });
+        .rpc({ skipPreflight: false });
 
       const method = (
         await onboardIotHotspot({
@@ -591,7 +591,7 @@ describe("helium-entity-manager", () => {
         })
       ).signers([makerKeypair, hotspotOwner]);
 
-      await method.rpc({ skipPreflight: true });
+      await method.rpc({ skipPreflight: false });
       const { iotInfo } = await method.pubkeys();
 
       const iotInfoAccount = await hemProgram.account.iotHotspotInfoV0.fetch(
@@ -639,7 +639,7 @@ describe("helium-entity-manager", () => {
             eccVerifier: eccVerifier.publicKey,
           })
           .signers([makerKeypair, eccVerifier])
-          .rpc({ skipPreflight: true });
+          .rpc({ skipPreflight: false });
 
         const method = (
           await onboardIotHotspot({
@@ -653,7 +653,7 @@ describe("helium-entity-manager", () => {
           })
         ).signers([makerKeypair, hotspotOwner]);
 
-        await method.rpc({ skipPreflight: true });
+        await method.rpc({ skipPreflight: false });
 
         await dcProgram.methods
           .mintDataCreditsV0({
@@ -683,7 +683,7 @@ describe("helium-entity-manager", () => {
         ).signers([hotspotOwner]);
 
         const info = (await method.pubkeys()).iotInfo!;
-        await method.rpc({ skipPreflight: true });
+        await method.rpc({ skipPreflight: false });
 
         const storageAcc = await hemProgram.account.iotHotspotInfoV0.fetch(
           info!
