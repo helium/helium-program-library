@@ -1,22 +1,21 @@
 import Fastify from "fastify";
 import fastifyCron from "fastify-cron";
 import { StatusCodes, ReasonPhrases } from "http-status-codes";
-import { PROGRAM_ID as HVSR_PROG_ID } from "@helium/voter-stake-registry-sdk";
+import { PROGRAM_ID as HVSR_PROGRAM_ID } from "@helium/voter-stake-registry-sdk";
 import { upsertProgramAccounts } from "./utils/upsertProgramAccounts";
+import { GLOBAL_CRON_CONFIG } from "./env";
 
 const server = Fastify();
 
-server.get("/sync-vsr", async (req, res) => {
+server.get("/hvsr", async (_req, res) => {
   try {
     await upsertProgramAccounts({
-      programId: HVSR_PROG_ID,
+      programId: HVSR_PROGRAM_ID,
       idlAccountTypes: ["PositionV0", "Registrar"],
     });
     res.code(StatusCodes.OK).send(ReasonPhrases.OK);
   } catch (err) {
-    res
-      .code(StatusCodes.INTERNAL_SERVER_ERROR)
-      .send(ReasonPhrases.INTERNAL_SERVER_ERROR);
+    res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
     console.error(err);
   }
 });
@@ -24,10 +23,11 @@ server.get("/sync-vsr", async (req, res) => {
 server.register(fastifyCron, {
   jobs: [
     {
-      cronTime: "0 0 * * *", // Everyday at midnight UTC
+      cronTime: GLOBAL_CRON_CONFIG,
+      runOnInit: true,
       onTick: async (server) => {
         try {
-          await server.inject("/sync-vsr");
+          await server.inject("/hvsr");
         } catch (err) {
           console.error(err);
         }

@@ -1,7 +1,5 @@
 import server from "./server";
 import database from "./utils/database";
-import * as dotenv from "dotenv";
-dotenv.config();
 
 const start = async () => {
   try {

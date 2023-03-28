@@ -5,7 +5,7 @@ const santizeValue = (value: any) => {
   if (value === "undefined" || value === null || value === "") return null;
   if (value instanceof PublicKey) return value.toBase58();
   if (value instanceof BN) return value.toString();
-  if (typeof value === "number") return value;
+  if (["number", "boolean"].includes(typeof value)) return value;
   if (typeof value === "object") {
     if (
       Object.keys(value).length === 1 &&

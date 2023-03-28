@@ -12,6 +12,7 @@ const TypeMap = new Map<string, any>([
   ["u32", DataTypes.INTEGER.UNSIGNED],
   ["i64", DataTypes.BIGINT],
   ["u64", DataTypes.BIGINT.UNSIGNED],
+  ["bool", DataTypes.BOOLEAN],
 ]);
 
 const determineType = (type: string | object): any => {
@@ -37,36 +38,40 @@ const determineType = (type: string | object): any => {
 
 export const defineIdlModels = async ({
   idl,
+  idlAccountTypes,
   sequelize,
 }: {
   idl: anchor.Idl;
+  idlAccountTypes: string[];
   sequelize: Sequelize;
 }) => {
   const { accounts } = idl;
 
   for (const acc of accounts) {
-    let schema: { [key: string]: any } = {};
-    for (const field of acc.type.fields) {
-      const type = determineType(field.type);
+    if (idlAccountTypes.includes(acc.name)) {
+      let schema: { [key: string]: any } = {};
+      for (const field of acc.type.fields) {
+        const type = determineType(field.type);
 
-      if (type.type !== "unknown") {
-        schema[acc.name] = {
-          ...schema[acc.name],
-          [field.name]: type,
-        };
+        if (type.type !== "unknown") {
+          schema[acc.name] = {
+            ...schema[acc.name],
+            [field.name]: type,
+          };
+        }
       }
-    }
 
-    sequelize.define(
-      acc.name,
-      {
-        address: {
-          type: DataTypes.STRING,
-          primaryKey: true,
+      sequelize.define(
+        acc.name,
+        {
+          address: {
+            type: DataTypes.STRING,
+            primaryKey: true,
+          },
+          ...schema[acc.name],
         },
-        ...schema[acc.name],
-      },
-      { underscored: true, tableName: underscore(acc.name) }
-    );
+        { underscored: true, tableName: underscore(acc.name) }
+      );
+    }
   }
 };
