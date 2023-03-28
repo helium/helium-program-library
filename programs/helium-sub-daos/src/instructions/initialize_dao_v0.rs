@@ -85,11 +85,7 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
         // should never get triggered.
         window_size_seconds: u64::try_from(EPOCH_LENGTH).unwrap(),
         threshold_type: ThresholdType::Absolute,
-        threshold: 5
-          * args
-            .emission_schedule
-            .get_emissions_at(Clock::get()?.unix_timestamp)
-            .unwrap(),
+        threshold: 5 * args.emission_schedule[0].emissions_per_epoch,
       },
       mint_authority: ctx.accounts.dao.key(),
     },

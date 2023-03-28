@@ -1,14 +1,14 @@
 [
   {
-    "startUnixTime": 1679064129,
+    "startTime": "2023-04-18T00:00:00Z",
     "percent": 32
   },
   {
-    "startUnixTime": 1690848000,
+    "startTime": "2023-08-01T00:00:00Z",
     "percent": 31
   },
   {
-    "startUnixTime": 1722470400,
+    "startTime": "2024-08-01T00:00:00Z",
     "percent": 30
   }
 ]
