@@ -3,23 +3,31 @@ import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
 import { Sequelize } from "sequelize";
 import { camelize } from "inflection";
 import database from "./database";
-import { provider } from "./solana";
 import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./santizeAccount";
+import { SOLANA_URL } from "../env";
 
 interface UpsertProgramAccountsArgs {
   programId: PublicKey;
-  idlAccountTypes: string[];
+  accounts: {
+    type: string;
+    table?: string;
+    schema?: string;
+  }[];
   accountAddress?: PublicKey;
   sequelize?: Sequelize;
 }
 
 export const upsertProgramAccounts = async ({
   programId,
-  idlAccountTypes,
+  accounts,
   accountAddress = null,
   sequelize = database,
 }: UpsertProgramAccountsArgs) => {
+  anchor.setProvider(
+    anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
+  );
+  const provider = anchor.getProvider() as anchor.AnchorProvider;
   const idl = await anchor.Program.fetchIdl(programId, provider);
 
   if (!idl) {
@@ -27,11 +35,11 @@ export const upsertProgramAccounts = async ({
   }
 
   if (
-    !idlAccountTypes.every((idlAccountType) =>
-      idl.accounts.some(({ name }) => name === idlAccountType)
+    !accounts.every(({ type }) =>
+      idl.accounts.some(({ name }) => name === type)
     )
   ) {
-    throw new Error("idl does not have every idlAccountType");
+    throw new Error("idl does not have every account type");
   }
 
   const program = new anchor.Program(idl, programId, provider);
@@ -40,29 +48,29 @@ export const upsertProgramAccounts = async ({
   } = {};
 
   if (accountAddress) {
-    if (idlAccountTypes.length > 1) {
-      throw new Error("idlAccountTypes should be of length 1");
+    if (accounts.length > 1) {
+      throw new Error("accounts should be of length 1");
     }
 
-    const [idlAccountType] = idlAccountTypes;
-    const acc = await program.account[
-      camelize(idlAccountType, true)
-    ].fetchNullable(accountAddress);
+    const [{ type }] = accounts;
+    const acc = await program.account[camelize(type, true)].fetchNullable(
+      accountAddress
+    );
 
     if (!acc) {
-      throw new Error("unable to fetch ${accountType}");
+      throw new Error(`unable to fetch ${type}`);
     }
 
-    accsByIdlAccountType[idlAccountType] = [
+    accsByIdlAccountType[type] = [
       {
         publicKey: accountAddress,
         account: acc,
       },
     ];
   } else {
-    for (const idlAccountType of idlAccountTypes) {
+    for (const { type } of accounts) {
       const filter: { offset?: number; bytes?: string; dataSize?: number } =
-        program.coder.accounts.memcmp(idlAccountType, undefined);
+        program.coder.accounts.memcmp(type, undefined);
       const coderFilters: GetProgramAccountsFilter[] = [];
 
       if (filter?.offset != undefined && filter?.bytes != undefined) {
@@ -80,16 +88,13 @@ export const upsertProgramAccounts = async ({
         filters: [...coderFilters],
       });
 
-      accsByIdlAccountType[idlAccountType] = resp
+      accsByIdlAccountType[type] = resp
         .map(({ pubkey, account }) => {
           // ignore accounts we cant decode
           try {
             return {
               publicKey: pubkey,
-              account: program.coder.accounts.decode(
-                idlAccountType,
-                account.data
-              ),
+              account: program.coder.accounts.decode(type, account.data),
             };
           } catch (_e) {
             return null;
@@ -102,7 +107,7 @@ export const upsertProgramAccounts = async ({
   await sequelize.authenticate();
   await defineIdlModels({
     idl,
-    idlAccountTypes,
+    accounts,
     sequelize,
   });
 

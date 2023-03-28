@@ -57,6 +57,14 @@ const yarg = yargs(hideBin(process.argv)).options({
     type: "string",
     required: true,
   },
+  pgTable: {
+    type: "string",
+    required: false,
+  },
+  pgSchema: {
+    type: "string",
+    required: false,
+  },
 });
 
 async function run() {
@@ -120,7 +128,13 @@ async function run() {
 
   await upsertProgramAccounts({
     programId,
-    idlAccountTypes: [argv.account],
+    accounts: [
+      {
+        type: argv.account,
+        ...(argv.pgTable ? { table: argv.pgTable } : {}),
+        ...(argv.pgSchema ? { schema: argv.pgSchema } : {}),
+      },
+    ],
     accountAddress: argv.address ? new PublicKey(argv.address) : null,
     sequelize,
   });

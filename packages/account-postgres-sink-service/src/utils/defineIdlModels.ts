@@ -38,27 +38,27 @@ const determineType = (type: string | object): any => {
 
 export const defineIdlModels = async ({
   idl,
-  idlAccountTypes,
+  accounts,
   sequelize,
 }: {
   idl: anchor.Idl;
-  idlAccountTypes: string[];
+  accounts: { type: string; table?: string; schema?: string }[];
   sequelize: Sequelize;
 }) => {
-  const { accounts } = idl;
+  for (const acc of idl.accounts) {
+    const accConfig = accounts.find(({ type }) => type === acc.name);
 
-  for (const acc of accounts) {
-    if (idlAccountTypes.includes(acc.name)) {
+    if (accConfig) {
       let schema: { [key: string]: any } = {};
       for (const field of acc.type.fields) {
-        const type = determineType(field.type);
+        schema[acc.name] = {
+          ...schema[acc.name],
+          [field.name]: determineType(field.type),
+        };
+      }
 
-        if (type.type !== "unknown") {
-          schema[acc.name] = {
-            ...schema[acc.name],
-            [field.name]: type,
-          };
-        }
+      if (accConfig.schema) {
+        await sequelize.createSchema(accConfig.schema, {});
       }
 
       sequelize.define(
@@ -70,7 +70,11 @@ export const defineIdlModels = async ({
           },
           ...schema[acc.name],
         },
-        { underscored: true, tableName: underscore(acc.name) }
+        {
+          underscored: true,
+          schema: underscore(accConfig.schema || "public"),
+          tableName: underscore(accConfig.table || acc.name),
+        }
       );
     }
   }

@@ -11,7 +11,10 @@ server.get("/hvsr", async (_req, res) => {
   try {
     await upsertProgramAccounts({
       programId: HVSR_PROGRAM_ID,
-      idlAccountTypes: ["PositionV0", "Registrar"],
+      accounts: [
+        { type: "PositionV0", table: "positions", schema: "hvsr" },
+        { type: "Registrar", table: "registrars", schema: "hvsr" },
+      ],
     });
     res.code(StatusCodes.OK).send(ReasonPhrases.OK);
   } catch (err) {
