@@ -21,7 +21,6 @@ const URL: &str = "https://positions.nft.test-helium.com";
 #[cfg(not(feature = "devnet"))]
 const URL: &str = "https://positions.nft.helium.io";
 
-
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializePositionArgsV0 {
   pub kind: LockupKind,
@@ -201,11 +200,7 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
     DataV2 {
       name: String::from("Voting Escrow Token Position"),
       symbol: String::from("VSR"),
-      uri: format!(
-        "{}/{}",
-        URL,
-        ctx.accounts.mint.key()
-      ),
+      uri: format!("{}/{}", URL, ctx.accounts.mint.key()),
       seller_fee_basis_points: 0,
       creators: None,
       collection: Some(Collection {

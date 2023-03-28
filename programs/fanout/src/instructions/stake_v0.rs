@@ -12,8 +12,6 @@ use shared_utils::create_metadata_accounts_v3;
 
 use crate::{fanout_seeds, voucher_seeds, FanoutV0, FanoutVoucherV0};
 
-
-
 #[cfg(feature = "devnet")]
 const URL: &str = "https://fanout.nft.test-helium.com";
 
