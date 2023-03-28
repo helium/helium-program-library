@@ -12,6 +12,14 @@ use shared_utils::create_metadata_accounts_v3;
 
 use crate::{fanout_seeds, voucher_seeds, FanoutV0, FanoutVoucherV0};
 
+
+
+#[cfg(feature = "devnet")]
+const URL: &str = "https://fanout.nft.test-helium.com";
+
+#[cfg(not(feature = "devnet"))]
+const URL: &str = "https://fanout.nft.helium.io";
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct StakeArgsV0 {
   pub amount: u64,
@@ -54,8 +62,6 @@ pub struct StakeV0<'info> {
   pub collection_master_edition: UncheckedAccount<'info>,
 
   #[account(
-    init_if_needed,
-    payer = payer,
     associated_token::mint = membership_mint,
     associated_token::authority = staker,
   )]
@@ -185,7 +191,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     DataV2 {
       name: format!("Staked {}", ctx.accounts.fanout.name),
       symbol: String::from("FANOUT"),
-      uri: format!("https://fanout.nft.helium.io/{}", ctx.accounts.mint.key()),
+      uri: format!("{}/{}", URL, ctx.accounts.mint.key()),
       seller_fee_basis_points: 0,
       creators: None,
       collection: Some(Collection {
