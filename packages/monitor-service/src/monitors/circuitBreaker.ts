@@ -54,7 +54,7 @@ export async function monitorAccountCircuitBreaker(cbProgram: Program<CircuitBre
   watch(cb, async (acc) => {
     const cbAccount = cbProgram.coder.accounts.decode(
       "AccountWindowedCircuitBreakerV0",
-      acc.data
+      acc!.data
     );
     const tokenAccount = await getAccount(provider.connection, account);
 
@@ -77,7 +77,7 @@ export async function monitorMintCircuitBreaker(
   watch(cb, async (acc) => {
     const account = cbProgram.coder.accounts.decode(
       "MintWindowedCircuitBreakerV0",
-      acc.data
+      acc!.data
     );
     const mintAcc = await getMint(provider.connection, mint);
     setLimit(

@@ -5,10 +5,10 @@ import { cache } from "../solana";
 
 export async function watch(
   account: PublicKey,
-  onChange: (account: AccountInfo<Buffer>) => void
+  onChange: (account: AccountInfo<Buffer> | undefined) => void
 ) {
   const [acc] = await cache.searchAndWatch(account);
-  onChange(acc!.account);
+  onChange(acc?.account);
   cache.emitter.onCache(async (e) => {
     const event = e;
     if (event.id === account.toString()) {
@@ -20,6 +20,6 @@ export async function watch(
   // Force a requery every 30 seconds to ensure accuracy
   setInterval(async () => {
     // @ts-ignore
-    onChange((await cache.search(account, undefined, false, true)).account!);
+    onChange((await cache.search(account, undefined, false, true))?.account);
   }, 30 * 1000);
 }

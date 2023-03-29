@@ -397,6 +397,7 @@ async function run() {
       await provider.connection.getLatestBlockhash()
     ).blockhash;
     tx.feePayer = provider.wallet.publicKey;
+    await provider.sendAndConfirm(tx);
   }
 
   if (!(await exists(conn, dao))) {
