@@ -767,7 +767,7 @@ describe("helium-sub-daos", () => {
           },
           positionAuthorityKp
         ));
-        program.methods
+        await program.methods
           .delegateV0()
           .accounts({
             position,
