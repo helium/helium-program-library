@@ -6,6 +6,7 @@ use anchor_lang::prelude::*;
 pub struct InitializePriceOracleArgsV0 {
   pub oracles: Vec<OracleV0>,
   pub decimals: u8,
+  pub authority: Pubkey,
 }
 
 #[derive(Accounts)]
@@ -42,6 +43,7 @@ pub fn handler(
     );
   }
   ctx.accounts.price_oracle.set_inner(PriceOracleV0 {
+    authority: args.authority,
     num_oracles: args.oracles.len().try_into().unwrap(),
     oracles: args.oracles,
     decimals: args.decimals,

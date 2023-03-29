@@ -12,6 +12,7 @@ import yargs from "yargs/yargs";
 import {
   loadKeypair,
 } from "./utils";
+import Squads from "@sqds/sdk";
 
 const { hideBin } = require("yargs/helpers");
 
@@ -36,12 +37,22 @@ async function run() {
     oraclesList: {
       type: "string",
       required: true,
-      describe: `Comma separated ist of public keys that will be the authorised oracles. E.g. '<oracle_key1>,<oracle_key2>,<oracle_key3>`
+      describe: `Comma separated ist of public keys that will be the authorised oracles. E.g. '<oracle_key1>,<oracle_key2>,<oracle_key3>`,
     },
     decimals: {
       type: "number",
       required: true,
-      describe: "Number of decimals in the price"
+      describe: "Number of decimals in the price",
+    },
+    multisig: {
+      type: "string",
+      describe:
+        "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority",
+    },
+    authorityIndex: {
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
+      default: 1,
     },
   });
 
@@ -52,6 +63,16 @@ async function run() {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const program = await init(provider);
+
+  const squads = Squads.endpoint(
+    process.env.ANCHOR_PROVIDER_URL,
+    provider.wallet
+  );
+  let authority = provider.wallet.publicKey;
+  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisig) {
+    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  }
 
   const priceOracleKeypair = argv.priceOracleKeypair ? await loadKeypair(argv.priceOracleKeypair) : Keypair.generate();
   console.log(argv.oraclesList);
@@ -66,6 +87,7 @@ async function run() {
   await program.methods.initializePriceOracleV0({
     oracles,
     decimals: argv.decimals,
+    authority
   }).accounts({
     priceOracle: priceOracleKeypair.publicKey,
     payer: provider.wallet.publicKey,
