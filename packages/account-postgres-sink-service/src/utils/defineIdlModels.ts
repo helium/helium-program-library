@@ -72,9 +72,13 @@ export const defineIdlModels = async ({
             primaryKey: true,
           },
           ...schema[acc.name],
+          refreshed_at: {
+            type: DataTypes.DATE,
+          },
         },
         {
           underscored: true,
+          updatedAt: false,
           schema: underscore(accConfig.schema || "public"),
           tableName: underscore(accConfig.table || acc.name),
         }

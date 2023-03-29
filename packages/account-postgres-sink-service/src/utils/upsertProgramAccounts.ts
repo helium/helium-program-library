@@ -120,26 +120,31 @@ export const upsertProgramAccounts = async ({
       const t = await sequelize.transaction();
 
       try {
-        await model.destroy({
-          transaction: t,
-          where: {
-            address: {
-              [Op.notIn]: addresses,
-            },
-          },
-        });
-
         const updateOnDuplicateFields: string[] = Object.keys(accs[0].account);
         await model.bulkCreate(
           accs.map(({ publicKey, account }) => ({
             address: publicKey.toBase58(),
+            refreshed_at: sequelize.fn("NOW"),
             ...sanitizeAccount(account),
           })),
           {
             transaction: t,
-            updateOnDuplicate: ["address", ...updateOnDuplicateFields],
+            updateOnDuplicate: [
+              "address",
+              "refreshed_at",
+              ...updateOnDuplicateFields,
+            ],
           }
         );
+
+        await model.destroy({
+          transaction: t,
+          where: {
+            refreshed_at: {
+              [Op.ne]: sequelize.fn("NOW"),
+            },
+          },
+        });
 
         await t.commit();
       } catch (err) {
