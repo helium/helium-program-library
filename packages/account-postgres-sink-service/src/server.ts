@@ -1,12 +1,11 @@
 import Fastify, { FastifyInstance } from "fastify";
 import fastifyCron from "fastify-cron";
 import cors from "@fastify/cors";
+import fs from "fs";
 import { StatusCodes, ReasonPhrases } from "http-status-codes";
+import { PublicKey } from "@solana/web3.js";
 import { upsertProgramAccounts } from "./utils/upsertProgramAccounts";
-import { GLOBAL_CRON_CONFIG } from "./env";
-import { PROGRAM_ID as HLT_PROGRAM_ID } from "@helium/lazy-transactions-sdk";
-import { PROGRAM_ID as HVSR_PROGRAM_ID } from "@helium/voter-stake-registry-sdk";
-import { PROGRAM_ID as HSD_PROGRAM_ID } from "@helium/helium-sub-daos-sdk";
+import { GLOBAL_CRON_CONFIG, PROGRAM_ACCOUNT_CONFIGS } from "./env";
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -16,64 +15,27 @@ server.register(cors, {
   origin: "*",
 });
 
-server.get("/hlt", async (_reg, res) => {
+server.get("/refresh-accounts", async (_reg, res) => {
   try {
-    // HLT
-    await upsertProgramAccounts({
-      programId: HLT_PROGRAM_ID,
-      accounts: [
-        {
-          type: "LazyTransactionsV0",
-          table: "lazy_transactions",
-          schema: "hlt",
-        },
-        { type: "Block", table: "blocks", schema: "hlt" },
-      ],
-    });
-    res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-  } catch (err) {
-    res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
-    console.error(err);
-  }
-});
+    const accountConfigs: null | {
+      configs: {
+        programId: string;
+        accounts: { type: string; table: string; schema: string }[];
+      }[];
+    } = JSON.parse(fs.readFileSync(PROGRAM_ACCOUNT_CONFIGS, "utf8"));
 
-server.get("/hvsr", async (_req, res) => {
-  try {
-    // HVSR
-    await upsertProgramAccounts({
-      programId: HVSR_PROGRAM_ID,
-      accounts: [
-        { type: "PositionV0", table: "positions", schema: "hvsr" },
-        { type: "Registrar", table: "registrars", schema: "hvsr" },
-      ],
-    });
-    res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-  } catch (err) {
-    res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
-    console.error(err);
-  }
-});
-
-server.get("/hsd", async (_reg, res) => {
-  try {
-    // HSD
-    await upsertProgramAccounts({
-      programId: HSD_PROGRAM_ID,
-      accounts: [
-        { type: "DaoV0", table: "daos", schema: "hsd" },
-        { type: "SubDaoV0", table: "sub_daos", schema: "hsd" },
-        {
-          type: "SubDaoEpochInfoV0",
-          table: "sub_dao_epoc_info",
-          schema: "hsd",
-        },
-        {
-          type: "DelegatedPositionV0",
-          table: "delegated_positions",
-          schema: "hsd",
-        },
-      ],
-    });
+    if (accountConfigs) {
+      for (const config of accountConfigs.configs) {
+        try {
+          await upsertProgramAccounts({
+            programId: new PublicKey(config.programId),
+            accounts: config.accounts,
+          });
+        } catch (err) {
+          console.log(err);
+        }
+      }
+    }
     res.code(StatusCodes.OK).send(ReasonPhrases.OK);
   } catch (err) {
     res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
@@ -88,29 +50,7 @@ server.register(fastifyCron, {
       runOnInit: true,
       onTick: async (server) => {
         try {
-          await server.inject("/hlt");
-        } catch (err) {
-          console.error(err);
-        }
-      },
-    },
-    {
-      cronTime: GLOBAL_CRON_CONFIG,
-      runOnInit: true,
-      onTick: async (server) => {
-        try {
-          await server.inject("/hvsr");
-        } catch (err) {
-          console.error(err);
-        }
-      },
-    },
-    {
-      cronTime: GLOBAL_CRON_CONFIG,
-      runOnInit: true,
-      onTick: async (server) => {
-        try {
-          await server.inject("/hsd");
+          await server.inject("/refresh-accounts");
         } catch (err) {
           console.error(err);
         }

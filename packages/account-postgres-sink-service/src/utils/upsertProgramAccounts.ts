@@ -121,10 +121,12 @@ export const upsertProgramAccounts = async ({
 
       try {
         const updateOnDuplicateFields: string[] = Object.keys(accs[0].account);
+        const now = new Date().toISOString();
+
         await model.bulkCreate(
           accs.map(({ publicKey, account }) => ({
             address: publicKey.toBase58(),
-            refreshed_at: sequelize.fn("NOW"),
+            refreshed_at: now,
             ...sanitizeAccount(account),
           })),
           {
@@ -141,7 +143,7 @@ export const upsertProgramAccounts = async ({
           transaction: t,
           where: {
             refreshed_at: {
-              [Op.ne]: sequelize.fn("NOW"),
+              [Op.ne]: now,
             },
           },
         });
