@@ -14,9 +14,6 @@
       "path": "../distributor-oracle"
     },
     {
-      "path": "../hydra-sdk"
-    },
-    {
       "path": "../data-credits-sdk"
     },
     {
