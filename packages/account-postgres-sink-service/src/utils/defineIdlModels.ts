@@ -3,6 +3,7 @@ import { underscore } from "inflection";
 import { Sequelize, DataTypes } from "sequelize";
 
 const TypeMap = new Map<string, any>([
+  ["string", DataTypes.STRING],
   ["publicKey", DataTypes.STRING],
   ["i16", DataTypes.INTEGER],
   ["u8", DataTypes.INTEGER.UNSIGNED],
@@ -12,6 +13,8 @@ const TypeMap = new Map<string, any>([
   ["u32", DataTypes.INTEGER.UNSIGNED],
   ["i64", DataTypes.BIGINT],
   ["u64", DataTypes.BIGINT.UNSIGNED],
+  ["i128", DataTypes.DECIMAL],
+  ["u128", DataTypes.DECIMAL.UNSIGNED],
   ["bool", DataTypes.BOOLEAN],
 ]);
 

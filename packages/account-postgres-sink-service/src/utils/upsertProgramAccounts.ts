@@ -1,10 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
-import { Sequelize } from "sequelize";
+import { Sequelize, Op } from "sequelize";
 import { camelize } from "inflection";
 import database from "./database";
 import { defineIdlModels } from "./defineIdlModels";
-import { sanitizeAccount } from "./santizeAccount";
+import { sanitizeAccount } from "./sanitizeAccount";
 import { SOLANA_URL } from "../env";
 
 interface UpsertProgramAccountsArgs {
@@ -112,16 +112,45 @@ export const upsertProgramAccounts = async ({
   });
 
   for (const [idlAccountType, accs] of Object.entries(accsByIdlAccountType)) {
+    const model = sequelize.models[idlAccountType];
+    await model.sync({ alter: true });
+
     if (accs.length > 0) {
-      const model = sequelize.models[idlAccountType];
-      await model.sync({ alter: true });
-      await model.bulkCreate(
-        accs.map(({ publicKey, account }) => ({
-          address: publicKey.toBase58(),
-          ...sanitizeAccount(account),
-        })),
-        { updateOnDuplicate: ["address"] }
-      );
+      const addresses = accs.map(({ publicKey }) => publicKey.toBase58());
+      const t = await sequelize.transaction();
+
+      try {
+        await model.destroy({
+          transaction: t,
+          where: {
+            address: {
+              [Op.notIn]: addresses,
+            },
+          },
+        });
+
+        const updateOnDuplicateFields: string[] = Object.keys(accs[0].account);
+        await model.bulkCreate(
+          accs.map(({ publicKey, account }) => ({
+            address: publicKey.toBase58(),
+            ...sanitizeAccount(account),
+          })),
+          {
+            transaction: t,
+            updateOnDuplicate: ["address", ...updateOnDuplicateFields],
+          }
+        );
+
+        await t.commit();
+      } catch (err) {
+        await t.rollback();
+        throw err;
+      }
+    } else {
+      await model.destroy({
+        where: {},
+        truncate: true,
+      });
     }
   }
 };

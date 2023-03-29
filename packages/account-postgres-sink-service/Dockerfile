@@ -13,7 +13,7 @@ COPY tsconfig.build.json tsconfig.json
 RUN yarn global add typescript
 RUN yarn run build
 
-RUN npm prun --production
+RUN npm prune --production
 
 FROM node:16-alpine
 

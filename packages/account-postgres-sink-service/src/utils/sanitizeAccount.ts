@@ -1,3 +1,4 @@
+import { ConcurrentMerkleTreeConstantsErrorError } from "@solana/spl-account-compression";
 import { PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
 
@@ -5,7 +6,7 @@ const santizeValue = (value: any) => {
   if (value === "undefined" || value === null || value === "") return null;
   if (value instanceof PublicKey) return value.toBase58();
   if (value instanceof BN) return value.toString();
-  if (["number", "boolean"].includes(typeof value)) return value;
+  if (["string", "number", "boolean"].includes(typeof value)) return value;
   if (typeof value === "object") {
     if (
       Object.keys(value).length === 1 &&
