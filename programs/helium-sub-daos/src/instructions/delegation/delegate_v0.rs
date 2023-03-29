@@ -1,7 +1,7 @@
 use crate::{current_epoch, id, state::*, utils::*};
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, Discriminator};
 use anchor_spl::token::{Mint, TokenAccount};
-use spl_governance_tools::account::create_and_serialize_account_signed;
+use spl_governance_tools::account::{create_and_serialize_account_signed, AccountMaxSize};
 
 use voter_stake_registry::{
   state::{PositionV0, Registrar},
@@ -86,6 +86,23 @@ pub struct DelegateV0<'info> {
 
   pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
+}
+
+pub struct SubDaoEpochInfoV0WithDescriminator {
+  pub sub_dao_epoch_info: SubDaoEpochInfoV0,
+}
+
+impl crate::borsh::BorshSerialize for SubDaoEpochInfoV0WithDescriminator {
+  fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+    SubDaoEpochInfoV0::DISCRIMINATOR.serialize(writer)?;
+    self.sub_dao_epoch_info.serialize(writer)
+  }
+}
+
+impl AccountMaxSize for SubDaoEpochInfoV0WithDescriminator {
+  fn get_max_size(&self) -> Option<usize> {
+    Some(60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>())
+  }
 }
 
 pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
@@ -174,18 +191,20 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
           .accounts
           .genesis_end_sub_dao_epoch_info
           .to_account_info(),
-        &SubDaoEpochInfoV0 {
-          epoch: genesis_end_epoch,
-          bump_seed: ctx.bumps["genesis_end_sub_dao_epoch_info"],
-          sub_dao: sub_dao.key(),
-          dc_burned: 0,
-          vehnt_at_epoch_start: 0,
-          vehnt_in_closing_positions: genesis_end_vehnt_correction,
-          fall_rates_from_closing_positions: genesis_end_fall_rate_correction,
-          delegation_rewards_issued: 0,
-          utility_score: None,
-          rewards_issued_at: None,
-          initialized: false,
+        &SubDaoEpochInfoV0WithDescriminator {
+          sub_dao_epoch_info: SubDaoEpochInfoV0 {
+            epoch: genesis_end_epoch,
+            bump_seed: ctx.bumps["genesis_end_sub_dao_epoch_info"],
+            sub_dao: sub_dao.key(),
+            dc_burned: 0,
+            vehnt_at_epoch_start: 0,
+            vehnt_in_closing_positions: genesis_end_vehnt_correction,
+            fall_rates_from_closing_positions: genesis_end_fall_rate_correction,
+            delegation_rewards_issued: 0,
+            utility_score: None,
+            rewards_issued_at: None,
+            initialized: false,
+          },
         },
         &[
           "sub_dao_epoch_info".as_bytes(),
