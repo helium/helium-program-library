@@ -1,14 +1,14 @@
 [
   {
-    "startUnixTime": 1679064129,
-    "emissionsPerEpoch": "144657534246575"
+    "startTime": "2023-04-18T00:00:00Z",
+    "emissionsPerEpoch": "108,493,150.684932"
   },
   {
-    "startUnixTime": 1690848000,
-    "emissionsPerEpoch": "54246575342466"
+    "startTime": "2023-08-01T00:00:00Z",
+    "emissionsPerEpoch": "54,098,360.655738"
   },
   {
-    "startUnixTime": 1722470400,
-    "emissionsPerEpoch": "54098360655738"
+    "startTime": "2024-08-01T00:00:00Z",
+    "emissionsPerEpoch": "54,246,575.342466"
   }
 ]

@@ -711,10 +711,19 @@ export async function sendInstructionsOrSquads({
 export async function parseEmissionsSchedule(filepath: string) {
   const json = JSON.parse(fs.readFileSync(filepath).toString());
   const schedule = json.map((x) => {
-    const extra = "percent" in x ? {percent: x.percent} : "emissionsPerEpoch" in x ? {emissionsPerEpoch: new anchor.BN(x.emissionsPerEpoch)} : null;
-    if (!extra || !("startUnixTime" in x)) throw new Error("json format incorrect");
+    const extra =
+      "percent" in x
+        ? { percent: x.percent }
+        : "emissionsPerEpoch" in x
+        ? {
+            emissionsPerEpoch: new anchor.BN(
+              x.emissionsPerEpoch.replaceAll(".", "").replaceAll(",", "")
+            ),
+          }
+        : null;
+    if (!extra || !("startTime" in x)) throw new Error("json format incorrect");
     return {
-      startUnixTime: new anchor.BN(x.startUnixTime),
+      startUnixTime: new anchor.BN(Math.floor(Date.parse(x.startTime) / 1000)),
       ...extra
     }
   });
