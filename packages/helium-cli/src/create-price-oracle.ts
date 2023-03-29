@@ -13,6 +13,8 @@ import {
   loadKeypair,
 } from "./utils";
 import Squads from "@sqds/sdk";
+import fs from "fs";
+import { heliumAddressToSolPublicKey } from "@helium/spl-utils";
 
 const { hideBin } = require("yargs/helpers");
 
@@ -34,10 +36,10 @@ async function run() {
       describe: "Keypair of the price oracle account",
       default: null,
     },
-    oraclesList: {
+    oracles: {
       type: "string",
       required: true,
-      describe: `Comma separated ist of public keys that will be the authorised oracles. E.g. '<oracle_key1>,<oracle_key2>,<oracle_key3>`,
+      describe: `JSON file of helium keypairs of the oracles`,
     },
     decimals: {
       type: "number",
@@ -75,11 +77,12 @@ async function run() {
   }
 
   const priceOracleKeypair = argv.priceOracleKeypair ? await loadKeypair(argv.priceOracleKeypair) : Keypair.generate();
-  console.log(argv.oraclesList);
-  const oracleKeys = argv.oraclesList.split(",");
-  const oracles = oracleKeys.map((x: string) => {
+  const oracleKeys = JSON.parse(fs.readFileSync(argv.oracles).toString()).map(
+    (hKey) => heliumAddressToSolPublicKey(hKey)
+  );
+  const oracles = oracleKeys.map((x: PublicKey) => {
     return {
-      authority: new PublicKey(x),
+      authority: x,
       lastSubmittedPrice: null,
       lastSubmittedTimestamp: null,
     }
