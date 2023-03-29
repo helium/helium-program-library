@@ -1,6 +1,6 @@
 {
   "name": "@helium/idls",
-  "version": "0.0.47",
+  "version": "0.0.48",
   "description": "Exported idls",
   "publishConfig": {
     "access": "public",
@@ -9,19 +9,14 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/StrataFoundation/strata"
+    "url": "https://github.com/helium/helium-program-library"
   },
-  "main": "./lib/cjs/data_credits.js",
-  "module": "./lib/esm/src/data_credits.js",
-  "types": "./lib/types/src/data_credits.d.ts",
   "sideEffects": false,
   "files": [
     "lib"
   ],
   "exports": {
-    "import": "./lib/esm/",
-    "require": "./lib/cjs/",
-    "types": "./lib/types/"
+    "./*": "./lib/esm/*"
   },
   "scripts": {
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",

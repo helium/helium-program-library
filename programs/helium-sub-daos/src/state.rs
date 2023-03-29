@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use spl_governance_tools::account::AccountMaxSize;
 
 use crate::EPOCH_LENGTH;
 
@@ -157,12 +156,6 @@ pub struct SubDaoEpochInfoV0 {
   pub rewards_issued_at: Option<i64>,
   pub bump_seed: u8,
   pub initialized: bool,
-}
-
-impl AccountMaxSize for SubDaoEpochInfoV0 {
-  fn get_max_size(&self) -> Option<usize> {
-    Some(60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>())
-  }
 }
 
 impl SubDaoEpochInfoV0 {

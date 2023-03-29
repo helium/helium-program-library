@@ -1,30 +1,20 @@
+import { ClockworkProvider } from "@clockwork-xyz/sdk";
 import * as anchor from "@coral-xyz/anchor";
-import yargs from "yargs/yargs";
-import os from "os";
-import fs from "fs";
-import { Keypair, PublicKey } from "@solana/web3.js";
-import {
-  createAssociatedTokenAccount,
-  createAssociatedTokenAccountIdempotent,
-  createAssociatedTokenAccountIdempotentInstruction,
-  getAssociatedTokenAddressSync,
-} from "@solana/spl-token";
-import {
-  fanoutConfigForMintKey,
-  fanoutConfigKey,
-  fanoutNativeAccountKey,
-  init,
-  membershipVoucherKey,
-  membershipMintVoucherKey,
-} from "@helium/hydra-sdk";
-import Squads from "@sqds/sdk";
-import { createAndMint, exists, sendInstructionsOrSquads } from "./utils";
-import { loadKeypair } from "@switchboard-xyz/solana.js";
 import Address from "@helium/address";
 import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
-import { sendInstructions } from "@helium/spl-utils";
-import { ClockworkProvider } from "@clockwork-xyz/sdk";
-import { sha256 } from "js-sha256";
+import { fanoutKey, init, membershipVoucherKey } from "@helium/fanout-sdk";
+import { createMintInstructions, sendInstructions } from "@helium/spl-utils";
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  getAssociatedTokenAddressSync
+} from "@solana/spl-token";
+import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
+import Squads from "@sqds/sdk";
+import { loadKeypair } from "@switchboard-xyz/solana.js";
+import fs from "fs";
+import os from "os";
+import yargs from "yargs/yargs";
+import { createAndMint, exists } from "./utils";
 
 const { hideBin } = require("yargs/helpers");
 const yarg = yargs(hideBin(process.argv)).options({
@@ -96,7 +86,7 @@ async function run() {
   const accounts = state.accounts as Record<string, any>;
   const hnt = new PublicKey(argv.hnt);
   const hst = hstKeypair.publicKey;
-  const hydraProgram = await init(provider);
+  const fanoutProgram = await init(provider);
 
   const totalHst: anchor.BN = Object.values(accounts).reduce(
     (acc: anchor.BN, v: any) => {
@@ -116,80 +106,30 @@ async function run() {
     metadataUrl: `${argv.bucket}/hst.json`,
   });
 
-  const [fanoutConfig, bumpSeed] = fanoutConfigKey(argv.name);
-  const [fanoutConfigForMint, fanoutForMintBumpSeed] = fanoutConfigForMintKey(
-    fanoutConfig,
-    hnt
-  );
-  const [fanoutNativeAccount, nativeAccountBumpSeed] =
-    fanoutNativeAccountKey(fanoutConfig);
-
-  const hntAccount = await getAssociatedTokenAddressSync(
-    hnt,
-    fanoutConfig,
-    true
-  );
+  const fanout = fanoutKey(argv.name)[0];
+  const hntAccount = await getAssociatedTokenAddressSync(hnt, fanout, true);
   console.log("Outputting hnt to", hntAccount.toBase58());
-  if (!(await exists(provider.connection, fanoutConfig))) {
-    const parentInstr = await hydraProgram.methods
-      .processInit(
-        {
-          bumpSeed,
-          name: argv.name,
-          nativeAccountBumpSeed,
-          totalShares: totalHst,
-        },
-        {
-          token: {},
-        }
-      )
+  if (!(await exists(provider.connection, fanout))) {
+    await fanoutProgram.methods
+      .initializeFanoutV0({
+        name: argv.name,
+      })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+      ])
       .accounts({
         authority,
-        fanout: fanoutConfig,
         membershipMint: hst,
+        fanoutMint: hnt,
       })
-      .instruction();
-
-    const initForMintInstr = await hydraProgram.methods
-      .processInitForMint(fanoutForMintBumpSeed)
-      .accounts({
-        authority,
-        fanout: fanoutConfig,
-        mint: hnt,
-        mintHoldingAccount: hntAccount,
-      })
-      .instruction();
-
-    const instructions = [
-      parentInstr,
-      createAssociatedTokenAccountIdempotentInstruction(
-        provider.wallet.publicKey,
-        hntAccount,
-        fanoutConfig,
-        hnt
-      ),
-      initForMintInstr,
-    ];
-
-    await sendInstructionsOrSquads({
-      provider,
-      instructions,
-      executeTransaction: true,
-      squads,
-      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-      authorityIndex: argv.authorityIndex,
-      signers: [],
-    });
+      .rpc({ skipPreflight: true });
   }
 
   const clockworkProvider = new ClockworkProvider(
     provider.wallet,
     provider.connection
   );
-  const myHstAcct = getAssociatedTokenAddressSync(
-    hst,
-    provider.wallet.publicKey
-  );
+
   for (const [address, account] of Object.entries(accounts)) {
     if (!account.hst || account.hst === 0 || account.hst === "0") {
       continue;
@@ -200,44 +140,43 @@ async function run() {
     }
 
     const hstAmount = new anchor.BN(account.hst);
-    const [voucher] = membershipVoucherKey(fanoutConfig, solAddress);
-    const memberStakeAccount = await getAssociatedTokenAddressSync(
-      hst,
-      voucher,
-      true
-    );
+    let mint: Keypair;
+    const mintPath = `${__dirname}/../keypairs/hst-receipt-${address}.json`;
+    if (fs.existsSync(mintPath)) {
+      mint = loadKeypair(mintPath);
+    } else {
+      mint = Keypair.generate();
+      fs.writeFileSync(mintPath, JSON.stringify(Array.from(mint.secretKey)));
+    }
+
+    const [voucher] = membershipVoucherKey(mint.publicKey);
     if (!(await exists(provider.connection, voucher))) {
-      await hydraProgram.methods
-        .processSetForTokenMemberStake(hstAmount)
-        .preInstructions([
-          await createAssociatedTokenAccountIdempotentInstruction(
-            provider.wallet.publicKey,
-            memberStakeAccount,
-            voucher,
-            hst
-          ),
-        ])
-        .accounts({
-          authority: provider.wallet.publicKey,
-          member: solAddress,
-          fanout: fanoutConfig,
-          membershipMint: hst,
-          membershipMintTokenAccount: myHstAcct,
-          memberStakeAccount,
+      await fanoutProgram.methods
+        .stakeV0({
+          amount: hstAmount,
         })
+        .preInstructions(
+          await createMintInstructions(provider, 0, voucher, voucher, mint)
+        )
+        .accounts({
+          recipient: solAddress,
+          fanout,
+          mint: mint.publicKey
+        })
+        .signers([mint])
         .rpc({ skipPreflight: true });
     }
 
     // 2️⃣  Define a trigger condition.
     const trigger = {
       cron: {
-        schedule: "0 0 30 * * * *",
+        schedule: "0 30 0 * * * *",
         skippable: true,
       },
     };
 
     // 3️⃣ Create the thread.
-    const threadId = `${argv.name}-${solAddress.toBase58().slice(0, 8)}`;
+    const threadId = `${argv.name}-${mint.publicKey.toBase58().slice(0, 8)}`;
     const [thread] = threadKey(provider.wallet.publicKey, threadId);
     console.log("Thread ID", threadId, thread.toBase58());
     const memberHntAccount = await getAssociatedTokenAddressSync(
@@ -256,26 +195,16 @@ async function run() {
       ]);
     }
 
-    const distributeIx = await hydraProgram.methods
-      .processDistributeToken(true)
+    const distributeIx = await fanoutProgram.methods
+      .distributeV0()
       .accounts({
         payer: new PublicKey("C1ockworkPayer11111111111111111111111111111"),
-        member: solAddress,
-        fanout: fanoutConfig,
-        holdingAccount: hntAccount,
-        fanoutForMint: fanoutConfigForMint,
-        fanoutMint: hnt,
-        fanoutMintMemberTokenAccount: memberHntAccount,
-        memberStakeAccount: memberStakeAccount,
-        membershipMint: hst,
-        fanoutForMintMembershipVoucher: membershipMintVoucherKey(
-          fanoutConfigForMint,
-          solAddress,
-          hnt
-        )[0],
+        fanout,
+        owner: solAddress,
+        mint: mint.publicKey
       })
       .instruction();
-      
+
     if (!(await exists(provider.connection, thread))) {
       const tx = await clockworkProvider.threadCreate(
         provider.wallet.publicKey, // authority

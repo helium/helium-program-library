@@ -1,12 +1,12 @@
 {
-  "name": "@helium/hydra-sdk",
+  "name": "@helium/fanout-sdk",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.0.48-hydra.1",
-  "description": "Interface to the hydra smart contract",
+  "version": "0.0.49-fanout.0",
+  "description": "Interface to the fanout smart contract",
   "repository": {
     "type": "git",
     "url": "https://github.com/HeliumFoundation/helium-program-libary"
@@ -32,7 +32,8 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.26.0",
-    "@helium/spl-utils": "^0.0.47",
+    "@helium/idls": "^0.0.48",
+    "@helium/spl-utils": "^0.0.48",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },

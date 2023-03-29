@@ -6,7 +6,7 @@ import {
   PROGRAM_ID,
   accountPayerKey,
 } from "@helium/data-credits-sdk";
-import { fanoutConfigKey } from "@helium/hydra-sdk";
+import { fanoutKey } from "@helium/fanout-sdk";
 import {
   daoKey,
   init as initDao,
@@ -28,6 +28,7 @@ import {
 } from "@solana/spl-governance";
 import { getAssociatedTokenAddress, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
+  ComputeBudgetProgram,
   Connection,
   LAMPORTS_PER_SOL,
   PublicKey,
@@ -298,6 +299,9 @@ async function run() {
         .initializeRegistrarV0({
           positionUpdateAuthority: (await daoKey(hntKeypair.publicKey))[0],
         })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+        ])
         .accounts({
           realm,
           realmGoverningTokenMint: hntKeypair.publicKey,
@@ -425,7 +429,7 @@ async function run() {
         // TODO: Create actual HST pool
         hstPool: getAssociatedTokenAddressSync(
           hntKeypair.publicKey,
-          authority,
+          fanoutKey("HST")[0],
           true
         ),
       })

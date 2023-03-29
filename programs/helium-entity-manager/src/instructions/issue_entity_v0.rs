@@ -73,7 +73,7 @@ pub struct IssueEntityV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 8 + std::mem::size_of::<KeyToAssetV0>() + (8 * args.entity_key.len()),
+    space = 8 + std::mem::size_of::<KeyToAssetV0>() + 4 + args.entity_key.len(),
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),

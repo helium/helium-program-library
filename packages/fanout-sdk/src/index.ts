@@ -1,34 +1,29 @@
-import { Hydra } from "./hydra";
 import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
-import { hydraResolvers } from "./resolvers";
-import { BN } from "bn.js";
+import { fanoutResolvers } from "./resolvers";
+import { Fanout, IDL } from "@helium/idls/lib/types/fanout";
 
 export async function init(
   provider: AnchorProvider,
   programId: PublicKey = PROGRAM_ID,
   idl?: Idl | null
-): Promise<Program<Hydra>> {
+): Promise<Program<Fanout>> {
   if (!idl) {
     idl = await Program.fetchIdl(programId, provider);
   }
-  const program = new Program<Hydra>(
-    idl as Hydra,
+  const program = new Program<Fanout>(
+    idl as Fanout,
     programId ?? PROGRAM_ID,
     provider,
     undefined,
     () => {
-      return hydraResolvers;
+      return fanoutResolvers;
     }
-  ) as Program<Hydra>;
+  ) as Program<Fanout>;
 
   return program;
 }
-
-export { IDL } from "./hydra";
-
-export type { Hydra } from "./hydra";
 
 export * from "./constants";
 export * from "./pdas";
