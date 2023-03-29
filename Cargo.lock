@@ -3286,6 +3286,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rewards-oracle"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang 0.26.0",
+ "helium-entity-manager",
+ "lazy-distributor",
+]
+
+[[package]]
 name = "ring"
 version = "0.16.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
