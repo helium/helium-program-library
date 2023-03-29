@@ -60,6 +60,7 @@ pub struct StakeV0<'info> {
   pub collection_master_edition: UncheckedAccount<'info>,
 
   #[account(
+    mut,
     associated_token::mint = membership_mint,
     associated_token::authority = staker,
   )]
