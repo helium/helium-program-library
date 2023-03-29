@@ -34,7 +34,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "0.26.0",
     "@helium/circuit-breaker-sdk": "^0.0.47",
-    "@helium/data-credits-sdk": "^0.0.47",
+    "@helium/data-credits-sdk": "^0.0.48",
     "@helium/helium-sub-daos-sdk": "^0.0.47",
     "@helium/idls": "^0.0.47",
     "@helium/spl-utils": "^0.0.47",
