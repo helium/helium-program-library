@@ -4,6 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 
 export * from "./constants";
+export * from "./pdas";
 
 export async function init(
   provider: AnchorProvider,
