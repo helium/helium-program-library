@@ -6,26 +6,24 @@ import { PublicKey } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
 
-const { hideBin } = require("yargs/helpers");
-const yarg = yargs(hideBin(process.argv)).options({
-  wallet: {
-    alias: "k",
-    describe: "Anchor wallet keypair",
-    default: `${os.homedir()}/.config/solana/id.json`,
-  },
-  url: {
-    alias: "u",
-    default: "http://127.0.0.1:8899",
-    describe: "The solana url",
-  },
-  hotspotKey: {
-    type: "string",
-    describe: "Pubkey of the Data Credit token",
-    required: true
-  },
-});
-
 export async function run(args: any = process.argv) {
+  const yarg = yargs(args).options({
+    wallet: {
+      alias: "k",
+      describe: "Anchor wallet keypair",
+      default: `${os.homedir()}/.config/solana/id.json`,
+    },
+    url: {
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
+    },
+    hotspotKey: {
+      type: "string",
+      describe: "Pubkey of the Data Credit token",
+      required: true,
+    },
+  });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
@@ -42,10 +40,3 @@ export async function run(args: any = process.argv) {
   console.log(keyToAsset);
   console.log(await getAsset(argv.url, keyToAsset.asset))
 }
-
-run()
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  })
-  .then(() => process.exit());

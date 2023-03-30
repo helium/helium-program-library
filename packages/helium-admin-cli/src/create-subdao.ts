@@ -51,151 +51,6 @@ import {
   sendInstructionsOrSquads,
 } from "./utils";
 
-const { hideBin } = require("yargs/helpers");
-
-const yarg = yargs(hideBin(process.argv)).options({
-  wallet: {
-    alias: "k",
-    describe: "Anchor wallet keypair",
-    default: `${os.homedir()}/.config/solana/id.json`,
-  },
-  noHotspots: {
-    type: "boolean",
-    default: false,
-  },
-  url: {
-    alias: "u",
-    default: "http://127.0.0.1:8899",
-    describe: "The solana url",
-  },
-  hntPubkey: {
-    type: "string",
-    describe: "Pubkey of the HNT token",
-    default: loadKeypair(`${__dirname}/../keypairs/hnt.json`).publicKey,
-  },
-  dcPubkey: {
-    type: "string",
-    describe: "Pubkey of the DC token",
-    default: loadKeypair(`${__dirname}/../keypairs/dc.json`).publicKey,
-  },
-  name: {
-    alias: "n",
-    describe: "The name of the subdao",
-    type: "string",
-    required: true,
-  },
-  realmName: {
-    describe: "The name of the realm",
-    type: "string",
-    required: true,
-  },
-  subdaoKeypair: {
-    type: "string",
-    describe: "Keypair of the subdao token",
-    required: true,
-  },
-  executeTransaction: {
-    type: "boolean",
-  },
-  numTokens: {
-    type: "number",
-    describe:
-      "Number of subdao tokens to pre mint before assigning authority to lazy distributor",
-    default: 0,
-  },
-  bucket: {
-    type: "string",
-    describe: "Bucket URL prefix holding all of the metadata jsons",
-    default:
-      "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib",
-  },
-  rewardsOracleUrl: {
-    alias: "ro",
-    type: "string",
-    describe: "The rewards oracle URL",
-    default: "http://localhost:8080",
-  },
-  oracleKeypair: {
-    type: "string",
-    describe: "Keypair of the oracle",
-    default: `${__dirname}/../keypairs/oracle.json`,
-  },
-  aggregatorKeypair: {
-    type: "string",
-    describe: "Keypair of the aggregtor",
-  },
-  merkleKeypair: {
-    type: "string",
-    describe: "Keypair of the merkle tree",
-    default: `${__dirname}/../keypairs/merkle.json`,
-  },
-  dcBurnAuthority: {
-    type: "string",
-    describe: "The authority to burn DC tokens",
-    required: true,
-  },
-  activeDeviceOracleUrl: {
-    alias: "ao",
-    type: "string",
-    describe: "The active device oracle URL",
-    default: "http://localhost:8081",
-  },
-  queue: {
-    type: "string",
-    describe: "Switchbaord oracle queue",
-    default: "F8ce7MsckeZAbAGmxjJNetxYXQa9mKr9nnrC3qKubyYy",
-  },
-  crank: {
-    type: "string",
-    describe: "Switchboard crank",
-    default: "GN9jjCy2THzZxhYqZETmPM3my8vg4R5JyNkgULddUMa5",
-  },
-  switchboardNetwork: {
-    type: "string",
-    describe: "The switchboard network",
-    default: "devnet",
-  },
-  decimals: {
-    type: "number",
-    default: 6,
-  },
-  startEpochRewards: {
-    type: "number",
-    describe: "The starting epoch rewards (yearly)",
-    required: true,
-  },
-  govProgramId: {
-    type: "string",
-    describe: "Pubkey of the GOV program",
-    default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
-  },
-  councilKeypair: {
-    type: "string",
-    describe: "Keypair of gov council token",
-    default: `${__dirname}/../keypairs/council.json`,
-  },
-  multisig: {
-    type: "string",
-    describe:
-      "Address of the squads multisig for subdao authority. If not provided, your wallet will be the authority",
-  },
-  authorityIndex: {
-    type: "number",
-    describe: "Authority index for squads. Defaults to 1",
-    default: 1,
-  },
-  delegatorRewardsPercent: {
-    type: "number",
-    required: true,
-    describe: "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
-  },
-  emissionSchedulePath: {
-    required: true,
-    describe: "Path to file that contains the dnt emissions schedule",
-    type: "string",
-  },
-});
-
 const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
 const MAX_LOCKUP = 4 * SECS_PER_YEAR;
@@ -203,6 +58,149 @@ const BASELINE = 0;
 const SCALE = 100;
 
 export async function run(args: any = process.argv) {
+  const yarg = yargs(args).options({
+    wallet: {
+      alias: "k",
+      describe: "Anchor wallet keypair",
+      default: `${os.homedir()}/.config/solana/id.json`,
+    },
+    noHotspots: {
+      type: "boolean",
+      default: false,
+    },
+    url: {
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
+    },
+    hntPubkey: {
+      type: "string",
+      describe: "Pubkey of the HNT token",
+      default: loadKeypair(`${__dirname}/../keypairs/hnt.json`).publicKey,
+    },
+    dcPubkey: {
+      type: "string",
+      describe: "Pubkey of the DC token",
+      default: loadKeypair(`${__dirname}/../keypairs/dc.json`).publicKey,
+    },
+    name: {
+      alias: "n",
+      describe: "The name of the subdao",
+      type: "string",
+      required: true,
+    },
+    realmName: {
+      describe: "The name of the realm",
+      type: "string",
+      required: true,
+    },
+    subdaoKeypair: {
+      type: "string",
+      describe: "Keypair of the subdao token",
+      required: true,
+    },
+    executeTransaction: {
+      type: "boolean",
+    },
+    numTokens: {
+      type: "number",
+      describe:
+        "Number of subdao tokens to pre mint before assigning authority to lazy distributor",
+      default: 0,
+    },
+    bucket: {
+      type: "string",
+      describe: "Bucket URL prefix holding all of the metadata jsons",
+      default:
+        "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib",
+    },
+    rewardsOracleUrl: {
+      alias: "ro",
+      type: "string",
+      describe: "The rewards oracle URL",
+      default: "http://localhost:8080",
+    },
+    oracleKeypair: {
+      type: "string",
+      describe: "Keypair of the oracle",
+      default: `${__dirname}/../keypairs/oracle.json`,
+    },
+    aggregatorKeypair: {
+      type: "string",
+      describe: "Keypair of the aggregtor",
+    },
+    merkleKeypair: {
+      type: "string",
+      describe: "Keypair of the merkle tree",
+      default: `${__dirname}/../keypairs/merkle.json`,
+    },
+    dcBurnAuthority: {
+      type: "string",
+      describe: "The authority to burn DC tokens",
+      required: true,
+    },
+    activeDeviceOracleUrl: {
+      alias: "ao",
+      type: "string",
+      describe: "The active device oracle URL",
+      default: "http://localhost:8081",
+    },
+    queue: {
+      type: "string",
+      describe: "Switchbaord oracle queue",
+      default: "F8ce7MsckeZAbAGmxjJNetxYXQa9mKr9nnrC3qKubyYy",
+    },
+    crank: {
+      type: "string",
+      describe: "Switchboard crank",
+      default: "GN9jjCy2THzZxhYqZETmPM3my8vg4R5JyNkgULddUMa5",
+    },
+    switchboardNetwork: {
+      type: "string",
+      describe: "The switchboard network",
+      default: "devnet",
+    },
+    decimals: {
+      type: "number",
+      default: 6,
+    },
+    startEpochRewards: {
+      type: "number",
+      describe: "The starting epoch rewards (yearly)",
+      required: true,
+    },
+    govProgramId: {
+      type: "string",
+      describe: "Pubkey of the GOV program",
+      default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
+    },
+    councilKeypair: {
+      type: "string",
+      describe: "Keypair of gov council token",
+      default: `${__dirname}/../keypairs/council.json`,
+    },
+    multisig: {
+      type: "string",
+      describe:
+        "Address of the squads multisig for subdao authority. If not provided, your wallet will be the authority",
+    },
+    authorityIndex: {
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
+      default: 1,
+    },
+    delegatorRewardsPercent: {
+      type: "number",
+      required: true,
+      describe:
+        "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
+    },
+    emissionSchedulePath: {
+      required: true,
+      describe: "Path to file that contains the dnt emissions schedule",
+      type: "string",
+    },
+  });
   const argv = await yarg.argv;
   console.log(argv.url);
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -243,8 +241,10 @@ export async function run(args: any = process.argv) {
 
   const calculateThread = threadKey(subdao, "calculate")[0];
   const issueThread = threadKey(subdao, "issue")[0];
-  const emissionSchedule = await parseEmissionsSchedule(argv.emissionSchedulePath);
-  
+  const emissionSchedule = await parseEmissionsSchedule(
+    argv.emissionSchedulePath
+  );
+
   const squads = Squads.endpoint(
     process.env.ANCHOR_PROVIDER_URL,
     provider.wallet
@@ -425,7 +425,9 @@ export async function run(args: any = process.argv) {
         windowConfig: {
           windowSizeSeconds: new anchor.BN(24 * 60 * 60),
           thresholdType: ThresholdType.Absolute as never,
-          threshold: new anchor.BN(emissionSchedule[0].emissionsPerEpoch).mul(new anchor.BN(5)),
+          threshold: new anchor.BN(emissionSchedule[0].emissionsPerEpoch).mul(
+            new anchor.BN(5)
+          ),
         },
       })
       .accounts({
@@ -476,7 +478,9 @@ export async function run(args: any = process.argv) {
           threshold: thresholdPercent(20),
         },
         onboardingDcFee: toBN(4000000, 0), // $40 in dc
-        delegatorRewardsPercent: delegatorRewardsPercent(argv.delegatorRewardsPercent),
+        delegatorRewardsPercent: delegatorRewardsPercent(
+          argv.delegatorRewardsPercent
+        ),
       })
       .accounts({
         dao,
@@ -574,10 +578,3 @@ export async function run(args: any = process.argv) {
     });
   }
 }
-
-run()
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  })
-  .then(() => process.exit());

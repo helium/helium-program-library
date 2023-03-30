@@ -6,8 +6,6 @@ import yargs from "yargs/yargs";
 import { BN } from "bn.js";
 import axios from "axios";
 
-const { hideBin } = require("yargs/helpers");
-
 async function findBinancePrice(symbol: string): Promise<number> {
   try {
     const response = await axios.get(
@@ -37,7 +35,7 @@ async function findCoingeckoPrice(token: string): Promise<number> {
 }
 
 export async function run(args: any = process.argv) {
-  const yarg = yargs(hideBin(args)).options({
+  const yarg = yargs(args).options({
     wallet: {
       alias: "k",
       describe: "Anchor wallet keypair",
@@ -49,6 +47,7 @@ export async function run(args: any = process.argv) {
       describe: "The solana url",
     },
     price: {
+      alias: "p",
       type: "number",
       required: false,
       describe: "The price to submit. Required if not using default pricing",
@@ -56,7 +55,9 @@ export async function run(args: any = process.argv) {
     priceOracle: {
       type: "string",
       required: true,
-      describe: "Address of the price oracle to submit a price to",
+      alias: "o",
+      describe:
+        "Name or Address of the price oracle to submit a price to. Example: hnt, iot, mobile, horUtvuHQFWxPFrZ35YZUmXUZ2TSQdSXhcD4kkCVNKi",
     },
     useBinancePrice: {
       type: "string",
@@ -94,6 +95,18 @@ export async function run(args: any = process.argv) {
     ? await findBinancePrice(argv.useBinancePrice)
     : null;
 
+  switch (argv.priceOracle) {
+    case "hnt":
+      argv.priceOracle = "horUtvuHQFWxPFrZ35YZUmXUZ2TSQdSXhcD4kkCVNKi";
+      break;
+    case "iot":
+      argv.priceOracle = "iortGU2NMgWc256XDBz2mQnmjPfKUMezJ4BWfayEZY3";
+      break;
+    case "mobile":
+      argv.priceOracle = "moraMdsjyPFz8Lp1RJGoW4bQriSF5mHE7Evxt7hytSF";
+      break;
+  }
+
   const priceOracle = new PublicKey(argv.priceOracle);
   const priceOracleAcc = await program.account.priceOracleV0.fetch(priceOracle);
   const oracleIndex = priceOracleAcc.oracles.findIndex((x) =>
@@ -120,10 +133,3 @@ export async function run(args: any = process.argv) {
 
   console.log(`Submitted price: ${price}`);
 }
-
-run()
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  })
-  .then(() => process.exit());

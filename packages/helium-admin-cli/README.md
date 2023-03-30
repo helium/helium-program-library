@@ -3,7 +3,7 @@ First, brick the genesis transactions. This keeps someone from front-running the
 Now, setup HST **using the migration service wallet**:
 
 ```
-npx ts-node --project tsconfig.cjs.json src/setup-hst -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --hnt $(solana address -k keypairs/hnt.json) --name "HST"
+helium-admin setup-hst -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --hnt $(solana address -k keypairs/hnt.json) --name "HST"
 ```
 
 Next, make sure startUnixTime in the emissions schedules is equal to the current time.
@@ -12,19 +12,19 @@ Next, make sure startUnixTime in the emissions schedules is equal to the current
 Setup the price oracles:
 
 ```
- npx ts-node --project tsconfig.cjs.json src/create-price-oracle.ts -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/hnt-price-oracle.json --oracles price-oracle-authorities.json --decimals 8
+helium-admin create-price-oracle -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/hnt-price-oracle.json --oracles price-oracle-authorities.json --decimals 8
  
-npx ts-node --project tsconfig.cjs.json src/create-price-oracle.ts -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/mobile-price-oracle.json --oracles price-oracle-authorities.json --decimals 6
+helium-admin create-price-oracle -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/mobile-price-oracle.json --oracles price-oracle-authorities.json --decimals 6
 
-npx ts-node --project tsconfig.cjs.json src/create-price-oracle.ts -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/iot-price-oracle.json --oracles price-oracle-authorities.json --decimals 6
+helium-admin create-price-oracle -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/iot-price-oracle.json --oracles price-oracle-authorities.json --decimals 6
 ```
 
 ```
-npx ts-node --project tsconfig.cjs.json src/create-dao.ts -u https://api.devnet.solana.com --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium" --emissionSchedulePath emissions/hnt.json --hstEmissionSchedulePath emissions/hst.json
+helium-admin create-dao -u https://api.devnet.solana.com --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium" --emissionSchedulePath emissions/hnt.json --hstEmissionSchedulePath emissions/hst.json
 
-npx ts-node --project tsconfig.cjs.json src/create-subdao.ts -u https://api.devnet.solana.com --rewardsOracleUrl https://iot-oracle.oracle.helium.io --activeDeviceOracleUrl https://iot-rewards.oracle.helium.io/active-devices -n IOT --subdaoKeypair keypairs/iot.json --numTokens 100302580998  --emissionSchedulePath emissions/iot.json --realmName "Helium IOT" --dcBurnAuthority $(solana address) --executeProposal --switchboardNetwork devnet
+helium-admin create-subdao -u https://api.devnet.solana.com --rewardsOracleUrl https://iot-oracle.oracle.helium.io --activeDeviceOracleUrl https://iot-rewards.oracle.helium.io/active-devices -n IOT --subdaoKeypair keypairs/iot.json --numTokens 100302580998  --emissionSchedulePath emissions/iot.json --realmName "Helium IOT" --dcBurnAuthority $(solana address) --executeProposal --switchboardNetwork devnet
 
- npx ts-node --project tsconfig.cjs.json src/create-subdao.ts -u https://api.devnet.solana.com --rewardsOracleUrl https://mobile-oracle.oracle.helium.io --activeDeviceOracleUrl https://mobile-rewards.oracle.helium.io/active-devices -n Mobile --subdaoKeypair keypairs/mobile.json --numTokens 100302580998 --emissionSchedulePath emissions/iot.json --realmName "Helium Mobile" --dcBurnAuthority $(solana address) --executeProposal --switchboardNetwork devnet
+ helium-admin create-subdao -u https://api.devnet.solana.com --rewardsOracleUrl https://mobile-oracle.oracle.helium.io --activeDeviceOracleUrl https://mobile-rewards.oracle.helium.io/active-devices -n Mobile --subdaoKeypair keypairs/mobile.json --numTokens 100302580998 --emissionSchedulePath emissions/iot.json --realmName "Helium Mobile" --dcBurnAuthority $(solana address) --executeProposal --switchboardNetwork devnet
 ```
 Now, go approve and run all commands in realms.
 
@@ -32,20 +32,20 @@ Now create iot makers:
 
 ```
 
-npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u https://api.devnet.solana.com --symbol IOT --subdaoMint $(solana address -k keypairs/iot.json) --fromFile makers.json --executeProposal
+helium-admin create-maker -u https://api.devnet.solana.com --symbol IOT --subdaoMint $(solana address -k keypairs/iot.json) --fromFile makers.json --executeProposal
 
 ```
 
 Next, create mobile makers:
 
 ```
-npx ts-node --project tsconfig.cjs.json src/create-maker.ts -u https://api.devnet.solana.com --symbol MOBILE --subdaoMint $(solana address -k keypairs/mobile.json) --fromFile makers-mobile.json --executeProposal
+helium-admin create-maker -u https://api.devnet.solana.com --symbol MOBILE --subdaoMint $(solana address -k keypairs/mobile.json) --fromFile makers-mobile.json --executeProposal
 ```
 
 Now, fund any maker wallets
 
 ```
-npx ts-node --project tsconfig.cjs.json src/mint-dc.ts -u https://api.devnet.solana.com --destination maker_address --numHnt 10000 --dcKey $(solana address -k keypairs/dc.json)
+helium-admin mint-dc -u https://api.devnet.solana.com --destination maker_address --numHnt 10000 --dcKey $(solana address -k keypairs/dc.json)
 
 # If needed, fund the maker wallet
 solana transfer -u devnet maker_address 1 --allow-unfunded-recipient 

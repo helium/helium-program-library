@@ -26,71 +26,6 @@ import yargs from "yargs/yargs";
 import { exists, loadKeypair, sendInstructionsOrSquads } from "./utils";
 import Squads from "@sqds/sdk";
 
-const { hideBin } = require("yargs/helpers");
-const yarg = yargs(hideBin(process.argv)).options({
-  wallet: {
-    alias: "k",
-    describe: "Anchor wallet keypair",
-    default: `${os.homedir()}/.config/solana/id.json`,
-  },
-  executeTransaction: {
-    type: "boolean",
-  },
-  url: {
-    alias: "u",
-    default: "http://127.0.0.1:8899",
-    describe: "The solana url",
-  },
-  subdaoMint: {
-    required: true,
-    describe: "Public Key of the subdao mint",
-    type: "string",
-  },
-  govProgramId: {
-    type: "string",
-    describe: "Pubkey of the GOV program",
-    default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
-  },
-  fromFile: {
-    describe: "Load makers from a json file and create in bulk",
-    required: false,
-    type: "string",
-  },
-  name: {
-    alias: "n",
-    type: "string",
-    required: false,
-    describe: "The name of the maker",
-  },
-  makerKey: {
-    alias: "m",
-    type: "string",
-    describe: "*Helium* Public Key of a maker",
-    required: false,
-  },
-  makerCount: {
-    alias: "c",
-    type: "number",
-    describe: "Estimated number of hotspots this maker will have",
-    required: false,
-  },
-  symbol: {
-    alias: "s",
-    type: "string",
-    required: true,
-    describe: "The symbol of the entity config",
-  },
-  multisig: {
-    type: "string",
-    describe: "Address of the squads multisig to be authority. If not provided, your wallet will be the authority"
-  },
-  authorityIndex: {
-    type: "number",
-    describe: "Authority index for squads. Defaults to 1",
-    default: 1,
-  }
-});
-
 // Goal = 3 proof nodes needed
 const merkleSizes = [
   [3, 8, 0],
@@ -106,6 +41,71 @@ const merkleSizes = [
 ];
 
 export async function run(args: any = process.argv) {
+  const yarg = yargs(args).options({
+    wallet: {
+      alias: "k",
+      describe: "Anchor wallet keypair",
+      default: `${os.homedir()}/.config/solana/id.json`,
+    },
+    executeTransaction: {
+      type: "boolean",
+    },
+    url: {
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
+    },
+    subdaoMint: {
+      required: true,
+      describe: "Public Key of the subdao mint",
+      type: "string",
+    },
+    govProgramId: {
+      type: "string",
+      describe: "Pubkey of the GOV program",
+      default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
+    },
+    fromFile: {
+      describe: "Load makers from a json file and create in bulk",
+      required: false,
+      type: "string",
+    },
+    name: {
+      alias: "n",
+      type: "string",
+      required: false,
+      describe: "The name of the maker",
+    },
+    makerKey: {
+      alias: "m",
+      type: "string",
+      describe: "*Helium* Public Key of a maker",
+      required: false,
+    },
+    makerCount: {
+      alias: "c",
+      type: "number",
+      describe: "Estimated number of hotspots this maker will have",
+      required: false,
+    },
+    symbol: {
+      alias: "s",
+      type: "string",
+      required: true,
+      describe: "The symbol of the entity config",
+    },
+    multisig: {
+      type: "string",
+      describe:
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+    },
+    authorityIndex: {
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
+      default: 1,
+    },
+  });
+
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
@@ -341,10 +341,3 @@ export async function run(args: any = process.argv) {
     }
   }
 }
-
-run()
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  })
-  .then(() => process.exit());

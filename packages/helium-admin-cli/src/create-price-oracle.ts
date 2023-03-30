@@ -16,10 +16,8 @@ import Squads from "@sqds/sdk";
 import fs from "fs";
 import { heliumAddressToSolPublicKey } from "@helium/spl-utils";
 
-const { hideBin } = require("yargs/helpers");
-
 export async function run(args: any = process.argv) {
-  const yarg = yargs(hideBin(process.argv)).options({
+  const yarg = yargs(args).options({
     wallet: {
       alias: "k",
       describe: "Anchor wallet keypair",
@@ -99,10 +97,3 @@ export async function run(args: any = process.argv) {
 
   console.log(`Created price oracle at: ${priceOracleKeypair.publicKey}`);
 }
-
-run()
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  })
-  .then(() => process.exit());
