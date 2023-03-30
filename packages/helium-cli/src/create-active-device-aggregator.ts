@@ -51,7 +51,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   }
 });
 
-async function run() {
+export async function run(args: any = process.argv) {
   const argv = await yarg.argv;
   console.log(argv.url);
   process.env.ANCHOR_WALLET = argv.wallet;

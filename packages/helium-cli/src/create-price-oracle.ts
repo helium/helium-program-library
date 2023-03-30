@@ -18,7 +18,7 @@ import { heliumAddressToSolPublicKey } from "@helium/spl-utils";
 
 const { hideBin } = require("yargs/helpers");
 
-async function run() {
+export async function run(args: any = process.argv) {
   const yarg = yargs(hideBin(process.argv)).options({
     wallet: {
       alias: "k",

@@ -66,7 +66,7 @@ const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
 const MAX_LOCKUP = 4 * SECS_PER_YEAR;
 
-async function run() {
+export async function run(args: any = process.argv) {
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;

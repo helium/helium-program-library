@@ -65,7 +65,7 @@ async function exists(
   return Boolean(await connection.getAccountInfo(account));
 }
 
-async function run() {
+export async function run(args: any = process.argv) {
   const yarg = yargs(hideBin(process.argv)).options({
     wallet: {
       alias: "k",

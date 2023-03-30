@@ -202,7 +202,7 @@ const MAX_LOCKUP = 4 * SECS_PER_YEAR;
 const BASELINE = 0;
 const SCALE = 100;
 
-async function run() {
+export async function run(args: any = process.argv) {
   const argv = await yarg.argv;
   console.log(argv.url);
   process.env.ANCHOR_WALLET = argv.wallet;
