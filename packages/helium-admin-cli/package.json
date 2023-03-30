@@ -1,5 +1,5 @@
 {
-  "name": "@helium/helium-cli",
+  "name": "@helium/helium-admin-cli",
   "private": true,
   "publishConfig": {
     "access": "public",

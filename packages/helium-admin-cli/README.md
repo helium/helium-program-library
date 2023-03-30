@@ -58,7 +58,7 @@ Now,migrate to a `-n` that nobody knows you're using. This will ensure nobody ca
 ```
  cd ../migration-service
 
-node --max_old_space_size=16000 lib/cjs/gen-transactions.js --mobile $(solana address -k ../helium-cli/keypairs/mobile.json) --hnt $(solana address -k ../helium-cli/keypairs/hnt.json) --dc $(solana address -k ../helium-cli/keypairs/dc.json) --iot $(solana address -k ../helium-cli/keypairs/iot.json) --hst $(solana address -k ../helium-cli/keypairs/hst.json) -n devnethelium -u http://127.0.0.1:8899 --payer $(solana address) --pgPort 5432 --pgDatabase migration --makers ../helium-cli/makers.json -p
+node --max_old_space_size=16000 lib/cjs/gen-transactions.js --mobile $(solana address -k ../helium-admin-cli/keypairs/mobile.json) --hnt $(solana address -k ../helium-admin-cli/keypairs/hnt.json) --dc $(solana address -k ../helium-admin-cli/keypairs/dc.json) --iot $(solana address -k ../helium-admin-cli/keypairs/iot.json) --hst $(solana address -k ../helium-admin-cli/keypairs/hst.json) -n devnethelium -u http://127.0.0.1:8899 --payer $(solana address) --pgPort 5432 --pgDatabase migration --makers ../helium-admin-cli/makers.json -p
 ```
 
 At this point, go and update all lazy signers with the value from -n (ie devnethelium), and unbrick the genesis endpoints.
