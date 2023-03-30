@@ -180,7 +180,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   // Only subtract from the stake if the position ends after the end of this epoch. Otherwise,
   // the position was already purged due to the sub_dao_epoch_info closing info logic.
   if position.lockup.end_ts >= ctx.accounts.sub_dao_epoch_info.end_ts()
-    || position.lockup.kind != LockupKind::Cliff
+    || position.lockup.kind == LockupKind::Constant
   {
     msg!(
       "Current vehnt {}, removing {} from the subdao",
