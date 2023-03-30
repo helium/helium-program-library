@@ -1,0 +1,40 @@
+{
+  "configs": [
+    {
+      "programId": "1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h",
+      "accounts": [
+        {
+          "type": "LazyTransactionsV0",
+          "table": "lazy_transactions",
+          "schema": "hlt"
+        },
+        { "type": "Block", "table": "blocks", "schema": "hlt" }
+      ]
+    },
+    {
+      "programId": "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8",
+      "accounts": [
+        { "type": "PositionV0", "table": "positions", "schema": "hvsr" },
+        { "type": "Registrar", "table": "registrars", "schema": "hvsr" }
+      ]
+    },
+    {
+      "programId": "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR",
+
+      "accounts": [
+        { "type": "DaoV0", "table": "daos", "schema": "hsd" },
+        { "type": "SubDaoV0", "table": "sub_daos", "schema": "hsd" },
+        {
+          "type": "SubDaoEpochInfoV0",
+          "table": "sub_dao_epoch_infos",
+          "schema": "hsd"
+        },
+        {
+          "type": "DelegatedPositionV0",
+          "table": "delegated_positions",
+          "schema": "hsd"
+        }
+      ]
+    }
+  ]
+}
