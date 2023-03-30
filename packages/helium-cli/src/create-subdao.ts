@@ -341,6 +341,9 @@ async function run() {
         .initializeRegistrarV0({
           positionUpdateAuthority: null,
         })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+        ])
         .accounts({
           realm,
           realmGoverningTokenMint: subdaoKeypair.publicKey,
@@ -451,8 +454,7 @@ async function run() {
     }
 
     console.log(`Initializing ${name} SubDAO`);
-    const currentTs = await getUnixTimestamp(provider);
-    const currentHntEmission = emissionSchedule[emissionSchedule.findIndex((x) => x.startUnixTime > currentTs) - 1];
+    const currentHntEmission = emissionSchedule[0];
 
     const initSubdaoMethod = await heliumSubDaosProgram.methods
       .initializeSubDaoV0({

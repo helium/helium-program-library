@@ -1,20 +1,44 @@
-import { AssetProof, chunks, getAssetProof, getAssetsByOwner } from "@helium/spl-utils";
+import {
+  AssetProof,
+  chunks,
+  getAssetProof,
+  getAssetsByOwner
+} from "@helium/spl-utils";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import {
-  createTransferInstruction, PROGRAM_ID as BUBBLEGUM_PROGRAM_ID
+  createTransferInstruction,
+  PROGRAM_ID as BUBBLEGUM_PROGRAM_ID
 } from "@metaplex-foundation/mpl-bubblegum";
-import { ConcurrentMerkleTreeAccount, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID, SPL_NOOP_PROGRAM_ID } from "@solana/spl-account-compression";
-import { createAssociatedTokenAccountIdempotentInstruction, createCloseAccountInstruction, createTransferCheckedInstruction, createTransferInstruction as createTokenTransfer, getAssociatedTokenAddressSync, getMint, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { AccountMeta, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
+import {
+  ConcurrentMerkleTreeAccount,
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  SPL_NOOP_PROGRAM_ID
+} from "@solana/spl-account-compression";
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  createCloseAccountInstruction,
+  createTransferCheckedInstruction,
+  createTransferInstruction as createTokenTransfer, getAssociatedTokenAddressSync,
+  getMint,
+  TOKEN_PROGRAM_ID
+} from "@solana/spl-token";
+import {
+  AccountMeta, PublicKey,
+  SystemProgram,
+  Transaction,
+  TransactionInstruction
+} from "@solana/web3.js";
 import { provider } from "./solana";
 
-export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Promise<Transaction[]> {
+export async function getMigrateTransactions(
+  from: PublicKey,
+  to: PublicKey
+): Promise<Transaction[]> {
   const assetApiUrl =
-    process.env.ASSET_API_URL ||
-    provider.connection.rpcEndpoint;
+    process.env.ASSET_API_URL || provider.connection.rpcEndpoint;
   const assets = await getAssetsByOwner(assetApiUrl, from.toBase58());
 
-  const uniqueAssets = new Set(assets.map(asset => asset.id.toBase58()));
+  const uniqueAssets = new Set(assets.map((asset) => asset.id.toBase58()));
   const vsrProgram = await initVsr(provider);
 
   const transferAssetIxns: TransactionInstruction[] = [];
@@ -81,81 +105,91 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
           from,
           []
         )
-      )
+      );
     }
   }
 
-  const tokensResponse = await provider.connection.getParsedTokenAccountsByOwner(
-    from,
-    {
+  const tokensResponse =
+    await provider.connection.getParsedTokenAccountsByOwner(from, {
       programId: TOKEN_PROGRAM_ID,
-    }
-  );
+    });
   const positions = [];
   const tokens = [];
   for (const token of tokensResponse.value) {
     const mint = new PublicKey(token.account.data.parsed.info.mint);
     const freezeAuth = (await getMint(provider.connection, mint))
       .freezeAuthority;
-    const freezeAuthOwner = (
-      await provider.connection.getAccountInfo(freezeAuth)
-    ).owner;
-    if (freezeAuthOwner.equals(vsrProgram.programId)) {
+    const freezeAuthOwner =
+      freezeAuth &&
+      (await provider.connection.getAccountInfo(freezeAuth)).owner;
+    if (freezeAuthOwner && freezeAuthOwner.equals(vsrProgram.programId)) {
       positions.push(mint);
     } else {
       tokens.push(token);
     }
   }
 
-  const transferPositionIxns = (await Promise.all(positions.map(async position => {
-    return [
-      await vsrProgram.methods
-        .ledgerTransferPositionV0()
-        .accounts({
-          to,
-          from,
-          payer: provider.wallet.publicKey,
-          mint: position,
-        })
-        .instruction(),
-      createCloseAccountInstruction(
-        getAssociatedTokenAddressSync(position, from),
-        provider.wallet.publicKey,
-        from,
-        []
-      ),
-    ];
-  }))).flat();
+  const transferPositionIxns = (
+    await Promise.all(
+      positions.map(async (position) => {
+        return [
+          await vsrProgram.methods
+            .ledgerTransferPositionV0()
+            .accounts({
+              to,
+              from,
+              payer: provider.wallet.publicKey,
+              mint: position,
+            })
+            .instruction(),
+          createCloseAccountInstruction(
+            getAssociatedTokenAddressSync(position, from),
+            provider.wallet.publicKey,
+            from,
+            []
+          ),
+        ];
+      })
+    )
+  ).flat();
 
-  const transferTokenInstructions = tokens.filter(token => !uniqueAssets.has(token.account.data.parsed.info.mint)).flatMap(token => {
-    const mint = new PublicKey(token.account.data.parsed.info.mint);
-    const fromAta = token.pubkey;
-    const toAta = getAssociatedTokenAddressSync(mint, to);
-    return [
-      createAssociatedTokenAccountIdempotentInstruction(
-        provider.wallet.publicKey,
-        toAta,
-        to,
-        mint
-      ),
-      createTokenTransfer(
-        fromAta,
-        toAta,
-        from,
-        token.account.data.parsed.info.tokenAmount.amount
-      ),
-      createCloseAccountInstruction(
-        fromAta,
-        provider.wallet.publicKey,
-        from,
-        []
-      ),
-    ];
-  })
+  const transferTokenInstructions = tokens
+    .filter((token) => !uniqueAssets.has(token.account.data.parsed.info.mint))
+    .flatMap((token) => {
+      const mint = new PublicKey(token.account.data.parsed.info.mint);
+      const amount = token.account.data.parsed.info.tokenAmount.uiAmount;
+      const fromAta = token.pubkey;
+      const toAta = getAssociatedTokenAddressSync(mint, to);
+      if (amount > 0) {
+        return [
+          createAssociatedTokenAccountIdempotentInstruction(
+            provider.wallet.publicKey,
+            toAta,
+            to,
+            mint
+          ),
+          createTokenTransfer(
+            fromAta,
+            toAta,
+            from,
+            token.account.data.parsed.info.tokenAmount.amount
+          ),
+          createCloseAccountInstruction(
+            fromAta,
+            provider.wallet.publicKey,
+            from,
+            []
+          ),
+        ];
+      } else {
+        return createCloseAccountInstruction(fromAta, to, from, []);
+      }
+    });
 
   const lamports = await provider.connection.getBalance(from);
 
-  const recentBlockhash = (await provider.connection.getLatestBlockhash()).blockhash
+  const recentBlockhash = (await provider.connection.getLatestBlockhash())
+    .blockhash;
   const transactions: Transaction[] = [];
   for (const chunk of chunks(transferPositionIxns, 4)) {
     const tx = new Transaction({
@@ -179,7 +213,10 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
     SystemProgram.transfer({
       fromPubkey: from,
       toPubkey: to,
-      lamports: lamports - (transactions.length + 1) * 5000,
+      lamports:
+        lamports -
+        (transactions.reduce((acc, tx) => acc + tx.signatures.length, 0) + 2) *
+          5000,
     })
   );
 
@@ -188,7 +225,16 @@ export async function getMigrateTransactions(from: PublicKey, to: PublicKey): Pr
     recentBlockhash,
   });
   tx.add(...transferTokenInstructions);
-  transactions.push(await provider.wallet.signTransaction(tx));
+
+  // Do not remove this line. Fun fact, tx.signatures will be empty unless you do this once.
+  tx.serialize({ requireAllSignatures: false });
+  if (
+    tx.signatures.some((sig) => sig.publicKey.equals(provider.wallet.publicKey))
+  ) {
+    transactions.push(await provider.wallet.signTransaction(tx));
+  } else {
+    transactions.push(tx);
+  }
 
   return transactions;
 }

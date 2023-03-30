@@ -63,7 +63,7 @@ export async function createAtaAndTransferInstructions(
       createAssociatedTokenAccountInstruction(payer, toAta, to, mint)
     );
   }
-  const fromAta = await getAssociatedTokenAddress(mint, from);
+  const fromAta = await getAssociatedTokenAddress(mint, from, true);
   if (amount != 0) {
     instructions.push(
       createTransferInstruction(fromAta, toAta, from, BigInt(amount.toString()))

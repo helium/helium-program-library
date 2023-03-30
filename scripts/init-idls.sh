@@ -1,6 +1,8 @@
 #!/bin/bash
 ### USAGE: './init-idls.sh' will init the idls on localnet. './init-idls.sh <cluster>' will init the idls on <cluster>
 
+
+anchor idl init fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6 --filepath target/idl/fanout.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json
 anchor idl init 1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w --filepath target/idl/lazy_distributor.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json
 anchor idl init hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR --filepath target/idl/helium_sub_daos.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json
 anchor idl init credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT --filepath target/idl/data_credits.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json

@@ -6,7 +6,7 @@ import {
   PROGRAM_ID,
   accountPayerKey,
 } from "@helium/data-credits-sdk";
-import { fanoutConfigKey } from "@helium/hydra-sdk";
+import { fanoutKey } from "@helium/fanout-sdk";
 import {
   daoKey,
   init as initDao,
@@ -28,6 +28,7 @@ import {
 } from "@solana/spl-governance";
 import { getAssociatedTokenAddress, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
+  ComputeBudgetProgram,
   Connection,
   LAMPORTS_PER_SOL,
   PublicKey,
@@ -108,7 +109,7 @@ async function run() {
       required: true,
       describe: "Path to file that contains the hnt emissions schedule",
       type: "string",
-      default: `${__dirname}/../emissions/hst.json`,
+      default: `${__dirname}/../emissions/hnt.json`,
     },
     hstEmissionSchedulePath: {
       required: true,
@@ -298,6 +299,9 @@ async function run() {
         .initializeRegistrarV0({
           positionUpdateAuthority: (await daoKey(hntKeypair.publicKey))[0],
         })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+        ])
         .accounts({
           realm,
           realmGoverningTokenMint: hntKeypair.publicKey,
@@ -407,9 +411,8 @@ async function run() {
     const hntEmission = await parseEmissionsSchedule(
       argv.emissionSchedulePath
     );
-    const currentTs = await getUnixTimestamp(provider);
-    const currentHstEmission = hstEmission[hstEmission.findIndex((x) => x.startUnixTime > currentTs) - 1];
-    const currentHntEmission = hntEmission[hntEmission.findIndex((x) => x.startUnixTime > currentTs) - 1];
+    const currentHstEmission = hstEmission[0];
+    const currentHntEmission = hntEmission[0];
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         registrar: registrar,
@@ -426,7 +429,7 @@ async function run() {
         // TODO: Create actual HST pool
         hstPool: getAssociatedTokenAddressSync(
           hntKeypair.publicKey,
-          authority,
+          fanoutKey("HST")[0],
           true
         ),
       })
