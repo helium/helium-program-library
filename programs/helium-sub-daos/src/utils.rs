@@ -114,19 +114,19 @@ pub fn update_subdao_vehnt(
   // Step 3. Update veHNT up to now (from start of epoch) using the current fall rate. At this point, closing positions are effectively ignored.
   if current_epoch(curr_ts) == curr_epoch_info.epoch {
     let fall = sub_dao
-        .vehnt_fall_rate
-        .checked_mul(
-          u128::try_from(curr_ts)
-            .unwrap()
-            .checked_sub(
-              u128::try_from(std::cmp::max(sub_dao.vehnt_last_calculated_ts, epoch_start)).unwrap(),
-            )
-            .unwrap(),
-        )
-        .unwrap();
+      .vehnt_fall_rate
+      .checked_mul(
+        u128::try_from(curr_ts)
+          .unwrap()
+          .checked_sub(
+            u128::try_from(std::cmp::max(sub_dao.vehnt_last_calculated_ts, epoch_start)).unwrap(),
+          )
+          .unwrap(),
+      )
+      .unwrap();
 
-      sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.saturating_sub(fall);
-      sub_dao.vehnt_last_calculated_ts = curr_ts;
+    sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.saturating_sub(fall);
+    sub_dao.vehnt_last_calculated_ts = curr_ts;
   }
 
   Ok(())
@@ -159,8 +159,7 @@ pub fn calculate_fall_rate(curr_vp: u64, future_vp: u64, num_seconds: u64) -> Op
     .checked_mul(FALL_RATE_FACTOR)
     .unwrap(); // add decimals of precision for fall rate calculation
 
-  diff
-    .checked_div(num_seconds.into())
+  diff.checked_div(num_seconds.into())
 }
 
 #[derive(Debug)]
