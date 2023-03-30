@@ -12,11 +12,11 @@ Next, make sure startUnixTime in the emissions schedules is equal to the current
 Setup the price oracles:
 
 ```
- npx ts-node --project tsconfig.cjs.json src/create-price-oracle.ts -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/hnt-price-oracle.json --oracles price-oracle-authorities.json
+ npx ts-node --project tsconfig.cjs.json src/create-price-oracle.ts -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/hnt-price-oracle.json --oracles price-oracle-authorities.json --decimals 8
  
-npx ts-node --project tsconfig.cjs.json src/create-price-oracle.ts -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/mobile-price-oracle.json --oracles price-oracle-authorities.json
+npx ts-node --project tsconfig.cjs.json src/create-price-oracle.ts -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/mobile-price-oracle.json --oracles price-oracle-authorities.json --decimals 6
 
-npx ts-node --project tsconfig.cjs.json src/create-price-oracle.ts -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/iot-price-oracle.json --oracles price-oracle-authorities.json
+npx ts-node --project tsconfig.cjs.json src/create-price-oracle.ts -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/iot-price-oracle.json --oracles price-oracle-authorities.json --decimals 6
 ```
 
 ```
