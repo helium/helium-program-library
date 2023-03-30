@@ -48,7 +48,7 @@ export const defineIdlModels = async ({
   accounts: { type: string; table?: string; schema?: string }[];
   sequelize: Sequelize;
 }) => {
-  for (const acc of idl.accounts) {
+  for (const acc of idl.accounts!) {
     const accConfig = accounts.find(({ type }) => type === acc.name);
 
     if (accConfig) {

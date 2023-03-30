@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
 
-const santizeValue = (value: any) => {
+const santizeValue = (value: any): any => {
   if (value === "undefined" || value === null || value === "") return null;
   if (value instanceof PublicKey) return value.toBase58();
   if (value instanceof BN) return value.toString();
@@ -28,8 +28,10 @@ const santizeValue = (value: any) => {
 export const sanitizeAccount = (acc: any) =>
   Object.entries(acc).reduce((acc, [key, value]) => {
     if (Array.isArray(value)) {
+      // @ts-ignore
       acc[key] = value.map(santizeValue);
     } else {
+      // @ts-ignore
       acc[key] = santizeValue(value);
     }
     return acc;

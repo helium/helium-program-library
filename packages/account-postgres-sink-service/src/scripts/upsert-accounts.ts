@@ -21,7 +21,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   programId: {
     type: "string",
     describe: "Program Id",
-    requried: true,
+    required: true,
   },
   account: {
     type: "string",
@@ -72,7 +72,7 @@ async function run() {
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   process.env.AWS_REGION = argv.awsRegion;
-  const programId = new PublicKey(argv.programId);
+  const programId = new PublicKey(argv.programId!);
 
   console.log("setting up database connection");
   const sequelize = new Sequelize({
@@ -135,7 +135,7 @@ async function run() {
         ...(argv.pgSchema ? { schema: argv.pgSchema } : {}),
       },
     ],
-    accountAddress: argv.address ? new PublicKey(argv.address) : null,
+    accountAddress: argv.address ? new PublicKey(argv.address) : undefined,
     sequelize,
   });
 }

@@ -1,11 +1,15 @@
 import * as anchor from "@coral-xyz/anchor";
 import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
-import { Sequelize, Op } from "sequelize";
 import { camelize } from "inflection";
+import { Op, Sequelize } from "sequelize";
+import { SOLANA_URL } from "../env";
 import database from "./database";
 import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
-import { SOLANA_URL } from "../env";
+
+export type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
+
+export const truthy = <T>(value: T): value is Truthy<T> => !!value;
 
 interface UpsertProgramAccountsArgs {
   programId: PublicKey;
@@ -21,7 +25,7 @@ interface UpsertProgramAccountsArgs {
 export const upsertProgramAccounts = async ({
   programId,
   accounts,
-  accountAddress = null,
+  accountAddress = undefined,
   sequelize = database,
 }: UpsertProgramAccountsArgs) => {
   anchor.setProvider(
@@ -36,7 +40,7 @@ export const upsertProgramAccounts = async ({
 
   if (
     !accounts.every(({ type }) =>
-      idl.accounts.some(({ name }) => name === type)
+      idl.accounts!.some(({ name }) => name === type)
     )
   ) {
     throw new Error("idl does not have every account type");
@@ -100,7 +104,7 @@ export const upsertProgramAccounts = async ({
             return null;
           }
         })
-        .filter(Boolean);
+        .filter(truthy);
     }
   }
 
