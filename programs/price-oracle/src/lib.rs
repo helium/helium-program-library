@@ -22,6 +22,13 @@ pub mod price_oracle {
     initialize_price_oracle_v0::handler(ctx, args)
   }
 
+  pub fn update_price_oracle_v0(
+    ctx: Context<UpdatePriceOracleV0>,
+    args: UpdatePriceOracleArgsV0,
+  ) -> Result<()> {
+    update_price_oracle_v0::handler(ctx, args)
+  }
+
   pub fn submit_price_v0(ctx: Context<SubmitPriceV0>, args: SubmitPriceArgsV0) -> Result<()> {
     submit_price_v0::handler(ctx, args)
   }

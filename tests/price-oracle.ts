@@ -38,6 +38,7 @@ describe("price-oracle", () => {
     await program.methods.initializePriceOracleV0({
       oracles,
       decimals: 8,
+      authority: me
     }).accounts({
       priceOracle: kp.publicKey,
       payer: me,
@@ -48,6 +49,7 @@ describe("price-oracle", () => {
     
     expect(priceOracle.numOracles).to.eq(oracles.length);
     expect(priceOracle.decimals).to.eq(8);
+    expect(priceOracle.authority.toBase58()).to.eq(me.toBase58());
     expect(priceOracle.currentPrice).to.be.null;
     expect(priceOracle.lastCalculatedTimestamp).to.be.null;
     expect(priceOracle.oracles).to.deep.equal(oracles);
@@ -71,12 +73,47 @@ describe("price-oracle", () => {
           }
         }),
         decimals: 8,
+        authority: me,
       }).accounts({
         priceOracle: kp.publicKey,
         payer: me,
       }).signers([kp])
       .rpc({skipPreflight: true});
       priceOracle = kp.publicKey;
+    })
+
+    it ("updates the price oracle", async () => {
+      const oracles: any[] = [
+        {
+          authority: Keypair.generate().publicKey,
+          lastSubmittedPrice: null,
+          lastSubmittedTimestamp: null,
+        },
+      ];
+      await program.methods
+        .updatePriceOracleV0({
+          oracles: oracles.map((o) => {
+            return {
+              authority: o.authority,
+              lastSubmittedPrice: null,
+              lastSubmittedTimestamp: null,
+            };
+          }).slice(0, 1),
+          authority: me,
+        })
+        .accounts({
+          priceOracle,
+        })
+        .rpc({ skipPreflight: true });
+
+      const priceOracleAcc = await program.account.priceOracleV0.fetch(priceOracle);
+
+      expect(priceOracleAcc.authority.toBase58()).to.eq(me.toBase58());
+      expect(priceOracleAcc.numOracles).to.eq(1);
+      expect(priceOracleAcc.decimals).to.eq(8);
+      expect(priceOracleAcc.currentPrice).to.be.null;
+      expect(priceOracleAcc.lastCalculatedTimestamp).to.be.null;
+      expect(priceOracleAcc.oracles).to.deep.equal(oracles);
     })
 
     it("oracle can submit a price", async () => {

@@ -9,6 +9,16 @@ npx ts-node --project tsconfig.cjs.json src/setup-hst -u https://api.devnet.sola
 Next, make sure startUnixTime in the emissions schedules is equal to the current time.
 
 
+Setup the price oracles:
+
+```
+ npx ts-node --project tsconfig.cjs.json src/create-price-oracle.ts -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/hnt-price-oracle.json --oracles price-oracle-authorities.json
+ 
+npx ts-node --project tsconfig.cjs.json src/create-price-oracle.ts -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/mobile-price-oracle.json --oracles price-oracle-authorities.json
+
+npx ts-node --project tsconfig.cjs.json src/create-price-oracle.ts -u https://api.devnet.solana.com  --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --priceOracleKeypair keypairs/iot-price-oracle.json --oracles price-oracle-authorities.json
+```
+
 ```
 npx ts-node --project tsconfig.cjs.json src/create-dao.ts -u https://api.devnet.solana.com --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium" --emissionSchedulePath emissions/hnt.json --hstEmissionSchedulePath emissions/hst.json
 

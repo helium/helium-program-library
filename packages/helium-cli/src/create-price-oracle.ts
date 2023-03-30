@@ -12,6 +12,9 @@ import yargs from "yargs/yargs";
 import {
   loadKeypair,
 } from "./utils";
+import Squads from "@sqds/sdk";
+import fs from "fs";
+import { heliumAddressToSolPublicKey } from "@helium/spl-utils";
 
 const { hideBin } = require("yargs/helpers");
 
@@ -33,15 +36,25 @@ async function run() {
       describe: "Keypair of the price oracle account",
       default: null,
     },
-    oraclesList: {
+    oracles: {
       type: "string",
       required: true,
-      describe: `Comma separated ist of public keys that will be the authorised oracles. E.g. '<oracle_key1>,<oracle_key2>,<oracle_key3>`
+      describe: `JSON file of helium keypairs of the oracles`,
     },
     decimals: {
       type: "number",
       required: true,
-      describe: "Number of decimals in the price"
+      describe: "Number of decimals in the price",
+    },
+    multisig: {
+      type: "string",
+      describe:
+        "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority",
+    },
+    authorityIndex: {
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
+      default: 1,
     },
   });
 
@@ -53,12 +66,23 @@ async function run() {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const program = await init(provider);
 
+  const squads = Squads.endpoint(
+    process.env.ANCHOR_PROVIDER_URL,
+    provider.wallet
+  );
+  let authority = provider.wallet.publicKey;
+  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisig) {
+    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  }
+
   const priceOracleKeypair = argv.priceOracleKeypair ? await loadKeypair(argv.priceOracleKeypair) : Keypair.generate();
-  console.log(argv.oraclesList);
-  const oracleKeys = argv.oraclesList.split(",");
-  const oracles = oracleKeys.map((x: string) => {
+  const oracleKeys = JSON.parse(fs.readFileSync(argv.oracles).toString()).map(
+    (hKey) => heliumAddressToSolPublicKey(hKey)
+  );
+  const oracles = oracleKeys.map((x: PublicKey) => {
     return {
-      authority: new PublicKey(x),
+      authority: x,
       lastSubmittedPrice: null,
       lastSubmittedTimestamp: null,
     }
@@ -66,6 +90,7 @@ async function run() {
   await program.methods.initializePriceOracleV0({
     oracles,
     decimals: argv.decimals,
+    authority
   }).accounts({
     priceOracle: priceOracleKeypair.publicKey,
     payer: provider.wallet.publicKey,
