@@ -4,7 +4,14 @@ import { BN } from "bn.js";
 const santizeValue = (value: any): any => {
   if (value === "undefined" || value === null || value === "") return null;
   if (value instanceof PublicKey) return value.toBase58();
-  if (value instanceof BN) return value.toString();
+  if (value instanceof BN) {
+    const val = value.toString();
+    if (val == "") {
+      return null;
+    }
+
+    return val
+  }
   if (["string", "number", "boolean"].includes(typeof value)) return value;
   if (typeof value === "object") {
     if (

@@ -31,7 +31,10 @@ const determineType = (type: string | object): any => {
       if (TypeMap.has(arrayType)) {
         return DataTypes.ARRAY(TypeMap.get(arrayType));
       }
-    } else {
+    } else if (key === "vec") {
+      const vecType = value;
+      return DataTypes.ARRAY(determineType(vecType));
+    }else {
       return determineType(value);
     }
   }
