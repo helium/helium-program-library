@@ -139,7 +139,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   makers: {
     type: "string",
     alias: "m",
-    default: "../helium-cli/makers.json",
+    default: "../helium-admin-cli/makers.json",
   },
   progress: {
     type: "boolean",
@@ -393,7 +393,7 @@ async function run() {
   }
 
   const hotspotIxs: EnrichedIxGroup[] = [];
-  const canopyPath = `../helium-cli/keypairs/canopy.json`;
+  const canopyPath = `../helium-admin-cli/keypairs/canopy.json`;
   let canopy;
   if (fs.existsSync(canopyPath)) {
     canopy = loadKeypair(canopyPath);

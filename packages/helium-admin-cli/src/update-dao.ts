@@ -7,68 +7,63 @@ import {
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, parseEmissionsSchedule, sendInstructionsOrSquads } from "./utils";
+import { parseEmissionsSchedule, sendInstructionsOrSquads } from "./utils";
 
-
-const { hideBin } = require("yargs/helpers");
-const yarg = yargs(hideBin(process.argv)).options({
-  wallet: {
-    alias: "k",
-    describe: "Anchor wallet keypair",
-    default: `${os.homedir()}/.config/solana/id.json`,
-  },
-  url: {
-    alias: "u",
-    default: "http://127.0.0.1:8899",
-    describe: "The solana url",
-  },
-  hntMint: {
-    required: true,
-    type: "string",
-    describe: "HNT mint of the dao to be updated",
-  },
-  newAuthority: {
-    required: false,
-    describe: "New DAO authority",
-    type: "string",
-    default: null,
-  },
-  newEmissionsSchedulePath: {
-    required: false,
-    describe: "Path to file that contains the new emissions schedule",
-    type: "string",
-    default: null,
-  },
-  newHstEmissionsSchedulePath: {
-    required: false,
-    describe: "Path to file that contains the new HST emissions schedule",
-    type: "string",
-    default: null,
-  },
-  newHstPool: {
-    required: false,
-    describe: "New HST Pool",
-    type: "string",
-    default: null,
-  },
-  executeTransaction: {
-    type: "boolean",
-  },
-  multisig: {
-    type: "string",
-    describe:
-      "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
-  },
-  authorityIndex: {
-    type: "number",
-    describe: "Authority index for squads. Defaults to 1",
-    default: 1,
-  },
-});
-
-
-
-async function run() {
+export async function run(args: any = process.argv) {
+  const yarg = yargs(args).options({
+    wallet: {
+      alias: "k",
+      describe: "Anchor wallet keypair",
+      default: `${os.homedir()}/.config/solana/id.json`,
+    },
+    url: {
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
+    },
+    hntMint: {
+      required: true,
+      type: "string",
+      describe: "HNT mint of the dao to be updated",
+    },
+    newAuthority: {
+      required: false,
+      describe: "New DAO authority",
+      type: "string",
+      default: null,
+    },
+    newEmissionsSchedulePath: {
+      required: false,
+      describe: "Path to file that contains the new emissions schedule",
+      type: "string",
+      default: null,
+    },
+    newHstEmissionsSchedulePath: {
+      required: false,
+      describe: "Path to file that contains the new HST emissions schedule",
+      type: "string",
+      default: null,
+    },
+    newHstPool: {
+      required: false,
+      describe: "New HST Pool",
+      type: "string",
+      default: null,
+    },
+    executeTransaction: {
+      type: "boolean",
+    },
+    multisig: {
+      type: "string",
+      describe:
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+    },
+    authorityIndex: {
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
+      default: 1,
+    },
+  });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
@@ -117,10 +112,3 @@ async function run() {
     signers: [],
   });
 }
-
-run()
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  })
-  .then(() => process.exit());

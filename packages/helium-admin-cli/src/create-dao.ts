@@ -65,8 +65,8 @@ async function exists(
   return Boolean(await connection.getAccountInfo(account));
 }
 
-async function run() {
-  const yarg = yargs(hideBin(process.argv)).options({
+export async function run(args: any = process.argv) {
+  const yarg = yargs(args).options({
     wallet: {
       alias: "k",
       describe: "Anchor wallet keypair",
@@ -459,10 +459,3 @@ async function run() {
     });
   }
 }
-
-run()
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  })
-  .then(() => process.exit());

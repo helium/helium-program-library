@@ -16,55 +16,54 @@ import os from "os";
 import yargs from "yargs/yargs";
 import { createAndMint, exists } from "./utils";
 
-const { hideBin } = require("yargs/helpers");
-const yarg = yargs(hideBin(process.argv)).options({
-  wallet: {
-    alias: "k",
-    describe: "Anchor wallet keypair",
-    default: `${os.homedir()}/.config/solana/id.json`,
-  },
-  url: {
-    alias: "u",
-    default: "http://127.0.0.1:8899",
-    describe: "The solana url",
-  },
-  hnt: {
-    type: "string",
-    describe: "Pubkey of hnt",
-    required: true,
-  },
-  state: {
-    type: "string",
-    alias: "s",
-    default: `${__dirname}/../../migration-service/export.json`,
-  },
-  name: {
-    type: "string",
-  },
-  multisig: {
-    type: "string",
-    describe:
-      "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority",
-  },
-  authorityIndex: {
-    type: "number",
-    describe: "Authority index for squads. Defaults to 1",
-    default: 1,
-  },
-  hstKeypair: {
-    type: "string",
-    describe: "Keypair of the HST token",
-    default: `${__dirname}/../keypairs/hst.json`,
-  },
-  bucket: {
-    type: "string",
-    describe: "Bucket URL prefix holding all of the metadata jsons",
-    default:
-      "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib",
-  },
-});
+export async function run(args: any = process.argv) {
+  const yarg = yargs(args).options({
+    wallet: {
+      alias: "k",
+      describe: "Anchor wallet keypair",
+      default: `${os.homedir()}/.config/solana/id.json`,
+    },
+    url: {
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
+    },
+    hnt: {
+      type: "string",
+      describe: "Pubkey of hnt",
+      required: true,
+    },
+    state: {
+      type: "string",
+      alias: "s",
+      default: `${__dirname}/../../migration-service/export.json`,
+    },
+    name: {
+      type: "string",
+    },
+    multisig: {
+      type: "string",
+      describe:
+        "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority",
+    },
+    authorityIndex: {
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
+      default: 1,
+    },
+    hstKeypair: {
+      type: "string",
+      describe: "Keypair of the HST token",
+      default: `${__dirname}/../keypairs/hst.json`,
+    },
+    bucket: {
+      type: "string",
+      describe: "Bucket URL prefix holding all of the metadata jsons",
+      default:
+        "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib",
+    },
+  });
 
-async function run() {
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
@@ -229,13 +228,6 @@ function toSolana(address: string): PublicKey | undefined {
     return undefined;
   }
 }
-
-run()
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  })
-  .then(() => process.exit());
 
 const CLOCKWORK_PID = new PublicKey(
   "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
