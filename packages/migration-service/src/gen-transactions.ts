@@ -77,6 +77,7 @@ type EnrichedIxGroup = {
   compute: number;
   size: number;
   wallet: string | undefined;
+  hotspot?: string;
 };
 
 const { hideBin } = require("yargs/helpers");
@@ -562,6 +563,7 @@ async function run() {
         compute: 350000,
         size: cachedAccountSize + ix.data.length,
         wallet: solAddress.toBase58(),
+        hotspot: hotspotKey,
       });
     }
   }
@@ -1007,6 +1009,46 @@ async function run() {
   );
   pgProgressWallets && pgProgressWallets.stop();
 
+
+  const hotspotRows = flatTransactions
+    .map((flatTransaction, index) => {
+      return Array.from(flatTransaction.hotspots).map((hotspot) => [
+        hotspot,
+        index,
+      ]);
+    })
+    .flat();
+  let pgProgressHotspots;
+  console.log("Inserting wallet transaction mapping");
+  let hotspotProgIdx = 0;
+  if (argv.progress) {
+    pgProgressHotspots = new cliProgress.SingleBar(
+      {},
+      cliProgress.Presets.shades_classic
+    );
+    pgProgressHotspots.start(walletRows.length, 0);
+  }
+
+  await Promise.all(
+    chunks(chunks(hotspotRows, chunkSize), parallelism).map(async (chunk) => {
+      for (const c of chunk) {
+        const query = format(
+          `
+            INSERT INTO hotspot_transactions(
+              hotspot, txid
+            )
+            VALUES %L
+          `,
+          c
+        );
+        await client.query(query);
+        hotspotProgIdx += chunkSize;
+        pgProgressHotspots && pgProgressHotspots.update(hotspotProgIdx);
+      }
+    })
+  );
+  pgProgressHotspots && pgProgressHotspots.stop();
+
   console.log("inserting canopy");
   const canopyRows = getCanopy({
     merkleTree,
@@ -1164,6 +1206,7 @@ type TransactionsReturn = LazyTransaction & {
   size: number;
   compute: number;
   wallets: Set<string>;
+  hotspots: Set<string>;
 };
 const baseTxSize =
   32 + // recent blockhash
@@ -1188,6 +1231,7 @@ function packTransactions(
     size: baseTxSize,
     compute: 0,
     wallets: new Set<string>(),
+    hotspots: new Set<string>(),
     instructions: [],
     signerSeeds: [],
   };
@@ -1200,6 +1244,9 @@ function packTransactions(
       currTx.compute += ix.compute;
       currTx.size += ix.size;
       currTx.wallets.add(ix.wallet);
+      if (ix.hotspot) {
+        currTx.hotspots.add(ix.hotspot);
+      }
       currTx.signerSeeds.push(...ix.signerSeeds);
       currTx.isRouter = ix.isRouter || currTx.isRouter;
     } else {
@@ -1208,6 +1255,7 @@ function packTransactions(
         size: baseTxSize + ix.size,
         compute: ix.compute,
         wallets: new Set([ix.wallet]),
+        hotspots: ix.hotspot ? new Set([ix.hotspot]) : new Set([]),
         instructions: ix.instructions,
         signerSeeds: ix.signerSeeds,
         isRouter: ix.isRouter,

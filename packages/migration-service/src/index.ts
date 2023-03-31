@@ -304,6 +304,50 @@ server.get<{
 
 server.get<{
   Querystring: { limit?: number; offset?: number };
+  Params: { hotspot: string };
+}>("/migrate/hotspot/:hotspot", async (request, reply) => {
+  const { hotspot } = request.params;
+  const { limit, offset } = request.query;
+  const client = await pool.connect();
+
+  try {
+    const results = (
+      await client.query(
+        `SELECT * FROM transactions
+        JOIN hotspot_transactions ON transactions.id = hotspot_transactions.txid
+        WHERE hotspot_transactions.hotspot = $1
+        LIMIT $2
+        OFFSET $3
+        `,
+        [hotspot, limit || 200, offset || 0]
+      )
+    ).rows;
+    const luts = (
+      await client.query("SELECT * FROM lookup_tables", [])
+    ).rows.map((row) => row.pubkey);
+    const transactions = await getTransactions(results, luts);
+    return {
+      transactions: transactions || [],
+      count: Number(
+        (
+          await client.query(
+            "SELECT count(*) FROM hotspot_transactions WHERE wallet = $1",
+            [hotspot]
+          )
+        ).rows[0].count
+      ),
+    };
+  } catch (e: any) {
+    console.error(e);
+    throw e;
+  } finally {
+    await client.release();
+  }
+});
+
+
+server.get<{
+  Querystring: { limit?: number; offset?: number };
 }>("/migrate", async (request, reply) => {
   const { limit, offset } = request.query;
   const client = await pool.connect();
