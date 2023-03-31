@@ -5,10 +5,3 @@ const run = async () => {
   const ecc = await (await HeliumKeypair.makeRandom()).address.publicKey;
   console.log(ecc);
 };
-
-run()
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  })
-  .then(() => process.exit());

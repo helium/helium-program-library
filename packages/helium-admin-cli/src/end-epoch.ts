@@ -12,29 +12,28 @@ import b58 from "bs58";
 import os from "os";
 import yargs from "yargs/yargs";
 
-const { hideBin } = require("yargs/helpers");
-const yarg = yargs(hideBin(process.argv)).options({
-  wallet: {
-    alias: "k",
-    describe: "Anchor wallet keypair",
-    default: `${os.homedir()}/.config/solana/id.json`,
-  },
-  url: {
-    alias: "u",
-    default: "http://127.0.0.1:8899",
-    describe: "The solana url",
-  },
-  hntMint: {
-    type: "string",
-    describe: "Mint of the HNT token",
-  },
-  from: {
-    type: "number",
-    describe: "The timestamp to start ending epochs from",
-  },
-});
+export async function run(args: any = process.argv) {
+  const yarg = yargs(args).options({
+    wallet: {
+      alias: "k",
+      describe: "Anchor wallet keypair",
+      default: `${os.homedir()}/.config/solana/id.json`,
+    },
+    url: {
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
+    },
+    hntMint: {
+      type: "string",
+      describe: "Mint of the HNT token",
+    },
+    from: {
+      type: "number",
+      describe: "The timestamp to start ending epochs from",
+    },
+  });
 
-async function run() {
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
@@ -122,10 +121,3 @@ async function run() {
     targetTs = targetTs.add(new BN(EPOCH_LENGTH));
   }
 }
-
-run()
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  })
-  .then(() => process.exit());

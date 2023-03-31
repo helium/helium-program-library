@@ -7,65 +7,65 @@ import os from "os";
 import yargs from "yargs/yargs";
 import { sendInstructionsOrSquads } from "./utils";
 
-const { hideBin } = require("yargs/helpers");
-const yarg = yargs(hideBin(process.argv)).options({
-  wallet: {
-    alias: "k",
-    describe: "Anchor wallet keypair",
-    default: `${os.homedir()}/.config/solana/id.json`,
-  },
-  url: {
-    alias: "u",
-    default: "http://127.0.0.1:8899",
-    describe: "The solana url",
-  },
-  circuitBreaker: {
-    type: "string",
-    required: true,
-    describe: "Circuit breaker account",
-  },
-  windowSizeSeconds: {
-    type: "number",
-  },
-  threshold: {
-    type: "number",
-  },
-  executeTransaction: {
-    type: "boolean",
-  },
-  multisig: {
-    type: "string",
-    describe:
-      "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
-  },
-  newAuthority: {
-    type: "string",
-  },
-  authorityIndex: {
-    type: "number",
-    describe: "Authority index for squads. Defaults to 1",
-    default: 1,
-  },
-});
+export async function run(args: any = process.argv) {
+  const yarg = yargs(args).options({
+    wallet: {
+      alias: "k",
+      describe: "Anchor wallet keypair",
+      default: `${os.homedir()}/.config/solana/id.json`,
+    },
+    url: {
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
+    },
+    circuitBreaker: {
+      type: "string",
+      required: true,
+      describe: "Circuit breaker account",
+    },
+    windowSizeSeconds: {
+      type: "number",
+    },
+    threshold: {
+      type: "number",
+    },
+    executeTransaction: {
+      type: "boolean",
+    },
+    multisig: {
+      type: "string",
+      describe:
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+    },
+    newAuthority: {
+      type: "string",
+    },
+    authorityIndex: {
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
+      default: 1,
+    },
+  });
 
-async function run() {
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
-  const circuitBreakerKey = new PublicKey(argv.circuitBreaker)
+  const circuitBreakerKey = new PublicKey(argv.circuitBreaker);
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const circuitBreakerProgram = await init(provider);
 
-  const instructions = []
-  const circuitBreaker = await circuitBreakerProgram.account.mintWindowedCircuitBreakerV0.fetch(circuitBreakerKey)
+  const instructions = [];
+  const circuitBreaker =
+    await circuitBreakerProgram.account.accountWindowedCircuitBreakerV0.fetch(
+      circuitBreakerKey
+    );
   instructions.push(
     await circuitBreakerProgram.methods
-      .updateMintWindowedBreakerV0({
-        newAuthority: argv.newAuthority
-          ? new PublicKey(argv.newAuthority)
-          : circuitBreaker.authority,
+      .updateAccountWindowedBreakerV0({
+        newAuthority: argv.newAuthority ? new PublicKey(argv.newAuthority) : circuitBreaker.authority,
         config: {
           windowSizeSeconds: argv.windowSizeSeconds
             ? new BN(argv.windowSizeSeconds)
@@ -97,10 +97,3 @@ async function run() {
     signers: [],
   });
 }
-
-run()
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  })
-  .then(() => process.exit());

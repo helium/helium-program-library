@@ -5,8 +5,8 @@ target
 node_modules
 test-ledger
 packages/*/lib
-packages/helium-cli/keypairs/
-packages/helium-cli/keypairs-prod/
+packages/helium-admin-cli/keypairs/
+packages/helium-admin-cli/keypairs-prod/
 **/*.tsbuildinfo
 .parcel-cache
 .vscode
