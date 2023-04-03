@@ -25,14 +25,14 @@ async function createMints(provider: anchor.AnchorProvider) {
 
   const hntMintKeypair = Keypair.fromSecretKey(
     new Uint8Array(
-      JSON.parse(fs.readFileSync("../helium-cli/keypairs/hnt.json").toString())
+      JSON.parse(fs.readFileSync("../helium-admin-cli/keypairs/hnt.json").toString())
     )
   );
   await createMint(provider, decimals, me, me, hntMintKeypair);
 
   const dcMintKeypair = Keypair.fromSecretKey(
     new Uint8Array(
-      JSON.parse(fs.readFileSync("../helium-cli/keypairs/dc.json").toString())
+      JSON.parse(fs.readFileSync("../helium-admin-cli/keypairs/dc.json").toString())
     )
   );
   await createMint(provider, decimals, me, me, dcMintKeypair);
@@ -40,7 +40,7 @@ async function createMints(provider: anchor.AnchorProvider) {
   const mobileMintKeypair = Keypair.fromSecretKey(
     new Uint8Array(
       JSON.parse(
-        fs.readFileSync("../helium-cli/keypairs/mobile.json").toString()
+        fs.readFileSync("../helium-admin-cli/keypairs/mobile.json").toString()
       )
     )
   );

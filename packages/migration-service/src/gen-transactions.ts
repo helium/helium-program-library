@@ -96,11 +96,6 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Pubkey of hnt",
     required: true,
   },
-  hst: {
-    type: "string",
-    describe: "Pubkey of hst",
-    required: true,
-  },
   mobile: {
     type: "string",
     describe: "Pubkey of mobile",
@@ -143,7 +138,7 @@ const yarg = yargs(hideBin(process.argv)).options({
   makers: {
     type: "string",
     alias: "m",
-    default: "../helium-cli/makers.json",
+    default: "../helium-admin-cli/makers.json",
   },
   progress: {
     type: "boolean",
@@ -188,7 +183,6 @@ async function run() {
   const dc = new PublicKey(argv.dc);
   const iot = new PublicKey(argv.iot);
   const hnt = new PublicKey(argv.hnt);
-  const hst = new PublicKey(argv.hst);
 
   const dao = daoKey(hnt)[0];
   const iotSubdao = (await subDaoKey(iot))[0];
@@ -315,7 +309,6 @@ async function run() {
     mobile: new BN(0),
     dc: new BN(0),
     sol: new BN(0),
-    hst: new BN(0),
   };
   // Keep track of unresolved balances so we can reserve them for later;
   const unresolvedBalances = {
@@ -323,14 +316,12 @@ async function run() {
     stakedHnt: new BN(0),
     mobile: new BN(0),
     dc: new BN(0),
-    hst: new BN(0),
   };
   // Keep track of router burned balances
   const routerBalances = {
     hnt: new BN(0),
     stakedHnt: new BN(0),
     mobile: new BN(0),
-    hst: new BN(0),
   };
   // Keep track of failed wallets
   const failed = [];
@@ -401,7 +392,7 @@ async function run() {
   }
 
   const hotspotIxs: EnrichedIxGroup[] = [];
-  const canopyPath = `../helium-cli/keypairs/canopy.json`;
+  const canopyPath = `../helium-admin-cli/keypairs/canopy.json`;
   let canopy;
   if (fs.existsSync(canopyPath)) {
     canopy = loadKeypair(canopyPath);
@@ -424,7 +415,6 @@ async function run() {
     registrarCollection,
     registrarCollectionMetadata,
     registrarCollectionMasterEdition,
-    hst,
     dao,
     subDao,
     registrar,
@@ -602,7 +592,6 @@ async function run() {
       routerBalances.stakedHnt = routerBalances.stakedHnt.add(
         new BN(account.staked_hnt)
       );
-      routerBalances.hst = routerBalances.hst.add(new BN(account.hst));
       const instruction = await dcProgram.methods
         .genesisIssueDelegatedDataCreditsV0({
           amount: dcBal,
@@ -634,7 +623,6 @@ async function run() {
       // Helium uses 8 decimals, we use 6
       const digitShift = new BN(100);
       const mobileBal = new BN(account.mobile).div(digitShift);
-      const hstBal = new BN(account.hst);
       const zero = new BN(0);
       if (hntBal.gt(zero)) {
         totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
@@ -657,13 +645,6 @@ async function run() {
         const { instruction, ata } = createAta(mobile, solAddress, lazySigner);
         tokenIxs.push(instruction);
         tokenIxs.push(createTransfer(mobile, ata, lazySigner, mobileBal));
-      }
-      if (hstBal.gt(zero)) {
-        totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
-        totalBalances.hst = totalBalances.hst.add(hstBal);
-        const { instruction, ata } = createAta(hst, solAddress, lazySigner);
-        tokenIxs.push(instruction);
-        tokenIxs.push(createTransfer(hst, ata, lazySigner, hstBal));
       }
 
       /// Dust with 100 txns of sol
@@ -757,7 +738,6 @@ async function run() {
         address,
         account,
       });
-      unresolvedBalances.hst = unresolvedBalances.hst.add(new BN(account.hst));
       unresolvedBalances.hnt = unresolvedBalances.hnt.add(new BN(account.hnt));
       unresolvedBalances.dc = unresolvedBalances.dc.add(new BN(account.dc));
       unresolvedBalances.mobile = unresolvedBalances.mobile.add(
@@ -1052,7 +1032,6 @@ async function run() {
 
   console.log(`Lazy transactions signer ${lazySigner} needs:
     HNT: ${totalBalances.hnt.toString()}
-    HST: ${totalBalances.hst.toString()}
     STAKED HNT: ${totalBalances.stakedHnt.toString()}
     DC: ${totalBalances.dc.toString()}
     MOBILE: ${totalBalances.mobile.toString()}
@@ -1064,7 +1043,6 @@ async function run() {
   `);
   console.log(`Unresolved:
     HNT: ${unresolvedBalances.hnt.toString()}
-    HST: ${unresolvedBalances.hst.toString()}
     DC: ${unresolvedBalances.dc.toString()}
     STAKED HNT: ${unresolvedBalances.stakedHnt.toString()}
     MOBILE: ${unresolvedBalances.mobile.toString()}
@@ -1072,7 +1050,6 @@ async function run() {
   `);
   console.log(`Router:
     HNT: ${routerBalances.hnt.toString()}
-    HST: ${routerBalances.hst.toString()}
     STAKED HNT: ${routerBalances.stakedHnt.toString()}
     MOBILE: ${routerBalances.mobile.toString()}
   `);
@@ -1091,18 +1068,6 @@ async function run() {
       getAssociatedTokenAddressSync(hnt, lazySigner, true),
       me,
       BigInt(totalBalances.hnt.add(totalBalances.stakedHnt).toString())
-    ),
-    await createAssociatedTokenAccountIdempotentInstruction(
-      me,
-      getAssociatedTokenAddressSync(hst, lazySigner, true),
-      lazySigner,
-      hst
-    ),
-    await createTransferInstruction(
-      getAssociatedTokenAddressSync(hst, me),
-      getAssociatedTokenAddressSync(hst, lazySigner, true),
-      me,
-      BigInt(totalBalances.hst.toString())
     ),
     await createAssociatedTokenAccountIdempotentInstruction(
       me,

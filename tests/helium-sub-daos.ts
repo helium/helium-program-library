@@ -244,6 +244,7 @@ describe("helium-sub-daos", () => {
           authority: newAuth,
           emissionSchedule: null,
           hstEmissionSchedule: null,
+          hstPool: null
         })
         .accounts({
           dao,
@@ -766,7 +767,7 @@ describe("helium-sub-daos", () => {
           },
           positionAuthorityKp
         ));
-        program.methods
+        await program.methods
           .delegateV0()
           .accounts({
             position,
