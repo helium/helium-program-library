@@ -11,6 +11,9 @@
       "path": "../helium-sub-daos-sdk"
     },
     {
+      "path": "../data-credits-sdk"
+    },
+    {
       "path": "../spl-utils"
     },
     {
