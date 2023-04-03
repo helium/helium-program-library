@@ -96,7 +96,7 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "editorMode": "builder",
-          "expr": "solana_account_sol_balance{name=\"clockwork_thread_dao_issue_hst\"}",
+          "expr": "solana_account_balance{name=\"clockwork_thread_dao_issue_hst\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -161,7 +161,7 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "editorMode": "builder",
-          "expr": "solana_account_sol_balance{name=\"clockwork_thread_iot_issue\"}",
+          "expr": "solana_account_balance{name=\"clockwork_thread_iot_issue\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -226,7 +226,7 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "editorMode": "builder",
-          "expr": "solana_account_sol_balance{name=\"clockwork_thread_mobile_issue\"}",
+          "expr": "solana_account_balance{name=\"clockwork_thread_mobile_issue\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -291,7 +291,7 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "editorMode": "builder",
-          "expr": "solana_account_sol_balance{name=\"data_credits_account_payer\"}",
+          "expr": "solana_account_balance{name=\"data_credits_account_payer\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -356,7 +356,7 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "editorMode": "builder",
-          "expr": "solana_account_sol_balance{name=\"clockwork_thread_iot_calculate\"}",
+          "expr": "solana_account_balance{name=\"clockwork_thread_iot_calculate\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -421,7 +421,7 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "editorMode": "builder",
-          "expr": "solana_account_sol_balance{name=\"clockwork_thread_mobile_calculate\"}",
+          "expr": "solana_account_balance{name=\"clockwork_thread_mobile_calculate\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -486,7 +486,7 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "editorMode": "builder",
-          "expr": "solana_account_sol_balance{name=\"switchboard_iot_lease_account\"}",
+          "expr": "solana_account_balance{name=\"switchboard_iot_lease_account\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -551,7 +551,7 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "editorMode": "builder",
-          "expr": "solana_account_sol_balance{name=\"switchboard_mobile_lease_account\"}",
+          "expr": "solana_account_balance{name=\"switchboard_mobile_lease_account\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -624,7 +624,7 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "editorMode": "code",
-          "expr": "solana_account_token_balance{name=\"mobile_treasury\"}",
+          "expr": "solana_account_balance{name=\"mobile_treasury\"}",
           "interval": "",
           "legendFormat": "",
           "range": true,
@@ -685,7 +685,7 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "editorMode": "code",
-          "expr": "solana_account_token_balance{name=\"mobile_rewards_escrow\"}",
+          "expr": "solana_account_balance{name=\"mobile_rewards_escrow\"}",
           "interval": "",
           "legendFormat": "",
           "range": true,
@@ -746,7 +746,7 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "editorMode": "code",
-          "expr": "solana_account_token_balance{name=\"iot_treasury\"}",
+          "expr": "solana_account_balance{name=\"iot_treasury\"}",
           "interval": "",
           "legendFormat": "",
           "range": true,
@@ -807,7 +807,7 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "editorMode": "code",
-          "expr": "solana_account_token_balance{name=\"iot_rewards_escrow\"}",
+          "expr": "solana_account_balance{name=\"iot_rewards_escrow\"}",
           "interval": "",
           "legendFormat": "",
           "range": true,

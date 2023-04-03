@@ -15,19 +15,12 @@ export const supplyGauge = new client.Gauge({
 });
 register.registerMetric(supplyGauge);
 
-export const tokenBalanceGauge = new client.Gauge({
-  name: "solana_account_token_balance",
+export const balanceGauge = new client.Gauge({
+  name: "solana_account_balance",
   help: "Balance of this token account",
   labelNames: ["name"],
 });
-register.registerMetric(tokenBalanceGauge);
-
-export const solBalanceGauge = new client.Gauge({
-  name: "solana_account_sol_balance",
-  help: "Sol balance of this account",
-  labelNames: ["name"],
-});
-register.registerMetric(solBalanceGauge);
+register.registerMetric(balanceGauge);
 
 export const circuitBreakerLimitGauge = new client.Gauge({
   name: "solana_circuit_breaker_limit",
