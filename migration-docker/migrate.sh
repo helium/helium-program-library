@@ -65,6 +65,7 @@ helium-admin create-price-oracle -u $SOLANA_URL \
 
 # Mint extra tokens since we do not know how many will be needed for the migration until the export is run
 helium-admin create-dao -u $SOLANA_URL \
+                        --multisig $MULTISIG \
                         --councilKeypair keypairs/council.json \
                         --hntKeypair keypairs/hnt.json \
                         --dcKeypair keypairs/dc.json \
