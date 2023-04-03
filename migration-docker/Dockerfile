@@ -1,5 +1,5 @@
 # Specify the base image
-FROM node:16-alpine AS JS_BUILD_IMAGE
+FROM node:16 AS JS_BUILD_IMAGE
 
 WORKDIR /app
 
@@ -8,29 +8,59 @@ COPY package.json .
 COPY lerna.json .
 COPY yarn.lock .
 
-RUN yarn install
+COPY packages packages
+
+COPY target/types target/types
+
+RUN yarn install && yarn global add lerna
+RUN lerna bootstrap
 
 RUN yarn run build
 
-RUN npm prune --production
+FROM node:16
 
-FROM node:16-alpine
+WORKDIR /app
 
 # Install rust
-RUN apt-get update && && apt-get install -y pkg-config build-essential libudev-dev libssl-dev
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+RUN apt-get update && apt-get install -y pkg-config build-essential libudev-dev libssl-dev
+ENV CARGO_HOME=/app/.cargo
+ENV RUSTUP_HOME=/app
+RUN curl https://sh.rustup.rs -sSf | \
+    sh -s -- -y
+
+ENV PATH=$CARGO_HOME/bin:$PATH
 
 # Install solana
-RUN sh -c "$(curl -sSfL https://release.solana.com/v1.15.2/install)"
+RUN sh -c "$(curl -sSfL https://release.solana.com/v1.14.7/install)"
+
+ENV PATH=/root/.local/share/solana/install/active_release/bin:$PATH
 
 # Install Anchor
 RUN cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+RUN avm install 0.26.0 && avm use 0.26.0
 
-COPY --from=JS_BUILD_IMAGE /app/packages/helium-admin-cli/lib ./helium-admin-cli/lib
-COPY --from=JS_BUILD_IMAGE /app/packages/helium-admin-cli/node_modules ./helium-admin-cli/node_modules
-COPY --from=JS_BUILD_IMAGE /app/packages/helium-admin-cli/bin ./helium-admin-cli/node_modules/bin
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    apt-get install -y unzip && \
+    unzip awscliv2.zip && \
+    ./aws/install
 
-COPY --from=JS_BUILD_IMAGE /app/packages/migration-service/lib ./migration-service/lib
-COPY --from=JS_BUILD_IMAGE /app/packages/migration-service/node_modules ./migration-service/node_modules
-COPY --from=JS_BUILD_IMAGE /app/packages/migration-service/bin ./migration-service/node_modules/bin
+COPY --from=JS_BUILD_IMAGE /app/packages packages
+COPY --from=JS_BUILD_IMAGE /app/node_modules node_modules
 
+COPY Anchor.toml .
+COPY Cargo.lock .
+COPY Cargo.toml .
+COPY programs programs
+COPY deps/metaplex-program-library deps/metaplex-program-library
+COPY package.json .
+COPY lerna.json .
+COPY yarn.lock .
+
+COPY ./migration-docker/migrate.sh migrate.sh
+
+COPY ./scripts/init-idls.sh init-idls.sh
+COPY ./migration-docker/encrypt-keypairs.sh .
+COPY ./migration-docker/local-validator.sh .
+COPY ./migration-docker/run-migrate.sh .
+
+CMD ["./run-migrate.sh"]

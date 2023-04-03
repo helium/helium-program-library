@@ -33,7 +33,9 @@ import {
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
+  LAMPORTS_PER_SOL,
   PublicKey,
+  SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
@@ -76,12 +78,10 @@ export async function run(args: any = process.argv) {
     hntPubkey: {
       type: "string",
       describe: "Pubkey of the HNT token",
-      default: loadKeypair(`${__dirname}/../keypairs/hnt.json`).publicKey,
     },
     dcPubkey: {
       type: "string",
       describe: "Pubkey of the DC token",
-      default: loadKeypair(`${__dirname}/../keypairs/dc.json`).publicKey,
     },
     name: {
       alias: "n",
@@ -129,11 +129,6 @@ export async function run(args: any = process.argv) {
       type: "string",
       describe: "Keypair of the aggregtor",
     },
-    merkleKeypair: {
-      type: "string",
-      describe: "Keypair of the merkle tree",
-      default: `${__dirname}/../keypairs/merkle.json`,
-    },
     dcBurnAuthority: {
       type: "string",
       describe: "The authority to burn DC tokens",
@@ -163,11 +158,6 @@ export async function run(args: any = process.argv) {
     decimals: {
       type: "number",
       default: 6,
-    },
-    startEpochRewards: {
-      type: "number",
-      describe: "The starting epoch rewards (yearly)",
-      required: true,
     },
     govProgramId: {
       type: "string",
@@ -294,7 +284,8 @@ export async function run(args: any = process.argv) {
   let instructions: TransactionInstruction[] = [];
   const govProgramVersion = await getGovernanceProgramVersion(
     conn,
-    govProgramId
+    govProgramId,
+    isLocalhost(provider) ? "localnet" : undefined
   );
 
   const realmName = argv.realmName;
@@ -438,22 +429,17 @@ export async function run(args: any = process.argv) {
   }
 
   if (!(await exists(conn, subdao))) {
-    let aggregatorKey = new PublicKey(
-      "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
-    ); // value cloned from mainnet to localnet
-    if (!isLocalhost(provider)) {
-      console.log("Initializing switchboard oracle");
-      aggregatorKey = await createSwitchboardAggregator({
-        crank: new PublicKey(argv.crank),
-        queue: new PublicKey(argv.queue),
-        wallet,
-        provider,
-        aggKeypair,
-        url: argv.activeDeviceOracleUrl,
-        switchboardNetwork: argv.switchboardNetwork,
-        authority,
-      });
-    }
+    console.log("Initializing switchboard oracle");
+    const aggregatorKey = await createSwitchboardAggregator({
+      crank: new PublicKey(argv.crank),
+      queue: new PublicKey(argv.queue),
+      wallet,
+      provider,
+      aggKeypair,
+      url: argv.activeDeviceOracleUrl,
+      switchboardNetwork: argv.switchboardNetwork,
+      authority,
+    });
 
     console.log(`Initializing ${name} SubDAO`);
     const currentHntEmission = emissionSchedule[0];

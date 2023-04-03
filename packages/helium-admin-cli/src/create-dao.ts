@@ -26,7 +26,12 @@ import {
   withCreateRealm,
   withSetRealmAuthority,
 } from "@solana/spl-governance";
-import { getAssociatedTokenAddress, getAssociatedTokenAddressSync } from "@solana/spl-token";
+import {
+  createAssociatedTokenAccountIdempotent,
+  createAssociatedTokenAccountIdempotentInstruction,
+  getAssociatedTokenAddress,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
   Connection,
@@ -159,11 +164,6 @@ export async function run(args: any = process.argv) {
       type: "string",
       default: "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm",
     },
-    hstKeypair: {
-      type: "string",
-      describe: "Keypair of the HST token",
-      default: `${__dirname}/../keypairs/hst.json`,
-    },
     numHst: {
       type: "number",
       describe:
@@ -188,7 +188,6 @@ export async function run(args: any = process.argv) {
 
   const hntKeypair = loadKeypair(argv.hntKeypair);
   const dcKeypair = loadKeypair(argv.dcKeypair);
-  const hstKeypair = loadKeypair(argv.hstKeypair);
   const me = provider.wallet.publicKey;
   const dao = daoKey(hntKeypair.publicKey)[0];
 
@@ -213,6 +212,18 @@ export async function run(args: any = process.argv) {
   let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
   if (multisig) {
     authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+    // Fund authority
+    const authAcc = await provider.connection.getAccountInfo(authority);
+    if (!authAcc || authAcc.lamports < LAMPORTS_PER_SOL) {
+      console.log("Funding multisig...")
+      await sendInstructions(provider, [
+        await SystemProgram.transfer({
+          fromPubkey: me,
+          toPubkey: authority,
+          lamports: LAMPORTS_PER_SOL,
+        }),
+      ]);
+    }
   }
 
   await createAndMint({
@@ -238,14 +249,6 @@ export async function run(args: any = process.argv) {
     metadataUrl: `${argv.bucket}/council.json`,
     to: councilWallet,
   });
-
-  await createAndMint({
-    provider,
-    mintKeypair: hstKeypair,
-    amount: argv.numHst,
-    metadataUrl: `${argv.bucket}/hst.json`,
-  });
-
 
   let instructions: TransactionInstruction[] = [];
   const govProgramVersion = await getGovernanceProgramVersion(
@@ -295,13 +298,14 @@ export async function run(args: any = process.argv) {
   if (!(await exists(conn, registrar))) {
     console.log("Initializing VSR Registrar");
     instructions.push(
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 800000 })
+    );
+    instructions.push(
       await heliumVsrProgram.methods
         .initializeRegistrarV0({
           positionUpdateAuthority: (await daoKey(hntKeypair.publicKey))[0],
         })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-        ])
+        .preInstructions([,])
         .accounts({
           realm,
           realmGoverningTokenMint: hntKeypair.publicKey,
@@ -408,11 +412,15 @@ export async function run(args: any = process.argv) {
     const hstEmission = await parseEmissionsSchedule(
       argv.hstEmissionSchedulePath
     );
-    const hntEmission = await parseEmissionsSchedule(
-      argv.emissionSchedulePath
-    );
+    const hntEmission = await parseEmissionsSchedule(argv.emissionSchedulePath);
     const currentHstEmission = hstEmission[0];
     const currentHntEmission = hntEmission[0];
+    const fanout = fanoutKey("HST")[0];
+    const hstPool = getAssociatedTokenAddressSync(
+      hntKeypair.publicKey,
+      fanout,
+      true
+    );
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         registrar: registrar,
@@ -422,16 +430,20 @@ export async function run(args: any = process.argv) {
         hstEmissionSchedule: [currentHstEmission],
         emissionSchedule: [currentHntEmission],
       })
+      .preInstructions([
+        createAssociatedTokenAccountIdempotentInstruction(
+          provider.wallet.publicKey,
+          hstPool,
+          fanout,
+          hntKeypair.publicKey
+        ),
+      ])
       .accounts({
         dcMint: dcKeypair.publicKey,
         hntMint: hntKeypair.publicKey,
         thread,
         // TODO: Create actual HST pool
-        hstPool: getAssociatedTokenAddressSync(
-          hntKeypair.publicKey,
-          fanoutKey("HST")[0],
-          true
-        ),
+        hstPool,
       })
       .rpc({ skipPreflight: true });
 
@@ -443,7 +455,7 @@ export async function run(args: any = process.argv) {
             authority,
             emissionSchedule: hntEmission,
             hstEmissionSchedule: hstEmission,
-            hstPool: null
+            hstPool: null,
           })
           .accounts({
             dao,

@@ -9,7 +9,8 @@ crate-type = ["cdylib", "lib"]
 name = "helium_sub_daos"
 
 [features]
-devnet = ["switchboard-v2/devnet"]
+devnet = []
+no-genesis = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []

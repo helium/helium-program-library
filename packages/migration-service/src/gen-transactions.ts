@@ -2,6 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
 import Address from "@helium/address";
+import AWS from "aws-sdk";
 import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
 import { mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
 import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
@@ -127,6 +128,9 @@ const yarg = yargs(hideBin(process.argv)).options({
   pgPort: {
     default: "5432",
   },
+  awsRegion: {
+    default: "us-east-1",
+  },
   fail: {
     describe: "Failed file",
     default: "./failures.json",
@@ -155,6 +159,11 @@ const yarg = yargs(hideBin(process.argv)).options({
     required: true,
     descibe:
       "The Payer of the transactions from the migration server, that way this can be included in the lut",
+  },
+  canopyKeypair: {
+    type: "string",
+    describe: "Optional keypair of the canopy",
+    default: "`../helium-admin-cli/keypairs/canopy.json`",
   },
 });
 
@@ -393,7 +402,7 @@ async function run() {
   }
 
   const hotspotIxs: EnrichedIxGroup[] = [];
-  const canopyPath = `../helium-admin-cli/keypairs/canopy.json`;
+  const canopyPath = argv.canopyKeypair;
   let canopy;
   if (fs.existsSync(canopyPath)) {
     canopy = loadKeypair(canopyPath);
@@ -763,15 +772,34 @@ async function run() {
     fs.writeFileSync(argv.fail, JSON.stringify(failed, null, 2));
   }
 
+  const isRds = argv.pgHost.includes("rds.amazonaws.com");
+  let password = argv.pgPassword;
+  if (isRds && !password) {
+    const signer = new AWS.RDS.Signer({
+      region: argv.awsRegion,
+      hostname: process.env.PGHOST,
+      port: Number(argv.pgPort),
+      username: process.env.PGUSER,
+    });
+    password = await new Promise((resolve, reject) =>
+      signer.getAuthToken({}, (err, token) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(token);
+      })
+    );
+  }
+
   const client = new Client({
     user: argv.pgUser,
-    password: argv.pgPassword,
+    password,
     host: argv.pgHost,
     database: argv.pgDatabase,
     port: Number(argv.pgPort),
-    // ssl: {
-    //   rejectUnauthorized: false,
-    // },
+    ssl: {
+      rejectUnauthorized: false,
+    },
   });
   await client.connect();
 

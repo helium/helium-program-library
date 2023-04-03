@@ -73,6 +73,27 @@
     superstruct "^0.15.4"
     toml "^3.0.0"
 
+"@coral-xyz/anchor@^0.27.0":
+  version "0.27.0"
+  resolved "https://registry.yarnpkg.com/@coral-xyz/anchor/-/anchor-0.27.0.tgz#621e5ef123d05811b97e49973b4ed7ede27c705c"
+  integrity sha512-+P/vPdORawvg3A9Wj02iquxb4T0C5m4P6aZBVYysKl4Amk+r6aMPZkUhilBkD6E4Nuxnoajv3CFykUfkGE0n5g==
+  dependencies:
+    "@coral-xyz/borsh" "^0.27.0"
+    "@solana/web3.js" "^1.68.0"
+    base64-js "^1.5.1"
+    bn.js "^5.1.2"
+    bs58 "^4.0.1"
+    buffer-layout "^1.2.2"
+    camelcase "^6.3.0"
+    cross-fetch "^3.1.5"
+    crypto-hash "^1.3.0"
+    eventemitter3 "^4.0.7"
+    js-sha256 "^0.9.0"
+    pako "^2.0.3"
+    snake-case "^3.0.4"
+    superstruct "^0.15.4"
+    toml "^3.0.0"
+
 "@coral-xyz/borsh@^0.2.6":
   version "0.2.6"
   resolved "https://registry.npmjs.org/@coral-xyz/borsh/-/borsh-0.2.6.tgz"
@@ -85,6 +106,14 @@
   version "0.26.0"
   resolved "https://registry.npmjs.org/@coral-xyz/borsh/-/borsh-0.26.0.tgz"
   integrity sha512-uCZ0xus0CszQPHYfWAqKS5swS1UxvePu83oOF+TWpUkedsNlg6p2p4azxZNSSqwXb9uXMFgxhuMBX9r3Xoi0vQ==
+  dependencies:
+    bn.js "^5.1.2"
+    buffer-layout "^1.2.0"
+
+"@coral-xyz/borsh@^0.27.0":
+  version "0.27.0"
+  resolved "https://registry.yarnpkg.com/@coral-xyz/borsh/-/borsh-0.27.0.tgz#700c647ea5262b1488957ac7fb4e8acf72c72b63"
+  integrity sha512-tJKzhLukghTWPLy+n8K8iJKgBq1yLT/AxaNd10yJrX8mI56ao5+OFAKAqW/h0i79KCvb4BK0VGO5ECmmolFz9A==
   dependencies:
     bn.js "^5.1.2"
     buffer-layout "^1.2.0"
@@ -2583,7 +2612,7 @@
   dependencies:
     tslib "^2.4.0"
 
-"@switchboard-xyz/common@^2.1.29", "@switchboard-xyz/common@^2.1.3", "@switchboard-xyz/common@^2.1.7":
+"@switchboard-xyz/common@^2.1.3":
   version "2.1.29"
   resolved "https://registry.npmjs.org/@switchboard-xyz/common/-/common-2.1.29.tgz"
   integrity sha512-FjyY6W4LjIQZF/sWBJ7Cmrv3t6q221XlOeVB60+RtFhFfakFGz3Nky/e7LYH2zZBbEPCAZRcFxOIrfHbo3pGWA==
@@ -2597,16 +2626,30 @@
     decimal.js "^10.4.3"
     protobufjs "^7.1.2"
 
-"@switchboard-xyz/solana.js@^2.0.7":
-  version "2.0.119"
-  resolved "https://registry.npmjs.org/@switchboard-xyz/solana.js/-/solana.js-2.0.119.tgz"
-  integrity sha512-JMw04kUJGrhcSO/oeCpqvQCfqtjd6MX35FXFvx6xJp1hmQt524ZZ3z1Eul9ZUNv7sjY3YFCuwLHKM4EA7cRKOg==
+"@switchboard-xyz/common@^2.1.33":
+  version "2.1.33"
+  resolved "https://registry.yarnpkg.com/@switchboard-xyz/common/-/common-2.1.33.tgz#4b75241ae4753ee3f0f2c72436e4d01da5586aca"
+  integrity sha512-cZ+OPxYdD4Z3qBWlhWWgemXQDQoNiPh6mgd2bcF8mIGvdlJ1WzE5rD7UqfpuBM8Sq9bHe9c2oNDzGRGuNUtG0w==
   dependencies:
-    "@project-serum/anchor" "^0.26.0"
-    "@project-serum/borsh" "^0.2.5"
+    "@solana/web3.js" "^1.66.2"
+    "@types/big.js" "^6.1.6"
+    "@types/bn.js" "^5.1.1"
+    big.js "^6.2.1"
+    bn.js "^5.2.1"
+    decimal.js "^10.4.3"
+    protobufjs "^7.1.2"
+    yaml "^2.2.1"
+
+"@switchboard-xyz/solana.js@^2.1.5":
+  version "2.1.5"
+  resolved "https://registry.yarnpkg.com/@switchboard-xyz/solana.js/-/solana.js-2.1.5.tgz#c5e0f7be6050da891a42b9d3193ae875d679f0e0"
+  integrity sha512-rnzUlgvkEKaAqTTK5DHE140n6tviXF7PLhcA/bhHD3DQj/Fh1+VZa/Im5AxWLqvMzy2+PQB1hbSOphQftSEWfA==
+  dependencies:
+    "@coral-xyz/anchor" "^0.27.0"
+    "@coral-xyz/borsh" "^0.27.0"
     "@solana/spl-token" "^0.3.6"
     "@solana/web3.js" "^1.73.0"
-    "@switchboard-xyz/common" "^2.1.29"
+    "@switchboard-xyz/common" "^2.1.33"
     dotenv "^16.0.3"
     lodash "^4.17.21"
 
@@ -10133,6 +10176,11 @@ yaml@^1.10.0:
   version "1.10.2"
   resolved "https://registry.npmjs.org/yaml/-/yaml-1.10.2.tgz"
   integrity sha512-r3vXyErRCYJ7wg28yvBY5VSoAF8ZvlcW9/BwUzEtUsjvX/DKs24dIkuwjtuprwJJHsbyUbLApepYTR1BN4uHrg==
+
+yaml@^2.2.1:
+  version "2.2.1"
+  resolved "https://registry.yarnpkg.com/yaml/-/yaml-2.2.1.tgz#3014bf0482dcd15147aa8e56109ce8632cd60ce4"
+  integrity sha512-e0WHiYql7+9wr4cWMx3TVQrNwejKaEe7/rHNmQmqRjazfOP5W8PB6Jpebb5o6fIapbz9o9+2ipcaTM2ZwDI6lw==
 
 yargs-parser@20.2.4:
   version "20.2.4"

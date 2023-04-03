@@ -1,14 +1,20 @@
 import * as anchor from "@coral-xyz/anchor";
 import {
   createAtaAndMintInstructions,
-  createMintInstructions, sendInstructions, toBN
+  createMintInstructions,
+  sendInstructions,
+  toBN,
 } from "@helium/spl-utils";
 import {
   createCreateMetadataAccountV3Instruction,
-  PROGRAM_ID as METADATA_PROGRAM_ID
+  PROGRAM_ID as METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
 import {
-  AccountMetaData, getGovernanceProgramVersion, getProposalTransactionAddress, getTokenOwnerRecordAddress, Governance,
+  AccountMetaData,
+  getGovernanceProgramVersion,
+  getProposalTransactionAddress,
+  getTokenOwnerRecordAddress,
+  Governance,
   GovernanceAccountParser,
   InstructionData,
   ProposalTransaction,
@@ -25,24 +31,34 @@ import {
   withRelinquishVote,
   withSignOffProposal,
   withWithdrawGoverningTokens,
-  YesNoVote
+  YesNoVote,
 } from "@solana/spl-governance";
 import {
   AuthorityType,
-  createSetAuthorityInstruction, getAssociatedTokenAddress
+  createSetAuthorityInstruction,
+  getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import {
-  AddressLookupTableProgram, Cluster, Commitment, ComputeBudgetProgram, Connection, Keypair,
-  PublicKey, Signer,
-  SYSVAR_CLOCK_PUBKEY, TransactionInstruction, TransactionMessage,
-  VersionedTransaction
+  AddressLookupTableProgram,
+  Cluster,
+  Commitment,
+  ComputeBudgetProgram,
+  Connection,
+  Keypair,
+  PublicKey,
+  Signer,
+  SYSVAR_CLOCK_PUBKEY,
+  TransactionInstruction,
+  TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import { OracleJob, sleep } from "@switchboard-xyz/common";
 import {
+  AggregatorAccount,
   AggregatorHistoryBuffer,
   QueueAccount,
-  SwitchboardProgram
+  SwitchboardProgram,
 } from "@switchboard-xyz/solana.js";
 import { BN } from "bn.js";
 import fs from "fs";
@@ -566,7 +582,7 @@ export async function createSwitchboardAggregator({
   wallet,
   crank,
   queue,
-  authority
+  authority,
 }: {
   authority: PublicKey;
   switchboardNetwork: string;
@@ -615,14 +631,13 @@ export async function createSwitchboardAggregator({
         },
       ],
     });
-    await agg.setAuthority({
-      newAuthority: authority,
-      authority: aggKeypair,
-    });
     console.log("Created active device aggregator", agg.publicKey.toBase58());
     await AggregatorHistoryBuffer.create(switchboard, {
       aggregatorAccount: agg,
       maxSamples: 24 * 31, // Give us a month of active device data. If we fail to run end epoch, RIP.
+    });
+    await agg.setAuthority({
+      newAuthority: authority,
     });
   }
 
@@ -660,7 +675,7 @@ export async function sendInstructionsOrSquads({
       payer,
       commitment,
       idlErrors
-    )
+    );
   }
 
   const signerSet = new Set(
@@ -670,14 +685,18 @@ export async function sendInstructionsOrSquads({
       )
       .flat()
   );
-  const signerKeys = Array.from(
-    signerSet
-  ).map((k) => new PublicKey(k));
+  const signerKeys = Array.from(signerSet).map((k) => new PublicKey(k));
 
-  const nonMissingSignerIxs = instructions.filter(ix => !ix.keys.some(k => k.isSigner && !k.pubkey.equals(provider.wallet.publicKey)));
-  const squadsSignatures = signerKeys.filter((k) =>
-    !k.equals(provider.wallet.publicKey) &&
-    !signers.some((s) => s.publicKey.equals(k))
+  const nonMissingSignerIxs = instructions.filter(
+    (ix) =>
+      !ix.keys.some(
+        (k) => k.isSigner && !k.pubkey.equals(provider.wallet.publicKey)
+      )
+  );
+  const squadsSignatures = signerKeys.filter(
+    (k) =>
+      !k.equals(provider.wallet.publicKey) &&
+      !signers.some((s) => s.publicKey.equals(k))
   );
 
   if (squadsSignatures.length == 0) {
@@ -703,8 +722,15 @@ export async function sendInstructionsOrSquads({
   await squads.activateTransaction(tx.publicKey);
   if (executeTransaction) {
     await squads.approveTransaction(tx.publicKey);
-    const ix = await squads.buildExecuteTransaction(tx.publicKey, provider.wallet.publicKey);
-    await sendInstructions(provider, [ix], signers);
+    const ix = await squads.buildExecuteTransaction(
+      tx.publicKey,
+      provider.wallet.publicKey
+    );
+    await sendInstructions(
+      provider,
+      [ComputeBudgetProgram.setComputeUnitLimit({ units: 800000 }), ix],
+      signers
+    );
   }
 }
 
@@ -724,8 +750,8 @@ export async function parseEmissionsSchedule(filepath: string) {
     if (!extra || !("startTime" in x)) throw new Error("json format incorrect");
     return {
       startUnixTime: new anchor.BN(Math.floor(Date.parse(x.startTime) / 1000)),
-      ...extra
-    }
+      ...extra,
+    };
   });
   return schedule;
 }
