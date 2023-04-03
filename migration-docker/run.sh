@@ -24,6 +24,7 @@ docker run -v $(pwd)/migration-docker/data:/data \
            -e SB_STATE=CyZuD7RPDcrqCGbNvLCyqk6Py9cEZTKmNKujfPi3ynDd \
            -p 8899:8899 \
            -p 1027:1027 \
+           -e GPG_PASSWORD=foo \
            -it \
            -m 8g \
            -c 2 \

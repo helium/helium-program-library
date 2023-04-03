@@ -12,7 +12,7 @@ aws s3 cp s3://$S3_BUCKET/export.json . --region $AWS_REGION --endpoint $S3_ENDP
 aws s3 cp s3://$S3_BUCKET/keypairs.tar.gz.asc . --region $AWS_REGION --endpoint $S3_ENDPOINT
 
 gpg --import $GPG_KEY
-gpg -o keypairs.tar.gz -d keypairs.tar.gz.asc
+gpg --passphrase $GPG_PASSWORD -o keypairs.tar.gz -d keypairs.tar.gz.asc 
 tar -xvf keypairs.tar.gz
 
 cp keypairs/$ADMIN_KEYPAIR ~/.config/solana/id.json

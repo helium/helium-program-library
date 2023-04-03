@@ -18,16 +18,16 @@ mv keypairs.tar.gz migration-docker/data/
 Then, use that container to encrypt all `keypairs` and generate a gpg key. This key will be output to ./migration-docker/data/migration.gpg
 
 ```
-./migration-docker/encrypt-keypairs.sh
+./migration-docker/run-encrypt-keypairs.sh <PASSWORD>
 ```
 
-Upload the encrypted keypairs to s3. Have migration.gpg as a sealed secret on the migration container.
+Upload the encrypted keypairs to s3. Have migration.gpg as a sealed secret on the migration container. As well as the password.
 
 Push the container, and make a pull request on k8s for the deploy.
 
 ## Migration Day
 
-Upload the export.json file to the s3 bucket. Merge the k8s PR. Watch the export go
+Upload the export.json, makers.json, and makers-mobile.json files to the s3 bucket. Merge the k8s PR. Watch the export go
 
 You must also populate the iot and mobile metadata databases. Port forward oracle db. Then:
 
