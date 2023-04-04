@@ -6,9 +6,27 @@ import { PublicKey } from '@solana/web3.js';
 import fastify from 'fastify';
 import { sequelize } from './model';
 import { findAccountKey, instructionParser } from './parser';
-import * as dotenv from 'dotenv';
-dotenv.config();
+import * as fs from 'fs';
 
+function loadSecret(): string | null {
+  const secretFilePath = process.env.HELIUS_AUTH_SECRET_FILE;
+  if (!secretFilePath) {
+    return null;
+  }
+
+  try {
+    const fileContent = fs.readFileSync(secretFilePath, 'utf8');
+    return fileContent;
+  } catch (err) {
+    console.error(`Error reading file: ${err}`);
+    return null;
+  }
+}
+
+const HELIUS_AUTH_SECRET = loadSecret();
+if (!HELIUS_AUTH_SECRET) {
+  throw new Error("Helius auth secret not available");
+}
 // sync the model with the database
 sequelize.sync()
   .then(() => {
@@ -21,14 +39,20 @@ sequelize.sync()
 const server = fastify();
 let hemProgram: Program<HeliumEntityManager>;
 
+server.get('/health', async (request, reply) => {
+  reply.send({
+    ok: true
+  })
+});
+
 server.post('/', async (request, reply) => {
-  if (request.headers.authorization != process.env.HELIUS_AUTH ) {
+  if (request.headers.authorization != HELIUS_AUTH_SECRET ) {
     reply.status(403).send({
       message: 'Invalid authorization'
     });
     return;
   }
-  let tx = request.body[0].transaction;
+  let tx = (request.body as any)[0].transaction;
   // testing code for localnet txs
   // let sig = request.body.sig;
   // let tx = (await hemProgram.provider.connection.getTransaction(sig, {commitment: 'finalized'}))!.transaction;
@@ -53,9 +77,9 @@ server.post('/', async (request, reply) => {
  
       const method = instructionParser[decoded.name];
       //@ts-ignore
-      const ixDaoKey = findAccountKey(hemProgram, tx, ix, decoded.name, "dao")
+      const ixDaoKey = findAccountKey(hemProgram, tx, ix, decoded.name, "dao")!;
       // ignore txs relating to other daos
-      if (!ixDaoKey.equals(daoKey(new PublicKey(process.env.HNT_MINT))[0])) {
+      if (!ixDaoKey.equals(daoKey(new PublicKey(process.env.HNT_MINT!))[0])) {
         continue;
       }
       //@ts-ignore
