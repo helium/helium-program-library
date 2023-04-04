@@ -73,6 +73,27 @@
     superstruct "^0.15.4"
     toml "^3.0.0"
 
+"@coral-xyz/anchor@^0.27.0":
+  version "0.27.0"
+  resolved "https://registry.yarnpkg.com/@coral-xyz/anchor/-/anchor-0.27.0.tgz#621e5ef123d05811b97e49973b4ed7ede27c705c"
+  integrity sha512-+P/vPdORawvg3A9Wj02iquxb4T0C5m4P6aZBVYysKl4Amk+r6aMPZkUhilBkD6E4Nuxnoajv3CFykUfkGE0n5g==
+  dependencies:
+    "@coral-xyz/borsh" "^0.27.0"
+    "@solana/web3.js" "^1.68.0"
+    base64-js "^1.5.1"
+    bn.js "^5.1.2"
+    bs58 "^4.0.1"
+    buffer-layout "^1.2.2"
+    camelcase "^6.3.0"
+    cross-fetch "^3.1.5"
+    crypto-hash "^1.3.0"
+    eventemitter3 "^4.0.7"
+    js-sha256 "^0.9.0"
+    pako "^2.0.3"
+    snake-case "^3.0.4"
+    superstruct "^0.15.4"
+    toml "^3.0.0"
+
 "@coral-xyz/borsh@^0.2.6":
   version "0.2.6"
   resolved "https://registry.npmjs.org/@coral-xyz/borsh/-/borsh-0.2.6.tgz"
@@ -85,6 +106,14 @@
   version "0.26.0"
   resolved "https://registry.npmjs.org/@coral-xyz/borsh/-/borsh-0.26.0.tgz"
   integrity sha512-uCZ0xus0CszQPHYfWAqKS5swS1UxvePu83oOF+TWpUkedsNlg6p2p4azxZNSSqwXb9uXMFgxhuMBX9r3Xoi0vQ==
+  dependencies:
+    bn.js "^5.1.2"
+    buffer-layout "^1.2.0"
+
+"@coral-xyz/borsh@^0.27.0":
+  version "0.27.0"
+  resolved "https://registry.yarnpkg.com/@coral-xyz/borsh/-/borsh-0.27.0.tgz#700c647ea5262b1488957ac7fb4e8acf72c72b63"
+  integrity sha512-tJKzhLukghTWPLy+n8K8iJKgBq1yLT/AxaNd10yJrX8mI56ao5+OFAKAqW/h0i79KCvb4BK0VGO5ECmmolFz9A==
   dependencies:
     bn.js "^5.1.2"
     buffer-layout "^1.2.0"
@@ -254,6 +283,18 @@
     js-sha256 "^0.9.0"
     multiformats "^9.6.4"
 
+"@helium/circuit-breaker-sdk@^0.0.48":
+  version "0.0.48"
+  resolved "https://registry.yarnpkg.com/@helium/circuit-breaker-sdk/-/circuit-breaker-sdk-0.0.48.tgz#8f5bba09c1fcda1196d00f7ee1be340034cc45df"
+  integrity sha512-stl2Ala8EOL9eOzqWsBhc00TmplwmiW30jzrmBe1oYjRMdszJL7UsCdG9xkgU1vgMXK5V3kuA/ikxkrZh0jWFQ==
+  dependencies:
+    "@coral-xyz/anchor" "^0.26.0"
+    "@helium/idls" "^0.0.48"
+    "@helium/spl-utils" "^0.0.48"
+    "@solana/spl-token" "^0.3.6"
+    bn.js "^5.2.0"
+    bs58 "^4.0.1"
+
 "@helium/crypto@^3.60.0":
   version "3.60.0"
   resolved "https://registry.yarnpkg.com/@helium/crypto/-/crypto-3.60.0.tgz#58be74745d0c7cc3198481dc69f5530393fc7287"
@@ -272,6 +313,34 @@
     create-hash "^1.2.0"
     libsodium-wrappers "^0.7.6"
 
+"@helium/data-credits-sdk@^0.0.48":
+  version "0.0.48"
+  resolved "https://registry.yarnpkg.com/@helium/data-credits-sdk/-/data-credits-sdk-0.0.48.tgz#e2973671604017102170f95264abd8b9c387ae78"
+  integrity sha512-PpmKYR8w2uOpRGfuL+Rdo12lAszKTLDVx3tHFn/8c74G0RLg/A+jSIVEYHUMkP8sOm6e6DKKfyS4NvpkdyVPEQ==
+  dependencies:
+    "@coral-xyz/anchor" "0.26.0"
+    "@helium/circuit-breaker-sdk" "^0.0.48"
+    "@helium/helium-sub-daos-sdk" "^0.0.48"
+    "@helium/idls" "^0.0.48"
+    "@helium/spl-utils" "^0.0.48"
+    "@solana/spl-token" "^0.3.6"
+    bn.js "^5.2.0"
+    bs58 "^4.0.1"
+    crypto-js "^4.1.1"
+
+"@helium/helium-sub-daos-sdk@^0.0.48":
+  version "0.0.48"
+  resolved "https://registry.yarnpkg.com/@helium/helium-sub-daos-sdk/-/helium-sub-daos-sdk-0.0.48.tgz#125d449eca92cbb327e6a5a0419672429cc7b47f"
+  integrity sha512-zm3xX+fpBwkVaYYJauciuDpFuLafxAxWpBVFHOCMuWzAv94Q++MAazn6Ec71VAHFeS1VnDwiRp0iPl0vEN4jwg==
+  dependencies:
+    "@coral-xyz/anchor" "0.26.0"
+    "@helium/circuit-breaker-sdk" "^0.0.48"
+    "@helium/spl-utils" "^0.0.48"
+    "@helium/treasury-management-sdk" "^0.0.48"
+    "@helium/voter-stake-registry-sdk" "^0.0.48"
+    bn.js "^5.2.0"
+    bs58 "^4.0.1"
+
 "@helium/idls@^0.0.40":
   version "0.0.40"
   resolved "https://registry.npmjs.org/@helium/idls/-/idls-0.0.40.tgz"
@@ -287,6 +356,17 @@
   version "0.0.43"
   resolved "https://registry.yarnpkg.com/@helium/idls/-/idls-0.0.43.tgz#de77dccd27411f6f2eed6daabb8b1ea1f600fe19"
   integrity sha512-E05u+qfF5esULoFyS/eHjnMTl9N5R54OR5PICt3S7z3A4mj/MN4AKDjs08MsZb9W81aRzWNaffKtRR/6Lm7/tA==
+  dependencies:
+    "@coral-xyz/anchor" "0.26.0"
+    "@solana/web3.js" "^1.43.4"
+    bn.js "^5.2.0"
+    borsh "^0.7.0"
+    bs58 "^4.0.1"
+
+"@helium/idls@^0.0.48":
+  version "0.0.48"
+  resolved "https://registry.yarnpkg.com/@helium/idls/-/idls-0.0.48.tgz#9f8ab90e613f89fe116da924b4ebef0401626ab1"
+  integrity sha512-QvRBVHoMNCiln/EawC7wm6ApoyM57+5eFDA/IJnCxN/1meQM7AzMrRKohMH/DHdLDyI7xfAp4POsBlKvujdM7w==
   dependencies:
     "@coral-xyz/anchor" "0.26.0"
     "@solana/web3.js" "^1.43.4"
@@ -314,6 +394,19 @@
     borsh "^0.7.0"
     bs58 "^5.0.0"
 
+"@helium/spl-utils@^0.0.48":
+  version "0.0.48"
+  resolved "https://registry.yarnpkg.com/@helium/spl-utils/-/spl-utils-0.0.48.tgz#350fa0e0865bdd29cb2d3108d8cb701bc33ce47a"
+  integrity sha512-tn3sHjNfcl/pe0sDNA7qhOIGw1+EctUF2fTOINxBPrk1nVAq2LNhwyMsmEngtjTqZmfpO/NM117/MwbLw1wqHA==
+  dependencies:
+    "@coral-xyz/anchor" "0.26.0"
+    "@helium/address" "^4.8.1"
+    "@solana/spl-token" "^0.3.6"
+    "@solana/web3.js" "^1.43.4"
+    bn.js "^5.2.0"
+    borsh "^0.7.0"
+    bs58 "^5.0.0"
+
 "@helium/transactions@^3.38.0":
   version "3.62.0"
   resolved "https://registry.yarnpkg.com/@helium/transactions/-/transactions-3.62.0.tgz#f201b3e502f65b0d0eb400d931064fc850246793"
@@ -324,6 +417,32 @@
     "@types/libsodium-wrappers" "^0.7.8"
     long "^4.0.0"
     path "^0.12.7"
+
+"@helium/treasury-management-sdk@^0.0.48":
+  version "0.0.48"
+  resolved "https://registry.yarnpkg.com/@helium/treasury-management-sdk/-/treasury-management-sdk-0.0.48.tgz#28f53deeb9e998bab83ea4193430ec08136ca606"
+  integrity sha512-/j6aj9Ah/Bm/BD64KTu7IFsiWUIurRh1NCntK/sn821K7twFAm4AvfKSybk74SKn1rFa6HZ5YdjTbTWMiaf6pA==
+  dependencies:
+    "@coral-xyz/anchor" "0.26.0"
+    "@helium/circuit-breaker-sdk" "^0.0.48"
+    "@helium/idls" "^0.0.48"
+    "@helium/spl-utils" "^0.0.48"
+    "@solana/spl-token" "^0.3.6"
+    bn.js "^5.2.0"
+    bs58 "^4.0.1"
+
+"@helium/voter-stake-registry-sdk@^0.0.48":
+  version "0.0.48"
+  resolved "https://registry.yarnpkg.com/@helium/voter-stake-registry-sdk/-/voter-stake-registry-sdk-0.0.48.tgz#444d2ae6922936729f6df2337a79bdb7130245e6"
+  integrity sha512-4amG2EzpbsPIdjtOLbB8ISToociLXzeJBz7x0jPD9gH1xZB4m6CP+34wn2UoUMZ8GRpiOFdsSEisJbaSEIMcOg==
+  dependencies:
+    "@coral-xyz/anchor" "0.26.0"
+    "@helium/idls" "^0.0.48"
+    "@helium/spl-utils" "^0.0.48"
+    "@metaplex-foundation/mpl-token-metadata" "^2.2.3"
+    "@solana/spl-token" "^0.3.6"
+    bn.js "^5.2.0"
+    bs58 "^4.0.1"
 
 "@hutson/parse-repository-url@^3.0.0":
   version "3.0.2"
@@ -2597,6 +2716,20 @@
     decimal.js "^10.4.3"
     protobufjs "^7.1.2"
 
+"@switchboard-xyz/common@^2.1.33":
+  version "2.1.33"
+  resolved "https://registry.yarnpkg.com/@switchboard-xyz/common/-/common-2.1.33.tgz#4b75241ae4753ee3f0f2c72436e4d01da5586aca"
+  integrity sha512-cZ+OPxYdD4Z3qBWlhWWgemXQDQoNiPh6mgd2bcF8mIGvdlJ1WzE5rD7UqfpuBM8Sq9bHe9c2oNDzGRGuNUtG0w==
+  dependencies:
+    "@solana/web3.js" "^1.66.2"
+    "@types/big.js" "^6.1.6"
+    "@types/bn.js" "^5.1.1"
+    big.js "^6.2.1"
+    bn.js "^5.2.1"
+    decimal.js "^10.4.3"
+    protobufjs "^7.1.2"
+    yaml "^2.2.1"
+
 "@switchboard-xyz/solana.js@^2.0.7":
   version "2.0.119"
   resolved "https://registry.npmjs.org/@switchboard-xyz/solana.js/-/solana.js-2.0.119.tgz"
@@ -2607,6 +2740,19 @@
     "@solana/spl-token" "^0.3.6"
     "@solana/web3.js" "^1.73.0"
     "@switchboard-xyz/common" "^2.1.29"
+    dotenv "^16.0.3"
+    lodash "^4.17.21"
+
+"@switchboard-xyz/solana.js@^2.1.4":
+  version "2.1.4"
+  resolved "https://registry.yarnpkg.com/@switchboard-xyz/solana.js/-/solana.js-2.1.4.tgz#b8cc9c18d8ee7717908b767ead71a92bca7de5b8"
+  integrity sha512-IlV1PuAUWIJaGcrAnwffZQ5W5dUkZmIulNJL+3y+/0p/f4rIcialD2Ka7KqTiQbJQr0XYAQMELv0I8Px8oZLNg==
+  dependencies:
+    "@coral-xyz/anchor" "^0.27.0"
+    "@coral-xyz/borsh" "^0.27.0"
+    "@solana/spl-token" "^0.3.6"
+    "@solana/web3.js" "^1.73.0"
+    "@switchboard-xyz/common" "^2.1.33"
     dotenv "^16.0.3"
     lodash "^4.17.21"
 
@@ -10133,6 +10279,11 @@ yaml@^1.10.0:
   version "1.10.2"
   resolved "https://registry.npmjs.org/yaml/-/yaml-1.10.2.tgz"
   integrity sha512-r3vXyErRCYJ7wg28yvBY5VSoAF8ZvlcW9/BwUzEtUsjvX/DKs24dIkuwjtuprwJJHsbyUbLApepYTR1BN4uHrg==
+
+yaml@^2.2.1:
+  version "2.2.1"
+  resolved "https://registry.yarnpkg.com/yaml/-/yaml-2.2.1.tgz#3014bf0482dcd15147aa8e56109ce8632cd60ce4"
+  integrity sha512-e0WHiYql7+9wr4cWMx3TVQrNwejKaEe7/rHNmQmqRjazfOP5W8PB6Jpebb5o6fIapbz9o9+2ipcaTM2ZwDI6lw==
 
 yargs-parser@20.2.4:
   version "20.2.4"
