@@ -368,7 +368,7 @@ export async function run(args: any = process.argv) {
       realm,
       provider.wallet.publicKey,
       authority,
-      SetRealmAuthorityAction.SetChecked
+      SetRealmAuthorityAction.SetUnchecked
     );
   }
   await sendInstructions(provider, instructions, []);

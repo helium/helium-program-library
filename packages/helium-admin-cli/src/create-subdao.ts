@@ -294,7 +294,8 @@ export async function run(args: any = process.argv) {
     govProgramId
   )[0];
   console.log("Realm, ", realm.toBase58());
-  if (!(await exists(conn, realm))) {
+  const isFreshRealm = !(await exists(conn, realm));
+  if (isFreshRealm) {
     console.log("Initializing Realm");
     await withCreateRealm(
       instructions,
@@ -387,7 +388,7 @@ export async function run(args: any = process.argv) {
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
-  if (!authority.equals(me)) {
+  if (isFreshRealm && !authority.equals(me)) {
     withSetRealmAuthority(
       instructions,
       govProgramId,
@@ -442,7 +443,7 @@ export async function run(args: any = process.argv) {
     });
 
     console.log(`Initializing ${name} SubDAO`);
-    const currentHntEmission = emissionSchedule[0];
+    const currentDntEmission = emissionSchedule[0];
 
     const initSubdaoMethod = await heliumSubDaosProgram.methods
       .initializeSubDaoV0({
@@ -450,19 +451,13 @@ export async function run(args: any = process.argv) {
         dcBurnAuthority: new PublicKey(argv.dcBurnAuthority),
         authority,
         // Tx to large to do here, do it with update
-        emissionSchedule: [currentHntEmission],
+        emissionSchedule: [currentDntEmission],
         // Linear curve
         treasuryCurve: {
           exponentialCurveV0: {
             k: toU128(0),
           },
         } as any,
-        // 20% in a day
-        treasuryWindowConfig: {
-          windowSizeSeconds: new anchor.BN(24 * 60 * 60),
-          thresholdType: ThresholdType.Percent as never,
-          threshold: thresholdPercent(20),
-        },
         onboardingDcFee: toBN(4000000, 0), // $40 in dc
         delegatorRewardsPercent: delegatorRewardsPercent(
           argv.delegatorRewardsPercent
@@ -478,11 +473,50 @@ export async function run(args: any = process.argv) {
         dntMintAuthority: daoAcc.authority,
         subDaoFreezeAuthority: daoAcc.authority,
         authority: daoAcc.authority,
-      })
-      .preInstructions([
+      });
+
+    await sendInstructionsOrSquads({
+      provider,
+      instructions: [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-      ]);
-    await initSubdaoMethod.rpc({ skipPreflight: true });
+        await initSubdaoMethod.instruction(),
+      ],
+      executeTransaction: true,
+      squads,
+      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
+      authorityIndex: argv.authorityIndex,
+      signers: [],
+    });
+
+    await sendInstructions(provider, [
+      SystemProgram.transfer({
+        fromPubkey: me,
+        toPubkey: authority,
+        lamports: LAMPORTS_PER_SOL * 2,
+      }),
+    ]);
+
+    // Reset thread
+    await sendInstructionsOrSquads({
+      provider,
+      instructions: [
+        
+        await heliumSubDaosProgram.methods
+          .resetSubDaoThreadV0()
+          .accounts({
+            subDao: subDaoKey(subdaoKeypair.publicKey)[0],
+            authority,
+            threadPayer: authority,
+          })
+          .instruction(),
+      ],
+      executeTransaction: true,
+      squads,
+      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
+      authorityIndex: argv.authorityIndex,
+      signers: [],
+    });
+
     const { subDao } = await initSubdaoMethod.pubkeys();
     await sendInstructionsOrSquads({
       provider,

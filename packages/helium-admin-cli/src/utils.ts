@@ -715,7 +715,7 @@ export async function sendInstructionsOrSquads({
   }
 
   const tx = await squads.createTransaction(multisig, authorityIndex);
-  for (const ix of instructions) {
+  for (const ix of instructions.filter(ix => !ix.programId.equals(ComputeBudgetProgram.programId))) {
     await squads.addInstruction(tx.publicKey, ix);
   }
 
