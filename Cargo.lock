@@ -1805,6 +1805,7 @@ dependencies = [
  "mpl-token-metadata 1.8.3",
  "rust_decimal",
  "shared-utils",
+ "solana-program",
  "spl-governance-tools",
  "switchboard-v2",
  "time 0.3.17",

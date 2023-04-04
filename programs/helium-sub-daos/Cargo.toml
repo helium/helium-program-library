@@ -28,7 +28,7 @@ shared-utils = { path = "../shared-utils" }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }
 clockwork-sdk = { git = "https://github.com/clockwork-xyz/clockwork", branch = "main", version="2.0.1" }
-
+solana-program = "1.14.10"
 time = "0.3.17"
 switchboard-v2 = { version = "0.1.17" }
 spl-governance-tools = "0.1.3"
