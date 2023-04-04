@@ -26,7 +26,7 @@ docker run -v $(pwd)/migration-docker/data:/data \
            -p 1027:1027 \
            -e GPG_PASSWORD=foo \
            -it \
-           -m 8g \
+           -m 18g \
            -c 2 \
            --rm \
            --name migration \

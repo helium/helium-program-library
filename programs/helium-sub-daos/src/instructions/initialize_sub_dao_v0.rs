@@ -1,4 +1,4 @@
-use crate::{next_epoch_ts};
+use crate::next_epoch_ts;
 use crate::{state::*, EPOCH_LENGTH};
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
@@ -19,9 +19,12 @@ use shared_utils::resize_to_fit;
 use switchboard_v2::AggregatorAccountData;
 use time::OffsetDateTime;
 use treasury_management::{
+  circuit_breaker::{
+    ThresholdType as TMThresholdType,
+    WindowedCircuitBreakerConfigV0 as TMWindowedCircuitBreakerConfigV0,
+  },
   cpi::{accounts::InitializeTreasuryManagementV0, initialize_treasury_management_v0},
   Curve as TreasuryCurve, InitializeTreasuryManagementArgsV0, TreasuryManagement,
-  circuit_breaker::{WindowedCircuitBreakerConfigV0 as TMWindowedCircuitBreakerConfigV0, ThresholdType as TMThresholdType},
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -211,7 +214,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
         window_size_seconds: u64::try_from(24 * 60 * 60).unwrap(),
         threshold_type: TMThresholdType::Percent,
         threshold: u64::MAX.checked_div(5_u64).unwrap(), // 20%
-      }
+      },
     },
   )?;
 

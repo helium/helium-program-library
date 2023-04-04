@@ -777,9 +777,9 @@ async function run() {
   if (isRds && !password) {
     const signer = new AWS.RDS.Signer({
       region: argv.awsRegion,
-      hostname: process.env.PGHOST,
+      hostname: argv.pgHost,
       port: Number(argv.pgPort),
-      username: process.env.PGUSER,
+      username: argv.pgUser,
     });
     password = await new Promise((resolve, reject) =>
       signer.getAuthToken({}, (err, token) => {
@@ -797,9 +797,9 @@ async function run() {
     host: argv.pgHost,
     database: argv.pgDatabase,
     port: Number(argv.pgPort),
-    ssl: {
+    ssl: isRds ? {
       rejectUnauthorized: false,
-    },
+    } : false,
   });
   await client.connect();
 
