@@ -32,6 +32,6 @@ Upload the export.json, makers.json, and makers-mobile.json files to the s3 buck
 You must also populate the iot and mobile metadata databases. Port forward oracle db. Then:
 
 ```
-$: cd ../helius-service
+$: cd ../hotspot-data-sink
 $: env ANCHOR_WALLET=/path/to/.config/solana/id.json yarn run seed-db -f ../migration-service/export.json
 ```

@@ -1,4 +1,4 @@
-import { Program } from '@project-serum/anchor';
+import { Program } from '@coral-xyz/anchor';
 import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
 import { PublicKey } from '@solana/web3.js';
 import { Entity, IotMetadata, MobileMetadata } from './model';
@@ -9,36 +9,36 @@ type Parser = {
 
 export function findAccountKey(program: Program<HeliumEntityManager>, tx: any, ix: any, ixName: string, accName: string): PublicKey | null {
   const idlIx = program.idl.instructions.find(
-    (x) => x.name === ixName
+    (x: any) => x.name === ixName
   )!;
   const accIdx = idlIx.accounts.findIndex(
-    (x) => x.name === accName
+    (x: any) => x.name === accName
   )!;
   return tx.message.accountKeys[ix.accounts[accIdx]];
 }
 
 async function getAssetIdFromInfo(program: Program<HeliumEntityManager>, tx: any, ix: any, ixName: string): Promise<PublicKey | null> {
   const idlIx = program.idl.instructions.find(
-    (x) => x.name === ixName
+    (x: any) => x.name === ixName
   )!;
   const infoIdx = idlIx.accounts.findIndex(
-    (x) => x.name === "info" || x.name === "iotInfo" || x.name === "mobileInfo"
+    (x: any) => x.name === "info" || x.name === "iotInfo" || x.name === "mobileInfo"
   )!;
   let infoKey = tx.message.accountKeys[ix.accounts[infoIdx]];
   let infoName = idlIx.accounts[infoIdx].name;
-  let info;
+  let info: any;
   if (infoName === "iotInfo" || infoName === "info") {
     info = await program.account.iotHotspotInfoV0.fetch(infoKey);
   } else if (infoName === "mobileInfo") {
     info = await program.account.mobileHotspotInfoV0.fetch(infoKey);
   }
-  return info.asset;
+  return info!.asset;
 }
 
 async function getKeysFromKeyToAsset(program: Program<HeliumEntityManager>, tx: any, ix: any, ixName: string): Promise<[PublicKey, string]> {
   let keyToAssetKey = findAccountKey(program, tx, ix, ixName, "keyToAsset")!;
   let keyToAsset = await program.account.keyToAssetV0.fetch(keyToAssetKey);
-  return [keyToAsset.asset, keyToAsset.entityKey.toString()];
+  return [keyToAsset.asset, (keyToAsset.entityKey as Buffer).toString()];
 }
 
 export const instructionParser: Record<string, Parser>  = {
@@ -72,7 +72,7 @@ export const instructionParser: Record<string, Parser>  = {
       await Entity.upsert({
         hotspotKey,
         assetId: assetId.toString(),
-        maker: makerKey.toString(),
+        maker: makerKey!.toString(),
       });
 
       await IotMetadata.upsert({
@@ -84,7 +84,7 @@ export const instructionParser: Record<string, Parser>  = {
       });
 
       const idlIx = program.idl.instructions.find(
-        (x) => x.name === "genesisIssueHotspotV0"
+        (x: any) => x.name === "genesisIssueHotspotV0"
       )!;
       // iot hotspot is also a mobile hotspot if there's remaining accounts
       const isMobile = ix.accounts.length() > idlIx.accounts.length
@@ -104,7 +104,7 @@ export const instructionParser: Record<string, Parser>  = {
       await Entity.create({
         assetId: assetId.toString(),
         hotspotKey,
-        maker: makerKey.toString(),
+        maker: makerKey!.toString(),
       })
     }
   },
@@ -113,7 +113,7 @@ export const instructionParser: Record<string, Parser>  = {
       const assetId = await getAssetIdFromInfo(program, tx, ix, "updateIotInfoV0");
       const record = await Entity.findOne({
         where: {
-          assetId: assetId.toString(),
+          assetId: assetId!.toString(),
         }
       });
       await IotMetadata.update({
@@ -121,7 +121,7 @@ export const instructionParser: Record<string, Parser>  = {
         ...(args.elevation && {elevation: args.elevation}),
         ...(args.gain && {gain: args.gain}),
       }, {
-        where: {hotspotKey: record.getDataValue("hotspotKey")}
+        where: {hotspotKey: record!.getDataValue("hotspotKey")}
       });
     }
   },
@@ -130,14 +130,14 @@ export const instructionParser: Record<string, Parser>  = {
       const assetId = await getAssetIdFromInfo(program, tx, ix, "updateIotInfoV0");
       const record = await Entity.findOne({
         where: {
-          assetId: assetId.toString(),
+          assetId: assetId!.toString(),
         }
       });
       
       await MobileMetadata.update({
         ...(args.location && {location: args.location.toString()}),
       }, {
-        where: {hotspotKey: record.getDataValue("hotspotKey")}
+        where: {hotspotKey: record!.getDataValue("hotspotKey")}
       });
     }
   }

@@ -2640,6 +2640,19 @@
     protobufjs "^7.1.2"
     yaml "^2.2.1"
 
+"@switchboard-xyz/solana.js@^2.1.4":
+  version "2.1.6"
+  resolved "https://registry.yarnpkg.com/@switchboard-xyz/solana.js/-/solana.js-2.1.6.tgz#298a0cb1dfa593b3766d95afbd28fd2e35d00647"
+  integrity sha512-mu8Uj/gOLJ06ScWdSJ5/2XZKHvYDvCq2kp6mSXyCyeq7kybNQIFX9ZGRb13zj4r+6DQIvTQfifbKPb0pN65xig==
+  dependencies:
+    "@coral-xyz/anchor" "^0.27.0"
+    "@coral-xyz/borsh" "^0.27.0"
+    "@solana/spl-token" "^0.3.6"
+    "@solana/web3.js" "^1.73.0"
+    "@switchboard-xyz/common" "^2.1.33"
+    dotenv "^16.0.3"
+    lodash "^4.17.21"
+
 "@switchboard-xyz/solana.js@^2.1.5":
   version "2.1.5"
   resolved "https://registry.yarnpkg.com/@switchboard-xyz/solana.js/-/solana.js-2.1.5.tgz#c5e0f7be6050da891a42b9d3193ae875d679f0e0"

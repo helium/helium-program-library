@@ -60,6 +60,9 @@
     },
     {
       "path": "./packages/hotspot-utils"
+    },
+    {
+      "path": "./packages/hotspot-data-sink"
     }
   ]
 }
