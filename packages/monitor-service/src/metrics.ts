@@ -17,7 +17,7 @@ register.registerMetric(supplyGauge);
 
 export const balanceGauge = new client.Gauge({
   name: "solana_account_balance",
-  help: "Balance of this token account",
+  help: "Balance of this account",
   labelNames: ["name"],
 });
 register.registerMetric(balanceGauge);
