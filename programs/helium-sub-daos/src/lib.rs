@@ -101,9 +101,7 @@ pub mod helium_sub_daos {
     reset_sub_dao_thread_v0::handler(ctx)
   }
 
-  pub fn repair_genesis_end_epoch_info_v0(
-    ctx: Context<RepairGenesisEndEpochInfoV0>
-  ) -> Result<()> {
+  pub fn repair_genesis_end_epoch_info_v0(ctx: Context<RepairGenesisEndEpochInfoV0>) -> Result<()> {
     repair_genesis_end_epoch_info_v0::handler(ctx)
   }
 }
