@@ -1,6 +1,7 @@
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
 import { init, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
+import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
 import { distributeCompressionRewards, initializeCompressionRecipient, recipientKey } from "@helium/lazy-distributor-sdk";
 import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
@@ -9,6 +10,12 @@ import {
   Transaction, TransactionInstruction
 } from "@solana/web3.js";
 import axios from "axios";
+import { HNT_MINT } from "@helium/spl-utils";
+import { daoKey } from "@helium/helium-sub-daos-sdk";
+import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
+
+const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
+const DAO = daoKey(HNT)[0];
 
 export type Reward = {
   currentRewards: string;
@@ -109,10 +116,12 @@ export async function getPendingRewards(
 
 
 export async function formTransaction({
-  program,
+  lazyDistributorProgram,
+  rewardsOracleProgram,
   provider,
   rewards,
   hotspot,
+  entityKey,
   lazyDistributor,
   wallet = provider.wallet.publicKey,
   skipOracleSign = false,
@@ -120,10 +129,12 @@ export async function formTransaction({
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
 }: {
-  program: Program<LazyDistributor>;
+  lazyDistributorProgram: Program<LazyDistributor>;
+  rewardsOracleProgram: Program<RewardsOracle>;
   provider: AnchorProvider;
   rewards: Reward[];
   hotspot: PublicKey;
+  entityKey: string;
   lazyDistributor: PublicKey;
   wallet?: PublicKey;
   assetEndpoint?: string;
@@ -141,7 +152,7 @@ export async function formTransaction({
   }
 
   const recipient = recipientKey(lazyDistributor, hotspot)[0];
-  const lazyDistributorAcc = (await program.account.lazyDistributorV0.fetch(
+  const lazyDistributorAcc = (await lazyDistributorProgram.account.lazyDistributorV0.fetch(
     lazyDistributor
   ))!;
   const rewardsMint = lazyDistributorAcc.rewardsMint!;
@@ -159,7 +170,7 @@ export async function formTransaction({
     if (asset.compression.compressed) {
       initRecipientIx = await(
         await initializeCompressionRecipient({
-          program,
+          program: lazyDistributorProgram,
           assetId: hotspot,
           lazyDistributor,
           assetEndpoint,
@@ -169,7 +180,7 @@ export async function formTransaction({
         })
       ).instruction();
     } else {
-      initRecipientIx = await program.methods
+      initRecipientIx = await lazyDistributorProgram.methods
         .initializeRecipientV0()
         .accounts({
           lazyDistributor,
@@ -181,16 +192,18 @@ export async function formTransaction({
     tx.add(initRecipientIx);
   }
 
+  const keyToAsset = keyToAssetKey(DAO, entityKey)[0]
   const ixPromises = rewards.map((x, idx) => {
-    return program.methods
-      .setCurrentRewardsV0({
+    return rewardsOracleProgram.methods
+      .setCurrentRewardsWrapperV0({
+        entityKey: Buffer.from(bs58.decode(entityKey)),
         currentRewards: new BN(x.currentRewards),
         oracleIndex: idx,
       })
       .accounts({
         lazyDistributor,
         recipient,
-        oracle: x.oracleKey,
+        keyToAsset,
       })
       .instruction();
   });
@@ -206,7 +219,7 @@ export async function formTransaction({
   if (asset.compression.compressed) {
     const distributeIx = await(
       await distributeCompressionRewards({
-        program,
+        program: lazyDistributorProgram,
         assetId: hotspot,
         lazyDistributor,
         getAssetFn: () => Promise.resolve(asset), // cache result so we don't hit again
@@ -216,7 +229,7 @@ export async function formTransaction({
     ).instruction();
     tx.add(distributeIx);
   } else {
-    const distributeIx = await program.methods
+    const distributeIx = await lazyDistributorProgram.methods
       .distributeRewardsV0()
       .accounts({
         // @ts-ignore

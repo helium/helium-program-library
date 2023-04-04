@@ -2,6 +2,7 @@ import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
 import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
+import { heliumCommonResolver } from "@helium/spl-utils";
 
 export * from "./constants";
 export * from "./pdas";
@@ -20,6 +21,9 @@ export async function init(
     programId,
     provider,
     undefined,
+    () => {
+      return heliumCommonResolver;
+    }
   ) as Program<RewardsOracle>;
 
   return program;

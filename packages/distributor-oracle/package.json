@@ -38,6 +38,7 @@
     "@fastify/cors": "^8.1.1",
     "@helium/address": "^4.6.2",
     "@helium/helium-entity-manager-sdk": "^0.0.47",
+    "@helium/rewards-oracle-sdk": "^0.0.47",
     "@helium/helium-sub-daos-sdk": "^0.0.47",
     "@helium/idls": "^0.0.47",
     "@helium/lazy-distributor-sdk": "^0.0.47",

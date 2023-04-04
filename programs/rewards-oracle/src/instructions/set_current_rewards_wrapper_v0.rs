@@ -17,7 +17,8 @@ pub struct SetCurrentRewardsWrapperArgsV0 {
 #[instruction(args: SetCurrentRewardsWrapperArgsV0)]
 pub struct SetCurrentRewardsWrapperV0<'info> {
   #[account(mut)]
-  pub payer: Signer<'info>,
+  // the oracle EOA that gets wrapped
+  pub oracle: Signer<'info>,
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
   #[account(
     mut,
@@ -33,7 +34,7 @@ pub struct SetCurrentRewardsWrapperV0<'info> {
 
   /// CHECK: checked in cpi
   #[account(
-    seeds = ["oracle_signer".as_bytes(), payer.key().as_ref()],
+    seeds = ["oracle_signer".as_bytes(), oracle.key().as_ref()],
     bump
   )]
   pub oracle_signer: AccountInfo<'info>,
@@ -46,7 +47,7 @@ pub fn handler(
   args: SetCurrentRewardsWrapperArgsV0,
 ) -> Result<()> {
   let cpi_accounts = SetCurrentRewardsV0 {
-    payer: ctx.accounts.payer.to_account_info(),
+    payer: ctx.accounts.oracle.to_account_info(),
     lazy_distributor: ctx.accounts.lazy_distributor.to_account_info(),
     recipient: ctx.accounts.recipient.to_account_info(),
     oracle: ctx.accounts.oracle_signer.to_account_info(),
@@ -55,7 +56,7 @@ pub fn handler(
 
   let signer_seeds: &[&[&[u8]]] = &[&[
     "oracle_signer".as_bytes(),
-    ctx.accounts.payer.to_account_info().key.as_ref(),
+    ctx.accounts.oracle.to_account_info().key.as_ref(),
     &[*ctx.bumps.get("oracle_signer").unwrap()],
   ]];
   set_current_rewards_v0(

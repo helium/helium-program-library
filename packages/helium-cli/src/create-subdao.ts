@@ -15,6 +15,7 @@ import {
   init as initLazy,
   lazyDistributorKey,
 } from "@helium/lazy-distributor-sdk";
+import { oracleSigner } from "@helium/rewards-oracle-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";
 import {
@@ -414,7 +415,7 @@ async function run() {
         authority: daoAcc.authority,
         oracles: [
           {
-            oracle: oracleKey,
+            oracle: oracleSigner(oracleKey)[0],
             url: rewardsOracleUrl,
           },
         ],

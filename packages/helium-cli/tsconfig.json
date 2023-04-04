@@ -32,6 +32,9 @@
       "path": "../price-oracle-sdk"
     },
     {
+      "path": "../rewards-oracle-sdk"
+    },
+    {
       "path": "./tsconfig.cjs.json"
     },
     {
