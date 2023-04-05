@@ -25,45 +25,9 @@ pub fn handler(ctx: Context<RepairGenesisEndEpochInfoV0>) -> Result<()> {
     .genesis_end_sub_dao_epoch_info
     .try_borrow_mut_data()?;
   let data_vec = &data.to_vec();
-  let new_size = data_vec.len() + 8;
-  let new_minimum_balance = Rent::get()?.minimum_balance(new_size);
-  let lamports_diff = new_minimum_balance.saturating_sub(
-    ctx
-      .accounts
-      .genesis_end_sub_dao_epoch_info
-      .to_account_info()
-      .lamports(),
-  );
-
-  msg!("Resizing to {} with lamports {}", new_size, lamports_diff);
-  invoke(
-    &system_instruction::transfer(
-      &ctx.accounts.payer.key(),
-      &ctx.accounts.genesis_end_sub_dao_epoch_info.key(),
-      lamports_diff,
-    ),
-    &[
-      ctx.accounts.payer.to_account_info().clone(),
-      ctx
-        .accounts
-        .genesis_end_sub_dao_epoch_info
-        .to_account_info()
-        .clone(),
-      ctx.accounts.system_program.to_account_info().clone(),
-    ],
-  )?;
-
-  ctx
-    .accounts
-    .genesis_end_sub_dao_epoch_info
-    .to_account_info()
-    .realloc(new_size, false)?;
+  
   data[0..8].copy_from_slice(&SubDaoEpochInfoV0::discriminator()[..]);
-  data[8..(data_vec.len() + 8)].copy_from_slice(data_vec);
-  ctx
-    .accounts
-    .genesis_end_sub_dao_epoch_info
-    .exit(&crate::id())?;
+  data[8..(data_vec.len() - 60 + 8)].copy_from_slice(&data_vec[0..(data_vec.len() - 60)]);
 
   Ok(())
 }
