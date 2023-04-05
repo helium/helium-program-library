@@ -41,6 +41,7 @@ pushd packages/helium-admin-cli && yarn link && popd
 TOTAL_HNT=$(helium-admin sum-tokens --token hnt --state export.json --decimals 8)
 TOTAL_MOBILE=$(helium-admin sum-tokens --token mobile --state export.json --decimals 8)
 TOTAL_IOT=$(helium-admin sum-tokens --token iot --state export.json --decimals 6)
+TOTAL_DC=$(helium-admin sum-tokens --token dc --state export.json --decimals 0)
 
 helium-admin create-price-oracle -u $SOLANA_URL \
                                  --wallet $ANCHOR_WALLET \
@@ -72,7 +73,7 @@ helium-admin create-dao -u $SOLANA_URL \
                         --wallet $ANCHOR_WALLET \
                         --numHnt $TOTAL_HNT  \
                         --numHst 200000000  \
-                        --numDc 0  \
+                        --numDc $TOTAL_DC  \
                         --oracleKeypair keypairs/oracle.json \
                         --merkleKeypair keypairs/merkle.json \
                         --realmName "Helium" \
