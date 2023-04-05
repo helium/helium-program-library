@@ -178,7 +178,7 @@ pub fn caclulate_vhnt_info(
   position: &PositionV0,
   voting_mint_config: &VotingMintConfigV0,
 ) -> Result<VehntInfo> {
-  let vehnt_at_curr_ts = position.voting_power(voting_mint_config, curr_ts)?;
+  let vehnt_at_curr_ts = &position.voting_power(voting_mint_config, curr_ts)?;
 
   let has_genesis = position.genesis_end >= curr_ts;
   let seconds_to_genesis = if has_genesis {
