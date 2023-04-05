@@ -111,6 +111,12 @@ export const heliumEntityManagerResolvers = combineResolvers(
     }
   }),
   ataResolver({
+    instruction: "issueIotOperationsFundV0",
+    account: "recipientAccount",
+    owner: "recipient",
+    mint: "mint"
+  }),
+  ataResolver({
     instruction: "issueEntityV0",
     account: "recipientTokenAccount",
     mint: "hotspot",
