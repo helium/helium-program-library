@@ -94,7 +94,7 @@ helium-admin create-subdao -u $SOLANA_URL \
                            --oracleKeypair keypairs/oracle.json \
                            --wallet $ANCHOR_WALLET \
                            --multisig $MULTISIG \
-                           --rewardsOracleUrl https://iot-oracle.oracle.helium.io \
+                           --rewardsOracleUrl https://iot-rewards.oracle.helium.io \
                            --activeDeviceOracleUrl https://iot-rewards.oracle.helium.io/active-devices  \
                            -n IOT \
                            --hntPubkey $(solana address -k keypairs/hnt.json) \
@@ -117,7 +117,7 @@ helium-admin create-subdao -u $SOLANA_URL \
                            --oracleKeypair keypairs/oracle.json \
                            --aggregatorKeypair keypairs/aggregator-MOBILE.json \
                            --multisig $MULTISIG \
-                           --rewardsOracleUrl https://mobile-oracle.oracle.helium.io \
+                           --rewardsOracleUrl https://mobile-rewards.oracle.helium.io \
                            --activeDeviceOracleUrl https://mobile-rewards.oracle.helium.io/active-devices  \
                            -n MOBILE \
                            --hntPubkey $(solana address -k keypairs/hnt.json) \

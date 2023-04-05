@@ -875,6 +875,10 @@ async function run() {
   }
 
   console.log("Compiling merkle tree");
+  if (global.gc) {
+    console.log("garbage collecting");
+    global.gc();
+  }
   let binaryTxs = (
     await client.query(
       `SELECT compiled, signers FROM transactions ORDER BY id ASC`,
@@ -895,7 +899,7 @@ async function run() {
   state = null;
   accounts = null;
   if (global.gc) {
-    console.log("garbage collecting")
+    console.log("garbage collecting");
     global.gc();
   }
 
