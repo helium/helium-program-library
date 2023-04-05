@@ -464,7 +464,7 @@ async function run() {
   let ix = 0;
   let txIdx = 0;
 
-  const routers = new Set(Object.keys(state.routers));
+  let routers = new Set(Object.keys(state.routers));
 
   let missingMakers = 0;
 
@@ -860,6 +860,12 @@ async function run() {
     await insertTransactions(lazySigner, client, accountIxs);
   }
 
+  routers = null; // clear memory
+  if (global.gc) {
+    console.log("garbage collecting");
+    global.gc();
+  }
+
   if (argv.progress) {
     progress.stop();
   }
@@ -869,7 +875,7 @@ async function run() {
   }
 
   console.log("Compiling merkle tree");
-  const binaryTxs = (
+  let binaryTxs = (
     await client.query(
       `SELECT compiled, signers FROM transactions ORDER BY id ASC`,
       []
@@ -881,19 +887,24 @@ async function run() {
     compiled.signerSeeds = signers;
     return toLeaf(compiled);
   });
+  binaryTxs = null; // clear memory
   let merkleTree = new MerkleTree(txs);
-  const proofIndices = txs.map((_, index) => index);
+  let proofIndices = txs.map((_, index) => index);
   txs = null; // Clear memory
   hotspots = null;
   state = null;
   accounts = null;
+  if (global.gc) {
+    console.log("garbage collecting")
+    global.gc();
+  }
 
   const canopyDepth = Math.min(17, merkleTree.depth - 1);
   console.log(
     `Merkle tree depth: ${merkleTree.depth - 1}, canopy depth: ${canopyDepth}`
   );
 
-  const chunkSize = 500;
+  const chunkSize = 2000;
   const parallelism = 4;
   await Promise.all(
     chunks(chunks(proofIndices, chunkSize), parallelism).map(async (chunk) => {
@@ -929,14 +940,18 @@ async function run() {
     })
   );
 
+  proofIndices = null;
+
   console.log("inserting canopy");
-  let canopyRows = getCanopy({
+  let canopyNodes = getCanopy({
     merkleTree,
     cacheDepth: canopyDepth,
-  }).map((canopy, index) => [index, canopy.node]);
+  });
+  let canopyRows = canopyNodes.map((canopy, index) => [index, canopy.node]);
 
   const root = merkleTree.getRoot().toJSON().data;
   const maxDepth = merkleTree.depth - 1;
+  merkleTree = null;
 
   await Promise.all(
     chunks(chunks(canopyRows, chunkSize), parallelism).map(async (chunk) => {
@@ -1113,7 +1128,7 @@ async function run() {
   await fillCanopy({
     program: lazyTransactionsProgram,
     lazyTransactions: ltKey,
-    merkleTree,
+    canopy: canopyNodes,
     cacheDepth: canopyDepth,
     showProgress: argv.progress,
   });

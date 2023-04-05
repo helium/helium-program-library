@@ -216,19 +216,23 @@ export async function fillCanopy({
   program,
   lazyTransactions,
   merkleTree,
+  canopy,
   cacheDepth,
   showProgress = false,
 }: {
   program: Program<LazyTransactions>;
   lazyTransactions: PublicKey;
-  merkleTree: MerkleTree;
+  merkleTree?: MerkleTree;
+  canopy?: TreeNode[];
   cacheDepth: number;
   showProgress?: boolean;
 }): Promise<void> {
-  const canopy = getCanopy({
-    merkleTree,
-    cacheDepth
-  })
+  if (!canopy) {
+    canopy = getCanopy({
+      merkleTree,
+      cacheDepth,
+    });
+  }
 
   // Write 30 leaves at a time
   const lazyTransactionsAcc = await program.account.lazyTransactionsV0.fetch(
@@ -271,8 +275,9 @@ export async function fillCanopy({
   await bulkSendTransactions(
     program.provider,
     txs,
-    ({ totalProgress }) => progress && progress.update(totalProgress * chunkSize)
-  )
+    ({ totalProgress }) =>
+      progress && progress.update(totalProgress * chunkSize)
+  );
 }
 
 export type LazyTransaction = {
