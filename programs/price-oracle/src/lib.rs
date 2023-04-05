@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("porcSnvH9pvcYPmQ65Y8qcZSRxQBiBBQX7UV5nmBegy");
 
 pub mod error;
 pub mod instructions;
@@ -20,6 +20,13 @@ pub mod price_oracle {
     args: InitializePriceOracleArgsV0,
   ) -> Result<()> {
     initialize_price_oracle_v0::handler(ctx, args)
+  }
+
+  pub fn update_price_oracle_v0(
+    ctx: Context<UpdatePriceOracleV0>,
+    args: UpdatePriceOracleArgsV0,
+  ) -> Result<()> {
+    update_price_oracle_v0::handler(ctx, args)
   }
 
   pub fn submit_price_v0(ctx: Context<SubmitPriceV0>, args: SubmitPriceArgsV0) -> Result<()> {

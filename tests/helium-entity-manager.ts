@@ -211,7 +211,7 @@ describe("helium-entity-manager", () => {
       metadata = {
         name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
         symbol: "HOTSPOT",
-        uri: `https://entities.nft.test-helium.com/${ecc}`,
+        uri: `https://entities.nft.helium.io/${ecc}`,
         collection: {
           key: hotspotCollection,
           verified: true,
@@ -497,7 +497,7 @@ describe("helium-entity-manager", () => {
       metadata = {
         name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
         symbol: "HOTSPOT",
-        uri: `https://entities.nft.test-helium.com/${ecc}`,
+        uri: `https://entities.nft.helium.io/${ecc}`,
         collection: {
           key: hotspotCollection,
           verified: true,

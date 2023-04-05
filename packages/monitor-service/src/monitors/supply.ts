@@ -11,7 +11,7 @@ import { watch } from "./watch";
 
 export function monitorSupply(mint: PublicKey, label: string) {
   watch(mint, (acc) => {
-    const mint = MintLayout.decode(acc.data);
+    const mint = MintLayout.decode(acc!.data);
     supplyGauge.set(
       { name: label },
       toNumber(new BN(mint.supply.toString()), mint.decimals)

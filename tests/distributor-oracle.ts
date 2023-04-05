@@ -197,7 +197,7 @@ describe("distributor-oracle", () => {
   let dataHash: Buffer;
   let creatorHash: Buffer;
   const uri =
-    "https://mobile-metadata.test-helium.com/13CGbZcFcAXkDqvACAKdWRdt5gdMEz8mbZC8nc4HGqZozyFYxSP";
+    "https://mobile-metadata.helium.io/13CGbZcFcAXkDqvACAKdWRdt5gdMEz8mbZC8nc4HGqZozyFYxSP";
   const getAssetFn = async () =>
     ({
       compression: { compressed: true, tree: merkle.publicKey, leafId: 0, dataHash, creatorHash },
