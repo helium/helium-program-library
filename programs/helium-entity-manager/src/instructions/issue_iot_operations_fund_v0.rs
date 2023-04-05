@@ -2,7 +2,9 @@ use crate::{dao_seeds, state::*};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::metadata::{create_master_edition_v3, CreateMetadataAccountsV3, CreateMasterEditionV3};
+use anchor_spl::metadata::{
+  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
+};
 use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount};
 use helium_sub_daos::DaoV0;
 use mpl_token_metadata::state::{Creator, DataV2};
@@ -92,9 +94,7 @@ impl<'info> IssueIotOperationsFundV0<'info> {
   }
 }
 
-pub fn handler(
-  ctx: Context<IssueIotOperationsFundV0>
-) -> Result<()> {
+pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
   let asset_id = ctx.accounts.mint.key();
   token::mint_to(
     ctx
