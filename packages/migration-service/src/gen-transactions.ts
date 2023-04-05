@@ -396,14 +396,14 @@ async function run() {
   let state = JSON.parse(fs.readFileSync(argv.state).toString());
   let accounts = state.accounts as Record<string, any>;
   let hotspots = Object.entries(state.hotspots) as [string, any][];
-  let validators = state.validators;
+  let validators = Object.values(state.validators);
 
-  const totalIot = new BN("5_000_000_000_000_000"); // 5bn
+  const totalIot = new BN("5000000000000000"); // 5bn
   const totalIotHotspots = totalIot.div(new BN(2));
   const totalIotValidators = totalIot.div(new BN(2));
 
   const eligibleValidators = validators.filter(
-    (validator) =>
+    (validator: any) =>
       Number(validator.last_heartbeat) >
         Number(argv.validatorHeartbeatThreshold) && validator.status == "staked"
   );
@@ -419,7 +419,7 @@ async function run() {
   );
 
   // Set iot premine for validators
-  eligibleValidators.map((v) => {
+  eligibleValidators.map((v: any) => {
     accounts[v.owner] ||= {
       hnt: "0",
       dc: "0",
@@ -605,7 +605,7 @@ async function run() {
       totalBalances.sol = totalBalances.sol
         .add(new BN(iotInfoRent))
         .add(new BN(keyToAssetRent));
-      const makerId = hotspot.maker || helAddr.b58; // Default (fallthrough) maker
+      const makerId = !hotspot.maker || hotspot.maker == "None" ? helAddr.b58 : hotspot.maker; // Default (fallthrough) maker
 
       if (!hotspot.maker) {
         missingMakers++;
