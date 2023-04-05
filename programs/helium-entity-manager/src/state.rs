@@ -105,3 +105,15 @@ pub const MOBILE_HOTSPOT_INFO_SIZE: usize = 8 +
     1 + // is full hotspot
     2 + // num location assers
     60; // pad
+
+
+#[macro_export]
+macro_rules! dao_seeds {
+  ( $dao:expr ) => {
+    &[
+      b"dao".as_ref(),
+      $dao.hnt_mint.as_ref(),
+      &[$dao.bump_seed],
+    ]
+  };
+}
