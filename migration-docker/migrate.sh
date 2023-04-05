@@ -40,7 +40,7 @@ pushd packages/helium-admin-cli && yarn link && popd
 
 TOTAL_HNT=$(helium-admin sum-tokens --token hnt --state export.json --decimals 8)
 TOTAL_MOBILE=$(helium-admin sum-tokens --token mobile --state export.json --decimals 8)
-TOTAL_IOT=$(helium-admin sum-tokens --token iot --state export.json --decimals 6)
+TOTAL_IOT=5000000000 # 5 billion premine
 TOTAL_DC=$(helium-admin sum-tokens --token dc --state export.json --decimals 0)
 
 helium-admin create-price-oracle -u $SOLANA_URL \

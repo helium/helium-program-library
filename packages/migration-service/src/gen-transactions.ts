@@ -137,6 +137,11 @@ const yarg = yargs(hideBin(process.argv)).options({
     describe: "Failed file",
     default: "./failures.json",
   },
+  validatorHeartbeatThreshold: {
+    type: "number",
+    required: true,
+    describe: "Last block height validator must have been seen",
+  },
   state: {
     type: "string",
     alias: "s",
@@ -391,24 +396,75 @@ async function run() {
   let state = JSON.parse(fs.readFileSync(argv.state).toString());
   let accounts = state.accounts as Record<string, any>;
   let hotspots = Object.entries(state.hotspots) as [string, any][];
+  let validators = state.validators;
+
+  const totalIot = new BN("5_000_000_000_000_000"); // 5bn
+  const totalIotHotspots = totalIot.div(new BN(2));
+  const totalIotValidators = totalIot.div(new BN(2));
+
+  const eligibleValidators = validators.filter(
+    (validator) =>
+      Number(validator.last_heartbeat) >
+        Number(argv.validatorHeartbeatThreshold) && validator.status == "staked"
+  );
+  const eligibleHotspots = hotspots.filter(
+    ([_, hotspot]) => hotspot.rewarded && !hotspot.on_denylist
+  );
+
+  const totalIotPerValidator = totalIotValidators.div(
+    new BN(eligibleValidators.length)
+  );
+  const totalIotPerHotspot = totalIotHotspots.div(
+    new BN(eligibleHotspots.length)
+  );
+
+  // Set iot premine for validators
+  eligibleValidators.map((v) => {
+    accounts[v.owner] ||= {
+      hnt: "0",
+      dc: "0",
+      mobile: "0",
+      iot: "0",
+      staked_hnt: "0",
+    };
+    accounts[v.owner].iot = new BN(accounts[v.owner].iot)
+      .add(totalIotPerValidator)
+      .toString();
+  });
+  // Set iot premine for hotspots
+  eligibleHotspots.map(([_, v]) => {
+    accounts[v.owner] ||= {
+      hnt: "0",
+      dc: "0",
+      mobile: "0",
+      iot: "0",
+      staked_hnt: "0",
+    };
+    accounts[v.owner].iot = new BN(accounts[v.owner].iot)
+      .add(totalIotPerHotspot)
+      .toString();
+  });
 
   // Keep track of balances so we can send that balance to the lazy signer
   const totalBalances = {
     hnt: new BN(0),
     stakedHnt: new BN(0),
     mobile: new BN(0),
+    iot: new BN(0),
     dc: new BN(0),
     sol: new BN(0),
   };
   // Keep track of unresolved balances so we can reserve them for later;
   const unresolvedBalances = {
     hnt: new BN(0),
+    iot: new BN(0),
     stakedHnt: new BN(0),
     mobile: new BN(0),
     dc: new BN(0),
   };
   // Keep track of router burned balances
   const routerBalances = {
+    iot: new BN(0),
     hnt: new BN(0),
     stakedHnt: new BN(0),
     mobile: new BN(0),
@@ -687,6 +743,9 @@ async function run() {
         routerBalances.mobile = routerBalances.mobile.add(
           new BN(account.mobile)
         );
+        routerBalances.iot = routerBalances.iot.add(
+          new BN(account.iot)
+        );
         routerBalances.stakedHnt = routerBalances.stakedHnt.add(
           new BN(account.staked_hnt)
         );
@@ -721,6 +780,7 @@ async function run() {
         // Helium uses 8 decimals, we use 6
         const digitShift = new BN(100);
         const mobileBal = new BN(account.mobile).div(digitShift);
+        const iotBal = new BN(account.iot);
         const zero = new BN(0);
         if (hntBal.gt(zero)) {
           totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
@@ -747,6 +807,17 @@ async function run() {
           );
           tokenIxs.push(instruction);
           tokenIxs.push(createTransfer(mobile, ata, lazySigner, mobileBal));
+        }
+        if (iotBal.gt(zero)) {
+          totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
+          totalBalances.iot = totalBalances.iot.add(iotBal);
+          const { instruction, ata } = createAta(
+            iot,
+            solAddress,
+            lazySigner
+          );
+          tokenIxs.push(instruction);
+          tokenIxs.push(createTransfer(mobile, ata, lazySigner, iotBal));
         }
 
         /// Dust with 100 txns of sol
@@ -846,6 +917,9 @@ async function run() {
         unresolvedBalances.dc = unresolvedBalances.dc.add(new BN(account.dc));
         unresolvedBalances.mobile = unresolvedBalances.mobile.add(
           new BN(account.mobile)
+        );
+        unresolvedBalances.iot = unresolvedBalances.iot.add(
+          new BN(account.iot)
         );
         unresolvedBalances.stakedHnt = unresolvedBalances.stakedHnt.add(
           new BN(account.staked_hnt)
@@ -1067,6 +1141,7 @@ async function run() {
     STAKED HNT: ${totalBalances.stakedHnt.toString()}
     DC: ${totalBalances.dc.toString()}
     MOBILE: ${totalBalances.mobile.toString()}
+    IOT: ${totalBalances.iot.toString()}
     SOL: ${totalBalances.sol
       .add(new BN(PER_TX * totalTx * LAMPORTS_PER_SOL))
       .toString()}
@@ -1078,12 +1153,14 @@ async function run() {
     DC: ${unresolvedBalances.dc.toString()}
     STAKED HNT: ${unresolvedBalances.stakedHnt.toString()}
     MOBILE: ${unresolvedBalances.mobile.toString()}
+    IOT: ${unresolvedBalances.iot.toString()}
     MAKERS: ${missingMakers}
   `);
   console.log(`Router:
     HNT: ${routerBalances.hnt.toString()}
     STAKED HNT: ${routerBalances.stakedHnt.toString()}
     MOBILE: ${routerBalances.mobile.toString()}
+    IOT: ${routerBalances.iot.toString()}
   `);
 
   console.log("Loading up lazy signer with hnt, dc, mobile...");
@@ -1124,6 +1201,18 @@ async function run() {
       getAssociatedTokenAddressSync(mobile, lazySigner, true),
       me,
       BigInt(totalBalances.mobile.toString())
+    ),
+    await createAssociatedTokenAccountIdempotentInstruction(
+      me,
+      getAssociatedTokenAddressSync(iot, lazySigner, true),
+      lazySigner,
+      iot
+    ),
+    await createTransferInstruction(
+      getAssociatedTokenAddressSync(iot, me),
+      getAssociatedTokenAddressSync(iot, lazySigner, true),
+      me,
+      BigInt(totalBalances.iot.toString())
     ),
   ];
   await sendInstructions(provider, transfers);

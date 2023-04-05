@@ -251,8 +251,9 @@ server.get<{
   try {
     const results = (
       await client.query(
-        `SELECT * FROM transactions
+        `SELECT transactions.*, transaction_proofs.proof FROM transactions
         JOIN wallet_transactions ON transactions.id = wallet_transactions.txid
+        JOIN transaction_proofs ON transactions.id = transaction_proofs.id
         WHERE wallet_transactions.wallet = $1
         LIMIT $2
         OFFSET $3
@@ -294,8 +295,9 @@ server.get<{
   try {
     const results = (
       await client.query(
-        `SELECT * FROM transactions
+        `SELECT transactions.*, transaction_proofs.proof FROM transactions
         JOIN hotspot_transactions ON transactions.id = hotspot_transactions.txid
+        JOIN transaction_proofs ON transactions.id = transaction_proofs.id
         WHERE hotspot_transactions.hotspot = $1
         LIMIT $2
         OFFSET $3
@@ -336,7 +338,13 @@ server.get<{
   try {
     const results = (
       await client.query(
-        "SELECT * FROM transactions ORDER BY is_router DESC, ID ASC LIMIT $1 OFFSET $2",
+        `SELECT transactions.*, transaction_proofs.proof
+        FROM transactions 
+        JOIN transaction_proofs ON transactions.id = transaction_proofs.id
+        ORDER BY is_router DESC, ID ASC 
+        LIMIT $1 
+        OFFSET $2
+        `,
         [limit || 200, offset || 0]
       )
     ).rows;
