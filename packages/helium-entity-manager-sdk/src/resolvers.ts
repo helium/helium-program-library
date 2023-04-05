@@ -48,7 +48,7 @@ export const heliumEntityManagerResolvers = combineResolvers(
       accounts.dao
     ) {
       return (
-        await keyToAssetKey(accounts.dao as PublicKey, "iot_operations_fund")
+        await keyToAssetKey(accounts.dao as PublicKey, Buffer.from("iot_operations_fund", "utf8"))
       )[0];
     }
   }),
