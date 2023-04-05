@@ -29,7 +29,7 @@ export const heliumEntityManagerResolvers = combineResolvers(
       return new PublicKey("eccSAJM3tq7nQSpQTm8roxv4FPoipCkMsGizW2KBhqZ");
     }
   }),
-  resolveIndividual(async ({ instruction, path, args, accounts }) => {
+  resolveIndividual(async ({ idlIx, path, args, accounts }) => {
     if (
       path[path.length - 1] === "keyToAsset" &&
       args[args.length - 1] &&
@@ -44,7 +44,7 @@ export const heliumEntityManagerResolvers = combineResolvers(
       )[0];
     } else if (
       path[path.length - 1] === "keyToAsset" &&
-      instruction === "issueIotOperationsFundV0" &&
+      idlIx.name === "issueIotOperationsFundV0" &&
       accounts.dao
     ) {
       return (
