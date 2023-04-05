@@ -115,7 +115,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   // don't allow unstake without claiming available rewards
   // unless we're testing, in which case we don't care
   let curr_epoch = current_epoch(curr_ts);
-  // assert!((ctx.accounts.delegated_position.last_claimed_epoch >= curr_epoch - 1) || TESTING);
+  assert!((ctx.accounts.delegated_position.last_claimed_epoch >= curr_epoch - 1) || TESTING);
 
   let delegated_position = &mut ctx.accounts.delegated_position;
   let sub_dao = &mut ctx.accounts.sub_dao;
