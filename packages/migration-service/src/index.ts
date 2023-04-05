@@ -23,7 +23,7 @@ import { Pool } from "pg";
 import { LAZY_TRANSACTIONS_NAME } from "./env";
 import { getMigrateTransactions } from "./ledger";
 import { provider, wallet } from "./solana";
-import { decompress } from "./utils";
+import { decompress, decompressSigners } from "./utils";
 
 const host = process.env.PGHOST || "localhost";
 const isRds = host.includes("rds.amazonaws.com");
@@ -147,27 +147,8 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
           const hasRun = blocksExist[idx];
           const compiledTx = decompress(compiled);
           const block = blockKey(lazyTransactions, id)[0];
-          let signers: Buffer[][] = [];
-
-          let offset = 0;
-          let currSigner = 0;
-          while (offset < signersRaw.length) {
-            let curr = signersRaw.subarray(offset, signersRaw.length);
-            const length = curr.readUInt8();
-            console.log(length);
-            signers[currSigner] = [];
-
-            offset += 1; // Account for the readUint we're about to do
-            for (let i = 0; i < length; i++) {
-              curr = signersRaw.subarray(offset, signersRaw.length);
-              let length = curr.readUInt8();
-              offset += 1;
-              offset += length;
-              signers[currSigner].push(curr.subarray(1, 1 + length));
-            }
-
-            currSigner += 1;
-          }
+          const signers = decompressSigners(signersRaw);
+          
 
           if (!hasRun && compiledTx.instructions.length > 0) {
             const ix = await program.methods

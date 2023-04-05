@@ -19,6 +19,7 @@ import * as Collections from "typescript-collections";
 
 export * from "./pdas";
 export * from "./constants";
+export { MerkleTree };
 
 type CompiledInstruction = IdlTypes<LazyTransactions>["CompiledInstruction"];
 
@@ -286,6 +287,20 @@ export function compile(
   merkleTree: MerkleTree;
   compiledTransactions: CompiledTransaction[];
 } {
+  const compiledTransactions = compileNoMerkle(lazySigner, transactions, programId)
+  const merkleTree = new MerkleTree(compiledTransactions.map(toLeaf));
+
+  return {
+    compiledTransactions,
+    merkleTree,
+  };
+}
+
+export function compileNoMerkle(
+  lazySigner: PublicKey,
+  transactions: LazyTransaction[],
+  programId: PublicKey = PROGRAM_ID
+): CompiledTransaction[] {
   const compiledTransactions = transactions.map((tx, index) => {
     const mapToNonSigners = tx.signerSeeds.map((seeds) => {
       return PublicKey.createProgramAddressSync(seeds, programId);
@@ -302,10 +317,6 @@ export function compile(
       index,
     };
   });
-  const merkleTree = new MerkleTree(compiledTransactions.map(toLeaf));
 
-  return {
-    compiledTransactions,
-    merkleTree,
-  };
+  return compiledTransactions
 }

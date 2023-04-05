@@ -150,7 +150,7 @@ helium-admin create-maker -u $SOLANA_URL \
                           --merkleBasePath keypairs \
                           --executeTransaction
 
-node --max_old_space_size=20000 packages/migration-service/lib/cjs/gen-transactions.js \
+node --max_old_space_size=7500 packages/migration-service/lib/cjs/gen-transactions.js \
                                 --wallet $ANCHOR_WALLET \
                                 --state export.json \
                                 --mobile $(solana address -k keypairs/mobile.json) \

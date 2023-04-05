@@ -514,8 +514,9 @@ export async function bulkSendTransactions(
 
       triesRemaining--;
       if (triesRemaining <= 0) {
+        console.error(txsWithSigs)
         throw new Error(
-          `Failed to submit all txs after blockhashes expired`
+          `Failed to submit all txs after blockhashes expired, ${signedTxs.length - confirmedTxs.length} remain`
         );
       }
     }

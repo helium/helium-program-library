@@ -23,6 +23,7 @@ docker run -v $(pwd)/migration-docker/data:/data \
            -e ORACLE_BUF=dBuf3CaQVKQftGPs6B2emKfAGewtGSTKUYqbv5sqf8h \
            -e SB_STATE=CyZuD7RPDcrqCGbNvLCyqk6Py9cEZTKmNKujfPi3ynDd \
            -p 8899:8899 \
+           -p 8900:8900 \
            -p 1027:1027 \
            -e GPG_PASSWORD=foo \
            -it \
