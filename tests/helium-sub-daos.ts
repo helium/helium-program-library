@@ -411,7 +411,7 @@ describe("helium-sub-daos", () => {
           expectBnAccuracy(
             toBN(expectedVeHnt, 8).mul(new BN("1000000000000")),
             sdAcc.vehntDelegated,
-            0.01
+            0.000000001
           );
           expectBnAccuracy(lockupAmount, acc.hntAmount, 0.01);
         });
