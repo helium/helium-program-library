@@ -38,7 +38,9 @@ anchor deploy --provider.cluster $SOLANA_URL
 
 pushd packages/helium-admin-cli && yarn link && popd
 
-TOTAL_HNT=$(helium-admin sum-tokens --token hnt --state export.json --decimals 8)
+TOTAL_STAKED_HNT=$(helium-admin sum-tokens --token staked_hnt --state export.json --decimals 8)
+TOTAL_UNSTAKED_HNT=$(helium-admin sum-tokens --token hnt --state export.json --decimals 8)
+TOTAL_HNT=$(echo "$TOTAL_STAKED_HNT + $TOTAL_UNSTAKED_HNT" | bc)
 TOTAL_MOBILE=$(helium-admin sum-tokens --token mobile --state export.json --decimals 8)
 TOTAL_IOT=5000000000 # 5 billion premine
 TOTAL_DC=$(helium-admin sum-tokens --token dc --state export.json --decimals 0)

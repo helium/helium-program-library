@@ -22,7 +22,7 @@ FROM node:16
 WORKDIR /app
 
 # Install rust
-RUN apt-get update && apt-get install -y pkg-config build-essential libudev-dev libssl-dev
+RUN apt-get update && apt-get install -y pkg-config build-essential libudev-dev libssl-dev bc
 ENV CARGO_HOME=/app/.cargo
 ENV RUSTUP_HOME=/app
 RUN curl https://sh.rustup.rs -sSf | \
