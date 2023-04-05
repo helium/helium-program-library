@@ -159,6 +159,7 @@ node --expose-gc --max_old_space_size=15000 packages/migration-service/lib/cjs/g
                                 --dc $(solana address -k keypairs/dc.json) \
                                 --iot $(solana address -k keypairs/iot.json) \
                                 --hst $(solana address -k keypairs/hst.json) \
+                                --validatorHeartbeatThreshold $VALIDATOR_HEARTBEAT_THRESHOLD \
                                 -n $LAZY_NAME \
                                 -u $SOLANA_URL \
                                 --payer $(solana address) \
