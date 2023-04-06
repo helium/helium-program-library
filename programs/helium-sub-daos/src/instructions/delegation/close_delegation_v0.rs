@@ -121,7 +121,6 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   let sub_dao = &mut ctx.accounts.sub_dao;
 
   ctx.accounts.sub_dao_epoch_info.epoch = current_epoch(curr_ts);
-
   update_subdao_vehnt(sub_dao, &mut ctx.accounts.sub_dao_epoch_info, curr_ts)?;
 
   // Update the ending epochs with this new info
@@ -205,20 +204,20 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   }
   // Unless the position was staked before this epoch, remove it.
   if current_epoch(delegated_position.start_ts) < curr_epoch {
-    let vehnt_at_start = position.voting_power(
+    let vehnt_last_calculated = position.voting_power(
       voting_mint_config,
-      ctx.accounts.sub_dao_epoch_info.start_ts(),
+      sub_dao.vehnt_last_calculated_ts,
     )?;
     msg!(
       "Removing {} vehnt from this epoch for this subdao, which currently has {} vehnt",
-      vehnt_at_start,
+      vehnt_last_calculated,
       ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start
     );
     ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start = ctx
       .accounts
       .sub_dao_epoch_info
       .vehnt_at_epoch_start
-      .checked_sub(vehnt_at_start)
+      .checked_sub(vehnt_last_calculated)
       .unwrap();
   }
 
