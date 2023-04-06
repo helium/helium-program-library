@@ -1362,9 +1362,11 @@ async function insertTransactions(
 
   const flatTransactions = packTransactions(ixs);
   const compiledTransactions = compileNoMerkle(lazySigner, flatTransactions);
+  
   const rows = compiledTransactions.map((compiledTransaction, index) => {
+    compiledTransaction.index = currId + compiledTransaction.index;
     return [
-      currId + compiledTransaction.index,
+      compiledTransaction.index,
       compress(compiledTransaction),
 
       // Compress seeds as [len, bytes]
