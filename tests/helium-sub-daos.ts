@@ -46,6 +46,7 @@ import {
 import { getUnixTimestamp } from "./utils/solana";
 import { createPosition, initVsr } from "./utils/vsr";
 import { expectBnAccuracy } from "./utils/expectBnAccuracy";
+import { option } from "@coral-xyz/borsh";
 
 chai.use(chaiAsPromised);
 
@@ -352,20 +353,42 @@ describe("helium-sub-daos", () => {
         name: "Case 1",
         options: {
           delay: 1000,
-          lockupPeriods: 183,
+          lockupPeriods: 365,
           lockupAmount: 100,
           expectedMultiplier:
-            Math.min((SECS_PER_DAY * 183) / MAX_LOCKUP, 1) * SCALE,
+            Math.min((SECS_PER_DAY * 365) / MAX_LOCKUP, 1) * SCALE,
         },
       },
       {
         name: "Case 2",
         options: {
           delay: 15000,
-          lockupPeriods: 183 * 4,
+          lockupPeriods: 365 * 2,
           lockupAmount: 50,
           expectedMultiplier:
-            Math.min((SECS_PER_DAY * 183 * 4) / MAX_LOCKUP, 1) * SCALE,
+            Math.min((SECS_PER_DAY * 365 * 2) / MAX_LOCKUP, 1) * SCALE,
+        },
+      },
+      {
+        name: "Case 3 (Cliff 100 4 years)",
+        options: {
+          delay: 15000,
+          lockupPeriods: 365 * 4,
+          lockupAmount: 100,
+          kind: { cliff: {} },
+          expectedMultiplier:
+            Math.min((SECS_PER_DAY * 365 * 4) / MAX_LOCKUP, 1) * SCALE,
+        },
+      },
+      {
+        name: "Case 4 (Constant 100 4 years)",
+        options: {
+          delay: 0,
+          lockupPeriods: 365 * 4,
+          lockupAmount: 100,
+          kind: { constant: {} },
+          expectedMultiplier:
+            Math.min((SECS_PER_DAY * 365 * 4) / MAX_LOCKUP, 1) * SCALE,
         },
       },
     ];
@@ -411,7 +434,7 @@ describe("helium-sub-daos", () => {
           expectBnAccuracy(
             toBN(expectedVeHnt, 8).mul(new BN("1000000000000")),
             sdAcc.vehntDelegated,
-            0.000000001
+            options.kind?.constant !== undefined ? 0 : 0.0000001
           );
           expectBnAccuracy(lockupAmount, acc.hntAmount, 0.01);
         });
@@ -620,7 +643,7 @@ describe("helium-sub-daos", () => {
             );
           });
 
-          describe("with existing delegated vehnt", () => {
+          describe("with multiple delegated vehnt", () => {
             let basePosition: PublicKey;
             let basePositionOptions = {
               lockupPeriods: 365 * 4,
@@ -649,6 +672,21 @@ describe("helium-sub-daos", () => {
                 })
                 .signers([positionAuthorityKp])
                 .rpc({ skipPreflight: true });
+            });
+
+            it("delegates proper vehnt amount", async () => {
+              const sdAcc = await program.account.subDaoV0.fetch(subDao);
+
+              const expectedVehnt =
+                options.lockupAmount * options.expectedMultiplier +
+                basePositionOptions.lockupAmount *
+                  basePositionOptions.expectedMultiplier;
+
+              expectBnAccuracy(
+                toBN(expectedVehnt, 8).mul(new BN("1000000000000")),
+                sdAcc.vehntDelegated,
+                0.0000001
+              );
             });
 
             it("allows closing delegate", async () => {
@@ -680,7 +718,7 @@ describe("helium-sub-daos", () => {
               expectBnAccuracy(
                 toBN(expectedVehnt, 8).mul(new BN("1000000000000")),
                 sdAcc.vehntDelegated,
-                0.000000001
+                0
               );
 
               expect(sdAcc.vehntFallRate.eq(new BN(0))).to.be.true;
