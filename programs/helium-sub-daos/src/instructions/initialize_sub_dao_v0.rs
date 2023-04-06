@@ -182,8 +182,6 @@ impl<'info> InitializeSubDaoV0<'info> {
 }
 
 pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -> Result<()> {
-  let curr_ts = Clock::get()?.unix_timestamp;
-
   let signer_seeds: &[&[&[u8]]] = &[&[
     "sub_dao".as_bytes(),
     ctx.accounts.dnt_mint.to_account_info().key.as_ref(),
