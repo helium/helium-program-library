@@ -768,7 +768,7 @@ async function run() {
           instructions: [instruction],
           wallet: solAddress ? solAddress.toBase58() : address,
           signerSeeds: [],
-          compute: 50000,
+          compute: 75000,
           size: size(instruction),
           isRouter: true,
         });
@@ -1142,9 +1142,8 @@ async function run() {
     DC: ${totalBalances.dc.toString()}
     MOBILE: ${totalBalances.mobile.toString()}
     IOT: ${totalBalances.iot.toString()}
-    SOL: ${totalBalances.sol
-      .add(new BN(PER_TX * totalTx * LAMPORTS_PER_SOL))
-      .toString()}
+    RENT SOL: ${totalBalances.sol.toString()}
+    TX SOL: ${new BN(PER_TX * totalTx * LAMPORTS_PER_SOL).toString()}
 
     TOTAL TXs: ${totalTx}
   `);
