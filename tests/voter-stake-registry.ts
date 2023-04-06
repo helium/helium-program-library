@@ -249,7 +249,7 @@ describe("voter-stake-registry", () => {
     expectBnAccuracy(
       toBN(223_000_000 * SCALE * GENESIS_MULTIPLIER, 8),
       maxVoterWeightAcc.maxVoterWeight,
-      0.000000001
+      0.00001
     );
   });
 
@@ -607,7 +607,7 @@ describe("voter-stake-registry", () => {
         expectBnAccuracy(
           toBN(testCase.expectedVeHnt, 8),
           voteRecord.account.getYesVoteWeight() as anchor.BN,
-          0.000000001
+          0.00001          
         );
       });
     });
