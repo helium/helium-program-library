@@ -12,7 +12,6 @@ use circuit_breaker::{
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
 use price_oracle::state::*;
-use std::str::FromStr;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MintDataCreditsArgsV0 {
@@ -21,12 +20,6 @@ pub struct MintDataCreditsArgsV0 {
 }
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
-
-pub const HNT_ORACLE: &str = if TESTING {
-  "horxeteuqLRK39UeaiVpgKUR565jStW2Edqd9ioShpU"
-} else {
-  "horUtvuHQFWxPFrZ35YZUmXUZ2TSQdSXhcD4kkCVNKi"
-};
 
 #[derive(Accounts)]
 #[instruction(args: MintDataCreditsArgsV0)]
@@ -43,7 +36,6 @@ pub struct MintDataCreditsV0<'info> {
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
 
-  #[account(address = Pubkey::from_str(HNT_ORACLE).unwrap())]
   pub hnt_price_oracle: Box<Account<'info, PriceOracleV0>>,
 
   // hnt tokens from this account are burned
