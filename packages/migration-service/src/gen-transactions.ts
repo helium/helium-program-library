@@ -707,7 +707,7 @@ async function run() {
         hotspotIxs.push({
           instructions: [ix],
           signerSeeds: [] as Buffer[][],
-          compute: 350000,
+          compute: 400000,
           size: cachedAccountSize + ix.data.length,
           wallet: solAddress.toBase58(),
           hotspot: hotspotKey,
@@ -817,7 +817,7 @@ async function run() {
             lazySigner
           );
           tokenIxs.push(instruction);
-          tokenIxs.push(createTransfer(mobile, ata, lazySigner, iotBal));
+          tokenIxs.push(createTransfer(iot, ata, lazySigner, iotBal));
         }
 
         /// Dust with 100 txns of sol
@@ -1279,7 +1279,7 @@ function createTransfer(
 }
 
 const MAX_TX_SIZE = 1200;
-const MAX_COMPUTE = 500000;
+const MAX_COMPUTE = 1000000;
 type TransactionsReturn = LazyTransaction & {
   isRouter?: boolean;
   size: number;
