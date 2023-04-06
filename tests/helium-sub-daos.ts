@@ -46,7 +46,6 @@ import {
 import { getUnixTimestamp } from "./utils/solana";
 import { createPosition, initVsr } from "./utils/vsr";
 import { expectBnAccuracy } from "./utils/expectBnAccuracy";
-import { option } from "@coral-xyz/borsh";
 
 chai.use(chaiAsPromised);
 
@@ -728,7 +727,7 @@ describe("helium-sub-daos", () => {
               expectBnAccuracy(
                 toBN(expectedVehnt, 8).mul(new BN("1000000000000")),
                 sdAcc.vehntDelegated,
-                0.0000001                
+                0.0000001
               );
 
               expect(sdAcc.vehntFallRate.eq(new BN(0))).to.be.true;
