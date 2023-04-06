@@ -39,15 +39,9 @@ import {
 import { BN } from "bn.js";
 import chaiAsPromised from "chai-as-promised";
 import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
-import fs from "fs";
+import { loadKeypair } from "./utils/solana"; 
 
 chai.use(chaiAsPromised);
-
-function loadKeypair(keypair: string): Keypair {
-  return Keypair.fromSecretKey(
-    new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString()))
-  );
-}
 
 describe("helium-entity-manager", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -59,7 +53,7 @@ describe("helium-entity-manager", () => {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
   const eccVerifier = loadKeypair(
-    __dirname + "/verifier-test.json"
+    __dirname + "/keypairs/verifier-test.json"
   );
 
   let dao: PublicKey;
