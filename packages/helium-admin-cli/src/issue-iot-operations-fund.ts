@@ -1,5 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { init } from "@helium/helium-entity-manager-sdk";
+import { init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import { createMintInstructions } from "@helium/spl-utils";
 import { PublicKey, Keypair } from "@solana/web3.js";
@@ -53,21 +54,30 @@ export async function run(args: any = process.argv) {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hemProgram = await init(provider);
+  const hsdProgram = await initHsd(provider);
 
   const mint = Keypair.generate()
   const hnt = new PublicKey(argv.hntMint)
   const [dao] = daoKey(hnt);
   const instructions = [];
+  const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
   instructions.push(
     await hemProgram.methods
       .issueIotOperationsFundV0()
       .preInstructions(
-        await createMintInstructions(provider, 0, dao, dao, mint)
+        await createMintInstructions(
+          provider,
+          0,
+          daoAcc.authority,
+          daoAcc.authority,
+          mint
+        )
       )
       .accounts({
         dao,
         recipient: new PublicKey(argv.recipient),
         mint: mint.publicKey,
+        authority: daoAcc.authority,
       })
       .signers([mint])
   );

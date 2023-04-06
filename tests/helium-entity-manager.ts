@@ -112,7 +112,7 @@ describe("helium-entity-manager", () => {
     await hemProgram.methods
       .issueIotOperationsFundV0()
       .preInstructions(
-        await createMintInstructions(provider, 0, dao, dao, mint)
+        await createMintInstructions(provider, 0, me, me, mint)
       )
       .accounts({
         dao,

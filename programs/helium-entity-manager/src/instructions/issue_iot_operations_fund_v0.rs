@@ -1,4 +1,4 @@
-use crate::{dao_seeds, state::*};
+use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_spl::associated_token::AssociatedToken;
@@ -47,13 +47,13 @@ pub struct IssueIotOperationsFundV0<'info> {
     associated_token::mint = mint,
     associated_token::authority = recipient,
   )]
-  pub receipt_account: Box<Account<'info, TokenAccount>>,
+  pub recipient_account: Box<Account<'info, TokenAccount>>,
   #[account(
     mut,
     constraint = mint.supply == 0,
     mint::decimals = 0,
-    mint::authority = dao,
-    mint::freeze_authority = dao,
+    mint::authority = authority,
+    mint::freeze_authority = authority,
   )]
   pub mint: Box<Account<'info, Mint>>,
 
@@ -87,8 +87,8 @@ impl<'info> IssueIotOperationsFundV0<'info> {
   fn mint_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintTo<'info>> {
     let cpi_accounts = MintTo {
       mint: self.mint.to_account_info(),
-      to: self.receipt_account.to_account_info(),
-      authority: self.dao.to_account_info(),
+      to: self.recipient_account.to_account_info(),
+      authority: self.authority.to_account_info(),
     };
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
@@ -96,22 +96,15 @@ impl<'info> IssueIotOperationsFundV0<'info> {
 
 pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
   let asset_id = ctx.accounts.mint.key();
-  token::mint_to(
-    ctx
-      .accounts
-      .mint_ctx()
-      .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
-    1,
-  )?;
+  msg!("minting");
+  token::mint_to(ctx.accounts.mint_ctx(), 1)?;
 
   let entity_creator_seeds: &[&[u8]] = &[
     b"entity_creator",
     ctx.accounts.dao.to_account_info().key.as_ref(),
     &[ctx.bumps["entity_creator"]],
   ];
-  let signer_seeds: &[&[&[u8]]] = &[entity_creator_seeds, dao_seeds!(ctx.accounts.dao)];
-  let mut creator = ctx.accounts.entity_creator.to_account_info();
-  creator.is_signer = true;
+  let signer_seeds: &[&[&[u8]]] = &[entity_creator_seeds];
   create_metadata_accounts_v3(
     CpiContext::new_with_signer(
       ctx
@@ -122,15 +115,14 @@ pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
       CreateMetadataAccountsV3 {
         metadata: ctx.accounts.metadata.to_account_info().clone(),
         mint: ctx.accounts.mint.to_account_info().clone(),
-        mint_authority: ctx.accounts.dao.to_account_info().clone(),
+        mint_authority: ctx.accounts.authority.to_account_info().clone(),
         payer: ctx.accounts.payer.to_account_info().clone(),
-        update_authority: ctx.accounts.dao.to_account_info().clone(),
+        update_authority: ctx.accounts.entity_creator.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
         rent: ctx.accounts.rent.to_account_info().clone(),
       },
       signer_seeds,
-    )
-    .with_remaining_accounts(vec![creator]),
+    ),
     DataV2 {
       name: String::from("IOT Operations Fund"),
       symbol: String::from("IOT OPS"),
@@ -159,8 +151,8 @@ pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
       CreateMasterEditionV3 {
         edition: ctx.accounts.master_edition.to_account_info().clone(),
         mint: ctx.accounts.mint.to_account_info().clone(),
-        update_authority: ctx.accounts.dao.to_account_info().clone(),
-        mint_authority: ctx.accounts.dao.to_account_info().clone(),
+        update_authority: ctx.accounts.entity_creator.to_account_info().clone(),
+        mint_authority: ctx.accounts.authority.to_account_info().clone(),
         metadata: ctx.accounts.metadata.to_account_info().clone(),
         payer: ctx.accounts.payer.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
