@@ -779,7 +779,7 @@ async function run() {
         const dcBal = new BN(account.dc);
         // Helium uses 8 decimals, we use 6
         const digitShift = new BN(100);
-        const mobileBal = new BN(account.mobile).div(digitShift);
+        const mobileBal = divBankersRound(new BN(account.mobile), digitShift);
         const iotBal = new BN(account.iot);
         const zero = new BN(0);
         if (hntBal.gt(zero)) {
@@ -1452,4 +1452,23 @@ async function insertTransactions(
       }
     })
   );
+}
+
+function divBankersRound(arg0: anchor.BN, arg1: anchor.BN) {
+  // Give us an extra digit
+  const divWithExtra = arg0.mul(new BN(10)).div(arg1);
+  const div = divWithExtra.div(new BN(10));
+  const lastBit = divWithExtra.mod(new BN(10));
+  const secondToLastBit = div.mod(new BN(10));
+  if (lastBit.eq(new BN(5))) {
+    if (secondToLastBit.mod(new BN(2)).eq(new BN(0))) {
+      return div;
+    } else {
+      return div.add(new BN(1));
+    }
+  } else if (lastBit.gt(new BN(5))) {
+    return div.add(new BN(1));
+  } else {
+    return div;
+  }
 }
