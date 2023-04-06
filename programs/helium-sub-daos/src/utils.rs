@@ -215,8 +215,11 @@ pub fn caclulate_vhnt_info(
       .checked_add(i64::try_from(seconds_to_genesis).unwrap())
       .unwrap(),
   )?;
-  let vehnt_at_genesis_end_exact =
-    position.voting_power(voting_mint_config, position.genesis_end)?;
+  let vehnt_at_genesis_end_exact = if has_genesis {
+    position.voting_power(voting_mint_config, position.genesis_end)?
+  } else {
+    position.voting_power(voting_mint_config, curr_ts)?
+  };
   let vehnt_at_position_end = position.voting_power(voting_mint_config, position.lockup.end_ts)?;
 
   let pre_genesis_end_fall_rate =

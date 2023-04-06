@@ -201,7 +201,7 @@ describe("helium-sub-daos", () => {
       await createAtaAndTransfer(
         provider,
         hntMint,
-        toBN(1000, 8),
+        toBN(100000000, 8),
         me,
         positionAuthorityKp.publicKey
       );
@@ -655,11 +655,11 @@ describe("helium-sub-daos", () => {
           describe("with multiple delegated vehnt", () => {
             let basePosition: PublicKey;
             let basePositionOptions = {
-              lockupPeriods: 365 * 4,
-              lockupAmount: 100,
-              kind: { constant: {} },
+              lockupPeriods: 365 * 1,
+              lockupAmount: 1000000,
+              kind: { cliff: {} },
               expectedMultiplier:
-                Math.min((SECS_PER_DAY * 365 * 4) / MAX_LOCKUP, 1) * SCALE,
+                Math.min((SECS_PER_DAY * 365 * 1) / MAX_LOCKUP, 1) * SCALE,
             };
 
             beforeEach(async () => {
@@ -700,10 +700,15 @@ describe("helium-sub-daos", () => {
 
             it("allows closing delegate", async () => {
               await sleep(options.delay);
+              await vsrProgram.methods
+                .setTimeOffsetV0(new BN(1 * 60 * 60 * 2))
+                .accounts({ registrar })
+                .rpc({ skipPreflight: true });
+
               const method = program.methods
                 .closeDelegationV0()
                 .accounts({
-                  position,
+                  position: basePosition,
                   subDao,
                   positionAuthority: positionAuthorityKp.publicKey,
                 })
@@ -711,19 +716,23 @@ describe("helium-sub-daos", () => {
 
               const { delegatedPosition, subDaoEpochInfo } =
                 await method.pubkeys();
-              const sed = await program.account.subDaoEpochInfoV0.fetch(
-                subDaoEpochInfo!
-              );
-              console.log(sed.fallRatesFromClosingPositions.toString());
-              console.log(sed.vehntInClosingPositions.toString());
+              // const sed = await program.account.subDaoEpochInfoV0.fetch(
+              //   subDaoEpochInfo!
+              // );
+              // console.log(sed.fallRatesFromClosingPositions.toString());
+              // console.log(sed.vehntInClosingPositions.toString());
               await method.rpc({ skipPreflight: true });
 
               const sdAcc = await program.account.subDaoV0.fetch(subDao);
 
               const expectedVehnt =
-                basePositionOptions.lockupAmount *
-                basePositionOptions.expectedMultiplier;
+                options.lockupAmount *
+                options.expectedMultiplier;
 
+                console.log(
+                  toBN(expectedVehnt, 8).mul(new BN("1000000000000")).toString(),
+                  sdAcc.vehntDelegated.toString()
+                );1000000000000.000000000000;
               expectBnAccuracy(
                 toBN(expectedVehnt, 8).mul(new BN("1000000000000")),
                 sdAcc.vehntDelegated,
