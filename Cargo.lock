@@ -908,7 +908,7 @@ dependencies = [
 [[package]]
 name = "clockwork-cron"
 version = "2.0.1"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#40b9538080abb3417464157f34dbdedf7f11d017"
+source = "git+https://github.com/clockwork-xyz/clockwork?rev=781b42fd06f2926899597ce5ea1f19b8ecd3d2e4#781b42fd06f2926899597ce5ea1f19b8ecd3d2e4"
 dependencies = [
  "chrono",
  "nom",
@@ -918,7 +918,7 @@ dependencies = [
 [[package]]
 name = "clockwork-network-program"
 version = "2.0.1"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#40b9538080abb3417464157f34dbdedf7f11d017"
+source = "git+https://github.com/clockwork-xyz/clockwork?rev=781b42fd06f2926899597ce5ea1f19b8ecd3d2e4#781b42fd06f2926899597ce5ea1f19b8ecd3d2e4"
 dependencies = [
  "anchor-lang 0.26.0",
  "anchor-spl",
@@ -928,7 +928,7 @@ dependencies = [
 [[package]]
 name = "clockwork-sdk"
 version = "2.0.1"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#40b9538080abb3417464157f34dbdedf7f11d017"
+source = "git+https://github.com/clockwork-xyz/clockwork?rev=781b42fd06f2926899597ce5ea1f19b8ecd3d2e4#781b42fd06f2926899597ce5ea1f19b8ecd3d2e4"
 dependencies = [
  "anchor-lang 0.26.0",
  "chrono",
@@ -940,7 +940,7 @@ dependencies = [
 [[package]]
 name = "clockwork-thread-program"
 version = "2.0.1"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#40b9538080abb3417464157f34dbdedf7f11d017"
+source = "git+https://github.com/clockwork-xyz/clockwork?rev=781b42fd06f2926899597ce5ea1f19b8ecd3d2e4#781b42fd06f2926899597ce5ea1f19b8ecd3d2e4"
 dependencies = [
  "anchor-lang 0.26.0",
  "chrono",
@@ -954,7 +954,7 @@ dependencies = [
 [[package]]
 name = "clockwork-utils"
 version = "2.0.1"
-source = "git+https://github.com/clockwork-xyz/clockwork?branch=main#40b9538080abb3417464157f34dbdedf7f11d017"
+source = "git+https://github.com/clockwork-xyz/clockwork?rev=781b42fd06f2926899597ce5ea1f19b8ecd3d2e4#781b42fd06f2926899597ce5ea1f19b8ecd3d2e4"
 dependencies = [
  "anchor-lang 0.26.0",
  "base64 0.13.1",
