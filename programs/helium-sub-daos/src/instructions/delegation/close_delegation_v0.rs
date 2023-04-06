@@ -113,7 +113,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
     ..
   } = vehnt_info;
 
-  msg!("Vehnt calculations: {:?}", vehnt_info);  
+  msg!("Vehnt calculations: {:?}", vehnt_info);
 
   // don't allow unstake without claiming available rewards
   // unless we're testing, in which case we don't care
