@@ -97,6 +97,11 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
   let vehnt_at_curr_ts = position.voting_power(voting_mint_config, curr_ts)?;
+  let vehnt_info = caclulate_vhnt_info(
+    ctx.accounts.delegated_position.start_ts,
+    position,
+    voting_mint_config,
+  )?;
 
   let VehntInfo {
     pre_genesis_end_fall_rate,
@@ -106,11 +111,9 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
     end_fall_rate_correction,
     end_vehnt_correction,
     ..
-  } = caclulate_vhnt_info(
-    ctx.accounts.delegated_position.start_ts,
-    position,
-    voting_mint_config,
-  )?;
+  } = vehnt_info;
+
+  msg!("Vehnt calculations: {:?}", vehnt_info);  
 
   // don't allow unstake without claiming available rewards
   // unless we're testing, in which case we don't care

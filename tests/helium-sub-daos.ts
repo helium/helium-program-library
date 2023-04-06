@@ -370,7 +370,17 @@ describe("helium-sub-daos", () => {
         },
       },
       {
-        name: "Case 3 (Cliff 100 4 years)",
+        name: "Case 3",
+        options: {
+          delay: 0,
+          lockupPeriods: 365 * 4,
+          lockupAmount: 50,
+          expectedMultiplier:
+            Math.min((SECS_PER_DAY * 365 * 4) / MAX_LOCKUP, 1) * SCALE,
+        },
+      },
+      {
+        name: "Case 4 (Cliff 100 4 years)",
         options: {
           delay: 15000,
           lockupPeriods: 365 * 4,
@@ -381,7 +391,7 @@ describe("helium-sub-daos", () => {
         },
       },
       {
-        name: "Case 4 (Constant 100 4 years)",
+        name: "Case 5 (Constant 100 4 years)",
         options: {
           delay: 0,
           lockupPeriods: 365 * 4,
