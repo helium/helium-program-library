@@ -72,6 +72,7 @@ helium-admin create-dao -u $SOLANA_URL \
                         --councilKeypair keypairs/council.json \
                         --hntKeypair keypairs/hnt.json \
                         --dcKeypair keypairs/dc.json \
+                        --hntPriceOracle $(solana address -k keypairs/hnt-price-oracle.json) \
                         --wallet $ANCHOR_WALLET \
                         --numHnt $TOTAL_HNT  \
                         --numHst 200000000  \
