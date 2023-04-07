@@ -157,7 +157,7 @@ export async function run(args: any = process.argv) {
     },
     hntPriceOracle: {
       type: "string",
-      default: "horxeteuqLRK39UeaiVpgKUR565jStW2Edqd9ioShpU",
+      required: true
     },
     hstKeypair: {
       type: "string",
