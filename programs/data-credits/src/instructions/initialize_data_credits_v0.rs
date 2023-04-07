@@ -11,13 +11,8 @@ use circuit_breaker::{
   cpi::{accounts::InitializeMintWindowedBreakerV0, initialize_mint_windowed_breaker_v0},
   CircuitBreaker, InitializeMintWindowedBreakerArgsV0,
 };
-use pyth_sdk_solana::load_price_feed_from_account_info;
 
-#[cfg(feature = "devnet")]
-const PYTH_PROGRAM_ID: &str = "gSbePebfvPy7tRqimPoVecS2UsBvYv46ynrzWocc92s";
-
-#[cfg(not(feature = "devnet"))]
-const PYTH_PROGRAM_ID: &str = "FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH";
+const PRICE_ORACLE_PID: &str = "porcSnvH9pvcYPmQ65Y8qcZSRxQBiBBQX7UV5nmBegy";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDataCreditsArgsV0 {
@@ -37,7 +32,7 @@ pub struct InitializeDataCreditsV0<'info> {
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
   /// CHECK: Checked via load call in handler
-  #[account(owner = Pubkey::from_str(PYTH_PROGRAM_ID).unwrap())]
+  #[account(owner = Pubkey::from_str(PRICE_ORACLE_PID).unwrap())]
   pub hnt_price_oracle: AccountInfo<'info>,
 
   pub hnt_mint: Box<Account<'info, Mint>>,
@@ -78,12 +73,6 @@ pub fn handler(
   ctx.accounts.data_credits.hnt_mint = ctx.accounts.hnt_mint.key();
   ctx.accounts.data_credits.authority = args.authority;
   ctx.accounts.data_credits.hnt_price_oracle = ctx.accounts.hnt_price_oracle.key();
-
-  // Make sure these Pyth price accounts can be loaded
-  load_price_feed_from_account_info(&ctx.accounts.hnt_price_oracle).map_err(|e| {
-    msg!("Pyth error {}", e);
-    error!(DataCreditsErrors::PythError)
-  })?;
 
   ctx.accounts.data_credits.data_credits_bump = *ctx
     .bumps

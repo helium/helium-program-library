@@ -46,6 +46,7 @@ import {
 import { getUnixTimestamp } from "./utils/solana";
 import { createPosition, initVsr } from "./utils/vsr";
 import { expectBnAccuracy } from "./utils/expectBnAccuracy";
+import { init as initPriceOracle } from "../packages/price-oracle-sdk/src";
 
 chai.use(chaiAsPromised);
 
@@ -220,6 +221,12 @@ describe("helium-sub-daos", () => {
         genesisVotePowerMultiplierExpirationTs,
         3
       ));
+
+      const poProgram = await initPriceOracle(
+        provider,
+        anchor.workspace.PriceOracle.programId,
+        anchor.workspace.PriceOracle.idl
+      );
       ({
         dataCredits: { dcMint },
         subDao: { subDao, treasury, rewardsEscrow },
@@ -229,6 +236,7 @@ describe("helium-sub-daos", () => {
         hemProgram,
         program,
         dcProgram,
+        poProgram,
         EPOCH_REWARDS,
         SUB_DAO_EPOCH_REWARDS,
         registrar,
