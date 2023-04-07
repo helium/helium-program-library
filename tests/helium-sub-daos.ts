@@ -201,7 +201,7 @@ describe("helium-sub-daos", () => {
       await createAtaAndTransfer(
         provider,
         hntMint,
-        toBN(1000, 8),
+        toBN(100000000, 8),
         me,
         positionAuthorityKp.publicKey
       );
@@ -244,7 +244,7 @@ describe("helium-sub-daos", () => {
           authority: newAuth,
           emissionSchedule: null,
           hstEmissionSchedule: null,
-          hstPool: null
+          hstPool: null,
         })
         .accounts({
           dao,
@@ -352,10 +352,10 @@ describe("helium-sub-daos", () => {
         name: "Case 1",
         options: {
           delay: 1000,
-          lockupPeriods: 183,
+          lockupPeriods: 365,
           lockupAmount: 100,
           expectedMultiplier:
-            Math.min((SECS_PER_DAY * 183) / MAX_LOCKUP, 1) * SCALE,
+            Math.min((SECS_PER_DAY * 365) / MAX_LOCKUP, 1) * SCALE,
         },
       },
       {
@@ -368,8 +368,38 @@ describe("helium-sub-daos", () => {
             Math.min((SECS_PER_DAY * 183 * 4) / MAX_LOCKUP, 1) * SCALE,
         },
       },
-      // { name: "Case 3", options: {delay: 45000, lockupPeriods: 183*8, lockupAmount: 100, delegateAmount: 10000} },
-      // { name: "Case 4", options: {delay: 5000, lockupPeriods: 183*8, lockupAmount: 1000, delegateAmount: 10000} },
+      {
+        name: "Case 3",
+        options: {
+          delay: 0,
+          lockupPeriods: 365 * 4,
+          lockupAmount: 50,
+          expectedMultiplier:
+            Math.min((SECS_PER_DAY * 365 * 4) / MAX_LOCKUP, 1) * SCALE,
+        },
+      },
+      {
+        name: "Case 4 (Cliff 100 4 years)",
+        options: {
+          delay: 15000,
+          lockupPeriods: 365 * 4,
+          lockupAmount: 100,
+          kind: { cliff: {} },
+          expectedMultiplier:
+            Math.min((SECS_PER_DAY * 365 * 4) / MAX_LOCKUP, 1) * SCALE,
+        },
+      },
+      {
+        name: "Case 5 (Constant 100 4 years)",
+        options: {
+          delay: 0,
+          lockupPeriods: 365 * 4,
+          lockupAmount: 100,
+          kind: { constant: {} },
+          expectedMultiplier:
+            Math.min((SECS_PER_DAY * 365 * 4) / MAX_LOCKUP, 1) * SCALE,
+        },
+      },
     ];
 
     vehntOptions.forEach(function ({ name, options }) {
@@ -377,6 +407,7 @@ describe("helium-sub-daos", () => {
         before(() => {
           genesisVotePowerMultiplierExpirationTs = 1;
         });
+
         beforeEach(async () => {
           ({ position, vault } = await createPosition(
             vsrProgram,
@@ -412,9 +443,9 @@ describe("helium-sub-daos", () => {
           expectBnAccuracy(
             toBN(expectedVeHnt, 8).mul(new BN("1000000000000")),
             sdAcc.vehntDelegated,
-            0.01
+            options.kind?.constant !== undefined ? 0 : 0.0000001
           );
-          expectBnAccuracy(lockupAmount, acc.hntAmount, 0.001);
+          expectBnAccuracy(lockupAmount, acc.hntAmount, 0.01);
         });
 
         it("calculates subdao rewards", async () => {
@@ -474,7 +505,10 @@ describe("helium-sub-daos", () => {
           const supply = (await getMint(provider.connection, hntMint)).supply;
           const veHnt = toNumber(subDaoInfo.vehntAtEpochStart, 8);
           const totalUtility =
-            Math.max(veHnt, 1) * Math.pow(currentActiveDeviceCount * 50, 1 / 4) * Math.sqrt(16) * 1;
+            Math.max(veHnt, 1) *
+            Math.pow(currentActiveDeviceCount * 50, 1 / 4) *
+            Math.sqrt(16) *
+            1;
           expect(daoInfo.totalRewards.toString()).to.eq(
             EPOCH_REWARDS.toString()
           );
@@ -604,17 +638,113 @@ describe("helium-sub-daos", () => {
             const sed = await program.account.subDaoEpochInfoV0.fetch(
               subDaoEpochInfo!
             );
-            console.log(sed.fallRatesFromClosingPositions.toNumber());
-            console.log(sed.vehntInClosingPositions.toNumber());
+            console.log(sed.fallRatesFromClosingPositions.toString());
+            console.log(sed.vehntInClosingPositions.toString());
             await method.rpc({ skipPreflight: true });
 
             const sdAcc = await program.account.subDaoV0.fetch(subDao);
-            let st = sdAcc.vehntDelegated.toNumber();
-            expect(sdAcc.vehntFallRate.toNumber()).to.eq(0);
-            expect(st).to.be.lte(1);
+
+            expect(sdAcc.vehntFallRate.eq(new BN(0))).to.be.true;
+            expect(sdAcc.vehntDelegated.eq(new BN(0))).to.be.true;
+
             assert.isFalse(
               !!(await provider.connection.getAccountInfo(delegatedPosition!))
             );
+          });
+
+          describe("with multiple delegated vehnt", () => {
+            let basePosition: PublicKey;
+            let basePositionOptions = {
+              lockupPeriods: 365 * 1,
+              lockupAmount: 1000000,
+              kind: { cliff: {} },
+              expectedMultiplier:
+                Math.min((SECS_PER_DAY * 365 * 1) / MAX_LOCKUP, 1) * SCALE,
+            };
+
+            beforeEach(async () => {
+              ({ position: basePosition } = await createPosition(
+                vsrProgram,
+                provider,
+                registrar,
+                hntMint,
+                basePositionOptions,
+                positionAuthorityKp
+              ));
+
+              await program.methods
+                .delegateV0()
+                .accounts({
+                  position: basePosition,
+                  subDao,
+                  positionAuthority: positionAuthorityKp.publicKey,
+                })
+                .signers([positionAuthorityKp])
+                .rpc({ skipPreflight: true });
+            });
+
+            it("delegates proper vehnt amount", async () => {
+              const sdAcc = await program.account.subDaoV0.fetch(subDao);
+
+              const expectedVehnt =
+                options.lockupAmount * options.expectedMultiplier +
+                basePositionOptions.lockupAmount *
+                  basePositionOptions.expectedMultiplier;
+
+              expectBnAccuracy(
+                toBN(expectedVehnt, 8).mul(new BN("1000000000000")),
+                sdAcc.vehntDelegated,
+                0.0000001
+              );
+            });
+
+            it("allows closing delegate", async () => {
+              await sleep(options.delay);
+              await vsrProgram.methods
+                .setTimeOffsetV0(new BN(1 * 60 * 60 * 2))
+                .accounts({ registrar })
+                .rpc({ skipPreflight: true });
+
+              const method = program.methods
+                .closeDelegationV0()
+                .accounts({
+                  position: basePosition,
+                  subDao,
+                  positionAuthority: positionAuthorityKp.publicKey,
+                })
+                .signers([positionAuthorityKp]);
+
+              const { delegatedPosition, subDaoEpochInfo } =
+                await method.pubkeys();
+              // const sed = await program.account.subDaoEpochInfoV0.fetch(
+              //   subDaoEpochInfo!
+              // );
+              // console.log(sed.fallRatesFromClosingPositions.toString());
+              // console.log(sed.vehntInClosingPositions.toString());
+              await method.rpc({ skipPreflight: true });
+
+              const sdAcc = await program.account.subDaoV0.fetch(subDao);
+
+              const expectedVehnt =
+                options.lockupAmount *
+                options.expectedMultiplier;
+
+                console.log(
+                  toBN(expectedVehnt, 8).mul(new BN("1000000000000")).toString(),
+                  sdAcc.vehntDelegated.toString()
+                );1000000000000.000000000000;
+              expectBnAccuracy(
+                toBN(expectedVehnt, 8).mul(new BN("1000000000000")),
+                sdAcc.vehntDelegated,
+                0.0000001
+              );
+
+              expect(sdAcc.vehntFallRate.eq(new BN(0))).to.be.true;
+
+              assert.isFalse(
+                !!(await provider.connection.getAccountInfo(delegatedPosition!))
+              );
+            });
           });
 
           describe("with calculated rewards", () => {
@@ -832,15 +962,15 @@ describe("helium-sub-daos", () => {
           .signers([positionAuthorityKp])
           .rpc({ skipPreflight: true });
         let subDaoAcc = await program.account.subDaoV0.fetch(subDao);
-        expect(subDaoAcc.vehntDelegated.toNumber()).to.eq(0);
-        expect(subDaoAcc.vehntFallRate.toNumber()).to.eq(0);
+        expect(subDaoAcc.vehntDelegated.eq(new BN(0))).to.be.true;
+        expect(subDaoAcc.vehntFallRate.eq(new BN(0))).to.be.true;
         const genesisEndEpoch = await program.account.subDaoEpochInfoV0.fetch(
           genesisEndSubDaoEpochInfo!
         );
-        expect(genesisEndEpoch.vehntInClosingPositions.toNumber()).to.eq(0);
-        expect(genesisEndEpoch.fallRatesFromClosingPositions.toNumber()).to.eq(
-          0
-        );
+        expect(genesisEndEpoch.vehntInClosingPositions.eq(new BN(0))).to.be
+          .true;
+        expect(genesisEndEpoch.fallRatesFromClosingPositions.eq(new BN(0))).to
+          .be.true;
 
         const {
           pubkeys: {

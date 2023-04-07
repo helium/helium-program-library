@@ -9,6 +9,7 @@ import {
   createMint,
   getAsset,
   sendAndConfirmWithRetry,
+  sendInstructions,
 } from "@helium/spl-utils";
 import {
   Keypair,
@@ -16,6 +17,7 @@ import {
   SystemProgram,
   Transaction,
   ComputeBudgetProgram
+  LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import chai, { assert, expect } from "chai";
 import chaiHttp from "chai-http";
@@ -84,7 +86,7 @@ export class DatabaseMock implements Database {
   }
 
   async getActiveDevices(): Promise<number> {
-    return 0
+    return 0;
   }
 
   getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
@@ -200,7 +202,13 @@ describe("distributor-oracle", () => {
     "https://mobile-metadata.helium.io/13CGbZcFcAXkDqvACAKdWRdt5gdMEz8mbZC8nc4HGqZozyFYxSP";
   const getAssetFn = async () =>
     ({
-      compression: { compressed: true, tree: merkle.publicKey, leafId: 0, dataHash, creatorHash },
+      compression: {
+        compressed: true,
+        tree: merkle.publicKey,
+        leafId: 0,
+        dataHash,
+        creatorHash,
+      },
       ownership: { owner: me },
       content: { json_uri: uri },
     } as Asset);
@@ -411,6 +419,13 @@ describe("distributor-oracle", () => {
       lazyDistributor
     );
     await oracleServer.start();
+    await sendInstructions(provider, [
+      SystemProgram.transfer({
+        fromPubkey: me,
+        toPubkey: oracle.publicKey,
+        lamports: LAMPORTS_PER_SOL,
+      }),
+    ]);
   });
 
   after(async function () {

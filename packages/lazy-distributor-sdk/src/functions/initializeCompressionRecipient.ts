@@ -13,6 +13,8 @@ export async function initializeCompressionRecipient({
   assetEndpoint,
   // @ts-ignore
   owner = program.provider.wallet.publicKey,
+  // @ts-ignore
+  payer = program.provider.wallet.publicKey,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
 }: {
@@ -20,6 +22,7 @@ export async function initializeCompressionRecipient({
   assetId: PublicKey;
   lazyDistributor: PublicKey;
   owner?: PublicKey;
+  payer?: PublicKey;
   assetEndpoint?: string;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
   getAssetProofFn?: (
@@ -43,14 +46,14 @@ export async function initializeCompressionRecipient({
     compression: { leafId },
   } = asset;
   const { root, proof, leaf, treeId } = assetProof;
-  const canopy = await(
+  const canopy = await (
     await ConcurrentMerkleTreeAccount.fromAccountAddress(
       program.provider.connection,
       treeId
     )
   ).getCanopyDepth();
 
-  const recipient = recipientKey(lazyDistributor, assetId)[0]
+  const recipient = recipientKey(lazyDistributor, assetId)[0];
 
   return program.methods
     .initializeCompressionRecipientV0({
@@ -65,6 +68,7 @@ export async function initializeCompressionRecipient({
       owner: owner,
       delegate: owner,
       recipient,
+      payer,
     })
     .remainingAccounts(
       proof.slice(0, proof.length - canopy).map((p) => {
