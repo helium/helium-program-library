@@ -1,8 +1,18 @@
 import * as anchor from "@coral-xyz/anchor";
 import { BN, Program } from "@coral-xyz/anchor";
+import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import Address from "@helium/address";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
-import { recipientKey } from "@helium/lazy-distributor-sdk";
+import { Keypair as HeliumKeypair } from "@helium/crypto";
+import {
+  init as initDataCredits,
+  PROGRAM_ID as DC_PID
+} from "@helium/data-credits-sdk";
+import {
+  daoKey,
+  init as initHeliumSubDaos,
+  PROGRAM_ID as HSD_PID
+} from "@helium/helium-sub-daos-sdk";
 import {
   Asset,
   AssetProof,
@@ -10,79 +20,56 @@ import {
   createMint,
   getAsset,
   sendAndConfirmWithRetry,
-  sendInstructions,
+  sendInstructions
 } from "@helium/spl-utils";
 import {
-  Keypair,
-  PublicKey,
+  ComputeBudgetProgram, Keypair, LAMPORTS_PER_SOL, PublicKey,
   SystemProgram,
-  Transaction,
-  ComputeBudgetProgram,
-  LAMPORTS_PER_SOL,
+  Transaction
 } from "@solana/web3.js";
 import chai, { assert, expect } from "chai";
 import chaiHttp from "chai-http";
+import fs from "fs";
 import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
 import * as client from "../packages/distributor-oracle/src/client";
 import {
   Database,
-  OracleServer,
+  OracleServer
 } from "../packages/distributor-oracle/src/server";
-import {
-  init as initLazy,
-  PROGRAM_ID as LD_PID,
-  initializeCompressionRecipient,
-} from "../packages/lazy-distributor-sdk/src";
-import { HeliumEntityManager } from "../target/types/helium_entity_manager";
-import {
-  init as initRewards,
-  oracleSigner,
-  PROGRAM_ID as REWARDS_PID,
-} from "../packages/rewards-oracle-sdk/src";
-import { LazyDistributor } from "../target/types/lazy_distributor";
-import { RewardsOracle } from "../target/types/rewards_oracle";
-import { Keypair as HeliumKeypair } from "@helium/crypto";
-import {
-  ensureDCIdl,
-  ensureHSDIdl,
-  ensureVSRIdl,
-  initWorld,
-} from "./utils/fixtures";
 import {
   entityCreatorKey,
   init as initHeliumEntityManager,
-  keyToAssetKey,
-  onboardIotHotspot,
-  onboardMobileHotspot,
-  PROGRAM_ID as HEM_PID,
+  keyToAssetKey, PROGRAM_ID as HEM_PID
 } from "../packages/helium-entity-manager-sdk/src";
 import {
-  init as initDataCredits,
-  PROGRAM_ID as DC_PID,
-} from "@helium/data-credits-sdk";
+  init as initLazy, initializeCompressionRecipient, PROGRAM_ID as LD_PID
+} from "../packages/lazy-distributor-sdk/src";
 import {
-  daoKey,
-  init as initHeliumSubDaos,
-  PROGRAM_ID as HSD_PID,
-} from "@helium/helium-sub-daos-sdk";
-import { initVsr } from "./utils/vsr";
+  init as initRewards,
+  oracleSigner,
+  PROGRAM_ID as REWARDS_PID
+} from "../packages/rewards-oracle-sdk/src";
 import {
   init as vsrInit,
-  PROGRAM_ID as VSR_PID,
+  PROGRAM_ID as VSR_PID
 } from "../packages/voter-stake-registry-sdk/src";
-import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
-import fs from "fs";
+import { HeliumEntityManager } from "../target/types/helium_entity_manager";
+import { LazyDistributor } from "../target/types/lazy_distributor";
+import { RewardsOracle } from "../target/types/rewards_oracle";
+import {
+  initWorld
+} from "./utils/fixtures";
+import { initVsr } from "./utils/vsr";
 // @ts-ignore
-import animalHash from "angry-purple-tiger";
 import {
   computeCompressedNFTHash,
   computeCreatorHash,
   computeDataHash,
   getLeafAssetId,
   TokenProgramVersion,
-  TokenStandard,
+  TokenStandard
 } from "@metaplex-foundation/mpl-bubblegum";
-import { ConcurrentMerkleTreeAccount } from "@solana/spl-account-compression";
+import animalHash from "angry-purple-tiger";
 
 chai.use(chaiHttp);
 
@@ -365,11 +352,6 @@ describe("distributor-oracle", () => {
       tokenProgramVersion: TokenProgramVersion.Original,
     };
     PublicKey.prototype.toString = PublicKey.prototype.toBase58;
-
-    const actual = await ConcurrentMerkleTreeAccount.fromAccountAddress(
-      provider.connection,
-      merkle
-    );
 
     const hash = computeCompressedNFTHash(
       hotspot,

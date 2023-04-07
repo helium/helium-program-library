@@ -27,7 +27,6 @@ export async function initializeCompressionRecipient({
 }) {
   const {
     asset: {
-      content: { json_uri },
       ownership: { owner },
     },
     args,
