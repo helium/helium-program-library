@@ -2,7 +2,7 @@ import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
 import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
-import { heliumCommonResolver } from "@helium/spl-utils";
+import { combineResolvers, heliumCommonResolver, resolveIndividual } from "@helium/spl-utils";
 
 export * from "./constants";
 export * from "./pdas";
@@ -22,7 +22,14 @@ export async function init(
     provider,
     undefined,
     () => {
-      return heliumCommonResolver;
+      return combineResolvers(
+        heliumCommonResolver,
+        resolveIndividual(async ({ path }) => {
+          if (path[path.length - 1] == "lazyDistributorProgram") {
+            return new PublicKey("1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w");
+          }
+        })
+      )
     }
   ) as Program<RewardsOracle>;
 

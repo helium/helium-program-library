@@ -5,6 +5,7 @@ import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { recipientKey } from "@helium/lazy-distributor-sdk";
 import {
   Asset,
+  AssetProof,
   createAtaAndMint,
   createMint,
   getAsset,
@@ -16,7 +17,7 @@ import {
   PublicKey,
   SystemProgram,
   Transaction,
-  ComputeBudgetProgram
+  ComputeBudgetProgram,
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import chai, { assert, expect } from "chai";
@@ -27,9 +28,17 @@ import {
   Database,
   OracleServer,
 } from "../packages/distributor-oracle/src/server";
-import { init as initLazy, PROGRAM_ID as LD_PID, initializeCompressionRecipient } from "../packages/lazy-distributor-sdk/src";
+import {
+  init as initLazy,
+  PROGRAM_ID as LD_PID,
+  initializeCompressionRecipient,
+} from "../packages/lazy-distributor-sdk/src";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
-import { init as initRewards, oracleSigner, PROGRAM_ID as REWARDS_PID } from "../packages/rewards-oracle-sdk/src"; 
+import {
+  init as initRewards,
+  oracleSigner,
+  PROGRAM_ID as REWARDS_PID,
+} from "../packages/rewards-oracle-sdk/src";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { RewardsOracle } from "../target/types/rewards_oracle";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
@@ -39,11 +48,28 @@ import {
   ensureVSRIdl,
   initWorld,
 } from "./utils/fixtures";
-import { entityCreatorKey, init as initHeliumEntityManager, keyToAssetKey, PROGRAM_ID as HEM_PID } from "../packages/helium-entity-manager-sdk/src";
-import { init as initDataCredits, PROGRAM_ID as DC_PID } from "@helium/data-credits-sdk";
-import { daoKey, init as initHeliumSubDaos, PROGRAM_ID as HSD_PID } from "@helium/helium-sub-daos-sdk";
+import {
+  entityCreatorKey,
+  init as initHeliumEntityManager,
+  keyToAssetKey,
+  onboardIotHotspot,
+  onboardMobileHotspot,
+  PROGRAM_ID as HEM_PID,
+} from "../packages/helium-entity-manager-sdk/src";
+import {
+  init as initDataCredits,
+  PROGRAM_ID as DC_PID,
+} from "@helium/data-credits-sdk";
+import {
+  daoKey,
+  init as initHeliumSubDaos,
+  PROGRAM_ID as HSD_PID,
+} from "@helium/helium-sub-daos-sdk";
 import { initVsr } from "./utils/vsr";
-import { init as vsrInit, PROGRAM_ID as VSR_PID } from "../packages/voter-stake-registry-sdk/src";
+import {
+  init as vsrInit,
+  PROGRAM_ID as VSR_PID,
+} from "../packages/voter-stake-registry-sdk/src";
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import fs from "fs";
 // @ts-ignore
@@ -54,8 +80,9 @@ import {
   computeDataHash,
   getLeafAssetId,
   TokenProgramVersion,
-  TokenStandard
+  TokenStandard,
 } from "@metaplex-foundation/mpl-bubblegum";
+import { ConcurrentMerkleTreeAccount } from "@solana/spl-account-compression";
 
 chai.use(chaiHttp);
 
@@ -174,7 +201,6 @@ export class DatabaseMock implements Database {
   }
 }
 
-
 function loadKeypair(keypair: string): Keypair {
   return Keypair.fromSecretKey(
     new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString()))
@@ -194,47 +220,22 @@ describe("distributor-oracle", () => {
   let lazyDistributor: PublicKey;
   let recipient: PublicKey;
   let asset: PublicKey;
-  let merkle = Keypair.generate();
-  let merkleTree: MerkleTree;
-  let dataHash: Buffer;
-  let creatorHash: Buffer;
-  const uri =
-    "https://mobile-metadata.helium.io/13CGbZcFcAXkDqvACAKdWRdt5gdMEz8mbZC8nc4HGqZozyFYxSP";
-  const getAssetFn = async () =>
-    ({
-      compression: {
-        compressed: true,
-        tree: merkle.publicKey,
-        leafId: 0,
-        dataHash,
-        creatorHash,
-      },
-      ownership: { owner: me },
-      content: { json_uri: uri },
-    } as Asset);
-  const getAssetProofFn = async () => {
-    const proof = merkleTree.getProof(0);
-    return {
-      root: new PublicKey(proof.root),
-      proof: proof.proof.map((p) => new PublicKey(p)),
-      nodeIndex: 0,
-      leaf: new PublicKey(proof.leaf),
-      treeId: merkle.publicKey,
-    };
-  };
-
-  let mint: PublicKey;
   let daoK: PublicKey;
   let ecc: string;
+  let getAssetFn: () => Promise<Asset | undefined>;
+  let getAssetProofFn: () => Promise<AssetProof | undefined>;
 
-  before(async () => {
-    console.log("tm1");
+  beforeEach(async () => {
     ldProgram = await initLazy(
       provider,
       LD_PID,
       anchor.workspace.LazyDistributor.idl
     );
-    rewardsProgram = await initRewards(provider, REWARDS_PID, anchor.workspace.RewardsOracle.idl);
+    rewardsProgram = await initRewards(
+      provider,
+      REWARDS_PID,
+      anchor.workspace.RewardsOracle.idl
+    );
     hemProgram = await initHeliumEntityManager(
       provider,
       HEM_PID,
@@ -274,11 +275,23 @@ describe("distributor-oracle", () => {
       pubkeys.lazyDistributor
     );
 
-    const hsdProgram = await initHeliumSubDaos(provider, HSD_PID, anchor.workspace.HeliumSubDaos.idl);
-    const dcProgram = await initDataCredits(provider, DC_PID, anchor.workspace.DataCredits.idl);
-    const vsrProgram = await vsrInit(provider, VSR_PID, anchor.workspace.VoterStakeRegistry.idl);
+    const hsdProgram = await initHeliumSubDaos(
+      provider,
+      HSD_PID,
+      anchor.workspace.HeliumSubDaos.idl
+    );
+    const dcProgram = await initDataCredits(
+      provider,
+      DC_PID,
+      anchor.workspace.DataCredits.idl
+    );
+    const vsrProgram = await vsrInit(
+      provider,
+      VSR_PID,
+      anchor.workspace.VoterStakeRegistry.idl
+    );
 
-    const { registrar }= await initVsr(
+    const { registrar } = await initVsr(
       vsrProgram,
       provider,
       me,
@@ -289,7 +302,9 @@ describe("distributor-oracle", () => {
     );
     const {
       dao: { dao },
+      dataCredits: { dcMint },
       maker: { maker, makerKeypair, merkle, collection },
+      rewardableEntityConfig: { rewardableEntityConfig },
     } = await initWorld(
       provider,
       hemProgram,
@@ -301,9 +316,7 @@ describe("distributor-oracle", () => {
       hntMint
     );
     daoK = dao;
-    const eccVerifier = loadKeypair(
-      __dirname + "/verifier-test.json"
-    );
+    const eccVerifier = loadKeypair(__dirname + "/verifier-test.json");
     ecc = (await HeliumKeypair.makeRandom()).address.b58;
 
     const hotspotOwner = Keypair.generate();
@@ -334,23 +347,29 @@ describe("distributor-oracle", () => {
         share: 100,
       },
     ];
-    const metadata = {
+    const metadata: any = {
       name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
       symbol: "HOTSPOT",
-      uri: `https://entities.nft.test-helium.com/${ecc}`,
+      uri: `https://entities.nft.helium.io/${ecc}`,
       collection: {
         key: collection,
         verified: true,
       },
-      primarySaleHappened: true,
-      isMutable: true,
       creators,
       sellerFeeBasisPoints: 0,
+      primarySaleHappened: true,
+      isMutable: true,
       editionNonce: null,
       tokenStandard: TokenStandard.NonFungible,
       uses: null,
       tokenProgramVersion: TokenProgramVersion.Original,
     };
+    PublicKey.prototype.toString = PublicKey.prototype.toBase58;
+
+    const actual = await ConcurrentMerkleTreeAccount.fromAccountAddress(
+      provider.connection,
+      merkle
+    );
 
     const hash = computeCompressedNFTHash(
       hotspot,
@@ -362,10 +381,10 @@ describe("distributor-oracle", () => {
     leaves[0] = hash;
     const merkleTree = new MerkleTree(leaves);
     const proof = merkleTree.getProof(0);
-    
-    let getAssetFn = async () =>
+    asset = await getLeafAssetId(merkle, new BN(0));
+    getAssetFn = async () =>
       ({
-        id: await getLeafAssetId(merkle, new BN(0)),
+        id: asset,
         content: {
           metadata: {
             name: metadata.name,
@@ -382,32 +401,38 @@ describe("distributor-oracle", () => {
           edition_nonce: null,
         },
         grouping: metadata.collection.key,
+        uses: metadata.uses,
         creators: metadata.creators,
-        ownership: { owner: hotspotOwner.publicKey },
+        ownership: {
+          owner: hotspotOwner.publicKey,
+          delegate: hotspotOwner.publicKey,
+        },
         compression: {
           compressed: true,
+          leafId: 0,
           eligible: true,
           dataHash: computeDataHash(metadata),
           creatorHash: computeCreatorHash(creators),
         },
       } as Asset);
+    getAssetProofFn = async () => {
+      return {
+        root: new PublicKey(proof.root),
+        proof: proof.proof.map((p) => new PublicKey(p)),
+        nodeIndex: 0,
+        leaf: new PublicKey(proof.leaf),
+        treeId: merkle,
+      };
+    };
     const recipientMethod = await initializeCompressionRecipient({
       program: ldProgram,
       assetId: hotspot,
       lazyDistributor,
       getAssetFn,
-      getAssetProofFn: async () => {
-        return {
-          root: new PublicKey(proof.root),
-          proof: proof.proof.map((p) => new PublicKey(p)),
-          nodeIndex: 0,
-          leaf: new PublicKey(proof.leaf),
-          treeId: merkle,
-        };
-      },
+      getAssetProofFn,
     });
 
-    await recipientMethod.rpc();
+    await recipientMethod.rpc({ skipPreflight: true });
     recipient = (await recipientMethod.pubkeys()).recipient!;
 
     oracleServer = new OracleServer(
@@ -429,7 +454,7 @@ describe("distributor-oracle", () => {
   });
 
   after(async function () {
-    await oracleServer.close();
+    if (oracleServer) await oracleServer.close();
   });
 
   it("allows oracle to set current reward", async () => {
@@ -446,11 +471,12 @@ describe("distributor-oracle", () => {
         lazyDistributor,
         recipient,
         keyToAsset,
-        lazyDistributorProgram: new PublicKey("1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w"),
+        lazyDistributorProgram: new PublicKey(
+          "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w"
+        ),
       })
       .rpc();
-      console.log("tm1");
-    
+
     const recipientAcc = await ldProgram.account.recipientV0.fetch(recipient);
     // @ts-ignore
     expect(recipientAcc?.currentRewards.length).to.eq(1);
@@ -473,9 +499,9 @@ describe("distributor-oracle", () => {
 
   it("should sign and execute properly formed transactions", async () => {
     const unsigned = await client.formTransaction({
-      lazyDistributorProgram: ldProgram,
+      dao: daoK,
+      program: ldProgram,
       rewardsOracleProgram: rewardsProgram,
-      entityKey: "",
       provider,
       getAssetFn,
       getAssetProofFn,
@@ -485,7 +511,7 @@ describe("distributor-oracle", () => {
           currentRewards: await oracleServer.db.getCurrentRewards(asset),
         },
       ],
-      hotspot: asset,
+      asset: asset,
       lazyDistributor,
       skipOracleSign: true,
     });

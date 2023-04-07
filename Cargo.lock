@@ -3156,7 +3156,7 @@ dependencies = [
 name = "rewards-oracle"
 version = "0.1.0"
 dependencies = [
- "anchor-lang 0.26.0",
+ "anchor-lang",
  "helium-entity-manager",
  "lazy-distributor",
 ]

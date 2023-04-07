@@ -5,7 +5,7 @@ import { keyToAssetKey, mobileInfoKey } from "../pdas";
 import {
   proofArgsAndAccounts,
   ProofArgsAndAccountsArgs,
-} from "./proofArgsAndAccounts";
+} from "@helium/spl-utils";
 import BN from "bn.js";
 
 export async function onboardMobileHotspot({

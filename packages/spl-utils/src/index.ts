@@ -25,3 +25,6 @@ export {
   getAssetsByOwner,
   searchAssets,
 } from "./mplAssetAPI";
+
+export { proofArgsAndAccounts } from "./proofArgsAndAccounts";
+export type { ProofArgsAndAccountsArgs } from "./proofArgsAndAccounts";

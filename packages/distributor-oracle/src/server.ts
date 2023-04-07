@@ -358,7 +358,7 @@ export class OracleServer {
     for (const ix of setRewardIxs) {
       let recipient: PublicKey | undefined, lazyDist: PublicKey | undefined, proposedCurrentRewards: any;
 
-      if (ix.keys[wrapperOracleKeyIdx].pubkey.equals(oracleSigner(this.oracle.publicKey)[0]) && ix.programId.equals(RO_PID)) {
+      if (ix.keys[wrapperOracleKeyIdx].pubkey.equals(this.oracle.publicKey) && ix.programId.equals(RO_PID)) {
         let decoded = (
           this.roProgram.coder.instruction as BorshInstructionCoder
         ).decode(ix.data);
