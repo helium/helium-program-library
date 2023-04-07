@@ -78,7 +78,7 @@ export async function initVsr(
         genesisVotePowerMultiplierExpirationTs: new BN(
           genesisVotePowerMultiplierExpirationTs
         ),
-        lockupSaturationSecs: new BN(15811200 * 8), // 4 years
+        lockupSaturationSecs: new BN(86400 * 365 * 4), // 4 years
       })
       .accounts({
         registrar,

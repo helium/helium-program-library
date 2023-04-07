@@ -6,11 +6,15 @@ export const expectBnAccuracy = (
   actualBn: anchor.BN,
   percentUncertainty: number
 ) => {
-  let upperBound = expectedBn.muln(1 + percentUncertainty);
-  let lowerBound = expectedBn.muln(1 - percentUncertainty);
+  let bigIntExpected = BigInt(expectedBn.toString());
+  let bigIntActual = BigInt(actualBn.toString());
+
+  let upperBound = Number(bigIntExpected) * (1 + percentUncertainty);
+  let lowerBound = Number(bigIntExpected) * (1 - percentUncertainty);
+
   try {
-    expect(upperBound.gte(actualBn)).to.be.true;
-    expect(lowerBound.lte(actualBn)).to.be.true;
+    expect(upperBound >= Number(bigIntActual)).to.be.true;
+    expect(lowerBound <= Number(bigIntActual)).to.be.true;
   } catch (e) {
     console.error(
       "Expected",

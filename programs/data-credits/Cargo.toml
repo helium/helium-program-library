@@ -24,5 +24,6 @@ anchor-lang = { version="0.26.0", features = ["init-if-needed"] }
 anchor-spl = "0.26.0"
 helium-sub-daos = { path = "../helium-sub-daos", features = ["cpi"] }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
+price-oracle = { path = "../price-oracle", features = ["cpi"] }
 pyth-sdk-solana = { version = "0.7.0" }
 lazy-transactions = { path = "../lazy-transactions", features = ["cpi"] }
