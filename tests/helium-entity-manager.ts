@@ -63,8 +63,7 @@ describe("helium-entity-manager", () => {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
-  const eccVerifier = loadKeypair(__dirname + "/verifier-test.json");
-
+  const eccVerifier = loadKeypair(__dirname + "/keypairs/verifier-test.json");
   let dao: PublicKey;
   let subDao: PublicKey;
   let dcMint: PublicKey;
