@@ -160,9 +160,9 @@ export async function run(args: any = process.argv) {
       describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
-    pythHntPriceFeed: {
+    hntPriceOracle: {
       type: "string",
-      default: "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm",
+      required: true
     },
     numHst: {
       type: "number",
@@ -389,7 +389,7 @@ export async function run(args: any = process.argv) {
       .accounts({
         hntMint: hntKeypair.publicKey,
         dcMint: dcKeypair.publicKey,
-        hntPriceOracle: new PublicKey(argv.pythHntPriceFeed),
+        hntPriceOracle: new PublicKey(argv.hntPriceOracle),
       })
       .rpc({ skipPreflight: true });
 

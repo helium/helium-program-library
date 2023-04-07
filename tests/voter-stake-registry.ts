@@ -7,7 +7,7 @@ import {
   createMintInstructions,
   sendInstructions,
   toBN,
-  truthy
+  truthy,
 } from "@helium/spl-utils";
 import {
   getGovernanceProgramVersion,
@@ -30,13 +30,13 @@ import {
   withRelinquishVote,
   withSetRealmConfig,
   withSignOffProposal,
-  YesNoVote
+  YesNoVote,
 } from "@solana/spl-governance";
 import {
   createAssociatedTokenAccountInstruction,
   createTransferInstruction,
   getAssociatedTokenAddress,
-  getAssociatedTokenAddressSync
+  getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import chai, { expect } from "chai";
@@ -45,12 +45,12 @@ import {
   init,
   nftVoteRecordKey,
   positionKey,
-  PROGRAM_ID
+  PROGRAM_ID,
 } from "../packages/voter-stake-registry-sdk/src";
 import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 import { getUnixTimestamp } from "./utils/solana";
 import { SPL_GOVERNANCE_PID } from "./utils/vsr";
-import fs from "fs";
+import { loadKeypair } from "./utils/solana"; 
 
 chai.use(chaiAsPromised);
 
@@ -249,7 +249,7 @@ describe("voter-stake-registry", () => {
     expectBnAccuracy(
       toBN(223_000_000 * SCALE * GENESIS_MULTIPLIER, 8),
       maxVoterWeightAcc.maxVoterWeight,
-      0.0001
+      0.00001
     );
   });
 
@@ -607,7 +607,7 @@ describe("voter-stake-registry", () => {
         expectBnAccuracy(
           toBN(testCase.expectedVeHnt, 8),
           voteRecord.account.getYesVoteWeight() as anchor.BN,
-          0.00001
+          0.00001          
         );
       });
     });
@@ -860,7 +860,7 @@ describe("voter-stake-registry", () => {
     });
 
     it("allows transfers for ledger users", async () => {
-      const approver = loadKeypair(__dirname + "/approver-test.json");
+      const approver = loadKeypair(__dirname + "/keypairs/approver-test.json");
       const to = Keypair.generate();
 
       const positionAccount = await program.account.positionV0.fetch(position);
@@ -877,7 +877,9 @@ describe("voter-stake-registry", () => {
         .signers([approver, to])
         .rpc({ skipPreflight: true });
 
-      const toBalance = await provider.connection.getTokenAccountBalance(getAssociatedTokenAddressSync(mint, to.publicKey));
+      const toBalance = await provider.connection.getTokenAccountBalance(
+        getAssociatedTokenAddressSync(mint, to.publicKey)
+      );
       expect(toBalance.value.uiAmount).to.equal(1);
     });
 
@@ -930,9 +932,3 @@ describe("voter-stake-registry", () => {
     });
   });
 });
-
-export function loadKeypair(keypair: string): Keypair {
-  return Keypair.fromSecretKey(
-    new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString()))
-  );
-}

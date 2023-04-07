@@ -164,6 +164,8 @@ export async function formTransaction({
           lazyDistributor,
           assetEndpoint,
           owner: wallet,
+          // Make the oracle pay for the recipient to avoid newly migrated users not having enough sol to claim rewards
+          payer: lazyDistributorAcc.oracles[0].oracle,
           getAssetFn: () => Promise.resolve(asset), // cache result so we don't hit again
           getAssetProofFn,
         })
