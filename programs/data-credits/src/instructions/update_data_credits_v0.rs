@@ -30,6 +30,6 @@ pub fn handler(ctx: Context<UpdateDataCreditsV0>, args: UpdateDataCreditsArgsV0)
   if let Some(hnt_price_oracle) = args.hnt_price_oracle {
     ctx.accounts.data_credits.hnt_price_oracle = hnt_price_oracle;
   }
-  
+
   Ok(())
 }
