@@ -444,9 +444,19 @@ describe("helium-sub-daos", () => {
             delegatedPosition!
           );
           const sdAcc = await program.account.subDaoV0.fetch(subDao);
+          const positionAcc = await vsrProgram.account.positionV0.fetch(
+            position
+          );
+          const endTs = positionAcc.lockup.endTs.toNumber();
+          const startTs = positionAcc.lockup.startTs.toNumber();
+          const multiplier =
+            typeof positionAcc.lockup.kind.cliff === "undefined"
+              ? 1
+              : (endTs - sdAcc.vehntLastCalculatedTs.toNumber()) /
+                (endTs - startTs);
 
           const expectedVeHnt =
-            options.lockupAmount * options.expectedMultiplier;
+            options.lockupAmount * options.expectedMultiplier * multiplier;
 
           expectBnAccuracy(
             toBN(expectedVeHnt, 8).mul(new BN("1000000000000")),
@@ -743,10 +753,12 @@ describe("helium-sub-daos", () => {
               );
 
               expect(sdAcc.vehntFallRate.toNumber()).to.be.closeTo(
-                typeof positionAcc.lockup.kind.cliff !== "undefined" ? ((options.lockupAmount * options.expectedMultiplier) /
-                  (endTs - startTs)) *
-                  100000000000000000000 : 0,
-                  1
+                typeof positionAcc.lockup.kind.cliff !== "undefined"
+                  ? ((options.lockupAmount * options.expectedMultiplier) /
+                      (endTs - startTs)) *
+                      100000000000000000000
+                  : 0,
+                1
               );
 
               assert.isFalse(

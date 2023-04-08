@@ -54,7 +54,7 @@ pub struct CloseDelegationV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
+    space = SubDaoEpochInfoV0::SIZE,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(registrar.clock_unix_timestamp()).to_le_bytes()],
     bump,
   )]
