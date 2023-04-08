@@ -104,9 +104,9 @@ pub fn update_subdao_vehnt(
       .checked_sub(curr_epoch_info.fall_rates_from_closing_positions)
       .unwrap();
 
-    sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.saturating_sub(
-      curr_epoch_info.vehnt_in_closing_positions
-    );
+    sub_dao.vehnt_delegated = sub_dao
+      .vehnt_delegated
+      .saturating_sub(curr_epoch_info.vehnt_in_closing_positions);
     // Since this has already been applied, set to 0
     curr_epoch_info.fall_rates_from_closing_positions = 0;
     curr_epoch_info.vehnt_in_closing_positions = 0;

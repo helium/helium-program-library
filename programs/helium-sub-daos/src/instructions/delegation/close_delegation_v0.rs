@@ -1,6 +1,6 @@
 use crate::{
-  caclulate_vhnt_info, current_epoch, id, state::*, update_subdao_vehnt,
-  PrecisePosition, VehntInfo, TESTING,
+  caclulate_vhnt_info, current_epoch, id, state::*, update_subdao_vehnt, PrecisePosition,
+  VehntInfo, TESTING,
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
@@ -169,9 +169,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
 
   genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = genesis_end_sub_dao_epoch_info
     .vehnt_in_closing_positions
-    .saturating_sub(
-      genesis_end_vehnt_correction
-    );
+    .saturating_sub(genesis_end_vehnt_correction);
 
   if end_and_genesis_same {
     // Ensure ordering of exit is correct

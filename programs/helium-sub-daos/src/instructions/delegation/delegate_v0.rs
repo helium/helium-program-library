@@ -238,9 +238,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
 
       genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = genesis_end_sub_dao_epoch_info
         .vehnt_in_closing_positions
-        .checked_add(
-          genesis_end_vehnt_correction
-        )
+        .checked_add(genesis_end_vehnt_correction)
         .unwrap();
 
       genesis_end_sub_dao_epoch_info.exit(&id())?;
