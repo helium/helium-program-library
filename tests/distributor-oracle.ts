@@ -313,7 +313,7 @@ describe("distributor-oracle", () => {
       hntMint
     );
     daoK = dao;
-    const eccVerifier = loadKeypair(__dirname + "/verifier-test.json");
+    const eccVerifier = loadKeypair(__dirname + "/keypairs/verifier-test.json");
     ecc = (await HeliumKeypair.makeRandom()).address.b58;
 
     const hotspotOwner = Keypair.generate();
