@@ -1,6 +1,6 @@
 use crate::{
-  caclulate_vhnt_info, current_epoch, id, state::*, update_subdao_vehnt, VehntInfo,
-  FALL_RATE_FACTOR, TESTING,
+  apply_fall_rate_factor, caclulate_vhnt_info, current_epoch, id, state::*, update_subdao_vehnt,
+  VehntInfo, FALL_RATE_FACTOR, TESTING, PrecisePosition,
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
@@ -96,7 +96,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   let registrar = &ctx.accounts.registrar;
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
-  let vehnt_at_curr_ts = position.voting_power(voting_mint_config, curr_ts)?;
+  let vehnt_at_curr_ts = position.voting_power_precise(voting_mint_config, curr_ts)?;
   let vehnt_info = caclulate_vhnt_info(
     ctx.accounts.delegated_position.start_ts,
     position,
@@ -144,7 +144,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
     .accounts
     .closing_time_sub_dao_epoch_info
     .vehnt_in_closing_positions
-    .checked_sub(end_vehnt_correction)
+    .checked_sub(u64::try_from(apply_fall_rate_factor(end_vehnt_correction).unwrap()).unwrap())
     .unwrap();
 
   // Closing time and genesis end can be the same account
@@ -169,7 +169,9 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
 
   genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = genesis_end_sub_dao_epoch_info
     .vehnt_in_closing_positions
-    .checked_sub(genesis_end_vehnt_correction)
+    .checked_sub(
+      u64::try_from(apply_fall_rate_factor(genesis_end_vehnt_correction).unwrap()).unwrap(),
+    )
     .unwrap();
 
   if end_and_genesis_same {
@@ -191,9 +193,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
     );
     // remove this stake information from the subdao
     sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.saturating_sub(
-      u128::from(vehnt_at_curr_ts)
-        .checked_mul(FALL_RATE_FACTOR)
-        .unwrap(),
+      vehnt_at_curr_ts
     );
 
     sub_dao.vehnt_fall_rate = sub_dao

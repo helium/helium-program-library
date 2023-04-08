@@ -451,7 +451,7 @@ describe("helium-sub-daos", () => {
           expectBnAccuracy(
             toBN(expectedVeHnt, 8).mul(new BN("1000000000000")),
             sdAcc.vehntDelegated,
-            options.kind?.constant !== undefined ? 0 : 0.0000001
+            options.kind?.constant !== undefined ? 0 : 0.00000000001
           );
           expectBnAccuracy(lockupAmount, acc.hntAmount, 0.01);
         });
@@ -652,8 +652,9 @@ describe("helium-sub-daos", () => {
 
             const sdAcc = await program.account.subDaoV0.fetch(subDao);
 
-            expect(sdAcc.vehntFallRate.eq(new BN(0))).to.be.true;
-            expect(sdAcc.vehntDelegated.eq(new BN(0))).to.be.true;
+            expect(sdAcc.vehntFallRate.toNumber()).to.eq(0);
+            // Extremely precise u128 can be off by 1.
+            expect(sdAcc.vehntDelegated.toNumber()).to.be.closeTo(0, 1)
 
             assert.isFalse(
               !!(await provider.connection.getAccountInfo(delegatedPosition!))
@@ -663,7 +664,7 @@ describe("helium-sub-daos", () => {
           describe("with multiple delegated vehnt", () => {
             let basePosition: PublicKey;
             let basePositionOptions = {
-              lockupPeriods: 365 * 1,
+              lockupPeriods: 3 * 1,
               lockupAmount: 1000000,
               kind: { cliff: {} },
               expectedMultiplier:
@@ -740,11 +741,11 @@ describe("helium-sub-daos", () => {
                 console.log(
                   toBN(expectedVehnt, 8).mul(new BN("1000000000000")).toString(),
                   sdAcc.vehntDelegated.toString()
-                );1000000000000.000000000000;
+                );
               expectBnAccuracy(
                 toBN(expectedVehnt, 8).mul(new BN("1000000000000")),
                 sdAcc.vehntDelegated,
-                0.0000001
+                0.000000001
               );
 
               expect(sdAcc.vehntFallRate.eq(new BN(0))).to.be.true;
