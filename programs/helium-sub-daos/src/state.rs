@@ -159,6 +159,10 @@ pub struct SubDaoEpochInfoV0 {
 }
 
 impl SubDaoEpochInfoV0 {
+  pub const SIZE: usize = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>() - 8; // subtract 8 the extra u64 we added to vehnt
+}
+
+impl SubDaoEpochInfoV0 {
   pub fn start_ts(&self) -> i64 {
     i64::try_from(self.epoch).unwrap() * EPOCH_LENGTH
   }
