@@ -11,7 +11,7 @@ use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
-use pyth_sdk_solana::load_price_feed_from_account_info;
+use price_oracle::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MintDataCreditsArgsV0 {
@@ -35,8 +35,8 @@ pub struct MintDataCreditsV0<'info> {
     has_one = hnt_price_oracle
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
-  /// CHECK: Checked via load call in handler
-  pub hnt_price_oracle: AccountInfo<'info>,
+
+  pub hnt_price_oracle: Box<Account<'info, PriceOracleV0>>,
 
   // hnt tokens from this account are burned
   #[account(
@@ -129,25 +129,10 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
     token::thaw_account(ctx.accounts.thaw_ctx().with_signer(signer_seeds))?;
   }
 
-  let hnt_price_oracle = load_price_feed_from_account_info(&ctx.accounts.hnt_price_oracle)
-    .map_err(|e| {
-      msg!("Pyth error {}", e);
-      error!(DataCreditsErrors::PythError)
-    })?;
+  let hnt_price = ctx.accounts.hnt_price_oracle.current_price.unwrap();
+  let expo = -(ctx.accounts.hnt_price_oracle.decimals as i32);
 
-  let current_time = Clock::get()?.unix_timestamp;
-  let hnt_price = hnt_price_oracle
-    .get_ema_price_no_older_than(current_time, if TESTING { 6000000 } else { 10 * 60 })
-    .ok_or_else(|| error!(DataCreditsErrors::PythPriceNotFound))?;
-
-  require_gt!(hnt_price.price, 0);
-
-  // Remove the confidence from the price to use the most conservative price
-  // https://docs.pyth.network/pythnet-price-feeds/best-practices
-  let hnt_price_with_conf = hnt_price
-    .price
-    .checked_sub(i64::try_from(hnt_price.conf.checked_mul(2).unwrap()).unwrap())
-    .unwrap();
+  require_gt!(hnt_price, 0);
 
   // dc_exponent = 5 since $1 = 10^5 DC
   // expo is a negative number, i.e. normally -8 for 8 hnt decimals
@@ -155,7 +140,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
   // dc = price * hnt_amount * 10^(expo - hnt_decimals + dc_exponent)
   // dc = price * hnt_amount / 10^(hnt_decimals - expo - dc_exponent)
   // hnt_amount = dc * 10^(hnt_decimals - expo - dc_exponent) / price
-  let exponent = i32::try_from(ctx.accounts.hnt_mint.decimals).unwrap() - hnt_price.expo - 5;
+  let exponent = i32::try_from(ctx.accounts.hnt_mint.decimals).unwrap() - expo - 5;
   let decimals_factor = 10_u128
     .checked_pow(u32::try_from(exponent).unwrap())
     .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?;
@@ -164,7 +149,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
     (Some(hnt_amount), None) => {
       let dc_amount = u64::try_from(
         u128::from(hnt_amount)
-          .checked_mul(u128::try_from(hnt_price_with_conf).unwrap())
+          .checked_mul(u128::try_from(hnt_price).unwrap())
           .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
           .div(decimals_factor),
       )
@@ -177,7 +162,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
         u128::from(dc_amount)
           .checked_mul(decimals_factor)
           .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?
-          .checked_div(u128::try_from(hnt_price_with_conf).unwrap())
+          .checked_div(u128::try_from(hnt_price).unwrap())
           .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?,
       )
       .map_err(|_| error!(DataCreditsErrors::ArithmeticError))?;
@@ -197,8 +182,8 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
 
   msg!(
     "HNT Price is {} * 10^{}, issuing {} data credits",
-    hnt_price_with_conf,
-    hnt_price.expo,
+    hnt_price,
+    expo,
     dc_amount
   );
 

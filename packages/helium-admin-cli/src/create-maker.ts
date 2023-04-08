@@ -120,6 +120,7 @@ export async function run(args: any = process.argv) {
       name,
       address: argv.makerKey,
       count: argv.makerCount || 300000,
+      staked: true
     },
   ];
 
@@ -132,6 +133,7 @@ export async function run(args: any = process.argv) {
       name: "Migrated Helium Hotspot",
       address: helAddr.b58,
       count: 50000,
+      staked: true
     });
   }
 
@@ -163,7 +165,7 @@ export async function run(args: any = process.argv) {
   const approveInstructions: TransactionInstruction[][] = [];
   const updateAuthority = dao.authority;
   let totalSol = 0;
-  for (const { name, address, count } of makers) {
+  for (const { name, address, count, staked } of makers) {
     const innerCreateInstrs = [];
     const makerAuthority = new PublicKey(Address.fromB58(address).publicKey);
     const [size, buffer, canopy] = merkleSizes.find(
@@ -301,7 +303,7 @@ export async function run(args: any = process.argv) {
 
     const innerApproveInstrs = [];
     let approve;
-    if (!(await exists(conn, makerApprovalKey(entityConfigKey, maker)[0]))) {
+    if (staked && !(await exists(conn, makerApprovalKey(entityConfigKey, maker)[0]))) {
       const authority = (
         await hemProgram.account.rewardableEntityConfigV0.fetch(entityConfigKey)
       ).authority;

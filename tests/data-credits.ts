@@ -20,15 +20,18 @@ import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
 import * as hsd from "../packages/helium-sub-daos-sdk/src";
 import { toBN, toNumber } from "../packages/spl-utils/src";
 import * as vsr from "../packages/voter-stake-registry-sdk/src";
+import * as po from "../packages/price-oracle-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestSubdao } from "./utils/daos";
 import { ensureHSDIdl, ensureVSRIdl } from "./utils/fixtures";
-
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { PriceOracle } from "@helium/idls/lib/types/price_oracle";
 import { ThresholdType } from "../packages/circuit-breaker-sdk/src";
 import { daoKey } from "../packages/helium-sub-daos-sdk/src";
 import { initVsr } from "./utils/vsr";
+import { exists, loadKeypair } from "./utils/solana"; 
+
 const EPOCH_REWARDS = 100000000;
 
 export async function burnDataCredits({
@@ -71,9 +74,11 @@ describe("data-credits", () => {
   let program: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
   let vsrProgram: Program<VoterStakeRegistry>;
+  let poProgram: Program<PriceOracle>;
   let dcKey: PublicKey;
   let hntMint: PublicKey;
   let dcMint: PublicKey;
+  let priceOracle: PublicKey;
   let startHntBal = 10000;
   let startDcBal = 2;
   let hntDecimals = 8;
@@ -97,6 +102,11 @@ describe("data-credits", () => {
       vsr.PROGRAM_ID,
       anchor.workspace.VoterStakeRegistry.idl
     );
+    poProgram = await po.init(
+      provider,
+      po.PROGRAM_ID,
+      anchor.workspace.PriceOracle.idl
+    );
     ensureVSRIdl(vsrProgram);
     // fresh start
     hntMint = await createMint(provider, hntDecimals, me, me);
@@ -113,6 +123,35 @@ describe("data-credits", () => {
       toBN(startDcBal, dcDecimals).toNumber(),
       me
     );
+
+    const hntOracleKp = loadKeypair(
+      __dirname + "/keypairs/hnt-oracle-test.json"
+    );
+    priceOracle = hntOracleKp.publicKey;
+    if (!(await exists(provider.connection, priceOracle))) {
+      await poProgram.methods.initializePriceOracleV0({
+        oracles: [{
+          authority: me,
+          lastSubmittedPrice: null,
+          lastSubmittedTimestamp: null,
+        }],
+        decimals: 8,
+        authority: me
+      }).accounts({
+        priceOracle: hntOracleKp.publicKey,
+        payer: me,
+      }).signers([hntOracleKp])
+      .rpc({skipPreflight: true});
+    }
+
+    const price = new BN(100000000); // $1
+    await poProgram.methods.submitPriceV0({
+      oracleIndex: 0,
+      price,
+    }).accounts({
+      priceOracle: hntOracleKp.publicKey,
+    }).rpc({skipPreflight: true});
+
     const method = await program.methods
       .initializeDataCreditsV0({
         authority: me,
@@ -127,7 +166,7 @@ describe("data-credits", () => {
         dcMint,
         payer: me,
         hntPriceOracle: new PublicKey(
-          "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"
+          "horxeteuqLRK39UeaiVpgKUR565jStW2Edqd9ioShpU"
         ),
       });
     dcKey = (await method.pubkeys()).dataCredits!;
@@ -213,13 +252,10 @@ describe("data-credits", () => {
       assert(dcAtaAcc.isFrozen);
       const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
       const hntBal = await provider.connection.getTokenAccountBalance(hntAta);
-      const pythData = (await provider.connection.getAccountInfo(
-        new PublicKey("7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm")
-      ))!.data;
-      const price = parsePriceData(pythData);
-      console.log(price)
+      const priceOracleAcc = await poProgram.account.priceOracleV0.fetch(priceOracle);
+
       const approxEndBal =
-        startDcBal + Math.floor((price.emaPrice.value - (price.emaConfidence!.value * 2)) * 10 ** 5);
+        startDcBal + Math.floor(priceOracleAcc.currentPrice!.toNumber() / Math.pow(10, priceOracleAcc.decimals) * 10 ** 5);
       expect(dcBal.value.uiAmount).to.be.within(
         approxEndBal - 1,
         approxEndBal + 1
@@ -245,11 +281,9 @@ describe("data-credits", () => {
       const hntBal = await provider.connection.getTokenAccountBalance(
         await getAssociatedTokenAddress(hntMint, me)
       );
-      const pythData = (await provider.connection.getAccountInfo(
-        new PublicKey("7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm")
-      ))!.data;
-      const price = parsePriceData(pythData);
-      const approxEndBal = startHntBal - (Math.floor(dcAmount * 10**11) / Number(price.emaPrice.valueComponent - (price.emaConfidence.valueComponent * BigInt(2)))) * 10**-hntDecimals;
+      const priceOracleAcc = await poProgram.account.priceOracleV0.fetch(priceOracle);
+
+      const approxEndBal = startHntBal - (Math.floor(dcAmount * 10**11) / Number(priceOracleAcc.currentPrice!.toNumber() )) * 10**-hntDecimals;
       expect(hntBal.value.uiAmount).to.be.within(approxEndBal * 0.999, approxEndBal * 1.001);
       expect(dcBal.value.uiAmount).to.eq(startDcBal + dcAmount);
     });
@@ -285,6 +319,7 @@ describe("data-credits", () => {
       await program.methods
         .updateDataCreditsV0({
           newAuthority: PublicKey.default,
+          hntPriceOracle: null
         })
         .accounts({
           dcMint,
