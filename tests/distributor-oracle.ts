@@ -4,6 +4,7 @@ import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import Address from "@helium/address";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
+import { init as initPriceOracle, PROGRAM_ID as PO_PID } from "@helium/price-oracle-sdk";
 import {
   init as initDataCredits,
   PROGRAM_ID as DC_PID
@@ -279,6 +280,12 @@ describe("distributor-oracle", () => {
       anchor.workspace.VoterStakeRegistry.idl
     );
 
+    const poProgram = await initPriceOracle(
+      provider,
+      PO_PID,
+      anchor.workspace.PriceOracle.idl
+    );
+
     const { registrar } = await initVsr(
       vsrProgram,
       provider,
@@ -299,6 +306,7 @@ describe("distributor-oracle", () => {
       hemProgram,
       hsdProgram,
       dcProgram,
+      poProgram,
       1,
       1,
       registrar,
