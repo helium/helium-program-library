@@ -69,6 +69,7 @@ import {
   TokenProgramVersion,
   TokenStandard
 } from "@metaplex-foundation/mpl-bubblegum";
+// @ts-ignore
 import animalHash from "angry-purple-tiger";
 
 chai.use(chaiHttp);
@@ -287,6 +288,7 @@ describe("distributor-oracle", () => {
       1,
       3
     );
+    console.log(dcProgram.methods);
     const {
       dao: { dao },
       dataCredits: { dcMint },
@@ -435,14 +437,12 @@ describe("distributor-oracle", () => {
     ]);
   });
 
-  after(async function () {
+  afterEach(async function () {
     if (oracleServer) await oracleServer.close();
   });
 
   it("allows oracle to set current reward", async () => {
     const keyToAsset = keyToAssetKey(daoK, ecc)[0];
-    const k = await hemProgram.account.keyToAssetV0.fetch(keyToAsset);
-    const r = await ldProgram.account.recipientV0.fetch(recipient);
     await rewardsProgram.methods
       .setCurrentRewardsWrapperV0({
         currentRewards: new anchor.BN("5000000"),
@@ -453,10 +453,12 @@ describe("distributor-oracle", () => {
         lazyDistributor,
         recipient,
         keyToAsset,
+        oracle: oracle.publicKey,
         lazyDistributorProgram: new PublicKey(
           "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w"
         ),
       })
+      .signers([oracle])
       .rpc();
 
     const recipientAcc = await ldProgram.account.recipientV0.fetch(recipient);
