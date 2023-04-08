@@ -29,9 +29,10 @@ export const heliumEntityManagerResolvers = combineResolvers(
       return new PublicKey("eccSAJM3tq7nQSpQTm8roxv4FPoipCkMsGizW2KBhqZ");
     }
   }),
-  resolveIndividual(async ({ path, args, accounts }) => {
+  resolveIndividual(async ({ idlIx, path, args, accounts }) => {
     if (
       path[path.length - 1] === "keyToAsset" &&
+      args[args.length - 1] &&
       args[args.length - 1].entityKey &&
       accounts.dao
     ) {
@@ -40,6 +41,14 @@ export const heliumEntityManagerResolvers = combineResolvers(
           accounts.dao as PublicKey,
           args[args.length - 1].entityKey
         )
+      )[0];
+    } else if (
+      path[path.length - 1] === "keyToAsset" &&
+      idlIx.name === "issueIotOperationsFundV0" &&
+      accounts.dao
+    ) {
+      return (
+        await keyToAssetKey(accounts.dao as PublicKey, Buffer.from("iot_operations_fund", "utf8"))
       )[0];
     }
   }),
@@ -100,6 +109,12 @@ export const heliumEntityManagerResolvers = combineResolvers(
         (accounts.owner || accounts.hotspotOwner) as PublicKey
       );
     }
+  }),
+  ataResolver({
+    instruction: "issueIotOperationsFundV0",
+    account: "recipientAccount",
+    owner: "recipient",
+    mint: "mint"
   }),
   ataResolver({
     instruction: "issueEntityV0",
