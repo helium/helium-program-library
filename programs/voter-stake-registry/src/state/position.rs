@@ -3,7 +3,6 @@ use crate::error::*;
 use anchor_lang::prelude::*;
 use std::cmp::min;
 
-
 pub const PRECISION_FACTOR: u128 = 1_000_000_000_000;
 
 #[account]

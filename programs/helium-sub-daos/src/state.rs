@@ -143,7 +143,7 @@ pub struct SubDaoEpochInfoV0 {
   /// total vehnt after the epoch passes. Typically these positions close somewhere between the epoch start and end time, so we cannot rely
   /// on fall rate calculations alone without knowing the exact end date of each position. Instead, just keep track of what needs to be
   /// removed.
-  pub vehnt_in_closing_positions: u64,
+  pub vehnt_in_closing_positions: u128,
   /// The vehnt amount that is decaying per second, with 12 decimals of extra precision. Associated with positions that are closing this epoch,
   /// which means they must be subtracted from the total fall rate on the subdao after this epoch passes
   pub fall_rates_from_closing_positions: u128,

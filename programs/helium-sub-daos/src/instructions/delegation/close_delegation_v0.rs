@@ -1,6 +1,6 @@
 use crate::{
-  apply_fall_rate_factor, caclulate_vhnt_info, current_epoch, id, state::*, update_subdao_vehnt,
-  VehntInfo, FALL_RATE_FACTOR, TESTING, PrecisePosition,
+  caclulate_vhnt_info, current_epoch, id, state::*, update_subdao_vehnt,
+  PrecisePosition, VehntInfo, TESTING,
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
@@ -144,7 +144,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
     .accounts
     .closing_time_sub_dao_epoch_info
     .vehnt_in_closing_positions
-    .checked_sub(u64::try_from(apply_fall_rate_factor(end_vehnt_correction).unwrap()).unwrap())
+    .checked_sub(end_vehnt_correction)
     .unwrap();
 
   // Closing time and genesis end can be the same account
@@ -169,10 +169,9 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
 
   genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = genesis_end_sub_dao_epoch_info
     .vehnt_in_closing_positions
-    .checked_sub(
-      u64::try_from(apply_fall_rate_factor(genesis_end_vehnt_correction).unwrap()).unwrap(),
-    )
-    .unwrap();
+    .saturating_sub(
+      genesis_end_vehnt_correction
+    );
 
   if end_and_genesis_same {
     // Ensure ordering of exit is correct
@@ -192,9 +191,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
       vehnt_at_curr_ts
     );
     // remove this stake information from the subdao
-    sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.saturating_sub(
-      vehnt_at_curr_ts
-    );
+    sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.saturating_sub(vehnt_at_curr_ts);
 
     sub_dao.vehnt_fall_rate = sub_dao
       .vehnt_fall_rate

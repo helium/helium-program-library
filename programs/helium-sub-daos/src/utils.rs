@@ -105,9 +105,7 @@ pub fn update_subdao_vehnt(
       .unwrap();
 
     sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.saturating_sub(
-      u128::from(curr_epoch_info.vehnt_in_closing_positions)
-        .checked_mul(FALL_RATE_FACTOR)
-        .unwrap(),
+      curr_epoch_info.vehnt_in_closing_positions
     );
     // Since this has already been applied, set to 0
     curr_epoch_info.fall_rates_from_closing_positions = 0;
@@ -219,12 +217,16 @@ impl PrecisePosition for PositionV0 {
 
     match self.lockup.kind {
       LockupKind::None => Ok(0),
-      LockupKind::Cliff => {
-        self.voting_power_precise_cliff_precise(curr_ts, max_locked_vote_weight, lockup_saturation_secs)
-      }
-      LockupKind::Constant => {
-        self.voting_power_precise_cliff_precise(curr_ts, max_locked_vote_weight, lockup_saturation_secs)
-      }
+      LockupKind::Cliff => self.voting_power_precise_cliff_precise(
+        curr_ts,
+        max_locked_vote_weight,
+        lockup_saturation_secs,
+      ),
+      LockupKind::Constant => self.voting_power_precise_cliff_precise(
+        curr_ts,
+        max_locked_vote_weight,
+        lockup_saturation_secs,
+      ),
     }
   }
 
@@ -315,7 +317,8 @@ pub fn caclulate_vhnt_info(
   } else {
     position.voting_power_precise(voting_mint_config, curr_ts)?
   };
-  let vehnt_at_position_end = position.voting_power_precise(voting_mint_config, position.lockup.end_ts)?;
+  let vehnt_at_position_end =
+    position.voting_power_precise(voting_mint_config, position.lockup.end_ts)?;
 
   let pre_genesis_end_fall_rate =
     calculate_fall_rate(vehnt_at_curr_ts, vehnt_at_genesis_end, seconds_to_genesis).unwrap();
@@ -347,17 +350,17 @@ pub fn caclulate_vhnt_info(
       .unwrap()
       // Correction factor
       .checked_sub(
-          post_genesis_end_fall_rate
-            .checked_mul(
-              u128::try_from(
-                position
-                  .genesis_end
-                  .checked_sub(genesis_end_epoch_start_ts)
-                  .unwrap(),
-              )
-              .unwrap(),
+        post_genesis_end_fall_rate
+          .checked_mul(
+            u128::try_from(
+              position
+                .genesis_end
+                .checked_sub(genesis_end_epoch_start_ts)
+                .unwrap(),
             )
             .unwrap(),
+          )
+          .unwrap(),
       )
       .unwrap();
   }

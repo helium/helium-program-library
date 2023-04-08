@@ -167,7 +167,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
     .accounts
     .closing_time_sub_dao_epoch_info
     .vehnt_in_closing_positions
-    .checked_add(u64::try_from(apply_fall_rate_factor(end_vehnt_correction).unwrap()).unwrap())
+    .checked_add(end_vehnt_correction)
     .unwrap();
   ctx.accounts.closing_time_sub_dao_epoch_info.sub_dao = sub_dao.key();
   ctx.accounts.closing_time_sub_dao_epoch_info.epoch = current_epoch(position.lockup.end_ts);
@@ -194,10 +194,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
             sub_dao: sub_dao.key(),
             dc_burned: 0,
             vehnt_at_epoch_start: 0,
-            vehnt_in_closing_positions: u64::try_from(
-              apply_fall_rate_factor(genesis_end_vehnt_correction).unwrap(),
-            )
-            .unwrap(),
+            vehnt_in_closing_positions: genesis_end_vehnt_correction,
             fall_rates_from_closing_positions: genesis_end_fall_rate_correction,
             delegation_rewards_issued: 0,
             utility_score: None,
@@ -242,7 +239,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
       genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = genesis_end_sub_dao_epoch_info
         .vehnt_in_closing_positions
         .checked_add(
-          u64::try_from(apply_fall_rate_factor(genesis_end_fall_rate_correction).unwrap()).unwrap(),
+          genesis_end_vehnt_correction
         )
         .unwrap();
 
