@@ -4,7 +4,7 @@ pub mod instructions;
 
 pub use instructions::*;
 
-declare_id!("EXCh5WEhHJFJpDz5AiZJ8TrpCZTaLF3KJt1UeXA4yyth");
+declare_id!("rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF");
 
 #[program]
 pub mod rewards_oracle {
