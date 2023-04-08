@@ -53,6 +53,7 @@ export const initTestDataCredits = async (
   dcMint = await createMint(provider, 0, me, me);
 
   await createAtaAndMint(provider, hntMint, toBN(startingHntbal, 8), me);
+  console.log("prog", program)
 
   const initDataCredits = await program.methods
     .initializeDataCreditsV0({
