@@ -220,8 +220,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
       .accounts
       .sub_dao_epoch_info
       .vehnt_at_epoch_start
-      .saturating_sub(vehnt_at_start)
-      .unwrap();
+      .saturating_sub(vehnt_at_start);
   }
 
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
