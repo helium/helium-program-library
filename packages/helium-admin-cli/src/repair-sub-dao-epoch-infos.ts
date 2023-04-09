@@ -23,17 +23,12 @@ export const run = async (args: any = process.argv) => {
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
-  if (!argv.mint) {
-    console.log("mint not provided");
-    return;
-  }
-
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hsdProgram = await initHsd(provider);
 
   const things = await hsdProgram.account.subDaoEpochInfoV0.all();
   for (const thing of things) {
-    hsdProgram.methods.repairSubDaoEpochInfoV0()
+    await hsdProgram.methods.repairSubDaoEpochInfoV0()
     .accounts({
       subDaoEpochInfo: thing.publicKey,
     })

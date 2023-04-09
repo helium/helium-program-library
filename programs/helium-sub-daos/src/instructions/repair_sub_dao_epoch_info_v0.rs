@@ -36,7 +36,8 @@ pub struct RepairSubDaoEpochInfoV0<'info> {
 
 pub fn handler(ctx: Context<RepairSubDaoEpochInfoV0>) -> Result<()> {
   let mut data = ctx.accounts.sub_dao_epoch_info.try_borrow_mut_data()?;
-  let original = SubDaoEpochInfoOriginal::try_from_slice(&data[8..])?;
+  let original = SubDaoEpochInfoOriginal::try_deserialize_unchecked(&mut &data[..])?;
+  msg!("original");
   let new = SubDaoEpochInfoV0 {
     epoch: original.epoch,
     sub_dao: original.sub_dao,
