@@ -220,7 +220,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
       .accounts
       .sub_dao_epoch_info
       .vehnt_at_epoch_start
-      .checked_sub(vehnt_at_start)
+      .saturating_sub(vehnt_at_start)
       .unwrap();
   }
 
