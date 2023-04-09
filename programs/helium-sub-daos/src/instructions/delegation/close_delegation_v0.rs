@@ -1,6 +1,6 @@
 use crate::{
-  caclulate_vhnt_info, current_epoch, id, state::*, update_subdao_vehnt, VehntInfo,
-  FALL_RATE_FACTOR, TESTING,
+  caclulate_vhnt_info, current_epoch, id, state::*, update_subdao_vehnt, PrecisePosition,
+  VehntInfo, TESTING,
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
@@ -54,7 +54,7 @@ pub struct CloseDelegationV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
+    space = SubDaoEpochInfoV0::SIZE,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(registrar.clock_unix_timestamp()).to_le_bytes()],
     bump,
   )]
@@ -96,7 +96,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   let registrar = &ctx.accounts.registrar;
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
-  let vehnt_at_curr_ts = position.voting_power(voting_mint_config, curr_ts)?;
+  let vehnt_at_curr_ts = position.voting_power_precise(voting_mint_config, curr_ts)?;
   let vehnt_info = caclulate_vhnt_info(
     ctx.accounts.delegated_position.start_ts,
     position,
@@ -169,8 +169,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
 
   genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = genesis_end_sub_dao_epoch_info
     .vehnt_in_closing_positions
-    .checked_sub(genesis_end_vehnt_correction)
-    .unwrap();
+    .saturating_sub(genesis_end_vehnt_correction);
 
   if end_and_genesis_same {
     // Ensure ordering of exit is correct
@@ -190,11 +189,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
       vehnt_at_curr_ts
     );
     // remove this stake information from the subdao
-    sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.saturating_sub(
-      u128::from(vehnt_at_curr_ts)
-        .checked_mul(FALL_RATE_FACTOR)
-        .unwrap(),
-    );
+    sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.saturating_sub(vehnt_at_curr_ts);
 
     sub_dao.vehnt_fall_rate = sub_dao
       .vehnt_fall_rate
