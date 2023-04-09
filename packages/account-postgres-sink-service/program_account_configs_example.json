@@ -6,21 +6,20 @@
         {
           "type": "LazyTransactionsV0",
           "table": "lazy_transactions",
-          "schema": "hlt"
+          "schema": "ltr"
         },
-        { "type": "Block", "table": "blocks", "schema": "hlt" }
+        { "type": "Block", "table": "blocks", "schema": "ltr" }
       ]
     },
     {
       "programId": "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8",
       "accounts": [
-        { "type": "PositionV0", "table": "positions", "schema": "hvsr" },
-        { "type": "Registrar", "table": "registrars", "schema": "hvsr" }
+        { "type": "PositionV0", "table": "positions", "schema": "vsr" },
+        { "type": "Registrar", "table": "registrars", "schema": "vsr" }
       ]
     },
     {
       "programId": "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR",
-
       "accounts": [
         { "type": "DaoV0", "table": "daos", "schema": "hsd" },
         { "type": "SubDaoV0", "table": "sub_daos", "schema": "hsd" },
@@ -30,10 +29,83 @@
           "schema": "hsd"
         },
         {
+          "type": "DaoEpochInfoV0",
+          "table": "dao_epoch_infos",
+          "schema": "hsd"
+        },
+        {
           "type": "DelegatedPositionV0",
           "table": "delegated_positions",
           "schema": "hsd"
         }
+      ]
+    },
+    {
+      "programId": "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g",
+      "accounts": [
+        {
+          "type": "MintWindowedCircuitBreakerV0",
+          "table": "mint_windowed_circuit_breaker_configs",
+          "schema": "cb"
+        },
+        {
+          "type": "AccountWindowedCircuitBreakerV0",
+          "table": "account_windowed_circuit_breaker_configs",
+          "schema": "cb"
+        }
+      ]
+    },
+    {
+      "programId": "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g",
+      "accounts": [
+        {
+          "type": "MintWindowedCircuitBreakerV0",
+          "table": "mint_windowed_circuit_breaker_configs",
+          "schema": "cb"
+        },
+        {
+          "type": "AccountWindowedCircuitBreakerV0",
+          "table": "account_windowed_circuit_breaker_configs",
+          "schema": "cb"
+        }
+      ]
+    },
+    {
+      "programId": "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8",
+      "accounts": [
+        {
+          "type": "RewardableEntityConfigV0",
+          "table": "rewardable_entity_configs",
+          "schema": "hem"
+        },
+        { "type": "MakerV0", "table": "makers", "schema": "hem" },
+        {
+          "type": "MakerApprovalV0",
+          "table": "maker_approvals",
+          "schema": "hem"
+        },
+        { "type": "KeyToAssetV0", "table": "key_to_assets", "schema": "hem" },
+        {
+          "type": "IotHotspotInfoV0",
+          "table": "iot_hotspot_infos",
+          "schema": "hem"
+        },
+        {
+          "type": "MobileHotspotInfoV0",
+          "table": "mobile_hotspot_infos",
+          "schema": "hem"
+        }
+      ]
+    },
+    {
+      "programId": "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w",
+      "accounts": [
+        {
+          "type": "LazyDistributorV0",
+          "table": "lazy_distributors",
+          "schema": "ldr"
+        },
+        { "type": "RecipientV0", "table": "recipients", "schema": "ldr" }
       ]
     }
   ]

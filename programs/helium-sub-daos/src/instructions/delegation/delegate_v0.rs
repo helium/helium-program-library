@@ -42,7 +42,7 @@ pub struct DelegateV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
+    space = SubDaoEpochInfoV0::SIZE,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(registrar.clock_unix_timestamp()).to_le_bytes()],
     bump,
   )]
@@ -50,7 +50,7 @@ pub struct DelegateV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    space = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>(),
+    space = SubDaoEpochInfoV0::SIZE,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(position.lockup.end_ts).to_le_bytes()],
     bump,
   )]
@@ -101,7 +101,7 @@ impl crate::borsh::BorshSerialize for SubDaoEpochInfoV0WithDescriminator {
 
 impl AccountMaxSize for SubDaoEpochInfoV0WithDescriminator {
   fn get_max_size(&self) -> Option<usize> {
-    Some(60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>())
+    Some(SubDaoEpochInfoV0::SIZE)
   }
 }
 
@@ -136,11 +136,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
 
   sub_dao.vehnt_delegated = sub_dao
     .vehnt_delegated
-    .checked_add(
-      u128::from(vehnt_at_curr_ts)
-        .checked_mul(FALL_RATE_FACTOR)
-        .unwrap(),
-    )
+    .checked_add(vehnt_at_curr_ts)
     .unwrap();
   sub_dao.vehnt_fall_rate = if has_genesis {
     sub_dao
