@@ -145,6 +145,7 @@ describe("lazy-distributor", () => {
         lazyDistributor,
         getAssetFn: async () => {
           return {
+            ownership: { owner: me },
             compression: {
               leafId: 0,
               dataHash,
@@ -187,10 +188,11 @@ describe("lazy-distributor", () => {
           lazyDistributor,
           getAssetFn: async () => {
             return {
+              ownership: { owner: me },
               compression: {
                 leafId: 0,
                 dataHash,
-                creatorHash
+                creatorHash,
               },
             } as Asset;
           },

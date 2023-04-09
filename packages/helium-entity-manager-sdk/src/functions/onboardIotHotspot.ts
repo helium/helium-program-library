@@ -6,7 +6,7 @@ import { iotInfoKey, keyToAssetKey } from "../pdas";
 import {
   proofArgsAndAccounts,
   ProofArgsAndAccountsArgs,
-} from "./proofArgsAndAccounts";
+} from "@helium/spl-utils";
 
 export async function onboardIotHotspot({
   program,

@@ -1,7 +1,6 @@
 import { PriceOracle } from "@helium/idls/lib/types/price_oracle";
 import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import BN from "bn.js";
 import { PROGRAM_ID } from "./constants";
 
 export * from "./constants";

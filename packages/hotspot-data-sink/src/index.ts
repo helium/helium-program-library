@@ -6,24 +6,8 @@ import { PublicKey } from '@solana/web3.js';
 import fastify from 'fastify';
 import { sequelize } from './model';
 import { findAccountKey, instructionParser } from './parser';
-import * as fs from 'fs';
 
-function loadSecret(): string | null {
-  const secretFilePath = process.env.HELIUS_AUTH_SECRET_FILE;
-  if (!secretFilePath) {
-    return null;
-  }
-
-  try {
-    const fileContent = fs.readFileSync(secretFilePath, 'utf8');
-    return fileContent;
-  } catch (err) {
-    console.error(`Error reading file: ${err}`);
-    return null;
-  }
-}
-
-const HELIUS_AUTH_SECRET = loadSecret();
+const HELIUS_AUTH_SECRET = process.env.HELIUS_AUTH_SECRET;
 if (!HELIUS_AUTH_SECRET) {
   throw new Error("Helius auth secret not available");
 }

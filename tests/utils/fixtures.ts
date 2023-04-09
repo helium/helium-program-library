@@ -8,8 +8,8 @@ import {
   toBN
 } from "@helium/spl-utils";
 import {
-  getConcurrentMerkleTreeAccountSize,
-  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  getConcurrentMerkleTreeAccountSize
 } from "@solana/spl-account-compression";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { BN } from "bn.js";
@@ -17,9 +17,9 @@ import { execSync } from "child_process";
 import { ThresholdType } from "../../packages/circuit-breaker-sdk/src";
 import { makerKey } from "../../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../../target/types/data_credits";
-import { PriceOracle } from "../../target/types/price_oracle";
 import { HeliumEntityManager } from "../../target/types/helium_entity_manager";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
+import { PriceOracle } from "../../target/types/price_oracle";
 import { initTestDao, initTestSubdao } from "./daos";
 import { exists, loadKeypair } from "./solana";
 import { random } from "./string";

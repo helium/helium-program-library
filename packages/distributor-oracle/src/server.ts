@@ -6,6 +6,7 @@ import {
   BN,
   BorshInstructionCoder,
   getProvider,
+  Instruction,
   Program,
   setProvider
 } from "@coral-xyz/anchor";
@@ -15,7 +16,8 @@ import {
   HeliumEntityManager
 } from "@helium/idls/lib/types/helium_entity_manager";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { init, lazyDistributorKey, PROGRAM_ID } from "@helium/lazy-distributor-sdk";
+import { init as initLazy, lazyDistributorKey, PROGRAM_ID as LD_PID } from "@helium/lazy-distributor-sdk";
+import { init as initRewards, PROGRAM_ID as RO_PID, oracleSigner } from "@helium/rewards-oracle-sdk";
 import { AccountFetchCache, Asset, getAsset, HNT_MINT, IOT_MINT } from "@helium/spl-utils";
 import {
   Keypair,
@@ -33,6 +35,7 @@ import Fastify, {
 } from "fastify";
 import cors from "@fastify/cors";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
+import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
 
 const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
 const DAO = daoKey(HNT)[0];
@@ -110,7 +113,8 @@ export class OracleServer {
   server: string | undefined;
 
   constructor(
-    public program: Program<LazyDistributor>,
+    public ldProgram: Program<LazyDistributor>,
+    public roProgram: Program<RewardsOracle>,
     public hemProgram: Program<HeliumEntityManager>,
     private oracle: Keypair,
     public db: Database,
@@ -228,16 +232,16 @@ export class OracleServer {
 
     const tx = Transaction.from(req.body.transaction.data);
 
-    // validate only interacts with LD program and only calls setCurrentRewards and distributeRewards
+    // validate only interacts with LD and RO programs and only calls setCurrentRewards, distributeRewards
     const setRewardIxs: TransactionInstruction[] = [];
     let recipientToLazyDistToMint: Record<
       string,
       Record<string, PublicKey>
     > = {};
-    const initRecipientTx = this.program.idl.instructions.find(
+    const initRecipientTx = this.ldProgram.idl.instructions.find(
       (x) => x.name === "initializeRecipientV0"
     )!;
-    const initCompressionRecipientTx = this.program.idl.instructions.find(
+    const initCompressionRecipientTx = this.ldProgram.idl.instructions.find(
       (x) => x.name === "initializeCompressionRecipientV0"
     )!;
     const lazyDistributorIdxInitRecipient = initRecipientTx.accounts.findIndex(
@@ -263,20 +267,28 @@ export class OracleServer {
       )!;
 
     for (const ix of tx.instructions) {
-      if (!ix.programId.equals(PROGRAM_ID)) {
+      if (!(ix.programId.equals(LD_PID) || ix.programId.equals(RO_PID))) {
         res.status(400).send({ error: "Invalid instructions in transaction" });
         return;
       }
-      let decoded = (
-        this.program.coder.instruction as BorshInstructionCoder
-      ).decode(ix.data);
+      let decoded: Instruction | null;
+      if (ix.programId.equals(LD_PID)) {
+        decoded = (
+          this.ldProgram.coder.instruction as BorshInstructionCoder
+        ).decode(ix.data);
+      } else {
+        decoded = (
+          this.roProgram.coder.instruction as BorshInstructionCoder
+        ).decode(ix.data);
+      }
       if (
         !decoded ||
         (decoded.name !== "setCurrentRewardsV0" &&
           decoded.name !== "distributeRewardsV0" &&
           decoded.name !== "distributeCompressionRewardsV0" &&
           decoded.name !== "initializeRecipientV0" &&
-          decoded.name !== "initializeCompressionRecipientV0")
+          decoded.name !== "initializeCompressionRecipientV0" &&
+          decoded.name !== "setCurrentRewardsWrapperV0")
       ) {
         res.status(400).send({ error: "Invalid instructions in transaction" });
         return;
@@ -284,7 +296,7 @@ export class OracleServer {
 
       console.log(decoded.name)
 
-      if (decoded.name === "setCurrentRewardsV0") setRewardIxs.push(ix);
+      if (decoded.name === "setCurrentRewardsV0" || decoded.name === "setCurrentRewardsWrapperV0") setRewardIxs.push(ix);
 
       // Since recipient wont exist to fetch to get the mint id, grab it from the init recipient ix
       if (decoded.name === "initializeRecipientV0") {
@@ -314,7 +326,7 @@ export class OracleServer {
       }
     }
 
-    const setRewardsIx = this.program.idl.instructions.find(
+    const setRewardsIx = this.ldProgram.idl.instructions.find(
       (x) => x.name === "setCurrentRewardsV0"
     )!;
     const payerKeyIdx = setRewardsIx.accounts.findIndex(
@@ -329,47 +341,72 @@ export class OracleServer {
     const recipientIdx = setRewardsIx.accounts.findIndex(
       (x) => x.name === "recipient"
     )!;
+
+    const setRewardsWrapperIx = this.roProgram.idl.instructions.find(
+      (x) => x.name === "setCurrentRewardsWrapperV0"
+    )!;
+    const wrapperOracleKeyIdx = setRewardsWrapperIx.accounts.findIndex(
+      (x) => x.name === "oracle"
+    )!;
+    const wrapperLazyDistIdx = setRewardsWrapperIx.accounts.findIndex(
+      (x) => x.name === "lazyDistributor"
+    )!;
+    const wrapperRecipientIdx = setRewardsWrapperIx.accounts.findIndex(
+      (x) => x.name === "recipient"
+    )!;
     // validate setRewards value for this oracle is correct
     for (const ix of setRewardIxs) {
-      if (ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey)) {
+      let recipient: PublicKey | undefined, lazyDist: PublicKey | undefined, proposedCurrentRewards: any;
+
+      if (ix.keys[wrapperOracleKeyIdx].pubkey.equals(this.oracle.publicKey) && ix.programId.equals(RO_PID)) {
         let decoded = (
-          this.program.coder.instruction as BorshInstructionCoder
+          this.roProgram.coder.instruction as BorshInstructionCoder
         ).decode(ix.data);
 
-        const recipient = ix.keys[recipientIdx].pubkey;
-        const lazyDist = ix.keys[lazyDistIdx].pubkey;
+        recipient = ix.keys[wrapperRecipientIdx].pubkey;
+        lazyDist = ix.keys[wrapperLazyDistIdx].pubkey;
+        //@ts-ignore
+        proposedCurrentRewards = decoded.data.args.currentRewards;
+      } else if (ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey) && ix.programId.equals(LD_PID)) {
+        let decoded = (
+          this.ldProgram.coder.instruction as BorshInstructionCoder
+        ).decode(ix.data);
 
-        if (!lazyDist.equals(this.lazyDistributor)) {
-          res.status(400).send({ error: "Invalid lazy distributor" });
+        recipient = ix.keys[recipientIdx].pubkey;
+        lazyDist = ix.keys[lazyDistIdx].pubkey;
+        //@ts-ignore
+        proposedCurrentRewards = decoded.data.args.currentRewards;
+      }
+
+      if (!lazyDist || !recipient || !lazyDist.equals(this.lazyDistributor)) {
+        res.status(400).send({ error: "Invalid lazy distributor" });
+        return;
+      }
+
+      let mint = (recipientToLazyDistToMint[recipient.toBase58()] || {})[
+        lazyDist.toBase58()
+      ];
+      if (!mint) {
+        const recipientAcc = await this.ldProgram.account.recipientV0.fetchNullable(
+          recipient
+        );
+        if (!recipientAcc) {
+          console.error(recipientToLazyDistToMint);
+          res
+            .status(400)
+            .send({
+              error: "Recipient doesn't exist",
+              recipientToLazyDistToMint,
+            });
           return;
         }
+        mint = recipientAcc.asset;
+      }
 
-        let mint = (recipientToLazyDistToMint[recipient.toBase58()] || {})[
-          lazyDist.toBase58()
-        ];
-        if (!mint) {
-          const recipientAcc = await this.program.account.recipientV0.fetchNullable(
-            recipient
-          );
-          if (!recipientAcc) {
-            console.error(recipientToLazyDistToMint);
-            res
-              .status(400)
-              .send({
-                error: "Recipient doesn't exist",
-                recipientToLazyDistToMint,
-              });
-            return;
-          }
-          mint = recipientAcc.asset;
-        }
-
-        const currentRewards = await this.db.getCurrentRewards(mint);
-        // @ts-ignore
-        if (decoded.data.args.currentRewards.toNumber() > currentRewards) {
-          res.status(400).send({ error: "Invalid amount" });
-          return;
-        }
+      const currentRewards = await this.db.getCurrentRewards(mint);
+      if (proposedCurrentRewards.toNumber() > currentRewards) {
+        res.status(400).send({ error: "Invalid amount" });
+        return;
       }
     }
 
@@ -408,14 +445,16 @@ export class OracleServer {
         )
       )
     );
-    const program = await init(provider);
+    const ldProgram = await initLazy(provider);
+    const roProgram = await initRewards(provider);
     const hemProgram = await initHeliumEntityManager(provider);
     const DNT = process.env.DNT_MINT
       ? new PublicKey(process.env.DNT_MINT)
       : IOT_MINT;
     const LAZY_DISTRIBUTOR = lazyDistributorKey(DNT)[0];
     const server = new OracleServer(
-      program,
+      ldProgram,
+      roProgram,
       hemProgram,
       oracleKeypair,
       new PgDatabase(hemProgram),
