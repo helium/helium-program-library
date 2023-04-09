@@ -140,10 +140,10 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   // rewards = staking_rewards_issued * staked_vehnt_at_epoch / total_vehnt
   let rewards = u64::try_from(
     (delegated_vehnt_at_epoch as u128)
-    .checked_mul(ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued as u128)
-    .unwrap()
-    .checked_div(ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start as u128)
-    .unwrap()
+      .checked_mul(ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued as u128)
+      .unwrap()
+      .checked_div(ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start as u128)
+      .unwrap(),
   )
   .unwrap();
 
