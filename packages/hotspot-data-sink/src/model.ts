@@ -2,6 +2,7 @@ import {Sequelize, STRING, INTEGER, Model, INET} from 'sequelize';
 import AWS from "aws-sdk";
 import * as pg from "pg";
 import { BOOLEAN } from 'sequelize';
+import { BIGINT } from 'sequelize';
 
 const host = process.env.PGHOST || "localhost";
 const port = Number(process.env.PGPORT) || 5432;
@@ -78,7 +79,7 @@ IotMetadata.init({
     primaryKey: true,
   },
   location: {
-    type: STRING,
+    type: BIGINT,
   },
   elevation: {
     type: INTEGER,
@@ -98,7 +99,7 @@ MobileMetadata.init({
     primaryKey: true,
   },
   location: {
-    type: STRING,
+    type: BIGINT,
   },
   isFullHotspot: {
     type: BOOLEAN,

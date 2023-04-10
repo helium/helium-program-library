@@ -12,6 +12,7 @@ name = "voter_stake_registry"
 
 [features]
 devnet = []
+no-genesis = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []

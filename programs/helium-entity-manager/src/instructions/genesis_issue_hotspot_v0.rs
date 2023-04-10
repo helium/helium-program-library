@@ -30,12 +30,14 @@ pub struct GenesisIssueHotspotArgsV0 {
   pub num_location_asserts: u16,
 }
 
+// pub const LAZY_NAME: Option<&str> = std::option_env!("LAZY_NAME");
+
 #[derive(Accounts)]
 #[instruction(args: GenesisIssueHotspotArgsV0)]
 pub struct GenesisIssueHotspotV0<'info> {
   #[account(
     mut,
-    seeds = [b"lazy_signer", b"devnethelium5"],
+    seeds = [b"lazy_signer", b"devnethelium"],
     seeds::program = lazy_transactions::ID,
     bump,
   )]
@@ -138,6 +140,10 @@ pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, GenesisIssueHotspotV0<'info>>,
   args: GenesisIssueHotspotArgsV0,
 ) -> Result<()> {
+  if cfg!(feature = "no-genesis") {
+    return Err(ErrorCode::NoGenesis.into());
+  }
+
   let asset_id = get_asset_id(
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,

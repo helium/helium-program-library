@@ -9,6 +9,7 @@ import {
 } from "@helium/spl-utils";
 import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Keypair, ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
+import { BN } from "bn.js";
 import { expect } from "chai";
 import { init, membershipVoucherKey, PROGRAM_ID } from "../packages/fanout-sdk";
 import { random } from "./utils/string";

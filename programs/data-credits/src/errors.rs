@@ -20,4 +20,7 @@ pub enum DataCreditsErrors {
 
   #[msg("Invalid arguments")]
   InvalidArgs,
+
+  #[msg("Genesis endpoints are currently disabled")]
+  NoGenesis,
 }

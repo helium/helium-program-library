@@ -33,12 +33,12 @@ export async function run(args: any = process.argv) {
     queue: {
       type: "string",
       describe: "Switchbaord oracle queue",
-      default: "F8ce7MsckeZAbAGmxjJNetxYXQa9mKr9nnrC3qKubyYy",
+      default: "uPeRMdfPmrPqgRWSrjAnAkH78RqAhe5kXoW6vBYRqFX",
     },
     crank: {
       type: "string",
       describe: "Switchboard crank",
-      default: "GN9jjCy2THzZxhYqZETmPM3my8vg4R5JyNkgULddUMa5",
+      default: "UcrnK4w2HXCEjY8z6TcQ9tysYr3c9VcFLdYAU9YQP5e",
     },
     switchboardNetwork: {
       type: "string",

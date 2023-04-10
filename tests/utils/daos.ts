@@ -118,11 +118,6 @@ export async function initTestSubdao(
           k: toU128(1),
         },
       } as any,
-      treasuryWindowConfig: {
-        windowSizeSeconds: new anchor.BN(60),
-        thresholdType: ThresholdType.Absolute as never,
-        threshold: new anchor.BN("10000000000000000000"),
-      },
       dcBurnAuthority: authority,
       delegatorRewardsPercent: delegatorRewardsPercent(6), // 6%
     })

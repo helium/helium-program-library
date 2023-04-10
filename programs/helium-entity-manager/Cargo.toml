@@ -10,6 +10,7 @@ name = "helium_entity_manager"
 
 [features]
 devnet = []
+no-genesis = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []

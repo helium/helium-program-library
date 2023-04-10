@@ -10,6 +10,7 @@ name = "helium_sub_daos"
 
 [features]
 devnet = []
+no-genesis = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []

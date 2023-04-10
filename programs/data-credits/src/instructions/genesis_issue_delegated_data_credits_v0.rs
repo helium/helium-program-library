@@ -1,3 +1,4 @@
+use crate::errors::DataCreditsErrors;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
@@ -37,7 +38,7 @@ pub struct GenesisIssueDelegatedDataCreditsV0<'info> {
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
   #[account(
     mut,
-    seeds = [b"lazy_signer", b"devnethelium5"],
+    seeds = [b"lazy_signer", b"devnethelium"],
     seeds::program = lazy_transactions::ID,
     bump,
   )]
@@ -80,6 +81,10 @@ pub fn handler(
   ctx: Context<GenesisIssueDelegatedDataCreditsV0>,
   args: GenesisIssueDelegatedDataCreditsArgsV0,
 ) -> Result<()> {
+  if cfg!(feature = "no-genesis") {
+    return Err(DataCreditsErrors::NoGenesis.into());
+  }
+
   ctx
     .accounts
     .delegated_data_credits
