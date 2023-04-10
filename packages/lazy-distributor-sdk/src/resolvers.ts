@@ -50,8 +50,9 @@ export const lazyDistributorResolvers = combineResolvers(
   circuitBreakerResolvers,
   resolveIndividual(async ({ path, accounts, provider }) => {
     if (path[path.length - 1] === "approver" && accounts.lazyDistributor) {
-      const lazyDistributorP: Program<LazyDistributor> = Program.at(PROGRAM_ID, provider); 
-      const lazyDistributor = lazyDistributorP.account.lazyDistributorV0.fetch(accounts.lazyDistributor as PublicKey);
+      const lazyDistributorP: Program<LazyDistributor> = await Program.at(PROGRAM_ID, provider); 
+      const lazyDistributor = await lazyDistributorP.account.lazyDistributorV0.fetch(accounts.lazyDistributor as PublicKey);
+      // @ts-ignore
       return lazyDistributor.approver || PublicKey.default;      
     }
   }),
