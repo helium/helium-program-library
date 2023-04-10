@@ -23,7 +23,7 @@ import { Pool } from "pg";
 import { LAZY_TRANSACTIONS_NAME } from "./env";
 import { getMigrateTransactions } from "./ledger";
 import { provider, wallet } from "./solana";
-import { decompress } from "./utils";
+import { decompress, decompressSigners } from "./utils";
 
 const host = process.env.PGHOST || "localhost";
 const isRds = host.includes("rds.amazonaws.com");
@@ -147,27 +147,8 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
           const hasRun = blocksExist[idx];
           const compiledTx = decompress(compiled);
           const block = blockKey(lazyTransactions, id)[0];
-          let signers: Buffer[][] = [];
-
-          let offset = 0;
-          let currSigner = 0;
-          while (offset < signersRaw.length) {
-            let curr = signersRaw.subarray(offset, signersRaw.length);
-            const length = curr.readUInt8();
-            console.log(length);
-            signers[currSigner] = [];
-
-            offset += 1; // Account for the readUint we're about to do
-            for (let i = 0; i < length; i++) {
-              curr = signersRaw.subarray(offset, signersRaw.length);
-              let length = curr.readUInt8();
-              offset += 1;
-              offset += length;
-              signers[currSigner].push(curr.subarray(1, 1 + length));
-            }
-
-            currSigner += 1;
-          }
+          const signers = decompressSigners(signersRaw);
+          
 
           if (!hasRun && compiledTx.instructions.length > 0) {
             const ix = await program.methods
@@ -270,8 +251,9 @@ server.get<{
   try {
     const results = (
       await client.query(
-        `SELECT * FROM transactions
+        `SELECT transactions.*, transaction_proofs.proof FROM transactions
         JOIN wallet_transactions ON transactions.id = wallet_transactions.txid
+        JOIN transaction_proofs ON transactions.id = transaction_proofs.id
         WHERE wallet_transactions.wallet = $1
         LIMIT $2
         OFFSET $3
@@ -304,6 +286,51 @@ server.get<{
 
 server.get<{
   Querystring: { limit?: number; offset?: number };
+  Params: { hotspot: string };
+}>("/migrate/hotspot/:hotspot", async (request, reply) => {
+  const { hotspot } = request.params;
+  const { limit, offset } = request.query;
+  const client = await pool.connect();
+
+  try {
+    const results = (
+      await client.query(
+        `SELECT transactions.*, transaction_proofs.proof FROM transactions
+        JOIN hotspot_transactions ON transactions.id = hotspot_transactions.txid
+        JOIN transaction_proofs ON transactions.id = transaction_proofs.id
+        WHERE hotspot_transactions.hotspot = $1
+        LIMIT $2
+        OFFSET $3
+        `,
+        [hotspot, limit || 200, offset || 0]
+      )
+    ).rows;
+    const luts = (
+      await client.query("SELECT * FROM lookup_tables", [])
+    ).rows.map((row) => row.pubkey);
+    const transactions = await getTransactions(results, luts);
+    return {
+      transactions: transactions || [],
+      count: Number(
+        (
+          await client.query(
+            "SELECT count(*) FROM hotspot_transactions WHERE wallet = $1",
+            [hotspot]
+          )
+        ).rows[0].count
+      ),
+    };
+  } catch (e: any) {
+    console.error(e);
+    throw e;
+  } finally {
+    await client.release();
+  }
+});
+
+
+server.get<{
+  Querystring: { limit?: number; offset?: number };
 }>("/migrate", async (request, reply) => {
   const { limit, offset } = request.query;
   const client = await pool.connect();
@@ -311,7 +338,13 @@ server.get<{
   try {
     const results = (
       await client.query(
-        "SELECT * FROM transactions ORDER BY is_router DESC, ID ASC LIMIT $1 OFFSET $2",
+        `SELECT transactions.*, transaction_proofs.proof
+        FROM transactions 
+        JOIN transaction_proofs ON transactions.id = transaction_proofs.id
+        ORDER BY is_router DESC, ID ASC 
+        LIMIT $1 
+        OFFSET $2
+        `,
         [limit || 200, offset || 0]
       )
     ).rows;

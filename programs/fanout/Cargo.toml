@@ -10,6 +10,7 @@ name = "fanout"
 
 [features]
 devnet = []
+no-genesis = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []

@@ -8,7 +8,12 @@ import {
 } from "@helium/helium-entity-manager-sdk";
 import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
-import { humanReadable, sendInstructions, truthy } from "@helium/spl-utils";
+import {
+  chunks,
+  humanReadable,
+  sendInstructions,
+  truthy,
+} from "@helium/spl-utils";
 import * as anchor from "@coral-xyz/anchor";
 import {
   getConcurrentMerkleTreeAccountSize,
@@ -88,6 +93,11 @@ export async function run(args: any = process.argv) {
       describe: "Estimated number of hotspots this maker will have",
       required: false,
     },
+    merkleBasePath: {
+      type: "string",
+      describe: "Base path for merkle keypairs",
+      default: `${__dirname}/../keypairs`,
+    },
     symbol: {
       alias: "s",
       type: "string",
@@ -151,7 +161,10 @@ export async function run(args: any = process.argv) {
   const dao = await hsdProgram.account.daoV0.fetch(subdaoAcc.dao);
   let subdaoPayer = provider.wallet.publicKey;
   let daoPayer = provider.wallet.publicKey;
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, provider.wallet);
+  const squads = Squads.endpoint(
+    process.env.ANCHOR_PROVIDER_URL,
+    provider.wallet
+  );
   let authority = provider.wallet.publicKey;
   let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
   if (multisig) {
@@ -179,7 +192,7 @@ export async function run(args: any = process.argv) {
     totalSol += rent;
 
     let merkle: Keypair;
-    const merklePath = `${__dirname}/../keypairs/merkle-${address}.json`;
+    const merklePath = `${argv.merkleBasePath}/merkle-${address}.json`;
     if (fs.existsSync(merklePath)) {
       merkle = loadKeypair(merklePath);
     } else {
@@ -328,15 +341,17 @@ export async function run(args: any = process.argv) {
     // Approve instructions must execute after ALL create instructions
     const instrs = createInstructions.flat().filter(truthy);
     const approveInstrs = approveInstructions.flat().filter(truthy);
-    await sendInstructionsOrSquads({
-      provider,
-      instructions: [...instrs, ...approveInstrs],
-      signers: [],
-      executeTransaction: argv.executeTransaction,
-      squads,
-      multisig,
-      authorityIndex: argv.authorityIndex,
-    });
+    for (const chunk of chunks([...instrs, ...approveInstrs], 3)) {
+      await sendInstructionsOrSquads({
+        provider,
+        instructions: chunk,
+        signers: [],
+        executeTransaction: argv.executeTransaction,
+        squads,
+        multisig,
+        authorityIndex: argv.authorityIndex,
+      });
+    }
   } else {
     for (const instrs of [...createInstructions, ...approveInstructions]) {
       await sendInstructions(provider, instrs, []);

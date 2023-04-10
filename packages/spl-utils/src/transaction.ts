@@ -499,8 +499,11 @@ export async function bulkSendTransactions(
         signedTxs.map((s) => s.serialize()),
         ({ totalProgress, ...rest }) =>
           onProgress &&
-          onProgress({ ...rest, totalProgress: totalProgress + ret.length }),
-        recentBlockhash.lastValidBlockHeight
+          onProgress({ ...rest, totalProgress: totalProgress + ret.length + thisRet.length}),
+        recentBlockhash.lastValidBlockHeight,
+        // Hail mary, try with preflight enabled. Sometimes this causes
+        // errors that wouldn't otherwise happen
+        triesRemaining != 1
       );
       thisRet.push(...confirmedTxs);
       if (confirmedTxs.length == signedTxs.length) {
@@ -516,7 +519,7 @@ export async function bulkSendTransactions(
       triesRemaining--;
       if (triesRemaining <= 0) {
         throw new Error(
-          `Failed to submit all txs after blockhashes expired`
+          `Failed to submit all txs after blockhashes expired, ${signedTxs.length - confirmedTxs.length} remain`
         );
       }
     }
@@ -534,7 +537,8 @@ export async function bulkSendRawTransactions(
   connection: Connection,
   txs: Buffer[],
   onProgress?: (status: Status) => void,
-  lastValidBlockHeight?: number
+  lastValidBlockHeight?: number,
+  skipPreflight: boolean = true
 ): Promise<string[]> {
   const txBatchSize = TX_BATCH_SIZE;
   let totalProgress = 0;
@@ -549,7 +553,7 @@ export async function bulkSendRawTransactions(
   for (let chunk of chunks(txs, txBatchSize)) {
     let currentBatchProgress = 0;
 
-    let pendingCount = txs.length;
+    let pendingCount = chunk.length;
     let txids: string[] = [];
     let lastRetry = 0;
 
@@ -567,7 +571,7 @@ export async function bulkSendRawTransactions(
         txids = [];
         for (const tx of chunk) {
           const txid = await connection.sendRawTransaction(tx, {
-            skipPreflight: true,
+            skipPreflight,
           });
           txids.push(txid);
         }
@@ -591,13 +595,14 @@ export async function bulkSendRawTransactions(
         console.error(failures);
         throw new Error("Failed to run txs");
       }
-      pendingCount -= completed.length;
-      chunk = chunk.filter((_, index) => statuses[index] === null);
       ret.push(
-        ...completed
-          .map((status, idx) => (status ? txids[idx] : null))
+        ...txids
+          .map((txid, idx) => statuses[idx] == null ? null : txid)
           .filter(truthy)
       );
+      chunk = chunk.filter((_, index) => statuses[index] === null);
+      txids = txids.filter((_, index) => statuses[index] === null);
+      pendingCount -= completed.length;
       await sleep(1000); // Wait one seconds before querying again
     }
   }

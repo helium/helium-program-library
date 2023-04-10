@@ -48,7 +48,7 @@ async function start() {
     iots.push({
       hotspotKey: hotspot[0],
       asset: null,
-      location: hotspot[1].location,
+      location: hotspot[1].location == "null" ? null : hotspot[1].location,
       elevation: hotspot[1].altitude,
       gain: hotspot[1].gain,
       isFullHotspot: !hotspot[1].dataonly
@@ -56,9 +56,9 @@ async function start() {
     if (makerId == bobcat5G || makerId == freedomFi) {
       mobiles.push({
         hotspotKey: hotspot[0],
-        location: hotspot[1].location,
-        isFullHotspot: !hotspot[1].dataonly
-      })
+        location: hotspot[1].location == "null" ? null : hotspot[1].location,
+        isFullHotspot: !hotspot[1].dataonly,
+      });
     }
   }
 

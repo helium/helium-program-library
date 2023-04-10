@@ -19,6 +19,7 @@ import * as Collections from "typescript-collections";
 
 export * from "./pdas";
 export * from "./constants";
+export { MerkleTree };
 
 type CompiledInstruction = IdlTypes<LazyTransactions>["CompiledInstruction"];
 
@@ -215,19 +216,23 @@ export async function fillCanopy({
   program,
   lazyTransactions,
   merkleTree,
+  canopy,
   cacheDepth,
   showProgress = false,
 }: {
   program: Program<LazyTransactions>;
   lazyTransactions: PublicKey;
-  merkleTree: MerkleTree;
+  merkleTree?: MerkleTree;
+  canopy?: TreeNode[];
   cacheDepth: number;
   showProgress?: boolean;
 }): Promise<void> {
-  const canopy = getCanopy({
-    merkleTree,
-    cacheDepth
-  })
+  if (!canopy) {
+    canopy = getCanopy({
+      merkleTree: merkleTree!,
+      cacheDepth,
+    });
+  }
 
   // Write 30 leaves at a time
   const lazyTransactionsAcc = await program.account.lazyTransactionsV0.fetch(
@@ -270,8 +275,9 @@ export async function fillCanopy({
   await bulkSendTransactions(
     program.provider,
     txs,
-    ({ totalProgress }) => progress && progress.update(totalProgress * chunkSize)
-  )
+    ({ totalProgress }) =>
+      progress && progress.update(totalProgress * chunkSize)
+  );
 }
 
 export type LazyTransaction = {
@@ -286,6 +292,20 @@ export function compile(
   merkleTree: MerkleTree;
   compiledTransactions: CompiledTransaction[];
 } {
+  const compiledTransactions = compileNoMerkle(lazySigner, transactions, programId)
+  const merkleTree = new MerkleTree(compiledTransactions.map(toLeaf));
+
+  return {
+    compiledTransactions,
+    merkleTree,
+  };
+}
+
+export function compileNoMerkle(
+  lazySigner: PublicKey,
+  transactions: LazyTransaction[],
+  programId: PublicKey = PROGRAM_ID
+): CompiledTransaction[] {
   const compiledTransactions = transactions.map((tx, index) => {
     const mapToNonSigners = tx.signerSeeds.map((seeds) => {
       return PublicKey.createProgramAddressSync(seeds, programId);
@@ -302,10 +322,6 @@ export function compile(
       index,
     };
   });
-  const merkleTree = new MerkleTree(compiledTransactions.map(toLeaf));
 
-  return {
-    compiledTransactions,
-    merkleTree,
-  };
+  return compiledTransactions
 }

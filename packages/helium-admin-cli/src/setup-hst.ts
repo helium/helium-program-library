@@ -56,6 +56,11 @@ export async function run(args: any = process.argv) {
       describe: "Keypair of the HST token",
       default: `${__dirname}/../keypairs/hst.json`,
     },
+    hstReceiptBasePath: {
+      type: "string",
+      describe: "Keypair of the HST receipt token",
+      default: `${__dirname}/../keypairs`
+    },
     bucket: {
       type: "string",
       describe: "Bucket URL prefix holding all of the metadata jsons",
@@ -140,7 +145,7 @@ export async function run(args: any = process.argv) {
 
     const hstAmount = new anchor.BN(account.hst);
     let mint: Keypair;
-    const mintPath = `${__dirname}/../keypairs/hst-receipt-${address}.json`;
+    const mintPath = `${argv.hstReceiptBasePath}/hst-receipt-${address}.json`;
     if (fs.existsSync(mintPath)) {
       mint = loadKeypair(mintPath);
     } else {

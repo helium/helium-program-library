@@ -1,13 +1,11 @@
 import * as anchor from "@coral-xyz/anchor";
 import {
   init as initHem,
-  rewardableEntityConfigKey
+  rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { toBN } from "@helium/spl-utils";
-import {
-  PublicKey
-} from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -65,7 +63,10 @@ export async function run(args: any = process.argv) {
   const rewardableConfigKey = (
     await rewardableEntityConfigKey(subdao, name.toUpperCase())
   )[0];
-  const rewardableConfigAcc = await hemProgram.account.rewardableEntityConfigV0.fetch(rewardableConfigKey);
+  const rewardableConfigAcc =
+    await hemProgram.account.rewardableEntityConfigV0.fetch(
+      rewardableConfigKey
+    );
   let payer = provider.wallet.publicKey;
   const squads = Squads.endpoint(
     process.env.ANCHOR_PROVIDER_URL,
@@ -90,7 +91,7 @@ export async function run(args: any = process.argv) {
       },
     };
   }
-  
+
   console.log(settings);
 
   const instructions = [

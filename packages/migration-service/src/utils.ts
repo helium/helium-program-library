@@ -49,3 +49,29 @@ export function compress(ct: CompiledTransaction): Buffer {
 export function decompress(ct: Buffer): CompiledTransaction {
   return schema.decode(ct);
 }
+
+export function decompressSigners(signersRaw: Buffer): Buffer[][] {
+  let signers: Buffer[][] = [];
+
+  let offset = 0;
+  let currSigner = 0;
+  while (offset < signersRaw.length) {
+    let curr = signersRaw.subarray(offset, signersRaw.length);
+    const length = curr.readUInt8();
+    console.log(length);
+    signers[currSigner] = [];
+
+    offset += 1; // Account for the readUint we're about to do
+    for (let i = 0; i < length; i++) {
+      curr = signersRaw.subarray(offset, signersRaw.length);
+      let length = curr.readUInt8();
+      offset += 1;
+      offset += length;
+      signers[currSigner].push(curr.subarray(1, 1 + length));
+    }
+
+    currSigner += 1;
+  }
+
+  return signers
+}

@@ -3,6 +3,7 @@ extern crate rocket;
 use anchor_lang::prelude::borsh;
 use anchor_lang::{prelude::Pubkey, AnchorDeserialize, AnchorSerialize};
 use helium_crypto::{PublicKey, Verify};
+use rocket::serde::json::serde_json;
 use rocket::{
   http::Status,
   serde::{json::Json, Deserialize, Serialize},
@@ -45,8 +46,16 @@ pub struct IssueEntityArgsV0 {
   pub entity_key: Vec<u8>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct HotspotResponse {
+  pub transactions: Vec<Vec<u8>>,
+  pub count: u32,
+}
+
 #[post("/verify", format = "application/json", data = "<verify>")]
 fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Status> {
+  let migration_service = env::var("MIGRATION_SERVICE").unwrap();
+
   let solana_txn_hex = hex::decode(&verify.transaction).map_err(|e| {
     error!("failed to decode transaction: {:?}", e);
     Status::BadRequest
@@ -99,6 +108,17 @@ fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Sta
     error!("failed to verify signature: {:?}", e);
     Status::BadRequest
   })?;
+
+  let body = reqwest::blocking::get(&format!("{}/migrate/hotspot/{}", migration_service, keystr))
+    .unwrap()
+    .text()
+    .unwrap();
+
+  let response = serde_json::from_str::<HotspotResponse>(&body).unwrap();
+  if response.transactions.len() > 0 {
+    error!("Cannot onboard hotspot with key: {:?}. It has not been migrated yet.", keystr);
+    return Err(Status::BadRequest);
+  }
 
   // Sign the solana transaction
   let keypair = read_keypair_file(env::var("ANCHOR_WALLET").unwrap_or("keypair.json".to_string()))

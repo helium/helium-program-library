@@ -10,6 +10,7 @@ name = "circuit_breaker"
 
 [features]
 devnet = []
+no-genesis = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
