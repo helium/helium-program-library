@@ -47,7 +47,7 @@ import {
 } from "../packages/lazy-distributor-sdk/src";
 import {
   init as initRewards,
-  oracleSigner,
+  oracleSignerKey,
   PROGRAM_ID as REWARDS_PID
 } from "../packages/rewards-oracle-sdk/src";
 import {
@@ -240,7 +240,7 @@ describe("distributor-oracle", () => {
         authority: me,
         oracles: [
           {
-            oracle: oracleSigner(oracle.publicKey)[0],
+            oracle: oracle.publicKey,
             url: "https://some-url/",
           },
         ],
@@ -249,6 +249,7 @@ describe("distributor-oracle", () => {
           thresholdType: ThresholdType.Absolute as never,
           threshold: new anchor.BN(1000000000),
         },
+        approver: oracleSignerKey()
       })
       .accounts({
         rewardsMint,

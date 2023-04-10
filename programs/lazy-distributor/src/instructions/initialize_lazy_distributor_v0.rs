@@ -14,6 +14,7 @@ pub struct InitializeLazyDistributorArgsV0 {
   pub oracles: Vec<OracleConfigV0>,
   pub authority: Pubkey,
   pub window_config: WindowedCircuitBreakerConfigV0,
+  pub approver: Option<Pubkey>
 }
 
 #[derive(Accounts)]
@@ -87,6 +88,7 @@ pub fn handler(
     version: 0,
     authority: args.authority,
     bump_seed: ctx.bumps["lazy_distributor"],
+    approver: args.approver,
   });
 
   Ok(())

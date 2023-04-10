@@ -50,6 +50,7 @@ describe("lazy-distributor", () => {
           thresholdType: ThresholdType.Absolute as never,
           threshold: new anchor.BN(1000000000),
         },
+        approver: null
       })
       .accounts({
         rewardsMint,
@@ -102,6 +103,7 @@ describe("lazy-distributor", () => {
             thresholdType: ThresholdType.Absolute as never,
             threshold: new anchor.BN(1000000000),
           },
+          approver: null,
         })
         .accounts({
           rewardsMint,
@@ -430,6 +432,7 @@ describe("lazy-distributor", () => {
             thresholdType: ThresholdType.Absolute as never,
             threshold: new anchor.BN(1000000000),
           },
+          approver: null,
         })
         .accounts({
           rewardsMint,

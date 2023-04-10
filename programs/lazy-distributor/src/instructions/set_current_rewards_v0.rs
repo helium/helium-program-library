@@ -25,6 +25,11 @@ pub struct SetCurrentRewardsV0<'info> {
     constraint = oracle.key() == lazy_distributor.oracles[usize::try_from(args.oracle_index).unwrap()].oracle
   )]
   pub oracle: Signer<'info>,
+  /// CHECK: Checked via constraint
+  #[account(
+    constraint = lazy_distributor.approver.map(|a| a == approver.key() && approver.is_signer).unwrap_or(true)
+  )]
+  pub approver: UncheckedAccount<'info>,
   pub system_program: Program<'info, System>,
 }
 

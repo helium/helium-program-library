@@ -34,7 +34,7 @@ pub struct SetCurrentRewardsWrapperV0<'info> {
 
   /// CHECK: checked in cpi
   #[account(
-    seeds = ["oracle_signer".as_bytes(), oracle.key().as_ref()],
+    seeds = ["oracle_signer".as_bytes()],
     bump
   )]
   pub oracle_signer: AccountInfo<'info>,
@@ -50,8 +50,9 @@ pub fn handler(
     payer: ctx.accounts.oracle.to_account_info(),
     lazy_distributor: ctx.accounts.lazy_distributor.to_account_info(),
     recipient: ctx.accounts.recipient.to_account_info(),
-    oracle: ctx.accounts.oracle_signer.to_account_info(),
+    oracle: ctx.accounts.oracle.to_account_info(),
     system_program: ctx.accounts.system_program.to_account_info(),
+    approver: ctx.accounts.oracle_signer.to_account_info(),
   };
 
   let signer_seeds: &[&[&[u8]]] = &[&[

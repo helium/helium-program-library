@@ -8,9 +8,11 @@ import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { circuitBreakerResolvers } from "@helium/circuit-breaker-sdk";
 import { recipientKey } from "./pdas";
-import { Accounts } from "@coral-xyz/anchor";
+import { Accounts, Program } from "@coral-xyz/anchor";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { BN } from "bn.js";
+import { PROGRAM_ID } from "./constants";
+import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 
 export const lazyDistributorResolvers = combineResolvers(
   resolveIndividual(async ({ path }) => {
@@ -46,6 +48,13 @@ export const lazyDistributorResolvers = combineResolvers(
     owner: "common.owner",
   }),
   circuitBreakerResolvers,
+  resolveIndividual(async ({ path, accounts, provider }) => {
+    if (path[path.length - 1] === "approver" && accounts.lazyDistributor) {
+      const lazyDistributorP: Program<LazyDistributor> = Program.at(PROGRAM_ID, provider); 
+      const lazyDistributor = lazyDistributorP.account.lazyDistributorV0.fetch(accounts.lazyDistributor as PublicKey);
+      return lazyDistributor.approver || PublicKey.default;      
+    }
+  }),
   resolveIndividual(async ({ path, accounts, idlIx }) => {
     if (path[path.length - 1] === "targetMetadata") {
       if (!accounts.mint) {
