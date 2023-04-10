@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import bs58 from "bs58";
 dotenv.config();
 // @ts-ignore
 import {
@@ -36,12 +37,14 @@ import Fastify, {
 import cors from "@fastify/cors";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
+import Address from "@helium/address";
 
 const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
 const DAO = daoKey(HNT)[0];
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
 export interface Database {
+  getCurrentRewardsByEntity: (entityKey: Buffer) => Promise<string>;
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
   getBulkRewards: (entityKeys: string[]) => Promise<Record<string, string>>;
   getActiveDevices(): Promise<number>;
@@ -55,39 +58,41 @@ export class PgDatabase implements Database {
       url: string,
       asset: PublicKey
     ) => Promise<Asset | undefined> = getAsset
-  ) {
-  }
+  ) {}
 
   getActiveDevices(): Promise<number> {
     return Reward.count({
       where: {
         lastReward: {
-          [Op.gte]: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30) // Active within the last 30 days
-        }
-      }
-    })
+          [Op.gte]: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30), // Active within the last 30 days
+        },
+      },
+    });
   }
 
   async getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
     const rewards = await Reward.findAll({
       where: {
         address: {
-          [Op.in]: entityKeys
-        }
-      }
-    })
+          [Op.in]: entityKeys,
+        },
+      },
+    });
 
-    return rewards.map(rew => [rew.address, rew.rewards]).reduce((acc, [key, val]) => {
-      // TODO: Remove when 6 decimals
-      acc[key] = new BN(val).div(new BN(100)).toString();
-      return acc;
-    }, {} as Record<string, string>)
+    return rewards
+      .map((rew) => [rew.address, rew.rewards])
+      .reduce((acc, [key, val]) => {
+        // TODO: Remove when 6 decimals
+        acc[key] = new BN(val).div(new BN(100)).toString();
+        return acc;
+      }, {} as Record<string, string>);
   }
 
   async getCurrentRewards(assetId: PublicKey) {
     const asset = await this.getAssetFn(
-      // @ts-ignore
-      process.env.ASSET_API_URL || this.issuanceProgram.provider.connection._rpcEndpoint,
+      process.env.ASSET_API_URL ||
+        // @ts-ignore
+        this.issuanceProgram.provider.connection._rpcEndpoint,
       assetId
     );
     if (!asset) {
@@ -97,14 +102,25 @@ export class PgDatabase implements Database {
     const eccCompact = asset.content.json_uri.split("/").slice(-1)[0] as string;
     // Verify the creator is our entity creator, otherwise they could just
     // pass in any NFT with this ecc compact to collect rewards
-    if (!asset.creators[0].verified || !new PublicKey(asset.creators[0].address).equals(ENTITY_CREATOR)) {
-      throw new Error("Not a valid rewardable entity")
+    if (
+      !asset.creators[0].verified ||
+      !new PublicKey(asset.creators[0].address).equals(ENTITY_CREATOR)
+    ) {
+      throw new Error("Not a valid rewardable entity");
     }
-    const reward = await Reward.findByPk(eccCompact) as Reward;
+
+    return this.getCurrentRewardsByEntity(Buffer.from(bs58.decode(eccCompact)));
+  }
+
+  async getCurrentRewardsByEntity(entityKey: Buffer) {
+    const encoded = bs58.encode(entityKey);
+    const isHotspot = entityKey.length === 32 && Address.isValid(encoded);
+    const entityKeyStr = isHotspot ? encoded : entityKey.toString("utf-8");
+    const reward = (await Reward.findByPk(entityKey)) as Reward;
 
     // TODO: Remove when 6 decimals
     return new BN(reward?.rewards).div(new BN(100)).toString() || "0";
-  };
+  }
 }
 
 export class OracleServer {
@@ -358,6 +374,7 @@ export class OracleServer {
     for (const ix of setRewardIxs) {
       let recipient: PublicKey | undefined, lazyDist: PublicKey | undefined, proposedCurrentRewards: any;
 
+      let entityKey;
       if (ix.keys[wrapperOracleKeyIdx].pubkey.equals(this.oracle.publicKey) && ix.programId.equals(RO_PID)) {
         let decoded = (
           this.roProgram.coder.instruction as BorshInstructionCoder
@@ -367,6 +384,8 @@ export class OracleServer {
         lazyDist = ix.keys[wrapperLazyDistIdx].pubkey;
         //@ts-ignore
         proposedCurrentRewards = decoded.data.args.currentRewards;
+        // @ts-ignore
+        entityKey = decoded.data.args.entityKey;
       } else if (ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey) && ix.programId.equals(LD_PID)) {
         let decoded = (
           this.ldProgram.coder.instruction as BorshInstructionCoder
@@ -403,7 +422,9 @@ export class OracleServer {
         mint = recipientAcc.asset;
       }
 
-      const currentRewards = await this.db.getCurrentRewards(mint);
+      const currentRewards = entityKey
+        ? await this.db.getCurrentRewardsByEntity(entityKey)
+        : await this.db.getCurrentRewards(mint);
       if (proposedCurrentRewards.toNumber() > currentRewards) {
         res.status(400).send({ error: "Invalid amount" });
         return;
