@@ -6,6 +6,7 @@ use anchor_spl::token::Mint;
 pub struct UpdateLazyDistributorArgsV0 {
   pub oracles: Option<Vec<OracleConfigV0>>,
   pub authority: Option<Pubkey>,
+  pub approver: Option<Option<Pubkey>>,
 }
 
 #[derive(Accounts)]
@@ -34,5 +35,10 @@ pub fn handler(
   if args.authority.is_some() {
     ld.authority = args.authority.unwrap();
   }
+
+  if let Some(approver) = args.approver {
+    ld.approver = approver;
+  }
+
   Ok(())
 }

@@ -29,6 +29,20 @@ pub struct SetCurrentRewardsV0<'info> {
 }
 
 pub fn handler(ctx: Context<SetCurrentRewardsV0>, args: SetCurrentRewardsArgsV0) -> Result<()> {
+  // if lazy distributor has an approver, expect 1 remaining_account
+  if ctx.accounts.lazy_distributor.approver.is_some() {
+    require!(
+      ctx.remaining_accounts.len() == 1,
+      ErrorCode::InvalidApproverSignature
+    );
+    let approver = &ctx.remaining_accounts[0];
+    require!(
+      approver.key() == ctx.accounts.lazy_distributor.approver.unwrap(),
+      ErrorCode::InvalidApproverSignature
+    );
+    require!(approver.is_signer, ErrorCode::InvalidApproverSignature);
+  }
+
   if ctx.accounts.recipient.current_config_version != ctx.accounts.lazy_distributor.version {
     ctx.accounts.recipient.current_config_version = ctx.accounts.lazy_distributor.version;
     ctx.accounts.recipient.current_rewards =

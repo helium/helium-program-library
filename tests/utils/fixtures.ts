@@ -1,3 +1,4 @@
+import { LazyDistributor } from "@/target/types/lazy_distributor";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
@@ -235,6 +236,21 @@ export async function ensureDCIdl(dcProgram: Program<DataCredits>) {
     );
   }
 }
+
+export async function ensureLDIdl(ldProgram: Program<LazyDistributor>) {
+  try {
+    execSync(
+      `anchor idl init --filepath ${__dirname}/../../target/idl/lazy_distributor.json ${ldProgram.programId}`,
+      { stdio: "inherit", shell: "/bin/bash" }
+    );
+  } catch {
+    execSync(
+      `anchor idl upgrade --filepath ${__dirname}/../../target/idl/lazy_distributor.json ${ldProgram.programId}`,
+      { stdio: "inherit", shell: "/bin/bash" }
+    );
+  }
+}
+
 
 export async function ensureHSDIdl(hsdProgram: Program<HeliumSubDaos>) {
   try {

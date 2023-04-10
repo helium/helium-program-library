@@ -13,4 +13,7 @@ pub enum ErrorCode {
 
   #[msg("Oracle index was out of range")]
   InvalidOracleIndex,
+
+  #[msg("Approver signature required")]
+  InvalidApproverSignature,
 }

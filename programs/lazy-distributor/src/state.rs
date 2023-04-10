@@ -15,6 +15,8 @@ pub struct LazyDistributorV0 {
   pub authority: Pubkey,
   pub oracles: Vec<OracleConfigV0>,
   pub bump_seed: u8,
+  // Optional approver of every set current rewards tx. Use if you want to require calls to proxy throuh another contract
+  pub approver: Option<Pubkey>,
 }
 
 #[account]

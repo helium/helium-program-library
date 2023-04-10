@@ -34,7 +34,7 @@ pub struct SetCurrentRewardsWrapperV0<'info> {
 
   /// CHECK: checked in cpi
   #[account(
-    seeds = ["oracle_signer".as_bytes(), oracle.key().as_ref()],
+    seeds = ["oracle_signer".as_bytes()],
     bump
   )]
   pub oracle_signer: AccountInfo<'info>,
@@ -46,17 +46,18 @@ pub fn handler(
   ctx: Context<SetCurrentRewardsWrapperV0>,
   args: SetCurrentRewardsWrapperArgsV0,
 ) -> Result<()> {
+  let mut approver = ctx.accounts.oracle_signer.to_account_info().clone();
+  approver.is_signer = true;
   let cpi_accounts = SetCurrentRewardsV0 {
     payer: ctx.accounts.oracle.to_account_info(),
     lazy_distributor: ctx.accounts.lazy_distributor.to_account_info(),
     recipient: ctx.accounts.recipient.to_account_info(),
-    oracle: ctx.accounts.oracle_signer.to_account_info(),
+    oracle: ctx.accounts.oracle.to_account_info(),
     system_program: ctx.accounts.system_program.to_account_info(),
   };
 
   let signer_seeds: &[&[&[u8]]] = &[&[
     "oracle_signer".as_bytes(),
-    ctx.accounts.oracle.to_account_info().key.as_ref(),
     &[*ctx.bumps.get("oracle_signer").unwrap()],
   ]];
   set_current_rewards_v0(
@@ -64,7 +65,8 @@ pub fn handler(
       ctx.accounts.lazy_distributor_program.to_account_info(),
       cpi_accounts,
       signer_seeds,
-    ),
+    )
+    .with_remaining_accounts(vec![approver]),
     SetCurrentRewardsArgsV0 {
       oracle_index: args.oracle_index,
       current_rewards: args.current_rewards,
