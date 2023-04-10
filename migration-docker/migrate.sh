@@ -11,8 +11,8 @@ aws s3 cp s3://$S3_BUCKET/makers-mobile.json . --region $AWS_REGION --endpoint $
 aws s3 cp s3://$S3_BUCKET/export.json . --region $AWS_REGION --endpoint $S3_ENDPOINT
 aws s3 cp s3://$S3_BUCKET/keypairs.tar.gz.asc . --region $AWS_REGION --endpoint $S3_ENDPOINT
 
-gpg --import $GPG_KEY
-gpg --passphrase $GPG_PASSWORD -o keypairs.tar.gz -d keypairs.tar.gz.asc 
+gpg --batch --import $GPG_KEY
+gpg --pinentry-mode=loopback --batch --passphrase $GPG_PASSWORD -o keypairs.tar.gz -d keypairs.tar.gz.asc 
 tar -xvf keypairs.tar.gz
 
 cp keypairs/$ADMIN_KEYPAIR ~/.config/solana/id.json
