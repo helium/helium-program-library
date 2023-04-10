@@ -88,7 +88,7 @@ export async function run(args: any = process.argv) {
               },
             ]
           : null,
-        newApprover: argv.newApprover ? new PublicKey(argv.newApprover) : null
+      approver: argv.newApprover ? new PublicKey(argv.newApprover) : null
     })
     .accounts({
       rewardsMint: subdaoMint,

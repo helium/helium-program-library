@@ -57,7 +57,6 @@ pub fn handler(
 
   let signer_seeds: &[&[&[u8]]] = &[&[
     "oracle_signer".as_bytes(),
-    ctx.accounts.oracle.to_account_info().key.as_ref(),
     &[*ctx.bumps.get("oracle_signer").unwrap()],
   ]];
   set_current_rewards_v0(

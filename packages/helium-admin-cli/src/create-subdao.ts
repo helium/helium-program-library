@@ -418,7 +418,7 @@ export async function run(args: any = process.argv) {
         authority: daoAcc.authority,
         oracles: [
           {
-            oracle: oracleSignerKey(oracleKey)[0],
+            oracle: oracleKey,
             url: rewardsOracleUrl,
           },
         ],
@@ -430,6 +430,7 @@ export async function run(args: any = process.argv) {
             new anchor.BN(5)
           ),
         },
+        approver: oracleSignerKey()[0]
       })
       .accounts({
         rewardsMint: subdaoKeypair.publicKey,

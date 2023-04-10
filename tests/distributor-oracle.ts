@@ -58,6 +58,7 @@ import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { RewardsOracle } from "../target/types/rewards_oracle";
 import {
+  ensureLDIdl,
   initWorld
 } from "./utils/fixtures";
 import { initVsr } from "./utils/vsr";
@@ -296,6 +297,9 @@ describe("distributor-oracle", () => {
       1,
       3
     );
+
+    await ensureLDIdl(ldProgram);
+
     console.log(dcProgram.methods);
     const {
       dao: { dao },
@@ -477,6 +481,7 @@ describe("distributor-oracle", () => {
     // @ts-ignore
     expect(recipientAcc?.currentRewards[0].toNumber()).to.eq(5000000);
   });
+
   it("should provide the current rewards for a hotspot", async () => {
     const res = await chai
       .request(oracleServer.server)

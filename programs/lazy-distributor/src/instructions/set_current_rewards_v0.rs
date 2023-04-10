@@ -27,9 +27,9 @@ pub struct SetCurrentRewardsV0<'info> {
   pub oracle: Signer<'info>,
   /// CHECK: Checked via constraint
   #[account(
-    constraint = lazy_distributor.approver.map(|a| a == approver.key() && approver.is_signer).unwrap_or(true)
+    constraint = lazy_distributor.approver.is_none() || (lazy_distributor.approver.unwrap() == *approver.key && approver.is_signer)
   )]
-  pub approver: UncheckedAccount<'info>,
+  pub approver: AccountInfo<'info>,
   pub system_program: Program<'info, System>,
 }
 
