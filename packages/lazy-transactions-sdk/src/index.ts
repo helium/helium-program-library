@@ -229,7 +229,7 @@ export async function fillCanopy({
 }): Promise<void> {
   if (!canopy) {
     canopy = getCanopy({
-      merkleTree,
+      merkleTree: merkleTree!,
       cacheDepth,
     });
   }
