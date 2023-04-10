@@ -185,4 +185,4 @@ anchor build
 anchor deploy --provider.cluster $SOLANA_URL
 
 # Fund the oracle account to pay for the recipients rent
-solana transfer $(solana address -k keypairs/oracle.json) $ORACLE_SOL --allow-unfunded-recipient
+solana transfer -u $SOLANA_URL $(solana address -k keypairs/oracle.json) $ORACLE_SOL --allow-unfunded-recipient
