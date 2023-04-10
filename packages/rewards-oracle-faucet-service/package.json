@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.0.49",
+  "version": "0.0.50",
   "description": "Receives requests from Helius webhooks",
   "repository": {
     "type": "git",
@@ -41,8 +41,8 @@
     "yargs": "^17.7.1"
   },
   "devDependencies": {
-    "@types/yargs": "^17.0.13",
     "@types/pg": "^8.6.6",
+    "@types/yargs": "^17.0.13",
     "git-format-staged": "^2.1.3",
     "ts-loader": "^9.2.3",
     "ts-node": "^10.9.1",
