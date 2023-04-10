@@ -377,6 +377,7 @@ export async function sendAndConfirmWithRetry(
   let done = false;
   let slot = 0;
   const txid = await connection.sendRawTransaction(txn, sendOptions);
+  console.log("txid", txid)
   const startTime = getUnixTime();
   (async () => {
     while (!done && getUnixTime() - startTime < timeout) {

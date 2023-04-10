@@ -52,6 +52,10 @@ export async function run(args: any = process.argv) {
     newAuthority: {
       type: "string",
     },
+    newApprover: {
+      type: "string",
+      description: "Pubkey of the approver pda"
+    }
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -75,13 +79,16 @@ export async function run(args: any = process.argv) {
       authority: argv.newAuthority
         ? new PublicKey(argv.newAuthority)
         : lazyDistAcc.authority,
-      oracles: argv.oracle &&
-        argv.rewardsOracleUrl ? [
-          {
-            oracle: new PublicKey(argv.oracle),
-            url: argv.rewardsOracleUrl,
-          },
-        ]: null,
+      oracles:
+        argv.oracle && argv.rewardsOracleUrl
+          ? [
+              {
+                oracle: new PublicKey(argv.oracle),
+                url: argv.rewardsOracleUrl,
+              },
+            ]
+          : null,
+      approver: argv.newApprover ? new PublicKey(argv.newApprover) : null
     })
     .accounts({
       rewardsMint: subdaoMint,

@@ -8,9 +8,11 @@ import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { circuitBreakerResolvers } from "@helium/circuit-breaker-sdk";
 import { recipientKey } from "./pdas";
-import { Accounts } from "@coral-xyz/anchor";
+import { Accounts, Program } from "@coral-xyz/anchor";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { BN } from "bn.js";
+import { PROGRAM_ID } from "./constants";
+import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 
 export const lazyDistributorResolvers = combineResolvers(
   resolveIndividual(async ({ path }) => {

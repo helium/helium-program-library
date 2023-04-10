@@ -1,4 +1,4 @@
-import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
+import { Asset, AssetProof, getAsset, getAssetProof } from "./mplAssetAPI";
 import { ConcurrentMerkleTreeAccount } from "@solana/spl-account-compression";
 import { Connection, PublicKey, AccountMeta } from "@solana/web3.js";
 

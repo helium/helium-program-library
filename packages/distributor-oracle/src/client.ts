@@ -1,14 +1,22 @@
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
 import { init, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
+import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
 import { distributeCompressionRewards, initializeCompressionRecipient, recipientKey } from "@helium/lazy-distributor-sdk";
 import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { init as initRewards } from "@helium/rewards-oracle-sdk";
 import {
   PublicKey,
   Transaction, TransactionInstruction
 } from "@solana/web3.js";
 import axios from "axios";
+import { HNT_MINT } from "@helium/spl-utils";
+import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
+
+const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
+const DAO = daoKey(HNT)[0];
 
 export type Reward = {
   currentRewards: string;
@@ -109,9 +117,12 @@ export async function getPendingRewards(
 
 
 export async function formTransaction({
-  program,
+  program: lazyDistributorProgram,
+  rewardsOracleProgram,
   provider,
   rewards,
+  asset,
+  dao = DAO,
   hotspot,
   lazyDistributor,
   wallet = provider.wallet.publicKey,
@@ -121,9 +132,13 @@ export async function formTransaction({
   getAssetProofFn = getAssetProof,
 }: {
   program: Program<LazyDistributor>;
+  rewardsOracleProgram?: Program<RewardsOracle>;
   provider: AnchorProvider;
   rewards: Reward[];
-  hotspot: PublicKey;
+  dao?: PublicKey; // Optional override to the dao, defaults to HNT
+  // Must either provider asset or hotspot. Hotspot is legacy.
+  asset?: PublicKey;
+  hotspot?: PublicKey;
   lazyDistributor: PublicKey;
   wallet?: PublicKey;
   assetEndpoint?: string;
@@ -134,14 +149,25 @@ export async function formTransaction({
     assetId: PublicKey
   ) => Promise<AssetProof | undefined>;
 }) {
-  // @ts-ignore
-  const asset = await getAssetFn(assetEndpoint || provider.connection._rpcEndpoint, hotspot);
+  if (!asset && !hotspot) {
+    throw new Error("Must provide asset or hotspot")
+  }
   if (!asset) {
-    throw new Error("No asset with ID " + hotspot.toBase58());
+    asset = hotspot!
+  }
+  if (!rewardsOracleProgram) {
+    rewardsOracleProgram = await initRewards(lazyDistributorProgram.provider as AnchorProvider)
+  }
+  
+  // @ts-ignore
+  const assetAcc = await getAssetFn(assetEndpoint || provider.connection._rpcEndpoint, asset);
+  if (!assetAcc) {
+    throw new Error("No asset with ID " + asset.toBase58());
   }
 
-  const recipient = recipientKey(lazyDistributor, hotspot)[0];
-  const lazyDistributorAcc = (await program.account.lazyDistributorV0.fetch(
+  const entityKey = assetAcc.content.json_uri.split("/").slice(-1)[0];
+  const recipient = recipientKey(lazyDistributor, asset)[0];
+  const lazyDistributorAcc = (await lazyDistributorProgram.account.lazyDistributorV0.fetch(
     lazyDistributor
   ))!;
   const rewardsMint = lazyDistributorAcc.rewardsMint!;
@@ -150,32 +176,32 @@ export async function formTransaction({
 
   const destinationAccount = await getAssociatedTokenAddress(
     rewardsMint,
-    asset.ownership.owner,
+    assetAcc.ownership.owner,
     true
   );
 
   if (!(await provider.connection.getAccountInfo(recipient))) {
     let initRecipientIx;
-    if (asset.compression.compressed) {
+    if (assetAcc.compression.compressed) {
       initRecipientIx = await(
         await initializeCompressionRecipient({
-          program,
-          assetId: hotspot,
+          program: lazyDistributorProgram,
+          assetId: asset,
           lazyDistributor,
           assetEndpoint,
           owner: wallet,
           // Make the oracle pay for the recipient to avoid newly migrated users not having enough sol to claim rewards
           payer: lazyDistributorAcc.oracles[0].oracle,
-          getAssetFn: () => Promise.resolve(asset), // cache result so we don't hit again
+          getAssetFn: () => Promise.resolve(assetAcc), // cache result so we don't hit again
           getAssetProofFn,
         })
       ).instruction();
     } else {
-      initRecipientIx = await program.methods
+      initRecipientIx = await lazyDistributorProgram.methods
         .initializeRecipientV0()
         .accounts({
           lazyDistributor,
-          mint: hotspot,
+          mint: asset,
         })
         .instruction();
     }
@@ -183,15 +209,18 @@ export async function formTransaction({
     tx.add(initRecipientIx);
   }
 
+  const keyToAsset = keyToAssetKey(dao, entityKey)[0]
   const ixPromises = rewards.map((x, idx) => {
-    return program.methods
-      .setCurrentRewardsV0({
+    return rewardsOracleProgram!.methods
+      .setCurrentRewardsWrapperV0({
+        entityKey: Buffer.from(bs58.decode(entityKey)),
         currentRewards: new BN(x.currentRewards),
         oracleIndex: idx,
       })
       .accounts({
         lazyDistributor,
         recipient,
+        keyToAsset,
         oracle: x.oracleKey,
       })
       .instruction();
@@ -205,20 +234,20 @@ export async function formTransaction({
 
   tx.feePayer = wallet ? wallet : provider.wallet.publicKey;
 
-  if (asset.compression.compressed) {
+  if (assetAcc.compression.compressed) {
     const distributeIx = await(
       await distributeCompressionRewards({
-        program,
-        assetId: hotspot,
+        program: lazyDistributorProgram,
+        assetId: asset,
         lazyDistributor,
-        getAssetFn: () => Promise.resolve(asset), // cache result so we don't hit again
+        getAssetFn: () => Promise.resolve(assetAcc), // cache result so we don't hit again
         getAssetProofFn,
         assetEndpoint,
       })
     ).instruction();
     tx.add(distributeIx);
   } else {
-    const distributeIx = await program.methods
+    const distributeIx = await lazyDistributorProgram.methods
       .distributeRewardsV0()
       .accounts({
         // @ts-ignore
@@ -226,7 +255,7 @@ export async function formTransaction({
           recipient,
           lazyDistributor,
           rewardsMint,
-          owner: asset.ownership.owner,
+          owner: assetAcc.ownership.owner,
           destinationAccount,
         },
       })

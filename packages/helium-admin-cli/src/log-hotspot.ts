@@ -1,10 +1,17 @@
 import * as anchor from "@coral-xyz/anchor";
-import { init as initHem, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
-import { daoKey } from "@helium/helium-sub-daos-sdk";
-import { getAsset, HNT_MINT } from "@helium/spl-utils";
+import {
+  init as initHem,
+  iotInfoKey,
+  keyToAssetKey,
+  mobileInfoKey,
+  rewardableEntityConfigKey,
+} from "@helium/helium-entity-manager-sdk";
+import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { getAsset, HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
+import { exists } from "./utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -38,5 +45,34 @@ export async function run(args: any = process.argv) {
   PublicKey.prototype.toString = PublicKey.prototype.toBase58;
 
   console.log(keyToAsset);
-  console.log(await getAsset(argv.url, keyToAsset.asset))
+  console.log(await getAsset(argv.url, keyToAsset.asset));
+
+  const [iotConfigKey] = rewardableEntityConfigKey(
+    subDaoKey(IOT_MINT)[0],
+    "IOT"
+  );
+  const [mobileConfigKey] = rewardableEntityConfigKey(
+    subDaoKey(MOBILE_MINT)[0],
+    "MOBILE"
+  );
+
+  const [iotInfo] = await iotInfoKey(iotConfigKey, argv.hotspotKey);
+  if (await exists(provider.connection, iotInfo)) {
+    console.log(
+      "Iot Info",
+      await hemProgram.account.iotHotspotInfoV0.fetchNullable(iotInfo)
+    );
+  } else {
+    console.log("No iot info")
+  }
+
+  const [info] = await mobileInfoKey(mobileConfigKey, argv.hotspotKey);
+  if (await exists(provider.connection, info)) {
+    console.log(
+      "Mobile Info",
+      await hemProgram.account.mobileHotspotInfoV0.fetchNullable(info)
+    );
+  } else {
+    console.log("No mobile info")
+  }
 }

@@ -15,6 +15,7 @@ import {
 import { PROGRAM_ID } from "../packages/lazy-distributor-sdk/src/constants";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { createCompressionNft } from "./utils/compression";
+import { ensureLDIdl } from "./utils/fixtures";
 
 describe("lazy-distributor", () => {
   // Configure the client to use the local cluster.
@@ -33,6 +34,8 @@ describe("lazy-distributor", () => {
     );
 
     rewardsMint = await createMint(provider, 6, me, me);
+
+    await ensureLDIdl(program);
   });
 
   it("initializes a lazy distributor", async () => {
@@ -50,6 +53,7 @@ describe("lazy-distributor", () => {
           thresholdType: ThresholdType.Absolute as never,
           threshold: new anchor.BN(1000000000),
         },
+        approver: null
       })
       .accounts({
         rewardsMint,
@@ -102,6 +106,7 @@ describe("lazy-distributor", () => {
             thresholdType: ThresholdType.Absolute as never,
             threshold: new anchor.BN(1000000000),
           },
+          approver: null,
         })
         .accounts({
           rewardsMint,
@@ -145,6 +150,7 @@ describe("lazy-distributor", () => {
         lazyDistributor,
         getAssetFn: async () => {
           return {
+            ownership: { owner: me },
             compression: {
               leafId: 0,
               dataHash,
@@ -187,10 +193,11 @@ describe("lazy-distributor", () => {
           lazyDistributor,
           getAssetFn: async () => {
             return {
+              ownership: { owner: me },
               compression: {
                 leafId: 0,
                 dataHash,
-                creatorHash
+                creatorHash,
               },
             } as Asset;
           },
@@ -381,7 +388,8 @@ describe("lazy-distributor", () => {
             oracle: PublicKey.default,
             url: "https://some-other-url",
           }
-        ]
+        ],
+        approver: null,
       }).accounts({
         rewardsMint
       }).rpc()
@@ -428,6 +436,7 @@ describe("lazy-distributor", () => {
             thresholdType: ThresholdType.Absolute as never,
             threshold: new anchor.BN(1000000000),
           },
+          approver: null,
         })
         .accounts({
           rewardsMint,

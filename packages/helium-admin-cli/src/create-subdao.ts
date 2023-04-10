@@ -15,6 +15,7 @@ import {
   init as initLazy,
   lazyDistributorKey,
 } from "@helium/lazy-distributor-sdk";
+import { oracleSignerKey } from "@helium/rewards-oracle-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";
 import {
@@ -421,6 +422,7 @@ export async function run(args: any = process.argv) {
             new anchor.BN(5)
           ),
         },
+        approver: oracleSignerKey()[0]
       })
       .accounts({
         rewardsMint: subdaoKeypair.publicKey,

@@ -5,7 +5,7 @@ import { iotInfoKey } from "../pdas";
 import {
   proofArgsAndAccounts,
   ProofArgsAndAccountsArgs,
-} from "./proofArgsAndAccounts";
+} from "@helium/spl-utils";
 
 export async function updateIotMetadata({
   program,

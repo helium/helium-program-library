@@ -1,18 +1,21 @@
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { Asset, AssetProof, createMintInstructions, toBN } from "@helium/spl-utils";
 import { init as initPriceOracle } from "../packages/price-oracle-sdk/src";
-import { Asset, AssetProof, toBN } from "@helium/spl-utils";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
 import chai from "chai";
-import { AddGatewayV1 } from "@helium/transactions"
+import { AddGatewayV1 } from "@helium/transactions";
 import {
   entityCreatorKey,
   init as initHeliumEntityManager,
   onboardIotHotspot,
-  onboardMobileHotspot, updateIotMetadata, updateMobileMetadata
+  onboardMobileHotspot,
+  updateIotMetadata,
+  updateMobileMetadata,
 } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
@@ -20,7 +23,12 @@ import { PriceOracle } from "../target/types/price_oracle";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import {
-  DC_FEE, ensureDCIdl, ensureHSDIdl, initTestDataCredits, initTestMaker, initTestRewardableEntityConfig
+  DC_FEE,
+  ensureDCIdl,
+  ensureHSDIdl,
+  initTestDataCredits,
+  initTestMaker,
+  initTestRewardableEntityConfig,
 } from "./utils/fixtures";
 // @ts-ignore
 import bs58 from "bs58";
@@ -36,7 +44,7 @@ import {
   computeDataHash,
   getLeafAssetId,
   TokenProgramVersion,
-  TokenStandard
+  TokenStandard,
 } from "@metaplex-foundation/mpl-bubblegum";
 import { BN } from "bn.js";
 import chaiAsPromised from "chai-as-promised";
@@ -55,10 +63,7 @@ describe("helium-entity-manager", () => {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
-  const eccVerifier = loadKeypair(
-    __dirname + "/keypairs/verifier-test.json"
-  );
-
+  const eccVerifier = loadKeypair(__dirname + "/keypairs/verifier-test.json");
   let dao: PublicKey;
   let subDao: PublicKey;
   let dcMint: PublicKey;
@@ -101,6 +106,26 @@ describe("helium-entity-manager", () => {
       dataCredits.dcMint
     ));
     ({ subDao } = await initTestSubdao(hsdProgram, provider, me, dao));
+  });
+
+  it("issues iot operations fund", async () => {
+    const mint = Keypair.generate();
+    await hemProgram.methods
+      .issueIotOperationsFundV0()
+      .preInstructions(
+        await createMintInstructions(provider, 0, me, me, mint)
+      )
+      .accounts({
+        dao,
+        recipient: me,
+        mint: mint.publicKey,
+      })
+      .signers([mint])
+      .rpc({ skipPreflight: true });
+
+    const addr = getAssociatedTokenAddressSync(mint.publicKey, me);
+    const balance = await provider.connection.getTokenAccountBalance(addr)
+    expect(balance.value.uiAmount).to.eq(1)
   });
 
   it("initializes a rewardable entity config", async () => {
@@ -307,10 +332,12 @@ describe("helium-entity-manager", () => {
         })
         .signers([makerKeypair])
         .transaction();
-      tx.recentBlockhash = (await provider.connection.getRecentBlockhash()).blockhash;
+      tx.recentBlockhash = (
+        await provider.connection.getRecentBlockhash()
+      ).blockhash;
       tx.feePayer = provider.wallet.publicKey;
-      tx.partialSign(makerKeypair)
-      tx = await provider.wallet.signTransaction(tx)
+      tx.partialSign(makerKeypair);
+      tx = await provider.wallet.signTransaction(tx);
 
       const { transaction } = (
         await axios.post("http://localhost:8000/verify", {
@@ -320,13 +347,14 @@ describe("helium-entity-manager", () => {
             })
             .toString("hex"),
           msg: Buffer.from(serialized).toString("hex"),
-          signature:
-            Buffer.from(txn.gatewaySignature!).toString("hex"),
+          signature: Buffer.from(txn.gatewaySignature!).toString("hex"),
         })
       ).data;
-      const sig = await provider.connection.sendRawTransaction(Buffer.from(transaction, "hex"));
-      await provider.connection.confirmTransaction(sig)
-    })
+      const sig = await provider.connection.sendRawTransaction(
+        Buffer.from(transaction, "hex")
+      );
+      await provider.connection.confirmTransaction(sig);
+    });
 
     it("issues a mobile hotspot", async () => {
       await hemProgram.methods
@@ -611,7 +639,7 @@ describe("helium-entity-manager", () => {
       await hemProgram.methods
         .updateRewardableEntityConfigV0({
           newAuthority: PublicKey.default,
-          settings: null
+          settings: null,
         })
         .accounts({
           rewardableEntityConfig,

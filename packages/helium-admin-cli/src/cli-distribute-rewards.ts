@@ -11,6 +11,9 @@ import {
   init as initLazy,
   lazyDistributorKey
 } from "@helium/lazy-distributor-sdk";
+import {
+  init as initRewards,
+} from "@helium/rewards-oracle-sdk";
 import { sendAndConfirmWithRetry } from "@helium/spl-utils";
 import Address from "@helium/address";
 import * as anchor from "@coral-xyz/anchor";
@@ -45,6 +48,7 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const heliumSubDaosProgram = await initDao(provider);
   const lazyDistributorProgram = await initLazy(provider);
+  const rewardsOracleProgram = await initRewards(provider);
 
   const mobileKeypair = await loadKeypair(argv.mobileKeypair);
   const mobileSubdao = (await subDaoKey(mobileKeypair.publicKey))[0];
@@ -69,6 +73,7 @@ export async function run(args: any = process.argv) {
 
   const tx = await client.formTransaction({
     program: lazyDistributorProgram,
+    rewardsOracleProgram: rewardsOracleProgram,
     provider,
     rewards,
     hotspot,

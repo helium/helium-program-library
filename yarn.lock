@@ -3173,7 +3173,7 @@ ajv@^8.0.0, ajv@^8.10.0, ajv@^8.11.0:
 
 angry-purple-tiger@^1.0.5:
   version "1.0.5"
-  resolved "https://registry.npmjs.org/angry-purple-tiger/-/angry-purple-tiger-1.0.5.tgz"
+  resolved "https://registry.yarnpkg.com/angry-purple-tiger/-/angry-purple-tiger-1.0.5.tgz#14cc6a077ab50c9a64629823f21d975ee5814f8f"
   integrity sha512-IhVFyt86Dz1/wbsGsuBM5l5Ea3qe4fVQ3DnA6DkwDsojnA/p99++phO+8ivvbsb3tmxB6CmDpIbuqSd0xDRFOg==
   dependencies:
     md5 "^2.2.1"

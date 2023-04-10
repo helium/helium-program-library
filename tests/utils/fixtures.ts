@@ -1,3 +1,4 @@
+import { LazyDistributor } from "@/target/types/lazy_distributor";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
@@ -8,8 +9,8 @@ import {
   toBN
 } from "@helium/spl-utils";
 import {
-  getConcurrentMerkleTreeAccountSize,
-  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  getConcurrentMerkleTreeAccountSize
 } from "@solana/spl-account-compression";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { BN } from "bn.js";
@@ -17,9 +18,9 @@ import { execSync } from "child_process";
 import { ThresholdType } from "../../packages/circuit-breaker-sdk/src";
 import { makerKey } from "../../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../../target/types/data_credits";
-import { PriceOracle } from "../../target/types/price_oracle";
 import { HeliumEntityManager } from "../../target/types/helium_entity_manager";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
+import { PriceOracle } from "../../target/types/price_oracle";
 import { initTestDao, initTestSubdao } from "./daos";
 import { exists, loadKeypair } from "./solana";
 import { random } from "./string";
@@ -235,6 +236,21 @@ export async function ensureDCIdl(dcProgram: Program<DataCredits>) {
     );
   }
 }
+
+export async function ensureLDIdl(ldProgram: Program<LazyDistributor>) {
+  try {
+    execSync(
+      `anchor idl init --filepath ${__dirname}/../../target/idl/lazy_distributor.json ${ldProgram.programId}`,
+      { stdio: "inherit", shell: "/bin/bash" }
+    );
+  } catch {
+    execSync(
+      `anchor idl upgrade --filepath ${__dirname}/../../target/idl/lazy_distributor.json ${ldProgram.programId}`,
+      { stdio: "inherit", shell: "/bin/bash" }
+    );
+  }
+}
+
 
 export async function ensureHSDIdl(hsdProgram: Program<HeliumSubDaos>) {
   try {

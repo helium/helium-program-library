@@ -319,6 +319,7 @@ describe("data-credits", () => {
       await program.methods
         .updateDataCreditsV0({
           newAuthority: PublicKey.default,
+          hntPriceOracle: null
         })
         .accounts({
           dcMint,
