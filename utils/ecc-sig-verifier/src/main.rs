@@ -3,7 +3,7 @@ extern crate rocket;
 use anchor_lang::prelude::borsh;
 use anchor_lang::{prelude::Pubkey, AnchorDeserialize, AnchorSerialize};
 use helium_crypto::{PublicKey, Verify};
-use rocket::serde::json::serde_json;
+use reqwest::blocking::Client;
 use rocket::{
   http::Status,
   serde::{json::Json, Deserialize, Serialize},
@@ -46,16 +46,14 @@ pub struct IssueEntityArgsV0 {
   pub entity_key: Vec<u8>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct HotspotResponse {
-  pub transactions: Vec<Vec<u8>>,
+#[derive(Deserialize, Serialize, Default)]
+struct TransactionResponse {
   pub count: u32,
+  pub transactions: Vec<Vec<u8>>,
 }
 
 #[post("/verify", format = "application/json", data = "<verify>")]
 fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Status> {
-  let migration_service = env::var("MIGRATION_SERVICE").unwrap();
-
   let solana_txn_hex = hex::decode(&verify.transaction).map_err(|e| {
     error!("failed to decode transaction: {:?}", e);
     Status::BadRequest
@@ -73,7 +71,8 @@ fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Sta
   // First ix is always a compute budget ix
   let compute_ixn = &solana_txn.message.instructions[0];
   let compute_program_id = account_keys[compute_ixn.program_id_index as usize];
-  if compute_program_id != Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap() {
+  if compute_program_id != Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap()
+  {
     error!("First instruction is not compute budget");
     return Err(Status::BadRequest);
   }
@@ -109,14 +108,26 @@ fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Sta
     Status::BadRequest
   })?;
 
-  let body = reqwest::blocking::get(&format!("{}/migrate/hotspot/{}", migration_service, keystr))
+  let migration_url = env::var("MIGRATION_SERVICE_URL").expect("MIGRATION_SERVICE_URL must be set");
+  // Make sure the hotspot doesn't need to be migrated
+  let url = format!(
+    "{}/migrate/hotspot/{}?limit=1&offset=0",
+    migration_url, keystr
+  );
+  println!("{}", url);
+  let client = Client::new();
+  let response = client
+    .get(url.as_str())
+    .send()
     .unwrap()
-    .text()
+    .json::<TransactionResponse>()
     .unwrap();
 
-  let response = serde_json::from_str::<HotspotResponse>(&body).unwrap();
   if response.transactions.len() > 0 {
-    error!("Cannot onboard hotspot with key: {:?}. It has not been migrated yet.", keystr);
+    error!(
+      "Cannot onboard hotspot with key: {:?}. It has not been migrated yet.",
+      keystr
+    );
     return Err(Status::BadRequest);
   }
 
