@@ -124,7 +124,10 @@ fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Sta
     .unwrap();
 
   if response.transactions.len() > 0 {
-    error!("Cannot onboard hotspot with key: {:?}. It has not been migrated yet.", keystr);
+    error!(
+      "Cannot onboard hotspot with key: {:?}. It has not been migrated yet.",
+      keystr
+    );
     return Err(Status::BadRequest);
   }
 
