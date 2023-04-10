@@ -19,7 +19,7 @@ export async function monitorTokenBalance(account: PublicKey, label: string) {
   watch(account, (raw) => {
     const account = AccountLayout.decode(raw!.data);
     balanceGauge.set(
-      { name: label },
+      { name: label, type: "token" },
       toNumber(new BN(account.amount.toString()), mint.decimals)
     );
   });
@@ -28,7 +28,7 @@ export async function monitorTokenBalance(account: PublicKey, label: string) {
 export async function monitorSolBalance(account: PublicKey, label: string) {
   watch(account, (raw) => {
     balanceGauge.set(
-      { name: label },
+      { name: label, type: "sol" },
       raw ? raw.lamports / LAMPORTS_PER_SOL : 0,
     );
   });

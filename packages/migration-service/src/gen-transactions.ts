@@ -1403,9 +1403,10 @@ async function insertTransactions(
 
   const walletRows = flatTransactions
     .map((flatTransaction, index) => {
+      const txid = currId + index;
       return Array.from(flatTransaction.wallets).map((wallet) => [
         wallet,
-        index,
+        txid,
       ]);
     })
     .flat();
@@ -1429,9 +1430,10 @@ async function insertTransactions(
 
   const hotspotRows = flatTransactions
     .map((flatTransaction, index) => {
+      const txid = currId + index;
       return Array.from(flatTransaction.hotspots).map((hotspot) => [
         hotspot,
-        index,
+        txid,
       ]);
     })
     .flat();

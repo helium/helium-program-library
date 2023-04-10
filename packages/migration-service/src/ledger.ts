@@ -215,7 +215,9 @@ export async function getMigrateTransactions(
       toPubkey: to,
       lamports:
         lamports -
-        (transactions.reduce((acc, tx) => acc + tx.signatures.length, 0) + 2) *
+        (transactions.reduce((acc, tx) => acc + tx.signatures.length, 0) +
+          1 +
+          (transferTokenInstructions.length > 0 ? 1 : 0)) *
           5000,
     })
   );
