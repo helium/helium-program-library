@@ -1,9 +1,9 @@
 #[macro_use]
 extern crate rocket;
 use anchor_lang::prelude::borsh;
-use reqwest::blocking::Client;
 use anchor_lang::{prelude::Pubkey, AnchorDeserialize, AnchorSerialize};
 use helium_crypto::{PublicKey, Verify};
+use reqwest::blocking::Client;
 use rocket::{
   http::Status,
   serde::{json::Json, Deserialize, Serialize},
@@ -71,7 +71,8 @@ fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Sta
   // First ix is always a compute budget ix
   let compute_ixn = &solana_txn.message.instructions[0];
   let compute_program_id = account_keys[compute_ixn.program_id_index as usize];
-  if compute_program_id != Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap() {
+  if compute_program_id != Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap()
+  {
     error!("First instruction is not compute budget");
     return Err(Status::BadRequest);
   }
