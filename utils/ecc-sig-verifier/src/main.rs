@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate rocket;
 use anchor_lang::prelude::borsh;
+use reqwest::blocking::Client;
 use anchor_lang::{prelude::Pubkey, AnchorDeserialize, AnchorSerialize};
 use helium_crypto::{PublicKey, Verify};
 use rocket::{
@@ -43,6 +44,12 @@ struct VerifyResult {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueEntityArgsV0 {
   pub entity_key: Vec<u8>,
+}
+
+#[derive(Deserialize, Serialize, Default)]
+struct TransactionResponse {
+  pub count: u32,
+  pub transactions: Vec<Vec<u8>>,
 }
 
 #[post("/verify", format = "application/json", data = "<verify>")]
@@ -99,6 +106,26 @@ fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Sta
     error!("failed to verify signature: {:?}", e);
     Status::BadRequest
   })?;
+
+  let migration_url = env::var("MIGRATION_SERVICE_URL").expect("MIGRATION_SERVICE_URL must be set");
+  // Make sure the hotspot doesn't need to be migrated
+  let url = format!(
+    "{}/migrate/hotspot/{}?limit=1&offset=0",
+    migration_url, keystr
+  );
+  println!("{}", url);
+  let client = Client::new();
+  let response = client
+    .get(url.as_str())
+    .send()
+    .unwrap()
+    .json::<TransactionResponse>()
+    .unwrap();
+
+  if response.transactions.len() > 0 {
+    error!("Hotspot needs to be migrated");
+    return Err(Status::BadRequest);
+  }
 
   // Sign the solana transaction
   let keypair = read_keypair_file(env::var("ANCHOR_WALLET").unwrap_or("keypair.json".to_string()))
