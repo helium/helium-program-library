@@ -14,7 +14,7 @@ pub struct InitializeLazyDistributorArgsV0 {
   pub oracles: Vec<OracleConfigV0>,
   pub authority: Pubkey,
   pub window_config: WindowedCircuitBreakerConfigV0,
-  pub approver: Option<Pubkey>
+  pub approver: Option<Pubkey>,
 }
 
 #[derive(Accounts)]

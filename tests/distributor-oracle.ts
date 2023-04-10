@@ -249,7 +249,7 @@ describe("distributor-oracle", () => {
           thresholdType: ThresholdType.Absolute as never,
           threshold: new anchor.BN(1000000000),
         },
-        approver: oracleSignerKey()
+        approver: oracleSignerKey()[0]
       })
       .accounts({
         rewardsMint,

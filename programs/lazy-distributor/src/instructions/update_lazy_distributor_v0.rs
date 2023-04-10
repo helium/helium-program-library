@@ -39,6 +39,6 @@ pub fn handler(
   if let Some(approver) = args.approver {
     ld.approver = approver;
   }
-  
+
   Ok(())
 }
