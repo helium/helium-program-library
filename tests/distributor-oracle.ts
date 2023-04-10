@@ -102,6 +102,14 @@ export class DatabaseMock implements Database {
     };
   }
 
+  async getCurrentRewardsByEntity(entityKey: Buffer): Promise<string> {
+    const pubkey = Address.fromBin(entityKey);
+    return Math.floor(
+      (this.inMemHash.byHotspot[pubkey.b58]?.lifetimeRewards || 0) *
+        Math.pow(10, 8)
+    ).toString();
+  }
+
   async getActiveDevices(): Promise<number> {
     return 0;
   }
