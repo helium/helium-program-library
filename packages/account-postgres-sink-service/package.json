@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.0.50",
+  "version": "0.0.51",
   "description": "Sync account data to postgres",
   "repository": {
     "type": "git",
