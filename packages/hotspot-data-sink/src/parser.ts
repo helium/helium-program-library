@@ -127,7 +127,7 @@ export const instructionParser: Record<string, Parser>  = {
   },
   "updateMobileInfoV0": {
     async parseAndWrite(program, tx, ix, args) {
-      const assetId = await getAssetIdFromInfo(program, tx, ix, "updateIotInfoV0");
+      const assetId = await getAssetIdFromInfo(program, tx, ix, "updateMobileInfoV0");
       const record = await Entity.findOne({
         where: {
           assetId: assetId!.toString(),
