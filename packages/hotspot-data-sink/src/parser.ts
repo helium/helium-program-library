@@ -1,4 +1,5 @@
 import { Program } from '@coral-xyz/anchor';
+import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
 import { PublicKey } from '@solana/web3.js';
 import { Entity, IotMetadata, MobileMetadata } from './model';
@@ -38,7 +39,7 @@ async function getAssetIdFromInfo(program: Program<HeliumEntityManager>, tx: any
 async function getKeysFromKeyToAsset(program: Program<HeliumEntityManager>, tx: any, ix: any, ixName: string): Promise<[PublicKey, string]> {
   let keyToAssetKey = findAccountKey(program, tx, ix, ixName, "keyToAsset")!;
   let keyToAsset = await program.account.keyToAssetV0.fetch(keyToAssetKey);
-  return [keyToAsset.asset, (keyToAsset.entityKey as Buffer).toString()];
+  return [keyToAsset.asset, bs58.encode(keyToAsset.entityKey as Buffer)];
 }
 
 export const instructionParser: Record<string, Parser>  = {
