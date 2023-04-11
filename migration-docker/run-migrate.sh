@@ -4,4 +4,4 @@ set +e
 time ./migrate.sh
 set -e
 
-read
+tail -f /dev/null
