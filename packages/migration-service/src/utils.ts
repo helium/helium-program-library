@@ -9,6 +9,7 @@ import { PublicKey } from "@solana/web3.js";
 import fs from "fs";
 import lo from "@solana/buffer-layout";
 import * as borsh from "@project-serum/borsh";
+import { MIGRATE_THROTTLE_PERCENTAGE } from "./env";
 
 export function inflatePubkeys(transactions: any[]) {
   transactions.forEach((instructions) => {
@@ -23,10 +24,10 @@ export function inflatePubkeys(transactions: any[]) {
 }
 
 const acctLayout = borsh.struct([
-      borsh.bool("isSigner"),
-      borsh.bool("isWritable"),
-      borsh.publicKey("pubkey"),
-    ]);
+  borsh.bool("isSigner"),
+  borsh.bool("isWritable"),
+  borsh.publicKey("pubkey"),
+]);
 const schema: lo.Layout<CompiledTransaction> = borsh.struct([
   borsh.vec(acctLayout, "accounts"),
   borsh.vec(compiledIxLayout, "instructions"),
@@ -73,5 +74,9 @@ export function decompressSigners(signersRaw: Buffer): Buffer[][] {
     currSigner += 1;
   }
 
-  return signers
+  return signers;
+}
+
+export function shouldThrottle() {
+  return Math.random() * 100 > 100 - MIGRATE_THROTTLE_PERCENTAGE;
 }

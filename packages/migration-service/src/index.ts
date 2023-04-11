@@ -7,7 +7,7 @@ import {
   blockKey,
   init,
   lazySignerKey,
-  lazyTransactionsKey
+  lazyTransactionsKey,
 } from "@helium/lazy-transactions-sdk";
 import { chunks } from "@helium/spl-utils";
 import {
@@ -15,7 +15,7 @@ import {
   PublicKey,
   SystemProgram,
   TransactionMessage,
-  VersionedTransaction
+  VersionedTransaction,
 } from "@solana/web3.js";
 import AWS from "aws-sdk";
 import Fastify, { FastifyInstance } from "fastify";
@@ -23,7 +23,7 @@ import { Pool } from "pg";
 import { LAZY_TRANSACTIONS_NAME } from "./env";
 import { getMigrateTransactions } from "./ledger";
 import { provider, wallet } from "./solana";
-import { decompress, decompressSigners } from "./utils";
+import { decompress, decompressSigners, shouldThrottle } from "./utils";
 
 const host = process.env.PGHOST || "localhost";
 const isRds = host.includes("rds.amazonaws.com");
@@ -106,7 +106,10 @@ server.get("/top-wallets", async () => {
   }
 });
 
-async function getTransactions(results: any[], luts: any[]): Promise<Array<number[]>> {
+async function getTransactions(
+  results: any[],
+  luts: any[]
+): Promise<Array<number[]>> {
   const recentBlockhash = (await provider.connection.getLatestBlockhash())
     .blockhash;
 
@@ -123,7 +126,9 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
       )
     )
   ).flat();
-  const lazyTxns = await program.account.lazyTransactionsV0.fetch(lazyTransactions);
+  const lazyTxns = await program.account.lazyTransactionsV0.fetch(
+    lazyTransactions
+  );
 
   const asExecuteTxs: { id: number; transaction: TransactionMessage }[] = (
     await Promise.all(
@@ -134,7 +139,7 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
             compiled,
             id,
             signers: signersRaw,
-            compute
+            compute,
           }: {
             id: number;
             compiled: Buffer;
@@ -148,7 +153,6 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
           const compiledTx = decompress(compiled);
           const block = blockKey(lazyTransactions, id)[0];
           const signers = decompressSigners(signersRaw);
-          
 
           if (!hasRun && compiledTx.instructions.length > 0) {
             const ix = await program.methods
@@ -225,7 +229,8 @@ async function getTransactions(results: any[], luts: any[]): Promise<Array<numbe
   }
 }
 
-const ATTESTATION = "I attest that both the source and destination wallets are owned and controlled by the same individual or entity, and that I have legal authority to perform this transaction on behalf of that individual or entity."
+const ATTESTATION =
+  "I attest that both the source and destination wallets are owned and controlled by the same individual or entity, and that I have legal authority to perform this transaction on behalf of that individual or entity.";
 server.post<{
   Body: { from: string; to: string; attestation: string };
 }>("/ledger/migrate", async (request, reply) => {
@@ -235,15 +240,20 @@ server.post<{
     return reply.code(400).send({ error: "Invalid attestation" });
   }
 
-  return (await getMigrateTransactions(from, to)).map(tx => 
-    Buffer.from(tx.serialize({ requireAllSignatures: false })).toJSON().data
-  )
-})
+  return (await getMigrateTransactions(from, to)).map(
+    (tx) =>
+      Buffer.from(tx.serialize({ requireAllSignatures: false })).toJSON().data
+  );
+});
 
 server.get<{
   Querystring: { limit?: number; offset?: number };
   Params: { wallet: string };
 }>("/migrate/:wallet", async (request, reply) => {
+  if (shouldThrottle()) {
+    reply.code(503).send();
+  }
+
   const { wallet: userWallet } = request.params;
   const { limit, offset } = request.query;
   const client = await pool.connect();
@@ -328,7 +338,6 @@ server.get<{
   }
 });
 
-
 server.get<{
   Querystring: { limit?: number; offset?: number };
 }>("/migrate", async (request, reply) => {
@@ -355,12 +364,8 @@ server.get<{
     return {
       transactions: transactions || [],
       count: Number(
-        (
-          await client.query(
-            "SELECT count(*) FROM transactions",
-            []
-          )
-        ).rows[0].count
+        (await client.query("SELECT count(*) FROM transactions", [])).rows[0]
+          .count
       ),
     };
   } catch (e: any) {
