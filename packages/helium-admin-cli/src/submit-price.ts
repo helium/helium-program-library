@@ -21,7 +21,7 @@ async function findBinancePrice(symbol: string): Promise<number> {
   }
 }
 
-async function findCoingeckoPrice(token: string): Promise<number> {
+export async function findCoingeckoPrice(token: string): Promise<number> {
   try {
     const response = await axios.get(
       `https://api.coingecko.com/api/v3/simple/price?ids=${token}&vs_currencies=usd`
