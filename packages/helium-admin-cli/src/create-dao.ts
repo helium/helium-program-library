@@ -264,7 +264,8 @@ export async function run(args: any = process.argv) {
   )[0];
 
   console.log("Realm, ", realm.toBase58());
-  if (!(await exists(conn, realm))) {
+  const needRealmCreate = !(await exists(conn, realm))
+  if (needRealmCreate) {
     console.log("Initializing Realm");
     await withCreateRealm(
       instructions,
@@ -360,7 +361,7 @@ export async function run(args: any = process.argv) {
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
-  if (!authority.equals(me)) {
+  if (needRealmCreate && !authority.equals(me)) {
     withSetRealmAuthority(
       instructions,
       govProgramId,

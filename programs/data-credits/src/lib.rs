@@ -29,6 +29,13 @@ pub mod data_credits {
     instructions::mint_data_credits_v0::handler(ctx, args)
   }
 
+  pub fn issue_data_credits_v0(
+    ctx: Context<IssueDataCreditsV0>,
+    args: IssueDataCreditsArgsV0,
+  ) -> Result<()> {
+    instructions::issue_data_credits_v0::handler(ctx, args)
+  }
+
   pub fn genesis_issue_delegated_data_credits_v0(
     ctx: Context<GenesisIssueDelegatedDataCreditsV0>,
     args: GenesisIssueDelegatedDataCreditsArgsV0,

@@ -33,5 +33,5 @@ docker run -v $(pwd)/migration-docker/data:/data \
            -c 2 \
            --rm \
            --name migration \
-           migration:latest bash
+           migration:latest
 
