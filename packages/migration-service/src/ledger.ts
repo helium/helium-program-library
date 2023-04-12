@@ -193,7 +193,7 @@ export async function getMigrateTransactions(
   const transactions: Transaction[] = [];
   for (const chunk of chunks(transferPositionIxns, 4)) {
     const tx = new Transaction({
-      feePayer: from,
+      feePayer: provider.wallet.publicKey,
       recentBlockhash,
     });
     tx.add(...chunk);
@@ -202,7 +202,7 @@ export async function getMigrateTransactions(
 
   for (const chunk of chunks(transferPositionIxns, 2)) {
     const tx = new Transaction({
-      feePayer: from,
+      feePayer: provider.wallet.publicKey,
       recentBlockhash,
     });
     tx.add(...chunk);
@@ -213,17 +213,12 @@ export async function getMigrateTransactions(
     SystemProgram.transfer({
       fromPubkey: from,
       toPubkey: to,
-      lamports:
-        lamports -
-        (transactions.reduce((acc, tx) => acc + tx.signatures.length, 0) +
-          1 +
-          (transferTokenInstructions.length > 0 ? 1 : 0)) *
-          5000,
+      lamports,
     })
   );
 
   const tx = new Transaction({
-    feePayer: from,
+    feePayer: provider.wallet.publicKey,
     recentBlockhash,
   });
   tx.add(...transferTokenInstructions);
