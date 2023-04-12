@@ -21,11 +21,13 @@ export const sequelize = new Sequelize({
     idle: 10000
   },
   dialectOptions: {
-          ssl: {
-            require: false,
-            rejectUnauthorized: false,
-          },
-        },
+    ssl: {
+      require: false,
+      rejectUnauthorized: false,
+    },
+    supportBigNumbers: true,
+    bigNumberStrings: true,
+  },
   hooks: {
     beforeConnect: async (config: any) => {
       const isRds = host.includes("rds.amazonaws.com");

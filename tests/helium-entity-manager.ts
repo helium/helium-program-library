@@ -423,6 +423,7 @@ describe("helium-entity-manager", () => {
             rewardableEntityConfig,
             getAssetFn,
             getAssetProofFn,
+            location: new BN(100),
           })
         ).signers([makerKeypair, hotspotOwner]);
 
@@ -616,6 +617,7 @@ describe("helium-entity-manager", () => {
           maker,
           dao,
           rewardableEntityConfig,
+          location: new BN(1000),
           getAssetFn,
           getAssetProofFn,
         })
@@ -677,6 +679,7 @@ describe("helium-entity-manager", () => {
             assetId: hotspot,
             maker,
             dao,
+            location: new BN(100),
             rewardableEntityConfig,
             getAssetFn,
             getAssetProofFn,
