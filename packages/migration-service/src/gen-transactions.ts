@@ -119,10 +119,10 @@ const yarg = yargs(hideBin(process.argv)).options({
     default: "postgres",
   },
   pgPassword: {
-    default: "postgres",
+    type: "string"
   },
   pgDatabase: {
-    default: "postgres",
+    type: "string"
   },
   pgHost: {
     default: "localhost",
