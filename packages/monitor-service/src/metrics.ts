@@ -5,20 +5,20 @@ export const register = new client.Registry();
 
 // Add a default label which is added to all metrics
 register.setDefaultLabels({
-  app: 'solana-monitor'
-})
+  app: "solana-monitor",
+});
 
 export const supplyGauge = new client.Gauge({
   name: "solana_mint_supply",
   help: "Supply of this mint",
-  labelNames: ["name"],
+  labelNames: ["name", "address"],
 });
 register.registerMetric(supplyGauge);
 
 export const balanceGauge = new client.Gauge({
   name: "solana_account_balance",
   help: "Balance of this account",
-  labelNames: ["name", "type"],
+  labelNames: ["name", "address", "type"],
 });
 register.registerMetric(balanceGauge);
 
