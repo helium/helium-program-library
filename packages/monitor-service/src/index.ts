@@ -70,12 +70,14 @@ async function run() {
   await monitorTokenBalance(mobileRewardsEscrow, "mobile_rewards_escrow");
 
   await monitorSolBalance(
-    new PublicKey(process.env.ORACLE_KEY || "orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q"),
+    new PublicKey(
+      process.env.ORACLE_KEY || "orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q"
+    ),
     "oracle"
   );
   await monitorSolBalance(
     new PublicKey(
-      process.env.MIGRATIOn_KEY || "mgrArTL62g582wWV6iM4fwU1LKnbUikDN6akKJ76pzK"
+      process.env.MIGRATION_KEY || "mgrArTL62g582wWV6iM4fwU1LKnbUikDN6akKJ76pzK"
     ),
     "oracle"
   );
