@@ -324,7 +324,7 @@ server.get<{
       count: Number(
         (
           await client.query(
-            "SELECT count(*) FROM hotspot_transactions WHERE wallet = $1",
+            "SELECT count(*) FROM hotspot_transactions WHERE hotspot = $1",
             [hotspot]
           )
         ).rows[0].count

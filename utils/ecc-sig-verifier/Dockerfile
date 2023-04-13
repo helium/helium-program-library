@@ -4,7 +4,7 @@ FROM rust:1.68-alpine3.17 AS build
 # Set the working directory
 WORKDIR /app
 
-RUN apk add --no-cache musl-dev
+RUN apk add --no-cache musl-dev pkgconf openssl-dev
 
 # Copy the Cargo files and install dependencies
 COPY Cargo.toml Cargo.lock ./
