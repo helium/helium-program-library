@@ -264,7 +264,8 @@ export async function run(args: any = process.argv) {
   )[0];
 
   console.log("Realm, ", realm.toBase58());
-  if (!(await exists(conn, realm))) {
+  const needRealmCreate = !(await exists(conn, realm))
+  if (needRealmCreate) {
     console.log("Initializing Realm");
     await withCreateRealm(
       instructions,
@@ -325,9 +326,8 @@ export async function run(args: any = process.argv) {
         baselineVoteWeightScaledFactor: new anchor.BN(BASELINE * 1e9),
         maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE * 1e9),
         genesisVotePowerMultiplier: GENESIS_MULTIPLIER,
-        genesisVotePowerMultiplierExpirationTs: new anchor.BN(
-          Number(await getUnixTimestamp(provider)) + getTimestampFromDays(7)
-        ),
+        // April 28th, 23:59:59 UTC
+        genesisVotePowerMultiplierExpirationTs: new anchor.BN("1682726399"),
         lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
       })
       .accounts({
@@ -360,7 +360,7 @@ export async function run(args: any = process.argv) {
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
-  if (!authority.equals(me)) {
+  if (needRealmCreate && !authority.equals(me)) {
     withSetRealmAuthority(
       instructions,
       govProgramId,

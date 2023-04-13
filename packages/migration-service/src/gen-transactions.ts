@@ -45,6 +45,7 @@ import {
 } from "@solana/spl-account-compression";
 import {
   ACCOUNT_SIZE,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
   createInitializeMintInstruction,
   createTransferInstruction,
@@ -792,10 +793,23 @@ async function run() {
         if (dcBal.gt(zero)) {
           totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
           totalBalances.dc = totalBalances.dc.add(dcBal);
-
-          const { instruction, ata } = createAta(dc, solAddress, lazySigner);
+          const instruction = await dcProgram.methods
+            .issueDataCreditsV0({
+              amount: dcBal
+            })
+            .accountsStrict({
+              dataCredits,
+              dcMint: dc,
+              to: solAddress,
+              from: lazySigner,
+              fromAccount: getAssociatedTokenAddressSync(dc, lazySigner, true),
+              toAccount: getAssociatedTokenAddressSync(dc, solAddress),
+              tokenProgram: TOKEN_PROGRAM_ID,
+              associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+              systemProgram: SystemProgram.programId,
+            })
+            .instruction()
           tokenIxs.push(instruction);
-          tokenIxs.push(createTransfer(dc, ata, lazySigner, dcBal));
         }
         if (mobileBal.gt(zero)) {
           totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
@@ -834,7 +848,7 @@ async function run() {
           instructions: tokenIxs,
           wallet: solAddress.toBase58(),
           signerSeeds: [],
-          compute: 30000 * tokenIxs.length,
+          compute: 30000 * tokenIxs.length + (dcBal.gt(new BN(0)) ? 100000 : 0),
           size: tokenIxs.reduce((acc, ix) => acc + size(ix), 0),
         });
 
