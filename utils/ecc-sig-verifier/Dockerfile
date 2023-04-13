@@ -15,7 +15,7 @@ RUN cargo build --release
 # Create a new image for the application
 FROM alpine:3.17
 WORKDIR /app
-COPY --from=build /app/target/release/ecc-sig-verifier /app/ecc-sig-verifier
+COPY --from=build /app/target/debug/ecc-sig-verifier /app/ecc-sig-verifier
 
 ENV ROCKET_ADDRESS=0.0.0.0
 ENV ROCKET_PORT=8000
