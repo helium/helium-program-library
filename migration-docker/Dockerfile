@@ -52,6 +52,8 @@ COPY Cargo.lock .
 COPY Cargo.toml .
 COPY programs programs
 COPY deps/metaplex-program-library deps/metaplex-program-library
+RUN rm -rf deps/metaplex-program-library/bubblegum/program/target && \
+  rm -rf deps/metaplex-program-library/token-metadata/program/target
 COPY package.json .
 COPY lerna.json .
 COPY yarn.lock .
