@@ -460,7 +460,9 @@ export async function run(args: any = process.argv) {
             k: toU128(0),
           },
         } as any,
-        onboardingDcFee: toBN(4000000, 0), // $40 in dc
+        // $40 for iot, $0 for mobile
+        onboardingDcFee:
+          name.toUpperCase() == "IOT" ? toBN(4000000, 0) : toBN(0, 0),
         delegatorRewardsPercent: delegatorRewardsPercent(
           argv.delegatorRewardsPercent
         ),
