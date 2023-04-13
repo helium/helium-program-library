@@ -848,7 +848,7 @@ async function run() {
           instructions: tokenIxs,
           wallet: solAddress.toBase58(),
           signerSeeds: [],
-          compute: 30000 * tokenIxs.length + (dcBal.gt(new BN(0)) ? 50000 : 0),
+          compute: 30000 * tokenIxs.length + (dcBal.gt(new BN(0)) ? 100000 : 0),
           size: tokenIxs.reduce((acc, ix) => acc + size(ix), 0),
         });
 
