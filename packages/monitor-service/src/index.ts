@@ -5,14 +5,20 @@ import {
   subDaoKey,
   threadKey,
 } from "@helium/helium-sub-daos-sdk";
+import { init as hemInit } from "@helium/helium-entity-manager-sdk";
 import { accountPayerKey } from "@helium/data-credits-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
+import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import * as anchor from "@coral-xyz/anchor";
 import fastify from "fastify";
 import { HNT_MINT, MOBILE_MINT, IOT_MINT } from "./env";
 import { register } from "./metrics";
-import { monitorSolBalance, monitorTokenBalance } from "./monitors/balance";
+import {
+  monitiorAssociatedTokenBalance,
+  monitorSolBalance,
+  monitorTokenBalance,
+} from "./monitors/balance";
 import {
   monitorAccountCircuitBreaker,
   monitorMintCircuitBreaker,
@@ -26,7 +32,9 @@ import {
   READ_ONLY_KEYPAIR,
 } from "@switchboard-xyz/solana.js";
 import { lazySignerKey } from "@helium/lazy-transactions-sdk";
+import { underscore } from "inflection";
 
+let hemProgram: anchor.Program<HeliumEntityManager>;
 let hsdProgram: anchor.Program<HeliumSubDaos>;
 let cbProgram: anchor.Program<CircuitBreaker>;
 
@@ -36,6 +44,7 @@ server.get("/metrics", async (request, reply) => {
 });
 
 async function run() {
+  hemProgram = await hemInit(provider);
   hsdProgram = await hsdInit(provider);
   cbProgram = await cbInit(provider);
 
@@ -45,6 +54,7 @@ async function run() {
   const iotKey = subDaoKey(IOT_MINT)[0];
   const mobile = await hsdProgram.account.subDaoV0.fetch(mobileKey);
   const iot = await hsdProgram.account.subDaoV0.fetch(iotKey);
+  const makers = await hemProgram.account.makerV0.all();
 
   const hntMint = dao.hntMint;
   const dcMint = dao.dcMint;
@@ -68,6 +78,22 @@ async function run() {
   await monitorTokenBalance(mobileTreasury, "mobile_treasury");
   await monitorTokenBalance(iotRewardsEscrow, "iot_rewards_escrow");
   await monitorTokenBalance(mobileRewardsEscrow, "mobile_rewards_escrow");
+
+  for (const maker of makers) {
+    await monitorSolBalance(
+      maker.account.issuingAuthority,
+      underscore(maker.account.name),
+      true
+    );
+
+    await monitiorAssociatedTokenBalance(
+      maker.account.issuingAuthority,
+      dcMint,
+      underscore(maker.account.name),
+      true,
+      "data-credits"
+    );
+  }
 
   await monitorSolBalance(
     new PublicKey(
