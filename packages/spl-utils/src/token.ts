@@ -265,7 +265,7 @@ export async function createNft(
           data: {
             name: "test",
             symbol: "TST",
-            uri: "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/dc.json",
+            uri: "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/dc.json",
             sellerFeeBasisPoints: 10,
             creators: [
               {

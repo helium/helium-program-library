@@ -28,7 +28,7 @@ server.get<{ Params: { mintKey: string } }>("/:mintKey", async (request, reply) 
   return {
     description: `${uiAmount} tokens staked in a fanout wallet, receiving ${fanout.fanoutMint.toBase58()} tokens`,
     image:
-      "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/vsr.png",
+      "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/vsr.png",
     attributes: [
       { trait_type: "amount_deposited", value: uiAmount },
     ],

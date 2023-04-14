@@ -140,7 +140,7 @@ async function createTokenMetadata(
         data: {
           name: "Mobile",
           symbol: "MOBILE",
-          uri: "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/mobile.json",
+          uri: "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/mobile.json",
           sellerFeeBasisPoints: 0,
           creators: null,
           collection: null,

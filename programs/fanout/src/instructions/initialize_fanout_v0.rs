@@ -117,7 +117,7 @@ pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -
       name: args.name.clone(),
       symbol: String::from("FANOUT"),
       uri:
-        "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/fanout.json"
+        "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/fanout.json"
           .to_string(),
       seller_fee_basis_points: 0,
       creators: None,
