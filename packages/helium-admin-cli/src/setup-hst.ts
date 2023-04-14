@@ -80,7 +80,9 @@ export async function run(args: any = process.argv) {
   let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
   const squads = Squads.endpoint(
     process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet
+    provider.wallet, {
+      commitmentOrConfig: "finalized"
+    }
   );
   if (multisig) {
     authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);

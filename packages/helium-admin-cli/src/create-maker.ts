@@ -163,7 +163,9 @@ export async function run(args: any = process.argv) {
   let daoPayer = provider.wallet.publicKey;
   const squads = Squads.endpoint(
     process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet
+    provider.wallet, {
+      commitmentOrConfig: "finalized"
+    }
   );
   let authority = provider.wallet.publicKey;
   let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;

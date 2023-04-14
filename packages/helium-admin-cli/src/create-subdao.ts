@@ -238,7 +238,9 @@ export async function run(args: any = process.argv) {
 
   const squads = Squads.endpoint(
     process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet
+    provider.wallet, {
+      commitmentOrConfig: "finalized"
+    }
   );
   let authority = provider.wallet.publicKey;
   const multisig = argv.multisig ? new PublicKey(argv.multisig) : null;

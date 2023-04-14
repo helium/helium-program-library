@@ -77,15 +77,13 @@ WITH
     JOIN hsd.sub_daos s on s.address = d.sub_dao
     GROUP BY s.dnt_mint
   )
-  -- SELECT * FROM positions_with_vehnt;
 SELECT 
   mint,
   delegations,
+  real_ve_tokens,
+  approx_ve_tokens,
   real_fall_rate,
   approx_fall_rate,
   approx_fall_rate - real_fall_rate as fall_rate_diff,
-  real_ve_tokens,
-  approx_ve_tokens,
   approx_ve_tokens - real_ve_tokens as ve_tokens_diff
 FROM subdao_delegations
--- WHERE mint = 'iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9fns';

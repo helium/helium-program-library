@@ -70,7 +70,9 @@ export async function run(args: any = process.argv) {
   let payer = provider.wallet.publicKey;
   const squads = Squads.endpoint(
     process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet
+    provider.wallet, {
+      commitmentOrConfig: "finalized"
+    }
   );
 
   let settings;

@@ -100,7 +100,9 @@ export async function run(args: any = process.argv) {
 
   const squads = Squads.endpoint(
     process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet
+    provider.wallet, {
+      commitmentOrConfig: "finalized"
+    }
   );
   await sendInstructionsOrSquads({
     provider,
