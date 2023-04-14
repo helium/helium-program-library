@@ -282,6 +282,7 @@ export async function run(args: any = process.argv) {
     metadataUrl: `${argv.bucket}/${name.toLowerCase()}.json`,
     mintAuthority: daoAcc.authority,
     freezeAuthority: daoAcc.authority,
+    updateAuthority: authority,
   });
 
   let instructions: TransactionInstruction[] = [];

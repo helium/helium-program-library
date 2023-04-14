@@ -110,6 +110,7 @@ export async function run(args: any = process.argv) {
     amount: totalHst.toNumber() / 10 ** 8,
     decimals: 8,
     metadataUrl: `${argv.bucket}/hst.json`,
+    updateAuthority: authority,
   });
 
   const fanout = fanoutKey(argv.name)[0];
