@@ -33,7 +33,7 @@ cp keypairs/programs/* target/deploy/
 
 # Build and deploy the contracts with genesis disabled
 anchor build -- --features no-genesis
-anchor deploy --provider.cluster $SOLANA_URL
+./deploy-programs.sh
 ./init-idls.sh $SOLANA_URL
 
 pushd packages/helium-admin-cli && yarn link && popd
@@ -182,7 +182,7 @@ aws s3 mv failures.json s3://$S3_BUCKET/failures.json --region $AWS_REGION --end
 
 # Build and deploy the contracts with genesis enabled
 anchor build
-anchor deploy --provider.cluster $SOLANA_URL
+./deploy-programs.sh
 
 # Fund the oracle account to pay for the recipients rent
 solana transfer -u $SOLANA_URL $(solana address -k keypairs/oracle.json) $ORACLE_SOL --allow-unfunded-recipient

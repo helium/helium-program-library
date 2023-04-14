@@ -64,5 +64,7 @@ COPY ./scripts/init-idls.sh init-idls.sh
 COPY ./migration-docker/encrypt-keypairs.sh .
 COPY ./migration-docker/local-validator.sh .
 COPY ./migration-docker/run-migrate.sh .
+COPY ./migration-docker/deploy-programs.sh .
+COPY ./migration-docker/deploy-with-retries.sh .
 
 CMD ["./run-migrate.sh"]
