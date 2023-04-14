@@ -116,7 +116,7 @@ export class PgDatabase implements Database {
     const encoded = bs58.encode(entityKey);
     const isHotspot = entityKey.length === 32 && Address.isValid(encoded);
     const entityKeyStr = isHotspot ? encoded : entityKey.toString("utf-8");
-    const reward = (await Reward.findByPk(entityKey)) as Reward;
+    const reward = (await Reward.findByPk(entityKeyStr)) as Reward;
 
     // TODO: Remove when 6 decimals
     return new BN(reward?.rewards).div(new BN(100)).toString() || "0";
