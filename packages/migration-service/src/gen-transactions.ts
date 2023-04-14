@@ -120,10 +120,10 @@ const yarg = yargs(hideBin(process.argv)).options({
     default: "postgres",
   },
   pgPassword: {
-    type: "string"
+    type: "string",
   },
   pgDatabase: {
-    type: "string"
+    type: "string",
   },
   pgHost: {
     default: "localhost",
@@ -521,7 +521,13 @@ async function run() {
   let ix = 0;
   let txIdx = 0;
 
-  let routers = new Set(Object.keys(state.routers));
+  let ownersToRouters = Object.entries(
+    state.routers as Record<string, any>
+  ).reduce((acc, [routerKey, { owner }]) => {
+    acc[owner] ||= [];
+    acc[owner].push(routerKey);
+    return acc;
+  }, {} as Record<string, string[]>);
 
   let missingMakers = 0;
 
@@ -606,7 +612,8 @@ async function run() {
       totalBalances.sol = totalBalances.sol
         .add(new BN(iotInfoRent))
         .add(new BN(keyToAssetRent));
-      const makerId = !hotspot.maker || hotspot.maker == "None" ? helAddr.b58 : hotspot.maker; // Default (fallthrough) maker
+      const makerId =
+        !hotspot.maker || hotspot.maker == "None" ? helAddr.b58 : hotspot.maker; // Default (fallthrough) maker
 
       if (!hotspot.maker) {
         missingMakers++;
@@ -736,43 +743,43 @@ async function run() {
     /// Iterate through accounts in order so we don't create 1mm promises.
     for (const [address, account] of chunk) {
       const solAddress: PublicKey | undefined = toSolana(address);
-      const isRouter = routers.has(address);
+      const routers = ownersToRouters[address];
 
-      if (isRouter) {
+      if (routers) {
         const dcBal = new BN(account.dc);
         routerBalances.hnt = routerBalances.hnt.add(new BN(account.hnt));
         routerBalances.mobile = routerBalances.mobile.add(
           new BN(account.mobile)
         );
-        routerBalances.iot = routerBalances.iot.add(
-          new BN(account.iot)
-        );
+        routerBalances.iot = routerBalances.iot.add(new BN(account.iot));
         routerBalances.stakedHnt = routerBalances.stakedHnt.add(
           new BN(account.staked_hnt)
         );
-        const instruction = await dcProgram.methods
-          .genesisIssueDelegatedDataCreditsV0({
-            amount: dcBal,
-            routerKey: address,
-          })
-          .accounts({
-            dcMint: dc,
-            dataCredits,
-            lazySigner,
-            circuitBreaker: dcCircuitBreaker,
-            dao,
-            subDao,
-          })
-          .instruction();
+        for (const router of routers) {
+          const instruction = await dcProgram.methods
+            .genesisIssueDelegatedDataCreditsV0({
+              amount: dcBal.div(new BN(routers.length)),
+              routerKey: router,
+            })
+            .accounts({
+              dcMint: dc,
+              dataCredits,
+              lazySigner,
+              circuitBreaker: dcCircuitBreaker,
+              dao,
+              subDao,
+            })
+            .instruction();
 
-        accountIxs.push({
-          instructions: [instruction],
-          wallet: solAddress ? solAddress.toBase58() : address,
-          signerSeeds: [],
-          compute: 75000,
-          size: size(instruction),
-          isRouter: true,
-        });
+          accountIxs.push({
+            instructions: [instruction],
+            wallet: solAddress ? solAddress.toBase58() : address,
+            signerSeeds: [],
+            compute: 75000,
+            size: size(instruction),
+            isRouter: true,
+          });
+        }
       } else if (solAddress) {
         // Create hotspots
         const tokenIxs = [];
@@ -795,7 +802,7 @@ async function run() {
           totalBalances.dc = totalBalances.dc.add(dcBal);
           const instruction = await dcProgram.methods
             .issueDataCreditsV0({
-              amount: dcBal
+              amount: dcBal,
             })
             .accountsStrict({
               dataCredits,
@@ -808,7 +815,7 @@ async function run() {
               associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
               systemProgram: SystemProgram.programId,
             })
-            .instruction()
+            .instruction();
           tokenIxs.push(instruction);
         }
         if (mobileBal.gt(zero)) {
@@ -825,11 +832,7 @@ async function run() {
         if (iotBal.gt(zero)) {
           totalBalances.sol = totalBalances.sol.add(new BN(ataRent));
           totalBalances.iot = totalBalances.iot.add(iotBal);
-          const { instruction, ata } = createAta(
-            iot,
-            solAddress,
-            lazySigner
-          );
+          const { instruction, ata } = createAta(iot, solAddress, lazySigner);
           tokenIxs.push(instruction);
           tokenIxs.push(createTransfer(iot, ata, lazySigner, iotBal));
         }
@@ -948,7 +951,7 @@ async function run() {
     await insertTransactions(lazySigner, client, accountIxs);
   }
 
-  routers = null; // clear memory
+  ownersToRouters = null; // clear memory
   if (global.gc) {
     console.log("garbage collecting");
     global.gc();
@@ -1375,7 +1378,7 @@ async function insertTransactions(
 
   const flatTransactions = packTransactions(ixs);
   const compiledTransactions = compileNoMerkle(lazySigner, flatTransactions);
-  
+
   const rows = compiledTransactions.map((compiledTransaction, index) => {
     compiledTransaction.index = currId + compiledTransaction.index;
     return [
