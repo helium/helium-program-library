@@ -35,6 +35,7 @@
     "@coral-xyz/anchor": "0.26.0",
     "@helium/circuit-breaker-sdk": "^0.0.52",
     "@helium/data-credits-sdk": "^0.0.52",
+    "@helium/helium-entity-manager-sdk": "^0.0.52",
     "@helium/helium-sub-daos-sdk": "^0.0.52",
     "@helium/idls": "^0.0.52",
     "@helium/lazy-transactions-sdk": "^0.0.52",
@@ -49,6 +50,7 @@
     "bs58": "^4.0.1",
     "cli-progress": "^3.12.0",
     "fastify": "^4.9.2",
+    "inflection": "^2.0.1",
     "prom-client": "^14.1.0",
     "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0"
