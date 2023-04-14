@@ -3,7 +3,6 @@ extern crate rocket;
 use anchor_lang::prelude::borsh;
 use anchor_lang::{prelude::Pubkey, AnchorDeserialize, AnchorSerialize};
 use helium_crypto::{PublicKey, Verify};
-use reqwest::blocking::Client;
 use rocket::{
   http::Status,
   serde::{json::Json, Deserialize, Serialize},
@@ -53,7 +52,7 @@ struct TransactionResponse {
 }
 
 #[post("/verify", format = "application/json", data = "<verify>")]
-fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Status> {
+async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Status> {
   let solana_txn_hex = hex::decode(&verify.transaction).map_err(|e| {
     error!("failed to decode transaction: {:?}", e);
     Status::BadRequest
@@ -65,6 +64,7 @@ fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Sta
 
   let account_keys = &solana_txn.message.account_keys;
   if solana_txn.message.instructions.len() != 2 {
+    error!("Invalid instruction count");
     return Err(Status::BadRequest);
   }
 
@@ -115,13 +115,18 @@ fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Sta
     migration_url, keystr
   );
   println!("{}", url);
-  let client = Client::new();
-  let response = client
-    .get(url.as_str())
-    .send()
-    .unwrap()
+  let response = reqwest::get(url.as_str())
+    .await
+    .map_err(|e| {
+      error!("failed to fetch from migration service: {:?}", e);
+      Status::BadRequest
+    })?
     .json::<TransactionResponse>()
-    .unwrap();
+    .await
+    .map_err(|e| {
+      error!("failed to deserialize json: {:?}", e);
+      Status::BadRequest
+    })?;
 
   if response.transactions.len() > 0 {
     error!(
