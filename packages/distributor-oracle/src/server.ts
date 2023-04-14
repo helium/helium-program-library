@@ -114,7 +114,7 @@ export class PgDatabase implements Database {
 
   async getCurrentRewardsByEntity(entityKey: Buffer) {
     const encoded = bs58.encode(entityKey);
-    const isHotspot = entityKey.length === 32 && Address.isValid(encoded);
+    const isHotspot = Address.isValid(encoded);
     const entityKeyStr = isHotspot ? encoded : entityKey.toString("utf-8");
     const reward = (await Reward.findByPk(entityKeyStr)) as Reward;
 
