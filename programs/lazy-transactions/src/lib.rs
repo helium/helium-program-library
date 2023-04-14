@@ -33,6 +33,10 @@ pub mod lazy_transactions {
     close_marker_v0::handler(ctx, args)
   }
 
+  pub fn close_canopy_v0(ctx: Context<CloseCanopyV0>) -> Result<()> {
+    close_canopy_v0::handler(ctx)
+  }
+
   pub fn update_lazy_transactions_v0(
     ctx: Context<UpdateLazyTransactionsV0>,
     args: UpdateLazyTransactionsArgsV0,
