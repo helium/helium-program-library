@@ -8,7 +8,9 @@ import Squads from "@sqds/sdk";
 import { BN } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { sendInstructionsOrSquads } from "./utils";
+import { sendInstructionsOrSquads, getUnixTimestamp } from "./utils";
+import { Client } from "pg";
+import AWS from "aws-sdk";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -33,15 +35,6 @@ export async function run(args: any = process.argv) {
       required: false,
       describe: "The name of the entity config",
     },
-    vehntDelegated: {
-      type: "string"
-    },
-    vehntLastCalculatedTs: {
-      type: "string"
-    },
-    vehntFallRate: {
-      type: "string"
-    },
     executeTransaction: {
       type: "boolean",
     },
@@ -55,23 +48,23 @@ export async function run(args: any = process.argv) {
       describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
-    switchboardNetwork: {
-      type: "string",
-      describe: "The switchboard network",
-      default: "devnet",
+    pgUser: {
+      default: "postgres",
     },
-    registrar: {
-      type: "string",
-      required: false,
-      describe: "VSR Registrar of subdao",
-      default: null,
+    pgPassword: {
+      type: "string"
     },
-    delegatorRewardsPercent: {
-      type: "number",
-      required: false,
-      describe:
-        "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
-      default: null,
+    pgDatabase: {
+      type: "string"
+    },
+    pgHost: {
+      default: "localhost",
+    },
+    pgPort: {
+      default: "5432",
+    },
+    awsRegion: {
+      default: "us-east-1",
     },
   });
   const argv = await yarg.argv;
@@ -81,24 +74,143 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const program = await initHsd(provider);
 
+  // configure pg connection
+  const isRds = argv.pgHost.includes("rds.amazonaws.com");
+  let password = argv.pgPassword;
+  if (isRds && !password) {
+    const signer = new AWS.RDS.Signer({
+      region: argv.awsRegion,
+      hostname: argv.pgHost,
+      port: Number(argv.pgPort),
+      username: argv.pgUser,
+    });
+    password = await new Promise((resolve, reject) =>
+      signer.getAuthToken({}, (err, token) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(token);
+      })
+    );
+  }
+  const client = new Client({
+    user: argv.pgUser,
+    password,
+    host: argv.pgHost,
+    database: argv.pgDatabase,
+    port: Number(argv.pgPort),
+    ssl: isRds
+      ? {
+          rejectUnauthorized: false,
+        }
+      : false,
+  });
+  await client.connect();
+  const response = (
+    await client.query(`WITH
+    readable_positions AS (
+      SELECT p.*,
+        r.realm_governing_token_mint,
+        cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'lockupSaturationSecs' as numeric) as lockup_saturation_seconds,
+        cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'maxExtraLockupVoteWeightScaledFactor' as numeric) / 1000000000 as max_extra_lockup_vote_weight_scaled_factor,
+        CASE WHEN p.genesis_end > current_ts THEN cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'genesisVotePowerMultiplier' as numeric) ELSE 1 END as genesis_multiplier,
+        cast(
+            p.end_ts - 
+            CASE WHEN lockup_kind = 'constant' THEN start_ts ELSE current_ts END
+            as numeric
+          ) as seconds_remaining
+      FROM (
+        SELECT *,
+          lockup->>'kind' as lockup_kind,
+          cast(lockup->>'endTs' as numeric) as end_ts,
+          cast(lockup->>'startTs' as numeric) as start_ts,
+          -- 1680892887 as current_ts
+          FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)) as current_ts
+        FROM positions 
+      ) p
+      JOIN registrars r on p.registrar = r.address
+    ),
+    positions_with_vehnt AS (
+      SELECT realm_governing_token_mint as mint,
+        address,
+        num_active_votes,
+        registrar,
+        refreshed_at,
+        created_at,
+        amount_deposited_native,
+        ve_tokens,
+        initial_ve_tokens,
+        CASE WHEN lockup_kind = 'constant' THEN 0 ELSE ve_tokens / (end_ts - current_ts) END as fall_rate,
+        start_ts,
+        end_ts,
+        current_ts
+      FROM (
+        SELECT *,
+          amount_deposited_native * (
+            LEAST(
+              seconds_remaining / lockup_saturation_seconds,
+              1
+            ) * (
+              max_extra_lockup_vote_weight_scaled_factor
+            ) * genesis_multiplier
+          ) as ve_tokens,
+          amount_deposited_native * (
+            LEAST(
+              (end_ts - start_ts) / lockup_saturation_seconds,
+              1
+            ) * (
+              max_extra_lockup_vote_weight_scaled_factor
+            ) * genesis_multiplier 
+          ) as initial_ve_tokens
+        FROM readable_positions
+      ) a
+    ),
+    subdao_delegations AS (
+      SELECT
+        count(*) as delegations,
+        sum(p.fall_rate) as real_fall_rate,
+        min(s.vehnt_fall_rate) / 1000000000000 as approx_fall_rate,
+        s.dnt_mint as mint,
+        SUM(ve_tokens) as real_ve_tokens,
+        (
+          MIN(s.vehnt_delegated) - (
+            (min(current_ts) - min(s.vehnt_last_calculated_ts))
+             * min(s.vehnt_fall_rate)
+          )
+        ) / 1000000000000 as approx_ve_tokens,
+        MIN(s.vehnt_delegated) as vehnt_delegated_snapshot,
+        min(s.vehnt_last_calculated_ts) as vehnt_last_calculated_ts
+      FROM positions_with_vehnt p
+      JOIN delegated_positions d on d.position = p.address
+      JOIN sub_daos s on s.address = d.sub_dao
+      GROUP BY s.dnt_mint
+    )
+  SELECT 
+    mint,
+    delegations,
+    real_ve_tokens,
+    approx_ve_tokens,
+    real_fall_rate,
+    approx_fall_rate,
+    approx_fall_rate - real_fall_rate as fall_rate_diff,
+    approx_ve_tokens - real_ve_tokens as ve_tokens_diff
+  FROM subdao_delegations`)
+  ).rows;
+  const row = response.find((x) => x.mint == argv.dntMint);
+
   const instructions = [];
 
   const subDao = subDaoKey(new PublicKey(argv.dntMint))[0];
   const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
   console.log("Subdao", subDao.toBase58())
 
+  const currentTs = await getUnixTimestamp(provider);
   instructions.push(
     await program.methods
       .updateSubDaoVehntV0({
-        vehntDelegated: isNull(argv.vehntDelegated)
-          ? null
-          : new BN(argv.vehntDelegated),
-        vehntLastCalculatedTs: isNull(argv.vehntLastCalculatedTs)
-          ? null
-          : new BN(argv.vehntLastCalculatedTs),
-        vehntFallRate: isNull(argv.vehntFallRate)
-          ? null
-          : new BN(argv.vehntFallRate),
+        vehntDelegated: new BN(row.real_ve_tokens),
+        vehntLastCalculatedTs: new BN(currentTs.toString()),
+        vehntFallRate: new BN(row.real_fall_rate),
       })
       .accounts({
         subDao,
@@ -123,8 +235,3 @@ export async function run(args: any = process.argv) {
     signers: [],
   });
 }
-
-function isNull(vehntDelegated: string | undefined | null) {
-  return vehntDelegated === null || typeof vehntDelegated == "undefined";
-}
-
