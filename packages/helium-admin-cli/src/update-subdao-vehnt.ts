@@ -187,6 +187,7 @@ export async function run(args: any = process.argv) {
     )
   SELECT 
     mint,
+    current_ts,
     delegations,
     real_ve_tokens,
     approx_ve_tokens,
@@ -204,12 +205,11 @@ export async function run(args: any = process.argv) {
   const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
   console.log("Subdao", subDao.toBase58())
 
-  const currentTs = await getUnixTimestamp(provider);
   instructions.push(
     await program.methods
       .updateSubDaoVehntV0({
         vehntDelegated: new BN(row.real_ve_tokens),
-        vehntLastCalculatedTs: new BN(currentTs.toString()),
+        vehntLastCalculatedTs: new BN(row.current_ts),
         vehntFallRate: new BN(row.real_fall_rate),
       })
       .accounts({
