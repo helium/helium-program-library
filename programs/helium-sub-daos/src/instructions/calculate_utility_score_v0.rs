@@ -1,5 +1,5 @@
 use crate::{
-  current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, OrArithError, EPOCH_LENGTH,
+  current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, EPOCH_LENGTH,
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
@@ -133,9 +133,9 @@ pub fn handler(
   let epoch_info = &mut ctx.accounts.sub_dao_epoch_info;
 
   let dc_burned = PreciseNumber::new(epoch_info.dc_burned.into())
-    .or_arith_error()?
-    .checked_div(&PreciseNumber::new(100000_u128).or_arith_error()?) // DC has 0 decimals, plus 10^5 to get to dollars.
-    .or_arith_error()?;
+    .unwrap()
+    .checked_div(&PreciseNumber::new(100000_u128).unwrap()) // DC has 0 decimals, plus 10^5 to get to dollars.
+    .unwrap();
 
   let history_buffer = AggregatorHistoryBuffer::new(&ctx.accounts.history_buffer)?;
 
@@ -154,14 +154,14 @@ pub fn handler(
     epoch_info.dc_burned
   );
 
-  let total_devices = PreciseNumber::new(total_devices_u64.into()).or_arith_error()?;
+  let total_devices = PreciseNumber::new(total_devices_u64.into()).unwrap();
   let devices_with_fee = total_devices
     .checked_mul(
-      &PreciseNumber::new(u128::from(ctx.accounts.sub_dao.onboarding_dc_fee)).or_arith_error()?,
+      &PreciseNumber::new(u128::from(ctx.accounts.sub_dao.onboarding_dc_fee)).unwrap(),
     )
-    .or_arith_error()?
-    .checked_div(&PreciseNumber::new(100000_u128).or_arith_error()?) // Need onboarding fee in dollars
-    .or_arith_error()?;
+    .unwrap()
+    .checked_div(&PreciseNumber::new(100000_u128).unwrap()) // Need onboarding fee in dollars
+    .unwrap();
 
   // sqrt(x) = e^(ln(x)/2)
   // x^1/4 = e^(ln(x)/4))
@@ -171,33 +171,33 @@ pub fn handler(
       one.clone(),
       dc_burned
         .log()
-        .or_arith_error()?
+        .unwrap()
         .checked_div(&TWO_PREC.clone().signed())
-        .or_arith_error()?
+        .unwrap()
         .exp()
-        .or_arith_error()?,
+        .unwrap(),
     )
   } else {
     one.clone()
   };
 
   let vehnt_staked = PreciseNumber::new(epoch_info.vehnt_at_epoch_start.into())
-    .or_arith_error()?
-    .checked_div(&PreciseNumber::new(100000000_u128).or_arith_error()?) // vehnt has 8 decimals
-    .or_arith_error()?;
+    .unwrap()
+    .checked_div(&PreciseNumber::new(100000000_u128).unwrap()) // vehnt has 8 decimals
+    .unwrap();
 
   let v = std::cmp::max(one.clone(), vehnt_staked);
 
-  let a = if total_devices_u64 > 0 {
+  let a = if total_devices_u64 > 0 && ctx.accounts.sub_dao.onboarding_dc_fee > 0 {
     std::cmp::max(
       one,
       devices_with_fee
         .log()
-        .or_arith_error()?
+        .unwrap()
         .checked_div(&FOUR_PREC.clone().signed())
-        .or_arith_error()?
+        .unwrap()
         .exp()
-        .or_arith_error()?,
+        .unwrap(),
     )
   } else {
     one
@@ -205,15 +205,15 @@ pub fn handler(
 
   let utility_score_prec = d
     .checked_mul(&a)
-    .or_arith_error()?
+    .unwrap()
     .checked_mul(&v)
-    .or_arith_error()?;
+    .unwrap();
   // Convert to u128 with 12 decimals of precision
   let utility_score = utility_score_prec
     .checked_mul(
-      &PreciseNumber::new(1000000000000_u128).or_arith_error()?, // u128 with 12 decimal places
+      &PreciseNumber::new(1000000000000_u128).unwrap(), // u128 with 12 decimal places
     )
-    .or_arith_error()?
+    .unwrap()
     .to_imprecise()
     .unwrap();
 
