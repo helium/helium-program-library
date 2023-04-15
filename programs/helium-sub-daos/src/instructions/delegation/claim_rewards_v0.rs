@@ -147,7 +147,7 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   )
   .unwrap();
 
-  delegated_position.last_claimed_epoch = epoch;
+  delegated_position.last_claimed_epoch += 1;
 
   let amount_left = ctx.accounts.delegator_pool.amount;
   transfer_v0(
