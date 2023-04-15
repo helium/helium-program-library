@@ -168,6 +168,7 @@ export async function run(args: any = process.argv) {
     subdao_delegations AS (
       SELECT
         count(*) as delegations,
+        current_ts,
         sum(p.fall_rate) as real_fall_rate,
         min(s.vehnt_fall_rate) / 1000000000000 as approx_fall_rate,
         s.dnt_mint as mint,
