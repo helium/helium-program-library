@@ -90,7 +90,7 @@ export async function run(args: any = process.argv) {
   }
   instructions.push(await program.methods.updateDaoV0({
     authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
-    emissionSchedule: argv.knewEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newEmissionsSchedulePath) : null,
+    emissionSchedule: argv.newEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newEmissionsSchedulePath) : null,
     hstEmissionSchedule: argv.newHstEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newHstEmissionsSchedulePath) : null,
     hstPool: argv.newHstPool ? new PublicKey(argv.newHstPool) : null,
   }).accounts({
