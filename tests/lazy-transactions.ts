@@ -207,5 +207,11 @@ describe("lazy-transactions", () => {
     } catch (e: any) {
       expect(e.toString()).to.not.include("Should have failed");
     }
+
+    /// Attempt to close the canopy
+    console.log("Closing canopy")
+    await program.methods.closeCanopyV0()
+      .accounts({ lazyTransactions, refund: provider.wallet.publicKey })
+      .rpc({ skipPreflight: true });
   });
 });
