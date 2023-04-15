@@ -143,7 +143,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
     DataV2 {
       name: String::from("Voting Escrow Collection"),
       symbol: String::from("VSR"),
-      uri: "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/vsr.json"
+      uri: "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/vsr.json"
         .to_string(),
       seller_fee_basis_points: 0,
       creators: None,

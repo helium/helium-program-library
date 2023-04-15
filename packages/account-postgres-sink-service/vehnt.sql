@@ -18,9 +18,9 @@ WITH
         cast(lockup->>'startTs' as numeric) as start_ts,
         -- 1680892887 as current_ts
         FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)) as current_ts
-      FROM vsr.positions 
+      FROM positions 
     ) p
-    JOIN vsr.registrars r on p.registrar = r.address
+    JOIN registrars r on p.registrar = r.address
   ),
   positions_with_vehnt AS (
     SELECT realm_governing_token_mint as mint,
@@ -73,8 +73,8 @@ WITH
       MIN(s.vehnt_delegated) as vehnt_delegated_snapshot,
       min(s.vehnt_last_calculated_ts) as vehnt_last_calculated_ts
     FROM positions_with_vehnt p
-    JOIN hsd.delegated_positions d on d.position = p.address
-    JOIN hsd.sub_daos s on s.address = d.sub_dao
+    JOIN delegated_positions d on d.position = p.address
+    JOIN sub_daos s on s.address = d.sub_dao
     GROUP BY s.dnt_mint
   )
 SELECT 

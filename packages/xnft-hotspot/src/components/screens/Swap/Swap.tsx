@@ -195,14 +195,14 @@ export function Swap() {
     {
       name: "MOBILE",
       toTokens: ["HNT"],
-      icon: "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/mobile.png",
+      icon: "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/mobile.png",
       mint: MOBILE_MINT,
     },
   ];
   const bottomTokens: Token[] = [
     {
       name: "DC",
-      icon: "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib/dc.png",
+      icon: "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/dc.png",
       mint: DC_MINT,
     },
     {

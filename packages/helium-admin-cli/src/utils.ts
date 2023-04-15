@@ -92,6 +92,7 @@ export async function createAndMint({
   to,
   mintAuthority = provider.wallet.publicKey,
   freezeAuthority = provider.wallet.publicKey,
+  updateAuthority = provider.wallet.publicKey,
 }: {
   provider: anchor.AnchorProvider;
   mintKeypair?: Keypair;
@@ -101,6 +102,7 @@ export async function createAndMint({
   to?: PublicKey;
   mintAuthority?: PublicKey;
   freezeAuthority?: PublicKey;
+  updateAuthority?: PublicKey;
 }): Promise<void> {
   const mintTo = to || provider.wallet.publicKey;
   const metadata = await fetch(metadataUrl).then((r) => r.json());
@@ -150,7 +152,7 @@ export async function createAndMint({
           mint: mintKeypair.publicKey,
           mintAuthority: provider.wallet.publicKey,
           payer: provider.wallet.publicKey,
-          updateAuthority: provider.wallet.publicKey,
+          updateAuthority: updateAuthority,
         },
         {
           createMetadataAccountArgsV3: {

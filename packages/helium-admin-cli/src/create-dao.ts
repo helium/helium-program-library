@@ -108,7 +108,7 @@ export async function run(args: any = process.argv) {
       type: "string",
       describe: "Bucket URL prefix holding all of the metadata jsons",
       default:
-        "https://shdw-drive.genesysgo.net/CsDkETHRRR1EcueeN346MJoqzymkkr7RFjMqGpZMzAib",
+        "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP",
     },
     emissionSchedulePath: {
       required: true,
@@ -233,6 +233,7 @@ export async function run(args: any = process.argv) {
     mintKeypair: hntKeypair,
     amount: argv.numHnt,
     metadataUrl: `${argv.bucket}/hnt.json`,
+    updateAuthority: authority
   });
 
   await createAndMint({
@@ -241,6 +242,7 @@ export async function run(args: any = process.argv) {
     amount: argv.numDc,
     decimals: 0,
     metadataUrl: `${argv.bucket}/dc.json`,
+    updateAuthority: authority,
   });
 
   await createAndMint({
@@ -250,6 +252,7 @@ export async function run(args: any = process.argv) {
     decimals: 0,
     metadataUrl: `${argv.bucket}/council.json`,
     to: councilWallet,
+    updateAuthority: authority,
   });
 
   let instructions: TransactionInstruction[] = [];

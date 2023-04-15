@@ -32,6 +32,9 @@
       "path": "./packages/vsr-metadata-service"
     },
     {
+      "path": "./packages/fanout-metadata-service"
+    },
+    {
       "path": "./packages/monitor-service"
     },
     {
