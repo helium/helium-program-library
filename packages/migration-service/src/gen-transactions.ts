@@ -775,7 +775,7 @@ async function run() {
             instructions: [instruction],
             wallet: solAddress ? solAddress.toBase58() : address,
             signerSeeds: [],
-            compute: 75000,
+            compute: 125000,
             size: size(instruction),
             isRouter: true,
           });
