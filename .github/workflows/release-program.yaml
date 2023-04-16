@@ -1,0 +1,53 @@
+name: Release Program to Mainnet
+
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - 'program-*' # Push events to matching program-*, i.e. program-circuit-breaker-0.0.1
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install toml-cli
+        run: sudo npm install -g toml-cli
+
+      - name: Set tag information
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}  # Extract tag name from ref
+          echo "Tag name: $TAG"
+          PROGRAM=$(echo $TAG | cut -d'-' -f1)  # Extract program name from tag name
+          VERSION=$(echo $TAG | cut -d'-' -f3)  # Extract version from tag name
+          PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
+          PROGRAM_ID=$(toml get programs.localnet.${PROGRAM_NAME})
+
+          echo "Program: $PROGRAM"
+          echo "Program: $PROGRAM_ID"
+          echo "Version: $VERSION"
+          echo "::set-env name=PROGRAM_ID::${PROGRAM_ID}"
+          echo "::set-env name=PROGRAM_NAME::${PROGRAM_NAME}"
+      - uses: ./.github/actions/upload-bpf/
+        id: buffer-deploy
+        with:
+          network: mainnet-beta
+          program: ${{ env.PROGRAM_NAME }}
+          keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
+          program-id: ${{ inputs.program-id }}
+          buffer-authority: ${{ env.MULTISIG_VAULT }}
+
+      - uses: actions/squads-program-upgrade@v0.2.4
+        with:
+          network-url: 'https://api.mainnet.solana.com'
+          program-multisig: ${{ env.MULTISIG }}
+          program-id: ${{ env.PROGRAM_ID }}
+          program-index: '1'
+          buffer: ${{ steps.buffer-deploy.outputs.buffer }}
+          idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
+          spill-address: ${{ env.DEPLOYER_ADDRESS }}
+          authority: ${{ env.MULTISIG_VAULT }}
+          name: 'Deploy ${{env.PROGRAM_NAME}} ${{env.VERSION}}'
+          keypair: ${{ secrets.DEPLOYER_KEYPAIR }}

@@ -1,0 +1,62 @@
+name: Build Programs on Develop Push
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  build_programs:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        program: ${{ fromJson(needs.programs.outputs.programs_with_changes) }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set program information
+        run: |
+          PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
+          PROGRAM_ID=$(toml get programs.localnet.${PROGRAM_NAME})
+          echo "Program: $PROGRAM_ID"
+          echo "::set-env name=PROGRAM_ID::${PROGRAM_ID}"
+        env:
+          PROGRAM_NAME: ${{ matrix.program }}
+
+      - uses: ./.github/actions/upload-bpf/
+        id: buffer-deploy
+        with:
+          network: devnet
+          program: ${{ matrix.program }}
+          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
+          program-id: ${{ env.PROGRAM_ID }}
+          buffer-authority: ${{ env.DEVNET_MULTISIG_VAULT }}
+
+      - uses: actions/squads-program-upgrade@v0.2.4
+        with:
+          network-url: 'https://api.devnet.solana.com'
+          program-multisig: ${{ env.DEVNET_MULTISIG }}
+          program-id: ${{ env.PROGRAM_ID }}
+          program-index: '1'
+          buffer: ${{ steps.buffer-deploy.outputs.buffer }}
+          idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
+          spill-address: ${{ env.DEVNET_DEPLOYER_ADDRESS }}
+          authority: ${{ env.DEVNET_MULTISIG_VAULT }}
+          name: 'Deploy ${{ matrix.program }}'
+          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
+
+  detect_changed_programs:
+    runs-on: ubuntu-latest
+    outputs:
+      programs_with_changes: ${{ steps.list_changed_programs.outputs.programs_with_changes }}
+    steps:
+      - name: List changed programs
+        id: list_changed_programs
+        run: |
+          echo "Detecting changes in programs..."
+          # Use git diff to get a list of changed programs and output it as JSON
+          changed_files="$(git diff --name-only HEAD~1 HEAD)"
+          changed_programs=$(echo "$changed_files" | grep "^programs/" | cut -d '/' -f 2 | sort -u)
+          echo "::set-output name=programs_with_changes::{\"program\": [${changed_programs/#/'\"'}]}\""
