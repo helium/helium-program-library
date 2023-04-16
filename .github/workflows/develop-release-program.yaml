@@ -52,6 +52,9 @@ jobs:
     outputs:
       programs_with_changes: ${{ steps.list_changed_programs.outputs.programs_with_changes }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
       - name: List changed programs
         id: list_changed_programs
         run: |
