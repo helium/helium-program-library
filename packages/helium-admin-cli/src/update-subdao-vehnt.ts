@@ -66,6 +66,10 @@ export async function run(args: any = process.argv) {
     awsRegion: {
       default: "us-east-1",
     },
+    noSsl: {
+      type: "boolean",
+      default: false
+    }
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -99,7 +103,7 @@ export async function run(args: any = process.argv) {
     host: argv.pgHost,
     database: argv.pgDatabase,
     port: Number(argv.pgPort),
-    ssl: isRds
+    ssl: argv.noSsl
       ? {
           rejectUnauthorized: false,
         }
@@ -168,10 +172,10 @@ export async function run(args: any = process.argv) {
     subdao_delegations AS (
       SELECT
         count(*) as delegations,
-        current_ts,
         sum(p.fall_rate) as real_fall_rate,
         min(s.vehnt_fall_rate) / 1000000000000 as approx_fall_rate,
         s.dnt_mint as mint,
+        min(current_ts) current_ts,
         SUM(ve_tokens) as real_ve_tokens,
         (
           MIN(s.vehnt_delegated) - (
@@ -190,15 +194,16 @@ export async function run(args: any = process.argv) {
     mint,
     current_ts,
     delegations,
-    real_ve_tokens,
-    approx_ve_tokens,
-    real_fall_rate,
-    approx_fall_rate,
+    real_ve_tokens * 1000000000000 as real_ve_tokens,
+    approx_ve_tokens * 1000000000000 as approx_ve_tokens,
+    real_fall_rate * 1000000000000 as real_fall_rate,
+    approx_fall_rate * 1000000000000 as approx_fall_rate,
     approx_fall_rate - real_fall_rate as fall_rate_diff,
     approx_ve_tokens - real_ve_tokens as ve_tokens_diff
   FROM subdao_delegations`)
   ).rows;
   const row = response.find((x) => x.mint == argv.dntMint);
+  console.log("Setting", row);
 
   const instructions = [];
 
@@ -209,9 +214,9 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await program.methods
       .updateSubDaoVehntV0({
-        vehntDelegated: new BN(row.real_ve_tokens),
+        vehntDelegated: new BN(row.real_ve_tokens.split(".")[0]),
         vehntLastCalculatedTs: new BN(row.current_ts),
-        vehntFallRate: new BN(row.real_fall_rate),
+        vehntFallRate: new BN(row.real_fall_rate.split(".")[0]),
       })
       .accounts({
         subDao,
