@@ -3,7 +3,7 @@
 set -e
 
 # Replace the lazy transactions name with the real one
-find programs -type f -name '*.rs' -exec sed -i "s/b\"devnethelium\"/b\"$LAZY_NAME\"/g" {} \;
+find programs -type f -name '*.rs' -exec sed -i "s/b\"devnethelium5\"/b\"$LAZY_NAME\"/g" {} \;
 
 # Download files from s3
 aws s3 cp s3://$S3_BUCKET/makers.json . --region $AWS_REGION --endpoint $S3_ENDPOINT
