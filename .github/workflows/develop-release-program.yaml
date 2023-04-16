@@ -60,6 +60,7 @@ jobs:
         run: |
           echo "Detecting changes in programs..."
           # Use git diff to get a list of changed programs and output it as JSON
-          changed_files="$(git diff --name-only HEAD~1 HEAD)"
+          changed_files="$(git diff --name-only $(git rev-list --max-parents=1 HEAD) HEAD)"
           changed_programs=$(echo "$changed_files" | grep "^programs/" | cut -d '/' -f 2 | sort -u)
-          echo "::set-output name=programs_with_changes::{\"program\": [${changed_programs/#/'\"'}]}\""
+          echo $changed_programs
+          echo "::set-output name=programs_with_changes::[$(printf '"%s",' "${changed_programs[@]}" | sed 's/,$//')]"
