@@ -32,18 +32,18 @@ jobs:
           program: ${{ matrix.program }}
           keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
           program-id: ${{ env.PROGRAM_ID }}
-          buffer-authority: ${{ env.DEVNET_MULTISIG_VAULT }}
+          buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
 
       - uses: actions/squads-program-upgrade@v0.2.4
         with:
           network-url: 'https://api.devnet.solana.com'
-          program-multisig: ${{ env.DEVNET_MULTISIG }}
+          program-multisig: ${{ secrets.DEVNET_MULTISIG }}
           program-id: ${{ env.PROGRAM_ID }}
           program-index: '1'
           buffer: ${{ steps.buffer-deploy.outputs.buffer }}
           idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
-          spill-address: ${{ env.DEVNET_DEPLOYER_ADDRESS }}
-          authority: ${{ env.DEVNET_MULTISIG_VAULT }}
+          spill-address: ${{ secrets.DEVNET_DEPLOYER_ADDRESS }}
+          authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
           name: 'Deploy ${{ matrix.program }}'
           keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
 

@@ -37,17 +37,17 @@ jobs:
           program: ${{ env.PROGRAM_NAME }}
           keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
           program-id: ${{ inputs.program-id }}
-          buffer-authority: ${{ env.MULTISIG_VAULT }}
+          buffer-authority: ${{ secrets.MULTISIG_VAULT }}
 
       - uses: actions/squads-program-upgrade@v0.2.4
         with:
           network-url: 'https://api.mainnet.solana.com'
-          program-multisig: ${{ env.MULTISIG }}
+          program-multisig: ${{ secrets.MULTISIG }}
           program-id: ${{ env.PROGRAM_ID }}
           program-index: '1'
           buffer: ${{ steps.buffer-deploy.outputs.buffer }}
           idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
-          spill-address: ${{ env.DEPLOYER_ADDRESS }}
-          authority: ${{ env.MULTISIG_VAULT }}
+          spill-address: ${{ secrets.DEPLOYER_ADDRESS }}
+          authority: ${{ secrets.MULTISIG_VAULT }}
           name: 'Deploy ${{env.PROGRAM_NAME}} ${{env.VERSION}}'
           keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
