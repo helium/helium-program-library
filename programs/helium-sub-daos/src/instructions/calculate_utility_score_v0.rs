@@ -13,6 +13,7 @@ pub struct CalculateUtilityScoreArgsV0 {
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
 
+
 #[derive(Accounts)]
 #[instruction(args: CalculateUtilityScoreArgsV0)]
 pub struct CalculateUtilityScoreV0<'info> {
