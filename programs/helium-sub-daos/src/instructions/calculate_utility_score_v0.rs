@@ -1,6 +1,4 @@
-use crate::{
-  current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, EPOCH_LENGTH,
-};
+use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, EPOCH_LENGTH};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
@@ -156,9 +154,7 @@ pub fn handler(
 
   let total_devices = PreciseNumber::new(total_devices_u64.into()).unwrap();
   let devices_with_fee = total_devices
-    .checked_mul(
-      &PreciseNumber::new(u128::from(ctx.accounts.sub_dao.onboarding_dc_fee)).unwrap(),
-    )
+    .checked_mul(&PreciseNumber::new(u128::from(ctx.accounts.sub_dao.onboarding_dc_fee)).unwrap())
     .unwrap()
     .checked_div(&PreciseNumber::new(100000_u128).unwrap()) // Need onboarding fee in dollars
     .unwrap();
@@ -203,11 +199,7 @@ pub fn handler(
     one
   };
 
-  let utility_score_prec = d
-    .checked_mul(&a)
-    .unwrap()
-    .checked_mul(&v)
-    .unwrap();
+  let utility_score_prec = d.checked_mul(&a).unwrap().checked_mul(&v).unwrap();
   // Convert to u128 with 12 decimals of precision
   let utility_score = utility_score_prec
     .checked_mul(
