@@ -161,13 +161,7 @@ export async function createAndMint({
               symbol: metadata.symbol,
               uri: metadataUrl,
               sellerFeeBasisPoints: 0,
-              creators: [
-                {
-                  address: provider.wallet.publicKey,
-                  verified: true,
-                  share: 100,
-                },
-              ],
+              creators: null,
               collection: null,
               uses: null,
             },
