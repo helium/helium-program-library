@@ -55,6 +55,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/build-anchor/
+        with:
+          testing: true
 
   test-contracts:
     needs: build
@@ -76,6 +78,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/
+        with:
+          testing: true
       - name: Start Anchor Localnet
         run: ~/.cargo/bin/anchor localnet --skip-build --provider.wallet ~/.config/solana/id.json & sleep 2
       - name: Wait for localnet to start

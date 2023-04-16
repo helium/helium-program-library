@@ -6,40 +6,58 @@ on:
       - develop
 
 jobs:
+  build:
+    name: Build Anchor
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/build-anchor/
+        with:
+          devnet: true
   build_programs:
+    needs: [detect_changed_programs, build]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        program: ${{ fromJson(needs.programs.outputs.programs_with_changes) }}
+        program: ${{ fromJson(needs.detect_changed_programs.outputs.programs_with_changes) }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - uses: ./.github/actions/build-anchor/
+        with:
+          devnet: true
+  
+      - name: Install toml-cli
+        if: steps.cache-toml.outputs.cache-hit != 'true'
+        run: cargo install toml-cli
+
       - name: Set program information
         run: |
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
-          PROGRAM_ID=$(toml get programs.localnet.${PROGRAM_NAME})
+          PROGRAM_ID=$(toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
           echo "Program: $PROGRAM_ID"
-          echo "::set-env name=PROGRAM_ID::${PROGRAM_ID}"
+          echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
+          echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
         env:
-          PROGRAM_NAME: ${{ matrix.program }}
+          PROGRAM: ${{ matrix.program }}
 
       - uses: ./.github/actions/upload-bpf/
         id: buffer-deploy
         with:
           network: devnet
-          program: ${{ matrix.program }}
+          program: ${{ env.PROGRAM_NAME }}
           keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
           program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
 
-      - uses: actions/squads-program-upgrade@v0.2.4
+      - name: Squads program upgrade
+        uses: helium/squads-program-upgrade@v0.2.7
         with:
           network-url: 'https://api.devnet.solana.com'
           program-multisig: ${{ secrets.DEVNET_MULTISIG }}
           program-id: ${{ env.PROGRAM_ID }}
-          program-index: '1'
           buffer: ${{ steps.buffer-deploy.outputs.buffer }}
           idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
           spill-address: ${{ secrets.DEVNET_DEPLOYER_ADDRESS }}
@@ -53,14 +71,17 @@ jobs:
       programs_with_changes: ${{ steps.list_changed_programs.outputs.programs_with_changes }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
-
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 0 }}
       - name: List changed programs
         id: list_changed_programs
         run: |
-          echo "Detecting changes in programs..."
+          echo "Detecting changes in programs"
           # Use git diff to get a list of changed programs and output it as JSON
-          changed_files="$(git diff --name-only $(git rev-list --max-parents=1 HEAD) HEAD)"
-          changed_programs=$(echo "$changed_files" | grep "^programs/" | cut -d '/' -f 2 | sort -u)
-          echo $changed_programs
-          echo "::set-output name=programs_with_changes::[$(printf '"%s",' "${changed_programs[@]}" | sed 's/,$//')]"
+          changed_files=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }})
+          changed_programs=($(echo "$changed_files" | grep "^programs/" | cut -d '/' -f 2 | sort -u))
+          echo "${changed_programs[@]}"
+          json="[$(printf "'%s'", "${changed_programs[@]}" | sed 's/,$//')]"
+          echo $json
+          echo "programs_with_changes=$json" >> $GITHUB_OUTPUT
