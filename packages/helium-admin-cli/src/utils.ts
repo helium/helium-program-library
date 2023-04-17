@@ -599,11 +599,11 @@ export async function createSwitchboardAggregator({
   if (!(await exists(provider.connection, agg))) {
     const [agg, _] = await queueAccount.createFeed({
       keypair: aggKeypair,
-      batchSize: 3,
-      minRequiredOracleResults: 2,
+      batchSize: 9,
+      minRequiredOracleResults: 7,
       minRequiredJobResults: 1,
       minUpdateDelaySeconds: 60 * 60, // hourly
-      fundAmount: 0.2,
+      fundAmount: 1,
       enable: true,
       crankPubkey: crank,
       jobs: [

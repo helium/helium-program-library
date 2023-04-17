@@ -6,7 +6,8 @@ docker run -v $(pwd)/migration-docker/data:/data \
            -e S3_BUCKET=helium-migration \
            -e S3_ENDPOINT=http://host.docker.internal:9000 \
            -e MULTISIG=BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm \
-           -e DC_BURN_AUTHORITY=pverYDx5LZx3cmBsdJSJtgPFHpTrZkSac1zRg4XKb46 \
+           -e MOBILE_DC_BURN_AUTHORITY=pverYDx5LZx3cmBsdJSJtgPFHpTrZkSac1zRg4XKb46 \
+           -e IOT_DC_BURN_AUTHORITY=pverYDx5LZx3cmBsdJSJtgPFHpTrZkSac1zRg4XKb46 \
            -e NETWORK=devnet \
            -e LAZY_NAME=testdocker1 \
            -e PGHOST=host.docker.internal \
