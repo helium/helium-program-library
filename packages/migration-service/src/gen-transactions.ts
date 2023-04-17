@@ -779,8 +779,10 @@ async function run() {
       
       if (isRouter) {
         routerBalances.hnt = routerBalances.hnt.add(new BN(account.hnt));
+        const digitShift = new BN(100);
+        const mobileBal = divBankersRound(new BN(account.mobile), digitShift);
         routerBalances.mobile = routerBalances.mobile.add(
-          new BN(account.mobile)
+          mobileBal
         );
         routerBalances.iot = routerBalances.iot.add(new BN(account.iot));
         routerBalances.stakedHnt = routerBalances.stakedHnt.add(
@@ -938,8 +940,10 @@ async function run() {
           new BN(account.hnt)
         );
         unresolvedBalances.dc = unresolvedBalances.dc.add(new BN(account.dc));
+        const digitShift = new BN(100);
+        const mobileBal = divBankersRound(new BN(account.mobile), digitShift);
         unresolvedBalances.mobile = unresolvedBalances.mobile.add(
-          new BN(account.mobile)
+          mobileBal
         );
         unresolvedBalances.iot = unresolvedBalances.iot.add(
           new BN(account.iot)
