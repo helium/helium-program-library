@@ -531,7 +531,6 @@ async function run() {
 
   let missingMakers = 0;
 
-  // TODO: Onboard to mobile if they were from either of these makers
   const bobcat5G = makers.find((maker) => maker.name === "Bobcat 5G");
   const freedomFi = makers.find((maker) => maker.name === "FreedomFi");
   // Show progress if requested

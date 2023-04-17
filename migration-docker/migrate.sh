@@ -106,7 +106,7 @@ helium-admin create-subdao -u $SOLANA_URL \
                            --numTokens $TOTAL_IOT \
                            --emissionSchedulePath packages/helium-admin-cli/emissions/iot.json \
                            --realmName "Helium IOT" \
-                           --dcBurnAuthority $DC_BURN_AUTHORITY \
+                           --dcBurnAuthority $IOT_DC_BURN_AUTHORITY \
                            --executeTransaction \
                            --decimals 6 \
                            --delegatorRewardsPercent 9.090909090909091 \
@@ -129,7 +129,7 @@ helium-admin create-subdao -u $SOLANA_URL \
                            --numTokens $TOTAL_MOBILE \
                            --emissionSchedulePath packages/helium-admin-cli/emissions/mobile.json \
                            --realmName "Helium MOBILE" \
-                           --dcBurnAuthority $DC_BURN_AUTHORITY \
+                           --dcBurnAuthority $MOBILE_DC_BURN_AUTHORITY \
                            --executeTransaction \
                            --decimals 6 \
                            --delegatorRewardsPercent 6.451612903225806 \

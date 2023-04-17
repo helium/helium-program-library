@@ -82,8 +82,7 @@ export class PgDatabase implements Database {
     return rewards
       .map((rew) => [rew.address, rew.rewards])
       .reduce((acc, [key, val]) => {
-        // TODO: Remove when 6 decimals
-        acc[key] = new BN(val).div(new BN(100)).toString();
+        acc[key] = new BN(val).toString();
         return acc;
       }, {} as Record<string, string>);
   }
@@ -118,8 +117,7 @@ export class PgDatabase implements Database {
     const entityKeyStr = isHotspot ? encoded : entityKey.toString("utf-8");
     const reward = (await Reward.findByPk(entityKeyStr)) as Reward;
 
-    // TODO: Remove when 6 decimals
-    return new BN(reward?.rewards).div(new BN(100)).toString() || "0";
+    return new BN(reward?.rewards).toString() || "0";
   }
 }
 

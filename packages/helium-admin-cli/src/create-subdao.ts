@@ -311,7 +311,7 @@ export async function run(args: any = process.argv) {
       provider.wallet.publicKey, // payer
       councilKeypair.publicKey, // councilMintPk
       MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION,
-      new anchor.BN(100000000000000), // TODO: 1mm vehnt to create governance
+      new anchor.BN(1000000000000000), // 10mm vehnt to create governance. Council should be the only one doing this
       new GoverningTokenConfigAccountArgs({
         // community token config
         voterWeightAddin: heliumVsrProgram.programId,
