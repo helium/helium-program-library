@@ -106,7 +106,7 @@ pub fn handler(
   }
 
   if end_of_epoch_ts < ctx.accounts.dao.emission_schedule[0].start_unix_time {
-    return Err(error!(ErrorCode::EpochToEarly));
+    return Err(error!(ErrorCode::EpochTooEarly));
   }
 
   ctx.accounts.sub_dao_epoch_info.epoch = args.epoch;
