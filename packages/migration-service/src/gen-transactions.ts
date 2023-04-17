@@ -528,6 +528,7 @@ async function run() {
     acc[owner].push(routerKey);
     return acc;
   }, {} as Record<string, string[]>);
+  let routerKeys = new Set(Object.keys(state.routers));
 
   let missingMakers = 0;
 
@@ -742,18 +743,13 @@ async function run() {
     /// Iterate through accounts in order so we don't create 1mm promises.
     for (const [address, account] of chunk) {
       const solAddress: PublicKey | undefined = toSolana(address);
+      const isRouter = routerKeys.has(address);
       const routers = ownersToRouters[address];
 
       if (routers) {
         const dcBal = new BN(account.dc);
-        routerBalances.hnt = routerBalances.hnt.add(new BN(account.hnt));
-        routerBalances.mobile = routerBalances.mobile.add(
-          new BN(account.mobile)
-        );
-        routerBalances.iot = routerBalances.iot.add(new BN(account.iot));
-        routerBalances.stakedHnt = routerBalances.stakedHnt.add(
-          new BN(account.staked_hnt)
-        );
+        account.dc = new BN(0) // So it doesn't get issued to the account
+        
         for (const router of routers) {
           const instruction = await dcProgram.methods
             .genesisIssueDelegatedDataCreditsV0({
@@ -779,6 +775,17 @@ async function run() {
             isRouter: true,
           });
         }
+      }
+      
+      if (isRouter) {
+        routerBalances.hnt = routerBalances.hnt.add(new BN(account.hnt));
+        routerBalances.mobile = routerBalances.mobile.add(
+          new BN(account.mobile)
+        );
+        routerBalances.iot = routerBalances.iot.add(new BN(account.iot));
+        routerBalances.stakedHnt = routerBalances.stakedHnt.add(
+          new BN(account.staked_hnt)
+        );
       } else if (solAddress) {
         // Create hotspots
         const tokenIxs = [];
@@ -951,6 +958,7 @@ async function run() {
   }
 
   ownersToRouters = null; // clear memory
+  routers = null; // clear memory
   if (global.gc) {
     console.log("garbage collecting");
     global.gc();
