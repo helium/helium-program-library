@@ -1,4 +1,4 @@
-use crate::{current_epoch, id, state::*, utils::*};
+use crate::{current_epoch, error::ErrorCode, id, state::*, utils::*, TESTING};
 use anchor_lang::{prelude::*, Discriminator};
 use anchor_spl::token::{Mint, TokenAccount};
 use spl_governance_tools::account::{create_and_serialize_account_signed, AccountMaxSize};
@@ -111,6 +111,12 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
   let registrar = &ctx.accounts.registrar;
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
+
+  // Disallow delegating before April 19th, 9am PST.
+  if !TESTING && curr_ts < 1681920000 {
+    return Err(error!(ErrorCode::EpochTooEarly));
+  }
+
   let vehnt_info = caclulate_vhnt_info(curr_ts, position, voting_mint_config)?;
   let VehntInfo {
     has_genesis,

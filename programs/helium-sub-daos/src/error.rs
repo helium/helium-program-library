@@ -39,7 +39,7 @@ pub enum ErrorCode {
   InvalidClaimEpoch,
 
   #[msg("Epochs start after the earliest emission schedule")]
-  EpochToEarly,
+  EpochTooEarly,
 
   #[msg("Must calculate vehnt linearly. Please ensure the previous epoch has been completed")]
   MustCalculateVehntLinearly,
