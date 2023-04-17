@@ -958,7 +958,7 @@ async function run() {
   }
 
   ownersToRouters = null; // clear memory
-  routers = null; // clear memory
+  routerKeys = null; // clear memory
   if (global.gc) {
     console.log("garbage collecting");
     global.gc();
