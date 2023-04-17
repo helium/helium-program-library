@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { init } from "@helium/helium-entity-manager-sdk";
 import { init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
-import { createMintInstructions } from "@helium/spl-utils";
+import { createMintInstructions, sendInstructions } from "@helium/spl-utils";
 import { PublicKey, Keypair } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import { BN } from "bn.js";
@@ -61,25 +61,27 @@ export async function run(args: any = process.argv) {
   const [dao] = daoKey(hnt);
   const instructions = [];
   const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
+  await sendInstructions(
+    provider,
+    await createMintInstructions(
+      provider,
+      0,
+      daoAcc.authority,
+      daoAcc.authority,
+      mint
+    ),
+    [mint]
+  )
   instructions.push(
     await hemProgram.methods
       .issueIotOperationsFundV0()
-      .preInstructions(
-        await createMintInstructions(
-          provider,
-          0,
-          daoAcc.authority,
-          daoAcc.authority,
-          mint
-        )
-      )
       .accounts({
         dao,
         recipient: new PublicKey(argv.recipient),
         mint: mint.publicKey,
         authority: daoAcc.authority,
       })
-      .signers([mint])
+      .instruction()
   );
 
   const squads = Squads.endpoint(
