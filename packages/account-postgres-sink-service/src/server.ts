@@ -64,9 +64,10 @@ server.post("/account-webhook", async (req, res) => {
     });
     return;
   }
+
   try {
     const accountConfigs = parseConfig();
-    const accounts = req.body[0];
+    const accounts = (req.body as any[]);
   
     if (accountConfigs) {
       for (const account of accounts) {
@@ -75,7 +76,9 @@ server.post("/account-webhook", async (req, res) => {
         if (!config) {
           // exit early if account doesn't need to be saved
           res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+          return;
         }
+
         try {
           await handleAccountWebhook({
             programId: new PublicKey(config.programId),

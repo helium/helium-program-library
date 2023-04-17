@@ -39,19 +39,19 @@ export async function handleAccountWebhook({
     throw new Error("idl does not have every account type");
   }
   const program = new anchor.Program(idl, programId, provider);
-
+  const info = await provider.connection.getAccountInfo(new PublicKey(account.pubkey));
+  const data = info.data;
   // decode the account
   let decodedAcc: any;
   let accName: any;
   for (const idlAcc of idl.accounts!) {
     try {
-      decodedAcc = program.coder.accounts.decode(idlAcc.name, account.data);
+      decodedAcc = program.coder.accounts.decode(idlAcc.name, data);
       accName = idlAcc.name;
     } catch(err) {}
   }
 
   const now = new Date().toISOString();
-
   const model = sequelize.models[accName];
   await model.upsert({
     address: account.pubkey,
