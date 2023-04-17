@@ -28,8 +28,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
     "build": "tsc -p tsconfig.json",
-    "start": "node lib/esm/index.js",
-    "dev": "npx ts-node --project tsconfig.cjs.json src/index.ts"
+    "start": "node lib/esm/server.js",
+    "dev": "npx ts-node --project tsconfig.cjs.json src/server.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.26.0",
