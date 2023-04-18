@@ -84,7 +84,7 @@ export const defineIdlModels = async ({
         {
           underscored: true,
           updatedAt: false,
-          // schema: underscore(accConfig.schema || "public"),
+          schema: underscore(accConfig.schema || "public"),
           tableName: underscore(accConfig.table || acc.name),
         }
       );
