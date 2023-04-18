@@ -22,11 +22,6 @@ export async function run(args: any = process.argv) {
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
     },
-    dcMint: {
-      type: "string",
-      describe: "Mint id of the DC token",
-      default: DC_MINT.toBase58(),
-    },
     routerKey: {
       alias: "r",
       type: "string",
@@ -47,11 +42,9 @@ export async function run(args: any = process.argv) {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const dcProgram = await init(provider);
-  const dcMint = new PublicKey(argv.dcMint);
   const dntMint = new PublicKey(argv.dntMint);
   const [subdao] = subDaoKey(dntMint)
 
-  console.log(subdao.toBase58())
   const [delegatedDataCreditsK] = delegatedDataCreditsKey(subdao, argv.routerKey);
   console.log("Delegated data credits key: ", delegatedDataCreditsK.toBase58())
   const delegatedDataCredits = await dcProgram.account.delegatedDataCreditsV0.fetch(delegatedDataCreditsK);
