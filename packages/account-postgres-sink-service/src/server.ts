@@ -35,7 +35,7 @@ export function parseConfig() {
 
 server.get("/refresh-accounts", async (_reg, res) => {
   try {
-    const configs = parseConfig();
+    const configs = parseConfig()!;
     await defineAllIdlModels({ configs: configs["configs"], sequelize: database });
     if (configs) {
       for (const config of configs.configs) {
@@ -119,7 +119,7 @@ const start = async () => {
     await server.listen({ port: 3000, host: "0.0.0.0" });
     // By default, jobs are not running at startup
     server.cron.startAllJobs();
-    const configs = parseConfig();
+    const configs = parseConfig()!;
     // models are defined on boot, and updated in refresh-accounts
     await defineAllIdlModels({ configs: configs["configs"], sequelize: database });
     const address = server.server.address();
