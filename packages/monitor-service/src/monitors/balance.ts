@@ -44,10 +44,20 @@ export async function monitiorAssociatedTokenBalance(
     account,
     true
   );
-  const acc = await getAccount(provider.connection, associatedTokenAddress);
-  const mintAcc = await getMint(provider.connection, acc.mint);
-  watch(associatedTokenAddress, (raw) => {
-    const rawAccount = AccountLayout.decode(raw!.data);
+
+  watch(associatedTokenAddress, async (raw) => {
+    let amount: number = 0;
+
+    try {
+      const acc = await getAccount(provider.connection, associatedTokenAddress);
+      const mintAcc = await getMint(provider.connection, acc.mint);
+      const rawAccount = AccountLayout.decode(raw!.data);
+      amount = toNumber(new BN(rawAccount.amount.toString()), mintAcc.decimals);
+    } catch (_e) {
+      // ata acc must not exist
+      // set amount to default 0
+    }
+
     balanceGauge.set(
       {
         name: label,
@@ -55,7 +65,7 @@ export async function monitiorAssociatedTokenBalance(
         type,
         is_maker: `${isMaker}`,
       },
-      toNumber(new BN(rawAccount.amount.toString()), mintAcc.decimals)
+      amount
     );
   });
 }
