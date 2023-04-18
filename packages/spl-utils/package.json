@@ -33,6 +33,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "0.26.0",
     "@helium/address": "^4.8.1",
+    "@solana/spl-account-compression": "^0.1.7",
     "@solana/spl-token": "^0.3.6",
     "@solana/web3.js": "^1.43.4",
     "bn.js": "^5.2.0",
