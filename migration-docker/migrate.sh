@@ -109,7 +109,7 @@ helium-admin create-subdao -u $SOLANA_URL \
                            --dcBurnAuthority $IOT_DC_BURN_AUTHORITY \
                            --executeTransaction \
                            --decimals 6 \
-                           --delegatorRewardsPercent 9.090909090909091 \
+                           --delegatorRewardsPercent  6.451612903225806 \
                            --queue $ORACLE_QUEUE \
                            --crank $ORACLE_CRANK \
                            --switchboardNetwork $NETWORK
@@ -132,7 +132,7 @@ helium-admin create-subdao -u $SOLANA_URL \
                            --dcBurnAuthority $MOBILE_DC_BURN_AUTHORITY \
                            --executeTransaction \
                            --decimals 6 \
-                           --delegatorRewardsPercent 6.451612903225806 \
+                           --delegatorRewardsPercent 9.090909090909091 \
                            --queue $ORACLE_QUEUE \
                            --crank $ORACLE_CRANK \
                            --switchboardNetwork $NETWORK
