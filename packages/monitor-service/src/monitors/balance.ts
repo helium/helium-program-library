@@ -54,7 +54,8 @@ export async function monitiorAssociatedTokenBalance(
       const rawAccount = AccountLayout.decode(raw!.data);
       amount = toNumber(new BN(rawAccount.amount.toString()), mintAcc.decimals);
     } catch (_e) {
-      // do nothing
+      // ata acc must not exist
+      // set amount to default 0
     }
 
     balanceGauge.set(
