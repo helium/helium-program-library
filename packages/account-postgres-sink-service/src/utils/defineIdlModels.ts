@@ -1,6 +1,8 @@
 import * as anchor from "@coral-xyz/anchor";
 import { underscore } from "inflection";
 import { Sequelize, DataTypes } from "sequelize";
+import { SOLANA_URL } from "../env";
+
 
 const TypeMap = new Map<string, any>([
   ["string", DataTypes.STRING],
@@ -89,3 +91,38 @@ export const defineIdlModels = async ({
     }
   }
 };
+
+export const defineAllIdlModels = async({
+  configs,
+  sequelize,
+}: {
+  configs: { accounts: { type: string; table?: string; schema?: string }[], programId: string }[];
+  sequelize: Sequelize;
+}) => {
+  for (const config of configs) {
+    anchor.setProvider(
+      anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
+    );
+    const provider = anchor.getProvider() as anchor.AnchorProvider;
+    const idl = await anchor.Program.fetchIdl(config.programId, provider);
+  
+    if (!idl) {
+      throw new Error(`unable to fetch idl for ${config.programId}`);
+    }
+  
+    if (
+      !config.accounts.every(({ type }) =>
+        idl.accounts!.some(({ name }) => name === type)
+      )
+    ) {
+      throw new Error("idl does not have every account type");
+    }
+  
+    await defineIdlModels({
+      idl,
+      accounts: config.accounts,
+      sequelize,
+    })
+  }
+  await sequelize.sync({ alter: true });
+}
