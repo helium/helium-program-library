@@ -97,7 +97,7 @@ export async function run(args: any = process.argv) {
         const ownerSolAddr = toSolana(owner);
         if (ownerSolAddr) {
           console.log(`    Refunding ${toRefund}`);
-          await program.methods
+          const sig = await program.methods
             .issueDataCreditsV0({
               amount: toRefund,
             })
