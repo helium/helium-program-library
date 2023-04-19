@@ -12,6 +12,7 @@ use anchor_spl::token::{Mint, MintTo, Token, TokenAccount};
 use mpl_token_metadata::state::Collection;
 use mpl_token_metadata::state::DataV2;
 use shared_utils::create_metadata_accounts_v3;
+use std::cmp::min;
 use std::convert::TryFrom;
 use std::mem::size_of;
 
@@ -156,8 +157,14 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
   let start_ts = curr_ts;
 
   let lockup = Lockup::new_from_periods(args.kind, curr_ts, start_ts, args.periods)?;
+
   let genesis_end = if curr_ts <= mint_config.genesis_vote_power_multiplier_expiration_ts {
-    i64::try_from(lockup.total_seconds()).unwrap() + curr_ts
+    i64::try_from(min(
+      mint_config.lockup_saturation_secs,
+      lockup.total_seconds(),
+    ))
+    .unwrap()
+      + curr_ts
   } else {
     0
   };

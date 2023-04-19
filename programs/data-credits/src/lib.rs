@@ -70,4 +70,11 @@ pub mod data_credits {
   ) -> Result<()> {
     instructions::update_data_credits_v0::handler(ctx, args)
   }
+
+  pub fn change_delegated_sub_dao_v0(
+    ctx: Context<ChangeDelegatedSubDaoV0>,
+    args: ChangeDelegatedSubDaoArgsV0,
+  ) -> Result<()> {
+    instructions::change_delegated_sub_dao_v0::handler(ctx, args)
+  }
 }

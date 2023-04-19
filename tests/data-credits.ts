@@ -331,5 +331,7 @@ describe("data-credits", () => {
 
       assert.isTrue(PublicKey.default.equals(dcAcc.authority));
     });
+
+    describe("with delegated data credits", async () => {})
   });
 });
