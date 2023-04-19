@@ -60,7 +60,7 @@ pub fn handler(ctx: Context<CorrectTreasuriesV0>) -> Result<()> {
       ]],
     ),
     TransferArgsV0 {
-      amount:  2710350941115,
+      amount: 2710350941115,
     },
   )?;
   Ok(())
