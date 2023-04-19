@@ -12,7 +12,6 @@ const cachedIdlFetch = (() => {
     skipCache?: boolean;
     provider: anchor.AnchorProvider;
   }): Promise<anchor.Idl | null> => {
-    console.log("CACHE", cache.length);
     let idl: anchor.Idl;
     const foundIdx = cache.findIndex(
       (cacheItem) => cacheItem.programId === programId
