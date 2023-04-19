@@ -107,6 +107,5 @@ pub fn handler(ctx: Context<RedeemV0>, args: RedeemArgsV0) -> Result<()> {
     TransferArgsV0 { amount: redeemed },
   )?;
 
-  Err(error!(ErrorCode::Frozen))
-  // Ok(())
+  Ok(())
 }
