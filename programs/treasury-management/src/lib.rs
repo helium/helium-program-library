@@ -42,4 +42,10 @@ pub mod treasury_management {
   pub fn redeem_v0(ctx: Context<RedeemV0>, args: RedeemArgsV0) -> Result<()> {
     redeem_v0::handler(ctx, args)
   }
+
+  pub fn correct_treasuries_v0(
+    ctx: Context<CorrectTreasuriesV0>,
+  ) -> Result<()> {
+    correct_treasuries_v0::handler(ctx)
+  }
 }
