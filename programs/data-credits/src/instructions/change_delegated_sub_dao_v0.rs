@@ -77,7 +77,7 @@ pub struct ChangeDelegatedSubDaoV0<'info> {
     seeds = ["escrow_dc_account".as_bytes(), destination_delegated_data_credits.key().as_ref()],
     bump,
     token::mint = dc_mint,
-    token::authority = delegated_data_credits
+    token::authority = destination_delegated_data_credits
   )]
   pub destination_escrow_account: Account<'info, TokenAccount>,
   pub associated_token_program: Program<'info, AssociatedToken>,
