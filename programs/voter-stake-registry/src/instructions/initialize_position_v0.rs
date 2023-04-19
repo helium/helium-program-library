@@ -159,12 +159,7 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
   let lockup = Lockup::new_from_periods(args.kind, curr_ts, start_ts, args.periods)?;
 
   let genesis_end = if curr_ts <= mint_config.genesis_vote_power_multiplier_expiration_ts {
-    i64::try_from(min(
-      mint_config.lockup_saturation_secs,
-      lockup.total_seconds(),
-    ))
-    .unwrap()
-      + curr_ts
+    i64::try_from(lockup.total_seconds()).unwrap() + curr_ts
   } else {
     0
   };
