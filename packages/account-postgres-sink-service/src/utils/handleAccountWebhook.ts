@@ -15,6 +15,7 @@ interface HandleAccountWebhookArgs {
   account: any;
   sequelize?: Sequelize;
 }
+
 export async function handleAccountWebhook({
   programId,
   configAccounts,
@@ -38,10 +39,12 @@ export async function handleAccountWebhook({
   ) {
     throw new Error("idl does not have every account type");
   }
+
   const program = new anchor.Program(idl, programId, provider);
   const info = await provider.connection.getAccountInfo(
     new PublicKey(account.pubkey)
   );
+
   if (info) {
     const data = info.data;
     // decode the account
@@ -59,8 +62,7 @@ export async function handleAccountWebhook({
     await model.upsert({
       address: account.pubkey,
       refreshed_at: now,
-      ...sanitizeAccount(account),
+      ...sanitizeAccount(decodedAcc),
     });
   }
-  
 }
