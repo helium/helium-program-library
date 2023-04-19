@@ -15,9 +15,8 @@ if (!HELIUS_AUTH_SECRET) {
   throw new Error("Helius auth secret not available");
 }
 
-// TODO: turn to true
 const server: FastifyInstance = Fastify({
-  logger: false,
+  logger: true,
 });
 
 server.register(cors, {
