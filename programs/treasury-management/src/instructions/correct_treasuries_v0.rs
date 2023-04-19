@@ -2,13 +2,12 @@ use std::str::FromStr;
 
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::{TokenAccount};
-use anchor_spl::token::{Token};
+use anchor_spl::token::Token;
+use anchor_spl::token::TokenAccount;
 use circuit_breaker::{
   cpi::{accounts::TransferV0, transfer_v0},
   AccountWindowedCircuitBreakerV0, CircuitBreaker, TransferArgsV0,
 };
-
 
 #[derive(Accounts)]
 pub struct CorrectTreasuriesV0<'info> {
@@ -60,7 +59,9 @@ pub fn handler(ctx: Context<CorrectTreasuriesV0>) -> Result<()> {
         &[ctx.accounts.treasury_management.bump_seed],
       ]],
     ),
-    TransferArgsV0 { amount: 27103509411 },
+    TransferArgsV0 {
+      amount: 27103509411,
+    },
   )?;
   Ok(())
 }
