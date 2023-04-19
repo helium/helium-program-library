@@ -1,3 +1,4 @@
+use crate::error::VsrError;
 use crate::position_seeds;
 use crate::registrar_seeds;
 use crate::state::*;
@@ -156,6 +157,11 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
   let start_ts = curr_ts;
 
   let lockup = Lockup::new_from_periods(args.kind, curr_ts, start_ts, args.periods)?;
+  // Can't lock more than 4 years
+  if lockup.total_seconds() > mint_config.lockup_saturation_secs {
+    return Err(VsrError::InvalidLockupPeriod.into());
+  }
+
   let genesis_end = if curr_ts <= mint_config.genesis_vote_power_multiplier_expiration_ts {
     i64::try_from(lockup.total_seconds()).unwrap() + curr_ts
   } else {
