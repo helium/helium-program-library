@@ -108,7 +108,7 @@ async function run() {
     "oracle"
   );
   await monitorSolBalance(
-    lazySignerKey(process.env.LAZY_SIGNER || "devnethelium5")[0],
+    lazySignerKey(process.env.LAZY_SIGNER || "nJWGUMOK")[0],
     "lazy_signer"
   );
   await monitorSolBalance(

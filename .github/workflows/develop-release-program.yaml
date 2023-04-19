@@ -25,6 +25,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Set devnet lazy signer
+        run: |
+          find programs -type f -name '*.rs' -exec sed -i "s/b\"nJWGUMOK\"/b\"devnethelium5\"/g" {} \;
+
       - uses: ./.github/actions/build-anchor/
         with:
           devnet: true
