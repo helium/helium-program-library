@@ -11,7 +11,9 @@ const cachedIdlFetch = (() => {
     programId: string;
     skipCache?: boolean;
     provider: anchor.AnchorProvider;
-  }) => {
+  }): Promise<anchor.Idl | null> => {
+    console.log("CACHE", cache.length);
+    let idl: anchor.Idl;
     const foundIdx = cache.findIndex(
       (cacheItem) => cacheItem.programId === programId
     );
@@ -19,13 +21,14 @@ const cachedIdlFetch = (() => {
     if (!skipCache && foundIdx > -1) {
       // move to front of cache
       cache.splice(0, 0, cache.splice(foundIdx, 1)[0]);
-      return cache[foundIdx].idl;
+      idl = cache[foundIdx].idl;
+    } else {
+      idl = await anchor.Program.fetchIdl(programId, provider);
+      cache.unshift({ programId, idl });
+      // prune cache to 10 items;
+      cache = cache.slice(0, 9);
     }
 
-    const idl = await anchor.Program.fetchIdl(programId, provider);
-    cache.unshift({ programId, idl });
-    // prune cache to 10 items;
-    cache = cache.slice(0, 9);
     return idl;
   };
 
