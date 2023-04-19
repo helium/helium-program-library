@@ -77,8 +77,8 @@ export async function run(args: any = process.argv) {
     aggKeypair.publicKey
   )
   const ix = await aggregator.setConfigInstruction(authority, {
-    batchSize: 8,
-    minOracleResults: 6
+    batchSize: 6,
+    minOracleResults: 5
   });
 
   await sendInstructionsOrSquads({
