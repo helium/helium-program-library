@@ -1,7 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
-import sha256 from "crypto-js/sha256";
-import hex from "crypto-js/enc-hex";
+import { sha256 } from "js-sha256";
 
 export function dataCreditsKey(dcMint: PublicKey, programId = PROGRAM_ID): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
@@ -24,11 +23,14 @@ export function delegatedDataCreditsKey(
   routerKey: string,
   programId: PublicKey = PROGRAM_ID
 ) {
-  let hexString = sha256(routerKey).toString(hex);
-  let seed = Uint8Array.from(Buffer.from(hexString, "hex"));
+  const hash = sha256(routerKey);
 
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("delegated_data_credits", "utf-8"), subDao.toBuffer(), seed],
+    [
+      Buffer.from("delegated_data_credits", "utf-8"),
+      subDao.toBuffer(),
+      Buffer.from(hash, "hex"),
+    ],
     programId
   );
 };
