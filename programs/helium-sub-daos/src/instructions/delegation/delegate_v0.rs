@@ -112,11 +112,6 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
 
-  // Disallow delegating before April 19th, 9am PST.
-  if !TESTING && curr_ts < 1681920000 {
-    return Err(error!(ErrorCode::EpochTooEarly));
-  }
-
   let vehnt_info = caclulate_vhnt_info(curr_ts, position, voting_mint_config)?;
   let VehntInfo {
     has_genesis,
