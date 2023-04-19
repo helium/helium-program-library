@@ -158,9 +158,10 @@ export async function getMigrateTransactions(
     .flatMap((token) => {
       const mint = new PublicKey(token.account.data.parsed.info.mint);
       const amount = token.account.data.parsed.info.tokenAmount.uiAmount;
+      const frozen = token.account.data.parsed.info.isFrozen;
       const fromAta = token.pubkey;
       const toAta = getAssociatedTokenAddressSync(mint, to);
-      if (amount > 0) {
+      if (amount > 0 && !frozen) {
         return [
           createAssociatedTokenAccountIdempotentInstruction(
             provider.wallet.publicKey,
@@ -181,7 +182,7 @@ export async function getMigrateTransactions(
             []
           ),
         ];
-      } else {
+      } else if (!frozen) {
         return createCloseAccountInstruction(fromAta, to, from, []);
       }
     });
