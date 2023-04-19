@@ -131,6 +131,11 @@ async function run() {
     threadKey(daoPk, "issue_hst")[0],
     "clockwork_thread_dao_issue_hst"
   );
+
+  await monitorSolBalance(mobile.dcBurnAuthority, "mobile_dc_burn_authority");
+
+  await monitorSolBalance(iot.dcBurnAuthority, "iot_dc_burn_authority");
+
   await monitorSolBalance(accountPayerKey()[0], "data_credits_account_payer");
 
   const ep = provider.connection.rpcEndpoint;
