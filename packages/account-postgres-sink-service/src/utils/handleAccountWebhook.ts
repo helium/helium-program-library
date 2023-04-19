@@ -1,9 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { Sequelize } from "sequelize";
-import { SOLANA_URL } from "../env";
+import { provider } from "./solana";
 import database from "./database";
 import { sanitizeAccount } from "./sanitizeAccount";
+import cachedIdlFetch from "./cachedIdlFetch";
 
 interface HandleAccountWebhookArgs {
   programId: PublicKey;
@@ -22,11 +23,10 @@ export async function handleAccountWebhook({
   account,
   sequelize = database,
 }: HandleAccountWebhookArgs) {
-  anchor.setProvider(
-    anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
-  );
-  const provider = anchor.getProvider() as anchor.AnchorProvider;
-  const idl = await anchor.Program.fetchIdl(programId, provider);
+  const idl = await cachedIdlFetch.fetchIdl({
+    programId: programId.toBase58(),
+    provider,
+  });
 
   if (!idl) {
     throw new Error(`unable to fetch idl for ${programId}`);
