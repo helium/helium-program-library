@@ -25,7 +25,7 @@ const cachedIdlFetch = (() => {
       idl = await anchor.Program.fetchIdl(programId, provider);
       cache.unshift({ programId, idl });
       // prune cache to 10 items;
-      cache = cache.slice(0, 9);
+      cache = cache.slice(0, 10);
     }
 
     return idl;
