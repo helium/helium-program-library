@@ -1,9 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { Sequelize } from "sequelize";
-import { SOLANA_URL } from "../env";
+import { provider } from "./solana";
 import database from "./database";
 import { sanitizeAccount } from "./sanitizeAccount";
+import cachedIdlFetch from "./cachedIdlFetch";
 
 interface HandleAccountWebhookArgs {
   programId: PublicKey;
@@ -15,17 +16,17 @@ interface HandleAccountWebhookArgs {
   account: any;
   sequelize?: Sequelize;
 }
+
 export async function handleAccountWebhook({
   programId,
   configAccounts,
   account,
   sequelize = database,
 }: HandleAccountWebhookArgs) {
-  anchor.setProvider(
-    anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
-  );
-  const provider = anchor.getProvider() as anchor.AnchorProvider;
-  const idl = await anchor.Program.fetchIdl(programId, provider);
+  const idl = await cachedIdlFetch.fetchIdl({
+    programId: programId.toBase58(),
+    provider,
+  });
 
   if (!idl) {
     throw new Error(`unable to fetch idl for ${programId}`);
@@ -38,10 +39,12 @@ export async function handleAccountWebhook({
   ) {
     throw new Error("idl does not have every account type");
   }
+
   const program = new anchor.Program(idl, programId, provider);
   const info = await provider.connection.getAccountInfo(
     new PublicKey(account.pubkey)
   );
+
   if (info) {
     const data = info.data;
     // decode the account
@@ -59,8 +62,7 @@ export async function handleAccountWebhook({
     await model.upsert({
       address: account.pubkey,
       refreshed_at: now,
-      ...sanitizeAccount(account),
+      ...sanitizeAccount(decodedAcc),
     });
   }
-  
 }

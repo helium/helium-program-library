@@ -36,7 +36,10 @@ export function parseConfig() {
 server.get("/refresh-accounts", async (_reg, res) => {
   try {
     const configs = parseConfig()!;
-    await defineAllIdlModels({ configs: configs["configs"], sequelize: database });
+    await defineAllIdlModels({
+      configs: configs["configs"],
+      sequelize: database,
+    });
     if (configs) {
       for (const config of configs.configs) {
         try {
@@ -54,25 +57,28 @@ server.get("/refresh-accounts", async (_reg, res) => {
     res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
     console.error(err);
   }
-    res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+  res.code(StatusCodes.OK).send(ReasonPhrases.OK);
 });
 
 server.post("/account-webhook", async (req, res) => {
-  if (req.headers.authorization != HELIUS_AUTH_SECRET ) {
+  if (req.headers.authorization != HELIUS_AUTH_SECRET) {
     res.status(403).send({
-      message: 'Invalid authorization'
+      message: "Invalid authorization",
     });
     return;
   }
 
   try {
     const accountConfigs = parseConfig();
-    const accounts = (req.body as any[]);
-  
+    const accounts = req.body as any[];
+
     if (accountConfigs) {
       for (const account of accounts) {
         const parsed = account["account"]["JsonParsed"];
-        const config = accountConfigs.configs.find((x) => x.programId == parsed["owner"]);
+        const config = accountConfigs.configs.find(
+          (x) => x.programId == parsed["owner"]
+        );
+
         if (!config) {
           // exit early if account doesn't need to be saved
           res.code(StatusCodes.OK).send(ReasonPhrases.OK);
@@ -84,7 +90,7 @@ server.post("/account-webhook", async (req, res) => {
             programId: new PublicKey(config.programId),
             configAccounts: config.accounts,
             account: parsed,
-          })
+          });
         } catch (err) {
           console.error(err);
         }
@@ -95,7 +101,7 @@ server.post("/account-webhook", async (req, res) => {
     res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
     console.error(err);
   }
-})
+});
 
 server.register(fastifyCron, {
   jobs: [
@@ -121,7 +127,10 @@ const start = async () => {
     server.cron.startAllJobs();
     const configs = parseConfig()!;
     // models are defined on boot, and updated in refresh-accounts
-    await defineAllIdlModels({ configs: configs["configs"], sequelize: database });
+    await defineAllIdlModels({
+      configs: configs["configs"],
+      sequelize: database,
+    });
     const address = server.server.address();
     const port = typeof address === "string" ? address : address?.port;
     console.log(`Running on 0.0.0.0:${port}`);

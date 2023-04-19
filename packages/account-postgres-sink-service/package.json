@@ -34,6 +34,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "0.26.0",
     "@fastify/cors": "^8.1.1",
+    "@helium/spl-utils": "^0.1.1",
     "@solana/web3.js": "^1.43.4",
     "aws-sdk": "^2.1344.0",
     "bn.js": "^5.2.0",
