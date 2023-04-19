@@ -2,7 +2,8 @@ import {
   AssetProof,
   chunks,
   getAssetProof,
-  getAssetsByOwner
+  getAssetsByOwner,
+  truthy
 } from "@helium/spl-utils";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import {
@@ -158,7 +159,7 @@ export async function getMigrateTransactions(
     .flatMap((token) => {
       const mint = new PublicKey(token.account.data.parsed.info.mint);
       const amount = token.account.data.parsed.info.tokenAmount.uiAmount;
-      const frozen = token.account.data.parsed.info.isFrozen;
+      const frozen = token.account.data.parsed.info.state == 'frozen';
       const fromAta = token.pubkey;
       const toAta = getAssociatedTokenAddressSync(mint, to);
       if (amount > 0 && !frozen) {
@@ -185,7 +186,8 @@ export async function getMigrateTransactions(
       } else if (!frozen) {
         return createCloseAccountInstruction(fromAta, to, from, []);
       }
-    });
+    })
+    .filter(truthy);
 
   const lamports = await provider.connection.getBalance(from);
 
