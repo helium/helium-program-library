@@ -1,15 +1,16 @@
 {
-  "name": "@helium/spl-utils",
-  "version": "0.1.2",
-  "description": "Utils shared across spl suite",
+  "name": "@helium/hnt-to-rent-service",
+  "private": true,
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
+  "version": "0.1.2",
+  "description": "Migration of state from helium",
   "repository": {
     "type": "git",
-    "url": "https://github.com/StrataFoundation/strata"
+    "url": "https://github.com/HeliumFoundation/helium-program-libary"
   },
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/src/index.js",
@@ -26,25 +27,30 @@
   "scripts": {
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
-    "clean": "npx shx mkdir -p lib && npx shx rm -rf lib",
-    "package": "npx shx mkdir -p lib/cjs lib/esm",
-    "prebuild": "npm run clean && npm run package"
+    "build": "tsc -p tsconfig.json",
+    "start": "node lib/esm/index.js",
+    "dev": "npx ts-node --project tsconfig.cjs.json src/index.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.26.0",
-    "@helium/address": "^4.8.1",
-    "@solana/spl-account-compression": "^0.1.7",
-    "@solana/spl-token": "^0.3.6",
-    "@solana/web3.js": "^1.43.4",
-    "bn.js": "^5.2.0",
-    "borsh": "^0.7.0",
-    "bs58": "^5.0.0"
+    "@fastify/cors": "^8.1.1",
+    "@helium/address": "^4.6.2",
+    "@helium/spl-utils": "^0.1.2",
+    "@orca-so/whirlpools-sdk": "^0.8.2",
+    "@solana/web3.js": "^1.66.2",
+    "axios": "^1.1.3",
+    "fastify": "^4.9.2",
+    "typescript-collections": "^1.3.3",
+    "yargs": "^17.6.2"
   },
   "devDependencies": {
     "git-format-staged": "^2.1.3",
     "ts-loader": "^9.2.3",
-    "typescript": "^4.3.4",
+    "ts-node": "^10.9.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^4.8.4",
     "yarn": "^1.22.18"
   },
-  "gitHead": "0721839b58fe86481db5ddf9f4b11e0fbf2ba738"
+  "keywords": [],
+  "author": ""
 }

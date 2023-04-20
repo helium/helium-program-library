@@ -1,6 +1,6 @@
 {
   "extends": "../../tsconfig.esm.json",
-  "include": ["src", "../hnt-to-rent-service/src/orca.ts"],
+  "include": ["src"],
   "compilerOptions": {
     "outDir": "lib/esm",
     "declarationDir": "lib/types"
