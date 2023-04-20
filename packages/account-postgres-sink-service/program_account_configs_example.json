@@ -16,7 +16,8 @@
       "accounts": [
         { "type": "PositionV0", "table": "positions", "schema": "public" },
         { "type": "Registrar", "table": "registrars", "schema": "public" }
-      ]
+      ],
+      "cron": "*/15 * * * *"
     },
     {
       "programId": "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR",
