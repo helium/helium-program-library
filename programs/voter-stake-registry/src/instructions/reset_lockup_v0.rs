@@ -68,6 +68,9 @@ pub fn handler(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<(
   } else {
     0
   };
+  if curr_ts <= mint_config.genesis_vote_power_multiplier_expiration_ts {
+    position.genesis_end = i64::try_from(position.lockup.seconds_left(curr_ts)).unwrap() + curr_ts;
+  }
 
   Ok(())
 }
