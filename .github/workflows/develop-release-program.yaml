@@ -1,4 +1,4 @@
-name: Build Programs on Develop Push
+name: Deploy Programs on Develop Push
 
 on:
   push:
@@ -57,7 +57,7 @@ jobs:
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
 
       - name: Squads program upgrade
-        uses: helium/squads-program-upgrade@v0.2.7
+        uses: helium/squads-program-upgrade@v0.2.8
         with:
           network-url: 'https://api.devnet.solana.com'
           program-multisig: ${{ secrets.DEVNET_MULTISIG }}
