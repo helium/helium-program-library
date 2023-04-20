@@ -1,11 +1,15 @@
 import * as anchor from "@coral-xyz/anchor";
-import { dataCreditsKey, delegatedDataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
+import {
+  delegatedDataCreditsKey,
+  init as initDc,
+} from "@helium/data-credits-sdk";
 import { PublicKey } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import { BN } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
 import { sendInstructionsOrSquads } from "./utils";
+import { subDaoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -19,11 +23,11 @@ export async function run(args: any = process.argv) {
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
     },
-    sourceSubDao: {
+    sourceDntMint: {
       type: "string",
       required: true,
     },
-    destinationSubDao: {
+    destinationDntMint: {
       type: "string",
       required: true,
     },
@@ -55,34 +59,52 @@ export async function run(args: any = process.argv) {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const program = await initDc(provider);
+  const hsdProgram = await initHsd(provider);
 
   const instructions = [];
 
-  const sourceSubDao = new PublicKey(argv.sourceSubDao);
-  const destinationSubDao = new PublicKey(argv.destinationSubDao);
-  const sourceDelegatedDataCredits = delegatedDataCreditsKey(sourceSubDao, argv.routerKey)[0];
-  const destinationDelegatedDataCredits = delegatedDataCreditsKey(destinationSubDao, argv.routerKey)[0];
-
-  const method = await program.methods.changeDelegatedSubDaoV0({
-    amount: new BN(argv.amount),
-    routerKey: argv.routerKey,
-  }).accounts({
-    delegatedDataCredits: sourceDelegatedDataCredits,
-    destinationDelegatedDataCredits,
-    subDao: sourceSubDao,
+  const sourceSubDao = subDaoKey(new PublicKey(argv.sourceDntMint))[0];
+  const destinationSubDao = subDaoKey(
+    new PublicKey(argv.destinationDntMint)
+  )[0];
+  const sourceDelegatedDataCredits = delegatedDataCreditsKey(
+    sourceSubDao,
+    argv.routerKey
+  )[0];
+  const destinationDelegatedDataCredits = delegatedDataCreditsKey(
     destinationSubDao,
-  });
+    argv.routerKey
+  )[0];
 
-  const {destinationEscrowAccount} = await method.pubkeys();
-  console.log(sourceDelegatedDataCredits.toString(), destinationDelegatedDataCredits.toString());
-  instructions.push(
-    await method.instruction()
-  )
+  const subdao = await hsdProgram.account.subDaoV0.fetch(sourceSubDao);
+  const dao = await hsdProgram.account.daoV0.fetch(subdao.dao)
+  const authority = dao.authority;
+
+  const method = await program.methods
+    .changeDelegatedSubDaoV0({
+      amount: new BN(argv.amount),
+      routerKey: argv.routerKey,
+    })
+    .accounts({
+      delegatedDataCredits: sourceDelegatedDataCredits,
+      destinationDelegatedDataCredits,
+      subDao: sourceSubDao,
+      destinationSubDao,
+      authority
+    });
+
+  const { destinationEscrowAccount } = await method.pubkeys();
+  console.log(
+    sourceDelegatedDataCredits.toString(),
+    destinationDelegatedDataCredits.toString()
+  );
+  instructions.push(await method.instruction());
 
   const squads = Squads.endpoint(
     process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet, {
-      commitmentOrConfig: "finalized"
+    provider.wallet,
+    {
+      commitmentOrConfig: "finalized",
     }
   );
 
