@@ -46,7 +46,6 @@ pub fn handler(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<(
 
   let registrar = &ctx.accounts.registrar;
   let position = &mut ctx.accounts.position;
-  let mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
 
   let mint_idx = position.voting_mint_config_idx;

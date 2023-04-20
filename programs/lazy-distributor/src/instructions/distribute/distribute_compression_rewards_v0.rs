@@ -2,7 +2,7 @@ use super::common::*;
 use crate::error::ErrorCode;
 use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
-use mpl_bubblegum::{program::Bubblegum, state::TreeConfig, utils::get_asset_id};
+use mpl_bubblegum::utils::get_asset_id;
 use shared_utils::*;
 use spl_account_compression::program::SplAccountCompression;
 
@@ -19,13 +19,6 @@ pub struct DistributeCompressionRewardsV0<'info> {
   pub common: DistributeRewardsCommonV0<'info>,
   /// CHECK: THe merkle tree
   pub merkle_tree: UncheckedAccount<'info>,
-  #[account(
-        seeds = [merkle_tree.key().as_ref()],
-        bump,
-        seeds::program = bubblegum_program.key()
-    )]
-  pub tree_authority: Account<'info, TreeConfig>,
-  pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
   pub token_program: Program<'info, Token>,
 }
