@@ -111,11 +111,11 @@ server.post("/account-webhook", async (req, res) => {
 });
 
 const configs = parseConfig()!;
-const customJobs = configs["configs"].filter((x) => x.cron).map((x) => {
+const customJobs = configs["configs"].filter((x) => !!x.cron).map((x) => {
   return {
-    cronTime: x.cron,
+    cronTime: x.cron!,
     runOnInit: false,
-    onTick: async (server) => {
+    onTick: async (server: any) => {
       try {
         await server.inject(`/refresh-accounts?program=${x.programId}`);
       } catch (err) {
