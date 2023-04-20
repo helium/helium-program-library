@@ -1,4 +1,5 @@
 pub mod burn;
+pub mod change_delegated_sub_dao_v0;
 pub mod delegate_data_credits_v0;
 pub mod genesis_issue_delegated_data_credits_v0;
 pub mod initialize_data_credits_v0;
@@ -7,6 +8,7 @@ pub mod mint_data_credits_v0;
 pub mod update_data_credits_v0;
 
 pub use burn::*;
+pub use change_delegated_sub_dao_v0::*;
 pub use delegate_data_credits_v0::*;
 pub use genesis_issue_delegated_data_credits_v0::*;
 pub use initialize_data_credits_v0::*;

@@ -14,6 +14,8 @@ import { assert, expect } from "chai";
 import {
   accountPayerKey,
   dataCreditsKey,
+  delegatedDataCreditsKey,
+  escrowAccountKey,
   init
 } from "../packages/data-credits-sdk/src";
 import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
@@ -331,5 +333,46 @@ describe("data-credits", () => {
 
       assert.isTrue(PublicKey.default.equals(dcAcc.authority));
     });
+
+
+    it("redelegates delegated data credits", async() => {
+      const { subDao: destinationSubDao } = await initTestSubdao(hsdProgram, provider, me, dao);
+
+      const amount = 2;
+      const routerKey = (await HeliumKeypair.makeRandom()).address.b58;
+      const methodA = program.methods
+        .delegateDataCreditsV0({
+          amount: toBN(amount, 0),
+          routerKey,
+        })
+        .accounts({
+          subDao,
+        });
+      const sourceDelegatedDataCredits = (await methodA.pubkeys()).delegatedDataCredits!;
+      await methodA.rpc({ skipPreflight: true });
+
+     
+      const destinationDelegatedDataCredits = delegatedDataCreditsKey(destinationSubDao, routerKey)[0];
+
+      await program.methods.changeDelegatedSubDaoV0({
+        amount: toBN(amount, 0),
+        routerKey,
+      }).accounts({
+        delegatedDataCredits: sourceDelegatedDataCredits,
+        destinationDelegatedDataCredits,
+        subDao,
+        destinationSubDao,
+        authority: me,
+      }).rpc({ skipPreflight: true });
+
+      const sourceEscrow = escrowAccountKey(sourceDelegatedDataCredits)[0];
+      const destinationEscrow = escrowAccountKey(destinationDelegatedDataCredits)[0];
+
+      const sourceBal = await provider.connection.getTokenAccountBalance(sourceEscrow);
+      const destinationBal = await provider.connection.getTokenAccountBalance(destinationEscrow);
+
+      expect(sourceBal.value.uiAmount).to.eq(0);
+      expect(destinationBal.value.uiAmount).to.eq(amount);
+    })
   });
 });
