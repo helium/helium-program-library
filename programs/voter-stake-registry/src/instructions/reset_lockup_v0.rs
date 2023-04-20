@@ -49,9 +49,18 @@ pub fn handler(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<(
   let mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
 
+  let mint_idx = position.voting_mint_config_idx;
+  let mint_config = &registrar.voting_mints[mint_idx as usize];
+
+  let new_seconds = (periods as u64).checked_mul(kind.period_secs()).unwrap();
+  // Can't lock more than 4 years
+  if new_seconds > mint_config.lockup_saturation_secs {
+    return Err(VsrError::InvalidLockupPeriod.into());
+  }
+
   // Must not decrease duration or strictness
   require_gte!(
-    (periods as u64).checked_mul(kind.period_secs()).unwrap(),
+    new_seconds,
     position.lockup.seconds_left(curr_ts),
     VsrError::InvalidLockupPeriod
   );
