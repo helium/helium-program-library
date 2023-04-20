@@ -46,6 +46,7 @@ pub fn handler(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<(
 
   let registrar = &ctx.accounts.registrar;
   let position = &mut ctx.accounts.position;
+  let mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
 
   // Must not decrease duration or strictness
@@ -62,6 +63,11 @@ pub fn handler(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<(
 
   // Change the deposit entry.
   position.lockup = Lockup::new_from_periods(kind, curr_ts, curr_ts, periods)?;
+  position.genesis_end = if curr_ts <= mint_config.genesis_vote_power_multiplier_expiration_ts {
+    i64::try_from(position.lockup.seconds_left(curr_ts)).unwrap() + curr_ts
+  } else {
+    0
+  };
 
   Ok(())
 }
