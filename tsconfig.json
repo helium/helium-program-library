@@ -41,6 +41,9 @@
       "path": "./packages/migration-service"
     },
     {
+      "path": "./packages/hnt-to-rent-service"
+    },
+    {
       "path": "./packages/treasury-management-sdk"
     },
     {

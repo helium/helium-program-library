@@ -50,7 +50,6 @@ export async function fundFees(userWalletPubkey: PublicKey): Promise<Transaction
 
   const pool = await client.getPool(HNT_SOL);
   const sol = pool.getTokenAInfo();
-  console.log(sol.mint.toBase58())
 
   const outputU64 = DecimalUtil.toU64(new Decimal("0.020015"), sol.decimals);
   const acceptableSlippage = Percentage.fromFraction(1, 100); // 1%
@@ -63,7 +62,6 @@ export async function fundFees(userWalletPubkey: PublicKey): Promise<Transaction
     ctx.fetcher,
     true
   );
-  console.log(quote.estimatedAmountIn.toNumber())
 
   // Tx contains instructions to create/close WSOL token account
   const swapTx = await pool.swap(quote);

@@ -24,7 +24,6 @@ import { LAZY_TRANSACTIONS_NAME } from "./env";
 import { getMigrateTransactions } from "./ledger";
 import { provider, wallet } from "./solana";
 import { decompress, decompressSigners, shouldThrottle } from "./utils";
-import { fundFees } from "./orca";
 
 const host = process.env.PGHOST || "localhost";
 const isRds = host.includes("rds.amazonaws.com");
@@ -245,16 +244,6 @@ server.post<{
     (tx) =>
       Buffer.from(tx.serialize({ requireAllSignatures: false })).toJSON().data
   );
-});
-
-server.post<{
-  Body: { wallet: PublicKey };
-}>("/hnt-to-fees", async (request, reply) => {
-  const wallet = new PublicKey(request.body.wallet);
-
-  return Buffer.from(
-    (await fundFees(wallet)).serialize({ requireAllSignatures: false })
-  ).toJSON().data;
 });
 
 server.get<{
