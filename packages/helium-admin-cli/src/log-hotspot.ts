@@ -40,7 +40,7 @@ export async function run(args: any = process.argv) {
   const hemProgram = await initHem(provider);
 
   const [keyToAssetK] = keyToAssetKey(daoKey(HNT_MINT)[0], argv.hotspotKey);
-  const keyToAsset = await hemProgram.account.keyToAssetV0.fetch(keyToAssetK);
+  const keyToAsset = await hemProgram.account.keyToAssetV0.fetchNullable(keyToAssetK);
   console.log("keyToAsset", keyToAssetK.toBase58());
   PublicKey.prototype.toString = PublicKey.prototype.toBase58;
 

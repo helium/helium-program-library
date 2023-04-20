@@ -46,8 +46,8 @@ export async function initializeCompressionRecipient({
     .accounts({
       ...accounts,
       lazyDistributor,
-      owner: owner,
-      delegate: owner,
+      owner: new PublicKey(owner),
+      delegate: new PublicKey(owner),
       recipient,
       payer,
     })

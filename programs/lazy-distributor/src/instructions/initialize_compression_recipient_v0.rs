@@ -1,6 +1,6 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
-use mpl_bubblegum::{program::Bubblegum, state::TreeConfig, utils::get_asset_id};
+use mpl_bubblegum::{utils::get_asset_id};
 use shared_utils::*;
 use spl_account_compression::program::SplAccountCompression;
 
@@ -42,13 +42,6 @@ pub struct InitializeCompressionRecipientV0<'info> {
   pub owner: UncheckedAccount<'info>,
   /// CHECK: delegate of the NFT
   pub delegate: UncheckedAccount<'info>,
-  #[account(
-    seeds = [merkle_tree.key().as_ref()],
-    bump,
-    seeds::program = bubblegum_program.key()
-  )]
-  pub tree_authority: Account<'info, TreeConfig>,
-  pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
   pub system_program: Program<'info, System>,
 }
