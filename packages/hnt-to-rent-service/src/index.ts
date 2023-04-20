@@ -3,7 +3,7 @@ import {
   PublicKey
 } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
-import { fundFees } from "./orca";
+import { estimate, fundFees } from "./orca";
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -25,6 +25,14 @@ server.post<{
   ).toJSON().data;
 });
 
+
+server.get<{
+  Body: { wallet: PublicKey };
+}>("/estimate", async (request, reply) => {
+  return {
+    estimate: await estimate()
+  }
+});
 
 const start = async () => {
   try {
