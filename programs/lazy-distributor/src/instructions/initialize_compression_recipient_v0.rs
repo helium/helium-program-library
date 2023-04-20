@@ -1,6 +1,6 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
-use mpl_bubblegum::{utils::get_asset_id};
+use mpl_bubblegum::utils::get_asset_id;
 use shared_utils::*;
 use spl_account_compression::program::SplAccountCompression;
 
