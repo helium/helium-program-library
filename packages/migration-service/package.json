@@ -48,6 +48,8 @@
     "@helium/treasury-management-sdk": "^0.1.1",
     "@helium/voter-stake-registry-sdk": "^0.1.1",
     "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
+    "@orca-so/sdk": "^1.2.25",
+    "@orca-so/whirlpools-sdk": "^0.8.2",
     "@project-serum/borsh": "^0.2.5",
     "@solana/buffer-layout": "^4.0.0",
     "@solana/spl-token": "0.3.6",
