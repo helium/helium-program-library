@@ -7,7 +7,7 @@
   },
   "license": "Apache-2.0",
   "version": "0.1.2",
-  "description": "Migration of state from helium",
+  "description": "Service that gives flashloans of sol to allow orca swap of small amounts of hnt to sol for fees",
   "repository": {
     "type": "git",
     "url": "https://github.com/HeliumFoundation/helium-program-libary"
