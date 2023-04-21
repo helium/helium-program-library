@@ -144,7 +144,7 @@ server.register(fastifyCron, {
 const start = async () => {
   try {
     await database.sync();
-    await server.listen({ port: 3000, host: "0.0.0.0" });
+    await server.listen({ port: 3001, host: "0.0.0.0" });
     // By default, jobs are not running at startup
     server.cron.startAllJobs();
     // models are defined on boot, and updated in refresh-accounts
