@@ -119,8 +119,9 @@ export async function run(args: any = process.argv) {
     authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
   }
   console.log(response);
+  const instructions = [];
   for (const row of response) {
-    const instructions = [
+    instructions.push([
       await program.methods
         .repairDelegationV0()
         .accounts({
@@ -128,17 +129,16 @@ export async function run(args: any = process.argv) {
           position: new PublicKey(row.paddr),
         })
         .instruction(),
-    ];
+    ]);
     console.log("Repairing delegation", row.paddr, row.daddr);
-
-    await sendInstructionsOrSquads({
-      provider,
-      instructions,
-      executeTransaction: argv.executeTransaction,
-      squads,
-      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-      authorityIndex: argv.authorityIndex,
-      signers: [],
-    });
   }
+  await sendInstructionsOrSquads({
+    provider,
+    instructions,
+    executeTransaction: argv.executeTransaction,
+    squads,
+    multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
+    authorityIndex: argv.authorityIndex,
+    signers: [],
+  });
 }
