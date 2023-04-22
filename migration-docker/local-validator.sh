@@ -43,7 +43,7 @@
 # "${args[@]}" \
 
 solana-test-validator \
-  --url https://solana-rpc.web.helium.io?session-key=Pluto \
+  --url https://api.devnet.solana.com \
   --account 7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm pyth.json \
   --clone Fi8vncGpNKbq62gPo56G4toCehWNy77GgqGkTaAF5Lkk \
   --bpf-program metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s metadata.so \
