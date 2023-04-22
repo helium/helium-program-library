@@ -7,7 +7,7 @@ import {
   rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
 import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
-import { getAsset, HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import { getAsset, getAssetProof, HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -40,12 +40,13 @@ export async function run(args: any = process.argv) {
   const hemProgram = await initHem(provider);
 
   const [keyToAssetK] = keyToAssetKey(daoKey(HNT_MINT)[0], argv.hotspotKey);
-  const keyToAsset = await hemProgram.account.keyToAssetV0.fetch(keyToAssetK);
+  const keyToAsset = await hemProgram.account.keyToAssetV0.fetchNullable(keyToAssetK);
   console.log("keyToAsset", keyToAssetK.toBase58());
   PublicKey.prototype.toString = PublicKey.prototype.toBase58;
 
   console.log(keyToAsset);
   console.log(await getAsset(argv.url, keyToAsset.asset));
+  console.log(await getAssetProof(argv.url, keyToAsset.asset));
 
   const [iotConfigKey] = rewardableEntityConfigKey(
     subDaoKey(IOT_MINT)[0],

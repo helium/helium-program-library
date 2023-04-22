@@ -33,6 +33,7 @@ pub struct DistributeV0<'info> {
     mut,
     seeds = ["fanout_voucher".as_bytes(), mint.key().as_ref()],
     bump = voucher.bump_seed,
+    has_one = fanout,
     has_one = mint
   )]
   pub voucher: Box<Account<'info, FanoutVoucherV0>>,

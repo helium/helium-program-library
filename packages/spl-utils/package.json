@@ -1,6 +1,6 @@
 {
   "name": "@helium/spl-utils",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Utils shared across spl suite",
   "publishConfig": {
     "access": "public",
@@ -46,5 +46,5 @@
     "typescript": "^4.3.4",
     "yarn": "^1.22.18"
   },
-  "gitHead": "ff670e6a6211209648c56dd69e5f5dfbda631b42"
+  "gitHead": "0721839b58fe86481db5ddf9f4b11e0fbf2ba738"
 }

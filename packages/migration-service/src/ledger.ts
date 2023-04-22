@@ -2,7 +2,8 @@ import {
   AssetProof,
   chunks,
   getAssetProof,
-  getAssetsByOwner
+  getAssetsByOwner,
+  truthy
 } from "@helium/spl-utils";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import {
@@ -158,9 +159,10 @@ export async function getMigrateTransactions(
     .flatMap((token) => {
       const mint = new PublicKey(token.account.data.parsed.info.mint);
       const amount = token.account.data.parsed.info.tokenAmount.uiAmount;
+      const frozen = token.account.data.parsed.info.state == 'frozen';
       const fromAta = token.pubkey;
       const toAta = getAssociatedTokenAddressSync(mint, to);
-      if (amount > 0) {
+      if (amount > 0 && !frozen) {
         return [
           createAssociatedTokenAccountIdempotentInstruction(
             provider.wallet.publicKey,
@@ -181,16 +183,26 @@ export async function getMigrateTransactions(
             []
           ),
         ];
-      } else {
+      } else if (!frozen) {
         return createCloseAccountInstruction(fromAta, to, from, []);
       }
-    });
+    })
+    .filter(truthy);
 
   const lamports = await provider.connection.getBalance(from);
 
   const recentBlockhash = (await provider.connection.getLatestBlockhash())
     .blockhash;
   const transactions: Transaction[] = [];
+  for (const chunk of chunks(transferAssetIxns, 4)) {
+    const tx = new Transaction({
+      feePayer: provider.wallet.publicKey,
+      recentBlockhash,
+    });
+    tx.add(...chunk);
+    transactions.push(await provider.wallet.signTransaction(tx));
+  }
+
   for (const chunk of chunks(transferPositionIxns, 4)) {
     const tx = new Transaction({
       feePayer: provider.wallet.publicKey,

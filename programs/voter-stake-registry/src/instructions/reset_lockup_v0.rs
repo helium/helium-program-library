@@ -48,9 +48,18 @@ pub fn handler(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<(
   let position = &mut ctx.accounts.position;
   let curr_ts = registrar.clock_unix_timestamp();
 
+  let mint_idx = position.voting_mint_config_idx;
+  let mint_config = &registrar.voting_mints[mint_idx as usize];
+
+  let new_seconds = (periods as u64).checked_mul(kind.period_secs()).unwrap();
+  // Can't lock more than 4 years
+  if new_seconds > mint_config.lockup_saturation_secs {
+    return Err(VsrError::InvalidLockupPeriod.into());
+  }
+
   // Must not decrease duration or strictness
   require_gte!(
-    (periods as u64).checked_mul(kind.period_secs()).unwrap(),
+    new_seconds,
     position.lockup.seconds_left(curr_ts),
     VsrError::InvalidLockupPeriod
   );
@@ -62,6 +71,9 @@ pub fn handler(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<(
 
   // Change the deposit entry.
   position.lockup = Lockup::new_from_periods(kind, curr_ts, curr_ts, periods)?;
+  if curr_ts <= mint_config.genesis_vote_power_multiplier_expiration_ts {
+    position.genesis_end = i64::try_from(position.lockup.seconds_left(curr_ts)).unwrap() + curr_ts;
+  }
 
   Ok(())
 }
