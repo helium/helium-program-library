@@ -85,12 +85,12 @@ export async function run(args: any = process.argv) {
     hntKeypair: {
       type: "string",
       describe: "Keypair of the HNT token",
-      default: `${__dirname}/../keypairs/hnt.json`,
+      default: `${__dirname}/../../keypairs/hnt.json`,
     },
     dcKeypair: {
       type: "string",
       describe: "Keypair of the Data Credit token",
-      default: `${__dirname}/../keypairs/dc.json`,
+      default: `${__dirname}/../../keypairs/dc.json`,
     },
     numHnt: {
       type: "number",
@@ -114,13 +114,13 @@ export async function run(args: any = process.argv) {
       required: true,
       describe: "Path to file that contains the hnt emissions schedule",
       type: "string",
-      default: `${__dirname}/../emissions/hnt.json`,
+      default: `${__dirname}/../../emissions/hnt.json`,
     },
     hstEmissionSchedulePath: {
       required: true,
       describe: "Path to file that contains the hst emissions schedule",
       type: "string",
-      default: `${__dirname}/../emissions/hst.json`,
+      default: `${__dirname}/../../emissions/hst.json`,
     },
     govProgramId: {
       type: "string",
@@ -135,7 +135,7 @@ export async function run(args: any = process.argv) {
     councilKeypair: {
       type: "string",
       describe: "Keypair of gov council token",
-      default: `${__dirname}/../keypairs/council.json`,
+      default: `${__dirname}/../../keypairs/council.json`,
     },
     councilWallet: {
       type: "string",

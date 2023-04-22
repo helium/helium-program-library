@@ -13,7 +13,7 @@ fi
 
 
 # create keypairs if they don't exist
-KEYPAIRS=( 'hnt.json' 'hst.json' 'dc.json' 'mobile.json' 'iot.json' 'council.json' 'aggregator-IOT.json' 'aggregator-MOBILE.json' 'merkle.json' 'oracle.json' )
+KEYPAIRS=( 'aggregator-IOT.json' 'aggregator-MOBILE.json' 'hnt-price-oracle.json' 'hnt.json' 'hst.json' 'dc.json' 'mobile.json' 'iot.json' 'council.json' 'aggregator-IOT.json' 'aggregator-MOBILE.json' 'merkle.json' 'oracle.json' )
 for f in "${KEYPAIRS[@]}"; do
 	if [ ! -f "./packages/helium-admin-cli/keypairs/$f" ]; then
         echo "$f keypair doesn't exist, creating it"
@@ -24,22 +24,30 @@ done
 RND=$RANDOM
 echo "Using $RND for dao names"
 
-./packages/helium-admin-cli/bin/helium-admin.js setup-hst -u $CLUSTER_URL --multisig BBhoCZSUJH8iiXHT5aP6GVbhnX2iY2vWR1BAsuYm7ZUm --hnt $(solana address -k packages/helium-admin-cli/keypairs/hnt.json) --name "HST"
+
+helium-admin create-price-oracle -u $SOLANA_URL \
+                                 --wallet $ANCHOR_WALLET \
+                                 --priceOracleKeypair ./packages/helium-admin-cli/keypairs/hnt-price-oracle.json \
+                                 --oracles packages/helium-admin-cli/price-oracle-authorities.json \
+                                 --decimals 8
 
 # init the dao and subdaos
 ./packages/helium-admin-cli/bin/helium-admin.js create-dao \
-    --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium $RND" -u $CLUSTER_URL
+    --hntPriceOracle $(solana address -k packages/helium-admin-cli/keypairs/hnt-price-oracle.json) \
+    --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium" -u $CLUSTER_URL
 
 ./packages/helium-admin-cli/bin/helium-admin.js create-subdao \
+    --hntPubkey $(solana address -k packages/helium-admin-cli/keypairs/hnt.json) \
     -rewardsOracleUrl https://iot-oracle.oracle.test-helium.com \
     --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n IOT --subdaoKeypair packages/helium-admin-cli/keypairs/iot.json \
-    --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "IOT $RND" --dcBurnAuthority $(solana address) -u $CLUSTER_URL --decimals 6 --delegatorRewardsPercent 6 \
+    --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "Helium IOT" --dcBurnAuthority $(solana address) -u $CLUSTER_URL --decimals 6 --delegatorRewardsPercent 6 \
     --emissionSchedulePath ./packages/helium-admin-cli/emissions/iot.json
 
 ./packages/helium-admin-cli/bin/helium-admin.js create-subdao \
+    --hntPubkey $(solana address -k packages/helium-admin-cli/keypairs/hnt.json) \
     -rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com \
     --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n MOBILE --subdaoKeypair packages/helium-admin-cli/keypairs/mobile.json \
-    --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Mobile $RND" --decimals 6 \
+    --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Helium Mobile" --decimals 6 \
     --dcBurnAuthority $(solana address) -u $CLUSTER_URL --delegatorRewardsPercent 6 --emissionSchedulePath ./packages/helium-admin-cli/emissions/mobile.json
 
 if test -f "./packages/helium-admin-cli/makers.json"; then
