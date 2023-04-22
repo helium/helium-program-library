@@ -4,7 +4,7 @@ on:
   push:
     # Sequence of patterns matched against refs/tags
     tags:
-      - 'program-*' # Push events to matching program-*, i.e. program-circuit-breaker-0.0.1
+      - "program-*" # Push events to matching program-*, i.e. program-circuit-breaker-0.0.1
 
 jobs:
   release:
@@ -39,18 +39,18 @@ jobs:
           network: mainnet-beta
           program: ${{ env.PROGRAM_NAME }}
           keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
-          program-id: ${{ inputs.program-id }}
+          program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.MULTISIG_VAULT }}
 
       - name: Squads program upgrade
         uses: helium/squads-program-upgrade@v0.2.8
         with:
-          network-url: 'https://api.mainnet.solana.com'
+          network-url: "https://api.mainnet.solana.com"
           program-multisig: ${{ secrets.MULTISIG }}
           program-id: ${{ env.PROGRAM_ID }}
           buffer: ${{ steps.buffer-deploy.outputs.buffer }}
           idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
           spill-address: ${{ secrets.DEPLOYER_ADDRESS }}
           authority: ${{ secrets.MULTISIG_VAULT }}
-          name: 'Deploy ${{env.PROGRAM_NAME}} ${{env.VERSION}}'
+          name: "Deploy ${{env.PROGRAM_NAME}} ${{env.VERSION}}"
           keypair: ${{ secrets.DEPLOYER_KEYPAIR }}

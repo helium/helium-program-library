@@ -47,7 +47,7 @@ runs:
         path: |
           ./target
         key: deps-${{ runner.os }}-build-${{ inputs.devnet }}-${{ inputs.testing }}-${{ hashFiles('./programs/**/*') }}
-    - run: TESTING=${{ inputs.testing }} ~/.cargo/bin/anchor build ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
+    - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/anchor build ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
       if: steps.cache-anchor-build.outputs.cache-hit != 'true'
       shell: bash
     - uses: ./.github/actions/setup-ts/
