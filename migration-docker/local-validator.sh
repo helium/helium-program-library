@@ -35,7 +35,13 @@
 #   args+=("--account" "$account_key" "$file")
 # done
 
-  # "${args[@]}" \
+  # --clone FftLLJWbQQhRDv72ihR4Q7259VdPa4AZ3zxJcsB3wjE9 \
+  # --clone hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux \
+  # --clone dcuc8Amr83Wz27ZkQ2K9NS6r8zRpf1J6cvArEBDZDmm \
+  # --clone mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6 \
+  # --clone iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9fns \
+# "${args[@]}" \
+
 solana-test-validator \
   --url https://solana-rpc.web.helium.io?session-key=Pluto \
   --account 7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm pyth.json \
@@ -48,13 +54,7 @@ solana-test-validator \
   --bpf-program hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S gov.so \
   --bpf-program SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f switchboard.so \
   --bpf-program SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu sqds.so \
-  --clone FftLLJWbQQhRDv72ihR4Q7259VdPa4AZ3zxJcsB3wjE9 \
-  --clone hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux \
-  --clone dcuc8Amr83Wz27ZkQ2K9NS6r8zRpf1J6cvArEBDZDmm \
-  --clone mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6 \
-  --clone iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9fns \
-  --clone 2VfPJn8ML1hNBnsEBo7SzmG11UJc7gbY8b23A3K8expd \
+  --clone uPeRMdfPmrPqgRWSrjAnAkH78RqAhe5kXoW6vBYRqFX \
   --clone UcrnK4w2HXCEjY8z6TcQ9tysYr3c9VcFLdYAU9YQP5e \
-  --clone FozqXFMS1nQKfPqwVdChr7RJ3y7ccSux39zU682kNYjJ \
-  --clone BKtF8yyQsj3Ft6jb2nkfpEKzARZVdGgdEPs6mFmZNmbA \
-  --clone 5JYwqvKkqp35w8Nq3ba4z1WYUeJQ1rB36V8XvaGp6zn1 
+  --clone CyZuD7RPDcrqCGbNvLCyqk6Py9cEZTKmNKujfPi3ynDd \
+  --clone dBuf3CaQVKQftGPs6B2emKfAGewtGSTKUYqbv5sqf8h 

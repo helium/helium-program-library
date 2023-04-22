@@ -3,8 +3,6 @@ use std::cmp::min;
 use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
-use anchor_spl::token::TokenAccount;
 
 #[derive(Accounts)]
 pub struct RepairPositionV0<'info> {
@@ -27,7 +25,7 @@ pub fn handler(ctx: Context<RepairPositionV0>) -> Result<()> {
   let position = &mut ctx.accounts.position;
   position.lockup.end_ts = min(
     position.lockup.end_ts,
-   position.lockup.start_ts + (4 * 365 * 60 * 60 * 24)
+    position.lockup.start_ts + (4 * 365 * 60 * 60 * 24),
   );
   position.genesis_end = position.lockup.end_ts;
 

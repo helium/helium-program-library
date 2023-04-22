@@ -97,21 +97,13 @@ WITH
     JOIN sub_daos s on s.address = d.sub_dao
     GROUP BY s.dnt_mint, s.vehnt_fall_rate, s.vehnt_delegated, s.vehnt_last_calculated_ts, s.vehnt_last_calculated_ts
   )
--- SELECT 
---   mint,
---   delegations,
---   real_ve_tokens,
---   approx_ve_tokens,
---   real_fall_rate,
---   approx_fall_rate,
---   approx_fall_rate - real_fall_rate as fall_rate_diff,
---   approx_ve_tokens - real_ve_tokens as ve_tokens_diff
--- FROM subdao_delegations;
-
-SELECT
-  SUM(p.fall_rate) as fall_rates, SUM(p.fall_rate * (p.current_ts - d.start_ts)), s.dnt_mint, count(p.fall_rate)
-FROM positions_with_vehnt p
-JOIN delegated_positions d on d.position = p.address
-JOIN sub_daos s on s.address = d.sub_dao
-WHERE p.end_ts - p.start_ts > (60 * 60 * 24 * 365 * 4)
-GROUP BY s.dnt_mint;
+SELECT 
+  mint,
+  delegations,
+  real_ve_tokens,
+  approx_ve_tokens,
+  real_fall_rate,
+  approx_fall_rate,
+  approx_fall_rate - real_fall_rate as fall_rate_diff,
+  approx_ve_tokens - real_ve_tokens as ve_tokens_diff
+FROM subdao_delegations;

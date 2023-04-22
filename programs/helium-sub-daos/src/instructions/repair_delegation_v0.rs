@@ -34,7 +34,6 @@ pub struct RepairDelegationV0<'info> {
 
   #[account(
     mut,
-    close = authority,
     seeds = ["delegated_position".as_bytes(), position.key().as_ref()],
     has_one = position,
     has_one = sub_dao,
@@ -103,7 +102,7 @@ pub fn handler(ctx: Context<RepairDelegationV0>) -> Result<()> {
   } = vehnt_info;
 
   msg!("Vehnt calculations: {:?}", vehnt_info);
-
+  msg!("Curr vehnt: {:?}", vehnt_at_curr_ts);
   let sub_dao = &mut ctx.accounts.sub_dao;
 
   ctx.accounts.sub_dao_epoch_info.epoch = current_epoch(curr_ts);
@@ -161,6 +160,22 @@ pub fn handler(ctx: Context<RepairDelegationV0>) -> Result<()> {
     ctx.accounts.genesis_end_sub_dao_epoch_info.reload()?;
   }
 
+  // This position has introduced an incorrect fall rate for its duration.
+  // Add the fall rate from this position back to the subdao vehnt to correct.
+  if position.lockup.total_seconds() > u64::try_from(EPOCH_LENGTH * 365 * 4).unwrap()
+    && position.lockup.kind == LockupKind::Cliff
+  {
+    let correction_vehnt = u128::try_from(curr_ts - ctx.accounts.delegated_position.start_ts)
+      .unwrap()
+      .checked_mul(pre_genesis_end_fall_rate)
+      .unwrap();
+    msg!("Correcting vehnt by {}", correction_vehnt);
+    sub_dao.vehnt_delegated = sub_dao
+      .vehnt_delegated
+      .checked_add(correction_vehnt)
+      .unwrap();
+  }
+
   if position.lockup.end_ts >= ctx.accounts.sub_dao_epoch_info.end_ts()
     || position.lockup.kind == LockupKind::Constant
   {
@@ -179,20 +194,6 @@ pub fn handler(ctx: Context<RepairDelegationV0>) -> Result<()> {
       } else {
         pre_genesis_end_fall_rate
       })
-      .unwrap();
-  }
-
-  // This position has introduced an incorrect fall rate for its duration.
-  // Add the fall rate from this position back to the subdao vehnt to correct.
-  if position.lockup.total_seconds() > u64::try_from(EPOCH_LENGTH * 365 * 4).unwrap() && position.lockup.kind == LockupKind::Cliff {
-    let correction_vehnt = u128::try_from(curr_ts - ctx.accounts.delegated_position.start_ts)
-      .unwrap()
-      .checked_mul(pre_genesis_end_fall_rate)
-      .unwrap();
-    msg!("Correcting vehnt by {}", correction_vehnt);
-    sub_dao.vehnt_delegated = sub_dao
-      .vehnt_delegated
-      .checked_add(correction_vehnt)
       .unwrap();
   }
 
