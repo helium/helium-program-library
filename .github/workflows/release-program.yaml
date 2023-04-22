@@ -23,8 +23,8 @@ jobs:
         run: |
           TAG=${GITHUB_REF#refs/tags/}  # Extract tag name from ref
           echo "Tag name: $TAG"
-          PROGRAM=$(echo $TAG | cut -d'-' -f1)  # Extract program name from tag name
-          VERSION=$(echo $TAG | cut -d'-' -f3)  # Extract version from tag name
+          PROGRAM=$(echo $TAG | sed 's/program-\(.*\)-[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/\1/')
+          VERSION=$(echo $TAG | sed 's/.*-\([0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\)$/\1/')
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
           PROGRAM_ID=$(toml get programs.localnet.${PROGRAM_NAME} | tr -d '"')
 
