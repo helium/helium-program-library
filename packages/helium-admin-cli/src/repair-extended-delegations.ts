@@ -98,7 +98,10 @@ export async function run(args: any = process.argv) {
   await client.connect();
   const response = (
     await client.query(`
-      select p.address as paddr, d.address as daddr from positions p JOIN delegated_positions d on d.position = p.address where cast(lockup->>'endTs' as numeric) - cast(lockup->>'startTs' as numeric) > (60 * 60 * 24 * 365 * 4) ;
+      select p.address as paddr, d.address as daddr from positions p 
+      JOIN delegated_positions d on d.position = p.address 
+      where cast(lockup->>'endTs' as numeric) - cast(lockup->>'startTs' as numeric) > (60 * 60 * 24 * 365 * 4) OR 
+            CAST(lockup ->>'endTs' as numeric) <> genesis_end;
     `)
   ).rows;
 
@@ -115,7 +118,7 @@ export async function run(args: any = process.argv) {
   if (multisig) {
     authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
   }
-  console.log(response)
+  console.log(response);
   for (const row of response) {
     const instructions = [
       await program.methods
@@ -126,7 +129,7 @@ export async function run(args: any = process.argv) {
         })
         .instruction(),
     ];
-    console.log("Repairing delegation", row.paddr, row.daddr)
+    console.log("Repairing delegation", row.paddr, row.daddr);
 
     await sendInstructionsOrSquads({
       provider,
