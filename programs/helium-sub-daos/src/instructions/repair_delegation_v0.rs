@@ -23,7 +23,7 @@ pub struct RepairDelegationV0<'info> {
   pub registrar: Box<Account<'info, Registrar>>,
   #[account(
     has_one = registrar,
-    // has_one = authority
+    has_one = authority
   )]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
