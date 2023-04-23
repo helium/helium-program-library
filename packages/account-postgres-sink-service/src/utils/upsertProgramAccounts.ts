@@ -73,8 +73,6 @@ export const upsertProgramAccounts = async ({
     ];
   } else {
     for (const { type } of accounts) {
-    console.log("type", type);
-
       const filter: { offset?: number; bytes?: string; dataSize?: number } =
         program.coder.accounts.memcmp(type, undefined);
       const coderFilters: GetProgramAccountsFilter[] = [];
