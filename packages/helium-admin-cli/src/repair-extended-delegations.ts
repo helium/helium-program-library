@@ -121,7 +121,7 @@ export async function run(args: any = process.argv) {
   console.log(response);
   const instructions = [];
   for (const row of response) {
-    instructions.push([
+    instructions.push(
       await program.methods
         .repairDelegationV0()
         .accounts({
@@ -129,9 +129,10 @@ export async function run(args: any = process.argv) {
           position: new PublicKey(row.paddr),
         })
         .instruction(),
-    ]);
+    );
     console.log("Repairing delegation", row.paddr, row.daddr);
   }
+
   await sendInstructionsOrSquads({
     provider,
     instructions,
