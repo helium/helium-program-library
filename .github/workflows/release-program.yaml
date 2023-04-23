@@ -43,7 +43,7 @@ jobs:
           buffer-authority: ${{ secrets.MULTISIG_VAULT }}
 
       - name: Squads program upgrade
-        uses: helium/squads-program-upgrade@v0.2.8
+        uses: helium/squads-program-upgrade@v0.3.1
         with:
           network-url: "https://api.mainnet-beta.solana.com"
           program-multisig: ${{ secrets.MULTISIG }}

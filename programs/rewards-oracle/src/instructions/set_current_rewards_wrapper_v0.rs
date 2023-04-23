@@ -1,9 +1,10 @@
 use anchor_lang::prelude::*;
 use helium_entity_manager::state::*;
+use lazy_distributor::program::LazyDistributor;
 use lazy_distributor::state::*;
 use lazy_distributor::{
   cpi::{accounts::SetCurrentRewardsV0, set_current_rewards_v0},
-  LazyDistributor, SetCurrentRewardsArgsV0,
+  SetCurrentRewardsArgsV0,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]

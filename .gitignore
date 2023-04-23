@@ -18,4 +18,4 @@ packages/migration-service/data/
 packages/migration-service/export.json
 packages/migration-service/failures.json
 migration-docker/data
-accounts/
+accounts
