@@ -36,7 +36,7 @@ jobs:
       - uses: ./.github/actions/upload-bpf/
         id: buffer-deploy
         with:
-          network: https://api.mainnet.solana.com
+          network: https://api.mainnet-beta.solana.com
           program: ${{ env.PROGRAM_NAME }}
           keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
           program-id: ${{ env.PROGRAM_ID }}
@@ -45,7 +45,7 @@ jobs:
       - name: Squads program upgrade
         uses: helium/squads-program-upgrade@v0.2.8
         with:
-          network-url: "https://api.mainnet.solana.com"
+          network-url: "https://api.mainnet-beta.solana.com"
           program-multisig: ${{ secrets.MULTISIG }}
           program-id: ${{ env.PROGRAM_ID }}
           buffer: ${{ steps.buffer-deploy.outputs.buffer }}
