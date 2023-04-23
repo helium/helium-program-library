@@ -47,10 +47,6 @@ pub mod helium_sub_daos {
     track_dc_burn_v0::handler(ctx, args)
   }
 
-  pub fn repair_delegation_v0(ctx: Context<RepairDelegationV0>) -> Result<()> {
-    repair_delegation_v0::handler(ctx)
-  }
-
   pub fn calculate_utility_score_v0(
     ctx: Context<CalculateUtilityScoreV0>,
     args: CalculateUtilityScoreArgsV0,
