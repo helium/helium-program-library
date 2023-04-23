@@ -5,7 +5,7 @@
     "build": "lerna run --parallel prebuild && tsc --build",
     "watch": "lerna run --parallel prebuild && tsc --build --watch",
     "clean": "npx shx rm -rf {.,packages/*}/{node_modules,lib,dist}",
-    "fmt": "cargo fmt",
+    "fmt": "cargo fmt --check",
     "clippy": "cargo clippy --all-targets -- -D warnings -A clippy::result_large_err -A clippy::too_many_arguments"
   },
   "workspaces": [

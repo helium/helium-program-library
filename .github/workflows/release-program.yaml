@@ -4,7 +4,7 @@ on:
   push:
     # Sequence of patterns matched against refs/tags
     tags:
-      - 'program-*' # Push events to matching program-*, i.e. program-circuit-breaker-0.0.1
+      - "program-*" # Push events to matching program-*, i.e. program-circuit-breaker-0.0.1
 
 jobs:
   release:
@@ -23,10 +23,10 @@ jobs:
         run: |
           TAG=${GITHUB_REF#refs/tags/}  # Extract tag name from ref
           echo "Tag name: $TAG"
-          PROGRAM=$(echo $TAG | cut -d'-' -f1)  # Extract program name from tag name
-          VERSION=$(echo $TAG | cut -d'-' -f3)  # Extract version from tag name
+          PROGRAM=$(echo $TAG | sed 's/program-\(.*\)-[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/\1/')
+          VERSION=$(echo $TAG | sed 's/.*-\([0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\)$/\1/')
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
-          PROGRAM_ID=$(toml get programs.localnet.${PROGRAM_NAME} | tr -d '"')
+          PROGRAM_ID=$(toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
 
           echo "Program: $PROGRAM"
           echo "Program: $PROGRAM_ID"
@@ -36,21 +36,21 @@ jobs:
       - uses: ./.github/actions/upload-bpf/
         id: buffer-deploy
         with:
-          network: mainnet-beta
+          network: https://api.mainnet-beta.solana.com
           program: ${{ env.PROGRAM_NAME }}
           keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
-          program-id: ${{ inputs.program-id }}
+          program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.MULTISIG_VAULT }}
 
       - name: Squads program upgrade
         uses: helium/squads-program-upgrade@v0.3.1
         with:
-          network-url: 'https://api.mainnet.solana.com'
+          network-url: "https://api.mainnet-beta.solana.com"
           program-multisig: ${{ secrets.MULTISIG }}
           program-id: ${{ env.PROGRAM_ID }}
           buffer: ${{ steps.buffer-deploy.outputs.buffer }}
           idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
           spill-address: ${{ secrets.DEPLOYER_ADDRESS }}
           authority: ${{ secrets.MULTISIG_VAULT }}
-          name: 'Deploy ${{env.PROGRAM_NAME}} ${{env.VERSION}}'
+          name: "Deploy ${{env.PROGRAM_NAME}} ${{env.VERSION}}"
           keypair: ${{ secrets.DEPLOYER_KEYPAIR }}

@@ -124,7 +124,7 @@ export async function run(args: any = process.argv) {
     oracleKeypair: {
       type: "string",
       describe: "Keypair of the oracle",
-      default: `${__dirname}/../keypairs/oracle.json`,
+      default: `${__dirname}/../../keypairs/oracle.json`,
     },
     aggregatorKeypair: {
       type: "string",
@@ -144,17 +144,17 @@ export async function run(args: any = process.argv) {
     queue: {
       type: "string",
       describe: "Switchbaord oracle queue",
-      default: "F8ce7MsckeZAbAGmxjJNetxYXQa9mKr9nnrC3qKubyYy",
+      default: "uPeRMdfPmrPqgRWSrjAnAkH78RqAhe5kXoW6vBYRqFX",
     },
     crank: {
       type: "string",
       describe: "Switchboard crank",
-      default: "GN9jjCy2THzZxhYqZETmPM3my8vg4R5JyNkgULddUMa5",
+      default: "UcrnK4w2HXCEjY8z6TcQ9tysYr3c9VcFLdYAU9YQP5e",
     },
     switchboardNetwork: {
       type: "string",
       describe: "The switchboard network",
-      default: "devnet",
+      default: "mainnet-beta",
     },
     decimals: {
       type: "number",
@@ -168,7 +168,7 @@ export async function run(args: any = process.argv) {
     councilKeypair: {
       type: "string",
       describe: "Keypair of gov council token",
-      default: `${__dirname}/../keypairs/council.json`,
+      default: `${__dirname}/../../keypairs/council.json`,
     },
     multisig: {
       type: "string",
@@ -208,7 +208,7 @@ export async function run(args: any = process.argv) {
 
   const wallet = loadKeypair(argv.wallet);
   const aggKeypair = await loadKeypair(
-    argv.aggregatorKeypair || `${__dirname}/../keypairs/aggregator-${name}.json`
+    argv.aggregatorKeypair || `${__dirname}/../../keypairs/aggregator-${name}.json`
   );
   const subdaoKeypair = await loadKeypair(argv.subdaoKeypair);
   const oracleKeypair = await loadKeypair(argv.oracleKeypair);
