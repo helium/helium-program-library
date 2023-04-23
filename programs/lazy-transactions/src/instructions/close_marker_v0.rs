@@ -1,7 +1,6 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
 
-
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CloseMarkerArgsV0 {
   pub index: u64,
