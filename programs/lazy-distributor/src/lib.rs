@@ -11,15 +11,6 @@ pub mod token_metadata;
 pub use instructions::*;
 pub use state::*;
 
-#[derive(Clone)]
-pub struct LazyDistributor;
-
-impl anchor_lang::Id for LazyDistributor {
-  fn id() -> Pubkey {
-    crate::id()
-  }
-}
-
 #[program]
 pub mod lazy_distributor {
   use super::*;
