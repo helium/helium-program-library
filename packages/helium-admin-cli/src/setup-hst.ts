@@ -158,8 +158,13 @@ export async function run(args: any = process.argv) {
     }
 
     const ownerActual = (await provider.connection.getTokenLargestAccounts(mint.publicKey)).value[0]?.address
-    if (ownerActual) {
+    if (ownerActual && ownerActual.toBase58() !== solAddress.toBase58()) {
       const acc = await getAccount(provider.connection, ownerActual)
+      console.log(
+        "Found diff address",
+        solAddress.toBase58(),
+        acc.owner.toBase58()
+      );
       solAddress = acc.owner
     }
 
