@@ -141,4 +141,8 @@ pub mod voter_stake_registry {
   pub fn ledger_transfer_position_v0(ctx: Context<LedgerTransferPositionV0>) -> Result<()> {
     instructions::ledger_transfer_position_v0::handler(ctx)
   }
+
+  pub fn update_registrar_authority_v0(ctx: Context<UpdateRegistrarAuthorityV0>) -> Result<()> {
+    instructions::update_registrar_authority_v0::handler(ctx)
+  }
 }

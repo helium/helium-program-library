@@ -11,6 +11,7 @@ pub use reset_lockup_v0::*;
 pub use set_time_offset_v0::*;
 pub use transfer_v0::*;
 pub use update_max_voter_weight_v0::*;
+pub use update_registrar_authority_v0::*;
 pub use update_voter_weight_record_v0::*;
 pub use withdraw_v0::*;
 
@@ -27,5 +28,6 @@ pub mod reset_lockup_v0;
 pub mod set_time_offset_v0;
 pub mod transfer_v0;
 pub mod update_max_voter_weight_v0;
+pub mod update_registrar_authority_v0;
 pub mod update_voter_weight_record_v0;
 pub mod withdraw_v0;
