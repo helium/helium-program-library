@@ -16,9 +16,6 @@ jobs:
       - name: Install toml-cli
         run: cargo install toml-cli
 
-      - name: Build Anchor
-        uses: ./.github/actions/build-anchor/
-
       - name: Set tag information
         run: |
           TAG=${GITHUB_REF#refs/tags/}  # Extract tag name from ref
