@@ -32,7 +32,7 @@ runs:
       id: cache-cargo-deps-builds
       with:
         path: |
-          ./deps/metaplex-program-library
+          ./deps/metaplex-program-brary
           ./deps/solana-program-library
           ./deps/helium-voter-stake-registry
           ./deps/clockwork
@@ -45,8 +45,8 @@ runs:
       id: cache-anchor-build
       with:
         path: |
-          ./target
-        key: deps-${{ runner.os }}-build-${{ inputs.devnet }}-${{ inputs.testing }}-${{ hashFiles('./programs/**/*') }}
+          ./target/
+        key: deps-${{ runner.os }}-build-${{ inputs.devnet }}-${{ inputs.testing }}-${{ hashFiles('./programs/**/**') }}
     - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/anchor build ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
       if: steps.cache-anchor-build.outputs.cache-hit != 'true'
       shell: bash

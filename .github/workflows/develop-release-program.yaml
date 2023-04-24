@@ -6,69 +6,6 @@ on:
       - develop
 
 jobs:
-  build:
-    name: Build Anchor
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: ./.github/actions/build-anchor/
-        with:
-          devnet: true
-  build_programs:
-    needs: [detect_changed_programs, build]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        program: ${{ fromJson(needs.detect_changed_programs.outputs.programs_with_changes) }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set devnet lazy signer
-        run: |
-          find programs -type f -name '*.rs' -exec sed -i "s/b\"nJWGUMOK\"/b\"devnethelium5\"/g" {} \;
-
-      - uses: ./.github/actions/build-anchor/
-        with:
-          devnet: true
-  
-      - name: Install toml-cli
-        if: steps.cache-toml.outputs.cache-hit != 'true'
-        run: cargo install toml-cli
-
-      - name: Set program information
-        run: |
-          PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
-          PROGRAM_ID=$(toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
-          echo "Program: $PROGRAM_ID"
-          echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
-          echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
-        env:
-          PROGRAM: ${{ matrix.program }}
-
-      - uses: ./.github/actions/upload-bpf/
-        id: buffer-deploy
-        with:
-          network: devnet
-          program: ${{ env.PROGRAM_NAME }}
-          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
-          program-id: ${{ env.PROGRAM_ID }}
-          buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
-
-      - name: Squads program upgrade
-        uses: helium/squads-program-upgrade@v0.3.1
-        with:
-          network-url: 'https://api.devnet.solana.com'
-          program-multisig: ${{ secrets.DEVNET_MULTISIG }}
-          program-id: ${{ env.PROGRAM_ID }}
-          buffer: ${{ steps.buffer-deploy.outputs.buffer }}
-          idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
-          spill-address: ${{ secrets.DEVNET_DEPLOYER_ADDRESS }}
-          authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
-          name: 'Deploy ${{ matrix.program }}'
-          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
-
   detect_changed_programs:
     runs-on: ubuntu-latest
     outputs:
@@ -89,3 +26,54 @@ jobs:
           json="[$(printf "'%s'", "${changed_programs[@]}" | sed 's/,$//')]"
           echo $json
           echo "programs_with_changes=$json" >> $GITHUB_OUTPUT
+  build_programs:
+    needs: [detect_changed_programs]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        program: ${{ fromJson(needs.detect_changed_programs.outputs.programs_with_changes) }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set devnet lazy signer
+        run: |
+          find programs -type f -name '*.rs' -exec sed -i "s/b\"nJWGUMOK\"/b\"devnethelium5\"/g" {} \;
+
+      - name: Install toml-cli
+        if: steps.cache-toml.outputs.cache-hit != 'true'
+        run: cargo install toml-cli
+
+      - name: Set program information
+        run: |
+          PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
+          PROGRAM_ID=$(toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
+          echo "Program: $PROGRAM_ID"
+          echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
+          echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
+        env:
+          PROGRAM: ${{ matrix.program }}
+
+      - uses: ./.github/actions/upload-bpf/
+        id: buffer-deploy
+        with:
+          devnet: true
+          network: devnet
+          program: ${{ env.PROGRAM_NAME }}
+          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
+          program-id: ${{ env.PROGRAM_ID }}
+          buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
+
+      - name: Squads program upgrade
+        uses: helium/squads-program-upgrade@v0.3.1
+        with:
+          network-url: "https://api.devnet.solana.com"
+          program-multisig: ${{ secrets.DEVNET_MULTISIG }}
+          program-id: ${{ env.PROGRAM_ID }}
+          buffer: ${{ steps.buffer-deploy.outputs.buffer }}
+          idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
+          spill-address: ${{ secrets.DEVNET_DEPLOYER_ADDRESS }}
+          authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
+          name: "Deploy ${{ matrix.program }}"
+          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
