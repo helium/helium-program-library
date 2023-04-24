@@ -6,5 +6,6 @@ exclude = [
   "deps/metaplex-program-library/bubblegum/program", 
   "deps/metaplex-program-library/token-metadata/program",
   "utils/ecc-sig-verifier",
-  "utils/migration-tx-executor"
+  "utils/migration-tx-executor",
+  "utils/vehnt"
 ]

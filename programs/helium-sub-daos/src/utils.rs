@@ -344,25 +344,28 @@ pub fn caclulate_vhnt_info(
     // When we do this, we're overcorrecting because the fall rate (corrected to post-genesis)
     // is also taking off vehnt for the time period between closing info start and genesis end.
     // So add that fall rate back in.
-    genesis_end_vehnt_correction = position
-      .voting_power_precise(voting_mint_config, genesis_end_epoch_start_ts)?
-      .checked_sub(vehnt_at_genesis_end_exact)
-      .unwrap()
-      // Correction factor
-      .checked_sub(
-        post_genesis_end_fall_rate
-          .checked_mul(
-            u128::try_from(
-              position
-                .genesis_end
-                .checked_sub(genesis_end_epoch_start_ts)
-                .unwrap(),
+    // Only do this if the genesis end isn't the same as the position end
+    if post_genesis_end_fall_rate > 0 {
+      genesis_end_vehnt_correction = position
+        .voting_power_precise(voting_mint_config, genesis_end_epoch_start_ts)?
+        .checked_sub(vehnt_at_genesis_end_exact)
+        .unwrap()
+        // Correction factor
+        .checked_sub(
+          post_genesis_end_fall_rate
+            .checked_mul(
+              u128::try_from(
+                position
+                  .genesis_end
+                  .checked_sub(genesis_end_epoch_start_ts)
+                  .unwrap(),
+              )
+              .unwrap(),
             )
             .unwrap(),
-          )
-          .unwrap(),
-      )
-      .unwrap();
+        )
+        .unwrap();
+    }
   }
 
   let mut end_fall_rate_correction = 0;
