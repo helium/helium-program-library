@@ -716,8 +716,8 @@ export async function sendInstructionsOrSquads({
   }
 
   await squads.activateTransaction(tx.publicKey);
+  await squads.approveTransaction(tx.publicKey);
   if (executeTransaction) {
-    await squads.approveTransaction(tx.publicKey);
     const ix = await squads.buildExecuteTransaction(
       tx.publicKey,
       provider.wallet.publicKey
