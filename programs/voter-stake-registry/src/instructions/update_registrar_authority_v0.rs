@@ -6,6 +6,7 @@ use spl_governance::state::realm;
 #[instruction()]
 pub struct UpdateRegistrarAuthorityV0<'info> {
   #[account(
+    mut,
     seeds = [realm.key().as_ref(), b"registrar".as_ref(), registrar.realm_governing_token_mint.key().as_ref()],
     bump,
     has_one = realm,
