@@ -1,4 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
+import { idlAddress } from "@coral-xyz/anchor/dist/cjs/idl";
 import {
   createAtaAndMintInstructions,
   createMintInstructions,
@@ -11,6 +12,7 @@ import {
 } from "@metaplex-foundation/mpl-token-metadata";
 import {
   AccountMetaData,
+  BPF_UPGRADE_LOADER_ID,
   getGovernanceProgramVersion,
   getProposalTransactionAddress,
   getTokenOwnerRecordAddress,
@@ -48,6 +50,7 @@ import {
   PublicKey,
   Signer,
   SYSVAR_CLOCK_PUBKEY,
+  SYSVAR_RENT_PUBKEY,
   TransactionInstruction,
   TransactionMessage,
   VersionedTransaction,
@@ -66,6 +69,42 @@ import fetch from "node-fetch";
 
 const SECONDS_PER_DAY = 86400;
 
+export async function createIdlUpgradeInstruction(
+  programId: PublicKey,
+  bufferAddress: PublicKey,
+  upgradeAuthority: PublicKey
+) {
+  const prefix = Buffer.from("0a69e9a778bcf440", "hex");
+  const ixn = Buffer.from("03", "hex");
+  const data = Buffer.concat([prefix.reverse(), ixn]);
+  const idlAddr = await idlAddress(programId);
+
+  const keys = [
+    {
+      pubkey: bufferAddress,
+      isWritable: true,
+      isSigner: false,
+    },
+    {
+      pubkey: idlAddr,
+      isWritable: true,
+      isSigner: false,
+    },
+    {
+      pubkey: upgradeAuthority,
+      isWritable: true,
+      isSigner: true,
+    },
+  ];
+
+  return new TransactionInstruction({
+    keys,
+    programId,
+    data,
+  });
+}
+
+
 export const getTimestampFromDays = (days: number) => days * SECONDS_PER_DAY;
 
 export const getUnixTimestamp = async (
@@ -81,6 +120,21 @@ export async function exists(
   account: PublicKey
 ): Promise<boolean> {
   return Boolean(await connection.getAccountInfo(account));
+}
+
+
+async function withRetries<A>(
+  tries: number,
+  input: () => Promise<A>
+): Promise<A> {
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await input();
+    } catch (e) {
+      console.log(`Retrying ${i}...`, e);
+    }
+  }
+  throw new Error("Failed after retries");
 }
 
 export async function createAndMint({
@@ -640,6 +694,54 @@ export async function createSwitchboardAggregator({
   return aggKeypair.publicKey;
 }
 
+export async function createCloseBufferInstruction(
+  programId: PublicKey,
+  bufferAddress: PublicKey,
+  upgradeAuthority: PublicKey,
+  recipientAddress: PublicKey
+) {
+  const bpfUpgradableLoaderId = BPF_UPGRADE_LOADER_ID;
+
+  const [programDataAddress] = await PublicKey.findProgramAddress(
+    [programId.toBuffer()],
+    bpfUpgradableLoaderId
+  );
+
+  const keys = [
+    {
+      pubkey: bufferAddress,
+      isWritable: true,
+      isSigner: false,
+    },
+    {
+      pubkey: recipientAddress,
+      isWritable: true,
+      isSigner: false,
+    },
+    {
+      pubkey: upgradeAuthority,
+      isWritable: false,
+      isSigner: true,
+    },
+    {
+      pubkey: programDataAddress,
+      isWritable: false,
+      isSigner: false,
+    },
+    {
+      pubkey: SYSVAR_RENT_PUBKEY,
+      isWritable: false,
+      isSigner: false,
+    },
+  ];
+
+  return new TransactionInstruction({
+    keys,
+    programId: bpfUpgradableLoaderId,
+    data: Buffer.from([5, 0, 0, 0]), // Upgrade instruction bincode
+  });
+}
+
 export async function sendInstructionsOrSquads({
   provider,
   instructions,
@@ -712,11 +814,11 @@ export async function sendInstructionsOrSquads({
 
   const tx = await squads.createTransaction(multisig, authorityIndex);
   for (const ix of instructions.filter(ix => !ix.programId.equals(ComputeBudgetProgram.programId))) {
-    await squads.addInstruction(tx.publicKey, ix);
+    await withRetries(3, async () => await squads.addInstruction(tx.publicKey, ix));
   }
 
-  await squads.activateTransaction(tx.publicKey);
-  await squads.approveTransaction(tx.publicKey);
+  await withRetries(3, async () => await squads.activateTransaction(tx.publicKey));
+  await withRetries(3, async () => await squads.approveTransaction(tx.publicKey));
   if (executeTransaction) {
     const ix = await squads.buildExecuteTransaction(
       tx.publicKey,
