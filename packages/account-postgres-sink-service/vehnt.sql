@@ -107,10 +107,10 @@ SELECT
   mint,
   delegations,
   current_ts,
-  real_ve_tokens,
-  approx_ve_tokens,
-  real_fall_rate,
-  approx_fall_rate,
+    real_ve_tokens * 1000000000000 as real_ve_tokens,
+    approx_ve_tokens * 1000000000000 as approx_ve_tokens,
+    real_fall_rate * 1000000000000 as real_fall_rate,
+    approx_fall_rate * 1000000000000 as approx_fall_rate,
   approx_fall_rate - real_fall_rate as fall_rate_diff,
   approx_ve_tokens - real_ve_tokens as ve_tokens_diff
 FROM subdao_delegations;
