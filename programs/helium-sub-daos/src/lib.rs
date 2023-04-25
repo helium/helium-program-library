@@ -17,7 +17,6 @@ pub use utils::*;
 pub mod helium_sub_daos {
   use super::*;
 
-  // trigger build
   pub fn initialize_dao_v0(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Result<()> {
     initialize_dao_v0::handler(ctx, args)
   }
