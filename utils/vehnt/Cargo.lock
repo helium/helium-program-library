@@ -245,6 +245,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "anchor-client"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "582dd4960f08a340a91ebe3cac5431338cfd2d2ccfa6520dcc8f2036a86f5125"
+dependencies = [
+ "anchor-lang",
+ "anyhow",
+ "regex",
+ "serde",
+ "solana-account-decoder",
+ "solana-client",
+ "solana-sdk",
+ "thiserror",
+ "url",
+]
+
+[[package]]
 name = "anchor-derive-accounts"
 version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6159,6 +6176,7 @@ name = "vehnt"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
+ "anchor-client",
  "anchor-lang",
  "anyhow",
  "base64 0.13.1",

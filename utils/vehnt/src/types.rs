@@ -8,17 +8,17 @@ pub const MOBILE_SUBDAO: &str = "Gm9xDCJawDEKDrrQW6haw94gABaYzQwCq4ZQU8h8bd22";
 
 #[derive(Debug)]
 pub enum SubDao {
-    Iot,
-    Mobile,
+  Iot,
+  Mobile,
 }
 
 impl TryFrom<Pubkey> for SubDao {
-    type Error = super::error::Error;
-    fn try_from(pubkey: Pubkey) -> MyResult<Self> {
-        match pubkey.to_string().as_str() {
-            IOT_SUBDAO => Ok(SubDao::Iot),
-            MOBILE_SUBDAO => Ok(SubDao::Mobile),
-            _ => Err(Self::Error::InvalidSubDao(pubkey)),
-        }
+  type Error = super::error::Error;
+  fn try_from(pubkey: Pubkey) -> MyResult<Self> {
+    match pubkey.to_string().as_str() {
+      IOT_SUBDAO => Ok(SubDao::Iot),
+      MOBILE_SUBDAO => Ok(SubDao::Mobile),
+      _ => Err(Self::Error::InvalidSubDao(pubkey)),
     }
+  }
 }

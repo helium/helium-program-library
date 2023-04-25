@@ -1,7 +1,13 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+  cell::RefCell,
+  collections::{HashMap, HashSet},
+  rc::Rc,
+};
+
+use crate::cli::epoch_info::get_sub_dao_epoch_infos;
 
 use super::*;
-use serde::Deserialize;
+use anchor_client::{Client, Cluster};
 
 use solana_account_decoder::UiAccountEncoding;
 use solana_client::{
@@ -10,22 +16,25 @@ use solana_client::{
   rpc_filter::{Memcmp, RpcFilterType},
 };
 
-use solana_sdk::pubkey::Pubkey;
-
-pub struct ReadablePosition {
-  pub address: String,
-  pub ve_tokens: Decimal,
-}
+use solana_sdk::{
+  pubkey::Pubkey,
+  signature::{read_keypair_file, Keypair},
+};
 
 #[derive(Debug, Clone, clap::Args)]
 /// Fetches all delegated positions and total HNT, veHNT, and subDAO delegations.
 pub struct Delegated {
   #[arg(short, long)]
   pub curr_ts: i64,
+  #[arg(short, long)]
+  pub keypair: String,
 }
 
 use anchor_lang::prelude::*;
-use helium_sub_daos::{caclulate_vhnt_info, DelegatedPositionV0, PrecisePosition, SubDaoV0};
+use helium_sub_daos::{
+  accounts::TempUpdateSubDaoEpochInfo, caclulate_vhnt_info, current_epoch, DelegatedPositionV0,
+  PrecisePosition, SubDaoEpochInfoV0, SubDaoV0, TempUpdateSubDaoEpochInfoArgs,
+};
 
 #[allow(unused)]
 /// This function can be used when a single query is too big
@@ -64,86 +73,16 @@ async fn get_accounts_with_prefix(
   Ok(accounts)
 }
 
-#[derive(Deserialize, Debug)]
-#[allow(unused)]
-struct PositionInfo {
-  pub name: String,
-  pub description: String,
-  pub image: String,
-  pub attributes: Vec<Attribute>,
-}
-
-#[derive(Debug)]
-struct Info {
-  start_ts: usize,
-  end_ts: usize,
-  kind: String,
-}
-use rust_decimal::{prelude::ToPrimitive, Decimal};
-
-impl Info {
-  fn get_multiple(&self) -> Decimal {
-    let stake_seconds = self.end_ts - self.start_ts;
-    let stake_days = stake_seconds / (60 * 60 * 24);
-    Decimal::from(stake_days * 100 * 3) / Decimal::from(1460)
-  }
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
-#[serde(tag = "trait_type", content = "value")]
-/// Helper type for deserializing data from https://positions.nft.helium.io
-enum Attribute {
-  Registrar(String),
-  AmountDepositedNative(String),
-  AmountDeposited(String),
-  VotingMintConfigIdx(usize),
-  VotingMint(String),
-  StartTs(String),
-  EndTs(String),
-  Kind(String),
-  GenesisEnd(String),
-  NumActiveVotes(usize),
-}
-
-/// Uses https://positions.nft.helium.io to get details about the position
-async fn get_position_info(position: &Position) -> MyResult<Info> {
-  let url = format!(
-    "https://positions.nft.helium.io/{}",
-    position.mint.to_string()
-  );
-  let mut response = reqwest::get(&url).await;
-  while response.is_err() {
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-    response = reqwest::get(&url).await;
-  }
-  let position_info: PositionInfo = response?.json().await?;
-  let mut info = Info {
-    start_ts: 0,
-    end_ts: 0,
-    kind: "".to_string(),
-  };
-  for attribute in position_info.attributes {
-    match attribute {
-      Attribute::StartTs(s) => info.start_ts = s.parse::<usize>()?,
-      Attribute::EndTs(s) => info.end_ts = s.parse::<usize>()?,
-      Attribute::Kind(s) => info.kind = s,
-      _ => (),
-    }
-  }
-  //TODO: check if any of the fields above are still default
-  Ok(info)
-}
-
 pub struct FullPosition {
   pub position_key: Pubkey,
   pub delegated_position_key: Pubkey,
   pub position: PositionV0,
   pub delegated_position: DelegatedPositionV0,
 }
+
 const BATCH_SIZE: usize = 100;
 impl Delegated {
-  pub async fn run(self, rpc_client: RpcClient) -> MyResult {
+  pub async fn run(self, rpc_client: RpcClient, solana_url: String) -> MyResult {
     let mut total_hnt = 0_u64;
     let mut total_vehnt = 0_u128;
     let mut mobile_vehnt = 0_u128;
@@ -152,7 +91,7 @@ impl Delegated {
     let mut mobile_fall_rate = 0_u128;
 
     let mut curr_ts = self.curr_ts;
-    
+
     println!("Current ts: {}", curr_ts);
     let accounts = get_stake_accounts(&rpc_client).await?;
     let delegated_positions = accounts
@@ -218,16 +157,88 @@ impl Delegated {
       .await?;
     let mobile_sub_dao = SubDaoV0::try_deserialize(&mut mobile_sub_dao_raw.data.as_slice())?;
 
+    let infos = get_sub_dao_epoch_infos(&rpc_client).await.unwrap();
+    let mut epoch_infos_by_subdao_and_epoch: HashMap<
+      Pubkey,
+      HashMap<u64, (Pubkey, SubDaoEpochInfoV0)>,
+    > = HashMap::new();
+    epoch_infos_by_subdao_and_epoch.insert(Pubkey::from_str(IOT_SUBDAO).unwrap(), HashMap::new());
+    epoch_infos_by_subdao_and_epoch
+      .insert(Pubkey::from_str(MOBILE_SUBDAO).unwrap(), HashMap::new());
+    for info in infos {
+      epoch_infos_by_subdao_and_epoch
+        .get_mut(&info.1.sub_dao)
+        .unwrap()
+        .insert(info.1.epoch, info);
+    }
+    let mut new_epoch_infos_by_subdao_and_epoch: HashMap<
+      Pubkey,
+      HashMap<u64, (Pubkey, SubDaoEpochInfoV0)>,
+    > = HashMap::new();
+    new_epoch_infos_by_subdao_and_epoch
+      .insert(Pubkey::from_str(IOT_SUBDAO).unwrap(), HashMap::new());
+    new_epoch_infos_by_subdao_and_epoch
+      .insert(Pubkey::from_str(MOBILE_SUBDAO).unwrap(), HashMap::new());
+
     println!("Total accounts {}", positions_with_delegations.len());
     for position in positions_with_delegations {
       let vehnt_info = caclulate_vhnt_info(curr_ts, &position.position, &voting_mint_config)?;
       let vehnt = position
         .position
         .voting_power_precise(&voting_mint_config, curr_ts)?;
-      if vehnt == 0 && vehnt_info.pre_genesis_end_fall_rate > 0 {
-        println!("0 position with {:?} {}", vehnt_info, position.position_key);
-      }
+
       total_vehnt += vehnt;
+      let epoch_infos_by_epoch = epoch_infos_by_subdao_and_epoch
+        .get_mut(&position.delegated_position.sub_dao)
+        .unwrap();
+      let new_epoch_infos_by_epoch = new_epoch_infos_by_subdao_and_epoch
+        .get_mut(&position.delegated_position.sub_dao)
+        .unwrap();
+      let end_epoch = current_epoch(position.position.lockup.end_ts);
+      let genesis_end_epoch = current_epoch(position.position.genesis_end);
+
+      // Initialize a new epoch info from the existing one if it hasn't been already
+      {
+        let has_new_epoch_info = new_epoch_infos_by_epoch.contains_key(&end_epoch);
+        let end_epoch_info = epoch_infos_by_epoch.get_mut(&end_epoch).unwrap();
+
+        if !has_new_epoch_info {
+          let mut new = end_epoch_info.clone();
+          new.1.vehnt_in_closing_positions = 0;
+          new.1.fall_rates_from_closing_positions = 0;
+          new_epoch_infos_by_epoch.insert(end_epoch, new);
+        }
+      }
+      {
+        let has_new_epoch_info = new_epoch_infos_by_epoch.contains_key(&genesis_end_epoch);
+        let genesis_end_epoch_info = epoch_infos_by_epoch.get_mut(&genesis_end_epoch).unwrap();
+        if !has_new_epoch_info {
+          let mut new = genesis_end_epoch_info.clone();
+          new.1.vehnt_in_closing_positions = 0;
+          new.1.fall_rates_from_closing_positions = 0;
+          new_epoch_infos_by_epoch.insert(genesis_end_epoch, new);
+        }
+      }
+
+      // Apply corrections
+      {
+        let mut new_end_epoch_info = new_epoch_infos_by_epoch.get_mut(&end_epoch).unwrap();
+        new_end_epoch_info.1.fall_rates_from_closing_positions +=
+          vehnt_info.end_fall_rate_correction;
+        new_end_epoch_info.1.vehnt_in_closing_positions += vehnt_info.end_vehnt_correction;
+      }
+      {
+        let mut new_genesis_end_epoch_info = new_epoch_infos_by_epoch
+          .get_mut(&genesis_end_epoch)
+          .unwrap();
+
+        new_genesis_end_epoch_info
+          .1
+          .fall_rates_from_closing_positions += vehnt_info.genesis_end_fall_rate_correction;
+        new_genesis_end_epoch_info.1.vehnt_in_closing_positions +=
+          vehnt_info.genesis_end_vehnt_correction;
+      }
+
       match SubDao::try_from(position.delegated_position.sub_dao).unwrap() {
         SubDao::Mobile => {
           mobile_vehnt += vehnt;
@@ -240,6 +251,77 @@ impl Delegated {
       }
       total_hnt += position.delegated_position.hnt_amount
     }
+
+    let anchor_client = Client::new_with_options(
+      Cluster::Custom(
+        solana_url.clone(),
+        solana_url
+          .clone()
+          .replace("https", "wss")
+          .replace("http", "ws"),
+      ),
+      Rc::new(read_keypair_file(self.keypair).unwrap()),
+      CommitmentConfig::confirmed(),
+    );
+    let program = anchor_client
+      .program(Pubkey::from_str("hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR").unwrap());
+    for (key, value) in epoch_infos_by_subdao_and_epoch.iter() {
+      if let Some(new_value) = new_epoch_infos_by_subdao_and_epoch.get(key) {
+        for (inner_key, sub_dao_epoch_info) in value.iter() {
+          // Don't bother correcting old epochs
+          if *inner_key > current_epoch(curr_ts) {
+            if let Some(new_sub_dao_epoch_info) = new_value.get(inner_key) {
+              let has_fall_rate_diff = sub_dao_epoch_info.1.fall_rates_from_closing_positions
+                != new_sub_dao_epoch_info.1.fall_rates_from_closing_positions;
+              let has_vehnt_diff = sub_dao_epoch_info.1.vehnt_in_closing_positions
+                != new_sub_dao_epoch_info.1.vehnt_in_closing_positions;
+              if has_fall_rate_diff || has_vehnt_diff {
+                println!(
+                  "Entry for key {:?},
+                  Fall Rates: {}
+                              {}
+                  VeHNT:      {}
+                              {}
+                ",
+                  sub_dao_epoch_info.0,
+                  sub_dao_epoch_info.1.fall_rates_from_closing_positions,
+                  new_sub_dao_epoch_info.1.fall_rates_from_closing_positions,
+                  sub_dao_epoch_info.1.vehnt_in_closing_positions,
+                  new_sub_dao_epoch_info.1.vehnt_in_closing_positions
+                );
+                println!("Correcting...");
+                program
+                  .request()
+                  .args(helium_sub_daos::instruction::TempUpdateSubDaoEpochInfo {
+                    args: TempUpdateSubDaoEpochInfoArgs {
+                      fall_rates_from_closing_positions: if has_fall_rate_diff {
+                        Some(new_sub_dao_epoch_info.1.fall_rates_from_closing_positions)
+                      } else {
+                        None
+                      },
+                      vehnt_in_closing_positions: if has_vehnt_diff {
+                        Some(new_sub_dao_epoch_info.1.vehnt_in_closing_positions)
+                      } else {
+                        None
+                      },
+                    },
+                  })
+                  .accounts(TempUpdateSubDaoEpochInfo {
+                    sub_dao_epoch_info: sub_dao_epoch_info.0,
+                    authority: Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW")
+                      .unwrap(),
+                  })
+                  .send()
+                  .unwrap();
+              }
+            }
+          }
+        }
+      } else {
+        println!("Key {:?} is in epoch_infos but not in epoch_infos_new", key);
+      }
+    }
+
     println!(
       "Total HNT staked   : {} {}",
       total_hnt, iot_sub_dao.vehnt_last_calculated_ts
