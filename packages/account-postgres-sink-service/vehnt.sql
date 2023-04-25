@@ -6,17 +6,21 @@ WITH
       cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'lockupSaturationSecs' as numeric) as lockup_saturation_seconds,
       cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'maxExtraLockupVoteWeightScaledFactor' as numeric) / 1000000000 as max_extra_lockup_vote_weight_scaled_factor,
       CASE WHEN p.genesis_end > current_ts THEN cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'genesisVotePowerMultiplier' as numeric) ELSE 1 END as genesis_multiplier,
-      cast(
+      GREATEST(
+        cast(
           p.end_ts - 
           CASE WHEN lockup_kind = 'constant' THEN start_ts ELSE current_ts END
           as numeric
-        ) as seconds_remaining
+        ),
+        0
+      )
+       as seconds_remaining
     FROM (
       SELECT *,
         lockup->>'kind' as lockup_kind,
         cast(lockup->>'endTs' as numeric) as end_ts,
         cast(lockup->>'startTs' as numeric) as start_ts,
-        -- 1680892887 as current_ts
+        -- 1682373334 as current_ts
         FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)) as current_ts
       FROM positions 
     ) p
@@ -55,24 +59,25 @@ WITH
       END as fall_rate,
       start_ts,
       end_ts,
-      current_ts
+      current_ts,
+      seconds_remaining
     FROM (
       SELECT *,
         amount_deposited_native * (
-          LEAST(
+           (
+            max_extra_lockup_vote_weight_scaled_factor
+          ) * genesis_multiplier * LEAST(
             seconds_remaining / lockup_saturation_seconds,
             1
-          ) * (
-            max_extra_lockup_vote_weight_scaled_factor
-          ) * genesis_multiplier
+          )
         ) as ve_tokens,
         amount_deposited_native * (
-          LEAST(
+          (
+            max_extra_lockup_vote_weight_scaled_factor
+          ) * genesis_multiplier * LEAST(
             (end_ts - start_ts) / lockup_saturation_seconds,
             1
-          ) * (
-            max_extra_lockup_vote_weight_scaled_factor
-          ) * genesis_multiplier 
+          )
         ) as initial_ve_tokens
       FROM readable_positions
     ) a
@@ -80,6 +85,7 @@ WITH
   subdao_delegations AS (
     SELECT
       count(*) as delegations,
+      min(current_ts) as current_ts,
       sum(p.fall_rate) as real_fall_rate,
       s.vehnt_fall_rate / 1000000000000 as approx_fall_rate,
       s.dnt_mint as mint,
@@ -100,10 +106,11 @@ WITH
 SELECT 
   mint,
   delegations,
-  real_ve_tokens,
-  approx_ve_tokens,
-  real_fall_rate,
-  approx_fall_rate,
+  current_ts,
+    real_ve_tokens * 1000000000000 as real_ve_tokens,
+    approx_ve_tokens * 1000000000000 as approx_ve_tokens,
+    real_fall_rate * 1000000000000 as real_fall_rate,
+    approx_fall_rate * 1000000000000 as approx_fall_rate,
   approx_fall_rate - real_fall_rate as fall_rate_diff,
   approx_ve_tokens - real_ve_tokens as ve_tokens_diff
 FROM subdao_delegations;
