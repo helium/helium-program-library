@@ -101,6 +101,7 @@ export const upsertProgramAccounts = async ({
               account: program.coder.accounts.decode(type, account.data),
             };
           } catch (_e) {
+            console.error(`Decode error ${pubkey.toBase58()}`, _e)
             return null;
           }
         })
@@ -155,6 +156,7 @@ export const upsertProgramAccounts = async ({
         await t.commit();
       } catch (err) {
         await t.rollback();
+        console.error("While inserting, err", err)
         throw err;
       }
     } else {

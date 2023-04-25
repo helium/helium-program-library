@@ -127,25 +127,27 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   update_subdao_vehnt(sub_dao, &mut ctx.accounts.sub_dao_epoch_info, curr_ts)?;
 
   // Update the ending epochs with this new info
-  ctx
-    .accounts
-    .closing_time_sub_dao_epoch_info
-    .fall_rates_from_closing_positions = ctx
-    .accounts
-    .closing_time_sub_dao_epoch_info
-    .fall_rates_from_closing_positions
-    .checked_sub(end_fall_rate_correction)
-    .unwrap();
+  if ctx.accounts.closing_time_sub_dao_epoch_info.end_ts() >= curr_ts {
+    ctx
+      .accounts
+      .closing_time_sub_dao_epoch_info
+      .fall_rates_from_closing_positions = ctx
+      .accounts
+      .closing_time_sub_dao_epoch_info
+      .fall_rates_from_closing_positions
+      .checked_sub(end_fall_rate_correction)
+      .unwrap();
 
-  ctx
-    .accounts
-    .closing_time_sub_dao_epoch_info
-    .vehnt_in_closing_positions = ctx
-    .accounts
-    .closing_time_sub_dao_epoch_info
-    .vehnt_in_closing_positions
-    .checked_sub(end_vehnt_correction)
-    .unwrap();
+    ctx
+      .accounts
+      .closing_time_sub_dao_epoch_info
+      .vehnt_in_closing_positions = ctx
+      .accounts
+      .closing_time_sub_dao_epoch_info
+      .vehnt_in_closing_positions
+      .checked_sub(end_vehnt_correction)
+      .unwrap();
+  }
 
   // Closing time and genesis end can be the same account
   let mut parsed: Account<SubDaoEpochInfoV0>;
@@ -162,14 +164,18 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
     )?;
     &mut parsed
   };
-  genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions = genesis_end_sub_dao_epoch_info
-    .fall_rates_from_closing_positions
-    .checked_sub(genesis_end_fall_rate_correction)
-    .unwrap();
 
-  genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = genesis_end_sub_dao_epoch_info
-    .vehnt_in_closing_positions
-    .saturating_sub(genesis_end_vehnt_correction);
+  if ctx.accounts.genesis_end_sub_dao_epoch_info.end_ts() >= curr_ts {
+    genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions =
+      genesis_end_sub_dao_epoch_info
+        .fall_rates_from_closing_positions
+        .checked_sub(genesis_end_fall_rate_correction)
+        .unwrap();
+
+    genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = genesis_end_sub_dao_epoch_info
+      .vehnt_in_closing_positions
+      .saturating_sub(genesis_end_vehnt_correction);
+  }
 
   if end_and_genesis_same {
     // Ensure ordering of exit is correct

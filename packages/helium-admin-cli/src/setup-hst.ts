@@ -6,6 +6,7 @@ import { fanoutKey, init, membershipVoucherKey } from "@helium/fanout-sdk";
 import { createMintInstructions, sendInstructions } from "@helium/spl-utils";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
+  getAccount,
   getAssociatedTokenAddressSync
 } from "@solana/spl-token";
 import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
@@ -141,7 +142,7 @@ export async function run(args: any = process.argv) {
     if (!account.hst || account.hst === 0 || account.hst === "0") {
       continue;
     }
-    const solAddress: PublicKey | undefined = toSolana(address);
+    let solAddress: PublicKey | undefined = toSolana(address);
     if (!solAddress) {
       throw new Error("HST Owner that doesn't have a sol address " + address);
     }
@@ -154,6 +155,17 @@ export async function run(args: any = process.argv) {
     } else {
       mint = Keypair.generate();
       fs.writeFileSync(mintPath, JSON.stringify(Array.from(mint.secretKey)));
+    }
+
+    const ownerActual = (await provider.connection.getTokenLargestAccounts(mint.publicKey)).value[0]?.address
+    if (ownerActual && ownerActual.toBase58() !== solAddress.toBase58()) {
+      const acc = await getAccount(provider.connection, ownerActual)
+      console.log(
+        "Found diff address",
+        solAddress.toBase58(),
+        acc.owner.toBase58()
+      );
+      solAddress = acc.owner
     }
 
     const [voucher] = membershipVoucherKey(mint.publicKey);
