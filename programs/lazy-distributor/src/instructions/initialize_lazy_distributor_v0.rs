@@ -53,6 +53,7 @@ pub struct InitializeLazyDistributorV0<'info> {
   pub token_program: Program<'info, Token>,
 }
 
+// Initializes a lazy distributor account
 pub fn handler(
   ctx: Context<InitializeLazyDistributorV0>,
   args: InitializeLazyDistributorArgsV0,
