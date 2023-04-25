@@ -763,7 +763,7 @@ export async function sendInstructionsOrSquads({
   idlErrors?: Map<number, string>;
   squads: Squads;
   multisig?: PublicKey;
-  authorityIndex: number;
+  authorityIndex?: number;
 }): Promise<string> {
   if (!multisig) {
     return await sendInstructions(
