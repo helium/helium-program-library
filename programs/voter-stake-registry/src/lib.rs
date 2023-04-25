@@ -108,10 +108,6 @@ pub mod voter_stake_registry {
     instructions::reset_lockup_v0::handler(ctx, args)
   }
 
-  pub fn repair_position_v0(ctx: Context<RepairPositionV0>) -> Result<()> {
-    instructions::repair_position_v0::handler(ctx)
-  }
-
   pub fn transfer_v0(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
     instructions::transfer_v0::handler(ctx, args)
   }
