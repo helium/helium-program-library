@@ -127,7 +127,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   update_subdao_vehnt(sub_dao, &mut ctx.accounts.sub_dao_epoch_info, curr_ts)?;
 
   // Update the ending epochs with this new info
-  if ctx.accounts.closing_time_sub_dao_epoch_info.end_ts() >= curr_ts {
+  if ctx.accounts.closing_time_sub_dao_epoch_info.epoch > curr_epoch {
     ctx
       .accounts
       .closing_time_sub_dao_epoch_info
