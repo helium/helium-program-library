@@ -119,17 +119,21 @@ export async function run(args: any = process.argv) {
       cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'lockupSaturationSecs' as numeric) as lockup_saturation_seconds,
       cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'maxExtraLockupVoteWeightScaledFactor' as numeric) / 1000000000 as max_extra_lockup_vote_weight_scaled_factor,
       CASE WHEN p.genesis_end > current_ts THEN cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'genesisVotePowerMultiplier' as numeric) ELSE 1 END as genesis_multiplier,
-      cast(
+      GREATEST(
+        cast(
           p.end_ts - 
           CASE WHEN lockup_kind = 'constant' THEN start_ts ELSE current_ts END
           as numeric
-        ) as seconds_remaining
+        ),
+        0
+      )
+       as seconds_remaining
     FROM (
       SELECT *,
         lockup->>'kind' as lockup_kind,
         cast(lockup->>'endTs' as numeric) as end_ts,
         cast(lockup->>'startTs' as numeric) as start_ts,
-        -- 1680892887 as current_ts
+        -- 1682373334 as current_ts
         FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)) as current_ts
       FROM positions 
     ) p
@@ -168,24 +172,25 @@ export async function run(args: any = process.argv) {
       END as fall_rate,
       start_ts,
       end_ts,
-      current_ts
+      current_ts,
+      seconds_remaining
     FROM (
       SELECT *,
         amount_deposited_native * (
-          LEAST(
+           (
+            max_extra_lockup_vote_weight_scaled_factor
+          ) * genesis_multiplier * LEAST(
             seconds_remaining / lockup_saturation_seconds,
             1
-          ) * (
-            max_extra_lockup_vote_weight_scaled_factor
-          ) * genesis_multiplier
+          )
         ) as ve_tokens,
         amount_deposited_native * (
-          LEAST(
+          (
+            max_extra_lockup_vote_weight_scaled_factor
+          ) * genesis_multiplier * LEAST(
             (end_ts - start_ts) / lockup_saturation_seconds,
             1
-          ) * (
-            max_extra_lockup_vote_weight_scaled_factor
-          ) * genesis_multiplier 
+          )
         ) as initial_ve_tokens
       FROM readable_positions
     ) a
@@ -209,6 +214,7 @@ export async function run(args: any = process.argv) {
     FROM positions_with_vehnt p
     JOIN delegated_positions d on d.position = p.address
     JOIN sub_daos s on s.address = d.sub_dao
+    WHERE end_ts > (current_ts + 60 * 60 * 24)
     GROUP BY s.dnt_mint, s.vehnt_fall_rate, s.vehnt_delegated, s.vehnt_last_calculated_ts, s.vehnt_last_calculated_ts
   )
   SELECT 
