@@ -65,26 +65,29 @@ export async function getMigrateTransactions(
           proofPath.length - (canopyHeight || 0)
         );
 
+        const ixn = createTransferInstruction(
+          {
+            treeAuthority,
+            leafOwner: asset.ownership.owner,
+            leafDelegate,
+            newLeafOwner: to,
+            merkleTree,
+            logWrapper: SPL_NOOP_PROGRAM_ID,
+            compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+            anchorRemainingAccounts,
+          },
+          {
+            root: [...proof.root.toBuffer()],
+            dataHash: [...asset.compression.dataHash!],
+            creatorHash: [...asset.compression.creatorHash!],
+            nonce: asset.compression.leafId!,
+            index: asset.compression.leafId!,
+          }
+        );
+        // Hack: Metaplex has a bug, this should be a signer.
+        ixn.keys[1].isSigner = true
         transferAssetIxns.push(
-          createTransferInstruction(
-            {
-              treeAuthority,
-              leafOwner: asset.ownership.owner,
-              leafDelegate,
-              newLeafOwner: to,
-              merkleTree,
-              logWrapper: SPL_NOOP_PROGRAM_ID,
-              compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-              anchorRemainingAccounts,
-            },
-            {
-              root: [...proof.root.toBuffer()],
-              dataHash: [...asset.compression.dataHash!],
-              creatorHash: [...asset.compression.creatorHash!],
-              nonce: asset.compression.leafId!,
-              index: asset.compression.leafId!,
-            }
-          )
+          ixn
         );
       }
     } else {
