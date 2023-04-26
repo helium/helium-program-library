@@ -197,7 +197,7 @@ export async function getMigrateTransactions(
   const recentBlockhash = (await provider.connection.getLatestBlockhash())
     .blockhash;
   const transactions: Transaction[] = [];
-  for (const chunk of chunks(transferAssetIxns, 4)) {
+  for (const chunk of chunks(transferAssetIxns, 3)) {
     const tx = new Transaction({
       feePayer: provider.wallet.publicKey,
       recentBlockhash,
