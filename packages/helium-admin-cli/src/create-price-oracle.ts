@@ -79,7 +79,7 @@ export async function run(args: any = process.argv) {
 
   const priceOracleKeypair = argv.priceOracleKeypair ? await loadKeypair(argv.priceOracleKeypair) : Keypair.generate();
 
-  if (exists(provider.connection, priceOracleKeypair.publicKey)) {
+  if (await exists(provider.connection, priceOracleKeypair.publicKey)) {
     console.log("Price oracle already exists");
     return;
   }
