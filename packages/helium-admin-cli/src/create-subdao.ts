@@ -435,17 +435,20 @@ export async function run(args: any = process.argv) {
   }
 
   if (!(await exists(conn, subdao))) {
-    console.log("Initializing switchboard oracle");
-    const aggregatorKey = await createSwitchboardAggregator({
-      crank: new PublicKey(argv.crank),
-      queue: new PublicKey(argv.queue),
-      wallet,
-      provider,
-      aggKeypair,
-      url: argv.activeDeviceOracleUrl,
-      switchboardNetwork: argv.switchboardNetwork,
-      authority,
-    });
+    let aggregatorKey = new PublicKey("GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR");
+    if (!isLocalhost(provider)) {
+      console.log("Initializing switchboard oracle");
+      aggregatorKey = await createSwitchboardAggregator({
+        crank: new PublicKey(argv.crank),
+        queue: new PublicKey(argv.queue),
+        wallet,
+        provider,
+        aggKeypair,
+        url: argv.activeDeviceOracleUrl,
+        switchboardNetwork: argv.switchboardNetwork,
+        authority,
+      });
+    }
 
     console.log(`Initializing ${name} SubDAO`);
     const currentDntEmission = emissionSchedule[0];
