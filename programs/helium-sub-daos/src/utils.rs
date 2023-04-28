@@ -370,17 +370,14 @@ pub fn caclulate_vhnt_info(
 
   let mut end_fall_rate_correction = 0;
   let mut end_vehnt_correction = 0;
-
-  if position.lockup.kind != LockupKind::None {
+  if position.lockup.kind == LockupKind::Cliff {
     let end_epoch_start_ts =
       i64::try_from(current_epoch(position.lockup.end_ts)).unwrap() * EPOCH_LENGTH;
     let vehnt_at_closing_epoch_start =
       position.voting_power_precise(voting_mint_config, end_epoch_start_ts)?;
 
     end_vehnt_correction = vehnt_at_closing_epoch_start;
-    if position.lockup.kind == LockupKind::Cliff {
-      end_fall_rate_correction = post_genesis_end_fall_rate;
-    }
+    end_fall_rate_correction = post_genesis_end_fall_rate;
   }
 
   Ok(VehntInfo {
