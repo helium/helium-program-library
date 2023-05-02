@@ -18,6 +18,7 @@ const TypeMap = new Map<string, any>([
   ["i128", DataTypes.DECIMAL],
   ["u128", DataTypes.DECIMAL.UNSIGNED],
   ["bool", DataTypes.BOOLEAN],
+  ["bytes", DataTypes.BLOB],
 ]);
 
 const determineType = (type: string | object): any => {

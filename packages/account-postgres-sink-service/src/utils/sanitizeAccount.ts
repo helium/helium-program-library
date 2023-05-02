@@ -3,6 +3,7 @@ import { BN } from "bn.js";
 
 const sanitizeValue = (value: any): any => {
   if (value === "undefined" || value === null || value === "") return null;
+  if (value instanceof Buffer) return value;
   if (value instanceof PublicKey) return value.toBase58();
   if (value instanceof BN) {
     const val = value.toString();
@@ -10,7 +11,7 @@ const sanitizeValue = (value: any): any => {
       return null;
     }
 
-    return val
+    return val;
   }
   if (["string", "number", "boolean"].includes(typeof value)) return value;
   if (typeof value === "object") {
