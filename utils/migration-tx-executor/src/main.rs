@@ -73,6 +73,9 @@ struct Args {
   /// Whether to migrate all at once
   #[arg(short, long, action)]
   all: bool,
+  /// Whether to migrate all hotspots
+  #[arg(long, action)]
+  hotspots: bool,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -111,16 +114,20 @@ async fn run_transactions(
   let wallets_with_counts = match args.wallet {
     Some(wallet) => vec![WalletResponse { wallet, count: 0 }],
     None => {
-      let results = client
-        .get(format!("{}/{}", migration_url, "top-wallets").as_str())
-        .send()
-        .await
-        .unwrap()
-        .json::<Vec<WalletResponse>>()
-        .await
-        .unwrap();
+      if args.all || args.hotspots {
+        vec![]
+      } else {
+        let results = client
+          .get(format!("{}/{}", migration_url, "top-wallets").as_str())
+          .send()
+          .await
+          .unwrap()
+          .json::<Vec<WalletResponse>>()
+          .await
+          .unwrap();
 
-      results
+        results
+      }
     }
   };
 
@@ -142,6 +149,38 @@ async fn run_transactions(
     loop {
       let url = format!(
         "{}/migrate?limit={}&offset={}",
+        migration_url, limit, offset
+      );
+      println!("{}", url);
+      let response = client
+        .get(url.as_str())
+        .send()
+        .await
+        .unwrap()
+        .json::<TransactionResponse>()
+        .await
+        .unwrap();
+
+      if offset > response.count {
+        break;
+      }
+
+      let result = send_and_confirm_messages_with_spinner(
+        rpc_client.clone(),
+        &tpu_client,
+        &response.transactions,
+      );
+      if result.is_ok() {
+        offset += limit;
+      }
+      NUM_SENT.inc_by(response.transactions.len() as u64);
+    }
+  } else if args.hotspots {
+    let limit = 1000;
+    let mut offset = 0;
+    loop {
+      let url = format!(
+        "{}/migrate/hotspots?limit={}&offset={}",
         migration_url, limit, offset
       );
       println!("{}", url);
