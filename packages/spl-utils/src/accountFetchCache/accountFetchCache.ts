@@ -213,7 +213,6 @@ export class AccountFetchCache {
     const currentBatch = this.currentBatch;
     this.currentBatch = new Set(); // Erase current batch from state, so we can fetch multiple at a time
     try {
-      console.log("accountFetchCache", `Batching account fetch of ${currentBatch.size}`);
       const keys = Array.from(currentBatch);
       const array = await this.connection.getMultipleAccountsInfo(keys.map(b => new PublicKey(b)), this.commitment)
       keys.forEach((key, index) => {
@@ -276,7 +275,7 @@ export class AccountFetchCache {
     if (!pubKey) {
       return [undefined, () => {}];
     }
-    
+
     const address = id.toBase58();
 
     const data = await this.search(pubKey, parser, isStatic, forceRequery);
