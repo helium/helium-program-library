@@ -81,6 +81,7 @@ export const upsertProgramAccounts = async ({
     await model.sync({ alter: true });
 
     const respChunks = chunks(resp, 50000);
+    const now = new Date().toISOString();
     for (const [idx, chunk] of respChunks.entries()) {
       const t = await sequelize.transaction();
       const accs = chunk
@@ -99,7 +100,6 @@ export const upsertProgramAccounts = async ({
         .filter(truthy);
 
       try {
-        const now = new Date().toISOString();
         const updateOnDuplicateFields: string[] = Object.keys(accs[0].account);
         await model.bulkCreate(
           accs.map(({ publicKey, account }) => ({
