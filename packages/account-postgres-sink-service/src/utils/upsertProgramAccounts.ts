@@ -6,6 +6,7 @@ import database from "./database";
 import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { chunks } from "@helium/spl-utils";
+import { getAllAccounts } from "./getAllAccounts";
 
 export type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
 
@@ -57,32 +58,19 @@ export const upsertProgramAccounts = async ({
     console.log(e);
   }
 
+  const now = new Date().toISOString();
   for (const { type } of accounts) {
-    const filter: { offset?: number; bytes?: string; dataSize?: number } =
-      program.coder.accounts.memcmp(type, undefined);
-    const coderFilters: GetProgramAccountsFilter[] = [];
-
-    if (filter?.offset != undefined && filter?.bytes != undefined) {
-      coderFilters.push({
-        memcmp: { offset: filter.offset, bytes: filter.bytes },
-      });
-    }
-
-    if (filter?.dataSize != undefined) {
-      coderFilters.push({ dataSize: filter.dataSize });
-    }
-
-    let resp = await provider.connection.getProgramAccounts(programId, {
-      commitment: provider.connection.commitment,
-      filters: [...coderFilters],
-    });
-
     const model = sequelize.models[type];
     await model.sync({ alter: true });
 
-    const now = new Date().toISOString();
-    const respChunks = chunks(resp, 1000);
-    for (const chunk of respChunks) {
+    const accounts = await getAllAccounts({
+      provider,
+      program,
+      idlAccountType: type,
+    });
+
+    const accountsChunks = chunks(accounts, 5000);
+    for (const chunk of accountsChunks) {
       const t = await sequelize.transaction();
       const accs = chunk
         .map(({ pubkey, account }) => {
