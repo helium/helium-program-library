@@ -57,6 +57,7 @@ export const upsertProgramAccounts = async ({
     console.log(e);
   }
 
+  const now = new Date().toISOString();
   for (const { type } of accounts) {
     const filter: { offset?: number; bytes?: string; dataSize?: number } =
       program.coder.accounts.memcmp(type, undefined);
@@ -72,6 +73,7 @@ export const upsertProgramAccounts = async ({
       coderFilters.push({ dataSize: filter.dataSize });
     }
 
+    console.log(`${type}, starting ${now}`);
     let resp = await provider.connection.getProgramAccounts(programId, {
       commitment: provider.connection.commitment,
       filters: [...coderFilters],
@@ -80,8 +82,7 @@ export const upsertProgramAccounts = async ({
     const model = sequelize.models[type];
     await model.sync({ alter: true });
 
-    const now = new Date().toISOString();
-    const respChunks = chunks(resp, 1000);
+    const respChunks = chunks(resp, 10000);
     for (const chunk of respChunks) {
       const t = await sequelize.transaction();
       const accs = chunk
