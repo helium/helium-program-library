@@ -83,7 +83,7 @@ export const upsertProgramAccounts = async ({
     await model.sync({ alter: true });
 
     const respChunks = chunks(resp, 10000);
-    for (const chunk of respChunks) {
+    for (const [idx, chunk] of respChunks.entries()) {
       const t = await sequelize.transaction();
       const accs = chunk
         .map(({ pubkey, account }) => {
@@ -101,6 +101,9 @@ export const upsertProgramAccounts = async ({
         .filter(truthy);
 
       try {
+        console.log(
+          `Inserting batch ${idx + 1} of ${respChunks.length} batches`
+        );
         const updateOnDuplicateFields: string[] = Object.keys(accs[0].account);
         await model.bulkCreate(
           accs.map(({ publicKey, account }) => ({
