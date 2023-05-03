@@ -8,7 +8,7 @@ import { upsertProgramAccounts } from "./utils/upsertProgramAccounts";
 import { GLOBAL_CRON_CONFIG, PROGRAM_ACCOUNT_CONFIGS } from "./env";
 import { handleAccountWebhook } from "./utils/handleAccountWebhook";
 import database from "./utils/database";
-import { defineAllIdlModels, defineIdlModels } from "./utils/defineIdlModels";
+import { defineAllIdlModels } from "./utils/defineIdlModels";
 
 const HELIUS_AUTH_SECRET = process.env.HELIUS_AUTH_SECRET;
 if (!HELIUS_AUTH_SECRET) {
@@ -56,7 +56,6 @@ server.get("/refresh-accounts", async (req, res) => {
             console.log(err);
           }
         }
-        
       }
     }
     res.code(StatusCodes.OK).send(ReasonPhrases.OK);
@@ -111,19 +110,21 @@ server.post("/account-webhook", async (req, res) => {
 });
 
 const configs = parseConfig()!;
-const customJobs = configs["configs"].filter((x) => !!x.cron).map((x) => {
-  return {
-    cronTime: x.cron!,
-    runOnInit: false,
-    onTick: async (server: any) => {
-      try {
-        await server.inject(`/refresh-accounts?program=${x.programId}`);
-      } catch (err) {
-        console.error(err);
-      }
-    },
-  }
-});
+const customJobs = configs["configs"]
+  .filter((x) => !!x.cron)
+  .map((x) => {
+    return {
+      cronTime: x.cron!,
+      runOnInit: false,
+      onTick: async (server: any) => {
+        try {
+          await server.inject(`/refresh-accounts?program=${x.programId}`);
+        } catch (err) {
+          console.error(err);
+        }
+      },
+    };
+  });
 server.register(fastifyCron, {
   jobs: [
     {
@@ -137,7 +138,7 @@ server.register(fastifyCron, {
         }
       },
     },
-    ...customJobs
+    ...customJobs,
   ],
 });
 
@@ -145,8 +146,6 @@ const start = async () => {
   try {
     await database.sync();
     await server.listen({ port: 3000, host: "0.0.0.0" });
-    // By default, jobs are not running at startup
-    server.cron.startAllJobs();
     // models are defined on boot, and updated in refresh-accounts
     await defineAllIdlModels({
       configs: configs["configs"],
@@ -155,6 +154,8 @@ const start = async () => {
     const address = server.server.address();
     const port = typeof address === "string" ? address : address?.port;
     console.log(`Running on 0.0.0.0:${port}`);
+    // By default, jobs are not running at startup
+    server.cron.startAllJobs();
   } catch (err) {
     console.error(err);
     process.exit(1);
