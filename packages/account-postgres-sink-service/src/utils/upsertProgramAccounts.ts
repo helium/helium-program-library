@@ -5,6 +5,7 @@ import { SOLANA_URL } from "../env";
 import database from "./database";
 import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
+import { chunks } from "@helium/spl-utils";
 
 export type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
 
@@ -44,12 +45,17 @@ export const upsertProgramAccounts = async ({
   }
 
   const program = new anchor.Program(idl, programId, provider);
-  await sequelize.authenticate();
-  await defineIdlModels({
-    idl,
-    accounts,
-    sequelize,
-  });
+
+  try {
+    await sequelize.authenticate();
+    await defineIdlModels({
+      idl,
+      accounts,
+      sequelize,
+    });
+  } catch (e) {
+    console.log(e);
+  }
 
   for (const { type } of accounts) {
     const filter: { offset?: number; bytes?: string; dataSize?: number } =
@@ -71,32 +77,30 @@ export const upsertProgramAccounts = async ({
       filters: [...coderFilters],
     });
 
-    const accs = resp
-      .map(({ pubkey, account }) => {
-        // ignore accounts we cant decode
-        try {
-          return {
-            publicKey: pubkey,
-            account: program.coder.accounts.decode(type, account.data),
-          };
-        } catch (_e) {
-          console.error(`Decode error ${pubkey.toBase58()}`, _e);
-          return null;
-        }
-      })
-      .filter(truthy);
-
     const model = sequelize.models[type];
     await model.sync({ alter: true });
 
-    if (accs.length > 0) {
-      const addresses = accs.map(({ publicKey }) => publicKey.toBase58());
+    const now = new Date().toISOString();
+    const respChunks = chunks(resp, 1000);
+    for (const chunk of respChunks) {
       const t = await sequelize.transaction();
+      const accs = chunk
+        .map(({ pubkey, account }) => {
+          // ignore accounts we cant decode
+          try {
+            return {
+              publicKey: pubkey,
+              account: program.coder.accounts.decode(type, account.data),
+            };
+          } catch (_e) {
+            console.error(`Decode error ${pubkey.toBase58()}`, _e);
+            return null;
+          }
+        })
+        .filter(truthy);
 
       try {
         const updateOnDuplicateFields: string[] = Object.keys(accs[0].account);
-        const now = new Date().toISOString();
-
         await model.bulkCreate(
           accs.map(({ publicKey, account }) => ({
             address: publicKey.toBase58(),
@@ -128,11 +132,6 @@ export const upsertProgramAccounts = async ({
         console.error("While inserting, err", err);
         throw err;
       }
-    } else {
-      await model.destroy({
-        where: {},
-        truncate: true,
-      });
     }
   }
 };
