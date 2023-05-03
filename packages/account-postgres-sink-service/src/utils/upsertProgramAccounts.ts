@@ -82,7 +82,7 @@ export const upsertProgramAccounts = async ({
     const model = sequelize.models[type];
     await model.sync({ alter: true });
 
-    const respChunks = chunks(resp, 10000);
+    const respChunks = chunks(resp, 50000);
     for (const [idx, chunk] of respChunks.entries()) {
       const t = await sequelize.transaction();
       const accs = chunk
