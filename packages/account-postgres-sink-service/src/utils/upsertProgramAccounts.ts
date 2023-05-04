@@ -89,11 +89,14 @@ export const upsertProgramAccounts = async ({
         .map(({ pubkey, account }) => {
           // ignore accounts we cant decode
           try {
-            return {
-              publicKey: pubkey,
-              account: program.coder.accounts.decode(type, account.data),
-            };
+            const decodedAcc = program.coder.accounts.decode(
+              type,
+              account.data
+            );
+
+            return { publicKey: pubkey, account: decodedAcc };
           } catch (_e) {
+            console.log(`Decode error ${pubkey.toBase58()}`, _e);
             console.error(`Decode error ${pubkey.toBase58()}`, _e);
             return null;
           }
@@ -129,7 +132,7 @@ export const upsertProgramAccounts = async ({
     await model.destroy({
       where: {
         refreshed_at: {
-          [Op.ne]: now,
+          [Op.lt]: now,
         },
       },
     });
