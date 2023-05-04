@@ -96,7 +96,6 @@ export const upsertProgramAccounts = async ({
 
             return { publicKey: pubkey, account: decodedAcc };
           } catch (_e) {
-            console.log(`Decode error ${pubkey.toBase58()}`, _e);
             console.error(`Decode error ${pubkey.toBase58()}`, _e);
             return null;
           }
