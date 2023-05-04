@@ -107,6 +107,10 @@ export const heliumAddressFromSolKey = (pubKey: PublicKey) => {
 };
 
 export const heliumAddressFromSolAddress = (solAddress: string) => {
-  const pubKey = new PublicKey(solAddress);
-  return heliumAddressFromSolKey(pubKey);
+  try {
+    const pubKey = new PublicKey(solAddress);
+    return heliumAddressFromSolKey(pubKey);
+  } catch {
+    return "";
+  }
 };
