@@ -101,6 +101,7 @@ WITH
     FROM positions_with_vehnt p
     JOIN delegated_positions d on d.position = p.address
     JOIN sub_daos s on s.address = d.sub_dao
+    WHERE end_ts > (floor(current_ts / (60 * 60 * 24)) * (60 * 60 * 24)) + 60 * 60 * 24
     GROUP BY s.dnt_mint, s.vehnt_fall_rate, s.vehnt_delegated, s.vehnt_last_calculated_ts, s.vehnt_last_calculated_ts
   )
 SELECT 
