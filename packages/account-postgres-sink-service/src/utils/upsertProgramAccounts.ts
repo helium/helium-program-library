@@ -1,13 +1,15 @@
-import * as anchor from "@coral-xyz/anchor";
-import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
-import { Op, Sequelize } from "sequelize";
-import { SOLANA_URL } from "../env";
-import database from "./database";
-import { defineIdlModels } from "./defineIdlModels";
-import { sanitizeAccount } from "./sanitizeAccount";
-import { chunks } from "@helium/spl-utils";
+import * as anchor from '@coral-xyz/anchor';
+import { GetProgramAccountsFilter, PublicKey } from '@solana/web3.js';
+import { Op, Sequelize } from 'sequelize';
+import { SOLANA_URL } from '../env';
+import database from './database';
+import { defineIdlModels } from './defineIdlModels';
+import { sanitizeAccount } from './sanitizeAccount';
+import { chunks } from '@helium/spl-utils';
 
-export type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
+export type Truthy<T> = T extends false | '' | 0 | null | undefined
+  ? never
+  : T; // from lodash
 
 export const truthy = <T>(value: T): value is Truthy<T> => !!value;
 
@@ -27,7 +29,9 @@ export const upsertProgramAccounts = async ({
   sequelize = database,
 }: UpsertProgramAccountsArgs) => {
   anchor.setProvider(
-    anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
+    anchor.AnchorProvider.local(
+      process.env.ANCHOR_PROVIDER_URL || SOLANA_URL
+    )
   );
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const idl = await anchor.Program.fetchIdl(programId, provider);
@@ -41,7 +45,7 @@ export const upsertProgramAccounts = async ({
       idl.accounts!.some(({ name }) => name === type)
     )
   ) {
-    throw new Error("idl does not have every account type");
+    throw new Error('idl does not have every account type');
   }
 
   const program = new anchor.Program(idl, programId, provider);
@@ -59,8 +63,11 @@ export const upsertProgramAccounts = async ({
 
   for (const { type } of accounts) {
     try {
-      const filter: { offset?: number; bytes?: string; dataSize?: number } =
-        program.coder.accounts.memcmp(type, undefined);
+      const filter: {
+        offset?: number;
+        bytes?: string;
+        dataSize?: number;
+      } = program.coder.accounts.memcmp(type, undefined);
       const coderFilters: GetProgramAccountsFilter[] = [];
 
       if (filter?.offset != undefined && filter?.bytes != undefined) {
@@ -73,64 +80,79 @@ export const upsertProgramAccounts = async ({
         coderFilters.push({ dataSize: filter.dataSize });
       }
 
-      let resp = await provider.connection.getProgramAccounts(programId, {
-        commitment: provider.connection.commitment,
-        filters: [...coderFilters],
-      });
+      let resp = await provider.connection.getProgramAccounts(
+        programId,
+        {
+          commitment: provider.connection.commitment,
+          filters: [...coderFilters],
+        }
+      );
 
       const model = sequelize.models[type];
       await model.sync({ alter: true });
 
-      const respChunks = chunks(resp, 50000);
+      const chunkSize = 25000;
+      const parallelism = 8;
       const now = new Date().toISOString();
 
-      for (const [idx, chunk] of respChunks.entries()) {
-        const t = await sequelize.transaction();
-        const accs = chunk
-          .map(({ pubkey, account }) => {
-            // ignore accounts we cant decode
-            try {
-              const decodedAcc = program.coder.accounts.decode(
-                type,
-                account.data
-              );
+      await Promise.all(
+        chunks(chunks(resp, chunkSize), parallelism).map(
+          async (respChunks) => {
+            for (const c of respChunks) {
+              const t = await sequelize.transaction();
+              const accs = c
+                .map(({ pubkey, account }) => {
+                  // ignore accounts we cant decode
+                  try {
+                    const decodedAcc = program.coder.accounts.decode(
+                      type,
+                      account.data
+                    );
 
-              return { publicKey: pubkey, account: decodedAcc };
-            } catch (_e) {
-              console.error(`Decode error ${pubkey.toBase58()}`, _e);
-              return null;
+                    return {
+                      publicKey: pubkey,
+                      account: decodedAcc,
+                    };
+                  } catch (_e) {
+                    console.error(
+                      `Decode error ${pubkey.toBase58()}`,
+                      _e
+                    );
+                    return null;
+                  }
+                })
+                .filter(truthy);
+
+              try {
+                const updateOnDuplicateFields: string[] = Object.keys(
+                  accs[0].account
+                );
+                await model.bulkCreate(
+                  accs.map(({ publicKey, account }) => ({
+                    address: publicKey.toBase58(),
+                    refreshed_at: now,
+                    ...sanitizeAccount(account),
+                  })),
+                  {
+                    transaction: t,
+                    updateOnDuplicate: [
+                      'address',
+                      'refreshed_at',
+                      ...updateOnDuplicateFields,
+                    ],
+                  }
+                );
+
+                await t.commit();
+              } catch (err) {
+                await t.rollback();
+                console.error('While inserting, err', err);
+                throw err;
+              }
             }
-          })
-          .filter(truthy);
-
-        try {
-          const updateOnDuplicateFields: string[] = Object.keys(
-            accs[0].account
-          );
-          await model.bulkCreate(
-            accs.map(({ publicKey, account }) => ({
-              address: publicKey.toBase58(),
-              refreshed_at: now,
-              ...sanitizeAccount(account),
-            })),
-            {
-              transaction: t,
-              updateOnDuplicate: [
-                "address",
-                "refreshed_at",
-                ...updateOnDuplicateFields,
-              ],
-            }
-          );
-
-          await t.commit();
-        } catch (err) {
-          await t.rollback();
-          console.error("While inserting, err", err);
-          throw err;
-        }
-      }
-
+          }
+        )
+      );
       await model.destroy({
         where: {
           refreshed_at: {
