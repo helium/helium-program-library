@@ -82,6 +82,7 @@ export const upsertProgramAccounts = async ({
 
     const respChunks = chunks(resp, 50000);
     const now = new Date().toISOString();
+
     for (const [idx, chunk] of respChunks.entries()) {
       const t = await sequelize.transaction();
       const accs = chunk
@@ -117,15 +118,6 @@ export const upsertProgramAccounts = async ({
           }
         );
 
-        await model.destroy({
-          transaction: t,
-          where: {
-            refreshed_at: {
-              [Op.ne]: now,
-            },
-          },
-        });
-
         await t.commit();
       } catch (err) {
         await t.rollback();
@@ -133,5 +125,13 @@ export const upsertProgramAccounts = async ({
         throw err;
       }
     }
+
+    await model.destroy({
+      where: {
+        refreshed_at: {
+          [Op.ne]: now,
+        },
+      },
+    });
   }
 };
