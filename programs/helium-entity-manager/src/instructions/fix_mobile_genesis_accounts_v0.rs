@@ -5,7 +5,7 @@ use crate::MobileHotspotInfoV0;
 
 #[derive(Accounts)]
 pub struct FixMobileGenesisAccountsV0<'info> {
-  #[account(address = Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW").unwrap())]
+  #[account(address = Pubkey::from_str("had8r3DWNaxvJdJzMJVDiJykGi6GBtPhKixvvZbZAqf").unwrap())]
   pub authority: Signer<'info>,
   /// CHECK: Raw data surgery requires this
   #[account(mut)]
