@@ -1,14 +1,16 @@
-import * as anchor from "@coral-xyz/anchor";
-import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
-import { Op, Sequelize } from "sequelize";
-import { SOLANA_URL } from "../env";
-import database from "./database";
-import { defineIdlModels } from "./defineIdlModels";
-import { sanitizeAccount } from "./sanitizeAccount";
-import { chunks } from "@helium/spl-utils";
+import * as anchor from '@coral-xyz/anchor';
+import { GetProgramAccountsFilter, PublicKey } from '@solana/web3.js';
+import { Op, Sequelize } from 'sequelize';
+import { SOLANA_URL } from '../env';
+import database from './database';
+import { defineIdlModels } from './defineIdlModels';
+import { sanitizeAccount } from './sanitizeAccount';
+import { chunks } from '@helium/spl-utils';
+import model from 'sequelize/types/model';
 
-export type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
-
+export type Truthy<T> = T extends false | '' | 0 | null | undefined
+  ? never
+  : T; // from lodash
 export const truthy = <T>(value: T): value is Truthy<T> => !!value;
 
 interface UpsertProgramAccountsArgs {
@@ -27,7 +29,9 @@ export const upsertProgramAccounts = async ({
   sequelize = database,
 }: UpsertProgramAccountsArgs) => {
   anchor.setProvider(
-    anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
+    anchor.AnchorProvider.local(
+      process.env.ANCHOR_PROVIDER_URL || SOLANA_URL
+    )
   );
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const idl = await anchor.Program.fetchIdl(programId, provider);
@@ -41,7 +45,7 @@ export const upsertProgramAccounts = async ({
       idl.accounts!.some(({ name }) => name === type)
     )
   ) {
-    throw new Error("idl does not have every account type");
+    throw new Error('idl does not have every account type');
   }
 
   const program = new anchor.Program(idl, programId, provider);
@@ -58,8 +62,11 @@ export const upsertProgramAccounts = async ({
   }
 
   for (const { type } of accounts) {
-    const filter: { offset?: number; bytes?: string; dataSize?: number } =
-      program.coder.accounts.memcmp(type, undefined);
+    const filter: {
+      offset?: number;
+      bytes?: string;
+      dataSize?: number;
+    } = program.coder.accounts.memcmp(type, undefined);
     const coderFilters: GetProgramAccountsFilter[] = [];
 
     if (filter?.offset != undefined && filter?.bytes != undefined) {
@@ -72,10 +79,13 @@ export const upsertProgramAccounts = async ({
       coderFilters.push({ dataSize: filter.dataSize });
     }
 
-    let resp = await provider.connection.getProgramAccounts(programId, {
-      commitment: provider.connection.commitment,
-      filters: [...coderFilters],
-    });
+    let resp = await provider.connection.getProgramAccounts(
+      programId,
+      {
+        commitment: provider.connection.commitment,
+        filters: [...coderFilters],
+      }
+    );
 
     const model = sequelize.models[type];
     await model.sync({ alter: true });
@@ -90,7 +100,10 @@ export const upsertProgramAccounts = async ({
           try {
             return {
               publicKey: pubkey,
-              account: program.coder.accounts.decode(type, account.data),
+              account: program.coder.accounts.decode(
+                type,
+                account.data
+              ),
             };
           } catch (_e) {
             console.error(`Decode error ${pubkey.toBase58()}`, _e);
@@ -100,7 +113,9 @@ export const upsertProgramAccounts = async ({
         .filter(truthy);
 
       try {
-        const updateOnDuplicateFields: string[] = Object.keys(accs[0].account);
+        const updateOnDuplicateFields: string[] = Object.keys(
+          accs[0].account
+        );
         await model.bulkCreate(
           accs.map(({ publicKey, account }) => ({
             address: publicKey.toBase58(),
@@ -110,8 +125,8 @@ export const upsertProgramAccounts = async ({
           {
             transaction: t,
             updateOnDuplicate: [
-              "address",
-              "refreshed_at",
+              'address',
+              'refreshed_at',
               ...updateOnDuplicateFields,
             ],
           }
@@ -129,7 +144,7 @@ export const upsertProgramAccounts = async ({
         await t.commit();
       } catch (err) {
         await t.rollback();
-        console.error("While inserting, err", err);
+        console.error('While inserting, err', err);
         throw err;
       }
     }
