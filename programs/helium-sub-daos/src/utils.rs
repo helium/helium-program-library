@@ -345,7 +345,9 @@ pub fn caclulate_vhnt_info(
     // is also taking off vehnt for the time period between closing info start and genesis end.
     // So add that fall rate back in.
     // Only do this if the genesis end isn't the same as the position end
-    if post_genesis_end_fall_rate > 0 {
+    if position.lockup.kind == LockupKind::Constant
+      || position.genesis_end != position.lockup.end_ts
+    {
       genesis_end_vehnt_correction = position
         .voting_power_precise(voting_mint_config, genesis_end_epoch_start_ts)?
         .checked_sub(vehnt_at_genesis_end_exact)
