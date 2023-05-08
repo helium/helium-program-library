@@ -11,6 +11,8 @@ else
     ./scripts/init-idls.sh
 fi
 
+set -e
+
 
 # create keypairs if they don't exist
 KEYPAIRS=( 'aggregator-IOT.json' 'aggregator-MOBILE.json' 'hnt-price-oracle.json' 'hnt.json' 'hst.json' 'dc.json' 'mobile.json' 'iot.json' 'council.json' 'aggregator-IOT.json' 'aggregator-MOBILE.json' 'merkle.json' 'oracle.json' )
@@ -25,7 +27,7 @@ RND=$RANDOM
 echo "Using $RND for dao names"
 
 
-helium-admin create-price-oracle -u $SOLANA_URL \
+./packages/helium-admin-cli/bin/helium-admin.js create-price-oracle -u $SOLANA_URL \
                                  --wallet $ANCHOR_WALLET \
                                  --priceOracleKeypair ./packages/helium-admin-cli/keypairs/hnt-price-oracle.json \
                                  --oracles packages/helium-admin-cli/price-oracle-authorities.json \
@@ -50,12 +52,12 @@ helium-admin create-price-oracle -u $SOLANA_URL \
     --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Helium Mobile" --decimals 6 \
     --dcBurnAuthority $(solana address) -u $CLUSTER_URL --delegatorRewardsPercent 6 --emissionSchedulePath ./packages/helium-admin-cli/emissions/mobile.json
 
-if test -f "./packages/helium-admin-cli/makers.json"; then
-  ./packages/helium-admin-cli/bin/helium-admin.js create-maker -u $CLUSTER --symbol IOT --subdaoMint $(solana address -k packages/helium-admin-cli/keypairs/iot.json) --fromFile packages/helium-admin-cli/makers.json --councilKeypair ./packages/helium-admin-cli/keypairs/council.json
-fi
-if test -f "./packages/helium-admin-cli/makers-mobile.json"; then
-  ./packages/helium-admin-cli/bin/helium-admin.js create-maker -u $CLUSTER --symbol MOBILE --subdaoMint $(solana address -k packages/helium-admin-cli/keypairs/mobile.json) --fromFile packages/helium-admin-cli/makers-mobile.json --councilKeypair ./packages/helium-admin-cli/keypairs/council.json
-fi
+# if test -f "./packages/helium-admin-cli/makers.json"; then
+#   ./packages/helium-admin-cli/bin/helium-admin.js create-maker -u $CLUSTER --symbol IOT --subdaoMint $(solana address -k packages/helium-admin-cli/keypairs/iot.json) --fromFile packages/helium-admin-cli/makers.json --councilKeypair ./packages/helium-admin-cli/keypairs/council.json
+# fi
+# if test -f "./packages/helium-admin-cli/makers-mobile.json"; then
+#   ./packages/helium-admin-cli/bin/helium-admin.js create-maker -u $CLUSTER --symbol MOBILE --subdaoMint $(solana address -k packages/helium-admin-cli/keypairs/mobile.json) --fromFile packages/helium-admin-cli/makers-mobile.json --councilKeypair ./packages/helium-admin-cli/keypairs/council.json
+# fi
 
 # save the keypairs as environment variables (used by other packages)
 export DC_MINT=$(solana address -k ./packages/helium-admin-cli/keypairs/dc.json)

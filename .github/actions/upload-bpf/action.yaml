@@ -58,7 +58,6 @@ runs:
         path: |
           ./deps/metaplex-program-brary
           ./deps/solana-program-library
-          ./deps/helium-voter-stake-registry
           ./deps/clockwork
         key: deps-${{ runner.os }}-build-${{ hashFiles('./deps/**/Cargo.lock') }}
     - run: ~/.cargo/bin/anchor run build-deps

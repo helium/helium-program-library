@@ -10,6 +10,7 @@ import {
 import os from "os";
 import yargs from "yargs/yargs";
 import {
+  exists,
   loadKeypair,
 } from "./utils";
 import Squads from "@sqds/sdk";
@@ -77,6 +78,11 @@ export async function run(args: any = process.argv) {
   }
 
   const priceOracleKeypair = argv.priceOracleKeypair ? await loadKeypair(argv.priceOracleKeypair) : Keypair.generate();
+
+  if (await exists(provider.connection, priceOracleKeypair.publicKey)) {
+    console.log("Price oracle already exists");
+    return;
+  }
   const oracleKeys = JSON.parse(fs.readFileSync(argv.oracles).toString()).map(
     (hKey) => heliumAddressToSolPublicKey(hKey)
   );
