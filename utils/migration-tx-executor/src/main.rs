@@ -213,14 +213,14 @@ async fn run_transactions(
   } else if args.hotspot.is_some() {
     let url = format!(
       "{}/migrate/hotspot/{}?limit=1&offset=0",
-      migration_url, hotspot
+      migration_url, args.hotspot.unwrap()
     );
     println!("{}", url);
     let response = client
       .get(url.as_str())
       .send()
       .await
-      .unwrap();
+      .unwrap()
       .json::<TransactionResponse>()
       .await
       .unwrap();
