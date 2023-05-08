@@ -206,7 +206,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
       })
       .unwrap();
   }
-  // Unless the position was staked before this epoch, remove it.
+  // If the position was staked before this epoch, remove it.
   if current_epoch(delegated_position.start_ts) < curr_epoch {
     let vehnt_at_start = position.voting_power(
       voting_mint_config,

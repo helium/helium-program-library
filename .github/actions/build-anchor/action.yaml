@@ -32,9 +32,8 @@ runs:
       id: cache-cargo-deps-builds
       with:
         path: |
-          ./deps/metaplex-program-brary
+          ./deps/metaplex-program-library
           ./deps/solana-program-library
-          ./deps/helium-voter-stake-registry
           ./deps/clockwork
         key: deps-${{ runner.os }}-build-${{ hashFiles('./deps/**/Cargo.lock') }}
     - run: ~/.cargo/bin/anchor run build-deps
