@@ -6,11 +6,11 @@ import database from './database';
 import { defineIdlModels } from './defineIdlModels';
 import { sanitizeAccount } from './sanitizeAccount';
 import { chunks } from '@helium/spl-utils';
-import model from 'sequelize/types/model';
 
 export type Truthy<T> = T extends false | '' | 0 | null | undefined
   ? never
   : T; // from lodash
+
 export const truthy = <T>(value: T): value is Truthy<T> => !!value;
 
 interface UpsertProgramAccountsArgs {
@@ -90,63 +90,73 @@ export const upsertProgramAccounts = async ({
     const model = sequelize.models[type];
     await model.sync({ alter: true });
 
-    const respChunks = chunks(resp, 50000);
+    const chunkSize = 25000;
+    const parallelism = 8;
     const now = new Date().toISOString();
-    for (const [idx, chunk] of respChunks.entries()) {
-      const t = await sequelize.transaction();
-      const accs = chunk
-        .map(({ pubkey, account }) => {
-          // ignore accounts we cant decode
-          try {
-            return {
-              publicKey: pubkey,
-              account: program.coder.accounts.decode(
-                type,
-                account.data
-              ),
-            };
-          } catch (_e) {
-            console.error(`Decode error ${pubkey.toBase58()}`, _e);
-            return null;
+    await Promise.all(
+      chunks(chunks(resp, chunkSize), parallelism).map(
+        async (chunk) => {
+          for (const c of chunk) {
+            const t = await sequelize.transaction();
+            const accs = c
+              .map(({ pubkey, account }) => {
+                // ignore accounts we cant decode
+                try {
+                  return {
+                    publicKey: pubkey,
+                    account: program.coder.accounts.decode(
+                      type,
+                      account.data
+                    ),
+                  };
+                } catch (_e) {
+                  console.error(
+                    `Decode error ${pubkey.toBase58()}`,
+                    _e
+                  );
+                  return null;
+                }
+              })
+              .filter(truthy);
+
+            try {
+              const updateOnDuplicateFields: string[] = Object.keys(
+                accs[0].account
+              );
+              await model.bulkCreate(
+                accs.map(({ publicKey, account }) => ({
+                  address: publicKey.toBase58(),
+                  refreshed_at: now,
+                  ...sanitizeAccount(account),
+                })),
+                {
+                  transaction: t,
+                  updateOnDuplicate: [
+                    'address',
+                    'refreshed_at',
+                    ...updateOnDuplicateFields,
+                  ],
+                }
+              );
+
+              await model.destroy({
+                transaction: t,
+                where: {
+                  refreshed_at: {
+                    [Op.ne]: now,
+                  },
+                },
+              });
+
+              await t.commit();
+            } catch (err) {
+              await t.rollback();
+              console.error('While inserting, err', err);
+              throw err;
+            }
           }
-        })
-        .filter(truthy);
-
-      try {
-        const updateOnDuplicateFields: string[] = Object.keys(
-          accs[0].account
-        );
-        await model.bulkCreate(
-          accs.map(({ publicKey, account }) => ({
-            address: publicKey.toBase58(),
-            refreshed_at: now,
-            ...sanitizeAccount(account),
-          })),
-          {
-            transaction: t,
-            updateOnDuplicate: [
-              'address',
-              'refreshed_at',
-              ...updateOnDuplicateFields,
-            ],
-          }
-        );
-
-        await model.destroy({
-          transaction: t,
-          where: {
-            refreshed_at: {
-              [Op.ne]: now,
-            },
-          },
-        });
-
-        await t.commit();
-      } catch (err) {
-        await t.rollback();
-        console.error('While inserting, err', err);
-        throw err;
-      }
-    }
+        }
+      )
+    );
   }
 };
