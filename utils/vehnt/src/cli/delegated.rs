@@ -16,6 +16,7 @@ use solana_client::{
   rpc_filter::{Memcmp, RpcFilterType},
 };
 
+use solana_program::system_program;
 use solana_sdk::{
   pubkey::Pubkey,
   signature::{read_keypair_file, Keypair},
@@ -211,12 +212,34 @@ impl Delegated {
       }
       {
         let has_new_epoch_info = new_epoch_infos_by_epoch.contains_key(&genesis_end_epoch);
-        let genesis_end_epoch_info = epoch_infos_by_epoch.get_mut(&genesis_end_epoch).unwrap();
-        if !has_new_epoch_info {
-          let mut new = genesis_end_epoch_info.clone();
-          new.1.vehnt_in_closing_positions = 0;
-          new.1.fall_rates_from_closing_positions = 0;
-          new_epoch_infos_by_epoch.insert(genesis_end_epoch, new);
+        if genesis_end_epoch > 0 {
+          let genesis_end_epoch_info = epoch_infos_by_epoch
+            .get(&genesis_end_epoch)
+            .map(|v| v.clone())
+            .unwrap_or_else(|| {
+              (
+                Pubkey::find_program_address(
+                  &[
+                    b"sub_dao_epoch_info",
+                    position.delegated_position.sub_dao.as_ref(),
+                    &genesis_end_epoch.to_le_bytes(),
+                  ],
+                  &helium_sub_daos::id(),
+                )
+                .0,
+                SubDaoEpochInfoV0 {
+                  epoch: genesis_end_epoch,
+                  sub_dao: position.delegated_position.sub_dao,
+                  ..SubDaoEpochInfoV0::default()
+                },
+              )
+            });
+          if !has_new_epoch_info {
+            let mut new = genesis_end_epoch_info.clone();
+            new.1.vehnt_in_closing_positions = 0;
+            new.1.fall_rates_from_closing_positions = 0;
+            new_epoch_infos_by_epoch.insert(genesis_end_epoch, new);
+          }
         }
       }
 
@@ -228,15 +251,17 @@ impl Delegated {
         new_end_epoch_info.1.vehnt_in_closing_positions += vehnt_info.end_vehnt_correction;
       }
       {
-        let mut new_genesis_end_epoch_info = new_epoch_infos_by_epoch
-          .get_mut(&genesis_end_epoch)
-          .unwrap();
+        if genesis_end_epoch > 0 {
+          let mut new_genesis_end_epoch_info = new_epoch_infos_by_epoch
+            .get_mut(&genesis_end_epoch)
+            .unwrap();
 
-        new_genesis_end_epoch_info
-          .1
-          .fall_rates_from_closing_positions += vehnt_info.genesis_end_fall_rate_correction;
-        new_genesis_end_epoch_info.1.vehnt_in_closing_positions +=
-          vehnt_info.genesis_end_vehnt_correction;
+          new_genesis_end_epoch_info
+            .1
+            .fall_rates_from_closing_positions += vehnt_info.genesis_end_fall_rate_correction;
+          new_genesis_end_epoch_info.1.vehnt_in_closing_positions +=
+            vehnt_info.genesis_end_vehnt_correction;
+        }
       }
 
       match SubDao::try_from(position.delegated_position.sub_dao).unwrap() {
@@ -304,12 +329,15 @@ impl Delegated {
                       } else {
                         None
                       },
+                      epoch: new_sub_dao_epoch_info.1.epoch,
                     },
                   })
                   .accounts(TempUpdateSubDaoEpochInfo {
                     sub_dao_epoch_info: sub_dao_epoch_info.0,
                     authority: Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW")
                       .unwrap(),
+                    sub_dao: new_sub_dao_epoch_info.1.sub_dao,
+                    system_program: system_program::id(),
                   })
                   .send()
                   .unwrap();
