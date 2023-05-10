@@ -1076,7 +1076,6 @@ dependencies = [
  "circuit-breaker",
  "helium-sub-daos",
  "lazy-transactions",
- "price-oracle",
  "pyth-sdk-solana",
 ]
 
