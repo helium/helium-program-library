@@ -1,11 +1,7 @@
 import * as anchor from '@coral-xyz/anchor';
 import { GetProgramAccountsFilter, PublicKey } from '@solana/web3.js';
 import { Op, Sequelize } from 'sequelize';
-import {
-  SOLANA_URL,
-  DEFAULT_CHUNK_SIZE,
-  DEFAULT_WRITE_DELAY,
-} from '../env';
+import { SOLANA_URL, CHUNK_SIZE, WRITE_DELAY } from '../env';
 import database from './database';
 import { defineIdlModels } from './defineIdlModels';
 import { sanitizeAccount } from './sanitizeAccount';
@@ -96,8 +92,24 @@ export const upsertProgramAccounts = async ({
 
       const model = sequelize.models[type];
       await model.sync({ alter: true });
-      const now = new Date().toISOString();
-      const resChunks = chunks(resp, DEFAULT_CHUNK_SIZE);
+      const now = new Date();
+      const nowISO = now.toISOString();
+      const resChunks = chunks(resp, CHUNK_SIZE);
+
+      model.beforeBulkCreate(async (instances, _options) => {
+        for (const instance of instances) {
+          const existing = await model.findByPk(
+            instance.dataValues.address
+          );
+
+          if (
+            existing &&
+            new Date(existing.dataValues.refreshed_at) > now
+          ) {
+            instance.dataValues = existing.dataValues;
+          }
+        }
+      });
 
       for (const c of resChunks) {
         const t = await sequelize.transaction();
@@ -129,7 +141,7 @@ export const upsertProgramAccounts = async ({
           await model.bulkCreate(
             accs.map(({ publicKey, account }) => ({
               address: publicKey.toBase58(),
-              refreshed_at: now,
+              refreshed_at: nowISO,
               ...sanitizeAccount(account),
             })),
             {
@@ -143,7 +155,7 @@ export const upsertProgramAccounts = async ({
           );
 
           await t.commit();
-          await sleep(DEFAULT_WRITE_DELAY);
+          await sleep(WRITE_DELAY);
         } catch (err) {
           await t.rollback();
           console.error('While inserting, err', err);
@@ -154,7 +166,7 @@ export const upsertProgramAccounts = async ({
       await model.destroy({
         where: {
           refreshed_at: {
-            [Op.lt]: now,
+            [Op.lt]: nowISO,
           },
         },
       });

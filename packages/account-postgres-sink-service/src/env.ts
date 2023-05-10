@@ -14,10 +14,10 @@ export const PROGRAM_ACCOUNT_CONFIGS =
 export const GLOBAL_CRON_CONFIG =
   process.env.GLOBAL_CRON_CONFIG || '0 1 * * *'; // at 1am
 
-export const DEFAULT_CHUNK_SIZE = process.env.DEFAULT_CHUNK_SIZE
+export const CHUNK_SIZE = process.env.CHUNK_SIZE
   ? Number(process.env.DEFAULT_CHUNK_SIZE)
   : 50000;
 
-export const DEFAULT_WRITE_DELAY = process.env.DEFAULT_WRITE_DELAY
+export const WRITE_DELAY = process.env.WRITE_DELAY
   ? Number(process.env.DEFAULT_WRITE_DELAY)
-  : 2000;
+  : 5000;
