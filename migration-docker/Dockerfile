@@ -1,5 +1,5 @@
 # Specify the base image
-FROM node:16 AS JS_BUILD_IMAGE
+FROM --platform=linux/amd64 node:16 AS JS_BUILD_IMAGE
 
 WORKDIR /app
 

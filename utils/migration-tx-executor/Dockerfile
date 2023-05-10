@@ -1,4 +1,4 @@
-FROM rust:latest as builder
+FROM --platform=linux/amd64 rust:latest as builder
 
 WORKDIR /app
 

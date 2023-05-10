@@ -1,5 +1,5 @@
 # Specify the base image
-FROM rust:1.68.2 as builder
+FROM --platform=linux/amd64 rust:1.68.2 as builder
 
 # Set the working directory
 WORKDIR /app
