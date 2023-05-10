@@ -4,15 +4,14 @@ import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import Address from "@helium/address";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
-import { init as initPriceOracle, PROGRAM_ID as PO_PID } from "@helium/price-oracle-sdk";
 import {
-  init as initDataCredits,
-  PROGRAM_ID as DC_PID
+  PROGRAM_ID as DC_PID,
+  init as initDataCredits
 } from "@helium/data-credits-sdk";
 import {
   daoKey,
-  init as initHeliumSubDaos,
-  PROGRAM_ID as HSD_PID
+  PROGRAM_ID as HSD_PID,
+  init as initHeliumSubDaos
 } from "@helium/helium-sub-daos-sdk";
 import {
   Asset,
@@ -39,11 +38,14 @@ import {
 } from "../packages/distributor-oracle/src/server";
 import {
   entityCreatorKey,
+  PROGRAM_ID as HEM_PID,
   init as initHeliumEntityManager,
-  keyToAssetKey, PROGRAM_ID as HEM_PID
+  keyToAssetKey
 } from "../packages/helium-entity-manager-sdk/src";
 import {
-  init as initLazy, initializeCompressionRecipient, PROGRAM_ID as LD_PID
+  initializeCompressionRecipient,
+  init as initLazy,
+  PROGRAM_ID as LD_PID
 } from "../packages/lazy-distributor-sdk/src";
 import {
   init as initRewards,
@@ -51,8 +53,8 @@ import {
   PROGRAM_ID as REWARDS_PID
 } from "../packages/rewards-oracle-sdk/src";
 import {
-  init as vsrInit,
-  PROGRAM_ID as VSR_PID
+  PROGRAM_ID as VSR_PID,
+  init as vsrInit
 } from "../packages/voter-stake-registry-sdk/src";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { LazyDistributor } from "../target/types/lazy_distributor";
@@ -290,12 +292,6 @@ describe("distributor-oracle", () => {
       anchor.workspace.VoterStakeRegistry.idl
     );
 
-    const poProgram = await initPriceOracle(
-      provider,
-      PO_PID,
-      anchor.workspace.PriceOracle.idl
-    );
-
     const { registrar } = await initVsr(
       vsrProgram,
       provider,
@@ -319,7 +315,6 @@ describe("distributor-oracle", () => {
       hemProgram,
       hsdProgram,
       dcProgram,
-      poProgram,
       1,
       1,
       registrar,

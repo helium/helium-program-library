@@ -33,7 +33,6 @@ export const DC_FEE = 5000000;
 
 export const initTestDataCredits = async (
   program: Program<DataCredits>,
-  poProgram: Program<PriceOracle>,
   provider: anchor.AnchorProvider,
   startingHntbal?: number,
   hntMint?: PublicKey
@@ -59,34 +58,6 @@ export const initTestDataCredits = async (
 
   await createAtaAndMint(provider, hntMint, toBN(startingHntbal, 8), me);
 
-  const hntOracleKp = loadKeypair(
-    __dirname + "/../keypairs/hnt-oracle-test.json"
-  );
-  if (!(await exists(provider.connection, hntOracleKp.publicKey))) {
-    await poProgram.methods.initializePriceOracleV0({
-      oracles: [{
-        authority: me,
-        lastSubmittedPrice: null,
-        lastSubmittedTimestamp: null,
-      }],
-      decimals: 8,
-      authority: me
-    }).accounts({
-      priceOracle: hntOracleKp.publicKey,
-      payer: me,
-    }).signers([hntOracleKp])
-    .rpc({skipPreflight: true});
-
-    const price = new BN(100000000); // $1
-    await poProgram.methods.submitPriceV0({
-      oracleIndex: 0,
-      price,
-    }).accounts({
-      priceOracle: hntOracleKp.publicKey,
-    }).rpc({skipPreflight: true});
-  }
-
-
   const initDataCredits = await program.methods
     .initializeDataCreditsV0({
       authority: me,
@@ -100,7 +71,7 @@ export const initTestDataCredits = async (
       hntMint,
       dcMint,
       hntPriceOracle: new PublicKey(
-        "horxeteuqLRK39UeaiVpgKUR565jStW2Edqd9ioShpU"
+        "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"
       ),
     });
 
@@ -285,7 +256,6 @@ export const initWorld = async (
   hemProgram: Program<HeliumEntityManager>,
   hsdProgram: Program<HeliumSubDaos>,
   dcProgram: Program<DataCredits>,
-  poProgram: Program<PriceOracle>,
   epochRewards?: number,
   subDaoEpochRewards?: number,
   registrar?: PublicKey,
@@ -321,7 +291,6 @@ export const initWorld = async (
 }> => {
   const dataCredits = await initTestDataCredits(
     dcProgram,
-    poProgram,
     provider,
     undefined,
     hntMint
