@@ -26,10 +26,8 @@ interface UpsertProgramAccountsArgs {
   sequelize?: Sequelize;
 }
 
-const sleep = (ms: number) => {
-  console.log('sleeping for', ms);
-  return new Promise((resolve) => setTimeout(resolve, ms));
-};
+const sleep = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 export const upsertProgramAccounts = async ({
   programId,
