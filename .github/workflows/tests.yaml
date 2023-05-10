@@ -89,8 +89,6 @@ jobs:
             echo "Waiting for local Anchor network to start..."
             sleep 5
           done
-      - name: Run bootstrap script
-        run: ./scripts/bootstrap.sh
       - run: ANCHOR_WALLET=${HOME}/.config/solana/id.json yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 $TEST
         env:
           TESTING: true
