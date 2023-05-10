@@ -76,6 +76,9 @@ struct Args {
   /// Whether to migrate all hotspots
   #[arg(long, action)]
   hotspots: bool,
+  /// Migrate a single hotspot
+  #[arg(long, action)]
+  hotspot: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -207,6 +210,29 @@ async fn run_transactions(
       }
       NUM_SENT.inc_by(response.transactions.len() as u64);
     }
+  } else if args.hotspot.is_some() {
+    let url = format!(
+      "{}/migrate/hotspot/{}?limit=1&offset=0",
+      migration_url, args.hotspot.unwrap()
+    );
+    println!("{}", url);
+    let response = client
+      .get(url.as_str())
+      .send()
+      .await
+      .unwrap()
+      .json::<TransactionResponse>()
+      .await
+      .unwrap();
+
+    let result = send_and_confirm_messages_with_spinner(
+      rpc_client.clone(),
+      &tpu_client,
+      &response.transactions,
+    );
+    result.unwrap();
+    NUM_SENT.inc_by(response.transactions.len() as u64);
+    
   } else {
     for wallet in wallets {
       println!("Migrating wallet {}", wallet);
