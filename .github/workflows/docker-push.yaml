@@ -1,9 +1,10 @@
 name: Deploy to ECR
 
 on:
- 
   push:
-    branches: [ feat/docker-push ]
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - "docker-*" # Push events to matching docker-<env>-*, i.e. docker-web-solana-monitor-0.0.1
 
 jobs:
   
@@ -15,12 +16,46 @@ jobs:
     steps:
     - name: Check out code
       uses: actions/checkout@v2
+
+    - name: Set tag information
+      run: |
+        TAG=${GITHUB_REF#refs/tags/}  # Extract tag name from ref
+        echo "Tag name: $TAG"
+
+        DOCKER_ENV=$(echo $TAG | cut -d'-' -f2)
+
+        VERSION=$(echo $TAG | rev | cut -d'-' -f1 | rev)
+
+        # Extract CONTAINER by removing DOCKER_ENV and VERSION, and the first and last dash
+        CONTAINER=$(echo $TAG | sed "s/docker-$DOCKER_ENV-//" | sed "s/-$VERSION//" | sed 's/^-//' | sed 's/-$//')
+
+        # Find the path of the docker directory by looking at docker-info.json
+        CONTAINER_PATH=$(jq -r ".$DOCKER_ENV[\"$CONTAINER\"]" docker-info.json)
+        
+        echo "DOCKER_ENV: $DOCKER_ENV"
+        echo "CONTAINER: $CONTAINER"
+        echo "CONTAINER_PATH: $CONTAINER_PATH"
+        echo "VERSION: $VERSION"
+
+        echo "DOCKER_ENV=${DOCKER_ENV}" >> $GITHUB_ENV
+        echo "VERSION=${VERSION}" >> $GITHUB_ENV
+        echo "CONTAINER=${CONTAINER}" >> $GITHUB_ENV
+        echo "CONTAINER_PATH=${CONTAINER_PATH}" >> $GITHUB_ENV
     
-    - name: Configure AWS credentials
+    - name: Configure Web AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
+      if: ${{ env.DOCKER_ENV == 'web' }}
       with:
         aws-access-key-id: ${{ secrets.WEB_ECR_ACCESS_KEY }}
         aws-secret-access-key: ${{ secrets.WEB_ECR_SECRET_KEY }}
+        aws-region: us-east-1
+
+    - name: Configure Oracle AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      if: ${{ env.DOCKER_ENV == 'oracle' }}
+      with:
+        aws-access-key-id: ${{ secrets.ORACLE_ECR_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.ORACLE_ECR_SECRET_KEY }}
         aws-region: us-east-1
 
     - name: Login to Amazon ECR
@@ -32,9 +67,10 @@ jobs:
     - name: Build, tag, and push image to Amazon ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: solana-monitor
+        ECR_REPOSITORY: ${{ env.CONTAINER }}
+        CONTAINER_PATH: ${{ env.CONTAINER_PTAH }}
         REGISTRY_ALIAS: ${{ secrets.WEB_ECR_ALIAS }}
         IMAGE_TAG: 0.0.13
       run: |
-        docker build -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG packages/monitor-service
+        docker build -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG $CONTAINER_PATH
         docker push $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG
