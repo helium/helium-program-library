@@ -1,3 +1,5 @@
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
 import { daoKey, EPOCH_LENGTH } from "@helium/helium-sub-daos-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
@@ -12,8 +14,6 @@ import {
   toBN,
   toNumber,
 } from "@helium/spl-utils";
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
 import { AccountLayout, getMint } from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
@@ -37,6 +37,7 @@ import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { burnDataCredits } from "./data-credits";
 import { initTestDao, initTestSubdao } from "./utils/daos";
+import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 import {
   ensureDCIdl,
   ensureHSDIdl,
@@ -45,8 +46,6 @@ import {
 } from "./utils/fixtures";
 import { getUnixTimestamp } from "./utils/solana";
 import { createPosition, initVsr } from "./utils/vsr";
-import { expectBnAccuracy } from "./utils/expectBnAccuracy";
-import { init as initPriceOracle } from "../packages/price-oracle-sdk/src";
 
 chai.use(chaiAsPromised);
 
@@ -222,11 +221,6 @@ describe("helium-sub-daos", () => {
         3
       ));
 
-      const poProgram = await initPriceOracle(
-        provider,
-        anchor.workspace.PriceOracle.programId,
-        anchor.workspace.PriceOracle.idl
-      );
       ({
         dataCredits: { dcMint },
         subDao: { subDao, treasury, rewardsEscrow },
@@ -236,7 +230,6 @@ describe("helium-sub-daos", () => {
         hemProgram,
         program,
         dcProgram,
-        poProgram,
         EPOCH_REWARDS,
         SUB_DAO_EPOCH_REWARDS,
         registrar,
