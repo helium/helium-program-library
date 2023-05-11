@@ -102,4 +102,25 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     fix_mobile_genesis_accounts_v0::handler(ctx)
   }
+
+  pub fn initialize_data_only_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, InitializeDataOnlyV0<'info>>,
+    args: InitializeDataOnlyArgsV0,
+  ) -> Result<()> {
+    initialize_data_only_v0::handler(ctx, args)
+  }
+
+  pub fn issue_data_only_entity_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, IssueDataOnlyEntityV0<'info>>,
+    args: IssueDataOnlyEntityArgsV0,
+  ) -> Result<()> {
+    issue_data_only_entity_v0::handler(ctx, args)
+  }
+
+  pub fn onboard_data_only_iot_hotspot_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, OnboardDataOnlyIotHotspotV0<'info>>,
+    args: OnboardDataOnlyIotHotspotArgsV0,
+  ) -> Result<()> {
+    onboard_data_only_iot_hotspot_v0::handler(ctx, args)
+  }
 }

@@ -59,6 +59,19 @@ pub struct MakerApprovalV0 {
 
 #[account]
 #[derive(Default)]
+pub struct DataOnlyConfigV0 {
+  pub bump_seed: u8,
+  pub collection: Pubkey, // The metaplex collection to be issued
+  pub merkle_tree: Pubkey,
+  pub collection_bump_seed: u8,
+  pub dao: Pubkey,
+  pub new_tree_depth: u32, // parameters for new merkle trees when old is full
+  pub new_tree_buffer_size: u32,
+  pub new_tree_fee_lamports: u64,
+}
+
+#[account]
+#[derive(Default)]
 pub struct KeyToAssetV0 {
   pub dao: Pubkey,
   pub asset: Pubkey,
