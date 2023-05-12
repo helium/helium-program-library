@@ -33,6 +33,7 @@ import bs58 from "bs58";
 const { expect } = chai;
 // @ts-ignore
 import { helium } from "@helium/proto";
+// @ts-ignore
 import animalHash from "angry-purple-tiger";
 import axios from "axios";
 
