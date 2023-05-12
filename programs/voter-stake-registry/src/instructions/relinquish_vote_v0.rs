@@ -1,6 +1,6 @@
 use crate::error::VsrError;
+use crate::state::Registrar;
 use crate::state::*;
-use crate::state::{get_nft_vote_record_data_for_proposal_and_token_owner, Registrar};
 use crate::util::get_vote_record_address;
 use anchor_lang::prelude::*;
 use itertools::Itertools;
@@ -125,11 +125,15 @@ pub fn handler(ctx: Context<RelinquishVoteV0>) -> Result<()> {
   // Dispose all NftVoteRecords
   for (nft_vote_record_info, position) in ctx.remaining_accounts.iter().tuples() {
     // Ensure NftVoteRecord is for the given Proposal and TokenOwner
-    let nft_vote_record = get_nft_vote_record_data_for_proposal_and_token_owner(
-      nft_vote_record_info,
-      &ctx.accounts.proposal.key(),
-      &governing_token_owner,
-    )?;
+    let nft_vote_record: Account<NftVoteRecord> = Account::try_from(nft_vote_record_info)?;
+    require!(
+      nft_vote_record.proposal == ctx.accounts.proposal.key(),
+      VsrError::InvalidProposalForNftVoteRecord
+    );
+    require!(
+      nft_vote_record.governing_token_owner == governing_token_owner,
+      VsrError::InvalidTokenOwnerForNftVoteRecord
+    );
 
     dispose_account(nft_vote_record_info, &ctx.accounts.beneficiary)?;
 
