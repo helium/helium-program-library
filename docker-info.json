@@ -8,7 +8,8 @@
     "helius-service": "./packages/helius-service",
     "hnt-to-rent-service": "./packages/hnt-to-rent-service",
     "migration-service": "./packages/migration-service",
-    "vsr-metadata-service": "./packages/vsr-metadata-service"
+    "vsr-metadata-service": "./packages/vsr-metadata-service",
+    "account-postgres-sink-service": "./packages/account-postgres-sink-service"
   },
   "oracle": {
     "distributor-oracle": "./packages/distributor-oracle"
