@@ -68,7 +68,7 @@ jobs:
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: ${{ env.CONTAINER }}
-        CONTAINER_PATH: ${{ env.CONTAINER_PTAH }}
+        CONTAINER_PATH: ${{ env.CONTAINER_PATH }}
         REGISTRY_ALIAS: ${{ secrets.WEB_ECR_ALIAS }}
         IMAGE_TAG: 0.0.13
       run: |
