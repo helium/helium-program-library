@@ -63,7 +63,7 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
   })?;
 
   let account_keys = &solana_txn.message.account_keys;
-  if solana_txn.message.instructions.len() != 2 {
+  if solana_txn.message.instructions.len() > 3 {
     error!("Invalid instruction count");
     return Err(Status::BadRequest);
   }
@@ -75,6 +75,16 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
   {
     error!("First instruction is not compute budget");
     return Err(Status::BadRequest);
+  }
+
+  // Third ix (may) be a transfer
+  if solana_txn.message.instructions.len() > 2 {
+    let transfer_ixn = &solana_txn.message.instructions[2];
+    let transfer_program_id = account_keys[transfer_ixn.program_id_index as usize];
+    if transfer_program_id != Pubkey::from_str("11111111111111111111111111111111").unwrap() {
+      error!("Third instruction is not System transfer");
+      return Err(Status::BadRequest);
+    }
   }
 
   // Verify it's entity manager instruction
