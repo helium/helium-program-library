@@ -6,7 +6,9 @@ use crate::{id, state::*};
 use anchor_lang::prelude::*;
 use anchor_lang::Accounts;
 use itertools::Itertools;
-use spl_governance_tools::account::create_and_serialize_account_signed;
+use solana_program::program::{invoke, invoke_signed};
+use solana_program::system_instruction::{self, create_account};
+use spl_governance_tools::account::AccountMaxSize;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CastVoteArgsV0 {
@@ -73,8 +75,6 @@ pub fn handler<'info>(
   // Ensure all voting nfts in the batch are unique
   let mut unique_nft_mints = vec![];
 
-  let rent = Rent::get()?;
-
   let governing_token_owner = resolve_governing_token_owner(
     registrar,
     &ctx.accounts.voter_token_owner_record,
@@ -117,24 +117,75 @@ pub fn handler<'info>(
     // for the voting population and the tokens of that mint are no longer used
     let nft_mint = *unique_nft_mints.last().unwrap();
     let nft_vote_record = NftVoteRecord {
-      account_discriminator: NftVoteRecord::ACCOUNT_DISCRIMINATOR,
       proposal: args.proposal,
       nft_mint,
       governing_token_owner: args.owner,
     };
 
-    // Anchor doesn't natively support dynamic account creation using remaining_accounts
-    // and we have to take it on the manual drive
-    create_and_serialize_account_signed(
-      &ctx.accounts.payer.to_account_info(),
-      nft_vote_record_info,
-      &nft_vote_record,
-      &get_nft_vote_record_seeds(&args.proposal, &nft_mint.key()),
-      &id(),
-      &ctx.accounts.system_program.to_account_info(),
-      &rent,
-      0,
-    )?;
+    let account_size = nft_vote_record.get_max_size().unwrap();
+    let mut signers_seeds = get_nft_vote_record_seeds(&args.proposal, &nft_mint).to_vec();
+    let (_, bump_seed) = Pubkey::find_program_address(&signers_seeds, &id());
+    let bump = &[bump_seed];
+    signers_seeds.push(bump);
+    let rent = Rent::get()?;
+    let total_lamports = rent.minimum_balance(account_size);
+    let payer_info = ctx.accounts.payer.to_account_info();
+    let system_info = ctx.accounts.system_program.to_account_info();
+    let serialized_data = nft_vote_record.try_to_vec().unwrap();
+
+    // If the account has some lamports already it can't be created using create_account instruction
+    // Anybody can send lamports to a PDA and by doing so create the account and perform DoS attack by blocking create_account
+    if nft_vote_record_info.lamports() > 0 {
+      let top_up_lamports = total_lamports.saturating_sub(nft_vote_record_info.lamports());
+
+      if top_up_lamports > 0 {
+        invoke(
+          &system_instruction::transfer(payer_info.key, nft_vote_record_info.key, top_up_lamports),
+          &[
+            payer_info.clone(),
+            nft_vote_record_info.clone(),
+            system_info.clone(),
+          ],
+        )?;
+      }
+
+      invoke_signed(
+        &system_instruction::allocate(nft_vote_record_info.key, account_size as u64),
+        &[nft_vote_record_info.clone(), system_info.clone()],
+        &[&signers_seeds[..]],
+      )?;
+
+      invoke_signed(
+        &system_instruction::assign(nft_vote_record_info.key, &id()),
+        &[nft_vote_record_info.clone(), system_info.clone()],
+        &[&signers_seeds[..]],
+      )?;
+    } else {
+      // If the PDA doesn't exist use create_account to use lower compute budget
+      let create_account_instruction = create_account(
+        payer_info.key,
+        nft_vote_record_info.key,
+        total_lamports,
+        account_size as u64,
+        &id(),
+      );
+
+      invoke_signed(
+        &create_account_instruction,
+        &[
+          payer_info.clone(),
+          nft_vote_record_info.clone(),
+          system_info.clone(),
+        ],
+        &[&signers_seeds[..]],
+      )?;
+    }
+
+    nft_vote_record_info.data.borrow_mut()[0..8]
+      .copy_from_slice(&NftVoteRecord::ACCOUNT_DISCRIMINATOR);
+    nft_vote_record_info.data.borrow_mut()[8..(serialized_data.len() + 8)]
+      .copy_from_slice(&serialized_data);
+    nft_vote_record_info.exit(&id())?;
   }
 
   if voter_weight_record.weight_action_target == Some(args.proposal)
