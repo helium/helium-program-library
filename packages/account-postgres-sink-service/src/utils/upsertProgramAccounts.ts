@@ -91,68 +91,59 @@ export const upsertProgramAccounts = async ({
       const model = sequelize.models[type];
       await model.sync({ alter: true });
 
-      const chunkSize = 25000;
-      const parallelism = 8;
+      const respChunks = chunks(resp, 50000);
       const now = new Date().toISOString();
 
-      await Promise.all(
-        chunks(chunks(resp, chunkSize), parallelism).map(
-          async (respChunks) => {
-            for (const c of respChunks) {
-              const t = await sequelize.transaction();
-              const accs = c
-                .map(({ pubkey, account }) => {
-                  // ignore accounts we cant decode
-                  try {
-                    const decodedAcc = program.coder.accounts.decode(
-                      type,
-                      account.data
-                    );
+      for (const c of respChunks) {
+        const t = await sequelize.transaction();
+        const accs = c
+          .map(({ pubkey, account }) => {
+            // ignore accounts we cant decode
+            try {
+              const decodedAcc = program.coder.accounts.decode(
+                type,
+                account.data
+              );
 
-                    return {
-                      publicKey: pubkey,
-                      account: decodedAcc,
-                    };
-                  } catch (_e) {
-                    console.error(
-                      `Decode error ${pubkey.toBase58()}`,
-                      _e
-                    );
-                    return null;
-                  }
-                })
-                .filter(truthy);
-
-              try {
-                const updateOnDuplicateFields: string[] = Object.keys(
-                  accs[0].account
-                );
-                await model.bulkCreate(
-                  accs.map(({ publicKey, account }) => ({
-                    address: publicKey.toBase58(),
-                    refreshed_at: now,
-                    ...sanitizeAccount(account),
-                  })),
-                  {
-                    transaction: t,
-                    updateOnDuplicate: [
-                      'address',
-                      'refreshed_at',
-                      ...updateOnDuplicateFields,
-                    ],
-                  }
-                );
-
-                await t.commit();
-              } catch (err) {
-                await t.rollback();
-                console.error('While inserting, err', err);
-                throw err;
-              }
+              return {
+                publicKey: pubkey,
+                account: decodedAcc,
+              };
+            } catch (_e) {
+              console.error(`Decode error ${pubkey.toBase58()}`, _e);
+              return null;
             }
-          }
-        )
-      );
+          })
+          .filter(truthy);
+
+        try {
+          const updateOnDuplicateFields: string[] = Object.keys(
+            accs[0].account
+          );
+          await model.bulkCreate(
+            accs.map(({ publicKey, account }) => ({
+              address: publicKey.toBase58(),
+              refreshed_at: now,
+              ...sanitizeAccount(account),
+            })),
+            {
+              transaction: t,
+              updateOnDuplicate: [
+                'address',
+                'refreshed_at',
+                ...updateOnDuplicateFields,
+              ],
+            }
+          );
+
+          await t.commit();
+        } catch (err) {
+          await t.rollback();
+          console.error('While inserting, err', err);
+          throw err;
+        }
+      }
+
       await model.destroy({
         where: {
           refreshed_at: {
