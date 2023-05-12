@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use solana_program::program_pack::IsInitialized;
 
 use spl_governance_tools::account::AccountMaxSize;
 
@@ -30,12 +29,6 @@ impl NftVoteRecord {
 impl AccountMaxSize for NftVoteRecord {
   fn get_max_size(&self) -> Option<usize> {
     Some(8 + std::mem::size_of::<NftVoteRecord>() + 32)
-  }
-}
-
-impl IsInitialized for NftVoteRecord {
-  fn is_initialized(&self) -> bool {
-    self.proposal != Pubkey::default()
   }
 }
 
