@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 use solana_program::program_pack::IsInitialized;
 
 use spl_governance_tools::account::{get_account_data, AccountMaxSize};
@@ -8,8 +9,7 @@ use crate::{error::VsrError, id};
 /// Vote record indicating the given NFT voted on the Proposal
 /// The PDA of the record is ["nft-vote-record",proposal,nft_mint]
 /// It guarantees uniques and ensures the same NFT can't vote twice
-#[account]
-#[derive(Default)]
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
 pub struct NftVoteRecord {
   /// NftVoteRecord discriminator sha256("account:NftVoteRecord")[..8]
   /// Note: The discriminator is used explicitly because NftVoteRecords
