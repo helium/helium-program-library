@@ -70,7 +70,7 @@ jobs:
         ECR_REPOSITORY: ${{ env.CONTAINER }}
         CONTAINER_PATH: ${{ env.CONTAINER_PATH }}
         REGISTRY_ALIAS: ${{ secrets.WEB_ECR_ALIAS }}
-        IMAGE_TAG: 0.0.13
+        IMAGE_TAG: ${{ env.CONTAINER }}
       run: |
         docker build -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG $CONTAINER_PATH
         docker push $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG
