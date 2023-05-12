@@ -5370,7 +5370,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
