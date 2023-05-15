@@ -4,7 +4,7 @@ use anchor_spl::token::{Mint, TokenAccount};
 use spl_governance_tools::account::{create_and_serialize_account_signed, AccountMaxSize};
 
 use voter_stake_registry::{
-  state::{PositionV0, Registrar},
+  state::{LockupKind, PositionV0, Registrar},
   VoterStakeRegistry,
 };
 
@@ -18,7 +18,7 @@ pub struct DelegateV0<'info> {
     bump = position.bump_seed,
     has_one = mint,
     has_one = registrar,
-    constraint = position.lockup.end_ts > registrar.clock_unix_timestamp()
+    constraint = position.lockup.kind == LockupKind::Constant || position.lockup.end_ts > registrar.clock_unix_timestamp()
   )]
   pub position: Box<Account<'info, PositionV0>>,
   pub mint: Box<Account<'info, Mint>>,
