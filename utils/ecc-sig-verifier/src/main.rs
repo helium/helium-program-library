@@ -7,6 +7,7 @@ use rocket::{
   http::Status,
   serde::{json::Json, Deserialize, Serialize},
 };
+use solana_sdk::signer::Signer;
 use solana_sdk::{bs58, signature::read_keypair_file, transaction::Transaction};
 use std::env;
 use std::str::FromStr;
@@ -77,12 +78,23 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
     return Err(Status::BadRequest);
   }
 
+  let keypair = read_keypair_file(env::var("ANCHOR_WALLET").unwrap_or("keypair.json".to_string()))
+    .map_err(|_| {
+      error!("failed to read keypair");
+      Status::InternalServerError
+    })?;
+
   // Third ix (may) be a transfer
   if solana_txn.message.instructions.len() > 2 {
     let transfer_ixn = &solana_txn.message.instructions[2];
     let transfer_program_id = account_keys[transfer_ixn.program_id_index as usize];
+    let transfer_from_acct = account_keys[transfer_ixn.accounts[0] as usize];
     if transfer_program_id != Pubkey::from_str("11111111111111111111111111111111").unwrap() {
       error!("Third instruction is not System transfer");
+      return Err(Status::BadRequest);
+    }
+    if transfer_from_acct == keypair.pubkey() {
+      error!("Cannot transfer from the verifier");
       return Err(Status::BadRequest);
     }
   }
@@ -147,11 +159,6 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
   }
 
   // Sign the solana transaction
-  let keypair = read_keypair_file(env::var("ANCHOR_WALLET").unwrap_or("keypair.json".to_string()))
-    .map_err(|_| {
-      error!("failed to read keypair");
-      Status::InternalServerError
-    })?;
   solana_txn
     .try_partial_sign(&[&keypair], solana_txn.message.recent_blockhash)
     .map_err(|e| {
