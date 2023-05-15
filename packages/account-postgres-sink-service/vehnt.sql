@@ -20,7 +20,7 @@ WITH
         lockup->>'kind' as lockup_kind,
         cast(lockup->>'endTs' as numeric) as end_ts,
         cast(lockup->>'startTs' as numeric) as start_ts,
-        -- 1682373334 as current_ts
+        -- 1683727980 as current_ts
         FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)) as current_ts
       FROM positions 
     ) p
@@ -29,7 +29,9 @@ WITH
   positions_with_vehnt AS (
     SELECT realm_governing_token_mint as mint,
       address,
+      genesis_end,
       num_active_votes,
+      lockup_kind,
       registrar,
       refreshed_at,
       created_at,
@@ -101,7 +103,8 @@ WITH
     FROM positions_with_vehnt p
     JOIN delegated_positions d on d.position = p.address
     JOIN sub_daos s on s.address = d.sub_dao
-    WHERE end_ts > (floor(current_ts / (60 * 60 * 24)) * (60 * 60 * 24)) + 60 * 60 * 24
+    -- Remove positions getting purged this epoch
+    WHERE (lockup_kind = 'constant' or end_ts > (floor(current_ts / (60 * 60 * 24)) * (60 * 60 * 24)) + 60 * 60 * 24)
     GROUP BY s.dnt_mint, s.vehnt_fall_rate, s.vehnt_delegated, s.vehnt_last_calculated_ts, s.vehnt_last_calculated_ts
   )
 SELECT 
