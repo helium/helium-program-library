@@ -108,11 +108,4 @@ pub mod helium_sub_daos {
   pub fn reset_sub_dao_thread_v0(ctx: Context<ResetSubDaoThreadV0>) -> Result<()> {
     reset_sub_dao_thread_v0::handler(ctx)
   }
-
-  pub fn temp_update_sub_dao_epoch_info(
-    ctx: Context<TempUpdateSubDaoEpochInfo>,
-    args: TempUpdateSubDaoEpochInfoArgs,
-  ) -> Result<()> {
-    temp_update_sub_dao_epoch_info::handler(ctx, args)
-  }
 }

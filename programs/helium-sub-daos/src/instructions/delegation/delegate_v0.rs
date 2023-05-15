@@ -4,7 +4,7 @@ use anchor_spl::token::{Mint, TokenAccount};
 use spl_governance_tools::account::{create_and_serialize_account_signed, AccountMaxSize};
 
 use voter_stake_registry::{
-  state::{PositionV0, Registrar},
+  state::{LockupKind, PositionV0, Registrar},
   VoterStakeRegistry,
 };
 
@@ -18,6 +18,7 @@ pub struct DelegateV0<'info> {
     bump = position.bump_seed,
     has_one = mint,
     has_one = registrar,
+    constraint = position.lockup.kind == LockupKind::Constant || position.lockup.end_ts > registrar.clock_unix_timestamp()
   )]
   pub position: Box<Account<'info, PositionV0>>,
   pub mint: Box<Account<'info, Mint>>,
@@ -63,7 +64,7 @@ pub struct DelegateV0<'info> {
       &current_epoch(
         // Avoid passing an extra account if the end is 0 (no genesis on this position).
         // Pass instead closing time epoch info, txn account deduplication will reduce the overall tx size
-        if position.genesis_end < registrar.clock_unix_timestamp() {
+        if position.genesis_end <= registrar.clock_unix_timestamp() {
           position.lockup.end_ts
         } else {
           position.genesis_end
@@ -175,9 +176,11 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
   ctx.accounts.closing_time_sub_dao_epoch_info.bump_seed =
     ctx.bumps["closing_time_sub_dao_epoch_info"];
 
+  let genesis_end_is_closing = ctx.accounts.genesis_end_sub_dao_epoch_info.key()
+    == ctx.accounts.closing_time_sub_dao_epoch_info.key();
   if genesis_end_fall_rate_correction > 0 || genesis_end_vehnt_correction > 0 {
     // If the end account doesn't exist, init it. Otherwise just set the correcitons
-    if ctx.accounts.genesis_end_sub_dao_epoch_info.data_len() == 0 {
+    if !genesis_end_is_closing && ctx.accounts.genesis_end_sub_dao_epoch_info.data_len() == 0 {
       msg!("Genesis end doesn't exist, initting");
       let genesis_end_epoch = current_epoch(position.genesis_end);
       // Anchor doesn't natively support dynamic account creation using remaining_accounts
@@ -217,9 +220,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
       // closing can be the same account as genesis end. Make sure to use the proper account
       let mut parsed: Account<SubDaoEpochInfoV0>;
       let genesis_end_sub_dao_epoch_info: &mut Account<SubDaoEpochInfoV0> =
-        if ctx.accounts.genesis_end_sub_dao_epoch_info.key()
-          == ctx.accounts.closing_time_sub_dao_epoch_info.key()
-        {
+        if genesis_end_is_closing {
           &mut ctx.accounts.closing_time_sub_dao_epoch_info
         } else {
           parsed = Account::try_from(
