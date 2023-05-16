@@ -2219,6 +2219,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "mobile-entity-manager"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "angry-purple-tiger",
+ "bs58 0.3.1",
+ "bytemuck",
+ "helium-entity-manager",
+ "helium-sub-daos",
+ "mpl-bubblegum",
+ "mpl-token-metadata 1.8.3",
+ "shared-utils",
+ "spl-account-compression 0.1.5",
+]
+
+[[package]]
 name = "modular-bitfield"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

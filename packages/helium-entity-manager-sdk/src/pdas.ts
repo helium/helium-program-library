@@ -1,7 +1,7 @@
-import { PublicKey } from "@solana/web3.js";
-import { PROGRAM_ID } from "./constants";
 import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
+import { PublicKey } from "@solana/web3.js";
 import { sha256 } from "js-sha256";
+import { PROGRAM_ID } from "./constants";
 // @ts-ignore
 import bs58 from "bs58";
 
@@ -38,6 +38,20 @@ export const makerKey = (dao: PublicKey, name: String, programId: PublicKey = PR
   PublicKey.findProgramAddressSync(
     [Buffer.from("maker", "utf-8"), dao.toBuffer(), Buffer.from(name, "utf-8")],
     programId
+  );
+
+export const programApprovalKey = (
+  dao: PublicKey,
+  program: PublicKey,
+  thisProgramId: PublicKey = PROGRAM_ID
+) =>
+  PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("program_approval", "utf-8"),
+      dao.toBuffer(),
+      program.toBuffer(),
+    ],
+    thisProgramId
   );
 
 export const makerApprovalKey = (

@@ -25,6 +25,21 @@ pub mod helium_entity_manager {
     approve_maker_v0::handler(ctx)
   }
 
+  pub fn revoke_maker_v0(ctx: Context<RevokeMakerV0>) -> Result<()> {
+    revoke_maker_v0::handler(ctx)
+  }
+
+  pub fn approve_program_v0(
+    ctx: Context<ApproveProgramV0>,
+    args: ApproveProgramArgsV0,
+  ) -> Result<()> {
+    approve_program_v0::handler(ctx, args)
+  }
+
+  pub fn revoke_program_v0(ctx: Context<RevokeProgramV0>, args: RevokeProgramArgsV0) -> Result<()> {
+    revoke_program_v0::handler(ctx, args)
+  }
+
   pub fn initialize_maker_v0(
     ctx: Context<InitializeMakerV0>,
     args: InitializeMakerArgsV0,
@@ -34,6 +49,13 @@ pub mod helium_entity_manager {
 
   pub fn issue_entity_v0(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<()> {
     issue_entity_v0::handler(ctx, args)
+  }
+
+  pub fn issue_program_entity_v0(
+    ctx: Context<IssueProgramEntityV0>,
+    args: IssueProgramEntityArgsV0,
+  ) -> Result<()> {
+    issue_program_entity_v0::handler(ctx, args)
   }
 
   pub fn issue_iot_operations_fund_v0(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {

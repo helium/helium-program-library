@@ -59,6 +59,14 @@ pub struct MakerApprovalV0 {
 
 #[account]
 #[derive(Default)]
+pub struct ProgramApprovalV0 {
+  pub dao: Pubkey,
+  pub program_id: Pubkey,
+  pub bump_seed: u8,
+}
+
+#[account]
+#[derive(Default)]
 pub struct KeyToAssetV0 {
   pub dao: Pubkey,
   pub asset: Pubkey,

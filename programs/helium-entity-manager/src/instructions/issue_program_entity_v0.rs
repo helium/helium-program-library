@@ -1,12 +1,8 @@
-use std::cmp::min;
-use std::str::FromStr;
-
 use crate::state::*;
 use crate::{constants::ENTITY_METADATA_URL, error::ErrorCode};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_spl::token::Mint;
-use angry_purple_tiger::AnimalName;
 use helium_sub_daos::DaoV0;
 use mpl_bubblegum::state::metaplex_adapter::{
   Collection, Creator, MetadataArgs, TokenProgramVersion,
@@ -20,26 +16,30 @@ use mpl_bubblegum::{
 use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct IssueEntityArgsV0 {
+pub struct IssueProgramEntityArgsV0 {
   pub entity_key: Vec<u8>,
+  pub name: String,
+  pub symbol: String,
+  pub approver_seeds: Vec<Vec<u8>>,
 }
 
-pub const TESTING: bool = std::option_env!("TESTING").is_some();
-
-pub const ECC_VERIFIER: &str = if TESTING {
-  "eccCd1PHAPSTNLUtDzihhPmFPTqGPQn7kgLyjf6dYTS"
-} else {
-  "eccSAJM3tq7nQSpQTm8roxv4FPoipCkMsGizW2KBhqZ"
-};
+fn program_address(seeds: Vec<Vec<u8>>, pid: &Pubkey) -> Result<Pubkey> {
+  let binding = seeds.iter().map(|s| s.as_ref()).collect::<Vec<&[u8]>>();
+  let seeds_bytes: &[&[u8]] = binding.as_slice();
+  Pubkey::create_program_address(seeds_bytes, pid).map_err(|_| error!(ErrorCode::InvalidSeeds))
+}
 
 #[derive(Accounts)]
-#[instruction(args: IssueEntityArgsV0)]
-pub struct IssueEntityV0<'info> {
+#[instruction(args: IssueProgramEntityArgsV0)]
+pub struct IssueProgramEntityV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  #[account(address = Pubkey::from_str(ECC_VERIFIER).unwrap())]
-  pub ecc_verifier: Signer<'info>,
-  pub issuing_authority: Signer<'info>,
+  #[account(
+    address = program_address(args.approver_seeds, &program_approval.program_id)?
+  )]
+  pub program_approver: Signer<'info>,
+  pub program_approval: Box<Account<'info, ProgramApprovalV0>>,
+  pub collection_authority: Signer<'info>,
   pub collection: Box<Account<'info, Mint>>,
   /// CHECK: Handled by cpi
   #[account(
@@ -56,14 +56,7 @@ pub struct IssueEntityV0<'info> {
     bump,
   )]
   pub collection_master_edition: UncheckedAccount<'info>,
-  #[account(
-    mut,
-    has_one = issuing_authority,
-    has_one = collection,
-    has_one = merkle_tree,
-  )]
-  pub maker: Box<Account<'info, MakerV0>>,
-  /// CHECK: Signs as a verified creator to make searching easier
+  /// CHECK: Checked via seeds
   #[account(
     seeds = [b"entity_creator", dao.key().as_ref()],
     bump,
@@ -111,7 +104,7 @@ pub struct IssueEntityV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-impl<'info> IssueEntityV0<'info> {
+impl<'info> IssueProgramEntityV0<'info> {
   fn mint_to_collection_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintToCollectionV1<'info>> {
     let cpi_accounts = MintToCollectionV1 {
       tree_authority: self.tree_authority.to_account_info(),
@@ -119,11 +112,11 @@ impl<'info> IssueEntityV0<'info> {
       leaf_owner: self.recipient.to_account_info(),
       merkle_tree: self.merkle_tree.to_account_info(),
       payer: self.payer.to_account_info(),
-      tree_delegate: self.maker.to_account_info(),
+      tree_delegate: self.program_approver.to_account_info(),
       log_wrapper: self.log_wrapper.to_account_info(),
       compression_program: self.compression_program.to_account_info(),
       system_program: self.system_program.to_account_info(),
-      collection_authority: self.maker.to_account_info(),
+      collection_authority: self.collection_authority.to_account_info(),
       collection_authority_record_pda: self.bubblegum_program.to_account_info(),
       collection_mint: self.collection.to_account_info(),
       collection_metadata: self.collection_metadata.to_account_info(),
@@ -135,27 +128,16 @@ impl<'info> IssueEntityV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<()> {
-  let key_str = bs58::encode(args.entity_key.clone()).into_string();
-  let animal_name: AnimalName = key_str
-    .parse()
-    .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
-
-  let maker_seeds: &[&[&[u8]]] = &[&[
-    b"maker",
-    ctx.accounts.maker.dao.as_ref(),
-    ctx.accounts.maker.name.as_bytes(),
-    &[ctx.accounts.maker.bump_seed],
-  ]];
+pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV0) -> Result<()> {
+  let key_str = std::str::from_utf8(&args.entity_key).unwrap();
   let asset_id = get_asset_id(
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,
   );
 
-  let name = animal_name.to_string();
   let metadata = MetadataArgs {
-    name: name[..min(name.len(), 32)].to_owned(),
-    symbol: String::from("HOTSPOT"),
+    name: args.name,
+    symbol: args.symbol,
     uri: format!("{}/{}", ENTITY_METADATA_URL, key_str),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
@@ -186,7 +168,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
       .accounts
       .mint_to_collection_ctx()
       .with_remaining_accounts(vec![creator])
-      .with_signer(&[maker_seeds[0], entity_creator_seeds[0]]),
+      .with_signer(&[entity_creator_seeds[0]]),
     metadata,
   )?;
 

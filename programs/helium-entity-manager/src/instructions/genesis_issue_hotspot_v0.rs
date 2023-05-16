@@ -1,6 +1,6 @@
 use std::cmp::min;
 
-use crate::constants::HOTSPOT_METADATA_URL;
+use crate::constants::ENTITY_METADATA_URL;
 use crate::error::ErrorCode;
 use crate::{id, state::*};
 use anchor_lang::prelude::*;
@@ -165,7 +165,7 @@ pub fn handler<'info>(
   let metadata = MetadataArgs {
     name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("{}/{}", HOTSPOT_METADATA_URL, key_str),
+    uri: format!("{}/{}", ENTITY_METADATA_URL, key_str),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
