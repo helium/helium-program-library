@@ -4,6 +4,7 @@ import { sha256 } from "js-sha256";
 import { PROGRAM_ID } from "./constants";
 // @ts-ignore
 import bs58 from "bs58";
+import Address from "@helium/address";
 
 export const entityCreatorKey = (
   dao: PublicKey,
@@ -71,10 +72,15 @@ export const makerApprovalKey = (
 export const keyToAssetKey = (
   dao: PublicKey,
   entityKey: Buffer | string,
+  encoding: BufferEncoding | "b58" = "utf8",
   programId: PublicKey = PROGRAM_ID
 ) => {
   if (typeof entityKey === "string") {
-    entityKey = Buffer.from(bs58.decode(entityKey));
+    if (encoding == "b58" || Address.isValid(entityKey)) {
+      entityKey = Buffer.from(bs58.decode(entityKey));
+    } else {
+      entityKey = Buffer.from(entityKey, encoding)
+    }
   }
   const hash = sha256(entityKey);
 
