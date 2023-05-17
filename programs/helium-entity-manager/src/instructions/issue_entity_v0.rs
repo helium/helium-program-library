@@ -195,6 +195,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
     dao: ctx.accounts.dao.key(),
     entity_key: args.entity_key,
     bump_seed: ctx.bumps["key_to_asset"],
+    key_serialization: KeySerialization::B58,
   });
 
   Ok(())

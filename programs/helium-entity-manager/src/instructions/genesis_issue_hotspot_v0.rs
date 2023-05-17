@@ -204,6 +204,7 @@ pub fn handler<'info>(
     entity_key: args.entity_key.clone(),
     dao: ctx.accounts.dao.key(),
     bump_seed: ctx.bumps["key_to_asset"],
+    key_serialization: KeySerialization::B58,
   });
 
   ctx.accounts.info.set_inner(IotHotspotInfoV0 {

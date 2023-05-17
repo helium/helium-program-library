@@ -169,6 +169,7 @@ pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
     dao: ctx.accounts.dao.key(),
     entity_key: String::from(NAME).into_bytes(),
     bump_seed: ctx.bumps["key_to_asset"],
+    key_serialization: KeySerialization::UTF8,
   });
 
   Ok(())

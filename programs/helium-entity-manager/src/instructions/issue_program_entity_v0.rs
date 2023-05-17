@@ -18,6 +18,7 @@ use spl_account_compression::{program::SplAccountCompression, Noop};
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueProgramEntityArgsV0 {
   pub entity_key: Vec<u8>,
+  pub key_serialization: KeySerialization,
   pub name: String,
   pub symbol: String,
   pub approver_seeds: Vec<Vec<u8>>,
@@ -129,7 +130,10 @@ impl<'info> IssueProgramEntityV0<'info> {
 }
 
 pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV0) -> Result<()> {
-  let key_str = std::str::from_utf8(&args.entity_key).unwrap();
+  let key_str = match args.key_serialization {
+    KeySerialization::B58 => bs58::encode(&args.entity_key).into_string(),
+    KeySerialization::UTF8 => std::str::from_utf8(&args.entity_key).unwrap().to_string(),
+  };
   let asset_id = get_asset_id(
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,
@@ -177,6 +181,7 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     dao: ctx.accounts.dao.key(),
     entity_key: args.entity_key,
     bump_seed: ctx.bumps["key_to_asset"],
+    key_serialization: args.key_serialization,
   });
 
   Ok(())

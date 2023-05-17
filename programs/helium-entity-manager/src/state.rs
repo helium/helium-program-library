@@ -72,6 +72,14 @@ pub struct KeyToAssetV0 {
   pub asset: Pubkey,
   pub entity_key: Vec<u8>,
   pub bump_seed: u8,
+  pub key_serialization: KeySerialization,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub enum KeySerialization {
+  #[default]
+  B58,
+  UTF8,
 }
 
 #[account]
