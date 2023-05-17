@@ -3,10 +3,10 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_spl::token::Mint;
 use helium_entity_manager::program::HeliumEntityManager;
-use helium_entity_manager::IssueProgramEntityArgsV0;
 use helium_entity_manager::{
   cpi::accounts::IssueProgramEntityV0, cpi::issue_program_entity_v0, ProgramApprovalV0,
 };
+use helium_entity_manager::{IssueProgramEntityArgsV0, KeySerialization};
 use helium_sub_daos::{DaoV0, SubDaoV0};
 use mpl_bubblegum::program::Bubblegum;
 use mpl_bubblegum::state::TreeConfig;
@@ -134,6 +134,7 @@ pub fn handler(ctx: Context<IssueCarrierNftV0>) -> Result<()> {
       name: ctx.accounts.carrier.name.clone(),
       symbol: String::from("CARRIER"),
       approver_seeds: seeds[0].iter().map(|s| s.to_vec()).collect(),
+      key_serialization: KeySerialization::UTF8,
     },
   )?;
 
