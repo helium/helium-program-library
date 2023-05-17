@@ -10,7 +10,7 @@ use helium_sub_daos::DaoV0;
 use mpl_token_metadata::state::{Creator, DataV2};
 use shared_utils::create_metadata_accounts_v3;
 
-const NAME: &str = "iot_operations_fund";
+pub const IOT_OPERATIONS_FUND: &str = "iot_operations_fund";
 
 #[derive(Accounts)]
 pub struct IssueIotOperationsFundV0<'info> {
@@ -30,11 +30,11 @@ pub struct IssueIotOperationsFundV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 8 + std::mem::size_of::<KeyToAssetV0>() + 1 + String::from(NAME).into_bytes().len(),
+    space = 8 + std::mem::size_of::<KeyToAssetV0>() + 1 + String::from(IOT_OPERATIONS_FUND).into_bytes().len(),
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
-      &hash(&String::from(NAME).into_bytes()).to_bytes()
+      &hash(&String::from(IOT_OPERATIONS_FUND).into_bytes()).to_bytes()
     ],
     bump
   )]
@@ -167,7 +167,7 @@ pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
   ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
     asset: asset_id,
     dao: ctx.accounts.dao.key(),
-    entity_key: String::from(NAME).into_bytes(),
+    entity_key: String::from(IOT_OPERATIONS_FUND).into_bytes(),
     bump_seed: ctx.bumps["key_to_asset"],
     key_serialization: KeySerialization::UTF8,
   });
