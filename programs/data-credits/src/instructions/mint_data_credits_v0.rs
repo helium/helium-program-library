@@ -15,8 +15,8 @@ use pyth_sdk_solana::load_price_feed_from_account_info;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MintDataCreditsArgsV0 {
-  hnt_amount: Option<u64>,
-  dc_amount: Option<u64>,
+  pub hnt_amount: Option<u64>,
+  pub dc_amount: Option<u64>,
 }
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
