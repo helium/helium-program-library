@@ -81,6 +81,7 @@ server.post("/account-webhook", async (req, res) => {
     if (accountConfigs) {
       for (const account of accounts) {
         const parsed = account["account"]["JsonParsed"];
+        console.log("Got account: ", parsed.pubkey);
         const config = accountConfigs.configs.find(
           (x) => x.programId == parsed["owner"]
         );
@@ -125,22 +126,25 @@ const customJobs = configs["configs"]
       },
     };
   });
-server.register(fastifyCron, {
-  jobs: [
-    {
-      cronTime: GLOBAL_CRON_CONFIG,
-      runOnInit: true,
-      onTick: async (server) => {
-        try {
-          await server.inject("/refresh-accounts");
-        } catch (err) {
-          console.error(err);
-        }
+
+if (GLOBAL_CRON_CONFIG) {
+  server.register(fastifyCron, {
+    jobs: [
+      {
+        cronTime: GLOBAL_CRON_CONFIG,
+        runOnInit: true,
+        onTick: async (server) => {
+          try {
+            await server.inject("/refresh-accounts");
+          } catch (err) {
+            console.error(err);
+          }
+        },
       },
-    },
-    ...customJobs,
-  ],
-});
+      ...customJobs,
+    ],
+  });
+}
 
 const start = async () => {
   try {
@@ -155,7 +159,9 @@ const start = async () => {
     const port = typeof address === "string" ? address : address?.port;
     console.log(`Running on 0.0.0.0:${port}`);
     // By default, jobs are not running at startup
-    server.cron.startAllJobs();
+    if (process.env.RUN_JOBS_AT_STARTUP === "true") {
+      server.cron.startAllJobs();
+    }
   } catch (err) {
     console.error(err);
     process.exit(1);

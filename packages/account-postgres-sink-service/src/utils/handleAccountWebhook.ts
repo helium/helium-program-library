@@ -41,28 +41,22 @@ export async function handleAccountWebhook({
   }
 
   const program = new anchor.Program(idl, programId, provider);
-  const info = await provider.connection.getAccountInfo(
-    new PublicKey(account.pubkey)
-  );
-
-  if (info) {
-    const data = info.data;
-    // decode the account
-    let decodedAcc: any;
-    let accName: any;
-    for (const idlAcc of idl.accounts!) {
-      try {
-        decodedAcc = program.coder.accounts.decode(idlAcc.name, data);
-        accName = idlAcc.name;
-      } catch (err) {}
-    }
-
-    const now = new Date().toISOString();
-    const model = sequelize.models[accName];
-    await model.upsert({
-      address: account.pubkey,
-      refreshed_at: now,
-      ...sanitizeAccount(decodedAcc),
-    });
+  const data = Buffer.from(account.data[0], account.data[1]);
+  // decode the account
+  let decodedAcc: any;
+  let accName: any;
+  for (const idlAcc of idl.accounts!) {
+    try {
+      decodedAcc = program.coder.accounts.decode(idlAcc.name, data);
+      accName = idlAcc.name;
+    } catch (err) {}
   }
+
+  const now = new Date().toISOString();
+  const model = sequelize.models[accName];
+  await model.upsert({
+    address: account.pubkey,
+    refreshed_at: now,
+    ...sanitizeAccount(decodedAcc),
+  });
 }

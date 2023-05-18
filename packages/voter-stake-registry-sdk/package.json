@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "Interface to the voter-stake-registry smart contract",
   "repository": {
     "type": "git",
@@ -33,7 +33,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "0.26.0",
     "@helium/idls": "^0.1.1",
-    "@helium/spl-utils": "^0.1.2",
+    "@helium/spl-utils": "^0.1.4",
     "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
     "@solana/spl-token": "^0.3.6",
     "bn.js": "^5.2.0",

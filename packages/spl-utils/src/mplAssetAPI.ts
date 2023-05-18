@@ -140,7 +140,7 @@ export async function getAssetsByOwner(
   {
     sortBy = { sortBy: "created", sortDirection: "asc" },
     limit = 50,
-    page = 0,
+    page = 1,
     before = "",
     after = "",
   }: AssetsByOwnerOpts = {}
@@ -179,7 +179,7 @@ export async function searchAssets(
   {
     creatorVerified = true,
     sortBy = { sortBy: "created", sortDirection: "asc" },
-    page = 0,
+    page = 1,
     ...rest
   }: SearchAssetsOpts
 ): Promise<Asset[]> {

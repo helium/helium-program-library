@@ -1,5 +1,4 @@
 pub mod approve_maker_v0;
-pub mod fix_mobile_genesis_accounts_v0;
 pub mod genesis_issue_hotspot_v0;
 pub mod initialize_data_only_v0;
 pub mod initialize_maker_v0;
@@ -19,7 +18,6 @@ pub mod update_mobile_info_v0;
 pub mod update_rewardable_entity_config_v0;
 
 pub use approve_maker_v0::*;
-pub use fix_mobile_genesis_accounts_v0::*;
 pub use genesis_issue_hotspot_v0::*;
 pub use initialize_data_only_v0::*;
 pub use initialize_maker_v0::*;

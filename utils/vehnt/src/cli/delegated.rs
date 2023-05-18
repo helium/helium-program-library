@@ -1,5 +1,4 @@
 use std::{
-  cell::RefCell,
   collections::{HashMap, HashSet},
   rc::Rc,
 };
@@ -19,22 +18,20 @@ use solana_client::{
 use solana_program::system_program;
 use solana_sdk::{
   pubkey::Pubkey,
-  signature::{read_keypair_file, Keypair},
+  signature::{read_keypair_file},
 };
 
 #[derive(Debug, Clone, clap::Args)]
 /// Fetches all delegated positions and total HNT, veHNT, and subDAO delegations.
 pub struct Delegated {
   #[arg(short, long)]
-  pub curr_ts: i64,
-  #[arg(short, long)]
   pub keypair: String,
 }
 
 use anchor_lang::prelude::*;
 use helium_sub_daos::{
-  accounts::TempUpdateSubDaoEpochInfo, caclulate_vhnt_info, current_epoch, DelegatedPositionV0,
-  PrecisePosition, SubDaoEpochInfoV0, SubDaoV0, TempUpdateSubDaoEpochInfoArgs,
+  caclulate_vhnt_info, current_epoch, DelegatedPositionV0,
+  PrecisePosition, SubDaoEpochInfoV0, SubDaoV0,
 };
 
 #[allow(unused)]
@@ -91,9 +88,6 @@ impl Delegated {
     let mut iot_fall_rate = 0_u128;
     let mut mobile_fall_rate = 0_u128;
 
-    let mut curr_ts = self.curr_ts;
-
-    println!("Current ts: {}", curr_ts);
     let accounts = get_stake_accounts(&rpc_client).await?;
     let delegated_positions = accounts
       .iter()
@@ -157,6 +151,10 @@ impl Delegated {
       .get_account(&Pubkey::from_str(MOBILE_SUBDAO).unwrap())
       .await?;
     let mobile_sub_dao = SubDaoV0::try_deserialize(&mut mobile_sub_dao_raw.data.as_slice())?;
+    let curr_ts = std::cmp::max(
+      iot_sub_dao.vehnt_last_calculated_ts,
+      mobile_sub_dao.vehnt_last_calculated_ts,
+    );
 
     let infos = get_sub_dao_epoch_infos(&rpc_client).await.unwrap();
     let mut epoch_infos_by_subdao_and_epoch: HashMap<
@@ -183,7 +181,11 @@ impl Delegated {
 
     println!("Total accounts {}", positions_with_delegations.len());
     for position in positions_with_delegations {
-      let vehnt_info = caclulate_vhnt_info(curr_ts, &position.position, &voting_mint_config)?;
+      let vehnt_info = caclulate_vhnt_info(
+        position.delegated_position.start_ts,
+        &position.position,
+        &voting_mint_config,
+      )?;
       let vehnt = position
         .position
         .voting_power_precise(&voting_mint_config, curr_ts)?;
@@ -196,7 +198,7 @@ impl Delegated {
         .get_mut(&position.delegated_position.sub_dao)
         .unwrap();
       let end_epoch = current_epoch(position.position.lockup.end_ts);
-      let genesis_end_epoch = current_epoch(position.position.genesis_end);
+      let genesis_end_epoch = current_epoch(position.position.genesis_end - 1);
 
       // Initialize a new epoch info from the existing one if it hasn't been already
       {
@@ -264,14 +266,26 @@ impl Delegated {
         }
       }
 
-      match SubDao::try_from(position.delegated_position.sub_dao).unwrap() {
-        SubDao::Mobile => {
-          mobile_vehnt += vehnt;
-          mobile_fall_rate += vehnt_info.pre_genesis_end_fall_rate;
-        }
-        SubDao::Iot => {
-          iot_vehnt += vehnt;
-          iot_fall_rate += vehnt_info.pre_genesis_end_fall_rate;
+      if position.position.lockup.kind == LockupKind::Constant
+        || current_epoch(position.position.lockup.end_ts) > current_epoch(curr_ts)
+      {
+        match SubDao::try_from(position.delegated_position.sub_dao).unwrap() {
+          SubDao::Mobile => {
+            mobile_vehnt += vehnt;
+            if curr_ts >= position.position.genesis_end {
+              mobile_fall_rate += vehnt_info.post_genesis_end_fall_rate;
+            } else {
+              mobile_fall_rate += vehnt_info.pre_genesis_end_fall_rate;
+            }
+          }
+          SubDao::Iot => {
+            iot_vehnt += vehnt;
+            if curr_ts >= position.position.genesis_end {
+              iot_fall_rate += vehnt_info.post_genesis_end_fall_rate;
+            } else {
+              iot_fall_rate += vehnt_info.pre_genesis_end_fall_rate;
+            }
+          }
         }
       }
       total_hnt += position.delegated_position.hnt_amount
@@ -314,33 +328,34 @@ impl Delegated {
                   sub_dao_epoch_info.1.vehnt_in_closing_positions,
                   new_sub_dao_epoch_info.1.vehnt_in_closing_positions
                 );
-                println!("Correcting...");
-                program
-                  .request()
-                  .args(helium_sub_daos::instruction::TempUpdateSubDaoEpochInfo {
-                    args: TempUpdateSubDaoEpochInfoArgs {
-                      fall_rates_from_closing_positions: if has_fall_rate_diff {
-                        Some(new_sub_dao_epoch_info.1.fall_rates_from_closing_positions)
-                      } else {
-                        None
-                      },
-                      vehnt_in_closing_positions: if has_vehnt_diff {
-                        Some(new_sub_dao_epoch_info.1.vehnt_in_closing_positions)
-                      } else {
-                        None
-                      },
-                      epoch: new_sub_dao_epoch_info.1.epoch,
-                    },
-                  })
-                  .accounts(TempUpdateSubDaoEpochInfo {
-                    sub_dao_epoch_info: sub_dao_epoch_info.0,
-                    authority: Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW")
-                      .unwrap(),
-                    sub_dao: new_sub_dao_epoch_info.1.sub_dao,
-                    system_program: system_program::id(),
-                  })
-                  .send()
-                  .unwrap();
+                // Uncomment if endpoint added back and needed.
+                // println!("Correcting...");
+                // program
+                //   .request()
+                //   .args(helium_sub_daos::instruction::TempUpdateSubDaoEpochInfo {
+                //     args: TempUpdateSubDaoEpochInfoArgs {
+                //       fall_rates_from_closing_positions: if has_fall_rate_diff {
+                //         Some(new_sub_dao_epoch_info.1.fall_rates_from_closing_positions)
+                //       } else {
+                //         None
+                //       },
+                //       vehnt_in_closing_positions: if has_vehnt_diff {
+                //         Some(new_sub_dao_epoch_info.1.vehnt_in_closing_positions)
+                //       } else {
+                //         None
+                //       },
+                //       epoch: new_sub_dao_epoch_info.1.epoch,
+                //     },
+                //   })
+                //   .accounts(TempUpdateSubDaoEpochInfo {
+                //     sub_dao_epoch_info: sub_dao_epoch_info.0,
+                //     authority: Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW")
+                //       .unwrap(),
+                //     sub_dao: new_sub_dao_epoch_info.1.sub_dao,
+                //     system_program: system_program::id(),
+                //   })
+                //   .send()
+                //   .unwrap();
               }
             }
           }
@@ -395,7 +410,7 @@ impl Delegated {
 }
 
 use helium_api::models::Hnt;
-use voter_stake_registry::state::{PositionV0, Registrar};
+use voter_stake_registry::state::{LockupKind, PositionV0, Registrar};
 
 #[derive(Debug)]
 #[allow(unused)]

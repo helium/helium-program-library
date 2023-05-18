@@ -1,3 +1,5 @@
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
@@ -7,8 +9,8 @@ import { init as initPriceOracle } from "../packages/price-oracle-sdk/src";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { ComputeBudgetProgram, Keypair, PublicKey, LAMPORTS_PER_SOL, SystemProgram } from "@solana/web3.js";
-import chai from "chai";
 import { AddGatewayV1 } from "@helium/transactions";
+import chai from "chai";
 import {
   dataOnlyConfigKey,
   entityCreatorKey,
@@ -21,7 +23,6 @@ import {
 } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
-import { PriceOracle } from "../target/types/price_oracle";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import {
@@ -36,9 +37,10 @@ import {
 import bs58 from "bs58";
 const { expect } = chai;
 // @ts-ignore
+import { helium } from "@helium/proto";
+// @ts-ignore
 import animalHash from "angry-purple-tiger";
 import axios from "axios";
-import { helium } from "@helium/proto";
 
 import {
   computeCompressedNFTHash,
@@ -63,7 +65,6 @@ describe("helium-entity-manager", () => {
   let dcProgram: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
   let hemProgram: Program<HeliumEntityManager>;
-  let poProgram: Program<PriceOracle>;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -94,13 +95,8 @@ describe("helium-entity-manager", () => {
       anchor.workspace.HeliumEntityManager.programId,
       anchor.workspace.HeliumEntityManager.idl
     );
-    poProgram = await initPriceOracle(
-      provider,
-      anchor.workspace.PriceOracle.programId,
-      anchor.workspace.PriceOracle.idl
-    );
     
-    const dataCredits = await initTestDataCredits(dcProgram, poProgram, provider);
+    const dataCredits = await initTestDataCredits(dcProgram, provider);
     dcMint = dataCredits.dcMint;
     ({ dao } = await initTestDao(
       hsdProgram,

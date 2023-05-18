@@ -277,7 +277,7 @@ pub fn caclulate_vhnt_info(
 ) -> Result<VehntInfo> {
   let vehnt_at_curr_ts = position.voting_power_precise(voting_mint_config, curr_ts)?;
 
-  let has_genesis = position.genesis_end >= curr_ts;
+  let has_genesis = position.genesis_end > curr_ts;
   let seconds_to_genesis = if has_genesis {
     u64::try_from(
       position
@@ -334,6 +334,7 @@ pub fn caclulate_vhnt_info(
   if has_genesis {
     let genesis_end_epoch_start_ts =
       i64::try_from(current_epoch(position.genesis_end)).unwrap() * EPOCH_LENGTH;
+
     if position.lockup.kind == LockupKind::Cliff {
       genesis_end_fall_rate_correction = pre_genesis_end_fall_rate
         .checked_sub(post_genesis_end_fall_rate)
@@ -349,25 +350,34 @@ pub fn caclulate_vhnt_info(
     if position.lockup.kind == LockupKind::Constant
       || current_epoch(position.genesis_end) != current_epoch(position.lockup.end_ts)
     {
-      genesis_end_vehnt_correction = position
-        .voting_power_precise(voting_mint_config, genesis_end_epoch_start_ts)?
-        .checked_sub(vehnt_at_genesis_end_exact)
-        .unwrap()
-        // Correction factor
-        .checked_sub(
-          post_genesis_end_fall_rate
-            .checked_mul(
-              u128::try_from(
-                position
-                  .genesis_end
-                  .checked_sub(genesis_end_epoch_start_ts)
-                  .unwrap(),
+      // edge case, if the genesis end is _exactly_ the start of the epoch, getting the voting power at the epoch start
+      // will not include the genesis. When this happens, we'll miss a vehnt correction
+      if genesis_end_epoch_start_ts == position.genesis_end {
+        genesis_end_vehnt_correction = position
+          .voting_power_precise(voting_mint_config, genesis_end_epoch_start_ts - 1)?
+          .checked_sub(vehnt_at_genesis_end_exact)
+          .unwrap();
+      } else {
+        genesis_end_vehnt_correction = position
+          .voting_power_precise(voting_mint_config, genesis_end_epoch_start_ts)?
+          .checked_sub(vehnt_at_genesis_end_exact)
+          .unwrap()
+          // Correction factor
+          .checked_sub(
+            post_genesis_end_fall_rate
+              .checked_mul(
+                u128::try_from(
+                  position
+                    .genesis_end
+                    .checked_sub(genesis_end_epoch_start_ts)
+                    .unwrap(),
+                )
+                .unwrap(),
               )
               .unwrap(),
-            )
-            .unwrap(),
-        )
-        .unwrap();
+          )
+          .unwrap();
+      }
     }
   }
 
