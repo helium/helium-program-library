@@ -20,7 +20,7 @@ jobs:
         with:
           script: |
             const pr = context.payload.pull_request;
-            const label = '[deploy-to-staging]';
+            const label = '[deploy-to-devnet]';
             const hasLabel = pr.labels.some(l => l.name.includes(label));
             console.log(`Should deploy: ${hasLabel}`);
             core.setOutput('deploy', hasLabel);
