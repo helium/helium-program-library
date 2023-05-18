@@ -10,7 +10,7 @@ on:
 
 jobs:
   detect_changed_programs:
-    # if: contains(github.event.pull_request.labels.*.name, '[deploy-to-devnet]')
+    if: contains(github.event.pull_request.labels.*.name, 'deploy-to-devnet')
     runs-on: ubuntu-latest
     outputs:
       programs_with_changes: ${{ steps.list_changed_programs.outputs.programs_with_changes }}
@@ -28,7 +28,7 @@ jobs:
         run: |
           echo "Detecting changes in programs"
           # Use git diff to get a list of changed programs and output it as JSON
-          changed_files=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }})
+          changed_files=$(git diff --name-only ${{ (github.event_name == "pull_request" && github.event.pull_request.base.sha) || github.event.before }} ${{ github.event.after }})
           changed_programs=($(echo "$changed_files" | grep "^programs/" | cut -d '/' -f 2 | sort -u))
           echo "${changed_programs[@]}"
           json="[$(printf "'%s'", "${changed_programs[@]}" | sed 's/,$//')]"
