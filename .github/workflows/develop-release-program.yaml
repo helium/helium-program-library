@@ -15,10 +15,6 @@ jobs:
     outputs:
       programs_with_changes: ${{ steps.list_changed_programs.outputs.programs_with_changes }}
     steps:
-      - name: Dump GitHub context
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-        run: echo "$GITHUB_CONTEXT"
       - name: Checkout code
         uses: actions/checkout@v3
         with:
