@@ -4,9 +4,14 @@ on:
   push:
     branches:
       - develop
+  pull_request:
+    branches:
+      - master
+      - develop
 
 jobs:
   detect_changed_programs:
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, '[deploy-to-devnet]')
     runs-on: ubuntu-latest
     outputs:
       programs_with_changes: ${{ steps.list_changed_programs.outputs.programs_with_changes }}
