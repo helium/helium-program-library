@@ -10,7 +10,7 @@ on:
 
 jobs:
   detect_changed_programs:
-    if: contains(github.event.pull_request.labels.*.name, '[deploy-to-devnet]')
+    # if: contains(github.event.pull_request.labels.*.name, '[deploy-to-devnet]')
     runs-on: ubuntu-latest
     outputs:
       programs_with_changes: ${{ steps.list_changed_programs.outputs.programs_with_changes }}
