@@ -181,6 +181,7 @@ export async function run(args: any = process.argv) {
     merklePath: {
       type: "string",
       describe: "Path to the merkle keypair",
+      default: `${__dirname}/../../keypairs/merkle.json`,
     }
   });
 
