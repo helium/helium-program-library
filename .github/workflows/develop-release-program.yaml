@@ -10,22 +10,12 @@ on:
 
 jobs:
   detect_changed_programs:
+    if: contains(github.event.pull_request.labels.*.name, '[deploy-to-devnet]')
     runs-on: ubuntu-latest
     outputs:
       programs_with_changes: ${{ steps.list_changed_programs.outputs.programs_with_changes }}
     steps:
-      - name: Check for deployment label
-        id: check_label
-        uses: actions/github-script@v4
-        with:
-          script: |
-            const pr = context.payload.pull_request;
-            const label = '[deploy-to-devnet]';
-            const hasLabel = pr.labels.some(l => l.name.includes(label));
-            console.log(`Should deploy: ${hasLabel}`);
-            core.setOutput('deploy', hasLabel);
       - name: Checkout code
-        if: steps.check_label.outputs.deploy == 'true' || github.ref == 'refs/heads/develop'
         uses: actions/checkout@v3
         with:
           fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 0 }}
