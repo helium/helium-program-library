@@ -1,7 +1,7 @@
 use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::program::invoke;
+use anchor_lang::solana_program::program::{invoke, invoke_signed};
 use anchor_lang::solana_program::system_instruction::{self};
 use mpl_bubblegum::state::TreeConfig;
 use mpl_bubblegum::{
@@ -68,7 +68,7 @@ pub fn handler(ctx: Context<UpdateDataOnlyTreeV0>) -> Result<()> {
   {
     require_gt!(
       ctx.accounts.old_tree_authority.num_minted,
-      ctx.accounts.old_tree_authority.total_mint_capacity - 3,
+      ctx.accounts.old_tree_authority.total_mint_capacity - 5,
       ErrorCode::TreeNotFull
     );
   }
@@ -100,7 +100,7 @@ pub fn handler(ctx: Context<UpdateDataOnlyTreeV0>) -> Result<()> {
 
   // reimburse the payer from the escrow account
   let cost = Rent::get()?.minimum_balance(ctx.accounts.data_only_config.new_tree_space as usize);
-  invoke(
+  invoke_signed(
     &system_instruction::transfer(
       &ctx.accounts.data_only_escrow.key(),
       &ctx.accounts.payer.key(),
@@ -111,6 +111,11 @@ pub fn handler(ctx: Context<UpdateDataOnlyTreeV0>) -> Result<()> {
       ctx.accounts.payer.to_account_info().clone(),
       ctx.accounts.system_program.to_account_info().clone(),
     ],
+    &[&[
+      b"data_only_escrow",
+      ctx.accounts.data_only_config.key().as_ref(),
+      &[ctx.bumps["data_only_escrow"]],
+    ]],
   )?;
   Ok(())
 }

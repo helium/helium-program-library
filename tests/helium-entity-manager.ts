@@ -182,7 +182,7 @@ describe("helium-entity-manager", () => {
       merkleTree: merkle.publicKey,
     }).preInstructions([
       ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-    ]).signers([merkle]).rpc()
+    ]).rpc();
   });
 
   describe("with data only config", () => {
@@ -240,7 +240,7 @@ describe("helium-entity-manager", () => {
         merkleTree: merkle.publicKey,
       }).preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-      ]).signers([merkle]).rpc({skipPreflight: true});
+      ]).rpc({skipPreflight: true});
 
       const doAcc = await hemProgram.account.dataOnlyConfigV0.fetch(dataOnlyConfigKey(dao)[0]);
 
@@ -315,6 +315,55 @@ describe("helium-entity-manager", () => {
       );
       expect(Boolean(iotInfoAccount)).to.be.true;
     });    
+
+    it("can swap tree when it's full", async () => {
+      let hotspotOwner = Keypair.generate();
+      
+      // fill up the tree
+      while (true) {
+        try {
+          ecc = (await HeliumKeypair.makeRandom()).address.b58;
+          await hemProgram.methods
+          .issueDataOnlyEntityV0({
+            entityKey: Buffer.from(bs58.decode(ecc)),
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+          ])
+          .accounts({
+            recipient: hotspotOwner.publicKey,
+            dao,
+            eccVerifier: eccVerifier.publicKey,
+          })
+          .signers([eccVerifier]).rpc({ skipPreflight: true });
+        } catch (err) {
+          break;
+        }
+      }
+      const [height, buffer, canopy] = [3, 8, 0];
+      const newMerkle = Keypair.generate();
+      const space = getConcurrentMerkleTreeAccountSize(height, buffer, canopy);
+      const cost = await provider.connection.getMinimumBalanceForRentExemption(
+        space
+      );
+      await sendInstructions(
+        provider,
+        [
+          SystemProgram.createAccount({
+            fromPubkey: provider.wallet.publicKey,
+            newAccountPubkey: newMerkle.publicKey,
+            lamports: cost,
+            space: space,
+            programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+          }),
+        ],
+        [newMerkle]
+      );
+      await hemProgram.methods.updateDataOnlyTreeV0().accounts({
+        dataOnlyConfig: dataOnlyConfigKey(dao)[0],
+        newMerkleTree: newMerkle.publicKey,
+      }).rpc({skipPreflight: true});
+    })
   });
 
 

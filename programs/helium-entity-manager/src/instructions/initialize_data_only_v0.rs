@@ -55,7 +55,7 @@ pub struct InitializeDataOnlyV0<'info> {
 
   /// CHECK: Checked by cpi
   #[account(mut)]
-  pub merkle_tree: Signer<'info>,
+  pub merkle_tree: AccountInfo<'info>,
 
   #[account(
     init,
