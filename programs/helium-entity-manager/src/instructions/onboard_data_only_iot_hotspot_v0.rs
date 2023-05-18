@@ -98,7 +98,7 @@ pub struct OnboardDataOnlyIotHotspotV0<'info> {
   pub dc_mint: Box<Account<'info, Mint>>,
 
   #[account(
-    seeds=[
+    seeds = [
       "dc".as_bytes(),
       dc_mint.key().as_ref()
     ],

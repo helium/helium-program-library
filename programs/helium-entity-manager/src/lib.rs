@@ -123,4 +123,10 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     onboard_data_only_iot_hotspot_v0::handler(ctx, args)
   }
+
+  pub fn update_data_only_tree_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, UpdateDataOnlyTreeV0<'info>>,
+  ) -> Result<()> {
+    update_data_only_tree_v0::handler(ctx)
+  }
 }

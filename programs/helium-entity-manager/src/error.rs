@@ -19,4 +19,10 @@ pub enum ErrorCode {
 
   #[msg("Genesis endpoints are currently disabled")]
   NoGenesis,
+
+  #[msg("The tree can only be replaced when it is close to full")]
+  TreeNotFull,
+
+  #[msg("The provided tree is an invalid size")]
+  InvalidTreeSpace,
 }

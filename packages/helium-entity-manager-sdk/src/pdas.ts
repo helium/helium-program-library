@@ -34,9 +34,9 @@ export const hotspotCollectionKey = (
     programId
   );
 
-export const dataOnlyKey = (dao: PublicKey, programId: PublicKey = PROGRAM_ID) => 
+export const dataOnlyConfigKey = (dao: PublicKey, programId: PublicKey = PROGRAM_ID) => 
   PublicKey.findProgramAddressSync(
-    [Buffer.from("data_only", "utf-8"), dao.toBuffer()],
+    [Buffer.from("data_only_config", "utf-8"), dao.toBuffer()],
     programId,
   );
 

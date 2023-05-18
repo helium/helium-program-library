@@ -17,10 +17,7 @@ use mpl_bubblegum::state::metaplex_adapter::{
 use mpl_bubblegum::state::{metaplex_adapter::TokenStandard, TreeConfig};
 use mpl_bubblegum::utils::get_asset_id;
 use mpl_bubblegum::{
-  cpi::{
-    accounts::{CreateTree, MintToCollectionV1},
-    create_tree, mint_to_collection_v1,
-  },
+  cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
   program::Bubblegum,
 };
 use spl_account_compression::{program::SplAccountCompression, Noop};
@@ -63,7 +60,7 @@ pub struct IssueDataOnlyEntityV0<'info> {
   pub data_only_config: Box<Account<'info, DataOnlyConfigV0>>,
   /// CHECK: Signs as a verified creator to make searching easier
   #[account(
-    seeds = [b"entity_creator", dao.key().as_ref()],
+    seeds = ["entity_creator".as_bytes(), dao.key().as_ref()],
     bump,
   )]
   pub entity_creator: UncheckedAccount<'info>,
@@ -93,17 +90,6 @@ pub struct IssueDataOnlyEntityV0<'info> {
   #[account(mut)]
   pub merkle_tree: AccountInfo<'info>,
 
-  /// CHECK: Only used if previous tree is full, and is then checked in cpi
-  #[account(mut)]
-  pub new_merkle_tree: UncheckedAccount<'info>,
-  /// CHECK: Only used if previous tree is full, and is then checked in cpi
-  #[account(
-    mut,
-    seeds = [merkle_tree.key().as_ref()],
-    bump,
-    seeds::program = bubblegum_program.key()
-  )]
-  pub new_tree_authority: AccountInfo<'info>,
   /// CHECK: checked with seeds
   #[account(mut,
     seeds = [
@@ -201,28 +187,6 @@ pub fn handler(ctx: Context<IssueDataOnlyEntityV0>, args: IssueDataOnlyEntityArg
   let mut creator = ctx.accounts.entity_creator.to_account_info();
   creator.is_signer = true;
 
-  // if previous merkle tree is full, then swap it out with a new one paid for by the escrow
-  if !ctx.accounts.tree_authority.contains_mint_capacity(1) {
-    create_tree(
-      CpiContext::new_with_signer(
-        ctx.accounts.bubblegum_program.to_account_info().clone(),
-        CreateTree {
-          tree_authority: ctx.accounts.new_tree_authority.to_account_info().clone(),
-          merkle_tree: ctx.accounts.new_merkle_tree.to_account_info().clone(),
-          payer: ctx.accounts.data_only_escrow.to_account_info().clone(),
-          tree_creator: ctx.accounts.data_only_config.to_account_info().clone(),
-          log_wrapper: ctx.accounts.log_wrapper.to_account_info().clone(),
-          compression_program: ctx.accounts.compression_program.to_account_info().clone(),
-          system_program: ctx.accounts.system_program.to_account_info().clone(),
-        },
-        data_only_seeds,
-      ),
-      ctx.accounts.data_only_config.new_tree_depth,
-      ctx.accounts.data_only_config.new_tree_buffer_size,
-      None,
-    )?;
-    ctx.accounts.data_only_config.merkle_tree = ctx.accounts.merkle_tree.key();
-  }
   mint_to_collection_v1(
     ctx
       .accounts

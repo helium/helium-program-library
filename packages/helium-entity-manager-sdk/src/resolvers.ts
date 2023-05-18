@@ -24,6 +24,12 @@ export const heliumEntityManagerResolvers = combineResolvers(
     mint: "collection",
     owner: "maker",
   }),
+  ataResolver({
+    instruction: "initializeDataOnlyV0",
+    account: "tokenAccount",
+    mint: "collection",
+    owner: "dataOnlyConfig",
+  }),
   resolveIndividual(async ({ path }) => {
     if (path[path.length - 1] === "eccVerifier") {
       return new PublicKey("eccSAJM3tq7nQSpQTm8roxv4FPoipCkMsGizW2KBhqZ");

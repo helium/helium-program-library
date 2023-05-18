@@ -21,8 +21,10 @@ use spl_account_compression::{program::SplAccountCompression, Noop};
 pub struct InitializeDataOnlyArgsV0 {
   pub max_depth: u32,
   pub max_buffer_size: u32,
+  pub tree_space: u64,
   pub new_tree_depth: u32,
   pub new_tree_buffer_size: u32, // params for trees created after this initial tree
+  pub new_tree_space: u64,
   pub new_tree_fee_lamports: u64,
   pub name: String,
   pub metadata_url: String,
@@ -33,7 +35,6 @@ pub struct InitializeDataOnlyArgsV0 {
 pub struct InitializeDataOnlyV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub update_authority: Signer<'info>,
   #[account(
     init,
     space = 8 + 60 + std::mem::size_of::<DataOnlyConfigV0>(),
@@ -54,7 +55,7 @@ pub struct InitializeDataOnlyV0<'info> {
 
   /// CHECK: Checked by cpi
   #[account(mut)]
-  pub merkle_tree: UncheckedAccount<'info>,
+  pub merkle_tree: Signer<'info>,
 
   #[account(
     init,
@@ -110,9 +111,9 @@ pub fn handler(ctx: Context<InitializeDataOnlyV0>, args: InitializeDataOnlyArgsV
 
   let dao = ctx.accounts.dao.key();
   let signer_seeds: &[&[&[u8]]] = &[&[
-    b"data_only_config",
+    "data_only_config".as_bytes(),
     dao.as_ref(),
-    &[ctx.accounts.data_only_config.bump_seed],
+    &[ctx.bumps["data_only_config"]],
   ]];
 
   token::mint_to(
@@ -183,6 +184,7 @@ pub fn handler(ctx: Context<InitializeDataOnlyV0>, args: InitializeDataOnlyArgsV
     dao,
     new_tree_depth: args.new_tree_depth,
     new_tree_buffer_size: args.new_tree_buffer_size,
+    new_tree_space: args.new_tree_space,
     new_tree_fee_lamports: args.new_tree_fee_lamports,
   });
 

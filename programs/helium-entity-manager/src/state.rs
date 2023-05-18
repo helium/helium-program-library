@@ -67,6 +67,7 @@ pub struct DataOnlyConfigV0 {
   pub dao: Pubkey,
   pub new_tree_depth: u32, // parameters for new merkle trees when old is full
   pub new_tree_buffer_size: u32,
+  pub new_tree_space: u64,
   pub new_tree_fee_lamports: u64,
 }
 
