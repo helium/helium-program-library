@@ -211,33 +211,19 @@ export async function formTransaction({
 
   const keyToAsset = keyToAssetKey(dao, entityKey)[0]
   const ixPromises = rewards.map((x, idx) => {
-    if (lazyDistributorAcc.approver.equals(rewardsOracleProgram.programId)) {
-      return rewardsOracleProgram!.methods
-        .setCurrentRewardsWrapperV0({
-          entityKey: Buffer.from(bs58.decode(entityKey)),
-          currentRewards: new BN(x.currentRewards),
-          oracleIndex: idx,
-        })
-        .accounts({
-          lazyDistributor,
-          recipient,
-          keyToAsset,
-          oracle: x.oracleKey,
-        })
-        .instruction();
-    } else {
-      return lazyDistributorProgram.methods
-        .setCurrentRewardsV0({
-          currentRewards: new BN(x.currentRewards),
-          oracleIndex: idx,
-        })
-        .accounts({
-          lazyDistributor,
-          recipient,
-          oracle: x.oracleKey,
-        })
-        .instruction();
-    }
+    return rewardsOracleProgram!.methods
+      .setCurrentRewardsWrapperV0({
+        entityKey: Buffer.from(bs58.decode(entityKey)),
+        currentRewards: new BN(x.currentRewards),
+        oracleIndex: idx,
+      })
+      .accounts({
+        lazyDistributor,
+        recipient,
+        keyToAsset,
+        oracle: x.oracleKey,
+      })
+      .instruction();
   });
   const ixs = await Promise.all(ixPromises);
   tx.add(...ixs);
