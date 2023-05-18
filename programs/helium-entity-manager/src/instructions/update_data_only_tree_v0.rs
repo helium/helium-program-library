@@ -1,7 +1,7 @@
 use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::program::{invoke, invoke_signed};
+use anchor_lang::solana_program::program::invoke_signed;
 use anchor_lang::solana_program::system_instruction::{self};
 use mpl_bubblegum::state::TreeConfig;
 use mpl_bubblegum::{

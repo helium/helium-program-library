@@ -96,11 +96,6 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     update_mobile_info_v0::handler(ctx, args)
   }
-  pub fn fix_mobile_genesis_accounts_v0<'info>(
-    ctx: Context<'_, '_, '_, 'info, FixMobileGenesisAccountsV0<'info>>,
-  ) -> Result<()> {
-    fix_mobile_genesis_accounts_v0::handler(ctx)
-  }
 
   pub fn initialize_data_only_v0<'info>(
     ctx: Context<'_, '_, '_, 'info, InitializeDataOnlyV0<'info>>,
