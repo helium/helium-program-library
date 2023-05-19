@@ -181,7 +181,7 @@ export async function run(args: any = process.argv) {
     merklePath: {
       type: "string",
       describe: "Path to the merkle keypair",
-      default: `${__dirname}/../../keypairs/merkle.json`,
+      default: `${__dirname}/../../keypairs/data-only-merkle.json`,
     }
   });
 
@@ -525,9 +525,7 @@ export async function run(args: any = process.argv) {
     }
     await hemProgram.methods
       .initializeDataOnlyV0({
-        maxDepth: size,
-        maxBufferSize: buffer,
-        treeSpace: new BN(getConcurrentMerkleTreeAccountSize(size, buffer, canopy)),
+        authority,
         newTreeDepth: size,
         newTreeBufferSize: buffer,
         newTreeSpace: new BN(getConcurrentMerkleTreeAccountSize(size, buffer, canopy)),

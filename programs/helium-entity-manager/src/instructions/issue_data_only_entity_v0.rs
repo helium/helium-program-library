@@ -1,6 +1,7 @@
 use std::cmp::min;
 use std::str::FromStr;
 
+use crate::data_only_config_seeds;
 use crate::state::*;
 use crate::ECC_VERIFIER;
 use crate::{constants::HOTSPOT_METADATA_URL, error::ErrorCode};
@@ -147,11 +148,7 @@ pub fn handler(ctx: Context<IssueDataOnlyEntityV0>, args: IssueDataOnlyEntityArg
     .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
 
   let dao = ctx.accounts.dao.key();
-  let data_only_seeds: &[&[&[u8]]] = &[&[
-    b"data_only_config",
-    dao.as_ref(),
-    &[ctx.accounts.data_only_config.bump_seed],
-  ]];
+  let data_only_seeds: &[&[&[u8]]] = &[data_only_config_seeds!(ctx.accounts.data_only_config)];
   let asset_id = get_asset_id(
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,

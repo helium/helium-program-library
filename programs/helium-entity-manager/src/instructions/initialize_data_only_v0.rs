@@ -1,5 +1,5 @@
 use crate::error::ErrorCode;
-use crate::state::*;
+use crate::{data_only_config_seeds, state::*};
 use anchor_lang::prelude::*;
 use anchor_spl::metadata::{
   create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
@@ -19,11 +19,9 @@ use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDataOnlyArgsV0 {
-  pub max_depth: u32,
-  pub max_buffer_size: u32,
-  pub tree_space: u64,
+  pub authority: Pubkey,
   pub new_tree_depth: u32,
-  pub new_tree_buffer_size: u32, // params for trees created after this initial tree
+  pub new_tree_buffer_size: u32,
   pub new_tree_space: u64,
   pub new_tree_fee_lamports: u64,
   pub name: String,
@@ -34,15 +32,16 @@ pub struct InitializeDataOnlyArgsV0 {
 #[instruction(args: InitializeDataOnlyArgsV0)]
 pub struct InitializeDataOnlyV0<'info> {
   #[account(mut)]
-  pub payer: Signer<'info>,
+  pub authority: Signer<'info>,
   #[account(
     init,
     space = 8 + 60 + std::mem::size_of::<DataOnlyConfigV0>(),
-    payer = payer,
+    payer = authority,
     seeds = ["data_only_config".as_bytes(), dao.key().as_ref()],
     bump,
   )]
   pub data_only_config: Box<Account<'info, DataOnlyConfigV0>>,
+  #[account(has_one = authority)]
   pub dao: Account<'info, DaoV0>,
   #[account(
     mut,
@@ -59,7 +58,7 @@ pub struct InitializeDataOnlyV0<'info> {
 
   #[account(
     init,
-    payer = payer,
+    payer = authority,
     mint::decimals = 0,
     mint::authority = data_only_config,
     mint::freeze_authority = data_only_config,
@@ -69,7 +68,7 @@ pub struct InitializeDataOnlyV0<'info> {
   pub collection: Box<Account<'info, Mint>>,
   #[account(
     init_if_needed,
-    payer = payer,
+    payer = authority,
     associated_token::mint = collection,
     associated_token::authority = data_only_config,
   )]
@@ -110,11 +109,19 @@ pub fn handler(ctx: Context<InitializeDataOnlyV0>, args: InitializeDataOnlyArgsV
   );
 
   let dao = ctx.accounts.dao.key();
-  let signer_seeds: &[&[&[u8]]] = &[&[
-    "data_only_config".as_bytes(),
-    dao.as_ref(),
-    &[ctx.bumps["data_only_config"]],
-  ]];
+  ctx.accounts.data_only_config.set_inner(DataOnlyConfigV0 {
+    authority: args.authority,
+    collection: ctx.accounts.collection.key(),
+    merkle_tree: Pubkey::default(),
+    bump_seed: ctx.bumps["data_only_config"],
+    collection_bump_seed: ctx.bumps["collection"],
+    dao,
+    new_tree_depth: args.new_tree_depth,
+    new_tree_buffer_size: args.new_tree_buffer_size,
+    new_tree_space: args.new_tree_space,
+    new_tree_fee_lamports: args.new_tree_fee_lamports,
+  });
+  let signer_seeds: &[&[&[u8]]] = &[data_only_config_seeds!(ctx.accounts.data_only_config)];
 
   token::mint_to(
     CpiContext::new(
@@ -136,7 +143,7 @@ pub fn handler(ctx: Context<InitializeDataOnlyV0>, args: InitializeDataOnlyArgsV
         metadata: ctx.accounts.metadata.to_account_info().clone(),
         mint: ctx.accounts.collection.to_account_info().clone(),
         mint_authority: ctx.accounts.data_only_config.to_account_info().clone(),
-        payer: ctx.accounts.payer.to_account_info().clone(),
+        payer: ctx.accounts.authority.to_account_info().clone(),
         update_authority: ctx.accounts.data_only_config.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
         rent: ctx.accounts.rent.to_account_info().clone(),
@@ -166,7 +173,7 @@ pub fn handler(ctx: Context<InitializeDataOnlyV0>, args: InitializeDataOnlyArgsV
         update_authority: ctx.accounts.data_only_config.to_account_info().clone(),
         mint_authority: ctx.accounts.data_only_config.to_account_info().clone(),
         metadata: ctx.accounts.metadata.to_account_info().clone(),
-        payer: ctx.accounts.payer.to_account_info().clone(),
+        payer: ctx.accounts.authority.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
         rent: ctx.accounts.rent.to_account_info().clone(),
@@ -176,25 +183,13 @@ pub fn handler(ctx: Context<InitializeDataOnlyV0>, args: InitializeDataOnlyArgsV
     Some(0),
   )?;
 
-  ctx.accounts.data_only_config.set_inner(DataOnlyConfigV0 {
-    collection: ctx.accounts.collection.key(),
-    merkle_tree: Pubkey::default(),
-    bump_seed: ctx.bumps["data_only_config"],
-    collection_bump_seed: ctx.bumps["collection"],
-    dao,
-    new_tree_depth: args.new_tree_depth,
-    new_tree_buffer_size: args.new_tree_buffer_size,
-    new_tree_space: args.new_tree_space,
-    new_tree_fee_lamports: args.new_tree_fee_lamports,
-  });
-
   create_tree(
     CpiContext::new_with_signer(
       ctx.accounts.bubblegum_program.to_account_info().clone(),
       CreateTree {
         tree_authority: ctx.accounts.tree_authority.to_account_info().clone(),
         merkle_tree: ctx.accounts.merkle_tree.to_account_info().clone(),
-        payer: ctx.accounts.payer.to_account_info().clone(),
+        payer: ctx.accounts.authority.to_account_info().clone(),
         tree_creator: ctx.accounts.data_only_config.to_account_info().clone(),
         log_wrapper: ctx.accounts.log_wrapper.to_account_info().clone(),
         compression_program: ctx.accounts.compression_program.to_account_info().clone(),
@@ -202,8 +197,8 @@ pub fn handler(ctx: Context<InitializeDataOnlyV0>, args: InitializeDataOnlyArgsV
       },
       signer_seeds,
     ),
-    args.max_depth,
-    args.max_buffer_size,
+    args.new_tree_depth,
+    args.new_tree_buffer_size,
     None,
   )?;
   ctx.accounts.data_only_config.merkle_tree = ctx.accounts.merkle_tree.key();

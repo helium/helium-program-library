@@ -1,5 +1,5 @@
 use crate::error::ErrorCode;
-use crate::state::*;
+use crate::{data_only_config_seeds, state::*};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
 use anchor_lang::solana_program::system_instruction::{self};
@@ -73,11 +73,7 @@ pub fn handler(ctx: Context<UpdateDataOnlyTreeV0>) -> Result<()> {
     );
   }
 
-  let data_only_seeds: &[&[&[u8]]] = &[&[
-    b"data_only_config",
-    ctx.accounts.data_only_config.dao.as_ref(),
-    &[ctx.accounts.data_only_config.bump_seed],
-  ]];
+  let data_only_seeds: &[&[&[u8]]] = &[data_only_config_seeds!(ctx.accounts.data_only_config)];
   create_tree(
     CpiContext::new_with_signer(
       ctx.accounts.bubblegum_program.to_account_info().clone(),

@@ -164,9 +164,7 @@ describe("helium-entity-manager", () => {
       [merkle]
     );
     await hemProgram.methods.initializeDataOnlyV0({
-      maxDepth: height,
-      maxBufferSize: buffer,
-      treeSpace: new BN(getConcurrentMerkleTreeAccountSize(height, buffer, canopy)),
+      authority: me,
       newTreeDepth: height,
       newTreeBufferSize: buffer,
       newTreeSpace: new BN(getConcurrentMerkleTreeAccountSize(height, buffer, canopy)),
@@ -222,9 +220,7 @@ describe("helium-entity-manager", () => {
         [merkle]
       );
       await hemProgram.methods.initializeDataOnlyV0({
-        maxDepth: height,
-        maxBufferSize: buffer,
-        treeSpace: new BN(getConcurrentMerkleTreeAccountSize(height, buffer, canopy)),
+        authority: me,
         newTreeDepth: height,
         newTreeBufferSize: buffer,
         newTreeSpace: new BN(getConcurrentMerkleTreeAccountSize(height, buffer, canopy)),
