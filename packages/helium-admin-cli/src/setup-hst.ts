@@ -1,4 +1,4 @@
-import { ClockworkProvider } from "@clockwork-xyz/sdk";
+import { ClockworkProvider, parseTransactionInstructions } from "@clockwork-xyz/sdk";
 import * as anchor from "@coral-xyz/anchor";
 import Address from "@helium/address";
 import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
@@ -234,6 +234,7 @@ export async function run(args: any = process.argv) {
       );
     } else {
       await clockworkProvider.threadUpdate(provider.wallet.publicKey, thread, {
+        instructions: await parseTransactionInstructions([distributeIx]),
         trigger,
       });
     }
