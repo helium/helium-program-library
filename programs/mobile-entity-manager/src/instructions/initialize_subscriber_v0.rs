@@ -145,7 +145,7 @@ pub fn handler(
       name: args.name,
       symbol: String::from("SUBSCRIBER"),
       approver_seeds: seeds[0].iter().map(|s| s.to_vec()).collect(),
-      key_serialization: KeySerialization::UTF8,
+      key_serialization: KeySerialization::B58,
     },
   )?;
 
