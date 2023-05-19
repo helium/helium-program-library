@@ -147,7 +147,6 @@ pub fn handler(ctx: Context<IssueDataOnlyEntityV0>, args: IssueDataOnlyEntityArg
     .parse()
     .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
 
-  let dao = ctx.accounts.dao.key();
   let data_only_seeds: &[&[&[u8]]] = &[data_only_config_seeds!(ctx.accounts.data_only_config)];
   let asset_id = get_asset_id(
     &ctx.accounts.merkle_tree.key(),

@@ -535,7 +535,7 @@ export async function run(args: any = process.argv) {
       })
       .accounts({
         dao,
-        payer: authority,
+        authority,
         merkleTree: merkle.publicKey,
       })
       .instruction();
