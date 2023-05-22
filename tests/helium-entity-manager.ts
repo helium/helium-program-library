@@ -1,5 +1,3 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
@@ -276,6 +274,8 @@ describe("helium-entity-manager", () => {
         keyToAsset!
       );
       expect(Boolean(ktaAcc)).to.be.true;
+      expect(ktaAcc.asset.toString()).to.eq(hotspot.toString());
+      expect(ktaAcc.dao.toString()).to.eq(dao.toString());
 
       const {
         args,
@@ -306,7 +306,13 @@ describe("helium-entity-manager", () => {
         iotInfo!
       );
       expect(Boolean(iotInfoAccount)).to.be.true;
-    });    
+      expect(iotInfoAccount.asset.toString()).to.eq(hotspot.toString());
+      expect(iotInfoAccount.location).to.be.null;
+      expect(iotInfoAccount.elevation).to.eq(50);
+      expect(iotInfoAccount.gain).to.eq(100);
+      expect(iotInfoAccount.isFullHotspot).to.be.false;
+
+    });
 
     it("can swap tree when it's full", async () => {
       let hotspotOwner = Keypair.generate();
