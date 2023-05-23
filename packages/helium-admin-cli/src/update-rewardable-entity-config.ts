@@ -96,10 +96,6 @@ export async function run(args: any = process.argv) {
 
   console.log(settings);
 
-  const config = await hemProgram.account.rewardableEntityConfigV0.fetch(
-    rewardableConfigKey
-  );
-
   const instructions = [
     await hemProgram.methods
       .updateRewardableEntityConfigV0({
@@ -108,7 +104,7 @@ export async function run(args: any = process.argv) {
       })
       .accounts({
         rewardableEntityConfig: rewardableConfigKey,
-        authority: config.authority,
+        authority: rewardableConfigAcc.authority,
       })
       .instruction(),
   ];
