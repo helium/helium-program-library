@@ -24,7 +24,7 @@ pub struct UpdateCarrierTreeV0<'info> {
   /// CHECK: Conditionally decoded
   #[account(
     mut,
-    seeds = [carrier.merkle_tree.key().as_ref()],
+    seeds = [carrier.merkle_tree.as_ref()],
     bump,
     seeds::program = bubblegum_program.key(),
   )]

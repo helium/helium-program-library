@@ -237,6 +237,7 @@ export async function run(args: any = process.argv) {
         instructions: await parseTransactionInstructions([distributeIx]),
         trigger,
       });
+      await clockworkProvider.threadReset(provider.wallet.publicKey, thread);
     }
   }
 }
