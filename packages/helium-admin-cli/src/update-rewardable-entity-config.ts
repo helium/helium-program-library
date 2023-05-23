@@ -81,20 +81,24 @@ export async function run(args: any = process.argv) {
       iotConfig: {
         minGain: 10,
         maxGain: 150,
-        fullLocationStakingFee: toBN(1000000, 0),
+        fullLocationStakingFee: toBN(500000, 0),
         dataonlyLocationStakingFee: toBN(500000, 0),
       } as any,
     };
   } else {
     settings = {
       mobileConfig: {
-        fullLocationStakingFee: toBN(1000000, 0),
-        dataonlyLocationStakingFee: toBN(500000, 0),
+        fullLocationStakingFee: toBN(0, 0),
+        dataonlyLocationStakingFee: toBN(0, 0),
       },
     };
   }
 
   console.log(settings);
+
+  const config = await hemProgram.account.rewardableEntityConfigV0.fetch(
+    rewardableConfigKey
+  );
 
   const instructions = [
     await hemProgram.methods
@@ -104,6 +108,7 @@ export async function run(args: any = process.argv) {
       })
       .accounts({
         rewardableEntityConfig: rewardableConfigKey,
+        authority: config.authority,
       })
       .instruction(),
   ];
