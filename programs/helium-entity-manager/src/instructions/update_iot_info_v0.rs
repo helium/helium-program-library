@@ -2,7 +2,7 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{Mint, Token, TokenAccount},
+  token::{Mint, Token},
 };
 use data_credits::{
   cpi::{
@@ -64,12 +64,9 @@ pub struct UpdateIotInfoV0<'info> {
     seeds::program = bubblegum_program.key()
   )]
   pub tree_authority: Account<'info, TreeConfig>,
-  #[account(
-    mut,
-    associated_token::mint = dc_mint,
-    associated_token::authority = dc_fee_payer,
-  )]
-  pub dc_burner: Box<Account<'info, TokenAccount>>,
+  /// CHECK: Only loaded if location is being asserted
+  #[account(mut)]
+  pub dc_burner: UncheckedAccount<'info>,
 
   #[account(
     has_one = sub_dao,
