@@ -11,6 +11,7 @@ pub struct UpdateSubDaoArgsV0 {
   pub active_device_aggregator: Option<Pubkey>,
   pub registrar: Option<Pubkey>,
   pub delegator_rewards_percent: Option<u64>,
+  pub onboarding_data_only_dc_fee: Option<u64>,
 }
 
 #[derive(Accounts)]
@@ -52,6 +53,10 @@ pub fn handler(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result
 
   if let Some(registrar) = args.registrar {
     ctx.accounts.sub_dao.registrar = registrar;
+  }
+
+  if let Some(onboarding_data_only_dc_fee) = args.onboarding_data_only_dc_fee {
+    ctx.accounts.sub_dao.onboarding_data_only_dc_fee = onboarding_data_only_dc_fee;
   }
 
   let max_percent = 100_u64.checked_mul(10_0000000).unwrap();

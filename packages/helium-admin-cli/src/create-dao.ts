@@ -523,21 +523,31 @@ export async function run(args: any = process.argv) {
         [merkle]
       );
     }
-    await hemProgram.methods
-      .initializeDataOnlyV0({
-        authority,
-        newTreeDepth: size,
-        newTreeBufferSize: buffer,
-        newTreeSpace: new BN(getConcurrentMerkleTreeAccountSize(size, buffer, canopy)),
-        newTreeFeeLamports: new BN(cost / 2 ** size),
-        name: "DATAONLY",
-        metadataUrl: "todo",
-      })
-      .accounts({
-        dao,
-        authority,
-        merkleTree: merkle.publicKey,
-      })
-      .instruction();
+    await sendInstructionsOrSquads({
+      provider,
+      instructions: [
+        await hemProgram.methods
+          .initializeDataOnlyV0({
+            authority,
+            newTreeDepth: size,
+            newTreeBufferSize: buffer,
+            newTreeSpace: new BN(getConcurrentMerkleTreeAccountSize(size, buffer, canopy)),
+            newTreeFeeLamports: new BN(cost / 2 ** size),
+            name: "DATAONLY",
+            metadataUrl: "todo",
+          })
+          .accounts({
+            dao,
+            authority,
+            merkleTree: merkle.publicKey,
+          })
+          .instruction()
+      ],
+      executeTransaction: false,
+      squads,
+      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
+      authorityIndex: argv.authorityIndex,
+      signers: [],
+    });
   }
 }

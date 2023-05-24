@@ -141,7 +141,7 @@ pub fn handler<'info>(
     proof_accounts: ctx.remaining_accounts.to_vec(),
   })?;
 
-  let mut dc_fee = ctx.accounts.sub_dao.onboarding_dc_fee;
+  let mut dc_fee = ctx.accounts.sub_dao.onboarding_data_only_dc_fee;
   ctx.accounts.iot_info.set_inner(IotHotspotInfoV0 {
     asset: asset_id,
     bump_seed: ctx.bumps["iot_info"],

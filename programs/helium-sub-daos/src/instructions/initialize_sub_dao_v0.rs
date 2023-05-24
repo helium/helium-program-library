@@ -57,6 +57,7 @@ pub struct InitializeSubDaoArgsV0 {
   pub dc_burn_authority: Pubkey,
   pub registrar: Pubkey,
   pub delegator_rewards_percent: u64,
+  pub onboarding_data_only_dc_fee: u64,
 }
 
 #[derive(Accounts)]
@@ -281,6 +282,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     vehnt_fall_rate: 0,
     delegator_pool: ctx.accounts.delegator_pool.key(),
     delegator_rewards_percent: args.delegator_rewards_percent,
+    onboarding_data_only_dc_fee: args.onboarding_data_only_dc_fee,
   });
 
   resize_to_fit(
