@@ -24,6 +24,7 @@ import { PriceOracle } from "../../target/types/price_oracle";
 import { initTestDao, initTestSubdao } from "./daos";
 import { exists, loadKeypair } from "./solana";
 import { random } from "./string";
+import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =
@@ -203,6 +204,20 @@ export async function ensureDCIdl(dcProgram: Program<DataCredits>) {
   } catch {
     execSync(
       `anchor idl upgrade --filepath ${__dirname}/../../target/idl/data_credits.json ${dcProgram.programId}`,
+      { stdio: "inherit", shell: "/bin/bash" }
+    );
+  }
+}
+
+export async function ensureMemIdl(memProgram: Program<MobileEntityManager>) {
+  try {
+    execSync(
+      `anchor idl init --filepath ${__dirname}/../../target/idl/mobile_entity_manager.json ${memProgram.programId}`,
+      { stdio: "inherit", shell: "/bin/bash" }
+    );
+  } catch {
+    execSync(
+      `anchor idl upgrade --filepath ${__dirname}/../../target/idl/mobile_entity_manager.json ${memProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   }

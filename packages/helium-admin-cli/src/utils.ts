@@ -69,6 +69,20 @@ import fetch from "node-fetch";
 
 const SECONDS_PER_DAY = 86400;
 
+// Goal = 3 proof nodes needed
+export const merkleSizes = [
+  [3, 8, 0],
+  [5, 8, 2],
+  [14, 64, 11],
+  [15, 64, 12],
+  [16, 64, 13],
+  [17, 64, 14],
+  [18, 64, 15],
+  [19, 64, 16],
+  [20, 64, 17],
+  [24, 64, 17],
+];
+
 export async function createIdlUpgradeInstruction(
   programId: PublicKey,
   bufferAddress: PublicKey,

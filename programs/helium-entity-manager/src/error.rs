@@ -19,4 +19,7 @@ pub enum ErrorCode {
 
   #[msg("Genesis endpoints are currently disabled")]
   NoGenesis,
+
+  #[msg("Invalid seeds provided")]
+  InvalidSeeds,
 }

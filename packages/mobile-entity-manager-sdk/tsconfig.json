@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.root.json",
+  "references": [
+    {
+      "path": "../idls"
+    },
+    {
+      "path": "../spl-utils"
+    },
+    {
+      "path": "../helium-sub-daos-sdk"
+    },
+    {
+      "path": "../helium-entity-manager-sdk"
+    },
+    {
+      "path": "./tsconfig.cjs.json"
+    },
+    {
+      "path": "./tsconfig.esm.json"
+    }
+  ]
+}
