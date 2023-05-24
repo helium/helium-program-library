@@ -1,12 +1,10 @@
+import * as anchor from "@coral-xyz/anchor";
 import * as client from "@helium/distributor-oracle";
-import { getCurrentRewards } from "@helium/distributor-oracle";
 import {
-  init as initDao,
-  subDaoKey
-} from "@helium/helium-sub-daos-sdk";
-import {
-  PROGRAM_ID
+  init as initHem,
+  keyToAssetKey
 } from "@helium/helium-entity-manager-sdk";
+import { daoKey } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
   lazyDistributorKey
@@ -14,13 +12,10 @@ import {
 import {
   init as initRewards,
 } from "@helium/rewards-oracle-sdk";
-import { sendAndConfirmWithRetry } from "@helium/spl-utils";
-import Address from "@helium/address";
-import * as anchor from "@coral-xyz/anchor";
+import { HNT_MINT, sendAndConfirmWithRetry } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair } from "./utils";
 
 export async function run(args: any = process.argv) {
   const argv = await yargs(args).options({
@@ -34,10 +29,21 @@ export async function run(args: any = process.argv) {
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
     },
-    mobileKeypair: {
+    mint: {
       type: "string",
-      describe: "Keypair of the Mobile token",
-      default: "./keypairs/mobile.json",
+      describe: "Pubkey of the rewards mint",
+    },
+    assetId: {
+      type: "string",
+      describe: "The asset id to claim rewards for",
+    },
+    entityKey: {
+      type: "string",
+      describe: "The entity key to claim rewards for",
+    },
+    hntMint: {
+      type: "string",
+      default: HNT_MINT,
     },
   }).argv;
 
@@ -46,37 +52,31 @@ export async function run(args: any = process.argv) {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
-  const heliumSubDaosProgram = await initDao(provider);
-  const lazyDistributorProgram = await initLazy(provider);
+  const lazyProgram = await initLazy(provider);
+  const hemProgram = await initHem(provider);
   const rewardsOracleProgram = await initRewards(provider);
 
-  const mobileKeypair = await loadKeypair(argv.mobileKeypair);
-  const mobileSubdao = (await subDaoKey(mobileKeypair.publicKey))[0];
+  const mint = new PublicKey(argv.mint);
+  const dao = daoKey(new PublicKey(argv.hntMint))[0];
+  const lazyDistributor = lazyDistributorKey(mint)[0];
+  let assetId = argv.assetId ? new PublicKey(argv.assetId) : undefined;
+  if (!assetId) {
+    const entityKey = argv.entityKey;
+    const keyToAsset = keyToAssetKey(dao, entityKey)[0];
+    assetId = (await hemProgram.account.keyToAssetV0.fetch(keyToAsset)).asset;
+  }
 
-  const hotspotEcc = "11wsqKcoXGesnSbEwKTY8QkoqdFsG7oafcyPn8jBnzRK4sfCSw8";
-  const eccCompact = Address.fromB58(hotspotEcc).publicKey;
-
-  const mobileSubdaoAcc = await heliumSubDaosProgram.account.subDaoV0.fetch(
-    mobileSubdao
-  );
-  const [lazyDistributor] = await lazyDistributorKey(mobileSubdaoAcc.dntMint);
-  const [hotspot] = await PublicKey.findProgramAddressSync(
-    [Buffer.from("hotspot", "utf-8"), eccCompact],
-    PROGRAM_ID
-  );
-
-  const rewards = await getCurrentRewards(
-    lazyDistributorProgram,
+  const rewards = await client.getCurrentRewards(
+    lazyProgram,
     lazyDistributor,
-    hotspot
+    assetId
   );
-
   const tx = await client.formTransaction({
-    program: lazyDistributorProgram,
+    program: lazyProgram,
     rewardsOracleProgram: rewardsOracleProgram,
     provider,
     rewards,
-    hotspot,
+    asset: assetId,
     lazyDistributor,
   });
   const signed = await provider.wallet.signTransaction(tx);

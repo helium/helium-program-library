@@ -83,7 +83,8 @@ export async function initTestSubdao(
   authority: PublicKey,
   dao: PublicKey,
   epochRewards?: number,
-  registrar?: PublicKey
+  registrar?: PublicKey,
+  numTokens?: number | BN,
 ): Promise<{
   mint: PublicKey;
   subDao: PublicKey;
@@ -94,6 +95,9 @@ export async function initTestSubdao(
 }> {
   const daoAcc = await program.account.daoV0.fetch(dao);
   const dntMint = await createMint(provider, 8, authority, authority);
+  if (numTokens) {
+    await createAtaAndMint(provider, dntMint, numTokens, authority);
+  }
   const rewardsEscrow = await createAtaAndMint(
     provider,
     dntMint,

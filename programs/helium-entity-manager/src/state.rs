@@ -84,6 +84,14 @@ pub struct DataOnlyConfigV0 {
   pub new_tree_space: u64,
   pub new_tree_fee_lamports: u64,
 }
+  
+ #[account]
+#[derive(Default)]
+pub struct ProgramApprovalV0 {
+  pub dao: Pubkey,
+  pub program_id: Pubkey,
+  pub bump_seed: u8,
+}
 
 #[account]
 #[derive(Default)]
@@ -92,6 +100,14 @@ pub struct KeyToAssetV0 {
   pub asset: Pubkey,
   pub entity_key: Vec<u8>,
   pub bump_seed: u8,
+  pub key_serialization: KeySerialization,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub enum KeySerialization {
+  #[default]
+  B58,
+  UTF8,
 }
 
 #[account]

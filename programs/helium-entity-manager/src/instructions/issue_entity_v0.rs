@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::str::FromStr;
 
 use crate::state::*;
-use crate::{constants::HOTSPOT_METADATA_URL, error::ErrorCode};
+use crate::{constants::ENTITY_METADATA_URL, error::ErrorCode};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_spl::token::Mint;
@@ -156,7 +156,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
   let metadata = MetadataArgs {
     name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("{}/{}", HOTSPOT_METADATA_URL, key_str),
+    uri: format!("{}/{}", ENTITY_METADATA_URL, key_str),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
@@ -195,6 +195,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
     dao: ctx.accounts.dao.key(),
     entity_key: args.entity_key,
     bump_seed: ctx.bumps["key_to_asset"],
+    key_serialization: KeySerialization::B58,
   });
 
   Ok(())

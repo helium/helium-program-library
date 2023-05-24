@@ -29,6 +29,9 @@
       "path": "../helium-entity-manager-sdk"
     },
     {
+      "path": "../mobile-entity-manager-sdk"
+    },
+    {
       "path": "../treasury-management-sdk"
     },
     {

@@ -5,16 +5,10 @@ import {
   heliumCommonResolver,
   resolveIndividual,
 } from "@helium/spl-utils";
-import { iotInfoKey, keyToAssetKey, mobileInfoKey } from "./pdas";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import {
-  HeliumEntityManager,
-  IDL,
-} from "@helium/idls/lib/types/helium_entity_manager";
-import { PROGRAM_ID } from "./constants";
-import { Program } from "@coral-xyz/anchor";
 import { init } from "./init";
+import { iotInfoKey, keyToAssetKey, mobileInfoKey, programApprovalKey } from "./pdas";
 
 export const heliumEntityManagerResolvers = combineResolvers(
   heliumCommonResolver,
@@ -29,6 +23,15 @@ export const heliumEntityManagerResolvers = combineResolvers(
     account: "tokenAccount",
     mint: "collection",
     owner: "dataOnlyConfig",
+  }),
+  resolveIndividual(async ({ path, args, accounts, provider }) => {
+    if (path[path.length - 1] == "programApproval" && accounts.dao) {
+      let programId = args[args.length - 1] && args[args.length - 1].programId;
+      if (!programId) {
+        return
+      }
+      return programApprovalKey(accounts.dao as PublicKey, programId)[0]
+    }
   }),
   resolveIndividual(async ({ path }) => {
     if (path[path.length - 1] === "eccVerifier") {
