@@ -236,7 +236,7 @@ export async function createMockCompression({
   const proof = merkleTree.getProof(0);
   let getAssetFn = async () =>
     ({
-      id: await getLeafAssetId(merkle, new BN(0)),
+      id: hotspot,
       content: {
         metadata: {
           name: metadata.name,

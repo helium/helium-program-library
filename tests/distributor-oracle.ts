@@ -75,6 +75,7 @@ import {
 } from "@metaplex-foundation/mpl-bubblegum";
 // @ts-ignore
 import animalHash from "angry-purple-tiger";
+import { createMockCompression } from "./utils/compression";
 
 chai.use(chaiHttp);
 
@@ -342,91 +343,16 @@ describe("distributor-oracle", () => {
       .signers([makerKeypair, eccVerifier])
       .rpc({ skipPreflight: true });
 
-    const hotspot = await getLeafAssetId(merkle, new BN(0));
-
-    const leaves = Array(2 ** 3).fill(Buffer.alloc(32));
-    const creators = [
-      {
-        address: entityCreatorKey(dao)[0],
-        verified: true,
-        share: 100,
-      },
-    ];
-    const metadata: any = {
-      name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
-      symbol: "HOTSPOT",
-      uri: `https://entities.nft.helium.io/${ecc}`,
-      collection: {
-        key: collection,
-        verified: true,
-      },
-      creators,
-      sellerFeeBasisPoints: 0,
-      primarySaleHappened: true,
-      isMutable: true,
-      editionNonce: null,
-      tokenStandard: TokenStandard.NonFungible,
-      uses: null,
-      tokenProgramVersion: TokenProgramVersion.Original,
-    };
-    PublicKey.prototype.toString = PublicKey.prototype.toBase58;
-
-    const hash = computeCompressedNFTHash(
-      hotspot,
-      hotspotOwner.publicKey,
-      hotspotOwner.publicKey,
-      new anchor.BN(0),
-      metadata
-    );
-    leaves[0] = hash;
-    const merkleTree = new MerkleTree(leaves);
-    const proof = merkleTree.getProof(0);
-    asset = await getLeafAssetId(merkle, new BN(0));
-    getAssetFn = async () =>
-      ({
-        id: asset,
-        content: {
-          metadata: {
-            name: metadata.name,
-            symbol: metadata.symbol,
-          },
-          json_uri: metadata.uri,
-        },
-        royalty: {
-          basis_points: metadata.sellerFeeBasisPoints,
-          primary_sale_happened: true,
-        },
-        mutable: true,
-        supply: {
-          edition_nonce: null,
-        },
-        grouping: metadata.collection.key,
-        uses: metadata.uses,
-        creators: metadata.creators,
-        ownership: {
-          owner: hotspotOwner.publicKey,
-          delegate: hotspotOwner.publicKey,
-        },
-        compression: {
-          compressed: true,
-          leafId: 0,
-          eligible: true,
-          dataHash: computeDataHash(metadata),
-          creatorHash: computeCreatorHash(creators),
-        },
-      } as Asset);
-    getAssetProofFn = async () => {
-      return {
-        root: new PublicKey(proof.root),
-        proof: proof.proof.map((p) => new PublicKey(p)),
-        nodeIndex: 0,
-        leaf: new PublicKey(proof.leaf),
-        treeId: merkle,
-      };
-    };
+    ({getAssetFn, getAssetProofFn, hotspot: asset} = await createMockCompression({
+      collection: collection,
+      dao,
+      merkle: merkle,
+      ecc,
+      hotspotOwner,
+    }));
     const recipientMethod = await initializeCompressionRecipient({
       program: ldProgram,
-      assetId: hotspot,
+      assetId: asset,
       lazyDistributor,
       getAssetFn,
       getAssetProofFn,
@@ -497,6 +423,53 @@ describe("distributor-oracle", () => {
       await oracleServer.db.getCurrentRewards(asset)
     );
   });
+
+  it("should bulk sign transactions", async() => {
+    const unsigned = await client.formTransaction({
+      dao: daoK,
+      program: ldProgram,
+      rewardsOracleProgram: rewardsProgram,
+      provider,
+      getAssetFn,
+      getAssetProofFn,
+      rewards: [
+        {
+          oracleKey: oracle.publicKey,
+          currentRewards: await oracleServer.db.getCurrentRewards(asset),
+        },
+      ],
+      asset: asset,
+      lazyDistributor,
+      skipOracleSign: true,
+    });
+    const tx = await provider.wallet.signTransaction(unsigned);
+    const serializedTx = tx.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    });
+
+    const res = await chai
+      .request(oracleServer.server)
+      .post("/bulk-sign")
+      .send({ transactions: [serializedTx] });
+
+    assert.hasAllKeys(res.body, ["transactions", "success"]);
+    const signedTx = Transaction.from(res.body.transactions[0].data);
+    await sendAndConfirmWithRetry(
+      provider.connection,
+      signedTx.serialize(),
+      {
+        skipPreflight: true,
+      },
+      "confirmed"
+    );
+
+    const recipientAcc = await ldProgram.account.recipientV0.fetch(recipient);
+    assert.equal(
+      recipientAcc.totalRewards.toNumber(),
+      Number(await oracleServer.db.getCurrentRewards(asset))
+    );
+  })
 
   it("should sign and execute properly formed transactions", async () => {
     const unsigned = await client.formTransaction({
