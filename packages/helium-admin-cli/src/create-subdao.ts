@@ -538,6 +538,7 @@ export async function run(args: any = process.argv) {
             emissionSchedule,
             dcBurnAuthority: null,
             onboardingDcFee: null,
+            onboardingDataOnlyDcFee: null,
             activeDeviceAggregator: null,
             registrar: null,
             delegatorRewardsPercent: null,
