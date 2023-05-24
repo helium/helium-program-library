@@ -84,8 +84,8 @@ pub struct DataOnlyConfigV0 {
   pub new_tree_space: u64,
   pub new_tree_fee_lamports: u64,
 }
-  
- #[account]
+
+#[account]
 #[derive(Default)]
 pub struct ProgramApprovalV0 {
   pub dao: Pubkey,

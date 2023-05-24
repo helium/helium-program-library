@@ -25,7 +25,7 @@ pub enum ErrorCode {
 
   #[msg("The provided tree is an invalid size")]
   InvalidTreeSpace,
-  
+
   #[msg("Invalid seeds provided")]
   InvalidSeeds,
 }
