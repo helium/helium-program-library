@@ -8,16 +8,16 @@ import BN from "bn.js";
 let lastDriftCalc = 0;
 let driftFromSol = BigInt(0);
 export async function getUnixTimestamp(): Promise<bigint> {
-  const localTime = new Date().valueOf();
+  const localTime = new Date().valueOf() / 1000;
   // Every hour, recheck the drift between hour clock and sol's clock
-  if (localTime - lastDriftCalc > 60 * 60 * 1000) {
+  if (localTime - lastDriftCalc > 60 * 60) {
     lastDriftCalc = localTime;
     const clock = await provider.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
     const unixTime = clock!.data.readBigInt64LE(8 * 4);
 
-    driftFromSol = BigInt(localTime / 1000) - unixTime;
+    driftFromSol = BigInt(localTime) - unixTime;
   }
-  return BigInt(localTime / 1000) - driftFromSol;
+  return BigInt(localTime) - driftFromSol;
 }
 
 const MAX_U64 = new anchor.BN("18446744073709551615");
