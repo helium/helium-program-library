@@ -70,6 +70,7 @@ pub struct OnboardDataOnlyIotHotspotV0<'info> {
     seeds = ["data_only_config".as_bytes(), dao.key().as_ref()],
     bump,
     has_one = merkle_tree,
+    has_one = dao,
   )]
   pub data_only_config: Box<Account<'info, DataOnlyConfigV0>>,
   #[account(
