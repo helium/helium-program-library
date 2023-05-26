@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Migration of state from helium",
   "repository": {
     "type": "git",
@@ -39,8 +39,8 @@
     "@helium/circuit-breaker-sdk": "^0.1.4",
     "@helium/crypto": "^4.6.2",
     "@helium/data-credits-sdk": "^0.1.4",
-    "@helium/distributor-oracle": "^0.1.4",
-    "@helium/helium-entity-manager-sdk": "^0.1.4",
+    "@helium/distributor-oracle": "^0.1.5",
+    "@helium/helium-entity-manager-sdk": "^0.1.5",
     "@helium/helium-sub-daos-sdk": "^0.1.4",
     "@helium/lazy-distributor-sdk": "^0.1.4",
     "@helium/lazy-transactions-sdk": "^0.1.4",
