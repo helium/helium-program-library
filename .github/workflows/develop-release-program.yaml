@@ -63,7 +63,6 @@ jobs:
         id: buffer-deploy
         with:
           devnet: true
-          testing: true
           network: devnet
           program: ${{ env.PROGRAM_NAME }}
           keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
