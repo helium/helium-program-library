@@ -119,33 +119,6 @@ pub mod helium_entity_manager {
     update_mobile_info_v0::handler(ctx, args)
   }
 
-  pub fn initialize_data_only_v0<'info>(
-    ctx: Context<'_, '_, '_, 'info, InitializeDataOnlyV0<'info>>,
-    args: InitializeDataOnlyArgsV0,
-  ) -> Result<()> {
-    initialize_data_only_v0::handler(ctx, args)
-  }
-
-  pub fn issue_data_only_entity_v0<'info>(
-    ctx: Context<'_, '_, '_, 'info, IssueDataOnlyEntityV0<'info>>,
-    args: IssueDataOnlyEntityArgsV0,
-  ) -> Result<()> {
-    issue_data_only_entity_v0::handler(ctx, args)
-  }
-
-  pub fn onboard_data_only_iot_hotspot_v0<'info>(
-    ctx: Context<'_, '_, '_, 'info, OnboardDataOnlyIotHotspotV0<'info>>,
-    args: OnboardDataOnlyIotHotspotArgsV0,
-  ) -> Result<()> {
-    onboard_data_only_iot_hotspot_v0::handler(ctx, args)
-  }
-
-  pub fn update_data_only_tree_v0<'info>(
-    ctx: Context<'_, '_, '_, 'info, UpdateDataOnlyTreeV0<'info>>,
-  ) -> Result<()> {
-    update_data_only_tree_v0::handler(ctx)
-  }
-
   pub fn temp_repair_iot_operations_fund(ctx: Context<TempRepairIotOperationsFund>) -> Result<()> {
     temp_repair_iot_operations_fund::handler(ctx)
   }

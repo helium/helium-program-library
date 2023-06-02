@@ -101,12 +101,6 @@ export async function run(args: any = process.argv) {
         "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
       default: null,
     },
-    onboardingDataOnlyDcFee: {
-      type: "number",
-      required: false,
-      describe: "The data credits fee for onboarding data only hotspots",
-      default: null,
-    }
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -223,7 +217,6 @@ export async function run(args: any = process.argv) {
           ? new PublicKey(argv.newDcBurnAuthority)
           : null,
         onboardingDcFee: null,
-        onboardingDataOnlyDcFee: argv.onboardingDataOnlyDcFee ? new BN(argv.onboardingDataOnlyDcFee) : null,
         activeDeviceAggregator: argv.newActiveDeviceAggregator
           ? new PublicKey(argv.newActiveDeviceAggregator)
           : null,
