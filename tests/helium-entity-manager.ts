@@ -1,16 +1,19 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
-import { Asset, AssetProof, createMintInstructions, toBN } from "@helium/spl-utils";
-import { AddGatewayV1 } from "@helium/transactions";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
+import { Asset, AssetProof, createMintInstructions, sendInstructions, toBN, proofArgsAndAccounts } from "@helium/spl-utils";
+import { init as initPriceOracle } from "../packages/price-oracle-sdk/src";
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
+import { ComputeBudgetProgram, Keypair, PublicKey, LAMPORTS_PER_SOL, SystemProgram } from "@solana/web3.js";
+import { AddGatewayV1 } from "@helium/transactions";
 import chai from "chai";
 import {
+  dataOnlyConfigKey,
   entityCreatorKey,
   init as initHeliumEntityManager,
+  iotInfoKey,
   onboardIotHotspot,
   onboardMobileHotspot,
   updateIotMetadata,
@@ -48,7 +51,9 @@ import {
 import { BN } from "bn.js";
 import chaiAsPromised from "chai-as-promised";
 import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
-import { loadKeypair } from "./utils/solana";
+import { exists, loadKeypair } from "./utils/solana"; 
+import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
+import { createMockCompression } from "./utils/compression";
 
 chai.use(chaiAsPromised);
 
@@ -135,6 +140,230 @@ describe("helium-entity-manager", () => {
       provider.wallet.publicKey.toBase58()
     );
   });
+
+  it("initializes a data only config", async () => {
+    const [height, buffer, canopy] = [14, 64, 11];
+    const merkle = Keypair.generate();
+    const space = getConcurrentMerkleTreeAccountSize(height, buffer, canopy);
+    const cost = await provider.connection.getMinimumBalanceForRentExemption(
+      space
+    );
+    await sendInstructions(
+      provider,
+      [
+        SystemProgram.createAccount({
+          fromPubkey: provider.wallet.publicKey,
+          newAccountPubkey: merkle.publicKey,
+          lamports: cost,
+          space: space,
+          programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+        }),
+      ],
+      [merkle]
+    );
+    await hemProgram.methods.initializeDataOnlyV0({
+      authority: me,
+      newTreeDepth: height,
+      newTreeBufferSize: buffer,
+      newTreeSpace: new BN(getConcurrentMerkleTreeAccountSize(height, buffer, canopy)),
+      newTreeFeeLamports: new BN((LAMPORTS_PER_SOL * 30) / 2**height),
+      name: "DATAONLY",
+      metadataUrl: "test",
+    }).accounts({
+      dao,
+      merkleTree: merkle.publicKey,
+    }).preInstructions([
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+    ]).rpc();
+  });
+
+  describe("with data only config", () => {
+    let ecc: string;
+    let rewardableEntityConfig: PublicKey;
+    let getAssetFn: (
+      url: string,
+      assetId: PublicKey
+    ) => Promise<Asset | undefined>;
+    let getAssetProofFn: (
+      url: string,
+      assetId: PublicKey
+    ) => Promise<AssetProof | undefined>;
+    let hotspotOwner = Keypair.generate();
+    let hotspot: PublicKey;
+    let startDcBal = DC_FEE * 10;
+
+    beforeEach(async () => {
+      ({ rewardableEntityConfig } = await initTestRewardableEntityConfig(
+        hemProgram,
+        subDao,
+      ));
+      ecc = (await HeliumKeypair.makeRandom()).address.b58;
+      const [height, buffer, canopy] = [3, 8, 0];
+      const merkle = Keypair.generate();
+      const space = getConcurrentMerkleTreeAccountSize(height, buffer, canopy);
+      const cost = await provider.connection.getMinimumBalanceForRentExemption(
+        space
+      );
+      await sendInstructions(
+        provider,
+        [
+          SystemProgram.createAccount({
+            fromPubkey: provider.wallet.publicKey,
+            newAccountPubkey: merkle.publicKey,
+            lamports: cost,
+            space: space,
+            programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+          }),
+        ],
+        [merkle]
+      );
+      await hemProgram.methods.initializeDataOnlyV0({
+        authority: me,
+        newTreeDepth: height,
+        newTreeBufferSize: buffer,
+        newTreeSpace: new BN(getConcurrentMerkleTreeAccountSize(height, buffer, canopy)),
+        newTreeFeeLamports: new BN((LAMPORTS_PER_SOL * 30) / 2**height),
+        name: "DATAONLY",
+        metadataUrl: "test",
+      }).accounts({
+        dao,
+        merkleTree: merkle.publicKey,
+      }).preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+      ]).rpc({skipPreflight: true});
+
+      const doAcc = await hemProgram.account.dataOnlyConfigV0.fetch(dataOnlyConfigKey(dao)[0]);
+
+      ({getAssetFn, getAssetProofFn, hotspot} = await createMockCompression({
+        collection: doAcc.collection,
+        dao,
+        merkle: merkle.publicKey,
+        ecc,
+        hotspotOwner,
+      }));
+
+      await dcProgram.methods
+        .mintDataCreditsV0({
+          hntAmount: toBN(startDcBal, 8),
+          dcAmount: null,
+        })
+        .accounts({ dcMint })
+        .rpc({ skipPreflight: true });
+    });
+    it("issues and onboards a data only hotspot", async () => {
+      let hotspotOwner = Keypair.generate();
+      const issueMethod = hemProgram.methods
+        .issueDataOnlyEntityV0({
+          entityKey: Buffer.from(bs58.decode(ecc)),
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+        ])
+        .accounts({
+          recipient: hotspotOwner.publicKey,
+          dao,
+          eccVerifier: eccVerifier.publicKey,
+        })
+        .signers([eccVerifier]);
+
+      const { keyToAsset } = await issueMethod.pubkeys();
+      await issueMethod.rpc({ skipPreflight: true });
+        
+      console.log(keyToAsset?.toString());
+      const ktaAcc = await hemProgram.account.keyToAssetV0.fetch(
+        keyToAsset!
+      );
+      expect(Boolean(ktaAcc)).to.be.true;
+      expect(ktaAcc.asset.toString()).to.eq(hotspot.toString());
+      expect(ktaAcc.dao.toString()).to.eq(dao.toString());
+
+      const {
+        args,
+      } = await proofArgsAndAccounts({
+        connection: hemProgram.provider.connection,
+        assetId: hotspot,
+        getAssetFn,
+        getAssetProofFn,
+      });
+      const onboardMethod = hemProgram.methods
+        .onboardDataOnlyIotHotspotV0({
+          ...args,
+          location: null,
+          elevation: 50,
+          gain: 100,
+        }).accounts({
+          rewardableEntityConfig,
+          hotspotOwner: hotspotOwner.publicKey,
+          keyToAsset,
+          iotInfo: iotInfoKey(rewardableEntityConfig, ecc)[0],
+          subDao,
+        }).signers([hotspotOwner]);
+      
+      const { iotInfo } = await onboardMethod.pubkeys();
+      await onboardMethod.rpc();
+
+      const iotInfoAccount = await hemProgram.account.iotHotspotInfoV0.fetch(
+        iotInfo!
+      );
+      expect(Boolean(iotInfoAccount)).to.be.true;
+      expect(iotInfoAccount.asset.toString()).to.eq(hotspot.toString());
+      expect(iotInfoAccount.location).to.be.null;
+      expect(iotInfoAccount.elevation).to.eq(50);
+      expect(iotInfoAccount.gain).to.eq(100);
+      expect(iotInfoAccount.isFullHotspot).to.be.false;
+
+    });
+
+    it("can swap tree when it's full", async () => {
+      let hotspotOwner = Keypair.generate();
+      
+      // fill up the tree
+      while (true) {
+        try {
+          ecc = (await HeliumKeypair.makeRandom()).address.b58;
+          await hemProgram.methods
+          .issueDataOnlyEntityV0({
+            entityKey: Buffer.from(bs58.decode(ecc)),
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+          ])
+          .accounts({
+            recipient: hotspotOwner.publicKey,
+            dao,
+            eccVerifier: eccVerifier.publicKey,
+          })
+          .signers([eccVerifier]).rpc({ skipPreflight: true });
+        } catch (err) {
+          break;
+        }
+      }
+      const [height, buffer, canopy] = [3, 8, 0];
+      const newMerkle = Keypair.generate();
+      const space = getConcurrentMerkleTreeAccountSize(height, buffer, canopy);
+      const cost = await provider.connection.getMinimumBalanceForRentExemption(
+        space
+      );
+      await sendInstructions(
+        provider,
+        [
+          SystemProgram.createAccount({
+            fromPubkey: provider.wallet.publicKey,
+            newAccountPubkey: newMerkle.publicKey,
+            lamports: cost,
+            space: space,
+            programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+          }),
+        ],
+        [newMerkle]
+      );
+      await hemProgram.methods.updateDataOnlyTreeV0().accounts({
+        dataOnlyConfig: dataOnlyConfigKey(dao)[0],
+        newMerkleTree: newMerkle.publicKey,
+      }).rpc({skipPreflight: true});
+    })
+  });
+
 
   it("initializes a maker", async () => {
     const { rewardableEntityConfig } = await initTestRewardableEntityConfig(
@@ -261,87 +490,14 @@ describe("helium-entity-manager", () => {
 
       maker = makerConf.maker;
       makerKeypair = makerConf.makerKeypair;
-      hotspotCollection = makerConf.collection;
 
-      // Setup merkle tree -- this isn't needed anywhere but localnet,
-      // we're effectively duplicating metaplex digital asset api
-      const merkle = makerConf.merkle;
-      hotspot = await getLeafAssetId(merkle, new BN(0));
-
-      const leaves = Array(2 ** 3).fill(Buffer.alloc(32));
-
-      const creators = [
-        {
-          address: entityCreatorKey(dao)[0],
-          verified: true,
-          share: 100,
-        },
-      ];
-      metadata = {
-        name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
-        symbol: "HOTSPOT",
-        uri: `https://entities.nft.helium.io/${ecc}`,
-        collection: {
-          key: hotspotCollection,
-          verified: true,
-        },
-        creators,
-        sellerFeeBasisPoints: 0,
-        primarySaleHappened: true,
-        isMutable: true,
-        editionNonce: null,
-        tokenStandard: TokenStandard.NonFungible,
-        uses: null,
-        tokenProgramVersion: TokenProgramVersion.Original,
-      };
-      const hash = computeCompressedNFTHash(
-        hotspot,
-        hotspotOwner.publicKey,
-        hotspotOwner.publicKey,
-        new anchor.BN(0),
-        metadata
-      );
-      leaves[0] = hash;
-      merkleTree = new MerkleTree(leaves);
-      const proof = merkleTree.getProof(0);
-      getAssetFn = async () =>
-        ({
-          id: await getLeafAssetId(merkle, new BN(0)),
-          content: {
-            metadata: {
-              name: metadata.name,
-              symbol: metadata.symbol,
-            },
-            json_uri: metadata.uri,
-          },
-          royalty: {
-            basis_points: metadata.sellerFeeBasisPoints,
-            primary_sale_happened: true,
-          },
-          mutable: true,
-          supply: {
-            edition_nonce: null,
-          },
-          grouping: metadata.collection.key,
-          uses: metadata.uses,
-          creators: metadata.creators,
-          ownership: { owner: hotspotOwner.publicKey },
-          compression: {
-            compressed: true,
-            eligible: true,
-            dataHash: computeDataHash(metadata),
-            creatorHash: computeCreatorHash(creators),
-          },
-        } as Asset);
-      getAssetProofFn = async () => {
-        return {
-          root: new PublicKey(proof.root),
-          proof: proof.proof.map((p) => new PublicKey(p)),
-          nodeIndex: 0,
-          leaf: new PublicKey(proof.leaf),
-          treeId: merkle,
-        };
-      };
+      ({getAssetFn, getAssetProofFn, hotspot} = await createMockCompression({
+        collection: makerConf.collection,
+        dao,
+        merkle: makerConf.merkle,
+        ecc,
+        hotspotOwner,
+      }));
     });
 
     // Only uncomment this when you want to debug the sig verifier service locally.
@@ -554,84 +710,13 @@ describe("helium-entity-manager", () => {
       makerKeypair = makerConf.makerKeypair;
       hotspotCollection = makerConf.collection;
 
-      // Setup merkle tree -- this isn't needed anywhere but localnet,
-      // we're effectively duplicating metaplex digital asset api
-      const merkle = makerConf.merkle;
-      hotspot = await getLeafAssetId(merkle, new BN(0));
-
-      const leaves = Array(2 ** 3).fill(Buffer.alloc(32));
-      const creators = [
-        {
-          address: entityCreatorKey(dao)[0],
-          verified: true,
-          share: 100,
-        },
-      ];
-      metadata = {
-        name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
-        symbol: "HOTSPOT",
-        uri: `https://entities.nft.helium.io/${ecc}`,
-        collection: {
-          key: hotspotCollection,
-          verified: true,
-        },
-        creators,
-        sellerFeeBasisPoints: 0,
-        primarySaleHappened: true,
-        isMutable: true,
-        editionNonce: null,
-        tokenStandard: TokenStandard.NonFungible,
-        uses: null,
-        tokenProgramVersion: TokenProgramVersion.Original,
-      };
-      const hash = computeCompressedNFTHash(
-        hotspot,
-        hotspotOwner.publicKey,
-        hotspotOwner.publicKey,
-        new anchor.BN(0),
-        metadata
-      );
-      leaves[0] = hash;
-      merkleTree = new MerkleTree(leaves);
-      const proof = merkleTree.getProof(0);
-      getAssetFn = async () =>
-        ({
-          id: await getLeafAssetId(merkle, new BN(0)),
-          content: {
-            metadata: {
-              name: metadata.name,
-              symbol: metadata.symbol,
-            },
-            json_uri: metadata.uri,
-          },
-          royalty: {
-            basis_points: metadata.sellerFeeBasisPoints,
-            primary_sale_happened: true,
-          },
-          mutable: true,
-          supply: {
-            edition_nonce: null,
-          },
-          grouping: metadata.collection.key,
-          uses: metadata.uses,
-          creators: metadata.creators,
-          ownership: { owner: hotspotOwner.publicKey },
-          compression: {
-            compressed: true,
-            eligible: true,
-            dataHash: computeDataHash(metadata),
-            creatorHash: computeCreatorHash(creators),
-          },
-        } as Asset);
-      getAssetProofFn = async () => {
-        return {
-          root: new PublicKey(proof.root),
-          proof: proof.proof.map((p) => new PublicKey(p)),
-          nodeIndex: 0,
-          leaf: new PublicKey(proof.leaf),
-          treeId: merkle,
-        };
-      };
+      ({getAssetFn, getAssetProofFn, hotspot} = await createMockCompression({
+        collection: makerConf.collection,
+        dao,
+        merkle: makerConf.merkle,
+        ecc,
+        hotspotOwner,
+      }));
     });
 
     it("issues an iot hotspot", async () => {
