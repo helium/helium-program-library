@@ -1,43 +1,51 @@
 use crate::state::*;
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::hash::hash};
+
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{Mint, Token},
+  token::{Mint, Token, TokenAccount},
 };
 use data_credits::{
   cpi::{
     accounts::{BurnCommonV0, BurnWithoutTrackingV0},
     burn_without_tracking_v0,
   },
+  program::DataCredits,
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
 use mpl_bubblegum::utils::get_asset_id;
-use mpl_bubblegum::{program::Bubblegum, state::TreeConfig};
 use shared_utils::*;
 use spl_account_compression::program::SplAccountCompression;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct UpdateIotInfoArgsV0 {
-  pub location: Option<u64>,
-  pub elevation: Option<i32>,
-  pub gain: Option<i32>,
+pub struct OnboardDataOnlyIotHotspotArgsV0 {
   pub data_hash: [u8; 32],
   pub creator_hash: [u8; 32],
   pub root: [u8; 32],
   pub index: u32,
+  pub location: Option<u64>,
+  pub elevation: Option<i32>,
+  pub gain: Option<i32>,
 }
 
 #[derive(Accounts)]
-#[instruction(args: UpdateIotInfoArgsV0)]
-pub struct UpdateIotInfoV0<'info> {
+#[instruction(args: OnboardDataOnlyIotHotspotArgsV0)]
+pub struct OnboardDataOnlyIotHotspotV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(mut)]
   pub dc_fee_payer: Signer<'info>,
   #[account(
-    mut,
-    constraint = iot_info.asset == get_asset_id(&merkle_tree.key(), u64::try_from(args.index).unwrap())
+    init,
+    payer = payer,
+    space = IOT_HOTSPOT_INFO_SIZE,
+    seeds = [
+      b"iot_info", 
+      rewardable_entity_config.key().as_ref(),
+      &hash(&key_to_asset.entity_key[..]).to_bytes()
+    ],
+    bump,
   )]
   pub iot_info: Box<Account<'info, IotHotspotInfoV0>>,
   #[account(mut)]
@@ -45,33 +53,44 @@ pub struct UpdateIotInfoV0<'info> {
   /// CHECK: The merkle tree
   pub merkle_tree: UncheckedAccount<'info>,
   #[account(
-    seeds = [merkle_tree.key().as_ref()],
-    bump,
-    seeds::program = bubblegum_program.key()
+    mut,
+    associated_token::mint = dc_mint,
+    associated_token::authority = dc_fee_payer,
   )]
-  pub tree_authority: Account<'info, TreeConfig>,
-  /// CHECK: Only loaded if location is being asserted
-  #[account(mut)]
-  pub dc_burner: UncheckedAccount<'info>,
+  pub dc_burner: Box<Account<'info, TokenAccount>>,
 
   #[account(
     has_one = sub_dao,
-    constraint = rewardable_entity_config.settings.validate_iot_gain(args.gain)
+    constraint = rewardable_entity_config.settings.validate_iot_gain(args.gain),
   )]
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
+
   #[account(
-    has_one = dc_mint
+    mut,
+    seeds = ["data_only_config".as_bytes(), dao.key().as_ref()],
+    bump,
+    has_one = merkle_tree,
+    has_one = dao,
+  )]
+  pub data_only_config: Box<Account<'info, DataOnlyConfigV0>>,
+  #[account(
+    has_one = dc_mint,
   )]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
-    has_one = dao
+    has_one = dao,
+    constraint = get_asset_id(&merkle_tree.key(), args.index.into()) == key_to_asset.asset,
+  )]
+  pub key_to_asset: Box<Account<'info, KeyToAssetV0>>,
+  #[account(
+    has_one = dao,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,
 
   #[account(
-    seeds=[
+    seeds = [
       "dc".as_bytes(),
       dc_mint.key().as_ref()
     ],
@@ -81,17 +100,14 @@ pub struct UpdateIotInfoV0<'info> {
   )]
   pub dc: Account<'info, DataCreditsV0>,
 
-  pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
-  /// CHECK: Checked with constraints
-  #[account(address = data_credits::ID)]
-  pub data_credits_program: AccountInfo<'info>,
+  pub data_credits_program: Program<'info, DataCredits>,
   pub token_program: Program<'info, Token>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
 }
 
-impl<'info> UpdateIotInfoV0<'info> {
+impl<'info> OnboardDataOnlyIotHotspotV0<'info> {
   pub fn burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, BurnWithoutTrackingV0<'info>> {
     let cpi_accounts = BurnWithoutTrackingV0 {
       burn_accounts: BurnCommonV0 {
@@ -110,9 +126,10 @@ impl<'info> UpdateIotInfoV0<'info> {
 }
 
 pub fn handler<'info>(
-  ctx: Context<'_, '_, '_, 'info, UpdateIotInfoV0<'info>>,
-  args: UpdateIotInfoArgsV0,
+  ctx: Context<'_, '_, '_, 'info, OnboardDataOnlyIotHotspotV0<'info>>,
+  args: OnboardDataOnlyIotHotspotArgsV0,
 ) -> Result<()> {
+  let asset_id = get_asset_id(&ctx.accounts.merkle_tree.key(), args.index.into());
   verify_compressed_nft(VerifyCompressedNftArgs {
     data_hash: args.data_hash,
     creator_hash: args.creator_hash,
@@ -125,10 +142,20 @@ pub fn handler<'info>(
     proof_accounts: ctx.remaining_accounts.to_vec(),
   })?;
 
+  let mut dc_fee = ctx.accounts.sub_dao.onboarding_data_only_dc_fee;
+  ctx.accounts.iot_info.set_inner(IotHotspotInfoV0 {
+    asset: asset_id,
+    bump_seed: ctx.bumps["iot_info"],
+    location: None,
+    elevation: args.elevation,
+    gain: args.gain,
+    is_full_hotspot: false,
+    num_location_asserts: 0,
+  });
+
   if let (
-    Some(new_location),
+    Some(location),
     ConfigSettingsV0::IotConfig {
-      full_location_staking_fee,
       dataonly_location_staking_fee,
       ..
     },
@@ -136,37 +163,21 @@ pub fn handler<'info>(
     args.location,
     ctx.accounts.rewardable_entity_config.settings,
   ) {
-    if ctx.accounts.iot_info.location.is_none()
-      || (ctx.accounts.iot_info.location.is_some()
-        && ctx.accounts.iot_info.location != Some(new_location))
-    {
-      let mut dc_fee: u64 = dataonly_location_staking_fee;
-      if ctx.accounts.iot_info.is_full_hotspot {
-        dc_fee = full_location_staking_fee;
-      }
+    dc_fee = dataonly_location_staking_fee.checked_add(dc_fee).unwrap();
 
-      ctx.accounts.iot_info.num_location_asserts = ctx
-        .accounts
-        .iot_info
-        .num_location_asserts
-        .checked_add(1)
-        .unwrap();
-
-      // burn the dc tokens
-      burn_without_tracking_v0(
-        ctx.accounts.burn_ctx(),
-        BurnWithoutTrackingArgsV0 { amount: dc_fee },
-      )?;
-      ctx.accounts.iot_info.location = Some(new_location);
-    }
+    ctx.accounts.iot_info.location = Some(location);
+    ctx.accounts.iot_info.num_location_asserts = ctx
+      .accounts
+      .iot_info
+      .num_location_asserts
+      .checked_add(1)
+      .unwrap();
   }
 
-  if args.elevation.is_some() {
-    ctx.accounts.iot_info.elevation = args.elevation;
-  }
+  burn_without_tracking_v0(
+    ctx.accounts.burn_ctx(),
+    BurnWithoutTrackingArgsV0 { amount: dc_fee },
+  )?;
 
-  if args.gain.is_some() {
-    ctx.accounts.iot_info.gain = args.gain;
-  }
   Ok(())
 }
