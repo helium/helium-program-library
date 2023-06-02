@@ -18,12 +18,6 @@ export const heliumEntityManagerResolvers = combineResolvers(
     mint: "collection",
     owner: "maker",
   }),
-  ataResolver({
-    instruction: "initializeDataOnlyV0",
-    account: "tokenAccount",
-    mint: "collection",
-    owner: "dataOnlyConfig",
-  }),
   resolveIndividual(async ({ path, args, accounts, provider }) => {
     if (path[path.length - 1] == "programApproval" && accounts.dao) {
       let programId = args[args.length - 1] && args[args.length - 1].programId;

@@ -27,24 +27,12 @@ export const rewardableEntityConfigKey = (
   );
 
 export const hotspotCollectionKey = (
-  makerOrDataOnly: PublicKey,
+  maker: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
-    [Buffer.from("collection", "utf-8"), makerOrDataOnly.toBuffer()],
+    [Buffer.from("collection", "utf-8"), maker.toBuffer()],
     programId
-  );
-
-export const dataOnlyConfigKey = (dao: PublicKey, programId: PublicKey = PROGRAM_ID) => 
-  PublicKey.findProgramAddressSync(
-    [Buffer.from("data_only_config", "utf-8"), dao.toBuffer()],
-    programId,
-  );
-
-export const dataOnlyEscrowKey = (dataOnly: PublicKey, programId: PublicKey = PROGRAM_ID) => 
-  PublicKey.findProgramAddressSync(
-    [Buffer.from("data_only_escrow", "utf-8"), dataOnly.toBuffer()],
-    programId,
   );
 
 export const makerKey = (dao: PublicKey, name: String, programId: PublicKey = PROGRAM_ID) =>
