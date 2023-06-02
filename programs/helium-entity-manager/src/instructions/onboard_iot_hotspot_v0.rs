@@ -60,7 +60,16 @@ pub struct OnboardIotHotspotV0<'info> {
 
   #[account(
     has_one = sub_dao,
-    constraint = rewardable_entity_config.settings.validate_iot_gain(args.gain),
+    constraint = match rewardable_entity_config.settings {
+      ConfigSettingsV0::IotConfig {
+        max_gain, min_gain, ..
+      } => {
+        args.gain
+          .map(|gain| gain <= max_gain && gain >= min_gain)
+          .unwrap_or(true)
+      }
+      _ => false,
+    }
   )]
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
   #[account(

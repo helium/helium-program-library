@@ -469,7 +469,6 @@ export async function run(args: any = process.argv) {
         // $40 for iot, $0 for mobile
         onboardingDcFee:
           name.toUpperCase() == "IOT" ? toBN(4000000, 0) : toBN(0, 0),
-        onboardingDataOnlyDcFee: name.toUpperCase() == "IOT" ? toBN(1000000, 0) : toBN(0, 0),
         delegatorRewardsPercent: delegatorRewardsPercent(
           argv.delegatorRewardsPercent
         ),
@@ -538,7 +537,6 @@ export async function run(args: any = process.argv) {
             emissionSchedule,
             dcBurnAuthority: null,
             onboardingDcFee: null,
-            onboardingDataOnlyDcFee: null,
             activeDeviceAggregator: null,
             registrar: null,
             delegatorRewardsPercent: null,

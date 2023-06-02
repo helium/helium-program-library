@@ -46,11 +46,6 @@ pub struct IssueEntityArgsV0 {
   pub entity_key: Vec<u8>,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct IssueDataOnlyEntityArgsV0 {
-  pub entity_key: Vec<u8>,
-}
-
 #[derive(Deserialize, Serialize, Default)]
 struct TransactionResponse {
   pub count: u32,
@@ -112,30 +107,20 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
     return Err(Status::BadRequest);
   }
 
-  // Verify it's issue_entity or issue_data_only_entity
-  let issue_sighash = sighash("global", "issue_entity_v0");
-  let issue_do_sighash = sighash("global", "issue_data_only_entity_v0");
-  if issue_sighash != ixn.data[0..8] && issue_do_sighash != ixn.data[0..8] {
+  // Verify it's issue entity
+  let sighash = sighash("global", "issue_entity_v0");
+  if sighash != ixn.data[0..8] {
     error!("Sighash mismatch");
     return Err(Status::BadRequest);
   }
 
-  let pubkey: PublicKey = if issue_sighash == ixn.data[0..8] {
-    let issue_entity = IssueEntityArgsV0::try_from_slice(&ixn.data[8..]).map_err(|e| {
-      error!("Failed to decode instruction: {:?}", e);
-      Status::BadRequest
-    })?;
-    let keystr = bs58::encode(&issue_entity.entity_key).into_string();
-    info!("key: {:?}", keystr);
-    PublicKey::from_str(&keystr).unwrap()
-  } else {
-    let issue_entity = IssueDataOnlyEntityArgsV0::try_from_slice(&ixn.data[8..]).map_err(|e| {
-      error!("Failed to decode instruction: {:?}", e);
-      Status::BadRequest
-    })?;
-    PublicKey::from_bytes(&issue_entity.entity_key).unwrap()
-  };
-  info!("key: {:?}", pubkey.to_string());
+  let issue_entity = IssueEntityArgsV0::try_from_slice(&ixn.data[8..]).map_err(|e| {
+    error!("Failed to decode instruction: {:?}", e);
+    Status::BadRequest
+  })?;
+  let keystr = bs58::encode(&issue_entity.entity_key).into_string();
+  info!("key: {:?}", keystr);
+  let pubkey = PublicKey::from_str(&keystr).unwrap();
 
   // Verify the ecc signature against the message
   let msg = hex::decode(&verify.msg).map_err(|_| Status::BadRequest)?;
@@ -149,7 +134,7 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
   // Make sure the hotspot doesn't need to be migrated
   let url = format!(
     "{}/migrate/hotspot/{}?limit=1&offset=0",
-    migration_url, pubkey.to_string()
+    migration_url, keystr
   );
   println!("{}", url);
   let response = reqwest::get(url.as_str())
@@ -168,7 +153,7 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
   if response.transactions.len() > 0 {
     error!(
       "Cannot onboard hotspot with key: {:?}. It has not been migrated yet.",
-      pubkey.to_string()
+      keystr
     );
     return Err(Status::BadRequest);
   }

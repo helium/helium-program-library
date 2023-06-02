@@ -25,19 +25,6 @@ pub enum ConfigSettingsV0 {
   },
 }
 
-impl ConfigSettingsV0 {
-  pub fn validate_iot_gain(&self, gain: Option<i32>) -> bool {
-    match self {
-      ConfigSettingsV0::IotConfig {
-        max_gain, min_gain, ..
-      } => gain
-        .map(|gain| &gain <= max_gain && &gain >= min_gain)
-        .unwrap_or(true),
-      _ => false,
-    }
-  }
-}
-
 impl Default for ConfigSettingsV0 {
   fn default() -> Self {
     ConfigSettingsV0::IotConfig {
@@ -68,21 +55,6 @@ pub struct MakerApprovalV0 {
   pub rewardable_entity_config: Pubkey,
   pub maker: Pubkey,
   pub bump_seed: u8,
-}
-
-#[account]
-#[derive(Default)]
-pub struct DataOnlyConfigV0 {
-  pub authority: Pubkey,
-  pub bump_seed: u8,
-  pub collection: Pubkey, // The metaplex collection to be issued
-  pub merkle_tree: Pubkey,
-  pub collection_bump_seed: u8,
-  pub dao: Pubkey,
-  pub new_tree_depth: u32, // parameters for new merkle trees when old is full
-  pub new_tree_buffer_size: u32,
-  pub new_tree_space: u64,
-  pub new_tree_fee_lamports: u64,
 }
 
 #[account]
@@ -149,14 +121,3 @@ pub const MOBILE_HOTSPOT_INFO_SIZE: usize = 8 +
     1 + // is full hotspot
     2 + // num location assers
     60; // pad
-
-#[macro_export]
-macro_rules! data_only_config_seeds {
-  ( $data_only_config:expr ) => {
-    &[
-      "data_only_config".as_bytes(),
-      $data_only_config.dao.as_ref(),
-      &[$data_only_config.bump_seed],
-    ]
-  };
-}
