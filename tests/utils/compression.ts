@@ -1,4 +1,3 @@
-import { resolveIndividual } from "@helium/spl-utils";
 import {
   computeCompressedNFTHash,
   computeCreatorHash,
@@ -6,6 +5,7 @@ import {
   getLeafAssetId, PROGRAM_ID as BUBBLEGUM_PROGRAM_ID, TokenProgramVersion,
   TokenStandard
 } from "@metaplex-foundation/mpl-bubblegum";
+import { Asset, AssetProof, resolveIndividual } from "@helium/spl-utils";
 import { Metadata, PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
@@ -17,6 +17,11 @@ import {
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { MerkleTree } from "../../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
 import { Bubblegum as MplBubblegum, IDL as BubblegumIdl } from "./bubblegum";
+import { entityCreatorKey } from "@helium/helium-entity-manager-sdk";
+// @ts-ignore
+import animalHash from "angry-purple-tiger";
+import { BN } from "bn.js";
+
 
 export async function createCompressionNft({
   provider,
@@ -174,4 +179,103 @@ export async function createCompressionNft({
     creatorHash: computeCreatorHash([]),
     dataHash: computeDataHash(metadata),
   };
+}
+
+// Setup merkle tree -- this isn't needed anywhere but localnet,
+// we're effectively duplicating metaplex digital asset api
+export async function createMockCompression({
+  collection,
+  dao,
+  merkle,
+  ecc,
+  hotspotOwner = Keypair.generate(),
+} : {
+  collection: PublicKey,
+  dao: PublicKey,
+  ecc: string,
+  merkle: PublicKey,
+  hotspotOwner: Keypair,
+}) {
+
+  const creators = [
+    {
+      address: entityCreatorKey(dao)[0],
+      verified: true,
+      share: 100,
+    },
+  ];
+  let metadata: any = {
+    name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
+    symbol: "HOTSPOT",
+    uri: `https://entities.nft.helium.io/${ecc}`,
+    collection: {
+      key: collection,
+      verified: true,
+    },
+    creators,
+    sellerFeeBasisPoints: 0,
+    primarySaleHappened: true,
+    isMutable: true,
+    editionNonce: null,
+    tokenStandard: TokenStandard.NonFungible,
+    uses: null,
+    tokenProgramVersion: TokenProgramVersion.Original,
+  };
+  let hotspot = await getLeafAssetId(merkle, new BN(0));
+
+  const hash = computeCompressedNFTHash(
+    hotspot,
+    hotspotOwner.publicKey,
+    hotspotOwner.publicKey,
+    new anchor.BN(0),
+    metadata
+  );
+  const leaves = Array(2 ** 3).fill(Buffer.alloc(32));
+  leaves[0] = hash;
+  let merkleTree = new MerkleTree(leaves);
+  const proof = merkleTree.getProof(0);
+  let getAssetFn = async () =>
+    ({
+      id: await getLeafAssetId(merkle, new BN(0)),
+      content: {
+        metadata: {
+          name: metadata.name,
+          symbol: metadata.symbol,
+        },
+        json_uri: metadata.uri,
+      },
+      royalty: {
+        basis_points: metadata.sellerFeeBasisPoints,
+        primary_sale_happened: true,
+      },
+      mutable: true,
+      supply: {
+        edition_nonce: null,
+      },
+      grouping: metadata.collection.key,
+      uses: metadata.uses,
+      creators: metadata.creators,
+      ownership: { owner: hotspotOwner.publicKey },
+      compression: {
+        compressed: true,
+        eligible: true,
+        dataHash: computeDataHash(metadata),
+        creatorHash: computeCreatorHash(creators),
+      },
+    } as Asset);
+  let getAssetProofFn = async () => {
+    return {
+      root: new PublicKey(proof.root),
+      proof: proof.proof.map((p) => new PublicKey(p)),
+      nodeIndex: 0,
+      leaf: new PublicKey(proof.leaf),
+      treeId: merkle,
+    };
+  };
+
+  return {
+    getAssetFn,
+    getAssetProofFn,
+    hotspot,
+  }
 }
