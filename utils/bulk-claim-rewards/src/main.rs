@@ -22,7 +22,7 @@ struct Args {
     /// Type of rewards to claim, either 'iot' or 'mobile'
     #[arg(long)]
     rewards_type: String,
-    /// Number of NFTs to check at a time. Defaults to 100
+    /// Number of NFTs to check at a time. Defaults to 10
     #[arg(long)]
     batch_size: Option<usize>,
     /// Initializes the onchain structs required to claim rewards. Defaults to true.
@@ -69,7 +69,7 @@ async fn run() {
 
     let batch_size = match args.batch_size {
         Some(size) => size,
-        None => 100,
+        None => 10,
     };
     let init_recipients = match args.init_recipients {
         Some(init) => init,
