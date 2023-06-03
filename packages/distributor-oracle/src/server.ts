@@ -427,7 +427,7 @@ export class OracleServer {
   }
 
   private async signBulkTransactionsHandler(
-    req: FastifyRequest<{ Body: {transactions: { data: number[] }[] } }>,
+    req: FastifyRequest<{ Body: {transactions: number[][] } }>,
     res: FastifyReply
   ) {
     if (!req.body.transactions) {
@@ -437,10 +437,9 @@ export class OracleServer {
 
     let _this = this;
     const serializedTxs = await Promise.all(req.body.transactions.map(async (txData) => {
-      const result = await _this.signTransaction(txData.data);
+      const result = await _this.signTransaction(txData);
       return result.success ? result.transaction : result.message;
     }));
-    console.log(serializedTxs);
     res.send({ success: true, transactions: serializedTxs });
   }
 
