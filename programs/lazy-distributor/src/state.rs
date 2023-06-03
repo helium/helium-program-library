@@ -25,7 +25,7 @@ pub struct RecipientV0 {
   pub lazy_distributor: Pubkey,
   // Attach to the mint of the NFT or asset id of compressed nft. Always pay to the owner of the NFT
   pub asset: Pubkey,
-  pub total_rewards: u64,
+  pub total_rewards: u64, // this is the amount that has been claimed by the recipient
   pub current_config_version: u16,
   pub current_rewards: Vec<Option<u64>>, // One for each oracle, matching indexes in` LazyDistrubutorV0`
   pub bump_seed: u8,

@@ -1290,6 +1290,7 @@ dependencies = [
  "bincode",
  "futures",
  "indicatif 0.17.4",
+ "lazy_static",
  "reqwest",
  "serde",
  "serde_json",
