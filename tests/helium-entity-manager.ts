@@ -389,6 +389,55 @@ describe("helium-entity-manager", () => {
     );
   });
 
+  it("allows revoking a maker", async () => {
+    const { rewardableEntityConfig } = await initTestRewardableEntityConfig(
+      hemProgram,
+      subDao
+    );
+
+    const { maker } = await initTestMaker(
+      hemProgram,
+      provider,
+      rewardableEntityConfig,
+      dao
+    );
+
+    const { pubkeys: {makerApproval} } = await hemProgram.methods.revokeMakerV0().accounts({
+      maker,
+      rewardableEntityConfig
+    }).rpcAndKeys();
+
+    const account = await hemProgram.account.makerApprovalV0.fetchNullable(makerApproval!);
+    expect(account).to.be.null;
+  })
+
+  it("allows approving and revoking programs", async () => {
+    const keypair = Keypair.generate();
+    const { pubkeys: { programApproval } } =await hemProgram.methods.approveProgramV0({
+      programId: keypair.publicKey
+    })
+    .accounts({
+      dao
+    })
+    .rpcAndKeys();
+
+    const account = await hemProgram.account.programApprovalV0.fetch(programApproval!);
+    expect(account.programId.toBase58()).eq(keypair.publicKey.toBase58());
+    await hemProgram.methods
+      .revokeProgramV0({
+        programId: keypair.publicKey,
+      })
+      .accounts({
+        dao,
+      })
+      .rpc();
+
+    const account2 = await hemProgram.account.programApprovalV0.fetchNullable(
+      programApproval!
+    );
+    expect(account2).to.be.null;
+  })
+
   describe("with mobile maker and data credits", () => {
     let makerKeypair: Keypair;
     let maker: PublicKey;

@@ -4,7 +4,7 @@ use std::str::FromStr;
 use crate::data_only_config_seeds;
 use crate::state::*;
 use crate::ECC_VERIFIER;
-use crate::{constants::HOTSPOT_METADATA_URL, error::ErrorCode};
+use crate::{constants::ENTITY_METADATA_URL, error::ErrorCode};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_lang::solana_program::program::invoke;
@@ -57,6 +57,7 @@ pub struct IssueDataOnlyEntityV0<'info> {
     bump,
     has_one = collection,
     has_one = merkle_tree,
+    has_one = dao,
   )]
   pub data_only_config: Box<Account<'info, DataOnlyConfigV0>>,
   /// CHECK: Signs as a verified creator to make searching easier
@@ -157,7 +158,7 @@ pub fn handler(ctx: Context<IssueDataOnlyEntityV0>, args: IssueDataOnlyEntityArg
   let metadata = MetadataArgs {
     name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("{}/{}", HOTSPOT_METADATA_URL, key_str),
+    uri: format!("{}/{}", ENTITY_METADATA_URL, key_str),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
@@ -197,6 +198,7 @@ pub fn handler(ctx: Context<IssueDataOnlyEntityV0>, args: IssueDataOnlyEntityArg
     dao: ctx.accounts.dao.key(),
     entity_key: args.entity_key,
     bump_seed: ctx.bumps["key_to_asset"],
+    key_serialization: KeySerialization::B58,
   });
 
   invoke(

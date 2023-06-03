@@ -3,7 +3,7 @@ use anchor_lang::{prelude::*, solana_program::hash::hash};
 
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{Mint, Token, TokenAccount},
+  token::{Mint, Token},
 };
 use data_credits::{
   cpi::{
@@ -54,12 +54,9 @@ pub struct OnboardIotHotspotV0<'info> {
   pub hotspot_owner: Signer<'info>,
   /// CHECK: The merkle tree
   pub merkle_tree: UncheckedAccount<'info>,
-  #[account(
-    mut,
-    associated_token::mint = dc_mint,
-    associated_token::authority = dc_fee_payer,
-  )]
-  pub dc_burner: Box<Account<'info, TokenAccount>>,
+  /// CHECK: Only loaded if location is being asserted
+  #[account(mut)]
+  pub dc_burner: UncheckedAccount<'info>,
 
   #[account(
     has_one = sub_dao,

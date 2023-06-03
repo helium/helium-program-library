@@ -12,8 +12,8 @@ use helium_sub_daos::{DaoV0, SubDaoV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct DelegateDataCreditsArgsV0 {
-  amount: u64,
-  router_key: String,
+  pub amount: u64,
+  pub router_key: String,
 }
 
 #[derive(Accounts)]

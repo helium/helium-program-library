@@ -526,6 +526,7 @@ export async function run(args: any = process.argv) {
     await sendInstructionsOrSquads({
       provider,
       instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
         await hemProgram.methods
           .initializeDataOnlyV0({
             authority,
@@ -534,7 +535,7 @@ export async function run(args: any = process.argv) {
             newTreeSpace: new BN(getConcurrentMerkleTreeAccountSize(size, buffer, canopy)),
             newTreeFeeLamports: new BN(cost / 2 ** size),
             name: "DATAONLY",
-            metadataUrl: "todo",
+            metadataUrl: "https://shdw-drive.genesysgo.net/H8b1gZmA2aBqDYxicxawGpznCaNbFSEJ3YnJuawGQ2EQ/data-only.json",
           })
           .accounts({
             dao,

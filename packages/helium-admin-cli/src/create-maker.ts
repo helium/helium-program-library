@@ -28,22 +28,8 @@ import {
 import fs from "fs";
 import os from "os";
 import yargs from "yargs/yargs";
-import { exists, loadKeypair, sendInstructionsOrSquads } from "./utils";
+import { exists, loadKeypair, sendInstructionsOrSquads, merkleSizes } from "./utils";
 import Squads from "@sqds/sdk";
-
-// Goal = 3 proof nodes needed
-const merkleSizes = [
-  [3, 8, 0],
-  [5, 8, 2],
-  [14, 64, 11],
-  [15, 64, 12],
-  [16, 64, 13],
-  [17, 64, 14],
-  [18, 64, 15],
-  [19, 64, 16],
-  [20, 64, 17],
-  [24, 64, 17],
-];
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
