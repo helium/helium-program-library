@@ -8,7 +8,7 @@ import BN from "bn.js";
 let lastDriftCalc = 0;
 let driftFromSol = BigInt(0);
 export async function getUnixTimestamp(): Promise<bigint> {
-  const localTime = new Date().valueOf() / 1000;
+  const localTime = Math.floor(new Date().valueOf() / 1000);
   // Every hour, recheck the drift between hour clock and sol's clock
   if (localTime - lastDriftCalc > 60 * 60) {
     lastDriftCalc = localTime;
