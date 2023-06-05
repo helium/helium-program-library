@@ -6,10 +6,6 @@ import {
   PROGRAM_ID,
   accountPayerKey,
 } from "@helium/data-credits-sdk";
-import {
-  init as initHem,
-  dataOnlyConfigKey,
-} from "@helium/helium-entity-manager-sdk";
 import { fanoutKey } from "@helium/fanout-sdk";
 import {
   daoKey,
@@ -58,9 +54,6 @@ import {
   parseEmissionsSchedule,
   sendInstructionsOrSquads,
 } from "./utils";
-import fs from "fs";
-import { BN } from "bn.js";
-import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
 
 const { hideBin } = require("yargs/helpers");
 
@@ -178,11 +171,6 @@ export async function run(args: any = process.argv) {
         "Number of HST tokens to pre mint before assigning authority to lazy distributor",
       default: 0,
     },
-    merklePath: {
-      type: "string",
-      describe: "Path to the merkle keypair",
-      default: `${__dirname}/../../keypairs/data-only-merkle.json`,
-    }
   });
 
   const argv = await yarg.argv;
@@ -194,7 +182,6 @@ export async function run(args: any = process.argv) {
   const dataCreditsProgram = await initDc(provider);
   const heliumSubDaosProgram = await initDao(provider);
   const heliumVsrProgram = await initVsr(provider);
-  const hemProgram = await initHem(provider);
 
 
   const govProgramId = new PublicKey(argv.govProgramId);
@@ -484,67 +471,6 @@ export async function run(args: any = process.argv) {
           .instruction(),
       ],
       executeTransaction: true,
-      squads,
-      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-      authorityIndex: argv.authorityIndex,
-      signers: [],
-    });
-  }
-
-  if (!(await exists(conn, dataOnlyConfigKey(dao)[0]))) {
-    console.log(`Initializing DataOnly Config`);
-    let merkle: Keypair;
-    if (fs.existsSync(argv.merklePath)) {
-      merkle = loadKeypair(argv.merklePath);
-    } else {
-      merkle = Keypair.generate();
-      fs.writeFileSync(
-        argv.merklePath,
-        JSON.stringify(Array.from(merkle.secretKey))
-      );
-    }
-    const [size, buffer, canopy] = [14, 64, 11];
-    const space = getConcurrentMerkleTreeAccountSize(size, buffer, canopy);
-    const cost = await provider.connection.getMinimumBalanceForRentExemption(
-      space
-    );
-    if (!(await exists(conn, merkle.publicKey))) {
-      await sendInstructions(
-        provider,
-        [
-          SystemProgram.createAccount({
-            fromPubkey: provider.wallet.publicKey,
-            newAccountPubkey: merkle.publicKey,
-            lamports: cost,
-            space: space,
-            programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-          }),
-        ],
-        [merkle]
-      );
-    }
-    await sendInstructionsOrSquads({
-      provider,
-      instructions: [
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
-        await hemProgram.methods
-          .initializeDataOnlyV0({
-            authority,
-            newTreeDepth: size,
-            newTreeBufferSize: buffer,
-            newTreeSpace: new BN(getConcurrentMerkleTreeAccountSize(size, buffer, canopy)),
-            newTreeFeeLamports: new BN(cost / 2 ** size),
-            name: "DATAONLY",
-            metadataUrl: "https://shdw-drive.genesysgo.net/H8b1gZmA2aBqDYxicxawGpznCaNbFSEJ3YnJuawGQ2EQ/data-only.json",
-          })
-          .accounts({
-            dao,
-            authority,
-            merkleTree: merkle.publicKey,
-          })
-          .instruction()
-      ],
-      executeTransaction: false,
       squads,
       multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
       authorityIndex: argv.authorityIndex,

@@ -51,41 +51,42 @@ export async function run(args: any = process.argv) {
   const ecc = (await HeliumKeypair.makeRandom()).address.b58;
   
   console.log(ecc);
-  const method = await hemProgram.methods.issueDataOnlyEntityV0({
-    entityKey: Buffer.from(bs58.decode(ecc)),
-  }).accounts({
-    recipient: provider.wallet.publicKey,
-    dao: daoKey(HNT_MINT)[0],
-    eccVerifier: eccVerifier.publicKey,
-  })
-  .signers([eccVerifier]);
+  // uncomment when data only hotspots are supported
+  // const method = await hemProgram.methods.issueDataOnlyEntityV0({
+  //   entityKey: Buffer.from(bs58.decode(ecc)),
+  // }).accounts({
+  //   recipient: provider.wallet.publicKey,
+  //   dao: daoKey(HNT_MINT)[0],
+  //   eccVerifier: eccVerifier.publicKey,
+  // })
+  // .signers([eccVerifier]);
   
-  const { keyToAsset } = await method.pubkeys();
-  await method.rpc({skipPreflight: true});
+  // const { keyToAsset } = await method.pubkeys();
+  // await method.rpc({skipPreflight: true});
 
-  const kta = await hemProgram.account.keyToAssetV0.fetch(keyToAsset);
-  const {
-    args: proofArgs,
-    remainingAccounts,
-  } = await proofArgsAndAccounts({
-    connection: hemProgram.provider.connection,
-    assetId: kta.asset,
-  });
+  // const kta = await hemProgram.account.keyToAssetV0.fetch(keyToAsset);
+  // const {
+  //   args: proofArgs,
+  //   remainingAccounts,
+  // } = await proofArgsAndAccounts({
+  //   connection: hemProgram.provider.connection,
+  //   assetId: kta.asset,
+  // });
 
 
-  const rewardableEntityConfig = rewardableEntityConfigKey(subDaoKey(IOT_MINT)[0], "IOT")[0];
-  await hemProgram.methods.onboardDataOnlyIotHotspotV0({
-      ...proofArgs,
-      location: null,
-      elevation: null,
-      gain: null,
-  }).accounts({
-    rewardableEntityConfig,
-    hotspotOwner: provider.wallet.publicKey,
-    keyToAsset,
-    iotInfo: iotInfoKey(rewardableEntityConfig, ecc)[0],
-    subDao: subDaoKey(IOT_MINT)[0],
-  }).remainingAccounts(remainingAccounts).rpc();
+  // const rewardableEntityConfig = rewardableEntityConfigKey(subDaoKey(IOT_MINT)[0], "IOT")[0];
+  // await hemProgram.methods.onboardDataOnlyIotHotspotV0({
+  //     ...proofArgs,
+  //     location: null,
+  //     elevation: null,
+  //     gain: null,
+  // }).accounts({
+  //   rewardableEntityConfig,
+  //   hotspotOwner: provider.wallet.publicKey,
+  //   keyToAsset,
+  //   iotInfo: iotInfoKey(rewardableEntityConfig, ecc)[0],
+  //   subDao: subDaoKey(IOT_MINT)[0],
+  // }).remainingAccounts(remainingAccounts).rpc();
 
-  await axios.get(`${argv.testRewardsOracleFaucet}/rewards/${ecc}?amount=5`);
+  // await axios.get(`${argv.testRewardsOracleFaucet}/rewards/${ecc}?amount=5`);
 }

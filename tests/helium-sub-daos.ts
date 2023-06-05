@@ -264,7 +264,6 @@ describe("helium-sub-daos", () => {
           dcBurnAuthority: null,
           emissionSchedule: null,
           onboardingDcFee: null,
-          onboardingDataOnlyDcFee: null,
           activeDeviceAggregator: null,
           registrar: null,
           delegatorRewardsPercent: null,
