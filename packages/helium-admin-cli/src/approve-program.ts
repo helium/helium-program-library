@@ -68,7 +68,8 @@ export async function run(args: any = process.argv) {
     })
     .accounts({
       dao,
-      authority
+      authority,
+      payer: authority
     })
     .instruction()
   )
