@@ -451,7 +451,7 @@ describe("distributor-oracle", () => {
     const res = await chai
       .request(oracleServer.server)
       .post("/bulk-sign")
-      .send({ transactions: [serializedTx] });
+      .send({ transactions: [[...serializedTx]] });
 
     assert.hasAllKeys(res.body, ["transactions", "success"]);
     const signedTx = Transaction.from(res.body.transactions[0].data);
