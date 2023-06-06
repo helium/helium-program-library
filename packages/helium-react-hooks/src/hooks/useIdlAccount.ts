@@ -1,8 +1,8 @@
-import { UseAccountState, useAccount } from "./useAccount";
+import { UseAccountState, useAccount } from "@helium/account-fetch-cache-hooks";
 import { BorshAccountsCoder, Idl, IdlAccounts } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { useMemo } from "react";
-import { TypedAccountParser } from "@helium/spl-utils";
+import { TypedAccountParser } from "@helium/account-fetch-cache";
 
 export function useIdlAccount<IDL extends Idl, A extends string = string>(
   key: PublicKey,

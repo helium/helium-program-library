@@ -1,4 +1,3 @@
-import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 

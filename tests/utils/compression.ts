@@ -1,4 +1,4 @@
-import { resolveIndividual } from "@helium/spl-utils";
+import { resolveIndividual } from "@helium/anchor-resolvers";
 import {
   computeCompressedNFTHash,
   computeCreatorHash,
