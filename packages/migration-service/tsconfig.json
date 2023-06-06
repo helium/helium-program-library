@@ -29,7 +29,7 @@
       "path": "../lazy-transactions-sdk"
     },
     {
-      "path": "../spl-utils"
+      "path": "../account-fetch-cache"
     },
     {
       "path": "./tsconfig.cjs.json"

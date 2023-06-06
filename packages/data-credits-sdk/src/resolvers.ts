@@ -1,6 +1,6 @@
-import { ataResolver, combineResolvers } from "@helium/spl-utils";
+import { ataResolver, combineResolvers } from "@helium/anchor-resolvers";
 import { heliumSubDaosResolvers } from "@helium/helium-sub-daos-sdk";
-import { resolveIndividual } from "@helium/spl-utils";
+import { resolveIndividual } from "@helium/anchor-resolvers";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { circuitBreakerResolvers } from "@helium/circuit-breaker-sdk";
 import { delegatedDataCreditsKey } from "./pdas";

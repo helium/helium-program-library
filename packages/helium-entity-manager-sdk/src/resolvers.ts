@@ -4,7 +4,7 @@ import {
   combineResolvers,
   heliumCommonResolver,
   resolveIndividual,
-} from "@helium/spl-utils";
+} from "@helium/anchor-resolvers";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { init } from "./init";

@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import React from "react";
-import { useAccount } from "./useAccount";
+import { useAccount } from "@helium/account-fetch-cache-hooks";
 
 export function useSolOwnedAmount(ownerPublicKey?: PublicKey): {
   amount: bigint;

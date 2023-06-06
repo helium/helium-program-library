@@ -1,10 +1,13 @@
-import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import { PublicKey } from "@solana/web3.js";
 import { sha256 } from "js-sha256";
 import { PROGRAM_ID } from "./constants";
 // @ts-ignore
 import bs58 from "bs58";
 import Address from "@helium/address";
+
+const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
+  "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+);
 
 export const entityCreatorKey = (
   dao: PublicKey,

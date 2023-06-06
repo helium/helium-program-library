@@ -3,7 +3,7 @@ import {
   combineResolvers,
   get,
   heliumCommonResolver, resolveIndividual
-} from "@helium/spl-utils";
+} from "@helium/anchor-resolvers";
 import { treasuryManagementResolvers } from "@helium/treasury-management-sdk";
 import { init, PROGRAM_ID as VSR_PROGRAM_ID, vsrResolvers } from "@helium/voter-stake-registry-sdk";
 import { AnchorProvider, Provider } from "@coral-xyz/anchor";

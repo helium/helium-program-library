@@ -33,7 +33,8 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.26.0",
-    "@helium/spl-utils": "^0.1.4",
+    "@helium/account-fetch-cache": "^0.1.4",
+    "@helium/account-fetch-cache-hooks": "^0.1.4",
     "@solana/spl-token": "^0.3.6",
     "@solana/web3.js": "^1.66.2",
     "bs58": "^5.0.0",

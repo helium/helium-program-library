@@ -330,19 +330,6 @@
   dependencies:
     protobufjs "^6.11.3"
 
-"@helium/spl-utils@^0.0.43":
-  version "0.0.43"
-  resolved "https://registry.yarnpkg.com/@helium/spl-utils/-/spl-utils-0.0.43.tgz#7b5d7266e5ea56f5fbb3e7635831378f90f90a8a"
-  integrity sha512-RfETETah5MtKVoZqMmIzeMTgpFdL6bfs1e+7+2U8zcmGPyi8zMNyRDyRWtQZiknkbBtpORfgJEaP3TXwQBaxSQ==
-  dependencies:
-    "@coral-xyz/anchor" "0.26.0"
-    "@helium/address" "^4.8.1"
-    "@solana/spl-token" "^0.3.6"
-    "@solana/web3.js" "^1.43.4"
-    bn.js "^5.2.0"
-    borsh "^0.7.0"
-    bs58 "^5.0.0"
-
 "@helium/transactions@^3.38.0":
   version "3.62.0"
   resolved "https://registry.yarnpkg.com/@helium/transactions/-/transactions-3.62.0.tgz#f201b3e502f65b0d0eb400d931064fc850246793"
@@ -2474,7 +2461,7 @@
   dependencies:
     buffer "~6.0.3"
 
-"@solana/spl-account-compression@^0.1.4", "@solana/spl-account-compression@^0.1.5":
+"@solana/spl-account-compression@^0.1.4":
   version "0.1.5"
   resolved "https://registry.npmjs.org/@solana/spl-account-compression/-/spl-account-compression-0.1.5.tgz"
   integrity sha512-ZrJNrc4fqxJtqOjws6fEeMKhiA/ile9aDP83mutee3MVxN2cloL9xVHb3p2g3JuNCw4jb+AClZt0JbLCthz47w==
