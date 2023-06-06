@@ -1,6 +1,6 @@
 {
   "name": "@helium/spl-utils",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Utils shared across spl suite",
   "publishConfig": {
     "access": "public",
@@ -32,10 +32,10 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.26.0",
+    "@helium/account-fetch-cache": "^0.2.0",
     "@helium/address": "^4.8.1",
+    "@helium/anchor-resolvers": "^0.2.0",
     "@metaplex-foundation/mpl-token-metadata": "^2.5.2",
-    "@helium/account-fetch-cache": "^0.1.4",
-    "@helium/anchor-resolvers": "^0.1.4",
     "@solana/spl-account-compression": "^0.1.7",
     "@solana/spl-token": "^0.3.6",
     "@solana/web3.js": "^1.43.4",
