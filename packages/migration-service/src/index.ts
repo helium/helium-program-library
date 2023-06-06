@@ -9,7 +9,6 @@ import {
   lazySignerKey,
   lazyTransactionsKey,
 } from "@helium/lazy-transactions-sdk";
-import { chunks } from "@helium/spl-utils";
 import {
   ComputeBudgetProgram,
   PublicKey,
@@ -24,6 +23,11 @@ import { LAZY_TRANSACTIONS_NAME } from "./env";
 import { getMigrateTransactions } from "./ledger";
 import { provider, wallet } from "./solana";
 import { decompress, decompressSigners, shouldThrottle } from "./utils";
+
+export const chunks = <T>(array: T[], size: number): T[][] =>
+  Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
+    array.slice(index * size, (index + 1) * size)
+  );
 
 const host = process.env.PGHOST || "localhost";
 const isRds = host.includes("rds.amazonaws.com");

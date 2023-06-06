@@ -1,4 +1,4 @@
-import { combineResolvers, resolveIndividual } from "@helium/spl-utils";
+import { combineResolvers, resolveIndividual } from "@helium/anchor-resolvers";
 import { PROGRAM_ID } from "./constants";
 
 export const circuitBreakerProgramResolver = resolveIndividual(

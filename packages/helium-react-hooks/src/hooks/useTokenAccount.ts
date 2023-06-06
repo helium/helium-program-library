@@ -1,4 +1,4 @@
-import { useAccount, UseAccountState } from "./useAccount";
+import { useAccount, UseAccountState } from "@helium/account-fetch-cache-hooks";
 import { Account, unpackAccount } from "@solana/spl-token";
 import { AccountInfo, PublicKey } from "@solana/web3.js";
 
