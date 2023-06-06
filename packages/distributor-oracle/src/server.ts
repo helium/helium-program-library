@@ -19,7 +19,8 @@ import {
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { init as initLazy, lazyDistributorKey, PROGRAM_ID as LD_PID } from "@helium/lazy-distributor-sdk";
 import { init as initRewards, PROGRAM_ID as RO_PID} from "@helium/rewards-oracle-sdk";
-import { AccountFetchCache, Asset, getAsset, HNT_MINT, IOT_MINT } from "@helium/spl-utils";
+import { Asset, getAsset, HNT_MINT, IOT_MINT } from "@helium/spl-utils";
+import { AccountFetchCache } from "@helium/account-fetch-cache";
 import {
   Keypair,
   PublicKey,

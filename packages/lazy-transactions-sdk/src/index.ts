@@ -1,24 +1,22 @@
-import { LazyTransactions } from "@helium/idls/lib/types/lazy_transactions";
-import { AnchorProvider, Idl, Program, IdlTypes, getProvider } from "@coral-xyz/anchor";
+import { AnchorProvider, Idl, IdlTypes, Program } from "@coral-xyz/anchor";
 import { IdlCoder } from "@coral-xyz/anchor/dist/cjs/coder/borsh/idl";
+import { LazyTransactions } from "@helium/idls/lib/types/lazy_transactions";
 import {
-  TransactionInstruction,
-  PublicKey,
   AccountMeta,
-  Connection,
-  TransactionResponse,
+  PublicKey,
+  TransactionInstruction
 } from "@solana/web3.js";
+import { keccak_256 } from "js-sha3";
 import { PROGRAM_ID } from "./constants";
 import { MerkleTree, TreeNode } from "./merkleTree";
-import { keccak_256 } from "js-sha3";
 // @ts-ignore
+import { bulkSendTransactions, chunks } from "@helium/spl-utils";
 import { Layout } from "buffer-layout";
-import { chunks, bulkSendTransactions } from "@helium/spl-utils";
 import cliProgress from "cli-progress";
 import * as Collections from "typescript-collections";
 
-export * from "./pdas";
 export * from "./constants";
+export * from "./pdas";
 export { MerkleTree };
 
 type CompiledInstruction = IdlTypes<LazyTransactions>["CompiledInstruction"];
