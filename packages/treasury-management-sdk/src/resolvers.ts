@@ -1,11 +1,10 @@
-import { PublicKey } from "@solana/web3.js";
 import {
   ataResolver,
   combineResolvers,
   resolveIndividual,
-} from "@helium/spl-utils";
-import { PROGRAM_ID } from "./constants";
+} from "@helium/anchor-resolvers";
 import { circuitBreakerResolvers } from "@helium/circuit-breaker-sdk";
+import { PROGRAM_ID } from "./constants";
 
 export const treasuryManagementResolvers = combineResolvers(
   circuitBreakerResolvers,

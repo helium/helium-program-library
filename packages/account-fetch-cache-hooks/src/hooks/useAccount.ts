@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { PublicKey, AccountInfo } from "@solana/web3.js";
 import { useAccountFetchCache } from "./useAccountFetchCache";
-import { TypedAccountParser } from "@helium/spl-utils";
+import { TypedAccountParser } from "@helium/account-fetch-cache";
 import { useAsync } from 'react-async-hook'
 
 export interface ParsedAccountBase {
