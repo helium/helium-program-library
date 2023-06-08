@@ -1,6 +1,6 @@
 {
   "name": "@helium/anchor-resolvers",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Wrappers around anchor custom resolvers to make composition easier",
   "publishConfig": {
     "access": "public",
@@ -31,9 +31,11 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.26.0",
     "@solana/spl-token": "^0.3.6",
     "@solana/web3.js": "^1.43.4"
+  },
+  "peerDependencies": {
+    "@coral-xyz/anchor": "^0.26.0"
   },
   "devDependencies": {
     "git-format-staged": "^2.1.3",

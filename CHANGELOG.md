@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.2.2](https://github.com/helium/helium-program-library/compare/v0.1.5...v0.2.2) (2023-06-08)
+
+
+### Reverts
+
+* Revert "Add support for data only hotspots (#246)" ([1728939](https://github.com/helium/helium-program-library/commit/17289397ff60de603fbd9cd90b2649373721511f)), closes [#246](https://github.com/helium/helium-program-library/issues/246)
+
+
+
+
+
 ## [0.2.1](https://github.com/helium/helium-program-library/compare/v0.1.5...v0.2.1) (2023-06-08)
 
 
