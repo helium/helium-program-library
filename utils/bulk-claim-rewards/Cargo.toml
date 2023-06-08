@@ -14,9 +14,6 @@ anchor-client = "*"
 mpl-bubblegum = { git = "https://github.com/metaplex-foundation/metaplex-program-library", rev = "8f75abd" }
 byteorder = "1.3.2"
 hmac = "0"
-shamirsecretsharing = {version="0.1.4", features=["have_libsodium"]}
-pbkdf2 = {version = "0", default-features=false }
-base64 = "0.13"
 sha2 = "0"
 clap = { version = "4", features = ["derive"]}
 helium-crypto = { version = "0.6.3", features = ["solana"] }
@@ -26,7 +23,6 @@ circuit-breaker = { path = "../../programs/circuit-breaker", features = [ "no-en
 lazy-distributor = { path = "../../programs/lazy-distributor", features = [ "no-entrypoint" ] }
 rewards-oracle = { path = "../../programs/rewards-oracle", features = [ "no-entrypoint" ] }
 helium-sub-daos = { path = "../../programs/helium-sub-daos", features = [ "no-entrypoint" ] }
-data-credits = { path = "../../programs/data-credits", features = [ "no-entrypoint" ] }
 hpl-utils = { path = "../hpl-utils" }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"

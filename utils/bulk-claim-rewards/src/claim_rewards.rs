@@ -1,6 +1,7 @@
+use crate::{json_err, parse_err};
 use anchor_client::Program;
 use anchor_lang::AccountDeserialize;
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use bs58;
 use circuit_breaker::ID as CB_PID;
 use futures::stream::{StreamExt, TryStreamExt};
@@ -81,6 +82,12 @@ struct OracleBulkSignResponse {
   transactions: Vec<TxBuffer>,
 }
 
+#[derive(Debug, Deserialize)]
+struct ProofJson {
+  root: String,
+  proof: Vec<String>,
+}
+
 #[derive(Clone)]
 struct Hotspot {
   id: Pubkey,
@@ -95,20 +102,31 @@ struct Hotspot {
 
 const COMPRESSION: &str = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK";
 
+pub struct ClaimRewardsArgs<'a> {
+  pub lazy_distributor_program: &'a Program,
+  pub rewards_oracle_program: &'a Program,
+  pub payer: &'a Keypair,
+  pub hotspot_owner: Pubkey,
+  pub rewards_mint: Pubkey,
+  pub dao: Pubkey,
+  pub batch_size: usize,
+}
+
 /// Claims all hotspot rewards for a given hotspot_owner. The payer set on the program object pays for the transactions
-pub async fn claim_rewards(
-  ld_program: &Program,
-  ro_program: &Program,
-  payer: &Keypair,
-  hotspot_owner: Pubkey,
-  rewards_mint: Pubkey,
-  dao: Pubkey,
-  batch_size: usize,
-) -> Result<(), anyhow::Error> {
+pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Error> {
+  let ClaimRewardsArgs {
+    lazy_distributor_program,
+    rewards_oracle_program,
+    payer,
+    hotspot_owner,
+    rewards_mint,
+    dao,
+    batch_size,
+  } = args;
   let mut total = 0;
   let tpu_client = TpuClient::new(
-    ld_program.rpc().into(),
-    &ld_program
+    lazy_distributor_program.rpc().into(),
+    &lazy_distributor_program
       .rpc()
       .url()
       .replace("https", "wss")
@@ -123,13 +141,13 @@ pub async fn claim_rewards(
     &LD_PID,
   );
 
-  let ld_acc = ld_program.account::<LazyDistributorV0>(lazy_distributor)?;
+  let ld_acc = lazy_distributor_program.account::<LazyDistributorV0>(lazy_distributor)?;
   let mut counter = 1;
   loop {
     // get all nfts owned by user from the das
     let req_client = reqwest::Client::new();
     let get_asset_response = req_client
-      .post(ld_program.rpc().url())
+      .post(lazy_distributor_program.rpc().url())
       .header("Cache-Control", "no-cache")
       .header("Pragma", "no-cache")
       .header("Expires", "0")
@@ -151,47 +169,44 @@ pub async fn claim_rewards(
       .map_err(|e| anyhow!("Failed to parse asset response: {e}"))?;
     let result = get_asset_response.result.unwrap();
     let assets = result
-      .as_object()
-      .unwrap()
       .get("items")
-      .unwrap()
+      .context(json_err!(result.to_string(), "items"))?
       .as_array()
-      .unwrap();
+      .context(parse_err!(result.to_string(), "items"))?;
     if assets.len() == 0 {
       break;
     }
 
     // filter out assets that are not created by entityCreator
     println!("Found {} assets", assets.len());
+    let first_creators = assets
+      .iter()
+      .map(|a| {
+        Ok(
+          a.get("creators")
+            .context(json_err!(a.to_string(), "creators"))?
+            .as_array()
+            .context(parse_err!(a.to_string(), "creators"))?[0]
+            .get("address")
+            .context(json_err!(a.to_string(), "address"))?
+            .as_str()
+            .context(parse_err!(a.to_string(), "address"))?,
+        )
+      })
+      .collect::<Result<Vec<_>, anyhow::Error>>()?;
+
     let parsed_hotspots: Result<Vec<Hotspot>, anyhow::Error> = assets
       .iter()
-      .filter(|a| {
-        let creators = a
-          .as_object()
-          .unwrap()
-          .get("creators")
-          .unwrap()
-          .as_array()
-          .unwrap();
-        creators[0]
-          .as_object()
-          .unwrap()
-          .get("address")
-          .unwrap()
-          .as_str()
-          .unwrap()
-          == entity_creator.to_string()
-      })
-      .map(|h| {
-        let compression_info = h
-          .as_object()
-          .unwrap()
-          .get("compression")
-          .unwrap()
-          .as_object()
-          .unwrap();
-        let id =
-          Pubkey::from_str(h.as_object().unwrap().get("id").unwrap().as_str().unwrap()).unwrap();
+      .zip(first_creators.iter())
+      .filter(|(_, first_creator)| first_creator.to_string() == entity_creator.to_string())
+      .map(|(h, _)| {
+        let compression_info = h.get("compression").unwrap();
+        let id = Pubkey::from_str(
+          h.get("id")
+            .context(json_err!(h.to_string(), "id"))?
+            .as_str()
+            .context(parse_err!(h.to_string(), "id"))?,
+        )?;
         let (recipient, _rcp_bump) = Pubkey::find_program_address(
           &[
             "recipient".as_bytes(),
@@ -200,45 +215,57 @@ pub async fn claim_rewards(
           ],
           &LD_PID,
         );
+        let json_uri = &["content", "json_uri"]
+          .iter()
+          .try_fold(h, |current_value, key| {
+            current_value
+              .get(key)
+              .context(json_err!(h.to_string(), key))
+          })?
+          .as_str()
+          .context(parse_err!(h.to_string(), "json_uri"))?;
+
         Ok(Hotspot {
           id,
-          entity_key: h
-            .as_object()
-            .unwrap()
-            .get("content")
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .get("json_uri")
-            .unwrap()
-            .as_str()
-            .unwrap()
+          entity_key: json_uri
             .split("/")
             .collect::<Vec<_>>()
             .last()
-            .unwrap()
+            .context(parse_err!(json_uri))?
             .to_string(),
-          data_hash: bs58::decode(compression_info.get("data_hash").unwrap().as_str().unwrap())
-            .into_vec()
-            .unwrap()
-            .as_slice()
-            .try_into()
-            .unwrap(),
+          data_hash: bs58::decode(
+            compression_info
+              .get("data_hash")
+              .context(json_err!(h.to_string(), "data_hash"))?
+              .as_str()
+              .context(parse_err!(h.to_string(), "data_hash"))?,
+          )
+          .into_vec()?
+          .as_slice()
+          .try_into()?,
           creator_hash: bs58::decode(
             compression_info
               .get("creator_hash")
-              .unwrap()
+              .context(json_err!(h.to_string(), "creator_hash"))?
               .as_str()
-              .unwrap(),
+              .context(parse_err!(h.to_string(), "creator_hash"))?,
           )
-          .into_vec()
-          .unwrap()
+          .into_vec()?
           .as_slice()
-          .try_into()
-          .unwrap(),
-          leaf_id: compression_info.get("leaf_id").unwrap().as_u64().unwrap(),
-          merkle_tree: Pubkey::from_str(compression_info.get("tree").unwrap().as_str().unwrap())
-            .unwrap(),
+          .try_into()?,
+          leaf_id: compression_info
+            .get("leaf_id")
+            .context(json_err!(h.to_string(), "leaf_id"))?
+            .as_u64()
+            .context(parse_err!(h.to_string(), "leaf_id"))?,
+          merkle_tree: Pubkey::from_str(
+            compression_info
+              .get("tree")
+              .context(json_err!(h.to_string(), "tree"))?
+              .as_str()
+              .context(parse_err!(h.to_string(), "tree"))?,
+          )
+          .context(parse_err!(h.to_string(), "tree"))?,
           recipient,
           recipient_acc: None,
         })
@@ -260,7 +287,7 @@ pub async fn claim_rewards(
       .await
       .map_err(|e| anyhow!("Failed to get hotspot rewards for hotspots: {:?}", e))?;
     println!("Fetching on-chain accounts");
-    let recipient_accs = ld_program
+    let recipient_accs = lazy_distributor_program
       .rpc()
       .get_multiple_accounts(
         hotspots
@@ -328,7 +355,7 @@ pub async fn claim_rewards(
 
     println!("Fetching compression proofs");
     let proofs_stream = futures::stream::iter(hotspots_to_claim.clone().into_iter())
-      .map(|hotspot| get_proof(ro_program.rpc().url(), hotspot.id))
+      .map(|hotspot| get_proof(rewards_oracle_program.rpc().url(), hotspot.id))
       .buffered(5);
     let proofs = proofs_stream
       .try_collect::<Vec<_>>()
@@ -336,22 +363,23 @@ pub async fn claim_rewards(
       .map_err(|e| anyhow!("Failed to get proofs: {e}"))?
       .iter()
       .map(|p| {
-        let root: [u8; 32] = Pubkey::from_str(p.as_object().unwrap()["root"].as_str().unwrap())
-          .unwrap()
+        let root: [u8; 32] = Pubkey::from_str(&p.root)
+          .context(parse_err!(p, "root"))?
           .to_bytes();
-        let proof = p.as_object().unwrap()["proof"]
-          .as_array()
-          .unwrap()
+        let proof = p
+          .proof
           .iter()
-          .map(|p| AccountMeta {
-            pubkey: Pubkey::from_str(p.as_str().unwrap()).unwrap(),
-            is_signer: false,
-            is_writable: false,
+          .map(|k| {
+            Ok(AccountMeta {
+              pubkey: Pubkey::from_str(k).context(parse_err!(p, "proof"))?,
+              is_signer: false,
+              is_writable: false,
+            })
           })
-          .collect::<Vec<_>>();
-        (root, proof)
+          .collect::<Result<Vec<_>, anyhow::Error>>()?;
+        Ok((root, proof))
       })
-      .collect::<Vec<_>>();
+      .collect::<Result<Vec<_>, anyhow::Error>>()?;
 
     anyhow::ensure!(
       proofs.len() == hotspots_to_claim.len(),
@@ -359,20 +387,20 @@ pub async fn claim_rewards(
     );
 
     println!("Initializing on chain structs");
-    let blockhash = ld_program.rpc().get_latest_blockhash()?;
+    let blockhash = lazy_distributor_program.rpc().get_latest_blockhash()?;
     let init_recipient_txs_res: Result<Vec<Option<Transaction>>, anyhow::Error> = hotspots_to_claim
       .clone()
       .iter()
       .zip(proofs.iter())
       .map(|(hotspot, (root, proof))| {
         check_and_init_recipient(
-          ld_program,
+          &lazy_distributor_program,
           lazy_distributor,
           hotspot.clone(),
           hotspot_owner,
           root,
           proof,
-          payer,
+          &payer,
           blockhash,
         )
       })
@@ -380,37 +408,44 @@ pub async fn claim_rewards(
     let init_recipient_txs =
       init_recipient_txs_res.map_err(|e| anyhow!("Failed to initialize recipients: {e}"))?;
 
-    if init_recipient_txs.len() > 0 {
+    let serialized_txs = init_recipient_txs
+      .iter()
+      .filter_map(|tx_opt| match tx_opt {
+        Some(tx) => {
+          Some(bincode::serialize(&tx.clone()).map_err(|e| anyhow!("Failed to serialize tx: {e}")))
+        }
+        None => None,
+      })
+      .collect::<Result<Vec<_>, anyhow::Error>>()
+      .context("Failed to serialize txs")?;
+
+    if serialized_txs.len() > 0 {
       println!("Sending init recipient transactions");
       send_and_confirm_messages_with_spinner(
-        ld_program.rpc().into(),
+        lazy_distributor_program.rpc().into(),
         &tpu_client,
-        &init_recipient_txs
-          .iter()
-          .filter(|tx| tx.clone().is_some())
-          .map(|tx| bincode::serialize(&tx.clone().unwrap()).unwrap())
-          .collect::<Vec<_>>(),
+        &serialized_txs,
       )
       .unwrap();
     }
 
     println!("Creating distribute rewards transactions");
     // construct the set and distribute rewards instructions
-    let blockhash = ld_program.rpc().get_latest_blockhash()?;
+    let blockhash = lazy_distributor_program.rpc().get_latest_blockhash()?;
     let initial_txs_res: Result<Vec<Transaction>, anyhow::Error> = hotspots_to_claim
       .clone()
       .into_iter()
       .zip(proofs.iter())
       .map(|(hotspot, (root, proof))| {
         process_hotspot(
-          ro_program,
-          ld_program,
+          &rewards_oracle_program,
+          &lazy_distributor_program,
           hotspot.clone(),
           root,
           proof,
           &rewards,
           hotspot_owner,
-          payer,
+          &payer,
           rewards_mint,
           dao,
           lazy_distributor,
@@ -422,10 +457,10 @@ pub async fn claim_rewards(
     let initial_txs =
       initial_txs_res.map_err(|e| anyhow!("Failed to generate hotspot transactions: {e}"))?;
 
-    let mut serialized_txs = initial_txs
+    let mut deserialized_txs = initial_txs
       .iter()
-      .map(|tx| bincode::serialize(&tx).unwrap())
-      .collect::<Vec<_>>();
+      .map(|tx| bincode::serialize(&tx).map_err(|e| anyhow!("Failed to serialize tx: {e}")))
+      .collect::<Result<Vec<_>, anyhow::Error>>()?;
 
     // bulk sign the whole batch from oracles
     println!("Signing transactions from oracles");
@@ -434,7 +469,7 @@ pub async fn claim_rewards(
       let bulk_sign_response = req_client
         .post(format!("{}/bulk-sign", oracle.url))
         .json(&OracleBulkSignRequest {
-          transactions: serialized_txs.clone(),
+          transactions: deserialized_txs.clone(),
         })
         .send()
         .await
@@ -443,7 +478,7 @@ pub async fn claim_rewards(
         .await
         .map_err(|e| anyhow!("Failed to parse oracle signatures response: {e}"))?;
 
-      serialized_txs = bulk_sign_response
+      deserialized_txs = bulk_sign_response
         .transactions
         .iter()
         .map(|x| x.data.clone())
@@ -471,8 +506,12 @@ pub async fn claim_rewards(
     total += final_txs.len();
 
     // submit the batch of txs
-    send_and_confirm_messages_with_spinner(ld_program.rpc().into(), &tpu_client, &serialized_txs)
-      .unwrap();
+    send_and_confirm_messages_with_spinner(
+      lazy_distributor_program.rpc().into(),
+      &tpu_client,
+      &serialized_txs,
+    )
+    .unwrap();
 
     counter += 1;
     println!("Total claimed so far: {}", total);
@@ -481,7 +520,7 @@ pub async fn claim_rewards(
 }
 
 fn check_and_init_recipient(
-  ld_program: &Program,
+  lazy_distributor_program: &Program,
   lazy_distributor: Pubkey,
   hotspot: Hotspot,
   hotspot_owner: Pubkey,
@@ -493,7 +532,7 @@ fn check_and_init_recipient(
   let compression_program = Pubkey::from_str(COMPRESSION).unwrap();
 
   if hotspot.recipient_acc.unwrap_or(None).is_none() {
-    let mut init_recipient_ixs = ld_program
+    let mut init_recipient_ixs = lazy_distributor_program
       .request()
       .args(
         lazy_distributor::instruction::InitializeCompressionRecipientV0 {
@@ -506,7 +545,7 @@ fn check_and_init_recipient(
         },
       )
       .accounts(InitializeCompressionRecipientV0 {
-        payer: ld_program.payer(),
+        payer: lazy_distributor_program.payer(),
         lazy_distributor,
         recipient: hotspot.recipient,
         merkle_tree: hotspot.merkle_tree,
@@ -535,7 +574,7 @@ fn check_and_init_recipient(
   Ok(None)
 }
 
-async fn get_proof(rpc_url: String, id: Pubkey) -> Result<serde_json::Value, anyhow::Error> {
+async fn get_proof(rpc_url: String, id: Pubkey) -> Result<ProofJson, anyhow::Error> {
   let req_client = reqwest::Client::new();
   let get_asset_proof_response = req_client
     .post(rpc_url)
@@ -553,15 +592,15 @@ async fn get_proof(rpc_url: String, id: Pubkey) -> Result<serde_json::Value, any
     .send()
     .await
     .unwrap()
-    .json::<JsonRpcResponse<serde_json::Value>>()
+    .json::<JsonRpcResponse<ProofJson>>()
     .await
     .unwrap();
   Ok(get_asset_proof_response.result.unwrap())
 }
 
 fn process_hotspot(
-  ro_program: &Program,
-  ld_program: &Program,
+  rewards_oracle_program: &Program,
+  lazy_distributor_program: &Program,
   hotspot: Hotspot,
   root: &[u8; 32],
   proof: &Vec<AccountMeta>,
@@ -586,7 +625,7 @@ fn process_hotspot(
     )
     .map_err(|e| anyhow!("Failed to construct set rewards accounts: {e}"))?;
 
-    let set_reward_ix = &ro_program
+    let set_reward_ix = &rewards_oracle_program
       .request()
       .args(rewards_oracle::instruction::SetCurrentRewardsWrapperV0 {
         args: SetCurrentRewardsWrapperArgsV0 {
@@ -614,7 +653,7 @@ fn process_hotspot(
   }
 
   let distribute_accounts = construct_distribute_rewards_accounts(
-    ld_program,
+    lazy_distributor_program,
     rewards_mint,
     hotspot_owner,
     hotspot.id,
@@ -624,7 +663,7 @@ fn process_hotspot(
   )
   .map_err(|e| anyhow!("Failed to construct distribute rewards accounts: {e}"))?;
 
-  let mut distribute_rewards_ixs = ld_program
+  let mut distribute_rewards_ixs = lazy_distributor_program
     .request()
     .args(
       lazy_distributor::instruction::DistributeCompressionRewardsV0 {
@@ -769,7 +808,7 @@ fn construct_set_rewards_accounts(
 }
 
 fn construct_distribute_rewards_accounts(
-  ld_program: &Program,
+  lazy_distributor_program: &Program,
   rewards_mint: Pubkey,
   hotspot_owner: Pubkey,
   asset_id: Pubkey,
@@ -798,7 +837,7 @@ fn construct_distribute_rewards_accounts(
 
   Ok(DistributeCompressionRewardsV0 {
     common: DistributeRewardsCommonV0 {
-      payer: ld_program.payer(),
+      payer: lazy_distributor_program.payer(),
       lazy_distributor,
       recipient,
       rewards_mint,
@@ -815,4 +854,21 @@ fn construct_distribute_rewards_accounts(
     compression_program,
     token_program: anchor_spl::token::ID,
   })
+}
+
+#[macro_export]
+macro_rules! json_err {
+  ( $object:expr, $key:expr ) => {
+    format!("Info: ${:?}\n\nKey not found: {}", $object, $key)
+  };
+}
+
+#[macro_export]
+macro_rules! parse_err {
+  ($object:expr) => {
+    format!("Info: ${:?}\n\nCould not parse", $object)
+  };
+  ( $object:expr, $subject:expr ) => {
+    format!("Info: ${:?}\n\nCould not parse: {}", $object, $subject)
+  };
 }

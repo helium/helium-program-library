@@ -10,6 +10,8 @@ use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file};
 use std::rc::Rc;
 use std::time::Instant;
 
+use crate::claim_rewards::ClaimRewardsArgs;
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -69,15 +71,15 @@ async fn run() {
   };
   let start = Instant::now();
 
-  claim_rewards(
-    &ld_program,
-    &ro_program,
-    &kp.clone(),
-    ld_program.payer(),
+  claim_rewards(ClaimRewardsArgs {
+    lazy_distributor_program: &ld_program,
+    rewards_oracle_program: &ro_program,
+    payer: &kp.clone(),
+    hotspot_owner: ld_program.payer(),
     rewards_mint,
     dao,
     batch_size,
-  )
+  })
   .await
   .unwrap();
   let duration = start.elapsed();

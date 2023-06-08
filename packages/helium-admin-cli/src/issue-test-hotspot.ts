@@ -13,7 +13,6 @@ import os from "os";
 import yargs from "yargs/yargs";
 import { exists } from "./utils";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
-// @ts-ignore
 import bs58 from "bs58";
 import { loadKeypair } from "./utils";
 import { getLeafAssetId, TreeAuthorityIncorrectError } from "@metaplex-foundation/mpl-bubblegum";
@@ -31,7 +30,7 @@ export async function run(args: any = process.argv) {
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
     },
-    testingEccVerifierKeypair: {
+    testEccVerifierKeypair: {
       type: "string",
     },
     testRewardsOracleFaucet: {
@@ -47,7 +46,7 @@ export async function run(args: any = process.argv) {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hemProgram = await initHem(provider);
-  const eccVerifier = loadKeypair(argv.testingEccVerifierKeypair);
+  const eccVerifier = loadKeypair(argv.testEccVerifierKeypair);
   const ecc = (await HeliumKeypair.makeRandom()).address.b58;
   
   console.log(ecc);

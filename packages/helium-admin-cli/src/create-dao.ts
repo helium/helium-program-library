@@ -35,7 +35,6 @@ import {
 import {
   ComputeBudgetProgram,
   Connection,
-  Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
@@ -182,7 +181,6 @@ export async function run(args: any = process.argv) {
   const dataCreditsProgram = await initDc(provider);
   const heliumSubDaosProgram = await initDao(provider);
   const heliumVsrProgram = await initVsr(provider);
-
 
   const govProgramId = new PublicKey(argv.govProgramId);
   const councilKeypair = await loadKeypair(argv.councilKeypair);
