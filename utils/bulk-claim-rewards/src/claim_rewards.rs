@@ -486,7 +486,7 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
     }
 
     // check that all the txs are the same as before
-    let final_txs_res: Result<Vec<Transaction>, anyhow::Error> = serialized_txs
+    let final_txs_res: Result<Vec<Transaction>, anyhow::Error> = deserialized_txs
       .iter()
       .map(|tx| {
         bincode::deserialize::<Transaction>(tx).map_err(|e| {
