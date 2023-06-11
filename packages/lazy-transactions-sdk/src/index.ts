@@ -9,8 +9,8 @@ import {
 import { keccak_256 } from "js-sha3";
 import { PROGRAM_ID } from "./constants";
 import { MerkleTree, TreeNode } from "./merkleTree";
-// @ts-ignore
 import { bulkSendTransactions, chunks } from "@helium/spl-utils";
+// @ts-ignore
 import { Layout } from "buffer-layout";
 import cliProgress from "cli-progress";
 import * as Collections from "typescript-collections";

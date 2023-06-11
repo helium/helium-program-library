@@ -117,8 +117,17 @@ export class DatabaseMock implements Database {
     return 0;
   }
 
-  getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
-    return Promise.resolve({});
+  async getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
+    let _this = this;
+    const res: Record<string, string> = entityKeys.reduce((acc: Record<string, string>, key) => {
+      acc[key] = Math.floor(
+        (_this.inMemHash.byHotspot[key]?.lifetimeRewards || 0) *
+          Math.pow(10, 8)
+      ).toString();
+      return acc;
+    }, {});
+
+    return res;
   }
 
   reset() {
@@ -361,12 +370,14 @@ describe("distributor-oracle", () => {
     await recipientMethod.rpc({ skipPreflight: true });
     recipient = (await recipientMethod.pubkeys()).recipient!;
 
+    let db = new DatabaseMock(hemProgram, getAssetFn);
+    db.incrementHotspotRewards(ecc);
     oracleServer = new OracleServer(
       ldProgram,
       rewardsProgram,
       hemProgram,
       oracle,
-      new DatabaseMock(hemProgram, getAssetFn),
+      db,
       lazyDistributor
     );
     await oracleServer.start();
@@ -425,7 +436,7 @@ describe("distributor-oracle", () => {
   });
 
   it("should bulk sign transactions", async() => {
-    const unsigned = await client.formTransaction({
+    const unsigned = await client.formBulkTransactions({
       dao: daoK,
       program: ldProgram,
       rewardsOracleProgram: rewardsProgram,
@@ -435,14 +446,16 @@ describe("distributor-oracle", () => {
       rewards: [
         {
           oracleKey: oracle.publicKey,
-          currentRewards: await oracleServer.db.getCurrentRewards(asset),
+          currentRewards: await oracleServer.db.getBulkRewards([ecc]),
         },
       ],
-      asset: asset,
+      assets: [asset],
+      compressionAssetAccs: [(await getAssetFn())!],
       lazyDistributor,
       skipOracleSign: true,
     });
-    const tx = await provider.wallet.signTransaction(unsigned);
+    console.log(unsigned);
+    const tx = await provider.wallet.signTransaction(unsigned[0]);
     const serializedTx = tx.serialize({
       requireAllSignatures: false,
       verifySignatures: false,
