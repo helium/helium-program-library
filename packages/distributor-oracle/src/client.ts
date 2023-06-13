@@ -233,6 +233,7 @@ export async function formBulkTransactions({
         program: lazyDistributorProgram,
         assetId: assets![idx],
         lazyDistributor,
+        rewardsMint: lazyDistributorAcc.rewardsMint!,
         getAssetFn: () => Promise.resolve(assetAcc), // cache result so we don't hit again
         getAssetProofFn,
         assetEndpoint,
