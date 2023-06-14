@@ -437,19 +437,22 @@ export class OracleServer {
     }
 
     let _this = this;
-    const serializedTxs = await Promise.all(req.body.transactions.map(async (txData, idx) => {
-      const result = await _this.signTransaction(txData);
-      if (!result.success) {
-        res
-          .status(400)
-          .send({ error: result.message ? `${result.message}\n\nTransaction index: ${idx}` : `Error signing transaction index: ${idx}` });
-        return null;
+    const results = await Promise.all(req.body.transactions.map(async (txData) => {
+      try {
+        return await _this.signTransaction(txData);
+      } catch (err) {
+        console.error(err);
+        return {success: false, message: err.message};
       }
-      return result.transaction;
     }));
-    // If any of the transactions failed to sign, return. Error code has already been set.
-    if (serializedTxs.filter((x) => !truthy(x)).length > 0) return;
-    res.send({ success: true, transactions: serializedTxs });
+
+    const errIdx = results.findIndex(x => !x.success);
+    if (errIdx > -1) {
+      res.status(400).send({ error: results[errIdx].message ?  `${results[errIdx].message}\n\nTransaction index: ${errIdx}` : `Error signing transaction index: ${errIdx}` });
+      return;
+    }
+
+    res.send({ success: true, transactions: results.map(x => x.transaction) });
   }
 
   private async signTransactionHandler(
