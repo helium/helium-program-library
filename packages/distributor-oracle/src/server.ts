@@ -442,7 +442,7 @@ export class OracleServer {
         return await _this.signTransaction(txData);
       } catch (err) {
         console.error(err);
-        return {success: false, message: err.message};
+        return ({success: false, message: err.message} as any);
       }
     }));
 
@@ -452,7 +452,6 @@ export class OracleServer {
       return;
     }
 
-    //@ts-ignore
     res.send({ success: true, transactions: results.map(x => x.transaction) });
   }
 
