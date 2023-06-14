@@ -19,7 +19,7 @@ import {
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { init as initLazy, lazyDistributorKey, PROGRAM_ID as LD_PID } from "@helium/lazy-distributor-sdk";
 import { init as initRewards, PROGRAM_ID as RO_PID} from "@helium/rewards-oracle-sdk";
-import { Asset, getAsset, HNT_MINT, IOT_MINT } from "@helium/spl-utils";
+import { Asset, getAsset, HNT_MINT, IOT_MINT, truthy } from "@helium/spl-utils";
 import { AccountFetchCache } from "@helium/account-fetch-cache";
 import {
   Keypair,
@@ -437,10 +437,18 @@ export class OracleServer {
     }
 
     let _this = this;
-    const serializedTxs = await Promise.all(req.body.transactions.map(async (txData) => {
+    const serializedTxs = await Promise.all(req.body.transactions.map(async (txData, idx) => {
       const result = await _this.signTransaction(txData);
-      return result.success ? result.transaction : result.message;
+      if (!result.success) {
+        res
+          .status(400)
+          .send({ error: result.message ? `${result.message}\n\nTransaction index: ${idx}` : `Error signing transaction index: ${idx}` });
+        return null;
+      }
+      return result.transaction;
     }));
+    // If any of the transactions failed to sign, return. Error code has already been set.
+    if (serializedTxs.filter((x) => !truthy(x)).length > 0) return;
     res.send({ success: true, transactions: serializedTxs });
   }
 

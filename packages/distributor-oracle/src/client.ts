@@ -119,15 +119,13 @@ export async function getPendingRewards(
 export async function formBulkTransactions({
   program: lazyDistributorProgram,
   rewardsOracleProgram,
-  provider,
   rewards,
   dao = DAO,
   assets,
-  entityKeys,
   compressionAssetAccs,
   lazyDistributor,
   lazyDistributorAcc,
-  wallet = provider.wallet.publicKey,
+  wallet = (lazyDistributorProgram.provider as AnchorProvider).wallet.publicKey,
   skipOracleSign = false,
   assetEndpoint,
   getAssetFn = getAsset,
@@ -135,14 +133,11 @@ export async function formBulkTransactions({
 }: {
   program: Program<LazyDistributor>;
   rewardsOracleProgram?: Program<RewardsOracle>;
-  provider: AnchorProvider;
   rewards: BulkRewards[]; // array of bulk rewards fetched from the oracle. Maps entityKey to reward
   dao?: PublicKey; // Optional override to the dao, defaults to HNT
-  // Must either provider assets or entityKeys. entityKeys are legacy.
-  assets?: PublicKey[];
+  assets: PublicKey[];
   compressionAssetAccs?: Asset[]; // Optional override to fetching the compression accounts from the RPC
   lazyDistributorAcc?: any; // Prefetch the lazyDistributor account to avoid hitting the RPC
-  entityKeys?: PublicKey[];
   lazyDistributor: PublicKey;
   wallet?: PublicKey;
   assetEndpoint?: string;
@@ -153,18 +148,13 @@ export async function formBulkTransactions({
     assetId: PublicKey
   ) => Promise<AssetProof | undefined>;
 }) {
-  if (!assets && !entityKeys) {
-    throw new Error("Must provide asset or hotspot");
-  }
-  if (!assets) {
-    assets = entityKeys!
-  }
   if (assets.length > 100) {
     throw new Error("Too many assets, max 100");
   }
+  const provider = lazyDistributorProgram.provider as AnchorProvider;
 
   if (!rewardsOracleProgram) {
-    rewardsOracleProgram = await initRewards(lazyDistributorProgram.provider as AnchorProvider)
+    rewardsOracleProgram = await initRewards(provider)
   }
   if (!lazyDistributorAcc) {
     lazyDistributorAcc = await lazyDistributorProgram.account.lazyDistributorV0.fetch(lazyDistributor);
@@ -257,7 +247,7 @@ export async function formBulkTransactions({
   let initialTxs = ixsPerAsset.map((ixs) => {
     const tx = new Transaction();
     tx.recentBlockhash = blockhash;
-    tx.feePayer = wallet ? wallet : provider.wallet.publicKey;
+    tx.feePayer = wallet;
     tx.add(...ixs);
     return tx;
   });
