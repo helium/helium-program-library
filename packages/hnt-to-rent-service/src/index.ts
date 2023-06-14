@@ -3,7 +3,7 @@ import {
   PublicKey
 } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
-import { estimate, fundFees } from "./orca";
+import { estimate, fundFeesFromHnt, fundFeesFromTokens } from "./orca";
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -14,20 +14,47 @@ server.register(cors, {
 server.get("/health", async () => {
   return { ok: true };
 });
+import {
+  HNT_MINT, IOT_MINT, MOBILE_MINT
+} from "@helium/spl-utils";
 
+
+/**
+ * DEPRECATED ENDPOINT
+ * Will be removed in future version
+ */
 server.post<{
   Body: { wallet: PublicKey };
 }>("/hnt-to-fees", async (request, reply) => {
   const wallet = new PublicKey(request.body.wallet);
 
   return Buffer.from(
-    (await fundFees(wallet)).serialize({ requireAllSignatures: false })
+    (await fundFeesFromHnt(wallet)).serialize({ requireAllSignatures: false })
   ).toJSON().data;
+});
+
+server.post<{
+  Body: { wallet: PublicKey, fromToken: PublicKey };
+}>("/token-to-rent-transaction", async (request, reply) => {
+  const wallet = new PublicKey(request.body.wallet);
+  const fromToken = new PublicKey(request.body.fromToken);
+
+  if (fromToken.equals(HNT_MINT)) {
+    return Buffer.from(
+      (await fundFeesFromHnt(wallet)).serialize({ requireAllSignatures: false })
+    ).toJSON().data;
+  } else if (IOT_MINT.equals(fromToken) || MOBILE_MINT.equals(fromToken)) {
+    return Buffer.from(
+      (await fundFeesFromTokens(wallet, fromToken)).serialize({ requireAllSignatures: false })
+    ).toJSON().data;
+  }
+  reply.status(400).send("Unsupported token");
+  
 });
 
 
 server.get<{
-  Body: { wallet: PublicKey };
+  Body: { wallet: PublicKey, fromToken?: PublicKey };
 }>("/estimate", async (request, reply) => {
   return {
     estimate: await estimate()

@@ -32,6 +32,9 @@
       "path": "../account-fetch-cache"
     },
     {
+      "path": "../spl-utils"
+    },
+    {
       "path": "./tsconfig.cjs.json"
     },
     {
