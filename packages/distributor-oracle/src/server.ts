@@ -452,6 +452,7 @@ export class OracleServer {
       return;
     }
 
+    //@ts-ignore
     res.send({ success: true, transactions: results.map(x => x.transaction) });
   }
 
