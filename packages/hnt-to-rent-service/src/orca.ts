@@ -38,8 +38,8 @@ class PubkeyWallet {
 }
 
 const HNT_SOL = new PublicKey("5qrvgpvr55Eo7c5bBcwopdiQ6TpvceiRm42yjHTbtDvc");
-const IOT_HNT = new PublicKey("");
-const MOBILE_HNT = new PublicKey("");
+const IOT_HNT = new PublicKey("6x6FPHbG1igaDCJ57UScYxg1sFjevhMNaW9md9PfudFx");
+const MOBILE_HNT = new PublicKey("45zpzzpZquaVv4BAdXfzNbuba7DAXV32d1sTrUh5wcnW");
 
 export async function fundFeesFromTokens(
   userWalletPubkey: PublicKey,
