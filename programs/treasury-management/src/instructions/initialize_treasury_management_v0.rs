@@ -34,7 +34,7 @@ pub struct InitializeTreasuryManagementV0<'info> {
   pub treasury_mint: Box<Account<'info, Mint>>,
   // IOT, MOBILE, etc
   #[account(
-    constraint = supply_mint.mint_authority.unwrap() == *mint_authority.key,
+    mint::authority = mint_authority
   )]
   pub supply_mint: Box<Account<'info, Mint>>,
   pub mint_authority: Signer<'info>,
