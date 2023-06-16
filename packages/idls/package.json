@@ -16,7 +16,7 @@
     "lib"
   ],
   "exports": {
-    "./*": "./lib/esm/*"
+    "./*": "./*"
   },
   "scripts": {
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
