@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Mint metadata of vsr positions",
   "repository": {
     "type": "git",
@@ -32,10 +32,10 @@
     "dev": "npx ts-node --project tsconfig.cjs.json src/index.ts"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "0.26.0",
+    "@coral-xyz/anchor": "^0.26.0",
     "@fastify/cors": "^8.1.1",
     "@helium/address": "^4.6.2",
-    "@helium/voter-stake-registry-sdk": "^0.2.0",
+    "@helium/voter-stake-registry-sdk": "^0.2.2",
     "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
     "@solana/spl-account-compression": "^0.1.7",
     "@solana/spl-token": "^0.3.6",
