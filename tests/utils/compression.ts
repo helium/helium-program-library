@@ -13,10 +13,10 @@ import { Program } from "@coral-xyz/anchor";
 import {
   ConcurrentMerkleTreeAccount,
   getConcurrentMerkleTreeAccountSize,
+  MerkleTree,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID
 } from "@solana/spl-account-compression";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
-import { MerkleTree } from "../../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
 import { Bubblegum as MplBubblegum, IDL as BubblegumIdl } from "./bubblegum";
 import { entityCreatorKey } from "@helium/helium-entity-manager-sdk";
 // @ts-ignore

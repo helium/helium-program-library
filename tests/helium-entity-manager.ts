@@ -1,22 +1,19 @@
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { Asset, AssetProof, createMintInstructions, sendInstructions, toBN, proofArgsAndAccounts } from "@helium/spl-utils";
-import { init as initPriceOracle } from "../packages/price-oracle-sdk/src";
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
-import { ComputeBudgetProgram, Keypair, PublicKey, LAMPORTS_PER_SOL, SystemProgram } from "@solana/web3.js";
+import { Asset, AssetProof, createMintInstructions, toBN } from "@helium/spl-utils";
 import { AddGatewayV1 } from "@helium/transactions";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
 import chai from "chai";
 import {
-  entityCreatorKey,
   init as initHeliumEntityManager,
-  iotInfoKey,
   onboardIotHotspot,
   onboardMobileHotspot,
   updateIotMetadata,
-  updateMobileMetadata,
+  updateMobileMetadata
 } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
@@ -36,23 +33,13 @@ const { expect } = chai;
 // @ts-ignore
 import { helium } from "@helium/proto";
 // @ts-ignore
-import animalHash from "angry-purple-tiger";
 import axios from "axios";
 
-import {
-  computeCompressedNFTHash,
-  computeCreatorHash,
-  computeDataHash,
-  getLeafAssetId,
-  TokenProgramVersion,
-  TokenStandard,
-} from "@metaplex-foundation/mpl-bubblegum";
+import { MerkleTree } from "@solana/spl-account-compression";
 import { BN } from "bn.js";
 import chaiAsPromised from "chai-as-promised";
-import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
-import { exists, loadKeypair } from "./utils/solana"; 
-import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
 import { createMockCompression } from "./utils/compression";
+import { loadKeypair } from "./utils/solana";
 
 chai.use(chaiAsPromised);
 

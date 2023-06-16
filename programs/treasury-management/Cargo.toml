@@ -1,3 +1,5 @@
+cargo-features = ["workspace-inheritance"]
+
 [package]
 name = "treasury-management"
 version = "0.0.1"
@@ -21,7 +23,7 @@ default = []
 overflow-checks = true
 
 [dependencies]
-anchor-lang = { version = "0.26.0", features = ["init-if-needed"] }
+anchor-lang = { workspace = true }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
-anchor-spl = "0.26.0"
+anchor-spl = { workspace = true }
 shared-utils = { path = "../shared-utils" }

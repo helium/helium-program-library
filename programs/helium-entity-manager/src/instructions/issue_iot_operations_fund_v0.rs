@@ -2,13 +2,13 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::metadata::{
-  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
-};
 use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount};
 use helium_sub_daos::DaoV0;
 use mpl_token_metadata::state::{Creator, DataV2};
 use shared_utils::create_metadata_accounts_v3;
+use shared_utils::token_metadata::{
+  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
+};
 
 pub const IOT_OPERATIONS_FUND: &str = "iot_operations_fund";
 

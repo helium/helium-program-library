@@ -30,14 +30,12 @@ import {
 import chai, { assert, expect } from "chai";
 import chaiHttp from "chai-http";
 import fs from "fs";
-import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
 import * as client from "../packages/distributor-oracle/src/client";
 import {
   Database,
   OracleServer
 } from "../packages/distributor-oracle/src/server";
 import {
-  entityCreatorKey,
   PROGRAM_ID as HEM_PID,
   init as initHeliumEntityManager,
   keyToAssetKey
@@ -64,17 +62,6 @@ import {
   initWorld
 } from "./utils/fixtures";
 import { initVsr } from "./utils/vsr";
-// @ts-ignore
-import {
-  computeCompressedNFTHash,
-  computeCreatorHash,
-  computeDataHash,
-  getLeafAssetId,
-  TokenProgramVersion,
-  TokenStandard
-} from "@metaplex-foundation/mpl-bubblegum";
-// @ts-ignore
-import animalHash from "angry-purple-tiger";
 import { createMockCompression } from "./utils/compression";
 
 chai.use(chaiHttp);
