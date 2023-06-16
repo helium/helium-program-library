@@ -400,7 +400,12 @@ describe("distributor-oracle", () => {
         supply: {
           edition_nonce: null,
         },
-        grouping: [{ group_key: metadata.collection.key }],
+        grouping: [
+          {
+            group_key: "collection",
+            group_value: metadata.collection.key as PublicKey,
+          },
+        ],
         uses: metadata.uses,
         creators: metadata.creators,
         ownership: {
