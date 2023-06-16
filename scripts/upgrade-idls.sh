@@ -12,3 +12,4 @@ anchor idl upgrade treaf4wWBBty3fHdyBpo35Mz84M8k3heKXmjmi9vFt5 --filepath target
 anchor idl upgrade 1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h --filepath target/idl/lazy_transactions.json --provider.cluster ${1:-localnet} --provider.wallet ${2:-~/.config/solana/id.json}
 anchor idl upgrade hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8 --filepath target/idl/voter_stake_registry.json --provider.cluster ${1:-localnet} --provider.wallet ${2:-~/.config/solana/id.json}
 anchor idl upgrade rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF --filepath target/idl/rewards_oracle.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json
+anchor idl upgrade memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr --filepath target/idl/mobile_entity_manager.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json &
