@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Oracle server for the lazy distributor",
   "repository": {
     "type": "git",
@@ -36,14 +36,14 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.26.0",
     "@fastify/cors": "^8.1.1",
-    "@helium/account-fetch-cache": "^0.2.0",
+    "@helium/account-fetch-cache": "^0.2.2",
     "@helium/address": "^4.6.2",
-    "@helium/helium-entity-manager-sdk": "^0.2.0",
-    "@helium/helium-sub-daos-sdk": "^0.2.0",
-    "@helium/idls": "^0.2.0",
-    "@helium/lazy-distributor-sdk": "^0.2.0",
-    "@helium/rewards-oracle-sdk": "^0.2.0",
-    "@helium/spl-utils": "^0.2.0",
+    "@helium/helium-entity-manager-sdk": "^0.2.2",
+    "@helium/helium-sub-daos-sdk": "^0.2.2",
+    "@helium/idls": "^0.2.2",
+    "@helium/lazy-distributor-sdk": "^0.2.2",
+    "@helium/rewards-oracle-sdk": "^0.2.2",
+    "@helium/spl-utils": "^0.2.2",
     "@types/sequelize": "^4.28.14",
     "aws-sdk": "^2.1313.0",
     "axios": "^0.27.2",
@@ -68,5 +68,5 @@
     "typescript": "^4.3.4",
     "yarn": "^1.22.18"
   },
-  "gitHead": "ff670e6a6211209648c56dd69e5f5dfbda631b42"
+  "gitHead": "5a8bf0b7b88e5934ef8d774e686f7c95804fbb8d"
 }
