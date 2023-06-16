@@ -43,7 +43,7 @@ pub struct WithdrawV0<'info> {
   pub deposit_mint: Box<Account<'info, Mint>>,
   #[account(
     mut,
-    constraint = destination.mint == deposit_mint.key()
+    token::mint = deposit_mint
   )]
   pub destination: Box<Account<'info, TokenAccount>>,
 

@@ -25,7 +25,7 @@ pub struct DepositV0<'info> {
 
   #[account(
         mut,
-        constraint = deposit_token.owner == deposit_authority.key(),
+        token::authority = deposit_authority,
         has_one = mint
     )]
   pub deposit_token: Box<Account<'info, TokenAccount>>,

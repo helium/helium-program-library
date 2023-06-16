@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.2.0",
+  "version": "0.2.4",
   "description": "CLI to bootstrap the network",
   "repository": {
     "type": "git",
@@ -40,20 +40,20 @@
   },
   "dependencies": {
     "@clockwork-xyz/sdk": "^0.2.4",
-    "@coral-xyz/anchor": "0.26.0",
+    "@coral-xyz/anchor": "^0.26.0",
     "@helium/address": "^4.6.2",
-    "@helium/circuit-breaker-sdk": "^0.2.0",
+    "@helium/circuit-breaker-sdk": "^0.2.4",
     "@helium/crypto": "^4.6.2",
-    "@helium/data-credits-sdk": "^0.2.0",
-    "@helium/distributor-oracle": "^0.2.0",
-    "@helium/fanout-sdk": "^0.2.0",
-    "@helium/helium-entity-manager-sdk": "^0.2.0",
-    "@helium/helium-sub-daos-sdk": "^0.2.0",
-    "@helium/lazy-distributor-sdk": "^0.2.0",
-    "@helium/mobile-entity-manager-sdk": "^0.2.0",
-    "@helium/price-oracle-sdk": "^0.2.0",
-    "@helium/spl-utils": "^0.2.0",
-    "@helium/treasury-management-sdk": "^0.2.0",
+    "@helium/data-credits-sdk": "^0.2.4",
+    "@helium/distributor-oracle": "^0.2.4",
+    "@helium/fanout-sdk": "^0.2.4",
+    "@helium/helium-entity-manager-sdk": "^0.2.4",
+    "@helium/helium-sub-daos-sdk": "^0.2.4",
+    "@helium/lazy-distributor-sdk": "^0.2.4",
+    "@helium/mobile-entity-manager-sdk": "^0.2.4",
+    "@helium/price-oracle-sdk": "^0.2.4",
+    "@helium/spl-utils": "^0.2.4",
+    "@helium/treasury-management-sdk": "^0.2.4",
     "@solana/spl-account-compression": "^0.1.4",
     "@solana/spl-governance": "^0.3.18",
     "@solana/spl-token": "^0.3.6",
@@ -74,5 +74,6 @@
     "typescript": "^4.3.4",
     "yarn": "^1.22.18"
   },
-  "author": ""
+  "author": "",
+  "gitHead": "5a8bf0b7b88e5934ef8d774e686f7c95804fbb8d"
 }
