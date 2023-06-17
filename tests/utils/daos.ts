@@ -110,6 +110,7 @@ export async function initTestSubdao(
     .initializeSubDaoV0({
       registrar: registrar || Keypair.generate().publicKey,
       onboardingDcFee: toBN(DC_FEE, 0),
+      onboardingDataOnlyDcFee: toBN(DC_FEE / 4, 0),
       authority: authority,
       emissionSchedule: [
         {
