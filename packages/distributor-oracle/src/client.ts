@@ -3,7 +3,7 @@ import { init, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
 import { distributeCompressionRewards, initializeCompressionRecipient, recipientKey } from "@helium/lazy-distributor-sdk";
-import { Asset, AssetProof, getAsset, getAssetProof } from "@helium/spl-utils";
+import { Asset, AssetProof, getAsset, getAssetProof, truthy } from "@helium/spl-utils";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { init as initRewards } from "@helium/rewards-oracle-sdk";
 import {
@@ -14,6 +14,7 @@ import axios from "axios";
 import { HNT_MINT } from "@helium/spl-utils";
 import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
+import { set } from "@coral-xyz/anchor/dist/cjs/utils/features";
 
 const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
 const DAO = daoKey(HNT)[0];
@@ -113,6 +114,169 @@ export async function getPendingRewards(
 
     return acc;
   }, {} as Record<string, string>);
+}
+
+export async function formBulkTransactions({
+  program: lazyDistributorProgram,
+  rewardsOracleProgram,
+  rewards,
+  dao = DAO,
+  assets,
+  compressionAssetAccs,
+  lazyDistributor,
+  lazyDistributorAcc,
+  wallet = (lazyDistributorProgram.provider as AnchorProvider).wallet.publicKey,
+  skipOracleSign = false,
+  assetEndpoint,
+  getAssetFn = getAsset,
+  getAssetProofFn = getAssetProof,
+}: {
+  program: Program<LazyDistributor>;
+  rewardsOracleProgram?: Program<RewardsOracle>;
+  rewards: BulkRewards[]; // array of bulk rewards fetched from the oracle. Maps entityKey to reward
+  dao?: PublicKey; // Optional override to the dao, defaults to HNT
+  assets: PublicKey[];
+  compressionAssetAccs?: Asset[]; // Optional override to fetching the compression accounts from the RPC
+  lazyDistributorAcc?: any; // Prefetch the lazyDistributor account to avoid hitting the RPC
+  lazyDistributor: PublicKey;
+  wallet?: PublicKey;
+  assetEndpoint?: string;
+  skipOracleSign?: boolean;
+  getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
+  getAssetProofFn?: (
+    url: string,
+    assetId: PublicKey
+  ) => Promise<AssetProof | undefined>;
+}) {
+  if (assets.length > 100) {
+    throw new Error("Too many assets, max 100");
+  }
+  const provider = lazyDistributorProgram.provider as AnchorProvider;
+
+  if (!rewardsOracleProgram) {
+    rewardsOracleProgram = await initRewards(provider)
+  }
+  if (!lazyDistributorAcc) {
+    lazyDistributorAcc = await lazyDistributorProgram.account.lazyDistributorV0.fetch(lazyDistributor);
+  }
+
+  if (!compressionAssetAccs) {
+    compressionAssetAccs = await Promise.all(assets.map(async (asset) => {
+      // @ts-ignore
+      const assetAcc = await getAssetFn(assetEndpoint || provider.connection._rpcEndpoint, asset);
+      if (!assetAcc) {
+        throw new Error("No asset with ID " + asset.toBase58());
+      }
+      return assetAcc;
+    }))
+  }
+  if (compressionAssetAccs.length != assets.length) {
+    throw new Error("Assets not the same length as compressionAssetAccs")
+  }
+
+  let recipientKeys = assets.map((asset) => recipientKey(lazyDistributor, asset)[0]);
+  let recipientAccs = await lazyDistributorProgram.account.recipientV0.fetchMultiple(recipientKeys);
+
+  let ixsPerAsset = await Promise.all(recipientAccs.map(async (recipientAcc, idx) => {
+    if (!recipientAcc) {
+      return [await(
+        await initializeCompressionRecipient({
+          program: lazyDistributorProgram,
+          assetId: assets![idx],
+          lazyDistributor,
+          assetEndpoint,
+          owner: wallet,
+          // Make the oracle pay for the recipient to avoid newly migrated users not having enough sol to claim rewards
+          payer: lazyDistributorAcc.oracles[0].oracle,
+          getAssetFn: () => Promise.resolve(compressionAssetAccs![idx]), // cache result so we don't hit again
+          getAssetProofFn,
+        })
+      ).instruction()];
+    }
+    return [];
+  }));
+
+  // construct the set and distribute ixs
+  let setAndDistributeIxs = await Promise.all(compressionAssetAccs.map(async (assetAcc, idx) => {
+    const entityKey = assetAcc.content.json_uri.split("/").slice(-1)[0];
+    const keyToAsset = keyToAssetKey(dao, entityKey)[0];
+    const setRewardIxs = (await Promise.all(rewards.map(async (bulkRewards, oracleIdx) => {
+      if (!(entityKey in bulkRewards.currentRewards)) {
+        return null;
+      }
+      return await rewardsOracleProgram!.methods.setCurrentRewardsWrapperV0({
+        entityKey: Buffer.from(bs58.decode(entityKey)),
+        currentRewards: new BN(bulkRewards.currentRewards[entityKey]),
+        oracleIndex: oracleIdx,
+      }).accounts({
+        lazyDistributor,
+        recipient: recipientKeys[idx],
+        keyToAsset,
+        oracle: bulkRewards.oracleKey,
+      }).instruction();
+    }))).filter(truthy);
+    if (setRewardIxs.length == 0) {
+      return [];
+    }
+    const distributeIx = await(
+      await distributeCompressionRewards({
+        program: lazyDistributorProgram,
+        assetId: assets![idx],
+        lazyDistributor,
+        rewardsMint: lazyDistributorAcc.rewardsMint!,
+        getAssetFn: () => Promise.resolve(assetAcc), // cache result so we don't hit again
+        getAssetProofFn,
+        assetEndpoint,
+      })
+    ).instruction();
+    return [...setRewardIxs, distributeIx];
+  }));
+
+  for (let i = 0; i < setAndDistributeIxs.length; i++) {
+    if (setAndDistributeIxs[i].length == 0) {
+      continue;
+    }
+    ixsPerAsset[i].push(...setAndDistributeIxs[i]);
+  }
+  // filter arrays where init recipient is the only ix
+  ixsPerAsset = ixsPerAsset.filter((x) => x.length > 1);
+
+  let blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
+
+  // unsigned txs
+  let initialTxs = ixsPerAsset.map((ixs) => {
+    const tx = new Transaction();
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = wallet;
+    tx.add(...ixs);
+    return tx;
+  });
+
+  // @ts-ignore
+  const oracleUrls = lazyDistributorAcc.oracles.map((x: any) => x.url);
+
+  let serTxs = initialTxs.map((tx) => {
+    return tx.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    })
+  })
+  if (!skipOracleSign) {
+    for (const oracle of oracleUrls) {
+      const res = await axios.post(`${oracle}/bulk-sign`, {
+        transactions: serTxs.map((tx) => tx.toJSON().data),
+      });
+      serTxs = res.data.transactions.map((x: any) => Buffer.from(x));;
+    }
+  }
+
+  const finalTxs = serTxs.map((tx) => Transaction.from(tx));
+  // Check instructions are the same
+  finalTxs.forEach((finalTx, idx) => {
+    assertSameIxns(finalTx.instructions, initialTxs[idx].instructions);
+  });
+
+  return finalTxs;
 }
 
 

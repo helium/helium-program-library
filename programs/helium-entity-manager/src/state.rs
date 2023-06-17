@@ -25,6 +25,19 @@ pub enum ConfigSettingsV0 {
   },
 }
 
+impl ConfigSettingsV0 {
+  pub fn validate_iot_gain(&self, gain: Option<i32>) -> bool {
+    match self {
+      ConfigSettingsV0::IotConfig {
+        max_gain, min_gain, ..
+      } => gain
+        .map(|gain| &gain <= max_gain && &gain >= min_gain)
+        .unwrap_or(true),
+      _ => false,
+    }
+  }
+}
+
 impl Default for ConfigSettingsV0 {
   fn default() -> Self {
     ConfigSettingsV0::IotConfig {

@@ -107,9 +107,9 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
     return Err(Status::BadRequest);
   }
 
-  // Verify it's issue entity
-  let sighash = sighash("global", "issue_entity_v0");
-  if sighash != ixn.data[0..8] {
+  // Verify it's issue_entity
+  let issue_sighash = sighash("global", "issue_entity_v0");
+  if issue_sighash != ixn.data[0..8] {
     error!("Sighash mismatch");
     return Err(Status::BadRequest);
   }

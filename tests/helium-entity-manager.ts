@@ -1,16 +1,18 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
-import { Asset, AssetProof, createMintInstructions, toBN } from "@helium/spl-utils";
-import { AddGatewayV1 } from "@helium/transactions";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
+import { Asset, AssetProof, createMintInstructions, sendInstructions, toBN, proofArgsAndAccounts } from "@helium/spl-utils";
+import { init as initPriceOracle } from "../packages/price-oracle-sdk/src";
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
+import { ComputeBudgetProgram, Keypair, PublicKey, LAMPORTS_PER_SOL, SystemProgram } from "@solana/web3.js";
+import { AddGatewayV1 } from "@helium/transactions";
 import chai from "chai";
 import {
   entityCreatorKey,
   init as initHeliumEntityManager,
+  iotInfoKey,
   onboardIotHotspot,
   onboardMobileHotspot,
   updateIotMetadata,
@@ -48,7 +50,9 @@ import {
 import { BN } from "bn.js";
 import chaiAsPromised from "chai-as-promised";
 import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
-import { loadKeypair } from "./utils/solana";
+import { exists, loadKeypair } from "./utils/solana"; 
+import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
+import { createMockCompression } from "./utils/compression";
 
 chai.use(chaiAsPromised);
 
@@ -261,92 +265,14 @@ describe("helium-entity-manager", () => {
 
       maker = makerConf.maker;
       makerKeypair = makerConf.makerKeypair;
-      hotspotCollection = makerConf.collection;
 
-      // Setup merkle tree -- this isn't needed anywhere but localnet,
-      // we're effectively duplicating metaplex digital asset api
-      const merkle = makerConf.merkle;
-      hotspot = await getLeafAssetId(merkle, new BN(0));
-
-      const leaves = Array(2 ** 3).fill(Buffer.alloc(32));
-
-      const creators = [
-        {
-          address: entityCreatorKey(dao)[0],
-          verified: true,
-          share: 100,
-        },
-      ];
-      metadata = {
-        name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
-        symbol: "HOTSPOT",
-        uri: `https://entities.nft.helium.io/${ecc}`,
-        collection: {
-          key: hotspotCollection,
-          verified: true,
-        },
-        creators,
-        sellerFeeBasisPoints: 0,
-        primarySaleHappened: true,
-        isMutable: true,
-        editionNonce: null,
-        tokenStandard: TokenStandard.NonFungible,
-        uses: null,
-        tokenProgramVersion: TokenProgramVersion.Original,
-      };
-      const hash = computeCompressedNFTHash(
-        hotspot,
-        hotspotOwner.publicKey,
-        hotspotOwner.publicKey,
-        new anchor.BN(0),
-        metadata
-      );
-      leaves[0] = hash;
-      merkleTree = new MerkleTree(leaves);
-      const proof = merkleTree.getProof(0);
-      getAssetFn = async () =>
-        ({
-          id: await getLeafAssetId(merkle, new BN(0)),
-          content: {
-            metadata: {
-              name: metadata.name,
-              symbol: metadata.symbol,
-            },
-            json_uri: metadata.uri,
-          },
-          royalty: {
-            basis_points: metadata.sellerFeeBasisPoints,
-            primary_sale_happened: true,
-          },
-          mutable: true,
-          supply: {
-            edition_nonce: null,
-          },
-          grouping: [
-            {
-              group_key: "collection",
-              group_value: metadata.collection.key as PublicKey,
-            },
-          ],
-          uses: metadata.uses,
-          creators: metadata.creators,
-          ownership: { owner: hotspotOwner.publicKey },
-          compression: {
-            compressed: true,
-            eligible: true,
-            dataHash: computeDataHash(metadata),
-            creatorHash: computeCreatorHash(creators),
-          },
-        } as Asset);
-      getAssetProofFn = async () => {
-        return {
-          root: new PublicKey(proof.root),
-          proof: proof.proof.map((p) => new PublicKey(p)),
-          nodeIndex: 0,
-          leaf: new PublicKey(proof.leaf),
-          treeId: merkle,
-        };
-      };
+      ({getAssetFn, getAssetProofFn, hotspot} = await createMockCompression({
+        collection: makerConf.collection,
+        dao,
+        merkle: makerConf.merkle,
+        ecc,
+        hotspotOwner,
+      }));
     });
 
     // Only uncomment this when you want to debug the sig verifier service locally.
@@ -559,89 +485,13 @@ describe("helium-entity-manager", () => {
       makerKeypair = makerConf.makerKeypair;
       hotspotCollection = makerConf.collection;
 
-      // Setup merkle tree -- this isn't needed anywhere but localnet,
-      // we're effectively duplicating metaplex digital asset api
-      const merkle = makerConf.merkle;
-      hotspot = await getLeafAssetId(merkle, new BN(0));
-
-      const leaves = Array(2 ** 3).fill(Buffer.alloc(32));
-      const creators = [
-        {
-          address: entityCreatorKey(dao)[0],
-          verified: true,
-          share: 100,
-        },
-      ];
-      metadata = {
-        name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
-        symbol: "HOTSPOT",
-        uri: `https://entities.nft.helium.io/${ecc}`,
-        collection: {
-          key: hotspotCollection,
-          verified: true,
-        },
-        creators,
-        sellerFeeBasisPoints: 0,
-        primarySaleHappened: true,
-        isMutable: true,
-        editionNonce: null,
-        tokenStandard: TokenStandard.NonFungible,
-        uses: null,
-        tokenProgramVersion: TokenProgramVersion.Original,
-      };
-      const hash = computeCompressedNFTHash(
-        hotspot,
-        hotspotOwner.publicKey,
-        hotspotOwner.publicKey,
-        new anchor.BN(0),
-        metadata
-      );
-      leaves[0] = hash;
-      merkleTree = new MerkleTree(leaves);
-      const proof = merkleTree.getProof(0);
-      getAssetFn = async () =>
-        ({
-          id: await getLeafAssetId(merkle, new BN(0)),
-          content: {
-            metadata: {
-              name: metadata.name,
-              symbol: metadata.symbol,
-            },
-            json_uri: metadata.uri,
-          },
-          royalty: {
-            basis_points: metadata.sellerFeeBasisPoints,
-            primary_sale_happened: true,
-          },
-          mutable: true,
-          supply: {
-            edition_nonce: null,
-          },
-          grouping: [
-            {
-              group_key: "collection",
-              group_value: metadata.collection.key as PublicKey,
-            },
-          ],
-          uses: metadata.uses,
-          creators: metadata.creators,
-          ownership: { owner: hotspotOwner.publicKey },
-          compression: {
-            compressed: true,
-            eligible: true,
-            dataHash: computeDataHash(metadata),
-            creatorHash: computeCreatorHash(creators),
-          },
-        } as Asset);
-      getAssetProofFn = async () => {
-        return {
-          root: new PublicKey(proof.root),
-          proof: proof.proof.map((p) => new PublicKey(p)),
-          nodeIndex: 0,
-          leaf: new PublicKey(proof.leaf),
-          treeId: merkle,
-        };
-      };
+      ({getAssetFn, getAssetProofFn, hotspot} = await createMockCompression({
+        collection: makerConf.collection,
+        dao,
+        merkle: makerConf.merkle,
+        ecc,
+        hotspotOwner,
+      }));
     });
 
     it("issues an iot hotspot", async () => {
