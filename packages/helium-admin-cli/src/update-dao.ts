@@ -44,6 +44,12 @@ export async function run(args: any = process.argv) {
       type: "string",
       default: null,
     },
+    newNetEmissionsCap: {
+      required: false,
+      describe: "New net emissions cap, without decimals",
+      type: "string",
+      default: null
+    },
     newHstPool: {
       required: false,
       describe: "New HST Pool",
@@ -92,6 +98,7 @@ export async function run(args: any = process.argv) {
     authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
     emissionSchedule: argv.newEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newEmissionsSchedulePath) : null,
     hstEmissionSchedule: argv.newHstEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newHstEmissionsSchedulePath) : null,
+    netEmissionsCap: argv.newNetEmissionsCap ? new anchor.BN(argv.newNetEmissionsCap) : null,
     hstPool: argv.newHstPool ? new PublicKey(argv.newHstPool) : null,
   }).accounts({
     dao,
