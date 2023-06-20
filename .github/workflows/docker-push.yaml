@@ -69,8 +69,8 @@ jobs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: ${{ env.CONTAINER }}
         CONTAINER_PATH: ${{ env.CONTAINER_PATH }}
-        REGISTRY_ALIAS: ${{ secrets.WEB_ECR_ALIAS }}
         IMAGE_TAG: ${{ env.VERSION }}
       run: |
+        REGISTRY_ALIAS=$(aws ecr-public describe-registries | jq --raw-output .registries[0].registryId)
         docker build -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG $CONTAINER_PATH
         docker push $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG
