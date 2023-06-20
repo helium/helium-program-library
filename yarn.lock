@@ -1164,6 +1164,20 @@
     bn.js "^5.2.0"
     js-sha3 "^0.8.0"
 
+"@metaplex-foundation/mpl-bubblegum@^0.7.0":
+  version "0.7.0"
+  resolved "https://registry.yarnpkg.com/@metaplex-foundation/mpl-bubblegum/-/mpl-bubblegum-0.7.0.tgz#b34067ad4fe846ceb60e47e49f221ecf4730add7"
+  integrity sha512-HCo6q+nh8M3KRv9/aUaZcJo5/vPJEeZwPGRDWkqN7lUXoMIvhd83fZi7MB1rIg1gwpVHfHqim0A02LCYKisWFg==
+  dependencies:
+    "@metaplex-foundation/beet" "0.7.1"
+    "@metaplex-foundation/beet-solana" "0.4.0"
+    "@metaplex-foundation/cusper" "^0.0.2"
+    "@metaplex-foundation/mpl-token-metadata" "^2.5.2"
+    "@solana/spl-account-compression" "^0.1.4"
+    "@solana/spl-token" "^0.1.8"
+    "@solana/web3.js" "^1.50.1"
+    js-sha3 "^0.8.0"
+
 "@metaplex-foundation/mpl-core@^0.0.2":
   version "0.0.2"
   resolved "https://registry.yarnpkg.com/@metaplex-foundation/mpl-core/-/mpl-core-0.0.2.tgz#17ee2cc216e17629d6df1dbba75964625ebbd603"
