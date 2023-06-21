@@ -31,7 +31,7 @@ pub struct Delegated {
 use anchor_lang::prelude::*;
 use helium_sub_daos::{
   caclulate_vhnt_info, current_epoch, DelegatedPositionV0,
-  PrecisePosition, SubDaoEpochInfoV0, SubDaoV0, TempUpdateSubDaoEpochInfoArgs, accounts::TempUpdateSubDaoEpochInfo,
+  PrecisePosition, SubDaoEpochInfoV0, SubDaoV0,
 };
 
 #[allow(unused)]
@@ -329,37 +329,37 @@ impl Delegated {
                   new_sub_dao_epoch_info.1.vehnt_in_closing_positions
                 );
                 // Uncomment if endpoint added back and needed.
-                loop {
-                  println!("Correcting...");
-                  let res = program
-                  .request()
-                  .args(helium_sub_daos::instruction::TempUpdateSubDaoEpochInfo {
-                    args: TempUpdateSubDaoEpochInfoArgs {
-                      fall_rates_from_closing_positions: if has_fall_rate_diff {
-                        Some(new_sub_dao_epoch_info.1.fall_rates_from_closing_positions)
-                      } else {
-                        None
-                      },
-                      vehnt_in_closing_positions: if has_vehnt_diff {
-                        Some(new_sub_dao_epoch_info.1.vehnt_in_closing_positions)
-                      } else {
-                        None
-                      },
-                      epoch: new_sub_dao_epoch_info.1.epoch,
-                    },
-                  })
-                  .accounts(TempUpdateSubDaoEpochInfo {
-                    sub_dao_epoch_info: sub_dao_epoch_info.0,
-                    authority: Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW")
-                      .unwrap(),
-                    sub_dao: new_sub_dao_epoch_info.1.sub_dao,
-                    system_program: system_program::id(),
-                  })
-                  .send();
-                  if res.is_ok() {
-                    break;
-                  }
-                }
+                // loop {
+                //   println!("Correcting...");
+                //   let res = program
+                //   .request()
+                //   .args(helium_sub_daos::instruction::TempUpdateSubDaoEpochInfo {
+                //     args: TempUpdateSubDaoEpochInfoArgs {
+                //       fall_rates_from_closing_positions: if has_fall_rate_diff {
+                //         Some(new_sub_dao_epoch_info.1.fall_rates_from_closing_positions)
+                //       } else {
+                //         None
+                //       },
+                //       vehnt_in_closing_positions: if has_vehnt_diff {
+                //         Some(new_sub_dao_epoch_info.1.vehnt_in_closing_positions)
+                //       } else {
+                //         None
+                //       },
+                //       epoch: new_sub_dao_epoch_info.1.epoch,
+                //     },
+                //   })
+                //   .accounts(TempUpdateSubDaoEpochInfo {
+                //     sub_dao_epoch_info: sub_dao_epoch_info.0,
+                //     authority: Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW")
+                //       .unwrap(),
+                //     sub_dao: new_sub_dao_epoch_info.1.sub_dao,
+                //     system_program: system_program::id(),
+                //   })
+                //   .send();
+                //   if res.is_ok() {
+                //     break;
+                //   }
+                // }
               }
             }
           }
