@@ -36,7 +36,7 @@ export type Asset = {
   supply: {
     edition_nonce: number | null;
   };
-  grouping?: { group_key: string, group_value: PublicKey }[];
+  grouping?: PublicKey;
   uses?: Uses;
   creators: Creator[];
 };
@@ -71,7 +71,7 @@ function toAsset(result: any): Asset {
   return {
     ...result,
     id: new PublicKey(result.id),
-    grouping: result.grouping && result.grouping.map((g: any) => ({ ...g, group_key: new PublicKey(g.group_key) })),
+    grouping: result.grouping && new PublicKey(result.grouping),
     compression: {
       ...result.compression,
       leafId: result.compression.leaf_id,

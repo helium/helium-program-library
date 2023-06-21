@@ -1,7 +1,7 @@
 import {
   ataResolver,
   combineResolvers, heliumCommonResolver
-} from "@helium/anchor-resolvers";
+} from "@helium/spl-utils";
 
 export const fanoutResolvers = combineResolvers(
   heliumCommonResolver,

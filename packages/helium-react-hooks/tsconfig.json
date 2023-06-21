@@ -2,10 +2,7 @@
   "extends": "../../tsconfig.root.json",
   "references": [
     {
-      "path": "../account-fetch-cache"
-    },
-    {
-      "path": "../account-fetch-cache-hooks"
+      "path": "../spl-utils"
     },
     {
       "path": "./tsconfig.cjs.json"

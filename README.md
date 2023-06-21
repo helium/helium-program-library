@@ -164,25 +164,30 @@ $: git submodule init
 $: git submodule update
 ```
 
-2. Start localnet
+2. Build anchor dependencies
+```
+$: anchor run build-deps
+```
+
+3. Start localnet
 
 ```
 $: TESTING=true anchor localnet
 ```
 
-3. Start watcher
+4. Start watcher
 
 ```
 $: yarn watch
 ```
 
-4. Bootstrap localnet
+5. Bootstrap localnet
 
 ```
 $: . ./scripts/bootstrap-localnet.sh
 ```
 
-5. Run tests against localnet
+6. Run tests against localnet
 
 ```
 $: anchor test --provider.cluster localnet --skip-deploy --skip-local-validator --skip-build
@@ -191,7 +196,7 @@ $: anchor test --provider.cluster localnet --skip-deploy --skip-local-validator 
 If you run into trouble with your installation, run the following command to rebuild everything from scratch.
 
 ```
-$: yarn clean && yarn && TESTING=true anchor build && yarn build
+$: yarn clean && yarn && anchor run build-deps && TESTING=true anchor build && yarn build
 ```
 
 ## Running packages

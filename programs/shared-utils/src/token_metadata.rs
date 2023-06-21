@@ -1,19 +1,9 @@
 use anchor_lang::{prelude::*, solana_program};
+use anchor_spl::metadata::CreateMetadataAccountsV3;
 use mpl_token_metadata::{
   state::{CollectionDetails, DataV2},
   ID,
 };
-
-#[derive(Accounts)]
-pub struct CreateMetadataAccountsV3<'info> {
-  pub metadata: AccountInfo<'info>,
-  pub mint: AccountInfo<'info>,
-  pub mint_authority: AccountInfo<'info>,
-  pub payer: AccountInfo<'info>,
-  pub update_authority: AccountInfo<'info>,
-  pub system_program: AccountInfo<'info>,
-  pub rent: AccountInfo<'info>,
-}
 
 pub fn create_metadata_accounts_v3<'info>(
   ctx: CpiContext<'_, '_, '_, 'info, CreateMetadataAccountsV3<'info>>,
@@ -55,80 +45,4 @@ pub fn create_metadata_accounts_v3<'info>(
     ctx.signer_seeds,
   )
   .map_err(Into::into)
-}
-
-#[derive(Clone)]
-pub struct Metadata;
-
-impl anchor_lang::Id for Metadata {
-  fn id() -> Pubkey {
-    ID
-  }
-}
-
-#[derive(Accounts)]
-pub struct CreateMasterEditionV3<'info> {
-  pub edition: AccountInfo<'info>,
-  pub mint: AccountInfo<'info>,
-  pub update_authority: AccountInfo<'info>,
-  pub mint_authority: AccountInfo<'info>,
-  pub payer: AccountInfo<'info>,
-  pub metadata: AccountInfo<'info>,
-  pub token_program: AccountInfo<'info>,
-  pub system_program: AccountInfo<'info>,
-  pub rent: AccountInfo<'info>,
-}
-
-pub fn create_master_edition_v3<'info>(
-  ctx: CpiContext<'_, '_, '_, 'info, CreateMasterEditionV3<'info>>,
-  max_supply: Option<u64>,
-) -> Result<()> {
-  let ix = mpl_token_metadata::instruction::create_master_edition_v3(
-    ID,
-    *ctx.accounts.edition.key,
-    *ctx.accounts.mint.key,
-    *ctx.accounts.update_authority.key,
-    *ctx.accounts.mint_authority.key,
-    *ctx.accounts.metadata.key,
-    *ctx.accounts.payer.key,
-    max_supply,
-  );
-  solana_program::program::invoke_signed(
-    &ix,
-    &ToAccountInfos::to_account_infos(&ctx),
-    ctx.signer_seeds,
-  )
-  .map_err(Into::into)
-}
-
-pub fn verify_sized_collection_item<'info>(
-  ctx: CpiContext<'_, '_, '_, 'info, VerifySizedCollectionItem<'info>>,
-  collection_authority_record: Option<Pubkey>,
-) -> Result<()> {
-  let ix = mpl_token_metadata::instruction::verify_sized_collection_item(
-    ID,
-    *ctx.accounts.metadata.key,
-    *ctx.accounts.collection_authority.key,
-    *ctx.accounts.payer.key,
-    *ctx.accounts.collection_mint.key,
-    *ctx.accounts.collection_metadata.key,
-    *ctx.accounts.collection_master_edition.key,
-    collection_authority_record,
-  );
-  solana_program::program::invoke_signed(
-    &ix,
-    &ToAccountInfos::to_account_infos(&ctx),
-    ctx.signer_seeds,
-  )
-  .map_err(Into::into)
-}
-
-#[derive(Accounts)]
-pub struct VerifySizedCollectionItem<'info> {
-  pub payer: AccountInfo<'info>,
-  pub metadata: AccountInfo<'info>,
-  pub collection_authority: AccountInfo<'info>,
-  pub collection_mint: AccountInfo<'info>,
-  pub collection_metadata: AccountInfo<'info>,
-  pub collection_master_edition: AccountInfo<'info>,
 }

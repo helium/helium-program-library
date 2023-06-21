@@ -1,0 +1,9 @@
+[submodule "deps/metaplex-program-library"]
+	path = deps/metaplex-program-library
+	url = https://github.com/ThornM9/metaplex-program-library.git
+[submodule "deps/solana-program-library"]
+	path = deps/solana-program-library
+	url = https://github.com/solana-labs/solana-program-library.git
+[submodule "deps/clockwork"]
+	path = deps/clockwork
+	url = https://github.com/clockwork-xyz/clockwork.git

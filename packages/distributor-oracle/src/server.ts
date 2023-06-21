@@ -19,8 +19,7 @@ import {
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { init as initLazy, lazyDistributorKey, PROGRAM_ID as LD_PID } from "@helium/lazy-distributor-sdk";
 import { init as initRewards, PROGRAM_ID as RO_PID} from "@helium/rewards-oracle-sdk";
-import { Asset, getAsset, HNT_MINT, IOT_MINT } from "@helium/spl-utils";
-import { AccountFetchCache } from "@helium/account-fetch-cache";
+import { AccountFetchCache, Asset, getAsset, HNT_MINT, IOT_MINT } from "@helium/spl-utils";
 import {
   Keypair,
   PublicKey,
@@ -169,7 +168,6 @@ export class OracleServer {
       this.getCurrentRewardsHandler.bind(this)
     );
     this.app.post("/", this.signTransactionHandler.bind(this));
-    this.app.post("/bulk-sign", this.signBulkTransactionsHandler.bind(this));
   }
 
   private async getActiveDevicesHandler(
@@ -237,8 +235,16 @@ export class OracleServer {
     });
   }
 
-  private async signTransaction(data: number[]): Promise<{ success: boolean; message?: string, transaction?: Buffer }> {
-    const tx = Transaction.from(data);
+  private async signTransactionHandler(
+    req: FastifyRequest<{ Body: { transaction: { data: number[] } } }>,
+    res: FastifyReply
+  ) {
+    if (!req.body.transaction) {
+      res.status(400).send({ error: "No transaction field" });
+      return;
+    }
+
+    const tx = Transaction.from(req.body.transaction.data);
 
     // validate only interacts with LD and RO programs and only calls setCurrentRewards, distributeRewards
     const setRewardIxs: TransactionInstruction[] = [];
@@ -276,7 +282,8 @@ export class OracleServer {
 
     for (const ix of tx.instructions) {
       if (!(ix.programId.equals(LD_PID) || ix.programId.equals(RO_PID))) {
-        return {success: false, message: "Invalid instructions in transaction"};
+        res.status(400).send({ error: "Invalid instructions in transaction" });
+        return;
       }
       let decoded: Instruction | null;
       if (ix.programId.equals(LD_PID)) {
@@ -297,7 +304,8 @@ export class OracleServer {
           decoded.name !== "initializeCompressionRecipientV0" &&
           decoded.name !== "setCurrentRewardsWrapperV0")
       ) {
-        return {success: false, message: "Invalid instructions in transaction"};
+        res.status(400).send({ error: "Invalid instructions in transaction" });
+        return;
       }
 
       console.log(decoded.name)
@@ -388,7 +396,8 @@ export class OracleServer {
       }
 
       if (!lazyDist || !recipient || !lazyDist.equals(this.lazyDistributor)) {
-        return {success: false, message: "Invalid lazy distributor"};
+        res.status(400).send({ error: "Invalid lazy distributor" });
+        return;
       }
 
       let mint = (recipientToLazyDistToMint[recipient.toBase58()] || {})[
@@ -400,7 +409,13 @@ export class OracleServer {
         );
         if (!recipientAcc) {
           console.error(recipientToLazyDistToMint);
-          return {success: false, message: "Recipient doesn't exist"};
+          res
+            .status(400)
+            .send({
+              error: "Recipient doesn't exist",
+              recipientToLazyDistToMint,
+            });
+          return;
         }
         mint = recipientAcc.asset;
       }
@@ -409,13 +424,17 @@ export class OracleServer {
         ? await this.db.getCurrentRewardsByEntity(entityKey)
         : await this.db.getCurrentRewards(mint);
       if (proposedCurrentRewards.toNumber() > currentRewards) {
-        return {success: false, message: "Invalid amount"};
+        res.status(400).send({ error: "Invalid amount" });
+        return;
       }
     }
 
     // validate that this oracle is not the fee payer
     if (tx.feePayer?.equals(this.oracle.publicKey)) {
-      return {success: false, message: "Cannot set this oracle as the fee payer"};
+      res
+        .status(400)
+        .send({ error: "Cannot set this oracle as the fee payer" });
+      return;
     }
 
     tx.partialSign(this.oracle);
@@ -424,55 +443,8 @@ export class OracleServer {
       requireAllSignatures: false,
       verifySignatures: false,
     });
-    return {success: true, transaction: serialized};
-  }
 
-  private async signBulkTransactionsHandler(
-    req: FastifyRequest<{ Body: {transactions: number[][] } }>,
-    res: FastifyReply
-  ) {
-    if (!req.body.transactions) {
-      res.status(400).send({ error: "No transactions field" });
-      return;
-    }
-
-    let _this = this;
-    const results = await Promise.all(req.body.transactions.map(async (txData) => {
-      try {
-        return await _this.signTransaction(txData);
-      } catch (err: any) {
-        console.error(err);
-        return ({success: false, message: err.message} as any);
-      }
-    }));
-
-    const errIdx = results.findIndex(x => !x.success);
-    if (errIdx > -1) {
-      res.status(400).send({ error: results[errIdx].message ?  `${results[errIdx].message}\n\nTransaction index: ${errIdx}` : `Error signing transaction index: ${errIdx}` });
-      return;
-    }
-
-    res.send({ success: true, transactions: results.map(x => x.transaction) });
-  }
-
-  private async signTransactionHandler(
-    req: FastifyRequest<{ Body: { transaction: { data: number[] } } }>,
-    res: FastifyReply
-  ) {
-    if (!req.body.transaction) {
-      res.status(400).send({ error: "No transaction field" });
-      return;
-    }
-
-    const result = await this.signTransaction(req.body.transaction.data);
-
-    if (!result.success) {
-      res
-        .status(400)
-        .send({ error: result.message || "Error signing transaction" });
-    }
-
-    res.send({ success: true, transaction: result.transaction });
+    res.send({ success: true, transaction: serialized });
   }
 }
 

@@ -113,7 +113,7 @@ pub struct InitializeSubDaoV0<'info> {
   )]
   pub treasury_management: AccountInfo<'info>,
   #[account(
-    token::mint = dnt_mint
+    constraint = rewards_escrow.mint == dnt_mint.key()
   )]
   pub rewards_escrow: Box<Account<'info, TokenAccount>>,
 

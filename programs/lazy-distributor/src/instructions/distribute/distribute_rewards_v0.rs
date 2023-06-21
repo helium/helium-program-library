@@ -6,7 +6,7 @@ use anchor_spl::token::TokenAccount;
 pub struct DistributeRewardsV0<'info> {
   common: DistributeRewardsCommonV0<'info>,
   #[account(
-    token::mint = common.recipient.asset,
+    constraint = recipient_mint_account.mint == common.recipient.asset,
     constraint = recipient_mint_account.amount > 0,
     constraint = recipient_mint_account.owner == common.owner.key()
   )]

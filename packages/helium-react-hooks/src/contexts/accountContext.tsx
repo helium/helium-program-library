@@ -1,5 +1,5 @@
 import { Commitment, Connection } from "@solana/web3.js";
-import { AccountFetchCache } from "@helium/account-fetch-cache";
+import { AccountFetchCache } from "@helium/spl-utils";
 import React, {
   createContext,
   FC,

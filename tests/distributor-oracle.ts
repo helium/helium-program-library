@@ -30,12 +30,14 @@ import {
 import chai, { assert, expect } from "chai";
 import chaiHttp from "chai-http";
 import fs from "fs";
+import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
 import * as client from "../packages/distributor-oracle/src/client";
 import {
   Database,
   OracleServer
 } from "../packages/distributor-oracle/src/server";
 import {
+  entityCreatorKey,
   PROGRAM_ID as HEM_PID,
   init as initHeliumEntityManager,
   keyToAssetKey
@@ -62,7 +64,17 @@ import {
   initWorld
 } from "./utils/fixtures";
 import { initVsr } from "./utils/vsr";
-import { createMockCompression } from "./utils/compression";
+// @ts-ignore
+import {
+  computeCompressedNFTHash,
+  computeCreatorHash,
+  computeDataHash,
+  getLeafAssetId,
+  TokenProgramVersion,
+  TokenStandard
+} from "@metaplex-foundation/mpl-bubblegum";
+// @ts-ignore
+import animalHash from "angry-purple-tiger";
 
 chai.use(chaiHttp);
 
@@ -104,17 +116,8 @@ export class DatabaseMock implements Database {
     return 0;
   }
 
-  async getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
-    let _this = this;
-    const res: Record<string, string> = entityKeys.reduce((acc: Record<string, string>, key) => {
-      acc[key] = Math.floor(
-        (_this.inMemHash.byHotspot[key]?.lifetimeRewards || 0) *
-          Math.pow(10, 8)
-      ).toString();
-      return acc;
-    }, {});
-
-    return res;
+  getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
+    return Promise.resolve({});
   }
 
   reset() {
@@ -339,16 +342,91 @@ describe("distributor-oracle", () => {
       .signers([makerKeypair, eccVerifier])
       .rpc({ skipPreflight: true });
 
-    ({getAssetFn, getAssetProofFn, hotspot: asset} = await createMockCompression({
-      collection: collection,
-      dao,
-      merkle: merkle,
-      ecc,
-      hotspotOwner,
-    }));
+    const hotspot = await getLeafAssetId(merkle, new BN(0));
+
+    const leaves = Array(2 ** 3).fill(Buffer.alloc(32));
+    const creators = [
+      {
+        address: entityCreatorKey(dao)[0],
+        verified: true,
+        share: 100,
+      },
+    ];
+    const metadata: any = {
+      name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
+      symbol: "HOTSPOT",
+      uri: `https://entities.nft.helium.io/${ecc}`,
+      collection: {
+        key: collection,
+        verified: true,
+      },
+      creators,
+      sellerFeeBasisPoints: 0,
+      primarySaleHappened: true,
+      isMutable: true,
+      editionNonce: null,
+      tokenStandard: TokenStandard.NonFungible,
+      uses: null,
+      tokenProgramVersion: TokenProgramVersion.Original,
+    };
+    PublicKey.prototype.toString = PublicKey.prototype.toBase58;
+
+    const hash = computeCompressedNFTHash(
+      hotspot,
+      hotspotOwner.publicKey,
+      hotspotOwner.publicKey,
+      new anchor.BN(0),
+      metadata
+    );
+    leaves[0] = hash;
+    const merkleTree = new MerkleTree(leaves);
+    const proof = merkleTree.getProof(0);
+    asset = await getLeafAssetId(merkle, new BN(0));
+    getAssetFn = async () =>
+      ({
+        id: asset,
+        content: {
+          metadata: {
+            name: metadata.name,
+            symbol: metadata.symbol,
+          },
+          json_uri: metadata.uri,
+        },
+        royalty: {
+          basis_points: metadata.sellerFeeBasisPoints,
+          primary_sale_happened: true,
+        },
+        mutable: true,
+        supply: {
+          edition_nonce: null,
+        },
+        grouping: metadata.collection.key,
+        uses: metadata.uses,
+        creators: metadata.creators,
+        ownership: {
+          owner: hotspotOwner.publicKey,
+          delegate: hotspotOwner.publicKey,
+        },
+        compression: {
+          compressed: true,
+          leafId: 0,
+          eligible: true,
+          dataHash: computeDataHash(metadata),
+          creatorHash: computeCreatorHash(creators),
+        },
+      } as Asset);
+    getAssetProofFn = async () => {
+      return {
+        root: new PublicKey(proof.root),
+        proof: proof.proof.map((p) => new PublicKey(p)),
+        nodeIndex: 0,
+        leaf: new PublicKey(proof.leaf),
+        treeId: merkle,
+      };
+    };
     const recipientMethod = await initializeCompressionRecipient({
       program: ldProgram,
-      assetId: asset,
+      assetId: hotspot,
       lazyDistributor,
       getAssetFn,
       getAssetProofFn,
@@ -357,14 +435,12 @@ describe("distributor-oracle", () => {
     await recipientMethod.rpc({ skipPreflight: true });
     recipient = (await recipientMethod.pubkeys()).recipient!;
 
-    let db = new DatabaseMock(hemProgram, getAssetFn);
-    db.incrementHotspotRewards(ecc);
     oracleServer = new OracleServer(
       ldProgram,
       rewardsProgram,
       hemProgram,
       oracle,
-      db,
+      new DatabaseMock(hemProgram, getAssetFn),
       lazyDistributor
     );
     await oracleServer.start();
@@ -421,54 +497,6 @@ describe("distributor-oracle", () => {
       await oracleServer.db.getCurrentRewards(asset)
     );
   });
-
-  it("should bulk sign transactions", async() => {
-    const unsigned = await client.formBulkTransactions({
-      dao: daoK,
-      program: ldProgram,
-      rewardsOracleProgram: rewardsProgram,
-      getAssetFn,
-      getAssetProofFn,
-      rewards: [
-        {
-          oracleKey: oracle.publicKey,
-          currentRewards: await oracleServer.db.getBulkRewards([ecc]),
-        },
-      ],
-      assets: [asset],
-      compressionAssetAccs: [(await getAssetFn())!],
-      lazyDistributor,
-      skipOracleSign: true,
-    });
-    console.log(unsigned);
-    const tx = await provider.wallet.signTransaction(unsigned[0]);
-    const serializedTx = tx.serialize({
-      requireAllSignatures: false,
-      verifySignatures: false,
-    });
-
-    const res = await chai
-      .request(oracleServer.server)
-      .post("/bulk-sign")
-      .send({ transactions: [[...serializedTx]] });
-
-    assert.hasAllKeys(res.body, ["transactions", "success"]);
-    const signedTx = Transaction.from(res.body.transactions[0].data);
-    await sendAndConfirmWithRetry(
-      provider.connection,
-      signedTx.serialize(),
-      {
-        skipPreflight: true,
-      },
-      "confirmed"
-    );
-
-    const recipientAcc = await ldProgram.account.recipientV0.fetch(recipient);
-    assert.equal(
-      recipientAcc.totalRewards.toNumber(),
-      Number(await oracleServer.db.getCurrentRewards(asset))
-    );
-  })
 
   it("should sign and execute properly formed transactions", async () => {
     const unsigned = await client.formTransaction({

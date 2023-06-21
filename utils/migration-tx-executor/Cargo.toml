@@ -1,5 +1,3 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "migration-tx-executor"
 version = "0.0.1"
@@ -22,4 +20,3 @@ warp = "0.3.3"
 prometheus = { version = "0.13.3", features = ["process"] }
 lazy_static = "1.4"
 futures = "0.3.25"
-hpl-utils = { path = "../hpl-utils" }

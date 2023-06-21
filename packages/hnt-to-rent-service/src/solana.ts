@@ -1,4 +1,4 @@
-import { AccountFetchCache } from "@helium/account-fetch-cache";
+import { AccountFetchCache } from "@helium/spl-utils";
 import * as anchor from "@coral-xyz/anchor";
 import { Keypair } from "@solana/web3.js";
 import fs from "fs";

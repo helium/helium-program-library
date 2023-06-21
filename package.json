@@ -1,9 +1,5 @@
 {
   "scripts": {
-    "versionup": "lerna version --conventional-commits --no-git-tag-version",
-    "versionup:patch": "lerna version patch --conventional-commits --no-git-tag-version",
-    "versionup:minor": "lerna version minor --conventional-commits --no-git-tag-version",
-    "versionup:major": "lerna version major --conventional-commits --no-git-tag-version",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "build": "lerna run --parallel prebuild && tsc --build",
@@ -20,7 +16,7 @@
   ],
   "private": true,
   "dependencies": {
-    "@coral-xyz/anchor": "^0.26.0",
+    "@coral-xyz/anchor": "0.26.0",
     "@coral-xyz/anchor-cli": "^0.26.0",
     "@coral-xyz/borsh": "^0.2.6",
     "@helium/crypto": "^4.6.2",

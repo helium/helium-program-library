@@ -2,18 +2,17 @@ import {
   ataResolver,
   combineResolvers,
   resolveIndividual,
-} from "@helium/anchor-resolvers";
+} from "@helium/spl-utils";
+import { PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { circuitBreakerResolvers } from "@helium/circuit-breaker-sdk";
 import { recipientKey } from "./pdas";
-import { Accounts } from "@coral-xyz/anchor";
+import { Accounts, Program } from "@coral-xyz/anchor";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { BN } from "bn.js";
-
-const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
-  "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
-);
+import { PROGRAM_ID } from "./constants";
+import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 
 export const lazyDistributorResolvers = combineResolvers(
   resolveIndividual(async ({ path }) => {

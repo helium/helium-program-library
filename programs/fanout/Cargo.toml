@@ -1,5 +1,3 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "fanout"
 version = "0.0.1"
@@ -23,7 +21,7 @@ default = []
 overflow-checks = true
 
 [dependencies]
-anchor-lang = { workspace = true }
-anchor-spl = { workspace = true }
+anchor-lang = { version = "0.26.0", features = ["init-if-needed"] }
+anchor-spl = "0.26.0"
 shared-utils = { path = "../shared-utils" }
-mpl-token-metadata = { workspace = true }
+mpl-token-metadata = { version = "1.6.4", path = "../../deps/metaplex-program-library/token-metadata/program", features = ["no-entrypoint"] }

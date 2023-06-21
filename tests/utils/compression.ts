@@ -1,4 +1,3 @@
-import { resolveIndividual } from "@helium/anchor-resolvers";
 import {
   computeCompressedNFTHash,
   computeCreatorHash,
@@ -6,17 +5,17 @@ import {
   getLeafAssetId, PROGRAM_ID as BUBBLEGUM_PROGRAM_ID, TokenProgramVersion,
   TokenStandard
 } from "@metaplex-foundation/mpl-bubblegum";
-import { Asset, AssetProof } from "@helium/spl-utils";
+import { Asset, AssetProof, resolveIndividual } from "@helium/spl-utils";
 import { Metadata, PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import {
   ConcurrentMerkleTreeAccount,
   getConcurrentMerkleTreeAccountSize,
-  MerkleTree,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID
 } from "@solana/spl-account-compression";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import { MerkleTree } from "../../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
 import { Bubblegum as MplBubblegum, IDL as BubblegumIdl } from "./bubblegum";
 import { entityCreatorKey } from "@helium/helium-entity-manager-sdk";
 // @ts-ignore
@@ -237,7 +236,7 @@ export async function createMockCompression({
   const proof = merkleTree.getProof(0);
   let getAssetFn = async () =>
     ({
-      id: hotspot,
+      id: await getLeafAssetId(merkle, new BN(0)),
       content: {
         metadata: {
           name: metadata.name,

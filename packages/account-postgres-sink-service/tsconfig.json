@@ -2,9 +2,6 @@
   "extends": "../../tsconfig.root.json",
   "references": [
     {
-      "path": "../account-fetch-cache"
-    },
-    {
       "path": "../idls"
     },
     {

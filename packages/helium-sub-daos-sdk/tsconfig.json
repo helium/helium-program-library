@@ -5,7 +5,7 @@
       "path": "../idls"
     },
     {
-      "path": "../anchor-resolvers"
+      "path": "../spl-utils"
     },
     {
       "path": "../voter-stake-registry-sdk"

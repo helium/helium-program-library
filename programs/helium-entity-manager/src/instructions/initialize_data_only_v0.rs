@@ -1,6 +1,9 @@
 use crate::error::ErrorCode;
 use crate::{data_only_config_seeds, state::*};
 use anchor_lang::prelude::*;
+use anchor_spl::metadata::{
+  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
+};
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
@@ -12,9 +15,6 @@ use mpl_bubblegum::{
 };
 use mpl_token_metadata::state::{CollectionDetails, DataV2};
 use shared_utils::create_metadata_accounts_v3;
-use shared_utils::token_metadata::{
-  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
-};
 use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]

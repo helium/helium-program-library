@@ -25,7 +25,7 @@ pub struct TempUpdateSubDaoEpochInfo<'info> {
   pub sub_dao: Account<'info, SubDaoV0>,
   #[account(
     mut,
-    token::authority = &Pubkey::from_str(FIX_DEPLOYER_KEY).unwrap(),
+    constraint = authority.key() == Pubkey::from_str(FIX_DEPLOYER_KEY).unwrap(),
   )]
   pub authority: Signer<'info>,
   pub system_program: Program<'info, System>,

@@ -1,5 +1,5 @@
 import { init as initDc } from "@helium/data-credits-sdk";
-import { toBN, DC_MINT } from "@helium/spl-utils";
+import { toBN } from "@helium/spl-utils";
 import * as anchor from "@coral-xyz/anchor";
 import { createAssociatedTokenAccountIdempotent, createAssociatedTokenAccountIdempotentInstruction, getAssociatedTokenAddress, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
@@ -21,7 +21,7 @@ export async function run(args: any = process.argv) {
     dcKey: {
       type: "string",
       describe: "Pubkey of the Data Credit token",
-      default: DC_MINT.toString(),
+      required: true,
     },
     numHnt: {
       type: "number",
@@ -32,6 +32,7 @@ export async function run(args: any = process.argv) {
       type: "string",
       describe: "The destination wallet for the dc",
       alias: "d",
+      required: true,
     },
   });
 
@@ -45,7 +46,7 @@ export async function run(args: any = process.argv) {
 
 
   const dcKey = new PublicKey(argv.dcKey);
-  const destination = new PublicKey(argv.destination || provider.wallet.publicKey.toString());
+  const destination = new PublicKey(argv.destination);
   const destAta = await getAssociatedTokenAddress(dcKey, destination)
   let preBalance = 0
   try {

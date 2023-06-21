@@ -4,7 +4,7 @@ import {
   combineResolvers,
   heliumCommonResolver,
   resolveIndividual
-} from "@helium/anchor-resolvers";
+} from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { PROGRAM_ID as HELIUM_ENTITY_MANAGER_PROGRAM_ID } from "@helium/helium-entity-manager-sdk";

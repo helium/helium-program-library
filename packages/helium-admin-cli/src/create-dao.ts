@@ -476,7 +476,6 @@ export async function run(args: any = process.argv) {
             emissionSchedule: hntEmission,
             hstEmissionSchedule: hstEmission,
             hstPool: null,
-            netEmissionsCap: null,
           })
           .accounts({
             dao,
