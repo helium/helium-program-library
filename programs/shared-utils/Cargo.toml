@@ -1,3 +1,5 @@
+cargo-features = ["workspace-inheritance"]
+
 [package]
 name = "shared-utils"
 version = "0.0.1"
@@ -21,9 +23,9 @@ default = []
 overflow-checks = true
 
 [dependencies]
-anchor-lang = { version = "0.26.0", features = ["init-if-needed"] }
-anchor-spl = { version = "0.26.0", features = ["metadata"] }
-spl-account-compression = { git = "https://github.com/ChewingGlass/solana-program-library", branch = "feature/anchor-26", version="0.1.5", features = ["cpi"] }
+anchor-lang = { workspace = true }
+anchor-spl = { workspace = true }
+spl-account-compression = { workspace = true }
 uint = "0.9"
-mpl-token-metadata = { version = "1.6.4", path = "../../deps/metaplex-program-library/token-metadata/program", features = ["no-entrypoint"] }
-mpl-bubblegum = {path = "../../deps/metaplex-program-library/bubblegum/program", features = ["cpi"]}
+mpl-token-metadata = { workspace = true }
+mpl-bubblegum = { workspace = true }

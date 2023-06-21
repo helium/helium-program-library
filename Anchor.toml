@@ -40,12 +40,6 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 tests/**/*.ts"
-build-deps = "anchor run build-metadata && anchor run build-bubblegum && anchor run build-noop && anchor run build-account-compression && anchor run build-clockwork"
-build-metadata = "cd deps/metaplex-program-library/token-metadata/program && pwd && cargo build-bpf && cd ../../../../"
-build-bubblegum = "pushd deps/metaplex-program-library && pwd && anchor build -p mpl_bubblegum && popd"
-build-noop = "pushd deps/solana-program-library/account-compression/programs/noop && pwd && cargo build-bpf && popd"
-build-account-compression = "pushd deps/solana-program-library/account-compression/programs/account-compression && pwd && cargo build-bpf && popd"
-build-clockwork = "pushd deps/clockwork && ./scripts/build-all.sh . && popd"
 
 [test]
 startup_wait = 20000
@@ -53,33 +47,20 @@ startup_wait = 20000
 [test.validator]
 url = "https://api.mainnet-beta.solana.com"
 
-[[test.genesis]]
-address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
-program = "./deps/metaplex-program-library/token-metadata/target/deploy/mpl_token_metadata.so"
+[[test.validator.clone]]
+address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s" # token-metadata
 
-[[test.genesis]]
-address = "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"
-program = "deps/metaplex-program-library/bubblegum/program/target/deploy/mpl_bubblegum.so"
+[[test.validator.clone]]
+address = "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY" # bubblegum
 
-[[test.genesis]]
-address = "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"
-program = "./deps/solana-program-library/account-compression/target/deploy/spl_noop.so"
+[[test.validator.clone]]
+address = "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV" # noop
 
-[[test.genesis]]
-address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"
-program = "./deps/solana-program-library/account-compression/target/deploy/spl_account_compression.so"
+[[test.validator.clone]]
+address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK" # account compression
 
-[[test.genesis]]
-address = "F8dKseqmBoAkHx3c58Lmb9TgJv5qeTf3BbtZZSEzYvUa"
-program = "./deps/clockwork/lib/clockwork_network_program.so"
-
-[[test.genesis]]
-address = "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
-program = "./deps/clockwork/lib/clockwork_thread_program.so"
-
-[[test.genesis]]
-address = "E7p5KFo8kKCDm6BUnWtnVFkQSYh6ZA6xaGAuvpv8NXTa"
-program = "./deps/clockwork/lib/clockwork_webhook_program.so"
+[[test.validator.clone]]
+address = "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh" # clockwork
 
 [[test.validator.clone]]
 address = "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S" # spl governance program

@@ -1,3 +1,5 @@
+cargo-features = ["workspace-inheritance"]
+
 [package]
 name = "lazy-distributor"
 version = "0.0.1"
@@ -21,10 +23,10 @@ default = []
 overflow-checks = true
 
 [dependencies]
-anchor-lang = { version = "0.26.0", features = ["init-if-needed"] }
-anchor-spl = "0.26.0"
-mpl-token-metadata = { version = "1.6.4", path = "../../deps/metaplex-program-library/token-metadata/program", features = ["no-entrypoint"] }
-mpl-bubblegum = { path = "../../deps/metaplex-program-library/bubblegum/program", features = ["cpi"] }
+anchor-lang = { workspace = true }
+anchor-spl = { workspace = true }
+mpl-token-metadata = { workspace = true }
+mpl-bubblegum = { workspace = true }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 shared-utils = { path = "../shared-utils" }
-spl-account-compression = { git = "https://github.com/ChewingGlass/solana-program-library", branch = "feature/anchor-26", version="0.1.5", features = ["cpi"] }
+spl-account-compression = { workspace = true }

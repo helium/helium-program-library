@@ -1,3 +1,5 @@
+cargo-features = ["workspace-inheritance"]
+
 [package]
 name = "data-credits"
 version = "0.1.2"
@@ -22,7 +24,7 @@ overflow-checks = true
 
 [dependencies]
 anchor-lang = { version="0.26.0", features = ["init-if-needed"] }
-anchor-spl = "0.26.0"
+anchor-spl = { workspace = true }
 helium-sub-daos = { path = "../helium-sub-daos", features = ["cpi"] }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 pyth-sdk-solana = { version = "0.7.0" }

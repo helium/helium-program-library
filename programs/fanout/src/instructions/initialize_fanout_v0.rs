@@ -1,11 +1,13 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  metadata::{create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata},
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
 use mpl_token_metadata::state::{CollectionDetails, DataV2};
 use shared_utils::create_metadata_accounts_v3;
+use shared_utils::token_metadata::{
+  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
+};
 
 use crate::FanoutV0;
 
