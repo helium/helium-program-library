@@ -25,7 +25,7 @@ jobs:
           echo "Detecting changes in programs"
           # Use git diff to get a list of changed programs and output it as JSON
           changed_files=$(git diff --name-only ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.sha) || github.event.before }} ${{ github.event.after }})
-          changed_programs=($(echo "$changed_files" | grep "^programs/" | cut -d '/' -f 2 | sort -u))
+          changed_programs=($(echo "$changed_files" | grep "^programs/" | grep -v "/shared-utils/" | cut -d '/' -f 2 | sort -u))
           echo "${changed_programs[@]}"
           json="[$(printf "'%s'", "${changed_programs[@]}" | sed 's/,$//')]"
           echo $json

@@ -103,6 +103,7 @@ export async function run(args: any = process.argv) {
   }).accounts({
     dao,
     authority: daoAcc.authority,
+    payer: daoAcc.authority,
   }).instruction());
 
   const squads = Squads.endpoint(
