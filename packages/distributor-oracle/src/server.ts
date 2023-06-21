@@ -440,7 +440,7 @@ export class OracleServer {
     const results = await Promise.all(req.body.transactions.map(async (txData) => {
       try {
         return await _this.signTransaction(txData);
-      } catch (err) {
+      } catch (err: any) {
         console.error(err);
         return ({success: false, message: err.message} as any);
       }

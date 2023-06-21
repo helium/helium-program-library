@@ -427,7 +427,6 @@ describe("distributor-oracle", () => {
       dao: daoK,
       program: ldProgram,
       rewardsOracleProgram: rewardsProgram,
-      provider,
       getAssetFn,
       getAssetProofFn,
       rewards: [
