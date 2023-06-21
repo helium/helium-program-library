@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.1.4",
+  "version": "0.2.4",
   "description": "Sync account data to postgres",
   "repository": {
     "type": "git",
@@ -32,9 +32,9 @@
     "dev": "npx ts-node --project tsconfig.cjs.json src/server.ts"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "0.26.0",
+    "@coral-xyz/anchor": "^0.26.0",
     "@fastify/cors": "^8.1.1",
-    "@helium/spl-utils": "^0.1.4",
+    "@helium/account-fetch-cache": "^0.2.4",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/web3.js": "^1.43.4",
     "aws-sdk": "^2.1344.0",

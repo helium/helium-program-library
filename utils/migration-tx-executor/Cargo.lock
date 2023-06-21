@@ -1378,6 +1378,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "hpl-utils"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "futures",
+ "indicatif 0.17.2",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "solana-client",
+ "solana-sdk",
+ "warp",
+]
+
+[[package]]
 name = "http"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1816,6 +1831,7 @@ dependencies = [
  "bincode",
  "clap 4.0.32",
  "futures",
+ "hpl-utils",
  "indicatif 0.17.2",
  "lazy_static",
  "prometheus",

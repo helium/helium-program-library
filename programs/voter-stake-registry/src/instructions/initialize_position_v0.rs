@@ -4,15 +4,15 @@ use crate::registrar_seeds;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::metadata::{
-  verify_sized_collection_item, CreateMetadataAccountsV3, Metadata, VerifySizedCollectionItem,
-};
 use anchor_spl::token;
 use anchor_spl::token::FreezeAccount;
 use anchor_spl::token::{Mint, MintTo, Token, TokenAccount};
 use mpl_token_metadata::state::Collection;
 use mpl_token_metadata::state::DataV2;
 use shared_utils::create_metadata_accounts_v3;
+use shared_utils::token_metadata::{
+  verify_sized_collection_item, CreateMetadataAccountsV3, Metadata, VerifySizedCollectionItem,
+};
 use std::convert::TryFrom;
 use std::mem::size_of;
 

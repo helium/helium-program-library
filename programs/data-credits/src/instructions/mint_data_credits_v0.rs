@@ -42,7 +42,7 @@ pub struct MintDataCreditsV0<'info> {
   // hnt tokens from this account are burned
   #[account(
     mut,
-    constraint = burner.mint == hnt_mint.key(),
+    token::mint = hnt_mint,
     has_one = owner,
   )]
   pub burner: Box<Account<'info, TokenAccount>>,

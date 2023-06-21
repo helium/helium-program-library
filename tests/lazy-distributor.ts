@@ -6,7 +6,6 @@ import {
 } from "@helium/spl-utils";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { assert, expect } from "chai";
-import { MerkleTree } from "../deps/solana-program-library/account-compression/sdk/src/merkle-tree";
 import {
   distributeCompressionRewards,
   init,
@@ -16,6 +15,7 @@ import { PROGRAM_ID } from "../packages/lazy-distributor-sdk/src/constants";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { createCompressionNft } from "./utils/compression";
 import { ensureLDIdl } from "./utils/fixtures";
+import { MerkleTree } from "@solana/spl-account-compression";
 
 describe("lazy-distributor", () => {
   // Configure the client to use the local cluster.

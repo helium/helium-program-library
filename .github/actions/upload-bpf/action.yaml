@@ -60,9 +60,6 @@ runs:
           ./deps/solana-program-library
           ./deps/clockwork
         key: deps-${{ runner.os }}-build-${{ hashFiles('./deps/**/Cargo.lock') }}
-    - run: ~/.cargo/bin/anchor run build-deps
-      shell: bash
-      if: steps.cache-cargo-deps-builds.outputs.cache-hit != 'true'
     - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/anchor build -p $PROGRAM ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
       shell: bash
       env:

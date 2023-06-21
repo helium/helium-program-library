@@ -1,14 +1,14 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  metadata::{
-    create_master_edition_v3, verify_sized_collection_item, CreateMasterEditionV3,
-    CreateMetadataAccountsV3, Metadata, VerifySizedCollectionItem,
-  },
   token::{self, Mint, MintTo, Token, TokenAccount, Transfer},
 };
 use mpl_token_metadata::state::{Collection, DataV2};
 use shared_utils::create_metadata_accounts_v3;
+use shared_utils::token_metadata::{
+  create_master_edition_v3, verify_sized_collection_item, CreateMasterEditionV3,
+  CreateMetadataAccountsV3, Metadata, VerifySizedCollectionItem,
+};
 
 use crate::{fanout_seeds, voucher_seeds, FanoutV0, FanoutVoucherV0};
 

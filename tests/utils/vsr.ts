@@ -64,7 +64,7 @@ export async function initVsr(
       realmGoverningTokenMint: hntMint,
     });
   instructions.push(await createRegistrar.instruction());
-  const { registrar } = await createRegistrar.pubkeys();
+  const registrar = (await createRegistrar.pubkeys()).registrar as PublicKey;
 
   // Configure voting mint
   instructions.push(
@@ -152,7 +152,7 @@ export async function createPosition(
         mint: hntMint,
         depositAuthority: positionOwner,
       })
-      .signers([positionKp].filter(truthy))
+      .signers([positionKp].filter(truthy) as Keypair[])
       .instruction()
   );
 

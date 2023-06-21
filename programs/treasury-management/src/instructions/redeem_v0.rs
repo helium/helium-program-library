@@ -42,12 +42,12 @@ pub struct RedeemV0<'info> {
   #[account(
     mut,
     has_one = owner,
-    constraint = from.mint == supply_mint.key()
+    token::mint = supply_mint
   )]
   pub from: Box<Account<'info, TokenAccount>>,
   #[account(
     mut,
-    constraint = to.mint == treasury_mint.key()
+    token::mint = treasury_mint
   )]
   pub to: Box<Account<'info, TokenAccount>>,
   pub owner: Signer<'info>,

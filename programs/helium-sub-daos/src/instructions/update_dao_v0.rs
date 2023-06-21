@@ -8,6 +8,7 @@ pub struct UpdateDaoArgsV0 {
   pub emission_schedule: Option<Vec<EmissionScheduleItem>>,
   pub hst_emission_schedule: Option<Vec<PercentItem>>,
   pub hst_pool: Option<Pubkey>,
+  pub net_emissions_cap: Option<u64>,
 }
 
 #[derive(Accounts)]
@@ -33,6 +34,10 @@ pub fn handler(ctx: Context<UpdateDaoV0>, args: UpdateDaoArgsV0) -> Result<()> {
 
   if let Some(hst_emission_schedule) = args.hst_emission_schedule {
     ctx.accounts.dao.hst_emission_schedule = hst_emission_schedule;
+  }
+
+  if let Some(net_emissions_cap) = args.net_emissions_cap {
+    ctx.accounts.dao.net_emissions_cap = net_emissions_cap;
   }
 
   if let Some(emission_schedule) = args.emission_schedule {

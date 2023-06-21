@@ -9,11 +9,13 @@ export async function distributeCompressionRewards<IDL extends Idl>({
   assetId,
   lazyDistributor,
   assetEndpoint,
+  rewardsMint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
 }: {
   program: Program<LazyDistributor>;
   assetId: PublicKey;
+  rewardsMint?: PublicKey;
   assetEndpoint?: string;
   lazyDistributor: PublicKey;
   owner?: PublicKey;
@@ -52,6 +54,7 @@ export async function distributeCompressionRewards<IDL extends Idl>({
     .accounts({
       common: {
         lazyDistributor,
+        rewardsMint,
         owner,
       },
       merkleTree: treeId,

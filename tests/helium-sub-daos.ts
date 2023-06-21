@@ -148,7 +148,9 @@ describe("helium-sub-daos", () => {
       );
 
     // @ts-ignore
-    expect(Boolean(breaker.config.thresholdType.absolute)).to.be.true;
+    console.log(breaker.config.thresholdType);
+    // @ts-ignore
+    expect(Boolean(breaker.config.thresholdType.percent)).to.be.true;
 
     expect(account.authority.toBase58()).eq(me.toBase58());
     expect(account.treasury.toBase58()).eq(treasury.toBase58());
@@ -246,6 +248,7 @@ describe("helium-sub-daos", () => {
           emissionSchedule: null,
           hstEmissionSchedule: null,
           hstPool: null,
+          netEmissionsCap: null,
         })
         .accounts({
           dao,
@@ -566,7 +569,7 @@ describe("helium-sub-daos", () => {
           await program.methods
             .resetLockupV0({
               kind: { constant: {} },
-              periods: 265 * 8,
+              periods: 365 * 4,
             })
             .accounts({
               dao,

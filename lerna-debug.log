@@ -1,6 +1,16 @@
-223 error Error: Command failed with exit code 128: git tag v0.0.44 -m v0.0.44
-223 error fatal: tag 'v0.0.44' already exists
-223 error     at makeError (/Users/nprince/source/helium-program-library/node_modules/execa/lib/error.js:60:11)
-223 error     at handlePromise (/Users/nprince/source/helium-program-library/node_modules/execa/index.js:118:26)
-223 error     at processTicksAndRejections (node:internal/process/task_queues:96:5)
-223 error     at async Promise.all (index 0)
+0 silly argv {
+0 silly argv   _: [ 'bootstrap' ],
+0 silly argv   lernaVersion: '5.6.2',
+0 silly argv   '$0': '/usr/local/bin/lerna'
+0 silly argv }
+1 notice cli v5.6.2
+2 verbose rootPath /Users/nprince/source/helium-program-library
+3 error Error: Invalid tag name "^0.1,4": Tags may not have any characters that encodeURIComponent encodes.
+3 error     at invalidTagName (/Users/nprince/source/helium-program-library/node_modules/npm-package-arg/npa.js:94:15)
+3 error     at fromRegistry (/Users/nprince/source/helium-program-library/node_modules/npm-package-arg/npa.js:299:13)
+3 error     at Function.resolve (/Users/nprince/source/helium-program-library/node_modules/npm-package-arg/npa.js:84:12)
+3 error     at /Users/nprince/source/helium-program-library/node_modules/@lerna/package-graph/index.js:89:30
+3 error     at Array.forEach (<anonymous>)
+3 error     at /Users/nprince/source/helium-program-library/node_modules/@lerna/package-graph/index.js:60:38
+3 error     at Map.forEach (<anonymous>)
+3 error     at new PackageGraph (/Users/nprince/source/helium-program-library/node_modules/@lerna/package-graph/index.js:49:10)
