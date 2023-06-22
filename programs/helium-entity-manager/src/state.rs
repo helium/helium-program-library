@@ -36,6 +36,13 @@ impl ConfigSettingsV0 {
       _ => false,
     }
   }
+  pub fn is_mobile(self) -> bool {
+    matches!(self, ConfigSettingsV0::MobileConfig { .. })
+  }
+
+  pub fn is_iot(self) -> bool {
+    matches!(self, ConfigSettingsV0::IotConfig { .. })
+  }
 }
 
 impl Default for ConfigSettingsV0 {
@@ -121,6 +128,8 @@ pub struct IotHotspotInfoV0 {
   pub gain: Option<i32>,
   pub is_full_hotspot: bool,
   pub num_location_asserts: u16,
+  pub is_active: bool,
+  pub dc_onboarding_fee_paid: u64,
 }
 pub const IOT_HOTSPOT_INFO_SIZE: usize = 8 +
     32 + // asset
@@ -129,7 +138,9 @@ pub const IOT_HOTSPOT_INFO_SIZE: usize = 8 +
     1 + 4 + // elevation
     1 + 4 +// gain
     1 + // is full hotspot
-    2 + // num location assers
+    2 + // num location asserts
+    1 + // is active
+    8 + // dc onboarding fee paid
     60; // pad
 
 #[account]
@@ -141,13 +152,17 @@ pub struct MobileHotspotInfoV0 {
   pub location: Option<u64>,
   pub is_full_hotspot: bool,
   pub num_location_asserts: u16,
+  pub is_active: bool,
+  pub dc_onboarding_fee_paid: u64,
 }
 pub const MOBILE_HOTSPOT_INFO_SIZE: usize = 8 +
     32 + // asset
     1 + // bump
     1 + 8 + // location
     1 + // is full hotspot
-    2 + // num location assers
+    2 + // num location asserts
+    1 + // is active
+    8 + // dc onboarding fee paid
     60; // pad
 
 #[macro_export]

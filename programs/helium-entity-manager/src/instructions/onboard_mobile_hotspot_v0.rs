@@ -13,7 +13,11 @@ use data_credits::{
   program::DataCredits,
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
-use helium_sub_daos::{DaoV0, SubDaoV0};
+use helium_sub_daos::{
+  cpi::{accounts::TrackDcOnboardingFeesV0, track_dc_onboarding_fees_v0},
+  program::HeliumSubDaos,
+  DaoV0, SubDaoV0, TrackDcOnboardingFeesArgsV0,
+};
 
 use mpl_bubblegum::utils::get_asset_id;
 use shared_utils::*;
@@ -83,6 +87,7 @@ pub struct OnboardMobileHotspotV0<'info> {
   )]
   pub key_to_asset: Box<Account<'info, KeyToAssetV0>>,
   #[account(
+    mut,
     has_one = dao,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
@@ -105,6 +110,7 @@ pub struct OnboardMobileHotspotV0<'info> {
   pub token_program: Program<'info, Token>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
+  pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
 }
 
 impl<'info> OnboardMobileHotspotV0<'info> {
@@ -153,7 +159,28 @@ pub fn handler<'info>(
     location: None,
     is_full_hotspot: true,
     num_location_asserts: 0,
+    is_active: true, // set active by default to start, oracle can mark it inactive
+    dc_onboarding_fee_paid: dc_fee,
   });
+  track_dc_onboarding_fees_v0(
+    CpiContext::new_with_signer(
+      ctx.accounts.helium_sub_daos_program.to_account_info(),
+      TrackDcOnboardingFeesV0 {
+        hem_auth: ctx.accounts.rewardable_entity_config.to_account_info(),
+        sub_dao: ctx.accounts.sub_dao.to_account_info(),
+      },
+      &[&[
+        "rewardable_entity_config".as_bytes(),
+        ctx.accounts.sub_dao.key().as_ref(),
+        ctx.accounts.rewardable_entity_config.symbol.as_bytes(),
+        &[ctx.accounts.rewardable_entity_config.bump_seed],
+      ]],
+    ),
+    TrackDcOnboardingFeesArgsV0 {
+      amount: dc_fee,
+      add: true,
+    },
+  )?;
 
   if let (
     Some(location),
