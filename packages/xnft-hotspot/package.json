@@ -1,6 +1,6 @@
 {
   "name": "@helium/xnft-hotspot",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "private": true,
   "description": "",
   "main": "index.js",
@@ -19,7 +19,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.26.0",
     "@helium/account-fetch-cache": "^0.2.5",
-    "@helium/distributor-oracle": "^0.2.5",
+    "@helium/distributor-oracle": "^0.2.6",
     "@helium/helium-react-hooks": "^0.2.5",
     "@helium/idls": "^0.2.5",
     "@helium/lazy-distributor-sdk": "^0.2.5",
