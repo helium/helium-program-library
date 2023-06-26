@@ -71,7 +71,7 @@ function toAsset(result: any): Asset {
   return {
     ...result,
     id: new PublicKey(result.id),
-    grouping: result.grouping && result.grouping.map(g => ({ ...g, group_key: new PublicKey(g.group_key) })),
+    grouping: result.grouping && result.grouping.map((g: any) => ({ ...g, group_key: new PublicKey(g.group_key) })),
     compression: {
       ...result.compression,
       leafId: result.compression.leaf_id,
