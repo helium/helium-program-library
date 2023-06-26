@@ -1,4 +1,4 @@
-use crate::state::*;
+use crate::{state::*, TESTING};
 use anchor_lang::prelude::*;
 use helium_sub_daos::SubDaoV0;
 
@@ -7,7 +7,7 @@ pub struct TempBackfillOnboardingFeesV0<'info> {
   pub active_device_authority: Signer<'info>,
   #[account(
     has_one = sub_dao,
-    constraint = rewardable_entity_config.settings.is_iot() && rewardable_entity_config.symbol == "IOT",
+    constraint = rewardable_entity_config.settings.is_iot() && (rewardable_entity_config.symbol == "IOT" || TESTING),
   )]
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
   #[account(

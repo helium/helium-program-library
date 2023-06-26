@@ -1,4 +1,4 @@
-use crate::{error::ErrorCode, state::*};
+use crate::{error::ErrorCode, state::*, TESTING};
 use anchor_lang::prelude::*;
 use helium_sub_daos::{
   cpi::{accounts::TrackDcOnboardingFeesV0, track_dc_onboarding_fees_v0},
@@ -33,9 +33,9 @@ pub fn handler(ctx: Context<SetEntityActiveV0>, args: SetEntityActiveArgsV0) -> 
   let info_accs_raw = ctx.remaining_accounts.to_vec();
 
   let is_mobile = ctx.accounts.rewardable_entity_config.settings.is_mobile()
-    && ctx.accounts.rewardable_entity_config.symbol == "MOBILE";
+    && (ctx.accounts.rewardable_entity_config.symbol == "MOBILE" || TESTING);
   let is_iot = ctx.accounts.rewardable_entity_config.settings.is_iot()
-    && ctx.accounts.rewardable_entity_config.symbol == "IOT";
+    && (ctx.accounts.rewardable_entity_config.symbol == "IOT" || TESTING);
   for info_acc in info_accs_raw {
     let mut info_data = info_acc.try_borrow_mut_data()?;
 
