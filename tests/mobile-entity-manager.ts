@@ -82,15 +82,13 @@ describe("mobile-entity-manager", () => {
       me,
       dataCredits.dcMint
     ));
-    ({ subDao } = await initTestSubdao(
+    ({ subDao } = await initTestSubdao({
       hsdProgram,
       provider,
-      me,
+      authority: me,
       dao,
-      undefined,
-      undefined,
-      new anchor.BN("500000000000000")
-    ));
+      numTokens: new anchor.BN("500000000000000")
+    }));
 
     await hemProgram.methods
       .approveProgramV0({

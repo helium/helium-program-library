@@ -15,6 +15,7 @@ pub const HEM_KEY: &str = "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8";
 pub struct TrackDcOnboardingFeesV0<'info> {
   #[account(owner = Pubkey::from_str(HEM_KEY).unwrap())]
   pub hem_auth: Signer<'info>, // any HEM pda can sign here
+  #[account(mut)]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
 }
 

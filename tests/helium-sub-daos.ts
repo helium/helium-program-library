@@ -139,7 +139,7 @@ describe("helium-sub-daos", () => {
       provider.wallet.publicKey
     );
     const { subDao, treasury, mint, treasuryCircuitBreaker } =
-      await initTestSubdao(program, provider, provider.wallet.publicKey, dao);
+      await initTestSubdao({hsdProgram: program, provider, authority: provider.wallet.publicKey, dao});
 
     const account = await program.account.subDaoV0.fetch(subDao!);
     const breaker =
@@ -147,8 +147,6 @@ describe("helium-sub-daos", () => {
         treasuryCircuitBreaker
       );
 
-    // @ts-ignore
-    console.log(breaker.config.thresholdType);
     // @ts-ignore
     expect(Boolean(breaker.config.thresholdType.percent)).to.be.true;
 
@@ -271,6 +269,7 @@ describe("helium-sub-daos", () => {
           activeDeviceAggregator: null,
           registrar: null,
           delegatorRewardsPercent: null,
+          activeDeviceAuthority: null,
         })
         .accounts({
           subDao,
