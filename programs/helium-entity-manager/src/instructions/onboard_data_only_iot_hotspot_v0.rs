@@ -178,6 +178,7 @@ pub fn handler<'info>(
     TrackDcOnboardingFeesArgsV0 {
       amount: dc_fee,
       add: true,
+      symbol: ctx.accounts.rewardable_entity_config.symbol.clone(),
     },
   )?;
 

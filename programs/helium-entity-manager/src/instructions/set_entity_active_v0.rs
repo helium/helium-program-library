@@ -76,6 +76,7 @@ pub fn handler(ctx: Context<SetEntityActiveV0>, args: SetEntityActiveArgsV0) -> 
         TrackDcOnboardingFeesArgsV0 {
           amount: dc_fee,
           add: true,
+          symbol: ctx.accounts.rewardable_entity_config.symbol.clone(),
         },
       )?;
     } else {
@@ -96,6 +97,7 @@ pub fn handler(ctx: Context<SetEntityActiveV0>, args: SetEntityActiveArgsV0) -> 
         TrackDcOnboardingFeesArgsV0 {
           amount: dc_fee,
           add: false,
+          symbol: ctx.accounts.rewardable_entity_config.symbol.clone(),
         },
       )?;
     }

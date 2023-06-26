@@ -6,6 +6,7 @@ use std::str::FromStr;
 pub struct TrackDcOnboardingFeesArgsV0 {
   pub amount: u64,
   pub add: bool,
+  pub symbol: String,
 }
 
 pub const HEM_KEY: &str = "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8";
@@ -13,8 +14,16 @@ pub const HEM_KEY: &str = "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8";
 #[derive(Accounts)]
 #[instruction(args: TrackDcOnboardingFeesArgsV0)]
 pub struct TrackDcOnboardingFeesV0<'info> {
-  #[account(owner = Pubkey::from_str(HEM_KEY).unwrap())]
-  pub hem_auth: Signer<'info>, // any HEM pda can sign here
+  #[account(
+    seeds = [
+      "rewardable_entity_config".as_bytes(),
+      sub_dao.key().as_ref(),
+      args.symbol.as_bytes()
+    ],
+    bump,
+    seeds::program = Pubkey::from_str(HEM_KEY).unwrap()
+  )]
+  pub hem_auth: Signer<'info>,
   #[account(mut)]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
 }
