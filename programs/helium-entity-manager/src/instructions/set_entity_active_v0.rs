@@ -32,8 +32,10 @@ pub fn handler(ctx: Context<SetEntityActiveV0>, args: SetEntityActiveArgsV0) -> 
   // All the remaining accounts are entity info accounts
   let info_accs_raw = ctx.remaining_accounts.to_vec();
 
-  let is_mobile = ctx.accounts.rewardable_entity_config.settings.is_mobile();
-  let is_iot = ctx.accounts.rewardable_entity_config.settings.is_iot();
+  let is_mobile = ctx.accounts.rewardable_entity_config.settings.is_mobile()
+    && ctx.accounts.rewardable_entity_config.symbol == "MOBILE";
+  let is_iot = ctx.accounts.rewardable_entity_config.settings.is_iot()
+    && ctx.accounts.rewardable_entity_config.symbol == "IOT";
   for info_acc in info_accs_raw {
     let mut info_data = info_acc.try_borrow_mut_data()?;
 

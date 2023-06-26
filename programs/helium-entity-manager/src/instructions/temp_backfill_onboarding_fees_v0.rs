@@ -7,7 +7,7 @@ pub struct TempBackfillOnboardingFeesV0<'info> {
   pub active_device_authority: Signer<'info>,
   #[account(
     has_one = sub_dao,
-    constraint = rewardable_entity_config.settings.is_iot()
+    constraint = rewardable_entity_config.settings.is_iot() && rewardable_entity_config.symbol == "IOT",
   )]
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
   #[account(
