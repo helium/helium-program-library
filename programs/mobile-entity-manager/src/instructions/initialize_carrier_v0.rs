@@ -195,7 +195,6 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
     sub_dao: ctx.accounts.sub_dao.key(),
     escrow: ctx.accounts.escrow.key(),
     approved: false,
-    metadata_url: args.metadata_url,
   });
 
   Ok(())

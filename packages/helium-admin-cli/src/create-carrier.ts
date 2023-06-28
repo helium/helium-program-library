@@ -1,84 +1,83 @@
-import * as anchor from "@coral-xyz/anchor";
-import { init as initHem, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
-import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
-import { carrierKey, init as initMem } from "@helium/mobile-entity-manager-sdk";
+import * as anchor from '@coral-xyz/anchor';
+import {
+  init as initHem,
+  keyToAssetKey,
+} from '@helium/helium-entity-manager-sdk';
+import { daoKey, subDaoKey } from '@helium/helium-sub-daos-sdk';
+import { carrierKey, init as initMem } from '@helium/mobile-entity-manager-sdk';
 import {
   HNT_MINT,
   MOBILE_MINT,
   humanReadable,
-  sendInstructions
-} from "@helium/spl-utils";
+  sendInstructions,
+} from '@helium/spl-utils';
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   getConcurrentMerkleTreeAccountSize,
-} from "@solana/spl-account-compression";
+} from '@solana/spl-account-compression';
 import {
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
-  SystemProgram
-} from "@solana/web3.js";
-import fs from "fs";
-import os from "os";
-import yargs from "yargs/yargs";
-import {
-  exists,
-  loadKeypair,
-  merkleSizes
-} from "./utils";
+  SystemProgram,
+} from '@solana/web3.js';
+import fs from 'fs';
+import os from 'os';
+import yargs from 'yargs/yargs';
+import { exists, loadKeypair, merkleSizes } from './utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: "k",
-      describe: "Anchor wallet keypair",
+      alias: 'k',
+      describe: 'Anchor wallet keypair',
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: "u",
-      default: "http://127.0.0.1:8899",
-      describe: "The solana url",
+      alias: 'u',
+      default: 'http://127.0.0.1:8899',
+      describe: 'The solana url',
     },
     hntMint: {
       default: HNT_MINT.toBase58(),
     },
     dntMint: {
       default: MOBILE_MINT.toBase58(),
-      describe: "Public Key of the subdao mint",
-      type: "string",
+      describe: 'Public Key of the subdao mint',
+      type: 'string',
     },
     name: {
-      alias: "n",
-      type: "string",
+      alias: 'n',
+      type: 'string',
       required: true,
-      describe: "The name of the carrier",
+      describe: 'The name of the carrier',
     },
     metadataUrl: {
       required: true,
-      type: "string",
-      describe: "Json metadata for the collection",
+      type: 'string',
+      describe: 'Json metadata for the collection',
     },
     issuingAuthority: {
-      alias: "m",
-      type: "string",
-      describe: "The pubkey that will approve issuance",
+      alias: 'm',
+      type: 'string',
+      describe: 'The pubkey that will approve issuance',
       required: true,
     },
     recipient: {
       describe:
-        "Recipient of the rewardable carrier nft, default to this wallet",
-      type: "string",
+        'Recipient of the rewardable carrier nft, default to this wallet',
+      type: 'string',
       required: false,
     },
     count: {
-      alias: "c",
-      type: "number",
-      describe: "Estimated number of entities this carrier will have",
+      alias: 'c',
+      type: 'number',
+      describe: 'Estimated number of entities this carrier will have',
       required: true,
     },
     merkleBasePath: {
-      type: "string",
-      describe: "Base path for merkle keypair",
+      type: 'string',
+      describe: 'Base path for merkle keypair',
       default: `${__dirname}/../../keypairs`,
     },
   });
@@ -124,7 +123,7 @@ export async function run(args: any = process.argv) {
     `
             Creating carrier with issuing authority: ${issuingAuthority.toBase58()}.
             Carrier: ${carrier.toBase58()}.
-            Size: ${size}, buffer: ${buffer}, canopy: ${canopy}. 
+            Size: ${size}, buffer: ${buffer}, canopy: ${canopy}.
             Space: ${space} bytes
             Cost: ~${humanReadable(new anchor.BN(rent), 9)} Sol
             `
@@ -137,7 +136,7 @@ export async function run(args: any = process.argv) {
   }
 
   if (!(await exists(conn, carrier))) {
-    console.log("Creating carrier");
+    console.log('Creating carrier');
     console.log(
       await memProgram.methods
         .initializeCarrierV0({
@@ -157,7 +156,7 @@ export async function run(args: any = process.argv) {
   }
 
   if (!(await exists(conn, merkle.publicKey))) {
-    console.log("Creating tree");
+    console.log('Creating tree');
     await sendInstructions(
       provider,
       [
@@ -191,17 +190,19 @@ export async function run(args: any = process.argv) {
     : provider.wallet.publicKey;
   const [keyToAssetK] = keyToAssetKey(
     daoKey(hntMint)[0],
-    Buffer.from(name, "utf-8")
+    Buffer.from(name, 'utf-8')
   );
   const keyToAsset = await hemProgram.account.keyToAssetV0.fetchNullable(
     keyToAssetK
   );
 
   if (!keyToAsset && issuingAuthority.equals(provider.wallet.publicKey)) {
-    console.log("Minting carrier NFT");
+    console.log('Minting carrier NFT');
     console.log(
       await memProgram.methods
-        .issueCarrierNftV0()
+        .issueCarrierNftV0({
+          metadataUrl: null,
+        })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ])

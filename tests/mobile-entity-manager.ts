@@ -196,7 +196,9 @@ describe('mobile-entity-manager', () => {
 
     it('allows the carrier to issue itself a rewardable NFT', async () => {
       await memProgram.methods
-        .issueCarrierNftV0()
+        .issueCarrierNftV0({
+          metadataUrl: null,
+        })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ])

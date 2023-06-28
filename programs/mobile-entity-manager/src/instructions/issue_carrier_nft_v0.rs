@@ -12,7 +12,13 @@ use mpl_bubblegum::program::Bubblegum;
 use mpl_bubblegum::state::TreeConfig;
 use spl_account_compression::{program::SplAccountCompression, Noop};
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct IssueCarrierNftArgsV0 {
+  pub metadata_url: Option<String>,
+}
+
 #[derive(Accounts)]
+#[instruction(args: IssueCarrierNftArgsV0)]
 pub struct IssueCarrierNftV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
@@ -100,7 +106,7 @@ pub struct IssueCarrierNftV0<'info> {
   pub helium_entity_manager_program: Program<'info, HeliumEntityManager>,
 }
 
-pub fn handler(ctx: Context<IssueCarrierNftV0>) -> Result<()> {
+pub fn handler(ctx: Context<IssueCarrierNftV0>, args: IssueCarrierNftArgsV0) -> Result<()> {
   let seeds: &[&[&[u8]]] = &[carrier_seeds!(ctx.accounts.carrier)];
 
   issue_program_entity_v0(
@@ -135,7 +141,7 @@ pub fn handler(ctx: Context<IssueCarrierNftV0>) -> Result<()> {
       symbol: String::from("CARRIER"),
       approver_seeds: seeds[0].iter().map(|s| s.to_vec()).collect(),
       key_serialization: KeySerialization::UTF8,
-      metadata_url: Some(ctx.accounts.carrier.metadata_url.clone()),
+      metadata_url: args.metadata_url,
     },
   )?;
 

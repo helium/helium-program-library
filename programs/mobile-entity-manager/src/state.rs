@@ -13,7 +13,6 @@ pub struct CarrierV0 {
   pub approved: bool,
   pub collection_bump_seed: u8,
   pub bump_seed: u8,
-  pub metadata_url: String,
 }
 
 #[macro_export]
