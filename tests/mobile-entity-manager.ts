@@ -1,36 +1,40 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
-import { init as initDataCredits } from "@helium/data-credits-sdk";
-import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
+import * as anchor from '@coral-xyz/anchor';
+import { Program } from '@coral-xyz/anchor';
+import { init as initDataCredits } from '@helium/data-credits-sdk';
+import { init as initHeliumSubDaos } from '@helium/helium-sub-daos-sdk';
 import {
-  SystemProgram, Keypair,
+  SystemProgram,
+  Keypair,
   PublicKey,
   ComputeBudgetProgram,
-} from "@solana/web3.js";
-import chai from "chai";
-import { init as initMobileEntityManager } from "../packages/mobile-entity-manager-sdk/src";
-import { init as initHeliumEntityManager } from "../packages/helium-entity-manager-sdk/src";
-import { DataCredits } from "../target/types/data_credits";
-import { HeliumSubDaos } from "../target/types/helium_sub_daos";
-import { MobileEntityManager } from "../target/types/mobile_entity_manager";
-import { initTestDao, initTestSubdao } from "./utils/daos";
+} from '@solana/web3.js';
+import chai from 'chai';
+import { init as initMobileEntityManager } from '../packages/mobile-entity-manager-sdk/src';
+import { init as initHeliumEntityManager } from '../packages/helium-entity-manager-sdk/src';
+import { DataCredits } from '../target/types/data_credits';
+import { HeliumSubDaos } from '../target/types/helium_sub_daos';
+import { MobileEntityManager } from '../target/types/mobile_entity_manager';
+import { initTestDao, initTestSubdao } from './utils/daos';
 import {
   ensureMemIdl,
   ensureDCIdl,
   ensureHSDIdl,
   initTestDataCredits,
-} from "./utils/fixtures";
+} from './utils/fixtures';
 const { expect } = chai;
-import chaiAsPromised from "chai-as-promised";
-import { getAccount } from "@solana/spl-token";
-import { random } from "./utils/string";
-import { SPL_ACCOUNT_COMPRESSION_PROGRAM_ID, getConcurrentMerkleTreeAccountSize } from "@solana/spl-account-compression";
-import { HeliumEntityManager } from "../target/types/helium_entity_manager";
+import chaiAsPromised from 'chai-as-promised';
+import { getAccount } from '@solana/spl-token';
+import { random } from './utils/string';
+import {
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  getConcurrentMerkleTreeAccountSize,
+} from '@solana/spl-account-compression';
+import { HeliumEntityManager } from '../target/types/helium_entity_manager';
 
 chai.use(chaiAsPromised);
 
-describe("mobile-entity-manager", () => {
-  anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
+describe('mobile-entity-manager', () => {
+  anchor.setProvider(anchor.AnchorProvider.local('http://127.0.0.1:8899'));
 
   let dcProgram: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
@@ -89,7 +93,7 @@ describe("mobile-entity-manager", () => {
       dao,
       undefined,
       undefined,
-      new anchor.BN("500000000000000")
+      new anchor.BN('500000000000000')
     ));
 
     await hemProgram.methods
@@ -100,7 +104,7 @@ describe("mobile-entity-manager", () => {
       .rpc({ skipPreflight: true });
   });
 
-  it("should initialize a carrier", async () => {
+  it('should initialize a carrier', async () => {
     const name = random();
     const {
       pubkeys: { carrier, escrow },
@@ -109,7 +113,7 @@ describe("mobile-entity-manager", () => {
         name,
         issuingAuthority: me,
         updateAuthority: me,
-        metadataUrl: "https://some/url",
+        metadataUrl: 'https://some/url',
       })
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
@@ -126,11 +130,11 @@ describe("mobile-entity-manager", () => {
     expect(carrierAcc.name).to.eq(name);
     expect(carrierAcc.approved).to.be.false;
 
-    const escrowAcc = await getAccount(provider.connection, escrow!)
-    expect(escrowAcc.amount.toString()).to.eq("500000000000000");
+    const escrowAcc = await getAccount(provider.connection, escrow!);
+    expect(escrowAcc.amount.toString()).to.eq('500000000000000');
   });
 
-  describe("with a carrier", async () => {
+  describe('with a carrier', async () => {
     let carrier: PublicKey;
     beforeEach(async () => {
       const name = random();
@@ -141,7 +145,7 @@ describe("mobile-entity-manager", () => {
           name,
           issuingAuthority: me,
           updateAuthority: me,
-          metadataUrl: "https://some/url",
+          metadataUrl: 'https://some/url',
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
@@ -174,7 +178,7 @@ describe("mobile-entity-manager", () => {
         .rpc({ skipPreflight: true });
     });
 
-    it("allows the subdao to approve and revoke the carrier", async () => {
+    it('allows the subdao to approve and revoke the carrier', async () => {
       await memProgram.methods
         .approveCarrierV0()
         .accounts({ carrier })
@@ -190,7 +194,7 @@ describe("mobile-entity-manager", () => {
       expect(carrierAcc.approved).to.be.false;
     });
 
-    it ("allows the carrier to issue itself a rewardable NFT", async () => {
+    it('allows the carrier to issue itself a rewardable NFT', async () => {
       await memProgram.methods
         .issueCarrierNftV0()
         .preInstructions([
@@ -199,9 +203,9 @@ describe("mobile-entity-manager", () => {
         .accounts({ carrier })
         .rpc({ skipPreflight: true });
       // No further assertions since we don't have the digital asset api in testing
-    })
+    });
 
-    describe("with carrier approval", async () => {
+    describe('with carrier approval', async () => {
       beforeEach(async () => {
         await memProgram.methods
           .approveCarrierV0()
@@ -209,11 +213,12 @@ describe("mobile-entity-manager", () => {
           .rpc({ skipPreflight: true });
       });
 
-      it("allows the carrier to initialize subscribers", async () => {
+      it('allows the carrier to initialize subscribers', async () => {
         const name = random();
         await memProgram.methods
           .initializeSubscriberV0({
-            entityKey: Buffer.from(name, "utf-8"),
+            entityKey: Buffer.from(name, 'utf-8'),
+            metadataUrl: null,
             name,
           })
           .preInstructions([
