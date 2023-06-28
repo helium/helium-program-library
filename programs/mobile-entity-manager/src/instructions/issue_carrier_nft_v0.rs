@@ -90,7 +90,7 @@ pub struct IssueCarrierNftV0<'info> {
   /// CHECK: Used in cpi
   pub bubblegum_signer: UncheckedAccount<'info>,
 
-  /// CHECK: Verified by constraint  
+  /// CHECK: Verified by constraint
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
   pub log_wrapper: Program<'info, Noop>,
@@ -135,6 +135,7 @@ pub fn handler(ctx: Context<IssueCarrierNftV0>) -> Result<()> {
       symbol: String::from("CARRIER"),
       approver_seeds: seeds[0].iter().map(|s| s.to_vec()).collect(),
       key_serialization: KeySerialization::UTF8,
+      metadata_url: Some(ctx.accounts.carrier.metadata_url.clone()),
     },
   )?;
 
