@@ -31,8 +31,11 @@ pub mod mobile_entity_manager {
     initialize_subscriber_v0::handler(ctx, args)
   }
 
-  pub fn issue_carrier_nft_v0(ctx: Context<IssueCarrierNftV0>) -> Result<()> {
-    issue_carrier_nft_v0::handler(ctx)
+  pub fn issue_carrier_nft_v0(
+    ctx: Context<IssueCarrierNftV0>,
+    args: IssueCarrierNftArgsV0,
+  ) -> Result<()> {
+    issue_carrier_nft_v0::handler(ctx, args)
   }
 
   pub fn revoke_carrier_v0(ctx: Context<RevokeCarrierV0>) -> Result<()> {

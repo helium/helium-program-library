@@ -22,6 +22,7 @@ pub struct IssueProgramEntityArgsV0 {
   pub name: String,
   pub symbol: String,
   pub approver_seeds: Vec<Vec<u8>>,
+  pub metadata_url: Option<String>,
 }
 
 fn program_address(seeds: Vec<Vec<u8>>, pid: &Pubkey) -> Result<Pubkey> {
@@ -95,8 +96,7 @@ pub struct IssueProgramEntityV0<'info> {
   )]
   /// CHECK: Used in cpi
   pub bubblegum_signer: UncheckedAccount<'info>,
-
-  /// CHECK: Verified by constraint  
+  /// CHECK: Verified by constraint
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
   pub log_wrapper: Program<'info, Noop>,
@@ -134,12 +134,13 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     KeySerialization::B58 => bs58::encode(&args.entity_key).into_string(),
     KeySerialization::UTF8 => std::str::from_utf8(&args.entity_key).unwrap().to_string(),
   };
+
   let asset_id = get_asset_id(
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,
   );
 
-  let metadata = MetadataArgs {
+  let mut metadata = MetadataArgs {
     name: args.name,
     symbol: args.symbol,
     uri: format!("{}/{}", ENTITY_METADATA_URL, key_str),
@@ -160,11 +161,24 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     }],
     seller_fee_basis_points: 0,
   };
+
+  if let Some(metadata_url) = args.metadata_url {
+    let formated_metadata_url = format!("{}/{}", metadata_url, key_str);
+
+    require!(
+      formated_metadata_url.len() <= 200,
+      ErrorCode::InvalidStringLength
+    );
+
+    metadata.uri = formated_metadata_url;
+  }
+
   let entity_creator_seeds: &[&[&[u8]]] = &[&[
     b"entity_creator",
     ctx.accounts.dao.to_account_info().key.as_ref(),
     &[ctx.bumps["entity_creator"]],
   ]];
+
   let mut creator = ctx.accounts.entity_creator.to_account_info();
   creator.is_signer = true;
   mint_to_collection_v1(

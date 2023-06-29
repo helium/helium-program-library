@@ -16,6 +16,7 @@ use spl_account_compression::{program::SplAccountCompression, Noop};
 pub struct InitializeSubscriberArgsV0 {
   pub entity_key: Vec<u8>,
   pub name: String,
+  pub metadata_url: Option<String>,
 }
 
 #[derive(Accounts)]
@@ -98,7 +99,7 @@ pub struct InitializeSubscriberV0<'info> {
   /// CHECK: Used in cpi
   pub bubblegum_signer: UncheckedAccount<'info>,
 
-  /// CHECK: Verified by constraint  
+  /// CHECK: Verified by constraint
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
   pub log_wrapper: Program<'info, Noop>,
@@ -146,6 +147,7 @@ pub fn handler(
       symbol: String::from("SUBSCRIBER"),
       approver_seeds: seeds[0].iter().map(|s| s.to_vec()).collect(),
       key_serialization: KeySerialization::B58,
+      metadata_url: args.metadata_url,
     },
   )?;
 
