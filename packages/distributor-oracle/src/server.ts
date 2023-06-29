@@ -197,7 +197,7 @@ export class OracleServer {
   ) {
     let assetId = req.query.assetId as string;
     let entityKey = req.query.entityKey as string;
-    let encoding = req.query.encoding as string | undefined;
+    let encoding = req.query.encoding;
     if (!encoding) {
       encoding = "b58";
     }
