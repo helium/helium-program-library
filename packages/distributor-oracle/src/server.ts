@@ -181,18 +181,26 @@ export class OracleServer {
     const count = await this.db.getActiveDevices();
 
     res.send({
-      count
+      count,
     });
   }
 
   private async getCurrentRewardsHandler(
     req: FastifyRequest<{
-      Querystring: { assetId?: string; entityKey?: string };
+      Querystring: {
+        assetId?: string;
+        entityKey?: string;
+        encoding?: BufferEncoding | "b58";
+      };
     }>,
     res: FastifyReply
   ) {
     let assetId = req.query.assetId as string;
     let entityKey = req.query.entityKey as string;
+    let encoding = req.query.encoding as string | undefined;
+    if (!encoding) {
+      encoding = "b58";
+    }
     if (!assetId && !entityKey) {
       res.status(400).send({
         error: "Must provide either `entityKey` or `assetId` parameter",
@@ -201,7 +209,7 @@ export class OracleServer {
     }
 
     if (entityKey) {
-      const [key] = await keyToAssetKey(DAO, entityKey as string);
+      const [key] = await keyToAssetKey(DAO, entityKey as string, encoding);
       const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(key);
       assetId = keyToAsset.asset.toBase58();
     }
@@ -237,7 +245,9 @@ export class OracleServer {
     });
   }
 
-  private async signTransaction(data: number[]): Promise<{ success: boolean; message?: string, transaction?: Buffer }> {
+  private async signTransaction(
+    data: number[]
+  ): Promise<{ success: boolean; message?: string; transaction?: Buffer }> {
     const tx = Transaction.from(data);
 
     // validate only interacts with LD and RO programs and only calls setCurrentRewards, distributeRewards
@@ -276,7 +286,10 @@ export class OracleServer {
 
     for (const ix of tx.instructions) {
       if (!(ix.programId.equals(LD_PID) || ix.programId.equals(RO_PID))) {
-        return {success: false, message: "Invalid instructions in transaction"};
+        return {
+          success: false,
+          message: "Invalid instructions in transaction",
+        };
       }
       let decoded: Instruction | null;
       if (ix.programId.equals(LD_PID)) {
@@ -297,12 +310,19 @@ export class OracleServer {
           decoded.name !== "initializeCompressionRecipientV0" &&
           decoded.name !== "setCurrentRewardsWrapperV0")
       ) {
-        return {success: false, message: "Invalid instructions in transaction"};
+        return {
+          success: false,
+          message: "Invalid instructions in transaction",
+        };
       }
 
-      console.log(decoded.name)
+      console.log(decoded.name);
 
-      if (decoded.name === "setCurrentRewardsV0" || decoded.name === "setCurrentRewardsWrapperV0") setRewardIxs.push(ix);
+      if (
+        decoded.name === "setCurrentRewardsV0" ||
+        decoded.name === "setCurrentRewardsWrapperV0"
+      )
+        setRewardIxs.push(ix);
 
       // Since recipient wont exist to fetch to get the mint id, grab it from the init recipient ix
       if (decoded.name === "initializeRecipientV0") {
@@ -362,10 +382,15 @@ export class OracleServer {
     )!;
     // validate setRewards value for this oracle is correct
     for (const ix of setRewardIxs) {
-      let recipient: PublicKey | undefined, lazyDist: PublicKey | undefined, proposedCurrentRewards: any;
+      let recipient: PublicKey | undefined,
+        lazyDist: PublicKey | undefined,
+        proposedCurrentRewards: any;
 
       let entityKey;
-      if (ix.keys[wrapperOracleKeyIdx].pubkey.equals(this.oracle.publicKey) && ix.programId.equals(RO_PID)) {
+      if (
+        ix.keys[wrapperOracleKeyIdx].pubkey.equals(this.oracle.publicKey) &&
+        ix.programId.equals(RO_PID)
+      ) {
         let decoded = (
           this.roProgram.coder.instruction as BorshInstructionCoder
         ).decode(ix.data);
@@ -376,7 +401,10 @@ export class OracleServer {
         proposedCurrentRewards = decoded.data.args.currentRewards;
         // @ts-ignore
         entityKey = decoded.data.args.entityKey;
-      } else if (ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey) && ix.programId.equals(LD_PID)) {
+      } else if (
+        ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey) &&
+        ix.programId.equals(LD_PID)
+      ) {
         let decoded = (
           this.ldProgram.coder.instruction as BorshInstructionCoder
         ).decode(ix.data);
@@ -388,19 +416,18 @@ export class OracleServer {
       }
 
       if (!lazyDist || !recipient || !lazyDist.equals(this.lazyDistributor)) {
-        return {success: false, message: "Invalid lazy distributor"};
+        return { success: false, message: "Invalid lazy distributor" };
       }
 
       let mint = (recipientToLazyDistToMint[recipient.toBase58()] || {})[
         lazyDist.toBase58()
       ];
       if (!mint) {
-        const recipientAcc = await this.ldProgram.account.recipientV0.fetchNullable(
-          recipient
-        );
+        const recipientAcc =
+          await this.ldProgram.account.recipientV0.fetchNullable(recipient);
         if (!recipientAcc) {
           console.error(recipientToLazyDistToMint);
-          return {success: false, message: "Recipient doesn't exist"};
+          return { success: false, message: "Recipient doesn't exist" };
         }
         mint = recipientAcc.asset;
       }
@@ -409,13 +436,16 @@ export class OracleServer {
         ? await this.db.getCurrentRewardsByEntity(entityKey)
         : await this.db.getCurrentRewards(mint);
       if (proposedCurrentRewards.toNumber() > currentRewards) {
-        return {success: false, message: "Invalid amount"};
+        return { success: false, message: "Invalid amount" };
       }
     }
 
     // validate that this oracle is not the fee payer
     if (tx.feePayer?.equals(this.oracle.publicKey)) {
-      return {success: false, message: "Cannot set this oracle as the fee payer"};
+      return {
+        success: false,
+        message: "Cannot set this oracle as the fee payer",
+      };
     }
 
     tx.partialSign(this.oracle);
@@ -424,11 +454,11 @@ export class OracleServer {
       requireAllSignatures: false,
       verifySignatures: false,
     });
-    return {success: true, transaction: serialized};
+    return { success: true, transaction: serialized };
   }
 
   private async signBulkTransactionsHandler(
-    req: FastifyRequest<{ Body: {transactions: number[][] } }>,
+    req: FastifyRequest<{ Body: { transactions: number[][] } }>,
     res: FastifyReply
   ) {
     if (!req.body.transactions) {
@@ -437,22 +467,33 @@ export class OracleServer {
     }
 
     let _this = this;
-    const results = await Promise.all(req.body.transactions.map(async (txData) => {
-      try {
-        return await _this.signTransaction(txData);
-      } catch (err: any) {
-        console.error(err);
-        return ({success: false, message: err.message} as any);
-      }
-    }));
+    const results = await Promise.all(
+      req.body.transactions.map(async (txData) => {
+        try {
+          return await _this.signTransaction(txData);
+        } catch (err: any) {
+          console.error(err);
+          return { success: false, message: err.message } as any;
+        }
+      })
+    );
 
-    const errIdx = results.findIndex(x => !x.success);
+    const errIdx = results.findIndex((x) => !x.success);
     if (errIdx > -1) {
-      res.status(400).send({ error: results[errIdx].message ?  `${results[errIdx].message}\n\nTransaction index: ${errIdx}` : `Error signing transaction index: ${errIdx}` });
+      res
+        .status(400)
+        .send({
+          error: results[errIdx].message
+            ? `${results[errIdx].message}\n\nTransaction index: ${errIdx}`
+            : `Error signing transaction index: ${errIdx}`,
+        });
       return;
     }
 
-    res.send({ success: true, transactions: results.map(x => x.transaction) });
+    res.send({
+      success: true,
+      transactions: results.map((x) => x.transaction),
+    });
   }
 
   private async signTransactionHandler(

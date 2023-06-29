@@ -80,6 +80,7 @@ export async function getPendingRewards(
   lazyDistributor: PublicKey,
   dao: PublicKey,
   entityKeys: string[],
+  encoding: BufferEncoding | "b58" = "b58"
 ): Promise<Record<string, string>> {
   const oracleRewards = await getBulkRewards(
     program,
@@ -88,17 +89,23 @@ export async function getPendingRewards(
   );
 
   const hemProgram = await init(program.provider as AnchorProvider);
-  const withRecipients = await Promise.all(entityKeys.map(async entityKey => {
-    const keyToAssetK = keyToAssetKey(dao, entityKey)[0];
-    const keyToAsset = await hemProgram.account.keyToAssetV0.fetch(keyToAssetK);
-    const recipient = recipientKey(lazyDistributor, keyToAsset.asset)[0];
-    const recipientAcc = await program.account.recipientV0.fetchNullable(recipient);
+  const withRecipients = await Promise.all(
+    entityKeys.map(async (entityKey) => {
+      const keyToAssetK = keyToAssetKey(dao, entityKey, encoding)[0];
+      const keyToAsset = await hemProgram.account.keyToAssetV0.fetch(
+        keyToAssetK
+      );
+      const recipient = recipientKey(lazyDistributor, keyToAsset.asset)[0];
+      const recipientAcc = await program.account.recipientV0.fetchNullable(
+        recipient
+      );
 
-    return {
-      entityKey,
-      recipientAcc,
-    };
-  }))
+      return {
+        entityKey,
+        recipientAcc,
+      };
+    })
+  );
 
   return withRecipients.reduce((acc, { entityKey, recipientAcc }) => {
     const sortedOracleRewards = oracleRewards
@@ -110,7 +117,7 @@ export async function getPendingRewards(
     );
 
     const subbed = oracleMedian.sub(recipientAcc?.totalRewards || new BN(0));
-    acc[entityKey] = subbed.toString()
+    acc[entityKey] = subbed.toString();
 
     return acc;
   }, {} as Record<string, string>);
@@ -130,6 +137,7 @@ export async function formBulkTransactions({
   assetEndpoint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
+  encoding = "b58"
 }: {
   program: Program<LazyDistributor>;
   rewardsOracleProgram?: Program<RewardsOracle>;
@@ -147,6 +155,7 @@ export async function formBulkTransactions({
     url: string,
     assetId: PublicKey
   ) => Promise<AssetProof | undefined>;
+  encoding: BufferEncoding | "b58";
 }) {
   if (assets.length > 100) {
     throw new Error("Too many assets, max 100");
@@ -154,83 +163,109 @@ export async function formBulkTransactions({
   const provider = lazyDistributorProgram.provider as AnchorProvider;
 
   if (!rewardsOracleProgram) {
-    rewardsOracleProgram = await initRewards(provider)
+    rewardsOracleProgram = await initRewards(provider);
   }
   if (!lazyDistributorAcc) {
-    lazyDistributorAcc = await lazyDistributorProgram.account.lazyDistributorV0.fetch(lazyDistributor);
+    lazyDistributorAcc =
+      await lazyDistributorProgram.account.lazyDistributorV0.fetch(
+        lazyDistributor
+      );
   }
 
   if (!compressionAssetAccs) {
-    compressionAssetAccs = await Promise.all(assets.map(async (asset) => {
-      // @ts-ignore
-      const assetAcc = await getAssetFn(assetEndpoint || provider.connection._rpcEndpoint, asset);
-      if (!assetAcc) {
-        throw new Error("No asset with ID " + asset.toBase58());
-      }
-      return assetAcc;
-    }))
+    compressionAssetAccs = await Promise.all(
+      assets.map(async (asset) => {
+        // @ts-ignore
+        const assetAcc = await getAssetFn(
+          assetEndpoint || provider.connection.rpcEndpoint,
+          asset
+        );
+        if (!assetAcc) {
+          throw new Error("No asset with ID " + asset.toBase58());
+        }
+        return assetAcc;
+      })
+    );
   }
   if (compressionAssetAccs.length != assets.length) {
-    throw new Error("Assets not the same length as compressionAssetAccs")
+    throw new Error("Assets not the same length as compressionAssetAccs");
   }
 
-  let recipientKeys = assets.map((asset) => recipientKey(lazyDistributor, asset)[0]);
-  let recipientAccs = await lazyDistributorProgram.account.recipientV0.fetchMultiple(recipientKeys);
+  let recipientKeys = assets.map(
+    (asset) => recipientKey(lazyDistributor, asset)[0]
+  );
+  let recipientAccs =
+    await lazyDistributorProgram.account.recipientV0.fetchMultiple(
+      recipientKeys
+    );
 
-  let ixsPerAsset = await Promise.all(recipientAccs.map(async (recipientAcc, idx) => {
-    if (!recipientAcc) {
-      return [await(
-        await initializeCompressionRecipient({
+  let ixsPerAsset = await Promise.all(
+    recipientAccs.map(async (recipientAcc, idx) => {
+      if (!recipientAcc) {
+        return [
+          await (
+            await initializeCompressionRecipient({
+              program: lazyDistributorProgram,
+              assetId: assets![idx],
+              lazyDistributor,
+              assetEndpoint,
+              owner: wallet,
+              // Make the oracle pay for the recipient to avoid newly migrated users not having enough sol to claim rewards
+              payer: lazyDistributorAcc.oracles[0].oracle,
+              getAssetFn: () => Promise.resolve(compressionAssetAccs![idx]), // cache result so we don't hit again
+              getAssetProofFn,
+            })
+          ).instruction(),
+        ];
+      }
+      return [];
+    })
+  );
+
+  // construct the set and distribute ixs
+  let setAndDistributeIxs = await Promise.all(
+    compressionAssetAccs.map(async (assetAcc, idx) => {
+      const entityKey = assetAcc.content.json_uri.split("/").slice(-1)[0];
+      const keyToAsset = keyToAssetKey(dao, entityKey, encoding)[0];
+      const setRewardIxs = (
+        await Promise.all(
+          rewards.map(async (bulkRewards, oracleIdx) => {
+            if (!(entityKey in bulkRewards.currentRewards)) {
+              return null;
+            }
+            return await rewardsOracleProgram!.methods
+              .setCurrentRewardsWrapperV0({
+                entityKey: Buffer.from(bs58.decode(entityKey)),
+                currentRewards: new BN(bulkRewards.currentRewards[entityKey]),
+                oracleIndex: oracleIdx,
+              })
+              .accounts({
+                lazyDistributor,
+                recipient: recipientKeys[idx],
+                keyToAsset,
+                oracle: bulkRewards.oracleKey,
+              })
+              .instruction();
+          })
+        )
+      ).filter(truthy);
+      if (setRewardIxs.length == 0) {
+        return [];
+      }
+      const distributeIx = await (
+        await distributeCompressionRewards({
           program: lazyDistributorProgram,
           assetId: assets![idx],
           lazyDistributor,
-          assetEndpoint,
-          owner: wallet,
-          // Make the oracle pay for the recipient to avoid newly migrated users not having enough sol to claim rewards
-          payer: lazyDistributorAcc.oracles[0].oracle,
-          getAssetFn: () => Promise.resolve(compressionAssetAccs![idx]), // cache result so we don't hit again
+          rewardsMint: lazyDistributorAcc.rewardsMint!,
+          getAssetFn: () => Promise.resolve(assetAcc), // cache result so we don't hit again
           getAssetProofFn,
+          assetEndpoint,
         })
-      ).instruction()];
-    }
-    return [];
-  }));
-
-  // construct the set and distribute ixs
-  let setAndDistributeIxs = await Promise.all(compressionAssetAccs.map(async (assetAcc, idx) => {
-    const entityKey = assetAcc.content.json_uri.split("/").slice(-1)[0];
-    const keyToAsset = keyToAssetKey(dao, entityKey)[0];
-    const setRewardIxs = (await Promise.all(rewards.map(async (bulkRewards, oracleIdx) => {
-      if (!(entityKey in bulkRewards.currentRewards)) {
-        return null;
-      }
-      return await rewardsOracleProgram!.methods.setCurrentRewardsWrapperV0({
-        entityKey: Buffer.from(bs58.decode(entityKey)),
-        currentRewards: new BN(bulkRewards.currentRewards[entityKey]),
-        oracleIndex: oracleIdx,
-      }).accounts({
-        lazyDistributor,
-        recipient: recipientKeys[idx],
-        keyToAsset,
-        oracle: bulkRewards.oracleKey,
-      }).instruction();
-    }))).filter(truthy);
-    if (setRewardIxs.length == 0) {
-      return [];
-    }
-    const distributeIx = await(
-      await distributeCompressionRewards({
-        program: lazyDistributorProgram,
-        assetId: assets![idx],
-        lazyDistributor,
-        rewardsMint: lazyDistributorAcc.rewardsMint!,
-        getAssetFn: () => Promise.resolve(assetAcc), // cache result so we don't hit again
-        getAssetProofFn,
-        assetEndpoint,
-      })
-    ).instruction();
-    return [...setRewardIxs, distributeIx];
-  }));
+      ).instruction();
+      return [...setRewardIxs, distributeIx];
+    })
+  );
 
   for (let i = 0; i < setAndDistributeIxs.length; i++) {
     if (setAndDistributeIxs[i].length == 0) {
@@ -259,14 +294,14 @@ export async function formBulkTransactions({
     return tx.serialize({
       requireAllSignatures: false,
       verifySignatures: false,
-    })
-  })
+    });
+  });
   if (!skipOracleSign) {
     for (const oracle of oracleUrls) {
       const res = await axios.post(`${oracle}/bulk-sign`, {
         transactions: serTxs.map((tx) => tx.toJSON().data),
       });
-      serTxs = res.data.transactions.map((x: any) => Buffer.from(x));;
+      serTxs = res.data.transactions.map((x: any) => Buffer.from(x));
     }
   }
 
@@ -294,6 +329,7 @@ export async function formTransaction({
   assetEndpoint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
+  encoding = "b58"
 }: {
   program: Program<LazyDistributor>;
   rewardsOracleProgram?: Program<RewardsOracle>;
@@ -312,28 +348,35 @@ export async function formTransaction({
     url: string,
     assetId: PublicKey
   ) => Promise<AssetProof | undefined>;
+  encoding: BufferEncoding | "b58";
 }) {
   if (!asset && !hotspot) {
-    throw new Error("Must provide asset or hotspot")
+    throw new Error("Must provide asset or hotspot");
   }
   if (!asset) {
-    asset = hotspot!
+    asset = hotspot!;
   }
   if (!rewardsOracleProgram) {
-    rewardsOracleProgram = await initRewards(lazyDistributorProgram.provider as AnchorProvider)
+    rewardsOracleProgram = await initRewards(
+      lazyDistributorProgram.provider as AnchorProvider
+    );
   }
-  
+
   // @ts-ignore
-  const assetAcc = await getAssetFn(assetEndpoint || provider.connection._rpcEndpoint, asset);
+  const assetAcc = await getAssetFn(
+    assetEndpoint || provider.connection._rpcEndpoint,
+    asset
+  );
   if (!assetAcc) {
     throw new Error("No asset with ID " + asset.toBase58());
   }
 
   const entityKey = assetAcc.content.json_uri.split("/").slice(-1)[0];
   const recipient = recipientKey(lazyDistributor, asset)[0];
-  const lazyDistributorAcc = (await lazyDistributorProgram.account.lazyDistributorV0.fetch(
-    lazyDistributor
-  ))!;
+  const lazyDistributorAcc =
+    (await lazyDistributorProgram.account.lazyDistributorV0.fetch(
+      lazyDistributor
+    ))!;
   const rewardsMint = lazyDistributorAcc.rewardsMint!;
 
   let tx = new Transaction();
@@ -347,7 +390,7 @@ export async function formTransaction({
   if (!(await provider.connection.getAccountInfo(recipient))) {
     let initRecipientIx;
     if (assetAcc.compression.compressed) {
-      initRecipientIx = await(
+      initRecipientIx = await (
         await initializeCompressionRecipient({
           program: lazyDistributorProgram,
           assetId: asset,
@@ -373,7 +416,7 @@ export async function formTransaction({
     tx.add(initRecipientIx);
   }
 
-  const keyToAsset = keyToAssetKey(dao, entityKey)[0]
+  const keyToAsset = keyToAssetKey(dao, entityKey, encoding)[0];
   const ixPromises = rewards.map((x, idx) => {
     return rewardsOracleProgram!.methods
       .setCurrentRewardsWrapperV0({
@@ -399,7 +442,7 @@ export async function formTransaction({
   tx.feePayer = wallet ? wallet : provider.wallet.publicKey;
 
   if (assetAcc.compression.compressed) {
-    const distributeIx = await(
+    const distributeIx = await (
       await distributeCompressionRewards({
         program: lazyDistributorProgram,
         assetId: asset,

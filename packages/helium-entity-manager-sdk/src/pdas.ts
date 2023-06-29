@@ -87,7 +87,7 @@ export const makerApprovalKey = (
 export const keyToAssetKey = (
   dao: PublicKey,
   entityKey: Buffer | string,
-  encoding: BufferEncoding | "b58" = "utf8",
+  encoding: BufferEncoding | "b58" = "b58",
   programId: PublicKey = PROGRAM_ID
 ) => {
   if (typeof entityKey === "string") {
