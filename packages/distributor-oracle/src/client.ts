@@ -155,7 +155,7 @@ export async function formBulkTransactions({
     url: string,
     assetId: PublicKey
   ) => Promise<AssetProof | undefined>;
-  encoding: BufferEncoding | "b58";
+  encoding?: BufferEncoding | "b58";
 }) {
   if (assets.length > 100) {
     throw new Error("Too many assets, max 100");
@@ -348,7 +348,7 @@ export async function formTransaction({
     url: string,
     assetId: PublicKey
   ) => Promise<AssetProof | undefined>;
-  encoding: BufferEncoding | "b58";
+  encoding?: BufferEncoding | "b58";
 }) {
   if (!asset && !hotspot) {
     throw new Error("Must provide asset or hotspot");
@@ -362,9 +362,8 @@ export async function formTransaction({
     );
   }
 
-  // @ts-ignore
   const assetAcc = await getAssetFn(
-    assetEndpoint || provider.connection._rpcEndpoint,
+    assetEndpoint || provider.connection.rpcEndpoint,
     asset
   );
   if (!assetAcc) {
