@@ -69,8 +69,7 @@ server.get<{ Params: { entityId: string } }>("/rewards/:entityId", {
       }
 
       await curr.update({
-        // TODO: Don't multiply by 100 when we go to mainnet and they're actually writing 6 decimals
-        rewards: BigInt(curr.rewards) + BigInt(amount * 100),
+        rewards: BigInt(curr.rewards) + BigInt(amount),
       });
 
       if (limit) {

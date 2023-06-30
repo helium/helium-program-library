@@ -84,6 +84,34 @@ export const makerApprovalKey = (
     programId
   );
 
+export function encodeEntityKey(
+  entityKey: string,
+  /// Object from anchor KeySerialization.
+  keySerialization: any = { b58: {} }
+): Buffer {
+  if (typeof keySerialization.b58 != "undefined") {
+    return bs58.encode(entityKey);
+  }
+
+  if (typeof keySerialization.utf8 != "undefined") {
+    return Buffer.from(entityKey, "utf-8");
+  }
+}
+
+export function decodeEntityKey(
+  entityKey: Buffer,
+  /// Object from anchor KeySerialization.
+  keySerialization: any = { b58: {} }
+): string {
+  if (typeof keySerialization.b58 != "undefined") {
+    return bs58.decode(entityKey)
+  }
+
+  if (typeof keySerialization.utf8 != "undefined") {
+    return entityKey.toString("utf-8")
+  }
+}
+
 export const keyToAssetKey = (
   dao: PublicKey,
   entityKey: Buffer | string,

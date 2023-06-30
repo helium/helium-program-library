@@ -11,10 +11,14 @@ import {
   Program,
   setProvider
 } from "@coral-xyz/anchor";
-import { entityCreatorKey, init as initHeliumEntityManager, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
+import {
+  decodeEntityKey, entityCreatorKey,
+  init as initHeliumEntityManager,
+  keyToAssetKey,
+} from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import {
-  HeliumEntityManager
+  HeliumEntityManager,
 } from "@helium/idls/lib/types/helium_entity_manager";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { init as initLazy, lazyDistributorKey, PROGRAM_ID as LD_PID } from "@helium/lazy-distributor-sdk";
@@ -45,7 +49,7 @@ const DAO = daoKey(HNT)[0];
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
 export interface Database {
-  getCurrentRewardsByEntity: (entityKey: Buffer) => Promise<string>;
+  getCurrentRewardsByEntity: (entityKey: string) => Promise<string>;
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
   getBulkRewards: (entityKeys: string[]) => Promise<Record<string, string>>;
   getActiveDevices(): Promise<number>;
@@ -91,15 +95,14 @@ export class PgDatabase implements Database {
   async getCurrentRewards(assetId: PublicKey) {
     const asset = await this.getAssetFn(
       process.env.ASSET_API_URL ||
-        // @ts-ignore
-        this.issuanceProgram.provider.connection._rpcEndpoint,
+        this.issuanceProgram.provider.connection.rpcEndpoint,
       assetId
     );
     if (!asset) {
       console.error("No asset found", assetId.toBase58());
       return "0";
     }
-    const eccCompact = asset.content.json_uri.split("/").slice(-1)[0] as string;
+    const entityKey = asset.content.json_uri.split("/").slice(-1)[0] as string;
     // Verify the creator is our entity creator, otherwise they could just
     // pass in any NFT with this ecc compact to collect rewards
     if (
@@ -109,13 +112,12 @@ export class PgDatabase implements Database {
       throw new Error("Not a valid rewardable entity");
     }
 
-    return this.getCurrentRewardsByEntity(Buffer.from(bs58.decode(eccCompact)));
+
+
+    return this.getCurrentRewardsByEntity(entityKey);
   }
 
-  async getCurrentRewardsByEntity(entityKey: Buffer) {
-    const encoded = bs58.encode(entityKey);
-    const isHotspot = Address.isValid(encoded);
-    const entityKeyStr = isHotspot ? encoded : entityKey.toString("utf-8");
+  async getCurrentRewardsByEntity(entityKeyStr: string) {
     const reward = (await Reward.findByPk(entityKeyStr)) as Reward;
 
     return new BN(reward?.rewards).toString() || "0";
@@ -164,7 +166,7 @@ export class OracleServer {
   private addRoutes() {
     this.app.get("/active-devices", this.getActiveDevicesHandler.bind(this));
     this.app.post("/bulk-rewards", this.getAllRewardsHandler.bind(this));
-    this.app.get<{ Querystring: { assetId?: string; entityKey?: string } }>(
+    this.app.get<{ Querystring: { assetId?: string; entityKey?: string, keySerialization?: BufferEncoding | "b58" } }>(
       "/",
       this.getCurrentRewardsHandler.bind(this)
     );
@@ -190,16 +192,16 @@ export class OracleServer {
       Querystring: {
         assetId?: string;
         entityKey?: string;
-        encoding?: BufferEncoding | "b58";
+        keySerialization?: BufferEncoding | "b58";
       };
     }>,
     res: FastifyReply
   ) {
     let assetId = req.query.assetId as string;
     let entityKey = req.query.entityKey as string;
-    let encoding = req.query.encoding;
-    if (!encoding) {
-      encoding = "b58";
+    let keySerialization = req.query.keySerialization;
+    if (!keySerialization) {
+      keySerialization = "b58";
     }
     if (!assetId && !entityKey) {
       res.status(400).send({
@@ -209,7 +211,8 @@ export class OracleServer {
     }
 
     if (entityKey) {
-      const [key] = await keyToAssetKey(DAO, entityKey as string, encoding);
+      const [key] = await keyToAssetKey(DAO, entityKey as string, keySerialization);
+      console.log(key.toBase58())
       const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(key);
       assetId = keyToAsset.asset.toBase58();
     }
@@ -386,7 +389,7 @@ export class OracleServer {
         lazyDist: PublicKey | undefined,
         proposedCurrentRewards: any;
 
-      let entityKey;
+      let entityKey: Buffer;
       if (
         ix.keys[wrapperOracleKeyIdx].pubkey.equals(this.oracle.publicKey) &&
         ix.programId.equals(RO_PID)
@@ -432,8 +435,12 @@ export class OracleServer {
         mint = recipientAcc.asset;
       }
 
+      const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
+        keyToAssetKey(DAO, entityKey)[0]
+      )
+
       const currentRewards = entityKey
-        ? await this.db.getCurrentRewardsByEntity(entityKey)
+        ? await this.db.getCurrentRewardsByEntity(decodeEntityKey(entityKey, keyToAsset.keySerialization))
         : await this.db.getCurrentRewards(mint);
       if (proposedCurrentRewards.toNumber() > currentRewards) {
         return { success: false, message: "Invalid amount" };
