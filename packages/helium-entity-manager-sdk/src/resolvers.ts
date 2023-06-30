@@ -48,7 +48,8 @@ export const heliumEntityManagerResolvers = combineResolvers(
       return (
         await keyToAssetKey(
           accounts.dao as PublicKey,
-          args[args.length - 1].entityKey
+          args[args.length - 1].entityKey,
+          args[args.length - 1].encoding || "b58"
         )
       )[0];
     } else if (

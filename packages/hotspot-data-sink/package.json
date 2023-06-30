@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Receives requests from Helius webhooks",
   "repository": {
     "type": "git",
@@ -36,7 +36,7 @@
     "@coral-xyz/anchor": "^0.26",
     "@fastify/cors": "^8.1.1",
     "@helium/address": "^4.6.2",
-    "@helium/helium-entity-manager-sdk": "^0.2.6",
+    "@helium/helium-entity-manager-sdk": "^0.2.7",
     "@helium/helium-sub-daos-sdk": "^0.2.5",
     "@helium/idls": "^0.2.5",
     "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
