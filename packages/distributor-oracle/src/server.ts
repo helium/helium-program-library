@@ -436,11 +436,15 @@ export class OracleServer {
       }
 
       const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
+        // @ts-ignore
         keyToAssetKey(DAO, entityKey)[0]
-      )
+      );
 
+      // @ts-ignore
       const currentRewards = entityKey
-        ? await this.db.getCurrentRewardsByEntity(decodeEntityKey(entityKey, keyToAsset.keySerialization))
+        ? await this.db.getCurrentRewardsByEntity(
+            decodeEntityKey(entityKey, keyToAsset.keySerialization)
+          )
         : await this.db.getCurrentRewards(mint);
       if (proposedCurrentRewards.toNumber() > currentRewards) {
         return { success: false, message: "Invalid amount" };
