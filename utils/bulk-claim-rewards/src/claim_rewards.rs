@@ -186,19 +186,27 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
           a.get("creators")
             .context(json_err!(a.to_string(), "creators"))?
             .as_array()
-            .context(parse_err!(a.to_string(), "creators"))?[0]
+            .context(parse_err!(a.to_string(), "creators"))?
+            .get(0)
+            .context(parse_err!(a.to_string(), "creators[0]"))?
             .get("address")
             .context(json_err!(a.to_string(), "address"))?
             .as_str()
-            .context(parse_err!(a.to_string(), "address"))?,
+            .context(parse_err!(a.to_string(), "address"))?
+            .to_string(),
         )
       })
-      .collect::<Result<Vec<_>, anyhow::Error>>()?;
+      .collect::<Vec<Result<_, anyhow::Error>>>();
 
     let parsed_hotspots: Result<Vec<Hotspot>, anyhow::Error> = assets
       .iter()
-      .zip(first_creators.iter())
-      .filter(|(_, first_creator)| first_creator.to_string() == entity_creator.to_string())
+      .zip(first_creators.into_iter())
+      .filter(|(_, res)| {
+        res
+          .as_ref()
+          .map(|first_creator| *first_creator == entity_creator.to_string())
+          .unwrap_or_else(|_| false)
+      })
       .map(|(h, _)| {
         let compression_info = h.get("compression").unwrap();
         let id = Pubkey::from_str(
