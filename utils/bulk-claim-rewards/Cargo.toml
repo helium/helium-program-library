@@ -35,8 +35,6 @@ solana-client = "*"
 solana-sdk = "*"
 solana-program = "*"
 spl-associated-token-account = { version = "*", git = "https://github.com/ChewingGlass/solana-program-library", features = [ "no-entrypoint" ] }
-spl-token-client = { version = "*", git = "https://github.com/solana-labs/solana-program-library.git" }
-spl-token-2022 = { version = "*", git = "https://github.com/solana-labs/solana-program-library.git" }
 thiserror = "1"
 helium-api = "3"
 rust_decimal = "1"
