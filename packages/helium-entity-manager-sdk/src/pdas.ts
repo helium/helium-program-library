@@ -88,7 +88,7 @@ export function encodeEntityKey(
   entityKey: string,
   /// Object from anchor KeySerialization.
   keySerialization: any = { b58: {} }
-): Buffer {
+): Buffer | undefined {
   if (typeof keySerialization.b58 != "undefined") {
     return bs58.decode(entityKey);
   }
@@ -102,7 +102,7 @@ export function decodeEntityKey(
   entityKey: Buffer,
   /// Object from anchor KeySerialization.
   keySerialization: any = { b58: {} }
-): string {
+): string | undefined {
   if (typeof keySerialization.b58 != "undefined") {
     return bs58.encode(entityKey)
   }

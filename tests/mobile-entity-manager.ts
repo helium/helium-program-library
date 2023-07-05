@@ -34,7 +34,7 @@ import { HeliumEntityManager } from '../target/types/helium_entity_manager';
 chai.use(chaiAsPromised);
 
 describe('mobile-entity-manager', () => {
-  anchor.setProvider(anchor.AnchorProvider.local('http://127.0.0.1:8899'));
+  anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
   let dcProgram: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
