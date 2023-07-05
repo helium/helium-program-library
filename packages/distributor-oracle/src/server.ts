@@ -383,6 +383,9 @@ export class OracleServer {
     const wrapperRecipientIdx = setRewardsWrapperIx.accounts.findIndex(
       (x) => x.name === "recipient"
     )!;
+    const wrapperKeyToAssetIdx = setRewardsWrapperIx.accounts.findIndex(
+      (x) => x.name === "keyToAsset"
+    )!;
     // validate setRewards value for this oracle is correct
     for (const ix of setRewardIxs) {
       let recipient: PublicKey | undefined,
@@ -390,6 +393,7 @@ export class OracleServer {
         proposedCurrentRewards: any;
 
       let entityKey: Buffer;
+      let keyToAssetK: PublicKey | undefined = undefined;
       if (
         ix.keys[wrapperOracleKeyIdx].pubkey.equals(this.oracle.publicKey) &&
         ix.programId.equals(RO_PID)
@@ -400,6 +404,7 @@ export class OracleServer {
 
         recipient = ix.keys[wrapperRecipientIdx].pubkey;
         lazyDist = ix.keys[wrapperLazyDistIdx].pubkey;
+        keyToAssetK = ix.keys[wrapperKeyToAssetIdx].pubkey;
         //@ts-ignore
         proposedCurrentRewards = decoded.data.args.currentRewards;
         // @ts-ignore
@@ -434,16 +439,19 @@ export class OracleServer {
         }
         mint = recipientAcc.asset;
       }
-
-      const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
-        // @ts-ignore
-        keyToAssetKey(DAO, entityKey)[0]
-      );
+      let keySerialization: any = { b58: {} }
+      if (keyToAssetK) {
+        const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
+          keyToAssetK
+        );
+        keySerialization = keyToAsset.keySerialization;
+      }
+      
 
       // @ts-ignore
       const currentRewards = entityKey
         ? await this.db.getCurrentRewardsByEntity(
-            decodeEntityKey(entityKey, keyToAsset.keySerialization)
+            decodeEntityKey(entityKey, keySerialization)!
           )
         : await this.db.getCurrentRewards(mint);
       if (proposedCurrentRewards.toNumber() > currentRewards) {
