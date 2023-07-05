@@ -92,8 +92,8 @@ export class DatabaseMock implements Database {
     };
   }
 
-  async getCurrentRewardsByEntity(entityKey: Buffer): Promise<string> {
-    const pubkey = Address.fromBin(entityKey);
+  async getCurrentRewardsByEntity(entityKey: string): Promise<string> {
+    const pubkey = Address.fromB58(entityKey);
     return Math.floor(
       (this.inMemHash.byHotspot[pubkey.b58]?.lifetimeRewards || 0) *
         Math.pow(10, 8)
@@ -452,6 +452,7 @@ describe("distributor-oracle", () => {
       .post("/bulk-sign")
       .send({ transactions: [[...serializedTx]] });
 
+      console.log(res.body)
     assert.hasAllKeys(res.body, ["transactions", "success"]);
     const signedTx = Transaction.from(res.body.transactions[0].data);
     await sendAndConfirmWithRetry(
