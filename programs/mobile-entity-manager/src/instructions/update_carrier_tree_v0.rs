@@ -5,6 +5,7 @@ use helium_entity_manager::{
   cpi::accounts::UpdateProgramTreeV0, cpi::update_program_tree_v0, program::HeliumEntityManager,
   ProgramApprovalV0, UpdateProgramTreeArgsV0,
 };
+use helium_sub_daos::DaoV0;
 use mpl_bubblegum::{program::Bubblegum, state::TreeConfig};
 use spl_account_compression::{program::SplAccountCompression, Noop};
 
@@ -22,9 +23,12 @@ pub struct UpdateCarrierTreeV0<'info> {
   #[account(mut)]
   pub carrier: Box<Account<'info, CarrierV0>>,
   #[account(
+    mut,
     constraint = program_approval.program_id == crate::id(),
+    has_one = dao,
   )]
   pub program_approval: Box<Account<'info, ProgramApprovalV0>>,
+  pub dao: Box<Account<'info, DaoV0>>,
   /// CHECK: Conditionally decoded
   #[account(
     mut,
