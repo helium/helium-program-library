@@ -261,7 +261,6 @@ describe('mobile-entity-manager', () => {
         expect(programApprovalAcc.approvedMerkleTrees[0].toString()).to.eq(merkle.publicKey.toString());
 
         const newMerkle = Keypair.generate();
-        // Testing -- small tree
         const space = getConcurrentMerkleTreeAccountSize(3, 8);
         const createMerkle = SystemProgram.createAccount({
           fromPubkey: provider.wallet.publicKey,
