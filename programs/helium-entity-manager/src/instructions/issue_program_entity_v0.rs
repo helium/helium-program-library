@@ -43,7 +43,6 @@ pub struct IssueProgramEntityV0<'info> {
   pub program_approver: Signer<'info>,
   #[account(
     has_one = dao,
-    constraint = program_approval.approved_merkle_trees.iter().any(|mt_key| mt_key == &merkle_tree.key()),
   )]
   pub program_approval: Box<Account<'info, ProgramApprovalV0>>,
   pub collection_authority: Signer<'info>,

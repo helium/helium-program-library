@@ -35,7 +35,6 @@ pub fn handler(ctx: Context<ApproveProgramV0>, args: ApproveProgramArgsV0) -> Re
     dao: ctx.accounts.dao.key(),
     program_id: args.program_id,
     bump_seed: ctx.bumps["program_approval"],
-    approved_merkle_trees: Vec::new(),
   });
 
   Ok(())
