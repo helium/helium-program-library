@@ -91,6 +91,7 @@ pub struct ProgramApprovalV0 {
   pub dao: Pubkey,
   pub program_id: Pubkey,
   pub bump_seed: u8,
+  pub approved_merkle_trees: Vec<Pubkey>,
 }
 
 #[account]

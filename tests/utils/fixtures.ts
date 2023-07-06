@@ -6,6 +6,7 @@ import {
   createAtaAndMint,
   createMint,
   sendInstructions,
+  sendMultipleInstructions,
   toBN
 } from "@helium/spl-utils";
 import {
@@ -179,10 +180,10 @@ export const initTestMaker = async (
     })
     .instruction();
 
-  await sendInstructions(
+  await sendMultipleInstructions(
     provider,
-    [createMerkle, initialize, setTree, approve],
-    [merkle, makerKeypair]
+    [[createMerkle, initialize], [setTree, approve]],
+    [[merkle], [makerKeypair]]
   );
 
   return {

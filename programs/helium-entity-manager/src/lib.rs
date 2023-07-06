@@ -146,6 +146,13 @@ pub mod helium_entity_manager {
     update_data_only_tree_v0::handler(ctx)
   }
 
+  pub fn update_program_tree_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, UpdateProgramTreeV0<'info>>,
+    args: UpdateProgramTreeArgsV0,
+  ) -> Result<()> {
+    update_program_tree_v0::handler(ctx, args)
+  }
+
   pub fn temp_repair_iot_operations_fund(ctx: Context<TempRepairIotOperationsFund>) -> Result<()> {
     temp_repair_iot_operations_fund::handler(ctx)
   }

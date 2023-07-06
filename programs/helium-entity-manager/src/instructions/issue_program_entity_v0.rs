@@ -13,6 +13,7 @@ use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
   program::Bubblegum,
 };
+use mpl_token_metadata::state::{MAX_NAME_LENGTH, MAX_SYMBOL_LENGTH};
 use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -25,7 +26,7 @@ pub struct IssueProgramEntityArgsV0 {
   pub metadata_url: Option<String>,
 }
 
-fn program_address(seeds: Vec<Vec<u8>>, pid: &Pubkey) -> Result<Pubkey> {
+pub fn program_address(seeds: Vec<Vec<u8>>, pid: &Pubkey) -> Result<Pubkey> {
   let binding = seeds.iter().map(|s| s.as_ref()).collect::<Vec<&[u8]>>();
   let seeds_bytes: &[&[u8]] = binding.as_slice();
   Pubkey::create_program_address(seeds_bytes, pid).map_err(|_| error!(ErrorCode::InvalidSeeds))
@@ -40,6 +41,10 @@ pub struct IssueProgramEntityV0<'info> {
     address = program_address(args.approver_seeds, &program_approval.program_id)?
   )]
   pub program_approver: Signer<'info>,
+  #[account(
+    has_one = dao,
+    constraint = program_approval.approved_merkle_trees.iter().find(|mt_key| **mt_key == merkle_tree.key()).is_some(),
+  )]
   pub program_approval: Box<Account<'info, ProgramApprovalV0>>,
   pub collection_authority: Signer<'info>,
   pub collection: Box<Account<'info, Mint>>,
@@ -130,6 +135,15 @@ impl<'info> IssueProgramEntityV0<'info> {
 }
 
 pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV0) -> Result<()> {
+  require!(
+    args.name.len() < MAX_NAME_LENGTH,
+    ErrorCode::InvalidStringLength
+  );
+  require!(
+    args.symbol.len() < MAX_SYMBOL_LENGTH,
+    ErrorCode::InvalidStringLength
+  );
+
   let key_str = match args.key_serialization {
     KeySerialization::B58 => bs58::encode(&args.entity_key).into_string(),
     KeySerialization::UTF8 => std::str::from_utf8(&args.entity_key).unwrap().to_string(),
