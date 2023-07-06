@@ -90,11 +90,11 @@ impl<'info> InitializeMakerV0<'info> {
 
 pub fn handler(ctx: Context<InitializeMakerV0>, args: InitializeMakerArgsV0) -> Result<()> {
   require!(
-    args.name.len() < MAX_NAME_LENGTH,
+    args.name.len() <= MAX_NAME_LENGTH,
     ErrorCode::InvalidStringLength
   );
   require!(
-    args.metadata_url.len() < MAX_URI_LENGTH,
+    args.metadata_url.len() <= MAX_URI_LENGTH,
     ErrorCode::InvalidStringLength
   );
 

@@ -103,11 +103,11 @@ pub struct InitializeDataOnlyV0<'info> {
 
 pub fn handler(ctx: Context<InitializeDataOnlyV0>, args: InitializeDataOnlyArgsV0) -> Result<()> {
   require!(
-    args.name.len() < MAX_NAME_LENGTH,
+    args.name.len() <= MAX_NAME_LENGTH,
     ErrorCode::InvalidStringLength
   );
   require!(
-    args.metadata_url.len() < MAX_URI_LENGTH,
+    args.metadata_url.len() <= MAX_URI_LENGTH,
     ErrorCode::InvalidStringLength
   );
 

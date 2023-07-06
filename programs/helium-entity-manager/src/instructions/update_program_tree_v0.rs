@@ -25,6 +25,7 @@ pub struct UpdateProgramTreeV0<'info> {
     address = program_address(args.approver_seeds, &program_approval.program_id)?
   )]
   pub program_approver: Signer<'info>,
+  #[account(mut)]
   pub program_approval: Box<Account<'info, ProgramApprovalV0>>,
   #[account(
     mut,

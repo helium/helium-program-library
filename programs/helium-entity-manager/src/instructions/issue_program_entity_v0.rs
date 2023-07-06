@@ -136,11 +136,11 @@ impl<'info> IssueProgramEntityV0<'info> {
 
 pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV0) -> Result<()> {
   require!(
-    args.name.len() < MAX_NAME_LENGTH,
+    args.name.len() <= MAX_NAME_LENGTH,
     ErrorCode::InvalidStringLength
   );
   require!(
-    args.symbol.len() < MAX_SYMBOL_LENGTH,
+    args.symbol.len() <= MAX_SYMBOL_LENGTH,
     ErrorCode::InvalidStringLength
   );
 
