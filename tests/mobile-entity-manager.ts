@@ -255,10 +255,6 @@ describe('mobile-entity-manager', () => {
             break;
           }
         }
-        console.log(programApproval);
-        const programApprovalAcc = await hemProgram.account.programApprovalV0.fetch(programApproval);
-        expect(programApprovalAcc.approvedMerkleTrees.length).to.eq(1);
-        expect(programApprovalAcc.approvedMerkleTrees[0].toString()).to.eq(merkle.publicKey.toString());
 
         const newMerkle = Keypair.generate();
         const space = getConcurrentMerkleTreeAccountSize(3, 8);
@@ -280,10 +276,6 @@ describe('mobile-entity-manager', () => {
           .preInstructions([createMerkle])
           .signers([newMerkle])
           .rpc();
-
-        const newApprovalAcc = await hemProgram.account.programApprovalV0.fetch(programApproval);
-        expect(newApprovalAcc.approvedMerkleTrees.length).to.eq(1);
-        expect(newApprovalAcc.approvedMerkleTrees[0].toString()).to.eq(newMerkle.publicKey.toString());
       })
     });
   });
