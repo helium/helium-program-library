@@ -109,13 +109,6 @@ pub mod helium_sub_daos {
     reset_sub_dao_thread_v0::handler(ctx)
   }
 
-  pub fn temp_update_sub_dao_epoch_info(
-    ctx: Context<TempUpdateSubDaoEpochInfo>,
-    args: TempUpdateSubDaoEpochInfoArgs,
-  ) -> Result<()> {
-    temp_update_sub_dao_epoch_info::handler(ctx, args)
-  }
-
   pub fn track_dc_onboarding_fees_v0(
     ctx: Context<TrackDcOnboardingFeesV0>,
     args: TrackDcOnboardingFeesArgsV0,

@@ -11,10 +11,14 @@ import {
   Program,
   setProvider
 } from "@coral-xyz/anchor";
-import { entityCreatorKey, init as initHeliumEntityManager, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
+import {
+  decodeEntityKey, entityCreatorKey,
+  init as initHeliumEntityManager,
+  keyToAssetKey,
+} from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import {
-  HeliumEntityManager
+  HeliumEntityManager,
 } from "@helium/idls/lib/types/helium_entity_manager";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { init as initLazy, lazyDistributorKey, PROGRAM_ID as LD_PID } from "@helium/lazy-distributor-sdk";
@@ -45,7 +49,7 @@ const DAO = daoKey(HNT)[0];
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
 export interface Database {
-  getCurrentRewardsByEntity: (entityKey: Buffer) => Promise<string>;
+  getCurrentRewardsByEntity: (entityKey: string) => Promise<string>;
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
   getBulkRewards: (entityKeys: string[]) => Promise<Record<string, string>>;
   getActiveDevices(): Promise<number>;
@@ -91,15 +95,14 @@ export class PgDatabase implements Database {
   async getCurrentRewards(assetId: PublicKey) {
     const asset = await this.getAssetFn(
       process.env.ASSET_API_URL ||
-        // @ts-ignore
-        this.issuanceProgram.provider.connection._rpcEndpoint,
+        this.issuanceProgram.provider.connection.rpcEndpoint,
       assetId
     );
     if (!asset) {
       console.error("No asset found", assetId.toBase58());
       return "0";
     }
-    const eccCompact = asset.content.json_uri.split("/").slice(-1)[0] as string;
+    const entityKey = asset.content.json_uri.split("/").slice(-1)[0] as string;
     // Verify the creator is our entity creator, otherwise they could just
     // pass in any NFT with this ecc compact to collect rewards
     if (
@@ -109,13 +112,12 @@ export class PgDatabase implements Database {
       throw new Error("Not a valid rewardable entity");
     }
 
-    return this.getCurrentRewardsByEntity(Buffer.from(bs58.decode(eccCompact)));
+
+
+    return this.getCurrentRewardsByEntity(entityKey);
   }
 
-  async getCurrentRewardsByEntity(entityKey: Buffer) {
-    const encoded = bs58.encode(entityKey);
-    const isHotspot = Address.isValid(encoded);
-    const entityKeyStr = isHotspot ? encoded : entityKey.toString("utf-8");
+  async getCurrentRewardsByEntity(entityKeyStr: string) {
     const reward = (await Reward.findByPk(entityKeyStr)) as Reward;
 
     return new BN(reward?.rewards).toString() || "0";
@@ -164,7 +166,7 @@ export class OracleServer {
   private addRoutes() {
     this.app.get("/active-devices", this.getActiveDevicesHandler.bind(this));
     this.app.post("/bulk-rewards", this.getAllRewardsHandler.bind(this));
-    this.app.get<{ Querystring: { assetId?: string; entityKey?: string } }>(
+    this.app.get<{ Querystring: { assetId?: string; entityKey?: string, keySerialization?: BufferEncoding | "b58" } }>(
       "/",
       this.getCurrentRewardsHandler.bind(this)
     );
@@ -181,18 +183,26 @@ export class OracleServer {
     const count = await this.db.getActiveDevices();
 
     res.send({
-      count
+      count,
     });
   }
 
   private async getCurrentRewardsHandler(
     req: FastifyRequest<{
-      Querystring: { assetId?: string; entityKey?: string };
+      Querystring: {
+        assetId?: string;
+        entityKey?: string;
+        keySerialization?: BufferEncoding | "b58";
+      };
     }>,
     res: FastifyReply
   ) {
     let assetId = req.query.assetId as string;
     let entityKey = req.query.entityKey as string;
+    let keySerialization = req.query.keySerialization;
+    if (!keySerialization) {
+      keySerialization = "b58";
+    }
     if (!assetId && !entityKey) {
       res.status(400).send({
         error: "Must provide either `entityKey` or `assetId` parameter",
@@ -201,7 +211,8 @@ export class OracleServer {
     }
 
     if (entityKey) {
-      const [key] = await keyToAssetKey(DAO, entityKey as string);
+      const [key] = await keyToAssetKey(DAO, entityKey as string, keySerialization);
+      console.log(key.toBase58())
       const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(key);
       assetId = keyToAsset.asset.toBase58();
     }
@@ -237,7 +248,9 @@ export class OracleServer {
     });
   }
 
-  private async signTransaction(data: number[]): Promise<{ success: boolean; message?: string, transaction?: Buffer }> {
+  private async signTransaction(
+    data: number[]
+  ): Promise<{ success: boolean; message?: string; transaction?: Buffer }> {
     const tx = Transaction.from(data);
 
     // validate only interacts with LD and RO programs and only calls setCurrentRewards, distributeRewards
@@ -276,7 +289,10 @@ export class OracleServer {
 
     for (const ix of tx.instructions) {
       if (!(ix.programId.equals(LD_PID) || ix.programId.equals(RO_PID))) {
-        return {success: false, message: "Invalid instructions in transaction"};
+        return {
+          success: false,
+          message: "Invalid instructions in transaction",
+        };
       }
       let decoded: Instruction | null;
       if (ix.programId.equals(LD_PID)) {
@@ -297,12 +313,19 @@ export class OracleServer {
           decoded.name !== "initializeCompressionRecipientV0" &&
           decoded.name !== "setCurrentRewardsWrapperV0")
       ) {
-        return {success: false, message: "Invalid instructions in transaction"};
+        return {
+          success: false,
+          message: "Invalid instructions in transaction",
+        };
       }
 
-      console.log(decoded.name)
+      console.log(decoded.name);
 
-      if (decoded.name === "setCurrentRewardsV0" || decoded.name === "setCurrentRewardsWrapperV0") setRewardIxs.push(ix);
+      if (
+        decoded.name === "setCurrentRewardsV0" ||
+        decoded.name === "setCurrentRewardsWrapperV0"
+      )
+        setRewardIxs.push(ix);
 
       // Since recipient wont exist to fetch to get the mint id, grab it from the init recipient ix
       if (decoded.name === "initializeRecipientV0") {
@@ -360,23 +383,36 @@ export class OracleServer {
     const wrapperRecipientIdx = setRewardsWrapperIx.accounts.findIndex(
       (x) => x.name === "recipient"
     )!;
+    const wrapperKeyToAssetIdx = setRewardsWrapperIx.accounts.findIndex(
+      (x) => x.name === "keyToAsset"
+    )!;
     // validate setRewards value for this oracle is correct
     for (const ix of setRewardIxs) {
-      let recipient: PublicKey | undefined, lazyDist: PublicKey | undefined, proposedCurrentRewards: any;
+      let recipient: PublicKey | undefined,
+        lazyDist: PublicKey | undefined,
+        proposedCurrentRewards: any;
 
-      let entityKey;
-      if (ix.keys[wrapperOracleKeyIdx].pubkey.equals(this.oracle.publicKey) && ix.programId.equals(RO_PID)) {
+      let entityKey: Buffer;
+      let keyToAssetK: PublicKey | undefined = undefined;
+      if (
+        ix.keys[wrapperOracleKeyIdx].pubkey.equals(this.oracle.publicKey) &&
+        ix.programId.equals(RO_PID)
+      ) {
         let decoded = (
           this.roProgram.coder.instruction as BorshInstructionCoder
         ).decode(ix.data);
 
         recipient = ix.keys[wrapperRecipientIdx].pubkey;
         lazyDist = ix.keys[wrapperLazyDistIdx].pubkey;
+        keyToAssetK = ix.keys[wrapperKeyToAssetIdx].pubkey;
         //@ts-ignore
         proposedCurrentRewards = decoded.data.args.currentRewards;
         // @ts-ignore
         entityKey = decoded.data.args.entityKey;
-      } else if (ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey) && ix.programId.equals(LD_PID)) {
+      } else if (
+        ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey) &&
+        ix.programId.equals(LD_PID)
+      ) {
         let decoded = (
           this.ldProgram.coder.instruction as BorshInstructionCoder
         ).decode(ix.data);
@@ -388,34 +424,47 @@ export class OracleServer {
       }
 
       if (!lazyDist || !recipient || !lazyDist.equals(this.lazyDistributor)) {
-        return {success: false, message: "Invalid lazy distributor"};
+        return { success: false, message: "Invalid lazy distributor" };
       }
 
       let mint = (recipientToLazyDistToMint[recipient.toBase58()] || {})[
         lazyDist.toBase58()
       ];
       if (!mint) {
-        const recipientAcc = await this.ldProgram.account.recipientV0.fetchNullable(
-          recipient
-        );
+        const recipientAcc =
+          await this.ldProgram.account.recipientV0.fetchNullable(recipient);
         if (!recipientAcc) {
           console.error(recipientToLazyDistToMint);
-          return {success: false, message: "Recipient doesn't exist"};
+          return { success: false, message: "Recipient doesn't exist" };
         }
         mint = recipientAcc.asset;
       }
+      let keySerialization: any = { b58: {} }
+      if (keyToAssetK) {
+        const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
+          keyToAssetK
+        );
+        keySerialization = keyToAsset.keySerialization;
+      }
+      
 
+      // @ts-ignore
       const currentRewards = entityKey
-        ? await this.db.getCurrentRewardsByEntity(entityKey)
+        ? await this.db.getCurrentRewardsByEntity(
+            decodeEntityKey(entityKey, keySerialization)!
+          )
         : await this.db.getCurrentRewards(mint);
       if (proposedCurrentRewards.toNumber() > currentRewards) {
-        return {success: false, message: "Invalid amount"};
+        return { success: false, message: "Invalid amount" };
       }
     }
 
     // validate that this oracle is not the fee payer
     if (tx.feePayer?.equals(this.oracle.publicKey)) {
-      return {success: false, message: "Cannot set this oracle as the fee payer"};
+      return {
+        success: false,
+        message: "Cannot set this oracle as the fee payer",
+      };
     }
 
     tx.partialSign(this.oracle);
@@ -424,11 +473,11 @@ export class OracleServer {
       requireAllSignatures: false,
       verifySignatures: false,
     });
-    return {success: true, transaction: serialized};
+    return { success: true, transaction: serialized };
   }
 
   private async signBulkTransactionsHandler(
-    req: FastifyRequest<{ Body: {transactions: number[][] } }>,
+    req: FastifyRequest<{ Body: { transactions: number[][] } }>,
     res: FastifyReply
   ) {
     if (!req.body.transactions) {
@@ -437,22 +486,33 @@ export class OracleServer {
     }
 
     let _this = this;
-    const results = await Promise.all(req.body.transactions.map(async (txData) => {
-      try {
-        return await _this.signTransaction(txData);
-      } catch (err: any) {
-        console.error(err);
-        return ({success: false, message: err.message} as any);
-      }
-    }));
+    const results = await Promise.all(
+      req.body.transactions.map(async (txData) => {
+        try {
+          return await _this.signTransaction(txData);
+        } catch (err: any) {
+          console.error(err);
+          return { success: false, message: err.message } as any;
+        }
+      })
+    );
 
-    const errIdx = results.findIndex(x => !x.success);
+    const errIdx = results.findIndex((x) => !x.success);
     if (errIdx > -1) {
-      res.status(400).send({ error: results[errIdx].message ?  `${results[errIdx].message}\n\nTransaction index: ${errIdx}` : `Error signing transaction index: ${errIdx}` });
+      res
+        .status(400)
+        .send({
+          error: results[errIdx].message
+            ? `${results[errIdx].message}\n\nTransaction index: ${errIdx}`
+            : `Error signing transaction index: ${errIdx}`,
+        });
       return;
     }
 
-    res.send({ success: true, transactions: results.map(x => x.transaction) });
+    res.send({
+      success: true,
+      transactions: results.map((x) => x.transaction),
+    });
   }
 
   private async signTransactionHandler(

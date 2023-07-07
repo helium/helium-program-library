@@ -151,7 +151,7 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
     DataV2 {
       name: args.name.clone(),
       symbol: "CARRIER".to_string(),
-      uri: args.metadata_url,
+      uri: args.metadata_url.clone(),
       seller_fee_basis_points: 0,
       creators: None,
       collection: None,
