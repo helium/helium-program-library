@@ -13,7 +13,7 @@ use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
   program::Bubblegum,
 };
-use mpl_token_metadata::state::{MAX_NAME_LENGTH, MAX_SYMBOL_LENGTH};
+use mpl_token_metadata::state::{MAX_NAME_LENGTH, MAX_SYMBOL_LENGTH, MAX_URI_LENGTH};
 use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -153,10 +153,15 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     ctx.accounts.tree_authority.num_minted,
   );
 
+  let metadata_uri = format!("{}/{}", ENTITY_METADATA_URL, key_str);
+  require!(
+    metadata_uri.len() <= MAX_URI_LENGTH,
+    ErrorCode::InvalidStringLength
+  );
   let mut metadata = MetadataArgs {
     name: args.name,
     symbol: args.symbol,
-    uri: format!("{}/{}", ENTITY_METADATA_URL, key_str),
+    uri: metadata_uri,
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
