@@ -1,4 +1,4 @@
-use crate::state::*;
+use crate::{rewardable_entity_config_seeds, state::*};
 use anchor_lang::{prelude::*, solana_program::hash::hash};
 
 use anchor_spl::{
@@ -168,12 +168,9 @@ pub fn handler<'info>(
         hem_auth: ctx.accounts.rewardable_entity_config.to_account_info(),
         sub_dao: ctx.accounts.sub_dao.to_account_info(),
       },
-      &[&[
-        "rewardable_entity_config".as_bytes(),
-        ctx.accounts.sub_dao.key().as_ref(),
-        ctx.accounts.rewardable_entity_config.symbol.as_bytes(),
-        &[ctx.accounts.rewardable_entity_config.bump_seed],
-      ]],
+      &[rewardable_entity_config_seeds!(
+        ctx.accounts.rewardable_entity_config
+      )],
     ),
     TrackDcOnboardingFeesArgsV0 {
       amount: dc_fee,

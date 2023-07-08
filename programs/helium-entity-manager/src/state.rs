@@ -175,3 +175,15 @@ macro_rules! data_only_config_seeds {
     ]
   };
 }
+
+#[macro_export]
+macro_rules! rewardable_entity_config_seeds {
+  ( $rewardable_entity_config:expr ) => {
+    &[
+      "rewardable_entity_config".as_bytes(),
+      $rewardable_entity_config.sub_dao.as_ref(),
+      $rewardable_entity_config.symbol.as_bytes(),
+      &[$rewardable_entity_config.bump_seed],
+    ]
+  };
+}

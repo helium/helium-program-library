@@ -1,4 +1,4 @@
-use crate::{error::ErrorCode, state::*, TESTING};
+use crate::{error::ErrorCode, rewardable_entity_config_seeds, state::*, TESTING};
 use anchor_lang::prelude::*;
 use helium_sub_daos::{
   cpi::{accounts::TrackDcOnboardingFeesV0, track_dc_onboarding_fees_v0},
@@ -60,49 +60,23 @@ pub fn handler(ctx: Context<SetEntityActiveV0>, args: SetEntityActiveArgsV0) -> 
       return Err(ErrorCode::InvalidSettings.into());
     }
 
-    if args.is_active {
-      track_dc_onboarding_fees_v0(
-        CpiContext::new_with_signer(
-          ctx.accounts.helium_sub_daos_program.to_account_info(),
-          TrackDcOnboardingFeesV0 {
-            hem_auth: ctx.accounts.rewardable_entity_config.to_account_info(),
-            sub_dao: ctx.accounts.sub_dao.to_account_info(),
-          },
-          &[&[
-            "rewardable_entity_config".as_bytes(),
-            ctx.accounts.sub_dao.key().as_ref(),
-            ctx.accounts.rewardable_entity_config.symbol.as_bytes(),
-            &[ctx.accounts.rewardable_entity_config.bump_seed],
-          ]],
-        ),
-        TrackDcOnboardingFeesArgsV0 {
-          amount: dc_fee,
-          add: true,
-          symbol: ctx.accounts.rewardable_entity_config.symbol.clone(),
+    track_dc_onboarding_fees_v0(
+      CpiContext::new_with_signer(
+        ctx.accounts.helium_sub_daos_program.to_account_info(),
+        TrackDcOnboardingFeesV0 {
+          hem_auth: ctx.accounts.rewardable_entity_config.to_account_info(),
+          sub_dao: ctx.accounts.sub_dao.to_account_info(),
         },
-      )?;
-    } else {
-      track_dc_onboarding_fees_v0(
-        CpiContext::new_with_signer(
-          ctx.accounts.helium_sub_daos_program.to_account_info(),
-          TrackDcOnboardingFeesV0 {
-            hem_auth: ctx.accounts.rewardable_entity_config.to_account_info(),
-            sub_dao: ctx.accounts.sub_dao.to_account_info(),
-          },
-          &[&[
-            "rewardable_entity_config".as_bytes(),
-            ctx.accounts.sub_dao.key().as_ref(),
-            ctx.accounts.rewardable_entity_config.symbol.as_bytes(),
-            &[ctx.accounts.rewardable_entity_config.bump_seed],
-          ]],
-        ),
-        TrackDcOnboardingFeesArgsV0 {
-          amount: dc_fee,
-          add: false,
-          symbol: ctx.accounts.rewardable_entity_config.symbol.clone(),
-        },
-      )?;
-    }
+        &[rewardable_entity_config_seeds!(
+          ctx.accounts.rewardable_entity_config
+        )],
+      ),
+      TrackDcOnboardingFeesArgsV0 {
+        amount: dc_fee,
+        add: args.is_active,
+        symbol: ctx.accounts.rewardable_entity_config.symbol.clone(),
+      },
+    )?;
   }
   Ok(())
 }
