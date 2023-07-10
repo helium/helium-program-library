@@ -191,6 +191,10 @@ export async function run(args: any = process.argv) {
       describe: "Path to file that contains the dnt emissions schedule",
       type: "string",
     },
+    activeDeviceAuthority: {
+      type: "string",
+      describe: "The authority that can set hotspot active status",
+    }
   });
   const argv = await yarg.argv;
   console.log(argv.url);
@@ -473,6 +477,7 @@ export async function run(args: any = process.argv) {
         delegatorRewardsPercent: delegatorRewardsPercent(
           argv.delegatorRewardsPercent
         ),
+        activeDeviceAuthority: argv.activeDeviceAuthority ? new PublicKey(argv.activeDeviceAuthority) : authority,
       })
       .accounts({
         dao,
@@ -542,6 +547,7 @@ export async function run(args: any = process.argv) {
             activeDeviceAggregator: null,
             registrar: null,
             delegatorRewardsPercent: null,
+            activeDeviceAuthority: null,
           })
           .accounts({
             subDao,

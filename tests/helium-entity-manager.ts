@@ -58,6 +58,7 @@ describe("helium-entity-manager", () => {
   let dao: PublicKey;
   let subDao: PublicKey;
   let dcMint: PublicKey;
+  let activeDeviceAuthority: Keypair;
 
   beforeEach(async () => {
     dcProgram = await initDataCredits(
@@ -91,7 +92,8 @@ describe("helium-entity-manager", () => {
       me,
       dataCredits.dcMint
     ));
-    ({ subDao } = await initTestSubdao(hsdProgram, provider, me, dao));
+    activeDeviceAuthority = Keypair.generate();
+    ({ subDao } = await initTestSubdao({hsdProgram, provider, authority: me, dao, activeDeviceAuthority: activeDeviceAuthority.publicKey}));
   });
 
   it("issues iot operations fund", async () => {
@@ -300,6 +302,8 @@ describe("helium-entity-manager", () => {
       expect(iotInfoAccount.gain).to.eq(100);
       expect(iotInfoAccount.isFullHotspot).to.be.false;
 
+      const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
+      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(subDaoAcc.onboardingDataOnlyDcFee.toNumber());
     });
 
     it("can swap tree when it's full", async () => {
@@ -579,9 +583,12 @@ describe("helium-entity-manager", () => {
         mobileInfo!
       );
       expect(Boolean(mobileInfoAcc)).to.be.true;
+      const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
+      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(subDaoAcc.onboardingDcFee.toNumber());
     });
 
     describe("with hotspot", () => {
+      let infoKey: PublicKey | undefined;
       beforeEach(async () => {
         await hemProgram.methods
           .issueEntityV0({
@@ -612,6 +619,8 @@ describe("helium-entity-manager", () => {
             location: new BN(100),
           })
         ).signers([makerKeypair, hotspotOwner]);
+
+        ({ mobileInfo: infoKey } = await method.pubkeys());
 
         await method.rpc({ skipPreflight: true });
 
@@ -646,6 +655,20 @@ describe("helium-entity-manager", () => {
         );
         expect(storageAcc.location?.toNumber()).to.eq(location.toNumber());
       });
+
+      it("oracle can update active status", async () => {
+        await hemProgram.methods.setEntityActiveV0({isActive: false}).accounts({
+          activeDeviceAuthority: activeDeviceAuthority.publicKey,
+          rewardableEntityConfig,
+        }).remainingAccounts([{ pubkey: infoKey!, isWritable: true, isSigner: false }])
+        .signers([activeDeviceAuthority])
+        .rpc({skipPreflight: true});
+
+        const infoAcc = await hemProgram.account.mobileHotspotInfoV0.fetch(infoKey!);
+        expect(infoAcc.isActive).to.be.false;
+        const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
+        expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(0); 
+      })
     });
   });
 
@@ -745,6 +768,8 @@ describe("helium-entity-manager", () => {
         iotInfo!
       );
       expect(Boolean(iotInfoAccount)).to.be.true;
+      const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
+      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(subDaoAcc.onboardingDcFee.toNumber());
     });
 
     it("updates entity config", async () => {
@@ -770,6 +795,7 @@ describe("helium-entity-manager", () => {
     });
 
     describe("with hotspot", () => {
+      let infoKey: PublicKey | undefined;
       beforeEach(async () => {
         await hemProgram.methods
           .issueEntityV0({
@@ -800,6 +826,7 @@ describe("helium-entity-manager", () => {
             getAssetProofFn,
           })
         ).signers([makerKeypair, hotspotOwner]);
+        ({ iotInfo: infoKey } = await method.pubkeys());
 
         await method.rpc({ skipPreflight: true });
 
@@ -810,6 +837,20 @@ describe("helium-entity-manager", () => {
           })
           .accounts({ dcMint, recipient: hotspotOwner.publicKey })
           .rpc();
+      });
+
+      it("oracle can update active status", async () => {
+        await hemProgram.methods.setEntityActiveV0({isActive: false}).accounts({
+          activeDeviceAuthority: activeDeviceAuthority.publicKey,
+          rewardableEntityConfig,
+        }).remainingAccounts([{ pubkey: infoKey!, isWritable: true, isSigner: false }])
+        .signers([activeDeviceAuthority])
+        .rpc({skipPreflight: true});
+
+        const infoAcc = await hemProgram.account.iotHotspotInfoV0.fetch(infoKey!);
+        expect(infoAcc.isActive).to.be.false;
+        const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
+        expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(0);
       });
 
       it("changes the metadata", async () => {

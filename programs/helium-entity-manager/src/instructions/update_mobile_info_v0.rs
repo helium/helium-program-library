@@ -26,12 +26,6 @@ pub struct UpdateMobileInfoArgsV0 {
   pub index: u32,
 }
 
-impl ConfigSettingsV0 {
-  pub fn is_valid_mobile(self, _: UpdateMobileInfoArgsV0) -> bool {
-    matches!(self, ConfigSettingsV0::MobileConfig { .. })
-  }
-}
-
 #[derive(Accounts)]
 #[instruction(args: UpdateMobileInfoArgsV0)]
 pub struct UpdateMobileInfoV0<'info> {
@@ -58,7 +52,7 @@ pub struct UpdateMobileInfoV0<'info> {
 
   #[account(
     has_one = sub_dao,
-    constraint = rewardable_entity_config.settings.is_valid_mobile(args)
+    constraint = rewardable_entity_config.settings.is_mobile()
   )]
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
   #[account(
