@@ -6,7 +6,7 @@ use anchor_spl::{
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
 use helium_sub_daos::DaoV0;
-use mpl_token_metadata::state::{CollectionDetails, DataV2};
+use mpl_token_metadata::state::{CollectionDetails, DataV2, MAX_NAME_LENGTH, MAX_URI_LENGTH};
 use shared_utils::create_metadata_accounts_v3;
 use shared_utils::token_metadata::{
   create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
@@ -61,7 +61,7 @@ pub struct InitializeMakerV0<'info> {
   )]
   pub master_edition: UncheckedAccount<'info>,
   #[account(
-    init_if_needed,
+    init,
     payer = payer,
     associated_token::mint = collection,
     associated_token::authority = maker,
@@ -89,9 +89,12 @@ impl<'info> InitializeMakerV0<'info> {
 }
 
 pub fn handler(ctx: Context<InitializeMakerV0>, args: InitializeMakerArgsV0) -> Result<()> {
-  require!(args.name.len() <= 32, ErrorCode::InvalidStringLength);
   require!(
-    args.metadata_url.len() <= 200,
+    args.name.len() <= MAX_NAME_LENGTH,
+    ErrorCode::InvalidStringLength
+  );
+  require!(
+    args.metadata_url.len() <= MAX_URI_LENGTH,
     ErrorCode::InvalidStringLength
   );
 

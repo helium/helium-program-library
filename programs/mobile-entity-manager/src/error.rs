@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 pub enum ErrorCode {
   #[msg("The carrier is not approved")]
   CarrierNotApproved,
-  #[msg("Names must be less than 32 characters")]
+  #[msg("Names, symbols and urls must be less than 32, 10, and 200 characters respectively")]
   InvalidStringLength,
   #[msg("Cannot swap tree until it is close to full")]
   TreeNotFull,

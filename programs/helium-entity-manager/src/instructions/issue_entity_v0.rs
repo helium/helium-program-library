@@ -17,6 +17,7 @@ use mpl_bubblegum::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
   program::Bubblegum,
 };
+use mpl_token_metadata::state::MAX_NAME_LENGTH;
 use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -61,6 +62,7 @@ pub struct IssueEntityV0<'info> {
     has_one = issuing_authority,
     has_one = collection,
     has_one = merkle_tree,
+    has_one = dao,
   )]
   pub maker: Box<Account<'info, MakerV0>>,
   /// CHECK: Signs as a verified creator to make searching easier
@@ -154,7 +156,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
 
   let name = animal_name.to_string();
   let metadata = MetadataArgs {
-    name: name[..min(name.len(), 32)].to_owned(),
+    name: name[..min(name.len(), MAX_NAME_LENGTH)].to_owned(),
     symbol: String::from("HOTSPOT"),
     uri: format!("{}/{}", ENTITY_METADATA_URL, key_str),
     collection: Some(Collection {

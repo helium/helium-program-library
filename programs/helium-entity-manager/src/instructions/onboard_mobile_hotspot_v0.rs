@@ -70,7 +70,8 @@ pub struct OnboardMobileHotspotV0<'info> {
   pub maker_approval: Box<Account<'info, MakerApprovalV0>>,
   #[account(
     has_one = merkle_tree,
-    has_one = issuing_authority
+    has_one = issuing_authority,
+    has_one = dao,
   )]
   pub maker: Box<Account<'info, MakerV0>>,
   #[account(

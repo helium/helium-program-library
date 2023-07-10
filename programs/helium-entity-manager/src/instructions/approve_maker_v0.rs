@@ -1,5 +1,6 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
+use helium_sub_daos::SubDaoV0;
 
 #[derive(Accounts)]
 pub struct ApproveMakerV0<'info> {
@@ -7,9 +8,14 @@ pub struct ApproveMakerV0<'info> {
   pub payer: Signer<'info>,
 
   #[account(
-    has_one = authority
+    has_one = authority,
+    has_one = sub_dao,
   )]
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
+  #[account(
+    constraint = sub_dao.dao == maker.dao
+  )]
+  pub sub_dao: Box<Account<'info, SubDaoV0>>,
   pub authority: Signer<'info>,
 
   pub maker: Box<Account<'info, MakerV0>>,
