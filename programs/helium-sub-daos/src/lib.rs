@@ -108,4 +108,11 @@ pub mod helium_sub_daos {
   pub fn reset_sub_dao_thread_v0(ctx: Context<ResetSubDaoThreadV0>) -> Result<()> {
     reset_sub_dao_thread_v0::handler(ctx)
   }
+
+  pub fn track_dc_onboarding_fees_v0(
+    ctx: Context<TrackDcOnboardingFeesV0>,
+    args: TrackDcOnboardingFeesArgsV0,
+  ) -> Result<()> {
+    track_dc_onboarding_fees_v0::handler(ctx, args)
+  }
 }

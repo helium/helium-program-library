@@ -28,4 +28,7 @@ pub enum ErrorCode {
 
   #[msg("Invalid seeds provided")]
   InvalidSeeds,
+
+  #[msg("Invalid settings provided")]
+  InvalidSettings,
 }

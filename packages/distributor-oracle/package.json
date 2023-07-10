@@ -45,6 +45,7 @@
     "@helium/rewards-oracle-sdk": "^0.2.5",
     "@helium/spl-utils": "^0.2.6",
     "@metaplex-foundation/mpl-bubblegum": "^0.6.2",
+    "@solana/spl-token": "^0.3.8",
     "@types/sequelize": "^4.28.14",
     "aws-sdk": "^2.1313.0",
     "axios": "^0.27.2",

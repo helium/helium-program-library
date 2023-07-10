@@ -321,14 +321,14 @@ export const initWorld = async (
     dataCredits.hntMint,
     registrar
   );
-  const subDao = await initTestSubdao(
+  const subDao = await initTestSubdao({
     hsdProgram,
     provider,
-    provider.wallet.publicKey,
-    dao.dao,
-    subDaoEpochRewards,
-    subDaoRegistrar
-  );
+    authority: provider.wallet.publicKey,
+    dao: dao.dao,
+    epochRewards: subDaoEpochRewards,
+    registrar: subDaoRegistrar
+  });
 
   const rewardableEntityConfig = await initTestRewardableEntityConfig(
     hemProgram,

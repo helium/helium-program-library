@@ -106,6 +106,12 @@ export async function run(args: any = process.argv) {
       required: false,
       describe: "The data credits fee for onboarding data only hotspots",
       default: null,
+    },
+    activeDeviceAuthority: {
+      type: "string",
+      required: false,
+      describe: "The authority that can set hotspot active status",
+      default: null,
     }
   });
   const argv = await yarg.argv;
@@ -229,6 +235,7 @@ export async function run(args: any = process.argv) {
           : null,
         registrar: argv.registrar ? new PublicKey(argv.registrar) : null,
         delegatorRewardsPercent: argv.delegatorRewardsPercent ? delegatorRewardsPercent(argv.delegatorRewardsPercent) : null,
+        activeDeviceAuthority: argv.activeDeviceAuthority ? new PublicKey(argv.activeDeviceAuthority) : null,
       })
       .accounts({
         subDao,
