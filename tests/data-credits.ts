@@ -201,7 +201,7 @@ describe("data-credits", () => {
         await method.rpc({ skipPreflight: true });
       }
 
-      ({ subDao } = await initTestSubdao(hsdProgram, provider, me, dao));
+      ({ subDao } = await initTestSubdao({hsdProgram, provider, authority: me, dao}));
     });
 
     it("mints some data credits with hnt amount", async () => {
@@ -317,7 +317,7 @@ describe("data-credits", () => {
 
 
     it("redelegates delegated data credits", async() => {
-      const { subDao: destinationSubDao } = await initTestSubdao(hsdProgram, provider, me, dao);
+      const { subDao: destinationSubDao } = await initTestSubdao({hsdProgram, provider, authority: me, dao});
 
       const amount = 2;
       const routerKey = (await HeliumKeypair.makeRandom()).address.b58;

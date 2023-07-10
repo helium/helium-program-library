@@ -78,14 +78,16 @@ export async function initTestDao(
 }
 
 export async function initTestSubdao(
-  program: anchor.Program<HeliumSubDaos>,
+  {hsdProgram, provider, authority, dao, epochRewards, registrar, numTokens, activeDeviceAuthority}: {
+  hsdProgram: anchor.Program<HeliumSubDaos>,
   provider: anchor.AnchorProvider,
   authority: PublicKey,
   dao: PublicKey,
   epochRewards?: number,
   registrar?: PublicKey,
   numTokens?: number | BN,
-): Promise<{
+  activeDeviceAuthority?: PublicKey,
+}): Promise<{
   mint: PublicKey;
   subDao: PublicKey;
   treasury: PublicKey;
@@ -93,7 +95,7 @@ export async function initTestSubdao(
   delegatorPool: PublicKey;
   treasuryCircuitBreaker: PublicKey;
 }> {
-  const daoAcc = await program.account.daoV0.fetch(dao);
+  const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
   const dntMint = await createMint(provider, 8, authority, authority);
   if (numTokens) {
     await createAtaAndMint(provider, dntMint, numTokens, authority);
@@ -106,7 +108,7 @@ export async function initTestSubdao(
   );
   const subDao = subDaoKey(dntMint)[0];
 
-  const method = program.methods
+  const method = hsdProgram.methods
     .initializeSubDaoV0({
       registrar: registrar || Keypair.generate().publicKey,
       onboardingDcFee: toBN(DC_FEE, 0),
@@ -125,6 +127,7 @@ export async function initTestSubdao(
       } as any,
       dcBurnAuthority: authority,
       delegatorRewardsPercent: delegatorRewardsPercent(6), // 6%
+      activeDeviceAuthority: activeDeviceAuthority || authority,
     })
     .preInstructions([
       ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),

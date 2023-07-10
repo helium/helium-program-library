@@ -142,4 +142,17 @@ pub mod helium_entity_manager {
   pub fn temp_repair_iot_operations_fund(ctx: Context<TempRepairIotOperationsFund>) -> Result<()> {
     temp_repair_iot_operations_fund::handler(ctx)
   }
+
+  pub fn set_entity_active_v0(
+    ctx: Context<SetEntityActiveV0>,
+    args: SetEntityActiveArgsV0,
+  ) -> Result<()> {
+    set_entity_active_v0::handler(ctx, args)
+  }
+
+  pub fn temp_backfill_onboarding_fees_v0(
+    ctx: Context<TempBackfillOnboardingFeesV0>,
+  ) -> Result<()> {
+    temp_backfill_onboarding_fees_v0::handler(ctx)
+  }
 }
