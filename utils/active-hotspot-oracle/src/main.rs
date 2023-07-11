@@ -18,6 +18,7 @@ use solana_sdk::transaction::Transaction;
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey, signature::read_keypair_file};
 use std::env;
 use std::rc::Rc;
+use std::str::FromStr;
 use std::{
   collections::{HashMap, HashSet},
   sync::Arc,
@@ -28,33 +29,47 @@ use std::{
 struct Args {
   /// Bucket name for the store. Required
   #[clap(long)]
-  pub source_bucket: String,
+  pub aws_bucket: Option<String>,
   #[clap(long)]
-  pub source_table: String,
+  pub aws_table: Option<String>,
   /// Optional api endpoint for the bucket. Default none
   #[clap(long)]
-  pub source_endpoint: Option<String>,
-  /// Optional region for the endpoint. Default: us-west-2
+  pub aws_endpoint: Option<String>,
+  /// Optional region for the endpoint
   #[clap(long)]
-  pub source_region: String,
+  pub aws_region: Option<String>,
 
   /// Should only be used for local testing, set as environment variables in deployment
   #[clap(long)]
-  pub source_access_key_id: Option<String>,
+  pub access_key_id: Option<String>,
   #[clap(long)]
-  pub source_secret_access_key: Option<String>,
+  pub secret_access_key: Option<String>,
 
   /// Solana paper wallet that will be the holder of the hotspot
   #[arg(short, long)]
-  keypair: String,
-  /// RPC url, defaults to https://api.mainnet-beta.solana.com
+  keypair: Option<String>,
+  /// RPC url
   #[arg(short, long)]
-  url: String,
+  url: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
 struct ActiveCheckpoint {
   set: HashSet<String>,
+}
+
+fn load_arg_from_cli_or_env(cli_opt: Option<String>, env_name: &str) -> String {
+  let arg = if let Some(cli_arg) = cli_opt {
+    cli_arg
+  } else {
+    env::var(env_name)
+      .context(format!(
+        "Must supply {} as env var or cli argument",
+        env_name
+      ))
+      .unwrap()
+  };
+  arg
 }
 
 #[tokio::main]
@@ -63,13 +78,20 @@ async fn main() -> Result<()> {
   use clap::Parser;
   let args = Args::parse();
 
+  let kp_path = load_arg_from_cli_or_env(args.keypair, "ANCHOR_WALLET");
+  let rpc_url = load_arg_from_cli_or_env(args.url, "SOLANA_URL");
+  let s3_bucket = load_arg_from_cli_or_env(args.aws_bucket, "AWS_BUCKET");
+  let s3_table = load_arg_from_cli_or_env(args.aws_table, "AWS_TABLE");
+  let s3_region = load_arg_from_cli_or_env(args.aws_region, "AWS_REGION");
+  let access_key_id = load_arg_from_cli_or_env(args.access_key_id, "AWS_ACCESS_KEY_ID");
+  let secret_access_key = load_arg_from_cli_or_env(args.secret_access_key, "AWS_SECRET_ACCESS_KEY");
+
   // Create anchor program client
-  let kp = Rc::new(read_keypair_file(args.keypair).unwrap());
+  let kp = Rc::new(read_keypair_file(kp_path).unwrap());
   let anchor_client = Client::new_with_options(
     Cluster::Custom(
-      args.url.clone(),
-      args
-        .url
+      rpc_url.clone(),
+      rpc_url
         .clone()
         .replace("https", "wss")
         .replace("http", "ws"),
@@ -90,26 +112,13 @@ async fn main() -> Result<()> {
   .unwrap();
 
   // set up delta-rs connection
-  let table_path = format!("s3://{}/{}", args.source_bucket, args.source_table);
-  let mut s3_config =
-    HashMap::from([("aws_default_region".to_string(), args.source_region.clone())]);
-  if let Some(aws_secret_key_id) = args.source_secret_access_key {
-    s3_config.insert("aws_secret_access_key".to_string(), aws_secret_key_id);
-    s3_config.insert("allow_http".to_string(), "true".to_string());
-  } else {
-    let secret = env::var("AWS_SECRET_ACCESS_KEY")
-      .context("Must set AWS_SECRET_ACCESS_KEY environment variable")?;
-    s3_config.insert("aws_secret_access_key".to_string(), secret);
-    s3_config.insert("allow_http".to_string(), "true".to_string());
-  }
-  if let Some(access_key_id) = args.source_access_key_id {
-    s3_config.insert("aws_access_key_id".to_string(), access_key_id);
-  } else {
-    let access_key =
-      env::var("AWS_ACCESS_KEY_ID").context("Must set AWS_ACCESS_KEY_ID environment variable")?;
-    s3_config.insert("aws_access_key_id".to_string(), access_key);
-  }
-  if let Some(endpoint) = args.source_endpoint {
+  let table_path = format!("s3://{}/{}", s3_bucket, s3_table);
+  let mut s3_config = HashMap::from([("aws_default_region".to_string(), s3_region.clone())]);
+  s3_config.insert("bucket_name".to_string(), s3_bucket);
+  s3_config.insert("aws_secret_access_key".to_string(), secret_access_key);
+  s3_config.insert("allow_http".to_string(), "true".to_string());
+  s3_config.insert("aws_access_key_id".to_string(), access_key_id);
+  if let Some(endpoint) = args.aws_endpoint {
     s3_config.insert("aws_endpoint".to_string(), endpoint);
   }
   let mut delta_table = DeltaTableBuilder::from_uri(table_path.clone())
@@ -252,7 +261,7 @@ fn construct_and_send_txs(
   payer: &Keypair,
 ) -> Result<()> {
   // send transactions in batches so blockhash doesn't expire
-  let transaction_batch_size = 150;
+  let transaction_batch_size = 100;
   for i in (0..ixs.len()).step_by(transaction_batch_size) {
     let start = i;
     let end = (i + transaction_batch_size).min(ixs.len());
@@ -429,10 +438,8 @@ async fn save_checkpoint(
   let checkpoint = ActiveCheckpoint { set: hashset };
   let json_data = serde_json::to_string(&checkpoint).context("Failed to serialize data")?;
 
-  let bucket_name = "delta";
-
-  let bucket =
-    create_bucket(bucket_name, s3_config).context("Failed to create s3 bucket object")?;
+  let bucket_name = s3_config.get("bucket_name").unwrap();
+  let bucket = create_bucket(s3_config.clone()).context("Failed to create s3 bucket object")?;
   bucket
     .put_object(
       format!("/{}/{}", bucket_name, file_name),
@@ -447,10 +454,8 @@ async fn load_checkpoint(
   s3_config: HashMap<String, String>,
   file_name: &str,
 ) -> Result<HashSet<String>> {
-  let bucket_name = "delta";
-
-  let bucket =
-    create_bucket(bucket_name, s3_config).context("Failed to create s3 bucket object")?;
+  let bucket_name = s3_config.get("bucket_name").unwrap();
+  let bucket = create_bucket(s3_config.clone()).context("Failed to create s3 bucket object")?;
   let file_contents_buffer = bucket
     .get_object(format!("/{}/{}", bucket_name, file_name))
     .await?;
@@ -461,16 +466,24 @@ async fn load_checkpoint(
   Ok(checkpoint.set)
 }
 
-fn create_bucket(bucket_name: &str, s3_config: HashMap<String, String>) -> Result<Bucket> {
+fn create_bucket(s3_config: HashMap<String, String>) -> Result<Bucket> {
   // Set up AWS credentials and region
   let access_key = s3_config.get("aws_access_key_id").unwrap();
   let secret_key = s3_config.get("aws_secret_access_key").unwrap();
-  let region = Region::Custom {
-    region: s3_config.get("aws_default_region").unwrap().clone(),
-    endpoint: s3_config.get("aws_endpoint").unwrap().clone(),
-  };
+  let region: Region;
+  let endpoint_opt = s3_config.get("aws_endpoint");
+  let region_str = s3_config.get("aws_default_region").unwrap().clone();
+  if endpoint_opt.is_some() {
+    region = Region::Custom {
+      region: region_str,
+      endpoint: s3_config.get("aws_endpoint").unwrap().clone(),
+    };
+  } else {
+    region = Region::from_str(&region_str).unwrap();
+  }
   let credentials = Credentials::new(Some(&access_key), Some(&secret_key), None, None, None)?;
+  let bucket_name = s3_config.get("bucket_name").unwrap();
 
   println!("bucket name: {}", bucket_name);
-  Ok(Bucket::new("delta", region, credentials)?)
+  Ok(Bucket::new(bucket_name, region, credentials)?)
 }
