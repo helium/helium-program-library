@@ -10,6 +10,7 @@ exclude = [
   "utils/vehnt",
   "utils/hpl-utils",
   "utils/bulk-claim-rewards",
+  "utils/active-hotspot-oracle",
 ]
 
 [workspace.dependencies]
