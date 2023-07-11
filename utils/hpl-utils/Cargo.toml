@@ -16,3 +16,12 @@ bincode = "1.3.3"
 warp = "0.3.3"
 futures = "0.3.25"
 lazy_static = "1.4.0"
+bs58 = "0"
+sha2 = "0.10"
+clap = {version = "4", features = ["derive"]}
+data-credits = { path = "../../programs/data-credits", features = ["no-entrypoint"] }
+lazy-distributor = { path = "../../programs/lazy-distributor", features = ["no-entrypoint"] }
+helium-entity-manager = { path = "../../programs/helium-entity-manager", features = ["no-entrypoint"] }
+helium-sub-daos = { path = "../../programs/helium-sub-daos", features = ["no-entrypoint"] }
+circuit-breaker = { path = "../../programs/circuit-breaker", features = ["no-entrypoint"] }
+anyhow = "1.0.71"

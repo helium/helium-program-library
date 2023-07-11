@@ -13,6 +13,7 @@ use solana_client::{
 };
 use solana_sdk::transaction::{TransactionError, VersionedTransaction};
 
+pub mod dao;
 pub mod token;
 
 pub const TRANSACTION_RESEND_INTERVAL: Duration = Duration::from_secs(4);

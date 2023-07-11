@@ -12,20 +12,20 @@ lazy_static::lazy_static! {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Clone, Copy, Hash)]
 #[serde(rename_all = "lowercase")]
-pub enum HeliumToken {
+pub enum Token {
   Hnt,
   Mobile,
   Iot,
   Dc,
 }
 
-impl HeliumToken {
+impl Token {
   pub fn from_mint(mint: Pubkey) -> Option<Self> {
     let token = match mint {
-      mint if mint == *HNT_MINT => HeliumToken::Hnt,
-      mint if mint == *IOT_MINT => HeliumToken::Iot,
-      mint if mint == *DC_MINT => HeliumToken::Dc,
-      mint if mint == *MOBILE_MINT => HeliumToken::Mobile,
+      mint if mint == *HNT_MINT => Token::Hnt,
+      mint if mint == *IOT_MINT => Token::Iot,
+      mint if mint == *DC_MINT => Token::Dc,
+      mint if mint == *MOBILE_MINT => Token::Mobile,
       _ => return None,
     };
 
