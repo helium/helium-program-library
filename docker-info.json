@@ -12,6 +12,7 @@
     "account-postgres-sink-service": "./packages/account-postgres-sink-service"
   },
   "oracle": {
-    "distributor-oracle": "./packages/distributor-oracle"
+    "distributor-oracle": "./packages/distributor-oracle",
+    "active-hotspot-oracle": "./utils/active-hotspot-oracle"
   }
 }
