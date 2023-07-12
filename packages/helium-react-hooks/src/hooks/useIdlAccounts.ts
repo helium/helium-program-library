@@ -1,19 +1,25 @@
 import { BorshAccountsCoder, Idl, IdlAccounts } from "@coral-xyz/anchor";
 import { AllAccountsMap } from "@coral-xyz/anchor/dist/cjs/program/namespace/types";
 import { TypedAccountParser } from "@helium/account-fetch-cache";
-import { UseAccountState, useAccount } from "@helium/account-fetch-cache-hooks";
+import {
+  UseAccountsState,
+  useAccounts,
+} from "@helium/account-fetch-cache-hooks";
 import { PublicKey } from "@solana/web3.js";
 import { useMemo } from "react";
-import { capitalizeFirstChar } from "./useIdlAccounts";
 
-export function useIdlAccount<IDL extends Idl, A extends keyof AllAccountsMap<IDL>>(
-  key: PublicKey | undefined,
+export const capitalizeFirstChar = (str) =>
+  str.charAt(0).toUpperCase() + str.substring(1);
+
+export function useIdlAccounts<
+  IDL extends Idl,
+  A extends keyof AllAccountsMap<IDL>
+>(
+  keys: PublicKey[] | undefined,
   idl: IDL | undefined,
   type: A
-): UseAccountState<IdlAccounts<IDL>[A]> {
-  const parser: TypedAccountParser<
-    IdlAccounts<IDL>[A]
-  > = useMemo(() => {
+): UseAccountsState<IdlAccounts<IDL>[A]> {
+  const parser: TypedAccountParser<IdlAccounts<IDL>[A]> = useMemo(() => {
     return (pubkey, data) => {
       if (idl) {
         try {
@@ -27,5 +33,5 @@ export function useIdlAccount<IDL extends Idl, A extends keyof AllAccountsMap<ID
       }
     };
   }, [idl, type]);
-  return useAccount(key, parser);
+  return useAccounts(keys, parser);
 }

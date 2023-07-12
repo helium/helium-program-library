@@ -9,7 +9,7 @@ import { PublicKey } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrSquads } from "./utils";
+import { sendInstructionsOrSquads } from "./utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -23,7 +23,7 @@ export async function run(args: any = process.argv) {
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
     },
-    subdaoMint: {
+    dntMint: {
       required: true,
       describe: "Public Key of the subdao mint",
       type: "string",
@@ -52,14 +52,12 @@ export async function run(args: any = process.argv) {
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
-  const wallet = loadKeypair(argv.wallet);
   const provider = anchor.getProvider() as anchor.AnchorProvider;
 
   const name = argv.name;
   const hemProgram = await initHem(provider);
-  const conn = provider.connection;
-  const subdaoMint = new PublicKey(argv.subdaoMint);
-  const subdao = (await subDaoKey(subdaoMint))[0];
+  const dntMint = new PublicKey(argv.dntMint);
+  const subdao = (await subDaoKey(dntMint))[0];
   const rewardableConfigKey = (
     await rewardableEntityConfigKey(subdao, name.toUpperCase())
   )[0];
@@ -88,19 +86,19 @@ export async function run(args: any = process.argv) {
   } else {
     settings = {
       mobileConfig: {
-        fullLocationStakingFee: toBN(0, 0),
-        dataonlyLocationStakingFee: toBN(0, 0),
+        fullLocationStakingFee: toBN(1000000, 0),
+        dataonlyLocationStakingFee: toBN(1000000, 0),
       },
     };
   }
 
-  console.log(settings);
+  console.log(settings, rewardableConfigAcc.authority.toBase58());
 
   const instructions = [
     await hemProgram.methods
       .updateRewardableEntityConfigV0({
         settings,
-        newAuthority: rewardableConfigAcc.authority,
+        newAuthority: null,
       })
       .accounts({
         rewardableEntityConfig: rewardableConfigKey,
