@@ -19,7 +19,7 @@ use helium_sub_daos::{
 };
 
 #[derive(Accounts)]
-pub struct PayMobileOnboardingFeeV0<'info> {
+pub struct TempPayMobileOnboardingFeeV0<'info> {
   #[account(mut)]
   pub dc_fee_payer: Signer<'info>,
   #[account(
@@ -62,7 +62,7 @@ has_one = dao)]
   pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
 }
 
-pub fn handler(ctx: Context<PayMobileOnboardingFeeV0>) -> Result<()> {
+pub fn handler(ctx: Context<TempPayMobileOnboardingFeeV0>) -> Result<()> {
   let dc_fee = ctx.accounts.sub_dao.onboarding_dc_fee;
   assert!(dc_fee == 4000000);
   assert!(ctx.accounts.mobile_info.dc_onboarding_fee_paid == 0);
