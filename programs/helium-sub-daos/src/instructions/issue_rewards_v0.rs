@@ -193,13 +193,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   )?;
 
   let delegation_rewards_amount = if delegators_present {
-    u128::from(total_emissions)
-      .checked_mul(ctx.accounts.sub_dao.delegator_rewards_percent as u128)
-      .unwrap()
-      .checked_div(max_percent as u128) // 100% with 8 decimals accuracy
-      .unwrap()
-      .try_into()
-      .unwrap()
+    total_emissions.checked_sub(dnt_emissions).unwrap()
   } else {
     0
   };

@@ -22,13 +22,6 @@ pub struct ResetDaoThreadV0<'info> {
   )]
   pub dao: Box<Account<'info, DaoV0>>,
 
-  #[account(
-    mut,
-    seeds = ["mint_windowed_breaker".as_bytes(), dao.hnt_mint.as_ref()],
-    seeds::program = circuit_breaker_program.key(),
-    bump = hnt_circuit_breaker.bump_seed
-  )]
-  pub hnt_circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
   ///CHECK: seeds checked
   #[account(
     mut,

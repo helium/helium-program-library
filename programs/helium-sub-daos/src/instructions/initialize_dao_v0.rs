@@ -28,7 +28,7 @@ pub struct InitializeDaoV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 60 + 8 + std::mem::size_of::<DaoV0>() + (std::mem::size_of::<EmissionScheduleItem>() * args.emission_schedule.len()),
+    space = 60 + 8 + std::mem::size_of::<DaoV0>() + (std::mem::size_of::<EmissionScheduleItem>() * args.emission_schedule.len()) +  (std::mem::size_of::<PercentItem>() * args.hst_emission_schedule.len()),
     seeds = ["dao".as_bytes(), hnt_mint.key().as_ref()],
     bump,
   )]
