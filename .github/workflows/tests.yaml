@@ -90,7 +90,7 @@ jobs:
           - utils/ecc-sig-verifier
     steps:
       - uses: actions/checkout@v3
-      - run: cd $TEST && docker build . -t $TEST
+      - run: pwd && cd $TEST && pwd && docker build .
         env:
           DOCKER_PATH: ${{ matrix.test }}
 
@@ -109,7 +109,7 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
-      - run: cd $TEST && cargo build
+      - run: pwd && cd $TEST && pwd && cargo build
         env:
           DOCKER_PATH: ${{ matrix.test }}
 
