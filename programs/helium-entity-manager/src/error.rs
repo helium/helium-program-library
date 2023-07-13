@@ -31,4 +31,7 @@ pub enum ErrorCode {
 
   #[msg("Invalid settings provided")]
   InvalidSettings,
+
+  #[msg("Account doesn't matched expected address")]
+  InvalidAccountAddress,
 }
