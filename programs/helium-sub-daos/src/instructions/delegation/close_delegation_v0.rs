@@ -145,8 +145,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
       .accounts
       .closing_time_sub_dao_epoch_info
       .vehnt_in_closing_positions
-      .checked_sub(end_vehnt_correction)
-      .unwrap();
+      .saturating_sub(end_vehnt_correction);
   }
 
   // Closing time and genesis end can be the same account
