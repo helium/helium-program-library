@@ -16,7 +16,7 @@ byteorder = "1.3.2"
 hmac = "0"
 sha2 = "0"
 clap = { version = "4", features = ["derive"]}
-helium-crypto = { version = "0.6.3", features = ["solana"] }
+helium-crypto = { version = "0.7.3", features = ["solana"] }
 reqwest = "0"
 helium-entity-manager = { path = "../../programs/helium-entity-manager", features = [ "no-entrypoint" ] }
 circuit-breaker = { path = "../../programs/circuit-breaker", features = [ "no-entrypoint" ] }
