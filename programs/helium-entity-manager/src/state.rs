@@ -187,3 +187,27 @@ macro_rules! rewardable_entity_config_seeds {
     ]
   };
 }
+
+#[macro_export]
+macro_rules! iot_info_seeds {
+  ( $iot_info:expr, $rewardable_entity_config:expr, $entity_key:expr ) => {
+    &[
+      "iot_info".as_bytes(),
+      $rewardable_entity_config.key().as_ref(),
+      &hash(&$entity_key).to_bytes(),
+      &[$iot_info.bump_seed],
+    ]
+  };
+}
+
+#[macro_export]
+macro_rules! mobile_info_seeds {
+  ( $mobile_info:expr, $rewardable_entity_config:expr, $entity_key:expr ) => {
+    &[
+      "mobile_info".as_bytes(),
+      $rewardable_entity_config.key().as_ref(),
+      &hash(&$entity_key).to_bytes(),
+      &[$mobile_info.bump_seed],
+    ]
+  };
+}

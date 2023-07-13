@@ -37,4 +37,7 @@ pub enum ErrorCode {
 
   #[msg("Onboarding fee has already been set for this account")]
   OnboardingFeeAlreadySet,
+
+  #[msg("Account doesn't matched expected address")]
+  InvalidAccountAddress,
 }

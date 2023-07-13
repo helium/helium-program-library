@@ -711,10 +711,11 @@ describe("helium-entity-manager", () => {
       });
 
       it("oracle can update active status", async () => {
-        await hemProgram.methods.setEntityActiveV0({ isActive: false }).accounts({
+        await hemProgram.methods.setEntityActiveV0({ isActive: false, entityKey: Buffer.from(bs58.decode(ecc)) }).accounts({
           activeDeviceAuthority: activeDeviceAuthority.publicKey,
           rewardableEntityConfig,
-        }).remainingAccounts([{ pubkey: infoKey!, isWritable: true, isSigner: false }])
+          info: infoKey!,
+        })
           .signers([activeDeviceAuthority])
           .rpc({ skipPreflight: true });
 
@@ -894,13 +895,15 @@ describe("helium-entity-manager", () => {
       });
 
       it("oracle can update active status", async () => {
-        await hemProgram.methods.setEntityActiveV0({ isActive: false }).accounts({
+        await hemProgram.methods.setEntityActiveV0({ isActive: false, entityKey: Buffer.from(bs58.decode(ecc)) }).accounts({
           activeDeviceAuthority: activeDeviceAuthority.publicKey,
           rewardableEntityConfig,
-        }).remainingAccounts([{ pubkey: infoKey!, isWritable: true, isSigner: false }])
+          info: infoKey!,
+        })
           .signers([activeDeviceAuthority])
           .rpc({ skipPreflight: true });
 
+        console.log(infoKey);
         const infoAcc = await hemProgram.account.iotHotspotInfoV0.fetch(infoKey!);
         expect(infoAcc.isActive).to.be.false;
         const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
