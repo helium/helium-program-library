@@ -104,7 +104,6 @@ jobs:
         test:
           - utils/ecc-sig-verifier
           - utils/bulk-claim-rewards
-          - utils/generate-test-gateway-txn
           - utils/hpl-utils
           - utils/migration-tx-executor
           - utils/vehnt
