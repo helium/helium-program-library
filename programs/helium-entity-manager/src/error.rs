@@ -31,4 +31,10 @@ pub enum ErrorCode {
 
   #[msg("Invalid settings provided")]
   InvalidSettings,
+
+  #[msg("Invalid DC fee")]
+  InvalidDcFee,
+
+  #[msg("Onboarding fee has already been set for this account")]
+  OnboardingFeeAlreadySet,
 }

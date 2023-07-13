@@ -1,5 +1,6 @@
-use crate::{rewardable_entity_config_seeds, state::*, TESTING};
+use crate::{error::ErrorCode, rewardable_entity_config_seeds, state::*, TESTING};
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::hash::hash;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
@@ -33,8 +34,10 @@ pub struct TempPayMobileOnboardingFeeV0<'info> {
     constraint = rewardable_entity_config.settings.is_mobile() && (rewardable_entity_config.symbol == "MOBILE" || TESTING),
   )]
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
-  #[account(mut,
-has_one = dao)]
+  #[account(
+    mut,
+    has_one = dao
+  )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
     has_one = dc_mint,
@@ -52,7 +55,18 @@ has_one = dao)]
     has_one = dc_mint
   )]
   pub dc: Account<'info, DataCreditsV0>,
-  #[account(mut)]
+  #[account(
+    has_one = dao,
+  )]
+  pub key_to_asset: Box<Account<'info, KeyToAssetV0>>,
+  #[account(mut,
+    seeds = [
+      "mobile_info".as_bytes(),
+      rewardable_entity_config.key().as_ref(),
+      &hash(&key_to_asset.entity_key[..]).to_bytes()
+    ],
+    bump
+  )]
   pub mobile_info: Box<Account<'info, MobileHotspotInfoV0>>,
 
   pub data_credits_program: Program<'info, DataCredits>,
@@ -64,8 +78,12 @@ has_one = dao)]
 
 pub fn handler(ctx: Context<TempPayMobileOnboardingFeeV0>) -> Result<()> {
   let dc_fee = ctx.accounts.sub_dao.onboarding_dc_fee;
-  assert!(dc_fee == 4000000);
-  assert!(ctx.accounts.mobile_info.dc_onboarding_fee_paid == 0);
+  require_eq!(dc_fee, 4000000, ErrorCode::InvalidDcFee);
+  require_eq!(
+    ctx.accounts.mobile_info.dc_onboarding_fee_paid,
+    0,
+    ErrorCode::OnboardingFeeAlreadySet
+  );
   ctx.accounts.mobile_info.dc_onboarding_fee_paid = dc_fee;
 
   burn_without_tracking_v0(
@@ -105,6 +123,5 @@ pub fn handler(ctx: Context<TempPayMobileOnboardingFeeV0>) -> Result<()> {
       },
     )?;
   }
-
   Ok(())
 }
