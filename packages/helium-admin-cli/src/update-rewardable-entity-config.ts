@@ -4,12 +4,12 @@ import {
   rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
-import { toBN } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
 import { sendInstructionsOrSquads } from "./utils";
+import BN from "bn.js";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -47,6 +47,16 @@ export async function run(args: any = process.argv) {
       describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
+    fullLocationStakingFee: {
+      type: "number",
+      describe: "The full hotspot location assert fee",
+      default: "1000000",
+    },
+    dataonlyLocationStakingFee: {
+      type: "number",
+      describe: "The full hotspot location assert fee",
+      default: "1000000",
+    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -79,15 +89,15 @@ export async function run(args: any = process.argv) {
       iotConfig: {
         minGain: 10,
         maxGain: 150,
-        fullLocationStakingFee: toBN(500000, 0),
-        dataonlyLocationStakingFee: toBN(500000, 0),
+        fullLocationStakingFee: new BN(argv.fullLocationStakingFee),
+        dataonlyLocationStakingFee: new BN(argv.dataonlyLocationStakingFee),
       } as any,
     };
   } else {
     settings = {
       mobileConfig: {
-        fullLocationStakingFee: toBN(1000000, 0),
-        dataonlyLocationStakingFee: toBN(1000000, 0),
+        fullLocationStakingFee: new BN(argv.fullLocationStakingFee),
+        dataonlyLocationStakingFee: new BN(argv.dataonlyLocationStakingFee),
       },
     };
   }
