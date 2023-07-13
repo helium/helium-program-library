@@ -1,7 +1,7 @@
 use crate::{construct_issue_hst_kickoff_ix, current_epoch, state::*};
 use anchor_lang::{prelude::*, solana_program::native_token::LAMPORTS_PER_SOL};
 use anchor_spl::token::Token;
-use circuit_breaker::{CircuitBreaker, MintWindowedCircuitBreakerV0};
+use circuit_breaker::CircuitBreaker;
 use clockwork_sdk::{
   cpi::{thread_create, thread_reset, thread_update},
   state::{ThreadSettings, Trigger},
