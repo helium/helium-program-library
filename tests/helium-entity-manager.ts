@@ -42,6 +42,7 @@ import { BN } from "bn.js";
 import chaiAsPromised from "chai-as-promised";
 import { createMockCompression } from "./utils/compression";
 import { loadKeypair } from "./utils/solana";
+import { keyToAssetKey } from "@helium/helium-entity-manager-sdk";
 
 chai.use(chaiAsPromised);
 
@@ -82,7 +83,7 @@ describe("helium-entity-manager", () => {
       anchor.workspace.HeliumEntityManager.programId,
       anchor.workspace.HeliumEntityManager.idl
     );
-    
+
     const dataCredits = await initTestDataCredits(dcProgram, provider);
     dcMint = dataCredits.dcMint;
     ({ dao } = await initTestDao(
@@ -93,7 +94,7 @@ describe("helium-entity-manager", () => {
       dataCredits.dcMint
     ));
     activeDeviceAuthority = Keypair.generate();
-    ({ subDao } = await initTestSubdao({hsdProgram, provider, authority: me, dao, activeDeviceAuthority: activeDeviceAuthority.publicKey}));
+    ({ subDao } = await initTestSubdao({ hsdProgram, provider, authority: me, dao, activeDeviceAuthority: activeDeviceAuthority.publicKey }));
   });
 
   it("issues iot operations fund", async () => {
@@ -156,7 +157,7 @@ describe("helium-entity-manager", () => {
       newTreeDepth: height,
       newTreeBufferSize: buffer,
       newTreeSpace: new BN(getConcurrentMerkleTreeAccountSize(height, buffer, canopy)),
-      newTreeFeeLamports: new BN((LAMPORTS_PER_SOL * 30) / 2**height),
+      newTreeFeeLamports: new BN((LAMPORTS_PER_SOL * 30) / 2 ** height),
       name: "DATAONLY",
       metadataUrl: "test",
     }).accounts({
@@ -212,7 +213,7 @@ describe("helium-entity-manager", () => {
         newTreeDepth: height,
         newTreeBufferSize: buffer,
         newTreeSpace: new BN(getConcurrentMerkleTreeAccountSize(height, buffer, canopy)),
-        newTreeFeeLamports: new BN((LAMPORTS_PER_SOL * 30) / 2**height),
+        newTreeFeeLamports: new BN((LAMPORTS_PER_SOL * 30) / 2 ** height),
         name: "DATAONLY",
         metadataUrl: "test",
       }).accounts({
@@ -220,11 +221,11 @@ describe("helium-entity-manager", () => {
         merkleTree: merkle.publicKey,
       }).preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
-      ]).rpc({skipPreflight: true});
+      ]).rpc({ skipPreflight: true });
 
       const doAcc = await hemProgram.account.dataOnlyConfigV0.fetch(dataOnlyConfigKey(dao)[0]);
 
-      ({getAssetFn, getAssetProofFn, hotspot} = await createMockCompression({
+      ({ getAssetFn, getAssetProofFn, hotspot } = await createMockCompression({
         collection: doAcc.collection,
         dao,
         merkle: merkle.publicKey,
@@ -258,7 +259,7 @@ describe("helium-entity-manager", () => {
 
       const { keyToAsset } = await issueMethod.pubkeys();
       await issueMethod.rpc({ skipPreflight: true });
-        
+
       console.log(keyToAsset?.toString());
       const ktaAcc = await hemProgram.account.keyToAssetV0.fetch(
         keyToAsset!
@@ -288,7 +289,7 @@ describe("helium-entity-manager", () => {
           iotInfo: iotInfoKey(rewardableEntityConfig, ecc)[0],
           subDao,
         }).signers([hotspotOwner]);
-      
+
       const { iotInfo } = await onboardMethod.pubkeys();
       await onboardMethod.rpc();
 
@@ -308,24 +309,24 @@ describe("helium-entity-manager", () => {
 
     it("can swap tree when it's full", async () => {
       let hotspotOwner = Keypair.generate();
-      
+
       // fill up the tree
       while (true) {
         try {
           ecc = (await HeliumKeypair.makeRandom()).address.b58;
           await hemProgram.methods
-          .issueDataOnlyEntityV0({
-            entityKey: Buffer.from(bs58.decode(ecc)),
-          })
-          .preInstructions([
-            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-          ])
-          .accounts({
-            recipient: hotspotOwner.publicKey,
-            dao,
-            eccVerifier: eccVerifier.publicKey,
-          })
-          .signers([eccVerifier]).rpc({ skipPreflight: true });
+            .issueDataOnlyEntityV0({
+              entityKey: Buffer.from(bs58.decode(ecc)),
+            })
+            .preInstructions([
+              ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+            ])
+            .accounts({
+              recipient: hotspotOwner.publicKey,
+              dao,
+              eccVerifier: eccVerifier.publicKey,
+            })
+            .signers([eccVerifier]).rpc({ skipPreflight: true });
         } catch (err) {
           break;
         }
@@ -352,7 +353,7 @@ describe("helium-entity-manager", () => {
       await hemProgram.methods.updateDataOnlyTreeV0().accounts({
         dataOnlyConfig: dataOnlyConfigKey(dao)[0],
         newMerkleTree: newMerkle.publicKey,
-      }).rpc({skipPreflight: true});
+      }).rpc({ skipPreflight: true });
     })
   });
 
@@ -394,7 +395,7 @@ describe("helium-entity-manager", () => {
       dao
     );
 
-    const { pubkeys: {makerApproval} } = await hemProgram.methods.revokeMakerV0().accounts({
+    const { pubkeys: { makerApproval } } = await hemProgram.methods.revokeMakerV0().accounts({
       maker,
       rewardableEntityConfig
     }).rpcAndKeys();
@@ -405,13 +406,13 @@ describe("helium-entity-manager", () => {
 
   it("allows approving and revoking programs", async () => {
     const keypair = Keypair.generate();
-    const { pubkeys: { programApproval } } =await hemProgram.methods.approveProgramV0({
+    const { pubkeys: { programApproval } } = await hemProgram.methods.approveProgramV0({
       programId: keypair.publicKey
     })
-    .accounts({
-      dao
-    })
-    .rpcAndKeys();
+      .accounts({
+        dao
+      })
+      .rpcAndKeys();
 
     const account = await hemProgram.account.programApprovalV0.fetch(programApproval!);
     expect(account.programId.toBase58()).eq(keypair.publicKey.toBase58());
@@ -483,7 +484,7 @@ describe("helium-entity-manager", () => {
       maker = makerConf.maker;
       makerKeypair = makerConf.makerKeypair;
 
-      ({getAssetFn, getAssetProofFn, hotspot} = await createMockCompression({
+      ({ getAssetFn, getAssetProofFn, hotspot } = await createMockCompression({
         collection: makerConf.collection,
         dao,
         merkle: makerConf.merkle,
@@ -607,6 +608,22 @@ describe("helium-entity-manager", () => {
           .signers([makerKeypair, eccVerifier])
           .rpc({ skipPreflight: true });
 
+        await hsdProgram.methods.updateSubDaoV0({
+          authority: null,
+          dcBurnAuthority: null,
+          emissionSchedule: null,
+          onboardingDcFee: new BN(0),
+          onboardingDataOnlyDcFee: null,
+          activeDeviceAggregator: null,
+          registrar: null,
+          delegatorRewardsPercent: null,
+          activeDeviceAuthority: null,
+        })
+          .accounts({
+            subDao,
+          })
+          .rpc({ skipPreflight: true });
+
         const method = (
           await onboardMobileHotspot({
             program: hemProgram,
@@ -633,6 +650,43 @@ describe("helium-entity-manager", () => {
           .rpc();
       });
 
+      it("onboarding fees be backpaid with DC when subdao fees are raised", async () => {
+        const method = hemProgram.methods.tempPayMobileOnboardingFeeV0().accounts({
+          rewardableEntityConfig,
+          subDao,
+          dao,
+          keyToAsset: keyToAssetKey(dao, ecc)[0],
+          mobileInfo: infoKey!,
+        })
+        const ata = getAssociatedTokenAddressSync(dcMint, provider.wallet.publicKey);
+        const preBalance = await provider.connection.getTokenAccountBalance(ata);
+        const preInfoAcc = await hemProgram.account.mobileHotspotInfoV0.fetch(infoKey!);
+        expect(preInfoAcc.dcOnboardingFeePaid.toNumber()).to.eq(0);
+
+        await hsdProgram.methods.updateSubDaoV0({
+          authority: null,
+          dcBurnAuthority: null,
+          emissionSchedule: null,
+          onboardingDcFee: new BN(4000000),
+          onboardingDataOnlyDcFee: null,
+          activeDeviceAggregator: null,
+          registrar: null,
+          delegatorRewardsPercent: null,
+          activeDeviceAuthority: null,
+        })
+          .accounts({
+            subDao,
+          })
+          .rpc({ skipPreflight: true });
+        await method.rpc();
+
+        const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
+        const postBalance = await provider.connection.getTokenAccountBalance(ata);
+        expect(postBalance.value.uiAmount).to.be.eq(preBalance.value.uiAmount! - subDaoAcc.onboardingDcFee.toNumber());
+        const infoAcc = await hemProgram.account.mobileHotspotInfoV0.fetch(infoKey!);
+        expect(infoAcc.dcOnboardingFeePaid.toNumber()).to.eq(subDaoAcc.onboardingDcFee.toNumber());
+      });
+
       it("changes the metadata", async () => {
         const location = new BN(1000);
 
@@ -657,17 +711,17 @@ describe("helium-entity-manager", () => {
       });
 
       it("oracle can update active status", async () => {
-        await hemProgram.methods.setEntityActiveV0({isActive: false}).accounts({
+        await hemProgram.methods.setEntityActiveV0({ isActive: false }).accounts({
           activeDeviceAuthority: activeDeviceAuthority.publicKey,
           rewardableEntityConfig,
         }).remainingAccounts([{ pubkey: infoKey!, isWritable: true, isSigner: false }])
-        .signers([activeDeviceAuthority])
-        .rpc({skipPreflight: true});
+          .signers([activeDeviceAuthority])
+          .rpc({ skipPreflight: true });
 
         const infoAcc = await hemProgram.account.mobileHotspotInfoV0.fetch(infoKey!);
         expect(infoAcc.isActive).to.be.false;
         const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
-        expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(0); 
+        expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(0);
       })
     });
   });
@@ -721,7 +775,7 @@ describe("helium-entity-manager", () => {
       makerKeypair = makerConf.makerKeypair;
       hotspotCollection = makerConf.collection;
 
-      ({getAssetFn, getAssetProofFn, hotspot} = await createMockCompression({
+      ({ getAssetFn, getAssetProofFn, hotspot } = await createMockCompression({
         collection: makerConf.collection,
         dao,
         merkle: makerConf.merkle,
@@ -840,12 +894,12 @@ describe("helium-entity-manager", () => {
       });
 
       it("oracle can update active status", async () => {
-        await hemProgram.methods.setEntityActiveV0({isActive: false}).accounts({
+        await hemProgram.methods.setEntityActiveV0({ isActive: false }).accounts({
           activeDeviceAuthority: activeDeviceAuthority.publicKey,
           rewardableEntityConfig,
         }).remainingAccounts([{ pubkey: infoKey!, isWritable: true, isSigner: false }])
-        .signers([activeDeviceAuthority])
-        .rpc({skipPreflight: true});
+          .signers([activeDeviceAuthority])
+          .rpc({ skipPreflight: true });
 
         const infoAcc = await hemProgram.account.iotHotspotInfoV0.fetch(infoKey!);
         expect(infoAcc.isActive).to.be.false;
