@@ -45,7 +45,7 @@ pub struct OnboardIotHotspotV0<'info> {
     payer = payer,
     space = IOT_HOTSPOT_INFO_SIZE,
     seeds = [
-      b"iot_info", 
+      b"iot_info",
       rewardable_entity_config.key().as_ref(),
       &hash(&key_to_asset.entity_key[..]).to_bytes()
     ],
