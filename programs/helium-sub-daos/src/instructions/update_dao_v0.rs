@@ -34,6 +34,12 @@ pub fn handler(ctx: Context<UpdateDaoV0>, args: UpdateDaoArgsV0) -> Result<()> {
 
   if let Some(hst_emission_schedule) = args.hst_emission_schedule {
     ctx.accounts.dao.hst_emission_schedule = hst_emission_schedule;
+
+    resize_to_fit(
+      &ctx.accounts.payer.to_account_info(),
+      &ctx.accounts.system_program.to_account_info(),
+      &ctx.accounts.dao,
+    )?;
   }
 
   if let Some(net_emissions_cap) = args.net_emissions_cap {
