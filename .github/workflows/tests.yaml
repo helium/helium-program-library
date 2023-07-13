@@ -79,6 +79,40 @@ jobs:
       - name: Run bootstrap script
         run: ./scripts/bootstrap.sh
 
+  test-docker-builds:
+    needs: build
+    name: Test Docker Builds
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - utils/ecc-sig-verifier
+    steps:
+      - uses: actions/checkout@v3
+      - run: cd $TEST && docker build . -t $TEST
+        env:
+          DOCKER_PATH: ${{ matrix.test }}
+
+  test-rust-builds:
+    needs: build
+    name: Test Rust Builds
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - utils/ecc-sig-verifier
+          - utils/bulk-claim-rewards
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-anchor/
+        with:
+          testing: true
+      - run: cd $TEST && cargo build
+        env:
+          DOCKER_PATH: ${{ matrix.test }}
+
   test-contracts:
     needs: build
     name: Test Anchor Contracts
