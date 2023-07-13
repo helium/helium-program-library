@@ -15,7 +15,7 @@ env:
 jobs:
   test-rust-lint:
     name: Test Rust Lint
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/setup/
@@ -34,7 +34,7 @@ jobs:
 
   test-unit:
     name: Rust Unit Tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/setup/
@@ -52,7 +52,7 @@ jobs:
 
   build:
     name: Build Anchor
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/build-anchor/
@@ -62,7 +62,7 @@ jobs:
   test-devflow:
     needs: build
     name: Test Development Workflow
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/
@@ -90,14 +90,14 @@ jobs:
           - utils/ecc-sig-verifier
     steps:
       - uses: actions/checkout@v3
-      - run: cd $PATH && docker build .
+      - run: cd $DOCKER_PATH && docker build .
         env:
-          PATH: ${{ matrix.test }}
+          DOCKER_PATH: ${{ matrix.test }}
 
   test-rust-builds:
     needs: build
     name: Test Rust Builds
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -109,14 +109,14 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
-      - run: cd $PATH && cargo build
+      - run: cd $RUST_PATH && cargo build
         env:
-          PATH: ${{ matrix.test }}
+          RUST_PATH: ${{ matrix.test }}
 
   test-contracts:
     needs: build
     name: Test Anchor Contracts
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
