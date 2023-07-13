@@ -82,7 +82,7 @@ jobs:
   test-docker-builds:
     needs: build
     name: Test Docker Builds
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -90,8 +90,6 @@ jobs:
           - utils/ecc-sig-verifier
     steps:
       - uses: actions/checkout@v3
-      - uses: docker-practice/actions-setup-docker@master
-        timeout-minutes: 12
       - run: cd $PATH && docker build .
         env:
           PATH: ${{ matrix.test }}
