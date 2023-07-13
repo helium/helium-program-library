@@ -28,4 +28,10 @@ pub enum ErrorCode {
 
   #[msg("Invalid seeds provided")]
   InvalidSeeds,
+
+  #[msg("Invalid settings provided")]
+  InvalidSettings,
+
+  #[msg("Account doesn't matched expected address")]
+  InvalidAccountAddress,
 }

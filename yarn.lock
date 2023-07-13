@@ -2537,19 +2537,19 @@
     buffer-layout "^1.2.0"
     dotenv "10.0.0"
 
-"@solana/spl-token@0.3.5":
-  version "0.3.5"
-  resolved "https://registry.npmjs.org/@solana/spl-token/-/spl-token-0.3.5.tgz"
-  integrity sha512-0bGC6n415lGjKu02gkLOIpP1wzndSP0SHwN9PefJ+wKAhmfU1rl3AV1Pa41uap2kzSCD6F9642ngNO8KXPvh/g==
+"@solana/spl-token@^0.3.6", "@solana/spl-token@^0.3.7":
+  version "0.3.7"
+  resolved "https://registry.npmjs.org/@solana/spl-token/-/spl-token-0.3.7.tgz"
+  integrity sha512-bKGxWTtIw6VDdCBngjtsGlKGLSmiu/8ghSt/IOYJV24BsymRbgq7r12GToeetpxmPaZYLddKwAz7+EwprLfkfg==
   dependencies:
     "@solana/buffer-layout" "^4.0.0"
     "@solana/buffer-layout-utils" "^0.2.0"
     buffer "^6.0.3"
 
-"@solana/spl-token@^0.3.6", "@solana/spl-token@^0.3.7":
-  version "0.3.7"
-  resolved "https://registry.npmjs.org/@solana/spl-token/-/spl-token-0.3.7.tgz"
-  integrity sha512-bKGxWTtIw6VDdCBngjtsGlKGLSmiu/8ghSt/IOYJV24BsymRbgq7r12GToeetpxmPaZYLddKwAz7+EwprLfkfg==
+"@solana/spl-token@^0.3.8":
+  version "0.3.8"
+  resolved "https://registry.yarnpkg.com/@solana/spl-token/-/spl-token-0.3.8.tgz#8e9515ea876e40a4cc1040af865f61fc51d27edf"
+  integrity sha512-ogwGDcunP9Lkj+9CODOWMiVJEdRtqHAtX2rWF62KxnnSWtMZtV9rDhTrZFshiyJmxDnRL/1nKE1yJHg4jjs3gg==
   dependencies:
     "@solana/buffer-layout" "^4.0.0"
     "@solana/buffer-layout-utils" "^0.2.0"

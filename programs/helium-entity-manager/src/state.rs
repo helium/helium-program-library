@@ -36,6 +36,13 @@ impl ConfigSettingsV0 {
       _ => false,
     }
   }
+  pub fn is_mobile(self) -> bool {
+    matches!(self, ConfigSettingsV0::MobileConfig { .. })
+  }
+
+  pub fn is_iot(self) -> bool {
+    matches!(self, ConfigSettingsV0::IotConfig { .. })
+  }
 }
 
 impl Default for ConfigSettingsV0 {
@@ -121,6 +128,8 @@ pub struct IotHotspotInfoV0 {
   pub gain: Option<i32>,
   pub is_full_hotspot: bool,
   pub num_location_asserts: u16,
+  pub is_active: bool,
+  pub dc_onboarding_fee_paid: u64,
 }
 pub const IOT_HOTSPOT_INFO_SIZE: usize = 8 +
     32 + // asset
@@ -129,7 +138,9 @@ pub const IOT_HOTSPOT_INFO_SIZE: usize = 8 +
     1 + 4 + // elevation
     1 + 4 +// gain
     1 + // is full hotspot
-    2 + // num location assers
+    2 + // num location asserts
+    1 + // is active
+    8 + // dc onboarding fee paid
     60; // pad
 
 #[account]
@@ -141,13 +152,17 @@ pub struct MobileHotspotInfoV0 {
   pub location: Option<u64>,
   pub is_full_hotspot: bool,
   pub num_location_asserts: u16,
+  pub is_active: bool,
+  pub dc_onboarding_fee_paid: u64,
 }
 pub const MOBILE_HOTSPOT_INFO_SIZE: usize = 8 +
     32 + // asset
     1 + // bump
     1 + 8 + // location
     1 + // is full hotspot
-    2 + // num location assers
+    2 + // num location asserts
+    1 + // is active
+    8 + // dc onboarding fee paid
     60; // pad
 
 #[macro_export]
@@ -157,6 +172,42 @@ macro_rules! data_only_config_seeds {
       "data_only_config".as_bytes(),
       $data_only_config.dao.as_ref(),
       &[$data_only_config.bump_seed],
+    ]
+  };
+}
+
+#[macro_export]
+macro_rules! rewardable_entity_config_seeds {
+  ( $rewardable_entity_config:expr ) => {
+    &[
+      "rewardable_entity_config".as_bytes(),
+      $rewardable_entity_config.sub_dao.as_ref(),
+      $rewardable_entity_config.symbol.as_bytes(),
+      &[$rewardable_entity_config.bump_seed],
+    ]
+  };
+}
+
+#[macro_export]
+macro_rules! iot_info_seeds {
+  ( $iot_info:expr, $rewardable_entity_config:expr, $entity_key:expr ) => {
+    &[
+      "iot_info".as_bytes(),
+      $rewardable_entity_config.key().as_ref(),
+      &hash(&$entity_key).to_bytes(),
+      &[$iot_info.bump_seed],
+    ]
+  };
+}
+
+#[macro_export]
+macro_rules! mobile_info_seeds {
+  ( $mobile_info:expr, $rewardable_entity_config:expr, $entity_key:expr ) => {
+    &[
+      "mobile_info".as_bytes(),
+      $rewardable_entity_config.key().as_ref(),
+      &hash(&$entity_key).to_bytes(),
+      &[$mobile_info.bump_seed],
     ]
   };
 }

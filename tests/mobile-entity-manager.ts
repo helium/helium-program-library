@@ -46,6 +46,7 @@ describe('mobile-entity-manager', () => {
   let dao: PublicKey;
   let subDao: PublicKey;
   let dcMint: PublicKey;
+  let programApproval: PublicKey;
 
   beforeEach(async () => {
     dcProgram = await initDataCredits(
@@ -86,22 +87,22 @@ describe('mobile-entity-manager', () => {
       me,
       dataCredits.dcMint
     ));
-    ({ subDao } = await initTestSubdao(
+    ({ subDao } = await initTestSubdao({
       hsdProgram,
       provider,
-      me,
+      authority: me,
       dao,
-      undefined,
-      undefined,
-      new anchor.BN('500000000000000')
-    ));
+      numTokens: new anchor.BN("500000000000000")
+    }));
 
-    await hemProgram.methods
+    const approve = await hemProgram.methods
       .approveProgramV0({
         programId: memProgram.programId,
       })
-      .accounts({ dao })
-      .rpc({ skipPreflight: true });
+      .accounts({ dao });
+
+    programApproval = (await approve.pubkeys()).programApproval!;
+    await approve.rpc({ skipPreflight: true });
   });
 
   it('should initialize a carrier', async () => {
@@ -136,6 +137,7 @@ describe('mobile-entity-manager', () => {
 
   describe('with a carrier', async () => {
     let carrier: PublicKey;
+    let merkle: Keypair;
     beforeEach(async () => {
       const name = random();
       const {
@@ -155,7 +157,7 @@ describe('mobile-entity-manager', () => {
         })
         .rpcAndKeys({ skipPreflight: true });
       carrier = carrierK!;
-      const merkle = Keypair.generate();
+      merkle = Keypair.generate();
       // Testing -- small tree
       const space = getConcurrentMerkleTreeAccountSize(3, 8);
       const createMerkle = SystemProgram.createAccount({
@@ -229,6 +231,50 @@ describe('mobile-entity-manager', () => {
           .accounts({ carrier, recipient: me })
           .rpc({ skipPreflight: true });
       });
+
+      it("can swap tree when it's full", async () => {
+        // fill up the tree
+        while (true) {
+          try {
+            const name = random();
+            await memProgram.methods
+              .initializeSubscriberV0({
+                entityKey: Buffer.from(name, 'utf-8'),
+                metadataUrl: null,
+                name,
+              })
+              .preInstructions([
+                ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+              ])
+              .accounts({ carrier, recipient: me })
+              .rpc({ skipPreflight: true });
+          } catch (err) {
+            console.error(err);
+            break;
+          }
+        }
+
+        const newMerkle = Keypair.generate();
+        const space = getConcurrentMerkleTreeAccountSize(3, 8);
+        const createMerkle = SystemProgram.createAccount({
+          fromPubkey: provider.wallet.publicKey,
+          newAccountPubkey: newMerkle.publicKey,
+          lamports: await provider.connection.getMinimumBalanceForRentExemption(
+            space
+          ),
+          space: space,
+          programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+        });
+        await memProgram.methods
+          .updateCarrierTreeV0({
+            maxDepth: 3,
+            maxBufferSize: 8,
+          })
+          .accounts({ carrier, newMerkleTree: newMerkle.publicKey })
+          .preInstructions([createMerkle])
+          .signers([newMerkle])
+          .rpc();
+      })
     });
   });
 });

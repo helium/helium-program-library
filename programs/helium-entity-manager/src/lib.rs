@@ -62,13 +62,6 @@ pub mod helium_entity_manager {
     issue_iot_operations_fund_v0::handler(ctx)
   }
 
-  pub fn genesis_issue_hotspot_v0<'info>(
-    ctx: Context<'_, '_, '_, 'info, GenesisIssueHotspotV0<'info>>,
-    args: GenesisIssueHotspotArgsV0,
-  ) -> Result<()> {
-    genesis_issue_hotspot_v0::handler(ctx, args)
-  }
-
   pub fn onboard_iot_hotspot_v0<'info>(
     ctx: Context<'_, '_, '_, 'info, OnboardIotHotspotV0<'info>>,
     args: OnboardIotHotspotArgsV0,
@@ -148,5 +141,18 @@ pub mod helium_entity_manager {
 
   pub fn temp_repair_iot_operations_fund(ctx: Context<TempRepairIotOperationsFund>) -> Result<()> {
     temp_repair_iot_operations_fund::handler(ctx)
+  }
+
+  pub fn set_entity_active_v0(
+    ctx: Context<SetEntityActiveV0>,
+    args: SetEntityActiveArgsV0,
+  ) -> Result<()> {
+    set_entity_active_v0::handler(ctx, args)
+  }
+
+  pub fn temp_backfill_onboarding_fees_v0(
+    ctx: Context<TempBackfillOnboardingFeesV0>,
+  ) -> Result<()> {
+    temp_backfill_onboarding_fees_v0::handler(ctx)
   }
 }

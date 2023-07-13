@@ -1,6 +1,5 @@
-use crate::state::*;
+use crate::{rewardable_entity_config_seeds, state::*};
 use anchor_lang::{prelude::*, solana_program::hash::hash};
-
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token},
@@ -13,8 +12,11 @@ use data_credits::{
   program::DataCredits,
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
-use helium_sub_daos::{DaoV0, SubDaoV0};
-
+use helium_sub_daos::{
+  cpi::{accounts::TrackDcOnboardingFeesV0, track_dc_onboarding_fees_v0},
+  program::HeliumSubDaos,
+  DaoV0, SubDaoV0, TrackDcOnboardingFeesArgsV0,
+};
 use mpl_bubblegum::utils::get_asset_id;
 use shared_utils::*;
 use spl_account_compression::program::SplAccountCompression;
@@ -43,7 +45,7 @@ pub struct OnboardIotHotspotV0<'info> {
     payer = payer,
     space = IOT_HOTSPOT_INFO_SIZE,
     seeds = [
-      b"iot_info", 
+      b"iot_info",
       rewardable_entity_config.key().as_ref(),
       &hash(&key_to_asset.entity_key[..]).to_bytes()
     ],
@@ -72,7 +74,8 @@ pub struct OnboardIotHotspotV0<'info> {
   pub maker_approval: Box<Account<'info, MakerApprovalV0>>,
   #[account(
     has_one = merkle_tree,
-    has_one = issuing_authority
+    has_one = issuing_authority,
+    has_one = dao,
   )]
   pub maker: Box<Account<'info, MakerV0>>,
   #[account(
@@ -85,6 +88,7 @@ pub struct OnboardIotHotspotV0<'info> {
   )]
   pub key_to_asset: Box<Account<'info, KeyToAssetV0>>,
   #[account(
+    mut,
     has_one = dao,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
@@ -107,6 +111,7 @@ pub struct OnboardIotHotspotV0<'info> {
   pub token_program: Program<'info, Token>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
+  pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
 }
 
 impl<'info> OnboardIotHotspotV0<'info> {
@@ -153,7 +158,26 @@ pub fn handler<'info>(
     gain: args.gain,
     is_full_hotspot: true,
     num_location_asserts: 0,
+    is_active: true, // set active by default to start, oracle can mark it inactive
+    dc_onboarding_fee_paid: dc_fee,
   });
+  track_dc_onboarding_fees_v0(
+    CpiContext::new_with_signer(
+      ctx.accounts.helium_sub_daos_program.to_account_info(),
+      TrackDcOnboardingFeesV0 {
+        hem_auth: ctx.accounts.rewardable_entity_config.to_account_info(),
+        sub_dao: ctx.accounts.sub_dao.to_account_info(),
+      },
+      &[rewardable_entity_config_seeds!(
+        ctx.accounts.rewardable_entity_config
+      )],
+    ),
+    TrackDcOnboardingFeesArgsV0 {
+      amount: dc_fee,
+      add: true,
+      symbol: ctx.accounts.rewardable_entity_config.symbol.clone(),
+    },
+  )?;
 
   if let (
     Some(location),

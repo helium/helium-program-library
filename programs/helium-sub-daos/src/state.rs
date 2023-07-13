@@ -190,6 +190,8 @@ pub struct SubDaoV0 {
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub bump_seed: u8,
   pub registrar: Pubkey,              // vsr registrar
-  pub delegator_rewards_percent: u64, // number between 0-10,000. The % of DNT rewards delegators receive with 8 decimal places of accuracy
+  pub delegator_rewards_percent: u64, // number between 0 - (100_u64 * 100_000_000). The % of DNT rewards delegators receive with 8 decimal places of accuracy
   pub onboarding_data_only_dc_fee: u64,
+  pub dc_onboarding_fees_paid: u64, // the total amount of dc onboarding fees paid to this subdao by active hotspots (inactive hotspots are excluded)
+  pub active_device_authority: Pubkey, // authority that can mark hotspots as active/inactive
 }
