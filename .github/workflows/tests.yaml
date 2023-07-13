@@ -90,7 +90,9 @@ jobs:
           - utils/ecc-sig-verifier
     steps:
       - uses: actions/checkout@v3
-      - run: pwd && cd $PATH && pwd && docker build .
+      - uses: docker-practice/actions-setup-docker@master
+        timeout-minutes: 12
+      - run: cd $PATH && docker build .
         env:
           PATH: ${{ matrix.test }}
 
@@ -109,7 +111,7 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
-      - run: pwd && cd $PATH && pwd && cargo build
+      - run: cd $PATH && cargo build
         env:
           PATH: ${{ matrix.test }}
 
