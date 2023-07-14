@@ -38,6 +38,7 @@
     "@solana/spl-token": "^0.3.6",
     "@solana/web3.js": "^1.66.2",
     "bs58": "^5.0.0",
+    "pako": "^2.0.3",
     "react-async-hook": "^4.0.0"
   },
   "devDependencies": {
