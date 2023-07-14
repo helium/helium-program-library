@@ -5,7 +5,11 @@ import { SOLANA_URL } from "../env";
 import database from "./database";
 import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
-import { chunks } from "@helium/spl-utils";
+
+const chunks = <T>(array: T[], size: number): T[][] =>
+  Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
+    array.slice(index * size, (index + 1) * size)
+  );
 
 export type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
 
@@ -85,6 +89,7 @@ export const upsertProgramAccounts = async ({
       await model.sync({ alter: true });
 
       const t = await sequelize.transaction();
+      // @ts-ignore
       const respChunks = chunks(resp, 50000);
       const now = new Date().toISOString();
 
