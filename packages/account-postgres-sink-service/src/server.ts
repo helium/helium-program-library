@@ -80,7 +80,7 @@ server.post("/account-webhook", async (req, res) => {
 
     if (accountConfigs) {
       for (const account of accounts) {
-        const parsed = account["account"]["JsonParsed"];
+        const parsed = account["account"]["jsonParsed"];
         console.log("Got account: ", parsed.pubkey);
         const config = accountConfigs.configs.find(
           (x) => x.programId == parsed["owner"]
