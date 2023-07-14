@@ -73,7 +73,6 @@ server.post("/account-webhook", async (req, res) => {
     });
     return;
   }
-  console.log(req.body);
 
   try {
     const accountConfigs = parseConfig();
