@@ -281,6 +281,10 @@ fn construct_and_send_txs(
   Ok(())
 }
 
+struct InfoWithEntityKey {
+  info_key: Pubkey,
+  entity_key: String,
+}
 fn construct_set_active_ixs(
   helium_entity_program: &Program,
   entity_keys: &Vec<String>,
@@ -354,7 +358,10 @@ fn construct_set_active_ixs(
             iot_infos[j].to_string()
           ))?;
           if parsed_info.is_active != is_active {
-            valid_iot_infos.push(iot_infos[j]);
+            valid_iot_infos.push(InfoWithEntityKey {
+              info_key: iot_infos[j],
+              entity_key: entity_keys[start + j].clone(),
+            });
           }
         }
         None => {}
@@ -367,7 +374,10 @@ fn construct_set_active_ixs(
             mobile_infos[j].to_string()
           ))?;
           if parsed_info.is_active != is_active {
-            valid_mobile_infos.push(mobile_infos[j]);
+            valid_mobile_infos.push(InfoWithEntityKey {
+              info_key: mobile_infos[j],
+              entity_key: entity_keys[start + j].clone(),
+            });
           }
         }
         None => {}
@@ -399,7 +409,7 @@ fn construct_set_active_ixs(
 
 fn construct_ix_from_valid_infos(
   helium_entity_program: &Program,
-  valid_infos: Vec<Pubkey>,
+  valid_infos: Vec<InfoWithEntityKey>,
   rewardable_entity_config: Pubkey,
   sub_dao: Pubkey,
   is_active: bool,
@@ -407,17 +417,22 @@ fn construct_ix_from_valid_infos(
   let ixs = valid_infos
     .iter()
     .map(|info| {
-      let mut set_entity_active_ix = helium_entity_program
+      let entity_key = &bs58::decode(info.entity_key.clone())
+        .into_vec()
+        .context(format!("Failed to decode entity key, {}", info.entity_key))?;
+      let set_entity_active_ix = helium_entity_program
         .request()
         .args(helium_entity_manager::instruction::SetEntityActiveV0 {
-          args: SetEntityActiveArgsV0 { is_active },
+          args: SetEntityActiveArgsV0 {
+            is_active,
+            entity_key: entity_key.clone(),
+          },
         })
         .accounts(SetEntityActiveV0 {
           active_device_authority: helium_entity_program.payer(),
           rewardable_entity_config,
           sub_dao,
-          // TODO uncomment this after relevant PR is merged
-          // info: info.clone(),
+          info: info.info_key,
           helium_sub_daos_program: helium_sub_daos::id(),
         })
         .instructions()
