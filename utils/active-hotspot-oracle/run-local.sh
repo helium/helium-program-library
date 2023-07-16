@@ -1,11 +1,11 @@
 #!/bin/bash
 
 ./target/debug/active-hotspot-oracle \
-  --source-region eu-central-1 \
-  --source-bucket delta \
-  --source-table silver/test11 \
-  --source-access-key-id minioadmin \
-  --source-secret-access-key minioadmin \
-  --source-endpoint http://localhost:9000 \
-  --url http://localhost:8899 \
+  --aws-region eu-central-1 \
+  --aws-bucket delta \
+  --aws-table gold/active_hotspots \
+  --access-key-id minioadmin \
+  --secret-access-key minioadmin \
+  --aws-endpoint http://localhost:9000 \
+  --url https://rpc.helius.xyz/?api-key=89ea4930-3f9f-4c66-af09-94092d463811 \
   --keypair ~/.config/solana/id.json

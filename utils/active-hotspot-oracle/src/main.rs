@@ -1,5 +1,5 @@
 use anchor_client::{Client, Cluster, Program};
-use anchor_lang::prelude::AccountMeta;
+use anchor_lang::AccountDeserialize;
 use anyhow::{anyhow, Context, Result};
 use bs58;
 use chrono::{Duration, Utc};
@@ -8,7 +8,9 @@ use datafusion::arrow::array::StringArray;
 use deltalake::arrow::array::Array;
 use deltalake::{datafusion::prelude::SessionContext, DeltaTableBuilder};
 use helium_entity_manager::{accounts::SetEntityActiveV0, SetEntityActiveArgsV0};
+use helium_entity_manager::{IotHotspotInfoV0, MobileHotspotInfoV0};
 use hpl_utils::{dao::SubDao, send_and_confirm_messages_with_spinner};
+use indicatif::{ProgressBar, ProgressStyle};
 use s3::{bucket::Bucket, creds::Credentials, region::Region};
 use serde::{Deserialize, Serialize};
 use solana_client::tpu_client::{TpuClient, TpuClientConfig};
@@ -88,25 +90,19 @@ async fn main() -> Result<()> {
 
   // Create anchor program client
   let kp = Rc::new(read_keypair_file(kp_path).unwrap());
+  let wss_url = rpc_url
+    .clone()
+    .replace("https", "wss")
+    .replace("http", "ws");
   let anchor_client = Client::new_with_options(
-    Cluster::Custom(
-      rpc_url.clone(),
-      rpc_url
-        .clone()
-        .replace("https", "wss")
-        .replace("http", "ws"),
-    ),
+    Cluster::Custom(rpc_url.clone(), wss_url.clone()),
     kp.clone(),
     CommitmentConfig::confirmed(),
   );
   let helium_entity_program = anchor_client.program(helium_entity_manager::id());
   let tpu_client = TpuClient::new(
     helium_entity_program.rpc().into(),
-    &helium_entity_program
-      .rpc()
-      .url()
-      .replace("https", "wss")
-      .replace("http", "ws"),
+    &wss_url,
     TpuClientConfig::default(),
   )
   .unwrap();
@@ -129,49 +125,30 @@ async fn main() -> Result<()> {
   session.register_table("delta_table", Arc::new(delta_table))?;
 
   // query the delta-rs table to get a list of active and known inactive hotspots
+  println!("Querying records");
   let current_time = Utc::now();
   let thirty_days_ago = current_time - Duration::days(180);
   let query = format!(
-    "
-  WITH raw AS (
-    SELECT
-      beacon.pub_key as beacon_pub_key,
-      beacon.received_timestamp as beacon_received_ts,
-      witness.pub_key as witness_pub_key,
-    FROM delta_table
-  )
-  SELECT * FROM raw WHERE raw.beacon_received_ts > {}
-  ",
-    thirty_days_ago.timestamp_millis(),
+    "SELECT * FROM delta_table WHERE most_recent_ts > {}",
+    thirty_days_ago.timestamp(),
   );
-  println!("Querying records");
   let record_batches = session.sql(query.as_str()).await?.collect().await?;
+  println!("Record batches: {:?}", record_batches.len());
 
   // parse the results into a hashset of active pubkeys
   let mut active_pub_keys: HashSet<String> = HashSet::new();
   let mut count = 0;
   println!("Processing records");
   for record_batch in record_batches {
-    let beacon_pub_keys = record_batch
-      .column_by_name("beacon_pub_key")
-      .context("No beacon_pub_key column array found")?
-      .as_any()
-      .downcast_ref::<StringArray>()
-      .context("Result is not a string array")?;
-    let witness_pub_keys = record_batch
-      .column_by_name("witness_pub_key")
-      .context("No witness_pub_key column array found")?
+    let pub_keys = record_batch
+      .column_by_name("hotspot_key")
+      .context("No hotspot_key column array found")?
       .as_any()
       .downcast_ref::<StringArray>()
       .context("Result is not a string array")?;
 
-    count += beacon_pub_keys.len();
-    for pk in beacon_pub_keys {
-      let pub_key = pk.unwrap_or("").clone().to_string();
-      active_pub_keys.insert(pub_key);
-    }
-
-    for pk in witness_pub_keys {
+    count += pub_keys.len();
+    for pk in pub_keys {
       let pub_key = pk.unwrap_or("").clone().to_string();
       active_pub_keys.insert(pub_key);
     }
@@ -191,6 +168,9 @@ async fn main() -> Result<()> {
       .await
       .unwrap_or(HashSet::new());
 
+  println!("Last active pub keys: {:?}", last_active_pub_keys.len());
+  println!("Last inactive pub keys: {:?}", last_inactive_pub_keys.len());
+
   // parse and find the diff
   println!("Finding new diffs");
   let mark_active_diff: Vec<String> = active_pub_keys
@@ -201,6 +181,9 @@ async fn main() -> Result<()> {
     .difference(&active_pub_keys)
     .cloned()
     .collect();
+
+  println!("Hotspots to mark active: {:?}", mark_active_diff.len());
+  println!("Hotspots to mark inactive: {:?}", mark_inactive_diff.len());
 
   // construct the transactions for the diffs
   println!("Constructing instructions");
@@ -242,7 +225,6 @@ async fn main() -> Result<()> {
   // write to new checkpoint file and upload to s3
   println!("Uploading new save files to s3");
   last_inactive_pub_keys.extend(mark_inactive_diff.iter().cloned());
-  let active_pub_keys = HashSet::new();
   save_checkpoint(active_pub_keys, s3_config.clone(), "active_save.json").await?;
   save_checkpoint(
     last_inactive_pub_keys,
@@ -262,22 +244,23 @@ fn construct_and_send_txs(
 ) -> Result<()> {
   // send transactions in batches so blockhash doesn't expire
   let transaction_batch_size = 100;
-  for i in (0..ixs.len()).step_by(transaction_batch_size) {
-    let start = i;
-    let end = (i + transaction_batch_size).min(ixs.len());
-    let ixs_to_send = &ixs[start..end];
+  let ixs_per_tx = 28;
+  let mut tx_count = 0;
+  for i in (0..ixs.len()).step_by(transaction_batch_size * ixs_per_tx) {
+    let tx_start = i;
+    let tx_end = (i + transaction_batch_size * ixs_per_tx).min(ixs.len());
     let blockhash = helium_entity_program.rpc().get_latest_blockhash()?;
-    let txs = ixs_to_send
-      .iter()
-      .map(|ix| {
-        let mut tx =
-          Transaction::new_with_payer(&[ix.clone()], Some(&helium_entity_program.payer()));
-        tx.try_sign(&[payer], blockhash)
-          .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
-        Ok(tx)
-      })
-      .collect::<Result<Vec<Transaction>>>()
-      .context("Failed to construct txs")?;
+    let mut txs = Vec::new();
+    for j in (tx_start..tx_end).step_by(ixs_per_tx) {
+      let ix_start = j;
+      let ix_end = (j + ixs_per_tx).min(ixs.len());
+      let ixs_to_send = &ixs[ix_start..ix_end];
+      let mut tx = Transaction::new_with_payer(ixs_to_send, Some(&helium_entity_program.payer()));
+      tx.try_sign(&[payer], blockhash)
+        .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
+      txs.push(tx);
+    }
+    tx_count += txs.len();
 
     let serialized_txs = txs
       .iter()
@@ -292,6 +275,8 @@ fn construct_and_send_txs(
     )
     .context("Failed sending transactions")?;
   }
+  println!("ix_count: {}", ixs.len());
+  println!("tx_count: {}", tx_count);
 
   Ok(())
 }
@@ -335,7 +320,16 @@ fn construct_set_active_ixs(
   let mut valid_iot_infos = Vec::new();
   let mut valid_mobile_infos = Vec::new();
   let step = 100;
+  let progress_bar = ProgressBar::new(entity_keys.len().try_into().unwrap());
+  progress_bar.set_style(
+    ProgressStyle::with_template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
+      .unwrap()
+      .progress_chars("##-"),
+  );
+  progress_bar.set_message("Fetching accounts...");
+
   for i in (0..entity_keys.len()).step_by(step) {
+    progress_bar.set_position(i.try_into().unwrap());
     let start = i;
     let end = (i + step).min(entity_keys.len());
     let iot_infos = &mark_iot_infos[start..end];
@@ -353,19 +347,34 @@ fn construct_set_active_ixs(
       let mobile_info_acc = &mobile_info_accs[j];
 
       match iot_info_acc {
-        Some(_) => {
-          valid_iot_infos.push(iot_infos[j]);
+        Some(raw_info) => {
+          let mut data = raw_info.data.as_slice();
+          let parsed_info = IotHotspotInfoV0::try_deserialize(&mut data).context(format!(
+            "Failed to deserialize iot info acc, {}",
+            iot_infos[j].to_string()
+          ))?;
+          if parsed_info.is_active != is_active {
+            valid_iot_infos.push(iot_infos[j]);
+          }
         }
         None => {}
       }
       match mobile_info_acc {
-        Some(_) => {
-          valid_mobile_infos.push(mobile_infos[j]);
+        Some(raw_info) => {
+          let mut data = raw_info.data.as_slice();
+          let parsed_info = MobileHotspotInfoV0::try_deserialize(&mut data).context(format!(
+            "Failed to deserialize mobile info acc, {}",
+            mobile_infos[j].to_string()
+          ))?;
+          if parsed_info.is_active != is_active {
+            valid_mobile_infos.push(mobile_infos[j]);
+          }
         }
         None => {}
       }
     }
   }
+  progress_bar.finish_with_message("Finished fetching accounts");
 
   // construct ixs
   let iot_ixs = construct_ix_from_valid_infos(
@@ -395,37 +404,28 @@ fn construct_ix_from_valid_infos(
   sub_dao: Pubkey,
   is_active: bool,
 ) -> Result<Vec<Instruction>> {
-  let mut ixs = Vec::new();
-  let max_keys_per_ix = 30;
-  for i in (0..valid_infos.len()).step_by(max_keys_per_ix) {
-    let start = i;
-    let end = (i + max_keys_per_ix).min(valid_infos.len());
-    let infos = &valid_infos[start..end]
-      .iter()
-      .map(|info| AccountMeta {
-        pubkey: info.clone(),
-        is_signer: false,
-        is_writable: false,
-      })
-      .collect::<Vec<_>>();
-
-    let mut set_entity_active_ix = helium_entity_program
-      .request()
-      .args(helium_entity_manager::instruction::SetEntityActiveV0 {
-        args: SetEntityActiveArgsV0 { is_active },
-      })
-      .accounts(SetEntityActiveV0 {
-        active_device_authority: helium_entity_program.payer(),
-        rewardable_entity_config,
-        sub_dao,
-        helium_sub_daos_program: helium_sub_daos::id(),
-      })
-      .instructions()
-      .map_err(|e| anyhow!("Failed to construct set reward instruction: {e}"))?;
-
-    set_entity_active_ix[0].accounts.extend_from_slice(infos);
-    ixs.push(set_entity_active_ix[0].clone());
-  }
+  let ixs = valid_infos
+    .iter()
+    .map(|info| {
+      let mut set_entity_active_ix = helium_entity_program
+        .request()
+        .args(helium_entity_manager::instruction::SetEntityActiveV0 {
+          args: SetEntityActiveArgsV0 { is_active },
+        })
+        .accounts(SetEntityActiveV0 {
+          active_device_authority: helium_entity_program.payer(),
+          rewardable_entity_config,
+          sub_dao,
+          // TODO uncomment this after relevant PR is merged
+          // info: info.clone(),
+          helium_sub_daos_program: helium_sub_daos::id(),
+        })
+        .instructions()
+        .map_err(|e| anyhow!("Failed to construct instruction: {e}"))?;
+      Ok(set_entity_active_ix[0].clone())
+    })
+    .collect::<Result<Vec<_>>>()
+    .context("Failed to construct ixs")?;
 
   Ok(ixs)
 }
@@ -484,6 +484,5 @@ fn create_bucket(s3_config: HashMap<String, String>) -> Result<Bucket> {
   let credentials = Credentials::new(Some(&access_key), Some(&secret_key), None, None, None)?;
   let bucket_name = s3_config.get("bucket_name").unwrap();
 
-  println!("bucket name: {}", bucket_name);
   Ok(Bucket::new(bucket_name, region, credentials)?)
 }
