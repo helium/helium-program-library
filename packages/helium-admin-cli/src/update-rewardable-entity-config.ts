@@ -4,12 +4,12 @@ import {
   rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
-import { toBN } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrSquads } from "./utils";
+import { sendInstructionsOrSquads } from "./utils";
+import BN from "bn.js";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -23,7 +23,7 @@ export async function run(args: any = process.argv) {
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
     },
-    subdaoMint: {
+    dntMint: {
       required: true,
       describe: "Public Key of the subdao mint",
       type: "string",
@@ -47,19 +47,27 @@ export async function run(args: any = process.argv) {
       describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
+    fullLocationStakingFee: {
+      type: "number",
+      describe: "The full hotspot location assert fee",
+      default: "1000000",
+    },
+    dataonlyLocationStakingFee: {
+      type: "number",
+      describe: "The full hotspot location assert fee",
+      default: "1000000",
+    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
-  const wallet = loadKeypair(argv.wallet);
   const provider = anchor.getProvider() as anchor.AnchorProvider;
 
   const name = argv.name;
   const hemProgram = await initHem(provider);
-  const conn = provider.connection;
-  const subdaoMint = new PublicKey(argv.subdaoMint);
-  const subdao = (await subDaoKey(subdaoMint))[0];
+  const dntMint = new PublicKey(argv.dntMint);
+  const subdao = (await subDaoKey(dntMint))[0];
   const rewardableConfigKey = (
     await rewardableEntityConfigKey(subdao, name.toUpperCase())
   )[0];
@@ -81,26 +89,26 @@ export async function run(args: any = process.argv) {
       iotConfig: {
         minGain: 10,
         maxGain: 150,
-        fullLocationStakingFee: toBN(500000, 0),
-        dataonlyLocationStakingFee: toBN(500000, 0),
+        fullLocationStakingFee: new BN(argv.fullLocationStakingFee),
+        dataonlyLocationStakingFee: new BN(argv.dataonlyLocationStakingFee),
       } as any,
     };
   } else {
     settings = {
       mobileConfig: {
-        fullLocationStakingFee: toBN(0, 0),
-        dataonlyLocationStakingFee: toBN(0, 0),
+        fullLocationStakingFee: new BN(argv.fullLocationStakingFee),
+        dataonlyLocationStakingFee: new BN(argv.dataonlyLocationStakingFee),
       },
     };
   }
 
-  console.log(settings);
+  console.log(settings, rewardableConfigAcc.authority.toBase58());
 
   const instructions = [
     await hemProgram.methods
       .updateRewardableEntityConfigV0({
         settings,
-        newAuthority: rewardableConfigAcc.authority,
+        newAuthority: null,
       })
       .accounts({
         rewardableEntityConfig: rewardableConfigKey,

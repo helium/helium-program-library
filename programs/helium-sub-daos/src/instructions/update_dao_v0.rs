@@ -28,12 +28,14 @@ pub struct UpdateDaoV0<'info> {
 }
 
 pub fn handler(ctx: Context<UpdateDaoV0>, args: UpdateDaoArgsV0) -> Result<()> {
+  let mut should_resize = false;
   if let Some(new_authority) = args.authority {
     ctx.accounts.dao.authority = new_authority;
   }
 
   if let Some(hst_emission_schedule) = args.hst_emission_schedule {
     ctx.accounts.dao.hst_emission_schedule = hst_emission_schedule;
+    should_resize = true;
   }
 
   if let Some(net_emissions_cap) = args.net_emissions_cap {
@@ -42,16 +44,19 @@ pub fn handler(ctx: Context<UpdateDaoV0>, args: UpdateDaoArgsV0) -> Result<()> {
 
   if let Some(emission_schedule) = args.emission_schedule {
     ctx.accounts.dao.emission_schedule = emission_schedule;
+    should_resize = true;
+  }
 
+  if let Some(hst_pool) = args.hst_pool {
+    ctx.accounts.dao.hst_pool = hst_pool;
+  }
+
+  if should_resize {
     resize_to_fit(
       &ctx.accounts.payer.to_account_info(),
       &ctx.accounts.system_program.to_account_info(),
       &ctx.accounts.dao,
     )?;
-  }
-
-  if let Some(hst_pool) = args.hst_pool {
-    ctx.accounts.dao.hst_pool = hst_pool;
   }
 
   Ok(())

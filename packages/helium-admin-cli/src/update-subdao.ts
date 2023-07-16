@@ -24,6 +24,7 @@ import {
   parseEmissionsSchedule,
   sendInstructionsOrSquads,
 } from "./utils";
+import { toBN } from "@helium/spl-utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -99,6 +100,12 @@ export async function run(args: any = process.argv) {
       required: false,
       describe:
         "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
+      default: null,
+    },
+    onboardingDcFee: {
+      type: "number",
+      required: false,
+      describe: "The data credits fee for onboarding hotspots",
       default: null,
     },
     onboardingDataOnlyDcFee: {
@@ -228,7 +235,7 @@ export async function run(args: any = process.argv) {
         dcBurnAuthority: argv.newDcBurnAuthority
           ? new PublicKey(argv.newDcBurnAuthority)
           : null,
-        onboardingDcFee: null,
+        onboardingDcFee: argv.onboardingDcFee ? new BN(argv.onboardingDcFee) : null,
         onboardingDataOnlyDcFee: argv.onboardingDataOnlyDcFee ? new BN(argv.onboardingDataOnlyDcFee) : null,
         activeDeviceAggregator: argv.newActiveDeviceAggregator
           ? new PublicKey(argv.newActiveDeviceAggregator)
