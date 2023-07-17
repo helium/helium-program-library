@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use claim_rewards::claim_rewards;
 use clap::Parser;
 use helium_sub_daos::ID as HSD_PID;
-use hpl_utils::token::HeliumToken;
+use hpl_utils::token::Token;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file};
 use std::rc::Rc;
@@ -52,8 +52,8 @@ async fn run() {
   let ro_program = anchor_client.program(rewards_oracle::id());
 
   let rewards_mint = match args.rewards_type.as_str() {
-    "iot" => Ok(*HeliumToken::Iot.mint()),
-    "mobile" => Ok(*HeliumToken::Mobile.mint()),
+    "iot" => Ok(*Token::Iot.mint()),
+    "mobile" => Ok(*Token::Mobile.mint()),
     _ => Err(anyhow!(
       "Invalid rewards type. Must be either 'iot' or 'mobile'"
     )),
@@ -61,7 +61,7 @@ async fn run() {
   .unwrap();
 
   let (dao, _dao_bump) = Pubkey::find_program_address(
-    &["dao".as_bytes(), HeliumToken::Hnt.mint().as_ref()],
+    &["dao".as_bytes(), Token::Hnt.mint().as_ref()],
     &HSD_PID,
   );
 
