@@ -283,15 +283,6 @@
     js-sha256 "^0.9.0"
     multiformats "^9.6.4"
 
-"@helium/address@^4.8.1":
-  version "4.8.1"
-  resolved "https://registry.npmjs.org/@helium/address/-/address-4.8.1.tgz"
-  integrity sha512-OEqX9j8m4sIc6bmvGUWV3/AHeuJCBWIl9EvRpS9xOPy+mC17OkDiPwZI35DSbMlAM7cK7+UjKYZvIVQL/aCgSQ==
-  dependencies:
-    bs58 "^5.0.0"
-    js-sha256 "^0.9.0"
-    multiformats "^9.6.4"
-
 "@helium/crypto@^3.60.0":
   version "3.60.0"
   resolved "https://registry.yarnpkg.com/@helium/crypto/-/crypto-3.60.0.tgz#58be74745d0c7cc3198481dc69f5530393fc7287"
@@ -301,12 +292,12 @@
     create-hash "^1.2.0"
     libsodium-wrappers "^0.7.6"
 
-"@helium/crypto@^4.6.2":
-  version "4.8.1"
-  resolved "https://registry.npmjs.org/@helium/crypto/-/crypto-4.8.1.tgz"
-  integrity sha512-yoiyenUShDRwVnUi7zrIiDJNjgeKNxcpRr0HNWF8ncOBaFikMQGuTwOaivDG04s1wIdHqK5k3MD7boEGjXlJFA==
+"@helium/crypto@^4.10.2":
+  version "4.10.2"
+  resolved "https://registry.yarnpkg.com/@helium/crypto/-/crypto-4.10.2.tgz#4707756a4623035e5a6f30b6e4ae51158f1e269a"
+  integrity sha512-ltDWuQwEMNNvIq82QhqF1EPsHm1LrOceiGZgPvi0c9FPp5B6ft2TPjpDueGM27uKy0XbcHAjvBM7HhSCRhs+iQ==
   dependencies:
-    "@helium/address" "^4.8.1"
+    "@helium/address" "^4.10.2"
     create-hash "^1.2.0"
     libsodium-wrappers "^0.7.6"
 

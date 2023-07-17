@@ -43,7 +43,7 @@
     "@coral-xyz/anchor": "^0.26.0",
     "@helium/address": "^4.10.2",
     "@helium/circuit-breaker-sdk": "^0.2.5",
-    "@helium/crypto": "^4.6.2",
+    "@helium/crypto": "^4.10.2",
     "@helium/data-credits-sdk": "^0.2.5",
     "@helium/distributor-oracle": "^0.2.10",
     "@helium/fanout-sdk": "^0.2.5",
