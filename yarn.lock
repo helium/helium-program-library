@@ -274,7 +274,16 @@
   dependencies:
     "@hapi/hoek" "^9.0.0"
 
-"@helium/address@^4.6.2", "@helium/address@^4.8.1":
+"@helium/address@^4.10.2":
+  version "4.10.2"
+  resolved "https://registry.yarnpkg.com/@helium/address/-/address-4.10.2.tgz#56960b118fceb6b6ddabe3e4ecec467d9ae50e26"
+  integrity sha512-qCswC7Z3GXuJyHv36RcOSnffeghjqJQx0fdu2Lxpf9fgOnIi1JZO2tjjk1mBaqOwCyp+0YzrTPUoEukL/WCtsA==
+  dependencies:
+    bs58 "^5.0.0"
+    js-sha256 "^0.9.0"
+    multiformats "^9.6.4"
+
+"@helium/address@^4.8.1":
   version "4.8.1"
   resolved "https://registry.npmjs.org/@helium/address/-/address-4.8.1.tgz"
   integrity sha512-OEqX9j8m4sIc6bmvGUWV3/AHeuJCBWIl9EvRpS9xOPy+mC17OkDiPwZI35DSbMlAM7cK7+UjKYZvIVQL/aCgSQ==

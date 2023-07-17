@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.26.0",
-    "@helium/address": "^4.6.2",
+    "@helium/address": "^4.10.2",
     "@helium/anchor-resolvers": "^0.2.5",
     "@helium/helium-sub-daos-sdk": "^0.2.5",
     "@helium/idls": "^0.2.5",
