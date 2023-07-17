@@ -1,4 +1,7 @@
 export { useIdlAccount } from "./hooks/useIdlAccount";
+export { useIdlAccounts } from "./hooks/useIdlAccounts";
+export { useAnchorAccount } from "./hooks/useAnchorAccount";
+export { useAnchorAccounts } from "./hooks/useAnchorAccounts";
 export { useInterval } from "./hooks/useInterval";
 export { useAssociatedTokenAccount } from "./hooks/useAssociatedTokenAccount";
 export { useMint } from "./hooks/useMint";
