@@ -6,3 +6,5 @@ export { useOwnedAmount } from "./hooks/useOwnedAmount";
 export { useSolOwnedAmount } from "./hooks/useSolOwnedAmount";
 export { useTokenAccount } from "./hooks/useTokenAccount";
 export { useAssociatedTokenAddress } from "./hooks/useAssociatedTokenAddress";
+export { useSolanaUnixNow } from "./hooks/useSolanaUnixNow";
+export { useAnchorProvider } from "./hooks/useAnchorProvider";

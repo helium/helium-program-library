@@ -10,7 +10,7 @@
   "description": "React hooks for helium",
   "repository": {
     "type": "git",
-    "url": "https://github.com/HeliumFoundation/helium-program-libary"
+    "url": "https://github.com/helium/helium-program-libary"
   },
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/src/index.js",
@@ -36,6 +36,7 @@
     "@helium/account-fetch-cache": "^0.2.5",
     "@helium/account-fetch-cache-hooks": "^0.2.5",
     "@solana/spl-token": "^0.3.6",
+    "@solana/wallet-adapter-react": "^0.15.32",
     "@solana/web3.js": "^1.66.2",
     "bs58": "^5.0.0",
     "react-async-hook": "^4.0.0"

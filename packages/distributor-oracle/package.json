@@ -9,7 +9,7 @@
   "description": "Oracle server for the lazy distributor",
   "repository": {
     "type": "git",
-    "url": "https://github.com/HeliumFoundation/helium-program-libary"
+    "url": "https://github.com/helium/helium-program-libary"
   },
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/src/index.js",
