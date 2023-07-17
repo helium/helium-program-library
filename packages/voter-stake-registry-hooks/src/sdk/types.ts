@@ -1,10 +1,8 @@
-import { PublicKey } from '@solana/web3.js'
 import { BN, IdlAccounts, IdlTypes } from '@coral-xyz/anchor'
-import { VoterStakeRegistry as HeliumVoterStakeRegistry } from '@helium/idls/lib/types/voter_stake_registry'
 import { HeliumSubDaos } from '@helium/idls/lib/types/helium_sub_daos'
-import { TokenProgramAccount } from '@utils/tokens'
-import { MintInfo } from '@solana/spl-token'
+import { VoterStakeRegistry as HeliumVoterStakeRegistry } from '@helium/idls/lib/types/voter_stake_registry'
 import { Sft } from '@metaplex-foundation/js'
+import { PublicKey } from '@solana/web3.js'
 
 export type VotingMintConfig = IdlTypes<HeliumVoterStakeRegistry>['VotingMintConfigV0']
 type RegistrarV0 = IdlAccounts<HeliumVoterStakeRegistry>['registrar']
@@ -24,9 +22,7 @@ export interface PositionWithMeta extends Position {
   hasRewards: boolean
   hasGenesisMultiplier: boolean
   votingPower: BN
-  votingMint: VotingMintConfig & {
-    mint: TokenProgramAccount<MintInfo>
-  }
+  votingMint: VotingMintConfig
 }
 export type LockupKind = IdlTypes<HeliumVoterStakeRegistry>['LockupKind']
 /* export type InitializePositionV0Args = IdlTypes<HeliumVoterStakeRegistry>['InitializePositionArgsV0']

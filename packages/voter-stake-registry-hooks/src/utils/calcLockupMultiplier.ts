@@ -1,5 +1,4 @@
 import { PublicKey } from '@solana/web3.js'
-import { ProgramAccount, Realm } from '@solana/spl-governance'
 import { Registrar, VotingMintConfig } from '../sdk/types'
 
 export const calcMultiplier = ({
@@ -27,16 +26,16 @@ export const calcMultiplier = ({
 export const calcLockupMultiplier = ({
   lockupSecs,
   registrar,
-  realm,
+  mint
 }: {
   lockupSecs: number
   registrar: Registrar | null
-  realm: ProgramAccount<Realm> | undefined
+  mint: PublicKey
 }) => {
   let multiplier = 0
   const mintCfgs = registrar?.votingMints || []
   const mintCfg = mintCfgs?.find((cfg) =>
-    cfg.mint.equals(realm?.account.communityMint || PublicKey.default)
+    cfg.mint.equals(mint)
   )
 
   if (mintCfg && !mintCfg.mint.equals(PublicKey.default)) {

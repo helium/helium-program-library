@@ -3,17 +3,14 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useMemo } from "react";
 
 
-export function useAnchorProvider(): AnchorProvider {
+export function useAnchorProvider(): AnchorProvider | undefined {
   const { connection } = useConnection();
   const { wallet } = useWallet();
-
   return useMemo(() => {
-    return new AnchorProvider(
-      connection,
-      wallet.adapter as any,
-      {
+    if (wallet && connection) {
+      return new AnchorProvider(connection, wallet.adapter as any, {
         commitment: "confirmed",
-      }
-    );
-  }, [connection, wallet])
+      });
+    }
+  }, [connection, wallet]);
 }

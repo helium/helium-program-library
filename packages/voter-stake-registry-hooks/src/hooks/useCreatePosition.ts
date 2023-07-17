@@ -15,6 +15,7 @@ import {
 } from "@solana/web3.js";
 import { useAsync, useAsyncCallback } from "react-async-hook";
 import { HeliumVsrClient } from "../sdk/client";
+import { getRegistrarKey } from "../utils/getPositionKeys";
 
 export const useCreatePosition = () => {
   const provider = useAnchorProvider();
@@ -27,16 +28,15 @@ export const useCreatePosition = () => {
       amount,
       lockupKind = { cliff: {} },
       lockupPeriodsInDays,
-      registrar,
       mint,
     }: {
       amount: BN;
       lockupKind: any;
       lockupPeriodsInDays: number;
-      registrar: PublicKey;
       mint: PublicKey;
     }) => {
       const isInvalid = !provider || !client;
+      const registrar = getRegistrarKey(mint)
 
       if (isInvalid) {
         throw new Error("Unable to Create Position, Invalid params");

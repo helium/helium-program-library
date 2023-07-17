@@ -24,6 +24,6 @@ export function useOwnedAmount(
   return {
     loading: loadingAssoc || loadingMint,
     amount,
-    decimals: mintAcc?.info.decimals,
+    decimals: mintAcc?.decimals,
   };
 }

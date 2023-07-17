@@ -12,18 +12,18 @@ export const useExtendPosition = () => {
     async ({
       position,
       lockupPeriodsInDays,
-      mint,
       programId = PROGRAM_ID
     }: {
       position: PositionWithMeta;
       lockupPeriodsInDays: number;
-      mint: PublicKey;
       programId?: PublicKey;
     }) => {
       const isInvalid = !provider;
 
       const idl = await Program.fetchIdl(programId, provider);
       const hsdProgram = await init(provider as any, programId, idl);
+      const mint = position.votingMint.mint;
+
 
       if (loading) return;
 

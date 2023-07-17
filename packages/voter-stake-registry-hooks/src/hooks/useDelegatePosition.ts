@@ -12,12 +12,10 @@ export const useDelegatePosition = () => {
     async ({
       position,
       subDao,
-      tokenOwnerRecordPk,
       programId = PROGRAM_ID,
     }: {
       position: PositionWithMeta;
       subDao: SubDaoWithMeta;
-      tokenOwnerRecordPk: PublicKey | null;
       programId?: PublicKey;
     }) => {
       const isInvalid =

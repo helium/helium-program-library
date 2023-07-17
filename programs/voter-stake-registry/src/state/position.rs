@@ -26,6 +26,7 @@ pub struct PositionV0 {
   pub num_active_votes: u16,
   pub genesis_end: i64,
   pub bump_seed: u8,
+  pub vote_controller: Pubkey,
 }
 
 impl PositionV0 {

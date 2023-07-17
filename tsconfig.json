@@ -23,6 +23,9 @@
       "path": "./packages/voter-stake-registry-sdk"
     },
     {
+      "path": "./packages/voter-stake-registry-hooks"
+    },
+    {
       "path": "./packages/distributor-oracle"
     },
     {
