@@ -33,7 +33,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.26.0",
     "@helium/account-fetch-cache": "^0.2.5",
-    "@helium/address": "^4.8.1",
+    "@helium/address": "^4.10.2",
     "@helium/anchor-resolvers": "^0.2.5",
     "@metaplex-foundation/mpl-token-metadata": "^2.5.2",
     "@solana/spl-account-compression": "^0.1.7",

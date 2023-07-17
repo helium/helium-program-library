@@ -35,7 +35,7 @@
     "@coral-xyz/anchor": "^0.26.0",
     "@fastify/cors": "^8.1.1",
     "@helium/account-fetch-cache": "^0.2.5",
-    "@helium/address": "^4.6.2",
+    "@helium/address": "^4.10.2",
     "@orca-so/whirlpools-sdk": "^0.8.2",
     "@solana/web3.js": "^1.66.2",
     "axios": "^1.1.3",

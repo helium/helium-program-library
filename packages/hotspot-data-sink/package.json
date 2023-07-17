@@ -35,7 +35,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.26",
     "@fastify/cors": "^8.1.1",
-    "@helium/address": "^4.6.2",
+    "@helium/address": "^4.10.2",
     "@helium/helium-entity-manager-sdk": "^0.2.10",
     "@helium/helium-sub-daos-sdk": "^0.2.5",
     "@helium/idls": "^0.2.5",
