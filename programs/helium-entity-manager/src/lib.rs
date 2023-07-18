@@ -156,4 +156,11 @@ pub mod helium_entity_manager {
   pub fn temp_repair_iot_operations_fund(ctx: Context<TempRepairIotOperationsFund>) -> Result<()> {
     temp_repair_iot_operations_fund::handler(ctx)
   }
+
+  pub fn temp_update_iot_operations_fund_metadata(
+    ctx: Context<TempUpdateIotOperationsFundMetadata>,
+    args: TempUpdateIotOperationsFundMetadataArgs,
+  ) -> Result<()> {
+    temp_update_iot_operations_fund_metadata::handler(ctx, args)
+  }
 }
