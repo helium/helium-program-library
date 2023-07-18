@@ -155,4 +155,11 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     temp_backfill_onboarding_fees_v0::handler(ctx)
   }
+
+  pub fn temp_update_iot_operations_fund_metadata(
+    ctx: Context<TempUpdateIotOperationsFundMetadata>,
+    args: TempUpdateIotOperationsFundMetadataArgs,
+  ) -> Result<()> {
+    temp_update_iot_operations_fund_metadata::handler(ctx, args)
+  }
 }
