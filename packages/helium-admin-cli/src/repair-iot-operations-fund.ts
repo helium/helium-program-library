@@ -1,42 +1,43 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from '@coral-xyz/anchor';
 import {
-  init as initHem, keyToAssetKey,
-} from "@helium/helium-entity-manager-sdk";
-import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
-import { PublicKey } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
-import os from "os";
-import yargs from "yargs/yargs";
-import { sendInstructionsOrSquads } from "./utils";
+  init as initHem,
+  keyToAssetKey,
+} from '@helium/helium-entity-manager-sdk';
+import { daoKey, init as initHsd } from '@helium/helium-sub-daos-sdk';
+import { PublicKey } from '@solana/web3.js';
+import Squads from '@sqds/sdk';
+import os from 'os';
+import yargs from 'yargs/yargs';
+import { sendInstructionsOrSquads } from './utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: "k",
-      describe: "Anchor wallet keypair",
+      alias: 'k',
+      describe: 'Anchor wallet keypair',
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: "u",
-      default: "http://127.0.0.1:8899",
-      describe: "The solana url",
+      alias: 'u',
+      default: 'http://127.0.0.1:8899',
+      describe: 'The solana url',
     },
     hntMint: {
       required: true,
-      type: "string",
-      describe: "HNT mint of the dao to be updated",
+      type: 'string',
+      describe: 'HNT mint of the dao to be updated',
     },
     executeTransaction: {
-      type: "boolean",
+      type: 'boolean',
     },
     multisig: {
-      type: "string",
+      type: 'string',
       describe:
-        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
     },
     authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
+      type: 'number',
+      describe: 'Authority index for squads. Defaults to 1',
       default: 1,
     },
   });
@@ -60,7 +61,7 @@ export async function run(args: any = process.argv) {
         dao,
         authority: daoAcc.authority,
         payer: daoAcc.authority,
-        keyToAsset: keyToAssetKey(dao, "iot_operations_fund", "utf8")[0]
+        keyToAsset: keyToAssetKey(dao, 'iot_operations_fund', 'utf8')[0],
       })
       .instruction()
   );
@@ -69,7 +70,7 @@ export async function run(args: any = process.argv) {
     process.env.ANCHOR_PROVIDER_URL,
     provider.wallet,
     {
-      commitmentOrConfig: "finalized",
+      commitmentOrConfig: 'finalized',
     }
   );
   await sendInstructionsOrSquads({

@@ -51,21 +51,24 @@ export async function run(args: any = process.argv) {
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
-  const program = await initHem(provider);
-  const daosProgram = await initHsd(provider);
+  const hemProgram = await initHem(provider);
+  const hsdProgram = await initHsd(provider);
 
   const instructions = [];
 
   const hntMint = new PublicKey(argv.hntMint);
   const dao = daoKey(hntMint)[0];
-  const daoAcc = await daosProgram.account.daoV0.fetch(dao);
+  const [keyToAsset] = keyToAssetKey(dao, 'iot_operations_fund', 'utf8');
+  const assetId = (await hemProgram.account.keyToAssetV0.fetch(keyToAsset))
+    .asset;
+
+  console.log('keyToAsset', keyToAsset.toBase58());
+  console.log('assetId', assetId.toBase58());
 
   instructions.push(
-    await program.methods
-      .tempUpdateIotOperationsFundMetadata({
-        metadataUrl: argv.metadataUrl,
-      })
-      .accounts({})
+    await hemProgram.methods
+      .tempUpdateIotOperationsFundMetadata({ metadataUrl: argv.metadataUrl })
+      .accounts({ dao, mint: assetId })
       .instruction()
   );
 
