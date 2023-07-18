@@ -472,11 +472,11 @@ export async function bulkSendTransactions(
   onProgress?: (status: Status) => void,
   triesRemaining: number = 10 // Number of blockhashes to try resending txs with before giving up
 ): Promise<string[]> {
-  let ret = [];
+  let ret: string[] = [];
 
   // attempt to chunk by blockhash bounds (so signing doesn't take too long)
   for (let chunk of chunks(txs, TX_BATCH_SIZE)) {
-    const thisRet = [];
+    const thisRet: string[] = [];
     // Continually send in bulk while resetting blockhash until we send them all
     while (true) {
       const recentBlockhash = await withRetries(5, () =>
@@ -546,7 +546,7 @@ export async function bulkSendRawTransactions(
 ): Promise<string[]> {
   const txBatchSize = TX_BATCH_SIZE;
   let totalProgress = 0;
-  const ret = [];
+  const ret: string[] = [];
   if (!lastValidBlockHeight) {
     const blockhash = await withRetries(5, () =>
       connection.getLatestBlockhash("confirmed")

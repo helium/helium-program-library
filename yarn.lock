@@ -690,6 +690,23 @@
     borsh "^0.7.0"
     bs58 "^4.0.1"
 
+"@helium/modular-governance-idls@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@helium/modular-governance-idls/-/modular-governance-idls-0.0.2.tgz#55011d98b489bb954787380e89d9461a4107a373"
+  integrity sha512-cv1VZbVUJMGw2yZpUcXL60/aw5OcamTmqUwa7Srg+Irt59wvCdfmU/BSP+g1L+7mhxyu8nMMhAs9bTVARyCxFw==
+  dependencies:
+    "@coral-xyz/anchor" "^0.27.0"
+    "@solana/web3.js" "^1.43.4"
+
+"@helium/proposal-sdk@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@helium/proposal-sdk/-/proposal-sdk-0.0.2.tgz#1310d4c6d2f20c7ec1979a66abd8364a14836382"
+  integrity sha512-HN9uy7zkYrMm3lWpC0U+MEHk5O+FKYMcs9njyR1J1+qj4fsOLwy/xdcxIMFZmkvP0T6NIXwoUAHMA2ktZ+KlrQ==
+  dependencies:
+    "@coral-xyz/anchor" "^0.27.0"
+    "@helium/anchor-resolvers" "^0.2.5"
+    "@helium/modular-governance-idls" "^0.0.2"
+
 "@helium/proto@^1.5.0":
   version "1.6.0"
   resolved "https://registry.yarnpkg.com/@helium/proto/-/proto-1.6.0.tgz#b97003bbc511afec1abac7cbffc5c088e348022d"

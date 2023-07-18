@@ -24,6 +24,8 @@
     "@coral-xyz/anchor-cli": "^0.26.0",
     "@coral-xyz/borsh": "^0.2.6",
     "@helium/crypto": "^4.6.2",
+    "@helium/modular-governance-idls": "^0.0.2",
+    "@helium/proposal-sdk": "^0.0.2",
     "@helium/transactions": "^3.38.0",
     "@metaplex-foundation/mpl-bubblegum": "^0.6.2",
     "@pythnetwork/client": "^2.8.0",

@@ -160,4 +160,5 @@ pub enum VsrError {
   #[msg("Cannot transfer to the same position")]
   SamePosition,
   MaxChoicesExceeded,
+  NoVoteForThisChoice,
 }

@@ -141,4 +141,18 @@ pub mod voter_stake_registry {
   pub fn update_registrar_authority_v0(ctx: Context<UpdateRegistrarAuthorityV0>) -> Result<()> {
     instructions::update_registrar_authority_v0::handler(ctx)
   }
+
+  pub fn vote_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, VoteV0<'info>>,
+    args: VoteArgsV0,
+  ) -> Result<()> {
+    instructions::vote_v0::handler(ctx, args)
+  }
+
+  pub fn relinquish_vote_v1(
+    ctx: Context<RelinquishVoteV1>,
+    args: RelinquishVoteArgsV1,
+  ) -> Result<()> {
+    instructions::relinquish_vote_v1::handler(ctx, args)
+  }
 }

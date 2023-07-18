@@ -8,7 +8,7 @@ import { useSolOwnedAmount } from "./useSolOwnedAmount";
 export function useOwnedAmount(
   wallet: PublicKey | undefined | null,
   mint: PublicKey | undefined | null
-): { amount: bigint, decimals: number, loading: boolean } {
+): { amount: bigint | undefined , decimals: number | undefined, loading: boolean } {
   const { amount: solOwnedAmount } = useSolOwnedAmount(wallet || undefined);
   const { associatedAccount, loading: loadingAssoc } =
     useAssociatedTokenAccount(wallet, mint);

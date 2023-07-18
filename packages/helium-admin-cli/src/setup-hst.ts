@@ -114,13 +114,13 @@ export async function run(args: any = process.argv) {
     updateAuthority: authority,
   });
 
-  const fanout = fanoutKey(argv.name)[0];
+  const fanout = fanoutKey(argv.name!)[0];
   const hntAccount = await getAssociatedTokenAddressSync(hnt, fanout, true);
   console.log("Outputting hnt to", hntAccount.toBase58());
   if (!(await exists(provider.connection, fanout))) {
     await fanoutProgram.methods
       .initializeFanoutV0({
-        name: argv.name,
+        name: argv.name!,
       })
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),

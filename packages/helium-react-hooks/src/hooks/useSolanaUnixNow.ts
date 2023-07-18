@@ -7,7 +7,7 @@ export const useSolanaUnixNow = (refreshInterval: number = 10000): number | unde
   const { connection } = useConnection();
   const [refresh, setRefresh] = useState(0);
 
-  const { result: unixTs } = useAsync(async (connection: Connection) => {
+  const { result: unixTs } = useAsync(async (connection: Connection, _: number) => {
     const clock = await connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
     return Number(clock!.data.readBigInt64LE(8 * 4));
   }, [connection, refresh]);

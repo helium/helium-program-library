@@ -36,7 +36,7 @@ export function useAccounts<T>(
       info?: T;
       publicKey: PublicKey;
     }[]
-  >();
+  >([]);
 
   const parsedAccountBaseParser = useMemo(
     () =>
@@ -71,7 +71,7 @@ export function useAccounts<T>(
   const { result, loading, error } = useAsync(
     async (
       keys: null | undefined | PublicKey[],
-      parser: TypedAccountParser<T>
+      parser: TypedAccountParser<T> | undefined
     ) => {
       return (
         keys &&
@@ -82,12 +82,18 @@ export function useAccounts<T>(
               parser ? parsedAccountBaseParser : undefined,
               isStatic
             );
-            return {
-              info: acc && parser && parser(acc.pubkey, acc?.account),
-              account: acc && acc.account,
-              publicKey: acc.pubkey,
-              parser: parser ? parsedAccountBaseParser : undefined,
-            };
+            if (acc) {
+              return {
+                info: parser && parser(acc.pubkey, acc?.account),
+                account: acc.account,
+                publicKey: acc.pubkey,
+                parser: parser ? parsedAccountBaseParser : undefined,
+              };
+            } else {
+              return {
+                publicKey: key
+              }
+            }
           })
         ))
       );
@@ -99,10 +105,9 @@ export function useAccounts<T>(
   useEffect(() => {
     if (result) {
       setAccounts(result);
-      const disposers =
-        result.map((account) => {
-          return cache.watch(account.publicKey, account.parser, true);
-        });
+      const disposers = result.map((account) => {
+        return cache.watch(account.publicKey, account.parser, true);
+      });
 
       return () => {
         disposers?.forEach((disposer) => disposer());
@@ -120,17 +125,23 @@ export function useAccounts<T>(
           (acc) => acc.publicKey.toBase58() === event.id
         );
         const acc = await cache.get(event.id);
-        const newAccounts = [
-          ...accounts.slice(0, index),
-          {
-            info: mergePublicKeys(accounts[index].info, acc && parser && parser(acc.pubkey, acc?.account)),
-            account: acc && acc.account,
-            publicKey: acc.pubkey,
-            parser: parser ? parsedAccountBaseParser : undefined,
-          },
-          ...accounts.slice(index + 1),
-        ];
-        setAccounts(newAccounts);
+        if (acc) {
+          const parsed = parser && parser(acc.pubkey, acc?.account);
+          const newParsed = accounts[index]
+            ? mergePublicKeys(accounts[index].info, parsed)
+            : parsed;
+          const newAccounts = [
+            ...accounts.slice(0, index),
+            {
+              info: newParsed,
+              account: acc.account,
+              publicKey: acc.pubkey,
+              parser: parser ? parsedAccountBaseParser : undefined,
+            },
+            ...accounts.slice(index + 1),
+          ];
+          setAccounts(newAccounts);
+        }
       }
     });
     return () => {
@@ -145,7 +156,6 @@ export function useAccounts<T>(
   };
 }
 
-
 /**
  *
  * @param input
@@ -154,9 +164,9 @@ export function useAccounts<T>(
 export function isPureObject(input: typeof Object | null) {
   return (
     input !== null &&
-    typeof input === 'object' &&
+    typeof input === "object" &&
     Object.getPrototypeOf(input).isPrototypeOf(Object)
-  )
+  );
 }
 
 /**
@@ -167,7 +177,7 @@ export function isPureObject(input: typeof Object | null) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mergePublicKeys(arg0: any, arg1: any) {
   if (!isPureObject(arg1) || !arg1 || !arg0) {
-    return arg1
+    return arg1;
   }
 
   return Object.entries(arg1).reduce((acc, [key, value]) => {
@@ -177,12 +187,12 @@ export function mergePublicKeys(arg0: any, arg1: any) {
       arg0[key] &&
       arg1[key].equals(arg0[key])
     ) {
-      acc[key as keyof typeof acc] = arg0[key]
+      acc[key as keyof typeof acc] = arg0[key];
     } else {
-      acc[key as keyof typeof acc] = value
+      acc[key as keyof typeof acc] = value;
     }
 
-    return acc
+    return acc;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }, {} as Record<string, any>)
+  }, {} as Record<string, any>);
 }

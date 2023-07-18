@@ -11,7 +11,7 @@ import { utf8 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 export function useIdl<IDL extends Idl>(programId: PublicKey | undefined): UseAccountState<IDL> & { error: Error | undefined } {
   const [idlError, setIdlError] = useState<Error | undefined>();
   const { result: idlKey, error } = useAsync(
-    (owner: string | undefined) => owner && idlAddress(new PublicKey(owner)),
+    async (owner: string | undefined) => owner ? idlAddress(new PublicKey(owner)) : undefined,
     [programId?.toBase58()]
   );
   const idlParser: TypedAccountParser<IDL> = useMemo(() => {

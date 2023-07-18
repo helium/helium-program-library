@@ -56,13 +56,13 @@ export async function run(args: any = process.argv) {
   const hemProgram = await initHem(provider);
   const rewardsOracleProgram = await initRewards(provider);
 
-  const mint = new PublicKey(argv.mint);
+  const mint = new PublicKey(argv.mint!);
   const dao = daoKey(new PublicKey(argv.hntMint))[0];
   const lazyDistributor = lazyDistributorKey(mint)[0];
   let assetId = argv.assetId ? new PublicKey(argv.assetId) : undefined;
   if (!assetId) {
     const entityKey = argv.entityKey;
-    const keyToAsset = keyToAssetKey(dao, entityKey)[0];
+    const keyToAsset = keyToAssetKey(dao, entityKey!)[0];
     assetId = (await hemProgram.account.keyToAssetV0.fetch(keyToAsset)).asset;
   }
 

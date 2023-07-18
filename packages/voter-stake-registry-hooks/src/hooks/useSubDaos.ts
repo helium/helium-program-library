@@ -8,6 +8,9 @@ import { useAnchorProvider } from '@helium/helium-react-hooks'
 export const useSubDaos = (
   programId: web3.PublicKey = PROGRAM_ID
 ): UseAsyncReturn<SubDaoWithMeta[]> => {
-  const provider = useAnchorProvider()
-  return useAsync(getSubDaos, [provider, programId])
-}
+  const provider = useAnchorProvider();
+  return useAsync(
+    async (provider, programId) => provider && getSubDaos(provider, programId),
+    [provider, programId]
+  );
+};

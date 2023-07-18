@@ -1,26 +1,26 @@
-use crate::error::ErrorCode;
+use crate::error::VsrError;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use proposal::{ProposalConfigV0, ProposalV0};
 
-use crate::{state::*, registrar_seeds};
+use crate::{registrar_seeds, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct RelinquishVoteArgsV0 {
+pub struct RelinquishVoteArgsV1 {
   pub choice: u16,
 }
 
 #[derive(Accounts)]
-pub struct RelinquishVoteV0<'info> {
+pub struct RelinquishVoteV1<'info> {
   /// CHECK: You're getting sol why do you care?
   /// Account to receive sol refund if marker is closed
   #[account(mut)]
   pub refund: AccountInfo<'info>,
   #[account(
     mut,
-    seeds = [b"marker", token_voter.key().as_ref(), mint.key().as_ref(), proposal.key().as_ref()],
+    seeds = [b"marker", registrar.key().as_ref(), mint.key().as_ref(), proposal.key().as_ref()],
     bump = marker.bump_seed,
-    has_one = token_voter,
+    has_one = registrar,
     has_one = mint
   )]
   pub marker: Account<'info, VoteMarkerV0>,
@@ -63,14 +63,14 @@ pub struct RelinquishVoteV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<RelinquishVoteV0>, args: RelinquishVoteArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<RelinquishVoteV1>, args: RelinquishVoteArgsV1) -> Result<()> {
   let marker = &mut ctx.accounts.marker;
   marker.proposal = ctx.accounts.proposal.key();
   marker.voter = ctx.accounts.voter.key();
 
   require!(
     marker.choices.iter().any(|choice| *choice == args.choice),
-    ErrorCode::NoVoteForThisChoice
+    VsrError::NoVoteForThisChoice
   );
 
   marker.choices = marker
@@ -95,7 +95,7 @@ pub fn handler(ctx: Context<RelinquishVoteV0>, args: RelinquishVoteArgsV0) -> Re
     proposal::VoteArgsV0 {
       remove_vote: true,
       choice: args.choice,
-      weight: u128::from(ctx.accounts.marker.weight),
+      weight: u128::from(marker.weight),
     },
   )?;
 

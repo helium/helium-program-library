@@ -11,7 +11,7 @@ import {
   Nft,
   Sft
 } from "@metaplex-foundation/js";
-import { getMint } from "@solana/spl-token";
+import { getMint, Mint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import {
   Registrar
@@ -54,7 +54,7 @@ export const getPositionKeys = async (
     registrarPk
   )) as Registrar;
   const mintCfgs = registrar.votingMints;
-  const mints = {};
+  const mints: Record<string, Mint> = {};
   for (const mcfg of mintCfgs) {
     const mint = await getMint(connection, mcfg.mint);
     mints[mcfg.mint.toBase58()] = mint;
