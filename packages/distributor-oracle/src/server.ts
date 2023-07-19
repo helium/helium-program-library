@@ -311,7 +311,8 @@ export class OracleServer {
           decoded.name !== "distributeCompressionRewardsV0" &&
           decoded.name !== "initializeRecipientV0" &&
           decoded.name !== "initializeCompressionRecipientV0" &&
-          decoded.name !== "setCurrentRewardsWrapperV0")
+          decoded.name !== "setCurrentRewardsWrapperV0" &&
+          decoded.name !== "setCurrentRewardsWrapperV1")
       ) {
         return {
           success: false,
@@ -323,7 +324,8 @@ export class OracleServer {
 
       if (
         decoded.name === "setCurrentRewardsV0" ||
-        decoded.name === "setCurrentRewardsWrapperV0"
+        decoded.name === "setCurrentRewardsWrapperV0" ||
+        decoded.name === "setCurrentRewardsWrapperV1"
       )
         setRewardIxs.push(ix);
 
@@ -372,7 +374,9 @@ export class OracleServer {
     )!;
 
     const setRewardsWrapperIx = this.roProgram.idl.instructions.find(
-      (x) => x.name === "setCurrentRewardsWrapperV0"
+      (x) =>
+        x.name === "setCurrentRewardsWrapperV0" ||
+        x.name === "setCurrentRewardsWrapperV1"
     )!;
     const wrapperOracleKeyIdx = setRewardsWrapperIx.accounts.findIndex(
       (x) => x.name === "oracle"
@@ -407,8 +411,7 @@ export class OracleServer {
         keyToAssetK = ix.keys[wrapperKeyToAssetIdx].pubkey;
         //@ts-ignore
         proposedCurrentRewards = decoded.data.args.currentRewards;
-        // @ts-ignore
-        entityKey = decoded.data.args.entityKey;
+        entityKey = (await this.hemProgram.account.keyToAssetV0.fetch(keyToAssetK)).entityKey;
       } else if (
         ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey) &&
         ix.programId.equals(LD_PID)

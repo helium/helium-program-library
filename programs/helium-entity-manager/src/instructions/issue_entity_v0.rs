@@ -155,7 +155,11 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
   let metadata = MetadataArgs {
     name: name[..min(name.len(), MAX_NAME_LENGTH)].to_owned(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("{}/{}", ENTITY_METADATA_URL, key_str),
+    uri: format!(
+      "{}/{}",
+      ENTITY_METADATA_URL,
+      bs58::encode(hash(&args.entity_key[..])).into_string()
+    ),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi

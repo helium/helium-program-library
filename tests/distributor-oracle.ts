@@ -384,10 +384,9 @@ describe("distributor-oracle", () => {
   it("allows oracle to set current reward", async () => {
     const keyToAsset = keyToAssetKey(daoK, ecc)[0];
     await rewardsProgram.methods
-      .setCurrentRewardsWrapperV0({
+      .setCurrentRewardsWrapperV1({
         currentRewards: new anchor.BN("5000000"),
         oracleIndex: 0,
-        entityKey: Buffer.from(bs58.decode(ecc)),
       })
       .accounts({
         lazyDistributor,

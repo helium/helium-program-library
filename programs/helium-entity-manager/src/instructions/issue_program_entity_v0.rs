@@ -140,11 +140,7 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     ErrorCode::InvalidStringLength
   );
 
-  let key_str = match args.key_serialization {
-    KeySerialization::B58 => bs58::encode(&args.entity_key).into_string(),
-    KeySerialization::UTF8 => std::str::from_utf8(&args.entity_key).unwrap().to_string(),
-  };
-
+  let key_str = bs58::encode(hash(&args.entity_key[..])).into_string();
   let asset_id = get_asset_id(
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,

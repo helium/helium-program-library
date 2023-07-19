@@ -112,6 +112,49 @@ export function decodeEntityKey(
   }
 }
 
+export const hashedEntityKeyFromJsonUri = (uri: string): Buffer => {
+  const isV1 = uri.includes("/v1/")
+  if (isV1) {
+    // V1 is better, the uri is just the hashed entity key. No need to know the full entity key or serializatoin strategy.
+    return bs58.decode(uri.split("/v1/").slice(-1)[0])
+  } else {
+    const entityKey = uri.split("/").slice(-1)[0];
+    if (Address.isValid(entityKey)) {
+      // Hotspot
+      sha256(Address.fromB58(entityKey).bin)
+    } else if (entityKey === "iot_operations_fund") {
+      // IOT Operations Fund
+      sha256(Buffer.from(entityKey, "utf-8"))
+    } else {
+      // Mobile subscriber
+      sha256(bs58.decode(entityKey));
+    }
+  }
+}
+
+export const keyToAssetKeyRaw = (
+  dao: PublicKey,
+  hashedEntityKey: Buffer,
+  programId: PublicKey = PROGRAM_ID
+) => {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("key_to_asset", "utf-8"),
+      dao.toBuffer(),
+      hashedEntityKey,
+    ],
+    programId
+  );
+};
+
+export const keyToAssetKeyForNFT = (
+  dao: PublicKey,
+  nftUri: string,
+  programId: PublicKey = PROGRAM_ID
+) => {
+  return keyToAssetKeyRaw(dao, hashedEntityKeyFromJsonUri(nftUri), programId);
+};
+
 export const keyToAssetKey = (
   dao: PublicKey,
   entityKey: Buffer | string,

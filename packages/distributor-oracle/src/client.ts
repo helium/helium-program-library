@@ -1,5 +1,5 @@
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
-import { init, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
+import { init, keyToAssetKey, keyToAssetKeyForNFT } from "@helium/helium-entity-manager-sdk";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
 import { distributeCompressionRewards, initializeCompressionRecipient, recipientKey } from "@helium/lazy-distributor-sdk";
@@ -225,8 +225,8 @@ export async function formBulkTransactions({
   // construct the set and distribute ixs
   let setAndDistributeIxs = await Promise.all(
     compressionAssetAccs.map(async (assetAcc, idx) => {
-      const entityKey = assetAcc.content.json_uri.split("/").slice(-1)[0];
-      const keyToAsset = keyToAssetKey(dao, entityKey, encoding)[0];
+      const keyToAssetK = keyToAssetKeyForNFT(dao, assetAcc.content.json_uri)[0];
+      const keyToAsset = await hemProgram
       const setRewardIxs = (
         await Promise.all(
           rewards.map(async (bulkRewards, oracleIdx) => {
@@ -234,8 +234,7 @@ export async function formBulkTransactions({
               return null;
             }
             return await rewardsOracleProgram!.methods
-              .setCurrentRewardsWrapperV0({
-                entityKey: Buffer.from(bs58.decode(entityKey)),
+              .setCurrentRewardsWrapperV1({
                 currentRewards: new BN(bulkRewards.currentRewards[entityKey]),
                 oracleIndex: oracleIdx,
               })
@@ -370,7 +369,7 @@ export async function formTransaction({
     throw new Error("No asset with ID " + asset.toBase58());
   }
 
-  const entityKey = assetAcc.content.json_uri.split("/").slice(-1)[0];
+  let keyToAsset = keyToAssetKeyForNFT(dao, assetAcc.content.json_uri)[0];
   const recipient = recipientKey(lazyDistributor, asset)[0];
   const lazyDistributorAcc =
     (await lazyDistributorProgram.account.lazyDistributorV0.fetch(
@@ -415,11 +414,9 @@ export async function formTransaction({
     tx.add(initRecipientIx);
   }
 
-  const keyToAsset = keyToAssetKey(dao, entityKey, encoding)[0];
   const ixPromises = rewards.map((x, idx) => {
     return rewardsOracleProgram!.methods
-      .setCurrentRewardsWrapperV0({
-        entityKey: Buffer.from(bs58.decode(entityKey)),
+      .setCurrentRewardsWrapperV1({
         currentRewards: new BN(x.currentRewards),
         oracleIndex: idx,
       })
