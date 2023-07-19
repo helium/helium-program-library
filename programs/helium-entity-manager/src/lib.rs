@@ -161,7 +161,7 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     temp_pay_mobile_onboarding_fee_v0::handler(ctx)
   }
-  
+
   pub fn temp_update_iot_operations_fund_metadata(
     ctx: Context<TempUpdateIotOperationsFundMetadata>,
     args: TempUpdateIotOperationsFundMetadataArgs,
