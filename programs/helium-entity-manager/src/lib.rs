@@ -161,4 +161,10 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     temp_backfill_mobile_info_data_v0::handler(ctx)
   }
+  
+  pub fn temp_pay_mobile_onboarding_fee_v0(
+    ctx: Context<TempPayMobileOnboardingFeeV0>,
+  ) -> Result<()> {
+    temp_pay_mobile_onboarding_fee_v0::handler(ctx)
+  }
 }
