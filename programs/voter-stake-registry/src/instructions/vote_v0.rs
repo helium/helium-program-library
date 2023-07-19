@@ -98,6 +98,7 @@ pub fn handler(ctx: Context<VoteV0>, args: VoteArgsV0) -> Result<()> {
       ctx.accounts.registrar.clock_unix_timestamp(),
     )?)
   };
+  marker.weight = weight;
 
   proposal::cpi::vote_v0(
     CpiContext::new_with_signer(
