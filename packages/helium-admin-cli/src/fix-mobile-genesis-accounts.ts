@@ -35,6 +35,7 @@ export async function run(args: any = process.argv) {
     }]
   });
 
+
   for (const acc of rawAccs) {
     if (acc.account.data.toString("hex").slice(0, 8) != "79c874d129f1e4b8") {
       // this account has a bad discriminator, needs to be fixed
