@@ -355,11 +355,17 @@ fn construct_set_active_ixs(
       match iot_info_acc {
         Some(raw_info) => {
           let mut data = raw_info.data.as_slice();
-          let parsed_info = IotHotspotInfoV0::try_deserialize(&mut data).context(format!(
-            "Failed to deserialize iot info acc, {}",
-            iot_infos[j].to_string()
-          ))?;
-          if parsed_info.is_active != is_active {
+          let parsed_info_res = IotHotspotInfoV0::try_deserialize(&mut data);
+
+          if let Err(e) = parsed_info_res {
+            println!(
+              "Failed to deserialize iot info acc, {}\n\n{}",
+              iot_infos[j].to_string(),
+              e
+            );
+            continue;
+          }
+          if parsed_info_res.unwrap().is_active != is_active {
             valid_iot_infos.push(InfoWithEntityKey {
               info_key: iot_infos[j],
               entity_key: entity_keys[start + j].clone(),
@@ -371,11 +377,17 @@ fn construct_set_active_ixs(
       match mobile_info_acc {
         Some(raw_info) => {
           let mut data = raw_info.data.as_slice();
-          let parsed_info = MobileHotspotInfoV0::try_deserialize(&mut data).context(format!(
-            "Failed to deserialize mobile info acc, {}",
-            mobile_infos[j].to_string()
-          ))?;
-          if parsed_info.is_active != is_active {
+          let parsed_info_res = MobileHotspotInfoV0::try_deserialize(&mut data);
+
+          if let Err(e) = parsed_info_res {
+            println!(
+              "Failed to deserialize mobile info acc, {}\n\n{}",
+              mobile_infos[j].to_string(),
+              e
+            );
+            continue;
+          }
+          if parsed_info_res.unwrap().is_active != is_active {
             valid_mobile_infos.push(InfoWithEntityKey {
               info_key: mobile_infos[j],
               entity_key: entity_keys[start + j].clone(),
