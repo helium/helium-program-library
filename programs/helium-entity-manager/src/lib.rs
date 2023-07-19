@@ -155,4 +155,10 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     temp_backfill_onboarding_fees_v0::handler(ctx)
   }
+
+  pub fn fix_mobile_genesis_accounts_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, FixMobileGenesisAccountsV0<'info>>,
+  ) -> Result<()> {
+    fix_mobile_genesis_accounts_v0::handler(ctx)
+  }
 }
