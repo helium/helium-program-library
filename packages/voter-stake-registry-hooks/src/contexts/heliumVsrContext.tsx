@@ -85,7 +85,7 @@ export const HeliumVsrStateProvider: React.FC<
       const mintCfgs = registrar?.votingMints;
       const positionsWithMeta = positions.map((position, idx) => {
         if (position && position.info) {
-          const isDelegated = !!delegatedAccounts[idx];
+          const isDelegated = !!delegatedAccounts?.[idx]?.info;
           const delegatedSubDao = isDelegated
             ? delegatedAccounts[idx]?.info?.subDao
             : null;

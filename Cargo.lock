@@ -216,8 +216,7 @@ dependencies = [
 [[package]]
 name = "anchor-gen"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a3b9def91d1f0c23b99be210afea0990f931a1edae439ea30e0da50baeaea8f"
+source = "git+https://github.com/ChewingGlass/anchor-gen.git#e0fc165075c2cbef7da8b75fe0377c28fba7fcfe"
 dependencies = [
  "anchor-generate-cpi-crate",
  "anchor-generate-cpi-interface",
@@ -226,8 +225,7 @@ dependencies = [
 [[package]]
 name = "anchor-generate-cpi-crate"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03e8733d55b8492bde0d6f219c25769786758ff9e5e90a16e6a348f91284af50"
+source = "git+https://github.com/ChewingGlass/anchor-gen.git#e0fc165075c2cbef7da8b75fe0377c28fba7fcfe"
 dependencies = [
  "anchor-idl",
  "syn 1.0.107",
@@ -236,8 +234,7 @@ dependencies = [
 [[package]]
 name = "anchor-generate-cpi-interface"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7092a50cf959ebf53460162cb07e88d4cc8ea7fa8c45292e80503a3186033daf"
+source = "git+https://github.com/ChewingGlass/anchor-gen.git#e0fc165075c2cbef7da8b75fe0377c28fba7fcfe"
 dependencies = [
  "anchor-idl",
  "darling",
@@ -247,8 +244,7 @@ dependencies = [
 [[package]]
 name = "anchor-idl"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3de2665dc06ee0bd3c7d08f47f136a3d5b1e34b7ac1bc632c86a812add04d68b"
+source = "git+https://github.com/ChewingGlass/anchor-gen.git#e0fc165075c2cbef7da8b75fe0377c28fba7fcfe"
 dependencies = [
  "anchor-syn 0.24.2",
  "darling",

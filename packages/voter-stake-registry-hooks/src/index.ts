@@ -22,3 +22,6 @@ export { calcLockupMultiplier } from "./utils/calcLockupMultiplier";
 export { calcPositionVotingPower } from "./utils/calcPositionVotingPower";
 export * from "./sdk/types";
 export { getRegistrarKey, getPositionKeys } from "./utils/getPositionKeys";
+export { useVoteMarkers } from "./hooks/useVoteMarkers";
+export { useVote } from "./hooks/useVote";
+export { useRelinquishVote } from "./hooks/useRelinquishVote";

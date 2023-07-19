@@ -4,6 +4,7 @@ import { UseAccountState, useAccount } from "@helium/account-fetch-cache-hooks";
 import { PublicKey } from "@solana/web3.js";
 import { useIdl } from "./useIdl";
 import { useIdlAccount } from "./useIdlAccount";
+import { useEffect } from "react";
 
 export function useAnchorAccount<IDL extends Idl, A extends keyof AllAccountsMap<IDL>>(
   key: PublicKey | undefined,
@@ -12,7 +13,12 @@ export function useAnchorAccount<IDL extends Idl, A extends keyof AllAccountsMap
   error?: Error;
 } {
   const { account: rawAccount } = useAccount(key);
-  const { info: idl, error } = useIdl<IDL>(rawAccount?.owner);
+  const { info: idl, error, loading } = useIdl<IDL>(rawAccount?.owner);
+  useEffect(() => {
+    if (!loading && rawAccount && !idl) {
+      console.warn(`Idl not found for ${rawAccount.owner.toBase58()}`)
+    }
+  }, [idl, loading, rawAccount])
 
   return {
     ...useIdlAccount(key, idl, type),

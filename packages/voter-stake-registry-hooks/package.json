@@ -37,6 +37,7 @@
     "@helium/account-fetch-cache-hooks": "^0.2.5",
     "@helium/helium-react-hooks": "^0.2.5",
     "@helium/helium-sub-daos-sdk": "^0.2.5",
+    "@helium/modular-governance-hooks": "^0.0.2",
     "@helium/spl-utils": "^0.2.5",
     "@helium/voter-stake-registry-sdk": "^0.2.5",
     "@metaplex-foundation/js": "^0.19.4",

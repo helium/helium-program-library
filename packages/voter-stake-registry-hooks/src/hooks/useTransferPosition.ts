@@ -40,7 +40,7 @@ export const useTransferPosition = () => {
       if (loading) return;
 
       if (isInvalid || !hsdProgram) {
-        throw new Error("Unable to Transfer Position, Invalid params");
+        throw new Error("Unable to Transfer Position, position has active votes");
       } else {
         const instructions: TransactionInstruction[] = [];
         const [dao] = daoKey(mint);

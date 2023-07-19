@@ -38,9 +38,12 @@ export function useAccounts<T>(
     }[]
   >([]);
 
-  const parsedAccountBaseParser = useMemo(
-    () =>
-      (pubkey: PublicKey, data: AccountInfo<Buffer>): ParsedAccountBase => {
+  const parsedAccountBaseParser = useMemo(() => {
+    if (parser) {
+      return (
+        pubkey: PublicKey,
+        data: AccountInfo<Buffer>
+      ): ParsedAccountBase => {
         try {
           if (parser) {
             const info = parser(pubkey, data);
@@ -64,14 +67,17 @@ export function useAccounts<T>(
             info: undefined,
           };
         }
-      },
-    [parser]
-  );
+      };
+    }
+  }, [parser]);
 
   const { result, loading, error } = useAsync(
     async (
       keys: null | undefined | PublicKey[],
-      parser: TypedAccountParser<T> | undefined
+      parsedAccountBaseParser: ((
+        pubkey: PublicKey,
+        data: AccountInfo<Buffer>
+      ) => ParsedAccountBase) | undefined
     ) => {
       return (
         keys &&
@@ -79,26 +85,37 @@ export function useAccounts<T>(
           keys.map(async (key) => {
             const acc = await cache.search(
               key,
-              parser ? parsedAccountBaseParser : undefined,
+              parsedAccountBaseParser,
               isStatic
             );
+
+            // The cache caches the parser, so we need to check if the parser is different
+            let info = acc?.info;
+            if (
+              cache.keyToAccountParser[key.toBase58()] !=
+                parsedAccountBaseParser &&
+              parsedAccountBaseParser &&
+              acc?.account
+            ) {
+              info = parsedAccountBaseParser(key, acc?.account).info;
+            }
             if (acc) {
               return {
-                info: parser && parser(acc.pubkey, acc?.account),
+                info,
                 account: acc.account,
                 publicKey: acc.pubkey,
-                parser: parser ? parsedAccountBaseParser : undefined,
+                parser: parsedAccountBaseParser,
               };
             } else {
               return {
-                publicKey: key
-              }
+                publicKey: key,
+              };
             }
           })
         ))
       );
     },
-    [keys, parser]
+    [keys, parsedAccountBaseParser]
   );
 
   // Start watchers
@@ -136,7 +153,7 @@ export function useAccounts<T>(
               info: newParsed,
               account: acc.account,
               publicKey: acc.pubkey,
-              parser: parser ? parsedAccountBaseParser : undefined,
+              parser: parsedAccountBaseParser,
             },
             ...accounts.slice(index + 1),
           ];
@@ -147,7 +164,7 @@ export function useAccounts<T>(
     return () => {
       disposeEmitter();
     };
-  }, [accounts, keys]);
+  }, [accounts, keys, parsedAccountBaseParser, parser]);
 
   return {
     loading,

@@ -482,20 +482,20 @@ export async function bulkSendTransactions(
       const recentBlockhash = await withRetries(5, () =>
         provider.connection.getLatestBlockhash("confirmed")
       );
-      const signedTxs = await Promise.all(
+      const blockhashedTxs = await Promise.all(
         chunk.map(async (tx) => {
           tx.recentBlockhash = recentBlockhash.blockhash;
-
-          // @ts-ignore
-          const signed = await provider.wallet.signTransaction(tx);
-          tx.signatures[0].signature;
-          return signed;
+          return tx;
         })
       );
+      const signedTxs = await (provider as AnchorProvider).wallet.signAllTransactions(
+        blockhashedTxs
+      );
+
       const txsWithSigs = signedTxs.map((tx, index) => {
         return {
           transaction: chunk[index],
-          sig: bs58.encode(tx.signatures[0].signature),
+          sig: bs58.encode(tx.signatures[0]!.signature!),
         };
       });
       const confirmedTxs = await bulkSendRawTransactions(

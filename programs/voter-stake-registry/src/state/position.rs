@@ -13,11 +13,11 @@ pub struct PositionV0 {
   // Locked state.
   pub lockup: Lockup,
 
-  /// Amount in deposited, in native currency. Withdraws of vested tokens
-  /// directly reduce this amount.
-  ///
-  /// This directly tracks the total amount added by the user. They may
-  /// never withdraw more than this amount.
+  // Amount in deposited, in native currency. Withdraws of vested tokens
+  // directly reduce this amount.
+  //
+  // This directly tracks the total amount added by the user. They may
+  // never withdraw more than this amount.
   pub amount_deposited_native: u64,
 
   // Points to the VotingMintConfig this position uses.
@@ -30,37 +30,37 @@ pub struct PositionV0 {
 }
 
 impl PositionV0 {
-  /// # Voting Power Caclulation
-  ///
-  /// Returns the voting power for the position, giving locked tokens boosted
-  /// voting power that scales linearly with the lockup time.
-  ///
-  /// For each cliff-locked token, the vote weight is:
-  ///
-  /// ```
-  ///    voting_power = baseline_vote_weight
-  ///                   + lockup_duration_factor * max_extra_lockup_vote_weight
-  /// ```
-  ///
-  /// with
-  ///   - lockup_duration_factor = min(lockup_time_remaining / lockup_saturation_secs, 1)
-  ///   - the VotingMintConfig providing the values for
-  ///     baseline_vote_weight, max_extra_lockup_vote_weight, lockup_saturation_secs
-  ///
-  /// ## Cliff Lockup
-  ///
-  /// The cliff lockup allows one to lockup their tokens for a set period
-  /// of time, unlocking all at once on a given date.
-  ///
-  /// The calculation for this is straightforward and is detailed above.
-  ///
-  /// ### Decay
-  ///
-  /// As time passes, the voting power decays until it's back to just
-  /// fixed_factor when the cliff has passed. This is important because at
-  /// each point in time the lockup should be equivalent to a new lockup
-  /// made for the remaining time period.
-  ///
+  // # Voting Power Caclulation
+  //
+  // Returns the voting power for the position, giving locked tokens boosted
+  // voting power that scales linearly with the lockup time.
+  //
+  // For each cliff-locked token, the vote weight is:
+  //
+  // ```
+  //    voting_power = baseline_vote_weight
+  //                   + lockup_duration_factor * max_extra_lockup_vote_weight
+  // ```
+  //
+  // with
+  //   - lockup_duration_factor = min(lockup_time_remaining / lockup_saturation_secs, 1)
+  //   - the VotingMintConfig providing the values for
+  //     baseline_vote_weight, max_extra_lockup_vote_weight, lockup_saturation_secs
+  //
+  // ## Cliff Lockup
+  //
+  // The cliff lockup allows one to lockup their tokens for a set period
+  // of time, unlocking all at once on a given date.
+  //
+  // The calculation for this is straightforward and is detailed above.
+  //
+  // ### Decay
+  //
+  // As time passes, the voting power decays until it's back to just
+  // fixed_factor when the cliff has passed. This is important because at
+  // each point in time the lockup should be equivalent to a new lockup
+  // made for the remaining time period.
+  //
   pub fn voting_power(&self, voting_mint_config: &VotingMintConfigV0, curr_ts: i64) -> Result<u64> {
     let baseline_vote_weight =
       voting_mint_config.baseline_vote_weight(self.amount_deposited_native)?;
@@ -92,7 +92,7 @@ impl PositionV0 {
       .ok_or_else(|| error!(VsrError::VoterWeightOverflow))
   }
 
-  /// Vote power contribution from locked funds only.
+  // Vote power contribution from locked funds only.
   pub fn voting_power_locked(
     &self,
     curr_ts: i64,

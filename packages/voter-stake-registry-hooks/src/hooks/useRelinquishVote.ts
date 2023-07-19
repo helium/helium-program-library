@@ -1,56 +1,31 @@
 import { useAnchorProvider } from "@helium/helium-react-hooks";
-import { useProposal } from "@helium/modular-governance-hooks";
-import {
-  bulkSendTransactions,
-  chunks,
-  truthy
-} from "@helium/spl-utils";
+import { bulkSendTransactions, chunks, truthy } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@metaplex-foundation/js";
 import { Transaction } from "@solana/web3.js";
-import BN from "bn.js";
-import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
+import { useCallback, useMemo } from "react";
 import { useVoteMarkers } from "./useVoteMarkers";
 
-export const useVote = (proposalKey: PublicKey) => {
-  const { info: proposal } = useProposal(proposalKey);
+export const useRelinquishVote = (proposal: PublicKey) => {
   const provider = useAnchorProvider();
   const { positions } = useHeliumVsrState();
   const voteMarkerKeys = useMemo(() => {
     return positions
-      ? positions.map((p) => voteMarkerKey(p.mint, proposalKey)[0])
+      ? positions.map((p) => voteMarkerKey(p.mint, proposal)[0])
       : [];
   }, [positions]);
   const { accounts: markers } = useVoteMarkers(voteMarkerKeys);
-  const voteWeights: BN[] | undefined = useMemo(() => {
-    if (proposal && markers) {
-      return markers.reduce((acc, marker) => {
-        marker.info?.choices.forEach((choice) => {
-          acc[choice] = (acc[choice] || new BN(0)).add(
-            marker.info?.weight || new BN(0)
-          );
-        });
-        return acc;
-      }, new Array(proposal?.choices.length));
-    }
-  }, [proposal, markers]);
-  const canVote = useCallback(
+  const canRelinquishVote = useCallback(
     (choice: number) => {
       if (!markers) return false;
 
-      return markers.some((m) => {
-        const noMarker = !m?.info;
-        const maxChoicesReached =
-          (m?.info?.choices.length || 0) >= (proposal?.maxChoicesPerVoter || 0);
-        const alreadyVotedThisChoice = m.info?.choices.includes(choice);
-        const canVote = noMarker || (!maxChoicesReached && !alreadyVotedThisChoice)
-        return canVote;
-      });
+      return markers.some((m) => m.info?.choices.includes(choice));
     },
     [markers]
   );
+
   const { error, loading, execute } = useAsyncCallback(
     async ({ choice }: { choice: number }) => {
       const isInvalid = !provider || !positions || positions.length === 0;
@@ -66,18 +41,17 @@ export const useVote = (proposalKey: PublicKey) => {
             positions.map(async (position, index) => {
               const marker = markers?.[index]?.info;
               const alreadyVotedThisChoice = marker?.choices.includes(choice);
-              const maxChoicesReached =
-                (marker?.choices.length || 0) >=
-                (proposal?.maxChoicesPerVoter || 0);
-              if (!marker || (!alreadyVotedThisChoice && !maxChoicesReached)) {
+
+              if (marker && alreadyVotedThisChoice) {
                 return await vsrProgram.methods
-                  .voteV0({
+                  .relinquishVoteV1({
                     choice,
                   })
                   .accounts({
-                    proposal: proposalKey,
+                    proposal,
                     voter: provider.wallet.publicKey,
                     position: position.pubkey,
+                    refund: provider.wallet.publicKey,
                   })
                   .instruction();
               }
@@ -98,14 +72,11 @@ export const useVote = (proposalKey: PublicKey) => {
       }
     }
   );
-  
 
   return {
     error,
     loading,
-    vote: execute,
-    markers,
-    voteWeights,
-    canVote,
+    relinquishVote: execute,
+    canRelinquishVote
   };
 };

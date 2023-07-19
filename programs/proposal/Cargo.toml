@@ -18,5 +18,5 @@ no-log-ix-name = []
 cpi = ["no-entrypoint"]
 
 [dependencies]
-anchor-gen = "0.3.1"
+anchor-gen = { git = "https://github.com/ChewingGlass/anchor-gen.git" }
 anchor-lang = { workspace = true }

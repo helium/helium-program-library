@@ -329,6 +329,17 @@ describe("voter-stake-registry", () => {
         })
         .accounts({ proposalConfig })
         .rpcAndKeys());
+
+      await proposalProgram.methods
+        .updateStateV0({
+          newState: {
+            voting: {
+              startTs: new anchor.BN(new Date().valueOf() / 1000),
+            } as any,
+          },
+        })
+        .accounts({ proposal })
+        .rpc({ skipPreflight: true });
     });
 
     const applyDigitShift = (amountNative: number, digitShift: number) => {
@@ -458,9 +469,7 @@ describe("voter-stake-registry", () => {
           instructions.push(...voteIxs);
 
 
-          console.log("vottting")
         await sendInstructions(provider, instructions, [depositor]);
-        console.log('voted')
         const acc = await proposalProgram.account.proposalV0.fetch(proposal!);
         expectBnAccuracy(
           toBN(testCase.expectedVeHnt, 8),

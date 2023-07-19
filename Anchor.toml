@@ -1,5 +1,6 @@
 [features]
 seeds = true
+docs = false
 
 [programs.localnet]
 lazy_distributor = "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w"

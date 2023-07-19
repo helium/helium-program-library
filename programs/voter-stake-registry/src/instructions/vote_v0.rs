@@ -18,7 +18,7 @@ pub struct VoteV0<'info> {
     init_if_needed,
     payer = payer,
     space = 8 + 60 + std::mem::size_of::<Registrar>(),
-    seeds = [b"marker", registrar.key().as_ref(), mint.key().as_ref(), proposal.key().as_ref()],
+    seeds = [b"marker", mint.key().as_ref(), proposal.key().as_ref()],
     bump
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
@@ -104,6 +104,7 @@ pub fn handler(ctx: Context<VoteV0>, args: VoteArgsV0) -> Result<()> {
     CpiContext::new_with_signer(
       ctx.accounts.proposal_program.to_account_info(),
       proposal::cpi::accounts::VoteV0 {
+        voter: ctx.accounts.voter.to_account_info(),
         vote_controller: ctx.accounts.registrar.to_account_info(),
         state_controller: ctx.accounts.state_controller.to_account_info(),
         proposal_config: ctx.accounts.proposal_config.to_account_info(),

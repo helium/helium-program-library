@@ -690,6 +690,19 @@
     borsh "^0.7.0"
     bs58 "^4.0.1"
 
+"@helium/modular-governance-hooks@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@helium/modular-governance-hooks/-/modular-governance-hooks-0.0.2.tgz#cbc51b2ae15c260614406cce092749883addd3a0"
+  integrity sha512-p0wBFQXXir+lwzCB+ENueGdzgESKW2qjHO6lFCfYGbCQS7jhS24t5irt9HCM+P1hq+gBKFvjEE8X9IoseZdmKQ==
+  dependencies:
+    "@coral-xyz/anchor" "^0.26.0"
+    "@helium/account-fetch-cache" "^0.2.5"
+    "@helium/account-fetch-cache-hooks" "^0.2.5"
+    "@helium/helium-react-hooks" "^0.2.5"
+    "@helium/modular-governance-idls" "^0.0.2"
+    "@helium/organization-sdk" "^0.0.2"
+    "@solana/web3.js" "^1.66.2"
+
 "@helium/modular-governance-idls@^0.0.2":
   version "0.0.2"
   resolved "https://registry.yarnpkg.com/@helium/modular-governance-idls/-/modular-governance-idls-0.0.2.tgz#55011d98b489bb954787380e89d9461a4107a373"
@@ -697,6 +710,16 @@
   dependencies:
     "@coral-xyz/anchor" "^0.27.0"
     "@solana/web3.js" "^1.43.4"
+
+"@helium/organization-sdk@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@helium/organization-sdk/-/organization-sdk-0.0.2.tgz#66a421671e09f709decb60fe3401d8bfcca6dd2c"
+  integrity sha512-C7wgLSfCFTrDx4XZfO3tG1ORUK17eEMZ/TCsUeY8RtC7XfHoaVDiKqTe07O3jzGw65qsjj3ZRbg1j3UwVirbsA==
+  dependencies:
+    "@coral-xyz/anchor" "^0.27.0"
+    "@helium/anchor-resolvers" "^0.2.5"
+    "@helium/modular-governance-idls" "^0.0.2"
+    "@helium/proposal-sdk" "^0.0.2"
 
 "@helium/proposal-sdk@^0.0.2":
   version "0.0.2"

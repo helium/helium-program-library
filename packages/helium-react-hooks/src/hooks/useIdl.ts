@@ -3,7 +3,7 @@ import { decodeIdlAccount, idlAddress } from "@coral-xyz/anchor/dist/cjs/idl";
 import { TypedAccountParser } from "@helium/account-fetch-cache";
 import { UseAccountState, useAccount } from "@helium/account-fetch-cache-hooks";
 import { PublicKey } from "@solana/web3.js";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAsync } from "react-async-hook";
 import { inflate } from "pako";
 import { utf8 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";

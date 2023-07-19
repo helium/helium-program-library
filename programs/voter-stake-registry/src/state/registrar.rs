@@ -3,7 +3,7 @@ use crate::state::voting_mint_config::VotingMintConfigV0;
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 
-/// Instance of a voting rights distributor.
+// Instance of a voting rights distributor.
 #[account]
 #[derive(Default)]
 pub struct Registrar {
@@ -11,11 +11,11 @@ pub struct Registrar {
   pub realm: Pubkey,
   pub realm_governing_token_mint: Pubkey,
   pub realm_authority: Pubkey,
-  /// Debug only: time offset, to allow tests to move forward in time.
+  // Debug only: time offset, to allow tests to move forward in time.
   pub time_offset: i64,
-  /// Allows a program to wrap updates to the position (transfer or reset lockup)
+  // Allows a program to wrap updates to the position (transfer or reset lockup)
   pub position_update_authority: Option<Pubkey>,
-  /// Storage for voting mints and their configuration.
+  // Storage for voting mints and their configuration.
   pub collection: Pubkey, // The metaplex collection to be issued for positions
   pub bump_seed: u8,
   pub collection_bump_seed: u8,

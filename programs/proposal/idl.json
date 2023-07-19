@@ -109,6 +109,11 @@
           "isSigner": true
         },
         {
+          "name": "voter",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "stateController",
           "isMut": true,
           "isSigner": false
@@ -117,13 +122,19 @@
           "name": "proposalConfig",
           "isMut": false,
           "isSigner": false,
-          "relations": ["on_vote_hook", "state_controller", "vote_controller"]
+          "relations": [
+            "on_vote_hook",
+            "state_controller",
+            "vote_controller"
+          ]
         },
         {
           "name": "proposal",
           "isMut": true,
           "isSigner": false,
-          "relations": ["proposal_config"]
+          "relations": [
+            "proposal_config"
+          ]
         },
         {
           "name": "onVoteHook",
@@ -152,13 +163,17 @@
           "name": "proposal",
           "isMut": true,
           "isSigner": false,
-          "relations": ["proposal_config"]
+          "relations": [
+            "proposal_config"
+          ]
         },
         {
           "name": "proposalConfig",
           "isMut": false,
           "isSigner": false,
-          "relations": ["state_controller"]
+          "relations": [
+            "state_controller"
+          ]
         }
       ],
       "args": [
@@ -179,7 +194,9 @@
         "fields": [
           {
             "name": "voteController",
-            "docs": ["Signer that controls voting and vote weights"],
+            "docs": [
+              "Signer that controls voting and vote weights"
+            ],
             "type": "publicKey"
           },
           {
@@ -242,7 +259,9 @@
           },
           {
             "name": "maxChoicesPerVoter",
-            "docs": ["Allows for multiple selection votes"],
+            "docs": [
+              "Allows for multiple selection votes"
+            ],
             "type": "u16"
           },
           {
@@ -255,7 +274,9 @@
           },
           {
             "name": "uri",
-            "docs": ["URI to json containing name, description, etc"],
+            "docs": [
+              "URI to json containing name, description, etc"
+            ],
             "type": "string"
           },
           {
@@ -292,7 +313,9 @@
           },
           {
             "name": "voteController",
-            "docs": ["Signer that controls voting and vote weights"],
+            "docs": [
+              "Signer that controls voting and vote weights"
+            ],
             "type": "publicKey"
           },
           {
@@ -328,7 +351,9 @@
           },
           {
             "name": "uri",
-            "docs": ["Any other data that you may want to put in here"],
+            "docs": [
+              "Any other data that you may want to put in here"
+            ],
             "type": {
               "option": "string"
             }
@@ -343,7 +368,9 @@
         "fields": [
           {
             "name": "seed",
-            "docs": ["Allow a custom seed for indexing"],
+            "docs": [
+              "Allow a custom seed for indexing"
+            ],
             "type": "bytes"
           },
           {
@@ -356,7 +383,9 @@
           },
           {
             "name": "maxChoicesPerVoter",
-            "docs": ["Allows for multiple selection votes"],
+            "docs": [
+              "Allows for multiple selection votes"
+            ],
             "type": "u16"
           },
           {
@@ -405,7 +434,9 @@
           },
           {
             "name": "removeVote",
-            "docs": ["This is a remove operation"],
+            "docs": [
+              "This is a remove operation"
+            ],
             "type": "bool"
           }
         ]
@@ -429,7 +460,9 @@
           },
           {
             "name": "uri",
-            "docs": ["Any other data that you may want to put in here"],
+            "docs": [
+              "Any other data that you may want to put in here"
+            ],
             "type": {
               "option": "string"
             }
@@ -487,8 +520,5 @@
       "name": "ArithmeticError",
       "msg": "Error in arithmetic"
     }
-  ],
-  "metadata": {
-    "address": "propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs"
-  }
+  ]
 }

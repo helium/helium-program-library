@@ -18,7 +18,7 @@ pub struct RelinquishVoteV1<'info> {
   pub refund: AccountInfo<'info>,
   #[account(
     mut,
-    seeds = [b"marker", registrar.key().as_ref(), mint.key().as_ref(), proposal.key().as_ref()],
+    seeds = [b"marker", mint.key().as_ref(), proposal.key().as_ref()],
     bump = marker.bump_seed,
     has_one = registrar,
     has_one = mint
@@ -86,6 +86,7 @@ pub fn handler(ctx: Context<RelinquishVoteV1>, args: RelinquishVoteArgsV1) -> Re
     CpiContext::new_with_signer(
       ctx.accounts.proposal_program.to_account_info(),
       proposal::cpi::accounts::VoteV0 {
+        voter: ctx.accounts.voter.to_account_info(),
         vote_controller: ctx.accounts.registrar.to_account_info(),
         state_controller: ctx.accounts.state_controller.to_account_info(),
         proposal_config: ctx.accounts.proposal_config.to_account_info(),
