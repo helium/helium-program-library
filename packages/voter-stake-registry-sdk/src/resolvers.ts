@@ -98,7 +98,7 @@ export const vsrResolvers = combineResolvers(
     owner: "voter",
   }),
   ataResolver({
-    instruction: "relinquishVoteV0",
+    instruction: "relinquishVoteV1",
     account: "tokenAccount",
     mint: "mint",
     owner: "voter",

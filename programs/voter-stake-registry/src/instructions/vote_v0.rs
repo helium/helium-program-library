@@ -21,8 +21,8 @@ pub struct VoteV0<'info> {
     seeds = [b"marker", registrar.key().as_ref(), mint.key().as_ref(), proposal.key().as_ref()],
     bump
   )]
-  pub marker: Account<'info, VoteMarkerV0>,
-  pub registrar: Account<'info, Registrar>,
+  pub marker: Box<Account<'info, VoteMarkerV0>>,
+  pub registrar: Box<Account<'info, Registrar>>,
   pub voter: Signer<'info>,
   #[account(
     mut,

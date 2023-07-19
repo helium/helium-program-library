@@ -73,7 +73,6 @@ describe("voter-stake-registry", () => {
     const thing = await Program.fetchIdl(
       new PublicKey("propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs")
     );
-    console.log("thing", thing);
     // @ts-ignore
     proposalProgram = await initProposal(provider as any);
     hntMint = await createMint(provider, 8, me, me);
@@ -293,9 +292,6 @@ describe("voter-stake-registry", () => {
   });
 
   describe("with proposal", async () => {
-    let governance: PublicKey;
-    let proposalOwner: PublicKey;
-
     let proposalConfig: PublicKey | undefined;
     let proposal: PublicKey | undefined;
     let name: string;
@@ -306,7 +302,7 @@ describe("voter-stake-registry", () => {
       } = await proposalProgram.methods
         .initializeProposalConfigV0({
           name,
-          voteController: me,
+          voteController: registrar,
           stateController: me,
           onVoteHook: PublicKey.default,
         })
@@ -462,7 +458,9 @@ describe("voter-stake-registry", () => {
           instructions.push(...voteIxs);
 
 
+          console.log("vottting")
         await sendInstructions(provider, instructions, [depositor]);
+        console.log('voted')
         const acc = await proposalProgram.account.proposalV0.fetch(proposal!);
         expectBnAccuracy(
           toBN(testCase.expectedVeHnt, 8),
@@ -507,7 +505,7 @@ describe("voter-stake-registry", () => {
             })
             .rpc({ skipPreflight: true });
         } catch (e: any) {
-          expect(e.InstructionError[1].Custom).to.eq(6044);
+          expect(e.code).to.eq(6044);
         }
       });
 
