@@ -26,8 +26,8 @@ dependencies = [
  "datafusion",
  "deltalake",
  "futures",
- "helium-entity-manager",
- "helium-sub-daos",
+ "helium-entity-manager 0.0.8 (git+https://github.com/helium/helium-program-library?branch=develop)",
+ "helium-sub-daos 0.0.12 (git+https://github.com/helium/helium-program-library?branch=develop)",
  "hpl-utils",
  "indicatif 0.17.5",
  "lazy_static",
@@ -1450,10 +1450,21 @@ dependencies = [
 [[package]]
 name = "circuit-breaker"
 version = "0.0.1"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#488b2a95b35bcb5a2761467338ae3d35ac2be341"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
- "shared-utils",
+ "shared-utils 0.0.1 (git+https://github.com/helium/helium-program-library?branch=develop)",
+]
+
+[[package]]
+name = "circuit-breaker"
+version = "0.0.1"
+source = "git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle#3cb998e50f1e8524ba3babbd0e6e4799847dac06"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "shared-utils 0.0.1 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
 ]
 
 [[package]]
@@ -1859,12 +1870,26 @@ dependencies = [
 [[package]]
 name = "data-credits"
 version = "0.1.2"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#488b2a95b35bcb5a2761467338ae3d35ac2be341"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
- "circuit-breaker",
- "helium-sub-daos",
- "lazy-transactions",
+ "circuit-breaker 0.0.1 (git+https://github.com/helium/helium-program-library?branch=develop)",
+ "helium-sub-daos 0.0.12 (git+https://github.com/helium/helium-program-library?branch=develop)",
+ "lazy-transactions 0.0.1 (git+https://github.com/helium/helium-program-library?branch=develop)",
+ "pyth-sdk-solana",
+]
+
+[[package]]
+name = "data-credits"
+version = "0.1.2"
+source = "git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle#3cb998e50f1e8524ba3babbd0e6e4799847dac06"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "circuit-breaker 0.0.1 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
+ "helium-sub-daos 0.0.12 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
+ "lazy-transactions 0.0.1 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
  "pyth-sdk-solana",
 ]
 
@@ -2758,36 +2783,75 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 [[package]]
 name = "helium-entity-manager"
 version = "0.0.8"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#488b2a95b35bcb5a2761467338ae3d35ac2be341"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
  "angry-purple-tiger",
  "bs58 0.3.1",
  "bytemuck",
- "data-credits",
- "helium-sub-daos",
- "lazy-transactions",
+ "data-credits 0.1.2 (git+https://github.com/helium/helium-program-library?branch=develop)",
+ "helium-sub-daos 0.0.12 (git+https://github.com/helium/helium-program-library?branch=develop)",
+ "lazy-transactions 0.0.1 (git+https://github.com/helium/helium-program-library?branch=develop)",
  "mpl-bubblegum",
  "mpl-token-metadata",
- "shared-utils",
+ "shared-utils 0.0.1 (git+https://github.com/helium/helium-program-library?branch=develop)",
+ "spl-account-compression 0.1.5",
+]
+
+[[package]]
+name = "helium-entity-manager"
+version = "0.0.8"
+source = "git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle#3cb998e50f1e8524ba3babbd0e6e4799847dac06"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "angry-purple-tiger",
+ "bs58 0.3.1",
+ "bytemuck",
+ "data-credits 0.1.2 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
+ "helium-sub-daos 0.0.12 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
+ "lazy-transactions 0.0.1 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
+ "mpl-bubblegum",
+ "mpl-token-metadata",
+ "shared-utils 0.0.1 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
  "spl-account-compression 0.1.5",
 ]
 
 [[package]]
 name = "helium-sub-daos"
 version = "0.0.12"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#488b2a95b35bcb5a2761467338ae3d35ac2be341"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
- "circuit-breaker",
+ "circuit-breaker 0.0.1 (git+https://github.com/helium/helium-program-library?branch=develop)",
  "clockwork-sdk",
  "mpl-token-metadata",
- "shared-utils",
+ "shared-utils 0.0.1 (git+https://github.com/helium/helium-program-library?branch=develop)",
  "spl-governance-tools",
  "switchboard-v2",
  "time 0.3.23",
- "treasury-management",
- "voter-stake-registry",
+ "treasury-management 0.0.1 (git+https://github.com/helium/helium-program-library?branch=develop)",
+ "voter-stake-registry 0.0.6 (git+https://github.com/helium/helium-program-library?branch=develop)",
+]
+
+[[package]]
+name = "helium-sub-daos"
+version = "0.0.12"
+source = "git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle#3cb998e50f1e8524ba3babbd0e6e4799847dac06"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "circuit-breaker 0.0.1 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
+ "clockwork-sdk",
+ "mpl-token-metadata",
+ "shared-utils 0.0.1 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
+ "spl-governance-tools",
+ "switchboard-v2",
+ "time 0.3.23",
+ "treasury-management 0.0.1 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
+ "voter-stake-registry 0.0.6 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
 ]
 
 [[package]]
@@ -2863,16 +2927,17 @@ dependencies = [
 [[package]]
 name = "hpl-utils"
 version = "0.1.0"
+source = "git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle#3cb998e50f1e8524ba3babbd0e6e4799847dac06"
 dependencies = [
  "anyhow",
  "bincode",
  "bs58 0.3.1",
- "circuit-breaker",
+ "circuit-breaker 0.0.1 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
  "clap 4.3.11",
- "data-credits",
+ "data-credits 0.1.2 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
  "futures",
- "helium-entity-manager",
- "helium-sub-daos",
+ "helium-entity-manager 0.0.8 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
+ "helium-sub-daos 0.0.12 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
  "indicatif 0.17.5",
  "lazy-distributor",
  "lazy_static",
@@ -3214,19 +3279,32 @@ dependencies = [
 [[package]]
 name = "lazy-distributor"
 version = "0.0.1"
+source = "git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle#3cb998e50f1e8524ba3babbd0e6e4799847dac06"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
- "circuit-breaker",
+ "circuit-breaker 0.0.1 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
  "mpl-bubblegum",
  "mpl-token-metadata",
- "shared-utils",
+ "shared-utils 0.0.1 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
  "spl-account-compression 0.1.5",
 ]
 
 [[package]]
 name = "lazy-transactions"
 version = "0.0.1"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#488b2a95b35bcb5a2761467338ae3d35ac2be341"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "spl-concurrent-merkle-tree 0.1.3",
+]
+
+[[package]]
+name = "lazy-transactions"
+version = "0.0.1"
+source = "git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle#3cb998e50f1e8524ba3babbd0e6e4799847dac06"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -5345,6 +5423,20 @@ dependencies = [
 [[package]]
 name = "shared-utils"
 version = "0.0.1"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#488b2a95b35bcb5a2761467338ae3d35ac2be341"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "mpl-bubblegum",
+ "mpl-token-metadata",
+ "spl-account-compression 0.1.5",
+ "uint",
+]
+
+[[package]]
+name = "shared-utils"
+version = "0.0.1"
+source = "git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle#3cb998e50f1e8524ba3babbd0e6e4799847dac06"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -6756,11 +6848,23 @@ dependencies = [
 [[package]]
 name = "treasury-management"
 version = "0.0.1"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#488b2a95b35bcb5a2761467338ae3d35ac2be341"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
- "circuit-breaker",
- "shared-utils",
+ "circuit-breaker 0.0.1 (git+https://github.com/helium/helium-program-library?branch=develop)",
+ "shared-utils 0.0.1 (git+https://github.com/helium/helium-program-library?branch=develop)",
+]
+
+[[package]]
+name = "treasury-management"
+version = "0.0.1"
+source = "git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle#3cb998e50f1e8524ba3babbd0e6e4799847dac06"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "circuit-breaker 0.0.1 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
+ "shared-utils 0.0.1 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
 ]
 
 [[package]]
@@ -6984,13 +7088,32 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "voter-stake-registry"
 version = "0.0.6"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#488b2a95b35bcb5a2761467338ae3d35ac2be341"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
  "itertools",
  "mpl-token-metadata",
- "shared-utils",
+ "shared-utils 0.0.1 (git+https://github.com/helium/helium-program-library?branch=develop)",
+ "solana-program",
+ "spl-governance",
+ "spl-governance-addin-api",
+ "spl-governance-tools",
+ "static_assertions",
+]
+
+[[package]]
+name = "voter-stake-registry"
+version = "0.0.6"
+source = "git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle#3cb998e50f1e8524ba3babbd0e6e4799847dac06"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "itertools",
+ "mpl-token-metadata",
+ "shared-utils 0.0.1 (git+https://github.com/helium/helium-program-library?branch=feature/active-hotspot-oracle)",
  "solana-program",
  "spl-governance",
  "spl-governance-addin-api",

@@ -85,8 +85,6 @@ async fn main() -> Result<()> {
   let s3_bucket = load_arg_from_cli_or_env(args.aws_bucket, "AWS_BUCKET");
   let s3_table = load_arg_from_cli_or_env(args.aws_table, "AWS_TABLE");
   let s3_region = load_arg_from_cli_or_env(args.aws_region, "AWS_REGION");
-  let access_key_id = load_arg_from_cli_or_env(args.access_key_id, "AWS_ACCESS_KEY_ID");
-  let secret_access_key = load_arg_from_cli_or_env(args.secret_access_key, "AWS_SECRET_ACCESS_KEY");
 
   // Create anchor program client
   let kp = Rc::new(read_keypair_file(kp_path).unwrap());
@@ -111,9 +109,13 @@ async fn main() -> Result<()> {
   let table_path = format!("s3://{}/{}", s3_bucket, s3_table);
   let mut s3_config = HashMap::from([("aws_default_region".to_string(), s3_region.clone())]);
   s3_config.insert("bucket_name".to_string(), s3_bucket);
-  s3_config.insert("aws_secret_access_key".to_string(), secret_access_key);
-  s3_config.insert("allow_http".to_string(), "true".to_string());
-  s3_config.insert("aws_access_key_id".to_string(), access_key_id);
+  if let Some(access_key_id) = args.access_key_id {
+    s3_config.insert("aws_access_key_id".to_string(), access_key_id);
+    s3_config.insert("allow_http".to_string(), "true".to_string());
+  }
+  if let Some(secret_access_key) = args.secret_access_key {
+    s3_config.insert("aws_secret_access_key".to_string(), secret_access_key);
+  }
   if let Some(endpoint) = args.aws_endpoint {
     s3_config.insert("aws_endpoint".to_string(), endpoint);
   }
@@ -127,7 +129,7 @@ async fn main() -> Result<()> {
   // query the delta-rs table to get a list of active and known inactive hotspots
   println!("Querying records");
   let current_time = Utc::now();
-  let thirty_days_ago = current_time - Duration::days(180);
+  let thirty_days_ago = current_time - Duration::days(30);
   let query = format!(
     "SELECT * FROM delta_table WHERE most_recent_ts > {}",
     thirty_days_ago.timestamp(),
@@ -483,8 +485,6 @@ async fn load_checkpoint(
 
 fn create_bucket(s3_config: HashMap<String, String>) -> Result<Bucket> {
   // Set up AWS credentials and region
-  let access_key = s3_config.get("aws_access_key_id").unwrap();
-  let secret_key = s3_config.get("aws_secret_access_key").unwrap();
   let region: Region;
   let endpoint_opt = s3_config.get("aws_endpoint");
   let region_str = s3_config.get("aws_default_region").unwrap().clone();
@@ -496,7 +496,7 @@ fn create_bucket(s3_config: HashMap<String, String>) -> Result<Bucket> {
   } else {
     region = Region::from_str(&region_str).unwrap();
   }
-  let credentials = Credentials::new(Some(&access_key), Some(&secret_key), None, None, None)?;
+  let credentials = Credentials::new(None, None, None, None, None)?;
   let bucket_name = s3_config.get("bucket_name").unwrap();
 
   Ok(Bucket::new(bucket_name, region, credentials)?)

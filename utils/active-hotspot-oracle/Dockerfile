@@ -1,5 +1,5 @@
 # Specify the base image
-FROM rust:1.68.2 as builder
+FROM rust:1.70.0 as builder
 
 # Set the working directory
 WORKDIR /app
@@ -14,4 +14,4 @@ RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/
 COPY --from=builder /app/target/release/active-hotspot-oracle /app/active-hotspot-oracle
 
 # Start the application
-CMD ["/app/active-hotspot-oracle"]
+ENTRYPOINT ["/app/active-hotspot-oracle"]

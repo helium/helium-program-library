@@ -88,6 +88,7 @@ jobs:
       matrix:
         test:
           - utils/ecc-sig-verifier
+          - utils/active-hotspot-oracle
     steps:
       - uses: actions/checkout@v3
       - run: cd $DOCKER_PATH && docker build .
