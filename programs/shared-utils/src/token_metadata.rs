@@ -101,6 +101,46 @@ pub fn create_master_edition_v3<'info>(
   .map_err(Into::into)
 }
 
+#[derive(Accounts)]
+pub struct UpdateMetadataAccountsV2<'info> {
+  pub metadata: AccountInfo<'info>,
+  pub update_authority: AccountInfo<'info>,
+}
+
+pub fn update_metadata_accounts_v2<'info>(
+  ctx: CpiContext<'_, '_, '_, 'info, UpdateMetadataAccountsV2<'info>>,
+  data: Option<DataV2>,
+  new_update_authority: Pubkey,
+  is_mutable: bool,
+  primary_sale_happened: bool,
+) -> Result<()> {
+  let ix = mpl_token_metadata::instruction::update_metadata_accounts_v2(
+    ID,
+    *ctx.accounts.metadata.key,
+    *ctx.accounts.update_authority.key,
+    Some(new_update_authority),
+    data,
+    Some(primary_sale_happened),
+    Some(is_mutable),
+  );
+  solana_program::program::invoke_signed(
+    &ix,
+    &ToAccountInfos::to_account_infos(&ctx),
+    ctx.signer_seeds,
+  )
+  .map_err(Into::into)
+}
+
+#[derive(Accounts)]
+pub struct VerifySizedCollectionItem<'info> {
+  pub payer: AccountInfo<'info>,
+  pub metadata: AccountInfo<'info>,
+  pub collection_authority: AccountInfo<'info>,
+  pub collection_mint: AccountInfo<'info>,
+  pub collection_metadata: AccountInfo<'info>,
+  pub collection_master_edition: AccountInfo<'info>,
+}
+
 pub fn verify_sized_collection_item<'info>(
   ctx: CpiContext<'_, '_, '_, 'info, VerifySizedCollectionItem<'info>>,
   collection_authority_record: Option<Pubkey>,
@@ -121,14 +161,4 @@ pub fn verify_sized_collection_item<'info>(
     ctx.signer_seeds,
   )
   .map_err(Into::into)
-}
-
-#[derive(Accounts)]
-pub struct VerifySizedCollectionItem<'info> {
-  pub payer: AccountInfo<'info>,
-  pub metadata: AccountInfo<'info>,
-  pub collection_authority: AccountInfo<'info>,
-  pub collection_mint: AccountInfo<'info>,
-  pub collection_metadata: AccountInfo<'info>,
-  pub collection_master_edition: AccountInfo<'info>,
 }
