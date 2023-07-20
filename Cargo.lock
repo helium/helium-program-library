@@ -216,7 +216,7 @@ dependencies = [
 [[package]]
 name = "anchor-gen"
 version = "0.3.1"
-source = "git+https://github.com/ChewingGlass/anchor-gen.git#e0fc165075c2cbef7da8b75fe0377c28fba7fcfe"
+source = "git+https://github.com/ChewingGlass/anchor-gen.git#d53511523aab2872f358620bcc56c9f296508278"
 dependencies = [
  "anchor-generate-cpi-crate",
  "anchor-generate-cpi-interface",
@@ -225,7 +225,7 @@ dependencies = [
 [[package]]
 name = "anchor-generate-cpi-crate"
 version = "0.3.1"
-source = "git+https://github.com/ChewingGlass/anchor-gen.git#e0fc165075c2cbef7da8b75fe0377c28fba7fcfe"
+source = "git+https://github.com/ChewingGlass/anchor-gen.git#d53511523aab2872f358620bcc56c9f296508278"
 dependencies = [
  "anchor-idl",
  "syn 1.0.107",
@@ -234,7 +234,7 @@ dependencies = [
 [[package]]
 name = "anchor-generate-cpi-interface"
 version = "0.3.1"
-source = "git+https://github.com/ChewingGlass/anchor-gen.git#e0fc165075c2cbef7da8b75fe0377c28fba7fcfe"
+source = "git+https://github.com/ChewingGlass/anchor-gen.git#d53511523aab2872f358620bcc56c9f296508278"
 dependencies = [
  "anchor-idl",
  "darling",
@@ -244,7 +244,7 @@ dependencies = [
 [[package]]
 name = "anchor-idl"
 version = "0.3.1"
-source = "git+https://github.com/ChewingGlass/anchor-gen.git#e0fc165075c2cbef7da8b75fe0377c28fba7fcfe"
+source = "git+https://github.com/ChewingGlass/anchor-gen.git#d53511523aab2872f358620bcc56c9f296508278"
 dependencies = [
  "anchor-syn 0.24.2",
  "darling",
