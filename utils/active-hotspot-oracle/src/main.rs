@@ -123,6 +123,29 @@ async fn main() -> Result<()> {
   if let Some(endpoint) = args.aws_endpoint {
     s3_config.insert("aws_endpoint".to_string(), endpoint);
   }
+
+  // download last checkpoint file from s3
+  println!("Loading last save files from s3");
+  let last_active_pub_keys: HashSet<String> =
+    load_checkpoint(s3_config.clone(), "active_save.json")
+      .await
+      .unwrap_or(HashSet::new());
+  let mut last_inactive_pub_keys: HashSet<String> =
+    load_checkpoint(s3_config.clone(), "inactive_save.json")
+      .await
+      .unwrap_or(HashSet::new());
+
+  println!("Last active pub keys: {:?}", last_active_pub_keys.len());
+  println!("Last inactive pub keys: {:?}", last_inactive_pub_keys.len());
+
+  if args.check_validity {
+    check_validity(&helium_entity_program, last_active_pub_keys, true)
+      .context("Active validity check failed")?;
+    check_validity(&helium_entity_program, last_inactive_pub_keys, false)
+      .context("Inactive validity check failed")?;
+    return Ok(());
+  };
+
   let mut delta_table = DeltaTableBuilder::from_uri(table_path.clone())
     .with_storage_options(s3_config.clone())
     .build()?;
@@ -162,28 +185,6 @@ async fn main() -> Result<()> {
 
   println!("Records processed: {:?}", count);
   println!("Active pub keys: {:?}", active_pub_keys.len());
-
-  // download last checkpoint file from s3
-  println!("Loading last save files from s3");
-  let last_active_pub_keys: HashSet<String> =
-    load_checkpoint(s3_config.clone(), "active_save.json")
-      .await
-      .unwrap_or(HashSet::new());
-  let mut last_inactive_pub_keys: HashSet<String> =
-    load_checkpoint(s3_config.clone(), "inactive_save.json")
-      .await
-      .unwrap_or(HashSet::new());
-
-  println!("Last active pub keys: {:?}", last_active_pub_keys.len());
-  println!("Last inactive pub keys: {:?}", last_inactive_pub_keys.len());
-
-  if args.check_validity {
-    check_validity(&helium_entity_program, last_active_pub_keys, true)
-      .context("Active validity check failed")?;
-    check_validity(&helium_entity_program, last_inactive_pub_keys, false)
-      .context("Inactive validity check failed")?;
-    return Ok(());
-  };
 
   // parse and find the diff
   println!("Finding new diffs");
@@ -263,6 +264,7 @@ fn check_validity(
     true,
   )?;
 
+  println!("Scanned {} entities", entity_keys.len());
   println!("Found {} invalid iot infos", invalid_iot_infos.len());
   println!("Found {} invalid mobile infos", invalid_mobile_infos.len());
   Ok(())
