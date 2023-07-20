@@ -53,6 +53,10 @@ struct Args {
   /// RPC url
   #[arg(short, long)]
   url: Option<String>,
+
+  /// Checks that all hotspots are marked correctly on-chain
+  #[clap(long, short, action)]
+  check_validity: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -173,6 +177,14 @@ async fn main() -> Result<()> {
   println!("Last active pub keys: {:?}", last_active_pub_keys.len());
   println!("Last inactive pub keys: {:?}", last_inactive_pub_keys.len());
 
+  if args.check_validity {
+    check_validity(&helium_entity_program, last_active_pub_keys, true)
+      .context("Active validity check failed")?;
+    check_validity(&helium_entity_program, last_inactive_pub_keys, false)
+      .context("Inactive validity check failed")?;
+    return Ok(());
+  };
+
   // parse and find the diff
   println!("Finding new diffs");
   let mark_active_diff: Vec<String> = active_pub_keys
@@ -238,6 +250,24 @@ async fn main() -> Result<()> {
   Ok(())
 }
 
+fn check_validity(
+  helium_entity_program: &Program,
+  entity_keys: HashSet<String>,
+  expected_is_active: bool,
+) -> Result<()> {
+  let entity_key_vec = entity_keys.iter().cloned().collect::<Vec<_>>();
+  let (invalid_iot_infos, invalid_mobile_infos) = find_infos_to_mark(
+    &helium_entity_program,
+    &entity_key_vec,
+    expected_is_active,
+    true,
+  )?;
+
+  println!("Found {} invalid iot infos", invalid_iot_infos.len());
+  println!("Found {} invalid mobile infos", invalid_mobile_infos.len());
+  Ok(())
+}
+
 fn construct_and_send_txs(
   helium_entity_program: &Program,
   tpu_client: &TpuClient,
@@ -298,6 +328,74 @@ fn construct_set_active_ixs(
   let iot_rec = SubDao::Iot.rewardable_entity_config_key();
   let mobile_rec = SubDao::Mobile.rewardable_entity_config_key();
 
+  let (valid_iot_infos, valid_mobile_infos) =
+    find_infos_to_mark(helium_entity_program, entity_keys, is_active, false)?;
+
+  // construct ixs
+  let iot_ixs = construct_ix_from_valid_infos(
+    helium_entity_program,
+    valid_iot_infos,
+    iot_rec,
+    iot_sd,
+    is_active,
+  )
+  .context("Failed to construct iot ixs")?;
+  let mobile_ixs = construct_ix_from_valid_infos(
+    helium_entity_program,
+    valid_mobile_infos,
+    mobile_rec,
+    mobile_sd,
+    is_active,
+  )
+  .context("Failed to construct mobile ixs")?;
+
+  Ok((iot_ixs, mobile_ixs))
+}
+
+fn construct_ix_from_valid_infos(
+  helium_entity_program: &Program,
+  valid_infos: Vec<InfoWithEntityKey>,
+  rewardable_entity_config: Pubkey,
+  sub_dao: Pubkey,
+  is_active: bool,
+) -> Result<Vec<Instruction>> {
+  let ixs = valid_infos
+    .iter()
+    .map(|info| {
+      let entity_key = &bs58::decode(info.entity_key.clone())
+        .into_vec()
+        .context(format!("Failed to decode entity key, {}", info.entity_key))?;
+      let set_entity_active_ix = helium_entity_program
+        .request()
+        .args(helium_entity_manager::instruction::SetEntityActiveV0 {
+          args: SetEntityActiveArgsV0 {
+            is_active,
+            entity_key: entity_key.clone(),
+          },
+        })
+        .accounts(SetEntityActiveV0 {
+          active_device_authority: helium_entity_program.payer(),
+          rewardable_entity_config,
+          sub_dao,
+          info: info.info_key,
+          helium_sub_daos_program: helium_sub_daos::id(),
+        })
+        .instructions()
+        .map_err(|e| anyhow!("Failed to construct instruction: {e}"))?;
+      Ok(set_entity_active_ix[0].clone())
+    })
+    .collect::<Result<Vec<_>>>()
+    .context("Failed to construct ixs")?;
+
+  Ok(ixs)
+}
+
+fn find_infos_to_mark(
+  helium_entity_program: &Program,
+  entity_keys: &Vec<String>,
+  is_active: bool,
+  log_diff: bool,
+) -> Result<(Vec<InfoWithEntityKey>, Vec<InfoWithEntityKey>)> {
   let mark_iot_infos = entity_keys
     .iter()
     .map(|entity_key| {
@@ -370,6 +468,13 @@ fn construct_set_active_ixs(
               info_key: iot_infos[j],
               entity_key: entity_keys[start + j].clone(),
             });
+            if log_diff {
+              println!(
+                "Found iot info to mark, is_active: {}, info: {}",
+                is_active,
+                iot_infos[j].to_string(),
+              );
+            }
           }
         }
         None => {}
@@ -392,6 +497,13 @@ fn construct_set_active_ixs(
               info_key: mobile_infos[j],
               entity_key: entity_keys[start + j].clone(),
             });
+            if log_diff {
+              println!(
+                "Found mobile info to mark, is_active: {}, info: {}",
+                is_active,
+                mobile_infos[j].to_string(),
+              );
+            }
           }
         }
         None => {}
@@ -400,63 +512,7 @@ fn construct_set_active_ixs(
   }
   progress_bar.finish_with_message("Finished fetching accounts");
 
-  // construct ixs
-  let iot_ixs = construct_ix_from_valid_infos(
-    helium_entity_program,
-    valid_iot_infos,
-    iot_rec,
-    iot_sd,
-    is_active,
-  )
-  .context("Failed to construct iot ixs")?;
-  let mobile_ixs = construct_ix_from_valid_infos(
-    helium_entity_program,
-    valid_mobile_infos,
-    mobile_rec,
-    mobile_sd,
-    is_active,
-  )
-  .context("Failed to construct mobile ixs")?;
-
-  Ok((iot_ixs, mobile_ixs))
-}
-
-fn construct_ix_from_valid_infos(
-  helium_entity_program: &Program,
-  valid_infos: Vec<InfoWithEntityKey>,
-  rewardable_entity_config: Pubkey,
-  sub_dao: Pubkey,
-  is_active: bool,
-) -> Result<Vec<Instruction>> {
-  let ixs = valid_infos
-    .iter()
-    .map(|info| {
-      let entity_key = &bs58::decode(info.entity_key.clone())
-        .into_vec()
-        .context(format!("Failed to decode entity key, {}", info.entity_key))?;
-      let set_entity_active_ix = helium_entity_program
-        .request()
-        .args(helium_entity_manager::instruction::SetEntityActiveV0 {
-          args: SetEntityActiveArgsV0 {
-            is_active,
-            entity_key: entity_key.clone(),
-          },
-        })
-        .accounts(SetEntityActiveV0 {
-          active_device_authority: helium_entity_program.payer(),
-          rewardable_entity_config,
-          sub_dao,
-          info: info.info_key,
-          helium_sub_daos_program: helium_sub_daos::id(),
-        })
-        .instructions()
-        .map_err(|e| anyhow!("Failed to construct instruction: {e}"))?;
-      Ok(set_entity_active_ix[0].clone())
-    })
-    .collect::<Result<Vec<_>>>()
-    .context("Failed to construct ixs")?;
-
-  Ok(ixs)
+  return Ok((valid_iot_infos, valid_mobile_infos));
 }
 
 async fn save_checkpoint(
