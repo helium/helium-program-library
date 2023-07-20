@@ -98,11 +98,11 @@ pub fn handler(ctx: Context<RelinquishVoteV1>, args: RelinquishVoteArgsV1) -> Re
     proposal::VoteArgsV0 {
       remove_vote: true,
       choice: args.choice,
-      weight: u128::from(marker.weight),
+      weight: marker.weight,
     },
   )?;
 
-  if marker.choices.len() == 0 {
+  if marker.choices.is_empty() {
     marker.close(ctx.accounts.refund.to_account_info())?;
   }
 
