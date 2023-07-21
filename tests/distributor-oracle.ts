@@ -59,6 +59,7 @@ import { LazyDistributor } from "../target/types/lazy_distributor";
 import { RewardsOracle } from "../target/types/rewards_oracle";
 import {
   ensureLDIdl,
+  ensureHEMIdl,
   initWorld
 } from "./utils/fixtures";
 import { initVsr } from "./utils/vsr";
@@ -300,6 +301,7 @@ describe("distributor-oracle", () => {
     );
 
     await ensureLDIdl(ldProgram);
+    await ensureHEMIdl(hemProgram);
 
     console.log(dcProgram.methods);
     const {
@@ -365,7 +367,8 @@ describe("distributor-oracle", () => {
       hemProgram,
       oracle,
       db,
-      lazyDistributor
+      lazyDistributor,
+      dao
     );
     await oracleServer.start();
     await sendInstructions(provider, [

@@ -42,7 +42,6 @@ import Fastify, {
 import cors from "@fastify/cors";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
-import Address from "@helium/address";
 
 const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
 const DAO = daoKey(HNT)[0];
@@ -135,7 +134,8 @@ export class OracleServer {
     public hemProgram: Program<HeliumEntityManager>,
     private oracle: Keypair,
     public db: Database,
-    readonly lazyDistributor: PublicKey
+    readonly lazyDistributor: PublicKey,
+    readonly dao: PublicKey = DAO
   ) {
     const server: FastifyInstance = Fastify({
       logger: true,
@@ -211,7 +211,7 @@ export class OracleServer {
     }
 
     if (entityKey) {
-      const [key] = await keyToAssetKey(DAO, entityKey as string, keySerialization);
+      const [key] = await keyToAssetKey(this.dao, entityKey as string, keySerialization);
       console.log(key.toBase58())
       const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(key);
       assetId = keyToAsset.asset.toBase58();
@@ -413,7 +413,8 @@ export class OracleServer {
         proposedCurrentRewards = decoded.data.args.currentRewards;
         entityKey = (await this.hemProgram.account.keyToAssetV0.fetch(keyToAssetK)).entityKey;
         // A sneaky RPC could return incorrect data. Verify that the entity key is correct for the key to asset
-        if (!keyToAssetKey(DAO, entityKey)[0].equals(keyToAssetK)) {
+        console.log(HNT.toBase58())
+        if (!keyToAssetKey(this.dao, entityKey)[0].equals(keyToAssetK)) {
           return { success: false, message: "RPC lied about the entity key for this asset." };
         }
       } else if (
@@ -572,7 +573,7 @@ export class OracleServer {
       hemProgram,
       oracleKeypair,
       new PgDatabase(hemProgram),
-      LAZY_DISTRIBUTOR
+      LAZY_DISTRIBUTOR,
     );
     // For performance
     new AccountFetchCache({
