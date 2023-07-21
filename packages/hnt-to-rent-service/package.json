@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.2.5",
+  "version": "0.2.13",
   "description": "Service that gives flashloans of sol to allow orca swap of small amounts of hnt to sol for fees",
   "repository": {
     "type": "git",
