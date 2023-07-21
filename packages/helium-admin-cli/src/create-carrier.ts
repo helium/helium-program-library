@@ -202,7 +202,7 @@ export async function run(args: any = process.argv) {
     console.log(
       await memProgram.methods
         .issueCarrierNftV0({
-          metadataUrl: null,
+          metadataUrl: `https://entities.nft.helium.io/${name}`,
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
