@@ -17,9 +17,9 @@ use helium_sub_daos::{
   program::HeliumSubDaos,
   DaoV0, SubDaoV0, TrackDcOnboardingFeesArgsV0,
 };
-use mpl_bubblegum::utils::get_asset_id;
+use account_compression_cpi::program::SplAccountCompression;
+use bubblegum_cpi::get_asset_id;
 use shared_utils::*;
-use spl_account_compression::program::SplAccountCompression;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct OnboardIotHotspotArgsV0 {

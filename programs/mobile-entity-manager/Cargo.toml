@@ -29,8 +29,8 @@ anchor-spl = { workspace = true }
 bytemuck = "1.12.3"
 angry-purple-tiger = "0.1.0"
 mpl-token-metadata = { workspace = true }
-mpl-bubblegum = { workspace = true }
-spl-account-compression = { workspace = true }
+bubblegum-cpi = { workspace = true }
+account-compression-cpi = { workspace = true }
 shared-utils = { path = "../shared-utils" }
 helium-entity-manager = { path = "../helium-entity-manager", features = ["cpi"] }
 
