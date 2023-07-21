@@ -1,10 +1,10 @@
 use crate::state::*;
+use account_compression_cpi::{program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
-use mpl_bubblegum::{
+use bubblegum_cpi::{
   cpi::{accounts::CreateTree, create_tree},
   program::Bubblegum,
 };
-use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct SetMakerTreeArgsV0 {

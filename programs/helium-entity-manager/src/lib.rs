@@ -62,13 +62,6 @@ pub mod helium_entity_manager {
     issue_iot_operations_fund_v0::handler(ctx)
   }
 
-  pub fn genesis_issue_hotspot_v0<'info>(
-    ctx: Context<'_, '_, '_, 'info, GenesisIssueHotspotV0<'info>>,
-    args: GenesisIssueHotspotArgsV0,
-  ) -> Result<()> {
-    genesis_issue_hotspot_v0::handler(ctx, args)
-  }
-
   pub fn onboard_iot_hotspot_v0<'info>(
     ctx: Context<'_, '_, '_, 'info, OnboardIotHotspotV0<'info>>,
     args: OnboardIotHotspotArgsV0,
