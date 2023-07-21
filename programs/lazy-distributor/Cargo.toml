@@ -26,7 +26,7 @@ overflow-checks = true
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 mpl-token-metadata = { workspace = true }
-mpl-bubblegum = { workspace = true }
+bubblegum-cpi = { workspace = true }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 shared-utils = { path = "../shared-utils" }
-spl-account-compression = { workspace = true }
+account-compression-cpi = { workspace = true }

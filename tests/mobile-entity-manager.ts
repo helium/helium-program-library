@@ -176,7 +176,7 @@ describe('mobile-entity-manager', () => {
           maxDepth: 3,
           maxBufferSize: 8,
         })
-        .accounts({ carrier, newMerkleTree: merkle.publicKey, dao })
+        .accounts({ carrier, newMerkleTree: merkle.publicKey })
         .preInstructions([createMerkle])
         .signers([merkle])
         .rpc({ skipPreflight: true });
@@ -272,7 +272,7 @@ describe('mobile-entity-manager', () => {
             maxDepth: 3,
             maxBufferSize: 8,
           })
-          .accounts({ carrier, newMerkleTree: newMerkle.publicKey, dao })
+          .accounts({ carrier, newMerkleTree: newMerkle.publicKey })
           .preInstructions([createMerkle])
           .signers([newMerkle])
           .rpc();

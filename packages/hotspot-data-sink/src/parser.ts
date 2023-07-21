@@ -28,7 +28,7 @@ async function getAssetIdFromInfo(program: Program<HeliumEntityManager>, tx: any
   let infoKey = tx.message.accountKeys[ix.accounts[infoIdx]];
   let infoName = idlIx.accounts[infoIdx].name;
   let info: any;
-  if (infoName === "iotInfo" || infoName === "info") {
+  if (infoName === "iotInfo") {
     info = await program.account.iotHotspotInfoV0.fetch(infoKey);
   } else if (infoName === "mobileInfo") {
     info = await program.account.mobileHotspotInfoV0.fetch(infoKey);

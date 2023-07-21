@@ -1,10 +1,10 @@
 use super::common::*;
 use crate::error::ErrorCode;
+use account_compression_cpi::program::SplAccountCompression;
 use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
-use mpl_bubblegum::utils::get_asset_id;
+use bubblegum_cpi::get_asset_id;
 use shared_utils::*;
-use spl_account_compression::program::SplAccountCompression;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct DistributeCompressionRewardsArgsV0 {

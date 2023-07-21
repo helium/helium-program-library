@@ -3,22 +3,19 @@ use std::str::FromStr;
 
 use crate::state::*;
 use crate::{constants::ENTITY_METADATA_URL, error::ErrorCode};
+use account_compression_cpi::{program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
-use helium_sub_daos::DaoV0;
-use mpl_bubblegum::state::metaplex_adapter::{
-  Collection, Creator, MetadataArgs, TokenProgramVersion,
-};
-use mpl_bubblegum::state::{metaplex_adapter::TokenStandard, TreeConfig};
-use mpl_bubblegum::utils::get_asset_id;
-use mpl_bubblegum::{
+use bubblegum_cpi::{
   cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
+  get_asset_id,
   program::Bubblegum,
+  Collection, Creator, MetadataArgs, TokenProgramVersion, TokenStandard, TreeConfig,
 };
+use helium_sub_daos::DaoV0;
 use mpl_token_metadata::state::MAX_NAME_LENGTH;
-use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueEntityArgsV0 {
