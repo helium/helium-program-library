@@ -6,7 +6,6 @@ use account_compression_cpi::{program::SplAccountCompression, Noop};
 use crate::{key_to_asset_seeds, state::*};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
-use anchor_lang::solana_program::keccak;
 use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
 use bubblegum_cpi::{
@@ -200,31 +199,6 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
     ],
     seller_fee_basis_points: 0,
   };
-  // @dev: seller_fee_basis points is encoded twice so that it can be passed to marketplace
-  // instructions, without passing the entire, un-hashed MetadataArgs struct
-  let metadata_args_hash = keccak::hashv(&[metadata.try_to_vec()?.as_slice()]);
-  let data_hash = keccak::hashv(&[
-    &metadata_args_hash.to_bytes(),
-    &metadata.seller_fee_basis_points.to_le_bytes(),
-  ]);
-
-  // Use the metadata auth to check whether we can allow `verified` to be set to true in the
-  // creator Vec.
-  let creator_data = metadata
-    .creators
-    .iter()
-    .map(|c| Ok([c.address.as_ref(), &[c.verified as u8], &[c.share]].concat()))
-    .collect::<Result<Vec<_>>>()?;
-
-  // Calculate creator hash.
-  let creator_hash = keccak::hashv(
-    creator_data
-      .iter()
-      .map(|c| c.as_slice())
-      .collect::<Vec<&[u8]>>()
-      .as_ref(),
-  );
-  msg!("Metadatda:{}, Creator: {}", data_hash, creator_hash);
   let entity_creator_seeds: &[&[&[u8]]] = &[&[
     b"entity_creator",
     ctx.accounts.dao.to_account_info().key.as_ref(),

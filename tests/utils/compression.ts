@@ -6,8 +6,6 @@ import {
   getLeafAssetId, PROGRAM_ID as BUBBLEGUM_PROGRAM_ID, TokenProgramVersion,
   TokenStandard
 } from "@metaplex-foundation/mpl-bubblegum";
-// @ts-ignore
-import bs58 from "bs58";
 import { Asset, AssetProof } from "@helium/spl-utils";
 import { Metadata, PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@coral-xyz/anchor";
@@ -242,10 +240,6 @@ export async function createMockCompression({
   leaves[0] = hash;
   let merkleTree = new MerkleTree(leaves);
   const proof = merkleTree.getProof(0);
-  console.log({
-    dataHash: bs58.encode(computeDataHash(metadata)),
-    creatorHash: bs58.encode(computeCreatorHash(creators)),
-  });
   let getAssetFn = async () =>
     ({
       id: hotspot,
