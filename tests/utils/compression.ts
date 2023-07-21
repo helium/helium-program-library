@@ -6,6 +6,8 @@ import {
   getLeafAssetId, PROGRAM_ID as BUBBLEGUM_PROGRAM_ID, TokenProgramVersion,
   TokenStandard
 } from "@metaplex-foundation/mpl-bubblegum";
+// @ts-ignore
+import bs58 from "bs58";
 import { Asset, AssetProof } from "@helium/spl-utils";
 import { Metadata, PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@coral-xyz/anchor";
@@ -18,7 +20,7 @@ import {
 } from "@solana/spl-account-compression";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { Bubblegum as MplBubblegum, IDL as BubblegumIdl } from "./bubblegum";
-import { entityCreatorKey } from "@helium/helium-entity-manager-sdk";
+import { entityCreatorKey, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
 // @ts-ignore
 import animalHash from "angry-purple-tiger";
 import { BN } from "bn.js";
@@ -204,6 +206,11 @@ export async function createMockCompression({
       verified: true,
       share: 100,
     },
+    {
+      address: keyToAssetKey(dao, ecc, "b58")[0],
+      verified: true,
+      share: 0,
+    },
   ];
   let metadata: any = {
     name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
@@ -235,6 +242,10 @@ export async function createMockCompression({
   leaves[0] = hash;
   let merkleTree = new MerkleTree(leaves);
   const proof = merkleTree.getProof(0);
+  console.log({
+    dataHash: bs58.encode(computeDataHash(metadata)),
+    creatorHash: bs58.encode(computeCreatorHash(creators)),
+  });
   let getAssetFn = async () =>
     ({
       id: hotspot,

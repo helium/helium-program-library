@@ -423,7 +423,6 @@ describe("distributor-oracle", () => {
 
   it("should bulk sign transactions", async() => {
     const unsigned = await client.formBulkTransactions({
-      dao: daoK,
       program: ldProgram,
       rewardsOracleProgram: rewardsProgram,
       getAssetFn,
@@ -472,7 +471,6 @@ describe("distributor-oracle", () => {
 
   it("should sign and execute properly formed transactions", async () => {
     const unsigned = await client.formTransaction({
-      dao: daoK,
       program: ldProgram,
       rewardsOracleProgram: rewardsProgram,
       provider,

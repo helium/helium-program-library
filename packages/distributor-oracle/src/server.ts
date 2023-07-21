@@ -412,6 +412,10 @@ export class OracleServer {
         //@ts-ignore
         proposedCurrentRewards = decoded.data.args.currentRewards;
         entityKey = (await this.hemProgram.account.keyToAssetV0.fetch(keyToAssetK)).entityKey;
+        // A sneaky RPC could return incorrect data. Verify that the entity key is correct for the key to asset
+        if (!keyToAssetKey(DAO, entityKey)[0].equals(keyToAssetK)) {
+          return { success: false, message: "RPC lied about the entity key for this asset." };
+        }
       } else if (
         ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey) &&
         ix.programId.equals(LD_PID)

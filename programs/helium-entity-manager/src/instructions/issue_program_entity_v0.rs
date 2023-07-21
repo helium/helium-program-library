@@ -1,6 +1,6 @@
-use crate::state::*;
 use crate::{constants::ENTITY_METADATA_URL, error::ErrorCode};
 use account_compression_cpi::{program::SplAccountCompression, Noop};
+use crate::{key_to_asset_seeds, state::*};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_spl::token::Mint;
@@ -140,18 +140,28 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     ErrorCode::InvalidStringLength
   );
 
-  let key_str = bs58::encode(hash(&args.entity_key[..])).into_string();
+  let key_str = bs58::encode(args.entity_key.clone()).into_string();
   let asset_id = get_asset_id(
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,
   );
 
-  let metadata_uri = format!("{}/{}", ENTITY_METADATA_URL, key_str);
+  let mut metadata_uri = format!("{}/{}", ENTITY_METADATA_URL, key_str);
+  if let Some(metadata_url) = args.metadata_url {
+    let formated_metadata_url = format!("{}/{}", metadata_url, key_str);
+
+    require!(
+      formated_metadata_url.len() <= 200,
+      ErrorCode::InvalidStringLength
+    );
+
+    metadata_uri = formated_metadata_url;
+  }
   require!(
     metadata_uri.len() <= MAX_URI_LENGTH,
     ErrorCode::InvalidStringLength
   );
-  let mut metadata = MetadataArgs {
+  let metadata = MetadataArgs {
     name: args.name,
     symbol: args.symbol,
     uri: metadata_uri,
@@ -165,24 +175,20 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     token_standard: Some(TokenStandard::NonFungible),
     uses: None,
     token_program_version: TokenProgramVersion::Original,
-    creators: vec![Creator {
-      address: ctx.accounts.entity_creator.key(),
-      verified: true,
-      share: 100,
-    }],
+    creators: vec![
+      Creator {
+        address: ctx.accounts.entity_creator.key(),
+        verified: true,
+        share: 100,
+      },
+      Creator {
+        address: ctx.accounts.key_to_asset.key(),
+        verified: true,
+        share: 0,
+      },
+    ],
     seller_fee_basis_points: 0,
   };
-
-  if let Some(metadata_url) = args.metadata_url {
-    let formated_metadata_url = format!("{}/{}", metadata_url, key_str);
-
-    require!(
-      formated_metadata_url.len() <= 200,
-      ErrorCode::InvalidStringLength
-    );
-
-    metadata.uri = formated_metadata_url;
-  }
 
   let entity_creator_seeds: &[&[&[u8]]] = &[&[
     b"entity_creator",
@@ -192,12 +198,15 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
 
   let mut creator = ctx.accounts.entity_creator.to_account_info();
   creator.is_signer = true;
+  let mut key_to_asset_creator = ctx.accounts.key_to_asset.to_account_info();
+  key_to_asset_creator.is_signer = true;
+  let key_to_asset_signer: &[&[u8]] = key_to_asset_seeds!(ctx.accounts.key_to_asset);
   mint_to_collection_v1(
     ctx
       .accounts
       .mint_to_collection_ctx()
       .with_remaining_accounts(vec![creator])
-      .with_signer(&[entity_creator_seeds[0]]),
+      .with_signer(&[entity_creator_seeds[0], key_to_asset_signer]),
     metadata,
   )?;
 

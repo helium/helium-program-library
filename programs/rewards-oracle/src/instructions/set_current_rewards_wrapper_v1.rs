@@ -11,10 +11,6 @@ use lazy_distributor::{
 pub struct SetCurrentRewardsWrapperArgsV1 {
   pub oracle_index: u16,
   pub current_rewards: u64,
-  /// Txn includes the hashed entity key so the oracle can be sure that,
-  /// even if the RPC lied about the entity key in KeyToAsset, the
-  /// transaction must match the entity key used in the oracle query.
-  pub hashed_entity_key: Vec<u8>,
 }
 
 #[derive(Accounts)]
@@ -30,14 +26,10 @@ pub struct SetCurrentRewardsWrapperV1<'info> {
   )]
   pub recipient: Box<Account<'info, RecipientV0>>,
 
+  // We assume that the oracle verified that the key to asset entity key went with these rewards.
+  // This endpoint then verifies the connection of that key_to_asset to the recipient asset.
   #[account(
     constraint = key_to_asset.asset == recipient.asset,
-    seeds = [
-      "key_to_asset".as_bytes(),
-      dao.key().as_ref(),
-      &hashed_entity_key[..]
-    ],
-    bump = key_to_asset.bump_seed,
   )]
   pub key_to_asset: Box<Account<'info, KeyToAssetV0>>,
 
@@ -49,7 +41,6 @@ pub struct SetCurrentRewardsWrapperV1<'info> {
   pub oracle_signer: AccountInfo<'info>,
   pub lazy_distributor_program: Program<'info, LazyDistributor>,
   pub system_program: Program<'info, System>,
-  pub dao: Account<'info, DaoV0>,
 }
 
 pub fn handler(
