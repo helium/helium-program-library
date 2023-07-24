@@ -5,16 +5,7 @@ import { SOLANA_URL } from '../env';
 import database from './database';
 import { defineIdlModels } from './defineIdlModels';
 import { sanitizeAccount } from './sanitizeAccount';
-
-const chunks = <T>(array: T[], size: number): T[][] =>
-  Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
-    array.slice(index * size, (index + 1) * size)
-  );
-
-export type Truthy<T> = T extends false | '' | 0 | null | undefined ? never : T; // from lodash
-
-export const truthy = <T>(value: T): value is Truthy<T> => !!value;
-
+import { chunks, truthy } from '@helium/spl-utils';
 interface UpsertProgramAccountsArgs {
   programId: PublicKey;
   accounts: {

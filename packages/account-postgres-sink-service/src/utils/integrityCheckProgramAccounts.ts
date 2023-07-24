@@ -7,7 +7,7 @@ import { SOLANA_URL } from '../env';
 import database from './database';
 import { sanitizeAccount } from './sanitizeAccount';
 import { chunks } from '@helium/spl-utils';
-import { getTransactionSignaturesUptoBlockTime } from './getTransactionSignaturesBeforeBlock';
+import { getTransactionSignaturesUptoBlockTime } from './getTransactionSignaturesUpToBlock';
 import { FastifyInstance } from 'fastify';
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;
