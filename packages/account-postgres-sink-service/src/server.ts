@@ -49,21 +49,21 @@ server.register(fastifyMetrics, { endpoint: '/metrics' });
 server.register(fastifyCron, { jobs: [...customJobs] });
 
 server.get('/refresh-accounts', async (req, res) => {
+  const programId = (req.query as any).program;
+
   try {
-    const programId = (req.query as any).program;
-    if (!programId) throw new Error('program not provided');
-
     if (configs) {
-      const config = configs.find((c) => c.programId === programId);
-      if (!config) throw new Error(`no config for program: ${programId} found`);
-
-      try {
-        await upsertProgramAccounts({
-          programId: new PublicKey(config.programId),
-          accounts: config.accounts,
-        });
-      } catch (err) {
-        console.log(err);
+      for (const config of configs) {
+        if ((programId && programId == config.programId) || !programId) {
+          try {
+            await upsertProgramAccounts({
+              programId: new PublicKey(config.programId),
+              accounts: config.accounts,
+            });
+          } catch (err) {
+            console.log(err);
+          }
+        }
       }
     }
     res.code(StatusCodes.OK).send(ReasonPhrases.OK);
@@ -74,8 +74,9 @@ server.get('/refresh-accounts', async (req, res) => {
 });
 
 server.get('/integrity-check', async (req, res) => {
+  const programId = (req.query as any).program;
+
   try {
-    const programId = (req.query as any).program;
     if (!programId) throw new Error('program not provided');
 
     if (configs) {
