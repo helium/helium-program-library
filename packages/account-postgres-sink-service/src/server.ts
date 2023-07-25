@@ -12,140 +12,141 @@ import { upsertProgramAccounts } from './utils/upsertProgramAccounts';
 import { integrityCheckProgramAccounts } from './utils/integrityCheckProgramAccounts';
 import { handleAccountWebhook } from './utils/handleAccountWebhook';
 
-const configs = (() => {
-  const accountConfigs: null | {
-    configs: {
-      programId: string;
-      accounts: { type: string; table: string; schema: string }[];
-      crons?: {
-        schedule: string;
-        type: 'refresh-accounts' | 'integrity-check';
+(async () => {
+  const configs = (() => {
+    const accountConfigs: null | {
+      configs: {
+        programId: string;
+        accounts: { type: string; table: string; schema: string }[];
+        crons?: {
+          schedule: string;
+          type: 'refresh-accounts' | 'integrity-check';
+        }[];
       }[];
-    }[];
-  } = JSON.parse(fs.readFileSync(PROGRAM_ACCOUNT_CONFIGS, 'utf8'));
+    } = JSON.parse(fs.readFileSync(PROGRAM_ACCOUNT_CONFIGS, 'utf8'));
 
-  return accountConfigs ? accountConfigs.configs : null;
-})();
+    return accountConfigs ? accountConfigs.configs : null;
+  })();
 
-const customJobs = configs
-  .filter((x) => !!x.crons)
-  .flatMap(({ programId, crons = [] }) =>
-    crons.map(({ schedule, type }) => ({
-      cronTime: schedule,
-      runOnInit: false,
-      onTick: async (server: any) => {
-        try {
-          await server.inject(`/${type}?program=${programId}`);
-        } catch (err) {
-          console.error(err);
-        }
-      },
-    }))
-  );
-
-const server: FastifyInstance = Fastify({ logger: true });
-server.register(cors, { origin: '*' });
-server.register(fastifyMetrics, { endpoint: '/metrics' });
-server.register(fastifyCron, { jobs: [...customJobs] });
-
-server.get('/refresh-accounts', async (req, res) => {
-  const programId = (req.query as any).program;
-
-  try {
-    if (configs) {
-      for (const config of configs) {
-        if ((programId && programId == config.programId) || !programId) {
+  const customJobs = configs
+    .filter((x) => !!x.crons)
+    .flatMap(({ programId, crons = [] }) =>
+      crons.map(({ schedule, type }) => ({
+        cronTime: schedule,
+        runOnInit: false,
+        onTick: async (server: any) => {
           try {
-            await upsertProgramAccounts({
-              programId: new PublicKey(config.programId),
-              accounts: config.accounts,
-            });
+            await server.inject(`/${type}?program=${programId}`);
           } catch (err) {
-            console.log(err);
+            console.error(err);
+          }
+        },
+      }))
+    );
+
+  const server: FastifyInstance = Fastify({ logger: true });
+  await server.register(cors, { origin: '*' });
+  await server.register(fastifyCron, { jobs: [...customJobs] });
+  await server.register(fastifyMetrics, { endpoint: '/metrics' });
+
+  server.get('/refresh-accounts', async (req, res) => {
+    const programId = (req.query as any).program;
+
+    try {
+      if (configs) {
+        for (const config of configs) {
+          if ((programId && programId == config.programId) || !programId) {
+            try {
+              await upsertProgramAccounts({
+                programId: new PublicKey(config.programId),
+                accounts: config.accounts,
+              });
+            } catch (err) {
+              console.log(err);
+            }
           }
         }
       }
+      res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+    } catch (err) {
+      res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
+      console.error(err);
     }
-    res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-  } catch (err) {
-    res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
-    console.error(err);
-  }
-});
+  });
 
-server.get('/integrity-check', async (req, res) => {
-  const programId = (req.query as any).program;
+  server.get('/integrity-check', async (req, res) => {
+    const programId = (req.query as any).program;
 
-  try {
-    if (!programId) throw new Error('program not provided');
+    try {
+      if (!programId) throw new Error('program not provided');
 
-    if (configs) {
-      const config = configs.find((c) => c.programId === programId);
-      if (!config) throw new Error(`no config for program: ${programId} found`);
-
-      try {
-        await integrityCheckProgramAccounts({
-          fastify: server,
-          programId: new PublicKey(config.programId),
-          accounts: config.accounts,
-        });
-      } catch (err) {
-        console.log(err);
-      }
-    }
-    res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-  } catch (err) {
-    res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
-    console.error(err);
-  }
-});
-
-server.post('/account-webhook', async (req, res) => {
-  try {
-    if (!HELIUS_AUTH_SECRET) {
-      throw new Error('Helius auth secret not available');
-    }
-
-    if (req.headers.authorization != HELIUS_AUTH_SECRET) {
-      res.code(StatusCodes.FORBIDDEN).send({
-        message: 'Invalid authorization',
-      });
-      return;
-    }
-
-    const accounts = req.body as any[];
-
-    if (configs) {
-      for (const account of accounts) {
-        const parsed = account['account']['JsonParsed'];
-        console.log('Got account: ', parsed.pubkey);
-        const config = configs.find((x) => x.programId == parsed['owner']);
-
-        if (!config) {
-          // exit early if account doesn't need to be saved
-          res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-          return;
-        }
+      if (configs) {
+        const config = configs.find((c) => c.programId === programId);
+        if (!config)
+          throw new Error(`no config for program: ${programId} found`);
 
         try {
-          await handleAccountWebhook({
+          await integrityCheckProgramAccounts({
+            fastify: server,
             programId: new PublicKey(config.programId),
-            configAccounts: config.accounts,
-            account: parsed,
+            accounts: config.accounts,
           });
         } catch (err) {
-          console.error(err);
+          console.log(err);
         }
       }
+      res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+    } catch (err) {
+      res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
+      console.error(err);
     }
-    res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-  } catch (err) {
-    res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
-    console.error(err);
-  }
-});
+  });
 
-(async () => {
+  server.post('/account-webhook', async (req, res) => {
+    try {
+      if (!HELIUS_AUTH_SECRET) {
+        throw new Error('Helius auth secret not available');
+      }
+
+      if (req.headers.authorization != HELIUS_AUTH_SECRET) {
+        res.code(StatusCodes.FORBIDDEN).send({
+          message: 'Invalid authorization',
+        });
+        return;
+      }
+
+      const accounts = req.body as any[];
+
+      if (configs) {
+        for (const account of accounts) {
+          const parsed = account['account']['JsonParsed'];
+          console.log('Got account: ', parsed.pubkey);
+          const config = configs.find((x) => x.programId == parsed['owner']);
+
+          if (!config) {
+            // exit early if account doesn't need to be saved
+            res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+            return;
+          }
+
+          try {
+            await handleAccountWebhook({
+              programId: new PublicKey(config.programId),
+              configAccounts: config.accounts,
+              account: parsed,
+            });
+          } catch (err) {
+            console.error(err);
+          }
+        }
+      }
+      res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+    } catch (err) {
+      res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
+      console.error(err);
+    }
+  });
+
   try {
     await database.sync();
     await server.listen({ port: 3000, host: '0.0.0.0' });
