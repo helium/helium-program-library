@@ -9,6 +9,7 @@ import { sanitizeAccount } from './sanitizeAccount';
 import { chunks } from '@helium/spl-utils';
 import { getTransactionSignaturesUptoBlockTime } from './getTransactionSignaturesUpToBlock';
 import { FastifyInstance } from 'fastify';
+import { Counter } from 'prom-client';
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;
   programId: PublicKey;
@@ -20,7 +21,7 @@ interface IntegrityCheckProgramAccountsArgs {
   sequelize?: Sequelize;
 }
 
-let integrityMetric;
+let integrityMetric: Counter;
 export const integrityCheckProgramAccounts = async ({
   fastify,
   programId,

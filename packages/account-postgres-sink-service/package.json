@@ -50,6 +50,7 @@
     "inflection": "^2.0.1",
     "lodash": "^4.17.21",
     "pg": "^8.9.0",
+    "prom-client": "^14.2.0",
     "sequelize": "^6.27.0",
     "yargs": "^17.7.1"
   },
