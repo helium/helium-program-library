@@ -1,12 +1,13 @@
-import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { Program } from "@coral-xyz/anchor";
-import { PublicKey } from "@solana/web3.js";
-import { keyToAssetKey, mobileInfoKey } from "../pdas";
+import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import {
-  proofArgsAndAccounts,
   ProofArgsAndAccountsArgs,
+  proofArgsAndAccounts,
 } from "@helium/spl-utils";
+import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
+import { keyToAssetForAsset } from "../helpers";
+import { mobileInfoKey } from "../pdas";
 
 export async function onboardMobileHotspot({
   program,
@@ -29,10 +30,7 @@ export async function onboardMobileHotspot({
   dao: PublicKey;
 } & Omit<ProofArgsAndAccountsArgs, "connection">) {
   const {
-    asset: {
-      content: { json_uri },
-      ownership: { owner },
-    },
+    asset,
     args,
     accounts,
     remainingAccounts,
@@ -41,10 +39,17 @@ export async function onboardMobileHotspot({
     assetId,
     ...rest,
   });
+  const {
+    ownership: { owner },
+  } = asset;
 
+  const keyToAssetKey = keyToAssetForAsset(asset, dao);
+  const keyToAsset = await program.account.keyToAssetV0.fetch(
+    keyToAssetKey
+  );
   const [info] = await mobileInfoKey(
     rewardableEntityConfig,
-    json_uri.split("/").slice(-1)[0]
+    keyToAsset.entityKey
   );
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
@@ -64,9 +69,7 @@ export async function onboardMobileHotspot({
       maker,
       dao,
       issuingAuthority: makerAcc?.issuingAuthority,
-      keyToAsset: (
-        await keyToAssetKey(dao, json_uri.split("/").slice(-1)[0])
-      )[0],
+      keyToAsset: keyToAssetKey,
     })
     .remainingAccounts(remainingAccounts);
 }

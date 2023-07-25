@@ -768,7 +768,7 @@ dependencies = [
 
 [[package]]
 name = "bulk-claim-rewards"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes-gcm",
  "anchor-client",
@@ -786,7 +786,7 @@ dependencies = [
  "helium-entity-manager",
  "helium-sub-daos",
  "hex",
- "hmac 0.12.1",
+ "hmac 0.8.1",
  "hpl-utils",
  "json",
  "lazy-distributor",
@@ -798,7 +798,7 @@ dependencies = [
  "rust_decimal",
  "serde",
  "serde_json",
- "sha2 0.10.6",
+ "sha2 0.9.9",
  "sodiumoxide",
  "solana-account-decoder",
  "solana-client",

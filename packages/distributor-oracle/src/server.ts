@@ -12,9 +12,11 @@ import {
   setProvider
 } from "@coral-xyz/anchor";
 import {
-  decodeEntityKey, entityCreatorKey,
+  decodeEntityKey,
+  entityCreatorKey,
   init as initHeliumEntityManager,
   keyToAssetKey,
+  keyToAssetForAsset,
 } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import {
@@ -101,7 +103,9 @@ export class PgDatabase implements Database {
       console.error("No asset found", assetId.toBase58());
       return "0";
     }
-    const entityKey = asset.content.json_uri.split("/").slice(-1)[0] as string;
+    const keyToAssetKey = keyToAssetForAsset(asset, DAO);
+    const keyToAsset = await this.issuanceProgram.account.keyToAssetV0.fetch(keyToAssetKey);
+    const entityKey = decodeEntityKey(keyToAsset.entityKey, keyToAsset.keySerialization)!;
     // Verify the creator is our entity creator, otherwise they could just
     // pass in any NFT with this ecc compact to collect rewards
     if (
@@ -110,8 +114,6 @@ export class PgDatabase implements Database {
     ) {
       throw new Error("Not a valid rewardable entity");
     }
-
-
 
     return this.getCurrentRewardsByEntity(entityKey);
   }

@@ -145,6 +145,13 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,
   );
+  ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
+    asset: asset_id,
+    dao: ctx.accounts.dao.key(),
+    entity_key: args.entity_key,
+    bump_seed: ctx.bumps["key_to_asset"],
+    key_serialization: args.key_serialization,
+  });
 
   let mut metadata_uri = format!("{}/{}", ENTITY_METADATA_URL, key_str);
   if let Some(metadata_url) = args.metadata_url {
@@ -205,18 +212,10 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     ctx
       .accounts
       .mint_to_collection_ctx()
-      .with_remaining_accounts(vec![creator])
+      .with_remaining_accounts(vec![creator, key_to_asset_creator])
       .with_signer(&[entity_creator_seeds[0], key_to_asset_signer]),
     metadata,
   )?;
-
-  ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
-    asset: asset_id,
-    dao: ctx.accounts.dao.key(),
-    entity_key: args.entity_key,
-    bump_seed: ctx.bumps["key_to_asset"],
-    key_serialization: args.key_serialization,
-  });
 
   Ok(())
 }
