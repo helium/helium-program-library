@@ -1,4 +1,5 @@
 import Fastify, { FastifyInstance } from 'fastify';
+import fp from 'fastify-plugin';
 import fastifyCron from 'fastify-cron';
 import fastifyMetrics from 'fastify-metrics';
 import cors from '@fastify/cors';
@@ -44,9 +45,13 @@ const customJobs = configs
   );
 
 const server: FastifyInstance = Fastify({ logger: true });
-server.register(cors, { origin: '*' });
-server.register(fastifyMetrics, { endpoint: '/metrics' });
-server.register(fastifyCron, { jobs: [...customJobs] });
+server.register(
+  fp(async (fastify, _opts) => {
+    await fastify.register(cors, { origin: '*' });
+    await fastify.register(fastifyMetrics, { endpoint: '/metrics' });
+    await fastify.register(fastifyCron, { jobs: [...customJobs] });
+  })
+);
 
 server.get('/refresh-accounts', async (req, res) => {
   const programId = (req.query as any).program;
