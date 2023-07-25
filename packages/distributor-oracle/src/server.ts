@@ -415,7 +415,6 @@ export class OracleServer {
         proposedCurrentRewards = decoded.data.args.currentRewards;
         entityKey = (await this.hemProgram.account.keyToAssetV0.fetch(keyToAssetK)).entityKey;
         // A sneaky RPC could return incorrect data. Verify that the entity key is correct for the key to asset
-        console.log(HNT.toBase58())
         if (!keyToAssetKey(this.dao, entityKey)[0].equals(keyToAssetK)) {
           return { success: false, message: "RPC lied about the entity key for this asset." };
         }
