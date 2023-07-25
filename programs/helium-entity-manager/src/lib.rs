@@ -156,6 +156,12 @@ pub mod helium_entity_manager {
     temp_backfill_onboarding_fees_v0::handler(ctx)
   }
 
+  pub fn temp_backfill_mobile_info_data_v0(
+    ctx: Context<TempBackfillMobileInfoDataV0>,
+  ) -> Result<()> {
+    temp_backfill_mobile_info_data_v0::handler(ctx)
+  }
+
   pub fn temp_pay_mobile_onboarding_fee_v0(
     ctx: Context<TempPayMobileOnboardingFeeV0>,
   ) -> Result<()> {
