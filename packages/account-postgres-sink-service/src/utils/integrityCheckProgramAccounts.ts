@@ -6,10 +6,10 @@ import _omit from 'lodash/omit';
 import { SOLANA_URL } from '../env';
 import database from './database';
 import { sanitizeAccount } from './sanitizeAccount';
-import { chunks } from '@helium/spl-utils';
 import { getTransactionSignaturesUptoBlockTime } from './getTransactionSignaturesUpToBlock';
 import { FastifyInstance } from 'fastify';
 import { Counter } from 'prom-client';
+import { chunks } from './chunks';
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;
   programId: PublicKey;
@@ -29,7 +29,7 @@ export const integrityCheckProgramAccounts = async ({
   sequelize = database,
 }: IntegrityCheckProgramAccountsArgs) => {
   if (!integrityMetric) {
-    integrityMetric = new fastify.metrics.client.Counter({
+    integrityMetric = new (fastify as any).metrics.client.Counter({
       name: 'integrity_check',
       help: 'Number of corrected records from integrity checker',
     });
