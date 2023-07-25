@@ -16,6 +16,16 @@ import { upsertProgramAccounts } from './utils/upsertProgramAccounts';
 import { integrityCheckProgramAccounts } from './utils/integrityCheckProgramAccounts';
 import { handleAccountWebhook } from './utils/handleAccountWebhook';
 
+if (!HELIUS_AUTH_SECRET) {
+  throw new Error('Helius auth secret not available');
+}
+
+const server: FastifyInstance = Fastify({
+  logger: true,
+});
+
+server.register(cors, { origin: '*' });
+
 const configs = (() => {
   const accountConfigs: null | {
     configs: {
@@ -47,8 +57,6 @@ const customJobs = configs
     }))
   );
 
-const server: FastifyInstance = Fastify({ logger: true });
-server.register(cors, { origin: '*' });
 server.register(fastifyCron, { jobs: [...customJobs] });
 server.register(fastifyMetrics, { endpoint: '/metrics' });
 
@@ -105,24 +113,19 @@ server.get('/integrity-check', async (req, res) => {
 });
 
 server.post('/account-webhook', async (req, res) => {
+  if (req.headers.authorization != HELIUS_AUTH_SECRET) {
+    res.code(StatusCodes.FORBIDDEN).send({
+      message: 'Invalid authorization',
+    });
+    return;
+  }
+
   try {
-    if (!HELIUS_AUTH_SECRET) {
-      throw new Error('Helius auth secret not available');
-    }
-
-    if (req.headers.authorization != HELIUS_AUTH_SECRET) {
-      res.code(StatusCodes.FORBIDDEN).send({
-        message: 'Invalid authorization',
-      });
-      return;
-    }
-
     const accounts = req.body as any[];
 
     if (configs) {
       for (const account of accounts) {
-        const parsed = account['account']['JsonParsed'];
-        console.log('Got account: ', parsed.pubkey);
+        const parsed = account['account']['parsed'];
         const config = configs.find((x) => x.programId == parsed['owner']);
 
         if (!config) {

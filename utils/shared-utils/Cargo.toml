@@ -23,9 +23,9 @@ default = []
 overflow-checks = true
 
 [dependencies]
-uint = "0.9"
-anchor-lang = { version = "0.26.0", features = ["init-if-needed"] }
-anchor-spl = { version = "0.26.0", features = ["mint", "token"] }
-mpl-token-metadata = { version = "1.11.0", features = ["no-entrypoint"] }
+anchor-lang = { workspace = true }
+anchor-spl = { workspace = true }
 account-compression-cpi = { workspace = true }
+uint = "0.9"
+mpl-token-metadata = { workspace = true }
 bubblegum-cpi = { workspace = true }
