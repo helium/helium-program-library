@@ -1,40 +1,40 @@
-import * as anchor from "@coral-xyz/anchor";
-import { underscore } from "inflection";
-import { Sequelize, DataTypes } from "sequelize";
-import { provider } from "./solana";
-import cachedIdlFetch from "./cachedIdlFetch";
+import * as anchor from '@coral-xyz/anchor';
+import { underscore } from 'inflection';
+import { Sequelize, DataTypes } from 'sequelize';
+import { provider } from './solana';
+import cachedIdlFetch from './cachedIdlFetch';
 
 const TypeMap = new Map<string, any>([
-  ["string", DataTypes.STRING],
-  ["publicKey", DataTypes.STRING],
-  ["i16", DataTypes.INTEGER],
-  ["u8", DataTypes.INTEGER.UNSIGNED],
-  ["i16", DataTypes.INTEGER],
-  ["u16", DataTypes.INTEGER.UNSIGNED],
-  ["i32", DataTypes.INTEGER],
-  ["u32", DataTypes.INTEGER.UNSIGNED],
-  ["i64", DataTypes.DECIMAL],
-  ["u64", DataTypes.DECIMAL.UNSIGNED],
-  ["i128", DataTypes.DECIMAL],
-  ["u128", DataTypes.DECIMAL.UNSIGNED],
-  ["bool", DataTypes.BOOLEAN],
-  ["bytes", DataTypes.BLOB],
+  ['string', DataTypes.STRING],
+  ['publicKey', DataTypes.STRING],
+  ['i16', DataTypes.INTEGER],
+  ['u8', DataTypes.INTEGER.UNSIGNED],
+  ['i16', DataTypes.INTEGER],
+  ['u16', DataTypes.INTEGER.UNSIGNED],
+  ['i32', DataTypes.INTEGER],
+  ['u32', DataTypes.INTEGER.UNSIGNED],
+  ['i64', DataTypes.DECIMAL],
+  ['u64', DataTypes.DECIMAL.UNSIGNED],
+  ['i128', DataTypes.DECIMAL],
+  ['u128', DataTypes.DECIMAL.UNSIGNED],
+  ['bool', DataTypes.BOOLEAN],
+  ['bytes', DataTypes.BLOB],
 ]);
 
 const determineType = (type: string | object): any => {
-  if (typeof type === "string" && TypeMap.has(type)) {
+  if (typeof type === 'string' && TypeMap.has(type)) {
     return TypeMap.get(type);
   }
 
-  if (typeof type === "object") {
+  if (typeof type === 'object') {
     const [key, value] = Object.entries(type)[0];
 
-    if (key === "array" && Array.isArray(value)) {
+    if (key === 'array' && Array.isArray(value)) {
       const [arrayType] = value;
       if (TypeMap.has(arrayType)) {
         return DataTypes.ARRAY(TypeMap.get(arrayType));
       }
-    } else if (key === "vec") {
+    } else if (key === 'vec') {
       const vecType = value;
       return DataTypes.ARRAY(determineType(vecType));
     } else {
@@ -85,7 +85,7 @@ export const defineIdlModels = async ({
         {
           underscored: true,
           updatedAt: false,
-          schema: underscore(accConfig.schema || "public"),
+          schema: underscore(accConfig.schema || 'public'),
           tableName: underscore(accConfig.table || acc.name),
         }
       );
@@ -119,7 +119,7 @@ export const defineAllIdlModels = async ({
         idl.accounts!.some(({ name }) => name === type)
       )
     ) {
-      throw new Error("idl does not have every account type");
+      throw new Error('idl does not have every account type');
     }
 
     await defineIdlModels({
