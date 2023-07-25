@@ -274,6 +274,15 @@
   dependencies:
     "@hapi/hoek" "^9.0.0"
 
+"@helium/address@^4.10.2":
+  version "4.10.2"
+  resolved "https://registry.yarnpkg.com/@helium/address/-/address-4.10.2.tgz#56960b118fceb6b6ddabe3e4ecec467d9ae50e26"
+  integrity sha512-qCswC7Z3GXuJyHv36RcOSnffeghjqJQx0fdu2Lxpf9fgOnIi1JZO2tjjk1mBaqOwCyp+0YzrTPUoEukL/WCtsA==
+  dependencies:
+    bs58 "^5.0.0"
+    js-sha256 "^0.9.0"
+    multiformats "^9.6.4"
+
 "@helium/address@^4.6.2", "@helium/address@^4.8.1":
   version "4.8.1"
   resolved "https://registry.npmjs.org/@helium/address/-/address-4.8.1.tgz"
@@ -329,6 +338,23 @@
   integrity sha512-aoVjhYDcic5g+n/iwKGXmGgMruPXTffpyr2ziGjuhAvU0phPSv6gnTbyHKY7FqBCUOYX4jHzEKJgX7M27UOGGg==
   dependencies:
     protobufjs "^6.11.3"
+
+"@helium/spl-utils@^0.2.13":
+  version "0.2.13"
+  resolved "https://registry.yarnpkg.com/@helium/spl-utils/-/spl-utils-0.2.13.tgz#71efe6093940dd9b8ecc7f24a656335a55d0c747"
+  integrity sha512-N68djQJI3HiX6MFLfjAteYzpxhd6pAee0rzy92OdoK0vT6iIL4F0Q9kx385n+Wtda8xbItWtqsNHKkdra8rSCg==
+  dependencies:
+    "@coral-xyz/anchor" "^0.26.0"
+    "@helium/account-fetch-cache" "^0.2.5"
+    "@helium/address" "^4.10.2"
+    "@helium/anchor-resolvers" "^0.2.5"
+    "@metaplex-foundation/mpl-token-metadata" "^2.5.2"
+    "@solana/spl-account-compression" "^0.1.7"
+    "@solana/spl-token" "^0.3.6"
+    "@solana/web3.js" "^1.43.4"
+    bn.js "^5.2.0"
+    borsh "^0.7.0"
+    bs58 "^5.0.0"
 
 "@helium/transactions@^3.38.0":
   version "3.62.0"
@@ -2887,6 +2913,11 @@
   dependencies:
     "@types/ms" "*"
 
+"@types/deep-equal@^1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@types/deep-equal/-/deep-equal-1.0.1.tgz#71cfabb247c22bcc16d536111f50c0ed12476b03"
+  integrity sha512-mMUu4nWHLBlHtxXY17Fg6+ucS/MnndyOWyOe7MmwkoMYxvfQU2ajtRaEvqSUv+aVkMqH/C0NCI8UoVfRNQ10yg==
+
 "@types/express-serve-static-core@^4.17.31":
   version "4.17.33"
   resolved "https://registry.npmjs.org/@types/express-serve-static-core/-/express-serve-static-core-4.17.33.tgz"
@@ -2920,6 +2951,11 @@
   version "4.14.191"
   resolved "https://registry.npmjs.org/@types/lodash/-/lodash-4.14.191.tgz"
   integrity sha512-BdZ5BCCvho3EIXw6wUCXHe7rS53AIDPLE+JzwgT+OsJk53oBfbSmZZ7CX4VaRoN78N+TJpFi9QPlfIVNmJYWxQ==
+
+"@types/lodash@^4.14.195":
+  version "4.14.195"
+  resolved "https://registry.yarnpkg.com/@types/lodash/-/lodash-4.14.195.tgz#bafc975b252eb6cea78882ce8a7b6bf22a6de632"
+  integrity sha512-Hwx9EUgdwf2GLarOjQp5ZH8ZmblzcbTBC2wtQWNKARBSxM9ezRIAUpeDTgoQRAFB0+8CNWXVA9+MaSOzOF3nPg==
 
 "@types/long@^4.0.1":
   version "4.0.2"

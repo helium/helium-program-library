@@ -29,12 +29,19 @@ export const getTransactionSignaturesUptoBlockTime = async ({
       'confirmed'
     );
 
-    if (transactions.length === 0 || transactions[0].blockTime < blockTime) {
+    if (
+      transactions.length === 0 ||
+      (transactions[0].blockTime && transactions[0].blockTime < blockTime)
+    ) {
       return transactionSignatures;
     }
 
     transactions.forEach((transaction) => {
-      if (!transaction.err && transaction.blockTime >= blockTime) {
+      if (
+        !transaction.err &&
+        transaction.blockTime &&
+        transaction.blockTime >= blockTime
+      ) {
         transactionSignatures.push(transaction.signature);
       }
     });
