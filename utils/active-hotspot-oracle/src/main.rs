@@ -173,8 +173,8 @@ async fn main() -> Result<()> {
   println!("Processing records");
   for record_batch in record_batches {
     let pub_keys = record_batch
-      .column_by_name("hotspot_key")
-      .context("No hotspot_key column array found")?
+      .column_by_name("gateway_key")
+      .context("No gateway_key column array found")?
       .as_any()
       .downcast_ref::<StringArray>()
       .context("Result is not a string array")?;
