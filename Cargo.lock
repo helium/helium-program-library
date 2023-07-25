@@ -13,6 +13,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "account-compression-cpi"
+version = "0.1.2"
+source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=9707a03#9707a03eb7be0ccf4d96a18b662ffcd376365640"
+dependencies = [
+ "anchor-gen",
+ "anchor-lang",
+ "solana-program",
+]
+
+[[package]]
 name = "adler"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -634,6 +644,16 @@ name = "bs58"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
+
+[[package]]
+name = "bubblegum-cpi"
+version = "0.9.2"
+source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=9707a03#9707a03eb7be0ccf4d96a18b662ffcd376365640"
+dependencies = [
+ "anchor-gen",
+ "anchor-lang",
+ "solana-program",
+]
 
 [[package]]
 name = "bumpalo"
@@ -1730,20 +1750,20 @@ checksum = "2540771e65fc8cb83cd6e8a237f70c319bd5c29f78ed1084ba5d50eeac86f7f9"
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.0.8"
+version = "0.1.1"
 dependencies = [
+ "account-compression-cpi",
  "anchor-lang",
  "anchor-spl",
  "angry-purple-tiger",
  "bs58 0.3.1",
+ "bubblegum-cpi",
  "bytemuck",
  "data-credits",
  "helium-sub-daos",
  "lazy-transactions",
- "mpl-bubblegum",
  "mpl-token-metadata",
  "shared-utils",
- "spl-account-compression 0.1.5",
 ]
 
 [[package]]
@@ -2073,13 +2093,13 @@ dependencies = [
 name = "lazy-distributor"
 version = "0.0.1"
 dependencies = [
+ "account-compression-cpi",
  "anchor-lang",
  "anchor-spl",
+ "bubblegum-cpi",
  "circuit-breaker",
- "mpl-bubblegum",
  "mpl-token-metadata",
  "shared-utils",
- "spl-account-compression 0.1.5",
 ]
 
 [[package]]
@@ -2089,7 +2109,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
- "spl-concurrent-merkle-tree 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spl-concurrent-merkle-tree",
 ]
 
 [[package]]
@@ -2323,17 +2343,17 @@ dependencies = [
 name = "mobile-entity-manager"
 version = "0.0.1"
 dependencies = [
+ "account-compression-cpi",
  "anchor-lang",
  "anchor-spl",
  "angry-purple-tiger",
  "bs58 0.3.1",
+ "bubblegum-cpi",
  "bytemuck",
  "helium-entity-manager",
  "helium-sub-daos",
- "mpl-bubblegum",
  "mpl-token-metadata",
  "shared-utils",
- "spl-account-compression 0.1.5",
 ]
 
 [[package]]
@@ -2355,21 +2375,6 @@ dependencies = [
  "proc-macro2 1.0.49",
  "quote 1.0.23",
  "syn 1.0.107",
-]
-
-[[package]]
-name = "mpl-bubblegum"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60a589ceb05c6277253960665ee3658da89f055629c428beb64c55ad24a41b13"
-dependencies = [
- "anchor-lang",
- "bytemuck",
- "mpl-token-metadata",
- "solana-program",
- "spl-account-compression 0.1.10",
- "spl-associated-token-account",
- "spl-token",
 ]
 
 [[package]]
@@ -3690,11 +3695,11 @@ dependencies = [
 name = "shared-utils"
 version = "0.0.1"
 dependencies = [
+ "account-compression-cpi",
  "anchor-lang",
  "anchor-spl",
- "mpl-bubblegum",
+ "bubblegum-cpi",
  "mpl-token-metadata",
- "spl-account-compression 0.1.5",
  "uint",
 ]
 
@@ -4611,29 +4616,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "spl-account-compression"
-version = "0.1.5"
-source = "git+https://github.com/ChewingGlass/solana-program-library?branch=feature/anchor-26#e6db7bcf6da7b41c3ab250a0c8489ea50d511a90"
-dependencies = [
- "anchor-lang",
- "bytemuck",
- "spl-concurrent-merkle-tree 0.1.2 (git+https://github.com/ChewingGlass/solana-program-library?branch=feature/anchor-26)",
- "spl-noop 0.1.3 (git+https://github.com/ChewingGlass/solana-program-library?branch=feature/anchor-26)",
-]
-
-[[package]]
-name = "spl-account-compression"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7a5417eae3c924553b872de5f1bca5945334a235f8d94841bd44c6dd7c6358c"
-dependencies = [
- "anchor-lang",
- "bytemuck",
- "spl-concurrent-merkle-tree 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "spl-noop 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "spl-associated-token-account"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4654,16 +4636,6 @@ name = "spl-concurrent-merkle-tree"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b8518df14b19ada73c6bd15ee344de8ab720580fb2df0029342f9a772e2392d"
-dependencies = [
- "bytemuck",
- "solana-program",
- "thiserror",
-]
-
-[[package]]
-name = "spl-concurrent-merkle-tree"
-version = "0.1.2"
-source = "git+https://github.com/ChewingGlass/solana-program-library?branch=feature/anchor-26#e6db7bcf6da7b41c3ab250a0c8489ea50d511a90"
 dependencies = [
  "bytemuck",
  "solana-program",
@@ -4724,23 +4696,6 @@ name = "spl-memo"
 version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd0dc6f70db6bacea7ff25870b016a65ba1d1b6013536f08e4fd79a8f9005325"
-dependencies = [
- "solana-program",
-]
-
-[[package]]
-name = "spl-noop"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "558536c75b5aed018113bfca39cddb414cd7ca77da7658d668e751d977830cda"
-dependencies = [
- "solana-program",
-]
-
-[[package]]
-name = "spl-noop"
-version = "0.1.3"
-source = "git+https://github.com/ChewingGlass/solana-program-library?branch=feature/anchor-26#e6db7bcf6da7b41c3ab250a0c8489ea50d511a90"
 dependencies = [
  "solana-program",
 ]

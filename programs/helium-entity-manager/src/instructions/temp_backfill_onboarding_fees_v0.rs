@@ -1,6 +1,7 @@
 use crate::{state::*, TESTING};
 use anchor_lang::prelude::*;
-use helium_sub_daos::SubDaoV0;
+use anchor_lang::solana_program::hash::hash;
+use helium_sub_daos::{DaoV0, SubDaoV0};
 
 #[derive(Accounts)]
 pub struct TempBackfillOnboardingFeesV0<'info> {
@@ -13,9 +14,22 @@ pub struct TempBackfillOnboardingFeesV0<'info> {
   #[account(
     mut,
     has_one = active_device_authority,
+    has_one = dao,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
-  #[account(mut)]
+  pub dao: Box<Account<'info, DaoV0>>,
+  #[account(
+    has_one = dao,
+  )]
+  pub key_to_asset: Box<Account<'info, KeyToAssetV0>>,
+  #[account(mut,
+    seeds = [
+      "iot_info".as_bytes(),
+      rewardable_entity_config.key().as_ref(),
+      &hash(&key_to_asset.entity_key[..]).to_bytes()
+    ],
+    bump
+  )]
   pub iot_info: Box<Account<'info, IotHotspotInfoV0>>,
 }
 

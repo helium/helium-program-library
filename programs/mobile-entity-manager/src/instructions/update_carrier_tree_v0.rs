@@ -1,12 +1,12 @@
 use crate::error::ErrorCode;
 use crate::{carrier_seeds, state::*};
+use account_compression_cpi::{program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
-use mpl_bubblegum::{
+use bubblegum_cpi::{
   cpi::{accounts::CreateTree, create_tree},
   program::Bubblegum,
-  state::TreeConfig,
+  TreeConfig,
 };
-use spl_account_compression::{program::SplAccountCompression, Noop};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateCarrierTreeArgsV0 {
