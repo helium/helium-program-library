@@ -140,7 +140,10 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     ErrorCode::InvalidStringLength
   );
 
-  let key_str = bs58::encode(args.entity_key.clone()).into_string();
+  let key_str = match args.key_serialization {
+    KeySerialization::B58 => bs58::encode(&args.entity_key).into_string(),
+    KeySerialization::UTF8 => std::str::from_utf8(&args.entity_key).unwrap().to_string(),
+  };
   let asset_id = get_asset_id(
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,
@@ -153,17 +156,7 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     key_serialization: args.key_serialization,
   });
 
-  let mut metadata_uri = format!("{}/{}", ENTITY_METADATA_URL, key_str);
-  if let Some(metadata_url) = args.metadata_url {
-    let formated_metadata_url = format!("{}/{}", metadata_url, key_str);
-
-    require!(
-      formated_metadata_url.len() <= 200,
-      ErrorCode::InvalidStringLength
-    );
-
-    metadata_uri = formated_metadata_url;
-  }
+  let metadata_uri = format!("{}/{}", ENTITY_METADATA_URL, key_str);
   require!(
     metadata_uri.len() <= MAX_URI_LENGTH,
     ErrorCode::InvalidStringLength

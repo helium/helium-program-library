@@ -4890,6 +4890,18 @@ dependencies = [
 [[package]]
 name = "spl-account-compression"
 version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7a5417eae3c924553b872de5f1bca5945334a235f8d94841bd44c6dd7c6358c"
+dependencies = [
+ "anchor-lang",
+ "bytemuck",
+ "spl-concurrent-merkle-tree 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spl-noop 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "spl-account-compression"
+version = "0.1.10"
 source = "git+https://github.com/solana-labs/solana-program-library.git#80624e7a1a996613e8266dbc7d72575740354687"
 dependencies = [
  "anchor-lang",
