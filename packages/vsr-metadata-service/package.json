@@ -36,6 +36,8 @@
     "@fastify/cors": "^8.1.1",
     "@helium/address": "^4.10.2",
     "@helium/voter-stake-registry-sdk": "^0.2.5",
+    "@helium/spl-utils": "^0.2.5",
+    "@helium/account-fetch-cache": "^0.2.5",
     "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
     "@solana/spl-account-compression": "^0.1.7",
     "@solana/spl-token": "^0.3.6",

@@ -88,6 +88,16 @@ jobs:
       matrix:
         test:
           - utils/ecc-sig-verifier
+          - packages/monitor-service
+          - packages/faucet-service
+          - packages/metadata-service
+          - packages/distributor-oracle
+          - packages/account-postgres-sink-service
+          - packages/active-device-oracle
+          - packages/fanout-metadata-service
+          - packages/hnt-to-rent-service
+          - packages/rewards-oracle-faucet-service
+          - packages/vsr-metadata-service
     steps:
       - uses: actions/checkout@v3
       - run: cd $DOCKER_PATH && docker build .
