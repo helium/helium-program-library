@@ -161,7 +161,7 @@ async fn main() -> Result<()> {
   let current_time = Utc::now();
   let thirty_days_ago = current_time - Duration::days(30);
   let query = format!(
-    "SELECT * FROM delta_table WHERE most_recent_ts > {} LIMIT 1000",
+    "SELECT * FROM delta_table WHERE most_recent_ts > {}",
     thirty_days_ago.timestamp(),
   );
   let record_batches = session.sql(query.as_str()).await?.collect().await?;
