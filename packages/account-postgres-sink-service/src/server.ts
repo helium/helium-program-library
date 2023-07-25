@@ -25,7 +25,7 @@ import { handleAccountWebhook } from './utils/handleAccountWebhook';
       }[];
     } = JSON.parse(fs.readFileSync(PROGRAM_ACCOUNT_CONFIGS, 'utf8'));
 
-    return accountConfigs ? accountConfigs.configs : null;
+    return accountConfigs ? accountConfigs.configs : [];
   })();
 
   const customJobs = configs
