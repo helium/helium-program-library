@@ -1,6 +1,6 @@
 use crate::{constants::ENTITY_METADATA_URL, error::ErrorCode};
-use account_compression_cpi::{program::SplAccountCompression, Noop};
 use crate::{key_to_asset_seeds, state::*};
+use account_compression_cpi::{program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
 use anchor_spl::token::Mint;

@@ -11,6 +11,7 @@ import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manage
 import { Program } from "@coral-xyz/anchor";
 import { provider } from "./solana"
 import Address from "@helium/address/build/Address";
+import { PublicKey } from "@solana/web3.js";
 
 const server: FastifyInstance = Fastify({
   logger: true
@@ -26,21 +27,29 @@ const DAO = daoKey(HNT_MINT)[0];
 
 let program: Program<HeliumEntityManager>;
 
-server.get<{ Params: { hashedEntityKey: string } }>(
-  "/v1/:hashedEntityKey",
+server.get<{ Params: { keyToAssetKey: string } }>(
+  "/v1/:keyToAssetKey",
   async (request, reply) => {
-    const { hashedEntityKey } = request.params;
-    const keyToAsset = keyToAssetKeyRaw(DAO, bs58.decode(hashedEntityKey))[0];
+    const { keyToAssetKey } = request.params;
+    const keyToAsset = new PublicKey(keyToAssetKey);
     if (!program) {
-      program = await init(provider)
+      program = await init(provider);
     }
-    const keyToAssetAccount = await program.account.keyToAssetV0.fetch(keyToAsset);
-    const keyStr = decodeEntityKey(keyToAssetAccount.entityKey, keyToAssetAccount.keySerialization);
+    const keyToAssetAccount = await program.account.keyToAssetV0.fetch(
+      keyToAsset
+    );
+    const keyStr = decodeEntityKey(
+      keyToAssetAccount.entityKey,
+      keyToAssetAccount.keySerialization
+    );
     const digest = animalHash(keyStr);
 
     return {
       name: digest,
-      description: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : "A Rewardable NFT on Helium",
+      description:
+        keyStr === "iot_operations_fund"
+          ? "IOT Operations Fund"
+          : "A Rewardable NFT on Helium",
       image:
         "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/hotspot.png",
       attributes: [
