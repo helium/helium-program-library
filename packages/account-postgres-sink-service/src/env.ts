@@ -9,6 +9,6 @@ export const PROGRAM_ACCOUNT_CONFIGS =
   process.env.PROGRAM_ACCOUNT_CONFIGS ||
   `${__dirname}/../program_account_configs_example.json`;
 
-export const GLOBAL_CRON_CONFIG = process.env.GLOBAL_CRON_CONFIG;
-
 export const HELIUS_AUTH_SECRET = process.env.HELIUS_AUTH_SECRET;
+
+export const RUN_JOBS_AT_STARTUP = process.env.RUN_JOBS_AT_STARTUP === 'true';

@@ -66,6 +66,10 @@ export const integrityCheckProgramAccounts = async ({
       twentyFourHoursAgoSlot
     );
 
+    if (!blockTime24HoursAgo) {
+      throw new Error('Unable to get blocktime from 24 hours ago');
+    }
+
     const transactionSignatures = await getTransactionSignaturesUptoBlockTime({
       programId,
       blockTime: blockTime24HoursAgo,
@@ -84,7 +88,7 @@ export const integrityCheckProgramAccounts = async ({
         );
 
         for (const parsed of parsedTransactions) {
-          parsed.transaction.message.accountKeys
+          parsed?.transaction.message.accountKeys
             .filter((acc) => acc.writable)
             .map((acc) => uniqueWritableAccounts.add(acc.pubkey));
         }
@@ -117,7 +121,10 @@ export const integrityCheckProgramAccounts = async ({
           accountTypeLoop: for (const { type } of accounts) {
             try {
               if (accName) break accountTypeLoop;
-              decodedAcc = program.coder.accounts.decode(type, c.data);
+              decodedAcc = program.coder.accounts.decode(
+                type,
+                c.data as Buffer
+              );
               accName = type;
             } catch (err) {}
           }
