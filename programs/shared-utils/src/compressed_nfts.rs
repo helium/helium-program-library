@@ -1,8 +1,7 @@
+use account_compression_cpi::cpi::accounts::VerifyLeaf;
+use account_compression_cpi::cpi::verify_leaf;
 use anchor_lang::prelude::*;
-use mpl_bubblegum::state::leaf_schema::LeafSchema;
-use mpl_bubblegum::utils::get_asset_id;
-use spl_account_compression::cpi::accounts::VerifyLeaf;
-use spl_account_compression::cpi::verify_leaf;
+use bubblegum_cpi::{get_asset_id, LeafSchema};
 
 pub struct VerifyCompressedNftArgs<'info> {
   /// CHECK: Why are you yelling at me here, anchor?

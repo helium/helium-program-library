@@ -17,5 +17,5 @@ exclude = [
 anchor-lang = { version = "0.26.0", features = ["init-if-needed"] }
 anchor-spl = { version = "0.26.0", features = ["mint", "token"] }
 mpl-token-metadata = { version = "1.11.0", features = ["no-entrypoint"] }
-spl-account-compression = { git = "https://github.com/ChewingGlass/solana-program-library", branch = "feature/anchor-26", version="0.1.5", features = ["cpi"] }
-mpl-bubblegum = {version = "0.8.0", features = ["cpi"]}
+account-compression-cpi = {rev = "9707a03", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
+bubblegum-cpi = {rev = "9707a03", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
