@@ -168,7 +168,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
     uri = format!(
       "{}/v1/{}",
       ENTITY_METADATA_URL,
-      ctx.accounts.key_to_asset.key().to_string()
+      ctx.accounts.key_to_asset.key()
     );
   }
   let metadata = MetadataArgs {
