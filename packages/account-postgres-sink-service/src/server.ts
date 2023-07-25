@@ -5,7 +5,11 @@ import cors from '@fastify/cors';
 import fs from 'fs';
 import { StatusCodes, ReasonPhrases } from 'http-status-codes';
 import { PublicKey } from '@solana/web3.js';
-import { HELIUS_AUTH_SECRET, PROGRAM_ACCOUNT_CONFIGS } from './env';
+import {
+  HELIUS_AUTH_SECRET,
+  PROGRAM_ACCOUNT_CONFIGS,
+  RUN_JOBS_AT_STARTUP,
+} from './env';
 import database from './utils/database';
 import { defineAllIdlModels } from './utils/defineIdlModels';
 import { upsertProgramAccounts } from './utils/upsertProgramAccounts';
@@ -158,9 +162,8 @@ import { handleAccountWebhook } from './utils/handleAccountWebhook';
     const address = server.server.address();
     const port = typeof address === 'string' ? address : address?.port;
     console.log(`Running on 0.0.0.0:${port}`);
-
     // By default, jobs are not running at startup
-    if (process.env.RUN_JOBS_AT_STARTUP === 'true') {
+    if (RUN_JOBS_AT_STARTUP) {
       server.cron.startAllJobs();
     }
   } catch (err) {

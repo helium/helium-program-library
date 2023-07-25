@@ -103,6 +103,9 @@
           "table": "mobile_hotspot_infos",
           "schema": "public"
         }
+      ],
+      "crons": [
+        { "schedule": "*/1 * * * *", "type": "integrity-check"}
       ]
     },
     {
