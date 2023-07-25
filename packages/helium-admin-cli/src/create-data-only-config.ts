@@ -1,41 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
-import { ThresholdType } from "@helium/circuit-breaker-sdk";
-import {
-  dataCreditsKey,
-  init as initDc,
-  PROGRAM_ID,
-  accountPayerKey,
-} from "@helium/data-credits-sdk";
 import {
   init as initHem,
   dataOnlyConfigKey,
 } from "@helium/helium-entity-manager-sdk";
-import { fanoutKey } from "@helium/fanout-sdk";
+import { HNT_MINT, sendInstructions } from "@helium/spl-utils";
 import {
   daoKey,
-  init as initDao,
-  threadKey,
 } from "@helium/helium-sub-daos-sdk";
-import { HNT_MINT, sendInstructions, toBN } from "@helium/spl-utils";
-import {
-  init as initVsr,
-  registrarKey,
-} from "@helium/voter-stake-registry-sdk";
-import {
-  getGovernanceProgramVersion,
-  GoverningTokenConfigAccountArgs,
-  GoverningTokenType,
-  MintMaxVoteWeightSource,
-  SetRealmAuthorityAction,
-  withCreateRealm,
-  withSetRealmAuthority,
-} from "@solana/spl-governance";
-import {
-  createAssociatedTokenAccountIdempotent,
-  createAssociatedTokenAccountIdempotentInstruction,
-  getAssociatedTokenAddress,
-  getAssociatedTokenAddressSync,
-} from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
   Connection,
@@ -43,34 +14,18 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
-  Transaction,
-  TransactionInstruction,
 } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
-  createAndMint,
-  getTimestampFromDays,
-  getUnixTimestamp,
-  isLocalhost,
   loadKeypair,
-  parseEmissionsSchedule,
   sendInstructionsOrSquads,
 } from "./utils";
 import fs from "fs";
 import { BN } from "bn.js";
 import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
 
-const { hideBin } = require("yargs/helpers");
-
-const HNT_EPOCH_REWARDS = 10000000000;
-const SECS_PER_DAY = 86400;
-const SECS_PER_YEAR = 365 * SECS_PER_DAY;
-const MAX_LOCKUP = 4 * SECS_PER_YEAR;
-const BASELINE = 0;
-const SCALE = 100;
-const GENESIS_MULTIPLIER = 3;
 async function exists(
   connection: Connection,
   account: PublicKey
