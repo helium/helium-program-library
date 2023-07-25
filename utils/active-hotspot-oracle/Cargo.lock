@@ -29,7 +29,6 @@ dependencies = [
  "helium-entity-manager 0.0.8 (git+https://github.com/helium/helium-program-library?branch=develop)",
  "helium-sub-daos 0.0.12 (git+https://github.com/helium/helium-program-library?branch=develop)",
  "hpl-utils",
- "indicatif 0.17.5",
  "lazy_static",
  "reqwest",
  "rust-s3",
