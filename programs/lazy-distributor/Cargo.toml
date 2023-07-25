@@ -28,5 +28,5 @@ anchor-spl = { workspace = true }
 mpl-token-metadata = { workspace = true }
 bubblegum-cpi = { workspace = true }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
-shared-utils = { path = "../shared-utils" }
+shared-utils = { path = "../../utils/shared-utils" }
 account-compression-cpi = { workspace = true }

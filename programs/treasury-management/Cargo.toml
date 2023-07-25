@@ -26,4 +26,4 @@ overflow-checks = true
 anchor-lang = { workspace = true }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 anchor-spl = { workspace = true }
-shared-utils = { path = "../shared-utils" }
+shared-utils = { path = "../../utils/shared-utils" }
