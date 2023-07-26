@@ -1,6 +1,5 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import fastifyCron from 'fastify-cron';
-import fastifyMetrics from 'fastify-metrics';
 import cors from '@fastify/cors';
 import fs from 'fs';
 import { StatusCodes, ReasonPhrases } from 'http-status-codes';
@@ -59,7 +58,6 @@ if (!HELIUS_AUTH_SECRET) {
 
   await server.register(cors, { origin: '*' });
   await server.register(fastifyCron, { jobs: [...customJobs] });
-  await server.register(fastifyMetrics, { endpoint: '/metrics' });
   await server.register(metrics);
 
   server.get('/refresh-accounts', async (req, res) => {

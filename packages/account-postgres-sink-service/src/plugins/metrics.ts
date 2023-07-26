@@ -1,4 +1,5 @@
 import fp from 'fastify-plugin';
+import fastifyMetrics from 'fastify-metrics';
 import { Counter } from 'prom-client';
 
 declare module 'fastify' {
@@ -10,14 +11,12 @@ declare module 'fastify' {
 }
 
 export const metrics = fp(async (fastify, _opts) => {
-  let integrityMetric: Counter;
+  await fastify.register(fastifyMetrics, { endpoint: '/metrics' });
 
-  if (!integrityMetric) {
-    integrityMetric = new fastify.metrics.client.Counter({
-      name: 'integrity_check',
-      help: 'Number of corrected records from integrity checker',
-    });
-  }
+  const integrityMetric = new fastify.metrics.client.Counter({
+    name: 'integrity_check',
+    help: 'Number of corrected records from integrity checker',
+  });
 
   fastify.customMetrics = {
     integrityMetric,
