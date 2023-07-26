@@ -21,19 +21,19 @@ interface IntegrityCheckProgramAccountsArgs {
   sequelize?: Sequelize;
 }
 
-let integrityMetric: Counter;
 export const integrityCheckProgramAccounts = async ({
   fastify,
   programId,
   accounts,
   sequelize = database,
 }: IntegrityCheckProgramAccountsArgs) => {
-  if (!integrityMetric) {
+  console.log(fastify.customMetrics);
+  /* if (!integrityMetric) {
     integrityMetric = new (fastify as any).metrics.client.Counter({
       name: 'integrity_check',
       help: 'Number of corrected records from integrity checker',
     });
-  }
+  } */
 
   anchor.setProvider(
     anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
@@ -148,7 +148,7 @@ export const integrityCheckProgramAccounts = async ({
               );
 
             if (!isEqual) {
-              integrityMetric.inc();
+              // integrityMetric.inc();
               await model.upsert({ ...sanitized }, { transaction: t });
             }
           }
