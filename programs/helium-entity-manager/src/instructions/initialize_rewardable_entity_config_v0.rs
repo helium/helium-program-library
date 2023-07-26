@@ -1,5 +1,5 @@
 use crate::error::ErrorCode;
-use crate::state::*;
+use crate::{state::*, TESTING};
 use anchor_lang::prelude::*;
 use helium_sub_daos::SubDaoV0;
 
@@ -37,6 +37,10 @@ pub fn handler(
   args: InitializeRewardableEntityConfigArgsV0,
 ) -> Result<()> {
   require!(args.symbol.len() <= 10, ErrorCode::InvalidStringLength);
+  require!(
+    args.symbol == "IOT" || args.symbol == "MOBILE" || TESTING,
+    ErrorCode::InvalidSymbol
+  );
 
   ctx
     .accounts
