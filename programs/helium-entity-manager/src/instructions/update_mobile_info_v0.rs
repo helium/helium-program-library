@@ -101,7 +101,7 @@ impl<'info> UpdateMobileInfoV0<'info> {
       },
     };
 
-    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+    CpiContext::new(self.data_credits_program.to_account_info(), cpi_accounts)
   }
 }
 

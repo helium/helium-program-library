@@ -92,7 +92,7 @@ impl<'info> IssueRewardsV0<'info> {
       token_program: self.token_program.to_account_info(),
     };
 
-    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
   }
 
   pub fn mint_delegation_rewards_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
@@ -104,7 +104,7 @@ impl<'info> IssueRewardsV0<'info> {
       token_program: self.token_program.to_account_info(),
     };
 
-    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
   }
 
   pub fn mint_treasury_emissions_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
@@ -116,7 +116,7 @@ impl<'info> IssueRewardsV0<'info> {
       token_program: self.token_program.to_account_info(),
     };
 
-    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
   }
 }
 
