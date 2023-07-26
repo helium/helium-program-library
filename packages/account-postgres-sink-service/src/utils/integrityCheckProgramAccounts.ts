@@ -8,8 +8,9 @@ import database from './database';
 import { sanitizeAccount } from './sanitizeAccount';
 import { getTransactionSignaturesUptoBlockTime } from './getTransactionSignaturesUpToBlock';
 import { FastifyInstance } from 'fastify';
-import { Counter } from 'prom-client';
 import { chunks } from './chunks';
+import { parse } from 'path';
+
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;
   programId: PublicKey;
@@ -27,14 +28,6 @@ export const integrityCheckProgramAccounts = async ({
   accounts,
   sequelize = database,
 }: IntegrityCheckProgramAccountsArgs) => {
-  console.log(fastify.customMetrics);
-  /* if (!integrityMetric) {
-    integrityMetric = new (fastify as any).metrics.client.Counter({
-      name: 'integrity_check',
-      help: 'Number of corrected records from integrity checker',
-    });
-  } */
-
   anchor.setProvider(
     anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
   );
@@ -70,32 +63,58 @@ export const integrityCheckProgramAccounts = async ({
       throw new Error('Unable to get blocktime from 24 hours ago');
     }
 
-    const transactionSignatures = await getTransactionSignaturesUptoBlockTime({
-      programId,
-      blockTime: blockTime24HoursAgo,
-      provider,
-    });
-
-    const uniqueWritableAccounts = new Set<PublicKey>();
-    await Promise.all(
-      chunks(transactionSignatures, 100).map(async (chunk) => {
-        const parsedTransactions = await connection.getParsedTransactions(
-          chunk,
-          {
+    const parsedTransactions = (
+      await Promise.all(
+        chunks(
+          await getTransactionSignaturesUptoBlockTime({
+            programId,
+            blockTime: blockTime24HoursAgo,
+            provider,
+          }),
+          100
+        ).map((chunk) =>
+          connection.getParsedTransactions(chunk, {
             commitment: 'confirmed',
             maxSupportedTransactionVersion: 0,
-          }
-        );
+          })
+        )
+      )
+    ).flat();
 
-        for (const parsed of parsedTransactions) {
-          parsed?.transaction.message.accountKeys
-            .filter((acc) => acc.writable)
-            .map((acc) => uniqueWritableAccounts.add(acc.pubkey));
-        }
-      })
+    const uniqueWritableAccounts = new Set<PublicKey>();
+    for (const parsed of parsedTransactions) {
+      parsed?.transaction.message.accountKeys
+        .filter((acc) => acc.writable)
+        .map((acc) => uniqueWritableAccounts.add(acc.pubkey));
+    }
+
+    console.log(
+      'uniqueWritableAccounts',
+      [...uniqueWritableAccounts.values()].length
     );
 
-    const accountInfosWithPk = (
+    const accountInfos = await Promise.all(
+      chunks(chunks([...uniqueWritableAccounts.values()], 100), 8).map(
+        async (chunk) => {
+          for (const c of chunk) {
+            return connection.getMultipleAccountsInfo(
+              c as PublicKey[],
+              'confirmed'
+            );
+          }
+        }
+      )
+    );
+
+    console.log('accountInfos', accountInfos.length);
+    console.log(
+      accountInfos.reduce((acc, infos) => {
+        acc = acc + infos.length;
+        return acc;
+      }, 0)
+    );
+
+    /*     const accountInfosWithPk = (
       await Promise.all(
         chunks([...uniqueWritableAccounts.values()], 100).map(
           async (chunk) =>
@@ -148,13 +167,13 @@ export const integrityCheckProgramAccounts = async ({
               );
 
             if (!isEqual) {
-              // integrityMetric.inc();
+              (fastify as any).customMetrics.integrityMetric.inc();
               await model.upsert({ ...sanitized }, { transaction: t });
             }
           }
         }
       })
-    );
+    ); */
     await t.commit();
   } catch (err) {
     await t.rollback();
