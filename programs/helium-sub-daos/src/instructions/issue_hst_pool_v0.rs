@@ -56,7 +56,7 @@ impl<'info> IssueHstPoolV0<'info> {
       token_program: self.token_program.to_account_info(),
     };
 
-    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
   }
 }
 

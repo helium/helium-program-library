@@ -40,4 +40,7 @@ pub enum ErrorCode {
 
   #[msg("Account doesn't matched expected address")]
   InvalidAccountAddress,
+
+  #[msg("Invalid symbol, must be 'IOT' or 'MOBILE'")]
+  InvalidSymbol,
 }

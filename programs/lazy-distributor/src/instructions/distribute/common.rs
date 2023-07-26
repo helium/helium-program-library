@@ -81,7 +81,7 @@ pub fn distribute_impl(ctx: &mut DistributeRewardsCommonV0) -> Result<()> {
 
   transfer_v0(
     CpiContext::new_with_signer(
-      ctx.token_program.to_account_info().clone(),
+      ctx.circuit_breaker_program.to_account_info().clone(),
       TransferV0 {
         from: ctx.rewards_escrow.to_account_info().clone(),
         to: ctx.destination_account.to_account_info().clone(),
