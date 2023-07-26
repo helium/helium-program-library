@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from '@coral-xyz/anchor';
 
 const cachedIdlFetch = (() => {
   let cache: { programId: string; idl: anchor.Idl }[] = [];
@@ -18,9 +18,9 @@ const cachedIdlFetch = (() => {
     );
 
     if (!skipCache && foundIdx > -1) {
+      idl = cache[foundIdx].idl;
       // move to front of cache
       cache.splice(0, 0, cache.splice(foundIdx, 1)[0]);
-      idl = cache[foundIdx].idl;
     } else {
       idl = await anchor.Program.fetchIdl(programId, provider);
 
