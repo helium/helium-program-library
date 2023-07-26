@@ -128,5 +128,5 @@ export const defineAllIdlModels = async ({
       sequelize,
     });
   }
-  await sequelize.sync({ alter: true });
+  await sequelize.sync();
 };
