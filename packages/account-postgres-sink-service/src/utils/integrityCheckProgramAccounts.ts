@@ -9,7 +9,6 @@ import { sanitizeAccount } from './sanitizeAccount';
 import { getTransactionSignaturesUptoBlockTime } from './getTransactionSignaturesUpToBlock';
 import { FastifyInstance } from 'fastify';
 import { chunks } from './chunks';
-import { parse } from 'path';
 
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;
@@ -49,6 +48,7 @@ export const integrityCheckProgramAccounts = async ({
   }
 
   const t = await sequelize.transaction();
+  const now = new Date().toISOString();
 
   try {
     const program = new anchor.Program(idl, programId, provider);
@@ -81,45 +81,19 @@ export const integrityCheckProgramAccounts = async ({
       )
     ).flat();
 
-    const uniqueWritableAccounts = new Set<PublicKey>();
+    const uniqueWritableAccounts = new Set<string>();
     for (const parsed of parsedTransactions) {
       parsed?.transaction.message.accountKeys
         .filter((acc) => acc.writable)
-        .map((acc) => uniqueWritableAccounts.add(acc.pubkey));
+        .map((acc) => uniqueWritableAccounts.add(acc.pubkey.toBase58()));
     }
 
-    console.log(
-      'uniqueWritableAccounts',
-      [...uniqueWritableAccounts.values()].length
-    );
-
-    const accountInfos = await Promise.all(
-      chunks(chunks([...uniqueWritableAccounts.values()], 100), 8).map(
-        async (chunk) => {
-          for (const c of chunk) {
-            return connection.getMultipleAccountsInfo(
-              c as PublicKey[],
-              'confirmed'
-            );
-          }
-        }
-      )
-    );
-
-    console.log('accountInfos', accountInfos.length);
-    console.log(
-      accountInfos.reduce((acc, infos) => {
-        acc = acc + infos.length;
-        return acc;
-      }, 0)
-    );
-
-    /*     const accountInfosWithPk = (
+    const accountInfosWithPk = (
       await Promise.all(
         chunks([...uniqueWritableAccounts.values()], 100).map(
           async (chunk) =>
             await connection.getMultipleAccountsInfo(
-              chunk as PublicKey[],
+              chunk.map((c) => new PublicKey(c)),
               'confirmed'
             )
         )
@@ -149,13 +123,12 @@ export const integrityCheckProgramAccounts = async ({
           }
 
           if (accName) {
-            const now = new Date().toISOString();
             const omitKeys = ['refreshed_at', 'createdAt'];
             const model = sequelize.models[accName];
-            const existing = await model.findByPk(c.pubkey.toBase58());
+            const existing = await model.findByPk(c.pubkey);
             const sanitized = {
               refreshed_at: now,
-              address: c.pubkey.toBase58(),
+              address: c.pubkey,
               ...sanitizeAccount(decodedAcc),
             };
 
@@ -173,7 +146,7 @@ export const integrityCheckProgramAccounts = async ({
           }
         }
       })
-    ); */
+    );
     await t.commit();
   } catch (err) {
     await t.rollback();
