@@ -27,7 +27,7 @@
     "@helium/proposal-sdk": "^0.0.2",
     "@helium/crypto": "^4.10.2",
     "@helium/transactions": "^3.38.0",
-    "@metaplex-foundation/mpl-bubblegum": "^0.6.2",
+    "@metaplex-foundation/mpl-bubblegum": "^0.7.0",
     "@pythnetwork/client": "^2.8.0",
     "@solana/spl-account-compression": "^0.1.4",
     "@switchboard-xyz/switchboard-v2": "^0.0.165",
