@@ -48,18 +48,35 @@ struct Args {
 
   /// Solana paper wallet that will be the holder of the hotspot
   #[arg(short, long)]
-  keypair: Option<String>,
+  pub keypair: Option<String>,
   /// RPC url
   #[arg(short, long)]
-  url: Option<String>,
+  pub url: Option<String>,
 
   /// Checks that all hotspots are marked correctly on-chain
   #[clap(long, short, action)]
-  check_validity: bool,
+  pub check_validity: bool,
 
   /// Runs the oracle without sending any transactions. Will still update S3 checkpoints.
   #[clap(long, short, action)]
-  dry_run: bool,
+  pub dry_run: bool,
+
+  #[clap(long, value_enum)]
+  pub sub_dao: SubDao,
+}
+
+trait IsActive {
+  fn is_active(&self) -> bool;
+}
+impl IsActive for IotHotspotInfoV0 {
+  fn is_active(&self) -> bool {
+    self.is_active
+  }
+}
+impl IsActive for MobileHotspotInfoV0 {
+  fn is_active(&self) -> bool {
+    self.is_active
+  }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -130,11 +147,11 @@ async fn main() -> Result<()> {
   // download last checkpoint file from s3
   println!("Loading last save files from s3");
   let last_active_pub_keys: HashSet<String> =
-    load_checkpoint(s3_config.clone(), "active_save.json")
+    load_checkpoint(s3_config.clone(), args.sub_dao, "active_save.json")
       .await
       .unwrap_or(HashSet::new());
   let mut last_inactive_pub_keys: HashSet<String> =
-    load_checkpoint(s3_config.clone(), "inactive_save.json")
+    load_checkpoint(s3_config.clone(), args.sub_dao, "inactive_save.json")
       .await
       .unwrap_or(HashSet::new());
 
@@ -142,10 +159,20 @@ async fn main() -> Result<()> {
   println!("Last inactive pub keys: {:?}", last_inactive_pub_keys.len());
 
   if args.check_validity {
-    check_validity(&helium_entity_program, last_active_pub_keys, true)
-      .context("Active validity check failed")?;
-    check_validity(&helium_entity_program, last_inactive_pub_keys, false)
-      .context("Inactive validity check failed")?;
+    check_validity(
+      &helium_entity_program,
+      last_active_pub_keys,
+      true,
+      args.sub_dao,
+    )
+    .context("Active validity check failed")?;
+    check_validity(
+      &helium_entity_program,
+      last_inactive_pub_keys,
+      false,
+      args.sub_dao,
+    )
+    .context("Inactive validity check failed")?;
     return Ok(());
   };
 
@@ -205,41 +232,34 @@ async fn main() -> Result<()> {
 
   // construct the transactions for the diffs
   println!("Constructing instructions");
-  let (mark_active_iot_ixs, mark_active_mobile_ixs) =
-    construct_set_active_ixs(&helium_entity_program, &mark_active_diff, true)?;
-  let (mark_inactive_iot_ixs, mark_inactive_mobile_ixs) =
-    construct_set_active_ixs(&helium_entity_program, &mark_inactive_diff, false)?;
+  let mark_active_ixs = construct_set_active_ixs(
+    &helium_entity_program,
+    &mark_active_diff,
+    true,
+    args.sub_dao,
+  )?;
+  let mark_inactive_ixs = construct_set_active_ixs(
+    &helium_entity_program,
+    &mark_inactive_diff,
+    false,
+    args.sub_dao,
+  )?;
 
   // send transactions
-  println!("Sending mark active iot transactions");
+  println!("Sending mark active transactions");
   construct_and_send_txs(
     &helium_entity_program,
     &tpu_client,
-    mark_active_iot_ixs,
+    mark_active_ixs,
     &kp,
     args.dry_run,
   )?;
-  println!("Sending mark active mobile transactions");
+
+  println!("Sending mark inactive transactions");
   construct_and_send_txs(
     &helium_entity_program,
     &tpu_client,
-    mark_active_mobile_ixs,
-    &kp,
-    args.dry_run,
-  )?;
-  println!("Sending mark inactive iot transactions");
-  construct_and_send_txs(
-    &helium_entity_program,
-    &tpu_client,
-    mark_inactive_iot_ixs,
-    &kp,
-    args.dry_run,
-  )?;
-  println!("Sending mark inactive mobile transactions");
-  construct_and_send_txs(
-    &helium_entity_program,
-    &tpu_client,
-    mark_inactive_mobile_ixs,
+    mark_inactive_ixs,
     &kp,
     args.dry_run,
   )?;
@@ -247,10 +267,17 @@ async fn main() -> Result<()> {
   // write to new checkpoint file and upload to s3
   println!("Uploading new save files to s3");
   last_inactive_pub_keys.extend(mark_inactive_diff.iter().cloned());
-  save_checkpoint(active_pub_keys, s3_config.clone(), "active_save.json").await?;
+  save_checkpoint(
+    active_pub_keys,
+    s3_config.clone(),
+    args.sub_dao,
+    "active_save.json",
+  )
+  .await?;
   save_checkpoint(
     last_inactive_pub_keys,
     s3_config.clone(),
+    args.sub_dao,
     "inactive_save.json",
   )
   .await?;
@@ -262,18 +289,19 @@ fn check_validity(
   helium_entity_program: &Program,
   entity_keys: HashSet<String>,
   expected_is_active: bool,
+  sub_dao: SubDao,
 ) -> Result<()> {
   let entity_key_vec = entity_keys.iter().cloned().collect::<Vec<_>>();
-  let (invalid_iot_infos, invalid_mobile_infos) = find_infos_to_mark(
+  let invalid_infos = find_infos_to_mark(
     &helium_entity_program,
     &entity_key_vec,
     expected_is_active,
     true,
+    sub_dao,
   )?;
 
   println!("Scanned {} entities", entity_keys.len());
-  println!("Found {} invalid iot infos", invalid_iot_infos.len());
-  println!("Found {} invalid mobile infos", invalid_mobile_infos.len());
+  println!("Found {} invalid iot infos", invalid_infos.len());
   Ok(())
 }
 
@@ -336,42 +364,27 @@ fn construct_set_active_ixs(
   helium_entity_program: &Program,
   entity_keys: &Vec<String>,
   is_active: bool,
-) -> Result<(Vec<Instruction>, Vec<Instruction>)> {
-  // get PDAs
-  let iot_sd = SubDao::Iot.key();
-  let mobile_sd = SubDao::Mobile.key();
-  let iot_rec = SubDao::Iot.rewardable_entity_config_key();
-  let mobile_rec = SubDao::Mobile.rewardable_entity_config_key();
-
-  let (valid_iot_infos, valid_mobile_infos) =
-    find_infos_to_mark(helium_entity_program, entity_keys, is_active, false)?;
+  sub_dao: SubDao,
+) -> Result<Vec<Instruction>> {
+  let valid_infos = find_infos_to_mark(
+    helium_entity_program,
+    entity_keys,
+    is_active,
+    false,
+    sub_dao,
+  )?;
 
   // construct ixs
-  let iot_ixs = construct_ix_from_valid_infos(
-    helium_entity_program,
-    valid_iot_infos,
-    iot_rec,
-    iot_sd,
-    is_active,
-  )
-  .context("Failed to construct iot ixs")?;
-  let mobile_ixs = construct_ix_from_valid_infos(
-    helium_entity_program,
-    valid_mobile_infos,
-    mobile_rec,
-    mobile_sd,
-    is_active,
-  )
-  .context("Failed to construct mobile ixs")?;
+  let ixs = construct_ix_from_valid_infos(helium_entity_program, valid_infos, sub_dao, is_active)
+    .context("Failed to construct ixs")?;
 
-  Ok((iot_ixs, mobile_ixs))
+  Ok(ixs)
 }
 
 fn construct_ix_from_valid_infos(
   helium_entity_program: &Program,
   valid_infos: Vec<InfoWithEntityKey>,
-  rewardable_entity_config: Pubkey,
-  sub_dao: Pubkey,
+  sub_dao: SubDao,
   is_active: bool,
 ) -> Result<Vec<Instruction>> {
   let ixs = valid_infos
@@ -390,8 +403,8 @@ fn construct_ix_from_valid_infos(
         })
         .accounts(SetEntityActiveV0 {
           active_device_authority: helium_entity_program.payer(),
-          rewardable_entity_config,
-          sub_dao,
+          rewardable_entity_config: sub_dao.rewardable_entity_config_key(),
+          sub_dao: sub_dao.key(),
           info: info.info_key,
           helium_sub_daos_program: helium_sub_daos::id(),
         })
@@ -410,34 +423,35 @@ fn find_infos_to_mark(
   entity_keys: &Vec<String>,
   is_active: bool,
   log_diff: bool,
-) -> Result<(Vec<InfoWithEntityKey>, Vec<InfoWithEntityKey>)> {
-  let mark_iot_infos = entity_keys
-    .iter()
-    .map(|entity_key| {
-      SubDao::Iot.info_key(
-        &bs58::decode(entity_key.clone())
-          .into_vec()
-          .context(format!("Failed to decode entity key, {}", entity_key))?,
-      )
-    })
-    .collect::<Result<Vec<Pubkey>>>()
-    .context("Failed to construct iot infos")?;
-
-  let mark_mobile_infos = entity_keys
-    .iter()
-    .map(|entity_key| {
-      SubDao::Mobile.info_key(
-        &bs58::decode(entity_key.clone())
-          .into_vec()
-          .context(format!("Failed to decode entity key, {}", entity_key))?,
-      )
-    })
-    .collect::<Result<Vec<Pubkey>>>()
-    .context("Failed to construct mobile infos")?;
+  sub_dao: SubDao,
+) -> Result<Vec<InfoWithEntityKey>> {
+  let to_mark_infos = match sub_dao {
+    SubDao::Iot => entity_keys
+      .iter()
+      .map(|entity_key| {
+        SubDao::Iot.info_key(
+          &bs58::decode(entity_key.clone())
+            .into_vec()
+            .context(format!("Failed to decode entity key, {}", entity_key))?,
+        )
+      })
+      .collect::<Result<Vec<Pubkey>>>()
+      .context("Failed to construct iot infos")?,
+    SubDao::Mobile => entity_keys
+      .iter()
+      .map(|entity_key| {
+        SubDao::Mobile.info_key(
+          &bs58::decode(entity_key.clone())
+            .into_vec()
+            .context(format!("Failed to decode entity key, {}", entity_key))?,
+        )
+      })
+      .collect::<Result<Vec<Pubkey>>>()
+      .context("Failed to construct mobile infos")?,
+  };
 
   // fetch infos
-  let mut valid_iot_infos = Vec::new();
-  let mut valid_mobile_infos = Vec::new();
+  let mut valid_infos = Vec::new();
   let step = 100;
 
   for i in (0..entity_keys.len()).step_by(step) {
@@ -446,72 +460,47 @@ fn find_infos_to_mark(
     }
     let start = i;
     let end = (i + step).min(entity_keys.len());
-    let iot_infos = &mark_iot_infos[start..end];
-    let mobile_infos = &mark_mobile_infos[start..end];
+    let info_keys = &to_mark_infos[start..end];
 
-    let iot_info_accs = helium_entity_program
+    let info_accs = helium_entity_program
       .rpc()
-      .get_multiple_accounts(iot_infos)?;
-    let mobile_info_accs = helium_entity_program
-      .rpc()
-      .get_multiple_accounts(mobile_infos)?;
+      .get_multiple_accounts(info_keys)?;
 
-    for j in 0..iot_infos.len() {
-      let iot_info_acc = &iot_info_accs[j];
-      let mobile_info_acc = &mobile_info_accs[j];
-
-      match iot_info_acc {
+    for j in 0..info_keys.len() {
+      let info_acc = &info_accs[j];
+      match info_acc {
         Some(raw_info) => {
           let mut data = raw_info.data.as_slice();
-          let parsed_info_res = IotHotspotInfoV0::try_deserialize(&mut data);
+
+          let parsed_info_res: anchor_lang::Result<Box<dyn IsActive>> = match sub_dao {
+            SubDao::Iot => {
+              let info = IotHotspotInfoV0::try_deserialize(&mut data)?;
+              Ok(Box::new(info))
+            }
+            SubDao::Mobile => {
+              let info = MobileHotspotInfoV0::try_deserialize(&mut data)?;
+              Ok(Box::new(info))
+            }
+          };
 
           if let Err(e) = parsed_info_res {
             println!(
-              "Failed to deserialize iot info acc, {}\n\n{}",
-              iot_infos[j].to_string(),
+              "Failed to deserialize info acc, {}\n\n{}",
+              info_keys[j].to_string(),
               e
             );
             continue;
           }
-          if parsed_info_res.unwrap().is_active != is_active {
-            valid_iot_infos.push(InfoWithEntityKey {
-              info_key: iot_infos[j],
+          if parsed_info_res.unwrap().is_active() != is_active {
+            valid_infos.push(InfoWithEntityKey {
+              info_key: info_keys[j],
               entity_key: entity_keys[start + j].clone(),
             });
             if log_diff {
               println!(
                 "Found iot info to mark, is_active: {}, info: {}",
                 is_active,
-                iot_infos[j].to_string(),
-              );
-            }
-          }
-        }
-        None => {}
-      }
-      match mobile_info_acc {
-        Some(raw_info) => {
-          let mut data = raw_info.data.as_slice();
-          let parsed_info_res = MobileHotspotInfoV0::try_deserialize(&mut data);
-
-          if let Err(e) = parsed_info_res {
-            println!(
-              "Failed to deserialize mobile info acc, {}\n\n{}",
-              mobile_infos[j].to_string(),
-              e
-            );
-            continue;
-          }
-          if parsed_info_res.unwrap().is_active != is_active {
-            valid_mobile_infos.push(InfoWithEntityKey {
-              info_key: mobile_infos[j],
-              entity_key: entity_keys[start + j].clone(),
-            });
-            if log_diff {
-              println!(
-                "Found mobile info to mark, is_active: {}, info: {}",
-                is_active,
-                mobile_infos[j].to_string(),
+                info_keys[j].to_string(),
               );
             }
           }
@@ -521,12 +510,13 @@ fn find_infos_to_mark(
     }
   }
   println!("Finished fetching infos");
-  return Ok((valid_iot_infos, valid_mobile_infos));
+  return Ok(valid_infos);
 }
 
 async fn save_checkpoint(
   hashset: HashSet<String>,
   s3_config: HashMap<String, String>,
+  sub_dao: SubDao,
   file_name: &str,
 ) -> Result<()> {
   let checkpoint = ActiveCheckpoint {
@@ -536,7 +526,7 @@ async fn save_checkpoint(
 
   let bucket_name = s3_config.get("bucket_name").unwrap();
   let bucket = create_bucket(s3_config.clone()).context("Failed to create s3 bucket object")?;
-  let path = get_checkpoint_path(s3_config.clone(), bucket_name, file_name);
+  let path = get_checkpoint_path(s3_config.clone(), bucket_name, sub_dao, file_name);
   bucket.put_object(path, json_data.as_bytes()).await?;
 
   Ok(())
@@ -545,28 +535,30 @@ async fn save_checkpoint(
 fn get_checkpoint_path(
   s3_config: HashMap<String, String>,
   bucket_name: &String,
+  sub_dao: SubDao,
   file_name: &str,
 ) -> String {
   // on local minio server, you also need to specify the bucket name in the file path
   let path = if let Some(access_key) = s3_config.get("aws_access_key_id") {
     if access_key.contains("minio") {
-      format!("/{}/checkpoints/{}", bucket_name, file_name)
+      format!("/{}/checkpoints/{}/{}", bucket_name, sub_dao, file_name)
     } else {
-      format!("/checkpoints/{}", file_name)
+      format!("/checkpoints/{}/{}", sub_dao, file_name)
     }
   } else {
-    format!("/checkpoints/{}", file_name)
+    format!("/checkpoints/{}/{}", sub_dao, file_name)
   };
   path
 }
 
 async fn load_checkpoint(
   s3_config: HashMap<String, String>,
+  sub_dao: SubDao,
   file_name: &str,
 ) -> Result<HashSet<String>> {
   let bucket_name = s3_config.get("bucket_name").unwrap();
   let bucket = create_bucket(s3_config.clone()).context("Failed to create s3 bucket object")?;
-  let path = get_checkpoint_path(s3_config.clone(), bucket_name, file_name);
+  let path = get_checkpoint_path(s3_config.clone(), bucket_name, sub_dao, file_name);
   let file_contents_buffer = bucket.get_object(path).await?;
 
   let checkpoint: ActiveCheckpoint = serde_json::from_slice(&file_contents_buffer.as_slice())
