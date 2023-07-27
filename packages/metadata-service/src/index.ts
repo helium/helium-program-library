@@ -53,7 +53,7 @@ server.get<{ Params: { keyToAssetKey: string } }>(
       image:
         "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/hotspot.png",
       attributes: [
-        Address.isValid(keyStr)
+        keyStr && Address.isValid(keyStr)
           ? { trait_type: "ecc_compact", value: keyStr }
           : undefined,
         { trait_type: "entity_key_string", value: keyStr },
