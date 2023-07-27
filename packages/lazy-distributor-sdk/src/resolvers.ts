@@ -2,62 +2,62 @@ import {
   ataResolver,
   combineResolvers,
   resolveIndividual,
-} from "@helium/anchor-resolvers";
-import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
-import { PublicKey } from "@solana/web3.js";
-import { circuitBreakerResolvers } from "@helium/circuit-breaker-sdk";
-import { recipientKey } from "./pdas";
-import { Accounts } from "@coral-xyz/anchor";
-import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
-import { BN } from "bn.js";
+} from '@helium/anchor-resolvers';
+import { getAccount, getAssociatedTokenAddress } from '@solana/spl-token';
+import { PublicKey } from '@solana/web3.js';
+import { circuitBreakerResolvers } from '@helium/circuit-breaker-sdk';
+import { recipientKey } from './pdas';
+import { Accounts } from '@coral-xyz/anchor';
+import { getLeafAssetId } from '@metaplex-foundation/mpl-bubblegum';
+import { BN, red } from 'bn.js';
 
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
-  "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+  'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
 );
 
 export const lazyDistributorResolvers = combineResolvers(
   resolveIndividual(async ({ path }) => {
     switch (path[path.length - 1]) {
-      case "tokenMetadataProgram":
-        return new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-      case "bubblegumProgram":
-        return new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY");
-      case "compressionProgram":
-        return new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK");
-      case "logWrapper":
-        return new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
+      case 'tokenMetadataProgram':
+        return new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+      case 'bubblegumProgram':
+        return new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
+      case 'compressionProgram':
+        return new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK');
+      case 'logWrapper':
+        return new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV');
       default:
         return;
     }
   }),
   ataResolver({
-    instruction: "initializeLazyDistributorV0",
-    account: "rewardsEscrow",
-    mint: "rewardsMint",
-    owner: "lazyDistributor",
+    instruction: 'initializeLazyDistributorV0',
+    account: 'rewardsEscrow',
+    mint: 'rewardsMint',
+    owner: 'lazyDistributor',
   }),
   ataResolver({
-    instruction: "distributeRewardsV0",
-    account: "common.destinationAccount",
-    mint: "common.rewardsMint",
-    owner: "common.owner",
+    instruction: 'distributeRewardsV0',
+    account: 'common.destinationAccount',
+    mint: 'common.rewardsMint',
+    owner: 'common.owner',
   }),
   ataResolver({
-    instruction: "distributeCompressionRewardsV0",
-    account: "common.destinationAccount",
-    mint: "common.rewardsMint",
-    owner: "common.owner",
+    instruction: 'distributeCompressionRewardsV0',
+    account: 'common.destinationAccount',
+    mint: 'common.rewardsMint',
+    owner: 'common.owner',
   }),
   circuitBreakerResolvers,
   resolveIndividual(async ({ path, accounts, idlIx }) => {
-    if (path[path.length - 1] === "targetMetadata") {
+    if (path[path.length - 1] === 'targetMetadata') {
       if (!accounts.mint) {
         console.log(path, accounts, idlIx);
       }
       return (
         await PublicKey.findProgramAddress(
           [
-            Buffer.from("metadata", "utf-8"),
+            Buffer.from('metadata', 'utf-8'),
             TOKEN_METADATA_PROGRAM_ID.toBuffer(),
             (accounts.mint as PublicKey).toBuffer(),
           ],
@@ -70,19 +70,22 @@ export const lazyDistributorResolvers = combineResolvers(
     let resolved = 0;
     const common = accounts.common as Accounts;
     if (
-      idlIx.name === "distributeCompressionRewardsV0" &&
+      idlIx.name === 'distributeCompressionRewardsV0' &&
       accounts.merkleTree &&
       common.lazyDistributor &&
       !common.recipient
     ) {
       common.recipient = recipientKey(
         common.lazyDistributor as PublicKey,
-        await getLeafAssetId(accounts.merkleTree as PublicKey, new BN(args[0].index)),
+        await getLeafAssetId(
+          accounts.merkleTree as PublicKey,
+          new BN(args[0].index)
+        )
       )[0];
       resolved++;
     }
     if (
-      idlIx.name === "distributeRewardsV0" &&
+      idlIx.name === 'distributeRewardsV0' &&
       accounts.mint &&
       accounts.lazyDistributor &&
       !common.recipient
@@ -102,7 +105,7 @@ export const lazyDistributorResolvers = combineResolvers(
   async ({ accounts, provider, idlIx }) => {
     let resolved = 0;
     if (
-      idlIx.name === "distributeRewardsV0" &&
+      idlIx.name === 'distributeRewardsV0' &&
       // @ts-ignore
       (!accounts.recipientMintAccount ||
         // @ts-ignore
@@ -126,7 +129,8 @@ export const lazyDistributorResolvers = combineResolvers(
       const destinationAccount = await getAssociatedTokenAddress(
         // @ts-ignore
         accounts.common.rewardsMint as PublicKey,
-        recipientMintTokenAccount.owner
+        recipientMintTokenAccount.owner,
+        true
       );
       // @ts-ignore
       accounts.common.owner = recipientMintTokenAccount.owner;

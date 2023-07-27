@@ -7,10 +7,16 @@ import {
 import {
   init as initLazy,
   lazyDistributorKey,
+  recipientKey,
 } from '@helium/lazy-distributor-sdk';
 import { init as initRewards } from '@helium/rewards-oracle-sdk';
 import { daoKey } from '@helium/helium-sub-daos-sdk';
-import { HNT_MINT, IOT_MINT, sendAndConfirmWithRetry } from '@helium/spl-utils';
+import {
+  HNT_MINT,
+  IOT_MINT,
+  sendAndConfirmWithRetry,
+  sendInstructions,
+} from '@helium/spl-utils';
 import { PublicKey } from '@solana/web3.js';
 import os from 'os';
 import yargs from 'yargs/yargs';
@@ -58,6 +64,16 @@ export async function run(args: any = process.argv) {
   const assetId = (await hemProgram.account.keyToAssetV0.fetch(keyToAsset))
     .asset;
 
+  const [recipient] = recipientKey(lazyDistributor, assetId);
+  if (!(await provider.connection.getAccountInfo(recipient))) {
+    const method = lazyProgram.methods.initializeRecipientV0().accounts({
+      lazyDistributor,
+      mint: assetId,
+    });
+
+    await method.rpc({ skipPreflight: true });
+  }
+
   const rewards = await client.getCurrentRewards(
     lazyProgram,
     lazyDistributor,
@@ -74,11 +90,11 @@ export async function run(args: any = process.argv) {
     encoding: 'utf8',
   });
 
-  /*   const signed = await provider.wallet.signTransaction(tx);
+  const signed = await provider.wallet.signTransaction(tx);
   await sendAndConfirmWithRetry(
     provider.connection,
     signed.serialize(),
     { skipPreflight: true },
     'confirmed'
-  ); */
+  );
 }
