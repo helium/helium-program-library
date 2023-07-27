@@ -16,7 +16,11 @@ pub mod rewards_oracle {
   ) -> Result<()> {
     set_current_rewards_wrapper_v0::handler(ctx, args)
   }
-}
 
-#[derive(Accounts)]
-pub struct Initialize {}
+  pub fn set_current_rewards_wrapper_v1(
+    ctx: Context<SetCurrentRewardsWrapperV1>,
+    args: SetCurrentRewardsWrapperArgsV1,
+  ) -> Result<()> {
+    set_current_rewards_wrapper_v1::handler(ctx, args)
+  }
+}

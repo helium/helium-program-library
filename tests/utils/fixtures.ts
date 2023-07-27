@@ -238,6 +238,19 @@ export async function ensureLDIdl(ldProgram: Program<LazyDistributor>) {
   }
 }
 
+export async function ensureHEMIdl(hemProgram: Program<HeliumEntityManager>) {
+  try {
+    execSync(
+      `anchor idl init --filepath ${__dirname}/../../target/idl/helium_entity_manager.json ${hemProgram.programId}`,
+      { stdio: "inherit", shell: "/bin/bash" }
+    );
+  } catch {
+    execSync(
+      `anchor idl upgrade --filepath ${__dirname}/../../target/idl/helium_entity_manager.json ${hemProgram.programId}`,
+      { stdio: "inherit", shell: "/bin/bash" }
+    );
+  }
+}
 
 export async function ensureHSDIdl(hsdProgram: Program<HeliumSubDaos>) {
   try {

@@ -112,6 +112,21 @@ export function decodeEntityKey(
   }
 }
 
+export const keyToAssetKeyRaw = (
+  dao: PublicKey,
+  hashedEntityKey: Buffer,
+  programId: PublicKey = PROGRAM_ID
+) => {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("key_to_asset", "utf-8"),
+      dao.toBuffer(),
+      hashedEntityKey,
+    ],
+    programId
+  );
+};
+
 export const keyToAssetKey = (
   dao: PublicKey,
   entityKey: Buffer | string,
@@ -127,10 +142,7 @@ export const keyToAssetKey = (
   }
   const hash = sha256(entityKey);
 
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("key_to_asset", "utf-8"), dao.toBuffer(), Buffer.from(hash, "hex")],
-    programId
-  );
+  return keyToAssetKeyRaw(dao, Buffer.from(hash, "hex"), programId);
 };
 
 export const iotInfoKey = (

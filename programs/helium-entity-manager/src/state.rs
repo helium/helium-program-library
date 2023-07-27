@@ -211,3 +211,15 @@ macro_rules! mobile_info_seeds {
     ]
   };
 }
+
+#[macro_export]
+macro_rules! key_to_asset_seeds {
+  ( $key_to_asset:expr ) => {
+    &[
+      "key_to_asset".as_bytes(),
+      $key_to_asset.dao.as_ref(),
+      &anchor_lang::solana_program::hash::hash(&$key_to_asset.entity_key[..]).to_bytes(),
+      &[$key_to_asset.bump_seed],
+    ]
+  };
+}
