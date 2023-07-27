@@ -167,13 +167,13 @@ export async function run(args: any = process.argv) {
   const updateAuthority = dao.authority;
   let totalSol = 0;
   for (const { name, address, count, staked } of makers) {
-    const innerCreateInstrs = [];
-    const makerAuthority = new PublicKey(Address.fromB58(address).publicKey);
+    const innerCreateInstrs: TransactionInstruction[] = [];
+    const makerAuthority = new PublicKey(Address.fromB58(address!).publicKey);
     const [size, buffer, canopy] = merkleSizes.find(
       ([height]) => Math.pow(2, height) > count * 2
-    );
+    )!;
     const space = getConcurrentMerkleTreeAccountSize(size, buffer, canopy);
-    const maker = await makerKey(subdaoAcc.dao, name)[0];
+    const maker = await makerKey(subdaoAcc.dao, name!)[0];
     const rent = await provider.connection.getMinimumBalanceForRentExemption(
       space
     );
@@ -210,7 +210,7 @@ export async function run(args: any = process.argv) {
 
       const create = await hemProgram.methods
         .initializeMakerV0({
-          name,
+          name: name!,
           metadataUrl: "todo",
           issuingAuthority: makerAuthority,
           updateAuthority,
@@ -302,8 +302,8 @@ export async function run(args: any = process.argv) {
     }
     createInstructions.push(innerCreateInstrs);
 
-    const innerApproveInstrs = [];
-    let approve;
+    const innerApproveInstrs: TransactionInstruction[] = [];
+    let approve: TransactionInstruction;
     if (staked && !(await exists(conn, makerApprovalKey(entityConfigKey, maker)[0]))) {
       const authority = (
         await hemProgram.account.rewardableEntityConfigV0.fetch(entityConfigKey)

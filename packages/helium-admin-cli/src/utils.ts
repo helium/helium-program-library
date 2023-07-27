@@ -348,12 +348,12 @@ export async function sendInstructionsOrCreateProposal({
     ).account;
 
     if (!votingMint) {
-      votingMint = realm.communityMint;
+      votingMint = realm.communityMint!;
     }
     const tokenOwner = await getTokenOwnerRecordAddress(
       govProgramId,
       realmKey,
-      votingMint,
+      votingMint!,
       wallet.publicKey
     );
 
@@ -372,12 +372,12 @@ export async function sendInstructionsOrCreateProposal({
         version,
         realmKey,
         wallet.publicKey,
-        votingMint,
+        votingMint!,
         wallet.publicKey
       );
     }
 
-    const acct = await getAssociatedTokenAddress(votingMint, wallet.publicKey);
+    const acct = await getAssociatedTokenAddress(votingMint!, wallet.publicKey);
     const balance = new BN(
       (await provider.connection.getTokenAccountBalance(acct)).value.amount
     );
@@ -388,7 +388,7 @@ export async function sendInstructionsOrCreateProposal({
         version,
         realmKey,
         acct,
-        votingMint,
+        votingMint!,
         wallet.publicKey,
         wallet.publicKey,
         wallet.publicKey,
@@ -405,7 +405,7 @@ export async function sendInstructionsOrCreateProposal({
       tokenOwner,
       proposalName,
       "Created via helium cli with args",
-      votingMint,
+      votingMint!,
       wallet.publicKey,
       gov.proposalCount,
       VoteType.SINGLE_CHOICE,
@@ -476,9 +476,10 @@ export async function sendInstructionsOrCreateProposal({
               payer: provider.wallet.publicKey,
               authority: provider.wallet.publicKey,
               lookupTable: lut,
+              // @ts-ignore
               addresses: addTxIxns[0].keys
                 .map((k) => k.pubkey)
-                .filter((p) => !walletSigner.publicKey.equals(p)),
+                .filter((p) => !walletSigner!.publicKey.equals(p)),
             });
           await sendInstructions(provider, [sig, addAddressesInstruction], []);
           await sleep(4000); // Wait for the lut to activate
@@ -491,10 +492,10 @@ export async function sendInstructionsOrCreateProposal({
               recentBlockhash: (await provider.connection.getLatestBlockhash())
                 .blockhash,
               instructions: [addTxIxns[0]],
-            }).compileToV0Message([lookupTableAcc])
+            }).compileToV0Message([lookupTableAcc!])
           );
           console.log("Created lookup table since ix too big", lut.toBase58());
-          await tx.sign([walletSigner]);
+          await tx.sign([walletSigner!]);
           const sent = await provider.connection.sendTransaction(tx);
           await provider.connection.confirmTransaction(sent, "confirmed");
           console.log(`Added tx ${idx}`, sent);
@@ -548,7 +549,7 @@ export async function sendInstructionsOrCreateProposal({
         tokenOwner,
         tokenOwner,
         wallet.publicKey,
-        votingMint,
+        votingMint!,
         Vote.fromYesNoVote(YesNoVote.Yes),
         wallet.publicKey
       );
@@ -604,7 +605,7 @@ export async function sendInstructionsOrCreateProposal({
         governanceKey,
         proposal,
         tokenOwner,
-        votingMint,
+        votingMint!,
         votingRecord,
         wallet.publicKey,
         wallet.publicKey
@@ -620,8 +621,8 @@ export async function sendInstructionsOrCreateProposal({
         govProgramId,
         version,
         realmKey,
-        await getAssociatedTokenAddress(votingMint, wallet.publicKey),
-        votingMint,
+        await getAssociatedTokenAddress(votingMint!, wallet.publicKey),
+        votingMint!,
         wallet.publicKey
       );
       await sendInstructions(provider, withdrawIxns);
@@ -778,7 +779,7 @@ export async function sendInstructionsOrSquads({
   squads: Squads;
   multisig?: PublicKey;
   authorityIndex?: number;
-}): Promise<string> {
+}): Promise<string | undefined> {
   if (!multisig) {
     return await sendInstructions(
       provider,
@@ -826,7 +827,7 @@ export async function sendInstructionsOrSquads({
     throw new Error("Too many missing signatures");
   }
 
-  const tx = await squads.createTransaction(multisig, authorityIndex);
+  const tx = await squads.createTransaction(multisig, authorityIndex!);
   for (const ix of instructions.filter(ix => !ix.programId.equals(ComputeBudgetProgram.programId))) {
     await withRetries(3, async () => await squads.addInstruction(tx.publicKey, ix));
   }

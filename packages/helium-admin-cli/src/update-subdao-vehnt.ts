@@ -3,7 +3,7 @@ import {
   init as initHsd,
   subDaoKey
 } from "@helium/helium-sub-daos-sdk";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import AWS from "aws-sdk";
 import { BN } from "bn.js";
@@ -234,7 +234,7 @@ export async function run(args: any = process.argv) {
   ).rows;
   const row = response.find((x) => x.mint == argv.dntMint);
 
-  const instructions = [];
+  const instructions: TransactionInstruction[] = [];
 
   const subDao = subDaoKey(new PublicKey(argv.dntMint))[0];
   const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
