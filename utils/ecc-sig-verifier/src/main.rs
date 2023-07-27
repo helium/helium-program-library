@@ -51,12 +51,6 @@ pub struct IssueDataOnlyEntityArgsV0 {
   pub entity_key: Vec<u8>,
 }
 
-#[derive(Deserialize, Serialize, Default)]
-struct TransactionResponse {
-  pub count: u32,
-  pub transactions: Vec<Vec<u8>>,
-}
-
 #[post("/verify", format = "application/json", data = "<verify>")]
 async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Status> {
   let solana_txn_hex = hex::decode(&verify.transaction).map_err(|e| {
@@ -144,34 +138,6 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
     error!("failed to verify signature: {:?}", e);
     Status::BadRequest
   })?;
-
-  let migration_url = env::var("MIGRATION_SERVICE_URL").expect("MIGRATION_SERVICE_URL must be set");
-  // Make sure the hotspot doesn't need to be migrated
-  let url = format!(
-    "{}/migrate/hotspot/{}?limit=1&offset=0",
-    migration_url, pubkey.to_string()
-  );
-  println!("{}", url);
-  let response = reqwest::get(url.as_str())
-    .await
-    .map_err(|e| {
-      error!("failed to fetch from migration service: {:?}", e);
-      Status::BadRequest
-    })?
-    .json::<TransactionResponse>()
-    .await
-    .map_err(|e| {
-      error!("failed to deserialize json: {:?}", e);
-      Status::BadRequest
-    })?;
-
-  if response.transactions.len() > 0 {
-    error!(
-      "Cannot onboard hotspot with key: {:?}. It has not been migrated yet.",
-      pubkey.to_string()
-    );
-    return Err(Status::BadRequest);
-  }
 
   // Sign the solana transaction
   solana_txn

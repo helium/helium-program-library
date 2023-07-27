@@ -1,20 +1,15 @@
-import * as anchor from "@coral-xyz/anchor";
-import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
-import { Op, Sequelize } from "sequelize";
-import { SOLANA_URL } from "../env";
-import database from "./database";
-import { defineIdlModels } from "./defineIdlModels";
-import { sanitizeAccount } from "./sanitizeAccount";
+import * as anchor from '@coral-xyz/anchor';
+import { GetProgramAccountsFilter, PublicKey } from '@solana/web3.js';
+import { Op, Sequelize } from 'sequelize';
+import { SOLANA_URL } from '../env';
+import database from './database';
+import { defineIdlModels } from './defineIdlModels';
+import { sanitizeAccount } from './sanitizeAccount';
+import { chunks } from './chunks';
 
-const chunks = <T>(array: T[], size: number): T[][] =>
-  Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
-    array.slice(index * size, (index + 1) * size)
-  );
-
-export type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
+export type Truthy<T> = T extends false | '' | 0 | null | undefined ? never : T; // from lodash
 
 export const truthy = <T>(value: T): value is Truthy<T> => !!value;
-
 interface UpsertProgramAccountsArgs {
   programId: PublicKey;
   accounts: {
@@ -45,7 +40,7 @@ export const upsertProgramAccounts = async ({
       idl.accounts!.some(({ name }) => name === type)
     )
   ) {
-    throw new Error("idl does not have every account type");
+    throw new Error('idl does not have every account type');
   }
 
   const program = new anchor.Program(idl, programId, provider);
@@ -84,7 +79,6 @@ export const upsertProgramAccounts = async ({
         commitment: provider.connection.commitment,
         filters: [...coderFilters],
       });
-
       const model = sequelize.models[type];
       await model.sync({ alter: true });
 
@@ -127,8 +121,8 @@ export const upsertProgramAccounts = async ({
             {
               transaction: t,
               updateOnDuplicate: [
-                "address",
-                "refreshed_at",
+                'address',
+                'refreshed_at',
                 ...updateOnDuplicateFields,
               ],
             }
@@ -138,7 +132,7 @@ export const upsertProgramAccounts = async ({
         await t.commit();
       } catch (err) {
         await t.rollback();
-        console.error("While inserting, err", err);
+        console.error('While inserting, err', err);
         throw err;
       }
 

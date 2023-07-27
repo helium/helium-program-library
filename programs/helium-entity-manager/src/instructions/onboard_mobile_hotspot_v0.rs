@@ -19,9 +19,9 @@ use helium_sub_daos::{
   DaoV0, SubDaoV0, TrackDcOnboardingFeesArgsV0,
 };
 
-use mpl_bubblegum::utils::get_asset_id;
+use account_compression_cpi::program::SplAccountCompression;
+use bubblegum_cpi::get_asset_id;
 use shared_utils::*;
-use spl_account_compression::program::SplAccountCompression;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct OnboardMobileHotspotArgsV0 {
@@ -128,7 +128,7 @@ impl<'info> OnboardMobileHotspotV0<'info> {
       },
     };
 
-    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+    CpiContext::new(self.data_credits_program.to_account_info(), cpi_accounts)
   }
 }
 

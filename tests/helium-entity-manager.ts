@@ -42,6 +42,7 @@ import { BN } from "bn.js";
 import chaiAsPromised from "chai-as-promised";
 import { createMockCompression } from "./utils/compression";
 import { loadKeypair } from "./utils/solana";
+import { keyToAssetKey } from "@helium/helium-entity-manager-sdk";
 
 chai.use(chaiAsPromised);
 
@@ -607,6 +608,22 @@ describe("helium-entity-manager", () => {
           .signers([makerKeypair, eccVerifier])
           .rpc({ skipPreflight: true });
 
+        await hsdProgram.methods.updateSubDaoV0({
+          authority: null,
+          dcBurnAuthority: null,
+          emissionSchedule: null,
+          onboardingDcFee: new BN(0),
+          onboardingDataOnlyDcFee: null,
+          activeDeviceAggregator: null,
+          registrar: null,
+          delegatorRewardsPercent: null,
+          activeDeviceAuthority: null,
+        })
+          .accounts({
+            subDao,
+          })
+          .rpc({ skipPreflight: true });
+
         const method = (
           await onboardMobileHotspot({
             program: hemProgram,
@@ -631,6 +648,43 @@ describe("helium-entity-manager", () => {
           })
           .accounts({ dcMint, recipient: hotspotOwner.publicKey })
           .rpc();
+      });
+
+      it("onboarding fees be backpaid with DC when subdao fees are raised", async () => {
+        const method = hemProgram.methods.tempPayMobileOnboardingFeeV0().accounts({
+          rewardableEntityConfig,
+          subDao,
+          dao,
+          keyToAsset: keyToAssetKey(dao, ecc)[0],
+          mobileInfo: infoKey!,
+        })
+        const ata = getAssociatedTokenAddressSync(dcMint, provider.wallet.publicKey);
+        const preBalance = await provider.connection.getTokenAccountBalance(ata);
+        const preInfoAcc = await hemProgram.account.mobileHotspotInfoV0.fetch(infoKey!);
+        expect(preInfoAcc.dcOnboardingFeePaid.toNumber()).to.eq(0);
+
+        await hsdProgram.methods.updateSubDaoV0({
+          authority: null,
+          dcBurnAuthority: null,
+          emissionSchedule: null,
+          onboardingDcFee: new BN(4000000),
+          onboardingDataOnlyDcFee: null,
+          activeDeviceAggregator: null,
+          registrar: null,
+          delegatorRewardsPercent: null,
+          activeDeviceAuthority: null,
+        })
+          .accounts({
+            subDao,
+          })
+          .rpc({ skipPreflight: true });
+        await method.rpc();
+
+        const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
+        const postBalance = await provider.connection.getTokenAccountBalance(ata);
+        expect(postBalance.value.uiAmount).to.be.eq(preBalance.value.uiAmount! - subDaoAcc.onboardingDcFee.toNumber());
+        const infoAcc = await hemProgram.account.mobileHotspotInfoV0.fetch(infoKey!);
+        expect(infoAcc.dcOnboardingFeePaid.toNumber()).to.eq(subDaoAcc.onboardingDcFee.toNumber());
       });
 
       it("changes the metadata", async () => {

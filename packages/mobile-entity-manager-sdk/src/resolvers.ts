@@ -21,7 +21,7 @@ export const mobileEntityManagerResolvers = combineResolvers(
     }
   }),
   resolveIndividual(async ({ path, accounts }) => {
-    if (path[path.length - 1] == "programApproval") {
+    if (path[path.length - 1] == "programApproval" && accounts.dao) {
       return programApprovalKey(accounts.dao as PublicKey, PROGRAM_ID)[0];
     }
   }),

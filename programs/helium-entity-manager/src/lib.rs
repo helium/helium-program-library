@@ -8,6 +8,7 @@ pub mod instructions;
 pub mod state;
 
 pub use instructions::*;
+
 pub use state::*;
 
 #[program]
@@ -154,5 +155,24 @@ pub mod helium_entity_manager {
     ctx: Context<TempBackfillOnboardingFeesV0>,
   ) -> Result<()> {
     temp_backfill_onboarding_fees_v0::handler(ctx)
+  }
+
+  pub fn temp_backfill_mobile_info_data_v0(
+    ctx: Context<TempBackfillMobileInfoDataV0>,
+  ) -> Result<()> {
+    temp_backfill_mobile_info_data_v0::handler(ctx)
+  }
+
+  pub fn temp_pay_mobile_onboarding_fee_v0(
+    ctx: Context<TempPayMobileOnboardingFeeV0>,
+  ) -> Result<()> {
+    temp_pay_mobile_onboarding_fee_v0::handler(ctx)
+  }
+
+  pub fn temp_update_iot_operations_fund_metadata(
+    ctx: Context<TempUpdateIotOperationsFundMetadata>,
+    args: TempUpdateIotOperationsFundMetadataArgs,
+  ) -> Result<()> {
+    temp_update_iot_operations_fund_metadata::handler(ctx, args)
   }
 }

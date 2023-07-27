@@ -19,7 +19,7 @@ pub struct SubmitPriceV0<'info> {
 }
 
 pub fn handler(ctx: Context<SubmitPriceV0>, args: SubmitPriceArgsV0) -> Result<()> {
-  let mut oracle = ctx
+  let oracle = ctx
     .accounts
     .price_oracle
     .oracles
