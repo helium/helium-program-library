@@ -1,6 +1,6 @@
 {
   "name": "@helium/spl-utils",
-  "version": "0.2.13",
+  "version": "0.2.14",
   "description": "Utils shared across spl suite",
   "publishConfig": {
     "access": "public",
@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.26.0",
-    "@helium/account-fetch-cache": "^0.2.5",
+    "@helium/account-fetch-cache": "^0.2.14",
     "@helium/address": "^4.10.2",
     "@helium/anchor-resolvers": "^0.2.5",
     "@metaplex-foundation/mpl-token-metadata": "^2.5.2",
