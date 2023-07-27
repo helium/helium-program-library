@@ -6,6 +6,7 @@ import {
   proofArgsAndAccounts,
   ProofArgsAndAccountsArgs,
 } from "@helium/spl-utils";
+import { HELIUM_DAO, keyToAssetForAsset } from "../helpers";
 
 export async function updateIotMetadata({
   program,
@@ -16,6 +17,7 @@ export async function updateIotMetadata({
   gain,
   dcFeePayer,
   payer,
+  dao = HELIUM_DAO,
   ...rest
 }: {
   program: Program<HeliumEntityManager>;
@@ -26,12 +28,10 @@ export async function updateIotMetadata({
   gain: number | null;
   assetId: PublicKey;
   rewardableEntityConfig: PublicKey;
+  dao?: PublicKey
 } & Omit<ProofArgsAndAccountsArgs, "connection">) {
   const {
-    asset: {
-      content: { json_uri },
-      ownership: { owner },
-    },
+    asset,
     args,
     accounts,
     remainingAccounts,
@@ -40,11 +40,15 @@ export async function updateIotMetadata({
     assetId,
     ...rest,
   });
+  const {
+    ownership: { owner },
+  } = asset;
 
-  const [info] = await iotInfoKey(
-    rewardableEntityConfig,
-    json_uri.split("/").slice(-1)[0]
+  const keyToAssetKey = keyToAssetForAsset(asset, dao);
+  const keyToAsset = await program.account.keyToAssetV0.fetch(
+    keyToAssetKey
   );
+  const [info] = await iotInfoKey(rewardableEntityConfig, keyToAsset.entityKey);
 
   return program.methods
     .updateIotInfoV0({

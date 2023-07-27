@@ -59,6 +59,7 @@ import { LazyDistributor } from "../target/types/lazy_distributor";
 import { RewardsOracle } from "../target/types/rewards_oracle";
 import {
   ensureLDIdl,
+  ensureHEMIdl,
   initWorld
 } from "./utils/fixtures";
 import { initVsr } from "./utils/vsr";
@@ -300,6 +301,7 @@ describe("distributor-oracle", () => {
     );
 
     await ensureLDIdl(ldProgram);
+    await ensureHEMIdl(hemProgram);
 
     console.log(dcProgram.methods);
     const {
@@ -365,7 +367,8 @@ describe("distributor-oracle", () => {
       hemProgram,
       oracle,
       db,
-      lazyDistributor
+      lazyDistributor,
+      dao
     );
     await oracleServer.start();
     await sendInstructions(provider, [
@@ -384,10 +387,9 @@ describe("distributor-oracle", () => {
   it("allows oracle to set current reward", async () => {
     const keyToAsset = keyToAssetKey(daoK, ecc)[0];
     await rewardsProgram.methods
-      .setCurrentRewardsWrapperV0({
+      .setCurrentRewardsWrapperV1({
         currentRewards: new anchor.BN("5000000"),
         oracleIndex: 0,
-        entityKey: Buffer.from(bs58.decode(ecc)),
       })
       .accounts({
         lazyDistributor,
@@ -424,7 +426,6 @@ describe("distributor-oracle", () => {
 
   it("should bulk sign transactions", async() => {
     const unsigned = await client.formBulkTransactions({
-      dao: daoK,
       program: ldProgram,
       rewardsOracleProgram: rewardsProgram,
       getAssetFn,
@@ -473,7 +474,6 @@ describe("distributor-oracle", () => {
 
   it("should sign and execute properly formed transactions", async () => {
     const unsigned = await client.formTransaction({
-      dao: daoK,
       program: ldProgram,
       rewardsOracleProgram: rewardsProgram,
       provider,

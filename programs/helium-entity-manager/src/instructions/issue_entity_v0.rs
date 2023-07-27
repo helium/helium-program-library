@@ -1,8 +1,8 @@
 use std::cmp::min;
 use std::str::FromStr;
 
-use crate::state::*;
 use crate::{constants::ENTITY_METADATA_URL, error::ErrorCode};
+use crate::{key_to_asset_seeds, state::*};
 use account_compression_cpi::{program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
@@ -135,6 +135,18 @@ impl<'info> IssueEntityV0<'info> {
 }
 
 pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<()> {
+  let asset_id = get_asset_id(
+    &ctx.accounts.merkle_tree.key(),
+    ctx.accounts.tree_authority.num_minted,
+  );
+  ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
+    asset: asset_id,
+    dao: ctx.accounts.dao.key(),
+    entity_key: args.entity_key.clone(),
+    bump_seed: ctx.bumps["key_to_asset"],
+    key_serialization: KeySerialization::B58,
+  });
+
   let key_str = bs58::encode(args.entity_key.clone()).into_string();
   let animal_name: AnimalName = key_str
     .parse()
@@ -146,16 +158,23 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
     ctx.accounts.maker.name.as_bytes(),
     &[ctx.accounts.maker.bump_seed],
   ]];
-  let asset_id = get_asset_id(
-    &ctx.accounts.merkle_tree.key(),
-    ctx.accounts.tree_authority.num_minted,
-  );
 
   let name = animal_name.to_string();
+  let mut uri = format!("{}/{}", ENTITY_METADATA_URL, key_str);
+
+  // HACK: Handle wifi hotspots with v1 uri. TODO: Find a way to do this for all hotspots after migration
+  // https://docs.google.com/document/d/1Q6VdcDA3McehQYb1MzWL8Iy421D84T7UrmJE7Z9Vc_Y/edit?usp=sharing
+  if uri.len() > 200 {
+    uri = format!(
+      "{}/v1/{}",
+      ENTITY_METADATA_URL,
+      ctx.accounts.key_to_asset.key()
+    );
+  }
   let metadata = MetadataArgs {
     name: name[..min(name.len(), MAX_NAME_LENGTH)].to_owned(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("{}/{}", ENTITY_METADATA_URL, key_str),
+    uri,
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi
@@ -166,11 +185,18 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
     token_standard: Some(TokenStandard::NonFungible),
     uses: None,
     token_program_version: TokenProgramVersion::Original,
-    creators: vec![Creator {
-      address: ctx.accounts.entity_creator.key(),
-      verified: true,
-      share: 100,
-    }],
+    creators: vec![
+      Creator {
+        address: ctx.accounts.entity_creator.key(),
+        verified: true,
+        share: 100,
+      },
+      Creator {
+        address: ctx.accounts.key_to_asset.key(),
+        verified: true,
+        share: 0,
+      },
+    ],
     seller_fee_basis_points: 0,
   };
   let entity_creator_seeds: &[&[&[u8]]] = &[&[
@@ -180,22 +206,17 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
   ]];
   let mut creator = ctx.accounts.entity_creator.to_account_info();
   creator.is_signer = true;
+  let mut key_to_asset_creator = ctx.accounts.key_to_asset.to_account_info();
+  key_to_asset_creator.is_signer = true;
+  let key_to_asset_signer: &[&[u8]] = key_to_asset_seeds!(ctx.accounts.key_to_asset);
   mint_to_collection_v1(
     ctx
       .accounts
       .mint_to_collection_ctx()
-      .with_remaining_accounts(vec![creator])
-      .with_signer(&[maker_seeds[0], entity_creator_seeds[0]]),
+      .with_remaining_accounts(vec![creator, key_to_asset_creator])
+      .with_signer(&[maker_seeds[0], entity_creator_seeds[0], key_to_asset_signer]),
     metadata,
   )?;
-
-  ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
-    asset: asset_id,
-    dao: ctx.accounts.dao.key(),
-    entity_key: args.entity_key,
-    bump_seed: ctx.bumps["key_to_asset"],
-    key_serialization: KeySerialization::B58,
-  });
 
   Ok(())
 }
