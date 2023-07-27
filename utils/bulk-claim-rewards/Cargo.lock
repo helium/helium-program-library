@@ -15,7 +15,7 @@ dependencies = [
 [[package]]
 name = "account-compression-cpi"
 version = "0.1.2"
-source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=9707a03#9707a03eb7be0ccf4d96a18b662ffcd376365640"
+source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=9707a03eb7be0ccf4d96a18b662ffcd376365640#9707a03eb7be0ccf4d96a18b662ffcd376365640"
 dependencies = [
  "anchor-gen",
  "anchor-lang",
@@ -759,7 +759,7 @@ dependencies = [
 [[package]]
 name = "bubblegum-cpi"
 version = "0.9.2"
-source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=9707a03#9707a03eb7be0ccf4d96a18b662ffcd376365640"
+source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=9707a03eb7be0ccf4d96a18b662ffcd376365640#9707a03eb7be0ccf4d96a18b662ffcd376365640"
 dependencies = [
  "anchor-gen",
  "anchor-lang",
@@ -3380,6 +3380,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "proposal"
+version = "0.0.1"
+dependencies = [
+ "anchor-gen",
+ "anchor-lang",
+]
+
+[[package]]
 name = "pyth-sdk"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5710,6 +5718,7 @@ dependencies = [
  "bytemuck",
  "itertools",
  "mpl-token-metadata 1.11.0",
+ "proposal",
  "shared-utils",
  "solana-program",
  "spl-governance",

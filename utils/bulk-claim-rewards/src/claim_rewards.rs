@@ -16,7 +16,7 @@ use lazy_distributor::{
   RecipientV0, ID as LD_PID,
 };
 use rewards_oracle::{
-  accounts::SetCurrentRewardsWrapperV0, SetCurrentRewardsWrapperArgsV0, ID as RO_PID,
+  accounts::SetCurrentRewardsWrapperV1, SetCurrentRewardsWrapperArgsV1, ID as RO_PID,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
@@ -685,11 +685,8 @@ fn process_hotspot(
 
     let set_reward_ix = &rewards_oracle_program
       .request()
-      .args(rewards_oracle::instruction::SetCurrentRewardsWrapperV0 {
-        args: SetCurrentRewardsWrapperArgsV0 {
-          entity_key: bs58::decode(&hotspot.entity_key)
-            .into_vec()
-            .map_err(|e| anyhow!("Failed to decode entity key: {e}"))?,
+      .args(rewards_oracle::instruction::SetCurrentRewardsWrapperV1 {
+        args: SetCurrentRewardsWrapperArgsV1 {
           oracle_index: oracle_index as u16,
           current_rewards: reward
             .get(&hotspot.entity_key)
@@ -836,7 +833,7 @@ fn construct_set_rewards_accounts(
   oracle: Pubkey,
   lazy_distributor: Pubkey,
   entity_key: String,
-) -> Result<SetCurrentRewardsWrapperV0, anyhow::Error> {
+) -> Result<SetCurrentRewardsWrapperV1, anyhow::Error> {
   let (recipient, _rcp_bump) = Pubkey::find_program_address(
     &[
       "recipient".as_bytes(),
@@ -854,7 +851,7 @@ fn construct_set_rewards_accounts(
   let (oracle_signer, _os_bump) =
     Pubkey::find_program_address(&["oracle_signer".as_bytes()], &RO_PID);
 
-  Ok(SetCurrentRewardsWrapperV0 {
+  Ok(SetCurrentRewardsWrapperV1 {
     oracle,
     lazy_distributor,
     recipient,

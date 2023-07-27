@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 // @ts-ignore
 import animalHash from "angry-purple-tiger";
-import { decodeEntityKey, init, keyToAssetKeyRaw } from "@helium/helium-entity-manager-sdk"
+import { decodeEntityKey, init } from "@helium/helium-entity-manager-sdk"
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import Fastify, { FastifyInstance } from "fastify";
 import { HNT_MINT } from "@helium/spl-utils";

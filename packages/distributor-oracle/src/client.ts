@@ -1,5 +1,11 @@
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
-import { decodeEntityKey, init, init as initHem, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
+import {
+  decodeEntityKey,
+  init,
+  init as initHem,
+  keyToAssetKey,
+  keyToAssetForAsset,
+} from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
@@ -224,7 +230,7 @@ export async function formBulkTransactions({
   // construct the set and distribute ixs
   let setAndDistributeIxs = await Promise.all(
     compressionAssetAccs.map(async (assetAcc, idx) => {
-      const keyToAssetK = assetAcc.creators[1].address
+      const keyToAssetK = keyToAssetForAsset(assetAcc);
       const keyToAsset = await heliumEntityManagerProgram!.account.keyToAssetV0.fetch(keyToAssetK)
       const entityKey = decodeEntityKey(
         keyToAsset.entityKey,
@@ -368,7 +374,7 @@ export async function formTransaction({
     throw new Error("No asset with ID " + asset.toBase58());
   }
 
-  let keyToAsset = assetAcc.creators[1].address;
+  const keyToAsset = keyToAssetForAsset(assetAcc);
   const recipient = recipientKey(lazyDistributor, asset)[0];
   const lazyDistributorAcc =
     (await lazyDistributorProgram.account.lazyDistributorV0.fetch(
