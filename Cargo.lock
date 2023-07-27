@@ -15,7 +15,7 @@ dependencies = [
 [[package]]
 name = "account-compression-cpi"
 version = "0.1.2"
-source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=9707a03#9707a03eb7be0ccf4d96a18b662ffcd376365640"
+source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=9707a03eb7be0ccf4d96a18b662ffcd376365640#9707a03eb7be0ccf4d96a18b662ffcd376365640"
 dependencies = [
  "anchor-gen",
  "anchor-lang",
@@ -648,7 +648,7 @@ checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
 [[package]]
 name = "bubblegum-cpi"
 version = "0.9.2"
-source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=9707a03#9707a03eb7be0ccf4d96a18b662ffcd376365640"
+source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=9707a03eb7be0ccf4d96a18b662ffcd376365640#9707a03eb7be0ccf4d96a18b662ffcd376365640"
 dependencies = [
  "anchor-gen",
  "anchor-lang",
@@ -2928,6 +2928,14 @@ dependencies = [
  "syn 1.0.107",
  "version_check",
  "yansi",
+]
+
+[[package]]
+name = "proposal"
+version = "0.0.1"
+dependencies = [
+ "anchor-gen",
+ "anchor-lang",
 ]
 
 [[package]]
@@ -5412,6 +5420,7 @@ dependencies = [
  "itertools",
  "log",
  "mpl-token-metadata",
+ "proposal",
  "serde",
  "shared-utils",
  "solana-banks-client",

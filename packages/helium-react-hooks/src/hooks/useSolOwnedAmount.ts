@@ -3,7 +3,7 @@ import React from "react";
 import { useAccount } from "@helium/account-fetch-cache-hooks";
 
 export function useSolOwnedAmount(ownerPublicKey?: PublicKey): {
-  amount: bigint;
+  amount: bigint | undefined;
   loading: boolean;
 } {
   const { info: lamports, loading } = useAccount<bigint>(

@@ -46,7 +46,7 @@ export async function run(args: any = process.argv) {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hemProgram = await initHem(provider);
-  const eccVerifier = loadKeypair(argv.testEccVerifierKeypair);
+  const eccVerifier = loadKeypair(argv.testEccVerifierKeypair!);
   const ecc = (await HeliumKeypair.makeRandom()).address.b58;
   
   console.log(ecc);

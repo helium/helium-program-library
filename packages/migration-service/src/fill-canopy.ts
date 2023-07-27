@@ -100,7 +100,7 @@ async function run() {
       return tx;
     })
   );
-  let progress: cliProgress.SingleBar;
+  let progress: cliProgress.SingleBar | undefined = undefined;
   if (argv.showProgress) {
     progress = new cliProgress.SingleBar(
       {},

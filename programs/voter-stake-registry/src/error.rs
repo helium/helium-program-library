@@ -159,4 +159,6 @@ pub enum VsrError {
   UnauthorizedPositionUpdateAuthority,
   #[msg("Cannot transfer to the same position")]
   SamePosition,
+  MaxChoicesExceeded,
+  NoVoteForThisChoice,
 }
