@@ -6,6 +6,7 @@ import {
   proofArgsAndAccounts,
   ProofArgsAndAccountsArgs,
 } from "@helium/spl-utils";
+import { HELIUM_DAO, keyToAssetForAsset } from "../helpers";
 
 export async function updateMobileMetadata({
   program,
@@ -14,6 +15,7 @@ export async function updateMobileMetadata({
   location,
   dcFeePayer,
   payer,
+  dao = HELIUM_DAO,
   ...rest
 }: {
   program: Program<HeliumEntityManager>;
@@ -22,12 +24,10 @@ export async function updateMobileMetadata({
   location: BN | null;
   assetId: PublicKey;
   rewardableEntityConfig: PublicKey;
+  dao?: PublicKey
 } & Omit<ProofArgsAndAccountsArgs, "connection">) {
   const {
-    asset: {
-      content: { json_uri },
-      ownership: { owner },
-    },
+    asset,
     args,
     accounts,
     remainingAccounts,
@@ -37,9 +37,17 @@ export async function updateMobileMetadata({
     ...rest,
   });
 
+  const {
+    ownership: { owner },
+  } = asset;
+
+  const keyToAssetKey = keyToAssetForAsset(asset, dao);
+  const keyToAsset = await program.account.keyToAssetV0.fetch(
+    keyToAssetKey
+  );
   const [info] = await mobileInfoKey(
     rewardableEntityConfig,
-    json_uri.split("/").slice(-1)[0]
+    keyToAsset.entityKey,
   );
 
   return program.methods

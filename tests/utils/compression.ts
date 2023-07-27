@@ -18,7 +18,7 @@ import {
 } from "@solana/spl-account-compression";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { Bubblegum as MplBubblegum, IDL as BubblegumIdl } from "./bubblegum";
-import { entityCreatorKey } from "@helium/helium-entity-manager-sdk";
+import { entityCreatorKey, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
 // @ts-ignore
 import animalHash from "angry-purple-tiger";
 import { BN } from "bn.js";
@@ -203,6 +203,11 @@ export async function createMockCompression({
       address: entityCreatorKey(dao)[0],
       verified: true,
       share: 100,
+    },
+    {
+      address: keyToAssetKey(dao, ecc, "b58")[0],
+      verified: true,
+      share: 0,
     },
   ];
   let metadata: any = {
