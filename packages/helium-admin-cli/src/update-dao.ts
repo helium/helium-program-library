@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { init as initCb, mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
 import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
 import {
-  PublicKey
+  PublicKey, TransactionInstruction
 } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
@@ -78,7 +78,7 @@ export async function run(args: any = process.argv) {
   const program = await initHsd(provider);
   const cbProgram = await initCb(provider);
 
-  const instructions = [];
+  const instructions: TransactionInstruction[] = [];
 
   const hntMint = new PublicKey(argv.hntMint);
   const dao = daoKey(hntMint)[0];

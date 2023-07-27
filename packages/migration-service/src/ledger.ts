@@ -24,7 +24,8 @@ import {
   TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
 import {
-  AccountMeta, PublicKey,
+  AccountInfo,
+  AccountMeta, ParsedAccountData, PublicKey,
   SystemProgram,
   Transaction,
   TransactionInstruction
@@ -117,15 +118,15 @@ export async function getMigrateTransactions(
     await provider.connection.getParsedTokenAccountsByOwner(from, {
       programId: TOKEN_PROGRAM_ID,
     });
-  const positions = [];
-  const tokens = [];
+  const positions: PublicKey[] = [];
+  const tokens: { pubkey: PublicKey, account: AccountInfo<ParsedAccountData> }[] = [];
   for (const token of tokensResponse.value) {
     const mint = new PublicKey(token.account.data.parsed.info.mint);
     const freezeAuth = (await getMint(provider.connection, mint))
       .freezeAuthority;
     const freezeAuthOwner =
       freezeAuth &&
-      (await provider.connection.getAccountInfo(freezeAuth)).owner;
+      (await provider.connection.getAccountInfo(freezeAuth))!.owner;
     if (freezeAuthOwner && freezeAuthOwner.equals(vsrProgram.programId)) {
       positions.push(mint);
     } else {

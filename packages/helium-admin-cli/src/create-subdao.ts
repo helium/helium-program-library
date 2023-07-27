@@ -228,7 +228,7 @@ export async function run(args: any = process.argv) {
 
   const conn = provider.connection;
 
-  const dao = (await daoKey(new PublicKey(argv.hntPubkey)))[0];
+  const dao = (await daoKey(new PublicKey(argv.hntPubkey!)))[0];
   const subdao = (await subDaoKey(subdaoKeypair.publicKey))[0];
   console.log("DAO", dao.toString());
   console.log("SUBDAO", subdao.toString());
@@ -270,7 +270,7 @@ export async function run(args: any = process.argv) {
 
   let payer = provider.wallet.publicKey;
   const auth = await provider.connection.getAccountInfo(daoAcc.authority);
-  if (auth.owner.equals(govProgramId)) {
+  if (auth!.owner.equals(govProgramId)) {
     const daoPayer = PublicKey.findProgramAddressSync(
       [Buffer.from("native-treasury", "utf-8"), daoAcc.authority.toBuffer()],
       govProgramId
@@ -483,7 +483,7 @@ export async function run(args: any = process.argv) {
         dao,
         dntMint: subdaoKeypair.publicKey,
         rewardsEscrow,
-        hntMint: new PublicKey(argv.hntPubkey),
+        hntMint: new PublicKey(argv.hntPubkey!),
         activeDeviceAggregator: aggregatorKey,
         payer,
         dntMintAuthority: daoAcc.authority,
@@ -611,7 +611,7 @@ export async function run(args: any = process.argv) {
       instructions,
       squads,
       executeTransaction: true,
-      multisig,
+      multisig: multisig!,
       authorityIndex: argv.authorityIndex,
     });
   }

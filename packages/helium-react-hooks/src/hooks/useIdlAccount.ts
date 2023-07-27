@@ -13,19 +13,21 @@ export function useIdlAccount<IDL extends Idl, A extends keyof AllAccountsMap<ID
 ): UseAccountState<IdlAccounts<IDL>[A]> {
   const parser: TypedAccountParser<
     IdlAccounts<IDL>[A]
-  > = useMemo(() => {
-    return (pubkey, data) => {
-      if (idl) {
+  > | undefined = useMemo(() => {
+    if (idl) {
+      const coder = new BorshAccountsCoder(idl);
+      const tpe = capitalizeFirstChar(type);
+      return (pubkey, data) => {
         try {
-          const coder = new BorshAccountsCoder(idl);
-          const decoded = coder.decode(capitalizeFirstChar(type), data.data);
+          if (data.data.length === 0) return;
+          const decoded = coder.decode(tpe, data.data);
           decoded.pubkey = pubkey;
           return decoded;
         } catch (e: any) {
           console.error(e);
         }
-      }
-    };
+      };
+    }
   }, [idl, type]);
   return useAccount(key, parser);
 }

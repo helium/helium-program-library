@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -50,7 +50,7 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const program = await initDc(provider);
 
-  const instructions = [];
+  const instructions: TransactionInstruction[] = [];
 
   const dataCredits = dataCreditsKey(new PublicKey(argv.dcMint))[0];
   const dataCreditsAcc = await program.account.dataCreditsV0.fetch(dataCredits);

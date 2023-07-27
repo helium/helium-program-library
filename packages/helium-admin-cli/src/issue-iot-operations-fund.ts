@@ -3,7 +3,7 @@ import { init } from "@helium/helium-entity-manager-sdk";
 import { init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import { createMintInstructions, sendInstructions } from "@helium/spl-utils";
-import { PublicKey, Keypair } from "@solana/web3.js";
+import { PublicKey, Keypair, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import { BN } from "bn.js";
 import os from "os";
@@ -59,7 +59,7 @@ export async function run(args: any = process.argv) {
   const mint = Keypair.generate()
   const hnt = new PublicKey(argv.hntMint)
   const [dao] = daoKey(hnt);
-  const instructions = [];
+  const instructions: TransactionInstruction[] = [];
   const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
   await sendInstructions(
     provider,
