@@ -23,6 +23,7 @@ import { LAZY_TRANSACTIONS_NAME } from "./env";
 import { getMigrateTransactions } from "./ledger";
 import { provider, wallet } from "./solana";
 import { decompress, decompressSigners, shouldThrottle } from "./utils";
+import { truthy } from "@helium/spl-utils";
 
 export const chunks = <T>(array: T[], size: number): T[][] =>
   Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
@@ -33,6 +34,7 @@ const host = process.env.PGHOST || "localhost";
 const isRds = host.includes("rds.amazonaws.com");
 const port = Number(process.env.PGPORT) || 5432;
 const pool = new Pool({
+  // @ts-ignore
   password: async () => {
     let password = process.env.PGPASSWORD;
     if (isRds && !password) {
@@ -134,6 +136,7 @@ async function getTransactions(
     lazyTransactions
   );
 
+  // @ts-ignore
   const asExecuteTxs: { id: number; transaction: TransactionMessage }[] = (
     await Promise.all(
       results.map(
@@ -215,7 +218,7 @@ async function getTransactions(
       asExecuteTxs.map((val) => {
         const { transaction: tx, id } = val;
         const ret = new VersionedTransaction(
-          tx.compileToV0Message(lookupTableAccs)
+          tx.compileToV0Message(lookupTableAccs.filter(truthy))
         );
 
         try {
@@ -231,6 +234,8 @@ async function getTransactions(
       })
     );
   }
+
+  return []
 }
 
 const ATTESTATION =

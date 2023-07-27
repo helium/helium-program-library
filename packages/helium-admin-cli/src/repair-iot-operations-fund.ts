@@ -3,7 +3,7 @@ import {
   init as initHem, keyToAssetKey,
 } from "@helium/helium-entity-manager-sdk";
 import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -48,7 +48,7 @@ export async function run(args: any = process.argv) {
   const program = await initHem(provider);
   const daosProgram = await initHsd(provider);
 
-  const instructions = [];
+  const instructions: TransactionInstruction[] = [];
 
   const hntMint = new PublicKey(argv.hntMint);
   const dao = daoKey(hntMint)[0];

@@ -22,9 +22,11 @@ class PubkeyWallet {
 
   // This wallet cannot sign transaction because it doesn't have private key.
   signAllTransactions(txs: Transaction[]): Promise<Transaction[]> {
+    // @ts-ignore
     return null; /* no impl */
   }
   signTransaction(tx: Transaction): Promise<Transaction> {
+    // @ts-ignore
     return null; /* no impl */
   }
 }

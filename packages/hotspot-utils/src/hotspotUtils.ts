@@ -102,10 +102,10 @@ export const createTransferInstructions = async ({
       },
       {
         root: [...assProof.root.toBuffer()],
-        dataHash: [...collectable.compression.dataHash],
-        creatorHash: [...collectable.compression.creatorHash],
-        nonce: collectable.compression.leafId,
-        index: collectable.compression.leafId,
+        dataHash: [...(collectable.compression.dataHash || [])],
+        creatorHash: [...(collectable.compression.creatorHash || [])],
+        nonce: collectable.compression.leafId!,
+        index: collectable.compression.leafId!,
       }
     )
   );

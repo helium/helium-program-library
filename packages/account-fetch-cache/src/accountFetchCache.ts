@@ -369,7 +369,6 @@ export class AccountFetchCache {
     try {
       const parsed = this.getParsed(key, account, parser);
       const address = key.toBase58();
-      console.log("accountFetchCache", `Received account change ${key}`, parsed);
       this.updateCache(address, parsed || null);
     } catch (e: any) {
       console.error("accountFetchCache", "Failed to update account", e)
