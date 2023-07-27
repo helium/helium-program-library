@@ -1,4 +1,7 @@
-import { Program } from "@coral-xyz/anchor";
+import { PublicKey } from "@solana/web3.js";
+import { Asset, HNT_MINT } from "@helium/spl-utils";
+import { keyToAssetKey } from "./pdas";
+import { daoKey } from "@helium/helium-sub-daos-sdk";
 
 export * from "./constants";
 export { onboardIotHotspot } from "./functions/onboardIotHotspot";
@@ -9,3 +12,4 @@ export { updateMobileMetadata } from "./functions/updateMobileMetadata";
 export { init } from "./init";
 export * from "./pdas";
 export * from "./resolvers";
+export { keyToAssetForAsset } from "./helpers";

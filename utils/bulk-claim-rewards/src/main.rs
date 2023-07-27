@@ -53,6 +53,7 @@ async fn run() {
 
   let ld_program = anchor_client.program(lazy_distributor::id());
   let ro_program = anchor_client.program(rewards_oracle::id());
+  let hem_program = anchor_client.program(helium_entity_manager::id());
 
   let rewards_mint = match args.rewards_type.as_str() {
     "iot" => Ok(*HeliumToken::Iot.mint()),
@@ -74,6 +75,7 @@ async fn run() {
   claim_rewards(ClaimRewardsArgs {
     lazy_distributor_program: &ld_program,
     rewards_oracle_program: &ro_program,
+    helium_entity_manager_program: &hem_program,
     payer: &kp.clone(),
     hotspot_owner: args.hotspot_owner.map(|p| Pubkey::from_str(&p).unwrap()).unwrap_or_else(|| ld_program.payer()),
     rewards_mint,
