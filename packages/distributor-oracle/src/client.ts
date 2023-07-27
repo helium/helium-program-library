@@ -502,7 +502,6 @@ export async function formTransaction({
   const finalTx = Transaction.from(serTx);
   // Ensure the oracle didn't pull a fast one
   assertSameIxns(finalTx.instructions, tx.instructions);
-
   return finalTx;
 }
 
