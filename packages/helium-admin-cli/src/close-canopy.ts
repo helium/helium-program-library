@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -45,7 +45,7 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const program = await init(provider);
 
-  const instructions = [];
+  const instructions: TransactionInstruction[] = [];
 
   const lazyTransactions = lazyTransactionsKey(argv.name)[0];
   instructions.push(

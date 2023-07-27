@@ -25,11 +25,15 @@ export async function run(args: any = process.argv) {
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
     },
-    hotspotKey: {
+    entityKey: {
       type: "string",
       describe: "Pubkey of the Data Credit token",
       required: true,
     },
+    keySerialization: {
+      type: "string",
+      default: "b58"
+    }
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -39,14 +43,15 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hemProgram = await initHem(provider);
 
-  const [keyToAssetK] = keyToAssetKey(daoKey(HNT_MINT)[0], argv.hotspotKey);
+  // @ts-ignore
+  const [keyToAssetK] = keyToAssetKey(daoKey(HNT_MINT)[0], argv.entityKey, argv.keySerialization!);
   const keyToAsset = await hemProgram.account.keyToAssetV0.fetchNullable(keyToAssetK);
   console.log("keyToAsset", keyToAssetK.toBase58());
   PublicKey.prototype.toString = PublicKey.prototype.toBase58;
 
   console.log(keyToAsset);
-  console.log(await getAsset(argv.url, keyToAsset.asset));
-  console.log(await getAssetProof(argv.url, keyToAsset.asset));
+  console.log(await getAsset(argv.url, keyToAsset!.asset));
+  console.log(await getAssetProof(argv.url, keyToAsset!.asset));
 
   const [iotConfigKey] = rewardableEntityConfigKey(
     subDaoKey(IOT_MINT)[0],
@@ -57,7 +62,7 @@ export async function run(args: any = process.argv) {
     "MOBILE"
   );
 
-  const [iotInfo] = await iotInfoKey(iotConfigKey, argv.hotspotKey);
+  const [iotInfo] = await iotInfoKey(iotConfigKey, argv.entityKey);
   if (await exists(provider.connection, iotInfo)) {
     console.log(
       "Iot Info",
@@ -67,7 +72,7 @@ export async function run(args: any = process.argv) {
     console.log("No iot info")
   }
 
-  const [info] = await mobileInfoKey(mobileConfigKey, argv.hotspotKey);
+  const [info] = await mobileInfoKey(mobileConfigKey, argv.entityKey);
   if (await exists(provider.connection, info)) {
     console.log(
       "Mobile Info",

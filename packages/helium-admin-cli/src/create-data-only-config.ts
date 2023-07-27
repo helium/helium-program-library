@@ -100,7 +100,7 @@ export async function run(args: any = process.argv) {
       ]);
     }
   }
-  if (exists(provider.connection, dataOnlyConfigKey(dao)[0])) {
+  if (await exists(provider.connection, dataOnlyConfigKey(dao)[0])) {
     console.log("DataOnly Config already exists");
     return;
   }

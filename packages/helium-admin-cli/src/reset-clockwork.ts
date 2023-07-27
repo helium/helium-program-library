@@ -4,7 +4,7 @@ import {
   init as initDao,
   subDaoKey
 } from "@helium/helium-sub-daos-sdk";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -68,7 +68,7 @@ export async function run(args: any = process.argv) {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hsdProgram = await initDao(provider);
-  const instructions = [];
+  const instructions: TransactionInstruction[] = [];
 
   const squads = Squads.endpoint(
     process.env.ANCHOR_PROVIDER_URL,
@@ -79,7 +79,7 @@ export async function run(args: any = process.argv) {
   
   if (argv.resetDaoThread) {
     console.log("resetting dao thread");
-    const hntMint = new PublicKey(argv.hntMint);
+    const hntMint = new PublicKey(argv.hntMint!);
     const dao = daoKey(hntMint)[0];
     const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
 
@@ -96,7 +96,7 @@ export async function run(args: any = process.argv) {
 
   if (argv.resetSubDaoThread) {
     console.log("resetting subdao thread");
-    const dntMint = new PublicKey(argv.dntMint);
+    const dntMint = new PublicKey(argv.dntMint!);
     const subDao = subDaoKey(dntMint)[0];
     const subdaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
 

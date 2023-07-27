@@ -1,4 +1,3 @@
-import { lazySignerKey } from "@helium/lazy-transactions-sdk";
 import * as anchor from "@coral-xyz/anchor";
 import axios from "axios";
 import os from "os";
@@ -46,7 +45,7 @@ async function run() {
     const tx = await provider.connection.confirmTransaction(txid, "processed");
     if(tx.value.err) {
       const tx = await provider.connection.getTransaction(txid);
-      console.error(txid, tx.meta.logMessages?.join("\n"));
+      console.error(txid, tx!.meta!.logMessages?.join("\n"));
     }
     return !tx.value.err
   }));

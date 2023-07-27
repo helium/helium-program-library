@@ -7,12 +7,13 @@
     "moduleResolution": "Node",
     "esModuleInterop": true,
     "isolatedModules": true,
+    "noImplicitAny": false,
     "noEmitOnError": true,
     "resolveJsonModule": true,
-    "strict": false,
+    "strict": true,
     "stripInternal": true,
     "skipLibCheck": true,
     "noEmit": false,
-    "allowSyntheticDefaultImports": true
-  }
+    "allowSyntheticDefaultImports": true,
+  },
 }

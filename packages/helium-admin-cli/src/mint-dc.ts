@@ -51,7 +51,7 @@ export async function run(args: any = process.argv) {
   try {
     preBalance = (
       await provider.connection.getTokenAccountBalance(destAta, "confirmed")
-    ).value.uiAmount;
+    ).value.uiAmount!;
   } catch (e: any) {
     if (!e.toString().includes("Invalid param: could not find account")) {
       throw e;
@@ -80,5 +80,5 @@ export async function run(args: any = process.argv) {
     await provider.connection.getTokenAccountBalance(destAta, "confirmed")
   ).value.uiAmount;
 
-  console.log(`Burned ${argv.numHnt} HNT to mint ${postBalance - preBalance} DC`);
+  console.log(`Burned ${argv.numHnt} HNT to mint ${postBalance! - preBalance} DC`);
 }
