@@ -2,39 +2,39 @@ use crate::error::*;
 use anchor_lang::prelude::*;
 use std::convert::TryFrom;
 
-/// Seconds in one day.
+// Seconds in one day.
 pub const SECS_PER_DAY: u64 = 86_400;
 
-/// Seconds in one month.
+// Seconds in one month.
 pub const SECS_PER_MONTH: u64 = 365 * SECS_PER_DAY / 12;
 
-/// Maximum acceptable number of lockup periods.
-///
-/// In the linear vesting voting power computation, a factor like
-/// `periods^2 * period_secs` is used. With the current setting
-/// that would be 36500^2 * SECS_PER_MONTH << 2^64.
-///
-/// This setting limits the maximum lockup duration for lockup methods
-/// with daily periods to 200 years.
+// Maximum acceptable number of lockup periods.
+//
+// In the linear vesting voting power computation, a factor like
+// `periods^2 * period_secs` is used. With the current setting
+// that would be 36500^2 * SECS_PER_MONTH << 2^64.
+//
+// This setting limits the maximum lockup duration for lockup methods
+// with daily periods to 200 years.
 pub const MAX_LOCKUP_PERIODS: u32 = 365 * 200;
 
 pub const MAX_LOCKUP_IN_FUTURE_SECS: i64 = 100 * 365 * 24 * 60 * 60;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Lockup {
-  /// Start of the lockup.
-  ///
-  /// Note, that if start_ts is in the future, the funds are nevertheless
-  /// locked up!
-  ///
-  /// Similarly vote power computations don't care about start_ts and always
-  /// assume the full interval from now to end_ts.
+  // Start of the lockup.
+  //
+  // Note, that if start_ts is in the future, the funds are nevertheless
+  // locked up!
+  //
+  // Similarly vote power computations don't care about start_ts and always
+  // assume the full interval from now to end_ts.
   pub start_ts: i64,
 
-  /// End of the lockup.
+  // End of the lockup.
   pub end_ts: i64,
 
-  /// Type of lockup.
+  // Type of lockup.
   pub kind: LockupKind,
 }
 
@@ -49,7 +49,7 @@ impl Default for Lockup {
 }
 
 impl Lockup {
-  /// Create lockup for a given period
+  // Create lockup for a given period
   pub fn new_from_periods(
     kind: LockupKind,
     curr_ts: i64,
@@ -73,7 +73,7 @@ impl Lockup {
     })
   }
 
-  /// True when the lockup is finished.
+  // True when the lockup is finished.
   pub fn expired(&self, curr_ts: i64) -> bool {
     self.seconds_left(curr_ts) == 0
   }
@@ -83,8 +83,8 @@ impl Lockup {
     (self.end_ts - self.start_ts) as u64
   }
 
-  /// Number of seconds left in the lockup.
-  /// May be more than end_ts-start_ts if curr_ts < start_ts.
+  // Number of seconds left in the lockup.
+  // May be more than end_ts-start_ts if curr_ts < start_ts.
   pub fn seconds_left(&self, mut curr_ts: i64) -> u64 {
     if self.kind == LockupKind::Constant {
       curr_ts = self.start_ts;
@@ -96,8 +96,8 @@ impl Lockup {
     }
   }
 
-  /// Number of seconds since the lockup expired.
-  /// Returns 0 if the lockup hasn't expired
+  // Number of seconds since the lockup expired.
+  // Returns 0 if the lockup hasn't expired
   pub fn seconds_since_expiry(&self, curr_ts: i64) -> u64 {
     if !self.expired(curr_ts) {
       return 0;
@@ -109,23 +109,23 @@ impl Lockup {
 #[repr(u8)]
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LockupKind {
-  /// No lockup, tokens can be withdrawn as long as not engaged in a proposal.
+  // No lockup, tokens can be withdrawn as long as not engaged in a proposal.
   #[default]
   None,
 
-  /// Lock up for a number of days
+  // Lock up for a number of days
   Cliff,
 
-  /// Lock up permanently. The number of days specified becomes the minimum
-  /// unlock period when the deposit (or a part of it) is changed to Cliff.
+  // Lock up permanently. The number of days specified becomes the minimum
+  // unlock period when the deposit (or a part of it) is changed to Cliff.
   Constant,
 }
 
 impl LockupKind {
-  /// The lockup length is specified by passing the number of lockup periods
-  /// to create_deposit_entry. This describes a period's length.
-  ///
-  /// For vesting lockups, the period length is also the vesting period.
+  // The lockup length is specified by passing the number of lockup periods
+  // to create_deposit_entry. This describes a period's length.
+  //
+  // For vesting lockups, the period length is also the vesting period.
   pub fn period_secs(&self) -> u64 {
     match self {
       LockupKind::None => 0,
@@ -134,7 +134,7 @@ impl LockupKind {
     }
   }
 
-  /// Lockups cannot decrease in strictness
+  // Lockups cannot decrease in strictness
   pub fn strictness(&self) -> u8 {
     match self {
       LockupKind::None => 0,

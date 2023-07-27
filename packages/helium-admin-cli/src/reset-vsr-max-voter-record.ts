@@ -5,7 +5,7 @@ import {
   subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -71,7 +71,7 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hsdProgram = await initDao(provider);
   const hvsrProgram = await initVsr(provider);
-  const instructions = [];
+  const instructions: TransactionInstruction[] = [];
 
   const squads = Squads.endpoint(
     process.env.ANCHOR_PROVIDER_URL,
@@ -82,7 +82,7 @@ export async function run(args: any = process.argv) {
 
   if (argv.resetDaoRecord) {
     console.log("resetting dao maxVoterWeightRecord");
-    const hntMint = new PublicKey(argv.hntMint);
+    const hntMint = new PublicKey(argv.hntMint!);
     const dao = daoKey(hntMint)[0];
     const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
 
@@ -99,7 +99,7 @@ export async function run(args: any = process.argv) {
 
   if (argv.resetSubDaoRecord) {
     console.log("resetting subdao maxVoterWeightRecord");
-    const dntMint = new PublicKey(argv.dntMint);
+    const dntMint = new PublicKey(argv.dntMint!);
     const subDao = subDaoKey(dntMint)[0];
     const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
 

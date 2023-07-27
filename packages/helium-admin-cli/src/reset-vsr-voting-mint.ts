@@ -5,7 +5,7 @@ import {
   subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -81,7 +81,7 @@ export async function run(args: any = process.argv) {
   const hvsrProgram = await initVsr(provider);
   const now = Number(await getUnixTimestamp(provider));
   const in7Days = now + getTimestampFromDays(7);
-  const instructions = [];
+  const instructions: TransactionInstruction[] = [];
 
   const squads = Squads.endpoint(
     process.env.ANCHOR_PROVIDER_URL,
@@ -92,7 +92,7 @@ export async function run(args: any = process.argv) {
 
   if (argv.resetDaoVotingMint) {
     console.log("resetting dao votingMint");
-    const hntMint = new PublicKey(argv.hntMint);
+    const hntMint = new PublicKey(argv.hntMint!);
     const dao = daoKey(hntMint)[0];
     const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
 
@@ -125,7 +125,7 @@ export async function run(args: any = process.argv) {
 
   if (argv.resetSubDaoVotingMint) {
     console.log("resetting subdao votingMint");
-    const dntMint = new PublicKey(argv.dntMint);
+    const dntMint = new PublicKey(argv.dntMint!);
     const subDao = subDaoKey(dntMint)[0];
     const subdaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
 

@@ -76,6 +76,8 @@ jobs:
             echo "Waiting for local Anchor network to start..."
             sleep 5
           done
+      - name: Install toml-cli
+        run: cargo install toml-cli
       - name: Run bootstrap script
         run: ./scripts/bootstrap.sh
 

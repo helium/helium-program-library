@@ -9,7 +9,7 @@ import {
   rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
 import { init as initHsd, subDaoKey, delegatorRewardsPercent } from "@helium/helium-sub-daos-sdk";
-import { Cluster, PublicKey } from "@solana/web3.js";
+import { Cluster, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import {
   AggregatorAccount,
@@ -131,7 +131,7 @@ export async function run(args: any = process.argv) {
   const hemProgram = await initHem(provider);
   const cbProgram = await initCb(provider);
 
-  const instructions = [];
+  const instructions: TransactionInstruction[] = [];
 
   const subDao = subDaoKey(new PublicKey(argv.dntMint))[0];
   const subDaoAcc = await program.account.subDaoV0.fetch(subDao);

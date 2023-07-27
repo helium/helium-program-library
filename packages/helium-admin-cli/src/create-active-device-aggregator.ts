@@ -58,7 +58,7 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
 
   const wallet = loadKeypair(argv.wallet);
-  const aggKeypair = await loadKeypair(argv.aggregatorKeypair);
+  const aggKeypair = await loadKeypair(argv.aggregatorKeypair!);
 
   console.log("Initializing switchboard oracle");
   await createSwitchboardAggregator({
