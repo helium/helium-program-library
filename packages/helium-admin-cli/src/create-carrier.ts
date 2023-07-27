@@ -102,7 +102,7 @@ export async function run(args: any = process.argv) {
 
   const [size, buffer, canopy] = merkleSizes.find(
     ([height]) => Math.pow(2, height) > count * 2
-  );
+  )!;
   const space = getConcurrentMerkleTreeAccountSize(size, buffer, canopy);
   const carrier = await carrierKey(subDao, name)[0];
   const rent = await provider.connection.getMinimumBalanceForRentExemption(
