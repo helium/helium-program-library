@@ -1,14 +1,22 @@
 [
   {
     "startTime": "2023-04-18T00:00:00Z",
-    "emissionsPerEpoch": "108,493,150.684932"
+    "emissionsPerEpoch": "124,931,506.849315"
+  },
+  {
+    "startTime": "2023-07-28T00:00:00Z",
+    "emissionsPerEpoch": "174,246,575.342466"
+  },
+  {
+    "startTime": "2023-07-29T00:00:01Z",
+    "emissionsPerEpoch": "141,369,863.013699"
   },
   {
     "startTime": "2023-08-01T00:00:00Z",
-    "emissionsPerEpoch": "54,098,360.655738"
+    "emissionsPerEpoch": "70,491,803.278689"
   },
   {
     "startTime": "2024-08-01T00:00:00Z",
-    "emissionsPerEpoch": "54,246,575.342466"
+    "emissionsPerEpoch": "70,684,931.506849"
   }
 ]
