@@ -164,7 +164,9 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
     &mut parsed
   };
 
-  if ctx.accounts.genesis_end_sub_dao_epoch_info.end_ts() >= curr_ts {
+  // Once start ts passes, everything gets purged. We only
+  // need this correction when the epoch has not passed
+  if ctx.accounts.genesis_end_sub_dao_epoch_info.start_ts() > curr_ts {
     genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions =
       genesis_end_sub_dao_epoch_info
         .fall_rates_from_closing_positions
