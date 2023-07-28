@@ -1,6 +1,6 @@
 import * as anchor from '@coral-xyz/anchor';
 import { underscore, camelize } from 'inflection';
-import { Sequelize, DataTypes, QueryTypes } from 'sequelize';
+import { Sequelize, DataTypes, QueryTypes, col } from 'sequelize';
 import { provider } from './solana';
 import cachedIdlFetch from './cachedIdlFetch';
 
@@ -90,7 +90,10 @@ export const defineIdlModels = async ({
         }
       );
 
-      const columns = Object.keys(schema[acc.name]);
+      const columns = Object.keys(model.getAttributes()).map((att) =>
+        camelize(att, true)
+      );
+
       const existingColumns = (
         await sequelize.query(
           `
@@ -101,9 +104,7 @@ export const defineIdlModels = async ({
       `,
           { type: QueryTypes.SELECT }
         )
-      )
-        .map((x: any) => camelize(x.column_name, true))
-        .filter((x) => !['refreshedAt', 'createdAt', 'address'].includes(x));
+      ).map((x: any) => camelize(x.column_name, true));
 
       if (
         !existingColumns.length ||
