@@ -1908,7 +1908,7 @@ dependencies = [
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.0.8"
+version = "0.1.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
