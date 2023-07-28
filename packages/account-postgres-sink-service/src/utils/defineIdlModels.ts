@@ -1,6 +1,6 @@
 import * as anchor from '@coral-xyz/anchor';
-import { underscore } from 'inflection';
-import { Sequelize, DataTypes } from 'sequelize';
+import { underscore, camelize } from 'inflection';
+import { Sequelize, DataTypes, QueryTypes } from 'sequelize';
 import { provider } from './solana';
 import cachedIdlFetch from './cachedIdlFetch';
 
@@ -70,7 +70,7 @@ export const defineIdlModels = async ({
         await sequelize.createSchema(accConfig.schema, {});
       }
 
-      sequelize.define(
+      const model = sequelize.define(
         acc.name,
         {
           address: {
@@ -89,6 +89,28 @@ export const defineIdlModels = async ({
           tableName: underscore(accConfig.table || acc.name),
         }
       );
+
+      const columns = Object.keys(schema[acc.name]);
+      const existingColumns = (
+        await sequelize.query(
+          `
+        SELECT column_name
+          FROM information_schema.columns
+        WHERE table_schema = '${underscore(accConfig.schema || 'public')}'
+          AND table_name = '${underscore(accConfig.table || acc.name)}'
+      `,
+          { type: QueryTypes.SELECT }
+        )
+      )
+        .map((x: any) => camelize(x.column_name, true))
+        .filter((x) => !['refreshedAt', 'createdAt', 'address'].includes(x));
+
+      if (
+        !existingColumns.length ||
+        !columns.every((col) => existingColumns.includes(col))
+      ) {
+        model.sync({ alter: true });
+      }
     }
   }
 };
@@ -128,5 +150,4 @@ export const defineAllIdlModels = async ({
       sequelize,
     });
   }
-  await sequelize.sync();
 };
