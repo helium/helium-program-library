@@ -11,12 +11,7 @@ import {
 } from '@helium/lazy-distributor-sdk';
 import { init as initRewards } from '@helium/rewards-oracle-sdk';
 import { daoKey } from '@helium/helium-sub-daos-sdk';
-import {
-  HNT_MINT,
-  IOT_MINT,
-  sendAndConfirmWithRetry,
-  sendInstructions,
-} from '@helium/spl-utils';
+import { HNT_MINT, IOT_MINT, sendAndConfirmWithRetry } from '@helium/spl-utils';
 import { PublicKey } from '@solana/web3.js';
 import os from 'os';
 import yargs from 'yargs/yargs';
