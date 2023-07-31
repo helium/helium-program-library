@@ -79,9 +79,8 @@ export const upsertProgramAccounts = async ({
         commitment: provider.connection.commitment,
         filters: [...coderFilters],
       });
-      const model = sequelize.models[type];
-      await model.sync({ alter: true });
 
+      const model = sequelize.models[type];
       const t = await sequelize.transaction();
       // @ts-ignore
       const respChunks = chunks(resp, 50000);
