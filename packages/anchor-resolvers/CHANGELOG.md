@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.2.15](https://github.com/helium/helium-program-library/compare/v0.2.14...v0.2.15) (2023-07-31)
+
+**Note:** Version bump only for package @helium/anchor-resolvers
+
+
+
+
+
 ## [0.2.3](https://github.com/helium/helium-program-library/compare/v0.1.5...v0.2.3) (2023-06-16)
 
 **Note:** Version bump only for package @helium/anchor-resolvers
