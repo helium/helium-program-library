@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "description": "Interface to the price oracle smart contract",
   "repository": {
     "type": "git",
