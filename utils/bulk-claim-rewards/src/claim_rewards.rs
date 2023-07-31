@@ -517,7 +517,7 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
     send_and_confirm_messages_with_spinner(
       lazy_distributor_program.rpc().into(),
       &tpu_client,
-      &serialized_txs,
+      &deserialized_txs,
     )
     .unwrap();
 
