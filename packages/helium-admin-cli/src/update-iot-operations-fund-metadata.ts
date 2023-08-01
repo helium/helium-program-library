@@ -56,22 +56,6 @@ export async function run(args: any = process.argv) {
 
   const instructions = [];
 
-  const hntMint = new PublicKey(argv.hntMint);
-  const dao = daoKey(hntMint)[0];
-  const [keyToAsset] = keyToAssetKey(dao, 'iot_operations_fund', 'utf8');
-  const assetId = (await hemProgram.account.keyToAssetV0.fetch(keyToAsset))
-    .asset;
-
-  console.log('keyToAsset', keyToAsset.toBase58());
-  console.log('assetId', assetId.toBase58());
-
-  instructions.push(
-    await hemProgram.methods
-      .tempUpdateIotOperationsFundMetadata({ metadataUrl: argv.metadataUrl })
-      .accounts({ dao, mint: assetId })
-      .instruction()
-  );
-
   const squads = Squads.endpoint(
     process.env.ANCHOR_PROVIDER_URL,
     provider.wallet,
@@ -80,7 +64,31 @@ export async function run(args: any = process.argv) {
     }
   );
 
-  await sendInstructionsOrSquads({
+  let authority = provider.wallet.publicKey;
+  const multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
+  const hntMint = new PublicKey(argv.hntMint);
+  const dao = daoKey(hntMint)[0];
+  const [keyToAsset] = keyToAssetKey(dao, 'iot_operations_fund', 'utf8');
+  const assetId = (await hemProgram.account.keyToAssetV0.fetch(keyToAsset))
+    .asset;
+
+  if (multisig) {
+    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  }
+
+  console.log('keyToAsset', keyToAsset.toBase58());
+  console.log('assetId', assetId.toBase58());
+  console.log('dao', dao.toBase58());
+  console.log('authority', authority.toBase58());
+
+  instructions.push(
+    await hemProgram.methods
+      .tempUpdateIotOperationsFundMetadata({ metadataUrl: argv.metadataUrl })
+      .accounts({ dao, mint: assetId, authority })
+      .instruction()
+  );
+
+  /* await sendInstructionsOrSquads({
     provider,
     instructions,
     executeTransaction: argv.executeTransaction,
@@ -88,5 +96,5 @@ export async function run(args: any = process.argv) {
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
     authorityIndex: argv.authorityIndex,
     signers: [],
-  });
+  }); */
 }
