@@ -78,8 +78,6 @@ export async function run(args: any = process.argv) {
 
   console.log('keyToAsset', keyToAsset.toBase58());
   console.log('assetId', assetId.toBase58());
-  console.log('dao', dao.toBase58());
-  console.log('authority', authority.toBase58());
 
   instructions.push(
     await hemProgram.methods
@@ -88,7 +86,7 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  /* await sendInstructionsOrSquads({
+  await sendInstructionsOrSquads({
     provider,
     instructions,
     executeTransaction: argv.executeTransaction,
@@ -96,5 +94,5 @@ export async function run(args: any = process.argv) {
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
     authorityIndex: argv.authorityIndex,
     signers: [],
-  }); */
+  });
 }
