@@ -82,7 +82,6 @@ export async function run(args: any = process.argv) {
     rewards,
     asset: assetId,
     lazyDistributor,
-    encoding: 'utf8',
   });
 
   const signed = await provider.wallet.signTransaction(tx);
