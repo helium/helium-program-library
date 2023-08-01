@@ -9,6 +9,7 @@ use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file};
 use std::rc::Rc;
 use std::time::Instant;
+use std::str::FromStr;
 
 use crate::claim_rewards::ClaimRewardsArgs;
 
@@ -18,15 +19,17 @@ struct Args {
   /// Solana paper wallet that will be the holder of the hotspot
   #[arg(short, long)]
   keypair: String,
+  #[arg(long)]
+  hotspot_owner: Option<String>,
   /// RPC url, defaults to https://api.mainnet-beta.solana.com
   #[arg(short, long)]
   url: String,
   /// Type of rewards to claim, either 'iot' or 'mobile'
   #[arg(long)]
   rewards_type: String,
-  /// Number of NFTs to check at a time. Defaults to 10
-  #[arg(long)]
-  batch_size: Option<usize>,
+  /// Number of NFTs to check at a time. Defaults to 100
+  #[arg(long, default_value = "100")]
+  batch_size: usize,
 }
 
 async fn run() {
@@ -65,17 +68,14 @@ async fn run() {
     &HSD_PID,
   );
 
-  let batch_size = match args.batch_size {
-    Some(size) => size,
-    None => 10,
-  };
+  let batch_size = args.batch_size;
   let start = Instant::now();
 
   claim_rewards(ClaimRewardsArgs {
     lazy_distributor_program: &ld_program,
     rewards_oracle_program: &ro_program,
     payer: &kp.clone(),
-    hotspot_owner: ld_program.payer(),
+    hotspot_owner: args.hotspot_owner.map(|p| Pubkey::from_str(&p).unwrap()).unwrap_or_else(|| ld_program.payer()),
     rewards_mint,
     dao,
     batch_size,
