@@ -30,13 +30,6 @@ export function useAccounts<T>(
   isStatic = false // Set if the accounts data will never change, optimisation to lower websocket usage.
 ): UseAccountsState<T> {
   const cache = useAccountFetchCache();
-  const [accounts, setAccounts] = useState<
-    {
-      account?: AccountInfo<Buffer>;
-      info?: T;
-      publicKey: PublicKey;
-    }[]
-  >([]);
 
   const parsedAccountBaseParser = useMemo(() => {
     if (parser) {
@@ -71,6 +64,43 @@ export function useAccounts<T>(
     }
   }, [parser]);
 
+  const eagerResult = useMemo(() => {
+    return keys?.map((key) => {
+      const acc = cache.get(key);
+
+      // The cache caches the parser, so we need to check if the parser is different
+      let info = acc?.info as T | undefined;
+      if (
+        cache.keyToAccountParser[key.toBase58()] != parsedAccountBaseParser &&
+        parsedAccountBaseParser &&
+        acc?.account
+      ) {
+        info = parsedAccountBaseParser(key, acc?.account).info;
+      }
+      if (acc) {
+        return {
+          info,
+          account: acc.account,
+          publicKey: acc.pubkey,
+          parser: parsedAccountBaseParser,
+        };
+      } else {
+        return {
+          publicKey: key,
+        };
+      }
+    })
+  }, [cache, keys, parsedAccountBaseParser])
+
+  const [accounts, setAccounts] = useState<
+    {
+      account?: AccountInfo<Buffer>;
+      info?: T;
+      publicKey: PublicKey;
+    }[]
+  >(eagerResult || []);
+
+
   const { result, loading, error } = useAsync(
     async (
       keys: null | undefined | PublicKey[],
@@ -88,7 +118,7 @@ export function useAccounts<T>(
               parsedAccountBaseParser,
               isStatic
             );
-
+            
             // The cache caches the parser, so we need to check if the parser is different
             let info = acc?.info;
             if (
