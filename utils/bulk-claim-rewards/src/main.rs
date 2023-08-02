@@ -7,7 +7,6 @@ use solana_sdk::signature::read_keypair_file;
 use solana_sdk::signer::Signer;
 use std::rc::Rc;
 use std::time::Instant;
-use std::str::FromStr;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
