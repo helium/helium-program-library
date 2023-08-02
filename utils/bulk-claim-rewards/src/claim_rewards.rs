@@ -33,6 +33,7 @@ use solana_sdk::{signer::Signer, transaction::Transaction};
 use spl_associated_token_account::get_associated_token_address;
 use std::rc::Rc;
 use std::str::FromStr;
+use tokio::runtime::Runtime;
 
 pub fn key_to_asset_for_asset(asset: &Value, dao: Pubkey) -> Result<Pubkey, anyhow::Error> {
   let creator = asset
@@ -190,6 +191,14 @@ pub struct ClaimRewardsArgs<'a> {
   pub rewards_mint: Pubkey,
   pub dao: Pubkey,
   pub batch_size: usize,
+}
+
+pub fn claim_rewards_blocking(args: ClaimRewardsArgs) -> anyhow::Result<()> {
+  let runtime = Runtime::new().unwrap();
+  runtime
+    .block_on(claim_rewards(args))
+    .context("Failed to claim rewards or listener failure")?;
+  Ok(())
 }
 
 /// Claims all hotspot rewards for a given hotspot_owner. The payer set on the program object pays for the transactions
