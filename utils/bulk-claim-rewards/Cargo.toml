@@ -33,7 +33,7 @@ solana-account-decoder = "*"
 solana-client = "*"
 solana-sdk = "*"
 solana-program = "*"
-spl-associated-token-account = { version = "*", git = "https://github.com/ChewingGlass/solana-program-library", features = [ "no-entrypoint" ] }
+spl-associated-token-account = { version = "*", features = [ "no-entrypoint" ] }
 thiserror = "1"
 helium-api = "3"
 rust_decimal = "1"
