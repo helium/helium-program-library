@@ -2040,7 +2040,7 @@ dependencies = [
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -2058,7 +2058,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.0.12"
+version = "0.0.14"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2484,7 +2484,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-distributor"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",

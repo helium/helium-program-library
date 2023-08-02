@@ -7,6 +7,7 @@ use solana_sdk::signature::read_keypair_file;
 use solana_sdk::signer::Signer;
 use std::rc::Rc;
 use std::time::Instant;
+use std::str::FromStr;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -14,6 +15,8 @@ struct Args {
   /// Solana paper wallet that will be the holder of the hotspot
   #[arg(short, long)]
   keypair: String,
+  #[arg(long)]
+  hotspot_owner: Option<String>,
   /// RPC url, defaults to https://api.mainnet-beta.solana.com
   #[arg(short, long)]
   url: String,

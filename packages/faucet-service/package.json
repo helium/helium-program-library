@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.2.15",
+  "version": "0.2.16",
   "description": "Faucet for devnet Helium tokens",
   "repository": {
     "type": "git",
@@ -36,7 +36,7 @@
     "@coral-xyz/anchor": "^0.26",
     "@fastify/cors": "^8.1.1",
     "@helium/idls": "^0.0.40",
-    "@helium/spl-utils": "^0.2.15",
+    "@helium/spl-utils": "^0.2.16",
     "@metaplex-foundation/mpl-token-metadata": "^2.8.4",
     "@solana/web3.js": "^1.43.4",
     "angry-purple-tiger": "^1.0.5",
