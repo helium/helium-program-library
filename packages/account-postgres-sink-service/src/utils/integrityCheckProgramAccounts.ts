@@ -150,14 +150,13 @@ export const integrityCheckProgramAccounts = async ({
     );
 
     await t.commit();
+    while (correctedRecordsCount > 0) {
+      correctedRecordsCount--;
+      (fastify as any).customMetrics.integrityMetric.inc();
+    }
   } catch (err) {
     await t.rollback();
     console.error('While inserting, err', err);
     throw err;
-  }
-
-  while (correctedRecordsCount > 0) {
-    correctedRecordsCount--;
-    (fastify as any).customMetrics.integrityMetric.inc();
   }
 };
