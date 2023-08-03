@@ -148,6 +148,7 @@ export const integrityCheckProgramAccounts = async ({
         }
       })
     );
+
     await t.commit();
   } catch (err) {
     await t.rollback();
