@@ -4,12 +4,10 @@ import {
   Connection,
   PublicKey,
   SendOptions,
-  Signer,
   Transaction,
   TransactionInstruction
 } from "@solana/web3.js";
 import { EventEmitter } from "./eventEmitter";
-import { getMultipleAccounts } from "./getMultipleAccounts";
 
 export const DEFAULT_CHUNK_SIZE = 99;
 export const DEFAULT_DELAY = 50;
@@ -60,6 +58,7 @@ export class AccountFetchCache {
   >();
   pendingCalls = new Map<string, Promise<ParsedAccountBase<unknown>>>();
   emitter = new EventEmitter();
+  id: number; // For debugging, to see which cache is being used
 
   oldGetAccountinfo?: (
     publicKey: PublicKey,
@@ -91,6 +90,7 @@ export class AccountFetchCache {
     /** Add functionatility to getAccountInfo that uses the cache */
     extendConnection?: boolean;
   }) {
+    this.id = ++id;
     this.connection = connection;
     this.chunkSize = chunkSize;
     this.delay = delay;
