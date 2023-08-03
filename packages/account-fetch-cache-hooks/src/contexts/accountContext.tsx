@@ -21,7 +21,7 @@ export const AccountContext = createContext<AccountFetchCache | undefined>(
   undefined
 );
 
-function usePrevious<T>(state: T): T | undefined {
+export function usePrevious<T>(state: T): T | undefined {
   const ref = useRef<T>();
 
   useEffect(() => {

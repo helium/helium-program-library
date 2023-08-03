@@ -280,6 +280,10 @@ export class AccountFetchCache {
 
     const data = await this.search(pubKey, parser, isStatic, forceRequery);
     const dispose = this.watch(id, parser, !!data);
+    const cacheEntry = this.genericCache.get(address);
+    if (!this.genericCache.has(address) || cacheEntry != data) {
+      this.updateCache<T>(address, data || null);
+    }
 
     return [data, dispose];
   }
@@ -344,9 +348,12 @@ export class AccountFetchCache {
         info: undefined,
       };
 
-      const cacheEntry = this.genericCache.get(address);
-      if (!this.genericCache.has(address) || cacheEntry != result) {
-        this.updateCache<T>(address, result);
+      // Only set the cache for defined static accounts. Static accounts can change if they go from nonexistant to existant.
+      // Rely on searchAndWatch to set the generic cache for everything else.
+      // Never update the cache with an account that isn't being watched. This could cause
+      // stale data to be returned.
+      if (isStatic && result && result.info) {
+        this.updateCache(address, result);
       }
 
       return result;

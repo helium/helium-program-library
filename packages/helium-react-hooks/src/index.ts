@@ -4,7 +4,7 @@ export { useAnchorAccount } from "./hooks/useAnchorAccount";
 export { useAnchorAccounts } from "./hooks/useAnchorAccounts";
 export { useInterval } from "./hooks/useInterval";
 export { useAssociatedTokenAccount } from "./hooks/useAssociatedTokenAccount";
-export { useMint } from "./hooks/useMint";
+export { useMint, MintParser } from "./hooks/useMint";
 export { useOwnedAmount } from "./hooks/useOwnedAmount";
 export { useSolOwnedAmount } from "./hooks/useSolOwnedAmount";
 export { useTokenAccount } from "./hooks/useTokenAccount";
