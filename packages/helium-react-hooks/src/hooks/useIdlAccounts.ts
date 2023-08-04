@@ -11,19 +11,18 @@ import { useMemo } from "react";
 export const capitalizeFirstChar = (str) =>
   str.charAt(0).toUpperCase() + str.substring(1);
 
-export function useIdlAccounts<
-  IDL extends Idl,
-  A extends keyof AllAccountsMap<IDL>
->(
+export function useIdlAccounts<IDL extends Idl, A extends keyof AllAccountsMap<IDL>>(
   keys: PublicKey[] | undefined,
   idl: IDL | undefined,
-  type: A
+  type: A,
+  // Perf optimization - set if the account will never change, to lower websocket usage.
+  isStatic: boolean = false
 ): UseAccountsState<IdlAccounts<IDL>[A]> {
   const parser: TypedAccountParser<IdlAccounts<IDL>[A]> | undefined =
     useMemo(() => {
       if (idl) {
         const coder = new BorshAccountsCoder(idl);
-        const tpe = capitalizeFirstChar(type)
+        const tpe = capitalizeFirstChar(type);
         return (pubkey, data) => {
           try {
             if (data.data.length === 0) return;
@@ -36,5 +35,5 @@ export function useIdlAccounts<
         };
       }
     }, [idl, type]);
-  return useAccounts(keys, parser);
+  return useAccounts(keys, parser, isStatic);
 }
