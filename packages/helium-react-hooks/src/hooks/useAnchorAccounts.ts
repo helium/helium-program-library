@@ -9,9 +9,14 @@ import { useIdl } from "./useIdl";
 import { useIdlAccounts } from "./useIdlAccounts";
 import { useEffect, useMemo } from "react";
 
-export function useAnchorAccounts<IDL extends Idl, A extends keyof AllAccountsMap<IDL>>(
+export function useAnchorAccounts<
+  IDL extends Idl,
+  A extends keyof AllAccountsMap<IDL>
+>(
   keys: PublicKey[] | undefined,
-  type: A
+  type: A,
+  // Perf optimization - set if the account will never change, to lower websocket usage.
+  isStatic: boolean = false
 ): UseAccountsState<IdlAccounts<IDL>[A]> & {
   error?: Error;
 } {
@@ -26,7 +31,12 @@ export function useAnchorAccounts<IDL extends Idl, A extends keyof AllAccountsMa
     }
   }, [idl, loading, owner]);
 
-  const { error: useAccErr, ...result } = useIdlAccounts<IDL, A>(keys, idl, type);
+  const { error: useAccErr, ...result } = useIdlAccounts<IDL, A>(
+    keys,
+    idl,
+    type,
+    isStatic
+  );
   return {
     ...result,
     error: error || useAccErr,
