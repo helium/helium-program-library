@@ -39,7 +39,7 @@ static_assertions = "1.1"
 mpl-token-metadata = { workspace = true }
 itertools = "0.10.2"
 spl-governance-tools=  "0.1.3"
-proposal = { path = "../proposal" }
+proposal = { path = "../../utils/proposal" }
 shared-utils = { path = "../../utils/shared-utils" }
 
 [dev-dependencies]
