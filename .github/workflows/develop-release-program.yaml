@@ -26,16 +26,8 @@ jobs:
           # Use git diff to get a list of changed programs and output it as JSON
           changed_files=$(git diff --name-only ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.sha) || github.event.before }} ${{ github.event.after }})
           changed_programs=($(echo "$changed_files" | grep "^programs/" | grep -v "/shared-utils/" | cut -d '/' -f 2 | sort -u))
-
-          # Check if the array is empty
-          if [ ${#changed_programs[@]} -eq 0 ]; then
-            # Set a default value for json when no results are found
-            json="[]"
-          else
-            # Convert the array to JSON format
-            json="[$(printf "'%s'," "${changed_programs[@]}" | sed 's/,$//')]"
-          fi
-
+          echo "${changed_programs[@]}"
+          json="[$(printf "'%s'", "${changed_programs[@]}" | sed 's/,$//')]"
           echo $json
           echo "programs_with_changes=$json" >> $GITHUB_OUTPUT
   build_programs:
@@ -47,14 +39,16 @@ jobs:
 
     steps:
       - name: Checkout code
+        if: ${{ matrix.program }} != ''  # Skip running this job if 'program' is empty
         uses: actions/checkout@v2
 
       - name: Set devnet lazy signer
+        if: ${{ matrix.program }} != ''  # Skip running this job if 'program' is empty
         run: |
           find programs -type f -name '*.rs' -exec sed -i "s/b\"nJWGUMOK\"/b\"devnethelium5\"/g" {} \;
 
       - name: Install toml-cli
-        if: steps.cache-toml.outputs.cache-hit != 'true'
+        if: ${{ matrix.program }} != '' && steps.cache-toml.outputs.cache-hit != 'true'
         run: cargo install toml-cli
 
       - name: Set program information
@@ -68,6 +62,7 @@ jobs:
           PROGRAM: ${{ matrix.program }}
 
       - uses: ./.github/actions/upload-bpf/
+        if: ${{ matrix.program }} != ''  # Skip running this job if 'program' is empty
         id: buffer-deploy
         with:
           devnet: true
@@ -78,6 +73,7 @@ jobs:
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
 
       - name: Squads program upgrade
+        if: ${{ matrix.program }} != ''  # Skip running this job if 'program' is empty
         uses: helium/squads-program-upgrade@v0.3.1
         with:
           network-url: "https://api.devnet.solana.com"
