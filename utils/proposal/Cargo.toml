@@ -20,3 +20,4 @@ cpi = ["no-entrypoint"]
 [dependencies]
 anchor-gen = { git = "https://github.com/ChewingGlass/anchor-gen.git" }
 anchor-lang = { workspace = true }
+
