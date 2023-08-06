@@ -33,25 +33,25 @@ jobs:
   build_programs:
     needs: [detect_changed_programs]
     runs-on: ubuntu-latest
+    if: needs.detect_changed_programs.outputs.programs_with_changes != '[]' && needs.detect_changed_programs.outputs.programs_with_changes != ''
     strategy:
       matrix:
         program: ${{ fromJson(needs.detect_changed_programs.outputs.programs_with_changes) }}
 
     steps:
       - name: Checkout code
-        if: ${{ matrix.program }} != ''  # Skip running this job if 'program' is empty
         uses: actions/checkout@v2
 
       - name: Set devnet lazy signer
-        if: ${{ matrix.program }} != ''  # Skip running this job if 'program' is empty
         run: |
           find programs -type f -name '*.rs' -exec sed -i "s/b\"nJWGUMOK\"/b\"devnethelium5\"/g" {} \;
 
       - name: Install toml-cli
-        if: ${{ matrix.program }} != '' && steps.cache-toml.outputs.cache-hit != 'true'
+        if: steps.cache-toml.outputs.cache-hit != 'true'
         run: cargo install toml-cli
 
       - name: Set program information
+        if: steps.cache-toml.outputs.cache-hit != 'true'
         run: |
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
           PROGRAM_ID=$(toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
@@ -62,7 +62,6 @@ jobs:
           PROGRAM: ${{ matrix.program }}
 
       - uses: ./.github/actions/upload-bpf/
-        if: ${{ matrix.program }} != ''  # Skip running this job if 'program' is empty
         id: buffer-deploy
         with:
           devnet: true
@@ -73,7 +72,6 @@ jobs:
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
 
       - name: Squads program upgrade
-        if: ${{ matrix.program }} != ''  # Skip running this job if 'program' is empty
         uses: helium/squads-program-upgrade@v0.3.1
         with:
           network-url: "https://api.devnet.solana.com"
