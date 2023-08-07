@@ -9,6 +9,7 @@ import { sanitizeAccount } from './sanitizeAccount';
 import { getTransactionSignaturesUptoBlockTime } from './getTransactionSignaturesUpToBlock';
 import { FastifyInstance } from 'fastify';
 import { chunks } from './chunks';
+import { getBlockTimeWithRetry } from './getBlockTimeWithRetry';
 
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;
@@ -49,20 +50,24 @@ export const integrityCheckProgramAccounts = async ({
 
   const t = await sequelize.transaction();
   const now = new Date().toISOString();
-  let correctedRecordsCount = 0;
+  const txIdsByAcountId = {};
+  const corrections: {
+    type: string;
+    accountId: string;
+    txSignatures: string[];
+    currentValues: null | { [key: string]: any };
+    newValues: { [key: string]: any };
+  }[] = [];
 
   try {
     const program = new anchor.Program(idl, programId, provider);
     const currentSlot = await connection.getSlot();
     const twentyFourHoursAgoSlot =
       currentSlot - Math.floor((24 * 60 * 60 * 1000) / 400); // (assuming a slot duration of 400ms)
-    const blockTime24HoursAgo = await connection.getBlockTime(
-      twentyFourHoursAgoSlot
-    );
-
-    if (!blockTime24HoursAgo) {
-      throw new Error('Unable to get blocktime from 24 hours ago');
-    }
+    const blockTime24HoursAgo = await getBlockTimeWithRetry({
+      slot: twentyFourHoursAgoSlot,
+      provider,
+    });
 
     const parsedTransactions = (
       await Promise.all(
@@ -86,7 +91,13 @@ export const integrityCheckProgramAccounts = async ({
     for (const parsed of parsedTransactions) {
       parsed?.transaction.message.accountKeys
         .filter((acc) => acc.writable)
-        .map((acc) => uniqueWritableAccounts.add(acc.pubkey.toBase58()));
+        .map((acc) => {
+          uniqueWritableAccounts.add(acc.pubkey.toBase58());
+          txIdsByAcountId[acc.pubkey.toBase58()] = [
+            ...parsed.transaction.signatures,
+            ...(txIdsByAcountId[acc.pubkey.toBase58()] || []),
+          ];
+        });
     }
 
     const accountInfosWithPk = (
@@ -141,7 +152,13 @@ export const integrityCheckProgramAccounts = async ({
               );
 
             if (!isEqual) {
-              correctedRecordsCount++;
+              corrections.push({
+                type: accName,
+                accountId: c.pubkey,
+                txSignatures: txIdsByAcountId[c.pubkey],
+                currentValues: existing ? existing.dataValues : null,
+                newValues: sanitized,
+              });
               await model.upsert({ ...sanitized }, { transaction: t });
             }
           }
@@ -150,9 +167,9 @@ export const integrityCheckProgramAccounts = async ({
     );
 
     await t.commit();
-    while (correctedRecordsCount > 0) {
-      correctedRecordsCount--;
+    for (const correction of corrections) {
       (fastify as any).customMetrics.integrityMetric.inc();
+      console.log('IntegrityCheckCorrection:', correction);
     }
   } catch (err) {
     await t.rollback();
