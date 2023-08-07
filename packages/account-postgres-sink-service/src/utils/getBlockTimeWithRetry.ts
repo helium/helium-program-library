@@ -10,7 +10,7 @@ export const getBlockTimeWithRetry = async ({
   maxRetries?: number;
   retryInterval?: number;
   provider: anchor.AnchorProvider;
-}) => {
+}): Promise<number | null> => {
   try {
     const connection = provider.connection;
 

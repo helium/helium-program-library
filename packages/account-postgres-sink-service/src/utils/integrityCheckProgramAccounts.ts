@@ -50,7 +50,7 @@ export const integrityCheckProgramAccounts = async ({
 
   const t = await sequelize.transaction();
   const now = new Date().toISOString();
-  const txIdsByAccountId = {};
+  const txIdsByAccountId: { [key: string]: string[] } = {};
   const corrections: {
     type: string;
     accountId: string;
@@ -68,6 +68,10 @@ export const integrityCheckProgramAccounts = async ({
       slot: twentyFourHoursAgoSlot,
       provider,
     });
+
+    if (!blockTime24HoursAgo) {
+      throw new Error('Unable to get blocktime from 24 hours ago');
+    }
 
     const parsedTransactions = (
       await Promise.all(
