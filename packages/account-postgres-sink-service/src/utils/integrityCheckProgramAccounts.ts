@@ -50,7 +50,7 @@ export const integrityCheckProgramAccounts = async ({
 
   const t = await sequelize.transaction();
   const now = new Date().toISOString();
-  const txIdsByAcountId = {};
+  const txIdsByAccountId = {};
   const corrections: {
     type: string;
     accountId: string;
@@ -93,9 +93,9 @@ export const integrityCheckProgramAccounts = async ({
         .filter((acc) => acc.writable)
         .map((acc) => {
           uniqueWritableAccounts.add(acc.pubkey.toBase58());
-          txIdsByAcountId[acc.pubkey.toBase58()] = [
+          txIdsByAccountId[acc.pubkey.toBase58()] = [
             ...parsed.transaction.signatures,
-            ...(txIdsByAcountId[acc.pubkey.toBase58()] || []),
+            ...(txIdsByAccountId[acc.pubkey.toBase58()] || []),
           ];
         });
     }
@@ -155,7 +155,7 @@ export const integrityCheckProgramAccounts = async ({
               corrections.push({
                 type: accName,
                 accountId: c.pubkey,
-                txSignatures: txIdsByAcountId[c.pubkey],
+                txSignatures: txIdsByAccountId[c.pubkey],
                 currentValues: existing ? existing.dataValues : null,
                 newValues: sanitized,
               });
