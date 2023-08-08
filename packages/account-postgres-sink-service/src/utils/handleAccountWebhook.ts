@@ -32,10 +32,12 @@ export async function handleAccountWebhook({
     throw new Error(`unable to fetch idl for ${programId}`);
   }
 
-  for (const { type } of configAccounts) {
-    if (!idl.accounts!.find(({ name }) => name === type)) {
-      throw new Error(`idl does not have account of type ${type}`);
-    }
+  if (
+    !configAccounts.every(({ type }) =>
+      idl.accounts!.some(({ name }) => name === type)
+    )
+  ) {
+    throw new Error('idl does not have every account type');
   }
 
   const program = new anchor.Program(idl, programId, provider);
@@ -43,10 +45,11 @@ export async function handleAccountWebhook({
   // decode the account
   let decodedAcc: any;
   let accName: any;
-  for (const idlAcc of idl.accounts!) {
+  for (const { type } of configAccounts) {
     try {
-      decodedAcc = program.coder.accounts.decode(idlAcc.name, data);
-      accName = idlAcc.name;
+      if (accName) break;
+      decodedAcc = program.coder.accounts.decode(type, data);
+      accName = type;
     } catch (err) {}
   }
 
