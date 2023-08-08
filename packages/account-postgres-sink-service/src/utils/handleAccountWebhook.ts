@@ -40,34 +40,36 @@ export async function handleAccountWebhook({
     throw new Error('idl does not have every account type');
   }
 
-  const program = new anchor.Program(idl, programId, provider);
-  const data = Buffer.from(account.data[0], account.data[1]);
-  // decode the account
-  let decodedAcc: any;
-  let accName: any;
-  for (const { type } of configAccounts) {
-    try {
-      if (accName) break;
-      decodedAcc = program.coder.accounts.decode(type, data);
-      accName = type;
-    } catch (err) {}
-  }
-
-  const now = new Date().toISOString();
-  const model = sequelize.models[accName];
   const t = await sequelize.transaction();
+  const now = new Date().toISOString();
 
   try {
-    await model.upsert(
-      {
-        address: account.pubkey,
-        refreshed_at: now,
-        ...sanitizeAccount(decodedAcc),
-      },
-      { transaction: t }
-    );
+    const program = new anchor.Program(idl, programId, provider);
+    const data = Buffer.from(account.data[0], account.data[1]);
+    let decodedAcc: any;
+    let accName: any;
 
-    await t.commit();
+    for (const { type } of configAccounts) {
+      try {
+        if (accName) break;
+        decodedAcc = program.coder.accounts.decode(type, data);
+        accName = type;
+      } catch (err) {}
+    }
+
+    if (accName) {
+      const model = sequelize.models[accName];
+      await model.upsert(
+        {
+          address: account.pubkey,
+          refreshed_at: now,
+          ...sanitizeAccount(decodedAcc),
+        },
+        { transaction: t }
+      );
+
+      await t.commit();
+    }
   } catch (err) {
     await t.rollback();
     console.error('While inserting, err', err);
