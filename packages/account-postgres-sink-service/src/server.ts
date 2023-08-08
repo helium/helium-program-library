@@ -44,6 +44,7 @@ if (!HELIUS_AUTH_SECRET) {
         runOnInit: false,
         onTick: async (server: any) => {
           try {
+            console.log(`Running custom job: ${type}`);
             await server.inject(`/${type}?program=${programId}`);
           } catch (err) {
             console.error(err);
@@ -52,16 +53,19 @@ if (!HELIUS_AUTH_SECRET) {
       }))
     );
 
-  const server: FastifyInstance = Fastify({
-    logger: true,
-  });
-
+  const server: FastifyInstance = Fastify({ logger: false });
   await server.register(cors, { origin: '*' });
   await server.register(fastifyCron, { jobs: [...customJobs] });
   await server.register(metrics);
 
   server.get('/refresh-accounts', async (req, res) => {
     const programId = (req.query as any).program;
+
+    console.log(
+      programId
+        ? `Refreshing accounts for program: ${programId}`
+        : `Refreshing accounts`
+    );
 
     try {
       if (configs) {
@@ -90,6 +94,7 @@ if (!HELIUS_AUTH_SECRET) {
 
     try {
       if (!programId) throw new Error('program not provided');
+      console.log(`Integrity checking program: ${programId}`);
 
       if (configs) {
         const config = configs.find((c) => c.programId === programId);
@@ -155,12 +160,9 @@ if (!HELIUS_AUTH_SECRET) {
 
   try {
     await database.sync();
-    await server.listen({ port: 3000, host: '0.0.0.0' });
     // models are defined on boot, and updated in refresh-accounts
-    await defineAllIdlModels({
-      configs,
-      sequelize: database,
-    });
+    await defineAllIdlModels({ configs, sequelize: database });
+    await server.listen({ port: 3000, host: '0.0.0.0' });
     const address = server.server.address();
     const port = typeof address === 'string' ? address : address?.port;
     console.log(`Running on 0.0.0.0:${port}`);
