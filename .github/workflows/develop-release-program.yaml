@@ -33,6 +33,7 @@ jobs:
   build_programs:
     needs: [detect_changed_programs]
     runs-on: ubuntu-latest
+    if: needs.detect_changed_programs.outputs.programs_with_changes != '[]' && needs.detect_changed_programs.outputs.programs_with_changes != ''
     strategy:
       matrix:
         program: ${{ fromJson(needs.detect_changed_programs.outputs.programs_with_changes) }}
@@ -50,6 +51,7 @@ jobs:
         run: cargo install toml-cli
 
       - name: Set program information
+        if: steps.cache-toml.outputs.cache-hit != 'true'
         run: |
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
           PROGRAM_ID=$(toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')

@@ -49,6 +49,7 @@ export const integrityCheckProgramAccounts = async ({
 
   const t = await sequelize.transaction();
   const now = new Date().toISOString();
+  let correctedRecordsCount = 0;
 
   try {
     const program = new anchor.Program(idl, programId, provider);
@@ -140,14 +141,19 @@ export const integrityCheckProgramAccounts = async ({
               );
 
             if (!isEqual) {
-              (fastify as any).customMetrics.integrityMetric.inc();
+              correctedRecordsCount++;
               await model.upsert({ ...sanitized }, { transaction: t });
             }
           }
         }
       })
     );
+
     await t.commit();
+    while (correctedRecordsCount > 0) {
+      correctedRecordsCount--;
+      (fastify as any).customMetrics.integrityMetric.inc();
+    }
   } catch (err) {
     await t.rollback();
     console.error('While inserting, err', err);

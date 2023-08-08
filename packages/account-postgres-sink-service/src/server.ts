@@ -73,7 +73,7 @@ if (!HELIUS_AUTH_SECRET) {
                 accounts: config.accounts,
               });
             } catch (err) {
-              console.log(err);
+              throw err;
             }
           }
         }
@@ -103,7 +103,7 @@ if (!HELIUS_AUTH_SECRET) {
             accounts: config.accounts,
           });
         } catch (err) {
-          console.log(err);
+          throw err;
         }
       }
       res.code(StatusCodes.OK).send(ReasonPhrases.OK);
@@ -142,7 +142,7 @@ if (!HELIUS_AUTH_SECRET) {
               account: parsed,
             });
           } catch (err) {
-            console.error(err);
+            throw err;
           }
         }
       }

@@ -52,9 +52,22 @@ export async function handleAccountWebhook({
 
   const now = new Date().toISOString();
   const model = sequelize.models[accName];
-  await model.upsert({
-    address: account.pubkey,
-    refreshed_at: now,
-    ...sanitizeAccount(decodedAcc),
-  });
+  const t = await sequelize.transaction();
+
+  try {
+    await model.upsert(
+      {
+        address: account.pubkey,
+        refreshed_at: now,
+        ...sanitizeAccount(decodedAcc),
+      },
+      { transaction: t }
+    );
+
+    await t.commit();
+  } catch (err) {
+    await t.rollback();
+    console.error('While inserting, err', err);
+    throw err;
+  }
 }
