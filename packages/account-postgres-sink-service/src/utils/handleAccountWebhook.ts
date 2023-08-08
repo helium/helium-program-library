@@ -67,9 +67,9 @@ export async function handleAccountWebhook({
         },
         { transaction: t }
       );
-
-      await t.commit();
     }
+
+    await t.commit();
   } catch (err) {
     await t.rollback();
     console.error('While inserting, err', err);
