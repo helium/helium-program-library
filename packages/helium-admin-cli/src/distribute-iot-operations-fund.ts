@@ -20,8 +20,11 @@ import {
 import { PublicKey } from '@solana/web3.js';
 import os from 'os';
 import yargs from 'yargs/yargs';
+import BN from "bn.js"
 
 const IOT_OPERATIONS_FUND = 'iot_operations_fund';
+
+const MAX_CLAIM_AMOUNT = new BN("207020547945205")
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -79,6 +82,10 @@ export async function run(args: any = process.argv) {
     lazyDistributor,
     assetId
   );
+  // Avoid claiming too much and tripping the breaker
+  if (new BN(rewards[0].currentRewards).gt(MAX_CLAIM_AMOUNT)) {
+    rewards[0].currentRewards = MAX_CLAIM_AMOUNT.toString();
+  }
 
   const tx = await client.formTransaction({
     program: lazyProgram,
