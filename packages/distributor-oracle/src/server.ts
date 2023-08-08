@@ -454,8 +454,8 @@ export class OracleServer {
             decodeEntityKey(entityKey, keySerialization)!
           )
         : await this.db.getCurrentRewards(mint);
-      if (proposedCurrentRewards.toNumber() > currentRewards) {
-        return { success: false, message: "Invalid amount" };
+      if (proposedCurrentRewards.gt(new BN(currentRewards))) {
+        return { success: false, message: `Invalid amount, ${proposedCurrentRewards} is greater than actual rewards ${currentRewards}` };
       }
     }
 
