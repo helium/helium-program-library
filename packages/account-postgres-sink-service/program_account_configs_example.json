@@ -60,21 +60,6 @@
       ]
     },
     {
-      "programId": "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g",
-      "accounts": [
-        {
-          "type": "MintWindowedCircuitBreakerV0",
-          "table": "mint_windowed_circuit_breaker_configs",
-          "schema": "public"
-        },
-        {
-          "type": "AccountWindowedCircuitBreakerV0",
-          "table": "account_windowed_circuit_breaker_configs",
-          "schema": "public"
-        }
-      ]
-    },
-    {
       "programId": "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8",
       "accounts": [
         {
