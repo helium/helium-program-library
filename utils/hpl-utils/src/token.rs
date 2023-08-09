@@ -1,6 +1,5 @@
 use lazy_static;
 use solana_sdk::pubkey::Pubkey;
-use std::fmt::Display;
 use std::result::Result as StdResult;
 use std::str::FromStr;
 
