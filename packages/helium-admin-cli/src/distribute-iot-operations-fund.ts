@@ -77,9 +77,19 @@ export async function run(args: any = process.argv) {
     lazyDistributor,
     assetId
   );
+  const pending = await client.getPendingRewards(
+    lazyProgram,
+    lazyDistributor,
+    daoKey(HNT_MINT)[0],
+    [IOT_OPERATIONS_FUND],
+    'utf8'
+  );
   // Avoid claiming too much and tripping the breaker
-  if (new BN(rewards[0].currentRewards).gt(MAX_CLAIM_AMOUNT)) {
-    rewards[0].currentRewards = MAX_CLAIM_AMOUNT.toString();
+  if (new BN(pending[IOT_OPERATIONS_FUND]).gt(MAX_CLAIM_AMOUNT)) {
+    rewards[0].currentRewards = new BN(rewards[0].currentRewards)
+      .sub(new BN(pending[IOT_OPERATIONS_FUND]))
+      .add(MAX_CLAIM_AMOUNT)
+      .toString();
   }
 
   const tx = await client.formTransaction({
