@@ -15,11 +15,11 @@ import { HNT_MINT, IOT_MINT, sendAndConfirmWithRetry } from '@helium/spl-utils';
 import { PublicKey } from '@solana/web3.js';
 import os from 'os';
 import yargs from 'yargs/yargs';
-import BN from "bn.js"
+import BN from 'bn.js';
 
 const IOT_OPERATIONS_FUND = 'iot_operations_fund';
 
-const MAX_CLAIM_AMOUNT = new BN("207020547945205")
+const MAX_CLAIM_AMOUNT = new BN('207020547945205');
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -89,7 +89,6 @@ export async function run(args: any = process.argv) {
     rewards,
     asset: assetId,
     lazyDistributor,
-    encoding: 'utf8',
   });
 
   const signed = await provider.wallet.signTransaction(tx);
