@@ -3,7 +3,7 @@
 CLUSTER=$1
 
 if [ "$CLUSTER" == "mainnet" ]; then
-    CLUSTER_URL='https://api.mainnet-beta.solana.com'    
+    CLUSTER_URL='https://api.mainnet-beta.solana.com'
 elif [ "$CLUSTER" == "devnet" ]; then
     CLUSTER_URL='https://api.devnet.solana.com'
 else
