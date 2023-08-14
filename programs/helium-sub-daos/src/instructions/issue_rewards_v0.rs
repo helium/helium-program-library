@@ -166,7 +166,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .accounts
     .sub_dao
     .emission_schedule
-    .get_emissions_at(Clock::get()?.unix_timestamp)
+    .get_emissions_at(end_of_epoch_ts)
     .unwrap();
 
   let delegators_present = ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start > 0;

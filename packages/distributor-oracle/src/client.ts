@@ -84,7 +84,7 @@ export async function getPendingRewards(
   lazyDistributor: PublicKey,
   dao: PublicKey,
   entityKeys: string[],
-  encoding: BufferEncoding | "b58" = "b58"
+  encoding: BufferEncoding | 'b58' = 'b58'
 ): Promise<Record<string, string>> {
   const oracleRewards = await getBulkRewards(
     program,
@@ -160,7 +160,7 @@ export async function formBulkTransactions({
   ) => Promise<AssetProof | undefined>;
 }) {
   if (assets.length > 100) {
-    throw new Error("Too many assets, max 100");
+    throw new Error('Too many assets, max 100');
   }
   const provider = lazyDistributorProgram.provider as AnchorProvider;
 
@@ -186,14 +186,14 @@ export async function formBulkTransactions({
           asset
         );
         if (!assetAcc) {
-          throw new Error("No asset with ID " + asset.toBase58());
+          throw new Error('No asset with ID ' + asset.toBase58());
         }
         return assetAcc;
       })
     );
   }
   if (compressionAssetAccs.length != assets.length) {
-    throw new Error("Assets not the same length as compressionAssetAccs");
+    throw new Error('Assets not the same length as compressionAssetAccs');
   }
 
   let recipientKeys = assets.map(
@@ -322,7 +322,6 @@ export async function formBulkTransactions({
   return finalTxs;
 }
 
-
 export async function formTransaction({
   program: lazyDistributorProgram,
   rewardsOracleProgram,
@@ -355,7 +354,7 @@ export async function formTransaction({
   ) => Promise<AssetProof | undefined>;
 }) {
   if (!asset && !hotspot) {
-    throw new Error("Must provide asset or hotspot");
+    throw new Error('Must provide asset or hotspot');
   }
   if (!asset) {
     asset = hotspot!;
@@ -371,7 +370,7 @@ export async function formTransaction({
     asset
   );
   if (!assetAcc) {
-    throw new Error("No asset with ID " + asset.toBase58());
+    throw new Error('No asset with ID ' + asset.toBase58());
   }
 
   const keyToAsset = keyToAssetForAsset(assetAcc);
@@ -498,7 +497,7 @@ function assertSameIxns(
   instructions1: TransactionInstruction[]
 ) {
   if (instructions.length !== instructions1.length) {
-    throw new Error("Extra instructions added by oracle");
+    throw new Error('Extra instructions added by oracle');
   }
 
   instructions.forEach((instruction, idx) => {
@@ -506,20 +505,20 @@ function assertSameIxns(
     if (
       instruction.programId.toBase58() !== instruction1.programId.toBase58()
     ) {
-      throw new Error("Program id mismatch");
+      throw new Error('Program id mismatch');
     }
     if (!instruction.data.equals(instruction1.data)) {
-      throw new Error("Instruction data mismatch");
+      throw new Error('Instruction data mismatch');
     }
 
     if (instruction.keys.length !== instruction1.keys.length) {
-      throw new Error("Key length mismatch");
+      throw new Error('Key length mismatch');
     }
 
     instruction.keys.forEach((key, idx) => {
       const key1 = instruction1.keys[idx];
       if (key.pubkey.toBase58() !== key1.pubkey.toBase58()) {
-        throw new Error("Key mismatch");
+        throw new Error('Key mismatch');
       }
     });
   });
