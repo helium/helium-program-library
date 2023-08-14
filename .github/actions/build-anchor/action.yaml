@@ -38,3 +38,4 @@ runs:
       if: steps.cache-anchor-build.outputs.cache-hit != 'true'
       shell: bash
     - uses: ./.github/actions/setup-ts/
+    - uses: ./.github/actions/setup-python/
