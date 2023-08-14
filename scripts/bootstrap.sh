@@ -3,7 +3,7 @@
 CLUSTER=$1
 
 if [ "$CLUSTER" == "mainnet" ]; then
-    CLUSTER_URL='https://api.mainnet-beta.solana.com'    
+    CLUSTER_URL='https://api.mainnet-beta.solana.com'
 elif [ "$CLUSTER" == "devnet" ]; then
     CLUSTER_URL='https://api.devnet.solana.com'
 else
@@ -20,7 +20,7 @@ set -e
 KEYPAIRS=( 'aggregator-IOT.json' 'aggregator-MOBILE.json' 'hnt-price-oracle.json' 'hnt.json' 'hst.json' 'dc.json' 'mobile.json' 'iot.json' 'council.json' 'aggregator-IOT.json' 'aggregator-MOBILE.json' 'merkle.json' 'oracle.json' )
 for f in "${KEYPAIRS[@]}"; do
 	if [ ! -f "./packages/helium-admin-cli/keypairs/$f" ]; then
-        echo "$f keypair doesn't exist, creating it"
+        echo "$f keypair doesn't exist, e"
         solana-keygen new --no-bip39-passphrase -o ./packages/helium-admin-cli/keypairs/$f -s
     fi
 done
@@ -37,7 +37,7 @@ echo "Using $RND for dao names"
 
 # init the dao and subdaos
 ./packages/helium-admin-cli/bin/helium-admin.js create-dao \
-    --hntPriceOracle 7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm \
+  --hntPriceOracle 7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm \
     --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium DAO" -u $CLUSTER_URL
 
 ./packages/helium-admin-cli/bin/helium-admin.js create-subdao \
