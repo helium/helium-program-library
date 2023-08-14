@@ -9,7 +9,7 @@ program_list=$(ls "$programs_dir")
 # Run anchor idl init for each program
 for program in $program_list; do
   underscored=$(echo $program | sed 's/-/_/g')
-  id=$(toml get --toml-path Anchor.toml programs.localnet.$underscored | tr -d '"')
+  id=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.$underscored | tr -d '"')
   filepath="target/idl/${underscored}.json"
   cluster="${1:-localnet}"
 
