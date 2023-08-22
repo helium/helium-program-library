@@ -1,8 +1,8 @@
-import { Creator, Uses } from "@metaplex-foundation/mpl-bubblegum";
-import { PublicKey } from "@solana/web3.js";
-import axios from "axios";
+import { Creator, Uses } from '@metaplex-foundation/mpl-bubblegum';
+import { PublicKey } from '@solana/web3.js';
+import axios from 'axios';
 // @ts-ignore
-import base58 from "bs58";
+import base58 from 'bs58';
 
 export type AssetProof = {
   root: PublicKey;
@@ -36,7 +36,7 @@ export type Asset = {
   supply: {
     edition_nonce: number | null;
   };
-  grouping?: { group_key: string, group_value: PublicKey }[];
+  grouping?: { group_key: string; group_value: PublicKey }[];
   uses?: Uses;
   creators: Creator[];
 };
@@ -47,14 +47,14 @@ export async function getAsset(
 ): Promise<Asset | undefined> {
   try {
     const response = await axios.post(url, {
-      jsonrpc: "2.0",
-      method: "getAsset",
-      id: "rpd-op-123",
+      jsonrpc: '2.0',
+      method: 'getAsset',
+      id: 'rpd-op-123',
       params: { id: assetId.toBase58() },
       headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+        Expires: '0',
       },
     });
     const result = response.data.result;
@@ -67,11 +67,61 @@ export async function getAsset(
   }
 }
 
+export async function getAssets(
+  url: string,
+  assetIds: PublicKey[]
+): Promise<(Asset | undefined)[]> {
+  try {
+    if (assetIds.length > 1000) {
+      throw new Error(
+        `Can only batch 1000 at a time, was given ${assetIds.length}`
+      );
+    }
+
+    const batch = assetIds.map((assetId, i) => ({
+      jsonrpc: '2.0',
+      id: `get-asset-${i}`,
+      method: 'getAsset',
+      params: {
+        id: assetId.toBase58(),
+      },
+    }));
+
+    const response = await axios({
+      url,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+        Expires: '0',
+      },
+      data: JSON.stringify(batch),
+    });
+
+    const result = response.data.result || [];
+
+    return [
+      ...(result
+        ? result.map((x: Asset | undefined) => (x ? toAsset(x) : x))
+        : []),
+    ];
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
 function toAsset(result: any): Asset {
   return {
     ...result,
     id: new PublicKey(result.id),
-    grouping: result.grouping && result.grouping.map((g: any) => ({ ...g, group_value: new PublicKey(g.group_value) })),
+    grouping:
+      result.grouping &&
+      result.grouping.map((g: any) => ({
+        ...g,
+        group_value: new PublicKey(g.group_value),
+      })),
     compression: {
       ...result.compression,
       leafId: result.compression.leaf_id,
@@ -88,7 +138,8 @@ function toAsset(result: any): Asset {
     },
     ownership: {
       ...result.ownership,
-      delegate: result.ownership.delegate && new PublicKey(result.ownership.delegate),
+      delegate:
+        result.ownership.delegate && new PublicKey(result.ownership.delegate),
       owner: result.ownership.owner && new PublicKey(result.ownership.owner),
     },
   };
@@ -100,14 +151,14 @@ export async function getAssetProof(
 ): Promise<AssetProof | undefined> {
   try {
     const response = await axios.post(url, {
-      jsonrpc: "2.0",
-      method: "getAssetProof",
-      id: "rpd-op-123",
+      jsonrpc: '2.0',
+      method: 'getAssetProof',
+      id: 'rpd-op-123',
       params: { id: assetId.toBase58() },
       headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+        Expires: '0',
       },
     });
     const result = response.data.result;
@@ -127,7 +178,7 @@ export async function getAssetProof(
 }
 
 export type AssetsByOwnerOpts = {
-  sortBy?: { sortBy: "created"; sortDirection: "asc" | "desc" };
+  sortBy?: { sortBy: 'created'; sortDirection: 'asc' | 'desc' };
   limit?: number;
   page?: number;
   before?: string;
@@ -138,23 +189,23 @@ export async function getAssetsByOwner(
   url: string,
   wallet: string,
   {
-    sortBy = { sortBy: "created", sortDirection: "asc" },
+    sortBy = { sortBy: 'created', sortDirection: 'asc' },
     limit = 50,
     page = 1,
-    before = "",
-    after = "",
+    before = '',
+    after = '',
   }: AssetsByOwnerOpts = {}
 ): Promise<Asset[]> {
   try {
     const response = await axios.post(url, {
-      jsonrpc: "2.0",
-      method: "getAssetsByOwner",
-      id: "rpd-op-123",
+      jsonrpc: '2.0',
+      method: 'getAssetsByOwner',
+      id: 'rpd-op-123',
       params: [wallet, sortBy, limit, page, before, after],
       headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+        Expires: '0',
       },
     });
 
@@ -166,7 +217,7 @@ export async function getAssetsByOwner(
 }
 
 export type SearchAssetsOpts = {
-  sortBy?: { sortBy: "created"; sortDirection: "asc" | "desc" };
+  sortBy?: { sortBy: 'created'; sortDirection: 'asc' | 'desc' };
   page?: number;
   collection?: string;
   ownerAddress: string;
@@ -178,16 +229,16 @@ export async function searchAssets(
   url: string,
   {
     creatorVerified = true,
-    sortBy = { sortBy: "created", sortDirection: "asc" },
+    sortBy = { sortBy: 'created', sortDirection: 'asc' },
     page = 1,
     ...rest
   }: SearchAssetsOpts
 ): Promise<Asset[]> {
   try {
     const response = await axios.post(url, {
-      jsonrpc: "2.0",
-      method: "searchAssets",
-      id: "get-assets-op-1",
+      jsonrpc: '2.0',
+      method: 'searchAssets',
+      id: 'get-assets-op-1',
       params: {
         page,
         creatorVerified,
@@ -195,9 +246,9 @@ export async function searchAssets(
         ...rest,
       },
       headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+        Expires: '0',
       },
     });
 
