@@ -99,7 +99,9 @@ export async function getAssets(
       data: JSON.stringify(batch),
     });
 
-    const result = response.data.result || [];
+    const result = response.data
+      ? response.data.map((res) => res?.result || undefined)
+      : [];
 
     return [
       ...(result
