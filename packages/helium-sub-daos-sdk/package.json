@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.2.19",
+  "version": "0.2.20",
   "description": "Interface to the helium-sub-daos smart contract",
   "repository": {
     "type": "git",
@@ -32,10 +32,10 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.26.0",
-    "@helium/anchor-resolvers": "^0.2.19",
-    "@helium/circuit-breaker-sdk": "^0.2.19",
-    "@helium/treasury-management-sdk": "^0.2.19",
-    "@helium/voter-stake-registry-sdk": "^0.2.19",
+    "@helium/anchor-resolvers": "^0.2.20",
+    "@helium/circuit-breaker-sdk": "^0.2.20",
+    "@helium/treasury-management-sdk": "^0.2.20",
+    "@helium/voter-stake-registry-sdk": "^0.2.20",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },
