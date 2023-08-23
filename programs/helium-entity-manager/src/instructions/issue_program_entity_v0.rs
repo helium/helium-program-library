@@ -159,12 +159,6 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
   let mut metadata_uri = format!("{}/{}", ENTITY_METADATA_URL, key_str);
   if let Some(metadata_url) = args.metadata_url {
     let formated_metadata_url = format!("{}/{}", metadata_url, key_str);
-
-    require!(
-      formated_metadata_url.len() <= 200,
-      ErrorCode::InvalidStringLength
-    );
-
     metadata_uri = formated_metadata_url;
   }
 
