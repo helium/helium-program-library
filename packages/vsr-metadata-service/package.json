@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.2.18-dev.0",
+  "version": "0.2.18",
   "description": "Mint metadata of vsr positions",
   "repository": {
     "type": "git",
@@ -36,7 +36,7 @@
     "@fastify/cors": "^8.1.1",
     "@helium/account-fetch-cache": "^0.2.18-dev.0",
     "@helium/address": "^4.10.2",
-    "@helium/spl-utils": "^0.2.18-dev.0",
+    "@helium/spl-utils": "^0.2.18",
     "@helium/voter-stake-registry-sdk": "^0.2.18-dev.0",
     "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
     "@solana/spl-account-compression": "^0.1.7",

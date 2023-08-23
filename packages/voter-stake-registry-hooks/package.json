@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.2.18-dev.0",
+  "version": "0.2.18",
   "description": "React hooks for helium voter stake registry",
   "repository": {
     "type": "git",
@@ -38,7 +38,7 @@
     "@helium/helium-react-hooks": "^0.2.18-dev.0",
     "@helium/helium-sub-daos-sdk": "^0.2.18-dev.0",
     "@helium/modular-governance-hooks": "^0.0.2",
-    "@helium/spl-utils": "^0.2.18-dev.0",
+    "@helium/spl-utils": "^0.2.18",
     "@helium/voter-stake-registry-sdk": "^0.2.18-dev.0",
     "@metaplex-foundation/js": "^0.19.4",
     "@solana/wallet-adapter-base": "^0.9.22",
