@@ -2,6 +2,7 @@ use std::cmp::min;
 use std::str::FromStr;
 
 use crate::data_only_config_seeds;
+use crate::key_to_asset_seeds;
 use crate::state::*;
 use crate::ECC_VERIFIER;
 use crate::{constants::ENTITY_METADATA_URL, error::ErrorCode};
@@ -151,6 +152,13 @@ pub fn handler(ctx: Context<IssueDataOnlyEntityV0>, args: IssueDataOnlyEntityArg
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,
   );
+  ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
+    asset: asset_id,
+    dao: ctx.accounts.dao.key(),
+    entity_key: args.entity_key,
+    bump_seed: ctx.bumps["key_to_asset"],
+    key_serialization: KeySerialization::B58,
+  });
 
   let name = animal_name.to_string();
   let metadata = MetadataArgs {
@@ -167,11 +175,18 @@ pub fn handler(ctx: Context<IssueDataOnlyEntityV0>, args: IssueDataOnlyEntityArg
     token_standard: Some(TokenStandard::NonFungible),
     uses: None,
     token_program_version: TokenProgramVersion::Original,
-    creators: vec![Creator {
-      address: ctx.accounts.entity_creator.key(),
-      verified: true,
-      share: 100,
-    }],
+    creators: vec![
+      Creator {
+        address: ctx.accounts.entity_creator.key(),
+        verified: true,
+        share: 100,
+      },
+      Creator {
+        address: ctx.accounts.key_to_asset.key(),
+        verified: true,
+        share: 0,
+      },
+    ],
     seller_fee_basis_points: 0,
   };
   let entity_creator_seeds: &[&[&[u8]]] = &[&[
@@ -181,23 +196,22 @@ pub fn handler(ctx: Context<IssueDataOnlyEntityV0>, args: IssueDataOnlyEntityArg
   ]];
   let mut creator = ctx.accounts.entity_creator.to_account_info();
   creator.is_signer = true;
+  let mut key_to_asset_creator = ctx.accounts.key_to_asset.to_account_info();
+  key_to_asset_creator.is_signer = true;
+  let key_to_asset_signer: &[&[u8]] = key_to_asset_seeds!(ctx.accounts.key_to_asset);
 
   mint_to_collection_v1(
     ctx
       .accounts
       .mint_to_collection_ctx()
-      .with_remaining_accounts(vec![creator])
-      .with_signer(&[data_only_seeds[0], entity_creator_seeds[0]]),
+      .with_remaining_accounts(vec![creator, key_to_asset_creator])
+      .with_signer(&[
+        data_only_seeds[0],
+        entity_creator_seeds[0],
+        key_to_asset_signer,
+      ]),
     metadata,
   )?;
-
-  ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
-    asset: asset_id,
-    dao: ctx.accounts.dao.key(),
-    entity_key: args.entity_key,
-    bump_seed: ctx.bumps["key_to_asset"],
-    key_serialization: KeySerialization::B58,
-  });
 
   invoke(
     &system_instruction::transfer(

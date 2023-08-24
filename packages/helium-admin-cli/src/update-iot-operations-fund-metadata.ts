@@ -4,7 +4,7 @@ import {
   keyToAssetKey,
 } from '@helium/helium-entity-manager-sdk';
 import { daoKey, init as initHsd } from '@helium/helium-sub-daos-sdk';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, TransactionInstruction } from '@solana/web3.js';
 import Squads from '@sqds/sdk';
 import os from 'os';
 import yargs from 'yargs/yargs';
@@ -52,12 +52,13 @@ export async function run(args: any = process.argv) {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hemProgram = await initHem(provider);
-  const hsdProgram = await initHsd(provider);
+  const daosProgram = await initHsd(provider);
 
-  const instructions = [];
+  const instructions: TransactionInstruction[] = [];
 
   const hntMint = new PublicKey(argv.hntMint);
   const dao = daoKey(hntMint)[0];
+  const daoAcc = await daosProgram.account.daoV0.fetch(dao);
   const [keyToAsset] = keyToAssetKey(dao, 'iot_operations_fund', 'utf8');
   const assetId = (await hemProgram.account.keyToAssetV0.fetch(keyToAsset))
     .asset;
@@ -68,7 +69,12 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await hemProgram.methods
       .tempUpdateIotOperationsFundMetadata({ metadataUrl: argv.metadataUrl })
-      .accounts({ dao, mint: assetId })
+      .accounts({
+        dao,
+        authority: daoAcc.authority,
+        payer: daoAcc.authority,
+        mint: assetId,
+      })
       .instruction()
   );
 

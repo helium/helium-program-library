@@ -13,7 +13,7 @@ async function findBinancePrice(symbol: string): Promise<number> {
     );
     const data = response.data;
     return parseFloat(data.price);
-  } catch (error) {
+  } catch (error: any) {
     console.error(
       `Error fetching ticker price for ${symbol}: ${error.message}`
     );
@@ -28,7 +28,7 @@ export async function findCoingeckoPrice(token: string): Promise<number> {
     );
     const data = response.data;
     return parseFloat(data[token]["usd"]);
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error fetching price for ${token}: ${error.message}`);
     throw error;
   }
@@ -118,7 +118,7 @@ export async function run(args: any = process.argv) {
     );
   }
 
-  const decimalShiftedPrice = new BN(price * 10 ** priceOracleAcc.decimals);
+  const decimalShiftedPrice = new BN(price! * 10 ** priceOracleAcc.decimals);
 
   await program.methods
     .submitPriceV0({

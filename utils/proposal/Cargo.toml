@@ -1,0 +1,22 @@
+cargo-features = ["workspace-inheritance"]
+
+[package]
+name = "proposal"
+version = "0.0.1"
+description = "Proposal cpi wrapper"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "proposal"
+
+[features]
+default = ["cpi"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+
+[dependencies]
+anchor-gen = { git = "https://github.com/ChewingGlass/anchor-gen.git" }
+anchor-lang = { workspace = true }

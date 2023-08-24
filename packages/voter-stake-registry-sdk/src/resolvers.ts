@@ -83,16 +83,30 @@ export const vsrResolvers = combineResolvers(
     instruction: "ledgerTransferPositionV0",
     account: "toTokenAccount",
     mint: "mint",
-    owner: "to"
+    owner: "to",
   }),
   ataResolver({
     instruction: "ledgerTransferPositionV0",
     account: "fromTokenAccount",
     mint: "mint",
-    owner: "from"
+    owner: "from",
+  }),
+  ataResolver({
+    instruction: "voteV0",
+    account: "tokenAccount",
+    mint: "mint",
+    owner: "voter",
+  }),
+  ataResolver({
+    instruction: "relinquishVoteV1",
+    account: "tokenAccount",
+    mint: "mint",
+    owner: "voter",
   }),
   resolveIndividual(async ({ accounts, path, provider }) => {
-    if (path[path.length - 1] === "recipient") {
+    if (path[path.length - 1] === "proposalProgram")  {
+      return new PublicKey("propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs");
+    } else if (path[path.length - 1] === "recipient") {
       // @ts-ignore
       return provider.wallet.publicKey;
     }

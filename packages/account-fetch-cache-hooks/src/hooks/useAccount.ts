@@ -2,6 +2,7 @@ import { TypedAccountParser } from "@helium/account-fetch-cache";
 import { AccountInfo, PublicKey } from "@solana/web3.js";
 import { useAccounts } from "./useAccounts";
 import { useMemo } from "react";
+import { AsyncStateStatus } from "react-async-hook";
 
 export interface ParsedAccountBase {
   pubkey: PublicKey
@@ -13,6 +14,7 @@ export interface UseAccountState<T> {
   loading: boolean
   account?: AccountInfo<Buffer>
   info?: T
+  status: AsyncStateStatus
 }
 
 /**
@@ -36,5 +38,6 @@ export function useAccount<T>(
     loading: ret.loading,
     account: ret.accounts?.[0]?.account,
     info: ret.accounts?.[0]?.info,
+    status: ret.status
   }
 }

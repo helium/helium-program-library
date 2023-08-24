@@ -3,7 +3,7 @@ import {
   delegatedDataCreditsKey,
   init as initDc,
 } from "@helium/data-credits-sdk";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import { BN } from "bn.js";
 import os from "os";
@@ -61,7 +61,7 @@ export async function run(args: any = process.argv) {
   const program = await initDc(provider);
   const hsdProgram = await initHsd(provider);
 
-  const instructions = [];
+  const instructions: TransactionInstruction[] = [];
 
   const sourceSubDao = subDaoKey(new PublicKey(argv.sourceDntMint))[0];
   const destinationSubDao = subDaoKey(

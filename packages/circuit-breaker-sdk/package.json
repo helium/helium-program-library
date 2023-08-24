@@ -5,11 +5,11 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.2.5",
+  "version": "0.2.21",
   "description": "Interface to the circuit breaker smart contract",
   "repository": {
     "type": "git",
-    "url": "https://github.com/HeliumFoundation/helium-program-libary"
+    "url": "https://github.com/helium/helium-program-libary"
   },
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/src/index.js",
@@ -32,8 +32,8 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.26.0",
-    "@helium/anchor-resolvers": "^0.2.5",
-    "@helium/idls": "^0.2.5",
+    "@helium/anchor-resolvers": "^0.2.21",
+    "@helium/idls": "^0.2.21",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },

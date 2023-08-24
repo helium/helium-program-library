@@ -3,7 +3,8 @@ import { PublicKey, AccountInfo } from "@solana/web3.js";
 import { useAccountFetchCache } from "./useAccountFetchCache";
 import { TypedAccountParser } from "@helium/account-fetch-cache";
 import { ParsedAccountBase } from "./useAccount";
-import { useAsync } from "react-async-hook";
+import { AsyncStateStatus, useAsync } from "react-async-hook";
+import { usePrevious } from "../contexts/accountContext";
 
 export interface UseAccountsState<T> {
   loading: boolean;
@@ -13,6 +14,7 @@ export interface UseAccountsState<T> {
     publicKey: PublicKey;
   }[];
   error: Error | undefined;
+  status: AsyncStateStatus;
 }
 
 /**
@@ -30,17 +32,13 @@ export function useAccounts<T>(
   isStatic = false // Set if the accounts data will never change, optimisation to lower websocket usage.
 ): UseAccountsState<T> {
   const cache = useAccountFetchCache();
-  const [accounts, setAccounts] = useState<
-    {
-      account?: AccountInfo<Buffer>;
-      info?: T;
-      publicKey: PublicKey;
-    }[]
-  >();
 
-  const parsedAccountBaseParser = useMemo(
-    () =>
-      (pubkey: PublicKey, data: AccountInfo<Buffer>): ParsedAccountBase => {
+  const parsedAccountBaseParser = useMemo(() => {
+    if (parser) {
+      return (
+        pubkey: PublicKey,
+        data: AccountInfo<Buffer>
+      ): ParsedAccountBase => {
         try {
           if (parser) {
             const info = parser(pubkey, data);
@@ -64,45 +62,106 @@ export function useAccounts<T>(
             info: undefined,
           };
         }
-      },
-    [parser]
-  );
+      };
+    }
+  }, [parser]);
 
-  const { result, loading, error } = useAsync(
+  const eagerResult = useMemo(() => {
+    return keys?.map((key) => {
+      const acc = cache.get(key);
+
+      // The cache caches the parser, so we need to check if the parser is different
+      let info = acc?.info as T | undefined;
+      if (
+        cache.keyToAccountParser[key.toBase58()] != parsedAccountBaseParser &&
+        parsedAccountBaseParser &&
+        acc?.account
+      ) {
+        info = parsedAccountBaseParser(key, acc?.account).info;
+      }
+      if (acc) {
+        return {
+          info,
+          account: acc.account,
+          publicKey: acc.pubkey,
+          parser: parsedAccountBaseParser,
+        };
+      } else {
+        return {
+          publicKey: key,
+        };
+      }
+    });
+  }, [cache, keys, parsedAccountBaseParser]);
+
+  const [accounts, setAccounts] = useState<
+    {
+      account?: AccountInfo<Buffer>;
+      info?: T;
+      publicKey: PublicKey;
+    }[]
+  >(eagerResult || []);
+
+  const prevKeys = usePrevious(keys);
+  const { result, loading, error, status } = useAsync(
     async (
       keys: null | undefined | PublicKey[],
-      parser: TypedAccountParser<T>
+      parsedAccountBaseParser:
+        | ((pubkey: PublicKey, data: AccountInfo<Buffer>) => ParsedAccountBase)
+        | undefined
     ) => {
       return (
         keys &&
         (await Promise.all(
           keys.map(async (key) => {
-            const acc = await cache.search(
+            // Important: MUST searchAndWatch here to guarentee caching.
+            // account fetch cache will not cache things unles it is watching them,
+            // or it could offer stale data
+            const [acc, dispose] = await cache.searchAndWatch(
               key,
-              parser ? parsedAccountBaseParser : undefined,
+              parsedAccountBaseParser,
               isStatic
             );
-            return {
-              info: acc && parser && parser(acc.pubkey, acc?.account),
-              account: acc && acc.account,
-              publicKey: acc.pubkey,
-              parser: parser ? parsedAccountBaseParser : undefined,
-            };
+
+            // Watch the account for at least 30 seconds
+            setTimeout(dispose, 1000 * 30);
+
+            // The cache caches the parser, so we need to check if the parser is different
+            let info = acc?.info;
+            if (
+              cache.keyToAccountParser[key.toBase58()] !=
+                parsedAccountBaseParser &&
+              parsedAccountBaseParser &&
+              acc?.account
+            ) {
+              info = parsedAccountBaseParser(key, acc?.account).info;
+            }
+            if (acc) {
+              return {
+                info,
+                account: acc.account,
+                publicKey: acc.pubkey,
+                parser: parsedAccountBaseParser,
+              };
+            } else {
+              return {
+                publicKey: key,
+              };
+            }
           })
         ))
       );
     },
-    [keys, parser]
+    [keys, parsedAccountBaseParser]
   );
 
   // Start watchers
   useEffect(() => {
     if (result) {
       setAccounts(result);
-      const disposers =
-        result.map((account) => {
-          return cache.watch(account.publicKey, account.parser, true);
-        });
+      const disposers = result.map((account) => {
+        return cache.watch(account.publicKey, account.parser, !!account.account);
+      });
 
       return () => {
         disposers?.forEach((disposer) => disposer());
@@ -120,31 +179,37 @@ export function useAccounts<T>(
           (acc) => acc.publicKey.toBase58() === event.id
         );
         const acc = await cache.get(event.id);
-        const newAccounts = [
-          ...accounts.slice(0, index),
-          {
-            info: mergePublicKeys(accounts[index].info, acc && parser && parser(acc.pubkey, acc?.account)),
-            account: acc && acc.account,
-            publicKey: acc.pubkey,
-            parser: parser ? parsedAccountBaseParser : undefined,
-          },
-          ...accounts.slice(index + 1),
-        ];
-        setAccounts(newAccounts);
+        if (acc) {
+          const parsed = parser && parser(acc.pubkey, acc?.account);
+          const newParsed = accounts[index]
+            ? mergePublicKeys(accounts[index].info, parsed)
+            : parsed;
+          const newAccounts = [
+            ...accounts.slice(0, index),
+            {
+              info: newParsed,
+              account: acc.account,
+              publicKey: acc.pubkey,
+              parser: parsedAccountBaseParser,
+            },
+            ...accounts.slice(index + 1),
+          ];
+          setAccounts(newAccounts);
+        }
       }
     });
     return () => {
       disposeEmitter();
     };
-  }, [accounts, keys]);
+  }, [accounts, keys, parsedAccountBaseParser, parser]);
 
   return {
-    loading,
+    status,
+    loading: loading || prevKeys !== keys,
     accounts,
     error,
   };
 }
-
 
 /**
  *
@@ -154,9 +219,9 @@ export function useAccounts<T>(
 export function isPureObject(input: typeof Object | null) {
   return (
     input !== null &&
-    typeof input === 'object' &&
+    typeof input === "object" &&
     Object.getPrototypeOf(input).isPrototypeOf(Object)
-  )
+  );
 }
 
 /**
@@ -167,7 +232,7 @@ export function isPureObject(input: typeof Object | null) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mergePublicKeys(arg0: any, arg1: any) {
   if (!isPureObject(arg1) || !arg1 || !arg0) {
-    return arg1
+    return arg1;
   }
 
   return Object.entries(arg1).reduce((acc, [key, value]) => {
@@ -177,12 +242,12 @@ export function mergePublicKeys(arg0: any, arg1: any) {
       arg0[key] &&
       arg1[key].equals(arg0[key])
     ) {
-      acc[key as keyof typeof acc] = arg0[key]
+      acc[key as keyof typeof acc] = arg0[key];
     } else {
-      acc[key as keyof typeof acc] = value
+      acc[key as keyof typeof acc] = value;
     }
 
-    return acc
+    return acc;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }, {} as Record<string, any>)
+  }, {} as Record<string, any>);
 }

@@ -1,12 +1,12 @@
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
-import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
+import { Idl, Program, Provider } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { heliumSubDaosResolvers } from "./resolvers";
 import { BN } from "bn.js";
 
 export async function init(
-  provider: AnchorProvider,
+  provider: Provider,
   programId: PublicKey = PROGRAM_ID,
   idl?: Idl | null
 ): Promise<Program<HeliumSubDaos>> {

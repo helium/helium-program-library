@@ -80,8 +80,6 @@ export const upsertProgramAccounts = async ({
         filters: [...coderFilters],
       });
       const model = sequelize.models[type];
-      await model.sync({ alter: true });
-
       const t = await sequelize.transaction();
       // @ts-ignore
       const respChunks = chunks(resp, 50000);

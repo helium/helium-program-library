@@ -1,23 +1,33 @@
 import { Idl } from "@coral-xyz/anchor";
-import { decodeIdlAccount, idlAddress } from "@coral-xyz/anchor/dist/cjs/idl";
+import { decodeIdlAccount } from "@coral-xyz/anchor/dist/cjs/idl";
+import { utf8 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import { TypedAccountParser } from "@helium/account-fetch-cache";
 import { UseAccountState, useAccount } from "@helium/account-fetch-cache-hooks";
+import { sha256 } from "@noble/hashes/sha256";
 import { PublicKey } from "@solana/web3.js";
-import { useMemo, useState } from "react";
-import { useAsync } from "react-async-hook";
 import { inflate } from "pako";
-import { utf8 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
+import { useMemo, useState } from "react";
 
-export function useIdl<IDL extends Idl>(programId: PublicKey | undefined): UseAccountState<IDL> & { error: Error | undefined } {
+export function useIdl<IDL extends Idl>(
+  programId: PublicKey | undefined
+): UseAccountState<IDL> & { error: Error | undefined } {
   const [idlError, setIdlError] = useState<Error | undefined>();
-  const { result: idlKey, error } = useAsync(
-    (owner: string | undefined) => owner && idlAddress(new PublicKey(owner)),
-    [programId?.toBase58()]
-  );
+  const idlKey = useMemo(() => {
+    if (programId) {
+      const base = PublicKey.findProgramAddressSync([], programId)[0];
+      const buffer = Buffer.concat([
+        base.toBuffer(),
+        Buffer.from("anchor:idl"),
+        programId.toBuffer(),
+      ]);
+      const publicKeyBytes = sha256(buffer);
+      return new PublicKey(publicKeyBytes);
+    }
+  }, [programId?.toBase58()]);
   const idlParser: TypedAccountParser<IDL> = useMemo(() => {
     return (_, data) => {
       try {
-        const idlData = decodeIdlAccount(data.data.subarray(8));
+        const idlData = decodeIdlAccount(Buffer.from(data.data.subarray(8)));
         const inflatedIdl = inflate(idlData.data);
         return JSON.parse(utf8.decode(inflatedIdl));
       } catch (e: any) {
@@ -30,6 +40,7 @@ export function useIdl<IDL extends Idl>(programId: PublicKey | undefined): UseAc
   const result = useAccount(idlKey, idlParser);
   return {
     ...result,
-    error: idlError || error
-  }
+    loading: result.loading,
+    error: idlError,
+  };
 }

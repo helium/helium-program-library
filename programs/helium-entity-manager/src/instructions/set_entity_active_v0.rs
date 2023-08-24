@@ -34,6 +34,7 @@ pub struct SetEntityActiveV0<'info> {
   pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
 }
 
+/// Modify active status of a batch of entity info accounts. Only allows info accounts from one subdao at a time.
 pub fn handler(ctx: Context<SetEntityActiveV0>, args: SetEntityActiveArgsV0) -> Result<()> {
   let is_mobile = ctx.accounts.rewardable_entity_config.settings.is_mobile()
     && (ctx.accounts.rewardable_entity_config.symbol == "MOBILE" || TESTING);

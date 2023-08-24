@@ -2,7 +2,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { carrierKey, init as initMem } from "@helium/mobile-entity-manager-sdk";
 import { subDaoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -54,7 +54,7 @@ export async function run(args: any = process.argv) {
   const program = await initMem(provider);
   const hsdProgram = await initHsd(provider);
 
-  const instructions = [];
+  const instructions: TransactionInstruction[] = [];
 
   const dntMint = new PublicKey(argv.dntMint);
   const subDao = subDaoKey(dntMint)[0];

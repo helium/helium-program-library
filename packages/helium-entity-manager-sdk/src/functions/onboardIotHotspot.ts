@@ -1,12 +1,13 @@
-import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { Program } from "@coral-xyz/anchor";
-import BN from "bn.js";
-import { PublicKey } from "@solana/web3.js";
-import { iotInfoKey, keyToAssetKey } from "../pdas";
+import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import {
-  proofArgsAndAccounts,
   ProofArgsAndAccountsArgs,
+  proofArgsAndAccounts,
 } from "@helium/spl-utils";
+import { PublicKey } from "@solana/web3.js";
+import BN from "bn.js";
+import { keyToAssetForAsset } from "../helpers";
+import { iotInfoKey } from "../pdas";
 
 export async function onboardIotHotspot({
   program,
@@ -31,23 +32,23 @@ export async function onboardIotHotspot({
   gain?: number;
   dao: PublicKey;
 } & Omit<ProofArgsAndAccountsArgs, "connection">) {
+  const { asset, args, accounts, remainingAccounts } =
+    await proofArgsAndAccounts({
+      connection: program.provider.connection,
+      assetId,
+      ...rest,
+    });
   const {
-    asset: {
-      content: { json_uri },
-      ownership: { owner },
-    },
-    args,
-    accounts,
-    remainingAccounts,
-  } = await proofArgsAndAccounts({
-    connection: program.provider.connection,
-    assetId,
-    ...rest,
-  });
+    ownership: { owner },
+  } = asset;
 
+  const keyToAssetKey = keyToAssetForAsset(asset, dao);
+  const keyToAsset = await program.account.keyToAssetV0.fetch(
+    keyToAssetKey
+  );
   const [info] = await iotInfoKey(
     rewardableEntityConfig,
-    json_uri.split("/").slice(-1)[0]
+    keyToAsset.entityKey
   );
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
@@ -69,9 +70,7 @@ export async function onboardIotHotspot({
       maker,
       dao,
       issuingAuthority: makerAcc?.issuingAuthority,
-      keyToAsset: (
-        await keyToAssetKey(dao, json_uri.split("/").slice(-1)[0])
-      )[0],
+      keyToAsset: keyToAssetKey,
     })
     .remainingAccounts(remainingAccounts);
 }

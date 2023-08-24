@@ -1,12 +1,14 @@
 use crate::{json_err, parse_err};
 use anchor_client::Program;
+use anchor_client::{Client, Cluster};
+use anchor_lang::solana_program::hash::hash;
 use anchor_lang::AccountDeserialize;
 use anyhow::{anyhow, Context};
 use bs58;
 use circuit_breaker::ID as CB_PID;
 use futures::stream::{StreamExt, TryStreamExt};
-use helium_entity_manager::ID as HEM_PID;
-use hpl_utils::send_and_confirm_messages_with_spinner;
+use helium_entity_manager::{KeyToAssetV0, ID as HEM_PID};
+use hpl_utils::{dao::Dao, send_and_confirm_messages_with_spinner};
 use lazy_distributor::{
   accounts::{
     DistributeCompressionRewardsV0, DistributeRewardsCommonV0, InitializeCompressionRecipientV0,
@@ -15,21 +17,101 @@ use lazy_distributor::{
   RecipientV0, ID as LD_PID,
 };
 use rewards_oracle::{
-  accounts::SetCurrentRewardsWrapperV0, SetCurrentRewardsWrapperArgsV0, ID as RO_PID,
+  accounts::SetCurrentRewardsWrapperV1, SetCurrentRewardsWrapperArgsV1, ID as RO_PID,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map};
-use sha2::{Digest, Sha256};
+use serde_json::{json, Map, Value};
 use solana_client::tpu_client::{TpuClient, TpuClientConfig};
 use solana_program::{
   hash::Hash,
   instruction::{AccountMeta, Instruction},
   system_program,
 };
-use solana_sdk::{pubkey::Pubkey, signature::Keypair};
+use solana_sdk::commitment_config::CommitmentConfig;
+use solana_sdk::pubkey::Pubkey;
 use solana_sdk::{signer::Signer, transaction::Transaction};
 use spl_associated_token_account::get_associated_token_address;
+use std::rc::Rc;
 use std::str::FromStr;
+use tokio::runtime::Runtime;
+
+pub fn key_to_asset_for_asset(asset: &Value, dao: Pubkey) -> Result<Pubkey, anyhow::Error> {
+  let creator = asset
+    .get("creators")
+    .context(json_err!(asset.to_string(), "creators"))?
+    .as_array()
+    .context(parse_err!(asset.to_string(), "creators"))?
+    .get(1);
+  match creator {
+    Some(v) => Pubkey::from_str(
+      v.get("address")
+        .context(json_err!(asset.to_string(), "address"))?
+        .as_str()
+        .context("No address in creator")?,
+    )
+    .map_err(anyhow::Error::from),
+    _ => {
+      let json_uri = &["content", "json_uri"]
+        .iter()
+        .try_fold(asset, |current_value, key| {
+          current_value
+            .get(key)
+            .context(json_err!(asset.to_string(), key))
+        })?
+        .as_str()
+        .context(parse_err!(asset.to_string(), "json_uri"))?;
+
+      let entity_key = json_uri
+        .split("/")
+        .collect::<Vec<_>>()
+        .last()
+        .context(parse_err!(json_uri))?
+        .to_string();
+
+      let symbol = ["content", "metadata", "symbol"]
+        .iter()
+        .try_fold(asset, |current_value, key| {
+          current_value
+            .get(key)
+            .context(json_err!(asset.to_string(), key))
+        })?
+        .as_str()
+        .context(parse_err!(asset.to_string(), "symbol"))?;
+
+      let entity_key_bytes = if symbol == "IOT OPS" || symbol == "CARRIER" {
+        entity_key.as_bytes().to_vec()
+      } else {
+        bs58::decode(entity_key)
+          .into_vec()
+          .map_err(anyhow::Error::from)?
+      };
+
+      Ok(
+        Pubkey::find_program_address(
+          &[
+            "key_to_asset".as_bytes(),
+            dao.as_ref(),
+            &hash(&entity_key_bytes[..]).to_bytes(),
+          ],
+          &helium_entity_manager::id(),
+        )
+        .0,
+      )
+    }
+  }
+}
+
+fn decode_entity_key(
+  entity_key: Vec<u8>,
+  key_serialization: helium_entity_manager::KeySerialization,
+) -> Result<String, anyhow::Error> {
+  match key_serialization {
+    helium_entity_manager::KeySerialization::B58 => Ok(bs58::encode(entity_key).into_string()),
+    helium_entity_manager::KeySerialization::UTF8 => std::str::from_utf8(&entity_key)
+      .map_err(anyhow::Error::from)
+      .map(|v| v.to_string()),
+  }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct JsonRpcRequest {
@@ -103,26 +185,47 @@ struct Hotspot {
 const COMPRESSION: &str = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK";
 
 pub struct ClaimRewardsArgs<'a> {
-  pub lazy_distributor_program: &'a Program,
-  pub rewards_oracle_program: &'a Program,
-  pub payer: &'a Keypair,
+  pub rpc_url: &'a str,
+  pub payer: Rc<dyn Signer>,
   pub hotspot_owner: Pubkey,
   pub rewards_mint: Pubkey,
   pub dao: Pubkey,
   pub batch_size: usize,
 }
 
+pub fn claim_rewards_blocking(args: ClaimRewardsArgs) -> anyhow::Result<()> {
+  let runtime = Runtime::new().unwrap();
+  runtime
+    .block_on(claim_rewards(args))
+    .context("Failed to claim rewards or listener failure")?;
+  Ok(())
+}
+
 /// Claims all hotspot rewards for a given hotspot_owner. The payer set on the program object pays for the transactions
 pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Error> {
   let ClaimRewardsArgs {
-    lazy_distributor_program,
-    rewards_oracle_program,
+    rpc_url,
     payer,
     hotspot_owner,
     rewards_mint,
     dao,
     batch_size,
   } = args;
+  let anchor_client = Client::new_with_options(
+    Cluster::Custom(
+      rpc_url.to_string().clone(),
+      rpc_url
+        .clone()
+        .replace("https", "wss")
+        .replace("http", "ws"),
+    ),
+    payer.clone(),
+    CommitmentConfig::confirmed(),
+  );
+
+  let lazy_distributor_program = anchor_client.program(lazy_distributor::id());
+  let rewards_oracle_program = anchor_client.program(rewards_oracle::id());
+  let helium_entity_manager_program = anchor_client.program(helium_entity_manager::id());
   let mut total = 0;
   let tpu_client = TpuClient::new(
     lazy_distributor_program.rpc().into(),
@@ -153,9 +256,11 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
       .header("Expires", "0")
       .json(&JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
-        method: "getAssetsByOwner".to_string(),
+        method: "searchAssets".to_string(),
         params: json!({
             "ownerAddress": hotspot_owner.to_string(),
+            "creatorAddress": entity_creator.to_string(),
+            "creatorVerified": true,
             "page": counter,
             "limit": batch_size,
         }),
@@ -179,35 +284,10 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
 
     // filter out assets that are not created by entityCreator
     println!("Found {} assets", assets.len());
-    let first_creators = assets
-      .iter()
-      .map(|a| {
-        Ok(
-          a.get("creators")
-            .context(json_err!(a.to_string(), "creators"))?
-            .as_array()
-            .context(parse_err!(a.to_string(), "creators"))?
-            .get(0)
-            .context(parse_err!(a.to_string(), "creators[0]"))?
-            .get("address")
-            .context(json_err!(a.to_string(), "address"))?
-            .as_str()
-            .context(parse_err!(a.to_string(), "address"))?
-            .to_string(),
-        )
-      })
-      .collect::<Vec<Result<_, anyhow::Error>>>();
 
     let parsed_hotspots: Result<Vec<Hotspot>, anyhow::Error> = assets
       .iter()
-      .zip(first_creators.into_iter())
-      .filter(|(_, res)| {
-        res
-          .as_ref()
-          .map(|first_creator| *first_creator == entity_creator.to_string())
-          .unwrap_or_else(|_| false)
-      })
-      .map(|(h, _)| {
+      .map(|h| {
         let compression_info = h.get("compression").unwrap();
         let id = Pubkey::from_str(
           h.get("id")
@@ -223,24 +303,16 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
           ],
           &LD_PID,
         );
-        let json_uri = &["content", "json_uri"]
-          .iter()
-          .try_fold(h, |current_value, key| {
-            current_value
-              .get(key)
-              .context(json_err!(h.to_string(), key))
-          })?
-          .as_str()
-          .context(parse_err!(h.to_string(), "json_uri"))?;
-
+        let key_to_asset = key_to_asset_for_asset(h, dao)?;
+        let key_to_asset_acc =
+          helium_entity_manager_program.account::<KeyToAssetV0>(key_to_asset)?;
+        let entity_key = decode_entity_key(
+          key_to_asset_acc.entity_key,
+          key_to_asset_acc.key_serialization,
+        )?;
         Ok(Hotspot {
           id,
-          entity_key: json_uri
-            .split("/")
-            .collect::<Vec<_>>()
-            .last()
-            .context(parse_err!(json_uri))?
-            .to_string(),
+          entity_key,
           data_hash: bs58::decode(
             compression_info
               .get("data_hash")
@@ -408,7 +480,7 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
           hotspot_owner,
           root,
           proof,
-          &payer,
+          payer.clone().as_ref(),
           blockhash,
         )
       })
@@ -453,9 +525,8 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
           proof,
           &rewards,
           hotspot_owner,
-          &payer,
+          payer.clone().as_ref(),
           rewards_mint,
-          dao,
           lazy_distributor,
           ld_acc.clone(),
           blockhash,
@@ -517,7 +588,7 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
     send_and_confirm_messages_with_spinner(
       lazy_distributor_program.rpc().into(),
       &tpu_client,
-      &serialized_txs,
+      &deserialized_txs,
     )
     .unwrap();
 
@@ -534,7 +605,7 @@ fn check_and_init_recipient(
   hotspot_owner: Pubkey,
   root: &[u8; 32],
   proof: &Vec<AccountMeta>,
-  payer: &Keypair,
+  payer: &dyn Signer,
   blockhash: Hash,
 ) -> Result<Option<Transaction>, anyhow::Error> {
   let compression_program = Pubkey::from_str(COMPRESSION).unwrap();
@@ -614,9 +685,8 @@ fn process_hotspot(
   proof: &Vec<AccountMeta>,
   rewards: &Vec<Map<String, serde_json::Value>>,
   hotspot_owner: Pubkey,
-  payer: &Keypair,
+  payer: &dyn Signer,
   rewards_mint: Pubkey,
-  dao: Pubkey,
   lazy_distributor: Pubkey,
   ld_acc: LazyDistributorV0,
   blockhash: Hash,
@@ -625,7 +695,6 @@ fn process_hotspot(
 
   for (oracle_index, reward) in rewards.clone().iter().enumerate() {
     let set_reward_accounts = construct_set_rewards_accounts(
-      dao,
       hotspot.id,
       ld_acc.oracles[oracle_index].oracle.clone(),
       lazy_distributor,
@@ -635,11 +704,8 @@ fn process_hotspot(
 
     let set_reward_ix = &rewards_oracle_program
       .request()
-      .args(rewards_oracle::instruction::SetCurrentRewardsWrapperV0 {
-        args: SetCurrentRewardsWrapperArgsV0 {
-          entity_key: bs58::decode(&hotspot.entity_key)
-            .into_vec()
-            .map_err(|e| anyhow!("Failed to decode entity key: {e}"))?,
+      .args(rewards_oracle::instruction::SetCurrentRewardsWrapperV1 {
+        args: SetCurrentRewardsWrapperArgsV1 {
           oracle_index: oracle_index as u16,
           current_rewards: reward
             .get(&hotspot.entity_key)
@@ -781,12 +847,11 @@ async fn get_hotspot_rewards(
 }
 
 fn construct_set_rewards_accounts(
-  dao: Pubkey,
   asset_id: Pubkey,
   oracle: Pubkey,
   lazy_distributor: Pubkey,
   entity_key: String,
-) -> Result<SetCurrentRewardsWrapperV0, anyhow::Error> {
+) -> Result<SetCurrentRewardsWrapperV1, anyhow::Error> {
   let (recipient, _rcp_bump) = Pubkey::find_program_address(
     &[
       "recipient".as_bytes(),
@@ -795,16 +860,12 @@ fn construct_set_rewards_accounts(
     ],
     &LD_PID,
   );
-
-  let hash = Sha256::digest(bs58::decode(entity_key.clone()).into_vec().unwrap());
-
-  let (key_to_asset, _kta_bump) =
-    Pubkey::find_program_address(&["key_to_asset".as_bytes(), dao.as_ref(), &hash], &HEM_PID);
+  let key_to_asset = Dao::Hnt.key_to_asset(&bs58::decode(&entity_key).into_vec().unwrap());
 
   let (oracle_signer, _os_bump) =
     Pubkey::find_program_address(&["oracle_signer".as_bytes()], &RO_PID);
 
-  Ok(SetCurrentRewardsWrapperV0 {
+  Ok(SetCurrentRewardsWrapperV1 {
     oracle,
     lazy_distributor,
     recipient,

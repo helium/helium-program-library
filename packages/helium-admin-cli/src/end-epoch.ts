@@ -41,7 +41,7 @@ export async function run(args: any = process.argv) {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const heliumSubDaosProgram = await initDao(provider);
-  const hntMint = new PublicKey(argv.hntMint);
+  const hntMint = new PublicKey(argv.hntMint!);
   const dao = await daoKey(hntMint)[0];
   const subdaos = await heliumSubDaosProgram.account.subDaoV0.all([{
     memcmp: {

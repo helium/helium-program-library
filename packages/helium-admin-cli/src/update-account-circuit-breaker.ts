@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { init } from "@helium/circuit-breaker-sdk";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import { BN } from "bn.js";
 import os from "os";
@@ -57,7 +57,7 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const circuitBreakerProgram = await init(provider);
 
-  const instructions = [];
+  const instructions: TransactionInstruction[] = [];
   const circuitBreaker =
     await circuitBreakerProgram.account.accountWindowedCircuitBreakerV0.fetch(
       circuitBreakerKey

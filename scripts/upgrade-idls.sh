@@ -1,15 +1,31 @@
 #!/bin/bash
-### USAGE: './upgrade-idls.sh' will upgrade the idls on localnet. './upgrade-idls.sh <cluster>' will upgrade the idls on <cluster>
 
-anchor idl upgrade porcSnvH9pvcYPmQ65Y8qcZSRxQBiBBQX7UV5nmBegy --filepath target/idl/price_oracle.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json
-anchor idl upgrade fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6 --filepath target/idl/fanout.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json
-anchor idl upgrade 1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w --filepath target/idl/lazy_distributor.json --provider.cluster ${1:-localnet} --provider.wallet ${2:-~/.config/solana/id.json}
-anchor idl upgrade hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR --filepath target/idl/helium_sub_daos.json --provider.cluster ${1:-localnet} --provider.wallet ${2:-~/.config/solana/id.json}
-anchor idl upgrade credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT --filepath target/idl/data_credits.json --provider.cluster ${1:-localnet} --provider.wallet ${2:-~/.config/solana/id.json}
-anchor idl upgrade circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g --filepath target/idl/circuit_breaker.json --provider.cluster ${1:-localnet} --provider.wallet ${2:-~/.config/solana/id.json}
-anchor idl upgrade hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8 --filepath target/idl/helium_entity_manager.json --provider.cluster ${1:-localnet} --provider.wallet ${2:-~/.config/solana/id.json}
-anchor idl upgrade treaf4wWBBty3fHdyBpo35Mz84M8k3heKXmjmi9vFt5 --filepath target/idl/treasury_management.json --provider.cluster ${1:-localnet} --provider.wallet ${2:-~/.config/solana/id.json}
-anchor idl upgrade 1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h --filepath target/idl/lazy_transactions.json --provider.cluster ${1:-localnet} --provider.wallet ${2:-~/.config/solana/id.json}
-anchor idl upgrade hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8 --filepath target/idl/voter_stake_registry.json --provider.cluster ${1:-localnet} --provider.wallet ${2:-~/.config/solana/id.json}
-anchor idl upgrade rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF --filepath target/idl/rewards_oracle.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json
-anchor idl upgrade memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr --filepath target/idl/mobile_entity_manager.json --provider.cluster ${1:-localnet} --provider.wallet ~/.config/solana/id.json &
+programs_dir="programs"
+pids=()  # Array to store the process IDs
+
+# Get the list of program names from the programs directory
+program_list=$(ls "$programs_dir")
+
+# Run anchor idl init for each program
+for program in $program_list; do
+  underscored=$(echo $program | sed 's/-/_/g')
+  id=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.$underscored | tr -d '"')
+  filepath="target/idl/${underscored}.json"
+  cluster="${1:-localnet}"
+
+  if [ -n "$id" ]; then
+    anchor_command="anchor idl upgrade ${id} --filepath ${filepath} --provider.cluster ${cluster} --provider.wallet $HOME/.config/solana/id.json"
+    echo "Running command: $anchor_command"
+
+    # Run the anchor idl init command in the background and store the PID
+    ($anchor_command) &
+    pids+=($!)  # Store the PID of the most recent background process
+  else
+    echo "Skipping program $program. ID is empty."
+  fi
+done
+
+# Wait for all background processes to finish
+for pid in "${pids[@]}"; do
+  wait "$pid"
+done

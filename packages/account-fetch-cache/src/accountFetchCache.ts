@@ -4,12 +4,10 @@ import {
   Connection,
   PublicKey,
   SendOptions,
-  Signer,
   Transaction,
   TransactionInstruction
 } from "@solana/web3.js";
 import { EventEmitter } from "./eventEmitter";
-import { getMultipleAccounts } from "./getMultipleAccounts";
 
 export const DEFAULT_CHUNK_SIZE = 99;
 export const DEFAULT_DELAY = 50;
@@ -60,6 +58,7 @@ export class AccountFetchCache {
   >();
   pendingCalls = new Map<string, Promise<ParsedAccountBase<unknown>>>();
   emitter = new EventEmitter();
+  id: number; // For debugging, to see which cache is being used
 
   oldGetAccountinfo?: (
     publicKey: PublicKey,
@@ -91,6 +90,7 @@ export class AccountFetchCache {
     /** Add functionatility to getAccountInfo that uses the cache */
     extendConnection?: boolean;
   }) {
+    this.id = ++id;
     this.connection = connection;
     this.chunkSize = chunkSize;
     this.delay = delay;
@@ -350,6 +350,8 @@ export class AccountFetchCache {
 
       // Only set the cache for defined static accounts. Static accounts can change if they go from nonexistant to existant.
       // Rely on searchAndWatch to set the generic cache for everything else.
+      // Never update the cache with an account that isn't being watched. This could cause
+      // stale data to be returned.
       if (isStatic && result && result.info) {
         this.updateCache(address, result);
       }
@@ -369,7 +371,6 @@ export class AccountFetchCache {
     try {
       const parsed = this.getParsed(key, account, parser);
       const address = key.toBase58();
-      console.log("accountFetchCache", `Received account change ${key}`, parsed);
       this.updateCache(address, parsed || null);
     } catch (e: any) {
       console.error("accountFetchCache", "Failed to update account", e)

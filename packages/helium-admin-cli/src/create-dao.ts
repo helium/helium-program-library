@@ -326,7 +326,6 @@ export async function run(args: any = process.argv) {
         .initializeRegistrarV0({
           positionUpdateAuthority: (await daoKey(hntKeypair.publicKey))[0],
         })
-        .preInstructions([,])
         .accounts({
           realm,
           realmGoverningTokenMint: hntKeypair.publicKey,

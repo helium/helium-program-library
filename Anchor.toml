@@ -1,5 +1,6 @@
 [features]
 seeds = true
+docs = false
 
 [programs.localnet]
 lazy_distributor = "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w"
@@ -67,6 +68,12 @@ address = "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S" # spl governance program
 
 [[test.validator.clone]]
 address = "ENmcpFCpxN1CqyUjuog9yyUVfdXBKF3LVCwLr7grJZpk" # required by spl governance 
+
+[[test.validator.clone]]
+address = "propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs" # Proposal
+
+[[test.validator.clone]]
+address = "66t3XARU6Ja3zj91gDZ2KoNLJHEMTYPSKqJWYb6PJJBA" # Proposal IDL
 
 # Pyth price oracle
 [[test.validator.clone]]

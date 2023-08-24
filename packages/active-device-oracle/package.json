@@ -6,11 +6,11 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.2.5",
+  "version": "0.2.21",
   "description": "Oracle of helium active devices",
   "repository": {
     "type": "git",
-    "url": "https://github.com/HeliumFoundation/helium-program-libary"
+    "url": "https://github.com/helium/helium-program-libary"
   },
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/src/index.js",

@@ -1,22 +1,40 @@
-import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
-import { init, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
-import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
-import { distributeCompressionRewards, initializeCompressionRecipient, recipientKey } from "@helium/lazy-distributor-sdk";
-import { Asset, AssetProof, getAsset, getAssetProof, truthy } from "@helium/spl-utils";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
-import { init as initRewards } from "@helium/rewards-oracle-sdk";
+import { AnchorProvider, BN, Program } from '@coral-xyz/anchor';
+import {
+  decodeEntityKey,
+  init,
+  init as initHem,
+  keyToAssetKey,
+  keyToAssetForAsset,
+} from '@helium/helium-entity-manager-sdk';
+import { daoKey } from '@helium/helium-sub-daos-sdk';
+import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
+import { LazyDistributor } from '@helium/idls/lib/types/lazy_distributor';
+import { RewardsOracle } from '@helium/idls/lib/types/rewards_oracle';
+import {
+  distributeCompressionRewards,
+  initializeCompressionRecipient,
+  recipientKey,
+} from '@helium/lazy-distributor-sdk';
+import { init as initRewards } from '@helium/rewards-oracle-sdk';
+import {
+  Asset,
+  AssetProof,
+  HNT_MINT,
+  getAsset,
+  getAssetProof,
+  truthy,
+} from '@helium/spl-utils';
+import { getAssociatedTokenAddress } from '@solana/spl-token';
 import {
   PublicKey,
-  Transaction, TransactionInstruction
-} from "@solana/web3.js";
-import axios from "axios";
-import { HNT_MINT } from "@helium/spl-utils";
-import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
-import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
-import { set } from "@coral-xyz/anchor/dist/cjs/utils/features";
+  Transaction,
+  TransactionInstruction,
+} from '@solana/web3.js';
+import axios from 'axios';
 
-const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
+const HNT = process.env.HNT_MINT
+  ? new PublicKey(process.env.HNT_MINT)
+  : HNT_MINT;
 const DAO = daoKey(HNT)[0];
 
 export type Reward = {
@@ -80,7 +98,7 @@ export async function getPendingRewards(
   lazyDistributor: PublicKey,
   dao: PublicKey,
   entityKeys: string[],
-  encoding: BufferEncoding | "b58" = "b58"
+  encoding: BufferEncoding | 'b58' = 'b58'
 ): Promise<Record<string, string>> {
   const oracleRewards = await getBulkRewards(
     program,
@@ -126,8 +144,8 @@ export async function getPendingRewards(
 export async function formBulkTransactions({
   program: lazyDistributorProgram,
   rewardsOracleProgram,
+  heliumEntityManagerProgram,
   rewards,
-  dao = DAO,
   assets,
   compressionAssetAccs,
   lazyDistributor,
@@ -137,12 +155,11 @@ export async function formBulkTransactions({
   assetEndpoint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
-  encoding = "b58"
 }: {
   program: Program<LazyDistributor>;
   rewardsOracleProgram?: Program<RewardsOracle>;
+  heliumEntityManagerProgram?: Program<HeliumEntityManager>;
   rewards: BulkRewards[]; // array of bulk rewards fetched from the oracle. Maps entityKey to reward
-  dao?: PublicKey; // Optional override to the dao, defaults to HNT
   assets: PublicKey[];
   compressionAssetAccs?: Asset[]; // Optional override to fetching the compression accounts from the RPC
   lazyDistributorAcc?: any; // Prefetch the lazyDistributor account to avoid hitting the RPC
@@ -155,15 +172,17 @@ export async function formBulkTransactions({
     url: string,
     assetId: PublicKey
   ) => Promise<AssetProof | undefined>;
-  encoding?: BufferEncoding | "b58";
 }) {
   if (assets.length > 100) {
-    throw new Error("Too many assets, max 100");
+    throw new Error('Too many assets, max 100');
   }
   const provider = lazyDistributorProgram.provider as AnchorProvider;
 
   if (!rewardsOracleProgram) {
     rewardsOracleProgram = await initRewards(provider);
+  }
+  if (!heliumEntityManagerProgram) {
+    heliumEntityManagerProgram = await initHem(provider);
   }
   if (!lazyDistributorAcc) {
     lazyDistributorAcc =
@@ -181,14 +200,14 @@ export async function formBulkTransactions({
           asset
         );
         if (!assetAcc) {
-          throw new Error("No asset with ID " + asset.toBase58());
+          throw new Error('No asset with ID ' + asset.toBase58());
         }
         return assetAcc;
       })
     );
   }
   if (compressionAssetAccs.length != assets.length) {
-    throw new Error("Assets not the same length as compressionAssetAccs");
+    throw new Error('Assets not the same length as compressionAssetAccs');
   }
 
   let recipientKeys = assets.map(
@@ -225,8 +244,15 @@ export async function formBulkTransactions({
   // construct the set and distribute ixs
   let setAndDistributeIxs = await Promise.all(
     compressionAssetAccs.map(async (assetAcc, idx) => {
-      const entityKey = assetAcc.content.json_uri.split("/").slice(-1)[0];
-      const keyToAsset = keyToAssetKey(dao, entityKey, encoding)[0];
+      const keyToAssetK = keyToAssetForAsset(assetAcc);
+      const keyToAsset =
+        await heliumEntityManagerProgram!.account.keyToAssetV0.fetch(
+          keyToAssetK
+        );
+      const entityKey = decodeEntityKey(
+        keyToAsset.entityKey,
+        keyToAsset.keySerialization
+      )!;
       const setRewardIxs = (
         await Promise.all(
           rewards.map(async (bulkRewards, oracleIdx) => {
@@ -234,15 +260,14 @@ export async function formBulkTransactions({
               return null;
             }
             return await rewardsOracleProgram!.methods
-              .setCurrentRewardsWrapperV0({
-                entityKey: Buffer.from(bs58.decode(entityKey)),
+              .setCurrentRewardsWrapperV1({
                 currentRewards: new BN(bulkRewards.currentRewards[entityKey]),
                 oracleIndex: oracleIdx,
               })
               .accounts({
                 lazyDistributor,
                 recipient: recipientKeys[idx],
-                keyToAsset,
+                keyToAsset: keyToAssetK,
                 oracle: bulkRewards.oracleKey,
               })
               .instruction();
@@ -314,14 +339,12 @@ export async function formBulkTransactions({
   return finalTxs;
 }
 
-
 export async function formTransaction({
   program: lazyDistributorProgram,
   rewardsOracleProgram,
   provider,
   rewards,
   asset,
-  dao = DAO,
   hotspot,
   lazyDistributor,
   wallet = provider.wallet.publicKey,
@@ -329,13 +352,11 @@ export async function formTransaction({
   assetEndpoint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
-  encoding = "b58"
 }: {
   program: Program<LazyDistributor>;
   rewardsOracleProgram?: Program<RewardsOracle>;
   provider: AnchorProvider;
   rewards: Reward[];
-  dao?: PublicKey; // Optional override to the dao, defaults to HNT
   // Must either provider asset or hotspot. Hotspot is legacy.
   asset?: PublicKey;
   hotspot?: PublicKey;
@@ -348,10 +369,9 @@ export async function formTransaction({
     url: string,
     assetId: PublicKey
   ) => Promise<AssetProof | undefined>;
-  encoding?: BufferEncoding | "b58";
 }) {
   if (!asset && !hotspot) {
-    throw new Error("Must provide asset or hotspot");
+    throw new Error('Must provide asset or hotspot');
   }
   if (!asset) {
     asset = hotspot!;
@@ -367,10 +387,10 @@ export async function formTransaction({
     asset
   );
   if (!assetAcc) {
-    throw new Error("No asset with ID " + asset.toBase58());
+    throw new Error('No asset with ID ' + asset.toBase58());
   }
 
-  const entityKey = assetAcc.content.json_uri.split("/").slice(-1)[0];
+  const keyToAsset = keyToAssetForAsset(assetAcc);
   const recipient = recipientKey(lazyDistributor, asset)[0];
   const lazyDistributorAcc =
     (await lazyDistributorProgram.account.lazyDistributorV0.fetch(
@@ -415,11 +435,9 @@ export async function formTransaction({
     tx.add(initRecipientIx);
   }
 
-  const keyToAsset = keyToAssetKey(dao, entityKey, encoding)[0];
   const ixPromises = rewards.map((x, idx) => {
     return rewardsOracleProgram!.methods
-      .setCurrentRewardsWrapperV0({
-        entityKey: Buffer.from(bs58.decode(entityKey)),
+      .setCurrentRewardsWrapperV1({
         currentRewards: new BN(x.currentRewards),
         oracleIndex: idx,
       })
@@ -496,7 +514,7 @@ function assertSameIxns(
   instructions1: TransactionInstruction[]
 ) {
   if (instructions.length !== instructions1.length) {
-    throw new Error("Extra instructions added by oracle");
+    throw new Error('Extra instructions added by oracle');
   }
 
   instructions.forEach((instruction, idx) => {
@@ -504,20 +522,20 @@ function assertSameIxns(
     if (
       instruction.programId.toBase58() !== instruction1.programId.toBase58()
     ) {
-      throw new Error("Program id mismatch");
+      throw new Error('Program id mismatch');
     }
     if (!instruction.data.equals(instruction1.data)) {
-      throw new Error("Instruction data mismatch");
+      throw new Error('Instruction data mismatch');
     }
 
     if (instruction.keys.length !== instruction1.keys.length) {
-      throw new Error("Key length mismatch");
+      throw new Error('Key length mismatch');
     }
 
     instruction.keys.forEach((key, idx) => {
       const key1 = instruction1.keys[idx];
       if (key.pubkey.toBase58() !== key1.pubkey.toBase58()) {
-        throw new Error("Key mismatch");
+        throw new Error('Key mismatch');
       }
     });
   });

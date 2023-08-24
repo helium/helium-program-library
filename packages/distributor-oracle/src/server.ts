@@ -12,9 +12,11 @@ import {
   setProvider
 } from "@coral-xyz/anchor";
 import {
-  decodeEntityKey, entityCreatorKey,
+  decodeEntityKey,
+  entityCreatorKey,
   init as initHeliumEntityManager,
   keyToAssetKey,
+  keyToAssetForAsset,
 } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import {
@@ -42,7 +44,6 @@ import Fastify, {
 import cors from "@fastify/cors";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
-import Address from "@helium/address";
 
 const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
 const DAO = daoKey(HNT)[0];
@@ -102,7 +103,9 @@ export class PgDatabase implements Database {
       console.error("No asset found", assetId.toBase58());
       return "0";
     }
-    const entityKey = asset.content.json_uri.split("/").slice(-1)[0] as string;
+    const keyToAssetKey = keyToAssetForAsset(asset, DAO);
+    const keyToAsset = await this.issuanceProgram.account.keyToAssetV0.fetch(keyToAssetKey);
+    const entityKey = decodeEntityKey(keyToAsset.entityKey, keyToAsset.keySerialization)!;
     // Verify the creator is our entity creator, otherwise they could just
     // pass in any NFT with this ecc compact to collect rewards
     if (
@@ -111,8 +114,6 @@ export class PgDatabase implements Database {
     ) {
       throw new Error("Not a valid rewardable entity");
     }
-
-
 
     return this.getCurrentRewardsByEntity(entityKey);
   }
@@ -135,7 +136,8 @@ export class OracleServer {
     public hemProgram: Program<HeliumEntityManager>,
     private oracle: Keypair,
     public db: Database,
-    readonly lazyDistributor: PublicKey
+    readonly lazyDistributor: PublicKey,
+    readonly dao: PublicKey = DAO
   ) {
     const server: FastifyInstance = Fastify({
       logger: true,
@@ -211,7 +213,7 @@ export class OracleServer {
     }
 
     if (entityKey) {
-      const [key] = await keyToAssetKey(DAO, entityKey as string, keySerialization);
+      const [key] = await keyToAssetKey(this.dao, entityKey as string, keySerialization);
       console.log(key.toBase58())
       const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(key);
       assetId = keyToAsset.asset.toBase58();
@@ -311,7 +313,8 @@ export class OracleServer {
           decoded.name !== "distributeCompressionRewardsV0" &&
           decoded.name !== "initializeRecipientV0" &&
           decoded.name !== "initializeCompressionRecipientV0" &&
-          decoded.name !== "setCurrentRewardsWrapperV0")
+          decoded.name !== "setCurrentRewardsWrapperV0" &&
+          decoded.name !== "setCurrentRewardsWrapperV1")
       ) {
         return {
           success: false,
@@ -323,7 +326,8 @@ export class OracleServer {
 
       if (
         decoded.name === "setCurrentRewardsV0" ||
-        decoded.name === "setCurrentRewardsWrapperV0"
+        decoded.name === "setCurrentRewardsWrapperV0" ||
+        decoded.name === "setCurrentRewardsWrapperV1"
       )
         setRewardIxs.push(ix);
 
@@ -372,7 +376,9 @@ export class OracleServer {
     )!;
 
     const setRewardsWrapperIx = this.roProgram.idl.instructions.find(
-      (x) => x.name === "setCurrentRewardsWrapperV0"
+      (x) =>
+        x.name === "setCurrentRewardsWrapperV0" ||
+        x.name === "setCurrentRewardsWrapperV1"
     )!;
     const wrapperOracleKeyIdx = setRewardsWrapperIx.accounts.findIndex(
       (x) => x.name === "oracle"
@@ -407,8 +413,11 @@ export class OracleServer {
         keyToAssetK = ix.keys[wrapperKeyToAssetIdx].pubkey;
         //@ts-ignore
         proposedCurrentRewards = decoded.data.args.currentRewards;
-        // @ts-ignore
-        entityKey = decoded.data.args.entityKey;
+        entityKey = (await this.hemProgram.account.keyToAssetV0.fetch(keyToAssetK)).entityKey;
+        // A sneaky RPC could return incorrect data. Verify that the entity key is correct for the key to asset
+        if (!keyToAssetKey(this.dao, entityKey)[0].equals(keyToAssetK)) {
+          return { success: false, message: "RPC lied about the entity key for this asset." };
+        }
       } else if (
         ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey) &&
         ix.programId.equals(LD_PID)
@@ -454,8 +463,8 @@ export class OracleServer {
             decodeEntityKey(entityKey, keySerialization)!
           )
         : await this.db.getCurrentRewards(mint);
-      if (proposedCurrentRewards.toNumber() > currentRewards) {
-        return { success: false, message: "Invalid amount" };
+      if (proposedCurrentRewards.gt(new BN(currentRewards))) {
+        return { success: false, message: `Invalid amount, ${proposedCurrentRewards} is greater than actual rewards ${currentRewards}` };
       }
     }
 
@@ -565,7 +574,7 @@ export class OracleServer {
       hemProgram,
       oracleKeypair,
       new PgDatabase(hemProgram),
-      LAZY_DISTRIBUTOR
+      LAZY_DISTRIBUTOR,
     );
     // For performance
     new AccountFetchCache({
