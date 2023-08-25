@@ -188,8 +188,9 @@ async fn main() -> Result<()> {
   let current_time = Utc::now();
   let thirty_days_ago = current_time - Duration::days(30);
   let query = format!(
-    "SELECT * FROM delta_table WHERE most_recent_ts > {}",
+    "SELECT * FROM delta_table WHERE most_recent_ts > {} AND sub_dao = '{}'",
     thirty_days_ago.timestamp(),
+    args.sub_dao.to_string().to_lowercase()
   );
   let record_batches = session.sql(query.as_str()).await?.collect().await?;
   println!("Record batches: {:?}", record_batches.len());
@@ -200,8 +201,8 @@ async fn main() -> Result<()> {
   println!("Processing records");
   for record_batch in record_batches {
     let pub_keys = record_batch
-      .column_by_name("gateway_key")
-      .context("No gateway_key column array found")?
+      .column_by_name("entity_key")
+      .context("No entity_key column array found")?
       .as_any()
       .downcast_ref::<StringArray>()
       .context("Result is not a string array")?;
