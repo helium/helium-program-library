@@ -15,6 +15,7 @@ use solana_sdk::transaction::{TransactionError, VersionedTransaction};
 
 pub mod dao;
 pub mod token;
+pub mod program;
 
 pub const TRANSACTION_RESEND_INTERVAL: Duration = Duration::from_secs(4);
 pub const MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS: usize = 256;

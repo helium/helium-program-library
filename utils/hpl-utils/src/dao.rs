@@ -1,4 +1,4 @@
-use crate::token::Token;
+use crate::{program, token::Token};
 use anyhow::Result;
 use sha2::{Digest, Sha256};
 use solana_sdk::pubkey::Pubkey;
@@ -21,24 +21,21 @@ impl Dao {
     let mint = match self {
       Self::Hnt => Token::Hnt.mint(),
     };
-    let (dao_key, _) =
-      Pubkey::find_program_address(&[b"dao", mint.as_ref()], &helium_sub_daos::id());
+    let (dao_key, _) = Pubkey::find_program_address(&[b"dao", mint.as_ref()], &program::HSD_PID);
     dao_key
   }
 
   pub fn data_only_config_key(&self) -> Pubkey {
     let (key, _) = Pubkey::find_program_address(
       &[b"data_only_config", self.key().as_ref()],
-      &helium_entity_manager::id(),
+      &program::HEM_PID,
     );
     key
   }
 
   pub fn entity_creator_key(&self) -> Pubkey {
-    let (key, _) = Pubkey::find_program_address(
-      &[b"entity_creator", self.key().as_ref()],
-      &helium_entity_manager::id(),
-    );
+    let (key, _) =
+      Pubkey::find_program_address(&[b"entity_creator", self.key().as_ref()], &program::HEM_PID);
     key
   }
 
@@ -46,7 +43,7 @@ impl Dao {
     let hash = Sha256::digest(entity_key);
     let (key, _) = Pubkey::find_program_address(
       &[b"key_to_asset", self.key().as_ref(), hash.as_ref()],
-      &helium_entity_manager::id(),
+      &program::HEM_PID,
     );
     key
   }
@@ -77,7 +74,7 @@ impl SubDao {
   pub fn key(&self) -> Pubkey {
     let mint = self.mint();
     let (subdao_key, _) =
-      Pubkey::find_program_address(&[b"sub_dao", mint.as_ref()], &helium_sub_daos::id());
+      Pubkey::find_program_address(&[b"sub_dao", mint.as_ref()], &program::HSD_PID);
     subdao_key
   }
 
@@ -90,7 +87,7 @@ impl SubDao {
 
   pub fn dc_key() -> Pubkey {
     let (key, _) =
-      Pubkey::find_program_address(&[b"dc", Token::Dc.mint().as_ref()], &data_credits::id());
+      Pubkey::find_program_address(&[b"dc", Token::Dc.mint().as_ref()], &program::DC_PID);
     key
   }
 
@@ -98,7 +95,7 @@ impl SubDao {
     let hash = Sha256::digest(router_key);
     let (key, _) = Pubkey::find_program_address(
       &[b"delegated_data_credits", self.key().as_ref(), &hash],
-      &data_credits::id(),
+      &program::DC_PID,
     );
     key
   }
@@ -106,7 +103,7 @@ impl SubDao {
   pub fn escrow_account_key(&self, delegated_dc_key: &Pubkey) -> Pubkey {
     let (key, _) = Pubkey::find_program_address(
       &[b"escrow_dc_account", delegated_dc_key.as_ref()],
-      &data_credits::id(),
+      &program::DC_PID,
     );
     key
   }
@@ -118,7 +115,7 @@ impl SubDao {
     };
     let (key, _) = Pubkey::find_program_address(
       &[b"rewardable_entity_config", self.key().as_ref(), suffix],
-      &helium_entity_manager::id(),
+      &program::HEM_PID,
     );
     key
   }
@@ -132,7 +129,7 @@ impl SubDao {
     };
     let (key, _) = Pubkey::find_program_address(
       &[prefix.as_bytes(), config_key.as_ref(), &hash],
-      &helium_entity_manager::id(),
+      &program::HEM_PID,
     );
     Ok(key)
   }
@@ -140,7 +137,7 @@ impl SubDao {
   pub fn lazy_distributor_key(&self) -> Pubkey {
     let (key, _) = Pubkey::find_program_address(
       &[b"lazy_distributor", self.mint().as_ref()],
-      &lazy_distributor::id(),
+      &program::LD_PID,
     );
     key
   }

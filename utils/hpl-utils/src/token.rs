@@ -24,6 +24,7 @@ pub enum TokenError {
 )]
 #[serde(rename_all = "lowercase")]
 pub enum Token {
+  Sol,
   Hnt,
   Mobile,
   Iot,
