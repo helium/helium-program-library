@@ -345,12 +345,16 @@ fn construct_and_send_txs(
       .collect::<Result<Vec<_>, anyhow::Error>>()
       .context("Failed to serialize txs")?;
 
-    send_and_confirm_messages_with_spinner(
+    let (_, failed_tx_count) = send_and_confirm_messages_with_spinner(
       helium_entity_program.rpc().into(),
       &tpu_client,
       &serialized_txs,
     )
     .context("Failed sending transactions")?;
+
+    if failed_tx_count > 0 {
+      return Err(anyhow!("{} transactions failed", failed_tx_count));
+    }
   }
 
   Ok(())
@@ -584,8 +588,6 @@ fn create_bucket(s3_config: HashMap<String, String>) -> Result<Bucket> {
   let credentials = if let (Some(aws_access_key), Some(aws_secret_key)) =
     (aws_access_key_opt, aws_secret_key_opt)
   {
-    println!("aws access key: {}", aws_access_key);
-    println!("aws secret key: {}", aws_secret_key);
     Credentials::new(
       Some(aws_access_key.clone().as_str()),
       Some(aws_secret_key.clone().as_str()),
@@ -599,5 +601,10 @@ fn create_bucket(s3_config: HashMap<String, String>) -> Result<Bucket> {
 
   let bucket_name = s3_config.get("bucket_name").unwrap();
 
-  Ok(Bucket::new(bucket_name, region, credentials)?)
+  let bucket = Bucket::new(bucket_name, region, credentials)?;
+  if aws_access_key_opt.is_some() {
+    Ok(bucket.with_path_style())
+  } else {
+    Ok(bucket)
+  }
 }
