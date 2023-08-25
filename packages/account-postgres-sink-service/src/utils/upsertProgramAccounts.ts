@@ -79,7 +79,6 @@ export const upsertProgramAccounts = async ({
         commitment: provider.connection.commitment,
         filters: [...coderFilters],
       });
-
       const model = sequelize.models[type];
       const t = await sequelize.transaction();
       // @ts-ignore
