@@ -13,6 +13,7 @@ exclude = [
   "utils/bulk-claim-rewards",
   "utils/generate-test-gateway-txn",
   "utils/active-hotspot-oracle",
+  "utils/backfill-onboarding-fees",
 ]
 
 [workspace.dependencies]

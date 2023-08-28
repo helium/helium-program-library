@@ -5,7 +5,7 @@ use std::str::FromStr;
 lazy_static::lazy_static! {
   pub static ref LD_PID: Pubkey = Pubkey::from_str("mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6").unwrap(); // Lazy Distributor
   pub static ref HSD_PID: Pubkey = Pubkey::from_str("hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR").unwrap(); // Helium Sub Daos
-  pub static ref DC_PID: Pubkey = Pubkey::from_str("7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm").unwrap(); // Data Credits
+  pub static ref DC_PID: Pubkey = Pubkey::from_str("credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT").unwrap(); // Data Credits
   pub static ref HEM_PID: Pubkey = Pubkey::from_str("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8").unwrap(); // Helium Entity Manager
   pub static ref CB_PID: Pubkey = Pubkey::from_str("circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g").unwrap(); // Circuit Breaker
   pub static ref TM_PID: Pubkey = Pubkey::from_str("treaf4wWBBty3fHdyBpo35Mz84M8k3heKXmjmi9vFt5").unwrap(); // Treasury Management
