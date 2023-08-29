@@ -100,7 +100,7 @@ export async function getAssets(
     });
 
     const result = response.data
-      ? response.data.map((res) => res?.result || undefined)
+      ? response.data.map((res: any) => res?.result || undefined)
       : [];
 
     return [

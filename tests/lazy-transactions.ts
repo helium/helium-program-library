@@ -201,11 +201,12 @@ describe("lazy-transactions", () => {
         })
         .accounts({ lazyTransactions })
         .remainingAccounts(accounts)
-        .rpc({ skipPreflight: true });
+        .rpc();
 
       throw new Error("Should have failed");
     } catch (e: any) {
-      expect(e.toString()).to.not.include("Should have failed");
+      console.log(e.toString())
+      expect(e.toString()).to.include("Transaction has already been executed");
     }
 
     /// Attempt to close the canopy

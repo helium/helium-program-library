@@ -6,6 +6,7 @@ import { LazyTransactions } from "@helium/idls/lib/types/lazy_transactions";
 import {
   blockKey,
   init,
+  isExecuted,
   lazySignerKey,
   lazyTransactionsKey,
 } from "@helium/lazy-transactions-sdk";
@@ -120,18 +121,8 @@ async function getTransactions(
     .blockhash;
 
   console.log(`Found ${results.length} transactions to migrate}`);
-  const blocks = results.map((r) => blockKey(lazyTransactions, r.id)[0]);
-  const blocksExist = (
-    await Promise.all(
-      chunks(blocks, 100).map(
-        async (chunk) =>
-          await provider.connection.getMultipleAccountsInfo(
-            chunk as PublicKey[],
-            "confirmed"
-          )
-      )
-    )
-  ).flat();
+  const lt = await program.account.lazyTransactionsV0.fetch(lazyTransactions);
+  const executed = lt.executed;
   const lazyTxns = await program.account.lazyTransactionsV0.fetch(
     lazyTransactions
   );
@@ -156,7 +147,7 @@ async function getTransactions(
           },
           idx
         ) => {
-          const hasRun = blocksExist[idx];
+          const hasRun = isExecuted(executed, idx);
           const compiledTx = decompress(compiled);
           const block = blockKey(lazyTransactions, id)[0];
           const signers = decompressSigners(signersRaw);

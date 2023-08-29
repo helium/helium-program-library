@@ -7,6 +7,7 @@ pub mod error;
 pub mod instructions;
 pub mod merkle_proof;
 pub mod state;
+pub mod util;
 
 pub use instructions::*;
 pub use state::*;
@@ -46,5 +47,11 @@ pub mod lazy_transactions {
 
   pub fn set_canopy_v0(ctx: Context<SetCanopyV0>, args: SetCanopyArgsV0) -> Result<()> {
     set_canopy_v0::handler(ctx, args)
+  }
+
+  pub fn reinitialize_executed_transactions_v0(
+    ctx: Context<ReinitializeExecutedTransactionsV0>,
+  ) -> Result<()> {
+    reinitialize_executed_transactions_v0::handler(ctx)
   }
 }

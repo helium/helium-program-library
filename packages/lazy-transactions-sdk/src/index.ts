@@ -323,3 +323,14 @@ export function compileNoMerkle(
 
   return compiledTransactions
 }
+
+export function isExecuted(
+  executed: Buffer,
+  index: number,
+): boolean {
+  const byteIndex = Math.floor(index / 8);
+  const bitIndex = index % 8;
+  const byte = executed[byteIndex];
+  const mask = 1 << bitIndex;
+  return (byte & mask) !== 0;
+}
