@@ -7,6 +7,7 @@ pub mod error;
 pub mod instructions;
 pub mod merkle_proof;
 pub mod state;
+pub mod util;
 
 pub use instructions::*;
 pub use state::*;

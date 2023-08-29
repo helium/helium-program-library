@@ -1,5 +1,6 @@
 use crate::canopy::fill_in_proof_from_canopy;
 use crate::error::ErrorCode;
+use crate::util::{is_executed, set_executed};
 use crate::{merkle_proof::verify, state::*};
 use anchor_lang::{prelude::*, solana_program, solana_program::instruction::Instruction};
 
@@ -30,8 +31,9 @@ pub struct ExecuteTransactionV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
+    mut,
     has_one = canopy,
-    constraint = lazy_transactions.executed[args.index as usize] == false @ ErrorCode::TransactionAlreadyExecuted,
+    constraint = !is_executed(&lazy_transactions.executed, args.index) @ ErrorCode::TransactionAlreadyExecuted,
   )]
   pub lazy_transactions: Account<'info, LazyTransactionsV0>,
   /// CHECK: Verified by has one
@@ -55,7 +57,7 @@ pub struct ExecuteTransactionV0<'info> {
 }
 
 pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV0) -> Result<()> {
-  ctx.accounts.lazy_transactions.executed[args.index as usize] = true;
+  set_executed(&mut ctx.accounts.lazy_transactions.executed, args.index);
 
   let largest_acct_idx: usize = (*args
     .instructions

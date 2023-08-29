@@ -6,6 +6,7 @@ import { LazyTransactions } from "@helium/idls/lib/types/lazy_transactions";
 import {
   blockKey,
   init,
+  isExecuted,
   lazySignerKey,
   lazyTransactionsKey,
 } from "@helium/lazy-transactions-sdk";
@@ -146,7 +147,7 @@ async function getTransactions(
           },
           idx
         ) => {
-          const hasRun = executed[idx];
+          const hasRun = isExecuted(executed, idx);
           const compiledTx = decompress(compiled);
           const block = blockKey(lazyTransactions, id)[0];
           const signers = decompressSigners(signersRaw);

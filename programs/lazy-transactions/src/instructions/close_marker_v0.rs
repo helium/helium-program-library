@@ -1,4 +1,4 @@
-use crate::state::*;
+use crate::{state::*, util::set_executed};
 use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -28,7 +28,7 @@ pub struct CloseMarkerV0<'info> {
 }
 
 pub fn handler(ctx: Context<CloseMarkerV0>, args: CloseMarkerArgsV0) -> Result<()> {
-  ctx.accounts.lazy_transactions.executed[args.index as usize] = true;
+  set_executed(&mut ctx.accounts.lazy_transactions.executed, args.index);
 
   Ok(())
 }
