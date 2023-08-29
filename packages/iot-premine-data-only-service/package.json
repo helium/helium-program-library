@@ -33,25 +33,26 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.26.0",
-    "@fastify/cors": "^8.3.0",
+    "@fastify/cors": "^8.1.1",
+    "@helium/account-fetch-cache": "^0.2.21",
     "@helium/address": "^4.10.2",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.43.4",
-    "aws-sdk": "^2.1447.0",
-    "bn.js": "^5.2.1",
-    "bs58": "^5.0.0",
+    "bn.js": "^5.2.0",
+    "bs58": "^4.0.1",
     "csv-parser": "^3.0.0",
-    "fastify": "^4.22.0",
-    "pg": "^8.11.3",
-    "pg-format": "^1.0.4",
-    "yargs": "^17.7.2"
+    "fastify": "^4.9.2",
+    "pg": "^8.9.0",
+    "pg-format": "^1.0.2",
+    "yargs": "^17.7.1"
   },
   "devDependencies": {
-    "@types/pg": "^8.10.2",
+    "@types/pg": "^8.6.6",
     "@types/pg-format": "^1.0.2",
     "@types/yargs": "^17.0.24",
-    "ts-loader": "^9.4.4",
+    "ts-loader": "^9.2.3",
     "ts-node": "^10.9.1",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "yarn": "^1.22.18"
   }
 }
