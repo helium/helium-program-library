@@ -35,3 +35,5 @@ shared-utils = { path = "../../utils/shared-utils" }
 data-credits = { path = "../data-credits", features = ["cpi"] }
 helium-sub-daos = { path = "../helium-sub-daos", features = ["cpi"] }
 lazy-transactions = { path = "../lazy-transactions", features = ["cpi"] }
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }

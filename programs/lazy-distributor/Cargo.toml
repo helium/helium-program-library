@@ -30,3 +30,5 @@ bubblegum-cpi = { workspace = true }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 shared-utils = { path = "../../utils/shared-utils" }
 account-compression-cpi = { workspace = true }
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }

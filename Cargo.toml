@@ -21,3 +21,5 @@ anchor-spl = { version = "0.26.0", features = ["mint", "token"] }
 mpl-token-metadata = { version = "1.11.0", features = ["no-entrypoint"] }
 account-compression-cpi = { rev = "9707a03eb7be0ccf4d96a18b662ffcd376365640", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
 bubblegum-cpi = { rev = "9707a03eb7be0ccf4d96a18b662ffcd376365640", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
+solana-security-txt = "1.1.1"
+default-env = "0.1.1"

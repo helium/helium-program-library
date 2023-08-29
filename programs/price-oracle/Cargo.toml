@@ -21,3 +21,5 @@ default = []
 
 [dependencies]
 anchor-lang = "0.26.0"
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }

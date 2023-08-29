@@ -60,7 +60,7 @@ runs:
           ./deps/solana-program-library
           ./deps/clockwork
         key: deps-${{ runner.os }}-build-${{ hashFiles('./deps/**/Cargo.lock') }}
-    - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/anchor build -p $PROGRAM ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
+    - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/solana-verify build --library-name $PROGRAM ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
       shell: bash
       env:
         PROGRAM: ${{ inputs.program }}

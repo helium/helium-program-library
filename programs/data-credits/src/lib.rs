@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+#[cfg(not(feature = "no-entrypoint"))]
+use {default_env::default_env, solana_security_txt::security_txt};
 
 pub mod circuit_breaker;
 pub mod errors;
@@ -10,6 +12,20 @@ pub use instructions::*;
 pub use state::*;
 
 declare_id!("credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT");
+
+#[cfg(not(feature = "no-entrypoint"))]
+security_txt! {
+  name: "Data Credits",
+  project_url: "http://helium.com",
+  contacts: "email:hello@helium.foundation",
+
+  // Optional Fields
+  preferred_languages: "en",
+  source_code: "https://github.com/helium/helium-program-library/tree/master/programs/data-credits",
+  source_revision: default_env!("GITHUB_SHA", ""),
+  source_release: default_env!("GITHUB_REF_NAME", ""),
+  auditors: "Sec3"
+}
 
 #[program]
 pub mod data_credits {
