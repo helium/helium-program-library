@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CloseMarkerArgsV0 {
-  pub index: u64,
+  pub index: u32,
 }
 
 #[derive(Accounts)]
@@ -13,6 +13,7 @@ pub struct CloseMarkerV0<'info> {
   /// CHECK: Just receiving funds
   pub refund: UncheckedAccount<'info>,
   #[account(
+    mut,
     has_one = authority
   )]
   pub lazy_transactions: Account<'info, LazyTransactionsV0>,
@@ -26,6 +27,8 @@ pub struct CloseMarkerV0<'info> {
   pub block: Account<'info, Block>,
 }
 
-pub fn handler(_ctx: Context<CloseMarkerV0>, _args: CloseMarkerArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<CloseMarkerV0>, args: CloseMarkerArgsV0) -> Result<()> {
+  ctx.accounts.lazy_transactions.executed[args.index as usize] = true;
+
   Ok(())
 }

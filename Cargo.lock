@@ -2109,6 +2109,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
+ "shared-utils",
  "spl-concurrent-merkle-tree",
 ]
 

@@ -9,6 +9,7 @@ pub struct LazyTransactionsV0 {
   pub authority: Pubkey,
   pub canopy: Pubkey,
   pub bump_seed: u8,
+  pub executed: Vec<bool>,
 }
 
 #[account]
