@@ -70,7 +70,16 @@ jobs:
           keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
           program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
-
+  publish_programs:
+    needs: [build_programs]
+    runs-on: ubuntu-latest
+    if: needs.detect_changed_programs.outputs.programs_with_changes != '[]' && needs.detect_changed_programs.outputs.programs_with_changes != ''
+    strategy:
+      # Publish must happen one at a time or there can be conflicts
+      max-parallel: 1
+      matrix:
+        program: ${{ fromJson(needs.detect_changed_programs.outputs.programs_with_changes) }}
+    steps:
       - name: Squads program upgrade
         uses: helium/squads-program-upgrade@v0.3.1
         with:
