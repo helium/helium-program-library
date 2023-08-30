@@ -799,7 +799,9 @@ version = "0.0.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "default-env",
  "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -1189,9 +1191,11 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "circuit-breaker",
+ "default-env",
  "helium-sub-daos",
  "lazy-transactions",
  "pyth-sdk-solana",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -1199,6 +1203,17 @@ name = "data-encoding"
 version = "2.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23d8666cb01533c39dde32bcbab8e227b4ed6679b2c925eba05feabea39508fb"
+
+[[package]]
+name = "default-env"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f753eb82d29277e79efc625e84aecacfd4851ee50e05a8573a4740239a77bfd3"
+dependencies = [
+ "proc-macro2 0.4.30",
+ "quote 0.6.13",
+ "syn 0.15.44",
+]
 
 [[package]]
 name = "der"
@@ -1475,8 +1490,10 @@ version = "0.0.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "default-env",
  "mpl-token-metadata",
  "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -1760,10 +1777,12 @@ dependencies = [
  "bubblegum-cpi",
  "bytemuck",
  "data-credits",
+ "default-env",
  "helium-sub-daos",
  "lazy-transactions",
  "mpl-token-metadata",
  "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -1774,9 +1793,11 @@ dependencies = [
  "anchor-spl",
  "circuit-breaker",
  "clockwork-sdk",
+ "default-env",
  "mpl-token-metadata",
  "rust_decimal",
  "shared-utils",
+ "solana-security-txt",
  "spl-governance-tools",
  "switchboard-v2",
  "time 0.3.17",
@@ -2098,8 +2119,10 @@ dependencies = [
  "anchor-spl",
  "bubblegum-cpi",
  "circuit-breaker",
+ "default-env",
  "mpl-token-metadata",
  "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -2109,7 +2132,9 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
+ "default-env",
  "shared-utils",
+ "solana-security-txt",
  "spl-concurrent-merkle-tree",
 ]
 
@@ -2351,10 +2376,12 @@ dependencies = [
  "bs58 0.3.1",
  "bubblegum-cpi",
  "bytemuck",
+ "default-env",
  "helium-entity-manager",
  "helium-sub-daos",
  "mpl-token-metadata",
  "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -2854,6 +2881,8 @@ name = "price-oracle"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "default-env",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -3255,8 +3284,10 @@ name = "rewards-oracle"
 version = "0.1.1"
 dependencies = [
  "anchor-lang",
+ "default-env",
  "helium-entity-manager",
  "lazy-distributor",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -4404,6 +4435,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-security-txt"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "468aa43b7edb1f9b7b7b686d5c3aeb6630dc1708e86e31343499dd5c4d775183"
+
+[[package]]
 name = "solana-send-transaction-service"
 version = "1.14.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5232,7 +5269,9 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "circuit-breaker",
+ "default-env",
  "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -5417,6 +5456,7 @@ dependencies = [
  "base64 0.13.1",
  "bincode",
  "bytemuck",
+ "default-env",
  "env_logger",
  "itertools",
  "log",
@@ -5429,6 +5469,7 @@ dependencies = [
  "solana-program",
  "solana-program-test",
  "solana-sdk",
+ "solana-security-txt",
  "spl-associated-token-account",
  "spl-governance",
  "spl-governance-addin-api",

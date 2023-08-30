@@ -40,7 +40,7 @@ async fn run() {
   claim_rewards(ClaimRewardsArgs {
     rpc_url: args.url.as_str(),
     payer: kp.clone(),
-    hotspot_owner: kp.try_pubkey().unwrap(),
+    hotspot_owner: args.hotspot_owner.map(|s| s.parse().unwrap()).unwrap_or_else(|| kp.pubkey()),
     rewards_mint,
     dao,
     batch_size: args.batch_size,

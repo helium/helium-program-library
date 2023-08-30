@@ -23,4 +23,5 @@ default = []
 anchor-lang = "0.26.0"
 lazy-distributor = { path = "../lazy-distributor", features = ["cpi"] }
 helium-entity-manager = { path = "../helium-entity-manager", features = ["cpi"] }
-
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }

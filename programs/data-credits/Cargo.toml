@@ -29,3 +29,5 @@ helium-sub-daos = { path = "../helium-sub-daos", features = ["cpi"] }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 pyth-sdk-solana = { version = "0.7.0" }
 lazy-transactions = { path = "../lazy-transactions", features = ["cpi"] }
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }

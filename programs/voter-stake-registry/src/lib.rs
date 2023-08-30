@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 pub use instructions::*;
+#[cfg(not(feature = "no-entrypoint"))]
+use {default_env::default_env, solana_security_txt::security_txt};
 
 pub mod error;
 pub mod governance;
@@ -9,6 +11,20 @@ pub mod util;
 
 // The program address.
 declare_id!("hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8");
+
+#[cfg(not(feature = "no-entrypoint"))]
+security_txt! {
+  name: "Voter Stake Registry",
+  project_url: "http://helium.com",
+  contacts: "email:hello@helium.foundation",
+
+  // Optional Fields
+  preferred_languages: "en",
+  source_code: "https://github.com/helium/helium-program-library/tree/master/programs/voter-stake-registry",
+  source_revision: default_env!("GITHUB_SHA", ""),
+  source_release: default_env!("GITHUB_REF_NAME", ""),
+  auditors: "Sec3"
+}
 
 #[derive(Clone)]
 pub struct VoterStakeRegistry;

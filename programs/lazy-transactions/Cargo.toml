@@ -28,3 +28,5 @@ anchor-spl = { workspace = true }
 spl-concurrent-merkle-tree = "0.1.2"
 bytemuck = "1.13.0"
 shared-utils = { path = "../../utils/shared-utils" }
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }

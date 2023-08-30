@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+#[cfg(not(feature = "no-entrypoint"))]
+use {default_env::default_env, solana_security_txt::security_txt};
 
 declare_id!("1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h");
 
@@ -11,6 +13,20 @@ pub mod util;
 
 pub use instructions::*;
 pub use state::*;
+
+#[cfg(not(feature = "no-entrypoint"))]
+security_txt! {
+  name: "Lazy Transactions",
+  project_url: "http://helium.com",
+  contacts: "email:hello@helium.foundation",
+
+  // Optional Fields
+  preferred_languages: "en",
+  source_code: "https://github.com/helium/helium-program-library/tree/master/programs/lazy-transactions",
+  source_revision: default_env!("GITHUB_SHA", ""),
+  source_release: default_env!("GITHUB_REF_NAME", ""),
+  auditors: "Sec3"
+}
 
 #[program]
 pub mod lazy_transactions {
