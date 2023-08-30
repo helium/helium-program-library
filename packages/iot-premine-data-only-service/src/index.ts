@@ -2,6 +2,7 @@ import cors from '@fastify/cors';
 import {
   blockKey,
   init,
+  isExecuted,
   lazySignerKey,
   lazyTransactionsKey,
 } from '@helium/lazy-transactions-sdk';
@@ -63,20 +64,10 @@ import { decompress, decompressSigners } from './utils';
   async function getTransactions(results: any[]): Promise<Array<number[]>> {
     const recentBlockhash = (await provider.connection.getLatestBlockhash())
       .blockhash;
-    console.log(`Found ${results.length} transactions to execute}`);
-    const blocks = results.map((r) => blockKey(lazyTransactions, r.id)[0]);
-    const blocksExist = (
-      await Promise.all(
-        chunks(blocks, 100).map(
-          async (chunk) =>
-            await provider.connection.getMultipleAccountsInfo(
-              chunk as PublicKey[],
-              'confirmed'
-            )
-        )
-      )
-    ).flat();
 
+    console.log(`Found ${results.length} transactions to execute}`);
+    const lt = await program.account.lazyTransactionsV0.fetch(lazyTransactions);
+    const executed = lt.executed;
     const lazyTxns = await program.account.lazyTransactionsV0.fetch(
       lazyTransactions
     );
@@ -101,7 +92,7 @@ import { decompress, decompressSigners } from './utils';
             },
             idx
           ) => {
-            const hasRun = blocksExist[idx];
+            const hasRun = isExecuted(executed, idx);
             const compiledTx = decompress(compiled);
             const block = blockKey(lazyTransactions, id)[0];
             const signers = decompressSigners(signersRaw);
