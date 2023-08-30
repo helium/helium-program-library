@@ -18,6 +18,8 @@ security_txt! {
   name: "Helium Entity Manager",
   project_url: "http://helium.com",
   contacts: "email:hello@helium.foundation",
+  policy: "https://github.com/helium/helium-program-library/tree/master/SECURITY.md",
+
 
   // Optional Fields
   preferred_languages: "en",
