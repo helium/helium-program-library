@@ -1,7 +1,7 @@
 {
   "include": [],
   "compilerOptions": {
-    "lib": ["ES2021.String"],
+    "lib": ["ES2021"],
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "Node",

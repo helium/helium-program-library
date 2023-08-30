@@ -1,74 +1,71 @@
-import * as anchor from "@coral-xyz/anchor";
-import {
-  init as initHsd,
-  subDaoKey
-} from "@helium/helium-sub-daos-sdk";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
-import AWS from "aws-sdk";
-import { BN } from "bn.js";
-import os from "os";
-import { Client } from "pg";
-import yargs from "yargs/yargs";
-import { sendInstructionsOrSquads } from "./utils";
-import fs from "fs";
+import * as anchor from '@coral-xyz/anchor';
+import { init as initHsd, subDaoKey } from '@helium/helium-sub-daos-sdk';
+import { PublicKey, TransactionInstruction } from '@solana/web3.js';
+import Squads from '@sqds/sdk';
+import AWS from 'aws-sdk';
+import { BN } from 'bn.js';
+import os from 'os';
+import { Client } from 'pg';
+import yargs from 'yargs/yargs';
+import { loadKeypair, sendInstructionsOrSquads } from './utils';
+import fs from 'fs';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: "k",
-      describe: "Anchor wallet keypair",
+      alias: 'k',
+      describe: 'Anchor wallet keypair',
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: "u",
-      default: "http://127.0.0.1:8899",
-      describe: "The solana url",
+      alias: 'u',
+      default: 'http://127.0.0.1:8899',
+      describe: 'The solana url',
     },
     dntMint: {
       required: true,
-      type: "string",
-      describe: "DNT mint of the subdao to be updated",
+      type: 'string',
+      describe: 'DNT mint of the subdao to be updated',
     },
     name: {
-      alias: "n",
-      type: "string",
+      alias: 'n',
+      type: 'string',
       required: false,
-      describe: "The name of the entity config",
+      describe: 'The name of the entity config',
     },
     executeTransaction: {
-      type: "boolean",
+      type: 'boolean',
     },
     multisig: {
-      type: "string",
+      type: 'string',
       describe:
-        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
     },
     authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
+      type: 'number',
+      describe: 'Authority index for squads. Defaults to 1',
       default: 1,
     },
     pgUser: {
-      default: "postgres",
+      default: 'postgres',
     },
     pgPassword: {
-      type: "string",
+      type: 'string',
     },
     pgDatabase: {
-      type: "string",
+      type: 'string',
     },
     pgHost: {
-      default: "localhost",
+      default: 'localhost',
     },
     pgPort: {
-      default: "5432",
+      default: '5432',
     },
     awsRegion: {
-      default: "us-east-1",
+      default: 'us-east-1',
     },
     noSsl: {
-      type: "boolean",
+      type: 'boolean',
       default: false,
     },
   });
@@ -77,10 +74,11 @@ export async function run(args: any = process.argv) {
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
+  const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const program = await initHsd(provider);
 
   // configure pg connection
-  const isRds = argv.pgHost.includes("rds.amazonaws.com");
+  const isRds = argv.pgHost.includes('rds.amazonaws.com');
   let password = argv.pgPassword;
   if (isRds && !password) {
     const signer = new AWS.RDS.Signer({
@@ -121,7 +119,7 @@ export async function run(args: any = process.argv) {
       CASE WHEN p.genesis_end > current_ts THEN cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'genesisVotePowerMultiplier' as numeric) ELSE 1 END as genesis_multiplier,
       GREATEST(
         cast(
-          p.end_ts - 
+          p.end_ts -
           CASE WHEN lockup_kind = 'constant' THEN start_ts ELSE current_ts END
           as numeric
         ),
@@ -135,7 +133,7 @@ export async function run(args: any = process.argv) {
         cast(lockup->>'startTs' as numeric) as start_ts,
         -- 1683727980 as current_ts
         FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)) as current_ts
-      FROM positions 
+      FROM positions
     ) p
     JOIN registrars r on p.registrar = r.address
   ),
@@ -151,9 +149,9 @@ export async function run(args: any = process.argv) {
       amount_deposited_native,
       ve_tokens,
       initial_ve_tokens,
-      CASE WHEN lockup_kind = 'constant' THEN 
+      CASE WHEN lockup_kind = 'constant' THEN
         0
-      ELSE 
+      ELSE
         CASE WHEN current_ts < genesis_end THEN
           -- genesis
           (ve_tokens - (
@@ -169,7 +167,7 @@ export async function run(args: any = process.argv) {
           ) / (genesis_end - current_ts)
         ELSE
           -- normal
-          ve_tokens / (end_ts - current_ts) 
+          ve_tokens / (end_ts - current_ts)
         END
       END as fall_rate,
       start_ts,
@@ -220,7 +218,7 @@ export async function run(args: any = process.argv) {
     WHERE (lockup_kind = 'constant' or end_ts > (floor(current_ts / (60 * 60 * 24)) * (60 * 60 * 24)) + 60 * 60 * 24)
     GROUP BY s.dnt_mint, s.vehnt_fall_rate, s.vehnt_delegated, s.vehnt_last_calculated_ts, s.vehnt_last_calculated_ts
   )
-  SELECT 
+  SELECT
     mint,
     current_ts,
     delegations,
@@ -238,14 +236,14 @@ export async function run(args: any = process.argv) {
 
   const subDao = subDaoKey(new PublicKey(argv.dntMint))[0];
   const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
-  console.log("Subdao", subDao.toBase58());
+  console.log('Subdao', subDao.toBase58());
 
   instructions.push(
     await program.methods
       .updateSubDaoVehntV0({
-        vehntDelegated: new BN(row.real_ve_tokens.split(".")[0]),
+        vehntDelegated: new BN(row.real_ve_tokens.split('.')[0]),
         vehntLastCalculatedTs: new BN(row.current_ts),
-        vehntFallRate: new BN(row.real_fall_rate.split(".")[0]),
+        vehntFallRate: new BN(row.real_fall_rate.split('.')[0]),
       })
       .accounts({
         subDao,
@@ -254,13 +252,9 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  const squads = Squads.endpoint(
-    process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet,
-    {
-      commitmentOrConfig: "finalized",
-    }
-  );
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
+    commitmentOrConfig: 'finalized',
+  });
   await sendInstructionsOrSquads({
     provider,
     instructions,

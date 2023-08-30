@@ -8,7 +8,7 @@ import { PublicKey, TransactionInstruction } from '@solana/web3.js';
 import Squads from '@sqds/sdk';
 import os from 'os';
 import yargs from 'yargs/yargs';
-import { sendInstructionsOrSquads } from './utils';
+import { loadKeypair, sendInstructionsOrSquads } from './utils';
 import { HNT_MINT } from '@helium/spl-utils';
 
 export async function run(args: any = process.argv) {
@@ -51,6 +51,7 @@ export async function run(args: any = process.argv) {
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
+  const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const hemProgram = await initHem(provider);
   const daosProgram = await initHsd(provider);
 
@@ -78,13 +79,9 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  const squads = Squads.endpoint(
-    process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet,
-    {
-      commitmentOrConfig: 'finalized',
-    }
-  );
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
+    commitmentOrConfig: 'finalized',
+  });
 
   await sendInstructionsOrSquads({
     provider,

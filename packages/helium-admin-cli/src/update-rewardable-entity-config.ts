@@ -1,61 +1,61 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from '@coral-xyz/anchor';
 import {
   init as initHem,
   rewardableEntityConfigKey,
-} from "@helium/helium-entity-manager-sdk";
-import { subDaoKey } from "@helium/helium-sub-daos-sdk";
-import { PublicKey } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
-import os from "os";
-import yargs from "yargs/yargs";
-import { sendInstructionsOrSquads } from "./utils";
-import BN from "bn.js";
+} from '@helium/helium-entity-manager-sdk';
+import { subDaoKey } from '@helium/helium-sub-daos-sdk';
+import { PublicKey } from '@solana/web3.js';
+import Squads from '@sqds/sdk';
+import os from 'os';
+import yargs from 'yargs/yargs';
+import { loadKeypair, sendInstructionsOrSquads } from './utils';
+import BN from 'bn.js';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: "k",
-      describe: "Anchor wallet keypair",
+      alias: 'k',
+      describe: 'Anchor wallet keypair',
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: "u",
-      default: "http://127.0.0.1:8899",
-      describe: "The solana url",
+      alias: 'u',
+      default: 'http://127.0.0.1:8899',
+      describe: 'The solana url',
     },
     dntMint: {
       required: true,
-      describe: "Public Key of the subdao mint",
-      type: "string",
+      describe: 'Public Key of the subdao mint',
+      type: 'string',
     },
     name: {
-      alias: "n",
-      type: "string",
+      alias: 'n',
+      type: 'string',
       required: true,
-      describe: "The name of the entity config",
+      describe: 'The name of the entity config',
     },
     executeTransaction: {
-      type: "boolean",
+      type: 'boolean',
     },
     multisig: {
-      type: "string",
+      type: 'string',
       describe:
-        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
     },
     authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
+      type: 'number',
+      describe: 'Authority index for squads. Defaults to 1',
       default: 1,
     },
     fullLocationStakingFee: {
-      type: "number",
-      describe: "The full hotspot location assert fee",
-      default: "1000000",
+      type: 'number',
+      describe: 'The full hotspot location assert fee',
+      default: '1000000',
     },
     dataonlyLocationStakingFee: {
-      type: "number",
-      describe: "The full hotspot location assert fee",
-      default: "1000000",
+      type: 'number',
+      describe: 'The full hotspot location assert fee',
+      default: '1000000',
     },
   });
   const argv = await yarg.argv;
@@ -63,7 +63,7 @@ export async function run(args: any = process.argv) {
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
-
+  const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const name = argv.name;
   const hemProgram = await initHem(provider);
   const dntMint = new PublicKey(argv.dntMint);
@@ -76,15 +76,12 @@ export async function run(args: any = process.argv) {
       rewardableConfigKey
     );
   let payer = provider.wallet.publicKey;
-  const squads = Squads.endpoint(
-    process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet, {
-      commitmentOrConfig: "finalized"
-    }
-  );
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
+    commitmentOrConfig: 'finalized',
+  });
 
   let settings;
-  if (name.toUpperCase() == "IOT") {
+  if (name.toUpperCase() == 'IOT') {
     settings = {
       iotConfig: {
         minGain: 10,

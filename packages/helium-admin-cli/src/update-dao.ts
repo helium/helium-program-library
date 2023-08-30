@@ -1,72 +1,77 @@
-import * as anchor from "@coral-xyz/anchor";
-import { init as initCb, mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
-import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
+import * as anchor from '@coral-xyz/anchor';
 import {
-  PublicKey, TransactionInstruction
-} from "@solana/web3.js";
-import Squads from "@sqds/sdk";
-import os from "os";
-import yargs from "yargs/yargs";
-import { parseEmissionsSchedule, sendInstructionsOrSquads } from "./utils";
+  init as initCb,
+  mintWindowedBreakerKey,
+} from '@helium/circuit-breaker-sdk';
+import { daoKey, init as initHsd } from '@helium/helium-sub-daos-sdk';
+import { PublicKey, TransactionInstruction } from '@solana/web3.js';
+import Squads from '@sqds/sdk';
+import os from 'os';
+import yargs from 'yargs/yargs';
+import {
+  loadKeypair,
+  parseEmissionsSchedule,
+  sendInstructionsOrSquads,
+} from './utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: "k",
-      describe: "Anchor wallet keypair",
+      alias: 'k',
+      describe: 'Anchor wallet keypair',
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: "u",
-      default: "http://127.0.0.1:8899",
-      describe: "The solana url",
+      alias: 'u',
+      default: 'http://127.0.0.1:8899',
+      describe: 'The solana url',
     },
     hntMint: {
       required: true,
-      type: "string",
-      describe: "HNT mint of the dao to be updated",
+      type: 'string',
+      describe: 'HNT mint of the dao to be updated',
     },
     newAuthority: {
       required: false,
-      describe: "New DAO authority",
-      type: "string",
+      describe: 'New DAO authority',
+      type: 'string',
       default: null,
     },
     newEmissionsSchedulePath: {
       required: false,
-      describe: "Path to file that contains the new emissions schedule",
-      type: "string",
+      describe: 'Path to file that contains the new emissions schedule',
+      type: 'string',
       default: null,
     },
     newHstEmissionsSchedulePath: {
       required: false,
-      describe: "Path to file that contains the new HST emissions schedule",
-      type: "string",
+      describe: 'Path to file that contains the new HST emissions schedule',
+      type: 'string',
       default: null,
     },
     newNetEmissionsCap: {
       required: false,
-      describe: "New net emissions cap, without decimals",
-      type: "string",
-      default: null
+      describe: 'New net emissions cap, without decimals',
+      type: 'string',
+      default: null,
     },
     newHstPool: {
       required: false,
-      describe: "New HST Pool",
-      type: "string",
+      describe: 'New HST Pool',
+      type: 'string',
       default: null,
     },
     executeTransaction: {
-      type: "boolean",
+      type: 'boolean',
     },
     multisig: {
-      type: "string",
+      type: 'string',
       describe:
-        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
     },
     authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
+      type: 'number',
+      describe: 'Authority index for squads. Defaults to 1',
       default: 1,
     },
   });
@@ -75,6 +80,7 @@ export async function run(args: any = process.argv) {
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
+  const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const program = await initHsd(provider);
   const cbProgram = await initCb(provider);
 
@@ -84,34 +90,49 @@ export async function run(args: any = process.argv) {
   const dao = daoKey(hntMint)[0];
   const daoAcc = await program.account.daoV0.fetch(dao);
   if (argv.newAuthority) {
-    const hntCircuitBreaker = mintWindowedBreakerKey(hntMint)[0]
-    const hntCbAcc = await cbProgram.account.mintWindowedCircuitBreakerV0.fetch(hntCircuitBreaker);
-    instructions.push(await cbProgram.methods.updateMintWindowedBreakerV0({
-      newAuthority: new PublicKey(argv.newAuthority),
-      config: null,
-    }).accounts({
-      circuitBreaker: hntCircuitBreaker,
-      authority: hntCbAcc.authority,
-    }).instruction());
+    const hntCircuitBreaker = mintWindowedBreakerKey(hntMint)[0];
+    const hntCbAcc = await cbProgram.account.mintWindowedCircuitBreakerV0.fetch(
+      hntCircuitBreaker
+    );
+    instructions.push(
+      await cbProgram.methods
+        .updateMintWindowedBreakerV0({
+          newAuthority: new PublicKey(argv.newAuthority),
+          config: null,
+        })
+        .accounts({
+          circuitBreaker: hntCircuitBreaker,
+          authority: hntCbAcc.authority,
+        })
+        .instruction()
+    );
   }
-  instructions.push(await program.methods.updateDaoV0({
-    authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
-    emissionSchedule: argv.newEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newEmissionsSchedulePath) : null,
-    hstEmissionSchedule: argv.newHstEmissionsSchedulePath ? await parseEmissionsSchedule(argv.newHstEmissionsSchedulePath) : null,
-    netEmissionsCap: argv.newNetEmissionsCap ? new anchor.BN(argv.newNetEmissionsCap) : null,
-    hstPool: argv.newHstPool ? new PublicKey(argv.newHstPool) : null,
-  }).accounts({
-    dao,
-    authority: daoAcc.authority,
-    payer: daoAcc.authority,
-  }).instruction());
-
-  const squads = Squads.endpoint(
-    process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet, {
-      commitmentOrConfig: "finalized"
-    }
+  instructions.push(
+    await program.methods
+      .updateDaoV0({
+        authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
+        emissionSchedule: argv.newEmissionsSchedulePath
+          ? await parseEmissionsSchedule(argv.newEmissionsSchedulePath)
+          : null,
+        hstEmissionSchedule: argv.newHstEmissionsSchedulePath
+          ? await parseEmissionsSchedule(argv.newHstEmissionsSchedulePath)
+          : null,
+        netEmissionsCap: argv.newNetEmissionsCap
+          ? new anchor.BN(argv.newNetEmissionsCap)
+          : null,
+        hstPool: argv.newHstPool ? new PublicKey(argv.newHstPool) : null,
+      })
+      .accounts({
+        dao,
+        authority: daoAcc.authority,
+        payer: daoAcc.authority,
+      })
+      .instruction()
   );
+
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
+    commitmentOrConfig: 'finalized',
+  });
   await sendInstructionsOrSquads({
     provider,
     instructions,
