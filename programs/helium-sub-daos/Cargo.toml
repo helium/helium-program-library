@@ -2,7 +2,7 @@ cargo-features = ["workspace-inheritance"]
 
 [package]
 name = "helium-sub-daos"
-version = "0.0.15"
+version = "0.0.16"
 description = "Created with Anchor"
 edition = "2021"
 

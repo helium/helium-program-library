@@ -2,7 +2,7 @@ cargo-features = ["workspace-inheritance"]
 
 [package]
 name = "voter-stake-registry"
-version = "0.0.7"
+version = "0.0.8"
 description = "Heliums voter weight plugin for spl-governance"
 license = "GPL-3.0-or-later"
 homepage = "https://github.com/helium/helium-program-library"
