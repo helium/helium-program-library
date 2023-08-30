@@ -50,7 +50,7 @@
   },
   "peerDependencies": {
     "@solana/wallet-adapter-react": "^0.15.32",
-    "react": "^17.0.2",
+    "react": "^16.8 || ^17 || ^18",
     "react-dom": "^16.8 || ^17 || ^18"
   },
   "keywords": [],

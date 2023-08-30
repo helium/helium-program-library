@@ -3700,9 +3700,9 @@
   integrity sha512-dRLjCWHYg4oaA77cxO64oO+7JwCwnIzkZPdrrC71jQmQtlhM556pwKo5bUzqvZndkVbeFLIIi+9TC40JNF5hNQ==
 
 "@types/libsodium-wrappers@^0.7.8":
-  version "0.7.10"
-  resolved "https://registry.yarnpkg.com/@types/libsodium-wrappers/-/libsodium-wrappers-0.7.10.tgz#a6ebde70d3b4af960fd802af8d0e3c7cfe281eb2"
-  integrity sha512-BqI9B92u+cM3ccp8mpHf+HzJ8fBlRwdmyd6+fz3p99m3V6ifT5O3zmOMi612PGkpeFeG/G6loxUnzlDNhfjPSA==
+  version "0.7.11"
+  resolved "https://registry.yarnpkg.com/@types/libsodium-wrappers/-/libsodium-wrappers-0.7.11.tgz#4ac53b8a16a4c80d062e32b3849e9d5b8c2f92ed"
+  integrity sha512-8avZYJny690B6lFZQEDz4PEdCgC8D8qmGE/mhJBzCwzZvsqne61tCRbtJOhxsjYMItEZd3k4SoR4xKKLnI9Ztg==
 
 "@types/lodash@*", "@types/lodash@^4.14.195":
   version "4.14.197"
@@ -3715,16 +3715,16 @@
   integrity sha512-MqTGEo5bj5t157U6fA/BiDynNkn0YknVdh48CMPkTSpFTVmvao5UQmm7uEF6xBEo7qIMAlY/JSleYaE6VOdpaA==
 
 "@types/lowdb@^1.0.11":
-  version "1.0.11"
-  resolved "https://registry.yarnpkg.com/@types/lowdb/-/lowdb-1.0.11.tgz#d8336a635ea0dbd48a7f6f62fb9fccc5ec358ae3"
-  integrity sha512-h99VMxvTuz+VsXUVCCJo4dsps4vbkXwvU71TpmxDoiBU24bJ0VBygIHgmMm+UPoQIFihmV6euRik4z8J7XDJWg==
+  version "1.0.12"
+  resolved "https://registry.yarnpkg.com/@types/lowdb/-/lowdb-1.0.12.tgz#e9828264cb5cc5ccd5462c437a9a625d34088f7f"
+  integrity sha512-m/hOfY7nuwo9V3yApvR6aJ3uZP6iNC74S7Bx5BWz0L7IrzjKyzUur/jEdlYWBWWVjmkCz+ECK9nk8UJoQa8aZw==
   dependencies:
     "@types/lodash" "*"
 
 "@types/luxon@~3.3.0":
-  version "3.3.1"
-  resolved "https://registry.yarnpkg.com/@types/luxon/-/luxon-3.3.1.tgz#08727da7d81ee6a6c702b9dc6c8f86be010eb4dc"
-  integrity sha512-XOS5nBcgEeP2PpcqJHjCWhUCAzGfXIU8ILOSLpx2FhxqMW9KdxgCGXNOEKGVBfveKtIpztHzKK5vSRVLyW/NqA==
+  version "3.3.2"
+  resolved "https://registry.yarnpkg.com/@types/luxon/-/luxon-3.3.2.tgz#f6e3524c2486b949a4db445e85d93c8e9886dfe2"
+  integrity sha512-l5cpE57br4BIjK+9BSkFBOsWtwv6J9bJpC7gdXIzZyI0vuKvNTk0wZZrkQxMGsUAuGW9+WMNWF2IJMD7br2yeQ==
 
 "@types/mime@*":
   version "3.0.1"
@@ -3806,9 +3806,9 @@
   integrity sha512-JCB8C6SnDoQf0cNycqd/35A7MjcnK+ZTqE7judS6o7utxUCg6imJg3QK2qzHKszlTjcj2cn+NwMB2i96ubpj7w==
 
 "@types/qs@*":
-  version "6.9.7"
-  resolved "https://registry.yarnpkg.com/@types/qs/-/qs-6.9.7.tgz#63bb7d067db107cc1e457c303bc25d511febf6cb"
-  integrity sha512-FGa1F62FT09qcrueBA6qYTrJPVDzah9a+493+o2PCXsesWHIn27G98TsSMs3WPNbZIEj4+VJf6saSFpvD+3Zsw==
+  version "6.9.8"
+  resolved "https://registry.yarnpkg.com/@types/qs/-/qs-6.9.8.tgz#f2a7de3c107b89b441e071d5472e6b726b4adf45"
+  integrity sha512-u95svzDlTysU5xecFNTgfFG5RUWu1A9P0VzgpcIiGZA9iraHOdSzcxMxQ55DyeRaGCSxQi7LxXDI4rzq/MYfdg==
 
 "@types/range-parser@*":
   version "1.2.4"
@@ -4354,9 +4354,9 @@ avvio@^8.2.1:
     fastq "^1.6.1"
 
 aws-sdk@^2.1344.0:
-  version "2.1447.0"
-  resolved "https://registry.yarnpkg.com/aws-sdk/-/aws-sdk-2.1447.0.tgz#fa5f356dbd3248ca2f778de4b5ce60a331c73fc2"
-  integrity sha512-7Z0VMwD679OCjZCgNbRnA0ZNxfpT8zSrI9PQXu9J0uwV7xAAfaRk3nKFpOgvobUkOXszlBiYdVubhbaHOzITtA==
+  version "2.1448.0"
+  resolved "https://registry.yarnpkg.com/aws-sdk/-/aws-sdk-2.1448.0.tgz#13d961afd7c4498d5b4af561118cd80eadee078d"
+  integrity sha512-15r8YKdAAXLgtPfQTAzD/qNxxgndF1SMEw6F+mXvLxZrLkG4BHnzOW2g2sQc3C2qG5yqCb3K6R+OrjbvGOAmdQ==
   dependencies:
     buffer "4.9.2"
     events "1.1.1"

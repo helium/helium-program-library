@@ -54,7 +54,7 @@
     "yarn": "^1.22.18"
   },
   "peerDependencies": {
-    "react": "^17.0.2",
+    "react": "^16.8 || ^17 || ^18",
     "react-dom": "^16.8 || ^17 || ^18"
   },
   "keywords": [],
