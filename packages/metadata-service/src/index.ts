@@ -6,9 +6,7 @@ import {
   init,
   keyToAssetKey,
 } from "@helium/helium-entity-manager-sdk";
-import { daoKey } from "@helium/helium-sub-daos-sdk";
 import Fastify, { FastifyInstance } from "fastify";
-import { getAsset, HNT_MINT } from "@helium/spl-utils";
 // @ts-ignore
 import bs58 from "bs58";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
@@ -78,32 +76,10 @@ server.get<{ Params: { eccCompact: string } }>(
     // TODO: Remove this once we can update compressed nft metadata
     if (eccCompact?.length === 22) {
       try {
-        if (!program) {
-          program = await init(provider);
-        }
-
-        const [keyToAssetK] = keyToAssetKey(
-          daoKey(HNT_MINT)[0],
-          eccCompact,
-          "b58"
+        const { data } = await axios(
+          `https://sol.hellohelium.com/api/metadata/${eccCompact}`
         );
-
-        const keyToAsset = await program.account.keyToAssetV0.fetchNullable(
-          keyToAssetK
-        );
-
-        const asset = await getAsset(
-          provider.connection.rpcEndpoint,
-          keyToAsset!.asset
-        );
-
-        // If the asset is a subscriber, fetch the metadata from helium mobile metadata service
-        if (asset?.content?.metadata?.symbol === "SUBSCRIBER") {
-          const { data } = await axios(
-            `https://sol.hellohelium.com/api/metadata/${eccCompact}`
-          );
-          return data;
-        }
+        return data;
       } catch {
         // ignore
       }
