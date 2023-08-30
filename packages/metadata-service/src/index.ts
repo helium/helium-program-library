@@ -1,29 +1,32 @@
 import cors from "@fastify/cors";
 // @ts-ignore
 import animalHash from "angry-purple-tiger";
-import { decodeEntityKey, init } from "@helium/helium-entity-manager-sdk"
+import {
+  decodeEntityKey,
+  init,
+  keyToAssetKey,
+} from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import Fastify, { FastifyInstance } from "fastify";
-import { HNT_MINT } from "@helium/spl-utils";
+import { getAsset, HNT_MINT } from "@helium/spl-utils";
 // @ts-ignore
 import bs58 from "bs58";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { Program } from "@coral-xyz/anchor";
-import { provider } from "./solana"
+import { provider } from "./solana";
 import Address from "@helium/address/build/Address";
 import { PublicKey } from "@solana/web3.js";
+import axios from "axios";
 
 const server: FastifyInstance = Fastify({
-  logger: true
+  logger: true,
 });
 server.register(cors, {
-  origin: "*"
+  origin: "*",
 });
 server.get("/health", async () => {
   return { ok: true };
-})
-
-const DAO = daoKey(HNT_MINT)[0];
+});
 
 let program: Program<HeliumEntityManager>;
 
@@ -67,24 +70,57 @@ server.get<{ Params: { keyToAssetKey: string } }>(
   }
 );
 
-server.get<{ Params: { eccCompact: string } }>("/:eccCompact", async (request, reply) => {
-  const { eccCompact } = request.params;
-  // const bufferCompact = Buffer.from(Address.fromB58(eccCompact).publicKey)
-  // const [storage] = await hotspotStorageKey(bufferCompact);
-  // const assetId = new PublicKey((await provider.connection.getAccountInfo(storage)).data.subarray(8, 8 + 32));
-  const digest = animalHash(eccCompact);
+server.get<{ Params: { eccCompact: string } }>(
+  "/:eccCompact",
+  async (request, reply) => {
+    const { eccCompact } = request.params;
 
-  return {
-    name: digest,
-    description: "A Hotspot NFT on Helium",
-    image:
-      "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/hotspot.png",
-    attributes: [
-      { trait_type: "ecc_compact", value: eccCompact },
-      { trait_type: "rewardable", value: true },
-    ],
-  };
-});
+    // TODO: Remove this once we can update compressed nft metadata
+    try {
+      if (!program) {
+        program = await init(provider);
+      }
+
+      const [keyToAssetK] = keyToAssetKey(
+        daoKey(HNT_MINT)[0],
+        eccCompact,
+        "b58"
+      );
+
+      const keyToAsset = await program.account.keyToAssetV0.fetchNullable(
+        keyToAssetK
+      );
+
+      const asset = await getAsset(
+        provider.connection.rpcEndpoint,
+        keyToAsset!.asset
+      );
+
+      // If the asset is a subscriber, fetch the metadata from helium mobile metadata service
+      if (asset?.content?.metadata?.symbol === "SUBSCRIBER") {
+        const { data } = await axios(
+          `https://sol.hellohelium.com/api/metadata/${eccCompact}`
+        );
+        return data;
+      }
+    } catch {
+      // ignore
+    }
+
+    const digest = animalHash(eccCompact);
+
+    return {
+      name: digest,
+      description: "A Hotspot NFT on Helium",
+      image:
+        "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/hotspot.png",
+      attributes: [
+        { trait_type: "ecc_compact", value: eccCompact },
+        { trait_type: "rewardable", value: true },
+      ],
+    };
+  }
+);
 
 const start = async () => {
   try {
