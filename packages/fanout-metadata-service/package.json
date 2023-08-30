@@ -38,14 +38,14 @@
     "@helium/address": "^4.10.2",
     "@helium/fanout-sdk": "^0.2.21",
     "@helium/spl-utils": "^0.2.21",
-    "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
+    "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-account-compression": "^0.1.7",
-    "@solana/spl-token": "^0.3.6",
-    "@solana/web3.js": "^1.43.4",
-    "axios": "^1.1.3",
+    "@solana/spl-token": "^0.3.8",
+    "@solana/web3.js": "^1.78.4",
+    "axios": "^0.27.2",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1",
-    "fastify": "^4.9.2"
+    "fastify": "^4.13.0"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.1",

@@ -35,9 +35,9 @@
     "@coral-xyz/anchor": "^0.26.0",
     "@helium/account-fetch-cache": "^0.2.21",
     "@helium/account-fetch-cache-hooks": "^0.2.21",
-    "@solana/spl-token": "^0.3.6",
-    "@solana/web3.js": "^1.66.2",
-    "bs58": "^5.0.0",
+    "@solana/spl-token": "^0.3.8",
+    "@solana/web3.js": "^1.78.4",
+    "bs58": "^4.0.1",
     "pako": "^2.0.3",
     "react-async-hook": "^4.0.0"
   },
@@ -45,12 +45,12 @@
     "@solana/wallet-adapter-react": "^0.15.32",
     "git-format-staged": "^2.1.3",
     "ts-loader": "^9.2.3",
-    "typescript": "^4.3.4",
+    "typescript": "^4.8.4",
     "yarn": "^1.22.18"
   },
   "peerDependencies": {
     "@solana/wallet-adapter-react": "^0.15.32",
-    "react": "^16.8 || ^17 || ^18",
+    "react": "^17.0.2",
     "react-dom": "^16.8 || ^17 || ^18"
   },
   "keywords": [],

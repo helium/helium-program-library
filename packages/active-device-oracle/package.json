@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^8.1.1",
-    "fastify": "^4.9.2"
+    "fastify": "^4.13.0"
   },
   "devDependencies": {
     "@types/node": "^18.11.11",

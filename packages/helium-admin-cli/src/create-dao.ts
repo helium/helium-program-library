@@ -1,26 +1,26 @@
-import * as anchor from "@coral-xyz/anchor";
-import { ThresholdType } from "@helium/circuit-breaker-sdk";
+import * as anchor from '@coral-xyz/anchor';
+import { ThresholdType } from '@helium/circuit-breaker-sdk';
 import {
   dataCreditsKey,
   init as initDc,
   PROGRAM_ID,
   accountPayerKey,
-} from "@helium/data-credits-sdk";
+} from '@helium/data-credits-sdk';
 import {
   init as initHem,
   dataOnlyConfigKey,
-} from "@helium/helium-entity-manager-sdk";
-import { fanoutKey } from "@helium/fanout-sdk";
+} from '@helium/helium-entity-manager-sdk';
+import { fanoutKey } from '@helium/fanout-sdk';
 import {
   daoKey,
   init as initDao,
   threadKey,
-} from "@helium/helium-sub-daos-sdk";
-import { sendInstructions, toBN } from "@helium/spl-utils";
+} from '@helium/helium-sub-daos-sdk';
+import { sendInstructions, toBN } from '@helium/spl-utils';
 import {
   init as initVsr,
   registrarKey,
-} from "@helium/voter-stake-registry-sdk";
+} from '@helium/voter-stake-registry-sdk';
 import {
   getGovernanceProgramVersion,
   GoverningTokenConfigAccountArgs,
@@ -29,13 +29,13 @@ import {
   SetRealmAuthorityAction,
   withCreateRealm,
   withSetRealmAuthority,
-} from "@solana/spl-governance";
+} from '@solana/spl-governance';
 import {
   createAssociatedTokenAccountIdempotent,
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
   getAssociatedTokenAddressSync,
-} from "@solana/spl-token";
+} from '@solana/spl-token';
 import {
   ComputeBudgetProgram,
   Connection,
@@ -45,10 +45,10 @@ import {
   SystemProgram,
   Transaction,
   TransactionInstruction,
-} from "@solana/web3.js";
-import Squads from "@sqds/sdk";
-import os from "os";
-import yargs from "yargs/yargs";
+} from '@solana/web3.js';
+import Squads from '@sqds/sdk';
+import os from 'os';
+import yargs from 'yargs/yargs';
 import {
   createAndMint,
   getTimestampFromDays,
@@ -57,12 +57,15 @@ import {
   loadKeypair,
   parseEmissionsSchedule,
   sendInstructionsOrSquads,
-} from "./utils";
-import fs from "fs";
-import { BN } from "bn.js";
-import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
+} from './utils';
+import fs from 'fs';
+import { BN } from 'bn.js';
+import {
+  getConcurrentMerkleTreeAccountSize,
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+} from '@solana/spl-account-compression';
 
-const { hideBin } = require("yargs/helpers");
+const { hideBin } = require('yargs/helpers');
 
 const HNT_EPOCH_REWARDS = 10000000000;
 const SECS_PER_DAY = 86400;
@@ -81,108 +84,108 @@ async function exists(
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: "k",
-      describe: "Anchor wallet keypair",
+      alias: 'k',
+      describe: 'Anchor wallet keypair',
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: "u",
-      default: "http://127.0.0.1:8899",
-      describe: "The solana url",
+      alias: 'u',
+      default: 'http://127.0.0.1:8899',
+      describe: 'The solana url',
     },
     hntKeypair: {
-      type: "string",
-      describe: "Keypair of the HNT token",
+      type: 'string',
+      describe: 'Keypair of the HNT token',
       default: `${__dirname}/../../keypairs/hnt.json`,
     },
     dcKeypair: {
-      type: "string",
-      describe: "Keypair of the Data Credit token",
+      type: 'string',
+      describe: 'Keypair of the Data Credit token',
       default: `${__dirname}/../../keypairs/dc.json`,
     },
     numHnt: {
-      type: "number",
+      type: 'number',
       describe:
-        "Number of HNT tokens to pre mint before assigning authority to lazy distributor",
+        'Number of HNT tokens to pre mint before assigning authority to lazy distributor',
       default: 0,
     },
     numDc: {
-      type: "number",
+      type: 'number',
       describe:
-        "Number of DC tokens to pre mint before assigning authority to lazy distributor",
+        'Number of DC tokens to pre mint before assigning authority to lazy distributor',
       default: 1000,
     },
     bucket: {
-      type: "string",
-      describe: "Bucket URL prefix holding all of the metadata jsons",
+      type: 'string',
+      describe: 'Bucket URL prefix holding all of the metadata jsons',
       default:
-        "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP",
+        'https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP',
     },
     emissionSchedulePath: {
       required: true,
-      describe: "Path to file that contains the hnt emissions schedule",
-      type: "string",
+      describe: 'Path to file that contains the hnt emissions schedule',
+      type: 'string',
       default: `${__dirname}/../../emissions/hnt.json`,
     },
     hstEmissionSchedulePath: {
       required: true,
-      describe: "Path to file that contains the hst emissions schedule",
-      type: "string",
+      describe: 'Path to file that contains the hst emissions schedule',
+      type: 'string',
       default: `${__dirname}/../../emissions/hst.json`,
     },
     govProgramId: {
-      type: "string",
-      describe: "Pubkey of the GOV program",
-      default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
+      type: 'string',
+      describe: 'Pubkey of the GOV program',
+      default: 'hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S',
     },
     realmName: {
-      type: "string",
-      describe: "Name of the realm to be generated",
-      default: "Helium",
+      type: 'string',
+      describe: 'Name of the realm to be generated',
+      default: 'Helium',
     },
     councilKeypair: {
-      type: "string",
-      describe: "Keypair of gov council token",
+      type: 'string',
+      describe: 'Keypair of gov council token',
       default: `${__dirname}/../../keypairs/council.json`,
     },
     councilWallet: {
-      type: "string",
-      describe: "Pubkey for holding/distributing council tokens",
+      type: 'string',
+      describe: 'Pubkey for holding/distributing council tokens',
       default: await loadKeypair(
         `${os.homedir()}/.config/solana/id.json`
       ).publicKey.toBase58(),
     },
     numCouncil: {
-      type: "number",
+      type: 'number',
       describe:
-        "Number of Gov Council tokens to pre mint before assigning authority to dao",
+        'Number of Gov Council tokens to pre mint before assigning authority to dao',
       default: 10,
     },
     multisig: {
-      type: "string",
+      type: 'string',
       describe:
-        "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority",
+        'Address of the squads multisig to control the dao. If not provided, your wallet will be the authority',
     },
     authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
+      type: 'number',
+      describe: 'Authority index for squads. Defaults to 1',
       default: 1,
     },
     hntPriceOracle: {
-      type: "string",
-      required: true
+      type: 'string',
+      required: true,
     },
     numHst: {
-      type: "number",
+      type: 'number',
       describe:
-        "Number of HST tokens to pre mint before assigning authority to lazy distributor",
+        'Number of HST tokens to pre mint before assigning authority to lazy distributor',
       default: 0,
     },
     merklePath: {
-      type: "string",
-      describe: "Path to the merkle keypair",
+      type: 'string',
+      describe: 'Path to the merkle keypair',
       default: `${__dirname}/../../keypairs/data-only-merkle.json`,
-    }
+    },
   });
 
   const argv = await yarg.argv;
@@ -191,11 +194,11 @@ export async function run(args: any = process.argv) {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
+  const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const dataCreditsProgram = await initDc(provider);
   const heliumSubDaosProgram = await initDao(provider);
   const heliumVsrProgram = await initVsr(provider);
   const hemProgram = await initHem(provider);
-
 
   const govProgramId = new PublicKey(argv.govProgramId);
   const councilKeypair = await loadKeypair(argv.councilKeypair);
@@ -206,25 +209,22 @@ export async function run(args: any = process.argv) {
   const me = provider.wallet.publicKey;
   const dao = daoKey(hntKeypair.publicKey)[0];
 
-  console.log("HNT", hntKeypair.publicKey.toBase58());
-  console.log("DC", dcKeypair.publicKey.toBase58());
-  console.log("GOV PID", govProgramId.toBase58());
-  console.log("COUNCIL", councilKeypair.publicKey.toBase58());
-  console.log("COUNCIL WALLET", councilWallet.toBase58());
+  console.log('HNT', hntKeypair.publicKey.toBase58());
+  console.log('DC', dcKeypair.publicKey.toBase58());
+  console.log('GOV PID', govProgramId.toBase58());
+  console.log('COUNCIL', councilKeypair.publicKey.toBase58());
+  console.log('COUNCIL WALLET', councilWallet.toBase58());
 
-  const thread = threadKey(dao, "issue_hst")[0];
+  const thread = threadKey(dao, 'issue_hst')[0];
 
-  console.log("DAO", dao.toString());
-  console.log("THREAD", thread.toString());
+  console.log('DAO', dao.toString());
+  console.log('THREAD', thread.toString());
 
   const conn = provider.connection;
 
-  const squads = Squads.endpoint(
-    process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet, {
-      commitmentOrConfig: "finalized"
-    }
-  );
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
+    commitmentOrConfig: 'finalized',
+  });
   let authority = provider.wallet.publicKey;
   let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
   if (multisig) {
@@ -232,7 +232,7 @@ export async function run(args: any = process.argv) {
     // Fund authority
     const authAcc = await provider.connection.getAccountInfo(authority);
     if (!authAcc || authAcc.lamports < LAMPORTS_PER_SOL) {
-      console.log("Funding multisig...")
+      console.log('Funding multisig...');
       await sendInstructions(provider, [
         await SystemProgram.transfer({
           fromPubkey: me,
@@ -248,7 +248,7 @@ export async function run(args: any = process.argv) {
     mintKeypair: hntKeypair,
     amount: argv.numHnt,
     metadataUrl: `${argv.bucket}/hnt.json`,
-    updateAuthority: authority
+    updateAuthority: authority,
   });
 
   await createAndMint({
@@ -274,19 +274,19 @@ export async function run(args: any = process.argv) {
   const govProgramVersion = await getGovernanceProgramVersion(
     conn,
     govProgramId,
-    isLocalhost(provider) ? "localnet" : undefined
+    isLocalhost(provider) ? 'localnet' : undefined
   );
 
   const realmName = argv.realmName;
   const realm = await PublicKey.findProgramAddressSync(
-    [Buffer.from("governance", "utf-8"), Buffer.from(realmName, "utf-8")],
+    [Buffer.from('governance', 'utf-8'), Buffer.from(realmName, 'utf-8')],
     govProgramId
   )[0];
 
-  console.log("Realm, ", realm.toBase58());
-  const needRealmCreate = !(await exists(conn, realm))
+  console.log('Realm, ', realm.toBase58());
+  const needRealmCreate = !(await exists(conn, realm));
   if (needRealmCreate) {
-    console.log("Initializing Realm");
+    console.log('Initializing Realm');
     await withCreateRealm(
       instructions,
       govProgramId,
@@ -317,7 +317,7 @@ export async function run(args: any = process.argv) {
 
   const registrar = (await registrarKey(realm, hntKeypair.publicKey))[0];
   if (!(await exists(conn, registrar))) {
-    console.log("Initializing VSR Registrar");
+    console.log('Initializing VSR Registrar');
     instructions.push(
       ComputeBudgetProgram.setComputeUnitLimit({ units: 800000 })
     );
@@ -336,7 +336,7 @@ export async function run(args: any = process.argv) {
     instructions = [];
   }
 
-  console.log("Configuring VSR voting mint at [0]");
+  console.log('Configuring VSR voting mint at [0]');
   instructions.push(
     await heliumVsrProgram.methods
       .configureVotingMintV0({
@@ -346,7 +346,7 @@ export async function run(args: any = process.argv) {
         maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE * 1e9),
         genesisVotePowerMultiplier: GENESIS_MULTIPLIER,
         // April 28th, 23:59:59 UTC
-        genesisVotePowerMultiplierExpirationTs: new anchor.BN("1682726399"),
+        genesisVotePowerMultiplierExpirationTs: new anchor.BN('1682726399'),
         lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
       })
       .accounts({
@@ -365,7 +365,7 @@ export async function run(args: any = process.argv) {
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
-  console.log("Creating max voter record");
+  console.log('Creating max voter record');
   instructions.push(
     await heliumVsrProgram.methods
       .updateMaxVoterWeightV0()
@@ -394,7 +394,7 @@ export async function run(args: any = process.argv) {
   instructions = [];
 
   const dcKey = (await dataCreditsKey(dcKeypair.publicKey))[0];
-  console.log("dcpid", PROGRAM_ID.toBase58());
+  console.log('dcpid', PROGRAM_ID.toBase58());
   if (!(await exists(conn, dcKey))) {
     await dataCreditsProgram.methods
       .initializeDataCreditsV0({
@@ -402,7 +402,7 @@ export async function run(args: any = process.argv) {
         config: {
           windowSizeSeconds: new anchor.BN(60 * 60),
           thresholdType: ThresholdType.Absolute as never,
-          threshold: new anchor.BN("1000000000000"),
+          threshold: new anchor.BN('1000000000000'),
         },
       })
       .accounts({
@@ -428,14 +428,14 @@ export async function run(args: any = process.argv) {
   }
 
   if (!(await exists(conn, dao))) {
-    console.log("Initializing DAO");
+    console.log('Initializing DAO');
     const hstEmission = await parseEmissionsSchedule(
       argv.hstEmissionSchedulePath
     );
     const hntEmission = await parseEmissionsSchedule(argv.emissionSchedulePath);
     const currentHstEmission = hstEmission[0];
     const currentHntEmission = hntEmission[0];
-    const fanout = fanoutKey("HST")[0];
+    const fanout = fanoutKey('HST')[0];
     const hstPool = getAssociatedTokenAddressSync(
       hntKeypair.publicKey,
       fanout,
@@ -532,17 +532,20 @@ export async function run(args: any = process.argv) {
             authority,
             newTreeDepth: size,
             newTreeBufferSize: buffer,
-            newTreeSpace: new BN(getConcurrentMerkleTreeAccountSize(size, buffer, canopy)),
+            newTreeSpace: new BN(
+              getConcurrentMerkleTreeAccountSize(size, buffer, canopy)
+            ),
             newTreeFeeLamports: new BN(cost / 2 ** size),
-            name: "DATAONLY",
-            metadataUrl: "https://shdw-drive.genesysgo.net/H8b1gZmA2aBqDYxicxawGpznCaNbFSEJ3YnJuawGQ2EQ/data-only.json",
+            name: 'DATAONLY',
+            metadataUrl:
+              'https://shdw-drive.genesysgo.net/H8b1gZmA2aBqDYxicxawGpznCaNbFSEJ3YnJuawGQ2EQ/data-only.json',
           })
           .accounts({
             dao,
             authority,
             merkleTree: merkle.publicKey,
           })
-          .instruction()
+          .instruction(),
       ],
       executeTransaction: false,
       squads,
