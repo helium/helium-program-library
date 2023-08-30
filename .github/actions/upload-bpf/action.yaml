@@ -51,6 +51,16 @@ runs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
         key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}-2
+    - uses: actions/cache@v2
+      name: Cache Cargo registry + index
+      id: cache-cargo-registry
+      with:
+        path: |
+          ~/.cargo/bin/solana-verify
+        key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('~/.cargo/bin/solana-verify') }}-2
+    - run: cargo install solana-verify
+      if: steps.cache-solana-verify.outputs.cache-hit != 'true'
+      shell: bash
     - name: Cache Deps Builds
       uses: actions/cache@v2
       id: cache-cargo-deps-builds

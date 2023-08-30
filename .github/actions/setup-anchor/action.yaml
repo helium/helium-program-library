@@ -21,6 +21,5 @@ runs:
     - run: if [ $ANCHOR_VERSION -eq 0 ]; then cargo install --git https://github.com/coral-xyz/anchor anchor-cli --locked --force; else cargo install --git https://github.com/coral-xyz/anchor --tag "v$ANCHOR_VERSION" anchor-cli --locked; fi
       shell: bash
       if: steps.cache-anchor-cli.outputs.cache-hit != 'true'
-    - run: cargo install toml-cli solana-verify
-      if: steps.cache-anchor-cli.outputs.cache-hit != 'true'
+    - run: cargo install toml-cli
       shell: bash
