@@ -76,35 +76,37 @@ server.get<{ Params: { eccCompact: string } }>(
     const { eccCompact } = request.params;
 
     // TODO: Remove this once we can update compressed nft metadata
-    try {
-      if (!program) {
-        program = await init(provider);
-      }
+    if (eccCompact?.length === 22) {
+      try {
+        if (!program) {
+          program = await init(provider);
+        }
 
-      const [keyToAssetK] = keyToAssetKey(
-        daoKey(HNT_MINT)[0],
-        eccCompact,
-        "b58"
-      );
-
-      const keyToAsset = await program.account.keyToAssetV0.fetchNullable(
-        keyToAssetK
-      );
-
-      const asset = await getAsset(
-        provider.connection.rpcEndpoint,
-        keyToAsset!.asset
-      );
-
-      // If the asset is a subscriber, fetch the metadata from helium mobile metadata service
-      if (asset?.content?.metadata?.symbol === "SUBSCRIBER") {
-        const { data } = await axios(
-          `https://sol.hellohelium.com/api/metadata/${eccCompact}`
+        const [keyToAssetK] = keyToAssetKey(
+          daoKey(HNT_MINT)[0],
+          eccCompact,
+          "b58"
         );
-        return data;
+
+        const keyToAsset = await program.account.keyToAssetV0.fetchNullable(
+          keyToAssetK
+        );
+
+        const asset = await getAsset(
+          provider.connection.rpcEndpoint,
+          keyToAsset!.asset
+        );
+
+        // If the asset is a subscriber, fetch the metadata from helium mobile metadata service
+        if (asset?.content?.metadata?.symbol === "SUBSCRIBER") {
+          const { data } = await axios(
+            `https://sol.hellohelium.com/api/metadata/${eccCompact}`
+          );
+          return data;
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
 
     const digest = animalHash(eccCompact);
