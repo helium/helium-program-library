@@ -116,12 +116,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
     if (!daoEpochInfo?.doneIssuingHstPool) {
       try {
-        if (!daoEpochInfo?.doneIssuingHstPool) {
-          await heliumSubDaosProgram.methods
-            .issueHstPoolV0({ epoch })
-            .accounts({ dao })
-            .rpc({ skipPreflight: true });
-        }
+        await heliumSubDaosProgram.methods
+          .issueHstPoolV0({ epoch })
+          .accounts({ dao })
+          .rpc({ skipPreflight: true });
       } catch (err: any) {
         console.log(`Failed to issue hst pool: ${err.message}`);
       }
