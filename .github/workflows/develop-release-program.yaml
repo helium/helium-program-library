@@ -68,15 +68,13 @@ jobs:
         env:
           PROGRAM: ${{ matrix.program }}
 
-      - uses: ./.github/actions/upload-bpf/
-        id: buffer-deploy
+      - uses: ./.github/actions/build-verified/
+        id: build-verified
         with:
           devnet: true
-          network: devnet
           program: ${{ env.PROGRAM_NAME }}
-          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
           program-id: ${{ env.PROGRAM_ID }}
-          buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
+
   publish_programs:
     needs: [build_programs]
     runs-on: ubuntu-latest
@@ -87,6 +85,15 @@ jobs:
       matrix:
         program: ${{ fromJson(needs.detect_changed_programs.outputs.programs_with_changes) }}
     steps:
+      - uses: ./.github/actions/upload-bpf/
+        id: buffer-deploy
+        with:
+          devnet: true
+          network: devnet
+          program: ${{ env.PROGRAM_NAME }}
+          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
+          program-id: ${{ env.PROGRAM_ID }}
+          buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
       - name: Squads program upgrade
         uses: helium/squads-program-upgrade@v0.3.1
         with:

@@ -38,7 +38,14 @@ jobs:
           echo "Version: $VERSION"
           echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
           echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
-      - uses: ./.github/actions/upload-bpf/
+
+      - uses: ./.github/actions/build-verified/
+        id: build-verified
+        with:
+          program: ${{ env.PROGRAM_NAME }}
+          program-id: ${{ env.PROGRAM_ID }}
+
+      - uses: ./.github/actions/buffer-deploy/
         id: buffer-deploy
         with:
           network: https://api.mainnet-beta.solana.com

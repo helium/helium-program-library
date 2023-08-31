@@ -1,0 +1,23 @@
+name: NPM Publish
+
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - "npm-*" # Push events to matching npm-*, i.e. npm-0.0.1
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/setup/
+      - uses: ./.github/actions/setup-anchor/
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: ./.github/actions/build-anchor/
+        with:
+          testing: false
+          devnet: false
+      - name: Lerna Publish
+        run: yarn release
