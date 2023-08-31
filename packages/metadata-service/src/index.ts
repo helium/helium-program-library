@@ -1,20 +1,13 @@
-import cors from "@fastify/cors";
-// @ts-ignore
-import animalHash from "angry-purple-tiger";
-import {
-  decodeEntityKey,
-  init,
-  keyToAssetKey,
-} from "@helium/helium-entity-manager-sdk";
-import Fastify, { FastifyInstance } from "fastify";
-// @ts-ignore
-import bs58 from "bs58";
-import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { Program } from "@coral-xyz/anchor";
-import { provider } from "./solana";
+import cors from "@fastify/cors";
 import Address from "@helium/address/build/Address";
+import { decodeEntityKey, init } from "@helium/helium-entity-manager-sdk";
+import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { PublicKey } from "@solana/web3.js";
+import animalHash from "angry-purple-tiger";
 import axios from "axios";
+import Fastify, { FastifyInstance } from "fastify";
+import { provider } from "./solana";
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -46,13 +39,17 @@ server.get<{ Params: { keyToAssetKey: string } }>(
     const digest = animalHash(keyStr);
 
     return {
-      name: digest,
+      name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
       description:
         keyStr === "iot_operations_fund"
           ? "IOT Operations Fund"
           : "A Rewardable NFT on Helium",
+      // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
+      // In the future, we need to put different symbols on different types of hotspots
       image:
-        "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/hotspot.png",
+        keyToAssetAccount.entityKey.length > 100
+          ? "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/mobile-hotspot.png"
+          : "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/hotspot.png",
       attributes: [
         keyStr && Address.isValid(keyStr)
           ? { trait_type: "ecc_compact", value: keyStr }
@@ -80,8 +77,8 @@ server.get<{ Params: { eccCompact: string } }>(
           `https://sol.hellohelium.com/api/metadata/${eccCompact}`
         );
         return data;
-      } catch {
-        // ignore
+      } catch (e: any) {
+        console.error(e);
       }
     }
 
