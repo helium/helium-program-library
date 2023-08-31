@@ -76,7 +76,7 @@ jobs:
           program-id: ${{ env.PROGRAM_ID }}
 
   publish_programs:
-    needs: [build_programs]
+    needs: [detect_changed_programs, build_programs]
     runs-on: ubuntu-latest
     if: needs.detect_changed_programs.outputs.programs_with_changes != '[]' && needs.detect_changed_programs.outputs.programs_with_changes != ''
     strategy:
