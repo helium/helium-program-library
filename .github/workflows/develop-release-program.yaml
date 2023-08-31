@@ -53,6 +53,7 @@ jobs:
           path: |
             ~/.cargo/bin/toml
           key: toml-cli-${{ runner.os }}-v0001
+          
       - run: cargo install toml-cli
         if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         shell: bash
@@ -85,6 +86,8 @@ jobs:
       matrix:
         program: ${{ fromJson(needs.detect_changed_programs.outputs.programs_with_changes) }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
       - uses: ./.github/actions/buffer-deploy/
         id: buffer-deploy
         with:
