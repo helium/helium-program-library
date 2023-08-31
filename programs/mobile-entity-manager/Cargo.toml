@@ -2,7 +2,7 @@ cargo-features = ["workspace-inheritance"]
 
 [package]
 name = "mobile-entity-manager"
-version = "0.0.2"
+version = "0.0.3"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -33,5 +33,6 @@ bubblegum-cpi = { workspace = true }
 account-compression-cpi = { workspace = true }
 shared-utils = { path = "../../utils/shared-utils" }
 helium-entity-manager = { path = "../helium-entity-manager", features = ["cpi"] }
-
 helium-sub-daos = { path = "../helium-sub-daos", features = ["cpi"] }
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }

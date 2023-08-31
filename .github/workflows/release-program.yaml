@@ -13,8 +13,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Install toml-cli
-        run: cargo install toml-cli
+      - uses: actions/cache@v2
+        name: Cache Toml Cli
+        id: cache-toml-cli
+        with:
+          path: |
+            ~/.cargo/bin/toml
+          key: toml-cli-${{ runner.os }}-v0001
+      - run: cargo install toml-cli
+        if: steps.cache-toml-cli.outputs.cache-hit != 'true'
+        shell: bash
 
       - name: Set tag information
         run: |
@@ -30,7 +38,14 @@ jobs:
           echo "Version: $VERSION"
           echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
           echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
-      - uses: ./.github/actions/upload-bpf/
+
+      - uses: ./.github/actions/build-verified/
+        id: build-verified
+        with:
+          program: ${{ env.PROGRAM_NAME }}
+          program-id: ${{ env.PROGRAM_ID }}
+
+      - uses: ./.github/actions/buffer-deploy/
         id: buffer-deploy
         with:
           network: https://api.mainnet-beta.solana.com

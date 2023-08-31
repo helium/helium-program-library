@@ -795,11 +795,13 @@ dependencies = [
 
 [[package]]
 name = "circuit-breaker"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "default-env",
  "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -1184,14 +1186,16 @@ dependencies = [
 
 [[package]]
 name = "data-credits"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
  "circuit-breaker",
+ "default-env",
  "helium-sub-daos",
  "lazy-transactions",
  "pyth-sdk-solana",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -1199,6 +1203,17 @@ name = "data-encoding"
 version = "2.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23d8666cb01533c39dde32bcbab8e227b4ed6679b2c925eba05feabea39508fb"
+
+[[package]]
+name = "default-env"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f753eb82d29277e79efc625e84aecacfd4851ee50e05a8573a4740239a77bfd3"
+dependencies = [
+ "proc-macro2 0.4.30",
+ "quote 0.6.13",
+ "syn 0.15.44",
+]
 
 [[package]]
 name = "der"
@@ -1471,12 +1486,14 @@ checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
 
 [[package]]
 name = "fanout"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "default-env",
  "mpl-token-metadata",
  "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -1750,7 +1767,7 @@ checksum = "2540771e65fc8cb83cd6e8a237f70c319bd5c29f78ed1084ba5d50eeac86f7f9"
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -1760,23 +1777,27 @@ dependencies = [
  "bubblegum-cpi",
  "bytemuck",
  "data-credits",
+ "default-env",
  "helium-sub-daos",
  "lazy-transactions",
  "mpl-token-metadata",
  "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.0.15"
+version = "0.0.16"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
  "circuit-breaker",
  "clockwork-sdk",
+ "default-env",
  "mpl-token-metadata",
  "rust_decimal",
  "shared-utils",
+ "solana-security-txt",
  "spl-governance-tools",
  "switchboard-v2",
  "time 0.3.17",
@@ -2091,24 +2112,29 @@ dependencies = [
 
 [[package]]
 name = "lazy-distributor"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
  "anchor-spl",
  "bubblegum-cpi",
  "circuit-breaker",
+ "default-env",
  "mpl-token-metadata",
  "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
 name = "lazy-transactions"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
+ "default-env",
+ "shared-utils",
+ "solana-security-txt",
  "spl-concurrent-merkle-tree",
 ]
 
@@ -2341,7 +2367,7 @@ dependencies = [
 
 [[package]]
 name = "mobile-entity-manager"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -2350,10 +2376,12 @@ dependencies = [
  "bs58 0.3.1",
  "bubblegum-cpi",
  "bytemuck",
+ "default-env",
  "helium-entity-manager",
  "helium-sub-daos",
  "mpl-token-metadata",
  "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -2850,9 +2878,11 @@ checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 
 [[package]]
 name = "price-oracle"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anchor-lang",
+ "default-env",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -3251,11 +3281,13 @@ dependencies = [
 
 [[package]]
 name = "rewards-oracle"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anchor-lang",
+ "default-env",
  "helium-entity-manager",
  "lazy-distributor",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -4403,6 +4435,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-security-txt"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "468aa43b7edb1f9b7b7b686d5c3aeb6630dc1708e86e31343499dd5c4d775183"
+
+[[package]]
 name = "solana-send-transaction-service"
 version = "1.14.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5226,12 +5264,14 @@ dependencies = [
 
 [[package]]
 name = "treasury-management"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
  "circuit-breaker",
+ "default-env",
  "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -5409,13 +5449,14 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
  "base64 0.13.1",
  "bincode",
  "bytemuck",
+ "default-env",
  "env_logger",
  "itertools",
  "log",
@@ -5428,6 +5469,7 @@ dependencies = [
  "solana-program",
  "solana-program-test",
  "solana-sdk",
+ "solana-security-txt",
  "spl-associated-token-account",
  "spl-governance",
  "spl-governance-addin-api",

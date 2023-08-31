@@ -41,31 +41,6 @@ runs:
     - uses: ./.github/actions/setup-anchor/
       with:
         node-version: ${{ env.NODE_VERSION }}
-    - uses: actions/cache@v2
-      name: Cache Cargo registry + index
-      id: cache-cargo-registry
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}-2
-    - name: Cache Deps Builds
-      uses: actions/cache@v2
-      id: cache-cargo-deps-builds
-      with:
-        path: |
-          ./deps/metaplex-program-brary
-          ./deps/solana-program-library
-          ./deps/clockwork
-        key: deps-${{ runner.os }}-build-${{ hashFiles('./deps/**/Cargo.lock') }}
-    - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/anchor build -p $PROGRAM ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
-      shell: bash
-      env:
-        PROGRAM: ${{ inputs.program }}
-    - run: solana-keygen new -o keyp --no-bip39-passphrase
-      shell: bash
     - run: echo "$DEPLOY_KEYPAIR" > ./deploy-keypair.json && chmod 600 ./deploy-keypair.json
       shell: bash
       env:

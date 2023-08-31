@@ -2,7 +2,7 @@ cargo-features = ["workspace-inheritance"]
 
 [package]
 name = "lazy-distributor"
-version = "0.0.2"
+version = "0.0.3"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -30,3 +30,5 @@ bubblegum-cpi = { workspace = true }
 circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
 shared-utils = { path = "../../utils/shared-utils" }
 account-compression-cpi = { workspace = true }
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }

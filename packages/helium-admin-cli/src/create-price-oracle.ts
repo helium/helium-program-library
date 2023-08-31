@@ -1,58 +1,49 @@
-import {
-  init,
-} from "@helium/price-oracle-sdk";
-import * as anchor from "@coral-xyz/anchor";
-import {
-  Connection,
-  Keypair,
-  PublicKey,
-} from "@solana/web3.js";
-import os from "os";
-import yargs from "yargs/yargs";
-import {
-  exists,
-  loadKeypair,
-} from "./utils";
-import Squads from "@sqds/sdk";
-import fs from "fs";
-import { heliumAddressToSolPublicKey } from "@helium/spl-utils";
+import { init } from '@helium/price-oracle-sdk';
+import * as anchor from '@coral-xyz/anchor';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import os from 'os';
+import yargs from 'yargs/yargs';
+import { exists, loadKeypair } from './utils';
+import Squads from '@sqds/sdk';
+import fs from 'fs';
+import { heliumAddressToSolPublicKey } from '@helium/spl-utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: "k",
-      describe: "Anchor wallet keypair",
+      alias: 'k',
+      describe: 'Anchor wallet keypair',
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: "u",
-      default: "http://127.0.0.1:8899",
-      describe: "The solana url",
+      alias: 'u',
+      default: 'http://127.0.0.1:8899',
+      describe: 'The solana url',
     },
     priceOracleKeypair: {
-      type: "string",
+      type: 'string',
       required: false,
-      describe: "Keypair of the price oracle account",
+      describe: 'Keypair of the price oracle account',
       default: null,
     },
     oracles: {
-      type: "string",
+      type: 'string',
       required: true,
       describe: `JSON file of helium keypairs of the oracles`,
     },
     decimals: {
-      type: "number",
+      type: 'number',
       required: true,
-      describe: "Number of decimals in the price",
+      describe: 'Number of decimals in the price',
     },
     multisig: {
-      type: "string",
+      type: 'string',
       describe:
-        "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority",
+        'Address of the squads multisig to control the dao. If not provided, your wallet will be the authority',
     },
     authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
+      type: 'number',
+      describe: 'Authority index for squads. Defaults to 1',
       default: 1,
     },
   });
@@ -63,24 +54,24 @@ export async function run(args: any = process.argv) {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
+  const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const program = await init(provider);
 
-  const squads = Squads.endpoint(
-    process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet, {
-      commitmentOrConfig: "finalized"
-    }
-  );
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
+    commitmentOrConfig: 'finalized',
+  });
   let authority = provider.wallet.publicKey;
   let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
   if (multisig) {
     authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
   }
 
-  const priceOracleKeypair = argv.priceOracleKeypair ? await loadKeypair(argv.priceOracleKeypair) : Keypair.generate();
+  const priceOracleKeypair = argv.priceOracleKeypair
+    ? await loadKeypair(argv.priceOracleKeypair)
+    : Keypair.generate();
 
   if (await exists(provider.connection, priceOracleKeypair.publicKey)) {
-    console.log("Price oracle already exists");
+    console.log('Price oracle already exists');
     return;
   }
   const oracleKeys = JSON.parse(fs.readFileSync(argv.oracles).toString()).map(
@@ -91,17 +82,20 @@ export async function run(args: any = process.argv) {
       authority: x,
       lastSubmittedPrice: null,
       lastSubmittedTimestamp: null,
-    }
-  })
-  await program.methods.initializePriceOracleV0({
-    oracles,
-    decimals: argv.decimals,
-    authority
-  }).accounts({
-    priceOracle: priceOracleKeypair.publicKey,
-    payer: provider.wallet.publicKey,
-  }).signers([priceOracleKeypair])
-  .rpc({skipPreflight: true});
+    };
+  });
+  await program.methods
+    .initializePriceOracleV0({
+      oracles,
+      decimals: argv.decimals,
+      authority,
+    })
+    .accounts({
+      priceOracle: priceOracleKeypair.publicKey,
+      payer: provider.wallet.publicKey,
+    })
+    .signers([priceOracleKeypair])
+    .rpc({ skipPreflight: true });
 
   console.log(`Created price oracle at: ${priceOracleKeypair.publicKey}`);
 }

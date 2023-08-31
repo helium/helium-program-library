@@ -1,72 +1,75 @@
-import { ClockworkProvider, parseTransactionInstructions } from "@clockwork-xyz/sdk";
-import * as anchor from "@coral-xyz/anchor";
-import Address from "@helium/address";
-import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
-import { fanoutKey, init, membershipVoucherKey } from "@helium/fanout-sdk";
-import { createMintInstructions, sendInstructions } from "@helium/spl-utils";
+import {
+  ClockworkProvider,
+  parseTransactionInstructions,
+} from '@clockwork-xyz/sdk';
+import * as anchor from '@coral-xyz/anchor';
+import Address from '@helium/address';
+import { ED25519_KEY_TYPE } from '@helium/address/build/KeyTypes';
+import { fanoutKey, init, membershipVoucherKey } from '@helium/fanout-sdk';
+import { createMintInstructions, sendInstructions } from '@helium/spl-utils';
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAccount,
-  getAssociatedTokenAddressSync
-} from "@solana/spl-token";
-import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
-import { loadKeypair } from "@switchboard-xyz/solana.js";
-import fs from "fs";
-import os from "os";
-import yargs from "yargs/yargs";
-import { createAndMint, exists } from "./utils";
+  getAssociatedTokenAddressSync,
+} from '@solana/spl-token';
+import { ComputeBudgetProgram, Keypair, PublicKey } from '@solana/web3.js';
+import Squads from '@sqds/sdk';
+import { loadKeypair } from '@switchboard-xyz/solana.js';
+import fs from 'fs';
+import os from 'os';
+import yargs from 'yargs/yargs';
+import { createAndMint, exists } from './utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: "k",
-      describe: "Anchor wallet keypair",
+      alias: 'k',
+      describe: 'Anchor wallet keypair',
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: "u",
-      default: "http://127.0.0.1:8899",
-      describe: "The solana url",
+      alias: 'u',
+      default: 'http://127.0.0.1:8899',
+      describe: 'The solana url',
     },
     hnt: {
-      type: "string",
-      describe: "Pubkey of hnt",
+      type: 'string',
+      describe: 'Pubkey of hnt',
       required: true,
     },
     state: {
-      type: "string",
-      alias: "s",
+      type: 'string',
+      alias: 's',
       default: `${__dirname}/../../migration-service/export.json`,
     },
     name: {
-      type: "string",
+      type: 'string',
     },
     multisig: {
-      type: "string",
+      type: 'string',
       describe:
-        "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority",
+        'Address of the squads multisig to control the dao. If not provided, your wallet will be the authority',
     },
     authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
+      type: 'number',
+      describe: 'Authority index for squads. Defaults to 1',
       default: 1,
     },
     hstKeypair: {
-      type: "string",
-      describe: "Keypair of the HST token",
+      type: 'string',
+      describe: 'Keypair of the HST token',
       default: `${__dirname}/../keypairs/hst.json`,
     },
     hstReceiptBasePath: {
-      type: "string",
-      describe: "Keypair of the HST receipt token",
-      default: `${__dirname}/../keypairs`
+      type: 'string',
+      describe: 'Keypair of the HST receipt token',
+      default: `${__dirname}/../keypairs`,
     },
     bucket: {
-      type: "string",
-      describe: "Bucket URL prefix holding all of the metadata jsons",
+      type: 'string',
+      describe: 'Bucket URL prefix holding all of the metadata jsons',
       default:
-        "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP",
+        'https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP',
     },
   });
 
@@ -75,16 +78,14 @@ export async function run(args: any = process.argv) {
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
+  const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const hstKeypair = loadKeypair(argv.hstKeypair);
 
   let authority = provider.wallet.publicKey;
   let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
-  const squads = Squads.endpoint(
-    process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet, {
-      commitmentOrConfig: "finalized"
-    }
-  );
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
+    commitmentOrConfig: 'finalized',
+  });
   if (multisig) {
     authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
   }
@@ -116,7 +117,7 @@ export async function run(args: any = process.argv) {
 
   const fanout = fanoutKey(argv.name!)[0];
   const hntAccount = await getAssociatedTokenAddressSync(hnt, fanout, true);
-  console.log("Outputting hnt to", hntAccount.toBase58());
+  console.log('Outputting hnt to', hntAccount.toBase58());
   if (!(await exists(provider.connection, fanout))) {
     await fanoutProgram.methods
       .initializeFanoutV0({
@@ -139,7 +140,7 @@ export async function run(args: any = process.argv) {
   );
 
   for (const [address, account] of Object.entries(accounts)) {
-    if (!account.hst || account.hst === 0 || account.hst === "0") {
+    if (!account.hst || account.hst === 0 || account.hst === '0') {
       continue;
     }
     let solAddress: PublicKey | undefined = toSolana(address);
@@ -157,15 +158,17 @@ export async function run(args: any = process.argv) {
       fs.writeFileSync(mintPath, JSON.stringify(Array.from(mint.secretKey)));
     }
 
-    const ownerActual = (await provider.connection.getTokenLargestAccounts(mint.publicKey)).value[0]?.address
+    const ownerActual = (
+      await provider.connection.getTokenLargestAccounts(mint.publicKey)
+    ).value[0]?.address;
     if (ownerActual && ownerActual.toBase58() !== solAddress.toBase58()) {
-      const acc = await getAccount(provider.connection, ownerActual)
+      const acc = await getAccount(provider.connection, ownerActual);
       console.log(
-        "Found diff address",
+        'Found diff address',
         solAddress.toBase58(),
         acc.owner.toBase58()
       );
-      solAddress = acc.owner
+      solAddress = acc.owner;
     }
 
     const [voucher] = membershipVoucherKey(mint.publicKey);
@@ -180,7 +183,7 @@ export async function run(args: any = process.argv) {
         .accounts({
           recipient: solAddress,
           fanout,
-          mint: mint.publicKey
+          mint: mint.publicKey,
         })
         .signers([mint])
         .rpc({ skipPreflight: true });
@@ -189,7 +192,7 @@ export async function run(args: any = process.argv) {
     // 2️⃣  Define a trigger condition.
     const trigger = {
       cron: {
-        schedule: "0 30 0 * * * *",
+        schedule: '0 30 0 * * * *',
         skippable: true,
       },
     };
@@ -197,7 +200,7 @@ export async function run(args: any = process.argv) {
     // 3️⃣ Create the thread.
     const threadId = `${argv.name}-${mint.publicKey.toBase58().slice(0, 8)}`;
     const [thread] = threadKey(provider.wallet.publicKey, threadId);
-    console.log("Thread ID", threadId, thread.toBase58());
+    console.log('Thread ID', threadId, thread.toBase58());
     const memberHntAccount = await getAssociatedTokenAddressSync(
       hnt,
       solAddress,
@@ -217,10 +220,10 @@ export async function run(args: any = process.argv) {
     const distributeIx = await fanoutProgram.methods
       .distributeV0()
       .accounts({
-        payer: new PublicKey("C1ockworkPayer11111111111111111111111111111"),
+        payer: new PublicKey('C1ockworkPayer11111111111111111111111111111'),
         fanout,
         owner: solAddress,
-        mint: mint.publicKey
+        mint: mint.publicKey,
       })
       .instruction();
 
@@ -252,7 +255,7 @@ function toSolana(address: string): PublicKey | undefined {
 }
 
 const CLOCKWORK_PID = new PublicKey(
-  "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
+  'CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh'
 );
 export function threadKey(
   authority: PublicKey,
@@ -261,9 +264,9 @@ export function threadKey(
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [
-      Buffer.from("thread", "utf8"),
+      Buffer.from('thread', 'utf8'),
       authority.toBuffer(),
-      Buffer.from(threadId, "utf8"),
+      Buffer.from(threadId, 'utf8'),
     ],
     programId
   );

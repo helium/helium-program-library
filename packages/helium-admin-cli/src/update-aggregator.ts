@@ -1,44 +1,47 @@
-import * as anchor from "@coral-xyz/anchor";
-import { PublicKey } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
-import { AggregatorAccount, SwitchboardProgram } from "@switchboard-xyz/solana.js";
-import { aggregatorSetConfig } from "@switchboard-xyz/solana.js/lib/cjs/generated";
-import os from "os";
-import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrSquads } from "./utils";
+import * as anchor from '@coral-xyz/anchor';
+import { PublicKey } from '@solana/web3.js';
+import Squads from '@sqds/sdk';
+import {
+  AggregatorAccount,
+  SwitchboardProgram,
+} from '@switchboard-xyz/solana.js';
+import { aggregatorSetConfig } from '@switchboard-xyz/solana.js/generated';
+import os from 'os';
+import yargs from 'yargs/yargs';
+import { loadKeypair, sendInstructionsOrSquads } from './utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: "k",
-      describe: "Anchor wallet keypair",
+      alias: 'k',
+      describe: 'Anchor wallet keypair',
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: "u",
-      default: "http://127.0.0.1:8899",
-      describe: "The solana url",
+      alias: 'u',
+      default: 'http://127.0.0.1:8899',
+      describe: 'The solana url',
     },
     executeTransaction: {
-      type: "boolean",
+      type: 'boolean',
     },
     aggregatorKeypair: {
-      type: "string",
-      describe: "Keypair of the aggregtor",
+      type: 'string',
+      describe: 'Keypair of the aggregtor',
     },
     switchboardNetwork: {
-      type: "string",
-      describe: "The switchboard network",
-      default: "mainnet-beta",
+      type: 'string',
+      describe: 'The switchboard network',
+      default: 'mainnet-beta',
     },
     multisig: {
-      type: "string",
+      type: 'string',
       describe:
-        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
     },
     authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
+      type: 'number',
+      describe: 'Authority index for squads. Defaults to 1',
       default: 1,
     },
   });
@@ -49,23 +52,19 @@ export async function run(args: any = process.argv) {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
-
-  const wallet = loadKeypair(argv.wallet);
+  const walletKP = loadKeypair(argv.wallet);
+  const wallet = new anchor.Wallet(walletKP);
   const aggKeypair = await loadKeypair(argv.aggregatorKeypair!);
 
   const switchboard = await SwitchboardProgram.load(
-    "mainnet-beta",
+    'mainnet-beta',
     provider.connection,
-    wallet
+    walletKP
   );
 
-  const squads = Squads.endpoint(
-    process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet,
-    {
-      commitmentOrConfig: "finalized",
-    }
-  );
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
+    commitmentOrConfig: 'finalized',
+  });
   let authority = provider.wallet.publicKey;
 
   let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
@@ -75,10 +74,10 @@ export async function run(args: any = process.argv) {
   const [aggregator] = await AggregatorAccount.load(
     switchboard,
     aggKeypair.publicKey
-  )
+  );
   const ix = await aggregator.setConfigInstruction(authority, {
     batchSize: 6,
-    minOracleResults: 5
+    minOracleResults: 5,
   });
 
   await sendInstructionsOrSquads({

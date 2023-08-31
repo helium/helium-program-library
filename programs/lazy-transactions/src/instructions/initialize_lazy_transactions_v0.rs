@@ -1,4 +1,4 @@
-use crate::{canopy::check_canopy_bytes, id, state::*};
+use crate::{canopy::check_canopy_bytes, id, state::*, util::get_bitmap_len};
 use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -17,7 +17,7 @@ pub struct InitializeLazyTransactionsV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 8 + 60 + std::mem::size_of::<LazyTransactionsV0>(),
+    space = 8 + 60 + std::mem::size_of::<LazyTransactionsV0>() + (1 << args.max_depth),
     seeds = ["lazy_transactions".as_bytes(), args.name.as_bytes()],
     bump,
   )]
@@ -50,6 +50,7 @@ pub fn handler(
       canopy: ctx.accounts.canopy.key(),
       max_depth: args.max_depth,
       bump_seed: ctx.bumps["lazy_transactions"],
+      executed: vec![0; get_bitmap_len(args.max_depth)],
     });
 
   Ok(())
