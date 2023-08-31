@@ -40,7 +40,7 @@ runs:
       with:
         path: |
           ~/.cargo/bin/solana-verify
-        key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('~/.cargo/bin/solana-verify') }}
+        key: cargo-${{ runner.os }}-solana-verify
     - run: cargo install solana-verify
       if: steps.cache-solana-verify.outputs.cache-hit != 'true'
       shell: bash
