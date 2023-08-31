@@ -156,11 +156,23 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     key_serialization: args.key_serialization,
   });
 
-  let metadata_uri = format!("{}/{}", ENTITY_METADATA_URL, key_str);
+  let mut metadata_uri = format!("{}/{}", ENTITY_METADATA_URL, key_str);
+  if let Some(metadata_url) = args.metadata_url {
+    let formated_metadata_url = format!("{}/{}", metadata_url, key_str);
+
+    require!(
+      formated_metadata_url.len() <= 200,
+      ErrorCode::InvalidStringLength
+    );
+
+    metadata_uri = formated_metadata_url;
+  }
+
   require!(
     metadata_uri.len() <= MAX_URI_LENGTH,
     ErrorCode::InvalidStringLength
   );
+
   let metadata = MetadataArgs {
     name: args.name,
     symbol: args.symbol,
