@@ -17,7 +17,6 @@ import os from 'os';
 import yargs from 'yargs/yargs';
 
 const FANOUT_NAME = 'HST';
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 (async (args: any = process.argv) => {
   const yarg = yargs(args).options({
     wallet: {

@@ -1,30 +1,30 @@
-import * as anchor from '@coral-xyz/anchor';
-import { fanoutKey, init } from '@helium/fanout-sdk';
-import { getAccount, getAssociatedTokenAddressSync } from '@solana/spl-token';
-import { PublicKey } from '@solana/web3.js';
-import os from 'os';
-import yargs from 'yargs/yargs';
+import * as anchor from "@coral-xyz/anchor";
+import { fanoutKey, init } from "@helium/fanout-sdk";
+import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { PublicKey } from "@solana/web3.js";
+import os from "os";
+import yargs from "yargs/yargs";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     name: {
-      type: 'string',
-      describe: 'Name of the fanout',
+      type: "string",
+      describe: "Name of the fanout",
       required: true,
     },
     mint: {
-      type: 'string',
-      describe: 'Mint to dist',
+      type: "string",
+      describe: "Mint to dist",
       required: true,
     },
   });
@@ -48,7 +48,7 @@ export async function run(args: any = process.argv) {
       await getAccount(provider.connection, owners.value[0].address)
     ).owner;
 
-    console.log('Distributing for mint', mint.toBase58());
+    console.log("Distributing for mint", mint.toBase58())
 
     await hydraProgram.methods
       .distributeV0()

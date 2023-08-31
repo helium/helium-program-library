@@ -3,34 +3,34 @@ import {
   daoEpochInfoKey,
   daoKey,
   EPOCH_LENGTH,
-  init as initDao,
-} from '@helium/helium-sub-daos-sdk';
-import * as anchor from '@coral-xyz/anchor';
-import { ComputeBudgetProgram, PublicKey } from '@solana/web3.js';
-import { BN } from 'bn.js';
-import b58 from 'bs58';
-import os from 'os';
-import yargs from 'yargs/yargs';
+  init as initDao
+} from "@helium/helium-sub-daos-sdk";
+import * as anchor from "@coral-xyz/anchor";
+import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
+import { BN } from "bn.js";
+import b58 from "bs58";
+import os from "os";
+import yargs from "yargs/yargs";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     hntMint: {
-      type: 'string',
-      describe: 'Mint of the HNT token',
+      type: "string",
+      describe: "Mint of the HNT token",
     },
     from: {
-      type: 'number',
-      describe: 'The timestamp to start ending epochs from',
+      type: "number",
+      describe: "The timestamp to start ending epochs from",
     },
   });
 
@@ -43,21 +43,17 @@ export async function run(args: any = process.argv) {
   const heliumSubDaosProgram = await initDao(provider);
   const hntMint = new PublicKey(argv.hntMint!);
   const dao = await daoKey(hntMint)[0];
-  const subdaos = await heliumSubDaosProgram.account.subDaoV0.all([
-    {
-      memcmp: {
-        offset: 8,
-        bytes: b58.encode(dao.toBuffer()),
-      },
-    },
-  ]);
-  let targetTs = argv.from
-    ? new BN(argv.from)
-    : subdaos[0].account.vehntLastCalculatedTs;
+  const subdaos = await heliumSubDaosProgram.account.subDaoV0.all([{
+    memcmp: {
+      offset: 8,
+      bytes: b58.encode(dao.toBuffer()),
+    }
+  }]);
+  let targetTs = argv.from ? new BN(argv.from) : subdaos[0].account.vehntLastCalculatedTs;
 
   while (targetTs.toNumber() < new Date().valueOf() / 1000) {
     const epoch = currentEpoch(targetTs);
-    console.log(epoch.toNumber(), targetTs.toNumber());
+    console.log(epoch.toNumber(), targetTs.toNumber())
     const daoEpochInfo =
       await heliumSubDaosProgram.account.daoEpochInfoV0.fetchNullable(
         daoEpochInfoKey(dao, targetTs)[0]
@@ -104,6 +100,8 @@ export async function run(args: any = process.argv) {
           );
         }
       }
+
+        
     }
     try {
       if (!daoEpochInfo?.doneIssuingHstPool) {
@@ -119,7 +117,7 @@ export async function run(args: any = process.argv) {
     } catch (e: any) {
       console.log(`Failed to issue hst pool: ${e.message}`);
     }
-
+    
     targetTs = targetTs.add(new BN(EPOCH_LENGTH));
   }
 }
