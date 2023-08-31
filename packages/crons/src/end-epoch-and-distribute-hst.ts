@@ -70,7 +70,7 @@ const FANOUT_NAME = 'HST';
             subDaoEpoch
           );
 
-        if (!subDaoEpochInfo?.doneCalculatingScores) {
+        if (!subDaoEpochInfo?.utilityScore) {
           try {
             await heliumSubDaosProgram.methods
               .calculateUtilityScoreV0({ epoch })
@@ -96,7 +96,7 @@ const FANOUT_NAME = 'HST';
             subDaoEpoch
           );
 
-        if (!subDaoEpochInfo?.doneIssuingRewards) {
+        if (!subDaoEpochInfo?.rewardsIssuedAt) {
           try {
             await heliumSubDaosProgram.methods
               .issueRewardsV0({ epoch })
