@@ -45,6 +45,8 @@ runs:
       shell: bash
       env:
         DEPLOY_KEYPAIR: ${{ inputs.keypair }}
+    - run: solana-keygen new -o keyp --no-bip39-passphrase
+      shell: bash
     - name: Buffer Deploy
       if: steps.cache-buffer.outputs.cache-hit != 'true'
       id: buffer-deploy
