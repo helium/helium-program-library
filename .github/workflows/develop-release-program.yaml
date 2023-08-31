@@ -53,6 +53,7 @@ jobs:
           path: |
             ~/.cargo/bin/toml
           key: toml-cli-${{ runner.os }}-v0001
+          
       - run: cargo install toml-cli
         if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         shell: bash
@@ -75,8 +76,15 @@ jobs:
           program: ${{ env.PROGRAM_NAME }}
           program-id: ${{ env.PROGRAM_ID }}
 
+      - name: Store so files
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{matrix.program}}-so
+          path: |
+            ./target/deploy/${{matrix.program}}.so
+
   publish_programs:
-    needs: [build_programs]
+    needs: [detect_changed_programs, build_programs]
     runs-on: ubuntu-latest
     if: needs.detect_changed_programs.outputs.programs_with_changes != '[]' && needs.detect_changed_programs.outputs.programs_with_changes != ''
     strategy:
@@ -85,7 +93,24 @@ jobs:
       matrix:
         program: ${{ fromJson(needs.detect_changed_programs.outputs.programs_with_changes) }}
     steps:
-      - uses: ./.github/actions/upload-bpf/
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Download a so files
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{matrix.program}}-so
+      - name: Set program information
+        if: steps.cache-toml.outputs.cache-hit != 'true'
+        run: |
+          PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
+          PROGRAM_ID=$(toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
+          echo "Program: $PROGRAM_ID"
+          echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
+          echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
+        env:
+          PROGRAM: ${{ matrix.program }}
+
+      - uses: ./.github/actions/buffer-deploy/
         id: buffer-deploy
         with:
           devnet: true
