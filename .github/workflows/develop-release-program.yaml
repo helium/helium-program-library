@@ -46,9 +46,16 @@ jobs:
         run: |
           find programs -type f -name '*.rs' -exec sed -i "s/b\"nJWGUMOK\"/b\"devnethelium5\"/g" {} \;
 
-      - name: Install toml-cli
-        if: steps.cache-toml.outputs.cache-hit != 'true'
-        run: cargo install toml-cli
+      - uses: actions/cache@v2
+        name: Cache Toml Cli
+        id: cache-toml-cli
+        with:
+          path: |
+            ~/.cargo/bin/toml
+          key: toml-cli-${{ runner.os }}-v0001
+      - run: cargo install toml-cli
+        if: steps.cache-toml-cli.outputs.cache-hit != 'true'
+        shell: bash
 
       - name: Set program information
         if: steps.cache-toml.outputs.cache-hit != 'true'
@@ -70,7 +77,16 @@ jobs:
           keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
           program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
-
+  publish_programs:
+    needs: [build_programs]
+    runs-on: ubuntu-latest
+    if: needs.detect_changed_programs.outputs.programs_with_changes != '[]' && needs.detect_changed_programs.outputs.programs_with_changes != ''
+    strategy:
+      # Publish must happen one at a time or there can be conflicts
+      max-parallel: 1
+      matrix:
+        program: ${{ fromJson(needs.detect_changed_programs.outputs.programs_with_changes) }}
+    steps:
       - name: Squads program upgrade
         uses: helium/squads-program-upgrade@v0.3.1
         with:
