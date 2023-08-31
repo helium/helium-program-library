@@ -85,7 +85,7 @@ jobs:
       matrix:
         program: ${{ fromJson(needs.detect_changed_programs.outputs.programs_with_changes) }}
     steps:
-      - uses: ./.github/actions/upload-bpf/
+      - uses: ./.github/actions/buffer-deploy/
         id: buffer-deploy
         with:
           devnet: true
