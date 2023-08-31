@@ -69,8 +69,17 @@ jobs:
         env:
           PROGRAM: ${{ matrix.program }}
 
+      - uses: actions/cache@v2
+        name: Cache Build Output
+        id: cache-build-output
+        with:
+          path: |
+            ./target/${{env.PROGRAM_NAME}}.so
+          key: build-${{ runner.os }}-v0001-${{matrix.program}}-${{ hashFiles('programs/${{matrix.program}}/src/**/*.rs') }}
+
       - uses: ./.github/actions/build-verified/
         id: build-verified
+        if: steps.cache-build-output.outputs.cache-hit != 'true'
         with:
           devnet: true
           program: ${{ env.PROGRAM_NAME }}
@@ -88,6 +97,26 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: Set program information
+        if: steps.cache-toml.outputs.cache-hit != 'true'
+        run: |
+          PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
+          PROGRAM_ID=$(toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
+          echo "Program: $PROGRAM_ID"
+          echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
+          echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
+        env:
+          PROGRAM: ${{ matrix.program }}
+
+      # This should load the build output from the previous step
+      - uses: actions/cache@v2
+        name: Cache Build Output
+        id: cache-build-output
+        with:
+          path: |
+            ./target/${{env.PROGRAM_NAME}}.so
+          key: build-${{ runner.os }}-v0001-${{matrix.program}}-${{ hashFiles('programs/${{matrix.program}}/src/**/*.rs') }}
+
       - uses: ./.github/actions/buffer-deploy/
         id: buffer-deploy
         with:
