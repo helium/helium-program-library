@@ -13,8 +13,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Install toml-cli
-        run: cargo install toml-cli
+      - uses: actions/cache@v2
+        name: Cache Toml Cli
+        id: cache-toml-cli
+        with:
+          path: |
+            ~/.cargo/bin/toml
+          key: toml-cli-${{ runner.os }}-v0001
+      - run: cargo install toml-cli
+        if: steps.cache-toml-cli.outputs.cache-hit != 'true'
+        shell: bash
 
       - name: Set tag information
         run: |

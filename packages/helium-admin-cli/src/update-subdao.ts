@@ -1,132 +1,137 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from '@coral-xyz/anchor';
 import {
   accountWindowedBreakerKey,
   init as initCb,
   mintWindowedBreakerKey,
-} from "@helium/circuit-breaker-sdk";
+} from '@helium/circuit-breaker-sdk';
 import {
   init as initHem,
   rewardableEntityConfigKey,
-} from "@helium/helium-entity-manager-sdk";
-import { init as initHsd, subDaoKey, delegatorRewardsPercent } from "@helium/helium-sub-daos-sdk";
-import { Cluster, PublicKey, TransactionInstruction } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
+} from '@helium/helium-entity-manager-sdk';
+import {
+  init as initHsd,
+  subDaoKey,
+  delegatorRewardsPercent,
+} from '@helium/helium-sub-daos-sdk';
+import { Cluster, PublicKey, TransactionInstruction } from '@solana/web3.js';
+import Squads from '@sqds/sdk';
 import {
   AggregatorAccount,
   SwitchboardProgram,
-} from "@switchboard-xyz/solana.js";
-import { BN } from "bn.js";
-import os from "os";
-import yargs from "yargs/yargs";
+} from '@switchboard-xyz/solana.js';
+import { BN } from 'bn.js';
+import os from 'os';
+import yargs from 'yargs/yargs';
 import {
   isLocalhost,
   loadKeypair,
   parseEmissionsSchedule,
   sendInstructionsOrSquads,
-} from "./utils";
-import { toBN } from "@helium/spl-utils";
+} from './utils';
+import { toBN } from '@helium/spl-utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: "k",
-      describe: "Anchor wallet keypair",
+      alias: 'k',
+      describe: 'Anchor wallet keypair',
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: "u",
-      default: "http://127.0.0.1:8899",
-      describe: "The solana url",
+      alias: 'u',
+      default: 'http://127.0.0.1:8899',
+      describe: 'The solana url',
     },
     dntMint: {
       required: true,
-      type: "string",
-      describe: "DNT mint of the subdao to be updated",
+      type: 'string',
+      describe: 'DNT mint of the subdao to be updated',
     },
     name: {
-      alias: "n",
-      type: "string",
+      alias: 'n',
+      type: 'string',
       required: false,
-      describe: "The name of the entity config",
+      describe: 'The name of the entity config',
     },
     newAuthority: {
       required: false,
-      describe: "New subdao authority",
-      type: "string",
+      describe: 'New subdao authority',
+      type: 'string',
       default: null,
     },
     newEmissionsSchedulePath: {
       required: false,
-      describe: "Path to file that contains the new emissions schedule",
-      type: "string",
+      describe: 'Path to file that contains the new emissions schedule',
+      type: 'string',
       default: null,
     },
     newActiveDeviceAggregator: {
       required: false,
       default: null,
-      type: "string",
+      type: 'string',
     },
     newDcBurnAuthority: {
       required: false,
       default: null,
-      type: "string",
+      type: 'string',
     },
     executeTransaction: {
-      type: "boolean",
+      type: 'boolean',
     },
     multisig: {
-      type: "string",
+      type: 'string',
       describe:
-        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
     },
     authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
+      type: 'number',
+      describe: 'Authority index for squads. Defaults to 1',
       default: 1,
     },
     switchboardNetwork: {
-      type: "string",
-      describe: "The switchboard network",
-      default: "devnet",
+      type: 'string',
+      describe: 'The switchboard network',
+      default: 'devnet',
     },
     registrar: {
-      type: "string",
+      type: 'string',
       required: false,
-      describe: "VSR Registrar of subdao",
+      describe: 'VSR Registrar of subdao',
       default: null,
     },
     delegatorRewardsPercent: {
-      type: "number",
+      type: 'number',
       required: false,
       describe:
-        "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
+        'Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.',
       default: null,
     },
     onboardingDcFee: {
-      type: "number",
+      type: 'number',
       required: false,
-      describe: "The data credits fee for onboarding hotspots",
+      describe: 'The data credits fee for onboarding hotspots',
       default: null,
     },
     onboardingDataOnlyDcFee: {
-      type: "number",
+      type: 'number',
       required: false,
-      describe: "The data credits fee for onboarding data only hotspots",
+      describe: 'The data credits fee for onboarding data only hotspots',
       default: null,
     },
     activeDeviceAuthority: {
-      type: "string",
+      type: 'string',
       required: false,
-      describe: "The authority that can set hotspot active status",
+      describe: 'The authority that can set hotspot active status',
       default: null,
-    }
+    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
-  const wallet = loadKeypair(argv.wallet);
   const provider = anchor.getProvider() as anchor.AnchorProvider;
+  const walletKP = loadKeypair(argv.wallet);
+  const wallet = new anchor.Wallet(walletKP);
   const program = await initHsd(provider);
   const hemProgram = await initHem(provider);
   const cbProgram = await initCb(provider);
@@ -137,7 +142,7 @@ export async function run(args: any = process.argv) {
   const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
   if (argv.newAuthority) {
     if (!argv.name) {
-      throw new Error("--name is required");
+      throw new Error('--name is required');
     }
     // update entity config auth
     const config = rewardableEntityConfigKey(
@@ -204,7 +209,7 @@ export async function run(args: any = process.argv) {
       const switchboard = await SwitchboardProgram.load(
         argv.switchboardNetwork as Cluster,
         provider.connection,
-        wallet
+        walletKP
       );
       const [agg, aggData] = await AggregatorAccount.load(
         switchboard,
@@ -221,8 +226,11 @@ export async function run(args: any = process.argv) {
     }
   }
 
-  if (argv.delegatorRewardsPercent && (argv.delegatorRewardsPercent > 100 || argv.delegatorRewardsPercent < 0)) {
-    throw new Error("Delegator rewards percent must be between 0 and 100");
+  if (
+    argv.delegatorRewardsPercent &&
+    (argv.delegatorRewardsPercent > 100 || argv.delegatorRewardsPercent < 0)
+  ) {
+    throw new Error('Delegator rewards percent must be between 0 and 100');
   }
 
   instructions.push(
@@ -235,14 +243,22 @@ export async function run(args: any = process.argv) {
         dcBurnAuthority: argv.newDcBurnAuthority
           ? new PublicKey(argv.newDcBurnAuthority)
           : null,
-        onboardingDcFee: argv.onboardingDcFee ? new BN(argv.onboardingDcFee) : null,
-        onboardingDataOnlyDcFee: argv.onboardingDataOnlyDcFee ? new BN(argv.onboardingDataOnlyDcFee) : null,
+        onboardingDcFee: argv.onboardingDcFee
+          ? new BN(argv.onboardingDcFee)
+          : null,
+        onboardingDataOnlyDcFee: argv.onboardingDataOnlyDcFee
+          ? new BN(argv.onboardingDataOnlyDcFee)
+          : null,
         activeDeviceAggregator: argv.newActiveDeviceAggregator
           ? new PublicKey(argv.newActiveDeviceAggregator)
           : null,
         registrar: argv.registrar ? new PublicKey(argv.registrar) : null,
-        delegatorRewardsPercent: argv.delegatorRewardsPercent ? delegatorRewardsPercent(argv.delegatorRewardsPercent) : null,
-        activeDeviceAuthority: argv.activeDeviceAuthority ? new PublicKey(argv.activeDeviceAuthority) : null,
+        delegatorRewardsPercent: argv.delegatorRewardsPercent
+          ? delegatorRewardsPercent(argv.delegatorRewardsPercent)
+          : null,
+        activeDeviceAuthority: argv.activeDeviceAuthority
+          ? new PublicKey(argv.activeDeviceAuthority)
+          : null,
       })
       .accounts({
         subDao,
@@ -252,12 +268,9 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  const squads = Squads.endpoint(
-    process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet, {
-      commitmentOrConfig: "finalized"
-    }
-  );
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
+    commitmentOrConfig: 'finalized',
+  });
   await sendInstructionsOrSquads({
     provider,
     instructions,

@@ -1,0 +1,60 @@
+{
+  "name": "@helium/crons",
+  "version": "1.0.0",
+  "description": "scripts to run on a schedule",
+  "private": true,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/helium/helium-program-library"
+  },
+  "main": "./lib/cjs/index.js",
+  "module": "./lib/esm/src/index.js",
+  "types": "./lib/types/src/index.d.ts",
+  "sideEffects": false,
+  "files": [
+    "lib"
+  ],
+  "exports": {
+    "import": "./lib/esm/src/index.js",
+    "require": "./lib/cjs/index.js",
+    "types": "./lib/types/src/index.d.ts"
+  },
+  "scripts": {
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
+    "clean": "npx shx mkdir -p lib && npx shx rm -rf lib",
+    "package": "npx shx mkdir -p lib/cjs lib/esm",
+    "prebuild": "npm run clean && npm run package"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.26.0",
+    "@helium/fanout-sdk": "^0.2.21",
+    "@helium/helium-sub-daos-sdk": "^0.2.21",
+    "@helium/lazy-distributor-sdk": "^0.2.21",
+    "@helium/mobile-entity-manager-sdk": "^0.2.21",
+    "@helium/price-oracle-sdk": "^0.2.21",
+    "@helium/spl-utils": "^0.2.21",
+    "@helium/treasury-management-sdk": "^0.2.21",
+    "@solana/spl-token": "^0.3.8",
+    "@solana/web3.js": "^1.78.4",
+    "axios": "^1.3.6",
+    "bn.js": "^5.2.0",
+    "bs58": "^4.0.1",
+    "yargs": "^17.7.1"
+  },
+  "devDependencies": {
+    "@types/bs58": "^4.0.1",
+    "@types/bn.js": "^5.1.0",
+    "@types/yargs": "^17.0.24",
+    "git-format-staged": "^2.1.3",
+    "ts-loader": "^9.2.3",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.8.4",
+    "yarn": "^1.22.18"
+  }
+}
