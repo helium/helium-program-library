@@ -36,7 +36,6 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/checkout@v2
     - uses: ./.github/actions/setup/
     - uses: ./.github/actions/setup-anchor/
       with:
@@ -46,6 +45,8 @@ runs:
       env:
         DEPLOY_KEYPAIR: ${{ inputs.keypair }}
     - run: solana-keygen new -o keyp --no-bip39-passphrase
+      shell: bash
+    - run: ls -l ./target/deploy/
       shell: bash
     - name: Buffer Deploy
       if: steps.cache-buffer.outputs.cache-hit != 'true'

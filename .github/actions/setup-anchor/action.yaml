@@ -3,7 +3,6 @@ description: "Setup Anchor"
 runs:
   using: "composite"
   steps:
-    - uses: actions/checkout@v2
     - uses: ./.github/actions/setup/
     - uses: ./.github/actions/setup-solana/
     - uses: actions/cache@v2
@@ -23,7 +22,7 @@ runs:
       with:
         path: |
           ~/.cargo/bin/toml
-        key: toml-cli-${{ runner.os }}-v0001
+        key: toml-cli-${{ runner.os }}-v0002
     - run: cargo install toml-cli
       if: steps.cache-toml-cli.outputs.cache-hit != 'true'
       shell: bash

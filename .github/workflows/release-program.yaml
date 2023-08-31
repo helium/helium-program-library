@@ -19,7 +19,7 @@ jobs:
         with:
           path: |
             ~/.cargo/bin/toml
-          key: toml-cli-${{ runner.os }}-v0001
+          key: toml-cli-${{ runner.os }}-v0002
       - run: cargo install toml-cli
         if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         shell: bash
@@ -31,13 +31,21 @@ jobs:
           PROGRAM=$(echo $TAG | sed 's/program-\(.*\)-[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/\1/')
           VERSION=$(echo $TAG | sed 's/.*-\([0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\)$/\1/')
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
-          PROGRAM_ID=$(toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
+          PROGRAM_ID=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
 
           echo "Program: $PROGRAM"
           echo "Program: $PROGRAM_ID"
           echo "Version: $VERSION"
           echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
           echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
+
+      # Build the program with anchor so we get the IDL
+      - uses: ./.github/actions/build-anchor/
+        id: build-anchor
+        with:
+          testing: false
+          devnet: false
+          program: ${{ env.PROGRAM_NAME }}
 
       - uses: ./.github/actions/build-verified/
         id: build-verified

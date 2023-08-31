@@ -19,5 +19,6 @@ jobs:
         with:
           testing: false
           devnet: false
+      - uses: ./.github/actions/setup-ts/
       - name: Lerna Publish
         run: yarn release

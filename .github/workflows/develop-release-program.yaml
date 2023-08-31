@@ -52,7 +52,7 @@ jobs:
         with:
           path: |
             ~/.cargo/bin/toml
-          key: toml-cli-${{ runner.os }}-v0001
+          key: toml-cli-${{ runner.os }}-v0002
           
       - run: cargo install toml-cli
         if: steps.cache-toml-cli.outputs.cache-hit != 'true'
@@ -62,12 +62,20 @@ jobs:
         if: steps.cache-toml.outputs.cache-hit != 'true'
         run: |
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
-          PROGRAM_ID=$(toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
+          PROGRAM_ID=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
           echo "Program: $PROGRAM_ID"
           echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
           echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
         env:
           PROGRAM: ${{ matrix.program }}
+
+      # Build the program with anchor so we get the IDL
+      - uses: ./.github/actions/build-anchor/
+        id: build-anchor
+        with:
+          testing: false
+          devnet: true
+          program: ${{ env.PROGRAM_NAME }}
 
       - uses: ./.github/actions/build-verified/
         id: build-verified
@@ -81,7 +89,14 @@ jobs:
         with:
           name: ${{matrix.program}}-so
           path: |
-            ./target/deploy/${{matrix.program}}.so
+            ./target/deploy/${{env.PROGRAM_NAME}}.so
+      - name: Store idl files
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{matrix.program}}-idl
+          path: |
+            ./target/idl/${{env.PROGRAM_NAME}}.json
+
 
   publish_programs:
     needs: [detect_changed_programs, build_programs]
@@ -95,21 +110,28 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Download a so files
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{matrix.program}}-so
+      - uses: ./.github/actions/setup-anchor/
       - name: Set program information
         if: steps.cache-toml.outputs.cache-hit != 'true'
         run: |
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
-          PROGRAM_ID=$(toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
+          PROGRAM_ID=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
           echo "Program: $PROGRAM_ID"
           echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
           echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
         env:
           PROGRAM: ${{ matrix.program }}
 
+      - name: Download a so files
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{matrix.program}}-so
+          path: ./target/deploy/
+      - name: Download idl files
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{matrix.program}}-idl
+          path: ./target/idl/
       - uses: ./.github/actions/buffer-deploy/
         id: buffer-deploy
         with:
