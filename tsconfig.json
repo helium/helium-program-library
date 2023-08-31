@@ -78,6 +78,9 @@
     },
     {
       "path": "./packages/iot-premine-data-only-service"
+    },
+    {
+      "path": "./packages/crons"
     }
   ]
 }

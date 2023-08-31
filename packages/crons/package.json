@@ -28,8 +28,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
     "clean": "npx shx mkdir -p lib && npx shx rm -rf lib",
-    "package": "npx shx mkdir -p lib/cjs lib/esm",
-    "prebuild": "npm run clean && npm run package"
+    "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.26.0",
