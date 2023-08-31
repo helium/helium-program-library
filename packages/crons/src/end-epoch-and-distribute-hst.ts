@@ -6,8 +6,9 @@ import {
   daoEpochInfoKey,
   daoKey,
   init as initDao,
+  subDaoEpochInfoKey,
 } from '@helium/helium-sub-daos-sdk';
-import { HNT_MINT } from '@helium/spl-utils';
+import { HNT_MINT, chunks } from '@helium/spl-utils';
 import { getAccount } from '@solana/spl-token';
 import { ComputeBudgetProgram as CBP, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
@@ -15,6 +16,8 @@ import bs58 from 'bs58';
 import os from 'os';
 import yargs from 'yargs/yargs';
 
+const FANOUT_NAME = 'HST';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 (async (args: any = process.argv) => {
   const yarg = yargs(args).options({
     wallet: {
@@ -27,21 +30,6 @@ import yargs from 'yargs/yargs';
       default: 'http://127.0.0.1:8899',
       describe: 'The solana url',
     },
-    hntMint: {
-      type: 'string',
-      default: HNT_MINT.toBase58(),
-      describe: 'Mint of the HNT token',
-    },
-    name: {
-      type: 'string',
-      describe: 'Name of the fanout',
-      required: true,
-    },
-    mint: {
-      type: 'string',
-      describe: 'Mint to dist',
-      required: true,
-    },
   });
 
   const argv = await yarg.argv;
@@ -51,8 +39,8 @@ import yargs from 'yargs/yargs';
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const heliumSubDaosProgram = await initDao(provider);
-  const hydraProgram = await initHydra(provider);
-  const hntMint = new PublicKey(argv.hntMint);
+  const hntMint = HNT_MINT;
+  const unixNow = new Date().valueOf() / 1000;
   const [dao] = daoKey(hntMint);
   const subDaos = await heliumSubDaosProgram.account.subDaoV0.all([
     {
@@ -65,45 +53,63 @@ import yargs from 'yargs/yargs';
 
   let targetTs = subDaos.reduce(
     (acc, subDao) => BN.min(acc, subDao.account.vehntLastCalculatedTs),
-    new BN(new Date().valueOf() / 1000)
+    new BN(unixNow)
   );
 
-  while (targetTs.toNumber() < new Date().valueOf() / 1000) {
-    const epoch = currentEpoch(new BN(targetTs));
-    console.log(epoch.toNumber(), targetTs);
+  while (targetTs.toNumber() < unixNow) {
+    const epoch = currentEpoch(targetTs);
+    console.log(epoch.toNumber(), targetTs.toNumber());
     const [daoEpoch] = daoEpochInfoKey(dao, targetTs);
     const daoEpochInfo =
       await heliumSubDaosProgram.account.daoEpochInfoV0.fetchNullable(daoEpoch);
 
-    for (const subDao of subDaos) {
-      if (!daoEpochInfo?.doneCalculatingScores) {
-        try {
-          await heliumSubDaosProgram.methods
-            .calculateUtilityScoreV0({ epoch })
-            .accounts({ subDao: subDao.publicKey })
-            .preInstructions([CBP.setComputeUnitLimit({ units: 350000 })])
-            .rpc({ skipPreflight: true });
-        } catch (err: any) {
-          console.log(
-            `Failed to calculate utility score for ${subDao.account.dntMint.toBase58()}: ${
-              err.message
-            }`
+    if (!daoEpochInfo?.doneCalculatingScores) {
+      for (const subDao of subDaos) {
+        const [subDaoEpoch] = subDaoEpochInfoKey(subDao.publicKey, targetTs);
+        const subDaoEpochInfo =
+          await heliumSubDaosProgram.account.subDaoEpochInfoV0.fetchNullable(
+            subDaoEpoch
           );
+
+        if (!subDaoEpochInfo?.doneCalculatingScores) {
+          try {
+            await heliumSubDaosProgram.methods
+              .calculateUtilityScoreV0({ epoch })
+              .accounts({ subDao: subDao.publicKey })
+              .preInstructions([CBP.setComputeUnitLimit({ units: 350000 })])
+              .rpc({ skipPreflight: true });
+          } catch (err: any) {
+            console.log(
+              `Failed to calculate utility score for ${subDao.account.dntMint.toBase58()}: ${
+                err.message
+              }`
+            );
+          }
         }
       }
+    }
 
-      if (!daoEpochInfo?.doneIssuingRewards) {
-        try {
-          await heliumSubDaosProgram.methods
-            .issueRewardsV0({ epoch })
-            .accounts({ subDao: subDao.publicKey })
-            .rpc({ skipPreflight: true });
-        } catch (err: any) {
-          console.log(
-            `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${
-              err.message
-            }`
+    if (!daoEpochInfo?.doneIssuingRewards) {
+      for (const subDao of subDaos) {
+        const [subDaoEpoch] = subDaoEpochInfoKey(subDao.publicKey, targetTs);
+        const subDaoEpochInfo =
+          await heliumSubDaosProgram.account.subDaoEpochInfoV0.fetchNullable(
+            subDaoEpoch
           );
+
+        if (!subDaoEpochInfo?.doneIssuingRewards) {
+          try {
+            await heliumSubDaosProgram.methods
+              .issueRewardsV0({ epoch })
+              .accounts({ subDao: subDao.publicKey })
+              .rpc({ skipPreflight: true });
+          } catch (err: any) {
+            console.log(
+              `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${
+                err.message
+              }`
+            );
+          }
         }
       }
     }
@@ -123,4 +129,38 @@ import yargs from 'yargs/yargs';
 
     targetTs = targetTs.add(new BN(EPOCH_LENGTH));
   }
+
+  const hydraProgram = await initHydra(provider);
+  const [fanoutK] = fanoutKey(FANOUT_NAME);
+  const members = (await hydraProgram.account.fanoutVoucherV0.all()).filter(
+    (m) => m.account.fanout.equals(fanoutK)
+  );
+
+  await Promise.all(
+    chunks(members, 100).map(async (chunk) => {
+      await Promise.all(
+        chunk.map(async (member) => {
+          const mint = member.account.mint;
+          const owners = await provider.connection.getTokenLargestAccounts(
+            mint
+          );
+          const owner = (
+            await getAccount(provider.connection, owners.value[0].address)
+          ).owner;
+
+          console.log('Distributing for mint', mint.toBase58());
+
+          await hydraProgram.methods
+            .distributeV0()
+            .accounts({
+              payer: provider.wallet.publicKey,
+              fanout: fanoutK,
+              owner,
+              mint,
+            })
+            .rpc({ skipPreflight: true });
+        })
+      );
+    })
+  );
 })();
