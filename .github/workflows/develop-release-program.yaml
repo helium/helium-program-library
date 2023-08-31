@@ -114,7 +114,7 @@ jobs:
         id: cache-build-output
         with:
           path: |
-            ./target/${{env.PROGRAM_NAME}}.so
+            ./target/deploy/${{env.PROGRAM_NAME}}.so
           key: build-${{ runner.os }}-v0001-${{matrix.program}}-${{ hashFiles('programs/${{matrix.program}}/src/**/*.rs') }}
 
       - uses: ./.github/actions/buffer-deploy/
