@@ -9,7 +9,9 @@
     "hnt-to-rent-service": "./packages/hnt-to-rent-service",
     "migration-service": "./packages/migration-service",
     "vsr-metadata-service": "./packages/vsr-metadata-service",
-    "account-postgres-sink-service": "./packages/account-postgres-sink-service"
+    "account-postgres-sink-service": "./packages/account-postgres-sink-service",
+    "iot-premine-data-only-service": "./packages/iot-premine-data-only-service",
+    "crons": "./packages/crons"
   },
   "oracle": {
     "distributor-oracle": "./packages/distributor-oracle",
