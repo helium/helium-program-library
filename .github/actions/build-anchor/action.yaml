@@ -37,6 +37,6 @@ runs:
         path: |
           ./target/
         key: build-${{ runner.os }}-v0001-${{ inputs.devnet }}-${{ inputs.testing }}-${{ hashFiles('./programs/**/**') }}-${{ inputs.program }}
-    - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/anchor build ${{ inputs.program != '' && '-p' }} ${{ inputs.program }} ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
+    - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/anchor build ${{ inputs.program != '' && '-p' }} ${{ inputs.program || '' }} ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
       if: steps.cache-anchor-build.outputs.cache-hit != 'true'
       shell: bash
