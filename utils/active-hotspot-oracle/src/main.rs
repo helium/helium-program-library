@@ -1,5 +1,5 @@
 use anchor_client::{Client, Cluster, Program};
-use anchor_lang::AccountDeserialize;
+use anchor_lang::{system_program, AccountDeserialize};
 use anyhow::{anyhow, Context, Result};
 use bs58;
 use chrono::{Duration, Utc};
@@ -8,7 +8,11 @@ use datafusion::arrow::array::StringArray;
 use deltalake::arrow::array::Array;
 use deltalake::{datafusion::prelude::SessionContext, DeltaTableBuilder};
 use helium_entity_manager::{accounts::SetEntityActiveV0, SetEntityActiveArgsV0};
-use helium_entity_manager::{IotHotspotInfoV0, MobileHotspotInfoV0};
+use helium_entity_manager::{
+  accounts::TempPayMobileOnboardingFeeV0, IotHotspotInfoV0, MobileHotspotInfoV0,
+};
+use hpl_utils::dao::Dao;
+use hpl_utils::token::Token;
 use hpl_utils::{dao::SubDao, send_and_confirm_messages_with_spinner};
 use s3::{bucket::Bucket, creds::Credentials, region::Region};
 use serde::{Deserialize, Serialize};
@@ -17,6 +21,7 @@ use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::signature::Keypair;
 use solana_sdk::transaction::Transaction;
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey, signature::read_keypair_file};
+use spl_associated_token_account::get_associated_token_address;
 use std::env;
 use std::rc::Rc;
 use std::str::FromStr;
@@ -306,6 +311,8 @@ fn check_validity(
   Ok(())
 }
 
+const MAX_TX_LEN: usize = 1232;
+
 fn construct_and_send_txs(
   helium_entity_program: &Program,
   tpu_client: &TpuClient,
@@ -315,41 +322,76 @@ fn construct_and_send_txs(
 ) -> Result<()> {
   // send transactions in batches so blockhash doesn't expire
   let transaction_batch_size = 100;
-  let ixs_per_tx = 10;
   println!("Ixs to execute: {}", ixs.len());
-  println!(
-    "Txs to execute: {}",
-    (ixs.len() + ixs_per_tx - 1) / ixs_per_tx
-  );
 
-  for i in (0..ixs.len()).step_by(transaction_batch_size * ixs_per_tx) {
-    let tx_start = i;
-    let tx_end = (i + transaction_batch_size * ixs_per_tx).min(ixs.len());
-    let blockhash = helium_entity_program.rpc().get_latest_blockhash()?;
-    let mut txs = Vec::new();
-    for j in (tx_start..tx_end).step_by(ixs_per_tx) {
-      let ix_start = j;
-      let ix_end = (j + ixs_per_tx).min(ixs.len());
-      let ixs_to_send = &ixs[ix_start..ix_end];
-      let mut tx = Transaction::new_with_payer(ixs_to_send, Some(&helium_entity_program.payer()));
+  let mut instructions = Vec::new();
+  let mut txs = Vec::new();
+  let mut blockhash = helium_entity_program.rpc().get_latest_blockhash()?;
+  // Pack as many ixs as possible into a tx, then send batches of 100
+  for ix in ixs {
+    instructions.push(ix.clone());
+    let mut tx = Transaction::new_with_payer(&instructions, Some(&helium_entity_program.payer()));
+    tx.try_sign(&[payer], blockhash)
+      .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
+    let tx_len = bincode::serialize(&tx).unwrap().len();
+
+    if tx_len > MAX_TX_LEN || tx.message.account_keys.len() > 64 {
+      // clear instructions except for last one
+      instructions.pop();
+      let mut tx = Transaction::new_with_payer(&instructions, Some(&helium_entity_program.payer()));
       tx.try_sign(&[payer], blockhash)
         .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
       txs.push(tx);
+      // clear instructions except for last one
+      instructions = vec![ix.clone()];
     }
 
     if dry_run {
       continue;
     }
-    let serialized_txs = txs
-      .iter()
-      .map(|tx| bincode::serialize(&tx.clone()).map_err(|e| anyhow!("Failed to serialize tx: {e}")))
-      .collect::<Result<Vec<_>, anyhow::Error>>()
-      .context("Failed to serialize txs")?;
 
+    // send batch of txns
+    if txs.len() >= transaction_batch_size {
+      let (_, failed_tx_count) = send_and_confirm_messages_with_spinner(
+        helium_entity_program.rpc().into(),
+        &tpu_client,
+        &txs
+          .iter()
+          .map(|tx| {
+            bincode::serialize(&tx.clone()).map_err(|e| anyhow!("Failed to serialize tx: {e}"))
+          })
+          .collect::<Result<Vec<_>, anyhow::Error>>()
+          .context("Failed to serialize txs")?,
+      )
+      .context("Failed sending transactions")?;
+
+      if failed_tx_count > 0 {
+        return Err(anyhow!("{} transactions failed", failed_tx_count));
+      }
+
+      txs = Vec::new();
+      blockhash = helium_entity_program.rpc().get_latest_blockhash()?;
+    }
+  }
+
+  // Send last group of txns
+  if instructions.len() > 0 {
+    let mut tx = Transaction::new_with_payer(&instructions, Some(&helium_entity_program.payer()));
+    tx.try_sign(&[payer], blockhash)
+      .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
+    txs.push(tx)
+  }
+  if txs.len() > 0 {
     let (_, failed_tx_count) = send_and_confirm_messages_with_spinner(
       helium_entity_program.rpc().into(),
       &tpu_client,
-      &serialized_txs,
+      &txs
+        .iter()
+        .map(|tx| {
+          bincode::serialize(&tx.clone()).map_err(|e| anyhow!("Failed to serialize tx: {e}"))
+        })
+        .collect::<Result<Vec<_>, anyhow::Error>>()
+        .context("Failed to serialize txs")?,
     )
     .context("Failed sending transactions")?;
 
@@ -364,6 +406,7 @@ fn construct_and_send_txs(
 struct InfoWithEntityKey {
   info_key: Pubkey,
   entity_key: String,
+  needs_paid: bool,
 }
 fn construct_set_active_ixs(
   helium_entity_program: &Program,
@@ -398,6 +441,7 @@ fn construct_ix_from_valid_infos(
       let entity_key = &bs58::decode(info.entity_key.clone())
         .into_vec()
         .context(format!("Failed to decode entity key, {}", info.entity_key))?;
+
       let set_entity_active_ix = helium_entity_program
         .request()
         .args(helium_entity_manager::instruction::SetEntityActiveV0 {
@@ -415,10 +459,44 @@ fn construct_ix_from_valid_infos(
         })
         .instructions()
         .map_err(|e| anyhow!("Failed to construct instruction: {e}"))?;
-      Ok(set_entity_active_ix[0].clone())
+      let mut ret = set_entity_active_ix;
+
+      if sub_dao == SubDao::Mobile && is_active && info.needs_paid {
+        ret = vec![
+          helium_entity_program
+            .request()
+            .args(helium_entity_manager::instruction::TempPayMobileOnboardingFeeV0 {})
+            .accounts(TempPayMobileOnboardingFeeV0 {
+              dc_fee_payer: helium_entity_program.payer(),
+              dc_burner: get_associated_token_address(
+                &helium_entity_program.payer(),
+                Token::Dc.mint(),
+              ),
+              rewardable_entity_config: sub_dao.rewardable_entity_config_key(),
+              sub_dao: sub_dao.key(),
+              dao: Dao::Hnt.key(),
+              dc_mint: *Token::Dc.mint(),
+              dc: SubDao::dc_key(),
+              key_to_asset: Dao::Hnt.key_to_asset(entity_key),
+              mobile_info: info.info_key,
+              data_credits_program: *hpl_utils::program::DC_PID,
+              token_program: spl_token::id(),
+              associated_token_program: spl_associated_token_account::id(),
+              system_program: system_program::ID,
+              helium_sub_daos_program: *hpl_utils::program::HSD_PID,
+            })
+            .instructions()
+            .map_err(|e| anyhow!("Failed to construct instruction: {e}"))?,
+          ret,
+        ]
+        .concat()
+      }
+      Ok(ret)
     })
-    .collect::<Result<Vec<_>>>()
-    .context("Failed to construct ixs")?;
+    .collect::<Result<Vec<_>>>()?
+    .into_iter()
+    .flatten()
+    .collect();
 
   Ok(ixs)
 }
@@ -476,15 +554,22 @@ fn find_infos_to_mark(
       match info_acc {
         Some(raw_info) => {
           let mut data = raw_info.data.as_slice();
+          let mut needs_paid = false;
 
           let parsed_info_res: anchor_lang::Result<Box<dyn IsActive>> = match sub_dao {
             SubDao::Iot => {
-              let info = IotHotspotInfoV0::try_deserialize(&mut data)?;
-              Ok(Box::new(info))
+              let info = IotHotspotInfoV0::try_deserialize(&mut data);
+              info.map(|i| Box::new(i) as Box<dyn IsActive>)
             }
             SubDao::Mobile => {
-              let info = MobileHotspotInfoV0::try_deserialize(&mut data)?;
-              Ok(Box::new(info))
+              let info = MobileHotspotInfoV0::try_deserialize(&mut data);
+
+              info.map(|i| {
+                if i.dc_onboarding_fee_paid == 0 {
+                  needs_paid = true
+                }
+                Box::new(i) as Box<dyn IsActive>
+              })
             }
           };
 
@@ -500,6 +585,7 @@ fn find_infos_to_mark(
             valid_infos.push(InfoWithEntityKey {
               info_key: info_keys[j],
               entity_key: entity_keys[start + j].clone(),
+              needs_paid,
             });
             if log_diff {
               println!(

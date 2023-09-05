@@ -1,7 +1,7 @@
 cargo-features = ["workspace-inheritance"]
 
 [package]
-name = "active-hotspot-oracle"
+name = "backfill-onboarding-fees"
 version = "0.0.1"
 edition = "2021"
 
@@ -22,15 +22,10 @@ anchor-lang = "0.26.0"
 clap = { version = "4.3.9", features = ["derive"] }
 tokio = "1.29.0"
 anchor-client = "0.26.0"
-rust-s3 = "0.33.0"
-deltalake = { git = "https://github.com/helium/delta-rs", branch = "main", features = ["s3", "datafusion"] }
 anyhow = "1.0.71"
 chrono = "0.4.26"
-datafusion = "25.0.0"
 helium-entity-manager = { git = "https://github.com/helium/helium-program-library", features = [ "no-entrypoint" ] }
 helium-sub-daos = { git = "https://github.com/helium/helium-program-library", features = [ "no-entrypoint" ] }
-hpl-utils = { path = "../hpl-utils" }
+hpl-utils = { git = "https://github.com/helium/helium-program-library", branch = "develop" }
 bs58 = "0.4.0"
 sha2 = "0"
-spl-associated-token-account = { version = "*", features = [ "no-entrypoint" ] }
-spl-token = { version = "*", features = ["no-entrypoint"] }
