@@ -1,5 +1,10 @@
 import * as anchor from '@coral-xyz/anchor';
+import * as client from '@helium/distributor-oracle';
 import { fanoutKey, init as initHydra } from '@helium/fanout-sdk';
+import {
+  init as initHem,
+  keyToAssetKey,
+} from '@helium/helium-entity-manager-sdk';
 import {
   EPOCH_LENGTH,
   currentEpoch,
@@ -8,15 +13,27 @@ import {
   init as initDao,
   subDaoEpochInfoKey,
 } from '@helium/helium-sub-daos-sdk';
-import { HNT_MINT, chunks } from '@helium/spl-utils';
+import {
+  init as initLazy,
+  lazyDistributorKey,
+  recipientKey,
+} from '@helium/lazy-distributor-sdk';
+import { init as initRewards } from '@helium/rewards-oracle-sdk';
+import {
+  HNT_MINT,
+  IOT_MINT,
+  chunks,
+  sendAndConfirmWithRetry,
+} from '@helium/spl-utils';
 import { getAccount } from '@solana/spl-token';
-import { ComputeBudgetProgram as CBP, PublicKey } from '@solana/web3.js';
+import { ComputeBudgetProgram as CBP } from '@solana/web3.js';
 import BN from 'bn.js';
 import bs58 from 'bs58';
-import os from 'os';
-import yargs from 'yargs/yargs';
 
 const FANOUT_NAME = 'HST';
+const IOT_OPERATIONS_FUND = 'iot_operations_fund';
+const MAX_CLAIM_AMOUNT = new BN('207020547945205');
+
 (async () => {
   try {
     if (!process.env.ANCHOR_WALLET)
@@ -30,8 +47,10 @@ const FANOUT_NAME = 'HST';
     const provider = anchor.getProvider() as anchor.AnchorProvider;
     const heliumSubDaosProgram = await initDao(provider);
     const hntMint = HNT_MINT;
+    const iotMint = IOT_MINT;
     const unixNow = new Date().valueOf() / 1000;
     const [dao] = daoKey(hntMint);
+
     const subDaos = await heliumSubDaosProgram.account.subDaoV0.all([
       {
         memcmp: {
@@ -120,6 +139,7 @@ const FANOUT_NAME = 'HST';
       targetTs = targetTs.add(new BN(EPOCH_LENGTH));
     }
 
+    // distribute hst
     const hydraProgram = await initHydra(provider);
     const [fanoutK] = fanoutKey(FANOUT_NAME);
     const members = (await hydraProgram.account.fanoutVoucherV0.all()).filter(
@@ -152,6 +172,64 @@ const FANOUT_NAME = 'HST';
           })
         );
       })
+    );
+
+    // distribute iot operations fund
+    const hemProgram = await initHem(provider);
+    const lazyProgram = await initLazy(provider);
+    const rewardsOracleProgram = await initRewards(provider);
+    const [lazyDistributor] = lazyDistributorKey(iotMint);
+    const [keyToAsset] = keyToAssetKey(dao, IOT_OPERATIONS_FUND, 'utf8');
+    const assetId = (await hemProgram.account.keyToAssetV0.fetch(keyToAsset))
+      .asset;
+
+    const [recipient] = recipientKey(lazyDistributor, assetId);
+    if (!(await provider.connection.getAccountInfo(recipient))) {
+      const method = lazyProgram.methods.initializeRecipientV0().accounts({
+        lazyDistributor,
+        mint: assetId,
+      });
+
+      await method.rpc({ skipPreflight: true });
+    }
+
+    const rewards = await client.getCurrentRewards(
+      lazyProgram,
+      lazyDistributor,
+      assetId
+    );
+
+    const pending = await client.getPendingRewards(
+      lazyProgram,
+      lazyDistributor,
+      daoKey(HNT_MINT)[0],
+      [IOT_OPERATIONS_FUND],
+      'utf8'
+    );
+
+    // Avoid claiming too much and tripping the breaker
+    if (new BN(pending[IOT_OPERATIONS_FUND]).gt(MAX_CLAIM_AMOUNT)) {
+      rewards[0].currentRewards = new BN(rewards[0].currentRewards)
+        .sub(new BN(pending[IOT_OPERATIONS_FUND]))
+        .add(MAX_CLAIM_AMOUNT)
+        .toString();
+    }
+
+    const tx = await client.formTransaction({
+      program: lazyProgram,
+      rewardsOracleProgram: rewardsOracleProgram,
+      provider,
+      rewards,
+      asset: assetId,
+      lazyDistributor,
+    });
+
+    const signed = await provider.wallet.signTransaction(tx);
+    await sendAndConfirmWithRetry(
+      provider.connection,
+      signed.serialize(),
+      { skipPreflight: true },
+      'confirmed'
     );
   } catch (err) {
     console.log(err);

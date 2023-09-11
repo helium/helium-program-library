@@ -32,11 +32,14 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.26.0",
+    "@helium/distributor-oracle": "^0.2.21",
     "@helium/fanout-sdk": "^0.2.21",
+    "@helium/helium-entity-manager-sdk": "^0.2.21",
     "@helium/helium-sub-daos-sdk": "^0.2.21",
     "@helium/lazy-distributor-sdk": "^0.2.21",
     "@helium/mobile-entity-manager-sdk": "^0.2.21",
     "@helium/price-oracle-sdk": "^0.2.21",
+    "@helium/rewards-oracle-sdk": "^0.2.21",
     "@helium/spl-utils": "^0.2.21",
     "@helium/treasury-management-sdk": "^0.2.21",
     "@solana/spl-token": "^0.3.8",
@@ -47,8 +50,8 @@
     "yargs": "^17.7.1"
   },
   "devDependencies": {
-    "@types/bs58": "^4.0.1",
     "@types/bn.js": "^5.1.0",
+    "@types/bs58": "^4.0.1",
     "@types/yargs": "^17.0.24",
     "git-format-staged": "^2.1.3",
     "ts-loader": "^9.2.3",
