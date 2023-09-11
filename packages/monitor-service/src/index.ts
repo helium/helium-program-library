@@ -1,45 +1,45 @@
-import { init as cbInit } from "@helium/circuit-breaker-sdk";
+import { init as cbInit } from '@helium/circuit-breaker-sdk';
 import {
   daoKey,
   init as hsdInit,
   subDaoKey,
   threadKey,
-} from "@helium/helium-sub-daos-sdk";
-import { init as hemInit } from "@helium/helium-entity-manager-sdk";
-import { accountPayerKey } from "@helium/data-credits-sdk";
-import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
-import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
-import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
-import * as anchor from "@coral-xyz/anchor";
-import fastify from "fastify";
-import { HNT_MINT, MOBILE_MINT, IOT_MINT } from "./env";
-import { register } from "./metrics";
+} from '@helium/helium-sub-daos-sdk';
+import { init as hemInit } from '@helium/helium-entity-manager-sdk';
+import { accountPayerKey } from '@helium/data-credits-sdk';
+import { CircuitBreaker } from '@helium/idls/lib/types/circuit_breaker';
+import { HeliumSubDaos } from '@helium/idls/lib/types/helium_sub_daos';
+import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
+import * as anchor from '@coral-xyz/anchor';
+import fastify from 'fastify';
+import { HNT_MINT, MOBILE_MINT, IOT_MINT } from './env';
+import { register } from './metrics';
 import {
   monitiorAssociatedTokenBalance,
   monitorSolBalance,
   monitorTokenBalance,
-} from "./monitors/balance";
+} from './monitors/balance';
 import {
   monitorAccountCircuitBreaker,
   monitorMintCircuitBreaker,
-} from "./monitors/circuitBreaker";
-import { monitorSupply } from "./monitors/supply";
-import { provider } from "./solana";
-import { Cluster, PublicKey } from "@solana/web3.js";
+} from './monitors/circuitBreaker';
+import { monitorSupply } from './monitors/supply';
+import { provider } from './solana';
+import { Cluster, PublicKey } from '@solana/web3.js';
 import {
   SwitchboardProgram,
   AggregatorAccount,
   READ_ONLY_KEYPAIR,
-} from "@switchboard-xyz/solana.js";
-import { lazySignerKey } from "@helium/lazy-transactions-sdk";
-import { underscore } from "inflection";
+} from '@switchboard-xyz/solana.js';
+import { lazySignerKey } from '@helium/lazy-transactions-sdk';
+import { underscore } from 'inflection';
 
 let hemProgram: anchor.Program<HeliumEntityManager>;
 let hsdProgram: anchor.Program<HeliumSubDaos>;
 let cbProgram: anchor.Program<CircuitBreaker>;
 
 const server = fastify();
-server.get("/metrics", async (request, reply) => {
+server.get('/metrics', async (request, reply) => {
   return register.metrics();
 });
 
@@ -65,19 +65,19 @@ async function run() {
   const mobileTreasury = mobile.treasury;
   const mobileRewardsEscrow = mobile.rewardsEscrow;
 
-  await monitorSupply(hntMint, "hnt");
-  await monitorSupply(dcMint, "dc");
-  await monitorSupply(iotMint, "iot");
-  await monitorSupply(mobileMint, "mobile");
-  await monitorMintCircuitBreaker(cbProgram, hntMint, "hnt_mint");
-  await monitorMintCircuitBreaker(cbProgram, dcMint, "dc_mint");
-  await monitorMintCircuitBreaker(cbProgram, iotMint, "iot_mint");
-  await monitorMintCircuitBreaker(cbProgram, mobileMint, "mobile_mint");
+  await monitorSupply(hntMint, 'hnt');
+  await monitorSupply(dcMint, 'dc');
+  await monitorSupply(iotMint, 'iot');
+  await monitorSupply(mobileMint, 'mobile');
+  await monitorMintCircuitBreaker(cbProgram, hntMint, 'hnt_mint');
+  await monitorMintCircuitBreaker(cbProgram, dcMint, 'dc_mint');
+  await monitorMintCircuitBreaker(cbProgram, iotMint, 'iot_mint');
+  await monitorMintCircuitBreaker(cbProgram, mobileMint, 'mobile_mint');
 
-  await monitorTokenBalance(iotTreasury, "iot_treasury");
-  await monitorTokenBalance(mobileTreasury, "mobile_treasury");
-  await monitorTokenBalance(iotRewardsEscrow, "iot_rewards_escrow");
-  await monitorTokenBalance(mobileRewardsEscrow, "mobile_rewards_escrow");
+  await monitorTokenBalance(iotTreasury, 'iot_treasury');
+  await monitorTokenBalance(mobileTreasury, 'mobile_treasury');
+  await monitorTokenBalance(iotRewardsEscrow, 'iot_rewards_escrow');
+  await monitorTokenBalance(mobileRewardsEscrow, 'mobile_rewards_escrow');
 
   for (const maker of makers) {
     await monitorSolBalance(
@@ -91,64 +91,70 @@ async function run() {
       dcMint,
       underscore(maker.account.name),
       true,
-      "data-credits"
+      'data-credits'
     );
   }
 
   await monitorSolBalance(
     new PublicKey(
-      process.env.ORACLE_KEY || "orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q"
+      process.env.CRON_KEY || 'cronjz7v2xsWdXr8BVz38ihi5DTWPihGZKuRr6vSPEU'
     ),
-    "oracle"
+    'cron'
   );
   await monitorSolBalance(
     new PublicKey(
-      process.env.MIGRATION_KEY || "mgrArTL62g582wWV6iM4fwU1LKnbUikDN6akKJ76pzK"
+      process.env.ORACLE_KEY || 'orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q'
     ),
-    "oracle"
+    'oracle'
   );
   await monitorSolBalance(
-    lazySignerKey(process.env.LAZY_SIGNER || "nJWGUMOK")[0],
-    "lazy_signer"
+    new PublicKey(
+      process.env.MIGRATION_KEY || 'mgrArTL62g582wWV6iM4fwU1LKnbUikDN6akKJ76pzK'
+    ),
+    'oracle'
   );
   await monitorSolBalance(
-    threadKey(mobileKey, "calculate")[0],
-    "clockwork_thread_mobile_calculate"
+    lazySignerKey(process.env.LAZY_SIGNER || 'nJWGUMOK')[0],
+    'lazy_signer'
   );
   await monitorSolBalance(
-    threadKey(mobileKey, "issue")[0],
-    "clockwork_thread_mobile_issue"
+    threadKey(mobileKey, 'calculate')[0],
+    'clockwork_thread_mobile_calculate'
   );
   await monitorSolBalance(
-    threadKey(iotKey, "calculate")[0],
-    "clockwork_thread_iot_calculate"
+    threadKey(mobileKey, 'issue')[0],
+    'clockwork_thread_mobile_issue'
   );
   await monitorSolBalance(
-    threadKey(iotKey, "issue")[0],
-    "clockwork_thread_iot_issue"
+    threadKey(iotKey, 'calculate')[0],
+    'clockwork_thread_iot_calculate'
   );
   await monitorSolBalance(
-    threadKey(daoPk, "issue_hst")[0],
-    "clockwork_thread_dao_issue_hst"
+    threadKey(iotKey, 'issue')[0],
+    'clockwork_thread_iot_issue'
+  );
+  await monitorSolBalance(
+    threadKey(daoPk, 'issue_hst')[0],
+    'clockwork_thread_dao_issue_hst'
   );
 
-  await monitorSolBalance(mobile.dcBurnAuthority, "mobile_dc_burn_authority");
+  await monitorSolBalance(mobile.dcBurnAuthority, 'mobile_dc_burn_authority');
 
-  await monitorSolBalance(iot.dcBurnAuthority, "iot_dc_burn_authority");
+  await monitorSolBalance(iot.dcBurnAuthority, 'iot_dc_burn_authority');
 
-  await monitorSolBalance(accountPayerKey()[0], "data_credits_account_payer");
+  await monitorSolBalance(accountPayerKey()[0], 'data_credits_account_payer');
 
   const ep = provider.connection.rpcEndpoint;
-  const isLocalhost = ep.includes("127.0.0.1") || ep.includes("localhost");
+  const isLocalhost = ep.includes('127.0.0.1') || ep.includes('localhost');
   if (!isLocalhost) {
     try {
-      const cluster = provider.connection.rpcEndpoint.includes("devnet")
-        ? "devnet"
-        : "mainnet-beta";
+      const cluster = provider.connection.rpcEndpoint.includes('devnet')
+        ? 'devnet'
+        : 'mainnet-beta';
       const pid =
-        cluster == "devnet"
-          ? "2TfB33aLaneQb5TNVwyDz3jSZXS6jdW2ARw1Dgf84XCG"
-          : "SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f";
+        cluster == 'devnet'
+          ? '2TfB33aLaneQb5TNVwyDz3jSZXS6jdW2ARw1Dgf84XCG'
+          : 'SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f';
       const switchboard = await SwitchboardProgram.load(
         cluster as Cluster,
         provider.connection,
@@ -161,7 +167,7 @@ async function run() {
       );
       const [mobileLease] = anchor.utils.publicKey.findProgramAddressSync(
         [
-          Buffer.from("LeaseAccountData"),
+          Buffer.from('LeaseAccountData'),
           mobileAgg[1].queuePubkey.toBytes(),
           mobileAgg[0].publicKey.toBytes(),
         ],
@@ -173,15 +179,15 @@ async function run() {
       );
       const [iotLease] = anchor.utils.publicKey.findProgramAddressSync(
         [
-          Buffer.from("LeaseAccountData"),
+          Buffer.from('LeaseAccountData'),
           iotAgg[1].queuePubkey.toBytes(),
           iotAgg[0].publicKey.toBytes(),
         ],
         switchboard.programId
       );
 
-      await monitorSolBalance(mobileLease, "switchboard_mobile_lease_account");
-      await monitorSolBalance(iotLease, "switchboard_iot_lease_account");
+      await monitorSolBalance(mobileLease, 'switchboard_mobile_lease_account');
+      await monitorSolBalance(iotLease, 'switchboard_iot_lease_account');
     } catch (err) {
       console.error(err);
     }
@@ -190,21 +196,21 @@ async function run() {
   await monitorAccountCircuitBreaker(
     cbProgram,
     mobileTreasury,
-    "mobile_treasury"
+    'mobile_treasury'
   );
-  await monitorAccountCircuitBreaker(cbProgram, iotTreasury, "iot_treasury");
+  await monitorAccountCircuitBreaker(cbProgram, iotTreasury, 'iot_treasury');
   await monitorAccountCircuitBreaker(
     cbProgram,
     iotRewardsEscrow,
-    "iot_rewards_escrow"
+    'iot_rewards_escrow'
   );
   await monitorAccountCircuitBreaker(
     cbProgram,
     mobileRewardsEscrow,
-    "mobile_rewards_escrow"
+    'mobile_rewards_escrow'
   );
 
-  server.listen({ port: 8082, host: "0.0.0.0" }, (err, address) => {
+  server.listen({ port: 8082, host: '0.0.0.0' }, (err, address) => {
     if (err) {
       console.error(err);
       process.exit(1);
