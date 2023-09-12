@@ -64,6 +64,9 @@ Reward.init(
     lastReward: {
       type: 'TIMESTAMP',
     },
+    rewardType: {
+      type: STRING,
+    }
   },
   { sequelize, modelName: "reward_index", tableName: "reward_index", underscored: true, timestamps: false }
 );

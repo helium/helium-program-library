@@ -72,6 +72,7 @@ export class PgDatabase implements Database {
         lastReward: {
           [Op.gte]: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30), // Active within the last 30 days
         },
+        rewardType: 'mobile_gateway'
       },
     });
   }
