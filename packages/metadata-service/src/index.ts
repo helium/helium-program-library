@@ -6,8 +6,8 @@ import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manage
 import { PublicKey } from "@solana/web3.js";
 // @ts-ignore
 import animalHash from "angry-purple-tiger";
-import axios from "axios";
 import Fastify, { FastifyInstance } from "fastify";
+import axios from "axios";
 import { provider } from "./solana";
 
 const server: FastifyInstance = Fastify({
