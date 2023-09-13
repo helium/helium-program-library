@@ -120,7 +120,7 @@ export async function getPendingRewards(
       account,
       info: hemProgram.coder.accounts.decode<
         IdlAccounts<HeliumEntityManager>["keyToAssetV0"]
-      >("keyToAssetV0", account.data),
+      >("KeyToAssetV0", account.data),
     }),
     true,
     false
@@ -140,7 +140,7 @@ export async function getPendingRewards(
       account,
       info: program.coder.accounts.decode<
         IdlAccounts<LazyDistributor>["recipientV0"]
-      >("recipientV0", account.data),
+      >("RecipientV0", account.data),
     })
   );
   const withRecipients = recipients.map((recipient, index) => {
@@ -247,7 +247,7 @@ export async function formBulkTransactions({
       account,
       info: lazyDistributorProgram.coder.accounts.decode<
         IdlAccounts<LazyDistributor>["recipientV0"]
-      >("recipientV0", account.data),
+      >("RecipientV0", account.data),
     }))
   ).map((x) => x!.info!);
 
