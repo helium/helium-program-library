@@ -9,25 +9,12 @@ permissions:
   packages: write # for publish
 
 jobs:
-  log:
-    name: log
-    runs-on: ubuntu-latest
-    steps:
-      - name: log
-        run: |
-          echo "event_name: ${{ github.event_name }}"
-          echo "comment: ${{ github.event.comment.body }}"
-          echo "author_association: ${{ github.event.comment.author_association }}"
-          echo "author: ${{ github.event.comment.user.login }}"
-          echo "author: ${{ github.event.comment.user.type }}"
-          echo "author: ${{ github.event.comment.user.site_admin }}"
-
   canary-release:
     name: canary-release
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'issue_comment' &&
-      (github.event.comment.author_association == 'ADMIN' || github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'CONTRIBUTOR') &&
+      (github.event.comment.author_association == 'COLLABORATOR' || github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'CONTRIBUTOR') &&
       startsWith(github.event.comment.body, '/canary-release')
     steps:
       - name: get pr information
