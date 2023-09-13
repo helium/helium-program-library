@@ -23,6 +23,6 @@ runs:
         path: |
           ~/.cargo/bin/toml
         key: toml-cli-${{ runner.os }}-v0002
-    - run: cargo install toml-cli
+    - run: (cargo install toml-cli || true)
       if: steps.cache-toml-cli.outputs.cache-hit != 'true'
       shell: bash

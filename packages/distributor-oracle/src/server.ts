@@ -69,10 +69,23 @@ export class PgDatabase implements Database {
   getActiveDevices(): Promise<number> {
     return Reward.count({
       where: {
-        lastReward: {
-          [Op.gte]: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30), // Active within the last 30 days
-        },
-        rewardType: 'mobile_gateway'
+        [Op.and]: [
+          {
+            lastReward: {
+              [Op.gte]: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30), // Active within the last 30 days
+            },
+          },
+          {
+            [Op.or]: [
+              {
+                rewardType: "mobile_gateway",
+              },
+              {
+                rewardType: "iot_gateway",
+              },
+            ],
+          },
+        ],
       },
     });
   }
@@ -105,8 +118,13 @@ export class PgDatabase implements Database {
       return "0";
     }
     const keyToAssetKey = keyToAssetForAsset(asset, DAO);
-    const keyToAsset = await this.issuanceProgram.account.keyToAssetV0.fetch(keyToAssetKey);
-    const entityKey = decodeEntityKey(keyToAsset.entityKey, keyToAsset.keySerialization)!;
+    const keyToAsset = await this.issuanceProgram.account.keyToAssetV0.fetch(
+      keyToAssetKey
+    );
+    const entityKey = decodeEntityKey(
+      keyToAsset.entityKey,
+      keyToAsset.keySerialization
+    )!;
     // Verify the creator is our entity creator, otherwise they could just
     // pass in any NFT with this ecc compact to collect rewards
     if (
