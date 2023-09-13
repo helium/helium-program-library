@@ -33,6 +33,7 @@ jobs:
   build_programs:
     needs: [detect_changed_programs]
     runs-on: ubuntu-latest
+    if: needs.detect_changed_programs.outputs.programs_with_changes != '[]' && needs.detect_changed_programs.outputs.programs_with_changes != ''
     strategy:
       matrix:
         program: ${{ fromJson(needs.detect_changed_programs.outputs.programs_with_changes) }}
@@ -45,21 +46,93 @@ jobs:
         run: |
           find programs -type f -name '*.rs' -exec sed -i "s/b\"nJWGUMOK\"/b\"devnethelium5\"/g" {} \;
 
-      - name: Install toml-cli
-        if: steps.cache-toml.outputs.cache-hit != 'true'
-        run: cargo install toml-cli
+      - uses: actions/cache@v2
+        name: Cache Toml Cli
+        id: cache-toml-cli
+        with:
+          path: |
+            ~/.cargo/bin/toml
+          key: toml-cli-${{ runner.os }}-v0002
+          
+      - run: cargo install toml-cli
+        if: steps.cache-toml-cli.outputs.cache-hit != 'true'
+        shell: bash
 
       - name: Set program information
+        if: steps.cache-toml.outputs.cache-hit != 'true'
         run: |
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
-          PROGRAM_ID=$(toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
+          PROGRAM_ID=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
           echo "Program: $PROGRAM_ID"
           echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
           echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
         env:
           PROGRAM: ${{ matrix.program }}
 
-      - uses: ./.github/actions/upload-bpf/
+      # Build the program with anchor so we get the IDL
+      - uses: ./.github/actions/build-anchor/
+        id: build-anchor
+        with:
+          testing: false
+          devnet: true
+          program: ${{ env.PROGRAM_NAME }}
+
+      - uses: ./.github/actions/build-verified/
+        id: build-verified
+        with:
+          devnet: true
+          program: ${{ env.PROGRAM_NAME }}
+          program-id: ${{ env.PROGRAM_ID }}
+
+      - name: Store so files
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{matrix.program}}-so
+          path: |
+            ./target/deploy/${{env.PROGRAM_NAME}}.so
+      - name: Store idl files
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{matrix.program}}-idl
+          path: |
+            ./target/idl/${{env.PROGRAM_NAME}}.json
+
+
+  publish_programs:
+    needs: [detect_changed_programs, build_programs]
+    runs-on: ubuntu-latest
+    if: needs.detect_changed_programs.outputs.programs_with_changes != '[]' && needs.detect_changed_programs.outputs.programs_with_changes != ''
+    strategy:
+      # Publish must happen one at a time or there can be conflicts
+      max-parallel: 1
+      matrix:
+        program: ${{ fromJson(needs.detect_changed_programs.outputs.programs_with_changes) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - uses: ./.github/actions/setup-anchor/
+      - name: Set program information
+        if: steps.cache-toml.outputs.cache-hit != 'true'
+        run: |
+          PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
+          PROGRAM_ID=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
+          echo "Program: $PROGRAM_ID"
+          echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
+          echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
+        env:
+          PROGRAM: ${{ matrix.program }}
+
+      - name: Download a so files
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{matrix.program}}-so
+          path: ./target/deploy/
+      - name: Download idl files
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{matrix.program}}-idl
+          path: ./target/idl/
+      - uses: ./.github/actions/buffer-deploy/
         id: buffer-deploy
         with:
           devnet: true
@@ -68,7 +141,6 @@ jobs:
           keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
           program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
-
       - name: Squads program upgrade
         uses: helium/squads-program-upgrade@v0.3.1
         with:

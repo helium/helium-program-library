@@ -9,6 +9,9 @@ inputs:
     description: "Whether to use devnet feature"
     required: false
     default: "false"
+  program:
+    description: "The program to build"
+    required: false
 runs:
   using: "composite"
   steps:
@@ -26,15 +29,14 @@ runs:
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-        key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}-2
+        key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
     - name: Cache Anchor Build
       uses: actions/cache@v2
       id: cache-anchor-build
       with:
         path: |
           ./target/
-        key: deps-${{ runner.os }}-build-${{ inputs.devnet }}-${{ inputs.testing }}-${{ hashFiles('./programs/**/**') }}
-    - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/anchor build ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
+        key: build-${{ runner.os }}-v0001-${{ inputs.devnet }}-${{ inputs.testing }}-${{ hashFiles('./programs/**/**') }}-${{ inputs.program }}
+    - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/anchor build ${{ (inputs.program != '' && '-p') || '' }} ${{ inputs.program || '' }} ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
       if: steps.cache-anchor-build.outputs.cache-hit != 'true'
       shell: bash
-    - uses: ./.github/actions/setup-ts/

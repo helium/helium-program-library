@@ -68,6 +68,7 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
+      - uses: ./.github/actions/setup-ts/
       - name: Start Anchor Localnet
         run: ~/.cargo/bin/anchor localnet --skip-build --provider.wallet ~/.config/solana/id.json & sleep 2
       - name: Wait for localnet to start
@@ -149,6 +150,7 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
+      - uses: ./.github/actions/setup-ts/
       - name: Start Anchor Localnet
         run: ~/.cargo/bin/anchor localnet --skip-build --provider.wallet ~/.config/solana/id.json & sleep 2
       - name: Wait for localnet to start

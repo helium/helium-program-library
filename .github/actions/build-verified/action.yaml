@@ -1,0 +1,48 @@
+name: "Build Verified"
+description: "Builds an Anchor Program using solana-verify"
+inputs:
+  devnet:
+    description: "Whether to use devnet feature"
+    required: false
+    default: "false"
+  testing:
+    description: "Whether to use devnet feature"
+    required: false
+    default: "false"
+  program:
+    description: "The program to build and upload"
+    required: true
+  program-id:
+    description: "The program id of the program we are uploading"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: ./.github/actions/setup/
+    - uses: ./.github/actions/setup-anchor/
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+    - uses: actions/cache@v2
+      name: Cache Cargo registry + index
+      id: cache-cargo-registry
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: cargo-${{ runner.os }}-v0001-${{ hashFiles('**/Cargo.lock') }}
+    - uses: actions/cache@v2
+      name: Cache Solana Verify
+      id: cache-solana-verify
+      with:
+        path: |
+          ~/.cargo/bin/solana-verify
+        key: cargo-${{ runner.os }}-solana-verify
+    - run: cargo install solana-verify
+      if: steps.cache-solana-verify.outputs.cache-hit != 'true'
+      shell: bash
+    - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/solana-verify build --library-name $PROGRAM ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
+      shell: bash
+      env:
+        PROGRAM: ${{ inputs.program }}
