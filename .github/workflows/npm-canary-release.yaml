@@ -9,6 +9,19 @@ permissions:
   packages: write # for publish
 
 jobs:
+  log:
+    name: log
+    runs-on: ubuntu-latest
+    steps:
+      - name: log
+        run: |
+          echo "event_name: ${{ github.event_name }}"
+          echo "comment: ${{ github.event.comment.body }}"
+          echo "author_association: ${{ github.event.comment.author_association }}"
+          echo "author: ${{ github.event.comment.user.login }}"
+          echo "author: ${{ github.event.comment.user.type }}"
+          echo "author: ${{ github.event.comment.user.site_admin }}"
+
   canary-release:
     name: canary-release
     runs-on: ubuntu-latest
