@@ -5,7 +5,7 @@ import {
   PublicKey,
   SendOptions,
   Transaction,
-  TransactionInstruction
+  TransactionInstruction,
 } from "@solana/web3.js";
 import { EventEmitter } from "./eventEmitter";
 
@@ -41,16 +41,15 @@ let id = 0;
 
 let singletons: Record<string, AccountFetchCache | undefined> = {};
 export function getSingleton(conn: Connection): AccountFetchCache {
-  const commitment = conn.commitment || "confirmed"
-  const endp = conn.rpcEndpoint
+  const commitment = conn.commitment || "confirmed";
+  const endp = conn.rpcEndpoint;
   if (!singletons[endp + commitment]) {
     singletons[endp + commitment] = new AccountFetchCache({
       connection: conn,
       commitment,
-    })
-
+    });
   }
-  return singletons[endp + commitment]!
+  return singletons[endp + commitment]!;
 }
 
 function setSingleton(conn: Connection, cache: AccountFetchCache) {
@@ -176,7 +175,7 @@ export class AccountFetchCache {
       return result;
     };
 
-    setSingleton(connection, this)
+    setSingleton(connection, this);
   }
 
   async requeryMissing(instructions: TransactionInstruction[]) {
@@ -250,6 +249,20 @@ export class AccountFetchCache {
       });
       throw e;
     }
+  }
+
+  addToBatchIgnoreResult(id: PublicKey): Promise<void> | undefined {
+    const idStr = id.toBase58();
+
+    this.currentBatch.add(idStr);
+
+    this.timeout != null && clearTimeout(this.timeout);
+    if (this.currentBatch.size > DEFAULT_CHUNK_SIZE) {
+      return this.fetchBatch().then(() => {});
+    } else {
+      this.timeout = setTimeout(() => this.fetchBatch(), this.delay);
+    }
+    return undefined
   }
 
   async addToBatch(id: PublicKey): Promise<AccountInfo<Buffer>> {
@@ -391,7 +404,7 @@ export class AccountFetchCache {
     isStatic: Boolean = false, // optimization, set if the data will never change
     forceRequery = false
   ): Promise<(ParsedAccountBase<T> | undefined)[]> {
-    pubKeys.forEach(key => {
+    for (const key of pubKeys) {
       this.registerParser(key, parser);
       const address = key.toBase58();
       if (isStatic) {
@@ -401,9 +414,9 @@ export class AccountFetchCache {
       }
 
       if (forceRequery || !this.genericCache.has(address)) {
-        this.currentBatch.add(address);
+        await this.addToBatchIgnoreResult(key);
       }
-    })
+    }
 
     const searched = new Set(pubKeys.map((p) => p.toBase58()));
     // Force a batch fetch to resolve all accounts
@@ -422,9 +435,13 @@ export class AccountFetchCache {
         }
       });
     }
-    
 
-    return pubKeys.map(key => this.genericCache.get(key.toBase58()) as ParsedAccountBase<T> | undefined);
+    return pubKeys.map(
+      (key) =>
+        this.genericCache.get(key.toBase58()) as
+          | ParsedAccountBase<T>
+          | undefined
+    );
   }
 
   onAccountChange<T>(
