@@ -48,11 +48,18 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - name: install
         run: yarn
+      - name: re create .npmrc file
+        run: |
+          cat << EOF > "$HOME/.npmrc"
+            //registry.npmjs.org/:_authToken=$NPM_TOKEN
+          EOF
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish
         run: yarn run release:canary
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - uses: actions/github-script@v4
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
