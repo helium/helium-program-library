@@ -1,4 +1,5 @@
-import { AnchorProvider, BN, Program } from '@coral-xyz/anchor';
+import { AnchorProvider, BN, IdlAccounts, Program } from '@coral-xyz/anchor';
+import { getSingleton } from '@helium/account-fetch-cache';
 import {
   decodeEntityKey,
   init,
@@ -7,7 +8,6 @@ import {
   keyToAssetForAsset,
 } from '@helium/helium-entity-manager-sdk';
 import { daoKey } from '@helium/helium-sub-daos-sdk';
-import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
 import { LazyDistributor } from '@helium/idls/lib/types/lazy_distributor';
 import { RewardsOracle } from '@helium/idls/lib/types/rewards_oracle';
 import {
@@ -31,6 +31,7 @@ import {
   TransactionInstruction,
 } from '@solana/web3.js';
 import axios from 'axios';
+import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 
 const HNT = process.env.HNT_MINT
   ? new PublicKey(process.env.HNT_MINT)
@@ -107,23 +108,47 @@ export async function getPendingRewards(
   );
 
   const hemProgram = await init(program.provider as AnchorProvider);
-  const withRecipients = await Promise.all(
-    entityKeys.map(async (entityKey) => {
-      const keyToAssetK = keyToAssetKey(dao, entityKey, encoding)[0];
-      const keyToAsset = await hemProgram.account.keyToAssetV0.fetch(
-        keyToAssetK
-      );
-      const recipient = recipientKey(lazyDistributor, keyToAsset.asset)[0];
-      const recipientAcc = await program.account.recipientV0.fetchNullable(
-        recipient
-      );
-
-      return {
-        entityKey,
-        recipientAcc,
-      };
+  const cache = await getSingleton(hemProgram.provider.connection)
+  const keyToAssetKs = entityKeys.map((entityKey) => {
+      return keyToAssetKey(dao, entityKey, encoding)[0];
+  })
+  
+  const keyToAssets = await cache.searchMultiple(
+    keyToAssetKs,
+    (pubkey, account) => ({
+      pubkey,
+      account,
+      info: hemProgram.coder.accounts.decode<
+        IdlAccounts<HeliumEntityManager>["keyToAssetV0"]
+      >("keyToAssetV0", account.data),
+    }),
+    true,
+    false
+  );
+  keyToAssets.forEach((kta, index) => {
+    if (!kta?.info) {
+      throw new Error(`Key to asset account not found for entity key ${entityKeys[index]}`)
+    }
+  })
+  const recipientKs = keyToAssets.map(
+    (keyToAsset) => recipientKey(lazyDistributor, keyToAsset!.info!.asset)[0]
+  );
+  const recipients = await cache.searchMultiple(
+    recipientKs,
+    (pubkey, account) => ({
+      pubkey,
+      account,
+      info: program.coder.accounts.decode<
+        IdlAccounts<LazyDistributor>["recipientV0"]
+      >("recipientV0", account.data),
     })
   );
+  const withRecipients = recipients.map((recipient, index) => {
+    return {
+      entityKey: entityKeys[index],
+      recipientAcc: recipient?.info,
+    }
+  })
 
   return withRecipients.reduce((acc, { entityKey, recipientAcc }) => {
     const sortedOracleRewards = oracleRewards
@@ -213,10 +238,18 @@ export async function formBulkTransactions({
   let recipientKeys = assets.map(
     (asset) => recipientKey(lazyDistributor, asset)[0]
   );
-  let recipientAccs =
-    await lazyDistributorProgram.account.recipientV0.fetchMultiple(
-      recipientKeys
-    );
+  const cache = await getSingleton(
+    heliumEntityManagerProgram.provider.connection
+  );
+  const recipientAccs = (
+    await cache.searchMultiple(recipientKeys, (pubkey, account) => ({
+      pubkey,
+      account,
+      info: lazyDistributorProgram.coder.accounts.decode<
+        IdlAccounts<LazyDistributor>["recipientV0"]
+      >("recipientV0", account.data),
+    }))
+  ).map((x) => x!.info!);
 
   let ixsPerAsset = await Promise.all(
     recipientAccs.map(async (recipientAcc, idx) => {
