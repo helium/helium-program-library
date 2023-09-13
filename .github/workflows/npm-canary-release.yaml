@@ -55,6 +55,8 @@ jobs:
           EOF
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: build anchor
+        uses: ./.github/actions/build-anchor
       - name: Publish
         run: yarn run release:canary
         env:
