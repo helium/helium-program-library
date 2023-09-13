@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.2.21",
+  "version": "0.2.22",
   "description": "React hooks and context for account-fetch-cache",
   "repository": {
     "type": "git",
@@ -32,7 +32,7 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@helium/account-fetch-cache": "^0.2.21",
+    "@helium/account-fetch-cache": "^0.2.22",
     "@solana/web3.js": "^1.78.4",
     "react-async-hook": "^4.0.0"
   },
