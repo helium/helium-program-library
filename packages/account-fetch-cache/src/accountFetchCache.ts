@@ -233,7 +233,7 @@ export class AccountFetchCache {
     this.currentBatch = new Set(); // Erase current batch from state, so we can fetch multiple at a time
     try {
       const keys = Array.from(currentBatch);
-      const array = await getMultipleAccounts(
+      const { array } = await getMultipleAccounts(
         this.connection,
         keys,
         this.commitment
