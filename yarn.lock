@@ -724,6 +724,22 @@
   dependencies:
     "@hapi/hoek" "^9.0.0"
 
+"@helium/account-fetch-cache-hooks@^0.2.21", "@helium/account-fetch-cache-hooks@^0.2.5":
+  version "0.2.21"
+  resolved "https://registry.yarnpkg.com/@helium/account-fetch-cache-hooks/-/account-fetch-cache-hooks-0.2.21.tgz#c957838d0f5767db0e7425e968fa7facc512ac4c"
+  integrity sha512-oYzYCmdlo3b2GL8XM5Bs6NzBcCQGF9TJggNyxaCNNnHfe0Pobvexf8jBHTPzijebNyXTpyKcvzIzPXD7WUqlYg==
+  dependencies:
+    "@helium/account-fetch-cache" "^0.2.21"
+    "@solana/web3.js" "^1.66.2"
+    react-async-hook "^4.0.0"
+
+"@helium/account-fetch-cache@^0.2.21", "@helium/account-fetch-cache@^0.2.5":
+  version "0.2.21"
+  resolved "https://registry.yarnpkg.com/@helium/account-fetch-cache/-/account-fetch-cache-0.2.21.tgz#a7aab7d9e32de14ea6d55cc239c33ab5513b6a62"
+  integrity sha512-aOtM/BkTGOUKh608MsoqS41kpGBcdmklFOCrJR2D/3eFWoVAyjNoyEaMAg5AMVFvEvIZ7ulGSAd7SXQnVbxO4w==
+  dependencies:
+    "@solana/web3.js" "^1.43.4"
+
 "@helium/address@^4.10.2":
   version "4.10.2"
   resolved "https://registry.yarnpkg.com/@helium/address/-/address-4.10.2.tgz#56960b118fceb6b6ddabe3e4ecec467d9ae50e26"
@@ -732,6 +748,14 @@
     bs58 "^5.0.0"
     js-sha256 "^0.9.0"
     multiformats "^9.6.4"
+
+"@helium/anchor-resolvers@^0.2.5":
+  version "0.2.21"
+  resolved "https://registry.yarnpkg.com/@helium/anchor-resolvers/-/anchor-resolvers-0.2.21.tgz#8cd13bca3e7af83ffff3ab754dcf9f788d26e57e"
+  integrity sha512-rz3GJaULGmokjrq63v4sy683PMUkL31jrK5wVX01tzCYbI1woC9vISoPd3oSSuauZqQXdBhhQ49GKrpzi49JbA==
+  dependencies:
+    "@solana/spl-token" "^0.3.6"
+    "@solana/web3.js" "^1.43.4"
 
 "@helium/crypto@^3.60.0":
   version "3.60.0"
@@ -750,6 +774,20 @@
     "@helium/address" "^4.10.2"
     create-hash "^1.2.0"
     libsodium-wrappers "^0.7.6"
+
+"@helium/helium-react-hooks@^0.2.5":
+  version "0.2.21"
+  resolved "https://registry.yarnpkg.com/@helium/helium-react-hooks/-/helium-react-hooks-0.2.21.tgz#84b82b83602c20cae4a96c790786bb4b84e32530"
+  integrity sha512-c+U6TB+D+pww8awYvf7WtfY285FhbiUDGhE8KVEU8Y2RBHA39gE2F13Y0oSCj4RQfjGynv60ONCVc7PEkOqmsw==
+  dependencies:
+    "@coral-xyz/anchor" "^0.26.0"
+    "@helium/account-fetch-cache" "^0.2.21"
+    "@helium/account-fetch-cache-hooks" "^0.2.21"
+    "@solana/spl-token" "^0.3.6"
+    "@solana/web3.js" "^1.66.2"
+    bs58 "^5.0.0"
+    pako "^2.0.3"
+    react-async-hook "^4.0.0"
 
 "@helium/modular-governance-hooks@^0.0.2":
   version "0.0.2"
