@@ -270,14 +270,29 @@ export async function formBulkTransactions({
     })
   );
 
+  const keyToAssetKs = compressionAssetAccs.map((assetAcc, idx) => {
+      return keyToAssetForAsset(assetAcc)
+  })
+   const keyToAssets = await cache.searchMultiple(
+     keyToAssetKs,
+     (pubkey, account) => ({
+       pubkey,
+       account,
+       info: heliumEntityManagerProgram!.coder.accounts.decode<
+         IdlAccounts<HeliumEntityManager>["keyToAssetV0"]
+       >("KeyToAssetV0", account.data),
+     }),
+     true,
+     false
+   );
   // construct the set and distribute ixs
   let setAndDistributeIxs = await Promise.all(
     compressionAssetAccs.map(async (assetAcc, idx) => {
-      const keyToAssetK = keyToAssetForAsset(assetAcc);
-      const keyToAsset =
-        await heliumEntityManagerProgram!.account.keyToAssetV0.fetch(
-          keyToAssetK
-        );
+      const keyToAssetK = keyToAssets[idx]?.pubkey;
+      const keyToAsset = keyToAssets[idx]?.info
+      if (!keyToAsset || !keyToAssetK) {
+        return []
+      }
       const entityKey = decodeEntityKey(
         keyToAsset.entityKey,
         keyToAsset.keySerialization

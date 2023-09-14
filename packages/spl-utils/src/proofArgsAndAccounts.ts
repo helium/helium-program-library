@@ -12,6 +12,8 @@ export type ProofArgsAndAccountsArgs = {
     assetId: PublicKey
   ) => Promise<AssetProof | undefined>;
 };
+// Cache canopy depths so we don't parse large tree accounts over and over
+const canopyToDepthCache: Record<string, number> = {};
 export async function proofArgsAndAccounts({
   connection,
   assetId,
@@ -42,11 +44,13 @@ export async function proofArgsAndAccounts({
   const {
     compression: { leafId },
   } = asset;
-  const { root, proof, leaf, treeId } = assetProof;
-  const canopy = await (
-    await ConcurrentMerkleTreeAccount.fromAccountAddress(connection, treeId)
-  ).getCanopyDepth();
-
+  const { root, proof, treeId } = assetProof;
+  if (typeof canopyToDepthCache[treeId.toBase58()] === "undefined") {
+    canopyToDepthCache[treeId.toBase58()] = await (
+      await ConcurrentMerkleTreeAccount.fromAccountAddress(connection, treeId)
+    ).getCanopyDepth();
+  }
+  const canopy = canopyToDepthCache[treeId.toBase58()];
   return {
     asset,
     args: {
