@@ -8,6 +8,7 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import { EventEmitter } from "./eventEmitter";
+import { getMultipleAccounts } from "./getMultipleAccounts";
 
 export const DEFAULT_CHUNK_SIZE = 99;
 export const DEFAULT_DELAY = 50;
@@ -232,8 +233,9 @@ export class AccountFetchCache {
     this.currentBatch = new Set(); // Erase current batch from state, so we can fetch multiple at a time
     try {
       const keys = Array.from(currentBatch);
-      const array = await this.connection.getMultipleAccountsInfo(
-        keys.map((b) => new PublicKey(b)),
+      const array = await getMultipleAccounts(
+        this.connection,
+        keys,
         this.commitment
       );
       keys.forEach((key, index) => {
