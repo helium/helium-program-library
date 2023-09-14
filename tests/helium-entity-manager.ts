@@ -509,7 +509,7 @@ describe("helium-entity-manager", () => {
 
       let tx = await hemProgram.methods
         .issueEntityV0({
-          entityKey: Buffer.from(bs58.decode(eccKey)),
+          entityKey: Buffer.from(bs58.decode(eccKey!)),
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),

@@ -22,6 +22,8 @@ import {
   HNT_MINT,
   getAsset,
   getAssetProof,
+  getAssetBatch,
+  getAssetProofBatch,
   truthy,
 } from '@helium/spl-utils';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
@@ -178,8 +180,8 @@ export async function formBulkTransactions({
   wallet = (lazyDistributorProgram.provider as AnchorProvider).wallet.publicKey,
   skipOracleSign = false,
   assetEndpoint,
-  getAssetFn = getAsset,
-  getAssetProofFn = getAssetProof,
+  getAssetBatchFn = getAssetBatch,
+  getAssetProofBatchFn = getAssetProofBatch,
 }: {
   program: Program<LazyDistributor>;
   rewardsOracleProgram?: Program<RewardsOracle>;
@@ -192,11 +194,11 @@ export async function formBulkTransactions({
   wallet?: PublicKey;
   assetEndpoint?: string;
   skipOracleSign?: boolean;
-  getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
-  getAssetProofFn?: (
+  getAssetBatchFn?: (url: string, assetIds: PublicKey[]) => Promise<Asset[] | undefined>;
+  getAssetProofBatchFn?: (
     url: string,
-    assetId: PublicKey
-  ) => Promise<AssetProof | undefined>;
+    assetIds: PublicKey[]
+  ) => Promise<Record<string, AssetProof> | undefined>;
 }) {
   if (assets.length > 100) {
     throw new Error('Too many assets, max 100');
@@ -217,21 +219,12 @@ export async function formBulkTransactions({
   }
 
   if (!compressionAssetAccs) {
-    compressionAssetAccs = await Promise.all(
-      assets.map(async (asset) => {
-        // @ts-ignore
-        const assetAcc = await getAssetFn(
-          assetEndpoint || provider.connection.rpcEndpoint,
-          asset
-        );
-        if (!assetAcc) {
-          throw new Error('No asset with ID ' + asset.toBase58());
-        }
-        return assetAcc;
-      })
-    );
+    compressionAssetAccs = await getAssetBatchFn(
+      assetEndpoint || provider.connection.rpcEndpoint,
+      assets
+    )
   }
-  if (compressionAssetAccs.length != assets.length) {
+  if (compressionAssetAccs?.length != assets.length) {
     throw new Error('Assets not the same length as compressionAssetAccs');
   }
 
@@ -250,7 +243,10 @@ export async function formBulkTransactions({
       >("RecipientV0", account.data),
     }))
   ).map((x) => x?.info);
-
+  const assetProofsById = await getAssetProofBatchFn(
+    assetEndpoint || provider.connection.rpcEndpoint,
+    assets
+  )
   let ixsPerAsset = await Promise.all(
     recipientAccs.map(async (recipientAcc, idx) => {
       if (!recipientAcc) {
@@ -265,7 +261,7 @@ export async function formBulkTransactions({
               // Make the oracle pay for the recipient to avoid newly migrated users not having enough sol to claim rewards
               payer: lazyDistributorAcc.oracles[0].oracle,
               getAssetFn: () => Promise.resolve(compressionAssetAccs![idx]), // cache result so we don't hit again
-              getAssetProofFn,
+              getAssetProofFn: assetProofsById ? () => Promise.resolve(assetProofsById[compressionAssetAccs![idx].id.toBase58()]) : undefined,
             })
           ).instruction(),
         ];
@@ -310,14 +306,19 @@ export async function formBulkTransactions({
       if (setRewardIxs.length == 0) {
         return [];
       }
-      const distributeIx = await (
+      const distributeIx = await(
         await distributeCompressionRewards({
           program: lazyDistributorProgram,
           assetId: assets![idx],
           lazyDistributor,
           rewardsMint: lazyDistributorAcc.rewardsMint!,
           getAssetFn: () => Promise.resolve(assetAcc), // cache result so we don't hit again
-          getAssetProofFn,
+          getAssetProofFn: assetProofsById
+            ? () =>
+                Promise.resolve(
+                  assetProofsById[compressionAssetAccs![idx].id.toBase58()]
+                )
+            : undefined,
           assetEndpoint,
         })
       ).instruction();
