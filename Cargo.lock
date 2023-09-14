@@ -1779,7 +1779,6 @@ dependencies = [
  "data-credits",
  "default-env",
  "helium-sub-daos",
- "lazy-transactions",
  "mpl-token-metadata",
  "shared-utils",
  "solana-security-txt",

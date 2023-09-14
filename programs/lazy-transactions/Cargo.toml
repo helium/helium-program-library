@@ -27,6 +27,6 @@ anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 spl-concurrent-merkle-tree = "0.1.2"
 bytemuck = "1.13.0"
-shared-utils = { path = "../../utils/shared-utils" }
+shared-utils = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }

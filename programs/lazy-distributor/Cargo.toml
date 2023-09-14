@@ -27,8 +27,8 @@ anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 mpl-token-metadata = { workspace = true }
 bubblegum-cpi = { workspace = true }
-circuit-breaker = { path = "../circuit-breaker", features = ["cpi"] }
-shared-utils = { path = "../../utils/shared-utils" }
+circuit-breaker = { workspace = true }
+shared-utils = { workspace = true }
 account-compression-cpi = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }

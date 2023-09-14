@@ -25,6 +25,6 @@ overflow-checks = true
 [dependencies]
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
-shared-utils = { path = "../../utils/shared-utils" }
+shared-utils = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }
