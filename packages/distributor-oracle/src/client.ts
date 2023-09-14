@@ -249,7 +249,7 @@ export async function formBulkTransactions({
         IdlAccounts<LazyDistributor>["recipientV0"]
       >("RecipientV0", account.data),
     }))
-  ).map((x) => x!.info!);
+  ).map((x) => x?.info);
 
   let ixsPerAsset = await Promise.all(
     recipientAccs.map(async (recipientAcc, idx) => {
