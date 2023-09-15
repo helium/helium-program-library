@@ -54,7 +54,7 @@ export async function proofArgsAndAccounts({
   const { root, proof, treeId } = assetProof;
 
   const tree = treeId.toBase58();
-  if (!canopyCache[tree] && !wellKnownCanopyCache[tree]) {
+  if (!canopyCache[tree] && !wellKnownCanopyCache?.[tree]) {
     canopyCache[tree] = (async () => {
       if (!wellKnownCanopyCache) {
         wellKnownCanopyCache = await (await fetch(WELL_KNOWN_CANOPY_URL)).json()
