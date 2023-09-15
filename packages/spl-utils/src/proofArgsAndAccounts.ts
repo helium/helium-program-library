@@ -1,5 +1,9 @@
 import { Asset, AssetProof, getAsset, getAssetProof } from "./mplAssetAPI";
-import { concurrentMerkleTreeBeetFactory, concurrentMerkleTreeHeaderBeet, getCanopyDepth } from "@solana/spl-account-compression";
+import {
+  concurrentMerkleTreeBeetFactory,
+  concurrentMerkleTreeHeaderBeet,
+  getCanopyDepth,
+} from "@solana/spl-account-compression";
 import { Connection, PublicKey, AccountMeta } from "@solana/web3.js";
 
 export type ProofArgsAndAccountsArgs = {
@@ -13,7 +17,10 @@ export type ProofArgsAndAccountsArgs = {
   ) => Promise<AssetProof | undefined>;
 };
 
-const canopyCache: Record<string, Promise<number>> = {}
+const WELL_KNOWN_CANOPY_URL =
+  "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/merkles.json";
+let wellKnownCanopyCache: Record<string, number>;
+const canopyCache: Record<string, Promise<number>> = {};
 export async function proofArgsAndAccounts({
   connection,
   assetId,
@@ -47,14 +54,20 @@ export async function proofArgsAndAccounts({
   const { root, proof, treeId } = assetProof;
 
   const tree = treeId.toBase58();
-  if (!canopyCache[tree]) {
+  if (!canopyCache[tree] && !wellKnownCanopyCache[tree]) {
     canopyCache[tree] = (async () => {
+      if (!wellKnownCanopyCache) {
+        wellKnownCanopyCache = await (await fetch(WELL_KNOWN_CANOPY_URL)).json()
+      }
+      if (wellKnownCanopyCache[tree]) {
+        return wellKnownCanopyCache[tree]
+      }
       // IMPORTANT! Do not use `ConcurrentMerkleTreeAccount` class. It stupidly deserializes the whole merkle tree,
       // including reading the entire canopy. For large trees this will freeze the wallet app.
       let offset = 0;
       // Construct a new connection to ensure there's no caching. Don't want to cache
       // a giant account in AccountFetchCache accidentally. It also adds uneeded latency
-      const newConn = new Connection(connection.rpcEndpoint)
+      const newConn = new Connection(connection.rpcEndpoint);
       const buffer = (await newConn.getAccountInfo(treeId))!.data;
       const [versionedHeader, offsetIncr] =
         concurrentMerkleTreeHeaderBeet.deserialize(buffer);
@@ -74,9 +87,9 @@ export async function proofArgsAndAccounts({
       offset = offsetIncr2;
 
       return getCanopyDepth(buffer.byteLength - offset);
-    })()
+    })();
   }
-  const canopy = await canopyCache[tree]
+  const canopy = await (wellKnownCanopyCache[tree] || canopyCache[tree]);
 
   return {
     asset,
