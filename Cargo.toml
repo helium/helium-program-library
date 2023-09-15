@@ -24,3 +24,7 @@ account-compression-cpi = { rev = "9707a03eb7be0ccf4d96a18b662ffcd376365640", gi
 bubblegum-cpi = { rev = "9707a03eb7be0ccf4d96a18b662ffcd376365640", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
 solana-security-txt = "1.1.1"
 default-env = "0.1.1"
+shared-utils = { path = "./utils/shared-utils" }
+circuit-breaker = { path = "./programs/circuit-breaker", features = ["cpi"] }
+helium-sub-daos = { path = "./programs/helium-sub-daos", features = ["cpi"] }
+helium-entity-manager = { path = "./programs/helium-entity-manager", features = ["cpi"] }

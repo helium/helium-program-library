@@ -1,4 +1,5 @@
-import { AnchorProvider, BN, Program } from '@coral-xyz/anchor';
+import { AnchorProvider, BN, IdlAccounts, Program } from '@coral-xyz/anchor';
+import { getSingleton } from '@helium/account-fetch-cache';
 import {
   decodeEntityKey,
   init,
@@ -7,7 +8,6 @@ import {
   keyToAssetForAsset,
 } from '@helium/helium-entity-manager-sdk';
 import { daoKey } from '@helium/helium-sub-daos-sdk';
-import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
 import { LazyDistributor } from '@helium/idls/lib/types/lazy_distributor';
 import { RewardsOracle } from '@helium/idls/lib/types/rewards_oracle';
 import {
@@ -22,6 +22,8 @@ import {
   HNT_MINT,
   getAsset,
   getAssetProof,
+  getAssetBatch,
+  getAssetProofBatch,
   truthy,
 } from '@helium/spl-utils';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
@@ -31,6 +33,7 @@ import {
   TransactionInstruction,
 } from '@solana/web3.js';
 import axios from 'axios';
+import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 
 const HNT = process.env.HNT_MINT
   ? new PublicKey(process.env.HNT_MINT)
@@ -107,23 +110,47 @@ export async function getPendingRewards(
   );
 
   const hemProgram = await init(program.provider as AnchorProvider);
-  const withRecipients = await Promise.all(
-    entityKeys.map(async (entityKey) => {
-      const keyToAssetK = keyToAssetKey(dao, entityKey, encoding)[0];
-      const keyToAsset = await hemProgram.account.keyToAssetV0.fetch(
-        keyToAssetK
-      );
-      const recipient = recipientKey(lazyDistributor, keyToAsset.asset)[0];
-      const recipientAcc = await program.account.recipientV0.fetchNullable(
-        recipient
-      );
-
-      return {
-        entityKey,
-        recipientAcc,
-      };
+  const cache = await getSingleton(hemProgram.provider.connection)
+  const keyToAssetKs = entityKeys.map((entityKey) => {
+      return keyToAssetKey(dao, entityKey, encoding)[0];
+  })
+  
+  const keyToAssets = await cache.searchMultiple(
+    keyToAssetKs,
+    (pubkey, account) => ({
+      pubkey,
+      account,
+      info: hemProgram.coder.accounts.decode<
+        IdlAccounts<HeliumEntityManager>["keyToAssetV0"]
+      >("KeyToAssetV0", account.data),
+    }),
+    true,
+    false
+  );
+  keyToAssets.forEach((kta, index) => {
+    if (!kta?.info) {
+      throw new Error(`Key to asset account not found for entity key ${entityKeys[index]}`)
+    }
+  })
+  const recipientKs = keyToAssets.map(
+    (keyToAsset) => recipientKey(lazyDistributor, keyToAsset!.info!.asset)[0]
+  );
+  const recipients = await cache.searchMultiple(
+    recipientKs,
+    (pubkey, account) => ({
+      pubkey,
+      account,
+      info: program.coder.accounts.decode<
+        IdlAccounts<LazyDistributor>["recipientV0"]
+      >("RecipientV0", account.data),
     })
   );
+  const withRecipients = recipients.map((recipient, index) => {
+    return {
+      entityKey: entityKeys[index],
+      recipientAcc: recipient?.info,
+    }
+  })
 
   return withRecipients.reduce((acc, { entityKey, recipientAcc }) => {
     const sortedOracleRewards = oracleRewards
@@ -153,8 +180,8 @@ export async function formBulkTransactions({
   wallet = (lazyDistributorProgram.provider as AnchorProvider).wallet.publicKey,
   skipOracleSign = false,
   assetEndpoint,
-  getAssetFn = getAsset,
-  getAssetProofFn = getAssetProof,
+  getAssetBatchFn = getAssetBatch,
+  getAssetProofBatchFn = getAssetProofBatch,
 }: {
   program: Program<LazyDistributor>;
   rewardsOracleProgram?: Program<RewardsOracle>;
@@ -167,11 +194,11 @@ export async function formBulkTransactions({
   wallet?: PublicKey;
   assetEndpoint?: string;
   skipOracleSign?: boolean;
-  getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
-  getAssetProofFn?: (
+  getAssetBatchFn?: (url: string, assetIds: PublicKey[]) => Promise<Asset[] | undefined>;
+  getAssetProofBatchFn?: (
     url: string,
-    assetId: PublicKey
-  ) => Promise<AssetProof | undefined>;
+    assetIds: PublicKey[]
+  ) => Promise<Record<string, AssetProof> | undefined>;
 }) {
   if (assets.length > 100) {
     throw new Error('Too many assets, max 100');
@@ -192,32 +219,34 @@ export async function formBulkTransactions({
   }
 
   if (!compressionAssetAccs) {
-    compressionAssetAccs = await Promise.all(
-      assets.map(async (asset) => {
-        // @ts-ignore
-        const assetAcc = await getAssetFn(
-          assetEndpoint || provider.connection.rpcEndpoint,
-          asset
-        );
-        if (!assetAcc) {
-          throw new Error('No asset with ID ' + asset.toBase58());
-        }
-        return assetAcc;
-      })
-    );
+    compressionAssetAccs = await getAssetBatchFn(
+      assetEndpoint || provider.connection.rpcEndpoint,
+      assets
+    )
   }
-  if (compressionAssetAccs.length != assets.length) {
+  if (compressionAssetAccs?.length != assets.length) {
     throw new Error('Assets not the same length as compressionAssetAccs');
   }
 
   let recipientKeys = assets.map(
     (asset) => recipientKey(lazyDistributor, asset)[0]
   );
-  let recipientAccs =
-    await lazyDistributorProgram.account.recipientV0.fetchMultiple(
-      recipientKeys
-    );
-
+  const cache = await getSingleton(
+    heliumEntityManagerProgram.provider.connection
+  );
+  const recipientAccs = (
+    await cache.searchMultiple(recipientKeys, (pubkey, account) => ({
+      pubkey,
+      account,
+      info: lazyDistributorProgram.coder.accounts.decode<
+        IdlAccounts<LazyDistributor>["recipientV0"]
+      >("RecipientV0", account.data),
+    }))
+  ).map((x) => x?.info);
+  const assetProofsById = await getAssetProofBatchFn(
+    assetEndpoint || provider.connection.rpcEndpoint,
+    assets
+  )
   let ixsPerAsset = await Promise.all(
     recipientAccs.map(async (recipientAcc, idx) => {
       if (!recipientAcc) {
@@ -232,7 +261,7 @@ export async function formBulkTransactions({
               // Make the oracle pay for the recipient to avoid newly migrated users not having enough sol to claim rewards
               payer: lazyDistributorAcc.oracles[0].oracle,
               getAssetFn: () => Promise.resolve(compressionAssetAccs![idx]), // cache result so we don't hit again
-              getAssetProofFn,
+              getAssetProofFn: assetProofsById ? () => Promise.resolve(assetProofsById[compressionAssetAccs![idx].id.toBase58()]) : undefined,
             })
           ).instruction(),
         ];
@@ -241,14 +270,29 @@ export async function formBulkTransactions({
     })
   );
 
+  const keyToAssetKs = compressionAssetAccs.map((assetAcc, idx) => {
+      return keyToAssetForAsset(assetAcc)
+  })
+   const keyToAssets = await cache.searchMultiple(
+     keyToAssetKs,
+     (pubkey, account) => ({
+       pubkey,
+       account,
+       info: heliumEntityManagerProgram!.coder.accounts.decode<
+         IdlAccounts<HeliumEntityManager>["keyToAssetV0"]
+       >("KeyToAssetV0", account.data),
+     }),
+     true,
+     false
+   );
   // construct the set and distribute ixs
   let setAndDistributeIxs = await Promise.all(
     compressionAssetAccs.map(async (assetAcc, idx) => {
-      const keyToAssetK = keyToAssetForAsset(assetAcc);
-      const keyToAsset =
-        await heliumEntityManagerProgram!.account.keyToAssetV0.fetch(
-          keyToAssetK
-        );
+      const keyToAssetK = keyToAssets[idx]?.pubkey;
+      const keyToAsset = keyToAssets[idx]?.info
+      if (!keyToAsset || !keyToAssetK) {
+        return []
+      }
       const entityKey = decodeEntityKey(
         keyToAsset.entityKey,
         keyToAsset.keySerialization
@@ -277,14 +321,19 @@ export async function formBulkTransactions({
       if (setRewardIxs.length == 0) {
         return [];
       }
-      const distributeIx = await (
+      const distributeIx = await(
         await distributeCompressionRewards({
           program: lazyDistributorProgram,
           assetId: assets![idx],
           lazyDistributor,
           rewardsMint: lazyDistributorAcc.rewardsMint!,
           getAssetFn: () => Promise.resolve(assetAcc), // cache result so we don't hit again
-          getAssetProofFn,
+          getAssetProofFn: assetProofsById
+            ? () =>
+                Promise.resolve(
+                  assetProofsById[compressionAssetAccs![idx].id.toBase58()]
+                )
+            : undefined,
           assetEndpoint,
         })
       ).instruction();

@@ -724,6 +724,22 @@
   dependencies:
     "@hapi/hoek" "^9.0.0"
 
+"@helium/account-fetch-cache-hooks@^0.2.21", "@helium/account-fetch-cache-hooks@^0.2.5":
+  version "0.2.21"
+  resolved "https://registry.yarnpkg.com/@helium/account-fetch-cache-hooks/-/account-fetch-cache-hooks-0.2.21.tgz#c957838d0f5767db0e7425e968fa7facc512ac4c"
+  integrity sha512-oYzYCmdlo3b2GL8XM5Bs6NzBcCQGF9TJggNyxaCNNnHfe0Pobvexf8jBHTPzijebNyXTpyKcvzIzPXD7WUqlYg==
+  dependencies:
+    "@helium/account-fetch-cache" "^0.2.21"
+    "@solana/web3.js" "^1.66.2"
+    react-async-hook "^4.0.0"
+
+"@helium/account-fetch-cache@^0.2.21", "@helium/account-fetch-cache@^0.2.5":
+  version "0.2.21"
+  resolved "https://registry.yarnpkg.com/@helium/account-fetch-cache/-/account-fetch-cache-0.2.21.tgz#a7aab7d9e32de14ea6d55cc239c33ab5513b6a62"
+  integrity sha512-aOtM/BkTGOUKh608MsoqS41kpGBcdmklFOCrJR2D/3eFWoVAyjNoyEaMAg5AMVFvEvIZ7ulGSAd7SXQnVbxO4w==
+  dependencies:
+    "@solana/web3.js" "^1.43.4"
+
 "@helium/address@^4.10.2":
   version "4.10.2"
   resolved "https://registry.yarnpkg.com/@helium/address/-/address-4.10.2.tgz#56960b118fceb6b6ddabe3e4ecec467d9ae50e26"
@@ -732,6 +748,14 @@
     bs58 "^5.0.0"
     js-sha256 "^0.9.0"
     multiformats "^9.6.4"
+
+"@helium/anchor-resolvers@^0.2.5":
+  version "0.2.21"
+  resolved "https://registry.yarnpkg.com/@helium/anchor-resolvers/-/anchor-resolvers-0.2.21.tgz#8cd13bca3e7af83ffff3ab754dcf9f788d26e57e"
+  integrity sha512-rz3GJaULGmokjrq63v4sy683PMUkL31jrK5wVX01tzCYbI1woC9vISoPd3oSSuauZqQXdBhhQ49GKrpzi49JbA==
+  dependencies:
+    "@solana/spl-token" "^0.3.6"
+    "@solana/web3.js" "^1.43.4"
 
 "@helium/crypto@^3.60.0":
   version "3.60.0"
@@ -750,6 +774,20 @@
     "@helium/address" "^4.10.2"
     create-hash "^1.2.0"
     libsodium-wrappers "^0.7.6"
+
+"@helium/helium-react-hooks@^0.2.5":
+  version "0.2.21"
+  resolved "https://registry.yarnpkg.com/@helium/helium-react-hooks/-/helium-react-hooks-0.2.21.tgz#84b82b83602c20cae4a96c790786bb4b84e32530"
+  integrity sha512-c+U6TB+D+pww8awYvf7WtfY285FhbiUDGhE8KVEU8Y2RBHA39gE2F13Y0oSCj4RQfjGynv60ONCVc7PEkOqmsw==
+  dependencies:
+    "@coral-xyz/anchor" "^0.26.0"
+    "@helium/account-fetch-cache" "^0.2.21"
+    "@helium/account-fetch-cache-hooks" "^0.2.21"
+    "@solana/spl-token" "^0.3.6"
+    "@solana/web3.js" "^1.66.2"
+    bs58 "^5.0.0"
+    pako "^2.0.3"
+    react-async-hook "^4.0.0"
 
 "@helium/modular-governance-hooks@^0.0.2":
   version "0.0.2"
@@ -4353,22 +4391,6 @@ avvio@^8.2.1:
     debug "^4.0.0"
     fastq "^1.6.1"
 
-aws-sdk@^2.1313.0:
-  version "2.1455.0"
-  resolved "https://registry.yarnpkg.com/aws-sdk/-/aws-sdk-2.1455.0.tgz#d4b98912e54ffdc06e868287d87c8bc6b4c3f00a"
-  integrity sha512-OCH3YcWZ1mqePNRcOxvnB4F270++X44K+/cKA7op2HYRKjTkIJjFVqJGVdMDPQAHlc0GTCKYD6CJOUEhR2pp7w==
-  dependencies:
-    buffer "4.9.2"
-    events "1.1.1"
-    ieee754 "1.1.13"
-    jmespath "0.16.0"
-    querystring "0.2.0"
-    sax "1.2.1"
-    url "0.10.3"
-    util "^0.12.4"
-    uuid "8.0.0"
-    xml2js "0.5.0"
-
 aws-sdk@^2.1344.0:
   version "2.1448.0"
   resolved "https://registry.yarnpkg.com/aws-sdk/-/aws-sdk-2.1448.0.tgz#13d961afd7c4498d5b4af561118cd80eadee078d"
@@ -6544,28 +6566,6 @@ fastify@^4.13.0:
     secure-json-parse "^2.5.0"
     semver "^7.5.0"
     tiny-lru "^11.0.1"
-
-fastify@^4.9.2:
-  version "4.23.0"
-  resolved "https://registry.yarnpkg.com/fastify/-/fastify-4.23.0.tgz#e49c4e90f0f6f9a2dd40b2443fce24b7bee86a2f"
-  integrity sha512-u4aQUjAqf+GQQI+IeIJtzOKCJHtdwPlGxzopq/Kv6QcEdJ7xuJFSQ5Bi7+uJ+F8990jWECLzRcAyZ4pVsloRpQ==
-  dependencies:
-    "@fastify/ajv-compiler" "^3.5.0"
-    "@fastify/error" "^3.2.0"
-    "@fastify/fast-json-stringify-compiler" "^4.3.0"
-    abstract-logging "^2.0.1"
-    avvio "^8.2.1"
-    fast-content-type-parse "^1.0.0"
-    fast-json-stringify "^5.7.0"
-    find-my-way "^7.6.0"
-    light-my-request "^5.9.1"
-    pino "^8.12.0"
-    process-warning "^2.2.0"
-    proxy-addr "^2.0.7"
-    rfdc "^1.3.0"
-    secure-json-parse "^2.5.0"
-    semver "^7.5.0"
-    toad-cache "^3.2.0"
 
 fastq@^1.6.0, fastq@^1.6.1:
   version "1.15.0"
@@ -11423,11 +11423,6 @@ to-regex-range@^5.0.1:
   integrity sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==
   dependencies:
     is-number "^7.0.0"
-
-toad-cache@^3.2.0:
-  version "3.2.0"
-  resolved "https://registry.yarnpkg.com/toad-cache/-/toad-cache-3.2.0.tgz#8221a1906ce7bd18cd56b22f5603bcf9e38b54f9"
-  integrity sha512-Hj5zSqBS6OHbZoQk9IU8VqIr+0JUpwzunnwSlFJhG8aJSInYUMEuzItl3kJsGteTPd1qtflafdRHlRtUazYeqg==
 
 toidentifier@1.0.1:
   version "1.0.1"

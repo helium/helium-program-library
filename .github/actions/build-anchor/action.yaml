@@ -15,7 +15,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/checkout@v2
     - uses: ./.github/actions/setup/
     - uses: ./.github/actions/setup-anchor/
       with:

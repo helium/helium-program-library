@@ -6,12 +6,12 @@ import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import {
   PROGRAM_ID as DC_PID,
-  init as initDataCredits
+  init as initDataCredits,
 } from "@helium/data-credits-sdk";
 import {
   daoKey,
   PROGRAM_ID as HSD_PID,
-  init as initHeliumSubDaos
+  init as initHeliumSubDaos,
 } from "@helium/helium-sub-daos-sdk";
 import {
   Asset,
@@ -20,12 +20,15 @@ import {
   createMint,
   getAsset,
   sendAndConfirmWithRetry,
-  sendInstructions
+  sendInstructions,
 } from "@helium/spl-utils";
 import {
-  ComputeBudgetProgram, Keypair, LAMPORTS_PER_SOL, PublicKey,
+  ComputeBudgetProgram,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
   SystemProgram,
-  Transaction
+  Transaction,
 } from "@solana/web3.js";
 import chai, { assert, expect } from "chai";
 import chaiHttp from "chai-http";
@@ -33,35 +36,31 @@ import fs from "fs";
 import * as client from "../packages/distributor-oracle/src/client";
 import {
   Database,
-  OracleServer
+  OracleServer,
 } from "../packages/distributor-oracle/src/server";
 import {
   PROGRAM_ID as HEM_PID,
   init as initHeliumEntityManager,
-  keyToAssetKey
+  keyToAssetKey,
 } from "../packages/helium-entity-manager-sdk/src";
 import {
   initializeCompressionRecipient,
   init as initLazy,
-  PROGRAM_ID as LD_PID
+  PROGRAM_ID as LD_PID,
 } from "../packages/lazy-distributor-sdk/src";
 import {
   init as initRewards,
   oracleSignerKey,
-  PROGRAM_ID as REWARDS_PID
+  PROGRAM_ID as REWARDS_PID,
 } from "../packages/rewards-oracle-sdk/src";
 import {
   PROGRAM_ID as VSR_PID,
-  init as vsrInit
+  init as vsrInit,
 } from "../packages/voter-stake-registry-sdk/src";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { RewardsOracle } from "../target/types/rewards_oracle";
-import {
-  ensureLDIdl,
-  ensureHEMIdl,
-  initWorld
-} from "./utils/fixtures";
+import { ensureLDIdl, ensureHEMIdl, initWorld } from "./utils/fixtures";
 import { initVsr } from "./utils/vsr";
 import { createMockCompression } from "./utils/compression";
 
@@ -107,13 +106,16 @@ export class DatabaseMock implements Database {
 
   async getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
     let _this = this;
-    const res: Record<string, string> = entityKeys.reduce((acc: Record<string, string>, key) => {
-      acc[key] = Math.floor(
-        (_this.inMemHash.byHotspot[key]?.lifetimeRewards || 0) *
-          Math.pow(10, 8)
-      ).toString();
-      return acc;
-    }, {});
+    const res: Record<string, string> = entityKeys.reduce(
+      (acc: Record<string, string>, key) => {
+        acc[key] = Math.floor(
+          (_this.inMemHash.byHotspot[key]?.lifetimeRewards || 0) *
+            Math.pow(10, 8)
+        ).toString();
+        return acc;
+      },
+      {}
+    );
 
     return res;
   }
@@ -258,7 +260,7 @@ describe("distributor-oracle", () => {
           thresholdType: ThresholdType.Absolute as never,
           threshold: new anchor.BN(1000000000),
         },
-        approver: oracleSignerKey()[0]
+        approver: oracleSignerKey()[0],
       })
       .accounts({
         rewardsMint,
@@ -341,7 +343,11 @@ describe("distributor-oracle", () => {
       .signers([makerKeypair, eccVerifier])
       .rpc({ skipPreflight: true });
 
-    ({getAssetFn, getAssetProofFn, hotspot: asset} = await createMockCompression({
+    ({
+      getAssetFn,
+      getAssetProofFn,
+      hotspot: asset,
+    } = await createMockCompression({
       collection: collection,
       dao,
       merkle: merkle,
@@ -424,12 +430,14 @@ describe("distributor-oracle", () => {
     );
   });
 
-  it("should bulk sign transactions", async() => {
+  it("should bulk sign transactions", async () => {
     const unsigned = await client.formBulkTransactions({
       program: ldProgram,
       rewardsOracleProgram: rewardsProgram,
-      getAssetFn,
-      getAssetProofFn,
+      getAssetBatchFn: async () => [(await getAssetFn())!],
+      getAssetProofBatchFn: async () => ({
+        [asset.toBase58()]: (await getAssetProofFn())!,
+      }),
       rewards: [
         {
           oracleKey: oracle.publicKey,
@@ -441,7 +449,6 @@ describe("distributor-oracle", () => {
       lazyDistributor,
       skipOracleSign: true,
     });
-    console.log(unsigned);
     const tx = await provider.wallet.signTransaction(unsigned[0]);
     const serializedTx = tx.serialize({
       requireAllSignatures: false,
@@ -453,7 +460,7 @@ describe("distributor-oracle", () => {
       .post("/bulk-sign")
       .send({ transactions: [[...serializedTx]] });
 
-      console.log(res.body)
+    console.log(res.body);
     assert.hasAllKeys(res.body, ["transactions", "success"]);
     const signedTx = Transaction.from(res.body.transactions[0].data);
     await sendAndConfirmWithRetry(
@@ -470,7 +477,7 @@ describe("distributor-oracle", () => {
       recipientAcc.totalRewards.toNumber(),
       Number(await oracleServer.db.getCurrentRewards(asset))
     );
-  })
+  });
 
   it("should sign and execute properly formed transactions", async () => {
     const unsigned = await client.formTransaction({

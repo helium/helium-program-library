@@ -3,6 +3,45 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.3.0](https://github.com/helium/helium-program-library/compare/v0.2.21...v0.3.0) (2023-09-14)
+
+### Breaking
+
+  * `distributor-oracle` - `bulkFormTransactions` now takes batch functions for asset and proof fetching, instead of individual fetch functions. If you were passing custom functions, this code will need to change.
+
+### Features
+
+* **#373:** replace clockwork ([#388](https://github.com/helium/helium-program-library/issues/388)) ([55033c7](https://github.com/helium/helium-program-library/commit/55033c718df08f41eb2f77d726d59d916ebbd677)), closes [#373](https://github.com/helium/helium-program-library/issues/373)
+* **#376:** Replace lazy transactions markers with a bitmap to reclaim rent ([#380](https://github.com/helium/helium-program-library/issues/380)) ([a691257](https://github.com/helium/helium-program-library/commit/a6912570d4e3d89869cd13c5cfc8ce8c4355148e)), closes [#376](https://github.com/helium/helium-program-library/issues/376) [#376](https://github.com/helium/helium-program-library/issues/376)
+* **#379:** Automate npm publish and fix devnet conflicting sqds txns ([#386](https://github.com/helium/helium-program-library/issues/386)) ([a4a3780](https://github.com/helium/helium-program-library/commit/a4a37806fefe82ca9a38f04c311f600ad1f7c36c))
+
+
+### Reverts
+
+* Revert "Add back mobile genesis fix for devnet" ([93e9a2c](https://github.com/helium/helium-program-library/commit/93e9a2c370ba77a49b02efc2590ddf3039465ed6))
+
+
+
+
+
+## [0.2.22](https://github.com/helium/helium-program-library/compare/v0.2.21...v0.2.22) (2023-09-13)
+
+
+### Features
+
+* **#373:** replace clockwork ([#388](https://github.com/helium/helium-program-library/issues/388)) ([55033c7](https://github.com/helium/helium-program-library/commit/55033c718df08f41eb2f77d726d59d916ebbd677)), closes [#373](https://github.com/helium/helium-program-library/issues/373)
+* **#376:** Replace lazy transactions markers with a bitmap to reclaim rent ([#380](https://github.com/helium/helium-program-library/issues/380)) ([a691257](https://github.com/helium/helium-program-library/commit/a6912570d4e3d89869cd13c5cfc8ce8c4355148e)), closes [#376](https://github.com/helium/helium-program-library/issues/376) [#376](https://github.com/helium/helium-program-library/issues/376)
+* **#379:** Automate npm publish and fix devnet conflicting sqds txns ([#386](https://github.com/helium/helium-program-library/issues/386)) ([a4a3780](https://github.com/helium/helium-program-library/commit/a4a37806fefe82ca9a38f04c311f600ad1f7c36c))
+
+
+### Reverts
+
+* Revert "Add back mobile genesis fix for devnet" ([93e9a2c](https://github.com/helium/helium-program-library/commit/93e9a2c370ba77a49b02efc2590ddf3039465ed6))
+
+
+
+
+
 ## [0.2.15](https://github.com/helium/helium-program-library/compare/v0.2.14...v0.2.15) (2023-07-31)
 
 **Note:** Version bump only for package helium-program-library

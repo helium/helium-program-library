@@ -1,8 +1,8 @@
-import { Creator, Uses } from '@metaplex-foundation/mpl-bubblegum';
-import { PublicKey } from '@solana/web3.js';
-import axios from 'axios';
+import { Creator, Uses } from "@metaplex-foundation/mpl-bubblegum";
+import { PublicKey } from "@solana/web3.js";
+import axios from "axios";
 // @ts-ignore
-import base58 from 'bs58';
+import base58 from "bs58";
 
 export type AssetProof = {
   root: PublicKey;
@@ -47,19 +47,45 @@ export async function getAsset(
 ): Promise<Asset | undefined> {
   try {
     const response = await axios.post(url, {
-      jsonrpc: '2.0',
-      method: 'getAsset',
-      id: 'rpd-op-123',
+      jsonrpc: "2.0",
+      method: "getAsset",
+      id: "rpd-op-123",
       params: { id: assetId.toBase58() },
       headers: {
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-        Expires: '0',
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
       },
     });
     const result = response.data.result;
     if (result) {
       return toAsset(result);
+    }
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
+export async function getAssetBatch(
+  url: string,
+  assetIds: PublicKey[]
+): Promise<Asset[] | undefined> {
+  try {
+    const response = await axios.post(url, {
+      jsonrpc: "2.0",
+      method: "getAssetBatch",
+      id: "rpd-op-123",
+      params: { ids: assetIds.map((assetId) => assetId.toBase58()) },
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    });
+    const result = response.data.result;
+    if (result) {
+      return result.map(toAsset);
     }
   } catch (error) {
     console.error(error);
@@ -79,9 +105,9 @@ export async function getAssets(
     }
 
     const batch = assetIds.map((assetId, i) => ({
-      jsonrpc: '2.0',
+      jsonrpc: "2.0",
       id: `get-asset-${i}`,
-      method: 'getAsset',
+      method: "getAsset",
       params: {
         id: assetId.toBase58(),
       },
@@ -89,12 +115,12 @@ export async function getAssets(
 
     const response = await axios({
       url,
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-        Expires: '0',
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
       },
       data: JSON.stringify(batch),
     });
@@ -153,14 +179,14 @@ export async function getAssetProof(
 ): Promise<AssetProof | undefined> {
   try {
     const response = await axios.post(url, {
-      jsonrpc: '2.0',
-      method: 'getAssetProof',
-      id: 'rpd-op-123',
+      jsonrpc: "2.0",
+      method: "getAssetProof",
+      id: "rpd-op-123",
       params: { id: assetId.toBase58() },
       headers: {
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-        Expires: '0',
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
       },
     });
     const result = response.data.result;
@@ -179,8 +205,46 @@ export async function getAssetProof(
   }
 }
 
+export async function getAssetProofBatch(
+  url: string,
+  assetIds: PublicKey[]
+): Promise<Record<string, AssetProof> | undefined> {
+  try {
+    const response = await axios.post(url, {
+      jsonrpc: "2.0",
+      method: "getAssetProofBatch",
+      id: "rpd-op-123",
+      params: { ids: assetIds.map((assetId) => assetId.toBase58()) },
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    });
+    const result = response.data.result;
+    if (result) {
+      return Object.entries(result as Record<string, any>).reduce(
+        (acc, [k, r]) => {
+          acc[k] = {
+            root: new PublicKey(r.root),
+            proof: r.proof.map((p: any) => new PublicKey(p)),
+            nodeIndex: r.node_index,
+            leaf: new PublicKey(r.leaf),
+            treeId: new PublicKey(r.tree_id),
+          } as AssetProof;
+          return acc;
+        },
+        {} as Record<string, AssetProof>
+      );
+    }
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
 export type AssetsByOwnerOpts = {
-  sortBy?: { sortBy: 'created'; sortDirection: 'asc' | 'desc' };
+  sortBy?: { sortBy: "created"; sortDirection: "asc" | "desc" };
   limit?: number;
   page?: number;
   before?: string;
@@ -191,23 +255,23 @@ export async function getAssetsByOwner(
   url: string,
   wallet: string,
   {
-    sortBy = { sortBy: 'created', sortDirection: 'asc' },
+    sortBy = { sortBy: "created", sortDirection: "asc" },
     limit = 50,
     page = 1,
-    before = '',
-    after = '',
+    before = "",
+    after = "",
   }: AssetsByOwnerOpts = {}
 ): Promise<Asset[]> {
   try {
     const response = await axios.post(url, {
-      jsonrpc: '2.0',
-      method: 'getAssetsByOwner',
-      id: 'rpd-op-123',
+      jsonrpc: "2.0",
+      method: "getAssetsByOwner",
+      id: "rpd-op-123",
       params: [wallet, sortBy, limit, page, before, after],
       headers: {
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-        Expires: '0',
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
       },
     });
 
@@ -219,7 +283,7 @@ export async function getAssetsByOwner(
 }
 
 export type SearchAssetsOpts = {
-  sortBy?: { sortBy: 'created'; sortDirection: 'asc' | 'desc' };
+  sortBy?: { sortBy: "created"; sortDirection: "asc" | "desc" };
   page?: number;
   collection?: string;
   ownerAddress: string;
@@ -231,16 +295,16 @@ export async function searchAssets(
   url: string,
   {
     creatorVerified = true,
-    sortBy = { sortBy: 'created', sortDirection: 'asc' },
+    sortBy = { sortBy: "created", sortDirection: "asc" },
     page = 1,
     ...rest
   }: SearchAssetsOpts
 ): Promise<Asset[]> {
   try {
     const response = await axios.post(url, {
-      jsonrpc: '2.0',
-      method: 'searchAssets',
-      id: 'get-assets-op-1',
+      jsonrpc: "2.0",
+      method: "searchAssets",
+      id: "get-assets-op-1",
       params: {
         page,
         creatorVerified,
@@ -248,9 +312,9 @@ export async function searchAssets(
         ...rest,
       },
       headers: {
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-        Expires: '0',
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
       },
     });
 

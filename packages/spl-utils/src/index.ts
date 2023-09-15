@@ -18,6 +18,8 @@ export {
   getAssetProof,
   getAssetsByOwner,
   searchAssets,
+  getAssetBatch,
+  getAssetProofBatch,
 } from './mplAssetAPI';
 
 export { proofArgsAndAccounts } from './proofArgsAndAccounts';
