@@ -89,7 +89,7 @@ export async function proofArgsAndAccounts({
       return getCanopyDepth(buffer.byteLength - offset);
     })();
   }
-  const canopy = await (wellKnownCanopyCache[tree] || canopyCache[tree]);
+  const canopy = await (wellKnownCanopyCache?.[tree] || canopyCache[tree]);
 
   return {
     asset,
