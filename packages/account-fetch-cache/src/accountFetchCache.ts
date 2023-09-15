@@ -429,6 +429,7 @@ export class AccountFetchCache {
     // Cache these results if they aren't going to change
     if (isStatic) {
       keys.forEach((key, index) => {
+        this.statics.add(key);
         if (searched.has(key)) {
           const item = array[index];
           if (item) {
