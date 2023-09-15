@@ -57,17 +57,21 @@ export async function proofArgsAndAccounts({
   if (!canopyCache[tree] && !wellKnownCanopyCache?.[tree]) {
     canopyCache[tree] = (async () => {
       if (!wellKnownCanopyCache) {
-        wellKnownCanopyCache = await (await fetch(WELL_KNOWN_CANOPY_URL)).json()
+        wellKnownCanopyCache = await(await fetch(WELL_KNOWN_CANOPY_URL)).json();
       }
       if (wellKnownCanopyCache[tree]) {
-        return wellKnownCanopyCache[tree]
+        return wellKnownCanopyCache[tree];
       }
       // IMPORTANT! Do not use `ConcurrentMerkleTreeAccount` class. It stupidly deserializes the whole merkle tree,
       // including reading the entire canopy. For large trees this will freeze the wallet app.
       let offset = 0;
       // Construct a new connection to ensure there's no caching. Don't want to cache
       // a giant account in AccountFetchCache accidentally. It also adds uneeded latency
-      const newConn = new Connection(connection.rpcEndpoint);
+      let newConn = connection;
+      //@ts-ignore
+      if (connection._accountFetchWrapped) {
+        newConn = new Connection(connection.rpcEndpoint);
+      }
       const buffer = (await newConn.getAccountInfo(treeId))!.data;
       const [versionedHeader, offsetIncr] =
         concurrentMerkleTreeHeaderBeet.deserialize(buffer);
