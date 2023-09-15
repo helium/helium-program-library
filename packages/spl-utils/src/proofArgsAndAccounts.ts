@@ -1,5 +1,5 @@
 import { Asset, AssetProof, getAsset, getAssetProof } from "./mplAssetAPI";
-import { ConcurrentMerkleTreeAccount } from "@solana/spl-account-compression";
+import { concurrentMerkleTreeBeetFactory, concurrentMerkleTreeHeaderBeet, getCanopyDepth } from "@solana/spl-account-compression";
 import { Connection, PublicKey, AccountMeta } from "@solana/web3.js";
 
 export type ProofArgsAndAccountsArgs = {
@@ -12,8 +12,6 @@ export type ProofArgsAndAccountsArgs = {
     assetId: PublicKey
   ) => Promise<AssetProof | undefined>;
 };
-// Cache canopy depths so we don't parse large tree accounts over and over
-const canopyToDepthCache: Record<string, Promise<number>> = {};
 export async function proofArgsAndAccounts({
   connection,
   assetId,
@@ -45,13 +43,29 @@ export async function proofArgsAndAccounts({
     compression: { leafId },
   } = asset;
   const { root, proof, treeId } = assetProof;
-  if (typeof canopyToDepthCache[treeId.toBase58()] === "undefined") {
-    canopyToDepthCache[treeId.toBase58()] =
-      ConcurrentMerkleTreeAccount.fromAccountAddress(connection, treeId).then(
-        (t) => t.getCanopyDepth()
-      );
+
+  // IMPORTANT! Do not use `ConcurrentMerkleTreeAccount` class. It stupidly deserializes the whole merkle tree,
+  // including reading the entire canopy. For large trees this will freeze the wallet app.
+  let offset = 0;
+  const buffer = (await connection.getAccountInfo(treeId))!.data;
+  const [versionedHeader, offsetIncr] =
+    concurrentMerkleTreeHeaderBeet.deserialize(buffer);
+  offset = offsetIncr;
+
+  // Only 1 version available
+  if (versionedHeader.header.__kind !== "V1") {
+    throw Error(
+      `Header has unsupported version: ${versionedHeader.header.__kind}`
+    );
   }
-  const canopy = await canopyToDepthCache[treeId.toBase58()];
+  const header = versionedHeader.header.fields[0];
+  const [_, offsetIncr2] = concurrentMerkleTreeBeetFactory(
+    header.maxDepth,
+    header.maxBufferSize
+  ).deserialize(buffer, offset);
+  offset = offsetIncr2;
+
+  const canopy = getCanopyDepth(buffer.byteLength - offset);
   return {
     asset,
     args: {
