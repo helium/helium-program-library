@@ -5,6 +5,9 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 # [0.3.0](https://github.com/helium/helium-program-library/compare/v0.2.21...v0.3.0) (2023-09-14)
 
+### Breaking
+
+  * `distributor-oracle` - `bulkFormTransactions` now takes batch functions for asset and proof fetching, instead of individual fetch functions. If you were passing custom functions, this code will need to change.
 
 ### Features
 
