@@ -123,7 +123,10 @@ export class AccountFetchCache {
 
     const self = this;
 
-    if (extendConnection) {
+    // @ts-ignore
+    if (extendConnection && !connection._accountFetchWrapped) {
+      // @ts-ignore
+      connection._accountFetchWrapped = true;
       this.oldGetAccountinfo = connection.getAccountInfo.bind(connection);
 
       connection.getAccountInfo = async (
