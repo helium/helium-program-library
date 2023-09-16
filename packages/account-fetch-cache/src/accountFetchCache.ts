@@ -256,14 +256,14 @@ export class AccountFetchCache {
     }
   }
 
-  addToBatchIgnoreResult(id: PublicKey): Promise<void> | undefined {
+  addToBatchIgnoreResult(id: PublicKey) {
     const idStr = id.toBase58();
 
     this.currentBatch.add(idStr);
 
     this.timeout != null && clearTimeout(this.timeout);
     if (this.currentBatch.size > DEFAULT_CHUNK_SIZE) {
-      return this.fetchBatch().then(() => {});
+      return this.fetchBatch();
     } else {
       this.timeout = setTimeout(() => this.fetchBatch(), this.delay);
     }
@@ -409,6 +409,10 @@ export class AccountFetchCache {
     isStatic: Boolean = false, // optimization, set if the data will never change
     forceRequery = false
   ): Promise<(ParsedAccountBase<T> | undefined)[]> {
+    // Store results of batch fetches in this map. If isStatic is false, genericCache will have none of the
+    // results of our searches in the batch. So need to accumulate them here
+    const result: Record<string, ParsedAccountBase<T>> = {}
+    const searched = new Set(pubKeys.map((p) => p.toBase58()));
     for (const key of pubKeys) {
       this.registerParser(key, parser);
       const address = key.toBase58();
@@ -419,32 +423,52 @@ export class AccountFetchCache {
       }
 
       if (forceRequery || !this.genericCache.has(address)) {
-        await this.addToBatchIgnoreResult(key);
+        const { keys, array } = (await this.addToBatchIgnoreResult(key)) || {
+          keys: [],
+          array: [],
+        };
+
+        keys.forEach((key, index) => {
+          this.statics.add(key);
+          if (searched.has(key)) {
+            const item = array[index];
+            if (item) {
+              const parsed = this.getParsed(key, item, parser) || null;
+              // Cache these results if they aren't going to change
+              if (isStatic) {
+                this.genericCache.set(key, parsed);
+              }
+              if (parsed) {
+                result[key] = parsed;
+              }
+            }
+          }
+        });
       }
     }
 
-    const searched = new Set(pubKeys.map((p) => p.toBase58()));
     // Force a batch fetch to resolve all accounts
     const { keys, array } = await this.fetchBatch();
-    // Cache these results if they aren't going to change
-    if (isStatic) {
-      keys.forEach((key, index) => {
-        this.statics.add(key);
-        if (searched.has(key)) {
-          const item = array[index];
-          if (item) {
-            this.genericCache.set(
-              key,
-              this.getParsed(key, item, parser) || null
-            );
+    keys.forEach((key, index) => {
+      this.statics.add(key);
+      if (searched.has(key)) {
+        const item = array[index];
+        if (item) {
+          const parsed = this.getParsed(key, item, parser) || null;
+          // Cache these results if they aren't going to change
+          if (isStatic) {
+            this.genericCache.set(key, parsed);
+          }
+          if (parsed) {
+            result[key] = parsed;
           }
         }
-      });
-    }
+      }
+    });
 
     return pubKeys.map(
       (key) =>
-        this.genericCache.get(key.toBase58()) as
+        result[key.toBase58()] || this.genericCache.get(key.toBase58()) as
           | ParsedAccountBase<T>
           | undefined
     );
