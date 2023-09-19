@@ -8,7 +8,6 @@ pub struct UpdateSubDaoArgsV0 {
   pub emission_schedule: Option<Vec<EmissionScheduleItem>>,
   pub onboarding_dc_fee: Option<u64>,
   pub dc_burn_authority: Option<Pubkey>,
-  pub active_device_aggregator: Option<Pubkey>,
   pub registrar: Option<Pubkey>,
   pub delegator_rewards_percent: Option<u64>,
   pub onboarding_data_only_dc_fee: Option<u64>,
@@ -42,10 +41,6 @@ pub fn handler(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result
 
   if let Some(dc_burn_authority) = args.dc_burn_authority {
     ctx.accounts.sub_dao.dc_burn_authority = dc_burn_authority;
-  }
-
-  if let Some(active_device_aggregator) = args.active_device_aggregator {
-    ctx.accounts.sub_dao.active_device_aggregator = active_device_aggregator;
   }
 
   if let Some(emission_schedule) = args.emission_schedule {

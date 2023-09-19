@@ -3,7 +3,6 @@ use anchor_lang::{prelude::*, solana_program::instruction::Instruction, Instruct
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
 use clockwork_sdk::{self, state::ThreadResponse, utils::PAYER_PUBKEY};
-use switchboard_v2::AggregatorAccountData;
 
 #[derive(Accounts)]
 pub struct CalculateKickoffV0<'info> {
@@ -13,12 +12,10 @@ pub struct CalculateKickoffV0<'info> {
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
     has_one = dao,
-    has_one = active_device_aggregator,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   pub hnt_mint: Box<Account<'info, Mint>>,
 
-  pub active_device_aggregator: AccountLoader<'info, AggregatorAccountData>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
@@ -57,14 +54,6 @@ fn construct_next_ix(ctx: &Context<CalculateKickoffV0>, epoch: u64) -> Option<In
       dao: ctx.accounts.dao.key(),
       hnt_mint: ctx.accounts.hnt_mint.key(),
       sub_dao: sub_dao_key,
-      active_device_aggregator: ctx.accounts.active_device_aggregator.key(),
-      history_buffer: ctx
-        .accounts
-        .active_device_aggregator
-        .load()
-        .ok()
-        .unwrap()
-        .history_buffer,
       prev_dao_epoch_info,
       dao_epoch_info,
       sub_dao_epoch_info,

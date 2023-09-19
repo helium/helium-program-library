@@ -54,7 +54,6 @@ pub fn handler(ctx: Context<ResetSubDaoThreadV0>) -> Result<()> {
     ctx.accounts.dao.key(),
     ctx.accounts.sub_dao.key(),
     ctx.accounts.dao.hnt_mint,
-    ctx.accounts.sub_dao.active_device_aggregator,
     ctx.accounts.system_program.key(),
     ctx.accounts.token_program.key(),
     ctx.accounts.circuit_breaker_program.key(),

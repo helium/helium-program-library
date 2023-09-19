@@ -29,7 +29,7 @@ chrono = "0.4.26"
 datafusion = "25.0.0"
 helium-entity-manager = { git = "https://github.com/helium/helium-program-library", features = [ "no-entrypoint" ] }
 helium-sub-daos = { git = "https://github.com/helium/helium-program-library", features = [ "no-entrypoint" ] }
-hpl-utils = { path = "../hpl-utils" }
+hpl-utils = { git = "https://github.com/helium/helium-program-library", branch = "develop" }
 bs58 = "0.4.0"
 sha2 = "0"
 spl-associated-token-account = { version = "*", features = [ "no-entrypoint" ] }

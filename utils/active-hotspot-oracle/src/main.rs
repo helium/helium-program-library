@@ -581,7 +581,8 @@ fn find_infos_to_mark(
             );
             continue;
           }
-          if parsed_info_res.unwrap().is_active() != is_active {
+
+          if parsed_info_res.unwrap().is_active() != is_active || needs_paid {
             valid_infos.push(InfoWithEntityKey {
               info_key: info_keys[j],
               entity_key: entity_keys[start + j].clone(),
