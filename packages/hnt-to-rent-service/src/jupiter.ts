@@ -156,7 +156,7 @@ export const fundFees = async ({
   const repayIx = SystemProgram.transfer({
     fromPubkey: userWallet,
     toPubkey: platformWallet.publicKey,
-    lamports: ataRent,
+    lamports: ataRent + (10000),
   });
 
   const instructions: TransactionInstruction[] = [
