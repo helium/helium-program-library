@@ -21,7 +21,7 @@ export const instructionDataToTransactionInstruction = (
 
   return new TransactionInstruction({
     programId: new PublicKey(instructionPayload.programId),
-    keys: instructionPayload.accounts.map((key) => ({
+    keys: instructionPayload.accounts.map((key: any) => ({
       pubkey: new PublicKey(key.pubkey),
       isSigner: key.isSigner,
       isWritable: key.isWritable,
