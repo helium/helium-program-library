@@ -78,6 +78,7 @@ pub fn update_subdao_vehnt(
 
     sub_dao.vehnt_delegated = sub_dao.vehnt_delegated.checked_sub(fall).unwrap();
     sub_dao.vehnt_last_calculated_ts = epoch_start;
+    curr_epoch_info.dc_onboarding_fees_paid = sub_dao.dc_onboarding_fees_paid;
   }
 
   // If sub dao epoch info account was just created, log the vehnt
@@ -429,7 +430,6 @@ pub fn construct_calculate_kickoff_ix(
   dao: Pubkey,
   sub_dao: Pubkey,
   hnt_mint: Pubkey,
-  active_device_aggregator: Pubkey,
   system_program: Pubkey,
   token_program: Pubkey,
   circuit_breaker_program: Pubkey,
@@ -440,7 +440,6 @@ pub fn construct_calculate_kickoff_ix(
       dao,
       sub_dao,
       hnt_mint,
-      active_device_aggregator,
       system_program,
       token_program,
       circuit_breaker_program,

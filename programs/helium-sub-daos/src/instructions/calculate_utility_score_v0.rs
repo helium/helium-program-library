@@ -3,7 +3,6 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
 use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
-use switchboard_v2::{AggregatorAccountData, AggregatorHistoryBuffer};
 use voter_stake_registry::state::Registrar;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -28,15 +27,8 @@ pub struct CalculateUtilityScoreV0<'info> {
   #[account(
     mut,
     has_one = dao,
-    has_one = active_device_aggregator
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
-  #[account(
-    has_one = history_buffer
-  )]
-  pub active_device_aggregator: AccountLoader<'info, AggregatorAccountData>,
-  /// CHECK: Checked by has_one with active device aggregator
-  pub history_buffer: AccountInfo<'info>,
   #[account(
     seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &(args.epoch - 1).to_le_bytes()],
     bump,
@@ -135,26 +127,13 @@ pub fn handler(
     .checked_div(&PreciseNumber::new(100000_u128).unwrap()) // DC has 0 decimals, plus 10^5 to get to dollars.
     .unwrap();
 
-  let history_buffer = AggregatorHistoryBuffer::new(&ctx.accounts.history_buffer)?;
-
-  let total_devices_opt = history_buffer.lower_bound(epoch_end_ts);
-
-  let total_devices_u64: u64;
-  if let Some(total_devices_row) = total_devices_opt {
-    total_devices_u64 = total_devices_row.value.try_into().unwrap();
-  } else {
-    total_devices_u64 = 0;
-  };
-
   msg!(
-    "Total devices: {}. Dc burned: {}.",
-    total_devices_u64,
+    "Total onboarding dc: {}. Dc burned: {}.",
+    epoch_info.dc_onboarding_fees_paid,
     epoch_info.dc_burned
   );
 
-  let total_devices = PreciseNumber::new(total_devices_u64.into()).unwrap();
-  let devices_with_fee = total_devices
-    .checked_mul(&PreciseNumber::new(u128::from(ctx.accounts.sub_dao.onboarding_dc_fee)).unwrap())
+  let devices_with_fee = &PreciseNumber::new(u128::from(epoch_info.dc_onboarding_fees_paid))
     .unwrap()
     .checked_div(&PreciseNumber::new(100000_u128).unwrap()) // Need onboarding fee in dollars
     .unwrap();
@@ -184,7 +163,7 @@ pub fn handler(
 
   let v = std::cmp::max(one.clone(), vehnt_staked);
 
-  let a = if total_devices_u64 > 0 && ctx.accounts.sub_dao.onboarding_dc_fee > 0 {
+  let a = if epoch_info.dc_onboarding_fees_paid > 0 {
     std::cmp::max(
       one,
       devices_with_fee

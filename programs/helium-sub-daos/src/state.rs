@@ -156,6 +156,7 @@ pub struct SubDaoEpochInfoV0 {
   pub rewards_issued_at: Option<i64>,
   pub bump_seed: u8,
   pub initialized: bool,
+  pub dc_onboarding_fees_paid: u64,
 }
 
 impl SubDaoEpochInfoV0 {
@@ -183,7 +184,7 @@ pub struct SubDaoV0 {
   pub vehnt_last_calculated_ts: i64,
   pub vehnt_fall_rate: u128, // the vehnt amount that the position decays by per second, with 12 decimals of extra precision
   pub authority: Pubkey,
-  pub active_device_aggregator: Pubkey,
+  pub _deprecated_active_device_aggregator: Pubkey,
   pub dc_burn_authority: Pubkey, // Authority to burn data delegated data credits
   pub onboarding_dc_fee: u64,
   pub emission_schedule: Vec<EmissionScheduleItem>,
