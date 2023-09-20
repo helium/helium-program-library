@@ -88,6 +88,7 @@ impl<'info> InitializeMakerV0<'info> {
   }
 }
 
+#[allow(clippy::deprecated)]
 pub fn handler(ctx: Context<InitializeMakerV0>, args: InitializeMakerArgsV0) -> Result<()> {
   require!(
     args.name.len() <= MAX_NAME_LENGTH,

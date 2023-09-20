@@ -118,6 +118,7 @@ impl<'info> InitializeCarrierV0<'info> {
   }
 }
 
+#[allow(clippy::deprecated)]
 pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0) -> Result<()> {
   require!(args.name.len() <= 32, ErrorCode::InvalidStringLength);
   require!(
