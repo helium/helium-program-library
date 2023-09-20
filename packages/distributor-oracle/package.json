@@ -34,7 +34,7 @@
     "start": "node lib/cjs/server.js serve"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.26.0",
+    "@coral-xyz/anchor": "^0.28.0",
     "@fastify/cors": "^8.1.1",
     "@helium/account-fetch-cache": "^0.3.2",
     "@helium/address": "^4.10.2",

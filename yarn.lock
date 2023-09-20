@@ -64,10 +64,10 @@
     "@coral-xyz/anchor" "^0.26.0"
     "@solana/web3.js" "^1.73.2"
 
-"@coral-xyz/anchor-cli@^0.26.0":
-  version "0.26.0"
-  resolved "https://registry.yarnpkg.com/@coral-xyz/anchor-cli/-/anchor-cli-0.26.0.tgz#edc70f1a159fe71f7c41c80ca80eaf901e76bd15"
-  integrity sha512-j+Q/zuT9+taoQ/w7Jxm6R5qBUlalzIMQsDwV2tYwOMbkq2B2muEsCI0weaFxiJsZZO98U3BQTuprPQGdC6PZWQ==
+"@coral-xyz/anchor-cli@^0.28.0":
+  version "0.28.0"
+  resolved "https://registry.yarnpkg.com/@coral-xyz/anchor-cli/-/anchor-cli-0.28.0.tgz#f88ce5b2821b6b56f8aca4aedcffdd7e07e86774"
+  integrity sha512-sI8pUpgh8W0w3Ef7KUif/PjgnBQYykVtj+JngpOcNTUV3yLWY4qVkDLFHyNrxGXgaQ2e9LUa7moFjNK9+499Sw==
 
 "@coral-xyz/anchor@^0.26.0":
   version "0.26.0"

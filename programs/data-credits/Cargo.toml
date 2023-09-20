@@ -1,5 +1,3 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "data-credits"
 version = "0.1.3"
@@ -23,11 +21,11 @@ default = []
 overflow-checks = true
 
 [dependencies]
-anchor-lang = { version="0.26.0", features = ["init-if-needed"] }
+anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 helium-sub-daos = { workspace = true }
 circuit-breaker = { workspace = true }
-pyth-sdk-solana = { version = "0.7.0" }
+pyth-sdk-solana = { version = "0.8.0" }
 lazy-transactions = { path = "../lazy-transactions", features = ["cpi"] }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }

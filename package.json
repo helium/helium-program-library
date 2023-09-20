@@ -27,8 +27,8 @@
   ],
   "private": true,
   "dependencies": {
-    "@coral-xyz/anchor": "^0.26.0",
-    "@coral-xyz/anchor-cli": "^0.26.0",
+    "@coral-xyz/anchor": "^0.28.0",
+    "@coral-xyz/anchor-cli": "^0.28.0",
     "@coral-xyz/borsh": "^0.2.6",
     "@helium/modular-governance-idls": "^0.0.2",
     "@helium/proposal-sdk": "^0.0.2",

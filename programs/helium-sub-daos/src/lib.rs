@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use clockwork_sdk::state::ThreadResponse;
 #[cfg(not(feature = "no-entrypoint"))]
 use {default_env::default_env, solana_security_txt::security_txt};
 

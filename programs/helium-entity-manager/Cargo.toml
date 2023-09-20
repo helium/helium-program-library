@@ -1,5 +1,3 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "helium-entity-manager"
 version = "0.1.4"

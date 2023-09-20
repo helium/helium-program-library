@@ -17,7 +17,7 @@
     "esbuild": "^0.15.12"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.26.0",
+    "@coral-xyz/anchor": "^0.28.0",
     "@helium/account-fetch-cache": "^0.3.2",
     "@helium/distributor-oracle": "^0.3.2",
     "@helium/helium-react-hooks": "^0.3.2",
