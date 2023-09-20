@@ -137,6 +137,8 @@ pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
     None,
   )?;
 
+  let mut update_auth = ctx.accounts.entity_creator.to_account_info().clone();
+  update_auth.is_signer = true;
   create_master_edition_v3(
     CpiContext::new_with_signer(
       ctx
@@ -147,7 +149,7 @@ pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
       CreateMasterEditionV3 {
         edition: ctx.accounts.master_edition.to_account_info().clone(),
         mint: ctx.accounts.mint.to_account_info().clone(),
-        update_authority: ctx.accounts.entity_creator.to_account_info().clone(),
+        update_authority: update_auth,
         mint_authority: ctx.accounts.authority.to_account_info().clone(),
         metadata: ctx.accounts.metadata.to_account_info().clone(),
         payer: ctx.accounts.payer.to_account_info().clone(),
