@@ -6,37 +6,25 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aes-gcm = "0"
-anyhow = "1"
-anchor-lang = "*"
-anchor-client = "*"
-mpl-bubblegum = { git = "https://github.com/metaplex-foundation/metaplex-program-library", rev = "8f75abd" }
-byteorder = "1.3.2"
-hmac = "0"
-shamirsecretsharing = {version="0.1.4", features=["have_libsodium"]}
-pbkdf2 = {version = "0", default-features=false }
-base64 = "0.13"
-sha2 = "0"
+anchor-lang = "0.28.0"
+anchor-client = "0.28.0"
 clap = { version = "4", features = ["derive"]}
-helium-crypto = {version = "0.6.3", features = ["solana"] }
 reqwest = "0"
-helium-sub-daos = { path = "../../programs/helium-sub-daos", features = [ "no-entrypoint" ] }
-voter-stake-registry = { path = "../../programs/voter-stake-registry", features = [ "no-entrypoint" ] }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 json = "*"
 lazy_static = "1"
-rand = "0.8"
-sodiumoxide = "~0.2"
 solana-account-decoder = "*"
 solana-client = "*"
 solana-sdk = "*"
 solana-program = "*"
-spl-associated-token-account = { version = "*", git = "https://github.com/ChewingGlass/solana-program-library", features = [ "no-entrypoint" ] }
 tokio = "1"
 thiserror = "1"
-helium-api = "3"
 rust_decimal = "1"
+base64 = "*"
+helium-sub-daos = { path = "../../programs/helium-sub-daos" }
+voter-stake-registry = { path = "../../programs/voter-stake-registry" }
+
 [dependencies.ledger-transport]
 git = "https://github.com/helium/ledger-rs"
 branch = "lthiery/tcp-transport"

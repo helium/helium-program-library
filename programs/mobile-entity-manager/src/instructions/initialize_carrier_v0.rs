@@ -7,10 +7,12 @@ use anchor_spl::{
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
 use helium_sub_daos::SubDaoV0;
-use mpl_token_metadata::state::{CollectionDetails, DataV2};
+use mpl_token_metadata::accounts::Metadata;
+use mpl_token_metadata::types::{CollectionDetails, DataV2};
 use shared_utils::create_metadata_accounts_v3;
 use shared_utils::token_metadata::{
   create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
+  Metadata as MetadataProgram,
 };
 
 // 500m MOBILE
@@ -89,9 +91,7 @@ pub struct InitializeCarrierV0<'info> {
   )]
   pub escrow: Box<Account<'info, TokenAccount>>,
 
-  /// CHECK: Checked with constraints
-  #[account(address = mpl_token_metadata::ID)]
-  pub token_metadata_program: AccountInfo<'info>,
+  pub token_metadata_program: Program<'info, MetadataProgram>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
@@ -137,7 +137,11 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
 
   create_metadata_accounts_v3(
     CpiContext::new_with_signer(
-      ctx.accounts.token_metadata_program.clone(),
+      ctx
+        .accounts
+        .token_metadata_program
+        .to_account_info()
+        .clone(),
       CreateMetadataAccountsV3 {
         metadata: ctx.accounts.metadata.to_account_info().clone(),
         mint: ctx.accounts.collection.to_account_info().clone(),
@@ -145,7 +149,7 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
         payer: ctx.accounts.payer.to_account_info().clone(),
         update_authority: ctx.accounts.carrier.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        rent: ctx.accounts.rent.to_account_info().clone(),
+        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
       },
       signer_seeds,
     ),
@@ -159,13 +163,16 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
       uses: None,
     },
     true,
-    true,
     Some(CollectionDetails::V1 { size: 0 }),
   )?;
 
   create_master_edition_v3(
     CpiContext::new_with_signer(
-      ctx.accounts.token_metadata_program.clone(),
+      ctx
+        .accounts
+        .token_metadata_program
+        .to_account_info()
+        .clone(),
       CreateMasterEditionV3 {
         edition: ctx.accounts.master_edition.to_account_info().clone(),
         mint: ctx.accounts.collection.to_account_info().clone(),
@@ -175,7 +182,7 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
         payer: ctx.accounts.payer.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        rent: ctx.accounts.rent.to_account_info().clone(),
+        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
       },
       signer_seeds,
     ),
