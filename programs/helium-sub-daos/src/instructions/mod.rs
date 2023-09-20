@@ -1,5 +1,4 @@
 pub mod calculate_utility_score_v0;
-pub mod clockwork;
 pub mod delegation;
 pub mod initialize_dao_v0;
 pub mod initialize_sub_dao_v0;
@@ -12,7 +11,6 @@ pub mod update_sub_dao_v0;
 pub mod update_sub_dao_vehnt_v0;
 
 pub use calculate_utility_score_v0::*;
-pub use clockwork::*;
 pub use delegation::*;
 pub use initialize_dao_v0::*;
 pub use initialize_sub_dao_v0::*;

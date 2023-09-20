@@ -1061,14 +1061,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clockwork-sdk"
-version = "0.0.1"
-dependencies = [
- "anchor-gen",
- "anchor-lang",
-]
-
-[[package]]
 name = "combine"
 version = "3.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1969,7 +1961,6 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "circuit-breaker",
- "clockwork-sdk",
  "default-env",
  "mpl-token-metadata",
  "rust_decimal",

@@ -3,7 +3,7 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use mpl_token_metadata::state::{CollectionDetails, DataV2};
+use mpl_token_metadata::state::DataV2;
 use shared_utils::create_metadata_accounts_v3;
 use shared_utils::token_metadata::{
   create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
@@ -128,7 +128,7 @@ pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -
     },
     true,
     true,
-    Some(CollectionDetails::V1 { size: 0 }),
+    None,
   )?;
 
   create_master_edition_v3(

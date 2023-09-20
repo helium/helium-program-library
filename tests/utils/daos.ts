@@ -137,9 +137,6 @@ export async function initTestSubdao(
       rewardsEscrow,
       dntMint,
       hntMint: daoAcc.hntMint,
-      activeDeviceAggregator: new PublicKey(
-        "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
-      ), // Copied from mainnet to localnet
     });
   const { treasury, treasuryCircuitBreaker, delegatorPool } =
     await method.pubkeys();

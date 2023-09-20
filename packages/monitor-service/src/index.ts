@@ -25,12 +25,7 @@ import {
 } from './monitors/circuitBreaker';
 import { monitorSupply } from './monitors/supply';
 import { provider } from './solana';
-import { Cluster, PublicKey } from '@solana/web3.js';
-import {
-  SwitchboardProgram,
-  AggregatorAccount,
-  READ_ONLY_KEYPAIR,
-} from '@switchboard-xyz/solana.js';
+import { PublicKey } from '@solana/web3.js';
 import { lazySignerKey } from '@helium/lazy-transactions-sdk';
 import { underscore } from 'inflection';
 
@@ -146,52 +141,6 @@ async function run() {
 
   const ep = provider.connection.rpcEndpoint;
   const isLocalhost = ep.includes('127.0.0.1') || ep.includes('localhost');
-  if (!isLocalhost) {
-    try {
-      const cluster = provider.connection.rpcEndpoint.includes('devnet')
-        ? 'devnet'
-        : 'mainnet-beta';
-      const pid =
-        cluster == 'devnet'
-          ? '2TfB33aLaneQb5TNVwyDz3jSZXS6jdW2ARw1Dgf84XCG'
-          : 'SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f';
-      const switchboard = await SwitchboardProgram.load(
-        cluster as Cluster,
-        provider.connection,
-        READ_ONLY_KEYPAIR,
-        new PublicKey(pid)
-      );
-      const mobileAgg = await AggregatorAccount.load(
-        switchboard,
-        mobile.activeDeviceAggregator
-      );
-      const [mobileLease] = anchor.utils.publicKey.findProgramAddressSync(
-        [
-          Buffer.from('LeaseAccountData'),
-          mobileAgg[1].queuePubkey.toBytes(),
-          mobileAgg[0].publicKey.toBytes(),
-        ],
-        switchboard.programId
-      );
-      const iotAgg = await AggregatorAccount.load(
-        switchboard,
-        iot.activeDeviceAggregator
-      );
-      const [iotLease] = anchor.utils.publicKey.findProgramAddressSync(
-        [
-          Buffer.from('LeaseAccountData'),
-          iotAgg[1].queuePubkey.toBytes(),
-          iotAgg[0].publicKey.toBytes(),
-        ],
-        switchboard.programId
-      );
-
-      await monitorSolBalance(mobileLease, 'switchboard_mobile_lease_account');
-      await monitorSolBalance(iotLease, 'switchboard_iot_lease_account');
-    } catch (err) {
-      console.error(err);
-    }
-  }
 
   await monitorAccountCircuitBreaker(
     cbProgram,

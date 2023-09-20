@@ -43,14 +43,14 @@ echo "Using $RND for dao names"
 ./packages/helium-admin-cli/bin/helium-admin.js create-subdao \
     --hntPubkey $(solana address -k packages/helium-admin-cli/keypairs/hnt.json) \
     -rewardsOracleUrl https://iot-oracle.oracle.test-helium.com \
-    --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n IOT --subdaoKeypair packages/helium-admin-cli/keypairs/iot.json \
+    -n IOT --subdaoKeypair packages/helium-admin-cli/keypairs/iot.json \
     --numTokens 100302580998  --startEpochRewards 65000000000 --realmName "Helium IOT SubDAO" --dcBurnAuthority $(solana address) -u $CLUSTER_URL --decimals 6 --delegatorRewardsPercent 6 \
     --emissionSchedulePath ./packages/helium-admin-cli/emissions/iot.json
 
 ./packages/helium-admin-cli/bin/helium-admin.js create-subdao \
     --hntPubkey $(solana address -k packages/helium-admin-cli/keypairs/hnt.json) \
     -rewardsOracleUrl https://mobile-oracle.oracle.test-helium.com \
-    --activeDeviceOracleUrl https://active-devices.oracle.test-helium.com -n MOBILE --subdaoKeypair packages/helium-admin-cli/keypairs/mobile.json \
+    -n MOBILE --subdaoKeypair packages/helium-admin-cli/keypairs/mobile.json \
     --numTokens 100302580998 --startEpochRewards 66000000000 --realmName "Helium MOBILE SubDAO" --decimals 6 \
     --dcBurnAuthority $(solana address) -u $CLUSTER_URL --delegatorRewardsPercent 6 --emissionSchedulePath ./packages/helium-admin-cli/emissions/mobile.json
 

@@ -1,24 +1,18 @@
-import {
-  ClockworkProvider,
-  parseTransactionInstructions,
-} from '@clockwork-xyz/sdk';
 import * as anchor from '@coral-xyz/anchor';
 import Address from '@helium/address';
 import { ED25519_KEY_TYPE } from '@helium/address/build/KeyTypes';
 import { fanoutKey, init, membershipVoucherKey } from '@helium/fanout-sdk';
-import { createMintInstructions, sendInstructions } from '@helium/spl-utils';
+import { createMintInstructions } from '@helium/spl-utils';
 import {
-  createAssociatedTokenAccountIdempotentInstruction,
   getAccount,
   getAssociatedTokenAddressSync,
 } from '@solana/spl-token';
 import { ComputeBudgetProgram, Keypair, PublicKey } from '@solana/web3.js';
 import Squads from '@sqds/sdk';
-import { loadKeypair } from '@switchboard-xyz/solana.js';
 import fs from 'fs';
 import os from 'os';
 import yargs from 'yargs/yargs';
-import { createAndMint, exists } from './utils';
+import { createAndMint, exists, loadKeypair } from './utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -134,11 +128,6 @@ export async function run(args: any = process.argv) {
       .rpc({ skipPreflight: true });
   }
 
-  const clockworkProvider = new ClockworkProvider(
-    provider.wallet,
-    provider.connection
-  );
-
   for (const [address, account] of Object.entries(accounts)) {
     if (!account.hst || account.hst === 0 || account.hst === '0') {
       continue;
@@ -188,60 +177,6 @@ export async function run(args: any = process.argv) {
         .signers([mint])
         .rpc({ skipPreflight: true });
     }
-
-    // 2️⃣  Define a trigger condition.
-    const trigger = {
-      cron: {
-        schedule: '0 30 0 * * * *',
-        skippable: true,
-      },
-    };
-
-    // 3️⃣ Create the thread.
-    const threadId = `${argv.name}-${mint.publicKey.toBase58().slice(0, 8)}`;
-    const [thread] = threadKey(provider.wallet.publicKey, threadId);
-    console.log('Thread ID', threadId, thread.toBase58());
-    const memberHntAccount = await getAssociatedTokenAddressSync(
-      hnt,
-      solAddress,
-      true
-    );
-    if (!(await exists(provider.connection, memberHntAccount))) {
-      await sendInstructions(provider, [
-        createAssociatedTokenAccountIdempotentInstruction(
-          provider.wallet.publicKey,
-          memberHntAccount,
-          solAddress,
-          hnt
-        ),
-      ]);
-    }
-
-    const distributeIx = await fanoutProgram.methods
-      .distributeV0()
-      .accounts({
-        payer: new PublicKey('C1ockworkPayer11111111111111111111111111111'),
-        fanout,
-        owner: solAddress,
-        mint: mint.publicKey,
-      })
-      .instruction();
-
-    if (!(await exists(provider.connection, thread))) {
-      const tx = await clockworkProvider.threadCreate(
-        provider.wallet.publicKey, // authority
-        threadId, // id
-        [distributeIx], // instructions
-        trigger, // trigger
-        anchor.web3.LAMPORTS_PER_SOL // amount
-      );
-    } else {
-      await clockworkProvider.threadUpdate(provider.wallet.publicKey, thread, {
-        instructions: await parseTransactionInstructions([distributeIx]),
-        trigger,
-      });
-      await clockworkProvider.threadReset(provider.wallet.publicKey, thread);
-    }
   }
 }
 
@@ -252,22 +187,4 @@ function toSolana(address: string): PublicKey | undefined {
   } catch (e: any) {
     return undefined;
   }
-}
-
-const CLOCKWORK_PID = new PublicKey(
-  'CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh'
-);
-export function threadKey(
-  authority: PublicKey,
-  threadId: string,
-  programId: PublicKey = CLOCKWORK_PID
-): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from('thread', 'utf8'),
-      authority.toBuffer(),
-      Buffer.from(threadId, 'utf8'),
-    ],
-    programId
-  );
 }

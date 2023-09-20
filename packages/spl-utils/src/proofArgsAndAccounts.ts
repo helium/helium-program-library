@@ -5,6 +5,7 @@ import {
   getCanopyDepth,
 } from "@solana/spl-account-compression";
 import { Connection, PublicKey, AccountMeta } from "@solana/web3.js";
+import axios from "axios"
 
 export type ProofArgsAndAccountsArgs = {
   connection: Connection;
@@ -57,7 +58,7 @@ export async function proofArgsAndAccounts({
   if (!canopyCache[tree] && !wellKnownCanopyCache?.[tree]) {
     canopyCache[tree] = (async () => {
       if (!wellKnownCanopyCache) {
-        wellKnownCanopyCache = await(await fetch(WELL_KNOWN_CANOPY_URL)).json();
+        wellKnownCanopyCache = await (await axios.get(WELL_KNOWN_CANOPY_URL)).data
       }
       if (wellKnownCanopyCache[tree]) {
         return wellKnownCanopyCache[tree];

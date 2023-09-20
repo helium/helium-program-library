@@ -37,7 +37,6 @@
     "@metaplex-foundation/mpl-bubblegum": "^0.7.0",
     "@pythnetwork/client": "^2.8.0",
     "@solana/spl-account-compression": "^0.1.4",
-    "@switchboard-xyz/switchboard-v2": "^0.0.165",
     "angry-purple-tiger": "^1.0.5",
     "lerna": "^5.5.4",
     "long": "^5.2.1"

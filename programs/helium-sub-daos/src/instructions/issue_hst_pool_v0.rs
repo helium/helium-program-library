@@ -5,7 +5,6 @@ use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
-use clockwork_sdk::state::{ThreadResponse, Trigger};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueHstPoolArgsV0 {
@@ -60,7 +59,7 @@ impl<'info> IssueHstPoolV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result<ThreadResponse> {
+pub fn handler(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result<()> {
   let curr_ts = Clock::get()?.unix_timestamp;
   let epoch_curr_ts = current_epoch(curr_ts);
   let end_of_epoch_ts = i64::try_from(args.epoch + 1).unwrap() * EPOCH_LENGTH;
@@ -94,24 +93,5 @@ pub fn handler(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result
 
   ctx.accounts.dao_epoch_info.done_issuing_hst_pool = true;
 
-  // update thread to point at next epoch
-  let next_epoch = args.epoch + 1;
-
-  let dao_key = ctx.accounts.dao.key();
-  let dao_ei_seeds: &[&[u8]] = &[
-    "dao_epoch_info".as_bytes(),
-    dao_key.as_ref(),
-    &next_epoch.to_le_bytes(),
-  ];
-  let next_dao_epoch_info = Pubkey::find_program_address(dao_ei_seeds, &crate::id()).0;
-
-  Ok(ThreadResponse {
-    dynamic_instruction: None,
-    trigger: Some(Trigger::Account {
-      address: next_dao_epoch_info,
-      offset: 8,
-      size: 1,
-    }),
-    close_to: None,
-  })
+  Ok(())
 }

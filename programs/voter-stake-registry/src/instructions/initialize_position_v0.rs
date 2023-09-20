@@ -11,7 +11,7 @@ use mpl_token_metadata::state::Collection;
 use mpl_token_metadata::state::DataV2;
 use shared_utils::create_metadata_accounts_v3;
 use shared_utils::token_metadata::{
-  verify_sized_collection_item, CreateMetadataAccountsV3, Metadata, VerifySizedCollectionItem,
+  verify_collection_item, CreateMetadataAccountsV3, Metadata, VerifyCollectionItem,
 };
 use std::convert::TryFrom;
 use std::mem::size_of;
@@ -31,6 +31,7 @@ pub struct InitializePositionArgsV0 {
 #[derive(Accounts)]
 pub struct InitializePositionV0<'info> {
   #[account(
+    mut,
     has_one = collection
   )]
   pub registrar: Box<Account<'info, Registrar>>,
@@ -223,14 +224,14 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
 
   let verify_signer_seeds: &[&[&[u8]]] = &[registrar_seeds!(ctx.accounts.registrar)];
 
-  verify_sized_collection_item(
+  verify_collection_item(
     CpiContext::new_with_signer(
       ctx
         .accounts
         .token_metadata_program
         .to_account_info()
         .clone(),
-      VerifySizedCollectionItem {
+      VerifyCollectionItem {
         payer: ctx.accounts.payer.to_account_info().clone(),
         metadata: ctx.accounts.metadata.to_account_info().clone(),
         collection_authority: ctx.accounts.registrar.to_account_info().clone(),

@@ -6,8 +6,8 @@ use anchor_spl::{
 use mpl_token_metadata::state::{Collection, DataV2};
 use shared_utils::create_metadata_accounts_v3;
 use shared_utils::token_metadata::{
-  create_master_edition_v3, verify_sized_collection_item, CreateMasterEditionV3,
-  CreateMetadataAccountsV3, Metadata, VerifySizedCollectionItem,
+  create_master_edition_v3, verify_collection_item, CreateMasterEditionV3,
+  CreateMetadataAccountsV3, Metadata, VerifyCollectionItem,
 };
 
 use crate::{fanout_seeds, voucher_seeds, FanoutV0, FanoutVoucherV0};
@@ -229,14 +229,14 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
 
   let verify_signer_seeds: &[&[&[u8]]] = &[fanout_seeds!(ctx.accounts.fanout)];
 
-  verify_sized_collection_item(
+  verify_collection_item(
     CpiContext::new_with_signer(
       ctx
         .accounts
         .token_metadata_program
         .to_account_info()
         .clone(),
-      VerifySizedCollectionItem {
+      VerifyCollectionItem {
         payer: ctx.accounts.payer.to_account_info().clone(),
         metadata: ctx.accounts.metadata.to_account_info().clone(),
         collection_authority: ctx.accounts.fanout.to_account_info().clone(),
