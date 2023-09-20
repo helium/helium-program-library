@@ -101,7 +101,7 @@ pub struct InitializeDataOnlyV0<'info> {
   pub rent: Sysvar<'info, Rent>,
 }
 
-#[allow(clippy::deprecated)]
+#[allow(deprecated)]
 pub fn handler(ctx: Context<InitializeDataOnlyV0>, args: InitializeDataOnlyArgsV0) -> Result<()> {
   require!(
     args.name.len() <= MAX_NAME_LENGTH,
