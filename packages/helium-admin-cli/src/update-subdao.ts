@@ -146,6 +146,7 @@ export async function run(args: any = process.argv) {
         .updateRewardableEntityConfigV0({
           newAuthority: new PublicKey(argv.newAuthority),
           settings: null,
+          stakingRequirement: null
         })
         .accounts({
           rewardableEntityConfig: config,

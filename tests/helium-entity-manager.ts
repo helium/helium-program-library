@@ -840,6 +840,7 @@ describe("helium-entity-manager", () => {
         .updateRewardableEntityConfigV0({
           newAuthority: PublicKey.default,
           settings: null,
+          stakingRequirement: null
         })
         .accounts({
           rewardableEntityConfig,

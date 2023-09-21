@@ -5,6 +5,7 @@ use anchor_lang::prelude::*;
 pub struct UpdateRewardableEntityConfigArgsV0 {
   pub new_authority: Option<Pubkey>,
   pub settings: Option<ConfigSettingsV0>,
+  pub staking_requirement: Option<u64>,
 }
 
 #[derive(Accounts)]
@@ -29,6 +30,10 @@ pub fn handler(
 
   if let Some(settings) = args.settings {
     config.settings = settings;
+  }
+
+  if let Some(staking_requirement) = args.staking_requirement {
+    config.staking_requirement = staking_requirement;
   }
 
   Ok(())
