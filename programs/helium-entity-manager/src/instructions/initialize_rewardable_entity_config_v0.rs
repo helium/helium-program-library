@@ -7,6 +7,7 @@ use helium_sub_daos::SubDaoV0;
 pub struct InitializeRewardableEntityConfigArgsV0 {
   pub symbol: String,
   pub settings: ConfigSettingsV0,
+  pub staking_requirement: u64,
 }
 
 #[derive(Accounts)]
@@ -51,6 +52,7 @@ pub fn handler(
       authority: ctx.accounts.authority.key(),
       bump_seed: ctx.bumps["rewardable_entity_config"],
       settings: args.settings,
+      staking_requirement: args.staking_requirement,
     });
 
   Ok(())

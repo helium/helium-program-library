@@ -28,6 +28,7 @@ import {
   initTestDataCredits,
   initTestMaker,
   initTestRewardableEntityConfig,
+  MAKER_STAKING_FEE,
 } from "./utils/fixtures";
 // @ts-ignore
 import bs58 from "bs58";
@@ -94,7 +95,14 @@ describe("helium-entity-manager", () => {
       dataCredits.dcMint
     ));
     activeDeviceAuthority = Keypair.generate();
-    ({ subDao } = await initTestSubdao({ hsdProgram, provider, authority: me, dao, activeDeviceAuthority: activeDeviceAuthority.publicKey }));
+    ({ subDao } = await initTestSubdao({
+      hsdProgram,
+      provider,
+      authority: me,
+      dao,
+      activeDeviceAuthority: activeDeviceAuthority.publicKey,
+      numTokens: MAKER_STAKING_FEE.mul(new BN(2)),
+    }));
   });
 
   it("issues iot operations fund", async () => {
@@ -436,7 +444,6 @@ describe("helium-entity-manager", () => {
     let maker: PublicKey;
     let startDcBal = DC_FEE * 10;
 
-    let merkleTree: MerkleTree;
     let getAssetFn: (
       url: string,
       assetId: PublicKey
@@ -445,12 +452,10 @@ describe("helium-entity-manager", () => {
       url: string,
       assetId: PublicKey
     ) => Promise<AssetProof | undefined>;
-    let hotspotCollection: PublicKey;
     let rewardableEntityConfig: PublicKey;
     let ecc: string;
     let hotspot: PublicKey;
     let hotspotOwner = Keypair.generate();
-    let metadata: any;
     beforeEach(async () => {
       ecc = (await HeliumKeypair.makeRandom()).address.b58;
 
