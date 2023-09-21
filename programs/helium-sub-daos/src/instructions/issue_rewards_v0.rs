@@ -6,7 +6,6 @@ use circuit_breaker::{
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use clockwork_sdk::state::{ThreadResponse, Trigger};
 use shared_utils::precise_number::{InnerUint, PreciseNumber};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -120,7 +119,7 @@ impl<'info> IssueRewardsV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<ThreadResponse> {
+pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<()> {
   let curr_ts = Clock::get()?.unix_timestamp;
   let epoch_curr_ts = current_epoch(curr_ts);
   let end_of_epoch_ts = i64::try_from(args.epoch + 1).unwrap() * EPOCH_LENGTH;
@@ -231,25 +230,5 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 
-  // update thread to point at next epoch
-  let next_epoch = args.epoch + 1;
-  let dao_epoch_info = Pubkey::find_program_address(
-    &[
-      "dao_epoch_info".as_bytes(),
-      ctx.accounts.dao.key().as_ref(),
-      &next_epoch.to_le_bytes(),
-    ],
-    &crate::id(),
-  )
-  .0;
-
-  Ok(ThreadResponse {
-    dynamic_instruction: None,
-    trigger: Some(Trigger::Account {
-      address: dao_epoch_info,
-      offset: 8,
-      size: 1,
-    }),
-    close_to: None,
-  })
+  Ok(())
 }

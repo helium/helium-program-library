@@ -1,39 +1,37 @@
 import * as anchor from '@coral-xyz/anchor';
 import { ThresholdType } from '@helium/circuit-breaker-sdk';
 import {
-  dataCreditsKey,
-  init as initDc,
   PROGRAM_ID,
   accountPayerKey,
+  dataCreditsKey,
+  init as initDc,
 } from '@helium/data-credits-sdk';
-import {
-  init as initHem,
-  dataOnlyConfigKey,
-} from '@helium/helium-entity-manager-sdk';
 import { fanoutKey } from '@helium/fanout-sdk';
 import {
-  daoKey,
-  init as initDao,
-  threadKey,
-} from '@helium/helium-sub-daos-sdk';
+  dataOnlyConfigKey,
+  init as initHem,
+} from '@helium/helium-entity-manager-sdk';
+import { daoKey, init as initDao } from "@helium/helium-sub-daos-sdk";
 import { sendInstructions, toBN } from '@helium/spl-utils';
 import {
   init as initVsr,
   registrarKey,
 } from '@helium/voter-stake-registry-sdk';
 import {
-  getGovernanceProgramVersion,
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  getConcurrentMerkleTreeAccountSize,
+} from '@solana/spl-account-compression';
+import {
   GoverningTokenConfigAccountArgs,
   GoverningTokenType,
   MintMaxVoteWeightSource,
   SetRealmAuthorityAction,
+  getGovernanceProgramVersion,
   withCreateRealm,
   withSetRealmAuthority,
 } from '@solana/spl-governance';
 import {
-  createAssociatedTokenAccountIdempotent,
   createAssociatedTokenAccountIdempotentInstruction,
-  getAssociatedTokenAddress,
   getAssociatedTokenAddressSync,
 } from '@solana/spl-token';
 import {
@@ -47,27 +45,18 @@ import {
   TransactionInstruction,
 } from '@solana/web3.js';
 import Squads from '@sqds/sdk';
+import { BN } from 'bn.js';
+import fs from 'fs';
 import os from 'os';
 import yargs from 'yargs/yargs';
 import {
   createAndMint,
-  getTimestampFromDays,
-  getUnixTimestamp,
   isLocalhost,
   loadKeypair,
   parseEmissionsSchedule,
   sendInstructionsOrSquads,
 } from './utils';
-import fs from 'fs';
-import { BN } from 'bn.js';
-import {
-  getConcurrentMerkleTreeAccountSize,
-  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-} from '@solana/spl-account-compression';
 
-const { hideBin } = require('yargs/helpers');
-
-const HNT_EPOCH_REWARDS = 10000000000;
 const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
 const MAX_LOCKUP = 4 * SECS_PER_YEAR;
@@ -215,10 +204,7 @@ export async function run(args: any = process.argv) {
   console.log('COUNCIL', councilKeypair.publicKey.toBase58());
   console.log('COUNCIL WALLET', councilWallet.toBase58());
 
-  const thread = threadKey(dao, 'issue_hst')[0];
-
   console.log('DAO', dao.toString());
-  console.log('THREAD', thread.toString());
 
   const conn = provider.connection;
 
@@ -461,7 +447,6 @@ export async function run(args: any = process.argv) {
       .accounts({
         dcMint: dcKeypair.publicKey,
         hntMint: hntKeypair.publicKey,
-        thread,
         hstPool,
       })
       .rpc({ skipPreflight: true });

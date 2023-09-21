@@ -25,7 +25,6 @@ import {
 } from "../packages/lazy-transactions-sdk/src";
 import { LazyTransactions } from "../target/types/lazy_transactions";
 import { random } from "./utils/string";
-import { sleep } from "@switchboard-xyz/common";
 
 describe("lazy-transactions", () => {
   // Configure the client to use the local cluster.
@@ -216,3 +215,7 @@ describe("lazy-transactions", () => {
       .rpc({ skipPreflight: true });
   });
 });
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

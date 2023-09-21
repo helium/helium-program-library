@@ -11,20 +11,27 @@ use solana_client::{
   rpc_config::RpcSendTransactionConfig,
   tpu_client::{TpuClient, TpuSenderError},
 };
+use solana_connection_cache::connection_cache::{
+  ConnectionManager, ConnectionPool, NewConnectionConfig,
+};
 use solana_sdk::transaction::{TransactionError, VersionedTransaction};
 
 pub mod dao;
-pub mod token;
 pub mod program;
+pub mod token;
 
 pub const TRANSACTION_RESEND_INTERVAL: Duration = Duration::from_secs(4);
 pub const MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS: usize = 256;
 pub const SEND_TRANSACTION_INTERVAL: Duration = Duration::from_millis(10);
 
 // This is based on tpu_client but rewritten to work with raw versioned txs
-pub fn send_and_confirm_messages_with_spinner(
+pub fn send_and_confirm_messages_with_spinner<
+  P: ConnectionPool<NewConnectionConfig = C>,
+  M: ConnectionManager<ConnectionPool = P, NewConnectionConfig = C>,
+  C: NewConnectionConfig,
+>(
   rpc_client: Arc<RpcClient>,
-  tpu_client: &TpuClient,
+  tpu_client: &TpuClient<P, M, C>,
   messages: &Vec<Vec<u8>>,
 ) -> Result<(Vec<Option<TransactionError>>, i32), TpuSenderError> {
   if messages.is_empty() {

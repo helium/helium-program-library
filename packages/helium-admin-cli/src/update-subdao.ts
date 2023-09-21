@@ -13,22 +13,16 @@ import {
   subDaoKey,
   delegatorRewardsPercent,
 } from '@helium/helium-sub-daos-sdk';
-import { Cluster, PublicKey, TransactionInstruction } from '@solana/web3.js';
+import { PublicKey, TransactionInstruction } from '@solana/web3.js';
 import Squads from '@sqds/sdk';
-import {
-  AggregatorAccount,
-  SwitchboardProgram,
-} from '@switchboard-xyz/solana.js';
 import { BN } from 'bn.js';
 import os from 'os';
 import yargs from 'yargs/yargs';
 import {
-  isLocalhost,
   loadKeypair,
   parseEmissionsSchedule,
   sendInstructionsOrSquads,
 } from './utils';
-import { toBN } from '@helium/spl-utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -64,11 +58,6 @@ export async function run(args: any = process.argv) {
       describe: 'Path to file that contains the new emissions schedule',
       type: 'string',
       default: null,
-    },
-    newActiveDeviceAggregator: {
-      required: false,
-      default: null,
-      type: 'string',
     },
     newDcBurnAuthority: {
       required: false,
@@ -203,27 +192,6 @@ export async function run(args: any = process.argv) {
         })
         .instruction()
     );
-
-    // update agg auth
-    if (!isLocalhost(provider)) {
-      const switchboard = await SwitchboardProgram.load(
-        argv.switchboardNetwork as Cluster,
-        provider.connection,
-        walletKP
-      );
-      const [agg, aggData] = await AggregatorAccount.load(
-        switchboard,
-        subDaoAcc.activeDeviceAggregator
-      );
-      if (!aggData.authority.equals(subDaoAcc.activeDeviceAggregator)) {
-        instructions.push(
-          ...agg.setAuthorityInstruction(
-            aggData.authority, // payer needs to be the same as the old authority
-            { newAuthority: new PublicKey(argv.newAuthority) }
-          ).ixns
-        );
-      }
-    }
   }
 
   if (
@@ -248,9 +216,6 @@ export async function run(args: any = process.argv) {
           : null,
         onboardingDataOnlyDcFee: argv.onboardingDataOnlyDcFee
           ? new BN(argv.onboardingDataOnlyDcFee)
-          : null,
-        activeDeviceAggregator: argv.newActiveDeviceAggregator
-          ? new PublicKey(argv.newActiveDeviceAggregator)
           : null,
         registrar: argv.registrar ? new PublicKey(argv.registrar) : null,
         delegatorRewardsPercent: argv.delegatorRewardsPercent

@@ -61,9 +61,6 @@ address = "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV" # noop
 address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK" # account compression
 
 [[test.validator.clone]]
-address = "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh" # clockwork
-
-[[test.validator.clone]]
 address = "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S" # spl governance program
 
 [[test.validator.clone]]
@@ -78,22 +75,6 @@ address = "66t3XARU6Ja3zj91gDZ2KoNLJHEMTYPSKqJWYb6PJJBA" # Proposal IDL
 # Pyth price oracle
 [[test.validator.clone]]
 address = "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"
-
-# Switchboard program
-[[test.validator.clone]]
-address = "SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f"
-
-# Switchboard aggregator
-[[test.validator.clone]]
-address = "E3cqnoFvTeKKNsGmC8YitpMjo2E39hwfoyt2Aiem7dCb"
-
-# Switchboard aggregator
-[[test.validator.clone]]
-address = "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
-
-# Switchboard aggregator history
-[[test.validator.clone]]
-address = "Fi8vncGpNKbq62gPo56G4toCehWNy77GgqGkTaAF5Lkk"
 
 # Squads multisig program
 [[test.validator.clone]]

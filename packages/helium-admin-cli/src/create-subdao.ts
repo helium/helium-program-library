@@ -1,5 +1,5 @@
 import * as anchor from '@coral-xyz/anchor';
-import { thresholdPercent, ThresholdType } from '@helium/circuit-breaker-sdk';
+import { ThresholdType } from '@helium/circuit-breaker-sdk';
 import {
   init as initHem,
   rewardableEntityConfigKey,
@@ -40,12 +40,10 @@ import {
   TransactionInstruction,
 } from '@solana/web3.js';
 import Squads from '@sqds/sdk';
-import { BN } from 'bn.js';
 import os from 'os';
 import yargs from 'yargs/yargs';
 import {
   createAndMint,
-  createSwitchboardAggregator,
   exists,
   getUnixTimestamp,
   isLocalhost,
@@ -134,12 +132,6 @@ export async function run(args: any = process.argv) {
       type: 'string',
       describe: 'The authority to burn DC tokens',
       required: true,
-    },
-    activeDeviceOracleUrl: {
-      alias: 'ao',
-      type: 'string',
-      describe: 'The active device oracle URL',
-      default: 'http://localhost:8081',
     },
     queue: {
       type: 'string',
@@ -251,10 +243,8 @@ export async function run(args: any = process.argv) {
     authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
   }
   if (await exists(conn, subdao)) {
-    const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
-
     console.log(
-      `Subdao exists. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}`
+      `Subdao exists. Key: ${subdao.toBase58()}.`
     );
     console.log('Calculate thread', calculateThread.toString());
     console.log('Issue thread', issueThread.toString());
@@ -438,23 +428,6 @@ export async function run(args: any = process.argv) {
   }
 
   if (!(await exists(conn, subdao))) {
-    let aggregatorKey = new PublicKey(
-      'GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR'
-    );
-    if (!isLocalhost(provider)) {
-      console.log('Initializing switchboard oracle');
-      aggregatorKey = await createSwitchboardAggregator({
-        crank: new PublicKey(argv.crank),
-        queue: new PublicKey(argv.queue),
-        wallet: walletKP,
-        provider,
-        aggKeypair,
-        url: argv.activeDeviceOracleUrl,
-        switchboardNetwork: argv.switchboardNetwork,
-        authority,
-      });
-    }
-
     console.log(`Initializing ${name} SubDAO`);
     const currentDntEmission = emissionSchedule[0];
 
@@ -488,7 +461,6 @@ export async function run(args: any = process.argv) {
         dntMint: subdaoKeypair.publicKey,
         rewardsEscrow,
         hntMint: new PublicKey(argv.hntPubkey!),
-        activeDeviceAggregator: aggregatorKey,
         payer,
         dntMintAuthority: daoAcc.authority,
         subDaoFreezeAuthority: daoAcc.authority,
@@ -516,26 +488,6 @@ export async function run(args: any = process.argv) {
       }),
     ]);
 
-    // Reset thread
-    await sendInstructionsOrSquads({
-      provider,
-      instructions: [
-        await heliumSubDaosProgram.methods
-          .resetSubDaoThreadV0()
-          .accounts({
-            subDao: subDaoKey(subdaoKeypair.publicKey)[0],
-            authority,
-            threadPayer: authority,
-          })
-          .instruction(),
-      ],
-      executeTransaction: true,
-      squads,
-      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-      authorityIndex: argv.authorityIndex,
-      signers: [],
-    });
-
     const { subDao } = await initSubdaoMethod.pubkeys();
     await sendInstructionsOrSquads({
       provider,
@@ -547,7 +499,6 @@ export async function run(args: any = process.argv) {
             dcBurnAuthority: null,
             onboardingDcFee: null,
             onboardingDataOnlyDcFee: null,
-            activeDeviceAggregator: null,
             registrar: null,
             delegatorRewardsPercent: null,
             activeDeviceAuthority: null,

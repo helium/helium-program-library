@@ -56,13 +56,6 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
-import { OracleJob, sleep } from "@switchboard-xyz/common";
-import {
-  AggregatorAccount,
-  AggregatorHistoryBuffer,
-  QueueAccount,
-  SwitchboardProgram,
-} from "@switchboard-xyz/solana.js";
 import { BN } from "bn.js";
 import fs from "fs";
 import fetch from "node-fetch";
@@ -639,76 +632,6 @@ export async function sendInstructionsOrCreateProposal({
   );
 }
 
-export async function createSwitchboardAggregator({
-  provider,
-  aggKeypair,
-  url,
-  switchboardNetwork,
-  wallet,
-  crank,
-  queue,
-  authority,
-}: {
-  authority: PublicKey;
-  switchboardNetwork: string;
-  wallet: Keypair;
-  crank: PublicKey;
-  queue: PublicKey;
-  provider: anchor.AnchorProvider;
-  aggKeypair: Keypair;
-  url: string;
-}) {
-  const switchboard = await SwitchboardProgram.load(
-    switchboardNetwork as Cluster,
-    provider.connection,
-    wallet
-  );
-  const queueAccount = new QueueAccount(switchboard, queue);
-  const agg = aggKeypair.publicKey;
-  if (!(await exists(provider.connection, agg))) {
-    const [agg, _] = await queueAccount.createFeed({
-      keypair: aggKeypair,
-      batchSize: 9,
-      minRequiredOracleResults: 7,
-      minRequiredJobResults: 1,
-      minUpdateDelaySeconds: 60 * 60, // hourly
-      fundAmount: 1,
-      enable: true,
-      crankPubkey: crank,
-      jobs: [
-        {
-          data: OracleJob.encodeDelimited(
-            OracleJob.fromObject({
-              tasks: [
-                {
-                  httpTask: {
-                    url,
-                  },
-                },
-                {
-                  jsonParseTask: {
-                    path: "$.count",
-                  },
-                },
-              ],
-            })
-          ).finish(),
-        },
-      ],
-    });
-    console.log("Created active device aggregator", agg.publicKey.toBase58());
-    await AggregatorHistoryBuffer.create(switchboard, {
-      aggregatorAccount: agg,
-      maxSamples: 24 * 31, // Give us a month of active device data. If we fail to run end epoch, RIP.
-    });
-    await agg.setAuthority({
-      newAuthority: authority,
-    });
-  }
-
-  return aggKeypair.publicKey;
-}
-
 export async function createCloseBufferInstruction(
   programId: PublicKey,
   bufferAddress: PublicKey,
@@ -868,3 +791,8 @@ export async function parseEmissionsSchedule(filepath: string) {
   });
   return schedule;
 }
+
+function sleep(arg0: number) {
+  return new Promise((resolve) => setTimeout(resolve, arg0));
+}
+

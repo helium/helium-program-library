@@ -4,11 +4,11 @@ use anchor_lang::solana_program::hash::hash;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount};
 use helium_sub_daos::DaoV0;
-use mpl_token_metadata::state::{Creator, DataV2};
-use shared_utils::create_metadata_accounts_v3;
+use mpl_token_metadata::types::{Creator, DataV2};
 use shared_utils::token_metadata::{
   create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
 };
+use shared_utils::{create_metadata_accounts_v3, Metadata};
 
 pub const IOT_OPERATIONS_FUND: &str = "iot_operations_fund";
 
@@ -74,13 +74,10 @@ pub struct IssueIotOperationsFundV0<'info> {
   )]
   pub master_edition: UncheckedAccount<'info>,
 
-  /// CHECK: Verified by constraint  
-  #[account(address = mpl_token_metadata::ID)]
-  pub token_metadata_program: AccountInfo<'info>,
+  pub token_metadata_program: Program<'info, Metadata>,
   pub token_program: Program<'info, Token>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> IssueIotOperationsFundV0<'info> {
@@ -104,6 +101,8 @@ pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
     ctx.accounts.dao.to_account_info().key.as_ref(),
     &[ctx.bumps["entity_creator"]],
   ];
+  let mut update_auth = ctx.accounts.entity_creator.to_account_info().clone();
+  update_auth.is_signer = true;
   let signer_seeds: &[&[&[u8]]] = &[entity_creator_seeds];
   create_metadata_accounts_v3(
     CpiContext::new_with_signer(
@@ -117,9 +116,9 @@ pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
         mint: ctx.accounts.mint.to_account_info().clone(),
         mint_authority: ctx.accounts.authority.to_account_info().clone(),
         payer: ctx.accounts.payer.to_account_info().clone(),
-        update_authority: ctx.accounts.entity_creator.to_account_info().clone(),
+        update_authority: update_auth.clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        rent: ctx.accounts.rent.to_account_info().clone(),
+        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
       },
       signer_seeds,
     ),
@@ -137,7 +136,6 @@ pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
       collection: None,
     },
     true,
-    true,
     None,
   )?;
 
@@ -151,13 +149,13 @@ pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
       CreateMasterEditionV3 {
         edition: ctx.accounts.master_edition.to_account_info().clone(),
         mint: ctx.accounts.mint.to_account_info().clone(),
-        update_authority: ctx.accounts.entity_creator.to_account_info().clone(),
+        update_authority: update_auth,
         mint_authority: ctx.accounts.authority.to_account_info().clone(),
         metadata: ctx.accounts.metadata.to_account_info().clone(),
         payer: ctx.accounts.payer.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        rent: ctx.accounts.rent.to_account_info().clone(),
+        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
       },
       signer_seeds,
     ),

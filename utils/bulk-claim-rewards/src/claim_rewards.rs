@@ -29,8 +29,10 @@ use solana_program::{
 };
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
+use solana_sdk::signature::Keypair;
 use solana_sdk::{signer::Signer, transaction::Transaction};
 use spl_associated_token_account::get_associated_token_address;
+use std::ops::Deref;
 use std::rc::Rc;
 use std::str::FromStr;
 use tokio::runtime::Runtime;
@@ -186,7 +188,7 @@ const COMPRESSION: &str = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK";
 
 pub struct ClaimRewardsArgs<'a> {
   pub rpc_url: &'a str,
-  pub payer: Rc<dyn Signer>,
+  pub payer: Keypair,
   pub hotspot_owner: Pubkey,
   pub rewards_mint: Pubkey,
   pub dao: Pubkey,
@@ -219,13 +221,13 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
         .replace("https", "wss")
         .replace("http", "ws"),
     ),
-    payer.clone(),
+    &payer,
     CommitmentConfig::confirmed(),
   );
 
-  let lazy_distributor_program = anchor_client.program(lazy_distributor::id());
-  let rewards_oracle_program = anchor_client.program(rewards_oracle::id());
-  let helium_entity_manager_program = anchor_client.program(helium_entity_manager::id());
+  let lazy_distributor_program = anchor_client.program(lazy_distributor::id())?;
+  let rewards_oracle_program = anchor_client.program(rewards_oracle::id())?;
+  let helium_entity_manager_program = anchor_client.program(helium_entity_manager::id())?;
   let mut total = 0;
   let tpu_client = TpuClient::new(
     lazy_distributor_program.rpc().into(),
@@ -480,7 +482,7 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
           hotspot_owner,
           root,
           proof,
-          payer.clone().as_ref(),
+          &payer,
           blockhash,
         )
       })
@@ -525,7 +527,7 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
           proof,
           &rewards,
           hotspot_owner,
-          payer.clone().as_ref(),
+          &payer,
           rewards_mint,
           lazy_distributor,
           ld_acc.clone(),
@@ -598,8 +600,8 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
   Ok(())
 }
 
-fn check_and_init_recipient(
-  lazy_distributor_program: &Program,
+fn check_and_init_recipient<C: Deref<Target = impl Signer> + Clone>(
+  lazy_distributor_program: &Program<C>,
   lazy_distributor: Pubkey,
   hotspot: Hotspot,
   hotspot_owner: Pubkey,
@@ -677,9 +679,9 @@ async fn get_proof(rpc_url: String, id: Pubkey) -> Result<ProofJson, anyhow::Err
   Ok(get_asset_proof_response.result.unwrap())
 }
 
-fn process_hotspot(
-  rewards_oracle_program: &Program,
-  lazy_distributor_program: &Program,
+fn process_hotspot<C: Deref<Target = impl Signer> + Clone>(
+  rewards_oracle_program: &Program<C>,
+  lazy_distributor_program: &Program<C>,
   hotspot: Hotspot,
   root: &[u8; 32],
   proof: &Vec<AccountMeta>,
@@ -876,8 +878,8 @@ fn construct_set_rewards_accounts(
   })
 }
 
-fn construct_distribute_rewards_accounts(
-  lazy_distributor_program: &Program,
+fn construct_distribute_rewards_accounts<C: Deref<Target = impl Signer> + Clone>(
+  lazy_distributor_program: &Program<C>,
   rewards_mint: Pubkey,
   hotspot_owner: Pubkey,
   asset_id: Pubkey,

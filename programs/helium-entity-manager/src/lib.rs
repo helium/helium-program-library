@@ -157,10 +157,6 @@ pub mod helium_entity_manager {
     update_data_only_tree_v0::handler(ctx)
   }
 
-  pub fn temp_repair_iot_operations_fund(ctx: Context<TempRepairIotOperationsFund>) -> Result<()> {
-    temp_repair_iot_operations_fund::handler(ctx)
-  }
-
   pub fn set_entity_active_v0(
     ctx: Context<SetEntityActiveV0>,
     args: SetEntityActiveArgsV0,
@@ -184,12 +180,5 @@ pub mod helium_entity_manager {
     ctx: Context<TempPayMobileOnboardingFeeV0>,
   ) -> Result<()> {
     temp_pay_mobile_onboarding_fee_v0::handler(ctx)
-  }
-
-  pub fn temp_update_iot_operations_fund_metadata(
-    ctx: Context<TempUpdateIotOperationsFundMetadata>,
-    args: TempUpdateIotOperationsFundMetadataArgs,
-  ) -> Result<()> {
-    temp_update_iot_operations_fund_metadata::handler(ctx, args)
   }
 }

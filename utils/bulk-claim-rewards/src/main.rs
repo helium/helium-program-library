@@ -32,15 +32,16 @@ async fn run() {
   let args = Args::parse();
 
   // load the solana paper wallet
-  let kp = Rc::new(read_keypair_file(args.keypair).unwrap());
+  let kp = read_keypair_file(args.keypair).unwrap();
+  let pk = kp.pubkey().clone();
   let rewards_mint = *args.sub_dao.mint();
   let dao = Dao::Hnt.key();
   let start = Instant::now();
 
   claim_rewards(ClaimRewardsArgs {
     rpc_url: args.url.as_str(),
-    payer: kp.clone(),
-    hotspot_owner: args.hotspot_owner.map(|s| s.parse().unwrap()).unwrap_or_else(|| kp.pubkey()),
+    payer: kp,
+    hotspot_owner: args.hotspot_owner.map(|s| s.parse().unwrap()).unwrap_or_else(|| pk),
     rewards_mint,
     dao,
     batch_size: args.batch_size,

@@ -5,7 +5,7 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use mpl_token_metadata::state::{CollectionDetails, DataV2};
+use mpl_token_metadata::types::DataV2;
 use shared_utils::create_metadata_accounts_v3;
 use shared_utils::token_metadata::{
   create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
@@ -86,7 +86,6 @@ pub struct InitializeRegistrarV0<'info> {
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
-  pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> InitializeRegistrarV0<'info> {
@@ -136,7 +135,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
         payer: ctx.accounts.payer.to_account_info().clone(),
         update_authority: ctx.accounts.registrar.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        rent: ctx.accounts.rent.to_account_info().clone(),
+        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
       },
       signer_seeds,
     ),
@@ -151,8 +150,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
       uses: None,
     },
     true,
-    true,
-    Some(CollectionDetails::V1 { size: 0 }),
+    None,
   )?;
 
   create_master_edition_v3(
@@ -171,7 +169,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
         payer: ctx.accounts.payer.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        rent: ctx.accounts.rent.to_account_info().clone(),
+        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
       },
       signer_seeds,
     ),

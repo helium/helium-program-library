@@ -9,7 +9,7 @@ on:
       - master
       - develop
 env:
-  SOLANA_CLI_VERSION: 1.14.3
+  SOLANA_CLI_VERSION: 1.16.13
   NODE_VERSION: 18.12.1
 
 jobs:
@@ -159,7 +159,7 @@ jobs:
             echo "Waiting for local Anchor network to start..."
             sleep 5
           done
-      - run: ANCHOR_WALLET=${HOME}/.config/solana/id.json yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 $TEST
+      - run: ANCHOR_WALLET=${HOME}/.config/solana/id.json yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 --exit $TEST
         env:
           TESTING: true
           TEST: ${{ matrix.test }}

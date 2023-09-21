@@ -1,5 +1,3 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "helium-sub-daos"
 version = "0.0.16"
@@ -30,11 +28,9 @@ voter-stake-registry = { path = "../voter-stake-registry", features = ["no-entry
 shared-utils = { workspace = true }
 circuit-breaker = { workspace = true }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }
-clockwork-sdk = { git = "https://github.com/clockwork-xyz/clockwork", version="2.0.1", rev="781b42fd06f2926899597ce5ea1f19b8ecd3d2e4" }
 
 time = "0.3.17"
-switchboard-v2 = { version = "0.1.17" }
-spl-governance-tools = "0.1.3"
+spl-governance-tools = { git = "https://github.com/solana-labs/solana-program-library.git", version = "0.1.3" }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }
 

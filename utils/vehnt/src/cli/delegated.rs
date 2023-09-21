@@ -14,7 +14,7 @@ use solana_client::{
   rpc_config::RpcProgramAccountsConfig,
   rpc_filter::{Memcmp, RpcFilterType},
 };
-
+use anchor_lang::AccountDeserialize;
 use solana_program::system_program;
 use solana_sdk::{
   pubkey::Pubkey,
@@ -413,7 +413,6 @@ impl Delegated {
   }
 }
 
-use helium_api::models::Hnt;
 use voter_stake_registry::state::{LockupKind, PositionV0, Registrar};
 
 #[derive(Debug)]
@@ -421,8 +420,8 @@ use voter_stake_registry::state::{LockupKind, PositionV0, Registrar};
 struct Position {
   pub mint: Pubkey,
   pub position: Pubkey,
-  pub hnt_amount: Hnt,
-  pub sub_dao: SubDao,
+  pub hnt_amount: u64,
+  pub sub_dao: Pubkey,
   pub last_claimed_epoch: u64,
   pub start_ts: i64,
   pub purged: bool,
@@ -435,8 +434,8 @@ impl TryFrom<DelegatedPositionV0> for Position {
     Ok(Self {
       mint: position.mint,
       position: position.position,
-      hnt_amount: Hnt::from(position.hnt_amount),
-      sub_dao: SubDao::try_from(position.sub_dao)?,
+      hnt_amount: position.hnt_amount,
+      sub_dao: position.sub_dao,
       last_claimed_epoch: position.last_claimed_epoch,
       start_ts: position.start_ts,
       purged: position.purged,
