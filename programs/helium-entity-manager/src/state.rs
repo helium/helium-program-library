@@ -11,7 +11,20 @@ pub struct RewardableEntityConfigV0 {
   pub bump_seed: u8,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, PartialEq)]
+pub enum MobileDeviceTypeV0 {
+  #[default]
+  Cbrs,
+  Wifi,
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
+pub struct DeviceFeesV0 {
+  pub dc_onboarding_fee: u64,
+  pub location_staking_fee: u64,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub enum ConfigSettingsV0 {
   IotConfig {
     min_gain: i32,
@@ -19,10 +32,33 @@ pub enum ConfigSettingsV0 {
     full_location_staking_fee: u64,
     dataonly_location_staking_fee: u64,
   },
+  #[deprecated]
   MobileConfig {
     full_location_staking_fee: u64,
     dataonly_location_staking_fee: u64,
   },
+  MobileConfigV1 {
+    fees_by_device: Vec<(MobileDeviceTypeV0, DeviceFeesV0)>,
+  },
+}
+
+impl ConfigSettingsV0 {
+  pub fn mobile_device_fees(&self, device: MobileDeviceTypeV0) -> Option<DeviceFeesV0> {
+    match self {
+      ConfigSettingsV0::MobileConfig {
+        full_location_staking_fee,
+        ..
+      } => Some(DeviceFeesV0 {
+        dc_onboarding_fee: 4000000_u64,
+        location_staking_fee: *full_location_staking_fee,
+      }),
+      ConfigSettingsV0::MobileConfigV1 { fees_by_device, .. } => fees_by_device
+        .iter()
+        .find(|(d, _)| *d == device)
+        .map(|(_, fees)| *fees),
+      _ => None,
+    }
+  }
 }
 
 impl ConfigSettingsV0 {
@@ -36,11 +72,12 @@ impl ConfigSettingsV0 {
       _ => false,
     }
   }
-  pub fn is_mobile(self) -> bool {
-    matches!(self, ConfigSettingsV0::MobileConfig { .. })
+  pub fn is_mobile(&self) -> bool {
+    matches!(self, ConfigSettingsV0::MobileConfigV1 { .. })
+      || matches!(self, ConfigSettingsV0::MobileConfig { .. })
   }
 
-  pub fn is_iot(self) -> bool {
+  pub fn is_iot(&self) -> bool {
     matches!(self, ConfigSettingsV0::IotConfig { .. })
   }
 }
@@ -154,6 +191,7 @@ pub struct MobileHotspotInfoV0 {
   pub num_location_asserts: u16,
   pub is_active: bool,
   pub dc_onboarding_fee_paid: u64,
+  pub device_type: MobileDeviceTypeV0,
 }
 pub const MOBILE_HOTSPOT_INFO_SIZE: usize = 8 +
     32 + // asset

@@ -43,4 +43,6 @@ pub enum ErrorCode {
 
   #[msg("Invalid symbol, must be 'IOT' or 'MOBILE'")]
   InvalidSymbol,
+  #[msg("Mobile device type not found")]
+  InvalidDeviceType,
 }
