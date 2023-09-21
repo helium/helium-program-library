@@ -1,4 +1,4 @@
-FROM node:16-alpine AS BUILD_IMAGE
+FROM node:18-alpine AS BUILD_IMAGE
 
 WORKDIR /usr/src/app
 
@@ -14,7 +14,7 @@ RUN yarn run build
 
 RUN npm prune --production
 
-FROM node:16-alpine
+FROM node:18-alpine
 
 WORKDIR /usr/src/app
 
@@ -26,4 +26,4 @@ RUN echo "[124,96,181,146,132,165,175,182,60,194,167,230,29,91,110,109,226,38,41
 
 env ANCHOR_WALLET=/usr/src/app/id.json
 
-CMD ["node", "lib/index.js"]
+CMD ["node", "lib/src/index.js"]
