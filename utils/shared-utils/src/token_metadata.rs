@@ -4,7 +4,7 @@ use mpl_token_metadata::{
     CreateMasterEditionV3Cpi, CreateMasterEditionV3CpiAccounts,
     CreateMasterEditionV3InstructionArgs, CreateMetadataAccountV3Cpi,
     CreateMetadataAccountV3CpiAccounts, CreateMetadataAccountV3InstructionArgs,
-    UpdateMetadataAccountV2Cpi, UpdateMetadataAccountV2CpiAccounts,
+    InstructionAccountInfo, UpdateMetadataAccountV2Cpi, UpdateMetadataAccountV2CpiAccounts,
     UpdateMetadataAccountV2InstructionArgs, VerifyCollectionCpi, VerifyCollectionCpiAccounts,
   },
   types::{CollectionDetails, DataV2},
@@ -28,15 +28,15 @@ pub fn create_metadata_accounts_v3<'info>(
   is_mutable: bool,
   details: Option<CollectionDetails>,
 ) -> Result<()> {
-  CreateMetadataAccountV3Cpi::new(
+  let cpi = CreateMetadataAccountV3Cpi::new(
     &ctx.accounts.token_metadata_program,
     CreateMetadataAccountV3CpiAccounts {
-      metadata: &ctx.accounts.metadata.to_account_info().clone(),
-      mint: &ctx.accounts.mint.to_account_info().clone(),
-      mint_authority: &ctx.accounts.mint_authority.to_account_info().clone(),
-      payer: &ctx.accounts.payer.to_account_info().clone(),
-      update_authority: &ctx.accounts.update_authority.to_account_info().clone(),
-      system_program: &ctx.accounts.system_program.to_account_info().clone(),
+      metadata: &ctx.accounts.metadata,
+      mint: &ctx.accounts.mint,
+      mint_authority: &ctx.accounts.mint_authority,
+      payer: &ctx.accounts.payer,
+      update_authority: &ctx.accounts.update_authority,
+      system_program: &ctx.accounts.system_program,
       rent: None,
     },
     CreateMetadataAccountV3InstructionArgs {
@@ -44,9 +44,19 @@ pub fn create_metadata_accounts_v3<'info>(
       is_mutable,
       collection_details: details,
     },
-  )
-  .invoke_signed(ctx.signer_seeds)
-  .map_err(Into::into)
+  );
+  if ctx.accounts.update_authority.is_signer {
+    cpi
+      .invoke_signed_with_remaining_accounts(
+        ctx.signer_seeds,
+        &[InstructionAccountInfo::ReadonlySigner(
+          &ctx.accounts.update_authority,
+        )],
+      )
+      .map_err(Into::into)
+  } else {
+    cpi.invoke_signed(ctx.signer_seeds).map_err(Into::into)
+  }
 }
 
 #[derive(Clone)]
@@ -78,14 +88,14 @@ pub fn create_master_edition_v3<'info>(
   CreateMasterEditionV3Cpi::new(
     &ctx.accounts.token_metadata_program,
     CreateMasterEditionV3CpiAccounts {
-      edition: &ctx.accounts.edition.to_account_info().clone(),
-      mint: &ctx.accounts.mint.to_account_info().clone(),
-      update_authority: &ctx.accounts.update_authority.to_account_info().clone(),
-      mint_authority: &ctx.accounts.mint_authority.to_account_info().clone(),
-      payer: &ctx.accounts.payer.to_account_info().clone(),
-      metadata: &ctx.accounts.metadata.to_account_info().clone(),
-      token_program: &ctx.accounts.token_program.to_account_info().clone(),
-      system_program: &ctx.accounts.system_program.to_account_info().clone(),
+      edition: &ctx.accounts.edition,
+      mint: &ctx.accounts.mint,
+      update_authority: &ctx.accounts.update_authority,
+      mint_authority: &ctx.accounts.mint_authority,
+      payer: &ctx.accounts.payer,
+      metadata: &ctx.accounts.metadata,
+      token_program: &ctx.accounts.token_program,
+      system_program: &ctx.accounts.system_program,
       rent: None,
     },
     CreateMasterEditionV3InstructionArgs { max_supply },
@@ -111,8 +121,8 @@ pub fn update_metadata_accounts_v2<'info>(
   UpdateMetadataAccountV2Cpi::new(
     &ctx.accounts.token_metadata_program,
     UpdateMetadataAccountV2CpiAccounts {
-      metadata: &ctx.accounts.metadata.to_account_info().clone(),
-      update_authority: &ctx.accounts.update_authority.to_account_info().clone(),
+      metadata: &ctx.accounts.metadata,
+      update_authority: &ctx.accounts.update_authority,
     },
     UpdateMetadataAccountV2InstructionArgs {
       data,
@@ -142,11 +152,11 @@ pub fn verify_collection_item<'info>(
   VerifyCollectionCpi::new(
     &ctx.accounts.token_metadata_program,
     VerifyCollectionCpiAccounts {
-      payer: &ctx.accounts.payer.to_account_info().clone(),
-      metadata: &ctx.accounts.metadata.to_account_info().clone(),
-      collection_authority: &ctx.accounts.collection_authority.to_account_info().clone(),
-      collection_mint: &ctx.accounts.collection_mint.to_account_info().clone(),
-      collection: &ctx.accounts.collection_metadata.to_account_info().clone(),
+      payer: &ctx.accounts.payer,
+      metadata: &ctx.accounts.metadata,
+      collection_authority: &ctx.accounts.collection_authority,
+      collection_mint: &ctx.accounts.collection_mint,
+      collection: &ctx.accounts.collection_metadata,
       collection_master_edition_account: &ctx
         .accounts
         .collection_master_edition

@@ -7,7 +7,6 @@ use anchor_spl::{
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
 use helium_sub_daos::SubDaoV0;
-use mpl_token_metadata::accounts::Metadata;
 use mpl_token_metadata::types::{CollectionDetails, DataV2};
 use shared_utils::create_metadata_accounts_v3;
 use shared_utils::token_metadata::{

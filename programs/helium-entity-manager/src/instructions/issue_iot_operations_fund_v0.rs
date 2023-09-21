@@ -101,6 +101,8 @@ pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
     ctx.accounts.dao.to_account_info().key.as_ref(),
     &[ctx.bumps["entity_creator"]],
   ];
+  let mut update_auth = ctx.accounts.entity_creator.to_account_info().clone();
+  update_auth.is_signer = true;
   let signer_seeds: &[&[&[u8]]] = &[entity_creator_seeds];
   create_metadata_accounts_v3(
     CpiContext::new_with_signer(
@@ -114,7 +116,7 @@ pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
         mint: ctx.accounts.mint.to_account_info().clone(),
         mint_authority: ctx.accounts.authority.to_account_info().clone(),
         payer: ctx.accounts.payer.to_account_info().clone(),
-        update_authority: ctx.accounts.entity_creator.to_account_info().clone(),
+        update_authority: update_auth.clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
         token_metadata_program: ctx.accounts.token_metadata_program.clone(),
       },
@@ -137,8 +139,6 @@ pub fn handler(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {
     None,
   )?;
 
-  let mut update_auth = ctx.accounts.entity_creator.to_account_info().clone();
-  update_auth.is_signer = true;
   create_master_edition_v3(
     CpiContext::new_with_signer(
       ctx
