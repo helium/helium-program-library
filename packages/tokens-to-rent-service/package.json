@@ -1,5 +1,5 @@
 {
-  "name": "@helium/hnt-to-rent-service",
+  "name": "@helium/tokens-to-rent-service",
   "private": true,
   "publishConfig": {
     "access": "public",
@@ -7,7 +7,7 @@
   },
   "license": "Apache-2.0",
   "version": "0.3.2",
-  "description": "Service that gives flashloans of sol to allow orca swap of small amounts of hnt to sol for fees",
+  "description": "Service that gives flashloans of sol to allow jupiter swap of small amounts of hnt/mobile/iot to sol for fees",
   "repository": {
     "type": "git",
     "url": "https://github.com/helium/helium-program-libary"
