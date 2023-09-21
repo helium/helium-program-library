@@ -17,7 +17,7 @@ pub struct InitializeLazyTransactionsV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 8 + 60 + std::mem::size_of::<LazyTransactionsV0>() + (1 << args.max_depth),
+    space = 8 + 60 + std::mem::size_of::<LazyTransactionsV0>() + get_bitmap_len(args.max_depth),
     seeds = ["lazy_transactions".as_bytes(), args.name.as_bytes()],
     bump,
   )]
