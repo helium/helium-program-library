@@ -160,7 +160,7 @@ pub struct SubDaoEpochInfoV0 {
 }
 
 impl SubDaoEpochInfoV0 {
-  pub const SIZE: usize = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>() - 8; // subtract 8 the extra u64 we added to vehnt
+  pub const SIZE: usize = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>() - 8 - 8; // subtract 8 the extra u64 we added to vehnt, and dc onboarding fees paid
 }
 impl SubDaoEpochInfoV0 {
   pub fn start_ts(&self) -> i64 {
