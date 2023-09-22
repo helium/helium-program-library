@@ -1,61 +1,68 @@
-import * as anchor from '@coral-xyz/anchor';
+import * as anchor from "@coral-xyz/anchor";
 import {
   init as initHem,
   rewardableEntityConfigKey,
-} from '@helium/helium-entity-manager-sdk';
-import { subDaoKey } from '@helium/helium-sub-daos-sdk';
-import { PublicKey } from '@solana/web3.js';
-import Squads from '@sqds/sdk';
-import os from 'os';
-import yargs from 'yargs/yargs';
-import { loadKeypair, sendInstructionsOrSquads } from './utils';
-import BN from 'bn.js';
+} from "@helium/helium-entity-manager-sdk";
+import { subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { PublicKey } from "@solana/web3.js";
+import Squads from "@sqds/sdk";
+import os from "os";
+import yargs from "yargs/yargs";
+import { loadKeypair, sendInstructionsOrSquads } from "./utils";
+import BN from "bn.js";
+import { getMint } from "@solana/spl-token";
+import { toBN } from "@helium/spl-utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     dntMint: {
       required: true,
-      describe: 'Public Key of the subdao mint',
-      type: 'string',
+      describe: "Public Key of the subdao mint",
+      type: "string",
     },
     name: {
-      alias: 'n',
-      type: 'string',
+      alias: "n",
+      type: "string",
       required: true,
-      describe: 'The name of the entity config',
+      describe: "The name of the entity config",
     },
     executeTransaction: {
-      type: 'boolean',
+      type: "boolean",
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
     authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
     fullLocationStakingFee: {
-      type: 'number',
-      describe: 'The full hotspot location assert fee',
-      default: '1000000',
+      type: "number",
+      describe: "The full hotspot location assert fee",
+      default: "1000000",
     },
     dataonlyLocationStakingFee: {
-      type: 'number',
-      describe: 'The full hotspot location assert fee',
-      default: '1000000',
+      type: "number",
+      describe: "The full hotspot location assert fee",
+      default: "1000000",
+    },
+    stakingRequirement: {
+      type: "number",
+      describe:
+        "The staking requirement for the entity, numeric. Decimals will be added automatically",
     },
     cbrsDcOnboardingFee: {
       type: 'number',
@@ -84,6 +91,7 @@ export async function run(args: any = process.argv) {
   const hemProgram = await initHem(provider);
   const dntMint = new PublicKey(argv.dntMint);
   const subdao = (await subDaoKey(dntMint))[0];
+  const dntMintAcc = await getMint(provider.connection, dntMint);
   const rewardableConfigKey = (
     await rewardableEntityConfigKey(subdao, name.toUpperCase())
   )[0];
@@ -93,11 +101,11 @@ export async function run(args: any = process.argv) {
     );
   let payer = provider.wallet.publicKey;
   const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
+    commitmentOrConfig: "finalized",
   });
 
   let settings;
-  if (name.toUpperCase() == 'IOT') {
+  if (name.toUpperCase() == "IOT") {
     settings = {
       iotConfig: {
         minGain: 10,
@@ -137,6 +145,9 @@ export async function run(args: any = process.argv) {
       .updateRewardableEntityConfigV0({
         settings,
         newAuthority: null,
+        stakingRequirement: argv.stakingRequirement
+          ? toBN(argv.stakingRequirement, dntMintAcc.decimals)
+          : new BN(0),
       })
       .accounts({
         rewardableEntityConfig: rewardableConfigKey,

@@ -24,13 +24,19 @@ export const heliumEntityManagerResolvers = combineResolvers(
     mint: "collection",
     owner: "dataOnlyConfig",
   }),
+  ataResolver({
+    instruction: "approveMakerV0",
+    account: "escrow",
+    mint: "dntMint",
+    owner: "maker",
+  }),
   resolveIndividual(async ({ path, args, accounts, provider }) => {
     if (path[path.length - 1] == "programApproval" && accounts.dao) {
       let programId = args[args.length - 1] && args[args.length - 1].programId;
       if (!programId) {
-        return
+        return;
       }
-      return programApprovalKey(accounts.dao as PublicKey, programId)[0]
+      return programApprovalKey(accounts.dao as PublicKey, programId)[0];
     }
   }),
   resolveIndividual(async ({ path }) => {
@@ -58,7 +64,10 @@ export const heliumEntityManagerResolvers = combineResolvers(
       accounts.dao
     ) {
       return (
-        await keyToAssetKey(accounts.dao as PublicKey, Buffer.from("iot_operations_fund", "utf8"))
+        await keyToAssetKey(
+          accounts.dao as PublicKey,
+          Buffer.from("iot_operations_fund", "utf8")
+        )
       )[0];
     }
   }),
@@ -124,7 +133,7 @@ export const heliumEntityManagerResolvers = combineResolvers(
     instruction: "issueIotOperationsFundV0",
     account: "recipientAccount",
     owner: "recipient",
-    mint: "mint"
+    mint: "mint",
   }),
   ataResolver({
     instruction: "issueEntityV0",

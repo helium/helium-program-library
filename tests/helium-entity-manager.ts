@@ -41,6 +41,7 @@ import {
   initTestDataCredits,
   initTestMaker,
   initTestRewardableEntityConfig,
+  MAKER_STAKING_FEE,
 } from "./utils/fixtures";
 // @ts-ignore
 import bs58 from "bs58";
@@ -117,6 +118,7 @@ describe("helium-entity-manager", () => {
       authority: me,
       dao,
       activeDeviceAuthority: activeDeviceAuthority.publicKey,
+      numTokens: MAKER_STAKING_FEE.mul(new BN(2)),
     }));
   });
 
@@ -761,6 +763,7 @@ describe("helium-entity-manager", () => {
               },
             },
             newAuthority: null,
+            stakingRequirement: MAKER_STAKING_FEE
           })
           .accounts({ rewardableEntityConfig })
           .rpc({ skipPreflight: true });
@@ -939,6 +942,7 @@ describe("helium-entity-manager", () => {
         .updateRewardableEntityConfigV0({
           newAuthority: PublicKey.default,
           settings: null,
+          stakingRequirement: null
         })
         .accounts({
           rewardableEntityConfig,

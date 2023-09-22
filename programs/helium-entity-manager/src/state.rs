@@ -9,6 +9,7 @@ pub struct RewardableEntityConfigV0 {
   pub settings: ConfigSettingsV0,
 
   pub bump_seed: u8,
+  pub staking_requirement: u64,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, PartialEq)]

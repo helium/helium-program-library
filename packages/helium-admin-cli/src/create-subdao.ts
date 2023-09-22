@@ -566,6 +566,7 @@ export async function run(args: any = process.argv) {
         .initializeRewardableEntityConfigV0({
           symbol: name.toUpperCase(),
           settings,
+          stakingRequirement: toBN(0, 0),
         })
         .accounts({
           subDao: subdao,
