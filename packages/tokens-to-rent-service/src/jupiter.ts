@@ -1,5 +1,10 @@
 import { HNT_MINT, IOT_MINT, MOBILE_MINT, toBN } from '@helium/spl-utils';
-import { Configuration, DefaultApi } from '@jup-ag/api';
+import {
+  Configuration,
+  DefaultApi,
+  Instruction,
+  AccountMeta,
+} from '@jup-ag/api';
 import { ACCOUNT_SIZE, NATIVE_MINT, getMint } from '@solana/spl-token';
 import {
   AddressLookupTableAccount,
@@ -13,20 +18,17 @@ import { JUPITER_FEE_ACCOUNT, JUPITER_FEE_BPS, JUPITER_URL } from './env';
 import { provider } from './solana';
 
 export const instructionDataToTransactionInstruction = (
-  instructionPayload: any
+  instruction: Instruction | undefined
 ) => {
-  if (instructionPayload === null) {
-    return null;
-  }
-
+  if (instruction === null || instruction === undefined) return null;
   return new TransactionInstruction({
-    programId: new PublicKey(instructionPayload.programId),
-    keys: instructionPayload.accounts.map((key: any) => ({
+    programId: new PublicKey(instruction.programId),
+    keys: instruction.accounts.map((key: AccountMeta) => ({
       pubkey: new PublicKey(key.pubkey),
       isSigner: key.isSigner,
       isWritable: key.isWritable,
     })),
-    data: Buffer.from(instructionPayload.data, 'base64'),
+    data: Buffer.from(instruction.data, 'base64'),
   });
 };
 
@@ -156,7 +158,7 @@ export const fundFees = async ({
   const repayIx = SystemProgram.transfer({
     fromPubkey: userWallet,
     toPubkey: platformWallet.publicKey,
-    lamports: ataRent + (10000),
+    lamports: ataRent + 10000,
   });
 
   const instructions: TransactionInstruction[] = [
