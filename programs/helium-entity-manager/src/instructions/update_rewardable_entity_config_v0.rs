@@ -39,7 +39,7 @@ pub fn handler(
   if let Some(staking_requirement) = args.staking_requirement {
     config.staking_requirement = staking_requirement;
   }
-  
+
   resize_to_fit(
     &ctx.accounts.payer,
     &ctx.accounts.system_program.to_account_info(),
