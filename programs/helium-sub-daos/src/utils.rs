@@ -90,6 +90,9 @@ pub fn update_subdao_vehnt(
     curr_epoch_info.vehnt_at_epoch_start =
       u64::try_from(apply_fall_rate_factor(sub_dao.vehnt_delegated).unwrap()).unwrap();
     curr_epoch_info.dc_onboarding_fees_paid = sub_dao.dc_onboarding_fees_paid;
+  } else if curr_epoch_info.dc_onboarding_fees_paid == 0 {
+    // TODO: Remove this after the first epoch using the new A score. This just makes sure we don't get one epoch with 0 A score
+    curr_epoch_info.dc_onboarding_fees_paid = sub_dao.dc_onboarding_fees_paid;
   }
 
   // Step 2. Update fall rate according to this epoch's closed position corrections
