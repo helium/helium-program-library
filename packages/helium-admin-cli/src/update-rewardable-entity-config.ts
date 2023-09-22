@@ -57,6 +57,22 @@ export async function run(args: any = process.argv) {
       describe: 'The full hotspot location assert fee',
       default: '1000000',
     },
+    cbrsDcOnboardingFee: {
+      type: 'number',
+      describe: 'The cbrs dc onboarding fee',
+    },
+    cbrsDcLocationStakingFee: {
+      type: 'number',
+      describe: 'The cbrs dc location staking fee',
+    },
+    wifiDcOnboardingFee: {
+      type: 'number',
+      describe: 'The wifi dc onboarding fee',
+    },
+    wifiDcLocationStakingFee: {
+      type: 'number',
+      describe: 'The wifi dc location staking fee',
+    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -92,9 +108,24 @@ export async function run(args: any = process.argv) {
     };
   } else {
     settings = {
-      mobileConfig: {
-        fullLocationStakingFee: new BN(argv.fullLocationStakingFee),
-        dataonlyLocationStakingFee: new BN(argv.dataonlyLocationStakingFee),
+      mobileConfigV1: {
+        feesByDevice: [
+          {
+            deviceType: { cbrs: {} },
+            dcOnboardingFee: new BN(argv.cbrsDcOnboardingFee!),
+            locationStakingFee: new BN(argv.cbrsDcLocationStakingFee!),
+          },
+          {
+            deviceType: { wifiIndoor: {} },
+            dcOnboardingFee: new BN(argv.wifiDcOnboardingFee!),
+            locationStakingFee: new BN(argv.wifiDcLocationStakingFee!),
+          },
+          {
+            deviceType: { wifiOutdoor: {} },
+            dcOnboardingFee: new BN(argv.wifiDcOnboardingFee!),
+            locationStakingFee: new BN(argv.wifiDcLocationStakingFee!),
+          },
+        ],
       },
     };
   }

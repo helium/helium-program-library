@@ -1,4 +1,4 @@
-import { LazyDistributor } from "@/target/types/lazy_distributor";
+import { LazyDistributor } from "../../target/types/lazy_distributor";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";

@@ -187,7 +187,7 @@ pub fn handler<'info>(
     },
   ) = (
     args.location,
-    ctx.accounts.rewardable_entity_config.settings,
+    &ctx.accounts.rewardable_entity_config.settings,
   ) {
     dc_fee = dataonly_location_staking_fee.checked_add(dc_fee).unwrap();
 
