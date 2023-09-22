@@ -539,9 +539,24 @@ export async function run(args: any = process.argv) {
       };
     } else {
       settings = {
-        mobileConfig: {
-          fullLocationStakingFee: toBN(500000, 0),
-          dataonlyLocationStakingFee: toBN(500000, 0),
+        mobileConfigV1: {
+          feesByDevice: [
+            {
+              deviceType: { cbrs: {} },
+              dcOnboardingFee: toBN(40, 5),
+              locationStakingFee: toBN(10, 5),
+            },
+            {
+              deviceType: { wifiIndoor: {} },
+              dcOnboardingFee: toBN(0, 5),
+              locationStakingFee: toBN(0, 5),
+            },
+            {
+              deviceType: { wifiOutdoor: {} },
+              dcOnboardingFee: toBN(0, 5),
+              locationStakingFee: toBN(0, 5),
+            },
+          ],
         },
       };
     }

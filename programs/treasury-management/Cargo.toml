@@ -1,6 +1,6 @@
 [package]
 name = "treasury-management"
-version = "0.0.2"
+version = "0.2.0"
 description = "Created with Anchor"
 edition = "2021"
 
