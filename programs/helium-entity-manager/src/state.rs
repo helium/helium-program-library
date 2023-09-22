@@ -15,11 +15,13 @@ pub struct RewardableEntityConfigV0 {
 pub enum MobileDeviceTypeV0 {
   #[default]
   Cbrs,
-  Wifi,
+  WifiIndoor,
+  WifiOutdoor,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
 pub struct DeviceFeesV0 {
+  pub device_type: MobileDeviceTypeV0,
   pub dc_onboarding_fee: u64,
   pub location_staking_fee: u64,
 }
@@ -38,7 +40,7 @@ pub enum ConfigSettingsV0 {
     dataonly_location_staking_fee: u64,
   },
   MobileConfigV1 {
-    fees_by_device: Vec<(MobileDeviceTypeV0, DeviceFeesV0)>,
+    fees_by_device: Vec<DeviceFeesV0>,
   },
 }
 
@@ -49,13 +51,14 @@ impl ConfigSettingsV0 {
         full_location_staking_fee,
         ..
       } => Some(DeviceFeesV0 {
+        device_type: MobileDeviceTypeV0::Cbrs,
         dc_onboarding_fee: 4000000_u64,
         location_staking_fee: *full_location_staking_fee,
       }),
       ConfigSettingsV0::MobileConfigV1 { fees_by_device, .. } => fees_by_device
-        .iter()
-        .find(|(d, _)| *d == device)
-        .map(|(_, fees)| *fees),
+        .into_iter()
+        .find(|d| d.device_type == device)
+        .map(|d| *d),
       _ => None,
     }
   }

@@ -65,7 +65,8 @@ pub struct TempPayMobileOnboardingFeeV0<'info> {
       rewardable_entity_config.key().as_ref(),
       &hash(&key_to_asset.entity_key[..]).to_bytes()
     ],
-    bump
+    bump,
+    constraint = mobile_info.device_type == MobileDeviceTypeV0::Cbrs
   )]
   pub mobile_info: Box<Account<'info, MobileHotspotInfoV0>>,
 
@@ -77,7 +78,13 @@ pub struct TempPayMobileOnboardingFeeV0<'info> {
 }
 
 pub fn handler(ctx: Context<TempPayMobileOnboardingFeeV0>) -> Result<()> {
-  let dc_fee = ctx.accounts.sub_dao.onboarding_dc_fee;
+  let dc_fee = ctx
+    .accounts
+    .rewardable_entity_config
+    .settings
+    .mobile_device_fees(ctx.accounts.mobile_info.device_type)
+    .ok_or(error!(ErrorCode::InvalidDeviceType))?
+    .dc_onboarding_fee;
   require_eq!(dc_fee, 4000000, ErrorCode::InvalidDcFee);
   require_eq!(
     ctx.accounts.mobile_info.dc_onboarding_fee_paid,

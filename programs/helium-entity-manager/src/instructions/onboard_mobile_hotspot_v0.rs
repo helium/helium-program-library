@@ -64,7 +64,7 @@ pub struct OnboardMobileHotspotV0<'info> {
 
   #[account(
     has_one = sub_dao,
-    constraint = matches!(rewardable_entity_config.settings, ConfigSettingsV0::MobileConfig { .. })
+    constraint = rewardable_entity_config.settings.is_mobile()
   )]
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
   #[account(
@@ -160,7 +160,7 @@ pub fn handler<'info>(
     .rewardable_entity_config
     .settings
     .mobile_device_fees(args.device_type)
-    .ok_or(error!(ErrorCode::InvalidSettings))?;
+    .ok_or(error!(ErrorCode::InvalidDeviceType))?;
   let mut dc_fee = fees.dc_onboarding_fee;
   let location_fee = fees.location_staking_fee;
 
@@ -183,7 +183,7 @@ pub fn handler<'info>(
     is_full_hotspot: true,
     num_location_asserts: 0,
     is_active: true, // set active by default to start, oracle can mark it inactive
-    dc_onboarding_fee_paid: dc_fee,
+    dc_onboarding_fee_paid: fees.dc_onboarding_fee,
     device_type: args.device_type,
   });
   track_dc_onboarding_fees_v0(
