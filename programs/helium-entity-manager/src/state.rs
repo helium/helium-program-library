@@ -27,6 +27,7 @@ pub struct DeviceFeesV0 {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+#[allow(deprecated)]
 pub enum ConfigSettingsV0 {
   IotConfig {
     min_gain: i32,
@@ -34,7 +35,7 @@ pub enum ConfigSettingsV0 {
     full_location_staking_fee: u64,
     dataonly_location_staking_fee: u64,
   },
-  #[deprecated]
+  // Deprecated, use MobileConfigV1
   MobileConfig {
     full_location_staking_fee: u64,
     dataonly_location_staking_fee: u64,
@@ -45,6 +46,7 @@ pub enum ConfigSettingsV0 {
 }
 
 impl ConfigSettingsV0 {
+  #[allow(deprecated)]
   pub fn mobile_device_fees(&self, device: MobileDeviceTypeV0) -> Option<DeviceFeesV0> {
     match self {
       ConfigSettingsV0::MobileConfig {
@@ -56,9 +58,9 @@ impl ConfigSettingsV0 {
         location_staking_fee: *full_location_staking_fee,
       }),
       ConfigSettingsV0::MobileConfigV1 { fees_by_device, .. } => fees_by_device
-        .into_iter()
+        .iter()
         .find(|d| d.device_type == device)
-        .map(|d| *d),
+        .copied(),
       _ => None,
     }
   }

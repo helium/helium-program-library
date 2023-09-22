@@ -134,7 +134,7 @@ pub fn handler<'info>(
       || (ctx.accounts.mobile_info.location.is_some()
         && ctx.accounts.mobile_info.location != Some(new_location))
     {
-      let mut dc_fee: u64 = fees.location_staking_fee;
+      let dc_fee: u64 = fees.location_staking_fee;
 
       ctx.accounts.mobile_info.num_location_asserts = ctx
         .accounts
