@@ -1011,7 +1011,7 @@ dependencies = [
 
 [[package]]
 name = "circuit-breaker"
-version = "0.0.2"
+version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1336,7 +1336,7 @@ dependencies = [
 
 [[package]]
 name = "data-credits"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1647,7 +1647,7 @@ checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
 
 [[package]]
 name = "fanout"
-version = "0.0.2"
+version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1937,7 +1937,7 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.1.4"
+version = "0.2.0"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -1956,7 +1956,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.0.16"
+version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2278,7 +2278,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-distributor"
-version = "0.0.3"
+version = "0.1.0"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -2293,7 +2293,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-transactions"
-version = "0.0.2"
+version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2500,7 +2500,7 @@ dependencies = [
 
 [[package]]
 name = "mobile-entity-manager"
-version = "0.0.3"
+version = "0.1.0"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -2999,7 +2999,7 @@ checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 
 [[package]]
 name = "price-oracle"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "default-env",
@@ -3391,7 +3391,7 @@ dependencies = [
 
 [[package]]
 name = "rewards-oracle"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "default-env",
@@ -5546,7 +5546,7 @@ dependencies = [
 
 [[package]]
 name = "treasury-management"
-version = "0.0.2"
+version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -5725,7 +5725,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.0.8"
+version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
