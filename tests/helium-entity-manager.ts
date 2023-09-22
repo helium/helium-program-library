@@ -649,7 +649,7 @@ describe("helium-entity-manager", () => {
       expect(Boolean(mobileInfoAcc)).to.be.true;
       const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
       expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(
-        subDaoAcc.onboardingDcFee.toNumber()
+        0
       );
     });
 
