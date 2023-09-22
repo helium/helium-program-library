@@ -763,6 +763,7 @@ describe("helium-entity-manager", () => {
               },
             },
             newAuthority: null,
+            stakingRequirement: MAKER_STAKING_FEE
           })
           .accounts({ rewardableEntityConfig })
           .rpc({ skipPreflight: true });

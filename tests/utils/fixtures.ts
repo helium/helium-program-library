@@ -358,7 +358,8 @@ export const initWorld = async (
     dao: dao.dao,
     epochRewards: subDaoEpochRewards,
     registrar: subDaoRegistrar,
-    numTokens: MAKER_STAKING_FEE
+    // Enough to stake 4 makers
+    numTokens: MAKER_STAKING_FEE.mul(new anchor.BN(4))
   });
 
   const rewardableEntityConfig = await initTestRewardableEntityConfig(
