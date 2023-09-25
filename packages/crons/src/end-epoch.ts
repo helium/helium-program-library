@@ -92,11 +92,18 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
                 .preInstructions([CBP.setComputeUnitLimit({ units: 1000000 })])
                 .rpc({ skipPreflight: true });
             } catch (err: any) {
-              errors.push(
-                `Failed to calculate utility score for ${subDao.account.dntMint.toBase58()}: ${
-                  err.message
-                }`
-              );
+              if (
+                !err.toString().includes('Error Code: EpochNotOver') &&
+                !err
+                  .toString()
+                  .includes('Error Code: UtilityScoreAlreadyCalculated')
+              ) {
+                errors.push(
+                  `Failed to calculate utility score for ${subDao.account.dntMint.toBase58()}: ${
+                    err.message
+                  }`
+                );
+              }
             }
           }
         }
@@ -117,11 +124,12 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
                 .accounts({ subDao: subDao.publicKey })
                 .rpc({ skipPreflight: true });
             } catch (err: any) {
-              errors.push(
-                `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${
-                  err.message
-                }`
-              );
+              if (!err.toString().includes('Error Code: EpochNotOver'))
+                errors.push(
+                  `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${
+                    err.message
+                  }`
+                );
             }
           }
         }
@@ -134,7 +142,9 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
             .accounts({ dao })
             .rpc({ skipPreflight: true });
         } catch (err: any) {
-          errors.push(`Failed to issue hst pool: ${err.message}`);
+          if (!err.toString().includes('Error Code: EpochNotOver')) {
+            errors.push(`Failed to issue hst pool: ${err.message}`);
+          }
         }
       }
 
