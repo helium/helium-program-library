@@ -171,7 +171,11 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
                 })
                 .rpc({ skipPreflight: true });
             } catch (err: any) {
-              errors.push(`Failed to distribute hst for mint: ${err.message}`);
+              errors.push(
+                `Failed to distribute hst for ${mint.toBase58()}: ${
+                  err.message
+                }`
+              );
             }
           })
         );
