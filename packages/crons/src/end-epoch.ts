@@ -67,7 +67,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
       new BN(unixNow)
     );
 
-    while (targetTs.toNumber() < unixNow) {
+    mainLoop: while (targetTs.toNumber() < unixNow) {
       const epoch = currentEpoch(targetTs);
       console.log(epoch.toNumber(), targetTs.toNumber());
       const [daoEpoch] = daoEpochInfoKey(dao, targetTs);
@@ -92,11 +92,23 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
                 .preInstructions([CBP.setComputeUnitLimit({ units: 1000000 })])
                 .rpc({ skipPreflight: true });
             } catch (err: any) {
-              errors.push(
-                `Failed to calculate utility score for ${subDao.account.dntMint.toBase58()}: ${
-                  err.message
-                }`
-              );
+              const strErr = JSON.stringify(err);
+
+              if (
+                strErr.includes('Error Code: EpochNotOver') ||
+                strErr.includes(`{"Custom":6003}`)
+              ) {
+                // epoch not over
+                break mainLoop;
+              }
+
+              if (
+                !strErr.includes('Error Code: UtilityScoreAlreadyCalculated') ||
+                !strErr.includes(`{"Custom":6002}`)
+              )
+                errors.push(
+                  `Failed to calculate utility score for ${subDao.account.dntMint.toBase58()}: ${err}`
+                );
             }
           }
         }
@@ -118,9 +130,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
                 .rpc({ skipPreflight: true });
             } catch (err: any) {
               errors.push(
-                `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${
-                  err.message
-                }`
+                `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${err}`
               );
             }
           }
@@ -134,7 +144,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
             .accounts({ dao })
             .rpc({ skipPreflight: true });
         } catch (err: any) {
-          errors.push(`Failed to issue hst pool: ${err.message}`);
+          errors.push(`Failed to issue hst pool: ${err}`);
         }
       }
 
@@ -172,9 +182,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
                 .rpc({ skipPreflight: true });
             } catch (err: any) {
               errors.push(
-                `Failed to distribute hst for ${mint.toBase58()}: ${
-                  err.message
-                }`
+                `Failed to distribute hst for ${mint.toBase58()}: ${err}`
               );
             }
           })
@@ -242,7 +250,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
         'confirmed'
       );
     } catch (err: any) {
-      errors.push(`Failed to distribute iot op funds: ${err.message}`);
+      errors.push(`Failed to distribute iot op funds: ${err}`);
     }
   } catch (err) {
     console.log(err);
@@ -252,5 +260,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
   if (errors.length) {
     errors.map(console.log);
     process.exit(1);
+  } else {
+    process.exit();
   }
 })();
