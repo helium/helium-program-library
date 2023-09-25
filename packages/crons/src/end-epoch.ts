@@ -26,7 +26,7 @@ import {
   sendAndConfirmWithRetry,
 } from '@helium/spl-utils';
 import { getAccount } from '@solana/spl-token';
-import { ComputeBudgetProgram as CBP, TransactionError } from '@solana/web3.js';
+import { ComputeBudgetProgram as CBP } from '@solana/web3.js';
 import BN from 'bn.js';
 import bs58 from 'bs58';
 
