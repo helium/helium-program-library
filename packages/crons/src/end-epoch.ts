@@ -35,6 +35,8 @@ const IOT_OPERATIONS_FUND = 'iot_operations_fund';
 const MAX_CLAIM_AMOUNT = new BN('207020547945205');
 
 (async () => {
+  const errors: string[] = [];
+
   try {
     if (!process.env.ANCHOR_WALLET)
       throw new Error('ANCHOR_WALLET not provided');
@@ -90,7 +92,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
                 .preInstructions([CBP.setComputeUnitLimit({ units: 1000000 })])
                 .rpc({ skipPreflight: true });
             } catch (err: any) {
-              console.log(
+              errors.push(
                 `Failed to calculate utility score for ${subDao.account.dntMint.toBase58()}: ${
                   err.message
                 }`
@@ -115,7 +117,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
                 .accounts({ subDao: subDao.publicKey })
                 .rpc({ skipPreflight: true });
             } catch (err: any) {
-              console.log(
+              errors.push(
                 `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${
                   err.message
                 }`
@@ -132,7 +134,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
             .accounts({ dao })
             .rpc({ skipPreflight: true });
         } catch (err: any) {
-          console.log(`Failed to issue hst pool: ${err.message}`);
+          errors.push(`Failed to issue hst pool: ${err.message}`);
         }
       }
 
@@ -158,17 +160,19 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
               await getAccount(provider.connection, owners.value[0].address)
             ).owner;
 
-            console.log('Distributing for mint', mint.toBase58());
-
-            await hydraProgram.methods
-              .distributeV0()
-              .accounts({
-                payer: provider.wallet.publicKey,
-                fanout: fanoutK,
-                owner,
-                mint,
-              })
-              .rpc({ skipPreflight: true });
+            try {
+              await hydraProgram.methods
+                .distributeV0()
+                .accounts({
+                  payer: provider.wallet.publicKey,
+                  fanout: fanoutK,
+                  owner,
+                  mint,
+                })
+                .rpc({ skipPreflight: true });
+            } catch (err: any) {
+              errors.push(`Failed to distribute hst for mint: ${err.message}`);
+            }
           })
         );
       })
@@ -225,14 +229,24 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
     });
 
     const signed = await provider.wallet.signTransaction(tx);
-    await sendAndConfirmWithRetry(
-      provider.connection,
-      signed.serialize(),
-      { skipPreflight: true },
-      'confirmed'
-    );
+
+    try {
+      await sendAndConfirmWithRetry(
+        provider.connection,
+        signed.serialize(),
+        { skipPreflight: true },
+        'confirmed'
+      );
+    } catch (err: any) {
+      errors.push(`Failed to distribute iot op funds: ${err.message}`);
+    }
   } catch (err) {
     console.log(err);
+    process.exit(1);
+  }
+
+  if (errors.length) {
+    errors.map(console.log);
     process.exit(1);
   }
 })();
