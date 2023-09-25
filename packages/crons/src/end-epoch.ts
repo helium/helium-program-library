@@ -67,8 +67,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
       new BN(unixNow)
     );
 
-    let epochNotOver = false;
-    mainLoop: while (targetTs.toNumber() < unixNow && !epochNotOver) {
+    mainLoop: while (targetTs.toNumber() < unixNow) {
       const epoch = currentEpoch(targetTs);
       const [daoEpoch] = daoEpochInfoKey(dao, targetTs);
       const daoEpochInfo =
