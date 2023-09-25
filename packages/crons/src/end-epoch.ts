@@ -87,7 +87,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
               await heliumSubDaosProgram.methods
                 .calculateUtilityScoreV0({ epoch })
                 .accounts({ subDao: subDao.publicKey })
-                .preInstructions([CBP.setComputeUnitLimit({ units: 350000 })])
+                .preInstructions([CBP.setComputeUnitLimit({ units: 1000000 })])
                 .rpc({ skipPreflight: true });
             } catch (err: any) {
               console.log(
