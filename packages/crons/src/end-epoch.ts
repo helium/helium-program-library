@@ -69,6 +69,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
 
     mainLoop: while (targetTs.toNumber() < unixNow) {
       const epoch = currentEpoch(targetTs);
+      console.log(epoch.toNumber(), targetTs.toNumber());
       const [daoEpoch] = daoEpochInfoKey(dao, targetTs);
       const daoEpochInfo =
         await heliumSubDaosProgram.account.daoEpochInfoV0.fetchNullable(
