@@ -26,7 +26,7 @@ import {
   sendAndConfirmWithRetry,
 } from '@helium/spl-utils';
 import { getAccount } from '@solana/spl-token';
-import { ComputeBudgetProgram as CBP } from '@solana/web3.js';
+import { ComputeBudgetProgram as CBP, TransactionError } from '@solana/web3.js';
 import BN from 'bn.js';
 import bs58 from 'bs58';
 
@@ -67,9 +67,9 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
       new BN(unixNow)
     );
 
-    while (targetTs.toNumber() < unixNow) {
+    let epochNotOver = false;
+    mainLoop: while (targetTs.toNumber() < unixNow && !epochNotOver) {
       const epoch = currentEpoch(targetTs);
-      console.log(epoch.toNumber(), targetTs.toNumber());
       const [daoEpoch] = daoEpochInfoKey(dao, targetTs);
       const daoEpochInfo =
         await heliumSubDaosProgram.account.daoEpochInfoV0.fetchNullable(
@@ -92,18 +92,23 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
                 .preInstructions([CBP.setComputeUnitLimit({ units: 1000000 })])
                 .rpc({ skipPreflight: true });
             } catch (err: any) {
+              const strErr = JSON.stringify(err);
+
               if (
-                !err.toString().includes('Error Code: EpochNotOver') &&
-                !err
-                  .toString()
-                  .includes('Error Code: UtilityScoreAlreadyCalculated')
+                strErr.includes('Error Code: EpochNotOver') ||
+                strErr.includes(`{"Custom":6003}`)
               ) {
-                errors.push(
-                  `Failed to calculate utility score for ${subDao.account.dntMint.toBase58()}: ${
-                    err.message
-                  }`
-                );
+                // epoch not over
+                break mainLoop;
               }
+
+              if (
+                !strErr.includes('Error Code: UtilityScoreAlreadyCalculated') ||
+                !strErr.includes(`{"Custom":6002}`)
+              )
+                errors.push(
+                  `Failed to calculate utility score for ${subDao.account.dntMint.toBase58()}: ${err}`
+                );
             }
           }
         }
@@ -124,12 +129,9 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
                 .accounts({ subDao: subDao.publicKey })
                 .rpc({ skipPreflight: true });
             } catch (err: any) {
-              if (!err.toString().includes('Error Code: EpochNotOver'))
-                errors.push(
-                  `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${
-                    err.message
-                  }`
-                );
+              errors.push(
+                `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${err}`
+              );
             }
           }
         }
@@ -142,9 +144,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
             .accounts({ dao })
             .rpc({ skipPreflight: true });
         } catch (err: any) {
-          if (!err.toString().includes('Error Code: EpochNotOver')) {
-            errors.push(`Failed to issue hst pool: ${err.message}`);
-          }
+          errors.push(`Failed to issue hst pool: ${err}`);
         }
       }
 
@@ -182,9 +182,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
                 .rpc({ skipPreflight: true });
             } catch (err: any) {
               errors.push(
-                `Failed to distribute hst for ${mint.toBase58()}: ${
-                  err.message
-                }`
+                `Failed to distribute hst for ${mint.toBase58()}: ${err}`
               );
             }
           })
@@ -252,7 +250,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
         'confirmed'
       );
     } catch (err: any) {
-      errors.push(`Failed to distribute iot op funds: ${err.message}`);
+      errors.push(`Failed to distribute iot op funds: ${err}`);
     }
   } catch (err) {
     console.log(err);
@@ -262,5 +260,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
   if (errors.length) {
     errors.map(console.log);
     process.exit(1);
+  } else {
+    process.exit();
   }
 })();
