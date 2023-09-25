@@ -152,6 +152,7 @@ export async function run(args: any = process.argv) {
       .accounts({
         rewardableEntityConfig: rewardableConfigKey,
         authority: rewardableConfigAcc.authority,
+        payer: rewardableConfigAcc.authority,
       })
       .instruction(),
   ];
