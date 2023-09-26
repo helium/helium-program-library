@@ -35,8 +35,6 @@ const IOT_OPERATIONS_FUND = 'iot_operations_fund';
 const MAX_CLAIM_AMOUNT = new BN('207020547945205');
 
 (async () => {
-  const errors: string[] = [];
-
   try {
     if (!process.env.ANCHOR_WALLET)
       throw new Error('ANCHOR_WALLET not provided');
@@ -46,6 +44,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
     process.env.ANCHOR_PROVIDER_URL = process.env.SOLANA_URL;
     anchor.setProvider(anchor.AnchorProvider.local(process.env.SOLANA_URL));
 
+    const errors: string[] = [];
     const provider = anchor.getProvider() as anchor.AnchorProvider;
     const heliumSubDaosProgram = await initDao(provider);
     const hntMint = HNT_MINT;
@@ -252,15 +251,12 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
     } catch (err: any) {
       errors.push(`Failed to distribute iot op funds: ${err}`);
     }
+
+    if (!errors.length) process.exit(0);
+    errors.map(console.log);
+    process.exit(1);
   } catch (err) {
     console.log(err);
     process.exit(1);
-  }
-
-  if (errors.length) {
-    errors.map(console.log);
-    process.exit(1);
-  } else {
-    process.exit();
   }
 })();
