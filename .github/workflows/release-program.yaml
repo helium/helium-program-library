@@ -6,6 +6,10 @@ on:
     tags:
       - "program-*" # Push events to matching program-*, i.e. program-circuit-breaker-0.0.1
 
+env:
+  SOLANA_CLI_VERSION: 1.14.3
+  NODE_VERSION: 18.12.1
+  
 jobs:
   release:
     runs-on: ubuntu-latest
