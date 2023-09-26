@@ -157,7 +157,7 @@ pub fn handler<'info>(
     gain: args.gain,
     is_full_hotspot: false,
     num_location_asserts: 0,
-    is_active: true,
+    is_active: false,
     dc_onboarding_fee_paid: dc_fee,
   });
 
