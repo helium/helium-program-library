@@ -7,6 +7,7 @@ use clap::Parser;
 use datafusion::arrow::array::StringArray;
 use deltalake::arrow::array::Array;
 use deltalake::{datafusion::prelude::SessionContext, DeltaTableBuilder};
+use helium_entity_manager::KeyToAssetV0;
 use helium_entity_manager::{accounts::SetEntityActiveV0, SetEntityActiveArgsV0};
 use helium_entity_manager::{
   accounts::TempPayMobileOnboardingFeeV0, IotHotspotInfoV0, MobileHotspotInfoV0,
@@ -17,12 +18,17 @@ use hpl_utils::{dao::SubDao, send_and_confirm_messages_with_spinner};
 use s3::{bucket::Bucket, creds::Credentials, region::Region};
 use serde::{Deserialize, Serialize};
 use solana_client::tpu_client::{TpuClient, TpuClientConfig};
+use solana_connection_cache::connection_cache::{
+  ConnectionManager, ConnectionPool, NewConnectionConfig,
+};
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::signature::Keypair;
+use solana_sdk::signer::Signer;
 use solana_sdk::transaction::Transaction;
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey, signature::read_keypair_file};
 use spl_associated_token_account::get_associated_token_address;
 use std::env;
+use std::ops::Deref;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::{
@@ -126,7 +132,7 @@ async fn main() -> Result<()> {
     kp.clone(),
     CommitmentConfig::confirmed(),
   );
-  let helium_entity_program = anchor_client.program(helium_entity_manager::id());
+  let helium_entity_program = anchor_client.program(helium_entity_manager::id())?;
   let tpu_client = TpuClient::new(
     helium_entity_program.rpc().into(),
     &wss_url,
@@ -151,10 +157,42 @@ async fn main() -> Result<()> {
 
   // download last checkpoint file from s3
   println!("Loading last save files from s3");
-  let last_active_pub_keys: HashSet<String> =
+  let last_active_pub_keys_opt: Option<HashSet<String>> =
     load_checkpoint(s3_config.clone(), args.sub_dao, "active_save.json")
       .await
-      .unwrap_or(HashSet::new());
+      .ok();
+
+  let last_active_pub_keys: HashSet<String>;
+  if let Some(l) = last_active_pub_keys_opt {
+    last_active_pub_keys = l;
+  } else {
+    println!("No active save file found, starting from scratch");
+    let ktas = helium_entity_program
+      .accounts::<KeyToAssetV0>(vec![])
+      .await?
+      .into_iter()
+      .map(|(_, v)| (v.asset, v))
+      .collect::<HashMap<Pubkey, KeyToAssetV0>>();
+    last_active_pub_keys = match args.sub_dao {
+      SubDao::Iot => {
+        let infos = helium_entity_program.accounts::<IotHotspotInfoV0>(vec![]).await?;
+        infos
+          .iter()
+          .filter(|i| i.1.is_active)
+          .map(|info| bs58::encode(&ktas.get(&info.1.asset).unwrap().entity_key).into_string())
+          .collect::<HashSet<_>>()
+      }
+      SubDao::Mobile => {
+        let infos = helium_entity_program.accounts::<IotHotspotInfoV0>(vec![]).await?;
+        infos
+          .iter()
+          .filter(|i| i.1.is_active)
+          .map(|info| bs58::encode(&ktas.get(&info.1.asset).unwrap().entity_key).into_string())
+          .collect::<HashSet<_>>()
+      }
+    }
+  }
+
   let mut last_inactive_pub_keys: HashSet<String> =
     load_checkpoint(s3_config.clone(), args.sub_dao, "inactive_save.json")
       .await
@@ -291,8 +329,8 @@ async fn main() -> Result<()> {
   Ok(())
 }
 
-fn check_validity(
-  helium_entity_program: &Program,
+fn check_validity<C: Deref<Target = impl Signer> + Clone>(
+  helium_entity_program: &Program<C>,
   entity_keys: HashSet<String>,
   expected_is_active: bool,
   sub_dao: SubDao,
@@ -313,9 +351,14 @@ fn check_validity(
 
 const MAX_TX_LEN: usize = 1232;
 
-fn construct_and_send_txs(
-  helium_entity_program: &Program,
-  tpu_client: &TpuClient,
+fn construct_and_send_txs<
+  P: ConnectionPool<NewConnectionConfig = C>,
+  M: ConnectionManager<ConnectionPool = P, NewConnectionConfig = C>,
+  C: NewConnectionConfig,
+  A: Deref<Target = impl Signer> + Clone,
+>(
+  helium_entity_program: &Program<A>,
+  tpu_client: &TpuClient<P, M, C>,
   ixs: Vec<Instruction>,
   payer: &Keypair,
   dry_run: bool,
@@ -408,8 +451,8 @@ struct InfoWithEntityKey {
   entity_key: String,
   needs_paid: bool,
 }
-fn construct_set_active_ixs(
-  helium_entity_program: &Program,
+fn construct_set_active_ixs<C: Deref<Target = impl Signer> + Clone>(
+  helium_entity_program: &Program<C>,
   entity_keys: &Vec<String>,
   is_active: bool,
   sub_dao: SubDao,
@@ -429,8 +472,8 @@ fn construct_set_active_ixs(
   Ok(ixs)
 }
 
-fn construct_ix_from_valid_infos(
-  helium_entity_program: &Program,
+fn construct_ix_from_valid_infos<C: Deref<Target = impl Signer> + Clone>(
+  helium_entity_program: &Program<C>,
   valid_infos: Vec<InfoWithEntityKey>,
   sub_dao: SubDao,
   is_active: bool,
@@ -501,8 +544,8 @@ fn construct_ix_from_valid_infos(
   Ok(ixs)
 }
 
-fn find_infos_to_mark(
-  helium_entity_program: &Program,
+fn find_infos_to_mark<C: Deref<Target = impl Signer> + Clone>(
+  helium_entity_program: &Program<C>,
   entity_keys: &Vec<String>,
   is_active: bool,
   log_diff: bool,
