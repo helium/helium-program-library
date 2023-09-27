@@ -112,26 +112,6 @@ async function run() {
     lazySignerKey(process.env.LAZY_SIGNER || 'nJWGUMOK')[0],
     'lazy_signer'
   );
-  await monitorSolBalance(
-    threadKey(mobileKey, 'calculate')[0],
-    'clockwork_thread_mobile_calculate'
-  );
-  await monitorSolBalance(
-    threadKey(mobileKey, 'issue')[0],
-    'clockwork_thread_mobile_issue'
-  );
-  await monitorSolBalance(
-    threadKey(iotKey, 'calculate')[0],
-    'clockwork_thread_iot_calculate'
-  );
-  await monitorSolBalance(
-    threadKey(iotKey, 'issue')[0],
-    'clockwork_thread_iot_issue'
-  );
-  await monitorSolBalance(
-    threadKey(daoPk, 'issue_hst')[0],
-    'clockwork_thread_dao_issue_hst'
-  );
 
   await monitorSolBalance(mobile.dcBurnAuthority, 'mobile_dc_burn_authority');
 
