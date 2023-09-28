@@ -89,6 +89,49 @@ server.get<{ Params: { entityId: string } }>("/rewards/:entityId", {
   },
 });
 
+server.post<{ Body: { entityId: string } }>("/rewards", {
+  handler: async (request, reply) => {
+    try {
+      const entityId = request.body.entityId;
+      const limit = isRateLimited(request, entityId, rateLimit);
+      //@ts-ignore
+      const amount = Number(request.query.amount) || 1;
+
+      let curr = await Reward.findByPk(entityId);
+      if (!curr) {
+        curr = await Reward.create({
+          address: entityId,
+          rewards: BigInt(0),
+          lastReward: new Date(),
+        });
+      }
+
+      if (amount > 10) {
+        reply.code(403).send("Must be less than 10");
+        return;
+      }
+
+      await curr.update({
+        rewards: BigInt(curr.rewards) + BigInt(amount),
+      });
+
+      if (limit) {
+        reply.code(429).send("Too Many Requests");
+        return;
+      }
+    } catch (err) {
+      console.error(err);
+      reply.status(500).send({
+        message: "Request failed",
+      });
+    }
+
+    reply.status(200).send({
+      message: "Rewards incremented",
+    });
+  },
+});
+
 const start = async () => {
   try {
     // start the server

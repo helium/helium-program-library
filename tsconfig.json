@@ -44,7 +44,7 @@
       "path": "./packages/migration-service"
     },
     {
-      "path": "./packages/hnt-to-rent-service"
+      "path": "./packages/tokens-to-rent-service"
     },
     {
       "path": "./packages/treasury-management-sdk"
@@ -75,6 +75,12 @@
     },
     {
       "path": "./packages/hotspot-utils"
+    },
+    {
+      "path": "./packages/iot-premine-data-only-service"
+    },
+    {
+      "path": "./packages/crons"
     }
   ]
 }

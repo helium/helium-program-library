@@ -1,37 +1,35 @@
-import { LazyDistributor } from "@/target/types/lazy_distributor";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
+import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import {
   createAtaAndMint,
+  createAtaAndTransfer,
   createMint,
-  sendInstructions,
   sendMultipleInstructions,
-  toBN
+  toBN,
 } from "@helium/spl-utils";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-  getConcurrentMerkleTreeAccountSize
+  getConcurrentMerkleTreeAccountSize,
 } from "@solana/spl-account-compression";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
-import { BN } from "bn.js";
 import { execSync } from "child_process";
 import { ThresholdType } from "../../packages/circuit-breaker-sdk/src";
 import { makerKey } from "../../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../../target/types/data_credits";
 import { HeliumEntityManager } from "../../target/types/helium_entity_manager";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
-import { PriceOracle } from "../../target/types/price_oracle";
+import { LazyDistributor } from "../../target/types/lazy_distributor";
 import { initTestDao, initTestSubdao } from "./daos";
-import { exists, loadKeypair } from "./solana";
 import { random } from "./string";
-import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =
   "https://c3zu2nc2m4x6zvqf5lofrtdbsa4niuh6drvzi7lq4n465ykbd3fa.arweave.net/FvNNNFpnL-zWBercWMxhkDjUUP4ca5R9cON57uFBHso/";
 
 export const DC_FEE = 5000000;
+export const MAKER_STAKING_FEE = toBN(10, 6);
 
 export const initTestDataCredits = async (
   program: Program<DataCredits>,
@@ -102,6 +100,8 @@ export const initTestRewardableEntityConfig = async (
     .initializeRewardableEntityConfigV0({
       symbol: random(), // symbol is unique would need to restart localnet everytime
       settings,
+      // Require 10 staked tokens
+      stakingRequirement: MAKER_STAKING_FEE,
     })
     .accounts({
       subDao,
@@ -172,17 +172,34 @@ export const initTestMaker = async (
       updateAuthority: makerKeypair.publicKey,
     })
     .prepare();
-  const approve = await program.methods
+
+  const rewConfig = await program.account.rewardableEntityConfigV0.fetch(
+    rewardableEntityConfig
+  );
+  const {
+    instruction: approve,
+    pubkeys: { dntMint },
+  } = await program.methods
     .approveMakerV0()
     .accounts({
       rewardableEntityConfig,
       maker,
     })
-    .instruction();
+    .prepare();
+  await createAtaAndTransfer(
+    provider,
+    dntMint!,
+    rewConfig.stakingRequirement,
+    provider.wallet.publicKey,
+    maker
+  );
 
   await sendMultipleInstructions(
     provider,
-    [[createMerkle, initialize], [setTree, approve]],
+    [
+      [createMerkle, initialize],
+      [setTree, approve],
+    ],
     [[merkle], [makerKeypair]]
   );
 
@@ -340,7 +357,9 @@ export const initWorld = async (
     authority: provider.wallet.publicKey,
     dao: dao.dao,
     epochRewards: subDaoEpochRewards,
-    registrar: subDaoRegistrar
+    registrar: subDaoRegistrar,
+    // Enough to stake 4 makers
+    numTokens: MAKER_STAKING_FEE.mul(new anchor.BN(4))
   });
 
   const rewardableEntityConfig = await initTestRewardableEntityConfig(

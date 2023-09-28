@@ -1,6 +1,11 @@
 import { Asset, AssetProof, getAsset, getAssetProof } from "./mplAssetAPI";
-import { ConcurrentMerkleTreeAccount } from "@solana/spl-account-compression";
+import {
+  concurrentMerkleTreeBeetFactory,
+  concurrentMerkleTreeHeaderBeet,
+  getCanopyDepth,
+} from "@solana/spl-account-compression";
 import { Connection, PublicKey, AccountMeta } from "@solana/web3.js";
+import axios from "axios"
 
 export type ProofArgsAndAccountsArgs = {
   connection: Connection;
@@ -12,6 +17,11 @@ export type ProofArgsAndAccountsArgs = {
     assetId: PublicKey
   ) => Promise<AssetProof | undefined>;
 };
+
+const WELL_KNOWN_CANOPY_URL =
+  "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/merkles.json";
+let wellKnownCanopyCache: Record<string, number>;
+const canopyCache: Record<string, Promise<number>> = {};
 export async function proofArgsAndAccounts({
   connection,
   assetId,
@@ -42,10 +52,49 @@ export async function proofArgsAndAccounts({
   const {
     compression: { leafId },
   } = asset;
-  const { root, proof, leaf, treeId } = assetProof;
-  const canopy = await (
-    await ConcurrentMerkleTreeAccount.fromAccountAddress(connection, treeId)
-  ).getCanopyDepth();
+  const { root, proof, treeId } = assetProof;
+
+  const tree = treeId.toBase58();
+  if (!canopyCache[tree] && !wellKnownCanopyCache?.[tree]) {
+    canopyCache[tree] = (async () => {
+      if (!wellKnownCanopyCache) {
+        wellKnownCanopyCache = await (await axios.get(WELL_KNOWN_CANOPY_URL)).data
+      }
+      if (wellKnownCanopyCache[tree]) {
+        return wellKnownCanopyCache[tree];
+      }
+      // IMPORTANT! Do not use `ConcurrentMerkleTreeAccount` class. It stupidly deserializes the whole merkle tree,
+      // including reading the entire canopy. For large trees this will freeze the wallet app.
+      let offset = 0;
+      // Construct a new connection to ensure there's no caching. Don't want to cache
+      // a giant account in AccountFetchCache accidentally. It also adds uneeded latency
+      let newConn = connection;
+      //@ts-ignore
+      if (connection._accountFetchWrapped) {
+        newConn = new Connection(connection.rpcEndpoint);
+      }
+      const buffer = (await newConn.getAccountInfo(treeId))!.data;
+      const [versionedHeader, offsetIncr] =
+        concurrentMerkleTreeHeaderBeet.deserialize(buffer);
+      offset = offsetIncr;
+
+      // Only 1 version available
+      if (versionedHeader.header.__kind !== "V1") {
+        throw Error(
+          `Header has unsupported version: ${versionedHeader.header.__kind}`
+        );
+      }
+      const header = versionedHeader.header.fields[0];
+      const [_, offsetIncr2] = concurrentMerkleTreeBeetFactory(
+        header.maxDepth,
+        header.maxBufferSize
+      ).deserialize(buffer, offset);
+      offset = offsetIncr2;
+
+      return getCanopyDepth(buffer.byteLength - offset);
+    })();
+  }
+  const canopy = await (wellKnownCanopyCache?.[tree] || canopyCache[tree]);
 
   return {
     asset,

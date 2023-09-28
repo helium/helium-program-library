@@ -9,7 +9,9 @@ import { capitalizeFirstChar } from "./useIdlAccounts";
 export function useIdlAccount<IDL extends Idl, A extends keyof AllAccountsMap<IDL>>(
   key: PublicKey | undefined,
   idl: IDL | undefined,
-  type: A
+  type: A,
+  // Perf optimization - set if the account will never change, to lower websocket usage.
+  isStatic: boolean = false
 ): UseAccountState<IdlAccounts<IDL>[A]> {
   const parser: TypedAccountParser<
     IdlAccounts<IDL>[A]
@@ -29,5 +31,5 @@ export function useIdlAccount<IDL extends Idl, A extends keyof AllAccountsMap<ID
       };
     }
   }, [idl, type]);
-  return useAccount(key, parser);
+  return useAccount(key, parser, isStatic);
 }

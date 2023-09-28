@@ -1,6 +1,13 @@
-use anchor_lang::{prelude::*, solana_program};
+use anchor_lang::prelude::*;
 use mpl_token_metadata::{
-  state::{CollectionDetails, DataV2},
+  instructions::{
+    CreateMasterEditionV3Cpi, CreateMasterEditionV3CpiAccounts,
+    CreateMasterEditionV3InstructionArgs, CreateMetadataAccountV3Cpi,
+    CreateMetadataAccountV3CpiAccounts, CreateMetadataAccountV3InstructionArgs,
+    InstructionAccountInfo, UpdateMetadataAccountV2Cpi, UpdateMetadataAccountV2CpiAccounts,
+    UpdateMetadataAccountV2InstructionArgs, VerifyCollectionCpi, VerifyCollectionCpiAccounts,
+  },
+  types::{CollectionDetails, DataV2},
   ID,
 };
 
@@ -12,49 +19,44 @@ pub struct CreateMetadataAccountsV3<'info> {
   pub payer: AccountInfo<'info>,
   pub update_authority: AccountInfo<'info>,
   pub system_program: AccountInfo<'info>,
-  pub rent: AccountInfo<'info>,
+  pub token_metadata_program: Program<'info, Metadata>,
 }
 
 pub fn create_metadata_accounts_v3<'info>(
   ctx: CpiContext<'_, '_, '_, 'info, CreateMetadataAccountsV3<'info>>,
   data: DataV2,
   is_mutable: bool,
-  update_authority_is_signer: bool,
   details: Option<CollectionDetails>,
 ) -> Result<()> {
-  let DataV2 {
-    name,
-    symbol,
-    uri,
-    creators,
-    seller_fee_basis_points,
-    collection,
-    uses,
-  } = data;
-  let ix = mpl_token_metadata::instruction::create_metadata_accounts_v3(
-    ID,
-    *ctx.accounts.metadata.key,
-    *ctx.accounts.mint.key,
-    *ctx.accounts.mint_authority.key,
-    *ctx.accounts.payer.key,
-    *ctx.accounts.update_authority.key,
-    name,
-    symbol,
-    uri,
-    creators,
-    seller_fee_basis_points,
-    update_authority_is_signer,
-    is_mutable,
-    collection,
-    uses,
-    details,
+  let cpi = CreateMetadataAccountV3Cpi::new(
+    &ctx.accounts.token_metadata_program,
+    CreateMetadataAccountV3CpiAccounts {
+      metadata: &ctx.accounts.metadata,
+      mint: &ctx.accounts.mint,
+      mint_authority: &ctx.accounts.mint_authority,
+      payer: &ctx.accounts.payer,
+      update_authority: &ctx.accounts.update_authority,
+      system_program: &ctx.accounts.system_program,
+      rent: None,
+    },
+    CreateMetadataAccountV3InstructionArgs {
+      data,
+      is_mutable,
+      collection_details: details,
+    },
   );
-  solana_program::program::invoke_signed(
-    &ix,
-    &ToAccountInfos::to_account_infos(&ctx),
-    ctx.signer_seeds,
-  )
-  .map_err(Into::into)
+  if ctx.accounts.update_authority.is_signer {
+    cpi
+      .invoke_signed_with_remaining_accounts(
+        ctx.signer_seeds,
+        &[InstructionAccountInfo::ReadonlySigner(
+          &ctx.accounts.update_authority,
+        )],
+      )
+      .map_err(Into::into)
+  } else {
+    cpi.invoke_signed(ctx.signer_seeds).map_err(Into::into)
+  }
 }
 
 #[derive(Clone)]
@@ -76,28 +78,29 @@ pub struct CreateMasterEditionV3<'info> {
   pub metadata: AccountInfo<'info>,
   pub token_program: AccountInfo<'info>,
   pub system_program: AccountInfo<'info>,
-  pub rent: AccountInfo<'info>,
+  pub token_metadata_program: Program<'info, Metadata>,
 }
 
 pub fn create_master_edition_v3<'info>(
   ctx: CpiContext<'_, '_, '_, 'info, CreateMasterEditionV3<'info>>,
   max_supply: Option<u64>,
 ) -> Result<()> {
-  let ix = mpl_token_metadata::instruction::create_master_edition_v3(
-    ID,
-    *ctx.accounts.edition.key,
-    *ctx.accounts.mint.key,
-    *ctx.accounts.update_authority.key,
-    *ctx.accounts.mint_authority.key,
-    *ctx.accounts.metadata.key,
-    *ctx.accounts.payer.key,
-    max_supply,
-  );
-  solana_program::program::invoke_signed(
-    &ix,
-    &ToAccountInfos::to_account_infos(&ctx),
-    ctx.signer_seeds,
+  CreateMasterEditionV3Cpi::new(
+    &ctx.accounts.token_metadata_program,
+    CreateMasterEditionV3CpiAccounts {
+      edition: &ctx.accounts.edition,
+      mint: &ctx.accounts.mint,
+      update_authority: &ctx.accounts.update_authority,
+      mint_authority: &ctx.accounts.mint_authority,
+      payer: &ctx.accounts.payer,
+      metadata: &ctx.accounts.metadata,
+      token_program: &ctx.accounts.token_program,
+      system_program: &ctx.accounts.system_program,
+      rent: None,
+    },
+    CreateMasterEditionV3InstructionArgs { max_supply },
   )
+  .invoke_signed(ctx.signer_seeds)
   .map_err(Into::into)
 }
 
@@ -105,6 +108,7 @@ pub fn create_master_edition_v3<'info>(
 pub struct UpdateMetadataAccountsV2<'info> {
   pub metadata: AccountInfo<'info>,
   pub update_authority: AccountInfo<'info>,
+  pub token_metadata_program: Program<'info, Metadata>,
 }
 
 pub fn update_metadata_accounts_v2<'info>(
@@ -114,51 +118,53 @@ pub fn update_metadata_accounts_v2<'info>(
   is_mutable: bool,
   primary_sale_happened: bool,
 ) -> Result<()> {
-  let ix = mpl_token_metadata::instruction::update_metadata_accounts_v2(
-    ID,
-    *ctx.accounts.metadata.key,
-    *ctx.accounts.update_authority.key,
-    Some(new_update_authority),
-    data,
-    Some(primary_sale_happened),
-    Some(is_mutable),
-  );
-  solana_program::program::invoke_signed(
-    &ix,
-    &ToAccountInfos::to_account_infos(&ctx),
-    ctx.signer_seeds,
+  UpdateMetadataAccountV2Cpi::new(
+    &ctx.accounts.token_metadata_program,
+    UpdateMetadataAccountV2CpiAccounts {
+      metadata: &ctx.accounts.metadata,
+      update_authority: &ctx.accounts.update_authority,
+    },
+    UpdateMetadataAccountV2InstructionArgs {
+      data,
+      new_update_authority: Some(new_update_authority),
+      is_mutable: Some(is_mutable),
+      primary_sale_happened: Some(primary_sale_happened),
+    },
   )
+  .invoke_signed(ctx.signer_seeds)
   .map_err(Into::into)
 }
 
 #[derive(Accounts)]
-pub struct VerifySizedCollectionItem<'info> {
+pub struct VerifyCollectionItem<'info> {
   pub payer: AccountInfo<'info>,
   pub metadata: AccountInfo<'info>,
   pub collection_authority: AccountInfo<'info>,
   pub collection_mint: AccountInfo<'info>,
   pub collection_metadata: AccountInfo<'info>,
   pub collection_master_edition: AccountInfo<'info>,
+  pub token_metadata_program: Program<'info, Metadata>,
 }
 
-pub fn verify_sized_collection_item<'info>(
-  ctx: CpiContext<'_, '_, '_, 'info, VerifySizedCollectionItem<'info>>,
-  collection_authority_record: Option<Pubkey>,
+pub fn verify_collection_item<'info>(
+  ctx: CpiContext<'_, '_, '_, 'info, VerifyCollectionItem<'info>>,
 ) -> Result<()> {
-  let ix = mpl_token_metadata::instruction::verify_sized_collection_item(
-    ID,
-    *ctx.accounts.metadata.key,
-    *ctx.accounts.collection_authority.key,
-    *ctx.accounts.payer.key,
-    *ctx.accounts.collection_mint.key,
-    *ctx.accounts.collection_metadata.key,
-    *ctx.accounts.collection_master_edition.key,
-    collection_authority_record,
-  );
-  solana_program::program::invoke_signed(
-    &ix,
-    &ToAccountInfos::to_account_infos(&ctx),
-    ctx.signer_seeds,
+  VerifyCollectionCpi::new(
+    &ctx.accounts.token_metadata_program,
+    VerifyCollectionCpiAccounts {
+      payer: &ctx.accounts.payer,
+      metadata: &ctx.accounts.metadata,
+      collection_authority: &ctx.accounts.collection_authority,
+      collection_mint: &ctx.accounts.collection_mint,
+      collection: &ctx.accounts.collection_metadata,
+      collection_master_edition_account: &ctx
+        .accounts
+        .collection_master_edition
+        .to_account_info()
+        .clone(),
+      collection_authority_record: None,
+    },
   )
+  .invoke_signed(ctx.signer_seeds)
   .map_err(Into::into)
 }

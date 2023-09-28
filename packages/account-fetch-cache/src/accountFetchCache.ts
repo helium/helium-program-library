@@ -4,9 +4,8 @@ import {
   Connection,
   PublicKey,
   SendOptions,
-  Signer,
   Transaction,
-  TransactionInstruction
+  TransactionInstruction,
 } from "@solana/web3.js";
 import { EventEmitter } from "./eventEmitter";
 import { getMultipleAccounts } from "./getMultipleAccounts";
@@ -41,6 +40,25 @@ function getWriteableAccounts(
 
 let id = 0;
 
+let singletons: Record<string, AccountFetchCache | undefined> = {};
+export function getSingleton(conn: Connection): AccountFetchCache {
+  const commitment = conn.commitment || "confirmed";
+  const endp = conn.rpcEndpoint;
+  if (!singletons[endp + commitment]) {
+    singletons[endp + commitment] = new AccountFetchCache({
+      connection: conn,
+      commitment,
+    });
+  }
+  return singletons[endp + commitment]!;
+}
+
+function setSingleton(conn: Connection, cache: AccountFetchCache) {
+  const commitment = conn.commitment || "confirmed";
+  const endp = conn.rpcEndpoint;
+  singletons[endp + commitment] = cache;
+}
+
 export class AccountFetchCache {
   connection: Connection;
   chunkSize: number;
@@ -60,14 +78,13 @@ export class AccountFetchCache {
   >();
   pendingCalls = new Map<string, Promise<ParsedAccountBase<unknown>>>();
   emitter = new EventEmitter();
+  id: number; // For debugging, to see which cache is being used
 
   oldGetAccountinfo?: (
     publicKey: PublicKey,
     com?: Commitment
   ) => Promise<AccountInfo<Buffer> | null>;
-  oldSendTransaction: (
-    ...args: any[]
-  ) => Promise<string>;
+  oldSendTransaction: (...args: any[]) => Promise<string>;
   oldSendRawTransaction: (
     rawTransaction: Buffer | Uint8Array | Array<number>,
     options?: SendOptions
@@ -91,6 +108,7 @@ export class AccountFetchCache {
     /** Add functionatility to getAccountInfo that uses the cache */
     extendConnection?: boolean;
   }) {
+    this.id = ++id;
     this.connection = connection;
     this.chunkSize = chunkSize;
     this.delay = delay;
@@ -101,12 +119,14 @@ export class AccountFetchCache {
     );
 
     this.oldSendTransaction = connection.sendTransaction.bind(connection);
-    this.oldSendRawTransaction =
-      connection.sendRawTransaction.bind(connection);
+    this.oldSendRawTransaction = connection.sendRawTransaction.bind(connection);
 
     const self = this;
 
-    if (extendConnection) {
+    // @ts-ignore
+    if (extendConnection && !connection._accountFetchWrapped) {
+      // @ts-ignore
+      connection._accountFetchWrapped = true;
       this.oldGetAccountinfo = connection.getAccountInfo.bind(connection);
 
       connection.getAccountInfo = async (
@@ -152,12 +172,14 @@ export class AccountFetchCache {
             return self.requeryMissing(instructions);
           })
           .catch(console.error);
-      } catch(e: any) {
+      } catch (e: any) {
         // TODO: handle transaction v2
       }
 
       return result;
     };
+
+    setSingleton(connection, this);
   }
 
   async requeryMissing(instructions: TransactionInstruction[]) {
@@ -214,7 +236,11 @@ export class AccountFetchCache {
     this.currentBatch = new Set(); // Erase current batch from state, so we can fetch multiple at a time
     try {
       const keys = Array.from(currentBatch);
-      const array = await this.connection.getMultipleAccountsInfo(keys.map(b => new PublicKey(b)), this.commitment)
+      const { array } = await getMultipleAccounts(
+        this.connection,
+        keys,
+        this.commitment
+      );
       keys.forEach((key, index) => {
         const callback = this.pendingCallbacks.get(key);
         callback && callback(array[index], null);
@@ -228,6 +254,20 @@ export class AccountFetchCache {
       });
       throw e;
     }
+  }
+
+  addToBatchIgnoreResult(id: PublicKey) {
+    const idStr = id.toBase58();
+
+    this.currentBatch.add(idStr);
+
+    this.timeout != null && clearTimeout(this.timeout);
+    if (this.currentBatch.size > DEFAULT_CHUNK_SIZE) {
+      return this.fetchBatch();
+    } else {
+      this.timeout = setTimeout(() => this.fetchBatch(), this.delay);
+    }
+    return undefined
   }
 
   async addToBatch(id: PublicKey): Promise<AccountInfo<Buffer>> {
@@ -350,6 +390,8 @@ export class AccountFetchCache {
 
       // Only set the cache for defined static accounts. Static accounts can change if they go from nonexistant to existant.
       // Rely on searchAndWatch to set the generic cache for everything else.
+      // Never update the cache with an account that isn't being watched. This could cause
+      // stale data to be returned.
       if (isStatic && result && result.info) {
         this.updateCache(address, result);
       }
@@ -359,6 +401,77 @@ export class AccountFetchCache {
     this.pendingCalls.set(address, query as any);
 
     return query;
+  }
+
+  async searchMultiple<T>(
+    pubKeys: PublicKey[],
+    parser?: AccountParser<T> | undefined,
+    isStatic: Boolean = false, // optimization, set if the data will never change
+    forceRequery = false
+  ): Promise<(ParsedAccountBase<T> | undefined)[]> {
+    // Store results of batch fetches in this map. If isStatic is false, genericCache will have none of the
+    // results of our searches in the batch. So need to accumulate them here
+    const result: Record<string, ParsedAccountBase<T>> = {}
+    const searched = new Set(pubKeys.map((p) => p.toBase58()));
+    for (const key of pubKeys) {
+      this.registerParser(key, parser);
+      const address = key.toBase58();
+      if (isStatic) {
+        this.statics.add(address);
+      } else if (this.statics.has(address)) {
+        this.statics.delete(address); // If trying to use this as not static, need to rm it from the statics list.
+      }
+
+      if (forceRequery || !this.genericCache.has(address)) {
+        const { keys, array } = (await this.addToBatchIgnoreResult(key)) || {
+          keys: [],
+          array: [],
+        };
+
+        keys.forEach((key, index) => {
+          this.statics.add(key);
+          if (searched.has(key)) {
+            const item = array[index];
+            if (item) {
+              const parsed = this.getParsed(key, item, parser) || null;
+              // Cache these results if they aren't going to change
+              if (isStatic) {
+                this.genericCache.set(key, parsed);
+              }
+              if (parsed) {
+                result[key] = parsed;
+              }
+            }
+          }
+        });
+      }
+    }
+
+    // Force a batch fetch to resolve all accounts
+    const { keys, array } = await this.fetchBatch();
+    keys.forEach((key, index) => {
+      this.statics.add(key);
+      if (searched.has(key)) {
+        const item = array[index];
+        if (item) {
+          const parsed = this.getParsed(key, item, parser) || null;
+          // Cache these results if they aren't going to change
+          if (isStatic) {
+            this.genericCache.set(key, parsed);
+          }
+          if (parsed) {
+            result[key] = parsed;
+          }
+        }
+      }
+    });
+
+    return pubKeys.map(
+      (key) =>
+        result[key.toBase58()] || this.genericCache.get(key.toBase58()) as
+          | ParsedAccountBase<T>
+          | undefined
+    );
   }
 
   onAccountChange<T>(
@@ -371,7 +484,7 @@ export class AccountFetchCache {
       const address = key.toBase58();
       this.updateCache(address, parsed || null);
     } catch (e: any) {
-      console.error("accountFetchCache", "Failed to update account", e)
+      console.error("accountFetchCache", "Failed to update account", e);
     }
   }
 
@@ -389,43 +502,43 @@ export class AccountFetchCache {
       // Only websocket watch accounts that exist
       // Don't recreate listeners
       // xNFT doesn't support onAccountChange, so we have to make a new usable connection.
-        if (!this.accountChangeListeners.has(address)) {
-          try {
+      if (!this.accountChangeListeners.has(address)) {
+        try {
+          this.accountChangeListeners.set(
+            address,
+            this.connection.onAccountChange(
+              id,
+              (account) => this.onAccountChange(id, undefined, account),
+              this.commitment
+            )
+          );
+        } catch (e: any) {
+          if (e.toString().includes("not implemented")) {
+            // @ts-ignore
+            this.usableConnection =
+              // @ts-ignore
+              this.usableConnection ||
+              new Connection(
+                // @ts-ignore
+                this.connection._rpcEndpoint,
+                this.commitment
+              );
             this.accountChangeListeners.set(
               address,
-              this.connection.onAccountChange(
+              // @ts-ignore
+              this.usableConnection.onAccountChange(
                 id,
+                // @ts-ignore
                 (account) => this.onAccountChange(id, undefined, account),
                 this.commitment
               )
             );
-          } catch (e: any) {
-            if (e.toString().includes("not implemented")) {
-              // @ts-ignore
-              this.usableConnection =
-                // @ts-ignore
-                this.usableConnection ||
-                new Connection(
-                  // @ts-ignore
-                  this.connection._rpcEndpoint,
-                  this.commitment
-                );
-              this.accountChangeListeners.set(
-                address,
-                // @ts-ignore
-                this.usableConnection.onAccountChange(
-                  id,
-                  // @ts-ignore
-                  (account) => this.onAccountChange(id, undefined, account),
-                  this.commitment
-                )
-              );
-            } else {
-              console.error(e)
-              throw e
-            }
+          } else {
+            console.error(e);
+            throw e;
           }
         }
+      }
     } else if (!exists) {
       // Poll accounts that don't exist
       this.missingAccounts.set(

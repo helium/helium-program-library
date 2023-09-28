@@ -1,27 +1,27 @@
-import * as anchor from "@coral-xyz/anchor";
-import { thresholdPercent, ThresholdType } from "@helium/circuit-breaker-sdk";
+import * as anchor from '@coral-xyz/anchor';
+import { ThresholdType } from '@helium/circuit-breaker-sdk';
 import {
   init as initHem,
   rewardableEntityConfigKey,
-} from "@helium/helium-entity-manager-sdk";
+} from '@helium/helium-entity-manager-sdk';
 import {
   daoKey,
   init as initDao,
   subDaoKey,
   threadKey,
   delegatorRewardsPercent,
-} from "@helium/helium-sub-daos-sdk";
+} from '@helium/helium-sub-daos-sdk';
 import {
   init as initLazy,
   lazyDistributorKey,
-} from "@helium/lazy-distributor-sdk";
-import { oracleSignerKey } from "@helium/rewards-oracle-sdk";
-import { sendInstructions, toBN } from "@helium/spl-utils";
-import { toU128 } from "@helium/treasury-management-sdk";
+} from '@helium/lazy-distributor-sdk';
+import { oracleSignerKey } from '@helium/rewards-oracle-sdk';
+import { sendInstructions, toBN } from '@helium/spl-utils';
+import { toU128 } from '@helium/treasury-management-sdk';
 import {
   init as initVsr,
   registrarKey,
-} from "@helium/voter-stake-registry-sdk";
+} from '@helium/voter-stake-registry-sdk';
 import {
   getGovernanceProgramVersion,
   GoverningTokenConfigAccountArgs,
@@ -30,29 +30,27 @@ import {
   SetRealmAuthorityAction,
   withCreateRealm,
   withSetRealmAuthority,
-} from "@solana/spl-governance";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+} from '@solana/spl-governance';
+import { getAssociatedTokenAddress } from '@solana/spl-token';
 import {
   ComputeBudgetProgram,
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
-} from "@solana/web3.js";
-import Squads from "@sqds/sdk";
-import { BN } from "bn.js";
-import os from "os";
-import yargs from "yargs/yargs";
+} from '@solana/web3.js';
+import Squads from '@sqds/sdk';
+import os from 'os';
+import yargs from 'yargs/yargs';
 import {
   createAndMint,
-  createSwitchboardAggregator,
   exists,
   getUnixTimestamp,
   isLocalhost,
   loadKeypair,
   parseEmissionsSchedule,
   sendInstructionsOrSquads,
-} from "./utils";
+} from './utils';
 
 const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
@@ -63,138 +61,132 @@ const SCALE = 100;
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: "k",
-      describe: "Anchor wallet keypair",
+      alias: 'k',
+      describe: 'Anchor wallet keypair',
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     noHotspots: {
-      type: "boolean",
+      type: 'boolean',
       default: false,
     },
     url: {
-      alias: "u",
-      default: "http://127.0.0.1:8899",
-      describe: "The solana url",
+      alias: 'u',
+      default: 'http://127.0.0.1:8899',
+      describe: 'The solana url',
     },
     hntPubkey: {
-      type: "string",
-      describe: "Pubkey of the HNT token",
+      type: 'string',
+      describe: 'Pubkey of the HNT token',
     },
     dcPubkey: {
-      type: "string",
-      describe: "Pubkey of the DC token",
+      type: 'string',
+      describe: 'Pubkey of the DC token',
     },
     name: {
-      alias: "n",
-      describe: "The name of the subdao",
-      type: "string",
+      alias: 'n',
+      describe: 'The name of the subdao',
+      type: 'string',
       required: true,
     },
     realmName: {
-      describe: "The name of the realm",
-      type: "string",
+      describe: 'The name of the realm',
+      type: 'string',
       required: true,
     },
     subdaoKeypair: {
-      type: "string",
-      describe: "Keypair of the subdao token",
+      type: 'string',
+      describe: 'Keypair of the subdao token',
       required: true,
     },
     executeTransaction: {
-      type: "boolean",
+      type: 'boolean',
     },
     numTokens: {
-      type: "number",
+      type: 'number',
       describe:
-        "Number of subdao tokens to pre mint before assigning authority to lazy distributor",
+        'Number of subdao tokens to pre mint before assigning authority to lazy distributor',
       default: 0,
     },
     bucket: {
-      type: "string",
-      describe: "Bucket URL prefix holding all of the metadata jsons",
+      type: 'string',
+      describe: 'Bucket URL prefix holding all of the metadata jsons',
       default:
-        "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP",
+        'https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP',
     },
     rewardsOracleUrl: {
-      alias: "ro",
-      type: "string",
-      describe: "The rewards oracle URL",
-      default: "http://localhost:8080",
+      alias: 'ro',
+      type: 'string',
+      describe: 'The rewards oracle URL',
+      default: 'http://localhost:8080',
     },
     oracleKeypair: {
-      type: "string",
-      describe: "Keypair of the oracle",
+      type: 'string',
+      describe: 'Keypair of the oracle',
       default: `${__dirname}/../../keypairs/oracle.json`,
     },
     aggregatorKeypair: {
-      type: "string",
-      describe: "Keypair of the aggregtor",
+      type: 'string',
+      describe: 'Keypair of the aggregtor',
     },
     dcBurnAuthority: {
-      type: "string",
-      describe: "The authority to burn DC tokens",
+      type: 'string',
+      describe: 'The authority to burn DC tokens',
       required: true,
     },
-    activeDeviceOracleUrl: {
-      alias: "ao",
-      type: "string",
-      describe: "The active device oracle URL",
-      default: "http://localhost:8081",
-    },
     queue: {
-      type: "string",
-      describe: "Switchbaord oracle queue",
-      default: "uPeRMdfPmrPqgRWSrjAnAkH78RqAhe5kXoW6vBYRqFX",
+      type: 'string',
+      describe: 'Switchbaord oracle queue',
+      default: 'uPeRMdfPmrPqgRWSrjAnAkH78RqAhe5kXoW6vBYRqFX',
     },
     crank: {
-      type: "string",
-      describe: "Switchboard crank",
-      default: "UcrnK4w2HXCEjY8z6TcQ9tysYr3c9VcFLdYAU9YQP5e",
+      type: 'string',
+      describe: 'Switchboard crank',
+      default: 'UcrnK4w2HXCEjY8z6TcQ9tysYr3c9VcFLdYAU9YQP5e',
     },
     switchboardNetwork: {
-      type: "string",
-      describe: "The switchboard network",
-      default: "mainnet-beta",
+      type: 'string',
+      describe: 'The switchboard network',
+      default: 'mainnet-beta',
     },
     decimals: {
-      type: "number",
+      type: 'number',
       default: 6,
     },
     govProgramId: {
-      type: "string",
-      describe: "Pubkey of the GOV program",
-      default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
+      type: 'string',
+      describe: 'Pubkey of the GOV program',
+      default: 'hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S',
     },
     councilKeypair: {
-      type: "string",
-      describe: "Keypair of gov council token",
+      type: 'string',
+      describe: 'Keypair of gov council token',
       default: `${__dirname}/../../keypairs/council.json`,
     },
     multisig: {
-      type: "string",
+      type: 'string',
       describe:
-        "Address of the squads multisig for subdao authority. If not provided, your wallet will be the authority",
+        'Address of the squads multisig for subdao authority. If not provided, your wallet will be the authority',
     },
     authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
+      type: 'number',
+      describe: 'Authority index for squads. Defaults to 1',
       default: 1,
     },
     delegatorRewardsPercent: {
-      type: "number",
+      type: 'number',
       required: true,
       describe:
-        "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
+        'Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.',
     },
     emissionSchedulePath: {
       required: true,
-      describe: "Path to file that contains the dnt emissions schedule",
-      type: "string",
+      describe: 'Path to file that contains the dnt emissions schedule',
+      type: 'string',
     },
     activeDeviceAuthority: {
-      type: "string",
-      describe: "The authority that can set hotspot active status",
-    }
+      type: 'string',
+      describe: 'The authority that can set hotspot active status',
+    },
   });
   const argv = await yarg.argv;
   console.log(argv.url);
@@ -210,9 +202,11 @@ export async function run(args: any = process.argv) {
   const hemProgram = await initHem(provider);
   const heliumVsrProgram = await initVsr(provider);
 
-  const wallet = loadKeypair(argv.wallet);
+  const walletKP = loadKeypair(argv.wallet);
+  const wallet = new anchor.Wallet(walletKP);
   const aggKeypair = await loadKeypair(
-    argv.aggregatorKeypair || `${__dirname}/../../keypairs/aggregator-${name}.json`
+    argv.aggregatorKeypair ||
+      `${__dirname}/../../keypairs/aggregator-${name}.json`
   );
   const subdaoKeypair = await loadKeypair(argv.subdaoKeypair);
   const oracleKeypair = await loadKeypair(argv.oracleKeypair);
@@ -222,43 +216,38 @@ export async function run(args: any = process.argv) {
   const councilKeypair = await loadKeypair(argv.councilKeypair);
   const me = provider.wallet.publicKey;
 
-  console.log("Subdao mint", subdaoKeypair.publicKey.toBase58());
-  console.log("GOV PID", govProgramId.toBase58());
-  console.log("COUNCIL", councilKeypair.publicKey.toBase58());
+  console.log('Subdao mint', subdaoKeypair.publicKey.toBase58());
+  console.log('GOV PID', govProgramId.toBase58());
+  console.log('COUNCIL', councilKeypair.publicKey.toBase58());
 
   const conn = provider.connection;
 
   const dao = (await daoKey(new PublicKey(argv.hntPubkey!)))[0];
   const subdao = (await subDaoKey(subdaoKeypair.publicKey))[0];
-  console.log("DAO", dao.toString());
-  console.log("SUBDAO", subdao.toString());
+  console.log('DAO', dao.toString());
+  console.log('SUBDAO', subdao.toString());
   const daoAcc = await heliumSubDaosProgram.account.daoV0.fetch(dao);
 
-  const calculateThread = threadKey(subdao, "calculate")[0];
-  const issueThread = threadKey(subdao, "issue")[0];
+  const calculateThread = threadKey(subdao, 'calculate')[0];
+  const issueThread = threadKey(subdao, 'issue')[0];
   const emissionSchedule = await parseEmissionsSchedule(
     argv.emissionSchedulePath
   );
 
-  const squads = Squads.endpoint(
-    process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet, {
-      commitmentOrConfig: "finalized"
-    }
-  );
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
+    commitmentOrConfig: 'finalized',
+  });
   let authority = provider.wallet.publicKey;
   const multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
   if (multisig) {
     authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
   }
   if (await exists(conn, subdao)) {
-    const subDao = await heliumSubDaosProgram.account.subDaoV0.fetch(subdao);
-
     console.log(
-      `Subdao exists. Key: ${subdao.toBase58()}. Agg: ${subDao.activeDeviceAggregator.toBase58()}}`
+      `Subdao exists. Key: ${subdao.toBase58()}.`
     );
-    console.log("Calculate thread", calculateThread.toString());
-    console.log("Issue thread", issueThread.toString());
+    console.log('Calculate thread', calculateThread.toString());
+    console.log('Issue thread', issueThread.toString());
     return;
   }
   const [lazyDist] = await lazyDistributorKey(subdaoKeypair.publicKey);
@@ -272,7 +261,7 @@ export async function run(args: any = process.argv) {
   const auth = await provider.connection.getAccountInfo(daoAcc.authority);
   if (auth!.owner.equals(govProgramId)) {
     const daoPayer = PublicKey.findProgramAddressSync(
-      [Buffer.from("native-treasury", "utf-8"), daoAcc.authority.toBuffer()],
+      [Buffer.from('native-treasury', 'utf-8'), daoAcc.authority.toBuffer()],
       govProgramId
     )[0];
     payer = daoPayer;
@@ -293,18 +282,18 @@ export async function run(args: any = process.argv) {
   const govProgramVersion = await getGovernanceProgramVersion(
     conn,
     govProgramId,
-    isLocalhost(provider) ? "localnet" : undefined
+    isLocalhost(provider) ? 'localnet' : undefined
   );
 
   const realmName = argv.realmName;
   const realm = await PublicKey.findProgramAddressSync(
-    [Buffer.from("governance", "utf-8"), Buffer.from(realmName, "utf-8")],
+    [Buffer.from('governance', 'utf-8'), Buffer.from(realmName, 'utf-8')],
     govProgramId
   )[0];
-  console.log("Realm, ", realm.toBase58());
+  console.log('Realm, ', realm.toBase58());
   const isFreshRealm = !(await exists(conn, realm));
   if (isFreshRealm) {
-    console.log("Initializing Realm");
+    console.log('Initializing Realm');
     await withCreateRealm(
       instructions,
       govProgramId,
@@ -335,7 +324,7 @@ export async function run(args: any = process.argv) {
 
   const registrar = (await registrarKey(realm, subdaoKeypair.publicKey))[0];
   if (!(await exists(conn, registrar))) {
-    console.log("Initializing VSR Registrar");
+    console.log('Initializing VSR Registrar');
     instructions.push(
       await heliumVsrProgram.methods
         .initializeRegistrarV0({
@@ -350,7 +339,7 @@ export async function run(args: any = process.argv) {
         })
         .instruction()
     );
-    console.log("Configuring VSR voting mint at [0]");
+    console.log('Configuring VSR voting mint at [0]');
     instructions.push(
       await heliumVsrProgram.methods
         .configureVotingMintV0({
@@ -381,7 +370,7 @@ export async function run(args: any = process.argv) {
     await sendInstructions(provider, instructions, []);
     instructions = [];
 
-    console.log("Creating max voter record");
+    console.log('Creating max voter record');
     instructions.push(
       await heliumVsrProgram.methods
         .updateMaxVoterWeightV0()
@@ -429,7 +418,7 @@ export async function run(args: any = process.argv) {
             new anchor.BN(5)
           ),
         },
-        approver: oracleSignerKey()[0]
+        approver: oracleSignerKey()[0],
       })
       .accounts({
         rewardsMint: subdaoKeypair.publicKey,
@@ -439,21 +428,6 @@ export async function run(args: any = process.argv) {
   }
 
   if (!(await exists(conn, subdao))) {
-    let aggregatorKey = new PublicKey("GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR");
-    if (!isLocalhost(provider)) {
-      console.log("Initializing switchboard oracle");
-      aggregatorKey = await createSwitchboardAggregator({
-        crank: new PublicKey(argv.crank),
-        queue: new PublicKey(argv.queue),
-        wallet,
-        provider,
-        aggKeypair,
-        url: argv.activeDeviceOracleUrl,
-        switchboardNetwork: argv.switchboardNetwork,
-        authority,
-      });
-    }
-
     console.log(`Initializing ${name} SubDAO`);
     const currentDntEmission = emissionSchedule[0];
 
@@ -472,19 +446,21 @@ export async function run(args: any = process.argv) {
         } as any,
         // $40 for iot, $0 for mobile
         onboardingDcFee:
-          name.toUpperCase() == "IOT" ? toBN(4000000, 0) : toBN(0, 0),
-        onboardingDataOnlyDcFee: name.toUpperCase() == "IOT" ? toBN(1000000, 0) : toBN(0, 0),
+          name.toUpperCase() == 'IOT' ? toBN(4000000, 0) : toBN(0, 0),
+        onboardingDataOnlyDcFee:
+          name.toUpperCase() == 'IOT' ? toBN(1000000, 0) : toBN(0, 0),
         delegatorRewardsPercent: delegatorRewardsPercent(
           argv.delegatorRewardsPercent
         ),
-        activeDeviceAuthority: argv.activeDeviceAuthority ? new PublicKey(argv.activeDeviceAuthority) : authority,
+        activeDeviceAuthority: argv.activeDeviceAuthority
+          ? new PublicKey(argv.activeDeviceAuthority)
+          : authority,
       })
       .accounts({
         dao,
         dntMint: subdaoKeypair.publicKey,
         rewardsEscrow,
         hntMint: new PublicKey(argv.hntPubkey!),
-        activeDeviceAggregator: aggregatorKey,
         payer,
         dntMintAuthority: daoAcc.authority,
         subDaoFreezeAuthority: daoAcc.authority,
@@ -512,27 +488,6 @@ export async function run(args: any = process.argv) {
       }),
     ]);
 
-    // Reset thread
-    await sendInstructionsOrSquads({
-      provider,
-      instructions: [
-        
-        await heliumSubDaosProgram.methods
-          .resetSubDaoThreadV0()
-          .accounts({
-            subDao: subDaoKey(subdaoKeypair.publicKey)[0],
-            authority,
-            threadPayer: authority,
-          })
-          .instruction(),
-      ],
-      executeTransaction: true,
-      squads,
-      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-      authorityIndex: argv.authorityIndex,
-      signers: [],
-    });
-
     const { subDao } = await initSubdaoMethod.pubkeys();
     await sendInstructionsOrSquads({
       provider,
@@ -544,7 +499,6 @@ export async function run(args: any = process.argv) {
             dcBurnAuthority: null,
             onboardingDcFee: null,
             onboardingDataOnlyDcFee: null,
-            activeDeviceAggregator: null,
             registrar: null,
             delegatorRewardsPercent: null,
             activeDeviceAuthority: null,
@@ -574,7 +528,7 @@ export async function run(args: any = process.argv) {
     const instructions: TransactionInstruction[] = [];
     console.log(`Initalizing ${name} RewardableEntityConfig`);
     let settings;
-    if (name.toUpperCase() == "IOT") {
+    if (name.toUpperCase() == 'IOT') {
       settings = {
         iotConfig: {
           minGain: 10,
@@ -585,9 +539,24 @@ export async function run(args: any = process.argv) {
       };
     } else {
       settings = {
-        mobileConfig: {
-          fullLocationStakingFee: toBN(500000, 0),
-          dataonlyLocationStakingFee: toBN(500000, 0),
+        mobileConfigV1: {
+          feesByDevice: [
+            {
+              deviceType: { cbrs: {} },
+              dcOnboardingFee: toBN(40, 5),
+              locationStakingFee: toBN(10, 5),
+            },
+            {
+              deviceType: { wifiIndoor: {} },
+              dcOnboardingFee: toBN(0, 5),
+              locationStakingFee: toBN(0, 5),
+            },
+            {
+              deviceType: { wifiOutdoor: {} },
+              dcOnboardingFee: toBN(0, 5),
+              locationStakingFee: toBN(0, 5),
+            },
+          ],
         },
       };
     }
@@ -597,6 +566,7 @@ export async function run(args: any = process.argv) {
         .initializeRewardableEntityConfigV0({
           symbol: name.toUpperCase(),
           settings,
+          stakingRequirement: toBN(0, 0),
         })
         .accounts({
           subDao: subdao,

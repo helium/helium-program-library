@@ -1,3 +1,4 @@
+use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::{prelude::*, solana_program::hash::hash};
 
@@ -30,6 +31,7 @@ pub struct OnboardMobileHotspotArgsV0 {
   pub root: [u8; 32],
   pub index: u32,
   pub location: Option<u64>,
+  pub device_type: MobileDeviceTypeV0,
 }
 
 #[derive(Accounts)]
@@ -62,7 +64,7 @@ pub struct OnboardMobileHotspotV0<'info> {
 
   #[account(
     has_one = sub_dao,
-    constraint = matches!(rewardable_entity_config.settings, ConfigSettingsV0::MobileConfig { .. })
+    constraint = rewardable_entity_config.settings.is_mobile()
   )]
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
   #[account(
@@ -153,7 +155,27 @@ pub fn handler<'info>(
     proof_accounts: ctx.remaining_accounts.to_vec(),
   })?;
 
-  let mut dc_fee = ctx.accounts.sub_dao.onboarding_dc_fee;
+  let fees = ctx
+    .accounts
+    .rewardable_entity_config
+    .settings
+    .mobile_device_fees(args.device_type)
+    .ok_or(error!(ErrorCode::InvalidDeviceType))?;
+  let mut dc_fee = fees.dc_onboarding_fee;
+  let location_fee = fees.location_staking_fee;
+
+  if let Some(location) = args.location {
+    dc_fee = location_fee.checked_add(dc_fee).unwrap();
+
+    ctx.accounts.mobile_info.location = Some(location);
+    ctx.accounts.mobile_info.num_location_asserts = ctx
+      .accounts
+      .mobile_info
+      .num_location_asserts
+      .checked_add(1)
+      .unwrap();
+  }
+
   ctx.accounts.mobile_info.set_inner(MobileHotspotInfoV0 {
     asset: asset_id,
     bump_seed: ctx.bumps["mobile_info"],
@@ -161,7 +183,8 @@ pub fn handler<'info>(
     is_full_hotspot: true,
     num_location_asserts: 0,
     is_active: false,
-    dc_onboarding_fee_paid: dc_fee,
+    dc_onboarding_fee_paid: fees.dc_onboarding_fee,
+    device_type: args.device_type,
   });
   track_dc_onboarding_fees_v0(
     CpiContext::new_with_signer(
@@ -178,32 +201,11 @@ pub fn handler<'info>(
       ]],
     ),
     TrackDcOnboardingFeesArgsV0 {
-      amount: dc_fee,
+      amount: fees.dc_onboarding_fee,
       add: true,
       symbol: ctx.accounts.rewardable_entity_config.symbol.clone(),
     },
   )?;
-
-  if let (
-    Some(location),
-    ConfigSettingsV0::MobileConfig {
-      full_location_staking_fee,
-      ..
-    },
-  ) = (
-    args.location,
-    ctx.accounts.rewardable_entity_config.settings,
-  ) {
-    dc_fee = full_location_staking_fee.checked_add(dc_fee).unwrap();
-
-    ctx.accounts.mobile_info.location = Some(location);
-    ctx.accounts.mobile_info.num_location_asserts = ctx
-      .accounts
-      .mobile_info
-      .num_location_asserts
-      .checked_add(1)
-      .unwrap();
-  }
 
   // burn the dc tokens
   burn_without_tracking_v0(

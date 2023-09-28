@@ -1,49 +1,49 @@
-import * as anchor from "@coral-xyz/anchor";
-import { init } from "@helium/circuit-breaker-sdk";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
-import { BN } from "bn.js";
-import os from "os";
-import yargs from "yargs/yargs";
-import { sendInstructionsOrSquads } from "./utils";
+import * as anchor from '@coral-xyz/anchor';
+import { init } from '@helium/circuit-breaker-sdk';
+import { PublicKey, TransactionInstruction } from '@solana/web3.js';
+import Squads from '@sqds/sdk';
+import { BN } from 'bn.js';
+import os from 'os';
+import yargs from 'yargs/yargs';
+import { loadKeypair, sendInstructionsOrSquads } from './utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: "k",
-      describe: "Anchor wallet keypair",
+      alias: 'k',
+      describe: 'Anchor wallet keypair',
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: "u",
-      default: "http://127.0.0.1:8899",
-      describe: "The solana url",
+      alias: 'u',
+      default: 'http://127.0.0.1:8899',
+      describe: 'The solana url',
     },
     circuitBreaker: {
-      type: "string",
+      type: 'string',
       required: true,
-      describe: "Circuit breaker account",
+      describe: 'Circuit breaker account',
     },
     windowSizeSeconds: {
-      type: "number",
+      type: 'number',
     },
     threshold: {
-      type: "number",
+      type: 'number',
     },
     executeTransaction: {
-      type: "boolean",
+      type: 'boolean',
     },
     multisig: {
-      type: "string",
+      type: 'string',
       describe:
-        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
     },
     newAuthority: {
-      type: "string",
+      type: 'string',
     },
     authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
+      type: 'number',
+      describe: 'Authority index for squads. Defaults to 1',
       default: 1,
     },
   });
@@ -53,12 +53,16 @@ export async function run(args: any = process.argv) {
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
-  const circuitBreakerKey = new PublicKey(argv.circuitBreaker)
+  const circuitBreakerKey = new PublicKey(argv.circuitBreaker);
   const provider = anchor.getProvider() as anchor.AnchorProvider;
+  const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const circuitBreakerProgram = await init(provider);
 
   const instructions: TransactionInstruction[] = [];
-  const circuitBreaker = await circuitBreakerProgram.account.mintWindowedCircuitBreakerV0.fetch(circuitBreakerKey)
+  const circuitBreaker =
+    await circuitBreakerProgram.account.mintWindowedCircuitBreakerV0.fetch(
+      circuitBreakerKey
+    );
   instructions.push(
     await circuitBreakerProgram.methods
       .updateMintWindowedBreakerV0({
@@ -82,12 +86,9 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  const squads = Squads.endpoint(
-    process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet, {
-      commitmentOrConfig: "finalized"
-    }
-  );
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
+    commitmentOrConfig: 'finalized',
+  });
   await sendInstructionsOrSquads({
     provider,
     instructions,

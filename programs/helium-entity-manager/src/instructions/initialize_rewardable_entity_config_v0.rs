@@ -2,11 +2,13 @@ use crate::error::ErrorCode;
 use crate::{state::*, TESTING};
 use anchor_lang::prelude::*;
 use helium_sub_daos::SubDaoV0;
+use shared_utils::resize_to_fit;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeRewardableEntityConfigArgsV0 {
   pub symbol: String,
   pub settings: ConfigSettingsV0,
+  pub staking_requirement: u64,
 }
 
 #[derive(Accounts)]
@@ -51,7 +53,14 @@ pub fn handler(
       authority: ctx.accounts.authority.key(),
       bump_seed: ctx.bumps["rewardable_entity_config"],
       settings: args.settings,
+      staking_requirement: args.staking_requirement,
     });
+
+  resize_to_fit(
+    &ctx.accounts.payer,
+    &ctx.accounts.system_program.to_account_info(),
+    &ctx.accounts.rewardable_entity_config,
+  )?;
 
   Ok(())
 }

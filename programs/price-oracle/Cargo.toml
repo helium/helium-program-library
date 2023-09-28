@@ -1,8 +1,6 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "price-oracle"
-version = "0.1.0"
+version = "0.2.0"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -20,4 +18,6 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = "0.26.0"
+anchor-lang = { workspace = true }
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }

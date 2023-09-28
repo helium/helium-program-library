@@ -20,6 +20,7 @@ pub struct UpdateLazyTransactionsV0<'info> {
   #[account(
     mut,
     owner = id(),
+    constraint = canopy.data.borrow()[0] == 0,
     constraint = check_canopy_bytes(&canopy.data.borrow()[1..]).is_ok(),
   )]
   pub canopy: AccountInfo<'info>,

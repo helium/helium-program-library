@@ -20,7 +20,6 @@ use bubblegum_cpi::{
   Collection, Creator, MetadataArgs, TokenProgramVersion, TokenStandard, TreeConfig,
 };
 use helium_sub_daos::DaoV0;
-use mpl_token_metadata::state::MAX_NAME_LENGTH;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueDataOnlyEntityArgsV0 {
@@ -162,7 +161,7 @@ pub fn handler(ctx: Context<IssueDataOnlyEntityV0>, args: IssueDataOnlyEntityArg
 
   let name = animal_name.to_string();
   let metadata = MetadataArgs {
-    name: name[..min(name.len(), MAX_NAME_LENGTH)].to_owned(),
+    name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
     uri: format!("{}/{}", ENTITY_METADATA_URL, key_str),
     collection: Some(Collection {

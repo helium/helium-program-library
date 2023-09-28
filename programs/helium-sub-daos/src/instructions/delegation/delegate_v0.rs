@@ -204,6 +204,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
             utility_score: None,
             rewards_issued_at: None,
             initialized: false,
+            dc_onboarding_fees_paid: 0,
           },
         },
         &[

@@ -121,15 +121,23 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
     })?;
     let keystr = bs58::encode(&issue_entity.entity_key).into_string();
     info!("key: {:?}", keystr);
-    PublicKey::from_str(&keystr).unwrap()
+    PublicKey::from_str(&keystr).map_err(|e| {
+      error!("failed to parse pubkey: {:?}", e);
+      Status::BadRequest
+    })?
   } else {
     let issue_entity = IssueDataOnlyEntityArgsV0::try_from_slice(&ixn.data[8..]).map_err(|e| {
       error!("Failed to decode instruction: {:?}", e);
       Status::BadRequest
     })?;
-    PublicKey::from_bytes(&issue_entity.entity_key).unwrap()
+    let keystr = bs58::encode(&issue_entity.entity_key).into_string();
+    info!("key: {:?}", keystr);
+    PublicKey::from_str(&keystr).map_err(|e| {
+      error!("failed to parse pubkey: {:?}", e);
+      Status::BadRequest
+    })?
   };
-  info!("key: {:?}", pubkey.to_string());
+  info!("pubkey: {:?}", pubkey.to_string());
 
   // Verify the ecc signature against the message
   let msg = hex::decode(&verify.msg).map_err(|_| Status::BadRequest)?;

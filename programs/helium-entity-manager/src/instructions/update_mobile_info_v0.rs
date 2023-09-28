@@ -1,3 +1,4 @@
+use crate::error::ErrorCode;
 use crate::state::*;
 use account_compression_cpi::program::SplAccountCompression;
 use anchor_lang::prelude::*;
@@ -121,25 +122,19 @@ pub fn handler<'info>(
     proof_accounts: ctx.remaining_accounts.to_vec(),
   })?;
 
-  if let (
-    Some(new_location),
-    ConfigSettingsV0::MobileConfig {
-      full_location_staking_fee,
-      dataonly_location_staking_fee,
-      ..
-    },
-  ) = (
-    args.location,
-    ctx.accounts.rewardable_entity_config.settings,
-  ) {
+  let fees = ctx
+    .accounts
+    .rewardable_entity_config
+    .settings
+    .mobile_device_fees(ctx.accounts.mobile_info.device_type)
+    .ok_or(error!(ErrorCode::InvalidDeviceType))?;
+
+  if let Some(new_location) = args.location {
     if ctx.accounts.mobile_info.location.is_none()
       || (ctx.accounts.mobile_info.location.is_some()
         && ctx.accounts.mobile_info.location != Some(new_location))
     {
-      let mut dc_fee: u64 = dataonly_location_staking_fee;
-      if ctx.accounts.mobile_info.is_full_hotspot {
-        dc_fee = full_location_staking_fee;
-      }
+      let dc_fee: u64 = fees.location_staking_fee;
 
       ctx.accounts.mobile_info.num_location_asserts = ctx
         .accounts

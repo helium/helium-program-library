@@ -1,10 +1,14 @@
 name: NPM Publish
 
+env:
+  SOLANA_CLI_VERSION: 1.16.13
+  NODE_VERSION: 18.12.1
+
 on:
   push:
     # Sequence of patterns matched against refs/tags
     tags:
-      - "npm-*" # Push events to matching npm-*, i.e. npm-0.0.1
+      - "v*" # Push events to matching v*, i.e. v0.0.1
 
 jobs:
   release:

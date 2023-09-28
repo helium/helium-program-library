@@ -36,7 +36,7 @@ export type Asset = {
   supply: {
     edition_nonce: number | null;
   };
-  grouping?: { group_key: string, group_value: PublicKey }[];
+  grouping?: { group_key: string; group_value: PublicKey }[];
   uses?: Uses;
   creators: Creator[];
 };
@@ -67,11 +67,89 @@ export async function getAsset(
   }
 }
 
+export async function getAssetBatch(
+  url: string,
+  assetIds: PublicKey[]
+): Promise<Asset[] | undefined> {
+  try {
+    const response = await axios.post(url, {
+      jsonrpc: "2.0",
+      method: "getAssetBatch",
+      id: "rpd-op-123",
+      params: { ids: assetIds.map((assetId) => assetId.toBase58()) },
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    });
+    const result = response.data.result;
+    if (result) {
+      return result.map(toAsset);
+    }
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
+export async function getAssets(
+  url: string,
+  assetIds: PublicKey[]
+): Promise<(Asset | undefined)[]> {
+  try {
+    if (assetIds.length > 1000) {
+      throw new Error(
+        `Can only batch 1000 at a time, was given ${assetIds.length}`
+      );
+    }
+
+    const batch = assetIds.map((assetId, i) => ({
+      jsonrpc: "2.0",
+      id: `get-asset-${i}`,
+      method: "getAsset",
+      params: {
+        id: assetId.toBase58(),
+      },
+    }));
+
+    const response = await axios({
+      url,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+      data: JSON.stringify(batch),
+    });
+
+    const result = response.data
+      ? response.data.map((res: any) => res?.result || undefined)
+      : [];
+
+    return [
+      ...(result
+        ? result.map((x: Asset | undefined) => (x ? toAsset(x) : x))
+        : []),
+    ];
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
 function toAsset(result: any): Asset {
   return {
     ...result,
     id: new PublicKey(result.id),
-    grouping: result.grouping && result.grouping.map((g: any) => ({ ...g, group_value: new PublicKey(g.group_value) })),
+    grouping:
+      result.grouping &&
+      result.grouping.map((g: any) => ({
+        ...g,
+        group_value: new PublicKey(g.group_value),
+      })),
     compression: {
       ...result.compression,
       leafId: result.compression.leaf_id,
@@ -88,7 +166,8 @@ function toAsset(result: any): Asset {
     },
     ownership: {
       ...result.ownership,
-      delegate: result.ownership.delegate && new PublicKey(result.ownership.delegate),
+      delegate:
+        result.ownership.delegate && new PublicKey(result.ownership.delegate),
       owner: result.ownership.owner && new PublicKey(result.ownership.owner),
     },
   };
@@ -119,6 +198,44 @@ export async function getAssetProof(
         leaf: new PublicKey(result.leaf),
         treeId: new PublicKey(result.tree_id),
       };
+    }
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
+export async function getAssetProofBatch(
+  url: string,
+  assetIds: PublicKey[]
+): Promise<Record<string, AssetProof> | undefined> {
+  try {
+    const response = await axios.post(url, {
+      jsonrpc: "2.0",
+      method: "getAssetProofBatch",
+      id: "rpd-op-123",
+      params: { ids: assetIds.map((assetId) => assetId.toBase58()) },
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    });
+    const result = response.data.result;
+    if (result) {
+      return Object.entries(result as Record<string, any>).reduce(
+        (acc, [k, r]) => {
+          acc[k] = {
+            root: new PublicKey(r.root),
+            proof: r.proof.map((p: any) => new PublicKey(p)),
+            nodeIndex: r.node_index,
+            leaf: new PublicKey(r.leaf),
+            treeId: new PublicKey(r.tree_id),
+          } as AssetProof;
+          return acc;
+        },
+        {} as Record<string, AssetProof>
+      );
     }
   } catch (error) {
     console.error(error);

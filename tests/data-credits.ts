@@ -1,6 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import { parsePriceData } from "@pythnetwork/client";
 import {
@@ -11,6 +12,7 @@ import * as web3 from "@solana/web3.js";
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import { assert, expect } from "chai";
+import { ThresholdType } from "../packages/circuit-breaker-sdk/src";
 import {
   accountPayerKey,
   dataCreditsKey,
@@ -20,18 +22,14 @@ import {
 } from "../packages/data-credits-sdk/src";
 import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
 import * as hsd from "../packages/helium-sub-daos-sdk/src";
+import { daoKey } from "../packages/helium-sub-daos-sdk/src";
 import { toBN, toNumber } from "../packages/spl-utils/src";
 import * as vsr from "../packages/voter-stake-registry-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestSubdao } from "./utils/daos";
 import { ensureHSDIdl, ensureVSRIdl } from "./utils/fixtures";
-import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
-import { PriceOracle } from "@helium/idls/lib/types/price_oracle";
-import { ThresholdType } from "../packages/circuit-breaker-sdk/src";
-import { daoKey } from "../packages/helium-sub-daos-sdk/src";
 import { initVsr } from "./utils/vsr";
-import { exists, loadKeypair } from "./utils/solana"; 
 
 const EPOCH_REWARDS = 100000000;
 

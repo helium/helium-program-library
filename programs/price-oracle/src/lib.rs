@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+#[cfg(not(feature = "no-entrypoint"))]
+use {default_env::default_env, solana_security_txt::security_txt};
 
 declare_id!("porcSnvH9pvcYPmQ65Y8qcZSRxQBiBBQX7UV5nmBegy");
 
@@ -10,6 +12,22 @@ pub mod utils;
 pub use instructions::*;
 pub use state::*;
 pub use utils::*;
+
+#[cfg(not(feature = "no-entrypoint"))]
+security_txt! {
+  name: "Price Oracle",
+  project_url: "http://helium.com",
+  contacts: "email:hello@helium.foundation",
+  policy: "https://github.com/helium/helium-program-library/tree/master/SECURITY.md",
+
+
+  // Optional Fields
+  preferred_languages: "en",
+  source_code: "https://github.com/helium/helium-program-library/tree/master/programs/price-oracle",
+  source_revision: default_env!("GITHUB_SHA", ""),
+  source_release: default_env!("GITHUB_REF_NAME", ""),
+  auditors: "Sec3"
+}
 
 #[program]
 pub mod price_oracle {

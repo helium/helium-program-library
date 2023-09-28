@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.2.15",
+  "version": "0.4.0",
   "description": "Faucet for devnet Helium tokens",
   "repository": {
     "type": "git",
@@ -33,19 +33,19 @@
     "seed-db": "npx ts-node --project tsconfig.cjs.json src/seed-db.ts"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.26",
+    "@coral-xyz/anchor": "^0.28.0",
     "@fastify/cors": "^8.1.1",
-    "@helium/idls": "^0.0.40",
-    "@helium/spl-utils": "^0.2.15",
-    "@metaplex-foundation/mpl-token-metadata": "^2.8.4",
-    "@solana/web3.js": "^1.43.4",
+    "@helium/idls": "^0.4.0",
+    "@helium/spl-utils": "^0.4.0",
+    "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
+    "@solana/web3.js": "^1.78.4",
     "angry-purple-tiger": "^1.0.5",
-    "axios": "^1.1.3",
+    "axios": "^1.3.6",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1",
     "fastify": "^4.13.0",
     "pg": "^8.9.0",
-    "sequelize": "^6.27.0"
+    "sequelize": "^6.28.0"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.1",

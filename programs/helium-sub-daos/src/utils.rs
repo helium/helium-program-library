@@ -1,5 +1,5 @@
 use crate::{error::ErrorCode, state::*, TESTING};
-use anchor_lang::{prelude::*, solana_program::instruction::Instruction, InstructionData};
+use anchor_lang::prelude::*;
 use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
 use std::{
   cmp::{min, Ordering},
@@ -83,11 +83,16 @@ pub fn update_subdao_vehnt(
   // If sub dao epoch info account was just created, log the vehnt
   if !curr_epoch_info.initialized {
     msg!(
-      "Setting vehnt_at_epoch_start to {}",
-      sub_dao.vehnt_delegated
+      "Setting vehnt_at_epoch_start to {}, dc onboarding fees paid to {}",
+      sub_dao.vehnt_delegated,
+      sub_dao.dc_onboarding_fees_paid
     );
     curr_epoch_info.vehnt_at_epoch_start =
       u64::try_from(apply_fall_rate_factor(sub_dao.vehnt_delegated).unwrap()).unwrap();
+    curr_epoch_info.dc_onboarding_fees_paid = sub_dao.dc_onboarding_fees_paid;
+  } else if curr_epoch_info.dc_onboarding_fees_paid == 0 {
+    // TODO: Remove this after the first epoch using the new A score. This just makes sure we don't get one epoch with 0 A score
+    curr_epoch_info.dc_onboarding_fees_paid = sub_dao.dc_onboarding_fees_paid;
   }
 
   // Step 2. Update fall rate according to this epoch's closed position corrections
@@ -422,76 +427,5 @@ pub fn apply_fall_rate_factor(item: u128) -> Option<u128> {
     }
     Ordering::Less => Some(round_divide),
     Ordering::Greater => round_divide.checked_add(1),
-  }
-}
-
-pub fn construct_calculate_kickoff_ix(
-  dao: Pubkey,
-  sub_dao: Pubkey,
-  hnt_mint: Pubkey,
-  active_device_aggregator: Pubkey,
-  system_program: Pubkey,
-  token_program: Pubkey,
-  circuit_breaker_program: Pubkey,
-) -> Instruction {
-  Instruction {
-    program_id: crate::ID,
-    accounts: crate::accounts::CalculateKickoffV0 {
-      dao,
-      sub_dao,
-      hnt_mint,
-      active_device_aggregator,
-      system_program,
-      token_program,
-      circuit_breaker_program,
-    }
-    .to_account_metas(Some(true)),
-    data: crate::instruction::CalculateKickoffV0 {}.data(),
-  }
-}
-
-pub fn construct_issue_rewards_kickoff_ix(
-  dao: Pubkey,
-  sub_dao: Pubkey,
-  hnt_mint: Pubkey,
-  dnt_mint: Pubkey,
-  system_program: Pubkey,
-  token_program: Pubkey,
-  circuit_breaker_program: Pubkey,
-) -> Instruction {
-  Instruction {
-    program_id: crate::ID,
-    accounts: crate::accounts::IssueRewardsKickoffV0 {
-      dao,
-      sub_dao,
-      hnt_mint,
-      dnt_mint,
-      system_program,
-      token_program,
-      circuit_breaker_program,
-    }
-    .to_account_metas(Some(true)),
-    data: crate::instruction::IssueRewardsKickoffV0 {}.data(),
-  }
-}
-
-pub fn construct_issue_hst_kickoff_ix(
-  dao: Pubkey,
-  hnt_mint: Pubkey,
-  system_program: Pubkey,
-  token_program: Pubkey,
-  circuit_breaker_program: Pubkey,
-) -> Instruction {
-  Instruction {
-    program_id: crate::ID,
-    accounts: crate::accounts::IssueHstKickoffV0 {
-      dao,
-      hnt_mint,
-      system_program,
-      token_program,
-      circuit_breaker_program,
-    }
-    .to_account_metas(Some(true)),
-    data: crate::instruction::IssueHstKickoffV0 {}.data(),
   }
 }

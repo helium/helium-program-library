@@ -1,6 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
+import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { daoKey, EPOCH_LENGTH } from "@helium/helium-sub-daos-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
@@ -12,7 +13,7 @@ import {
   roundToDecimals,
   sendInstructions,
   toBN,
-  toNumber,
+  toNumber
 } from "@helium/spl-utils";
 import { AccountLayout, getMint } from "@solana/spl-token";
 import {
@@ -26,7 +27,7 @@ import { BN } from "bn.js";
 import chai, { assert, expect } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import { init as dcInit } from "../packages/data-credits-sdk/src";
-import { init as issuerInit } from "../packages/helium-entity-manager-sdk/src";
+import { init as issuerInit, onboardIotHotspot } from "../packages/helium-entity-manager-sdk/src";
 import {
   currentEpoch,
   heliumSubDaosResolvers,
@@ -36,16 +37,21 @@ import { init as vsrInit } from "../packages/voter-stake-registry-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { burnDataCredits } from "./data-credits";
+import { createMockCompression } from "./utils/compression";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 import {
   ensureDCIdl,
   ensureHSDIdl,
   ensureVSRIdl,
+  initTestMaker,
+  initTestRewardableEntityConfig,
   initWorld,
 } from "./utils/fixtures";
-import { getUnixTimestamp } from "./utils/solana";
+import { getUnixTimestamp, loadKeypair } from "./utils/solana";
 import { createPosition, initVsr } from "./utils/vsr";
+// @ts-ignore
+import bs58 from "bs58";
 
 chai.use(chaiAsPromised);
 
@@ -266,7 +272,6 @@ describe("helium-sub-daos", () => {
           emissionSchedule: null,
           onboardingDcFee: null,
           onboardingDataOnlyDcFee: null,
-          activeDeviceAggregator: null,
           registrar: null,
           delegatorRewardsPercent: null,
           activeDeviceAuthority: null,
@@ -278,24 +283,6 @@ describe("helium-sub-daos", () => {
 
       const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
       expect(subDaoAcc.authority.toString()).to.eq(newAuth.toString());
-    });
-
-    it("resets the subdao clockwork thread", async () => {
-      await program.methods
-        .resetSubDaoThreadV0()
-        .accounts({
-          subDao,
-        })
-        .rpc({ skipPreflight: true });
-    });
-
-    it("resets the dao clockwork thread", async () => {
-      await program.methods
-        .resetDaoThreadV0()
-        .accounts({
-          dao,
-        })
-        .rpc({ skipPreflight: true });
     });
 
     it("allows tracking dc spend", async () => {
@@ -463,6 +450,70 @@ describe("helium-sub-daos", () => {
         });
 
         it("calculates subdao rewards", async () => {
+          // Onboard one hotspot to add to the utility score
+          const { rewardableEntityConfig } =
+            await initTestRewardableEntityConfig(hemProgram, subDao);
+          const { maker, collection, makerKeypair, merkle } = await initTestMaker(
+            hemProgram,
+            provider,
+            rewardableEntityConfig,
+            dao
+          );
+          const eccVerifier = loadKeypair(__dirname + "/keypairs/verifier-test.json");
+          const ecc = (await HeliumKeypair.makeRandom()).address.b58;
+          const hotspotOwner = Keypair.generate();
+            
+          const { getAssetFn, getAssetProofFn, hotspot } =
+            await createMockCompression({
+              collection,
+              dao,
+              merkle,
+              ecc,
+              hotspotOwner,
+            });
+            console.log("I AM ISSUING")
+          const issueMethod = hemProgram.methods
+            .issueEntityV0({
+              entityKey: Buffer.from(bs58.decode(ecc)),
+            })
+            .preInstructions([
+              ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+            ])
+            .accounts({
+              maker,
+              recipient: hotspotOwner.publicKey,
+              issuingAuthority: makerKeypair.publicKey,
+              dao,
+              eccVerifier: eccVerifier.publicKey,
+            })
+            .signers([makerKeypair, eccVerifier]);
+
+          await issueMethod.rpc({ skipPreflight: true });
+          await dcProgram.methods
+            .mintDataCreditsV0({
+              // $50 onboard, $10 location assert
+              dcAmount: toBN(60, 5),
+              hntAmount: null
+            })
+            .accounts({ dcMint })
+            .rpc({ skipPreflight: true });
+
+          const method = (
+            await onboardIotHotspot({
+              program: hemProgram,
+              assetId: hotspot,
+              maker,
+              dao,
+              rewardableEntityConfig,
+              location: new BN(1000),
+              getAssetFn,
+              getAssetProofFn,
+              dcFeePayer: me
+            })
+          ).signers([makerKeypair, hotspotOwner]);
+
+          await method.rpc({ skipPreflight: true });
+
           const { subDaoEpochInfo } = await burnDc(1600000);
           const epoch = (
             await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
@@ -492,20 +543,10 @@ describe("helium-sub-daos", () => {
             });
 
           const pubkeys = await instr.pubkeys();
-          const sig = await instr.rpc({
+          await instr.rpc({
             skipPreflight: true,
             commitment: "confirmed",
           });
-          const resp = await provider.connection.getTransaction(sig, {
-            commitment: "confirmed",
-          });
-
-          const currentActiveDeviceCount = Number(
-            resp?.meta?.logMessages
-              ?.find((m) => m.includes("Total devices"))
-              ?.replace("Program log: Total devices: ", "")
-              .split(".")[0]!
-          );
 
           const subDaoInfo = await program.account.subDaoEpochInfoV0.fetch(
             subDaoEpochInfo
@@ -520,7 +561,7 @@ describe("helium-sub-daos", () => {
           const veHnt = toNumber(subDaoInfo.vehntAtEpochStart, 8);
           const totalUtility =
             Math.max(veHnt, 1) *
-            Math.pow(currentActiveDeviceCount * 50, 1 / 4) *
+            Math.pow(50, 1 / 4) *
             Math.sqrt(16) *
             1;
           expect(daoInfo.totalRewards.toString()).to.eq(
@@ -530,7 +571,6 @@ describe("helium-sub-daos", () => {
             new BN(supply.toString()).add(new BN(EPOCH_REWARDS)).toString()
           );
 
-          console.log(totalUtility, veHnt, currentActiveDeviceCount);
           expectBnAccuracy(
             toBN(totalUtility, 12),
             daoInfo.totalUtilityScore,

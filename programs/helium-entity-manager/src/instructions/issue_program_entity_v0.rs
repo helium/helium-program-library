@@ -11,7 +11,6 @@ use bubblegum_cpi::{
   Collection, Creator, MetadataArgs, TokenProgramVersion, TokenStandard, TreeConfig,
 };
 use helium_sub_daos::DaoV0;
-use mpl_token_metadata::state::{MAX_NAME_LENGTH, MAX_SYMBOL_LENGTH, MAX_URI_LENGTH};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueProgramEntityArgsV0 {
@@ -131,14 +130,8 @@ impl<'info> IssueProgramEntityV0<'info> {
 }
 
 pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV0) -> Result<()> {
-  require!(
-    args.name.len() <= MAX_NAME_LENGTH,
-    ErrorCode::InvalidStringLength
-  );
-  require!(
-    args.symbol.len() <= MAX_SYMBOL_LENGTH,
-    ErrorCode::InvalidStringLength
-  );
+  require!(args.name.len() <= 32, ErrorCode::InvalidStringLength);
+  require!(args.symbol.len() <= 10, ErrorCode::InvalidStringLength);
 
   let key_str = match args.key_serialization {
     KeySerialization::B58 => bs58::encode(&args.entity_key).into_string(),
@@ -168,10 +161,7 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     metadata_uri = formated_metadata_url;
   }
 
-  require!(
-    metadata_uri.len() <= MAX_URI_LENGTH,
-    ErrorCode::InvalidStringLength
-  );
+  require!(metadata_uri.len() <= 200, ErrorCode::InvalidStringLength);
 
   let metadata = MetadataArgs {
     name: args.name,

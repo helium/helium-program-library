@@ -1,8 +1,6 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "lazy-transactions"
-version = "0.0.1"
+version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -25,5 +23,8 @@ overflow-checks = true
 [dependencies]
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
-spl-concurrent-merkle-tree = "0.1.2"
+spl-concurrent-merkle-tree = "0.2.0"
 bytemuck = "1.13.0"
+shared-utils = { workspace = true }
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }

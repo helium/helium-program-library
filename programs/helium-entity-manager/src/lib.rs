@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+#[cfg(not(feature = "no-entrypoint"))]
+use {default_env::default_env, solana_security_txt::security_txt};
 
 declare_id!("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8");
 
@@ -10,6 +12,21 @@ pub mod state;
 pub use instructions::*;
 
 pub use state::*;
+
+#[cfg(not(feature = "no-entrypoint"))]
+security_txt! {
+  name: "Helium Entity Manager",
+  project_url: "http://helium.com",
+  contacts: "email:hello@helium.foundation",
+  policy: "https://github.com/helium/helium-program-library/tree/master/SECURITY.md",
+
+  // Optional Fields
+  preferred_languages: "en",
+  source_code: "https://github.com/helium/helium-program-library/tree/master/programs/helium-entity-manager",
+  source_revision: default_env!("GITHUB_SHA", ""),
+  source_release: default_env!("GITHUB_REF_NAME", ""),
+  auditors: "Sec3"
+}
 
 #[program]
 pub mod helium_entity_manager {
@@ -140,10 +157,6 @@ pub mod helium_entity_manager {
     update_data_only_tree_v0::handler(ctx)
   }
 
-  pub fn temp_repair_iot_operations_fund(ctx: Context<TempRepairIotOperationsFund>) -> Result<()> {
-    temp_repair_iot_operations_fund::handler(ctx)
-  }
-
   pub fn set_entity_active_v0(
     ctx: Context<SetEntityActiveV0>,
     args: SetEntityActiveArgsV0,
@@ -167,12 +180,5 @@ pub mod helium_entity_manager {
     ctx: Context<TempPayMobileOnboardingFeeV0>,
   ) -> Result<()> {
     temp_pay_mobile_onboarding_fee_v0::handler(ctx)
-  }
-
-  pub fn temp_update_iot_operations_fund_metadata(
-    ctx: Context<TempUpdateIotOperationsFundMetadata>,
-    args: TempUpdateIotOperationsFundMetadataArgs,
-  ) -> Result<()> {
-    temp_update_iot_operations_fund_metadata::handler(ctx, args)
   }
 }

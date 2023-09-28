@@ -66,7 +66,7 @@ export async function run(args: any = process.argv) {
               epoch,
             })
             .preInstructions([
-              ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+              ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
             ])
             .accounts({
               subDao: subDao.publicKey,

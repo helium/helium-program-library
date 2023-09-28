@@ -1,8 +1,6 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "mobile-entity-manager"
-version = "0.0.2"
+version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -31,7 +29,8 @@ angry-purple-tiger = "0.1.0"
 mpl-token-metadata = { workspace = true }
 bubblegum-cpi = { workspace = true }
 account-compression-cpi = { workspace = true }
-shared-utils = { path = "../../utils/shared-utils" }
-helium-entity-manager = { path = "../helium-entity-manager", features = ["cpi"] }
-
-helium-sub-daos = { path = "../helium-sub-daos", features = ["cpi"] }
+shared-utils = { workspace = true }
+helium-entity-manager = { workspace = true }
+helium-sub-daos = { workspace = true }
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }

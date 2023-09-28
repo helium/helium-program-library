@@ -18,6 +18,7 @@ export async function onboardMobileHotspot({
   dao,
   payer,
   dcFeePayer,
+  deviceType = 'cbrs',
   ...rest
 }: {
   program: Program<HeliumEntityManager>;
@@ -28,6 +29,7 @@ export async function onboardMobileHotspot({
   rewardableEntityConfig: PublicKey;
   maker: PublicKey;
   dao: PublicKey;
+  deviceType?: 'cbrs' | 'wifiIndoor' | 'wifiOutdoor'
 } & Omit<ProofArgsAndAccountsArgs, "connection">) {
   const {
     asset,
@@ -57,6 +59,9 @@ export async function onboardMobileHotspot({
     .onboardMobileHotspotV0({
       ...args,
       location: typeof location == "undefined" ? null : location,
+      deviceType: {
+        [deviceType]: {}
+      } as any
     })
     .accounts({
       // hotspot: assetId,

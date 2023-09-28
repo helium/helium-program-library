@@ -8,7 +8,9 @@ import { useEffect } from "react";
 
 export function useAnchorAccount<IDL extends Idl, A extends keyof AllAccountsMap<IDL>>(
   key: PublicKey | undefined,
-  type: A
+  type: A,
+  // Perf optimization - set if the account will never change, to lower websocket usage.
+  isStatic: boolean = false
 ): UseAccountState<IdlAccounts<IDL>[A]> & {
   error?: Error;
 } {
@@ -16,12 +18,12 @@ export function useAnchorAccount<IDL extends Idl, A extends keyof AllAccountsMap
   const { info: idl, error, loading } = useIdl<IDL>(rawAccount?.owner);
   useEffect(() => {
     if (!loading && rawAccount && !idl) {
-      console.warn(`Idl not found for ${rawAccount.owner.toBase58()}`)
+      console.warn(`Idl not found for ${rawAccount.owner.toBase58()}`);
     }
-  }, [idl, loading, rawAccount])
+  }, [idl, loading, rawAccount]);
 
   return {
-    ...useIdlAccount(key, idl, type),
-    error
+    ...useIdlAccount(key, idl, type, isStatic),
+    error,
   };
 }

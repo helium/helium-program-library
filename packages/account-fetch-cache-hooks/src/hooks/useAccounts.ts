@@ -3,7 +3,8 @@ import { PublicKey, AccountInfo } from "@solana/web3.js";
 import { useAccountFetchCache } from "./useAccountFetchCache";
 import { TypedAccountParser } from "@helium/account-fetch-cache";
 import { ParsedAccountBase } from "./useAccount";
-import { useAsync } from "react-async-hook";
+import { AsyncStateStatus, useAsync } from "react-async-hook";
+import { usePrevious } from "../contexts/accountContext";
 
 export interface UseAccountsState<T> {
   loading: boolean;
@@ -13,6 +14,7 @@ export interface UseAccountsState<T> {
     publicKey: PublicKey;
   }[];
   error: Error | undefined;
+  status: AsyncStateStatus;
 }
 
 /**
@@ -30,13 +32,6 @@ export function useAccounts<T>(
   isStatic = false // Set if the accounts data will never change, optimisation to lower websocket usage.
 ): UseAccountsState<T> {
   const cache = useAccountFetchCache();
-  const [accounts, setAccounts] = useState<
-    {
-      account?: AccountInfo<Buffer>;
-      info?: T;
-      publicKey: PublicKey;
-    }[]
-  >([]);
 
   const parsedAccountBaseParser = useMemo(() => {
     if (parser) {
@@ -71,23 +66,65 @@ export function useAccounts<T>(
     }
   }, [parser]);
 
-  const { result, loading, error } = useAsync(
+  const eagerResult = useMemo(() => {
+    return keys?.map((key) => {
+      const acc = cache.get(key);
+
+      // The cache caches the parser, so we need to check if the parser is different
+      let info = acc?.info as T | undefined;
+      if (
+        cache.keyToAccountParser[key.toBase58()] != parsedAccountBaseParser &&
+        parsedAccountBaseParser &&
+        acc?.account
+      ) {
+        info = parsedAccountBaseParser(key, acc?.account).info;
+      }
+      if (acc) {
+        return {
+          info,
+          account: acc.account,
+          publicKey: acc.pubkey,
+          parser: parsedAccountBaseParser,
+        };
+      } else {
+        return {
+          publicKey: key,
+        };
+      }
+    });
+  }, [cache, keys, parsedAccountBaseParser]);
+
+  const [accounts, setAccounts] = useState<
+    {
+      account?: AccountInfo<Buffer>;
+      info?: T;
+      publicKey: PublicKey;
+    }[]
+  >(eagerResult || []);
+
+  const prevKeys = usePrevious(keys);
+  const { result, loading, error, status } = useAsync(
     async (
       keys: null | undefined | PublicKey[],
-      parsedAccountBaseParser: ((
-        pubkey: PublicKey,
-        data: AccountInfo<Buffer>
-      ) => ParsedAccountBase) | undefined
+      parsedAccountBaseParser:
+        | ((pubkey: PublicKey, data: AccountInfo<Buffer>) => ParsedAccountBase)
+        | undefined
     ) => {
       return (
         keys &&
         (await Promise.all(
           keys.map(async (key) => {
-            const acc = await cache.search(
+            // Important: MUST searchAndWatch here to guarentee caching.
+            // account fetch cache will not cache things unles it is watching them,
+            // or it could offer stale data
+            const [acc, dispose] = await cache.searchAndWatch(
               key,
               parsedAccountBaseParser,
               isStatic
             );
+
+            // Watch the account for at least 30 seconds
+            setTimeout(dispose, 1000 * 30);
 
             // The cache caches the parser, so we need to check if the parser is different
             let info = acc?.info;
@@ -123,7 +160,7 @@ export function useAccounts<T>(
     if (result) {
       setAccounts(result);
       const disposers = result.map((account) => {
-        return cache.watch(account.publicKey, account.parser, true);
+        return cache.watch(account.publicKey, account.parser, !!account.account);
       });
 
       return () => {
@@ -167,7 +204,8 @@ export function useAccounts<T>(
   }, [accounts, keys, parsedAccountBaseParser, parser]);
 
   return {
-    loading,
+    status,
+    loading: loading || prevKeys !== keys,
     accounts,
     error,
   };

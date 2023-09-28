@@ -1,20 +1,15 @@
 import * as anchor from "@coral-xyz/anchor";
 import { BN } from "@coral-xyz/anchor";
-import { Keypair, ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
-import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
+import { delegatorRewardsPercent, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { createAtaAndMint, createMint, toBN } from "@helium/spl-utils";
 import {
-  getAssociatedTokenAddress,
   createAssociatedTokenAccountIdempotentInstruction,
+  getAssociatedTokenAddress,
 } from "@solana/spl-token";
-import { ThresholdType } from "@helium/circuit-breaker-sdk";
+import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
 import { toU128 } from "../../packages/treasury-management-sdk/src";
+import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { DC_FEE } from "./fixtures";
-import { subDaoKey, delegatorRewardsPercent } from "@helium/helium-sub-daos-sdk";
-
-const CLOCKWORK_PID = new PublicKey(
-  "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
-);
 
 export async function initTestDao(
   program: anchor.Program<HeliumSubDaos>,
@@ -137,9 +132,6 @@ export async function initTestSubdao(
       rewardsEscrow,
       dntMint,
       hntMint: daoAcc.hntMint,
-      activeDeviceAggregator: new PublicKey(
-        "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
-      ), // Copied from mainnet to localnet
     });
   const { treasury, treasuryCircuitBreaker, delegatorPool } =
     await method.pubkeys();

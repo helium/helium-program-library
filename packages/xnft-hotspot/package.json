@@ -1,6 +1,6 @@
 {
   "name": "@helium/xnft-hotspot",
-  "version": "0.2.15",
+  "version": "0.4.0",
   "private": true,
   "description": "",
   "main": "index.js",
@@ -17,13 +17,13 @@
     "esbuild": "^0.15.12"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.26.0",
-    "@helium/account-fetch-cache": "^0.2.15",
-    "@helium/distributor-oracle": "^0.2.15",
-    "@helium/helium-react-hooks": "^0.2.15",
-    "@helium/idls": "^0.2.15",
-    "@helium/lazy-distributor-sdk": "^0.2.15",
-    "@solana/spl-token": "^0.3.6",
+    "@coral-xyz/anchor": "^0.28.0",
+    "@helium/account-fetch-cache": "^0.4.0",
+    "@helium/distributor-oracle": "^0.4.0",
+    "@helium/helium-react-hooks": "^0.4.0",
+    "@helium/idls": "^0.4.0",
+    "@helium/lazy-distributor-sdk": "^0.4.0",
+    "@solana/spl-token": "^0.3.8",
     "assert": "^2.0.0",
     "bn.js": "^5.2.0",
     "classnames": "^2.3.2",

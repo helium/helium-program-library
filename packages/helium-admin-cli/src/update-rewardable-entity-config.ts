@@ -8,8 +8,10 @@ import { PublicKey } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { sendInstructionsOrSquads } from "./utils";
+import { loadKeypair, sendInstructionsOrSquads } from "./utils";
 import BN from "bn.js";
+import { getMint } from "@solana/spl-token";
+import { toBN } from "@helium/spl-utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -57,17 +59,39 @@ export async function run(args: any = process.argv) {
       describe: "The full hotspot location assert fee",
       default: "1000000",
     },
+    stakingRequirement: {
+      type: "number",
+      describe:
+        "The staking requirement for the entity, numeric. Decimals will be added automatically",
+    },
+    cbrsDcOnboardingFee: {
+      type: 'number',
+      describe: 'The cbrs dc onboarding fee',
+    },
+    cbrsDcLocationStakingFee: {
+      type: 'number',
+      describe: 'The cbrs dc location staking fee',
+    },
+    wifiDcOnboardingFee: {
+      type: 'number',
+      describe: 'The wifi dc onboarding fee',
+    },
+    wifiDcLocationStakingFee: {
+      type: 'number',
+      describe: 'The wifi dc location staking fee',
+    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
-
+  const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const name = argv.name;
   const hemProgram = await initHem(provider);
   const dntMint = new PublicKey(argv.dntMint);
   const subdao = (await subDaoKey(dntMint))[0];
+  const dntMintAcc = await getMint(provider.connection, dntMint);
   const rewardableConfigKey = (
     await rewardableEntityConfigKey(subdao, name.toUpperCase())
   )[0];
@@ -76,12 +100,9 @@ export async function run(args: any = process.argv) {
       rewardableConfigKey
     );
   let payer = provider.wallet.publicKey;
-  const squads = Squads.endpoint(
-    process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet, {
-      commitmentOrConfig: "finalized"
-    }
-  );
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
+    commitmentOrConfig: "finalized",
+  });
 
   let settings;
   if (name.toUpperCase() == "IOT") {
@@ -95,9 +116,24 @@ export async function run(args: any = process.argv) {
     };
   } else {
     settings = {
-      mobileConfig: {
-        fullLocationStakingFee: new BN(argv.fullLocationStakingFee),
-        dataonlyLocationStakingFee: new BN(argv.dataonlyLocationStakingFee),
+      mobileConfigV1: {
+        feesByDevice: [
+          {
+            deviceType: { cbrs: {} },
+            dcOnboardingFee: new BN(argv.cbrsDcOnboardingFee!),
+            locationStakingFee: new BN(argv.cbrsDcLocationStakingFee!),
+          },
+          {
+            deviceType: { wifiIndoor: {} },
+            dcOnboardingFee: new BN(argv.wifiDcOnboardingFee!),
+            locationStakingFee: new BN(argv.wifiDcLocationStakingFee!),
+          },
+          {
+            deviceType: { wifiOutdoor: {} },
+            dcOnboardingFee: new BN(argv.wifiDcOnboardingFee!),
+            locationStakingFee: new BN(argv.wifiDcLocationStakingFee!),
+          },
+        ],
       },
     };
   }
@@ -109,10 +145,14 @@ export async function run(args: any = process.argv) {
       .updateRewardableEntityConfigV0({
         settings,
         newAuthority: null,
+        stakingRequirement: argv.stakingRequirement
+          ? toBN(argv.stakingRequirement, dntMintAcc.decimals)
+          : new BN(0),
       })
       .accounts({
         rewardableEntityConfig: rewardableConfigKey,
         authority: rewardableConfigAcc.authority,
+        payer: rewardableConfigAcc.authority,
       })
       .instruction(),
   ];

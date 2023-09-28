@@ -1,80 +1,77 @@
-import * as anchor from "@coral-xyz/anchor";
-import {} from "@helium/helium-entity-manager-sdk";
+import * as anchor from '@coral-xyz/anchor';
+import {} from '@helium/helium-entity-manager-sdk';
 import {
   init as initLazy,
   lazyDistributorKey,
-} from "@helium/lazy-distributor-sdk";
-import { PublicKey } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
-import os from "os";
-import yargs from "yargs/yargs";
-import { sendInstructionsOrSquads } from "./utils";
+} from '@helium/lazy-distributor-sdk';
+import { PublicKey } from '@solana/web3.js';
+import Squads from '@sqds/sdk';
+import os from 'os';
+import yargs from 'yargs/yargs';
+import { loadKeypair, sendInstructionsOrSquads } from './utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: "k",
-      describe: "Anchor wallet keypair",
+      alias: 'k',
+      describe: 'Anchor wallet keypair',
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: "u",
-      default: "http://127.0.0.1:8899",
-      describe: "The solana url",
+      alias: 'u',
+      default: 'http://127.0.0.1:8899',
+      describe: 'The solana url',
     },
     subdaoMint: {
       required: true,
-      describe: "Public Key of the subdao mint",
-      type: "string",
+      describe: 'Public Key of the subdao mint',
+      type: 'string',
     },
     executeTransaction: {
-      type: "boolean",
+      type: 'boolean',
     },
     multisig: {
-      type: "string",
+      type: 'string',
       describe:
-        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
+        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
     },
     authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
+      type: 'number',
+      describe: 'Authority index for squads. Defaults to 1',
       default: 1,
     },
     oracle: {
-      type: "string",
-      describe: "Pubkey of the oracle",
+      type: 'string',
+      describe: 'Pubkey of the oracle',
     },
     rewardsOracleUrl: {
-      alias: "ro",
-      type: "string",
-      describe: "The rewards oracle URL",
+      alias: 'ro',
+      type: 'string',
+      describe: 'The rewards oracle URL',
     },
     newAuthority: {
-      type: "string",
+      type: 'string',
     },
     newApprover: {
-      type: "string",
-      description: "Pubkey of the approver pda"
-    }
+      type: 'string',
+      description: 'Pubkey of the approver pda',
+    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
-
+  const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const lazyDistProgram = await initLazy(provider);
   const subdaoMint = new PublicKey(argv.subdaoMint);
   const [lazyDist] = lazyDistributorKey(subdaoMint);
   const lazyDistAcc = await lazyDistProgram.account.lazyDistributorV0.fetch(
     lazyDist
   );
-  const squads = Squads.endpoint(
-    process.env.ANCHOR_PROVIDER_URL,
-    provider.wallet, {
-      commitmentOrConfig: "finalized"
-    }
-  );
+  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
+    commitmentOrConfig: 'finalized',
+  });
 
   const ix = await lazyDistProgram.methods
     .updateLazyDistributorV0({
@@ -90,7 +87,7 @@ export async function run(args: any = process.argv) {
               },
             ]
           : null,
-      approver: argv.newApprover ? new PublicKey(argv.newApprover) : null
+      approver: argv.newApprover ? new PublicKey(argv.newApprover) : null,
     })
     .accounts({
       rewardsMint: subdaoMint,

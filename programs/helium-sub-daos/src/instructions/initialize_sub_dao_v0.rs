@@ -16,7 +16,6 @@ use circuit_breaker::{
   WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
 };
 use shared_utils::resize_to_fit;
-use switchboard_v2::AggregatorAccountData;
 use time::OffsetDateTime;
 use treasury_management::{
   circuit_breaker::{
@@ -136,7 +135,6 @@ pub struct InitializeSubDaoV0<'info> {
   )]
   pub delegator_pool: Box<Account<'info, TokenAccount>>,
 
-  pub active_device_aggregator: AccountLoader<'info, AggregatorAccountData>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub treasury_management_program: Program<'info, TreasuryManagement>,
@@ -267,7 +265,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
   );
   ctx.accounts.dao.num_sub_daos += 1;
   ctx.accounts.sub_dao.set_inner(SubDaoV0 {
-    active_device_aggregator: ctx.accounts.active_device_aggregator.key(),
+    _deprecated_active_device_aggregator: Pubkey::default(),
     dao: ctx.accounts.dao.key(),
     dnt_mint: ctx.accounts.dnt_mint.key(),
     dc_burn_authority: args.dc_burn_authority,

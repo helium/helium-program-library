@@ -25,7 +25,6 @@ import {
 } from "../packages/lazy-transactions-sdk/src";
 import { LazyTransactions } from "../target/types/lazy_transactions";
 import { random } from "./utils/string";
-import { sleep } from "@switchboard-xyz/common";
 
 describe("lazy-transactions", () => {
   // Configure the client to use the local cluster.
@@ -201,11 +200,12 @@ describe("lazy-transactions", () => {
         })
         .accounts({ lazyTransactions })
         .remainingAccounts(accounts)
-        .rpc({ skipPreflight: true });
+        .rpc();
 
       throw new Error("Should have failed");
     } catch (e: any) {
-      expect(e.toString()).to.not.include("Should have failed");
+      console.log(e.toString())
+      expect(e.toString()).to.include("Transaction has already been executed");
     }
 
     /// Attempt to close the canopy
@@ -215,3 +215,7 @@ describe("lazy-transactions", () => {
       .rpc({ skipPreflight: true });
   });
 });
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

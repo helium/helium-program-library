@@ -6,12 +6,16 @@
     "fanout-metadata-service": "./packages/fanout-metadata-service",
     "faucet-service": "./packages/faucet-service",
     "helius-service": "./packages/helius-service",
-    "hnt-to-rent-service": "./packages/hnt-to-rent-service",
+    "tokens-to-rent-service": "./packages/tokens-to-rent-service",
     "migration-service": "./packages/migration-service",
     "vsr-metadata-service": "./packages/vsr-metadata-service",
-    "account-postgres-sink-service": "./packages/account-postgres-sink-service"
+    "account-postgres-sink-service": "./packages/account-postgres-sink-service",
+    "iot-premine-data-only-service": "./packages/iot-premine-data-only-service",
+    "crons": "./packages/crons",
+    "rewards-oracle-faucet-service": "./packages/rewards-oracle-faucet-service"
   },
   "oracle": {
-    "distributor-oracle": "./packages/distributor-oracle"
+    "distributor-oracle": "./packages/distributor-oracle",
+    "active-hotspot-oracle": "./utils/active-hotspot-oracle"
   }
 }

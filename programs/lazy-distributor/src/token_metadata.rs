@@ -1,14 +1,13 @@
-use mpl_token_metadata::utils::try_from_slice_checked;
 use std::io::Write;
 use std::ops::Deref;
 
 pub use mpl_token_metadata::ID;
 
 #[derive(Clone)]
-pub struct Metadata(mpl_token_metadata::state::Metadata);
+pub struct Metadata(mpl_token_metadata::accounts::Metadata);
 
 impl Deref for Metadata {
-  type Target = mpl_token_metadata::state::Metadata;
+  type Target = mpl_token_metadata::accounts::Metadata;
 
   fn deref(&self) -> &Self::Target {
     &self.0
@@ -21,13 +20,9 @@ impl anchor_lang::AccountDeserialize for Metadata {
   }
 
   fn try_deserialize_unchecked(buf: &mut &[u8]) -> Result<Self> {
-    try_from_slice_checked(
-      buf,
-      mpl_token_metadata::state::Key::MetadataV1,
-      mpl_token_metadata::state::MAX_METADATA_LEN,
-    )
-    .map(Metadata)
-    .map_err(|e| e.into())
+    mpl_token_metadata::accounts::Metadata::from_bytes(buf)
+      .map(Metadata)
+      .map_err(|e| e.into())
   }
 }
 
@@ -61,8 +56,8 @@ pub struct Creator {
 }
 
 impl Creator {
-  pub fn adapt(&self) -> mpl_token_metadata::state::Creator {
-    mpl_token_metadata::state::Creator {
+  pub fn adapt(&self) -> mpl_token_metadata::types::Creator {
+    mpl_token_metadata::types::Creator {
       address: self.address,
       verified: self.verified,
       share: self.share,
@@ -94,12 +89,12 @@ pub struct Uses {
 }
 
 impl Uses {
-  pub fn adapt(&self) -> mpl_token_metadata::state::Uses {
-    mpl_token_metadata::state::Uses {
+  pub fn adapt(&self) -> mpl_token_metadata::types::Uses {
+    mpl_token_metadata::types::Uses {
       use_method: match self.use_method {
-        UseMethod::Burn => mpl_token_metadata::state::UseMethod::Burn,
-        UseMethod::Multiple => mpl_token_metadata::state::UseMethod::Multiple,
-        UseMethod::Single => mpl_token_metadata::state::UseMethod::Single,
+        UseMethod::Burn => mpl_token_metadata::types::UseMethod::Burn,
+        UseMethod::Multiple => mpl_token_metadata::types::UseMethod::Multiple,
+        UseMethod::Single => mpl_token_metadata::types::UseMethod::Single,
       },
       remaining: self.remaining,
       total: self.total,
@@ -115,8 +110,8 @@ pub struct Collection {
 }
 
 impl Collection {
-  pub fn adapt(&self) -> mpl_token_metadata::state::Collection {
-    mpl_token_metadata::state::Collection {
+  pub fn adapt(&self) -> mpl_token_metadata::types::Collection {
+    mpl_token_metadata::types::Collection {
       verified: self.verified,
       key: self.key,
     }

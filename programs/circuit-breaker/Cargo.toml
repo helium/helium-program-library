@@ -1,8 +1,6 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "circuit-breaker"
-version = "0.0.1"
+version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -25,4 +23,6 @@ overflow-checks = true
 [dependencies]
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
-shared-utils = { path = "../../utils/shared-utils" }
+shared-utils = { workspace = true }
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }

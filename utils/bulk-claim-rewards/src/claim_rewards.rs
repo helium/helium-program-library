@@ -1,5 +1,6 @@
 use crate::{json_err, parse_err};
 use anchor_client::Program;
+use anchor_client::{Client, Cluster};
 use anchor_lang::solana_program::hash::hash;
 use anchor_lang::AccountDeserialize;
 use anyhow::{anyhow, Context};
@@ -7,7 +8,7 @@ use bs58;
 use circuit_breaker::ID as CB_PID;
 use futures::stream::{StreamExt, TryStreamExt};
 use helium_entity_manager::{KeyToAssetV0, ID as HEM_PID};
-use hpl_utils::send_and_confirm_messages_with_spinner;
+use hpl_utils::{dao::Dao, send_and_confirm_messages_with_spinner};
 use lazy_distributor::{
   accounts::{
     DistributeCompressionRewardsV0, DistributeRewardsCommonV0, InitializeCompressionRecipientV0,
@@ -20,17 +21,21 @@ use rewards_oracle::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
-use sha2::{Digest, Sha256};
 use solana_client::tpu_client::{TpuClient, TpuClientConfig};
 use solana_program::{
   hash::Hash,
   instruction::{AccountMeta, Instruction},
   system_program,
 };
-use solana_sdk::{pubkey::Pubkey, signature::Keypair};
+use solana_sdk::commitment_config::CommitmentConfig;
+use solana_sdk::pubkey::Pubkey;
+use solana_sdk::signature::Keypair;
 use solana_sdk::{signer::Signer, transaction::Transaction};
 use spl_associated_token_account::get_associated_token_address;
+use std::ops::Deref;
+use std::rc::Rc;
 use std::str::FromStr;
+use tokio::runtime::Runtime;
 
 pub fn key_to_asset_for_asset(asset: &Value, dao: Pubkey) -> Result<Pubkey, anyhow::Error> {
   let creator = asset
@@ -182,28 +187,47 @@ struct Hotspot {
 const COMPRESSION: &str = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK";
 
 pub struct ClaimRewardsArgs<'a> {
-  pub lazy_distributor_program: &'a Program,
-  pub rewards_oracle_program: &'a Program,
-  pub helium_entity_manager_program: &'a Program,
-  pub payer: &'a Keypair,
+  pub rpc_url: &'a str,
+  pub payer: Keypair,
   pub hotspot_owner: Pubkey,
   pub rewards_mint: Pubkey,
   pub dao: Pubkey,
   pub batch_size: usize,
 }
 
+pub fn claim_rewards_blocking(args: ClaimRewardsArgs) -> anyhow::Result<()> {
+  let runtime = Runtime::new().unwrap();
+  runtime
+    .block_on(claim_rewards(args))
+    .context("Failed to claim rewards or listener failure")?;
+  Ok(())
+}
+
 /// Claims all hotspot rewards for a given hotspot_owner. The payer set on the program object pays for the transactions
 pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Error> {
   let ClaimRewardsArgs {
-    lazy_distributor_program,
-    rewards_oracle_program,
-    helium_entity_manager_program,
+    rpc_url,
     payer,
     hotspot_owner,
     rewards_mint,
     dao,
     batch_size,
   } = args;
+  let anchor_client = Client::new_with_options(
+    Cluster::Custom(
+      rpc_url.to_string().clone(),
+      rpc_url
+        .clone()
+        .replace("https", "wss")
+        .replace("http", "ws"),
+    ),
+    &payer,
+    CommitmentConfig::confirmed(),
+  );
+
+  let lazy_distributor_program = anchor_client.program(lazy_distributor::id())?;
+  let rewards_oracle_program = anchor_client.program(rewards_oracle::id())?;
+  let helium_entity_manager_program = anchor_client.program(helium_entity_manager::id())?;
   let mut total = 0;
   let tpu_client = TpuClient::new(
     lazy_distributor_program.rpc().into(),
@@ -505,7 +529,6 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
           hotspot_owner,
           &payer,
           rewards_mint,
-          dao,
           lazy_distributor,
           ld_acc.clone(),
           blockhash,
@@ -577,14 +600,14 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
   Ok(())
 }
 
-fn check_and_init_recipient(
-  lazy_distributor_program: &Program,
+fn check_and_init_recipient<C: Deref<Target = impl Signer> + Clone>(
+  lazy_distributor_program: &Program<C>,
   lazy_distributor: Pubkey,
   hotspot: Hotspot,
   hotspot_owner: Pubkey,
   root: &[u8; 32],
   proof: &Vec<AccountMeta>,
-  payer: &Keypair,
+  payer: &dyn Signer,
   blockhash: Hash,
 ) -> Result<Option<Transaction>, anyhow::Error> {
   let compression_program = Pubkey::from_str(COMPRESSION).unwrap();
@@ -656,17 +679,16 @@ async fn get_proof(rpc_url: String, id: Pubkey) -> Result<ProofJson, anyhow::Err
   Ok(get_asset_proof_response.result.unwrap())
 }
 
-fn process_hotspot(
-  rewards_oracle_program: &Program,
-  lazy_distributor_program: &Program,
+fn process_hotspot<C: Deref<Target = impl Signer> + Clone>(
+  rewards_oracle_program: &Program<C>,
+  lazy_distributor_program: &Program<C>,
   hotspot: Hotspot,
   root: &[u8; 32],
   proof: &Vec<AccountMeta>,
   rewards: &Vec<Map<String, serde_json::Value>>,
   hotspot_owner: Pubkey,
-  payer: &Keypair,
+  payer: &dyn Signer,
   rewards_mint: Pubkey,
-  dao: Pubkey,
   lazy_distributor: Pubkey,
   ld_acc: LazyDistributorV0,
   blockhash: Hash,
@@ -675,7 +697,6 @@ fn process_hotspot(
 
   for (oracle_index, reward) in rewards.clone().iter().enumerate() {
     let set_reward_accounts = construct_set_rewards_accounts(
-      dao,
       hotspot.id,
       ld_acc.oracles[oracle_index].oracle.clone(),
       lazy_distributor,
@@ -828,7 +849,6 @@ async fn get_hotspot_rewards(
 }
 
 fn construct_set_rewards_accounts(
-  dao: Pubkey,
   asset_id: Pubkey,
   oracle: Pubkey,
   lazy_distributor: Pubkey,
@@ -842,11 +862,7 @@ fn construct_set_rewards_accounts(
     ],
     &LD_PID,
   );
-
-  let hash = Sha256::digest(&bs58::decode(&entity_key[..]).into_vec().unwrap());
-
-  let (key_to_asset, _kta_bump) =
-    Pubkey::find_program_address(&["key_to_asset".as_bytes(), dao.as_ref(), &hash], &HEM_PID);
+  let key_to_asset = Dao::Hnt.key_to_asset(&bs58::decode(&entity_key).into_vec().unwrap());
 
   let (oracle_signer, _os_bump) =
     Pubkey::find_program_address(&["oracle_signer".as_bytes()], &RO_PID);
@@ -862,8 +878,8 @@ fn construct_set_rewards_accounts(
   })
 }
 
-fn construct_distribute_rewards_accounts(
-  lazy_distributor_program: &Program,
+fn construct_distribute_rewards_accounts<C: Deref<Target = impl Signer> + Clone>(
+  lazy_distributor_program: &Program<C>,
   rewards_mint: Pubkey,
   hotspot_owner: Pubkey,
   asset_id: Pubkey,

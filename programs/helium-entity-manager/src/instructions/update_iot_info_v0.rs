@@ -134,15 +134,15 @@ pub fn handler<'info>(
     },
   ) = (
     args.location,
-    ctx.accounts.rewardable_entity_config.settings,
+    &ctx.accounts.rewardable_entity_config.settings,
   ) {
     if ctx.accounts.iot_info.location.is_none()
       || (ctx.accounts.iot_info.location.is_some()
         && ctx.accounts.iot_info.location != Some(new_location))
     {
-      let mut dc_fee: u64 = dataonly_location_staking_fee;
+      let mut dc_fee: u64 = *dataonly_location_staking_fee;
       if ctx.accounts.iot_info.is_full_hotspot {
-        dc_fee = full_location_staking_fee;
+        dc_fee = *full_location_staking_fee;
       }
 
       ctx.accounts.iot_info.num_location_asserts = ctx
