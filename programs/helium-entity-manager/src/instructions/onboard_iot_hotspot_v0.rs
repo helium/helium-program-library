@@ -158,7 +158,7 @@ pub fn handler<'info>(
     gain: args.gain,
     is_full_hotspot: true,
     num_location_asserts: 0,
-    is_active: true, // set active by default to start, oracle can mark it inactive
+    is_active: false,
     dc_onboarding_fee_paid: dc_fee,
   });
   track_dc_onboarding_fees_v0(

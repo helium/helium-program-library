@@ -105,4 +105,8 @@ pub mod helium_sub_daos {
   ) -> Result<()> {
     track_dc_onboarding_fees_v0::handler(ctx, args)
   }
+
+  pub fn temp_claim_failed_claims(ctx: Context<TempClaimFailedClaims>) -> Result<()> {
+    temp_claim_failed_claims::handler(ctx)
+  }
 }

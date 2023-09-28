@@ -182,7 +182,7 @@ pub fn handler<'info>(
     location: None,
     is_full_hotspot: true,
     num_location_asserts: 0,
-    is_active: true, // set active by default to start, oracle can mark it inactive
+    is_active: false,
     dc_onboarding_fee_paid: fees.dc_onboarding_fee,
     device_type: args.device_type,
   });

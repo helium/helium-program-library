@@ -154,6 +154,12 @@ export const heliumSubDaosResolvers = combineResolvers(
     owner: "positionAuthority",
   }),
   ataResolver({
+    instruction: "tempClaimFailedClaims",
+    account: "delegatorAta",
+    mint: "dntMint",
+    owner: "positionAuthority",
+  }),
+  ataResolver({
     account: "positionTokenAccount",
     mint: "mint",
     owner: "positionAuthority",

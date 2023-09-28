@@ -46,4 +46,7 @@ pub enum ErrorCode {
 
   #[msg("Cannot change a position while it is delegated")]
   PositionChangeWhileDelegated,
+
+  #[msg("This epoch was not closed, cannot claim rewards.")]
+  EpochNotClosed,
 }

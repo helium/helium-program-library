@@ -1,4 +1,6 @@
-use crate::{current_epoch, error::ErrorCode, state::*, TESTING};
+use std::str::FromStr;
+
+use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
@@ -13,14 +15,25 @@ use voter_stake_registry::{
   VoterStakeRegistry,
 };
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct ClaimRewardsArgsV0 {
-  pub epoch: u64,
-}
+#[account]
+pub struct Block {}
 
 #[derive(Accounts)]
-#[instruction(args: ClaimRewardsArgsV0)]
-pub struct ClaimRewardsV0<'info> {
+pub struct TempClaimFailedClaims<'info> {
+  #[account(
+    mut,
+    address = Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW").unwrap()
+  )]
+  pub authority: Signer<'info>,
+  // Ensure this is run once per wallet
+  #[account(
+    init,
+    payer = authority,
+    seeds = [b"block".as_ref(), sub_dao_epoch_info.key().as_ref(), position.key().as_ref()],
+    bump,
+    space = 8
+  )]
+  pub block: Account<'info, Block>,
   #[account(
     seeds = [b"position".as_ref(), mint.key().as_ref()],
     seeds::program = vsr_program.key(),
@@ -36,8 +49,8 @@ pub struct ClaimRewardsV0<'info> {
     constraint = position_token_account.amount > 0
   )]
   pub position_token_account: Box<Account<'info, TokenAccount>>,
-  #[account(mut)]
-  pub position_authority: Signer<'info>,
+  /// CHECK: Not the signer since this is a backfill
+  pub position_authority: AccountInfo<'info>,
   pub registrar: Box<Account<'info, Registrar>>,
   #[account(
     has_one = registrar
@@ -45,14 +58,12 @@ pub struct ClaimRewardsV0<'info> {
   pub dao: Box<Account<'info, DaoV0>>,
 
   #[account(
-    mut,
     has_one = delegator_pool,
     has_one = dnt_mint,
     has_one = dao,
   )]
   pub sub_dao: Account<'info, SubDaoV0>,
   #[account(
-    mut,
     has_one = sub_dao,
     seeds = ["delegated_position".as_bytes(), position.key().as_ref()],
     bump,
@@ -62,16 +73,15 @@ pub struct ClaimRewardsV0<'info> {
   pub dnt_mint: Box<Account<'info, Mint>>,
 
   #[account(
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
-    bump,
-    constraint = sub_dao_epoch_info.rewards_issued_at.is_some() @ ErrorCode::EpochNotClosed
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &19624_u64.to_le_bytes()],
+    bump = sub_dao_epoch_info.bump_seed,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   #[account(mut)]
   pub delegator_pool: Box<Account<'info, TokenAccount>>,
   #[account(
     init_if_needed,
-    payer = position_authority,
+    payer = authority,
     associated_token::mint = dnt_mint,
     associated_token::authority = position_authority,
   )]
@@ -93,7 +103,7 @@ pub struct ClaimRewardsV0<'info> {
   pub token_program: Program<'info, Token>,
 }
 
-impl<'info> ClaimRewardsV0<'info> {
+impl<'info> TempClaimFailedClaims<'info> {
   fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, TransferV0<'info>> {
     let cpi_accounts = TransferV0 {
       from: self.delegator_pool.to_account_info(),
@@ -107,24 +117,11 @@ impl<'info> ClaimRewardsV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<TempClaimFailedClaims>) -> Result<()> {
   // load the vehnt information
-  let position = &mut ctx.accounts.position;
+  let position = &ctx.accounts.position;
   let registrar = &ctx.accounts.registrar;
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
-
-  let delegated_position = &mut ctx.accounts.delegated_position;
-
-  // check epoch that's being claimed is over
-  let epoch = current_epoch(registrar.clock_unix_timestamp());
-  if !TESTING {
-    require_gt!(epoch, args.epoch, ErrorCode::EpochNotOver,);
-    require_eq!(
-      args.epoch,
-      delegated_position.last_claimed_epoch + 1,
-      ErrorCode::InvalidClaimEpoch
-    )
-  }
 
   let delegated_vehnt_at_epoch = position.voting_power(
     voting_mint_config,
@@ -147,8 +144,6 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
       .unwrap(),
   )
   .unwrap();
-
-  delegated_position.last_claimed_epoch += 1;
 
   let amount_left = ctx.accounts.delegator_pool.amount;
   transfer_v0(
