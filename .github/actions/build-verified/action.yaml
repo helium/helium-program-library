@@ -42,7 +42,7 @@ runs:
     - run: cargo install solana-verify
       if: steps.cache-solana-verify.outputs.cache-hit != 'true'
       shell: bash
-    - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/solana-verify build -b ellipsislabs/solana:1.16.3 --library-name $PROGRAM ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
+    - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/solana-verify build -b ellipsislabs/solana:${{env.SOLANA_CLI_VERSION}} --library-name $PROGRAM ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
       shell: bash
       env:
         PROGRAM: ${{ inputs.program }}
