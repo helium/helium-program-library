@@ -11,5 +11,7 @@ runs:
         # On anchor 0.28.1 we can probably stop using 0 as the source
       - run: echo "ANCHOR_VERSION=0" >> $GITHUB_ENV
         shell: bash
+      - run: echo "ANCHOR_SHA=3e8bc76d72e2bfdb3962868b5066b2479cf49d25" >> $GITHUB_ENV
+        shell: bash
       - run: git submodule update --init --recursive --depth 1
         shell: bash
