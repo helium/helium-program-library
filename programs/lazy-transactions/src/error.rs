@@ -13,7 +13,4 @@ pub enum ErrorCode {
 
   #[msg("Invalid canopy length")]
   CanopyLengthMismatch,
-
-  #[msg("Transaction has already been executed")]
-  TransactionAlreadyExecuted,
 }
