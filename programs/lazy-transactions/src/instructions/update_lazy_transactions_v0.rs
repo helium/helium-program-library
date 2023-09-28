@@ -1,4 +1,4 @@
-use crate::{canopy::check_canopy_bytes, id, state::*};
+use crate::{id, state::*};
 use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
