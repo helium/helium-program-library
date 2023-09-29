@@ -19,11 +19,13 @@ export interface IConfig {
   crons?: { type: Crons; schedule: string }[];
 }
 
+export interface IInitedPlugin {
+  updateOnDuplicateFields?: string[];
+  addFields?: (schema: { [key: string]: any }, accountName: string) => void;
+  processAccount: (account: any) => Promise<any>;
+}
+
 export interface IPlugin {
   name: Plugins;
-  init: (config: { [key: string]: any }) => Promise<{
-    updateOnDuplicateFields?: string[];
-    addFields?: (schema: { [key: string]: any }, accountName: string) => void;
-    processAccount: (account: any) => Promise<any>;
-  }>;
+  init: (config: { [key: string]: any }) => Promise<IInitedPlugin>;
 }

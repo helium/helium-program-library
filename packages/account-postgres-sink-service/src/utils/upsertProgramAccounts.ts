@@ -130,7 +130,6 @@ export const upsertProgramAccounts = async ({
                   sanitizedAccount = await plugin.processAccount(
                     sanitizedAccount
                   );
-                  console.log(sanitizedAccount);
                 }
               }
 
@@ -142,7 +141,6 @@ export const upsertProgramAccounts = async ({
             })
           );
 
-          console.log(values);
           await model.bulkCreate(values, {
             transaction: t,
             updateOnDuplicate: [

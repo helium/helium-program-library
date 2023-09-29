@@ -154,8 +154,8 @@ if (!HELIUS_AUTH_SECRET) {
   });
 
   try {
-    await database.sync();
     // models are defined on boot, and updated in refresh-accounts
+    await database.sync();
     await defineAllIdlModels({ configs, sequelize: database });
     await server.listen({ port: 3000, host: '0.0.0.0' });
     const address = server.server.address();

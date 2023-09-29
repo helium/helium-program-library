@@ -4,7 +4,7 @@ import * as pg from "pg";
 
 const host = process.env.PGHOST || "localhost";
 const port = Number(process.env.PGPORT) || 5432;
-const database = new Sequelize({
+export const database = new Sequelize({
   host: host,
   dialect: "postgres",
   port: port,

@@ -1,24 +1,23 @@
-import * as anchor from '@coral-xyz/anchor';
-import { PublicKey } from '@solana/web3.js';
-import { Sequelize } from 'sequelize';
-import deepEqual from 'deep-equal';
-import _omit from 'lodash/omit';
-import { SOLANA_URL } from '../env';
-import database from './database';
-import { sanitizeAccount } from './sanitizeAccount';
-import { getTransactionSignaturesUptoBlockTime } from './getTransactionSignaturesUpToBlock';
-import { FastifyInstance } from 'fastify';
-import { chunks } from './chunks';
-import { getBlockTimeWithRetry } from './getBlockTimeWithRetry';
+import * as anchor from "@coral-xyz/anchor";
+import { PublicKey } from "@solana/web3.js";
+import deepEqual from "deep-equal";
+import { FastifyInstance } from "fastify";
+import _omit from "lodash/omit";
+import { Sequelize } from "sequelize";
+import { SOLANA_URL } from "../env";
+import { initPlugins } from "../plugins";
+import { IAccountConfig, IInitedPlugin } from "../types";
+import { chunks } from "./chunks";
+import database from "./database";
+import { getBlockTimeWithRetry } from "./getBlockTimeWithRetry";
+import { getTransactionSignaturesUptoBlockTime } from "./getTransactionSignaturesUpToBlock";
+import { sanitizeAccount } from "./sanitizeAccount";
+import { truthy } from "./upsertProgramAccounts";
 
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;
   programId: PublicKey;
-  accounts: {
-    type: string;
-    table?: string;
-    schema?: string;
-  }[];
+  accounts: IAccountConfig[];
   sequelize?: Sequelize;
 }
 
@@ -45,7 +44,7 @@ export const integrityCheckProgramAccounts = async ({
       idl.accounts!.some(({ name }) => name === type)
     )
   ) {
-    throw new Error('idl does not have every account type');
+    throw new Error("idl does not have every account type");
   }
 
   const t = await sequelize.transaction();
@@ -70,7 +69,7 @@ export const integrityCheckProgramAccounts = async ({
     });
 
     if (!blockTime24HoursAgo) {
-      throw new Error('Unable to get blocktime from 24 hours ago');
+      throw new Error("Unable to get blocktime from 24 hours ago");
     }
 
     const parsedTransactions = (
@@ -84,7 +83,7 @@ export const integrityCheckProgramAccounts = async ({
           100
         ).map((chunk) =>
           connection.getParsedTransactions(chunk, {
-            commitment: 'confirmed',
+            commitment: "confirmed",
             maxSupportedTransactionVersion: 0,
           })
         )
@@ -110,7 +109,7 @@ export const integrityCheckProgramAccounts = async ({
           async (chunk) =>
             await connection.getMultipleAccountsInfo(
               chunk.map((c) => new PublicKey(c)),
-              'confirmed'
+              "confirmed"
             )
         )
       )
@@ -121,32 +120,53 @@ export const integrityCheckProgramAccounts = async ({
         ...accountInfo,
       }));
 
+    const pluginsByAccountType = (
+      await Promise.all(
+        accounts.map(async (acc) => {
+          const plugins = await initPlugins(acc.plugins);
+          return { type: acc.type, plugins };
+        })
+      )
+    ).reduce((acc, { type, plugins }) => {
+      acc[type] = plugins.filter(truthy);
+      return acc;
+    }, {} as Record<string, IInitedPlugin[]>);
+
     await Promise.all(
       chunks(accountInfosWithPk, 1000).map(async (chunk) => {
         for (const c of chunk) {
-          let decodedAcc: any;
-          let accName: any;
-
-          accountTypeLoop: for (const { type } of accounts) {
-            try {
-              if (accName) break accountTypeLoop;
-              decodedAcc = program.coder.accounts.decode(
-                type,
-                c.data as Buffer
-              );
-              accName = type;
-            } catch (err) {}
+          const accName = accounts.find(({ type }) => {
+            return (
+              c.data &&
+              anchor.BorshAccountsCoder.accountDiscriminator(type).equals(
+                c.data.subarray(0, 8)
+              )
+            );
+          })?.type;
+          if (!accName) {
+            continue;
           }
 
+          const decodedAcc = program.coder.accounts.decode(
+            accName!,
+            c.data as Buffer
+          );
+
           if (accName) {
-            const omitKeys = ['refreshed_at', 'createdAt'];
+            const omitKeys = ["refreshed_at", "createdAt"];
             const model = sequelize.models[accName];
             const existing = await model.findByPk(c.pubkey);
-            const sanitized = {
+            let sanitized = {
               refreshed_at: now,
               address: c.pubkey,
               ...sanitizeAccount(decodedAcc),
             };
+
+            for (const plugin of pluginsByAccountType[accName]) {
+              if (plugin?.processAccount) {
+                sanitized = await plugin.processAccount(sanitized);
+              }
+            }
 
             const isEqual =
               existing &&
@@ -172,12 +192,13 @@ export const integrityCheckProgramAccounts = async ({
 
     await t.commit();
     for (const correction of corrections) {
+      // @ts-ignore
       fastify.customMetrics.integrityCheckCounter.inc();
       console.log(`IntegrityCheckCorrection:`, correction);
     }
   } catch (err) {
     await t.rollback();
-    console.error('While inserting, err', err);
+    console.error("While inserting, err", err);
     throw err;
   }
 };
