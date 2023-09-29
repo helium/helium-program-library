@@ -6,7 +6,7 @@ use mpl_token_metadata::{
     CreateMetadataAccountV3CpiAccounts, CreateMetadataAccountV3InstructionArgs,
     InstructionAccountInfo, UpdateMetadataAccountV2Cpi, UpdateMetadataAccountV2CpiAccounts,
     UpdateMetadataAccountV2InstructionArgs, VerifyCollectionCpi, VerifyCollectionCpiAccounts,
-    VerifySizedCollectionItem, VerifySizedCollectionItemCpi, VerifySizedCollectionItemCpiAccounts,
+    VerifySizedCollectionItemCpi, VerifySizedCollectionItemCpiAccounts,
   },
   types::{CollectionDetails, DataV2},
   ID,
