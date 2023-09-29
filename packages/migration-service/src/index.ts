@@ -122,7 +122,10 @@ async function getTransactions(
 
   console.log(`Found ${results.length} transactions to migrate}`);
   const lt = await program.account.lazyTransactionsV0.fetch(lazyTransactions);
-  const executed = lt.executed;
+  const executedTransactionsKey = lt.executedTransactions;
+  const executed = (
+    await provider.connection.getAccountInfo(executedTransactionsKey)
+  )?.data.subarray(1)!;
   const lazyTxns = await program.account.lazyTransactionsV0.fetch(
     lazyTransactions
   );
@@ -166,6 +169,7 @@ async function getTransactions(
                 lazySigner,
                 block,
                 systemProgram: SystemProgram.programId,
+                executedTransactions: lt.executedTransactions,
               })
               .remainingAccounts([
                 ...compiledTx.accounts,
@@ -226,7 +230,7 @@ async function getTransactions(
     );
   }
 
-  return []
+  return [];
 }
 
 const ATTESTATION =
@@ -364,12 +368,8 @@ server.get<{
     return {
       transactions: transactions || [],
       count: Number(
-        (
-          await client.query(
-            "SELECT count(*) FROM hotspot_transactions",
-            []
-          )
-        ).rows[0].count
+        (await client.query("SELECT count(*) FROM hotspot_transactions", []))
+          .rows[0].count
       ),
     };
   } catch (e: any) {

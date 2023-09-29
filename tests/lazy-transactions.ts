@@ -22,6 +22,7 @@ import {
   lazySignerKey,
   fillCanopy,
   getCanopySize,
+  getBitmapLen,
 } from "../packages/lazy-transactions-sdk/src";
 import { LazyTransactions } from "../target/types/lazy_transactions";
 import { random } from "./utils/string";
@@ -101,8 +102,12 @@ describe("lazy-transactions", () => {
       { instructions: createMintIxns, signerSeeds: [mintSignerSeeds] },
     ]);
     const canopy = Keypair.generate();
+    const executedTransactions = Keypair.generate();
     const canopySize = getCanopySize(merkleTree.depth - 1);
     const canopyRent = await provider.connection.getMinimumBalanceForRentExemption(canopySize)
+    const executedTransactionsSize = 1 + getBitmapLen(merkleTree.depth - 1);
+    const executedTransactionsRent =
+      await provider.connection.getMinimumBalanceForRentExemption(executedTransactionsSize);
     await program.methods
       .initializeLazyTransactionsV0({
         root: merkleTree.getRoot().toJSON().data,
@@ -111,7 +116,8 @@ describe("lazy-transactions", () => {
         maxDepth: merkleTree.depth - 1,
       })
       .accounts({
-        canopy: canopy.publicKey
+        canopy: canopy.publicKey,
+        executedTransactions: executedTransactions.publicKey,
       })
       .preInstructions([
         SystemProgram.createAccount({
@@ -119,10 +125,17 @@ describe("lazy-transactions", () => {
           newAccountPubkey: canopy.publicKey,
           space: canopySize,
           lamports: canopyRent,
-          programId: program.programId
+          programId: program.programId,
+        }),
+        SystemProgram.createAccount({
+          fromPubkey: me,
+          newAccountPubkey: executedTransactions.publicKey,
+          space: executedTransactionsSize,
+          lamports: executedTransactionsRent,
+          programId: program.programId,
         }),
       ])
-      .signers([canopy])
+      .signers([canopy, executedTransactions])
       .rpc({ skipPreflight: true });
     
     await fillCanopy({
