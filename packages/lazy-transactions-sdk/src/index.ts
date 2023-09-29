@@ -334,3 +334,10 @@ export function isExecuted(
   const mask = 1 << bitIndex;
   return (byte & mask) !== 0;
 }
+
+export function getBitmapLen(maxDepth: number): number {
+  const numTxns = 1 << maxDepth;
+  // Calculate the ceiling division
+  const result = Math.ceil(numTxns / 8);
+  return result;
+}

@@ -6,6 +6,7 @@ use mpl_token_metadata::{
     CreateMetadataAccountV3CpiAccounts, CreateMetadataAccountV3InstructionArgs,
     InstructionAccountInfo, UpdateMetadataAccountV2Cpi, UpdateMetadataAccountV2CpiAccounts,
     UpdateMetadataAccountV2InstructionArgs, VerifyCollectionCpi, VerifyCollectionCpiAccounts,
+    VerifySizedCollectionItemCpi, VerifySizedCollectionItemCpiAccounts,
   },
   types::{CollectionDetails, DataV2},
   ID,
@@ -152,6 +153,29 @@ pub fn verify_collection_item<'info>(
   VerifyCollectionCpi::new(
     &ctx.accounts.token_metadata_program,
     VerifyCollectionCpiAccounts {
+      payer: &ctx.accounts.payer,
+      metadata: &ctx.accounts.metadata,
+      collection_authority: &ctx.accounts.collection_authority,
+      collection_mint: &ctx.accounts.collection_mint,
+      collection: &ctx.accounts.collection_metadata,
+      collection_master_edition_account: &ctx
+        .accounts
+        .collection_master_edition
+        .to_account_info()
+        .clone(),
+      collection_authority_record: None,
+    },
+  )
+  .invoke_signed(ctx.signer_seeds)
+  .map_err(Into::into)
+}
+
+pub fn verify_sized_collection_item<'info>(
+  ctx: CpiContext<'_, '_, '_, 'info, VerifyCollectionItem<'info>>,
+) -> Result<()> {
+  VerifySizedCollectionItemCpi::new(
+    &ctx.accounts.token_metadata_program,
+    VerifySizedCollectionItemCpiAccounts {
       payer: &ctx.accounts.payer,
       metadata: &ctx.accounts.metadata,
       collection_authority: &ctx.accounts.collection_authority,

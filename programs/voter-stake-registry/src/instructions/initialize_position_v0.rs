@@ -11,7 +11,7 @@ use mpl_token_metadata::types::Collection;
 use mpl_token_metadata::types::DataV2;
 use shared_utils::create_metadata_accounts_v3;
 use shared_utils::token_metadata::{
-  verify_collection_item, CreateMetadataAccountsV3, Metadata, VerifyCollectionItem,
+  verify_sized_collection_item, CreateMetadataAccountsV3, Metadata, VerifyCollectionItem,
 };
 use std::convert::TryFrom;
 use std::mem::size_of;
@@ -222,7 +222,7 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
 
   let verify_signer_seeds: &[&[&[u8]]] = &[registrar_seeds!(ctx.accounts.registrar)];
 
-  verify_collection_item(CpiContext::new_with_signer(
+  verify_sized_collection_item(CpiContext::new_with_signer(
     ctx
       .accounts
       .token_metadata_program
