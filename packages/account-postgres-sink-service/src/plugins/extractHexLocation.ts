@@ -20,7 +20,7 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
     const processAccount = async (account: { [key: string]: any }) => {
       return {
         ...account,
-        city: 'boby',
+        city: 'test',
         state: 'test',
         country: 'test',
       };
