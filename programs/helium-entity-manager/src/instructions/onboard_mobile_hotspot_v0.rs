@@ -164,6 +164,17 @@ pub fn handler<'info>(
   let mut dc_fee = fees.dc_onboarding_fee;
   let location_fee = fees.location_staking_fee;
 
+  ctx.accounts.mobile_info.set_inner(MobileHotspotInfoV0 {
+    asset: asset_id,
+    bump_seed: ctx.bumps["mobile_info"],
+    location: None,
+    is_full_hotspot: true,
+    num_location_asserts: 0,
+    is_active: false,
+    dc_onboarding_fee_paid: fees.dc_onboarding_fee,
+    device_type: args.device_type,
+  });
+
   if let Some(location) = args.location {
     dc_fee = location_fee.checked_add(dc_fee).unwrap();
 
@@ -176,16 +187,6 @@ pub fn handler<'info>(
       .unwrap();
   }
 
-  ctx.accounts.mobile_info.set_inner(MobileHotspotInfoV0 {
-    asset: asset_id,
-    bump_seed: ctx.bumps["mobile_info"],
-    location: None,
-    is_full_hotspot: true,
-    num_location_asserts: 0,
-    is_active: false,
-    dc_onboarding_fee_paid: fees.dc_onboarding_fee,
-    device_type: args.device_type,
-  });
   track_dc_onboarding_fees_v0(
     CpiContext::new_with_signer(
       ctx.accounts.helium_sub_daos_program.to_account_info(),
