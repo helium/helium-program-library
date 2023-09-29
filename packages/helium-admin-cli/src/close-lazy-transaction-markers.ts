@@ -1,9 +1,20 @@
 import * as anchor from "@coral-xyz/anchor";
-import { blockKey, init as initLazy, lazyTransactionsKey } from "@helium/lazy-transactions-sdk";
+import {
+  blockKey,
+  getBitmapLen,
+  init as initLazy,
+  lazyTransactionsKey,
+} from "@helium/lazy-transactions-sdk";
 import os from "os";
 import yargs from "yargs/yargs";
 import { bulkSendTransactions, chunks } from "@helium/spl-utils";
-import { Transaction } from "@solana/web3.js";
+import {
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  TransactionInstruction,
+} from "@solana/web3.js";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -19,8 +30,8 @@ export async function run(args: any = process.argv) {
     },
     name: {
       default: "nJWGUMOK",
-      describe: "The lazy transactions instance name"
-    }
+      describe: "The lazy transactions instance name",
+    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -30,47 +41,91 @@ export async function run(args: any = process.argv) {
   const lazyProgram = await initLazy(provider);
   const ltKey = lazyTransactionsKey(argv.name)[0];
   const lt = await lazyProgram.account.lazyTransactionsV0.fetch(ltKey);
-  
+
   const blocks = await lazyProgram.account.block.all();
   const blocksByKey = new Set(blocks.map((b) => b.publicKey.toString()));
-  const allIndices = new Array(1 << lt.maxDepth).fill(0).map((_, i) => i);
+  const allIndices = new Array(1 << lt.maxDepth)
+    .fill(0)
+    .map((_, i) => i)
+    .map((bi) => ({
+      index: bi,
+      block: blockKey(ltKey, bi)[0],
+    }));
   const blockIndices = allIndices.filter((bi) =>
-    blocksByKey.has(blockKey(ltKey, bi)[0].toBase58())
+    blocksByKey.has(bi.block.toBase58())
   );
-  if (lt.executed.length !== 1 << lt.maxDepth) {
+  if (lt.executedTransactions.equals(PublicKey.default)) {
+    const executedTransactions = Keypair.generate();
+    const executedTransactionsSize = 1 + getBitmapLen(lt.maxDepth);
+    const executedTransactionsRent =
+      await provider.connection.getMinimumBalanceForRentExemption(
+        executedTransactionsSize
+      );
     await lazyProgram.methods
-      .reinitializeExecutedTransactionsV0()
+      .updateLazyTransactionsV0({
+        root: null,
+        authority: null,
+      })
+      .preInstructions([
+        SystemProgram.createAccount({
+          fromPubkey: provider.wallet.publicKey,
+          newAccountPubkey: executedTransactions.publicKey,
+          space: executedTransactionsSize,
+          lamports: executedTransactionsRent,
+          programId: lazyProgram.programId,
+        }),
+      ])
       .accounts({
         lazyTransactions: ltKey,
+        executedTransactions: executedTransactions.publicKey,
       })
+      .signers([executedTransactions])
       .rpc({ skipPreflight: true });
+
+    lt.executedTransactions = executedTransactions.publicKey;
   }
-  const instructions = await Promise.all(
-    blockIndices.map((bi) =>
-      lazyProgram.methods
-        .closeMarkerV0({
-          index: bi,
-        })
-        .accounts({
-          refund: provider.wallet.publicKey,
-          lazyTransactions: ltKey,
-          authority: provider.wallet.publicKey,
-        })
-        .instruction()
-    )
-  );
+
+  // Do in chunks so we don't create too many promises
+  let instructions: TransactionInstruction[] = [];
+  let i = 0;
+  for (const chunk of chunks(blockIndices, 10)) {
+    if (i % 1000 === 0) {
+      console.log(`Forming txns ${i * 10}/${blockIndices.length}`);
+    }
+    i++;
+    instructions.push(
+      ...(await Promise.all(
+        chunk.map((bi) =>
+          lazyProgram.methods
+            .closeMarkerV0({
+              index: bi.index,
+            })
+            .accountsStrict({
+              refund: provider.wallet.publicKey,
+              lazyTransactions: ltKey,
+              authority: provider.wallet.publicKey,
+              block: bi.block,
+              executedTransactions: lt.executedTransactions,
+            })
+            .instruction()
+        )
+      ))
+    );
+  }
 
   console.log(`${blocks.length} blocks to close`);
-  const txns = chunks(instructions, 10).map(chunk => {
+  const txns = chunks(instructions, 10).map((chunk) => {
     const tx = new Transaction({
       feePayer: provider.wallet.publicKey,
-    })
-    tx.add(...chunk)
-    return tx
-  })
+    });
+    tx.add(...chunk);
+    return tx;
+  });
 
   await bulkSendTransactions(provider, txns, (status) => {
-    console.log(`Sending ${status.currentBatchProgress} / ${status.currentBatchSize} batch. ${status.totalProgress} / ${txns.length}`)
-  })
-  console.log("Done")
+    console.log(
+      `Sending ${status.currentBatchProgress} / ${status.currentBatchSize} batch. ${status.totalProgress} / ${txns.length}`
+    );
+  });
+  console.log("Done");
 }

@@ -30,6 +30,14 @@ pub struct InitializeLazyTransactionsV0<'info> {
     constraint = check_canopy_bytes(&canopy.data.borrow()[1..]).is_ok(),
   )]
   pub canopy: AccountInfo<'info>,
+  /// CHECK: Account to store the bitmap of executed txns, the size will determine the size of the bitmap
+  #[account(
+    mut,
+    owner = id(),
+    constraint = executed_transactions.key() == lazy_transactions.executed_transactions || executed_transactions.data.borrow()[0] == 0,
+    constraint = executed_transactions.data.borrow().len() == 1 + get_bitmap_len(lazy_transactions.max_depth),
+  )]
+  pub executed_transactions: AccountInfo<'info>,
   pub system_program: Program<'info, System>,
 }
 
@@ -39,6 +47,9 @@ pub fn handler(
 ) -> Result<()> {
   let mut data = ctx.accounts.canopy.try_borrow_mut_data()?;
   data[0] = 1;
+
+  let mut exdata = ctx.accounts.executed_transactions.try_borrow_mut_data()?;
+  exdata[0] = 1;
 
   ctx
     .accounts
@@ -50,7 +61,7 @@ pub fn handler(
       canopy: ctx.accounts.canopy.key(),
       max_depth: args.max_depth,
       bump_seed: ctx.bumps["lazy_transactions"],
-      executed: vec![0; get_bitmap_len(args.max_depth)],
+      executed_transactions: ctx.accounts.executed_transactions.key(),
     });
 
   Ok(())

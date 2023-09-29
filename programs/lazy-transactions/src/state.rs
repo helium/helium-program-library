@@ -10,7 +10,7 @@ pub struct LazyTransactionsV0 {
   pub canopy: Pubkey,
   pub bump_seed: u8,
   // Bitmap of executed transactions
-  pub executed: Vec<u8>,
+  pub executed_transactions: Pubkey,
 }
 
 #[account]

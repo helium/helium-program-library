@@ -14,7 +14,8 @@ pub struct CloseMarkerV0<'info> {
   pub refund: UncheckedAccount<'info>,
   #[account(
     mut,
-    has_one = authority
+    has_one = authority,
+    has_one = executed_transactions,
   )]
   pub lazy_transactions: Account<'info, LazyTransactionsV0>,
   pub authority: Signer<'info>,
@@ -25,10 +26,14 @@ pub struct CloseMarkerV0<'info> {
     bump
   )]
   pub block: Account<'info, Block>,
+  /// CHECK: Checked by has_one
+  #[account(mut)]
+  pub executed_transactions: AccountInfo<'info>,
 }
 
 pub fn handler(ctx: Context<CloseMarkerV0>, args: CloseMarkerArgsV0) -> Result<()> {
-  set_executed(&mut ctx.accounts.lazy_transactions.executed, args.index);
+  let slice = &mut ctx.accounts.executed_transactions.try_borrow_mut_data()?[1..];
+  set_executed(slice, args.index);
 
   Ok(())
 }

@@ -33,7 +33,8 @@ pub struct ExecuteTransactionV0<'info> {
   #[account(
     mut,
     has_one = canopy,
-    constraint = !is_executed(&lazy_transactions.executed, args.index) @ ErrorCode::TransactionAlreadyExecuted,
+    has_one = executed_transactions,
+    constraint = !is_executed(&executed_transactions.try_borrow_mut_data()?[1..], args.index) @ ErrorCode::TransactionAlreadyExecuted,
   )]
   pub lazy_transactions: Account<'info, LazyTransactionsV0>,
   /// CHECK: Verified by has one
@@ -54,10 +55,14 @@ pub struct ExecuteTransactionV0<'info> {
   )]
   pub block: AccountInfo<'info>,
   pub system_program: Program<'info, System>,
+  /// CHECK: Checked by has_one
+  #[account(mut)]
+  pub executed_transactions: AccountInfo<'info>,
 }
 
 pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV0) -> Result<()> {
-  set_executed(&mut ctx.accounts.lazy_transactions.executed, args.index);
+  let slice = &mut ctx.accounts.executed_transactions.try_borrow_mut_data()?[1..];
+  set_executed(slice, args.index);
 
   let largest_acct_idx: usize = (*args
     .instructions
