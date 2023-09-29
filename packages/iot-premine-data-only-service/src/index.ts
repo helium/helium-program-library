@@ -1,22 +1,22 @@
-import cors from '@fastify/cors';
+import cors from "@fastify/cors";
 import {
   blockKey,
   init,
   isExecuted,
   lazySignerKey,
   lazyTransactionsKey,
-} from '@helium/lazy-transactions-sdk';
-import { chunks } from '@helium/spl-utils';
+} from "@helium/lazy-transactions-sdk";
+import { chunks } from "@helium/spl-utils";
 import {
   ComputeBudgetProgram,
   PublicKey,
   SystemProgram,
   TransactionMessage,
   VersionedTransaction,
-} from '@solana/web3.js';
-import AWS from 'aws-sdk';
-import Fastify, { FastifyInstance } from 'fastify';
-import { Pool } from 'pg';
+} from "@solana/web3.js";
+import AWS from "aws-sdk";
+import Fastify, { FastifyInstance } from "fastify";
+import { Pool } from "pg";
 import {
   LAZY_TRANSACTIONS_NAME,
   PGDATABASE,
@@ -25,15 +25,15 @@ import {
   PGPORT,
   PGUSER,
   AWS_REGION,
-} from './env';
-import { provider, wallet } from './solana';
-import { decompress, decompressSigners } from './utils';
+} from "./env";
+import { provider, wallet } from "./solana";
+import { decompress, decompressSigners } from "./utils";
 
 (async () => {
   const [lazySigner] = lazySignerKey(LAZY_TRANSACTIONS_NAME);
   const [lazyTransactions] = lazyTransactionsKey(LAZY_TRANSACTIONS_NAME);
   const program = await init(provider);
-  const isRds = PGHOST.includes('rds.amazonaws.com');
+  const isRds = PGHOST.includes("rds.amazonaws.com");
   const pool = new Pool({
     port: PGPORT,
     host: PGHOST,
@@ -67,7 +67,10 @@ import { decompress, decompressSigners } from './utils';
 
     console.log(`Found ${results.length} transactions to execute}`);
     const lt = await program.account.lazyTransactionsV0.fetch(lazyTransactions);
-    const executed = lt.executed;
+    const executedTransactionsKey = lt.executedTransactions;
+    const executed = (
+      await provider.connection.getAccountInfo(executedTransactionsKey)
+    )?.data.subarray(1)!;
     const lazyTxns = await program.account.lazyTransactionsV0.fetch(
       lazyTransactions
     );
@@ -115,7 +118,7 @@ import { decompress, decompressSigners } from './utils';
                 .remainingAccounts([
                   ...compiledTx.accounts,
                   ...proof.map((p) => ({
-                    pubkey: new PublicKey(Buffer.from(p, 'hex')),
+                    pubkey: new PublicKey(Buffer.from(p, "hex")),
                     isWritable: false,
                     isSigner: false,
                   })),
@@ -151,7 +154,7 @@ import { decompress, decompressSigners } from './utils';
             ret.sign([wallet]);
             return Buffer.from(ret.serialize()).toJSON().data;
           } catch (e: any) {
-            console.error('Failed to serialize tx with id', id);
+            console.error("Failed to serialize tx with id", id);
             PublicKey.prototype.toString = PublicKey.prototype.toBase58;
             console.error(ret);
             console.error(ret.message.addressTableLookups);
@@ -165,13 +168,13 @@ import { decompress, decompressSigners } from './utils';
   }
 
   const server: FastifyInstance = Fastify({ logger: true });
-  server.register(cors, { origin: '*' });
+  server.register(cors, { origin: "*" });
 
-  server.get('/health', async () => ({ ok: true }));
+  server.get("/health", async () => ({ ok: true }));
 
   server.get<{
     Querystring: { limit?: number; offset?: number };
-  }>('/migrate', async (req, res) => {
+  }>("/migrate", async (req, res) => {
     const { limit, offset } = req.query;
     const client = await pool.connect();
 
@@ -194,7 +197,7 @@ import { decompress, decompressSigners } from './utils';
       res.code(200).send({
         transactions: results || [],
         count: Number(
-          (await client.query('SELECT count(*) FROM transactions', [])).rows[0]
+          (await client.query("SELECT count(*) FROM transactions", [])).rows[0]
             .count
         ),
       });
@@ -208,9 +211,9 @@ import { decompress, decompressSigners } from './utils';
   });
 
   try {
-    await server.listen({ port: 8081, host: '0.0.0.0' });
+    await server.listen({ port: 8081, host: "0.0.0.0" });
     const address = server.server.address();
-    const port = typeof address === 'string' ? address : address?.port;
+    const port = typeof address === "string" ? address : address?.port;
     console.log(`Running on 0.0.0.0:${port}`);
   } catch (err) {
     server.log.error(err);
