@@ -114,6 +114,7 @@ import { decompress, decompressSigners } from "./utils";
                   lazySigner,
                   block,
                   systemProgram: SystemProgram.programId,
+                  executedTransactions: executedTransactionsKey,
                 })
                 .remainingAccounts([
                   ...compiledTx.accounts,
