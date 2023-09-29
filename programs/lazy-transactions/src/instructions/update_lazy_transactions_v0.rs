@@ -21,6 +21,7 @@ pub struct UpdateLazyTransactionsV0<'info> {
     mut,
     owner = id(),
     constraint = canopy.key() == lazy_transactions.canopy || canopy.data.borrow()[0] == 0,
+    constraint = check_canopy_bytes(&canopy.data.borrow()[1..]).is_ok(),
   )]
   pub canopy: AccountInfo<'info>,
 }

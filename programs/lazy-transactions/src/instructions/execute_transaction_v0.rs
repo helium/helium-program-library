@@ -1,5 +1,6 @@
 use crate::canopy::fill_in_proof_from_canopy;
 use crate::error::ErrorCode;
+use crate::util::{is_executed, set_executed};
 use crate::{merkle_proof::verify, state::*};
 use anchor_lang::{prelude::*, solana_program, solana_program::instruction::Instruction};
 
@@ -30,7 +31,9 @@ pub struct ExecuteTransactionV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
-    has_one = canopy
+    mut,
+    has_one = canopy,
+    constraint = !is_executed(&lazy_transactions.executed, args.index) @ ErrorCode::TransactionAlreadyExecuted,
   )]
   pub lazy_transactions: Account<'info, LazyTransactionsV0>,
   /// CHECK: Verified by has one
@@ -42,18 +45,20 @@ pub struct ExecuteTransactionV0<'info> {
   )]
   /// CHECK: You can throw things behind this signer and it will sign the tx via cpi
   pub lazy_signer: AccountInfo<'info>,
+  /// CHECK: Temporary. We can remove this once executed txns is fully populated
   #[account(
-    init,
-    payer = payer,
-    space = 8,
+    constraint = block.lamports() == 0,
+    constraint = block.data.borrow().len() == 0,
     seeds = ["block".as_bytes(), lazy_transactions.key().as_ref(), &args.index.to_le_bytes()],
     bump
   )]
-  pub block: Account<'info, Block>,
+  pub block: AccountInfo<'info>,
   pub system_program: Program<'info, System>,
 }
 
 pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV0) -> Result<()> {
+  set_executed(&mut ctx.accounts.lazy_transactions.executed, args.index);
+
   let largest_acct_idx: usize = (*args
     .instructions
     .iter()
