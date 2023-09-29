@@ -5,6 +5,7 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
+use mpl_token_metadata::types::CollectionDetails;
 use mpl_token_metadata::types::DataV2;
 use shared_utils::create_metadata_accounts_v3;
 use shared_utils::token_metadata::{
@@ -150,7 +151,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
       uses: None,
     },
     true,
-    None,
+    Some(CollectionDetails::V1 { size: 0 }),
   )?;
 
   create_master_edition_v3(
