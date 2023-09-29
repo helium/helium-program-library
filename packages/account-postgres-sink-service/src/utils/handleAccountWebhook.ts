@@ -5,21 +5,21 @@ import { provider } from './solana';
 import database from './database';
 import { sanitizeAccount } from './sanitizeAccount';
 import cachedIdlFetch from './cachedIdlFetch';
+import { FastifyInstance } from 'fastify';
+import { IAccountConfig } from '../types';
 
 interface HandleAccountWebhookArgs {
+  fastify: FastifyInstance;
   programId: PublicKey;
-  configAccounts: {
-    type: string;
-    table?: string;
-    schema?: string;
-  }[];
+  accounts: IAccountConfig[];
   account: any;
   sequelize?: Sequelize;
 }
 
 export async function handleAccountWebhook({
+  fastify,
   programId,
-  configAccounts,
+  accounts,
   account,
   sequelize = database,
 }: HandleAccountWebhookArgs) {
@@ -33,7 +33,7 @@ export async function handleAccountWebhook({
   }
 
   if (
-    !configAccounts.every(({ type }) =>
+    !accounts.every(({ type }) =>
       idl.accounts!.some(({ name }) => name === type)
     )
   ) {
@@ -49,7 +49,7 @@ export async function handleAccountWebhook({
     let decodedAcc: any;
     let accName: any;
 
-    for (const { type } of configAccounts) {
+    for (const { type } of accounts) {
       try {
         if (accName) break;
         decodedAcc = program.coder.accounts.decode(type, data);
@@ -70,6 +70,7 @@ export async function handleAccountWebhook({
     }
 
     await t.commit();
+    fastify.customMetrics.accountWebhookCounter.inc();
   } catch (err) {
     await t.rollback();
     console.error('While inserting, err', err);

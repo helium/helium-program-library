@@ -15,6 +15,7 @@ import { upsertProgramAccounts } from './utils/upsertProgramAccounts';
 import { integrityCheckProgramAccounts } from './utils/integrityCheckProgramAccounts';
 import { handleAccountWebhook } from './utils/handleAccountWebhook';
 import { metrics } from './plugins/metrics';
+import { IConfig } from './types';
 
 if (!HELIUS_AUTH_SECRET) {
   throw new Error('Helius auth secret not available');
@@ -23,14 +24,7 @@ if (!HELIUS_AUTH_SECRET) {
 (async () => {
   const configs = (() => {
     const accountConfigs: null | {
-      configs: {
-        programId: string;
-        accounts: { type: string; table: string; schema: string }[];
-        crons?: {
-          schedule: string;
-          type: 'refresh-accounts' | 'integrity-check';
-        }[];
-      }[];
+      configs: IConfig[];
     } = JSON.parse(fs.readFileSync(PROGRAM_ACCOUNT_CONFIGS, 'utf8'));
 
     return accountConfigs ? accountConfigs.configs : [];
@@ -142,8 +136,9 @@ if (!HELIUS_AUTH_SECRET) {
 
           try {
             await handleAccountWebhook({
+              fastify: server,
               programId: new PublicKey(config.programId),
-              configAccounts: config.accounts,
+              accounts: config.accounts,
               account: parsed,
             });
           } catch (err) {

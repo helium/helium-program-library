@@ -172,7 +172,7 @@ export const integrityCheckProgramAccounts = async ({
 
     await t.commit();
     for (const correction of corrections) {
-      (fastify as any).customMetrics.integrityMetric.inc();
+      fastify.customMetrics.integrityCheckCounter.inc();
       console.log(`IntegrityCheckCorrection:`, correction);
     }
   } catch (err) {
