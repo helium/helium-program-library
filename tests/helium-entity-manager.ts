@@ -1020,7 +1020,7 @@ describe("helium-entity-manager", () => {
         );
         expect(infoAcc.isActive).to.be.false;
         const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
-        expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(0);
+        expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(5000000);
       });
 
       it("changes the metadata", async () => {

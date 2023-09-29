@@ -69,6 +69,7 @@ export async function run(args: any = process.argv) {
       lazyTransactions,
       authority: lazyTrAcc.authority,
       canopy: lazyTrAcc.canopy,
+      executedTransactions: lazyTrAcc.executedTransactions,
     })
     .instruction();
 
