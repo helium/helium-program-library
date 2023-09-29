@@ -18,6 +18,7 @@ export class ReverseGeoCache extends Model {
   declare country: string;
   declare lat: number;
   declare lng: number;
+  declare raw: Object;
 }
 ReverseGeoCache.init(
   {
@@ -31,6 +32,7 @@ ReverseGeoCache.init(
     city: DataTypes.STRING,
     state: DataTypes.STRING,
     country: DataTypes.STRING,
+    raw: DataTypes.JSONB,
   },
   {
     sequelize: database,
@@ -89,7 +91,9 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
       let reverseGeod: ReverseGeoCache | null = null;
       const location = account[config.field || "location"];
       if (location) {
-        reverseGeod = await ReverseGeoCache.findByPk(location.toString());
+        reverseGeod = await ReverseGeoCache.findByPk(location.toString(), {
+          attributes: updateOnDuplicateFields,
+        });
         if (!reverseGeod) {
           const coords = parseH3BNLocation(location);
           const response = await axios.get(
@@ -112,9 +116,18 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
             country,
             lat: coords[0],
             long: coords[1],
+            raw: response.data.features,
           });
         }
       }
+      // Remove raw response, format camelcase
+      if (reverseGeod) {
+        delete reverseGeod.dataValues.raw;
+        reverseGeod.dataValues.streetAddress =
+          reverseGeod?.dataValues.street_address;
+        delete reverseGeod.dataValues.street_address;
+      }
+
       return {
         ...account,
         city: null,
