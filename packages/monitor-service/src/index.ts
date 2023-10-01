@@ -5,7 +5,8 @@ import {
   subDaoKey,
   threadKey,
 } from '@helium/helium-sub-daos-sdk';
-import { init as hemInit } from '@helium/helium-entity-manager-sdk';
+import { getAssociatedTokenAddressSync } from "@solana/spl-token"
+import { init as hemInit, rewardableEntityConfigKey } from '@helium/helium-entity-manager-sdk';
 import { accountPayerKey } from '@helium/data-credits-sdk';
 import { CircuitBreaker } from '@helium/idls/lib/types/circuit_breaker';
 import { HeliumSubDaos } from '@helium/idls/lib/types/helium_sub_daos';
@@ -73,6 +74,22 @@ async function run() {
   await monitorTokenBalance(mobileTreasury, 'mobile_treasury');
   await monitorTokenBalance(iotRewardsEscrow, 'iot_rewards_escrow');
   await monitorTokenBalance(mobileRewardsEscrow, 'mobile_rewards_escrow');
+  await monitorTokenBalance(
+    getAssociatedTokenAddressSync(dao.dcMint, iot.activeDeviceAuthority)[0],
+    "iot_active_device_oracle_dc"
+  );
+  await monitorTokenBalance(
+    getAssociatedTokenAddressSync(dao.dcMint, mobile.activeDeviceAuthority)[0],
+    "mobile_active_device_oracle_dc"
+  );
+  await monitorSolBalance(
+    iot.activeDeviceAuthority,
+    "iot_active_device_oracle_sol"
+  );
+  await monitorSolBalance(
+    mobile.activeDeviceAuthority,
+    "mobile_active_device_oracle_sol"
+  );
 
   for (const maker of makers) {
     await monitorSolBalance(
