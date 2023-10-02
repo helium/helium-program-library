@@ -15,7 +15,9 @@
     "rewards-oracle-faucet-service": "./packages/rewards-oracle-faucet-service"
   },
   "oracle": {
-    "distributor-oracle": "./packages/distributor-oracle",
+    "distributor-oracle": "./packages/distributor-oracle"
+  },
+  "data": {
     "active-hotspot-oracle": "./utils/active-hotspot-oracle"
   }
 }
