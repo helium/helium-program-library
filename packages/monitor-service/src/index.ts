@@ -75,11 +75,11 @@ async function run() {
   await monitorTokenBalance(iotRewardsEscrow, 'iot_rewards_escrow');
   await monitorTokenBalance(mobileRewardsEscrow, 'mobile_rewards_escrow');
   await monitorTokenBalance(
-    getAssociatedTokenAddressSync(dao.dcMint, iot.activeDeviceAuthority)[0],
+    getAssociatedTokenAddressSync(dao.dcMint, iot.activeDeviceAuthority),
     "iot_active_device_oracle_dc"
   );
   await monitorTokenBalance(
-    getAssociatedTokenAddressSync(dao.dcMint, mobile.activeDeviceAuthority)[0],
+    getAssociatedTokenAddressSync(dao.dcMint, mobile.activeDeviceAuthority),
     "mobile_active_device_oracle_dc"
   );
   await monitorSolBalance(
