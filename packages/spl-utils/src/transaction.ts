@@ -13,6 +13,7 @@ import {
   TransactionInstruction,
   TransactionResponse,
   TransactionSignature,
+  VersionedTransaction,
   VersionedTransactionResponse,
 } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -270,7 +271,7 @@ export const awaitTransactionSignatureConfirmation = async (
             slot: context.slot,
             confirmations: 0,
           };
-          done = true
+          done = true;
           if (result.err) {
             console.log("Rejected via websocket", result.err);
             reject(status);
@@ -283,7 +284,7 @@ export const awaitTransactionSignatureConfirmation = async (
     } catch (e) {
       console.error("WS error in setup", txid, e);
     } finally {
-      done = true
+      done = true;
       clearTimeout(t);
     }
     while (!done && queryStatus) {
@@ -381,7 +382,7 @@ export async function sendAndConfirmWithRetry(
   let done = false;
   let slot = 0;
   const txid = await connection.sendRawTransaction(txn, sendOptions);
-  console.log("txid", txid)
+  console.log("txid", txid);
   const startTime = getUnixTime();
   (async () => {
     while (!done && getUnixTime() - startTime < timeout) {
@@ -457,7 +458,7 @@ async function withRetries<A>(
       console.log(`Retrying ${i}...`, e);
     }
   }
-  throw new Error("Failed after retries")
+  throw new Error("Failed after retries");
 }
 
 type Status = {
@@ -468,7 +469,7 @@ type Status = {
 const TX_BATCH_SIZE = 200;
 export async function bulkSendTransactions(
   provider: Provider,
-  txs: Transaction[],
+  txs: (Transaction | VersionedTransaction)[],
   onProgress?: (status: Status) => void,
   triesRemaining: number = 10 // Number of blockhashes to try resending txs with before giving up
 ): Promise<string[]> {
@@ -484,26 +485,53 @@ export async function bulkSendTransactions(
       );
       const blockhashedTxs = await Promise.all(
         chunk.map(async (tx) => {
-          tx.recentBlockhash = recentBlockhash.blockhash;
-          return tx;
+          let isVersionedTransaction = false;
+          const legacyTxn = tx as Transaction;
+          const versionedTxn = tx as VersionedTransaction;
+          if (!legacyTxn?.partialSign) {
+            isVersionedTransaction = true;
+          }
+
+          if (!isVersionedTransaction) {
+            legacyTxn.recentBlockhash = recentBlockhash.blockhash;
+            return legacyTxn;
+          }
+
+          versionedTxn.message.recentBlockhash = recentBlockhash.blockhash;
+          return versionedTxn;
         })
       );
-      const signedTxs = await (provider as AnchorProvider).wallet.signAllTransactions(
-        blockhashedTxs
-      );
+      const signedTxs = await (
+        provider as AnchorProvider
+      ).wallet.signAllTransactions(blockhashedTxs);
 
       const txsWithSigs = signedTxs.map((tx, index) => {
+        let isVersionedTransaction = false;
+        const legacyTxn = tx as Transaction;
+        const versionedTxn = tx as VersionedTransaction;
+
+        if (!legacyTxn?.partialSign) {
+          isVersionedTransaction = true;
+        }
+
         return {
           transaction: chunk[index],
-          sig: bs58.encode(tx.signatures[0]!.signature!),
+          sig: bs58.encode(
+            !isVersionedTransaction
+              ? legacyTxn.signatures[0]!.signature!
+              : versionedTxn.signatures[0]!
+          ),
         };
       });
       const confirmedTxs = await bulkSendRawTransactions(
         provider.connection,
-        signedTxs.map((s) => s.serialize()),
+        signedTxs.map((s) => Buffer.from(s.serialize())),
         ({ totalProgress, ...rest }) =>
           onProgress &&
-          onProgress({ ...rest, totalProgress: totalProgress + ret.length + thisRet.length}),
+          onProgress({
+            ...rest,
+            totalProgress: totalProgress + ret.length + thisRet.length,
+          }),
         recentBlockhash.lastValidBlockHeight,
         // Hail mary, try with preflight enabled. Sometimes this causes
         // errors that wouldn't otherwise happen
@@ -523,7 +551,9 @@ export async function bulkSendTransactions(
       triesRemaining--;
       if (triesRemaining <= 0) {
         throw new Error(
-          `Failed to submit all txs after blockhashes expired, ${signedTxs.length - confirmedTxs.length} remain`
+          `Failed to submit all txs after blockhashes expired, ${
+            signedTxs.length - confirmedTxs.length
+          } remain`
         );
       }
     }
@@ -601,7 +631,7 @@ export async function bulkSendRawTransactions(
       }
       ret.push(
         ...txids
-          .map((txid, idx) => statuses[idx] == null ? null : txid)
+          .map((txid, idx) => (statuses[idx] == null ? null : txid))
           .filter(truthy)
       );
       chunk = chunk.filter((_, index) => statuses[index] === null);
