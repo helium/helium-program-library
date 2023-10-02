@@ -10,7 +10,7 @@ use deltalake::{datafusion::prelude::SessionContext, DeltaTableBuilder};
 use helium_entity_manager::KeyToAssetV0;
 use helium_entity_manager::{accounts::SetEntityActiveV0, SetEntityActiveArgsV0};
 use helium_entity_manager::{
-  accounts::TempPayMobileOnboardingFeeV0, IotHotspotInfoV0, MobileHotspotInfoV0,
+  accounts::TempPayMobileOnboardingFeeV0, IotHotspotInfoV0, MobileHotspotInfoV0, MobileDeviceTypeV0
 };
 use hpl_utils::dao::Dao;
 use hpl_utils::token::Token;
