@@ -9,6 +9,9 @@ import animalHash from "angry-purple-tiger";
 import Fastify, { FastifyInstance } from "fastify";
 import axios from "axios";
 import { provider } from "./solana";
+import { IotHotspotInfo, KeyToAsset, MobileHotspotInfo, sequelize } from "./model";
+import bs58 from 'bs58';
+import { truthy } from "@helium/spl-utils";
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -38,6 +41,12 @@ server.get<{ Params: { keyToAssetKey: string } }>(
       keyToAssetAccount.keySerialization
     );
     const digest = animalHash(keyStr);
+    const record = await KeyToAsset.findOne({
+      where: {
+        address: keyToAsset.toBase58(),
+      },
+      include: [IotHotspotInfo, MobileHotspotInfo],
+    });
 
     return {
       name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
@@ -61,6 +70,15 @@ server.get<{ Params: { keyToAssetKey: string } }>(
           value: keyToAssetAccount.entityKey.toString("base64"),
         },
         { trait_type: "rewardable", value: true },
+        {
+          trait_type: "networks",
+          value: [
+            record?.iot_hotspot_info && "iot",
+            record?.mobile_hotspot_info && "mobile",
+          ].filter(truthy),
+        },
+        ...locationAttributes("iot", record?.iot_hotspot_info),
+        ...locationAttributes("iot", record?.mobile_hotspot_info),
       ],
     };
   }
@@ -83,6 +101,13 @@ server.get<{ Params: { eccCompact: string } }>(
       }
     }
 
+    const record = await KeyToAsset.findOne({
+      where: {
+        entityKey: bs58.decode(eccCompact),
+      },
+      include: [IotHotspotInfo, MobileHotspotInfo],
+    });
+
     const digest = animalHash(eccCompact);
 
     return {
@@ -93,10 +118,38 @@ server.get<{ Params: { eccCompact: string } }>(
       attributes: [
         { trait_type: "ecc_compact", value: eccCompact },
         { trait_type: "rewardable", value: true },
+        {
+          trait_type: "networks",
+          value: [
+            record?.iot_hotspot_info && "iot",
+            record?.mobile_hotspot_info && "mobile",
+          ].filter(truthy),
+        },
+        ...locationAttributes("iot", record?.iot_hotspot_info),
+        ...locationAttributes("iot", record?.mobile_hotspot_info),
       ],
     };
   }
 );
+
+function locationAttributes(
+  name: string,
+  info: MobileHotspotInfo | IotHotspotInfo | undefined
+) {
+  if (!info) {
+    return []
+  }
+
+  return [
+    { trait_type: `${name}_street_address`, value: info.streetAddress },
+    { trait_type: `${name}_city`, value: info.city },
+    { trait_type: `${name}_state`, value: info.state },
+    { trait_type: `${name}_country`, value: info.country },
+    { trait_type: `${name}_lat`, value: info.lat },
+    { trait_type: `${name}_long`, value: info.long },
+  ];
+}
+
 
 const start = async () => {
   try {
@@ -104,9 +157,19 @@ const start = async () => {
 
     const address = server.server.address();
     const port = typeof address === "string" ? address : address?.port;
+    await sequelize.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS key_to_asset_asset_index ON key_to_assets(asset);
+    `);
+    await sequelize.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS iot_hotspot_infos_asset_index ON iot_hotspot_infos(asset);
+    `);
+    await sequelize.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS mobile_hotspot_infos_asset_index ON mobile_hotspot_infos(asset);
+    `);
   } catch (err) {
     server.log.error(err);
     process.exit(1);
   }
 };
 start();
+

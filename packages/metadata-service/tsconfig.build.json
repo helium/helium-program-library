@@ -18,10 +18,14 @@
     "baseUrl": ".",
     "typeRoots": ["node_modules/@types"],
     "strict": true,
+    "noImplicitAny": false,
+    "noEmitOnError": true,
+    "stripInternal": true,
+    "noEmit": false,
     "paths": {
       "@/*": ["*"]
     },
-    "outDir": "lib",
+    "outDir": "lib"
   },
   "include": ["src"],
 }
