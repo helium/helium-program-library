@@ -93,6 +93,7 @@ export async function handleAccountWebhook({
     }
 
     await t.commit();
+    // @ts-ignore
     fastify.customMetrics.accountWebhookCounter.inc();
   } catch (err) {
     await t.rollback();

@@ -1,4 +1,3 @@
-import axios from "axios";
 import BN from "bn.js";
 import { cellToLatLng } from "h3-js";
 import { camelize } from "inflection";
@@ -6,6 +5,7 @@ import _omit from "lodash/omit";
 import { DECIMAL, DataTypes, Model, QueryTypes } from "sequelize";
 import { IPlugin } from "../types";
 import { database } from "../utils/database";
+import { MapboxService } from "../utils/mapboxService";
 
 const parseH3BNLocation = (location: BN) =>
   cellToLatLng(location.toString("hex"));
@@ -87,6 +87,7 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
       };
     };
 
+    const mapbox = MapboxService.getInstance();
     const processAccount = async (account: { [key: string]: any }) => {
       let reverseGeod: ReverseGeoCache | null = null;
       const location = account[config.field || "location"];
@@ -96,12 +97,10 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
         });
         if (!reverseGeod) {
           const coords = parseH3BNLocation(location);
-          const response = await axios.get(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords[0]},${coords[1]}.json?access_token=${process.env.MAPBOX_ACCESS_TOKEN}`
-          );
+          const response = await mapbox.fetchLocation(coords);
           let placeName, parts, streetAddress, city, state, country;
-          if (response.data.features && response.data.features.length > 0) {
-            placeName = response.data.features[0].place_name;
+          if (response.features && response.features.length > 0) {
+            placeName = response.features[0].place_name;
             parts = placeName.split(",");
             streetAddress = parts[parts.length - 4]?.trim();
             city = parts[parts.length - 3]?.trim();
@@ -116,7 +115,7 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
             country,
             lat: coords[0],
             long: coords[1],
-            raw: response.data.features,
+            raw: response.features,
           });
         }
       }
