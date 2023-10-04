@@ -82,15 +82,16 @@ if (!HELIUS_AUTH_SECRET) {
       } catch (err) {
         console.error(err);
       } finally {
-        refreshing = false
+        refreshing = false;
       }
     }
   });
 
   server.get("/refresh-accounts", async (req, res) => {
     const programId = (req.query as any).program;
+    let prevRefreshing = refreshing;
     eventHandler.emit("refresh-accounts", programId);
-    if (refreshing) {
+    if (prevRefreshing) {
       res
         .code(StatusCodes.TOO_MANY_REQUESTS)
         .send(ReasonPhrases.TOO_MANY_REQUESTS);
