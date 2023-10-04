@@ -42,6 +42,7 @@ ReverseGeoCache.init(
     timestamps: true,
   }
 );
+const locationFetchCache: { [location: string]: Promise<ReverseGeoCache> } = {};
 export const ExtractHexLocationPlugin = ((): IPlugin => {
   const name = "ExtractHexLocation";
   const init = async (config: { [key: string]: any }) => {
@@ -88,8 +89,6 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
     };
 
     const mapbox = MapboxService.getInstance();
-    const locationFetchCache: { [location: string]: Promise<ReverseGeoCache> } =
-      {};
     const processAccount = async (account: { [key: string]: any }) => {
       let reverseGeod: ReverseGeoCache | null = null;
       const location = account[config.field || "location"];
@@ -123,10 +122,10 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
               });
             })();
           }
-          reverseGeod = await locationFetchCache[location]
+          reverseGeod = await locationFetchCache[location];
           // Once the create call finishes, we can cleanup this promise. Subsequent queries to postgres will discover
           // the account. This helps with memory management
-          delete locationFetchCache[location]
+          delete locationFetchCache[location];
         }
       }
       // Remove raw response, format camelcase

@@ -56,35 +56,36 @@ if (!HELIUS_AUTH_SECRET) {
 
   const eventHandler = new EventEmitter();
 
-  let refreshing = false;
-  eventHandler.on("refresh-accounts", async (programId) => {
+  let refreshing: Promise<void> | undefined = undefined;
+  eventHandler.on("refresh-accounts", (programId) => {
     if (!refreshing) {
-      refreshing = true;
-      try {
-        if (configs) {
-          for (const config of configs) {
-            console.log(
-              programId
-                ? `Refreshing accounts for program: ${programId}`
-                : `Refreshing accounts`
-            );
-            if ((programId && programId == config.programId) || !programId) {
-              try {
-                await upsertProgramAccounts({
-                  programId: new PublicKey(config.programId),
-                  accounts: config.accounts,
-                });
-              } catch (err) {
-                throw err;
+      refreshing = (async () => {
+        try {
+          if (configs) {
+            for (const config of configs) {
+              console.log(
+                programId
+                  ? `Refreshing accounts for program: ${programId}`
+                  : `Refreshing accounts`
+              );
+              if ((programId && programId == config.programId) || !programId) {
+                try {
+                  await upsertProgramAccounts({
+                    programId: new PublicKey(config.programId),
+                    accounts: config.accounts,
+                  });
+                } catch (err) {
+                  throw err;
+                }
               }
             }
           }
+        } catch (err) {
+          console.error(err);
+        } finally {
+          refreshing = undefined;
         }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        refreshing = false;
-      }
+      })();
     }
   });
 
