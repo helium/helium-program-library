@@ -16,6 +16,7 @@ interface HandleAccountWebhookArgs {
   accounts: IAccountConfig[];
   account: any;
   sequelize?: Sequelize;
+  pluginsByAccountType: Record<string, IInitedPlugin[]>
 }
 
 export async function handleAccountWebhook({
@@ -24,6 +25,7 @@ export async function handleAccountWebhook({
   accounts,
   account,
   sequelize = database,
+  pluginsByAccountType
 }: HandleAccountWebhookArgs) {
   const idl = await cachedIdlFetch.fetchIdl({
     programId: programId.toBase58(),
@@ -44,19 +46,6 @@ export async function handleAccountWebhook({
 
   const t = await sequelize.transaction();
   const now = new Date().toISOString();
-
-  const pluginsByAccountType = (
-    await Promise.all(
-      accounts.map(async (acc) => {
-        const plugins = await initPlugins(acc.plugins);
-        return { type: acc.type, plugins };
-      })
-    )
-  ).reduce((acc, { type, plugins }) => {
-    acc[type] = plugins.filter(truthy);
-    return acc;
-  }, {} as Record<string, IInitedPlugin[]>);
-
   try {
     const program = new anchor.Program(idl, programId, provider);
     const data = Buffer.from(account.data[0], account.data[1]);
@@ -78,7 +67,7 @@ export async function handleAccountWebhook({
       let sanitized = sanitizeAccount(decodedAcc);
       for (const plugin of pluginsByAccountType[accName]) {
         if (plugin?.processAccount) {
-          sanitized = await plugin.processAccount(sanitized);
+          sanitized = await plugin.processAccount(sanitized, t);
         }
       }
       const model = sequelize.models[accName];

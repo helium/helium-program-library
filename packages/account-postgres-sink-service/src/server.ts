@@ -11,12 +11,13 @@ import {
 } from "./env";
 import database from "./utils/database";
 import { defineAllIdlModels } from "./utils/defineIdlModels";
-import { upsertProgramAccounts } from "./utils/upsertProgramAccounts";
+import { truthy, upsertProgramAccounts } from "./utils/upsertProgramAccounts";
 import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAccounts";
 import { handleAccountWebhook } from "./utils/handleAccountWebhook";
 import { metrics } from "./plugins/metrics";
-import { IConfig } from "./types";
+import { IConfig, IInitedPlugin } from "./types";
 import { EventEmitter } from "events";
+import { initPlugins } from "./plugins";
 
 if (!HELIUS_AUTH_SECRET) {
   throw new Error("Helius auth secret not available");
@@ -129,6 +130,30 @@ if (!HELIUS_AUTH_SECRET) {
     }
   });
 
+  const pluginsByAccountTypeByProgram = (
+    await Promise.all(
+      configs.map(async (config) => {
+        return {
+          programId: config.programId,
+          pluginsByAccountType: (
+            await Promise.all(
+              config.accounts.map(async (acc) => {
+                const plugins = await initPlugins(acc.plugins);
+                return { type: acc.type, plugins };
+              })
+            )
+          ).reduce((acc, { type, plugins }) => {
+            acc[type] = plugins.filter(truthy);
+            return acc;
+          }, {} as Record<string, IInitedPlugin[]>),
+        };
+      })
+    )
+  ).reduce((acc, { programId, pluginsByAccountType }) => {
+    acc[programId] = pluginsByAccountType;
+    return acc;
+  }, {} as Record<string, Record<string, IInitedPlugin[]>>);
+
   server.post("/account-webhook", async (req, res) => {
     if (req.headers.authorization != HELIUS_AUTH_SECRET) {
       res.code(StatusCodes.FORBIDDEN).send({
@@ -157,6 +182,8 @@ if (!HELIUS_AUTH_SECRET) {
               programId: new PublicKey(config.programId),
               accounts: config.accounts,
               account: parsed,
+              pluginsByAccountType:
+                pluginsByAccountTypeByProgram[parsed["owner"]] || {},
             });
           } catch (err) {
             throw err;
