@@ -81,6 +81,8 @@ if (!HELIUS_AUTH_SECRET) {
         }
       } catch (err) {
         console.error(err);
+      } finally {
+        refreshing = false
       }
     }
   });
