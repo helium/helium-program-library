@@ -1,3 +1,5 @@
+import { Transaction } from "sequelize";
+
 type Plugins = 'ExtractHexLocation';
 type Crons = 'refresh-accounts' | 'integrity-check';
 
@@ -23,7 +25,7 @@ export interface IConfig {
 export interface IInitedPlugin {
   updateOnDuplicateFields?: string[];
   addFields?: (schema: { [key: string]: any }, accountName: string) => void;
-  processAccount: (account: any) => Promise<any>;
+  processAccount: (account: any, t: Transaction) => Promise<any>;
 }
 
 export interface IPlugin {
