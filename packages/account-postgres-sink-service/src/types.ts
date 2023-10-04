@@ -25,7 +25,7 @@ export interface IConfig {
 export interface IInitedPlugin {
   updateOnDuplicateFields?: string[];
   addFields?: (schema: { [key: string]: any }, accountName: string) => void;
-  processAccount: (account: any, t: Transaction) => Promise<any>;
+  processAccount: (account: any, t?: Transaction) => Promise<any>;
 }
 
 export interface IPlugin {
