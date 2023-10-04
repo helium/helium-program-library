@@ -15,8 +15,11 @@ export class MapboxService {
       retries: 10, // Number of retry attempts
       retryDelay: axiosRetry.exponentialDelay, // Exponential back-off
       retryCondition: (error) => {
+        const is429 = error.response ? error.response.status === 429 : false;
+        console.log("Received 429, backing off...");
+
         // Retry on 429 response
-        return error.response ? error.response.status === 429 : false;
+        return is429;
       },
     });
   }
