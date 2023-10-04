@@ -13,7 +13,7 @@ export const database = new Sequelize({
   username: process.env.PGUSER,
   database: process.env.PGDATABASE,
   pool: {
-    max: 5,
+    max: process.env.PG_POOL_SIZE ? Number(process.env.PG_POOL_SIZE) : 5,
     min: 0,
     acquire: 30000,
     idle: 10000,

@@ -6,6 +6,7 @@ import { DECIMAL, DataTypes, Model, QueryTypes } from "sequelize";
 import { IPlugin } from "../types";
 import { database } from "../utils/database";
 import { MapboxService } from "../utils/mapboxService";
+import pLimit from "p-limit";
 
 const parseH3BNLocation = (location: BN) =>
   cellToLatLng(location.toString("hex"));
@@ -89,63 +90,66 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
     };
 
     const mapbox = MapboxService.getInstance();
-    const processAccount = async (account: { [key: string]: any }) => {
-      let reverseGeod: ReverseGeoCache | null = null;
-      const location = account[config.field || "location"];
-      if (location) {
-        reverseGeod = await ReverseGeoCache.findByPk(location.toString(), {
-          attributes: updateOnDuplicateFields,
-        });
-        if (!reverseGeod) {
-          if (!locationFetchCache[location]) {
-            locationFetchCache[location] = (async () => {
-              const coords = parseH3BNLocation(location);
-              const response = await mapbox.fetchLocation(coords);
-              let placeName, parts, streetAddress, city, state, country;
-              if (response.features && response.features.length > 0) {
-                placeName = response.features[0].place_name;
-                parts = placeName.split(",");
-                streetAddress = parts[parts.length - 4]?.trim();
-                city = parts[parts.length - 3]?.trim();
-                state = parts[parts.length - 2]?.split(" ")[1]?.trim();
-                country = parts[parts.length - 1]?.trim();
-              }
-              return await ReverseGeoCache.create({
-                location: location.toString(),
-                streetAddress,
-                city,
-                state,
-                country,
-                lat: coords[0],
-                long: coords[1],
-                raw: response.features,
-              });
-            })();
+    const limit = pLimit(10);
+    const processAccount = (account: { [key: string]: any }) => {
+      return limit(async () => {
+        let reverseGeod: ReverseGeoCache | null = null;
+        const location = account[config.field || "location"];
+        if (location) {
+          reverseGeod = await ReverseGeoCache.findByPk(location.toString(), {
+            attributes: updateOnDuplicateFields,
+          });
+          if (!reverseGeod) {
+            if (!locationFetchCache[location]) {
+              locationFetchCache[location] = (async () => {
+                const coords = parseH3BNLocation(location);
+                const response = await mapbox.fetchLocation(coords);
+                let placeName, parts, streetAddress, city, state, country;
+                if (response.features && response.features.length > 0) {
+                  placeName = response.features[0].place_name;
+                  parts = placeName.split(",");
+                  streetAddress = parts[parts.length - 4]?.trim();
+                  city = parts[parts.length - 3]?.trim();
+                  state = parts[parts.length - 2]?.split(" ")[1]?.trim();
+                  country = parts[parts.length - 1]?.trim();
+                }
+                return await ReverseGeoCache.create({
+                  location: location.toString(),
+                  streetAddress,
+                  city,
+                  state,
+                  country,
+                  lat: coords[0],
+                  long: coords[1],
+                  raw: response.features,
+                });
+              })();
+            }
+            reverseGeod = await locationFetchCache[location];
+            // Once the create call finishes, we can cleanup this promise. Subsequent queries to postgres will discover
+            // the account. This helps with memory management
+            delete locationFetchCache[location];
           }
-          reverseGeod = await locationFetchCache[location];
-          // Once the create call finishes, we can cleanup this promise. Subsequent queries to postgres will discover
-          // the account. This helps with memory management
-          delete locationFetchCache[location];
         }
-      }
-      // Remove raw response, format camelcase
-      if (reverseGeod) {
-        delete reverseGeod.dataValues.raw;
-        reverseGeod.dataValues.streetAddress =
-          reverseGeod?.dataValues.street_address;
-        delete reverseGeod.dataValues.street_address;
-      }
+        // Remove raw response, format camelcase
+        if (reverseGeod) {
+          delete reverseGeod.dataValues.raw;
+          reverseGeod.dataValues.streetAddress =
+            reverseGeod?.dataValues.street_address;
+          delete reverseGeod.dataValues.street_address;
+        }
 
-      return {
-        ...account,
-        city: null,
-        state: null,
-        country: null,
-        streetAddress: null,
-        lat: null,
-        long: null,
-        ..._omit(reverseGeod?.dataValues || {}, ["createdAt", "updatedAt"]),
-      };
+        return {
+          ...account,
+          city: null,
+          state: null,
+          country: null,
+          streetAddress: null,
+          lat: null,
+          long: null,
+          ..._omit(reverseGeod?.dataValues || {}, ["createdAt", "updatedAt"]),
+        };
+      });
     };
 
     return {
