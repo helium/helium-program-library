@@ -1,31 +1,32 @@
-import Fastify, { FastifyInstance } from 'fastify';
-import fastifyCron from 'fastify-cron';
-import cors from '@fastify/cors';
-import fs from 'fs';
-import { StatusCodes, ReasonPhrases } from 'http-status-codes';
-import { PublicKey } from '@solana/web3.js';
+import Fastify, { FastifyInstance } from "fastify";
+import fastifyCron from "fastify-cron";
+import cors from "@fastify/cors";
+import fs from "fs";
+import { StatusCodes, ReasonPhrases } from "http-status-codes";
+import { PublicKey } from "@solana/web3.js";
 import {
   HELIUS_AUTH_SECRET,
   PROGRAM_ACCOUNT_CONFIGS,
   RUN_JOBS_AT_STARTUP,
-} from './env';
-import database from './utils/database';
-import { defineAllIdlModels } from './utils/defineIdlModels';
-import { upsertProgramAccounts } from './utils/upsertProgramAccounts';
-import { integrityCheckProgramAccounts } from './utils/integrityCheckProgramAccounts';
-import { handleAccountWebhook } from './utils/handleAccountWebhook';
-import { metrics } from './plugins/metrics';
-import { IConfig } from './types';
+} from "./env";
+import database from "./utils/database";
+import { defineAllIdlModels } from "./utils/defineIdlModels";
+import { upsertProgramAccounts } from "./utils/upsertProgramAccounts";
+import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAccounts";
+import { handleAccountWebhook } from "./utils/handleAccountWebhook";
+import { metrics } from "./plugins/metrics";
+import { IConfig } from "./types";
+import { EventEmitter } from "events";
 
 if (!HELIUS_AUTH_SECRET) {
-  throw new Error('Helius auth secret not available');
+  throw new Error("Helius auth secret not available");
 }
 
 (async () => {
   const configs = (() => {
     const accountConfigs: null | {
       configs: IConfig[];
-    } = JSON.parse(fs.readFileSync(PROGRAM_ACCOUNT_CONFIGS, 'utf8'));
+    } = JSON.parse(fs.readFileSync(PROGRAM_ACCOUNT_CONFIGS, "utf8"));
 
     return accountConfigs ? accountConfigs.configs : [];
   })();
@@ -48,46 +49,59 @@ if (!HELIUS_AUTH_SECRET) {
     );
 
   const server: FastifyInstance = Fastify({ logger: false });
-  await server.register(cors, { origin: '*' });
+  await server.register(cors, { origin: "*" });
   await server.register(fastifyCron, { jobs: [...customJobs] });
   await server.register(metrics);
 
-  server.get('/refresh-accounts', async (req, res) => {
-    const programId = (req.query as any).program;
+  const eventHandler = new EventEmitter();
 
-    console.log(
-      programId
-        ? `Refreshing accounts for program: ${programId}`
-        : `Refreshing accounts`
-    );
-
-    try {
-      if (configs) {
-        for (const config of configs) {
-          if ((programId && programId == config.programId) || !programId) {
-            try {
-              await upsertProgramAccounts({
-                programId: new PublicKey(config.programId),
-                accounts: config.accounts,
-              });
-            } catch (err) {
-              throw err;
+  let refreshing = false;
+  eventHandler.on("refresh-accounts", async (programId) => {
+    if (!refreshing) {
+      refreshing = true;
+      try {
+        if (configs) {
+          for (const config of configs) {
+            console.log(
+              programId
+                ? `Refreshing accounts for program: ${programId}`
+                : `Refreshing accounts`
+            );
+            if ((programId && programId == config.programId) || !programId) {
+              try {
+                await upsertProgramAccounts({
+                  programId: new PublicKey(config.programId),
+                  accounts: config.accounts,
+                });
+              } catch (err) {
+                throw err;
+              }
             }
           }
         }
+      } catch (err) {
+        console.error(err);
       }
-      res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-    } catch (err) {
-      res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
-      console.error(err);
     }
   });
 
-  server.get('/integrity-check', async (req, res) => {
+  server.get("/refresh-accounts", async (req, res) => {
+    const programId = (req.query as any).program;
+    eventHandler.emit("refresh-accounts", programId);
+    if (refreshing) {
+      res
+        .code(StatusCodes.TOO_MANY_REQUESTS)
+        .send(ReasonPhrases.TOO_MANY_REQUESTS);
+    } else {
+      res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+    }
+  });
+
+  server.get("/integrity-check", async (req, res) => {
     const programId = (req.query as any).program;
 
     try {
-      if (!programId) throw new Error('program not provided');
+      if (!programId) throw new Error("program not provided");
       console.log(`Integrity checking program: ${programId}`);
 
       if (configs) {
@@ -112,10 +126,10 @@ if (!HELIUS_AUTH_SECRET) {
     }
   });
 
-  server.post('/account-webhook', async (req, res) => {
+  server.post("/account-webhook", async (req, res) => {
     if (req.headers.authorization != HELIUS_AUTH_SECRET) {
       res.code(StatusCodes.FORBIDDEN).send({
-        message: 'Invalid authorization',
+        message: "Invalid authorization",
       });
       return;
     }
@@ -125,8 +139,8 @@ if (!HELIUS_AUTH_SECRET) {
 
       if (configs) {
         for (const account of accounts) {
-          const parsed = account['account']['parsed'];
-          const config = configs.find((x) => x.programId == parsed['owner']);
+          const parsed = account["account"]["parsed"];
+          const config = configs.find((x) => x.programId == parsed["owner"]);
 
           if (!config) {
             // exit early if account doesn't need to be saved
@@ -157,9 +171,9 @@ if (!HELIUS_AUTH_SECRET) {
     // models are defined on boot, and updated in refresh-accounts
     await database.sync();
     await defineAllIdlModels({ configs, sequelize: database });
-    await server.listen({ port: 3000, host: '0.0.0.0' });
+    await server.listen({ port: 3000, host: "0.0.0.0" });
     const address = server.server.address();
-    const port = typeof address === 'string' ? address : address?.port;
+    const port = typeof address === "string" ? address : address?.port;
     console.log(`Running on 0.0.0.0:${port}`);
     // By default, jobs are not running at startup
     if (RUN_JOBS_AT_STARTUP) {
