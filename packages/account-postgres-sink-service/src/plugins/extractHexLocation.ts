@@ -88,6 +88,8 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
     };
 
     const mapbox = MapboxService.getInstance();
+    const locationFetchCache: { [location: string]: Promise<ReverseGeoCache> } =
+      {};
     const processAccount = async (account: { [key: string]: any }) => {
       let reverseGeod: ReverseGeoCache | null = null;
       const location = account[config.field || "location"];
@@ -96,27 +98,35 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
           attributes: updateOnDuplicateFields,
         });
         if (!reverseGeod) {
-          const coords = parseH3BNLocation(location);
-          const response = await mapbox.fetchLocation(coords);
-          let placeName, parts, streetAddress, city, state, country;
-          if (response.features && response.features.length > 0) {
-            placeName = response.features[0].place_name;
-            parts = placeName.split(",");
-            streetAddress = parts[parts.length - 4]?.trim();
-            city = parts[parts.length - 3]?.trim();
-            state = parts[parts.length - 2]?.split(" ")[1]?.trim();
-            country = parts[parts.length - 1]?.trim();
+          if (!locationFetchCache[location]) {
+            locationFetchCache[location] = (async () => {
+              const coords = parseH3BNLocation(location);
+              const response = await mapbox.fetchLocation(coords);
+              let placeName, parts, streetAddress, city, state, country;
+              if (response.features && response.features.length > 0) {
+                placeName = response.features[0].place_name;
+                parts = placeName.split(",");
+                streetAddress = parts[parts.length - 4]?.trim();
+                city = parts[parts.length - 3]?.trim();
+                state = parts[parts.length - 2]?.split(" ")[1]?.trim();
+                country = parts[parts.length - 1]?.trim();
+              }
+              return await ReverseGeoCache.create({
+                location: location.toString(),
+                streetAddress,
+                city,
+                state,
+                country,
+                lat: coords[0],
+                long: coords[1],
+                raw: response.features,
+              });
+            })();
           }
-          reverseGeod = await ReverseGeoCache.create({
-            location: location.toString(),
-            streetAddress,
-            city,
-            state,
-            country,
-            lat: coords[0],
-            long: coords[1],
-            raw: response.features,
-          });
+          reverseGeod = await locationFetchCache[location]
+          // Once the create call finishes, we can cleanup this promise. Subsequent queries to postgres will discover
+          // the account. This helps with memory management
+          delete locationFetchCache[location]
         }
       }
       // Remove raw response, format camelcase

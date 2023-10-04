@@ -12,7 +12,7 @@ export class MapboxService {
     this.limit = pLimit(5); // Limit to 5 concurrent requests
 
     axiosRetry(this.axiosInstance, {
-      retries: 3, // Number of retry attempts
+      retries: 10, // Number of retry attempts
       retryDelay: axiosRetry.exponentialDelay, // Exponential back-off
       retryCondition: (error) => {
         // Retry on 429 response
