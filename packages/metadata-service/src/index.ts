@@ -9,8 +9,13 @@ import animalHash from "angry-purple-tiger";
 import Fastify, { FastifyInstance } from "fastify";
 import axios from "axios";
 import { provider } from "./solana";
-import { IotHotspotInfo, KeyToAsset, MobileHotspotInfo, sequelize } from "./model";
-import bs58 from 'bs58';
+import {
+  IotHotspotInfo,
+  KeyToAsset,
+  MobileHotspotInfo,
+  sequelize,
+} from "./model";
+import bs58 from "bs58";
 import { truthy } from "@helium/spl-utils";
 
 const server: FastifyInstance = Fastify({
@@ -137,7 +142,7 @@ function locationAttributes(
   info: MobileHotspotInfo | IotHotspotInfo | undefined
 ) {
   if (!info) {
-    return []
+    return [];
   }
 
   return [
@@ -150,13 +155,8 @@ function locationAttributes(
   ];
 }
 
-
 const start = async () => {
   try {
-    await server.listen({ port: 8081, host: "0.0.0.0" });
-
-    const address = server.server.address();
-    const port = typeof address === "string" ? address : address?.port;
     await sequelize.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS key_to_asset_asset_index ON key_to_assets(asset);
     `);
@@ -166,10 +166,13 @@ const start = async () => {
     await sequelize.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS mobile_hotspot_infos_asset_index ON mobile_hotspot_infos(asset);
     `);
+    await server.listen({ port: 8081, host: "0.0.0.0" });
+
+    const address = server.server.address();
+    const port = typeof address === "string" ? address : address?.port;
   } catch (err) {
     server.log.error(err);
     process.exit(1);
   }
 };
 start();
-
