@@ -52,7 +52,7 @@ export const sequelize = new Sequelize({
 
 export class MobileHotspotInfo extends Model {
   declare address: string;
-  declare streetAddress: string;
+  declare street: string;
   declare city: string;
   declare state: string;
   declare country: string;
@@ -65,7 +65,7 @@ MobileHotspotInfo.init(
       type: STRING,
       primaryKey: true,
     },
-    streetAddress: DataTypes.STRING,
+    street: DataTypes.STRING,
     lat: DataTypes.DECIMAL(8, 6),
     long: DataTypes.DECIMAL(9, 6),
     city: DataTypes.STRING,
@@ -84,7 +84,7 @@ MobileHotspotInfo.init(
 export class IotHotspotInfo extends Model {
   declare address: string;
   declare asset: string;
-  declare streetAddress: string;
+  declare street: string;
   declare city: string;
   declare state: string;
   declare country: string;
@@ -97,7 +97,7 @@ IotHotspotInfo.init(
       type: STRING,
       primaryKey: true,
     },
-    streetAddress: DataTypes.STRING,
+    street: DataTypes.STRING,
     lat: DataTypes.DECIMAL(8, 6),
     long: DataTypes.DECIMAL(9, 6),
     city: DataTypes.STRING,

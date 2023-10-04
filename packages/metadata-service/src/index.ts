@@ -146,7 +146,7 @@ function locationAttributes(
   }
 
   return [
-    { trait_type: `${name}_street_address`, value: info.streetAddress },
+    { trait_type: `${name}_street`, value: info.street },
     { trait_type: `${name}_city`, value: info.city },
     { trait_type: `${name}_state`, value: info.state },
     { trait_type: `${name}_country`, value: info.country },

@@ -12,7 +12,7 @@ const parseH3BNLocation = (location: BN) =>
 
 export class ReverseGeoCache extends Model {
   declare h3: string;
-  declare streetAddress: string;
+  declare street: string;
   declare city: string;
   declare state: string;
   declare country: string;
@@ -26,7 +26,7 @@ ReverseGeoCache.init(
       type: DECIMAL,
       primaryKey: true,
     },
-    streetAddress: DataTypes.STRING,
+    street: DataTypes.STRING,
     lat: DataTypes.DECIMAL(8, 6),
     long: DataTypes.DECIMAL(9, 6),
     city: DataTypes.STRING,
@@ -50,7 +50,7 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
       "city",
       "state",
       "country",
-      "street_address",
+      "street",
       "lat",
       "long",
     ];
@@ -81,7 +81,7 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
         ...schema[accountName],
         lat: DataTypes.DECIMAL(8, 6),
         long: DataTypes.DECIMAL(9, 6),
-        streetAddress: DataTypes.STRING,
+        street: DataTypes.STRING,
         city: DataTypes.STRING,
         state: DataTypes.STRING,
         country: DataTypes.STRING,
@@ -99,26 +99,19 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
         if (!reverseGeod) {
           if (!locationFetchCache[location]) {
             locationFetchCache[location] = (async () => {
-              const coords = parseH3BNLocation(location);
-              const response = await mapbox.fetchLocation(coords);
-              let placeName, parts, streetAddress, city, state, country;
-              if (response.features && response.features.length > 0) {
-                placeName = response.features[0].place_name;
-                parts = placeName.split(",");
-                streetAddress = parts[parts.length - 4]?.trim();
-                city = parts[parts.length - 3]?.trim();
-                state = parts[parts.length - 2]?.split(" ")[1]?.trim();
-                country = parts[parts.length - 1]?.trim();
-              }
+              const coords = parseH3BNLocation(new BN(location));
+              const { city, state, country, name, raw } =
+                await mapbox.fetchParsedLocation(coords);
+
               return await ReverseGeoCache.create({
                 location: location.toString(),
-                streetAddress,
+                street: name,
                 city,
                 state,
                 country,
                 lat: coords[0],
                 long: coords[1],
-                raw: response.features,
+                raw,
               });
             })();
           }
@@ -131,9 +124,6 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
       // Remove raw response, format camelcase
       if (reverseGeod) {
         delete reverseGeod.dataValues.raw;
-        reverseGeod.dataValues.streetAddress =
-          reverseGeod?.dataValues.street_address;
-        delete reverseGeod.dataValues.street_address;
       }
 
       return {
@@ -141,7 +131,7 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
         city: null,
         state: null,
         country: null,
-        streetAddress: null,
+        street: null,
         lat: null,
         long: null,
         ..._omit(reverseGeod?.dataValues || {}, ["createdAt", "updatedAt"]),
