@@ -10,6 +10,7 @@ export interface IAccountConfig {
   type: string;
   table: string;
   schema: string;
+  batchSize: number;
   plugins?: IPluginConfig[];
 }
 

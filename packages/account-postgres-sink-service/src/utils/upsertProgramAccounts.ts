@@ -59,7 +59,7 @@ export const upsertProgramAccounts = async ({
     console.log(e);
   }
 
-  for (const { type, ...rest } of accounts) {
+  for (const { type, batchSize, ...rest } of accounts) {
     try {
       const filter: {
         offset?: number;
@@ -85,7 +85,7 @@ export const upsertProgramAccounts = async ({
       const model = sequelize.models[type];
       const t = await sequelize.transaction();
       // @ts-ignore
-      const respChunks = chunks(resp, 50000);
+      const respChunks = chunks(resp, batchSize || 50000);
       const now = new Date().toISOString();
 
       try {
