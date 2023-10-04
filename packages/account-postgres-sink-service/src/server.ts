@@ -166,6 +166,7 @@ if (!HELIUS_AUTH_SECRET) {
       res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
         message: "Refresh is happening, cannot create transactions",
       });
+      return
     }
 
     try {
