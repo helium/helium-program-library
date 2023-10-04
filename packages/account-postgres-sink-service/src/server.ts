@@ -63,12 +63,12 @@ if (!HELIUS_AUTH_SECRET) {
         try {
           if (configs) {
             for (const config of configs) {
-              console.log(
-                programId
-                  ? `Refreshing accounts for program: ${programId}`
-                  : `Refreshing accounts`
-              );
               if ((programId && programId == config.programId) || !programId) {
+                console.log(
+                  programId
+                    ? `Refreshing accounts for program: ${programId}`
+                    : `Refreshing accounts`
+                );
                 try {
                   await upsertProgramAccounts({
                     programId: new PublicKey(config.programId),
@@ -161,6 +161,11 @@ if (!HELIUS_AUTH_SECRET) {
         message: "Invalid authorization",
       });
       return;
+    }
+    if (refreshing) {
+      res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
+        message: "Refresh is happening, cannot create transactions",
+      });
     }
 
     try {
