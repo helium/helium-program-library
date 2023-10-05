@@ -34,7 +34,7 @@ export class MapboxService {
   public async fetchLocation(coords: [number, number]): Promise<any> {
     return this.limit(async () => {
       const response = await axios.get(
-        `https://photon.komoot.io/reverse?lat=${coords[0]}&lon=${coords[1]}`
+        `${process.env.PHOTON_URL!}/reverse?lat=${coords[0]}&lon=${coords[1]}`
       );
 
       // Uncomment for mapbox impl
