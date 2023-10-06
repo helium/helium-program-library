@@ -83,7 +83,7 @@ server.get<{ Params: { keyToAssetKey: string } }>(
           ].filter(truthy),
         },
         ...locationAttributes("iot", record?.iot_hotspot_info),
-        ...locationAttributes("iot", record?.mobile_hotspot_info),
+        ...locationAttributes("mobile", record?.mobile_hotspot_info),
       ],
     };
   }
@@ -131,7 +131,7 @@ server.get<{ Params: { eccCompact: string } }>(
           ].filter(truthy),
         },
         ...locationAttributes("iot", record?.iot_hotspot_info),
-        ...locationAttributes("iot", record?.mobile_hotspot_info),
+        ...locationAttributes("mobile", record?.mobile_hotspot_info),
       ]
     };
   }
