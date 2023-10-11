@@ -16,7 +16,7 @@ runs:
         if: steps.cache-solana.outputs.cache-hit != 'true'
       - run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
         shell: bash
-      - run: solana-keygen new --no-bip39-passphrase --force
+      - run: solana-keygen new -s --no-bip39-passphrase --force
         shell: bash
       - run: solana config set --url localhost
         shell: bash
