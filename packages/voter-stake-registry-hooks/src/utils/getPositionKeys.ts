@@ -37,9 +37,9 @@ export function getRegistrarKey(mint: PublicKey) {
 }
 
 const realmNames: Record<string, string> = {
-  [HNT_MINT.toBase58()]: "Helium DAO",
-  [MOBILE_MINT.toBase58()]: "Helium MOBILE SubDAO",
-  [IOT_MINT.toBase58()]: "Helium IOT SubDAO",
+  [HNT_MINT.toBase58()]: "Helium",
+  [MOBILE_MINT.toBase58()]: "Helium MOBILE",
+  [IOT_MINT.toBase58()]: "Helium IOT",
 };
 export const getPositionKeys = async (
   args: GetPositionsArgs
