@@ -1,3 +1,4 @@
+use proposal::ProposalV0;
 use std::str::FromStr;
 
 use anchor_lang::prelude::*;
@@ -16,8 +17,10 @@ pub struct RepairVoteMarkerSizes<'info> {
   #[account(
     mut,
     has_one = voter,
+    has_one = proposal,
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
+  pub proposal: Box<Account<'info, ProposalV0>>,
   /// CHECK: Just refunding
   #[account(mut)]
   pub voter: AccountInfo<'info>,
@@ -26,7 +29,7 @@ pub struct RepairVoteMarkerSizes<'info> {
 
 pub fn handler(ctx: Context<RepairVoteMarkerSizes>) -> Result<()> {
   let new_size =
-    8 + 32 + std::mem::size_of::<VoteMarkerV0>() + 1 + 2 * ctx.accounts.marker.choices.len();
+    8 + 32 + std::mem::size_of::<VoteMarkerV0>() + 1 + 2 * ctx.accounts.proposal.choices.len();
 
   ctx
     .accounts

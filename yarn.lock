@@ -737,7 +737,7 @@
     js-sha256 "^0.9.0"
     multiformats "^9.6.4"
 
-"@helium/anchor-resolvers@^0.2.5":
+"@helium/anchor-resolvers@^0.2.17", "@helium/anchor-resolvers@^0.2.5":
   version "0.2.21"
   resolved "https://registry.yarnpkg.com/@helium/anchor-resolvers/-/anchor-resolvers-0.2.21.tgz#8cd13bca3e7af83ffff3ab754dcf9f788d26e57e"
   integrity sha512-rz3GJaULGmokjrq63v4sy683PMUkL31jrK5wVX01tzCYbI1woC9vISoPd3oSSuauZqQXdBhhQ49GKrpzi49JbA==
@@ -798,6 +798,14 @@
     "@coral-xyz/anchor" "^0.27.0"
     "@solana/web3.js" "^1.43.4"
 
+"@helium/modular-governance-idls@^0.0.5":
+  version "0.0.5"
+  resolved "https://registry.yarnpkg.com/@helium/modular-governance-idls/-/modular-governance-idls-0.0.5.tgz#eedbed0a4975c1f14d5cfc218ed5d01117acc2b7"
+  integrity sha512-/pzNtQyKirVMz5VZAM23b0ajwSNJanrXIXHkUEBax2xC5oqoETOrblqODsHh8TOr0hKEaTRY8DRIAe+Qfv66BQ==
+  dependencies:
+    "@coral-xyz/anchor" "^0.28.0"
+    "@solana/web3.js" "^1.43.4"
+
 "@helium/organization-sdk@^0.0.2":
   version "0.0.2"
   resolved "https://registry.yarnpkg.com/@helium/organization-sdk/-/organization-sdk-0.0.2.tgz#66a421671e09f709decb60fe3401d8bfcca6dd2c"
@@ -808,6 +816,16 @@
     "@helium/modular-governance-idls" "^0.0.2"
     "@helium/proposal-sdk" "^0.0.2"
 
+"@helium/organization-sdk@^0.0.5":
+  version "0.0.5"
+  resolved "https://registry.yarnpkg.com/@helium/organization-sdk/-/organization-sdk-0.0.5.tgz#c6eda3351a3681ed2c3d8f84639513ca2522ca1f"
+  integrity sha512-NYGTUVEB7dd6Ws8AtLYewXN53Ds4054lmc56ePQHPo2R9K0WAqGPpoa3CtMhn4a+9zyDiz9lP61QWaTHjQNnag==
+  dependencies:
+    "@coral-xyz/anchor" "^0.28.0"
+    "@helium/anchor-resolvers" "^0.2.17"
+    "@helium/modular-governance-idls" "^0.0.5"
+    "@helium/proposal-sdk" "^0.0.5"
+
 "@helium/proposal-sdk@^0.0.2":
   version "0.0.2"
   resolved "https://registry.yarnpkg.com/@helium/proposal-sdk/-/proposal-sdk-0.0.2.tgz#1310d4c6d2f20c7ec1979a66abd8364a14836382"
@@ -817,12 +835,30 @@
     "@helium/anchor-resolvers" "^0.2.5"
     "@helium/modular-governance-idls" "^0.0.2"
 
+"@helium/proposal-sdk@^0.0.5":
+  version "0.0.5"
+  resolved "https://registry.yarnpkg.com/@helium/proposal-sdk/-/proposal-sdk-0.0.5.tgz#64c5a28a9b6643236f8742c99da24f23657a9117"
+  integrity sha512-h9IZd7C2fhp8pEivec/DWAV7pasav73UpFoW2wfXLdMa4TxaoYXnR5rXZ/Iu37SgfSPUYkV7sIymV+jZ7wwdfg==
+  dependencies:
+    "@coral-xyz/anchor" "^0.28.0"
+    "@helium/anchor-resolvers" "^0.2.17"
+    "@helium/modular-governance-idls" "^0.0.5"
+
 "@helium/proto@^1.5.0":
   version "1.6.0"
   resolved "https://registry.yarnpkg.com/@helium/proto/-/proto-1.6.0.tgz#b97003bbc511afec1abac7cbffc5c088e348022d"
   integrity sha512-aoVjhYDcic5g+n/iwKGXmGgMruPXTffpyr2ziGjuhAvU0phPSv6gnTbyHKY7FqBCUOYX4jHzEKJgX7M27UOGGg==
   dependencies:
     protobufjs "^6.11.3"
+
+"@helium/state-controller-sdk@^0.0.5":
+  version "0.0.5"
+  resolved "https://registry.yarnpkg.com/@helium/state-controller-sdk/-/state-controller-sdk-0.0.5.tgz#5cabfa4eb22ac630e2f52b21c7908c48585d9647"
+  integrity sha512-Y09sDl3oW6AO1YNCY8PzJ2Y0EDlZmLMd0byagD8dsx0nGZPlTgG1JK6DwHPTcQifICvWkM0kpYn6pP+G0JKWLQ==
+  dependencies:
+    "@coral-xyz/anchor" "^0.28.0"
+    "@helium/anchor-resolvers" "^0.2.17"
+    "@helium/modular-governance-idls" "^0.0.5"
 
 "@helium/transactions@^3.38.0":
   version "3.62.0"
@@ -9171,6 +9207,13 @@ p-is-promise@^1.1.0:
   resolved "https://registry.yarnpkg.com/p-is-promise/-/p-is-promise-1.1.0.tgz#9c9456989e9f6588017b0434d56097675c3da05e"
   integrity sha512-zL7VE4JVS2IFSkR2GQKDSPEVxkoH43/p7oEnwpdCndKYJO0HVeRB7fA8TJwuLOTBREtK0ea8eHaxdwcpob5dmg==
 
+p-limit@3.1.0, p-limit@^3.0.2:
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/p-limit/-/p-limit-3.1.0.tgz#e1daccbe78d0d1388ca18c64fea38e3e57e3706b"
+  integrity sha512-TYOanM3wGwNGsZN2cVTYPArw454xnXj5qmWF1bEoAc4+cU/ol7GVh7odevjp1FNHduHc3KZMcFduxU5Xc6uJRQ==
+  dependencies:
+    yocto-queue "^0.1.0"
+
 p-limit@^1.1.0:
   version "1.3.0"
   resolved "https://registry.yarnpkg.com/p-limit/-/p-limit-1.3.0.tgz#b86bd5f0c25690911c7590fcbfc2010d54b3ccb8"
@@ -9184,13 +9227,6 @@ p-limit@^2.2.0:
   integrity sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w==
   dependencies:
     p-try "^2.0.0"
-
-p-limit@^3.0.2:
-  version "3.1.0"
-  resolved "https://registry.yarnpkg.com/p-limit/-/p-limit-3.1.0.tgz#e1daccbe78d0d1388ca18c64fea38e3e57e3706b"
-  integrity sha512-TYOanM3wGwNGsZN2cVTYPArw454xnXj5qmWF1bEoAc4+cU/ol7GVh7odevjp1FNHduHc3KZMcFduxU5Xc6uJRQ==
-  dependencies:
-    yocto-queue "^0.1.0"
 
 p-locate@^2.0.0:
   version "2.0.0"

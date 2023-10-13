@@ -10,4 +10,6 @@ pub struct VoteMarkerV0 {
   pub choices: Vec<u16>,
   pub weight: u128,
   pub bump_seed: u8,
+  /// Whether this vote has been cleared on the position after proposal expireds
+  pub relinquished: bool,
 }
