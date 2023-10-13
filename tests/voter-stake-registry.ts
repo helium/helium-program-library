@@ -31,7 +31,8 @@ import chaiAsPromised from "chai-as-promised";
 import {
   PROGRAM_ID,
   init,
-  positionKey
+  positionKey,
+  voteMarkerKey
 } from "../packages/voter-stake-registry-sdk/src";
 import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 import { getUnixTimestamp, loadKeypair } from "./utils/solana";
@@ -476,6 +477,12 @@ describe("voter-stake-registry", () => {
           acc.choices[0].weight,
           0.00001          
         );
+
+        await program.methods.repairVoteMarkerSizes().accounts({
+          marker: voteMarkerKey(positions[0].mint, proposal!)[0],
+          voter: depositor.publicKey,
+          payer: me,
+        }).rpcAndKeys({ skipPreflight: true });
       });
     });
 

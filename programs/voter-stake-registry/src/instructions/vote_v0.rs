@@ -17,7 +17,7 @@ pub struct VoteV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    space = 8 + 60 + std::mem::size_of::<Registrar>(),
+    space = 8 + 32 + std::mem::size_of::<VoteMarkerV0>() + 1 + 2 * proposal.choices.len(),
     seeds = [b"marker", mint.key().as_ref(), proposal.key().as_ref()],
     bump
   )]
