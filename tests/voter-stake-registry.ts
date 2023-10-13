@@ -17,7 +17,7 @@ import {
   MintMaxVoteWeightSource,
   getGovernanceProgramVersion,
   withCreateRealm,
-  withSetRealmConfig
+  withSetRealmConfig,
 } from "@solana/spl-governance";
 import {
   createAssociatedTokenAccountInstruction,
@@ -32,7 +32,7 @@ import {
   PROGRAM_ID,
   init,
   positionKey,
-  voteMarkerKey
+  voteMarkerKey,
 } from "../packages/voter-stake-registry-sdk/src";
 import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 import { getUnixTimestamp, loadKeypair } from "./utils/solana";
@@ -451,38 +451,31 @@ describe("voter-stake-registry", () => {
           .accounts({ registrar })
           .rpc();
 
-          const voteIxs = await Promise.all(
-            positions.map(
-              async (position) =>
-                await program.methods
-                  .voteV0({
-                    choice: 0,
-                  })
-                  .accounts({
-                    registrar,
-                    proposal,
-                    voter: depositor.publicKey,
-                    position: position.position
-                  })
-                  .instruction()
-            )
-          );
-          instructions.push(...voteIxs);
-
+        const voteIxs = await Promise.all(
+          positions.map(
+            async (position) =>
+              await program.methods
+                .voteV0({
+                  choice: 0,
+                })
+                .accounts({
+                  registrar,
+                  proposal,
+                  voter: depositor.publicKey,
+                  position: position.position,
+                })
+                .instruction()
+          )
+        );
+        instructions.push(...voteIxs);
 
         await sendInstructions(provider, instructions, [depositor]);
         const acc = await proposalProgram.account.proposalV0.fetch(proposal!);
         expectBnAccuracy(
           toBN(testCase.expectedVeHnt, 8),
           acc.choices[0].weight,
-          0.00001          
+          0.00001
         );
-
-        await program.methods.repairVoteMarkerSizes().accounts({
-          marker: voteMarkerKey(positions[0].mint, proposal!)[0],
-          voter: depositor.publicKey,
-          payer: me,
-        }).rpcAndKeys({ skipPreflight: true });
       });
     });
 
@@ -556,12 +549,12 @@ describe("voter-stake-registry", () => {
         instructions.push(
           await program.methods
             .relinquishVoteV1({
-              choice: 0
+              choice: 0,
             })
             .accounts({
               proposal,
               refund: me,
-              position
+              position,
             })
             .instruction()
         );
