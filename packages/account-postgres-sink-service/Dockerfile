@@ -8,7 +8,7 @@ COPY package.json ./
 RUN yarn install
 
 COPY src src
-COPY typeings typeings
+COPY typings typings
 COPY tsconfig.build.json tsconfig.json
 
 RUN yarn global add typescript

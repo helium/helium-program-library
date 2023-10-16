@@ -16,7 +16,7 @@
     "moduleResolution": "Node",
     "skipLibCheck": true,
     "baseUrl": ".",
-    "typeRoots": ["node_modules/@types", "typeings"],
+    "typeRoots": ["node_modules/@types", "typings"],
     "strict": true,
     "paths": {
       "@/*": ["*"]
