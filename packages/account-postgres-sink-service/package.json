@@ -62,7 +62,6 @@
     "@types/deep-equal": "^1.0.1",
     "@types/lodash": "^4.14.195",
     "@types/node": "^18.11.11",
-    "@types/node-cron": "^3.0.9",
     "@types/pg": "^8.6.6",
     "@types/yargs": "^17.0.24",
     "git-format-staged": "^2.1.3",
