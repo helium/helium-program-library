@@ -1,33 +1,23 @@
 import { Program } from '@coral-xyz/anchor';
 import cors from '@fastify/cors';
 import Address from '@helium/address/build/Address';
-import {
-  decodeEntityKey,
-  init,
-  iotInfoKey,
-  mobileInfoKey,
-  rewardableEntityConfigKey,
-} from '@helium/helium-entity-manager-sdk';
+import { decodeEntityKey, init } from '@helium/helium-entity-manager-sdk';
 import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
 import { PublicKey } from '@solana/web3.js';
 // @ts-ignore
+import { truthy } from '@helium/spl-utils';
 import animalHash from 'angry-purple-tiger';
-import Fastify, { FastifyInstance } from 'fastify';
 import axios from 'axios';
-import { provider } from './solana';
+import bs58 from 'bs58';
+import Fastify, { FastifyInstance } from 'fastify';
+import { SHDW_DRIVE_URL } from './constants';
 import {
   IotHotspotInfo,
   KeyToAsset,
   MobileHotspotInfo,
   sequelize,
 } from './model';
-import bs58 from 'bs58';
-import { truthy } from '@helium/spl-utils';
-import {
-  IOT_SUB_DAO_KEY,
-  MOBILE_SUB_DAO_KEY,
-  SHDW_DRIVE_URL,
-} from './constants';
+import { provider } from './solana';
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -62,26 +52,13 @@ server.get<{ Params: { keyToAssetKey: string } }>(
     // In the future, we need to put different symbols on different types of hotspots
     const hotspotType = entityKey.length > 100 ? 'MOBILE' : 'IOT';
     const isMobile = hotspotType === 'MOBILE';
-    const [configKey] = rewardableEntityConfigKey(
-      isMobile ? MOBILE_SUB_DAO_KEY : IOT_SUB_DAO_KEY,
-      hotspotType
-    );
-
-    const [info] = isMobile
-      ? mobileInfoKey(configKey, entityKey)
-      : iotInfoKey(configKey, entityKey);
-
-    const infoAcc = await program.account[
-      isMobile ? 'mobileHotspotInfoV0' : 'iotHotspotInfoV0'
-    ].fetch(info);
-
     const image = `${SHDW_DRIVE_URL}/${
-      infoAcc?.isActive
-        ? isMobile
+      isMobile
+        ? record?.mobile_hotspot_info?.is_active
           ? 'mobile-hotspot-active.png'
-          : 'hotspot-active.png'
-        : isMobile
-        ? 'mobile-hotspot.png'
+          : 'mobile-hotspot.png'
+        : record?.iot_hotspot_info?.is_active
+        ? 'hotspot-active.png'
         : 'hotspot.png'
     }`;
 
@@ -143,11 +120,8 @@ server.get<{ Params: { eccCompact: string } }>(
     });
 
     const digest = animalHash(eccCompact);
-    const [configKey] = rewardableEntityConfigKey(IOT_SUB_DAO_KEY, 'IOT');
-    const [info] = iotInfoKey(configKey, eccCompact);
-    const infoAcc = await program.account.iotHotspotInfoV0.fetch(info);
     const image = `${SHDW_DRIVE_URL}/${
-      infoAcc?.isActive ? 'hotspot-active.png' : 'hotspot.png'
+      record?.iot_hotspot_info?.is_active ? 'hotspot-active.png' : 'hotspot.png'
     }`;
 
     return {
