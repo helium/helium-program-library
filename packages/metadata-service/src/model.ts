@@ -58,6 +58,7 @@ export class MobileHotspotInfo extends Model {
   declare country: string;
   declare lat: number;
   declare long: number;
+  declare is_active: boolean;
 }
 MobileHotspotInfo.init(
   {
@@ -71,6 +72,7 @@ MobileHotspotInfo.init(
     city: DataTypes.STRING,
     state: DataTypes.STRING,
     country: DataTypes.STRING,
+    isActive: DataTypes.BOOLEAN,
   },
   {
     sequelize,
@@ -90,6 +92,7 @@ export class IotHotspotInfo extends Model {
   declare country: string;
   declare lat: number;
   declare long: number;
+  declare is_active: boolean;
 }
 IotHotspotInfo.init(
   {
@@ -103,6 +106,7 @@ IotHotspotInfo.init(
     city: DataTypes.STRING,
     state: DataTypes.STRING,
     country: DataTypes.STRING,
+    isActive: DataTypes.BOOLEAN,
   },
   {
     sequelize,
@@ -144,5 +148,5 @@ KeyToAsset.hasOne(IotHotspotInfo, {
 });
 KeyToAsset.hasOne(MobileHotspotInfo, {
   sourceKey: "asset",
-  foreignKey: "asset"
+  foreignKey: "asset",
 });

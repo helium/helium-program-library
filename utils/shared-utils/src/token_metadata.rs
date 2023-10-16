@@ -36,7 +36,10 @@ pub fn create_metadata_accounts_v3<'info>(
       mint: &ctx.accounts.mint,
       mint_authority: &ctx.accounts.mint_authority,
       payer: &ctx.accounts.payer,
-      update_authority: &ctx.accounts.update_authority,
+      update_authority: (
+        &ctx.accounts.update_authority,
+        ctx.accounts.update_authority.is_signer,
+      ),
       system_program: &ctx.accounts.system_program,
       rent: None,
     },
