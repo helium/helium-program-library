@@ -51,9 +51,8 @@ server.get<{ Params: { keyToAssetKey: string } }>(
     // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
     // In the future, we need to put different symbols on different types of hotspots
     const hotspotType = entityKey.length > 100 ? "MOBILE" : "IOT";
-    const isMobile = hotspotType === "MOBILE";
     const image = `${SHDW_DRIVE_URL}/${
-      isMobile
+      hotspotType === "MOBILE"
         ? record?.mobile_hotspot_info?.is_active
           ? "mobile-hotspot-active.png"
           : "mobile-hotspot.png"
