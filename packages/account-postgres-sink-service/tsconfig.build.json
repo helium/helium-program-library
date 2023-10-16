@@ -16,7 +16,7 @@
     "moduleResolution": "Node",
     "skipLibCheck": true,
     "baseUrl": ".",
-    "typeRoots": ["node_modules/@types", "node", "cron"],
+    "typeRoots": ["node_modules/@types"],
     "strict": true,
     "paths": {
       "@/*": ["*"]
