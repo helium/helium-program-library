@@ -11,7 +11,6 @@ COPY src src
 COPY tsconfig.build.json tsconfig.json
 
 RUN yarn global add typescript
-RUN yarn add -D @types/cron
 RUN yarn run build
 
 RUN npm prune --production
