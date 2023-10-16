@@ -1,12 +1,12 @@
-import { Sequelize, STRING, Model, DataTypes } from 'sequelize';
-import AWS from 'aws-sdk';
-import * as pg from 'pg';
+import { Sequelize, STRING, Model, DataTypes } from "sequelize";
+import AWS from "aws-sdk";
+import * as pg from "pg";
 
-const host = process.env.PGHOST || 'localhost';
+const host = process.env.PGHOST || "localhost";
 const port = Number(process.env.PGPORT) || 5432;
 export const sequelize = new Sequelize({
   host: host,
-  dialect: 'postgres',
+  dialect: "postgres",
   port: port,
   logging: false,
   dialectModule: pg,
@@ -20,7 +20,7 @@ export const sequelize = new Sequelize({
   },
   hooks: {
     beforeConnect: async (config: any) => {
-      const isRds = host.includes('rds.amazonaws.com');
+      const isRds = host.includes("rds.amazonaws.com");
 
       let password = process.env.PGPASSWORD;
       if (isRds && !password) {
@@ -76,8 +76,8 @@ MobileHotspotInfo.init(
   },
   {
     sequelize,
-    modelName: 'mobile_hotspot_infos',
-    tableName: 'mobile_hotspot_infos',
+    modelName: "mobile_hotspot_infos",
+    tableName: "mobile_hotspot_infos",
     underscored: true,
     timestamps: false,
   }
@@ -110,8 +110,8 @@ IotHotspotInfo.init(
   },
   {
     sequelize,
-    modelName: 'iot_hotspot_infos',
-    tableName: 'iot_hotspot_infos',
+    modelName: "iot_hotspot_infos",
+    tableName: "iot_hotspot_infos",
     underscored: true,
     timestamps: false,
   }
@@ -135,18 +135,18 @@ KeyToAsset.init(
   },
   {
     sequelize,
-    modelName: 'key_to_assets',
-    tableName: 'key_to_assets',
+    modelName: "key_to_assets",
+    tableName: "key_to_assets",
     underscored: true,
     timestamps: false,
   }
 );
 
 KeyToAsset.hasOne(IotHotspotInfo, {
-  sourceKey: 'asset',
-  foreignKey: 'asset',
+  sourceKey: "asset",
+  foreignKey: "asset",
 });
 KeyToAsset.hasOne(MobileHotspotInfo, {
-  sourceKey: 'asset',
-  foreignKey: 'asset',
+  sourceKey: "asset",
+  foreignKey: "asset",
 });

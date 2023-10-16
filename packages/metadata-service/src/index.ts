@@ -1,38 +1,38 @@
-import { Program } from '@coral-xyz/anchor';
-import cors from '@fastify/cors';
-import Address from '@helium/address/build/Address';
-import { decodeEntityKey, init } from '@helium/helium-entity-manager-sdk';
-import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manager';
-import { PublicKey } from '@solana/web3.js';
+import { Program } from "@coral-xyz/anchor";
+import cors from "@fastify/cors";
+import Address from "@helium/address/build/Address";
+import { decodeEntityKey, init } from "@helium/helium-entity-manager-sdk";
+import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
+import { PublicKey } from "@solana/web3.js";
 // @ts-ignore
-import { truthy } from '@helium/spl-utils';
-import animalHash from 'angry-purple-tiger';
-import axios from 'axios';
-import bs58 from 'bs58';
-import Fastify, { FastifyInstance } from 'fastify';
-import { SHDW_DRIVE_URL } from './constants';
+import { truthy } from "@helium/spl-utils";
+import animalHash from "angry-purple-tiger";
+import axios from "axios";
+import bs58 from "bs58";
+import Fastify, { FastifyInstance } from "fastify";
+import { SHDW_DRIVE_URL } from "./constants";
 import {
   IotHotspotInfo,
   KeyToAsset,
   MobileHotspotInfo,
   sequelize,
-} from './model';
-import { provider } from './solana';
+} from "./model";
+import { provider } from "./solana";
 
 const server: FastifyInstance = Fastify({
   logger: true,
 });
 server.register(cors, {
-  origin: '*',
+  origin: "*",
 });
-server.get('/health', async () => {
+server.get("/health", async () => {
   return { ok: true };
 });
 
 let program: Program<HeliumEntityManager>;
 
 server.get<{ Params: { keyToAssetKey: string } }>(
-  '/v1/:keyToAssetKey',
+  "/v1/:keyToAssetKey",
   async (request, reply) => {
     program = program || (await init(provider));
     const { keyToAssetKey } = request.params;
@@ -50,53 +50,53 @@ server.get<{ Params: { keyToAssetKey: string } }>(
 
     // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
     // In the future, we need to put different symbols on different types of hotspots
-    const hotspotType = entityKey.length > 100 ? 'MOBILE' : 'IOT';
-    const isMobile = hotspotType === 'MOBILE';
+    const hotspotType = entityKey.length > 100 ? "MOBILE" : "IOT";
+    const isMobile = hotspotType === "MOBILE";
     const image = `${SHDW_DRIVE_URL}/${
       isMobile
         ? record?.mobile_hotspot_info?.is_active
-          ? 'mobile-hotspot-active.png'
-          : 'mobile-hotspot.png'
+          ? "mobile-hotspot-active.png"
+          : "mobile-hotspot.png"
         : record?.iot_hotspot_info?.is_active
-        ? 'hotspot-active.png'
-        : 'hotspot.png'
+        ? "hotspot-active.png"
+        : "hotspot.png"
     }`;
 
     return {
-      name: keyStr === 'iot_operations_fund' ? 'IOT Operations Fund' : digest,
+      name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
       description:
-        keyStr === 'iot_operations_fund'
-          ? 'IOT Operations Fund'
-          : 'A Rewardable NFT on Helium',
+        keyStr === "iot_operations_fund"
+          ? "IOT Operations Fund"
+          : "A Rewardable NFT on Helium",
       // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
       // In the future, we need to put different symbols on different types of hotspots
       image,
       attributes: [
         keyStr && Address.isValid(keyStr)
-          ? { trait_type: 'ecc_compact', value: keyStr }
+          ? { trait_type: "ecc_compact", value: keyStr }
           : undefined,
-        { trait_type: 'entity_key_string', value: keyStr },
+        { trait_type: "entity_key_string", value: keyStr },
         {
-          trait_type: 'entity_key',
-          value: entityKey.toString('base64'),
+          trait_type: "entity_key",
+          value: entityKey.toString("base64"),
         },
-        { trait_type: 'rewardable', value: true },
+        { trait_type: "rewardable", value: true },
         {
-          trait_type: 'networks',
+          trait_type: "networks",
           value: [
-            record?.iot_hotspot_info && 'iot',
-            record?.mobile_hotspot_info && 'mobile',
+            record?.iot_hotspot_info && "iot",
+            record?.mobile_hotspot_info && "mobile",
           ].filter(truthy),
         },
-        ...locationAttributes('iot', record?.iot_hotspot_info),
-        ...locationAttributes('mobile', record?.mobile_hotspot_info),
+        ...locationAttributes("iot", record?.iot_hotspot_info),
+        ...locationAttributes("mobile", record?.mobile_hotspot_info),
       ],
     };
   }
 );
 
 server.get<{ Params: { eccCompact: string } }>(
-  '/:eccCompact',
+  "/:eccCompact",
   async (request, reply) => {
     const { eccCompact } = request.params;
 
@@ -121,25 +121,25 @@ server.get<{ Params: { eccCompact: string } }>(
 
     const digest = animalHash(eccCompact);
     const image = `${SHDW_DRIVE_URL}/${
-      record?.iot_hotspot_info?.is_active ? 'hotspot-active.png' : 'hotspot.png'
+      record?.iot_hotspot_info?.is_active ? "hotspot-active.png" : "hotspot.png"
     }`;
 
     return {
       name: digest,
-      description: 'A Hotspot NFT on Helium',
+      description: "A Hotspot NFT on Helium",
       image,
       attributes: [
-        { trait_type: 'ecc_compact', value: eccCompact },
-        { trait_type: 'rewardable', value: true },
+        { trait_type: "ecc_compact", value: eccCompact },
+        { trait_type: "rewardable", value: true },
         {
-          trait_type: 'networks',
+          trait_type: "networks",
           value: [
-            record?.iot_hotspot_info && 'iot',
-            record?.mobile_hotspot_info && 'mobile',
+            record?.iot_hotspot_info && "iot",
+            record?.mobile_hotspot_info && "mobile",
           ].filter(truthy),
         },
-        ...locationAttributes('iot', record?.iot_hotspot_info),
-        ...locationAttributes('mobile', record?.mobile_hotspot_info),
+        ...locationAttributes("iot", record?.iot_hotspot_info),
+        ...locationAttributes("mobile", record?.mobile_hotspot_info),
       ],
     };
   }
@@ -171,10 +171,10 @@ const start = async () => {
     await sequelize.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS mobile_hotspot_infos_asset_index ON mobile_hotspot_infos(asset);
     `);
-    await server.listen({ port: 8081, host: '0.0.0.0' });
+    await server.listen({ port: 8081, host: "0.0.0.0" });
 
     const address = server.server.address();
-    const port = typeof address === 'string' ? address : address?.port;
+    const port = typeof address === "string" ? address : address?.port;
   } catch (err) {
     server.log.error(err);
     process.exit(1);
