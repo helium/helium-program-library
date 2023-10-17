@@ -44,7 +44,7 @@ runs:
       shell: bash
       env:
         DEPLOY_KEYPAIR: ${{ inputs.keypair }}
-    - run: solana-keygen new -o keyp --no-bip39-passphrase
+    - run: solana-keygen new -s -o keyp --no-bip39-passphrase
       shell: bash
     - run: ls -l ./target/deploy/
       shell: bash

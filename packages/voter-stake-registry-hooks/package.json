@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "React hooks for helium voter stake registry",
   "repository": {
     "type": "git",
@@ -33,13 +33,13 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
-    "@helium/account-fetch-cache": "^0.4.0",
-    "@helium/account-fetch-cache-hooks": "^0.4.0",
-    "@helium/helium-react-hooks": "^0.4.0",
-    "@helium/helium-sub-daos-sdk": "^0.4.0",
+    "@helium/account-fetch-cache": "^0.4.1",
+    "@helium/account-fetch-cache-hooks": "^0.4.1",
+    "@helium/helium-react-hooks": "^0.4.1",
+    "@helium/helium-sub-daos-sdk": "^0.4.1",
     "@helium/modular-governance-hooks": "^0.0.2",
-    "@helium/spl-utils": "^0.4.0",
-    "@helium/voter-stake-registry-sdk": "^0.4.0",
+    "@helium/spl-utils": "^0.4.1",
+    "@helium/voter-stake-registry-sdk": "^0.4.1",
     "@metaplex-foundation/js": "^0.19.4",
     "@solana/wallet-adapter-base": "^0.9.22",
     "@solana/wallet-adapter-react": "^0.15.32",
@@ -50,7 +50,7 @@
   "devDependencies": {
     "git-format-staged": "^2.1.3",
     "ts-loader": "^9.2.3",
-    "typescript": "^4.8.4",
+    "typescript": "^5.2.2",
     "yarn": "^1.22.18"
   },
   "peerDependencies": {

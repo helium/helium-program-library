@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Oracle server for the lazy distributor",
   "repository": {
     "type": "git",
@@ -36,14 +36,14 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
     "@fastify/cors": "^8.1.1",
-    "@helium/account-fetch-cache": "^0.4.0",
+    "@helium/account-fetch-cache": "^0.4.1",
     "@helium/address": "^4.10.2",
-    "@helium/helium-entity-manager-sdk": "^0.4.0",
-    "@helium/helium-sub-daos-sdk": "^0.4.0",
-    "@helium/idls": "^0.4.0",
-    "@helium/lazy-distributor-sdk": "^0.4.0",
-    "@helium/rewards-oracle-sdk": "^0.4.0",
-    "@helium/spl-utils": "^0.4.0",
+    "@helium/helium-entity-manager-sdk": "^0.4.1",
+    "@helium/helium-sub-daos-sdk": "^0.4.1",
+    "@helium/idls": "^0.4.1",
+    "@helium/lazy-distributor-sdk": "^0.4.1",
+    "@helium/rewards-oracle-sdk": "^0.4.1",
+    "@helium/spl-utils": "^0.4.1",
     "@metaplex-foundation/mpl-bubblegum": "^0.7.0",
     "@solana/spl-token": "^0.3.8",
     "@types/sequelize": "^4.28.14",
@@ -68,7 +68,7 @@
     "nodemon": "^2.0.20",
     "ts-loader": "^9.2.3",
     "ts-node": "^10.9.1",
-    "typescript": "^4.8.4",
+    "typescript": "^5.2.2",
     "yarn": "^1.22.18"
   },
   "gitHead": "5a8bf0b7b88e5934ef8d774e686f7c95804fbb8d"

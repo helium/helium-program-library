@@ -5,18 +5,19 @@ import { decodeEntityKey, init } from "@helium/helium-entity-manager-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { PublicKey } from "@solana/web3.js";
 // @ts-ignore
+import { truthy } from "@helium/spl-utils";
 import animalHash from "angry-purple-tiger";
-import Fastify, { FastifyInstance } from "fastify";
 import axios from "axios";
-import { provider } from "./solana";
+import bs58 from "bs58";
+import Fastify, { FastifyInstance } from "fastify";
+import { SHDW_DRIVE_URL } from "./constants";
 import {
   IotHotspotInfo,
   KeyToAsset,
   MobileHotspotInfo,
   sequelize,
 } from "./model";
-import bs58 from "bs58";
-import { truthy } from "@helium/spl-utils";
+import { provider } from "./solana";
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -33,18 +34,12 @@ let program: Program<HeliumEntityManager>;
 server.get<{ Params: { keyToAssetKey: string } }>(
   "/v1/:keyToAssetKey",
   async (request, reply) => {
+    program = program || (await init(provider));
     const { keyToAssetKey } = request.params;
     const keyToAsset = new PublicKey(keyToAssetKey);
-    if (!program) {
-      program = await init(provider);
-    }
-    const keyToAssetAccount = await program.account.keyToAssetV0.fetch(
-      keyToAsset
-    );
-    const keyStr = decodeEntityKey(
-      keyToAssetAccount.entityKey,
-      keyToAssetAccount.keySerialization
-    );
+    const keyToAssetAcc = await program.account.keyToAssetV0.fetch(keyToAsset);
+    const { entityKey, keySerialization } = keyToAssetAcc;
+    const keyStr = decodeEntityKey(entityKey, keySerialization);
     const digest = animalHash(keyStr);
     const record = await KeyToAsset.findOne({
       where: {
@@ -52,6 +47,19 @@ server.get<{ Params: { keyToAssetKey: string } }>(
       },
       include: [IotHotspotInfo, MobileHotspotInfo],
     });
+
+    // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
+    // In the future, we need to put different symbols on different types of hotspots
+    const hotspotType = entityKey.length > 100 ? "MOBILE" : "IOT";
+    const image = `${SHDW_DRIVE_URL}/${
+      hotspotType === "MOBILE"
+        ? record?.mobile_hotspot_info?.is_active
+          ? "mobile-hotspot-active.png"
+          : "mobile-hotspot.png"
+        : record?.iot_hotspot_info?.is_active
+        ? "hotspot-active.png"
+        : "hotspot.png"
+    }`;
 
     return {
       name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
@@ -61,10 +69,7 @@ server.get<{ Params: { keyToAssetKey: string } }>(
           : "A Rewardable NFT on Helium",
       // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
       // In the future, we need to put different symbols on different types of hotspots
-      image:
-        keyToAssetAccount.entityKey.length > 100
-          ? "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/mobile-hotspot.png"
-          : "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/hotspot.png",
+      image,
       attributes: [
         keyStr && Address.isValid(keyStr)
           ? { trait_type: "ecc_compact", value: keyStr }
@@ -72,7 +77,7 @@ server.get<{ Params: { keyToAssetKey: string } }>(
         { trait_type: "entity_key_string", value: keyStr },
         {
           trait_type: "entity_key",
-          value: keyToAssetAccount.entityKey.toString("base64"),
+          value: entityKey.toString("base64"),
         },
         { trait_type: "rewardable", value: true },
         {
@@ -114,12 +119,14 @@ server.get<{ Params: { eccCompact: string } }>(
     });
 
     const digest = animalHash(eccCompact);
+    const image = `${SHDW_DRIVE_URL}/${
+      record?.iot_hotspot_info?.is_active ? "hotspot-active.png" : "hotspot.png"
+    }`;
 
     return {
       name: digest,
       description: "A Hotspot NFT on Helium",
-      image:
-        "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/hotspot.png",
+      image,
       attributes: [
         { trait_type: "ecc_compact", value: eccCompact },
         { trait_type: "rewardable", value: true },
@@ -132,7 +139,7 @@ server.get<{ Params: { eccCompact: string } }>(
         },
         ...locationAttributes("iot", record?.iot_hotspot_info),
         ...locationAttributes("mobile", record?.mobile_hotspot_info),
-      ]
+      ],
     };
   }
 );

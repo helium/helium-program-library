@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.1](https://github.com/helium/helium-program-library/compare/v0.4.0...v0.4.1) (2023-10-12)
+
+
+### Reverts
+
+* Revert "Revert lazy transactions bitmap" ([46b3cdf](https://github.com/helium/helium-program-library/commit/46b3cdf11c8348ef2b3a4a5c29b36e9206e148f2))
+
+
+
+
+
 # [0.4.0](https://github.com/helium/helium-program-library/compare/v0.2.21...v0.4.0) (2023-09-22)
 
 
