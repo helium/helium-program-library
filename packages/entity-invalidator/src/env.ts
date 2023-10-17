@@ -5,7 +5,7 @@ export const AWS_REGION = process.env.AWS_REGION;
 export const CLOUDFRONT_DISTRIBUTION = process.env.CLOUDFRONT_DISTRIBUTION!;
 
 // Check for required environment variables
-const requiredEnvVars = ["AWS_REGION", "S3_BUCKET"];
+const requiredEnvVars = ["AWS_REGION", "CLOUDFRONT_DISTRIBUTION"];
 for (const varName of requiredEnvVars) {
   if (!process.env[varName]) {
     throw new Error(`Environment variable ${varName} is required`);
