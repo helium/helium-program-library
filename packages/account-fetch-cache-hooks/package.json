@@ -1,6 +1,5 @@
 {
   "name": "@helium/account-fetch-cache-hooks",
-  "private": false,
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"

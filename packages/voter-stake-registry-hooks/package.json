@@ -1,6 +1,5 @@
 {
   "name": "@helium/voter-stake-registry-hooks",
-  "private": false,
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
