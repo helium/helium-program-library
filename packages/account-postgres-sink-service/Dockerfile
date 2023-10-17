@@ -4,16 +4,17 @@ FROM node:18-alpine AS BUILD_IMAGE
 WORKDIR /usr/src/app
 
 COPY package.json ./
+COPY yarn.deploy.lock ./
+ENV YARN_LOCKFILE_FILENAME=yarn.deploy.lock
 
+RUN corepack enable
+RUN yarn set version stable
 RUN yarn install
 
 COPY src src
-COPY typings typings
 COPY tsconfig.build.json tsconfig.json
 
-RUN yarn global add typescript
 RUN yarn run build
-
 RUN npm prune --production
 
 FROM node:18-alpine

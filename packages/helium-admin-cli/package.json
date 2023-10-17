@@ -1,6 +1,5 @@
 {
   "name": "@helium/helium-admin-cli",
-  "private": false,
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -68,8 +67,7 @@
     "git-format-staged": "^2.1.3",
     "ts-loader": "^9.2.3",
     "ts-node": "^10.9.1",
-    "typescript": "^5.2.2",
-    "yarn": "^1.22.18"
+    "typescript": "^5.2.2"
   },
   "author": "",
   "gitHead": "5a8bf0b7b88e5934ef8d774e686f7c95804fbb8d"
