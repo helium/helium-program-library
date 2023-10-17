@@ -32,6 +32,7 @@ import pLimit from "p-limit";
     const stateProgram = await initState(provider);
     const proposalProgram = await initProposal(provider);
     const vsrProgram = await initVsr(provider);
+    let closedProposals = new Set();
     for (const orgName of ["Helium", "Helium MOBILE", "Helium IOT"]) {
       console.log(`Checking for expired proposals in ${orgName}`);
       const organizationK = organizationKey(orgName)[0];
@@ -66,6 +67,17 @@ import pLimit from "p-limit";
         })
       );
 
+      const proposalsNow = await Promise.all(
+        proposalKeys.map(async (p) => ({
+          account: await proposalProgram.account.proposalV0.fetch(p),
+          pubkey: p,
+        }))
+      );
+      for (const proposal of proposalsNow) {
+        if (typeof proposal.account.state.voting === "undefined") {
+          closedProposals.add(proposal.pubkey.toBase58());
+        }
+      }
       const txs = chunks(resolveIxs, 10).map((ixs) => {
         const tx = new Transaction({
           feePayer: provider.wallet.publicKey,
@@ -78,7 +90,9 @@ import pLimit from "p-limit";
     }
 
     const markers = (await vsrProgram.account.voteMarkerV0.all()).filter(
-      (m) => !m.account.relinquished
+      (m) =>
+        !m.account.relinquished &&
+        closedProposals.has(m.account.proposal.toBase58())
     );
     const limit = pLimit(100);
     const relinquishIxns = await Promise.all(
