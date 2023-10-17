@@ -306,7 +306,6 @@ __metadata:
     react-async-hook: ^4.0.0
     ts-loader: ^9.2.3
     typescript: ^5.2.2
-    yarn: ^1.22.18
   peerDependencies:
     react: ^16.8 || ^17 || ^18
     react-dom: ^16.8 || ^17 || ^18
@@ -321,7 +320,6 @@ __metadata:
     git-format-staged: ^2.1.3
     ts-loader: ^9.2.3
     typescript: ^5.2.2
-    yarn: ^1.22.18
   languageName: unknown
   linkType: soft
 
@@ -345,7 +343,6 @@ __metadata:
     git-format-staged: ^2.1.3
     ts-loader: ^9.2.3
     typescript: ^5.2.2
-    yarn: ^1.22.18
   peerDependencies:
     "@coral-xyz/anchor": ^0.28.0
   languageName: unknown
@@ -364,7 +361,6 @@ __metadata:
     ts-loader: ^9.2.3
     ts-node: ^10.9.1
     typescript: ^5.2.2
-    yarn: ^1.22.18
   languageName: unknown
   linkType: soft
 
@@ -405,7 +401,6 @@ __metadata:
     ts-node: ^10.9.1
     typescript: ^5.2.2
     typescript-collections: ^1.3.3
-    yarn: ^1.22.18
   languageName: unknown
   linkType: soft
 
@@ -428,7 +423,6 @@ __metadata:
     ts-loader: ^9.2.3
     ts-node: ^10.9.1
     typescript: ^5.2.2
-    yarn: ^1.22.18
   languageName: unknown
   linkType: soft
 
@@ -448,7 +442,6 @@ __metadata:
     react-async-hook: ^4.0.0
     ts-loader: ^9.2.3
     typescript: ^5.2.2
-    yarn: ^1.22.18
   peerDependencies:
     "@solana/wallet-adapter-react": ^0.15.32
     react: ^16.8 || ^17 || ^18
@@ -471,7 +464,6 @@ __metadata:
     ts-loader: ^9.2.3
     ts-node: ^10.9.1
     typescript: ^5.2.2
-    yarn: ^1.22.18
   languageName: unknown
   linkType: soft
 
@@ -502,7 +494,6 @@ __metadata:
     ts-loader: ^9.2.3
     ts-node: ^10.9.1
     typescript: ^5.2.2
-    yarn: ^1.22.18
   languageName: unknown
   linkType: soft
 
@@ -519,7 +510,6 @@ __metadata:
     ts-loader: ^9.2.3
     ts-node: ^10.9.1
     typescript: ^5.2.2
-    yarn: ^1.22.18
   languageName: unknown
   linkType: soft
 
@@ -542,7 +532,6 @@ __metadata:
     git-format-staged: ^2.1.3
     ts-loader: ^9.2.3
     typescript: ^5.2.2
-    yarn: ^1.22.18
   languageName: unknown
   linkType: soft
 
@@ -560,7 +549,6 @@ __metadata:
     ts-loader: ^9.2.3
     ts-node: ^10.9.1
     typescript: ^5.2.2
-    yarn: ^1.22.18
   languageName: unknown
   linkType: soft
 
@@ -579,7 +567,6 @@ __metadata:
     ts-loader: ^9.2.3
     ts-node: ^10.9.1
     typescript: ^5.2.2
-    yarn: ^1.22.18
   languageName: unknown
   linkType: soft
 
@@ -8482,16 +8469,6 @@ download-git-repo@latest:
   version: 4.0.0
   resolution: "yallist@npm:4.0.0"
   checksum: 343617202af32df2a15a3be36a5a8c0c8545208f3d3dfbc6bb7c3e3b7e8c6f8e7485432e4f3b88da3031a6e20afa7c711eded32ddfb122896ac5d914e75848d5
-  languageName: node
-  linkType: hard
-
-"yarn@npm:^1.22.18":
-  version: 1.22.19
-  resolution: "yarn@npm:1.22.19"
-  bin:
-    yarn: bin/yarn.js
-    yarnpkg: bin/yarn.js
-  checksum: b43d2cc5fee7e933beb12a8aee7dfceca9e9ef2dd17c5d04d15a12ab7bec5f5744ea34a07b86e013da7f291a18c4e1ad8f70e150f5ed2f4666e6723c7f0a8452
   languageName: node
   linkType: hard
 
