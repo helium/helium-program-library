@@ -158,7 +158,7 @@ The client should:
 
 1. Make sure you're using Node 18+
 
-2. Instal dependencies
+2. Install dependencies
 
 ```
 corepack enable
