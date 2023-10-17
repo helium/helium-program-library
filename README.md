@@ -162,7 +162,6 @@ The client should:
 
 ```
 corepack enable
-yarn set version berry
 yarn
 ```
 
