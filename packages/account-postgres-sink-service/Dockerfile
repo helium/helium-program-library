@@ -15,9 +15,7 @@ COPY src src
 # COPY typings typings
 COPY tsconfig.build.json tsconfig.json
 
-RUN yarn dlx add typescript
 RUN yarn run build
-
 RUN npm prune --production
 
 FROM node:18-alpine
