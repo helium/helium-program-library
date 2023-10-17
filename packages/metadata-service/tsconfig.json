@@ -5,10 +5,16 @@
       "path": "../spl-utils"
     },
     {
+      "path": "../idls"
+    },
+    {
       "path": "../helium-entity-manager-sdk"
     },
     {
       "path": "../helium-sub-daos-sdk"
+    },
+    {
+      "path": "../account-fetch-cache"
     },
     {
       "path": "./tsconfig.cjs.json"
