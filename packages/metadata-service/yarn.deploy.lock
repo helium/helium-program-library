@@ -218,6 +218,7 @@ __metadata:
     "@helium/address": ^4.10.2
     "@helium/helium-entity-manager-sdk": ^0.4.1
     "@helium/helium-sub-daos-sdk": ^0.4.1
+    "@helium/idls": ^0.4.1
     "@helium/spl-utils": ^0.4.1
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
