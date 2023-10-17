@@ -12,7 +12,6 @@ RUN yarn set version stable
 RUN yarn install
 
 COPY src src
-# COPY typings typings
 COPY tsconfig.build.json tsconfig.json
 
 RUN yarn run build
