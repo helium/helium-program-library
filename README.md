@@ -56,13 +56,13 @@ flowchart TD
   end
 
   data_credits --DC Burned--> helium_sub_daos
-  
+
   onboarding --issue hotspot, assert location txs--> maker
   maker --issue hotspot, assert location--> manager
 
   hnt_price_oracle --HNT Price--> data_credits
   dnt_rewards_escrow --> lazy_distributor
-  
+
   manager --Burn DC--> data_credits
   manager --Create--> hotspots
   manager --Device Count--> helium_sub_daos
@@ -105,7 +105,7 @@ of particular NFTs as specified by oracles.
 ### Oracle Architecture
 
 In order to facilitate setting rewards _and_ distributing rewards in a single Solana transaction,
-I propose at the url specified in the oracle configuration, supporting `GET` and `POST` 
+I propose at the url specified in the oracle configuration, supporting `GET` and `POST`
 
 #### GET Request
 
@@ -156,33 +156,35 @@ The client should:
 
 ## Local Setup
 
-1. Install dependencies
+1. Make sure you're using Node 18+
+
+2. Instal dependencies
 
 ```
-$: yarn
-$: git submodule init
-$: git submodule update
+corepack enable
+yarn set version berry
+yarn
 ```
 
-2. Start localnet
+3. Start localnet
 
 ```
 $: TESTING=true anchor localnet
 ```
 
-3. Start watcher
+4. Start watcher
 
 ```
 $: yarn watch
 ```
 
-4. Bootstrap localnet
+5. Bootstrap localnet
 
 ```
 $: . ./scripts/bootstrap-localnet.sh
 ```
 
-5. Run tests against localnet
+6. Run tests against localnet
 
 ```
 $: anchor test --provider.cluster localnet --skip-deploy --skip-local-validator --skip-build
