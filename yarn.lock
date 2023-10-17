@@ -1222,6 +1222,7 @@ __metadata:
     "@helium/idls": ^0.4.1
     "@helium/spl-utils": ^0.4.1
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
+    "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.78.4
     "@types/bn.js": ^5.1.1
     angry-purple-tiger: ^1.0.5
@@ -1453,6 +1454,7 @@ __metadata:
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@fastify/cors": ^8.1.1
+    "@helium/account-fetch-cache": ^0.4.1
     "@helium/address": ^4.10.2
     "@helium/helium-entity-manager-sdk": ^0.4.1
     "@helium/helium-sub-daos-sdk": ^0.4.1
@@ -1584,6 +1586,7 @@ __metadata:
     "@helium/helium-sub-daos-sdk": ^0.4.1
     "@helium/idls": ^0.4.1
     "@helium/lazy-transactions-sdk": ^0.4.1
+    "@helium/spl-utils": ^0.4.1
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
