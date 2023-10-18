@@ -82,7 +82,7 @@
     {
       "path": "./packages/crons"
     }, {
-      "path": "./packages/entity-postgres-s3-sink"
+      "path": "./packages/entity-invalidator"
     }
   ]
 }
