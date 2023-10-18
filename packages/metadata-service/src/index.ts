@@ -30,7 +30,6 @@ server.get("/health", async () => {
 });
 
 let program: Program<HeliumEntityManager>;
-server.get("/favicon.ico", async (req, res) => res.status(204));
 server.get<{ Params: { keyToAssetKey: string } }>(
   "/v1/:keyToAssetKey",
   async (request, reply) => {
