@@ -58,7 +58,7 @@ export class MobileHotspotInfo extends Model {
   declare country: string;
   declare lat: number;
   declare long: number;
-  declare is_active: boolean;
+  declare isActive: boolean;
 }
 MobileHotspotInfo.init(
   {
@@ -92,7 +92,7 @@ export class IotHotspotInfo extends Model {
   declare country: string;
   declare lat: number;
   declare long: number;
-  declare is_active: boolean;
+  declare isActive: boolean;
 }
 IotHotspotInfo.init(
   {
