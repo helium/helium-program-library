@@ -151,8 +151,6 @@ function locationAttributes(
     return [];
   }
 
-  console.log(info.city);
-  console.log(info.state);
   return [
     { trait_type: `${name}_city`, value: info.city },
     { trait_type: `${name}_state`, value: info.state },
