@@ -30,7 +30,7 @@ server.get("/health", async () => {
 });
 
 let program: Program<HeliumEntityManager>;
-
+server.get("/favicon.ico", async (req, res) => res.status(204));
 server.get<{ Params: { keyToAssetKey: string } }>(
   "/v1/:keyToAssetKey",
   async (request, reply) => {
@@ -53,10 +53,10 @@ server.get<{ Params: { keyToAssetKey: string } }>(
     const hotspotType = entityKey.length > 100 ? "MOBILE" : "IOT";
     const image = `${SHDW_DRIVE_URL}/${
       hotspotType === "MOBILE"
-        ? record?.mobile_hotspot_info?.is_active
+        ? record?.mobile_hotspot_info?.isActive
           ? "mobile-hotspot-active.png"
           : "mobile-hotspot.png"
-        : record?.iot_hotspot_info?.is_active
+        : record?.iot_hotspot_info?.isActive
         ? "hotspot-active.png"
         : "hotspot.png"
     }`;
@@ -120,7 +120,7 @@ server.get<{ Params: { eccCompact: string } }>(
 
     const digest = animalHash(eccCompact);
     const image = `${SHDW_DRIVE_URL}/${
-      record?.iot_hotspot_info?.is_active ? "hotspot-active.png" : "hotspot.png"
+      record?.iot_hotspot_info?.isActive ? "hotspot-active.png" : "hotspot.png"
     }`;
 
     return {
@@ -152,6 +152,8 @@ function locationAttributes(
     return [];
   }
 
+  console.log(info.city);
+  console.log(info.state);
   return [
     { trait_type: `${name}_city`, value: info.city },
     { trait_type: `${name}_state`, value: info.state },
