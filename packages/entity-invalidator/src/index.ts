@@ -104,12 +104,12 @@ async function run() {
 }
 
 function getPaths(entity: KeyToAsset): string[] {
-  const v1 = `v1/${entity.address}`;
+  const v1 = `/v1/${entity.address}`;
   if ((entity.entityKeyStr?.length || 0) >= 200) {
     return [v1];
   }
 
-  return [entity.entityKeyStr!, v1];
+  return [`/${entity.entityKeyStr!}`, v1];
 }
 
 run().catch((e) => {
