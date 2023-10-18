@@ -15,7 +15,7 @@ async function run() {
   let lastId = null;
   let entities;
 
-  const lastIdWhere = {};
+  const lastIdWhere: any = {};
   const whereClause = {
     [Op.or]: [
       {
@@ -96,7 +96,7 @@ async function run() {
         })
         .promise();
 
-      lastId = entities[entities.length - 1].id;
+      lastId = entities[entities.length - 1].address;
       totalProgress += entities.length;
       console.log(`Processed ${totalProgress} / ${totalCount}`);
     }
