@@ -917,7 +917,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@^0.4.0, @helium/account-fetch-cache@^0.4.1, @helium/account-fetch-cache@workspace:packages/account-fetch-cache":
+"@helium/account-fetch-cache@^0.4.1, @helium/account-fetch-cache@workspace:packages/account-fetch-cache":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -1175,7 +1175,8 @@ __metadata:
   resolution: "@helium/entity-invalidator@workspace:packages/entity-invalidator"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.4.0
+    "@helium/account-fetch-cache": ^0.4.1
+    "@helium/helium-entity-manager-sdk": ^0.4.1
     "@solana/web3.js": ^1.78.4
     "@types/bn.js": ^5.1.1
     "@types/deep-equal": ^1.0.1
