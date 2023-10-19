@@ -12,11 +12,13 @@ import bs58 from "bs58";
 import Fastify, { FastifyInstance } from "fastify";
 import { SHDW_DRIVE_URL } from "./constants";
 import {
+  sequelize,
+} from "./model_primary";
+import {
   IotHotspotInfo,
   KeyToAsset,
   MobileHotspotInfo,
-  sequelize,
-} from "./model";
+} from "./model_rr";
 import { provider } from "./solana";
 
 const server: FastifyInstance = Fastify({

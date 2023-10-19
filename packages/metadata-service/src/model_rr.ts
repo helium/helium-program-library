@@ -11,7 +11,7 @@ export const sequelize = new Sequelize({
   logging: false,
   dialectModule: pg,
   username: process.env.PGUSER,
-  database: process.env.PGDATABASE,
+  database: process.env.PGDATABASE_RR,
   pool: {
     max: 5,
     min: 0,
