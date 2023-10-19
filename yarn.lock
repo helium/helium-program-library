@@ -1052,6 +1052,7 @@ __metadata:
   resolution: "@helium/crons@workspace:packages/crons"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
+    "@helium/account-fetch-cache": ^0.4.1
     "@helium/distributor-oracle": ^0.4.1
     "@helium/fanout-sdk": ^0.4.1
     "@helium/helium-entity-manager-sdk": ^0.4.1
@@ -1065,6 +1066,7 @@ __metadata:
     "@helium/spl-utils": ^0.4.1
     "@helium/state-controller-sdk": ^0.0.5
     "@helium/treasury-management-sdk": ^0.4.1
+    "@helium/voter-stake-registry-sdk": ^0.4.1
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.78.4
     "@types/bn.js": ^5.1.0
