@@ -15,7 +15,6 @@ import {
   IotHotspotInfo,
   KeyToAsset,
   MobileHotspotInfo,
-  sequelize,
 } from "./model";
 import { provider } from "./solana";
 
@@ -160,19 +159,11 @@ function locationAttributes(
 
 const start = async () => {
   try {
-    await sequelize.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS key_to_asset_asset_index ON key_to_assets(asset);
-    `);
-    await sequelize.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS iot_hotspot_infos_asset_index ON iot_hotspot_infos(asset);
-    `);
-    await sequelize.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS mobile_hotspot_infos_asset_index ON mobile_hotspot_infos(asset);
-    `);
     await server.listen({ port: 8081, host: "0.0.0.0" });
 
     const address = server.server.address();
     const port = typeof address === "string" ? address : address?.port;
+    console.log(`Running on 0.0.0.0:${port}`);
   } catch (err) {
     server.log.error(err);
     process.exit(1);
