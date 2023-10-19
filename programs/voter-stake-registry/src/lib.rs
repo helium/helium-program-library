@@ -129,4 +129,12 @@ pub mod voter_stake_registry {
   ) -> Result<()> {
     instructions::relinquish_vote_v1::handler(ctx, args)
   }
+
+  pub fn repair_vote_marker_sizes(ctx: Context<RepairVoteMarkerSizes>) -> Result<()> {
+    instructions::repair_vote_marker_sizes::handler(ctx)
+  }
+
+  pub fn relinquish_expired_vote_v0(ctx: Context<RelinquishExpiredVoteV0>) -> Result<()> {
+    instructions::relinquish_expired_vote_v0::handler(ctx)
+  }
 }

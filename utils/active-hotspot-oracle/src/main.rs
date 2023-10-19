@@ -10,7 +10,7 @@ use deltalake::{datafusion::prelude::SessionContext, DeltaTableBuilder};
 use helium_entity_manager::KeyToAssetV0;
 use helium_entity_manager::{accounts::SetEntityActiveV0, SetEntityActiveArgsV0};
 use helium_entity_manager::{
-  accounts::TempPayMobileOnboardingFeeV0, IotHotspotInfoV0, MobileHotspotInfoV0,
+  accounts::TempPayMobileOnboardingFeeV0, IotHotspotInfoV0, MobileHotspotInfoV0, MobileDeviceTypeV0
 };
 use hpl_utils::dao::Dao;
 use hpl_utils::token::Token;
@@ -183,7 +183,7 @@ async fn main() -> Result<()> {
           .collect::<HashSet<_>>()
       }
       SubDao::Mobile => {
-        let infos = helium_entity_program.accounts::<IotHotspotInfoV0>(vec![]).await?;
+        let infos = helium_entity_program.accounts::<MobileHotspotInfoV0>(vec![]).await?;
         infos
           .iter()
           .filter(|i| i.1.is_active)
@@ -608,7 +608,7 @@ fn find_infos_to_mark<C: Deref<Target = impl Signer> + Clone>(
               let info = MobileHotspotInfoV0::try_deserialize(&mut data);
 
               info.map(|i| {
-                if i.dc_onboarding_fee_paid == 0 {
+                if i.dc_onboarding_fee_paid == 0 && i.device_type == MobileDeviceTypeV0::Cbrs {
                   needs_paid = true
                 }
                 Box::new(i) as Box<dyn IsActive>

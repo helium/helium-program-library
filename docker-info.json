@@ -16,7 +16,9 @@
     "entity-invalidator": "./packages/entity-invalidator"
   },
   "oracle": {
-    "distributor-oracle": "./packages/distributor-oracle",
+    "distributor-oracle": "./packages/distributor-oracle"
+  },
+  "data": {
     "active-hotspot-oracle": "./utils/active-hotspot-oracle"
   }
 }
