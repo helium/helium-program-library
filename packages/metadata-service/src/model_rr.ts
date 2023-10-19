@@ -26,7 +26,7 @@ export const sequelize = new Sequelize({
       if (isRds && !password) {
         const signer = new AWS.RDS.Signer({
           region: process.env.AWS_REGION,
-          hostname: process.env.PGHOST,
+          hostname: process.env.PGHOST_RR,
           port,
           username: process.env.PGUSER,
         });
