@@ -20,5 +20,3 @@ export const createPgIndexes = async ({
     console.error(err);
   }
 };
-
-export default createPgIndexes;
