@@ -176,6 +176,7 @@ __metadata:
     "@helium/fanout-sdk": ^0.4.2
     "@helium/helium-entity-manager-sdk": ^0.4.2
     "@helium/helium-sub-daos-sdk": ^0.4.2
+    "@helium/idls": ^0.4.2
     "@helium/lazy-distributor-sdk": ^0.4.2
     "@helium/mobile-entity-manager-sdk": ^0.4.2
     "@helium/organization-sdk": ^0.0.5
