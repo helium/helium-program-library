@@ -1,9 +1,9 @@
 {
   "scripts": {
-    "versionup": "lerna version --conventional-commits --no-git-tag-version",
-    "versionup:patch": "lerna version patch --conventional-commits --no-git-tag-version",
-    "versionup:minor": "lerna version minor --conventional-commits --no-git-tag-version",
-    "versionup:major": "lerna version major --conventional-commits --no-git-tag-version",
+    "versionup": "lerna version --force-publish--conventional-commits --no-git-tag-version",
+    "versionup:patch": "lerna version patch --force-publish --conventional-commits --no-git-tag-version",
+    "versionup:minor": "lerna version minor --force-publish --conventional-commits --no-git-tag-version",
+    "versionup:major": "lerna version major --force-publish --conventional-commits --no-git-tag-version",
     "postversionup": "npm run commit-version",
     "postversionup:patch": "npm run commit-version",
     "postversionup:minor": "npm run commit-version",
