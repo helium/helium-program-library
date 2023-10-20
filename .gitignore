@@ -19,3 +19,4 @@ packages/migration-service/export.json
 packages/migration-service/failures.json
 migration-docker/data
 accounts
+.yarn

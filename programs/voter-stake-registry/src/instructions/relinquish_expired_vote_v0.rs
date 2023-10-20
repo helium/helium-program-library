@@ -19,7 +19,6 @@ pub struct RelinquishExpiredVoteV0<'info> {
   )]
   pub position: Box<Account<'info, PositionV0>>,
   #[account(
-    mut,
     constraint = !matches!(proposal.state, ProposalState::Voting { .. })
   )]
   pub proposal: Box<Account<'info, ProposalV0>>,
