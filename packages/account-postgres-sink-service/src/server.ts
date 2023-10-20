@@ -7,6 +7,7 @@ import { PublicKey } from "@solana/web3.js";
 import {
   HELIUS_AUTH_SECRET,
   PROGRAM_ACCOUNT_CONFIGS,
+  INDEX_CONFIGS,
   RUN_JOBS_AT_STARTUP,
 } from "./env";
 import database from "./utils/database";
@@ -31,6 +32,16 @@ if (!HELIUS_AUTH_SECRET) {
     } = JSON.parse(fs.readFileSync(PROGRAM_ACCOUNT_CONFIGS, "utf8"));
 
     return accountConfigs ? accountConfigs.configs : [];
+  })();
+
+  const indexConfigs = (() => {
+    let configs: null | { configs: string[] } = null;
+
+    if (INDEX_CONFIGS) {
+      configs = JSON.parse(fs.readFileSync(INDEX_CONFIGS, "utf8"));
+    }
+
+    return configs ? configs.configs : [];
   })();
 
   const customJobs = configs
@@ -209,7 +220,7 @@ if (!HELIUS_AUTH_SECRET) {
     // models are defined on boot, and updated in refresh-accounts
     await database.sync();
     await defineAllIdlModels({ configs, sequelize: database });
-    await createPgIndexes({ sequelize: database });
+    await createPgIndexes({ indexConfigs, sequelize: database });
     await server.listen({ port: 3000, host: "0.0.0.0" });
     const address = server.server.address();
     const port = typeof address === "string" ? address : address?.port;

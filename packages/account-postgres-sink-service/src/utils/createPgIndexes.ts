@@ -1,20 +1,20 @@
 import { Sequelize } from "sequelize";
 
 export const createPgIndexes = async ({
-  sequelize,
+  indexConfigs,
+  sequelize
 }: {
+  indexConfigs: string[],
   sequelize: Sequelize;
 }) => {
   try {
-    await sequelize.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS key_to_asset_asset_index ON key_to_assets(asset);
-    `);
-    await sequelize.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS iot_hotspot_infos_asset_index ON iot_hotspot_infos(asset);
-    `);
-    await sequelize.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS mobile_hotspot_infos_asset_index ON mobile_hotspot_infos(asset);
-    `);
+    const indexPromises = indexConfigs.map((config) => {
+      return sequelize.query(config);
+    });
+
+    await Promise.all(indexPromises);
+
+    console.log("createPgIndexes: Indexes created!");
   } catch (err) {
     console.error("createPgIndexes: Index creation failed");
     console.error(err);
