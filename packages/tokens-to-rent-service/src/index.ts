@@ -1,19 +1,19 @@
-import cors from '@fastify/cors';
-import { PublicKey } from '@solana/web3.js';
-import Fastify, { FastifyInstance } from 'fastify';
-import * as jup from './jupiter';
-import { HNT_MINT, IOT_MINT, MOBILE_MINT } from '@helium/spl-utils';
+import cors from "@fastify/cors";
+import { PublicKey } from "@solana/web3.js";
+import Fastify, { FastifyInstance } from "fastify";
+import * as jup from "./jupiter";
+import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 
 const server: FastifyInstance = Fastify({ logger: true });
-server.register(cors, { origin: '*' });
+server.register(cors, { origin: "*" });
 
-server.get('/health', async (req, res) => {
+server.get("/health", async (req, res) => {
   res.send({ ok: true });
 });
 
 server.post<{
   Body: { wallet: string; mint: string };
-}>('/fees', async (req, res) => {
+}>("/fees", async (req, res) => {
   try {
     const { wallet, mint } = req.body;
     const walletPk = new PublicKey(wallet);
@@ -32,7 +32,7 @@ server.post<{
 
 server.post<{
   Body: { mint: string };
-}>('/estimate', async (req, res) => {
+}>("/estimate", async (req, res) => {
   try {
     const { mint } = req.body;
     const mintPk = new PublicKey(mint);
@@ -46,7 +46,7 @@ server.post<{
   }
 });
 
-server.get<{}>('/estimates', async (req, res) => {
+server.get<{}>("/estimates", async (req, res) => {
   try {
     res.send({
       [HNT_MINT.toBase58()]: await jup.estimate({ mint: HNT_MINT }),
@@ -63,11 +63,11 @@ const start = async () => {
   try {
     await server.listen({
       port: Number(process.env.PORT) || 8081,
-      host: '0.0.0.0',
+      host: "0.0.0.0",
     });
 
     const address = server.server.address();
-    const port = typeof address === 'string' ? address : address?.port;
+    const port = typeof address === "string" ? address : address?.port;
     console.log(`Running on 0.0.0.0:${port}`);
   } catch (err) {
     server.log.error(err);
