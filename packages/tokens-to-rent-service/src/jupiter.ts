@@ -1,11 +1,11 @@
-import { HNT_MINT, IOT_MINT, MOBILE_MINT, toBN } from '@helium/spl-utils';
+import { HNT_MINT, IOT_MINT, MOBILE_MINT, toBN } from "@helium/spl-utils";
 import {
   Configuration,
   DefaultApi,
   Instruction,
   AccountMeta,
-} from '@jup-ag/api';
-import { ACCOUNT_SIZE, NATIVE_MINT, getMint } from '@solana/spl-token';
+} from "@jup-ag/api";
+import { ACCOUNT_SIZE, NATIVE_MINT, getMint } from "@solana/spl-token";
 import {
   AddressLookupTableAccount,
   PublicKey,
@@ -13,9 +13,9 @@ import {
   TransactionInstruction,
   TransactionMessage,
   VersionedTransaction,
-} from '@solana/web3.js';
-import { JUPITER_FEE_ACCOUNT, JUPITER_FEE_BPS, JUPITER_URL } from './env';
-import { provider } from './solana';
+} from "@solana/web3.js";
+import { JUPITER_FEE_ACCOUNT, JUPITER_FEE_BPS, JUPITER_URL } from "./env";
+import { provider } from "./solana";
 
 export const instructionDataToTransactionInstruction = (
   instruction: Instruction | undefined
@@ -28,7 +28,7 @@ export const instructionDataToTransactionInstruction = (
       isSigner: key.isSigner,
       isWritable: key.isWritable,
     })),
-    data: Buffer.from(instruction.data, 'base64'),
+    data: Buffer.from(instruction.data, "base64"),
   });
 };
 
@@ -94,7 +94,7 @@ export const estimate = async ({
     platformFeeBps: Number(JUPITER_FEE_BPS) || 0,
   });
 
-  if (!quote) throw new Error('Unable to quote');
+  if (!quote) throw new Error("Unable to quote");
   return quote.outAmount;
 };
 
@@ -127,6 +127,7 @@ export const fundFees = async ({
     outputMint: NATIVE_MINT.toBase58(),
     slippageBps: 100, // 1%
     platformFeeBps: Number(JUPITER_FEE_BPS) || 0,
+    maxAccounts: 20,
   });
 
   // Tx contains instructions to create/close WSOL token account
