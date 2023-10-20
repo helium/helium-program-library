@@ -22,7 +22,7 @@ pub struct RelinquishExpiredVoteV0<'info> {
     mut,
     constraint = !matches!(proposal.state, ProposalState::Voting { .. })
   )]
-  pub proposal: Account<'info, ProposalV0>,
+  pub proposal: Box<Account<'info, ProposalV0>>,
   pub system_program: Program<'info, System>,
 }
 
