@@ -7,7 +7,6 @@ import { PublicKey } from "@solana/web3.js";
 import {
   HELIUS_AUTH_SECRET,
   PROGRAM_ACCOUNT_CONFIGS,
-  INDEX_CONFIGS,
   RUN_JOBS_AT_STARTUP,
 } from "./env";
 import database from "./utils/database";
@@ -26,22 +25,16 @@ if (!HELIUS_AUTH_SECRET) {
 }
 
 (async () => {
-  const configs = (() => {
-    const accountConfigs: null | {
+  const { configs, indexConfigs } = (() => {
+    const dbConfigs: null | {
       configs: IConfig[];
+      indexConfigs?: string[]
     } = JSON.parse(fs.readFileSync(PROGRAM_ACCOUNT_CONFIGS, "utf8"));
 
-    return accountConfigs ? accountConfigs.configs : [];
-  })();
-
-  const indexConfigs = (() => {
-    let configs: null | { configs: string[] } = null;
-
-    if (INDEX_CONFIGS) {
-      configs = JSON.parse(fs.readFileSync(INDEX_CONFIGS, "utf8"));
+    return {
+      configs: dbConfigs && dbConfigs.configs ? dbConfigs.configs : [],
+      indexConfigs: dbConfigs && dbConfigs.indexConfigs ? dbConfigs.indexConfigs : [],
     }
-
-    return configs ? configs.configs : [];
   })();
 
   const customJobs = configs

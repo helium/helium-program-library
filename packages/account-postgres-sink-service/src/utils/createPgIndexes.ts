@@ -8,6 +8,11 @@ export const createPgIndexes = async ({
   sequelize: Sequelize;
 }) => {
   try {
+    if (indexConfigs.length === 0) {
+      console.log("createPgIndexes: No indexes created!");
+      return;
+    }
+
     const indexPromises = indexConfigs.map((config) => {
       return sequelize.query(config);
     });
