@@ -77,9 +77,6 @@
       "path": "./packages/hotspot-utils"
     },
     {
-      "path": "./packages/iot-premine-data-only-service"
-    },
-    {
       "path": "./packages/crons"
     }, {
       "path": "./packages/entity-invalidator"
