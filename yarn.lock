@@ -1423,32 +1423,6 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/iot-premine-data-only-service@workspace:packages/iot-premine-data-only-service":
-  version: 0.0.0-use.local
-  resolution: "@helium/iot-premine-data-only-service@workspace:packages/iot-premine-data-only-service"
-  dependencies:
-    "@coral-xyz/anchor": ^0.28.0
-    "@fastify/cors": ^8.1.1
-    "@helium/account-fetch-cache": ^0.4.2
-    "@helium/address": ^4.10.2
-    "@solana/spl-token": ^0.3.8
-    "@solana/web3.js": ^1.78.4
-    "@types/pg": ^8.6.6
-    "@types/pg-format": ^1.0.2
-    "@types/yargs": ^17.0.24
-    bn.js: ^5.2.0
-    bs58: ^4.0.1
-    csv-parser: ^3.0.0
-    fastify: ^4.13.0
-    pg: ^8.9.0
-    pg-format: ^1.0.4
-    ts-loader: ^9.2.3
-    ts-node: ^10.9.1
-    typescript: ^5.2.2
-    yargs: ^17.7.1
-  languageName: unknown
-  linkType: soft
-
 "@helium/lazy-distributor-sdk@^0.4.2, @helium/lazy-distributor-sdk@workspace:packages/lazy-distributor-sdk":
   version: 0.0.0-use.local
   resolution: "@helium/lazy-distributor-sdk@workspace:packages/lazy-distributor-sdk"
@@ -7771,17 +7745,6 @@ __metadata:
   version: 5.5.0
   resolution: "csv-parse@npm:5.5.0"
   checksum: a9cc73a332debdabe9658c532e7668c626c06616113b650fb2e063f3a1451d45a48080c1942a680e8ddeaf1665efef49f126e655c54c19e025d70cccc002ff4d
-  languageName: node
-  linkType: hard
-
-"csv-parser@npm:^3.0.0":
-  version: 3.0.0
-  resolution: "csv-parser@npm:3.0.0"
-  dependencies:
-    minimist: ^1.2.0
-  bin:
-    csv-parser: bin/csv-parser
-  checksum: adc9d67d9f185249825570778c24d13004625301655330f6b735a052b9fdfbe1a239a014afb1f89939e0626ee573718f71f9f14164db7c17e4bcb2f38d6a162b
   languageName: node
   linkType: hard
 
