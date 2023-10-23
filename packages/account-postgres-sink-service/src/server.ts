@@ -11,6 +11,7 @@ import {
 } from "./env";
 import database from "./utils/database";
 import { defineAllIdlModels } from "./utils/defineIdlModels";
+import { createPgIndexes } from "./utils/createPgIndexes";
 import { truthy, upsertProgramAccounts } from "./utils/upsertProgramAccounts";
 import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAccounts";
 import { handleAccountWebhook } from "./utils/handleAccountWebhook";
@@ -24,12 +25,16 @@ if (!HELIUS_AUTH_SECRET) {
 }
 
 (async () => {
-  const configs = (() => {
-    const accountConfigs: null | {
+  const { configs, indexConfigs } = (() => {
+    const dbConfigs: null | {
       configs: IConfig[];
+      indexConfigs?: string[]
     } = JSON.parse(fs.readFileSync(PROGRAM_ACCOUNT_CONFIGS, "utf8"));
 
-    return accountConfigs ? accountConfigs.configs : [];
+    return {
+      configs: dbConfigs && dbConfigs.configs ? dbConfigs.configs : [],
+      indexConfigs: dbConfigs && dbConfigs.indexConfigs ? dbConfigs.indexConfigs : [],
+    }
   })();
 
   const customJobs = configs
@@ -208,6 +213,7 @@ if (!HELIUS_AUTH_SECRET) {
     // models are defined on boot, and updated in refresh-accounts
     await database.sync();
     await defineAllIdlModels({ configs, sequelize: database });
+    await createPgIndexes({ indexConfigs, sequelize: database });
     await server.listen({ port: 3000, host: "0.0.0.0" });
     const address = server.server.address();
     const port = typeof address === "string" ? address : address?.port;
