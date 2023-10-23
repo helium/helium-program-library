@@ -102,7 +102,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@^0.4.1":
+"@helium/account-fetch-cache@^0.4.2":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -130,7 +130,7 @@ __metadata:
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@fastify/cors": ^8.1.1
-    "@helium/account-fetch-cache": ^0.4.1
+    "@helium/account-fetch-cache": ^0.4.2
     "@helium/address": ^4.10.2
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.78.4
