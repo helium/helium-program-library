@@ -6,8 +6,7 @@ COPY package.json ./
 COPY yarn.deploy.lock ./
 ENV YARN_LOCKFILE_FILENAME=yarn.deploy.lock
 
-RUN corepack enable
-RUN yarn set version stable
+RUN yarn set version 3.6.4
 RUN yarn install
 
 COPY src src

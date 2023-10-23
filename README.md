@@ -162,6 +162,7 @@ The client should:
 
 ```
 corepack enable
+yarn set version 3.6.4
 yarn
 ```
 
