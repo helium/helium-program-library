@@ -110,7 +110,7 @@ server.get<{ Params: { wallet: string } }>(
   }
 );
 
-server.get("/v2/hotspots/iot/all", async () => {
+server.get("/v2/hotspots/iot", async () => {
   const ktas = await KeyToAsset.findAll({
     include: [
       {
@@ -126,7 +126,7 @@ server.get("/v2/hotspots/iot/all", async () => {
   }));
 });
 
-server.get("/v2/hotspots/mobile/all", async (request) => {
+server.get("/v2/hotspots/mobile", async (request) => {
   const ktas = await KeyToAsset.findAll({
     include: [
       {
