@@ -56,9 +56,8 @@ export class MobileHotspotInfo extends Model {
   declare city: string;
   declare state: string;
   declare country: string;
-  declare lat: number;
-  declare long: number;
-  declare isActive: boolean;
+  declare is_active: boolean;
+  declare device_type: string;
 }
 MobileHotspotInfo.init(
   {
@@ -67,12 +66,13 @@ MobileHotspotInfo.init(
       primaryKey: true,
     },
     street: DataTypes.STRING,
-    lat: DataTypes.DECIMAL(8, 6),
-    long: DataTypes.DECIMAL(9, 6),
     city: DataTypes.STRING,
     state: DataTypes.STRING,
     country: DataTypes.STRING,
-    isActive: DataTypes.BOOLEAN,
+    is_active: DataTypes.BOOLEAN,
+    device_type: DataTypes.JSONB,
+    location: DataTypes.DECIMAL.UNSIGNED,
+    dc_onboarding_fee_paid: DataTypes.DECIMAL.UNSIGNED,
   },
   {
     sequelize,
@@ -90,9 +90,7 @@ export class IotHotspotInfo extends Model {
   declare city: string;
   declare state: string;
   declare country: string;
-  declare lat: number;
-  declare long: number;
-  declare isActive: boolean;
+  declare is_active: boolean;
 }
 IotHotspotInfo.init(
   {
@@ -101,12 +99,14 @@ IotHotspotInfo.init(
       primaryKey: true,
     },
     street: DataTypes.STRING,
-    lat: DataTypes.DECIMAL(8, 6),
-    long: DataTypes.DECIMAL(9, 6),
     city: DataTypes.STRING,
     state: DataTypes.STRING,
     country: DataTypes.STRING,
-    isActive: DataTypes.BOOLEAN,
+    is_active: DataTypes.BOOLEAN,
+    location: DataTypes.DECIMAL.UNSIGNED,
+    dc_onboarding_fee_paid: DataTypes.DECIMAL.UNSIGNED,
+    elevation: DataTypes.NUMBER,
+    gain: DataTypes.NUMBER
   },
   {
     sequelize,
@@ -123,6 +123,7 @@ export class KeyToAsset extends Model {
   declare entity_key: Buffer;
   declare mobile_hotspot_info?: MobileHotspotInfo;
   declare iot_hotspot_info?: IotHotspotInfo;
+  declare keySerialization: string;
 }
 KeyToAsset.init(
   {
@@ -130,8 +131,9 @@ KeyToAsset.init(
       type: STRING,
       primaryKey: true,
     },
-    entityKey: DataTypes.BLOB,
+    entity_key: DataTypes.BLOB,
     asset: STRING,
+    keySerialization: DataTypes.JSONB,
   },
   {
     sequelize,
