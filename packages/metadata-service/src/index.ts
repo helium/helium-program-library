@@ -110,38 +110,54 @@ server.get<{ Params: { wallet: string } }>(
   }
 );
 
-server.get("/v2/hotspots/iot", async () => {
-  const ktas = await KeyToAsset.findAll({
-    include: [
-      {
-        model: IotHotspotInfo,
-        required: true,
-      },
-    ],
-  });
-  return ktas.map((kta) => ({
-    entity_key: decodeEntityKey(kta.entity_key, { [kta.keySerialization]: {} }),
-    key_to_asset_key: kta.address,
-    is_active: kta.iot_hotspot_info!.is_active,
-  }));
-});
+server.get<{ Querystring: { subnetwork: string } }>(
+  "/v2/hotspots",
+  async (request, reply) => {
+    const { subnetwork } = request.query;
 
-server.get("/v2/hotspots/mobile", async (request) => {
-  const ktas = await KeyToAsset.findAll({
-    include: [
-      {
-        model: MobileHotspotInfo,
-        required: true,
-      },
-    ],
-  });
-  return ktas.map((kta) => ({
-    entity_key: decodeEntityKey(kta.entity_key, { [kta.keySerialization]: {} }),
-    key_to_asset_key: kta.address,
-    is_active: kta.mobile_hotspot_info!.is_active,
-    device_type: kta.mobile_hotspot_info!.device_type,
-  }));
-});
+    if (subnetwork === "iot") {
+      const ktas = await KeyToAsset.findAll({
+        include: [
+          {
+            model: IotHotspotInfo,
+            required: true,
+          },
+        ],
+      });
+
+      return ktas.map((kta) => {
+        return {
+          entity_key: decodeEntityKey(kta.entity_key, {
+            [kta.keySerialization]: {},
+          }),
+          key_to_asset_key: kta.address,
+          is_active: kta.iot_hotspot_info!.is_active,
+        };
+      });
+    } else if (subnetwork === "mobile") {
+      const ktas = await KeyToAsset.findAll({
+        include: [
+          {
+            model: MobileHotspotInfo,
+            required: true,
+          },
+        ],
+      });
+      return ktas.map((kta) => {
+        return {
+          entity_key: decodeEntityKey(kta.entity_key, {
+            [kta.keySerialization]: {},
+          }),
+          key_to_asset_key: kta.address,
+          is_active: kta.mobile_hotspot_info!.is_active,
+          device_type: kta.mobile_hotspot_info!.device_type
+        };
+      });
+    }
+
+    return reply.code(400).send("Invalid subnetwork");
+  }
+);
 
 function generateAssetJson(record: KeyToAsset, keyStr: string) {
   const digest = animalHash(keyStr);
