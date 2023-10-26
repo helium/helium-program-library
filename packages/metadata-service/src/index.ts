@@ -150,7 +150,7 @@ server.get<{ Querystring: { subnetwork: string } }>(
           }),
           key_to_asset_key: kta.address,
           is_active: kta.mobile_hotspot_info!.is_active,
-          device_type: kta.mobile_hotspot_info!.device_type
+          device_type: kta.mobile_hotspot_info!.device_type,
         };
       });
     }
@@ -161,10 +161,18 @@ server.get<{ Querystring: { subnetwork: string } }>(
 
 function generateAssetJson(record: KeyToAsset, keyStr: string) {
   const digest = animalHash(keyStr);
+  // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
+  // In the future, we need to put different symbols on different types of hotspots
+  const hotspotType = keyStr.length > 100 ? "MOBILE" : "IOT";
   const image = `${SHDW_DRIVE_URL}/${
-    record?.iot_hotspot_info?.is_active ? "hotspot-active.png" : "hotspot.png"
+    hotspotType === "MOBILE"
+      ? record?.mobile_hotspot_info?.is_active
+        ? "mobile-hotspot-active.png"
+        : "mobile-hotspot.png"
+      : record?.iot_hotspot_info?.is_active
+      ? "hotspot-active.png"
+      : "hotspot.png"
   }`;
-
   return {
     name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
     description:
