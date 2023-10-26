@@ -143,6 +143,21 @@ export async function getAssets(
 function toAsset(result: any): Asset {
   return {
     ...result,
+    creators: result.creators.map(
+      ({
+        address,
+        share,
+        verified,
+      }: {
+        address: string;
+        share: number;
+        verified: boolean;
+      }) => ({
+        share,
+        verified,
+        address: address && new PublicKey(address),
+      })
+    ),
     id: new PublicKey(result.id),
     grouping:
       result.grouping &&

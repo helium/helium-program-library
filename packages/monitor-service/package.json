@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.4.0",
+  "version": "0.4.3",
   "description": "Prometheus monitoring of important accounts on Solana",
   "repository": {
     "type": "git",
@@ -33,13 +33,14 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
-    "@helium/account-fetch-cache": "^0.4.0",
-    "@helium/circuit-breaker-sdk": "^0.4.0",
-    "@helium/data-credits-sdk": "^0.4.0",
-    "@helium/helium-entity-manager-sdk": "^0.4.0",
-    "@helium/helium-sub-daos-sdk": "^0.4.0",
-    "@helium/idls": "^0.4.0",
-    "@helium/lazy-transactions-sdk": "^0.4.0",
+    "@helium/account-fetch-cache": "^0.4.3",
+    "@helium/circuit-breaker-sdk": "^0.4.3",
+    "@helium/data-credits-sdk": "^0.4.3",
+    "@helium/helium-entity-manager-sdk": "^0.4.3",
+    "@helium/helium-sub-daos-sdk": "^0.4.3",
+    "@helium/idls": "^0.4.3",
+    "@helium/lazy-transactions-sdk": "^0.4.3",
+    "@helium/spl-utils": "^0.4.3",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-account-compression": "^0.1.7",
     "@solana/spl-token": "^0.3.8",
@@ -60,8 +61,7 @@
     "ts-loader": "^9.2.3",
     "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^4.8.4",
-    "yarn": "^1.22.18"
+    "typescript": "^5.2.2"
   },
   "keywords": [],
   "author": ""

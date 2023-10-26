@@ -2,10 +2,16 @@
   "extends": "../../tsconfig.root.json",
   "references": [
     {
+      "path": "../account-fetch-cache"
+    },
+    {
       "path": "../idls"
     },
     {
-      "path": "../lazy-transactions-sdk"
+      "path": "../voter-stake-registry-sdk"
+    },
+    {
+      "path": "../helium-sub-daos-sdk"
     },
     {
       "path": "../spl-utils"

@@ -1,8 +1,10 @@
 import * as anchor from '@coral-xyz/anchor';
-import { underscore, camelize } from 'inflection';
-import { Sequelize, DataTypes, QueryTypes, col } from 'sequelize';
-import { provider } from './solana';
+import { camelize, underscore } from 'inflection';
+import { DataTypes, QueryTypes, Sequelize } from 'sequelize';
+import { Plugins, initPlugins } from '../plugins';
+import { IAccountConfig, IConfig } from '../types';
 import cachedIdlFetch from './cachedIdlFetch';
+import { provider } from './solana';
 
 const TypeMap = new Map<string, any>([
   ['string', DataTypes.STRING],
@@ -51,12 +53,11 @@ export const defineIdlModels = async ({
   sequelize,
 }: {
   idl: anchor.Idl;
-  accounts: { type: string; table?: string; schema?: string }[];
+  accounts: IAccountConfig[];
   sequelize: Sequelize;
 }) => {
   for (const acc of idl.accounts!) {
     const accConfig = accounts.find(({ type }) => type === acc.name);
-
     if (accConfig) {
       let schema: { [key: string]: any } = {};
       for (const field of acc.type.fields) {
@@ -65,6 +66,10 @@ export const defineIdlModels = async ({
           [field.name]: determineType(field.type),
         };
       }
+
+      (await initPlugins(accConfig?.plugins)).map(
+        (plugin) => plugin?.addFields && plugin.addFields(schema, acc.name)
+      );
 
       if (accConfig.schema) {
         await sequelize.createSchema(accConfig.schema, {});
@@ -120,10 +125,7 @@ export const defineAllIdlModels = async ({
   configs,
   sequelize,
 }: {
-  configs: {
-    accounts: { type: string; table?: string; schema?: string }[];
-    programId: string;
-  }[];
+  configs: IConfig[];
   sequelize: Sequelize;
 }) => {
   for (const config of configs) {

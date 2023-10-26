@@ -10,9 +10,9 @@
     "migration-service": "./packages/migration-service",
     "vsr-metadata-service": "./packages/vsr-metadata-service",
     "account-postgres-sink-service": "./packages/account-postgres-sink-service",
-    "iot-premine-data-only-service": "./packages/iot-premine-data-only-service",
     "crons": "./packages/crons",
-    "rewards-oracle-faucet-service": "./packages/rewards-oracle-faucet-service"
+    "rewards-oracle-faucet-service": "./packages/rewards-oracle-faucet-service",
+    "entity-invalidator": "./packages/entity-invalidator"
   },
   "oracle": {
     "distributor-oracle": "./packages/distributor-oracle"

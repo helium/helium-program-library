@@ -2,21 +2,20 @@ import * as anchor from '@coral-xyz/anchor';
 import { GetProgramAccountsFilter, PublicKey } from '@solana/web3.js';
 import { Op, Sequelize } from 'sequelize';
 import { SOLANA_URL } from '../env';
+import { IAccountConfig } from '../types';
+import cachedIdlFetch from './cachedIdlFetch';
+import { chunks } from './chunks';
 import database from './database';
 import { defineIdlModels } from './defineIdlModels';
 import { sanitizeAccount } from './sanitizeAccount';
-import { chunks } from './chunks';
+import { initPlugins } from '../plugins';
 
 export type Truthy<T> = T extends false | '' | 0 | null | undefined ? never : T; // from lodash
-
 export const truthy = <T>(value: T): value is Truthy<T> => !!value;
+
 interface UpsertProgramAccountsArgs {
   programId: PublicKey;
-  accounts: {
-    type: string;
-    table?: string;
-    schema?: string;
-  }[];
+  accounts: IAccountConfig[];
   sequelize?: Sequelize;
 }
 
@@ -29,7 +28,11 @@ export const upsertProgramAccounts = async ({
     anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
   );
   const provider = anchor.getProvider() as anchor.AnchorProvider;
-  const idl = await anchor.Program.fetchIdl(programId, provider);
+  const idl = await cachedIdlFetch.fetchIdl({
+    skipCache: true,
+    programId: programId.toBase58(),
+    provider,
+  });
 
   if (!idl) {
     throw new Error(`unable to fetch idl for ${programId}`);
@@ -56,7 +59,7 @@ export const upsertProgramAccounts = async ({
     console.log(e);
   }
 
-  for (const { type } of accounts) {
+  for (const { type, batchSize, ...rest } of accounts) {
     try {
       const filter: {
         offset?: number;
@@ -64,7 +67,7 @@ export const upsertProgramAccounts = async ({
         dataSize?: number;
       } = program.coder.accounts.memcmp(type, undefined);
       const coderFilters: GetProgramAccountsFilter[] = [];
-
+      const plugins = await initPlugins(rest.plugins);
       if (filter?.offset != undefined && filter?.bytes != undefined) {
         coderFilters.push({
           memcmp: { offset: filter.offset, bytes: filter.bytes },
@@ -82,7 +85,7 @@ export const upsertProgramAccounts = async ({
       const model = sequelize.models[type];
       const t = await sequelize.transaction();
       // @ts-ignore
-      const respChunks = chunks(resp, 50000);
+      const respChunks = chunks(resp, batchSize || 50000);
       const now = new Date().toISOString();
 
       try {
@@ -107,24 +110,45 @@ export const upsertProgramAccounts = async ({
             })
             .filter(truthy);
 
-          const updateOnDuplicateFields: string[] = Object.keys(
-            accs[0].account
+          const updateOnDuplicateFields: string[] = [
+            ...Object.keys(accs[0].account),
+            ...[
+              ...new Set(
+                plugins
+                  .map((plugin) => plugin?.updateOnDuplicateFields || [])
+                  .flat()
+              ),
+            ],
+          ];
+
+          const values = await Promise.all(
+            accs.map(async ({ publicKey, account }) => {
+              let sanitizedAccount = sanitizeAccount(account);
+
+              for (const plugin of plugins) {
+                if (plugin?.processAccount) {
+                  sanitizedAccount = await plugin.processAccount(
+                    sanitizedAccount
+                  );
+                }
+              }
+
+              return {
+                address: publicKey.toBase58(),
+                refreshed_at: now,
+                ...sanitizedAccount,
+              };
+            })
           );
-          await model.bulkCreate(
-            accs.map(({ publicKey, account }) => ({
-              address: publicKey.toBase58(),
-              refreshed_at: now,
-              ...sanitizeAccount(account),
-            })),
-            {
-              transaction: t,
-              updateOnDuplicate: [
-                'address',
-                'refreshed_at',
-                ...updateOnDuplicateFields,
-              ],
-            }
-          );
+
+          await model.bulkCreate(values, {
+            transaction: t,
+            updateOnDuplicate: [
+              'address',
+              'refreshed_at',
+              ...updateOnDuplicateFields,
+            ],
+          });
         }
 
         await t.commit();

@@ -18,8 +18,8 @@
         { "type": "Registrar", "table": "registrars", "schema": "public" }
       ],
       "crons": [
-        { "schedule": "*/15 * * * *", "type": "refresh-accounts"},
-        { "schedule": "*/15 * * * *", "type": "integrity-check"}
+        { "schedule": "*/15 * * * *", "type": "refresh-accounts" },
+        { "schedule": "*/15 * * * *", "type": "integrity-check" }
       ]
     },
     {
@@ -81,12 +81,28 @@
         {
           "type": "IotHotspotInfoV0",
           "table": "iot_hotspot_infos",
-          "schema": "public"
+          "schema": "public",
+          "plugins": [
+            {
+              "type": "ExtractHexLocation",
+              "config": {
+                "field": "location"
+              }
+            }
+          ]
         },
         {
           "type": "MobileHotspotInfoV0",
           "table": "mobile_hotspot_infos",
-          "schema": "public"
+          "schema": "public",
+          "plugins": [
+            {
+              "type": "ExtractHexLocation",
+              "config": {
+                "field": "location"
+              }
+            }
+          ]
         }
       ]
     },
@@ -101,5 +117,10 @@
         { "type": "RecipientV0", "table": "recipients", "schema": "public" }
       ]
     }
+  ],
+  "indexConfigs": [
+    "CREATE UNIQUE INDEX IF NOT EXISTS key_to_asset_asset_index ON key_to_assets(asset);",
+    "CREATE UNIQUE INDEX IF NOT EXISTS iot_hotspot_infos_asset_index ON iot_hotspot_infos(asset);",
+    "CREATE UNIQUE INDEX IF NOT EXISTS mobile_hotspot_infos_asset_index ON mobile_hotspot_infos(asset);"
   ]
 }

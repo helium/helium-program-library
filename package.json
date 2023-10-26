@@ -1,9 +1,9 @@
 {
   "scripts": {
-    "versionup": "lerna version --conventional-commits --no-git-tag-version",
-    "versionup:patch": "lerna version patch --conventional-commits --no-git-tag-version",
-    "versionup:minor": "lerna version minor --conventional-commits --no-git-tag-version",
-    "versionup:major": "lerna version major --conventional-commits --no-git-tag-version",
+    "versionup": "lerna version --force-publish--conventional-commits --no-git-tag-version",
+    "versionup:patch": "lerna version patch --force-publish --conventional-commits --no-git-tag-version",
+    "versionup:minor": "lerna version minor --force-publish --conventional-commits --no-git-tag-version",
+    "versionup:major": "lerna version major --force-publish --conventional-commits --no-git-tag-version",
     "postversionup": "npm run commit-version",
     "postversionup:patch": "npm run commit-version",
     "postversionup:minor": "npm run commit-version",
@@ -30,9 +30,9 @@
     "@coral-xyz/anchor": "^0.28.0",
     "@coral-xyz/anchor-cli": "^0.28.0",
     "@coral-xyz/borsh": "^0.2.6",
+    "@helium/crypto": "^4.10.2",
     "@helium/modular-governance-idls": "^0.0.2",
     "@helium/proposal-sdk": "^0.0.2",
-    "@helium/crypto": "^4.10.2",
     "@helium/transactions": "^3.38.0",
     "@metaplex-foundation/mpl-bubblegum": "^0.7.0",
     "@pythnetwork/client": "^2.8.0",
@@ -56,6 +56,7 @@
     "prettier": "^2.6.2",
     "shx": "^0.3.4",
     "ts-mocha": "^10.0.0",
-    "typescript": "^4.3.5"
-  }
+    "typescript": "^5.2.2"
+  },
+  "packageManager": "yarn@3.6.4"
 }

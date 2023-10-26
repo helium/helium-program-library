@@ -1,12 +1,11 @@
 {
   "name": "@helium/helium-react-hooks",
-  "private": false,
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.4.0",
+  "version": "0.4.3",
   "description": "React hooks for helium",
   "repository": {
     "type": "git",
@@ -33,8 +32,8 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
-    "@helium/account-fetch-cache": "^0.4.0",
-    "@helium/account-fetch-cache-hooks": "^0.4.0",
+    "@helium/account-fetch-cache": "^0.4.3",
+    "@helium/account-fetch-cache-hooks": "^0.4.3",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.78.4",
     "bs58": "^4.0.1",
@@ -45,8 +44,7 @@
     "@solana/wallet-adapter-react": "^0.15.32",
     "git-format-staged": "^2.1.3",
     "ts-loader": "^9.2.3",
-    "typescript": "^4.8.4",
-    "yarn": "^1.22.18"
+    "typescript": "^5.2.2"
   },
   "peerDependencies": {
     "@solana/wallet-adapter-react": "^0.15.32",

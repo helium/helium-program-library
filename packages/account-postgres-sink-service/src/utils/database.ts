@@ -4,7 +4,7 @@ import * as pg from "pg";
 
 const host = process.env.PGHOST || "localhost";
 const port = Number(process.env.PGPORT) || 5432;
-const database = new Sequelize({
+export const database = new Sequelize({
   host: host,
   dialect: "postgres",
   port: port,
@@ -13,7 +13,7 @@ const database = new Sequelize({
   username: process.env.PGUSER,
   database: process.env.PGDATABASE,
   pool: {
-    max: 5,
+    max: process.env.PG_POOL_SIZE ? Number(process.env.PG_POOL_SIZE) : 5,
     min: 0,
     acquire: 30000,
     idle: 10000,
