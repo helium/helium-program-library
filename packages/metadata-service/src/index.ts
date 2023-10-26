@@ -1,22 +1,36 @@
 import { Program } from "@coral-xyz/anchor";
 import cors from "@fastify/cors";
 import Address from "@helium/address/build/Address";
-import { decodeEntityKey, init } from "@helium/helium-entity-manager-sdk";
+import {
+  decodeEntityKey,
+  entityCreatorKey,
+  init,
+} from "@helium/helium-entity-manager-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
-import { PublicKey } from "@solana/web3.js";
 // @ts-ignore
-import { truthy } from "@helium/spl-utils";
+import {
+  Asset,
+  DC_MINT,
+  HNT_MINT,
+  IOT_MINT,
+  MOBILE_MINT,
+  searchAssets,
+  truthy,
+} from "@helium/spl-utils";
 import animalHash from "angry-purple-tiger";
 import axios from "axios";
 import bs58 from "bs58";
 import Fastify, { FastifyInstance } from "fastify";
 import { SHDW_DRIVE_URL } from "./constants";
-import {
-  IotHotspotInfo,
-  KeyToAsset,
-  MobileHotspotInfo,
-} from "./model";
+import { IotHotspotInfo, KeyToAsset, MobileHotspotInfo } from "./model";
 import { provider } from "./solana";
+import { daoKey } from "@helium/helium-sub-daos-sdk";
+import {
+  AccountLayout,
+  getAccount,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
+import { PublicKey } from "@solana/web3.js";
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -28,68 +42,205 @@ server.get("/health", async () => {
   return { ok: true };
 });
 
-let program: Program<HeliumEntityManager>;
-server.get<{ Params: { keyToAssetKey: string } }>(
-  "/v1/:keyToAssetKey",
-  async (request, reply) => {
-    program = program || (await init(provider));
-    const { keyToAssetKey } = request.params;
-    const keyToAsset = new PublicKey(keyToAssetKey);
-    const keyToAssetAcc = await program.account.keyToAssetV0.fetch(keyToAsset);
-    const { entityKey, keySerialization } = keyToAssetAcc;
-    const keyStr = decodeEntityKey(entityKey, keySerialization);
-    const digest = animalHash(keyStr);
-    const record = await KeyToAsset.findOne({
+server.get<{ Params: { wallet: string } }>(
+  "/v2/wallet/:wallet",
+  async (request) => {
+    const { wallet } = request.params;
+    let page = 1;
+    const limit = 1000;
+    let allAssets: Asset[] = [];
+
+    while (true) {
+      const assets =
+        (await searchAssets(provider.connection.rpcEndpoint, {
+          ownerAddress: wallet,
+          creatorVerified: true,
+          creatorAddress: entityCreatorKey(daoKey(HNT_MINT)[0])[0].toBase58(),
+          page,
+          limit,
+        })) || [];
+
+      allAssets = allAssets.concat(assets);
+
+      if (assets.length < limit) {
+        break;
+      }
+
+      page++;
+    }
+
+    const assetIds = allAssets.map((a) => a.id);
+    const keyToAssets = await KeyToAsset.findAll({
       where: {
-        address: keyToAsset.toBase58(),
+        asset: assetIds.map((a) => a.toBase58()),
       },
       include: [IotHotspotInfo, MobileHotspotInfo],
     });
 
-    // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
-    // In the future, we need to put different symbols on different types of hotspots
-    const hotspotType = entityKey.length > 100 ? "MOBILE" : "IOT";
-    const image = `${SHDW_DRIVE_URL}/${
-      hotspotType === "MOBILE"
-        ? record?.mobile_hotspot_info?.isActive
-          ? "mobile-hotspot-active.png"
-          : "mobile-hotspot.png"
-        : record?.iot_hotspot_info?.isActive
-        ? "hotspot-active.png"
-        : "hotspot.png"
-    }`;
+    const assetJsons = keyToAssets.map((record) => {
+      const keyStr = decodeEntityKey(record.entity_key, {
+        [record.keySerialization]: {},
+      });
+      return generateAssetJson(record, keyStr!);
+    });
+
+    const tokens = [HNT_MINT, MOBILE_MINT, IOT_MINT, DC_MINT];
+    const walletPk = new PublicKey(wallet);
+    const balances = await Promise.all(
+      tokens.map(async (mint) => {
+        const account = await provider.connection.getAccountInfo(
+          getAssociatedTokenAddressSync(mint, walletPk, true)
+        );
+        if (account) {
+          return {
+            mint,
+            balance: AccountLayout.decode(account.data).amount.toString(),
+          };
+        } else {
+          return { mint, balance: "0" };
+        }
+      })
+    );
 
     return {
-      name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
-      description:
-        keyStr === "iot_operations_fund"
-          ? "IOT Operations Fund"
-          : "A Rewardable NFT on Helium",
-      // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
-      // In the future, we need to put different symbols on different types of hotspots
-      image,
-      attributes: [
-        keyStr && Address.isValid(keyStr)
-          ? { trait_type: "ecc_compact", value: keyStr }
-          : undefined,
-        { trait_type: "entity_key_string", value: keyStr },
-        {
-          trait_type: "entity_key",
-          value: entityKey.toString("base64"),
-        },
-        { trait_type: "rewardable", value: true },
-        {
-          trait_type: "networks",
-          value: [
-            record?.iot_hotspot_info && "iot",
-            record?.mobile_hotspot_info && "mobile",
-          ].filter(truthy),
-        },
-        ...locationAttributes("iot", record?.iot_hotspot_info),
-        ...locationAttributes("mobile", record?.mobile_hotspot_info),
-      ],
+      hotspots_count: assetJsons.length,
+      hotspots: assetJsons,
+      balances,
     };
   }
+);
+
+server.get<{ Querystring: { subnetwork: string } }>(
+  "/v2/hotspots",
+  async (request, reply) => {
+    const { subnetwork } = request.query;
+
+    if (subnetwork === "iot") {
+      const ktas = await KeyToAsset.findAll({
+        include: [
+          {
+            model: IotHotspotInfo,
+            required: true,
+          },
+        ],
+      });
+
+      return ktas.map((kta) => {
+        return {
+          entity_key: decodeEntityKey(kta.entity_key, {
+            [kta.keySerialization]: {},
+          }),
+          key_to_asset_key: kta.address,
+          is_active: kta.iot_hotspot_info!.is_active,
+        };
+      });
+    } else if (subnetwork === "mobile") {
+      const ktas = await KeyToAsset.findAll({
+        include: [
+          {
+            model: MobileHotspotInfo,
+            required: true,
+          },
+        ],
+      });
+      return ktas.map((kta) => {
+        return {
+          entity_key: decodeEntityKey(kta.entity_key, {
+            [kta.keySerialization]: {},
+          }),
+          key_to_asset_key: kta.address,
+          is_active: kta.mobile_hotspot_info!.is_active,
+          device_type: kta.mobile_hotspot_info!.device_type,
+        };
+      });
+    }
+
+    return reply.code(400).send("Invalid subnetwork");
+  }
+);
+
+function generateAssetJson(record: KeyToAsset, keyStr: string) {
+  const digest = animalHash(keyStr);
+  // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
+  // In the future, we need to put different symbols on different types of hotspots
+  const hotspotType = keyStr.length > 100 ? "MOBILE" : "IOT";
+  const image = `${SHDW_DRIVE_URL}/${
+    hotspotType === "MOBILE"
+      ? record?.mobile_hotspot_info?.is_active
+        ? "mobile-hotspot-active.png"
+        : "mobile-hotspot.png"
+      : record?.iot_hotspot_info?.is_active
+      ? "hotspot-active.png"
+      : "hotspot.png"
+  }`;
+  return {
+    name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
+    description:
+      keyStr === "iot_operations_fund"
+        ? "IOT Operations Fund"
+        : "A Rewardable NFT on Helium",
+    asset_id: record.asset,
+    key_to_asset_key: record.address,
+    image,
+    hotspot_infos: {
+      iot: record?.iot_hotspot_info,
+      mobile: record?.mobile_hotspot_info,
+    },
+    entity_key_b64: record?.entity_key.toString("base64"),
+    key_serialization: record?.keySerialization,
+    entity_key_str: keyStr,
+    attributes: [
+      keyStr && Address.isValid(keyStr)
+        ? { trait_type: "ecc_compact", value: keyStr }
+        : undefined,
+      { trait_type: "entity_key_string", value: keyStr },
+      {
+        trait_type: "entity_key",
+        value: record?.entity_key?.toString("base64"),
+      },
+      { trait_type: "rewardable", value: true },
+      {
+        trait_type: "networks",
+        value: [
+          record?.iot_hotspot_info && "iot",
+          record?.mobile_hotspot_info && "mobile",
+        ].filter(truthy),
+      },
+      ...locationAttributes("iot", record?.iot_hotspot_info),
+      ...locationAttributes("mobile", record?.mobile_hotspot_info),
+    ],
+  };
+}
+
+const getHotspotByKeyToAsset = async (request, reply) => {
+  program = program || (await init(provider));
+  const { keyToAssetKey } = request.params;
+  const record = await KeyToAsset.findOne({
+    where: {
+      address: keyToAssetKey,
+    },
+    include: [IotHotspotInfo, MobileHotspotInfo],
+  });
+  if (!record) {
+    return reply.code(404);
+  }
+
+  const { entity_key: entityKey, keySerialization } = record;
+  const keyStr = decodeEntityKey(entityKey, { [keySerialization]: {} });
+
+  const assetJson = generateAssetJson(record, keyStr!);
+  return assetJson;
+};
+
+let program: Program<HeliumEntityManager>;
+server.get<{ Params: { keyToAssetKey: string } }>(
+  "/v1/:keyToAssetKey",
+  getHotspotByKeyToAsset
+);
+
+server.get<{ Params: { keyToAssetKey: string } }>(
+  "/v2/hotspot/:keyToAssetKey",
+  getHotspotByKeyToAsset
 );
 
 server.get<{ Params: { eccCompact: string } }>(
@@ -116,29 +267,12 @@ server.get<{ Params: { eccCompact: string } }>(
       include: [IotHotspotInfo, MobileHotspotInfo],
     });
 
-    const digest = animalHash(eccCompact);
-    const image = `${SHDW_DRIVE_URL}/${
-      record?.iot_hotspot_info?.isActive ? "hotspot-active.png" : "hotspot.png"
-    }`;
+    if (!record) {
+      return reply.code(404);
+    }
 
-    return {
-      name: digest,
-      description: "A Hotspot NFT on Helium",
-      image,
-      attributes: [
-        { trait_type: "ecc_compact", value: eccCompact },
-        { trait_type: "rewardable", value: true },
-        {
-          trait_type: "networks",
-          value: [
-            record?.iot_hotspot_info && "iot",
-            record?.mobile_hotspot_info && "mobile",
-          ].filter(truthy),
-        },
-        ...locationAttributes("iot", record?.iot_hotspot_info),
-        ...locationAttributes("mobile", record?.mobile_hotspot_info),
-      ],
-    };
+    const assetJson = generateAssetJson(record, eccCompact);
+    return assetJson;
   }
 );
 
