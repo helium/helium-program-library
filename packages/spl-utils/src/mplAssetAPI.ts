@@ -1,45 +1,26 @@
-import { Creator, Uses } from "@metaplex-foundation/mpl-bubblegum";
 import { PublicKey } from "@solana/web3.js";
 import axios from "axios";
-// @ts-ignore
 import base58 from "bs58";
+import { Asset, AssetProof, Item, Result } from "./mplAsset";
 
-export type AssetProof = {
-  root: PublicKey;
-  proof: PublicKey[];
-  nodeIndex: number;
-  leaf: PublicKey;
-  treeId: PublicKey;
-};
+function mapAddressToPubKey(
+  key: "address" | "group_value",
+  items?: (any & { address: string })[]
+) {
+  if (!items) return [];
+  return items.map((item) => ({
+    ...item,
+    key: toPubKey(item[key]),
+  }));
+}
 
-export type Asset = {
-  id: PublicKey;
-  content: any;
-  compression: {
-    eligible: boolean;
-    compressed: boolean;
-    dataHash?: Buffer;
-    creatorHash?: Buffer;
-    assetHash?: Buffer;
-    tree?: PublicKey;
-    leafId?: number;
-  };
-  ownership: {
-    owner: PublicKey;
-    delegate: PublicKey;
-  };
-  royalty: {
-    basis_points: number;
-    primary_sale_happened: boolean;
-  };
-  mutable: boolean;
-  supply: {
-    edition_nonce: number | null;
-  };
-  grouping?: { group_key: string; group_value: PublicKey }[];
-  uses?: Uses;
-  creators: Creator[];
-};
+function toBuffer(item?: string) {
+  return item ? Buffer.from(base58.decode(item)) : undefined;
+}
+
+function toPubKey(item?: string) {
+  return item ? new PublicKey(item) : undefined;
+}
 
 export async function getAsset(
   url: string,
@@ -113,77 +94,50 @@ export async function getAssets(
       },
     }));
 
-    const response = await axios({
-      url,
-      method: "POST",
+    const response = await axios.post<
+      {
+        jsonrpc: string;
+        result: Item;
+        id: string;
+      }[]
+    >(url, JSON.stringify(batch), {
       headers: {
-        "Content-Type": "application/json",
         "Cache-Control": "no-cache",
         Pragma: "no-cache",
         Expires: "0",
       },
-      data: JSON.stringify(batch),
     });
 
-    const result = response.data
-      ? response.data.map((res: any) => res?.result || undefined)
-      : [];
-
-    return [
-      ...(result
-        ? result.map((x: Asset | undefined) => (x ? toAsset(x) : x))
-        : []),
-    ];
+    return response.data
+      ?.flatMap((item) => {
+        if (!item?.result) return [];
+        return [item.result];
+      })
+      .map((item) => toAsset(item));
   } catch (error) {
     console.error(error);
     throw error;
   }
 }
 
-function toAsset(result: any): Asset {
+function toAsset(result: Item): Asset {
   return {
     ...result,
-    creators: result.creators.map(
-      ({
-        address,
-        share,
-        verified,
-      }: {
-        address: string;
-        share: number;
-        verified: boolean;
-      }) => ({
-        share,
-        verified,
-        address: address && new PublicKey(address),
-      })
-    ),
+    creators: mapAddressToPubKey("address", result.creators),
     id: new PublicKey(result.id),
-    grouping:
-      result.grouping &&
-      result.grouping.map((g: any) => ({
-        ...g,
-        group_value: new PublicKey(g.group_value),
-      })),
+    grouping: mapAddressToPubKey("group_value", result.grouping),
     compression: {
       ...result.compression,
       leafId: result.compression.leaf_id,
-      dataHash:
-        result.compression.data_hash &&
-        Buffer.from(base58.decode(result.compression.data_hash)),
-      creatorHash:
-        result.compression.creator_hash &&
-        Buffer.from(base58.decode(result.compression.creator_hash)),
-      assetHash:
-        result.compression.asset_hash &&
-        Buffer.from(base58.decode(result.compression.asset_hash)),
-      tree: result.compression.tree && new PublicKey(result.compression.tree),
+      dataHash: toBuffer(result.compression.data_hash),
+      creatorHash: toBuffer(result.compression.creator_hash),
+      assetHash: toBuffer(result.compression.asset_hash),
+      tree: toPubKey(result.compression.tree),
     },
     ownership: {
       ...result.ownership,
-      delegate:
-        result.ownership.delegate && new PublicKey(result.ownership.delegate),
-      owner: result.ownership.owner && new PublicKey(result.ownership.owner),
+      delegate: toPubKey(result.ownership.delegate),
+      owner: toPubKey(result.ownership.owner),
     },
   };
 }
@@ -299,14 +253,16 @@ export async function getAssetsByOwner(
 
 export type SearchAssetsOpts = {
   sortBy?: { sortBy: "created"; sortDirection: "asc" | "desc" };
+  limit?: number;
   page?: number;
   collection?: string;
   ownerAddress: string;
   creatorAddress: string;
   creatorVerified?: boolean;
+  displayOptions?: { showGrandTotal?: boolean };
 } & { [key: string]: unknown };
 
-export async function searchAssets(
+export async function fetchAssets(
   url: string,
   {
     creatorVerified = true,
@@ -314,9 +270,13 @@ export async function searchAssets(
     page = 1,
     ...rest
   }: SearchAssetsOpts
-): Promise<Asset[]> {
+) {
   try {
-    const response = await axios.post(url, {
+    const response = await axios.post<{
+      jsonrpc: string;
+      result: Result;
+      id: string;
+    }>(url, {
       jsonrpc: "2.0",
       method: "searchAssets",
       id: "get-assets-op-1",
@@ -333,7 +293,58 @@ export async function searchAssets(
       },
     });
 
-    return response.data.result?.items.map(toAsset);
+    return response.data;
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
+export async function searchAssets(
+  url: string,
+  opts: SearchAssetsOpts
+): Promise<Asset[]> {
+  const response = await fetchAssets(url, opts);
+  return response.result?.items.map(toAsset);
+}
+
+export async function searchPagedAssets(
+  url: string,
+  {
+    creatorVerified = true,
+    sortBy = { sortBy: "created", sortDirection: "asc" },
+    page = 1,
+    limit = 1000,
+    displayOptions,
+    ...opts
+  }: SearchAssetsOpts
+): Promise<{ data: Asset[]; grandTotal?: number; totalPages?: number }> {
+  try {
+    // according to helius, we should only query for the grand total on the first page
+    const showGrandTotal = displayOptions?.showGrandTotal && page === 1;
+
+    const response = await fetchAssets(url, {
+      page,
+      limit,
+      creatorVerified,
+      sortBy,
+      displayOptions: { showGrandTotal },
+      ...opts,
+    });
+
+    const data = response.result?.items?.map(toAsset) || [];
+
+    if (!displayOptions?.showGrandTotal) {
+      return { data };
+    }
+
+    const grandTotal = response.result?.grand_total;
+    let totalPages: number | undefined = undefined;
+    if (grandTotal) {
+      totalPages = Math.ceil(grandTotal / limit);
+    }
+
+    return { grandTotal, totalPages, data };
   } catch (error) {
     console.error(error);
     throw error;
