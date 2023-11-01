@@ -27,7 +27,6 @@ import { provider } from "./solana";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import {
   AccountLayout,
-  getAccount,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
@@ -78,7 +77,7 @@ server.get<{ Params: { wallet: string } }>(
     });
 
     const assetJsons = keyToAssets.map((record) => {
-      const keyStr = decodeEntityKey(record.entity_key, {
+      const keyStr = decodeEntityKey(record.entityKey, {
         [record.keySerialization]: {},
       });
       return generateAssetJson(record, keyStr!);
@@ -128,7 +127,7 @@ server.get<{ Querystring: { subnetwork: string } }>(
       return ktas.map((kta) => {
         return {
           key_to_asset_key: kta.address,
-          is_active: kta.iot_hotspot_info!.is_active,
+          is_active: kta.iotHotspotInfo!.isActive,
         };
       });
     } else if (subnetwork === "mobile") {
@@ -143,8 +142,8 @@ server.get<{ Querystring: { subnetwork: string } }>(
       return ktas.map((kta) => {
         return {
           key_to_asset_key: kta.address,
-          is_active: kta.mobile_hotspot_info!.is_active,
-          device_type: kta.mobile_hotspot_info!.device_type,
+          is_active: kta.mobileHotspotInfo!.isActive,
+          device_type: kta.mobileHotspotInfo!.deviceType,
         };
       });
     }
@@ -160,10 +159,10 @@ function generateAssetJson(record: KeyToAsset, keyStr: string) {
   const hotspotType = keyStr.length > 100 ? "MOBILE" : "IOT";
   const image = `${SHDW_DRIVE_URL}/${
     hotspotType === "MOBILE"
-      ? record?.mobile_hotspot_info?.is_active
+      ? record?.mobileHotspotInfo?.isActive
         ? "mobile-hotspot-active.png"
         : "mobile-hotspot.png"
-      : record?.iot_hotspot_info?.is_active
+      : record?.iotHotspotInfo?.isActive
       ? "hotspot-active.png"
       : "hotspot.png"
   }`;
@@ -177,10 +176,10 @@ function generateAssetJson(record: KeyToAsset, keyStr: string) {
     key_to_asset_key: record.address,
     image,
     hotspot_infos: {
-      iot: record?.iot_hotspot_info,
-      mobile: record?.mobile_hotspot_info,
+      iot: record?.iotHotspotInfo,
+      mobile: record?.mobileHotspotInfo,
     },
-    entity_key_b64: record?.entity_key.toString("base64"),
+    entity_key_b64: record?.entityKey.toString("base64"),
     key_serialization: record?.keySerialization,
     entity_key_str: keyStr,
     attributes: [
@@ -190,18 +189,18 @@ function generateAssetJson(record: KeyToAsset, keyStr: string) {
       { trait_type: "entity_key_string", value: keyStr },
       {
         trait_type: "entity_key",
-        value: record?.entity_key?.toString("base64"),
+        value: record?.entityKey?.toString("base64"),
       },
       { trait_type: "rewardable", value: true },
       {
         trait_type: "networks",
         value: [
-          record?.iot_hotspot_info && "iot",
-          record?.mobile_hotspot_info && "mobile",
+          record?.iotHotspotInfo && "iot",
+          record?.mobileHotspotInfo && "mobile",
         ].filter(truthy),
       },
-      ...locationAttributes("iot", record?.iot_hotspot_info),
-      ...locationAttributes("mobile", record?.mobile_hotspot_info),
+      ...locationAttributes("iot", record?.iotHotspotInfo),
+      ...locationAttributes("mobile", record?.mobileHotspotInfo),
     ],
   };
 }
@@ -219,7 +218,7 @@ const getHotspotByKeyToAsset = async (request, reply) => {
     return reply.code(404);
   }
 
-  const { entity_key: entityKey, keySerialization } = record;
+  const { entityKey, keySerialization } = record;
   const keyStr = decodeEntityKey(entityKey, { [keySerialization]: {} });
 
   const assetJson = generateAssetJson(record, keyStr!);

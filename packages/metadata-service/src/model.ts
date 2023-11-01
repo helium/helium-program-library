@@ -56,8 +56,8 @@ export class MobileHotspotInfo extends Model {
   declare city: string;
   declare state: string;
   declare country: string;
-  declare is_active: boolean;
-  declare device_type: string;
+  declare isActive: boolean;
+  declare deviceType: string;
 }
 MobileHotspotInfo.init(
   {
@@ -90,7 +90,7 @@ export class IotHotspotInfo extends Model {
   declare city: string;
   declare state: string;
   declare country: string;
-  declare is_active: boolean;
+  declare isActive: boolean;
 }
 IotHotspotInfo.init(
   {
@@ -106,7 +106,7 @@ IotHotspotInfo.init(
     location: DataTypes.DECIMAL.UNSIGNED,
     dcOnboardingFeePaid: DataTypes.DECIMAL.UNSIGNED,
     elevation: DataTypes.NUMBER,
-    gain: DataTypes.NUMBER
+    gain: DataTypes.NUMBER,
   },
   {
     sequelize,
@@ -120,9 +120,9 @@ IotHotspotInfo.init(
 export class KeyToAsset extends Model {
   declare address: string;
   declare asset: string;
-  declare entity_key: Buffer;
-  declare mobile_hotspot_info?: MobileHotspotInfo;
-  declare iot_hotspot_info?: IotHotspotInfo;
+  declare entityKey: Buffer;
+  declare mobileHotspotInfo?: MobileHotspotInfo;
+  declare iotHotspotInfo?: IotHotspotInfo;
   declare keySerialization: string;
 }
 KeyToAsset.init(
