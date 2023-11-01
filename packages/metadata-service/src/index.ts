@@ -127,9 +127,6 @@ server.get<{ Querystring: { subnetwork: string } }>(
 
       return ktas.map((kta) => {
         return {
-          entity_key: decodeEntityKey(kta.entity_key, {
-            [kta.keySerialization]: {},
-          }),
           key_to_asset_key: kta.address,
           is_active: kta.iot_hotspot_info!.is_active,
         };
@@ -145,9 +142,6 @@ server.get<{ Querystring: { subnetwork: string } }>(
       });
       return ktas.map((kta) => {
         return {
-          entity_key: decodeEntityKey(kta.entity_key, {
-            [kta.keySerialization]: {},
-          }),
           key_to_asset_key: kta.address,
           is_active: kta.mobile_hotspot_info!.is_active,
           device_type: kta.mobile_hotspot_info!.device_type,
