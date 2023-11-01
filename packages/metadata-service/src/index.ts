@@ -176,8 +176,8 @@ function generateAssetJson(record: KeyToAsset, keyStr: string) {
     key_to_asset_key: record.address,
     image,
     hotspot_infos: {
-      iot: record?.iotHotspotInfo,
-      mobile: record?.mobileHotspotInfo,
+      iot: snakeCaseKeys(record?.iotHotspotInfo?.dataValues),
+      mobile: snakeCaseKeys(record?.mobileHotspotInfo?.dataValues),
     },
     entity_key_b64: record?.entityKey.toString("base64"),
     key_serialization: record?.keySerialization,
@@ -268,6 +268,25 @@ server.get<{ Params: { eccCompact: string } }>(
     return assetJson;
   }
 );
+
+function snakeCaseKeys(obj: any): any {
+  if (obj instanceof Array) {
+    return obj.map((item) => snakeCaseKeys(item));
+  } else if (obj instanceof Object) {
+    const snakeCasedObject: { [key: string]: any } = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        const snakeCasedKey = key
+          .replace(/([A-Z])/g, (match) => `_${match.toLowerCase()}`)
+          .replace(/^_/, ""); // Remove leading underscore
+        snakeCasedObject[snakeCasedKey] = snakeCaseKeys(obj[key]);
+      }
+    }
+    return snakeCasedObject;
+  } else {
+    return obj;
+  }
+}
 
 function locationAttributes(
   name: string,
