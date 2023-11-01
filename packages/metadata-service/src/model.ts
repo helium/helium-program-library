@@ -76,7 +76,7 @@ MobileHotspotInfo.init(
   },
   {
     sequelize,
-    modelName: "mobile_hotspot_infos",
+    modelName: "mobileHotspotInfo",
     tableName: "mobile_hotspot_infos",
     underscored: true,
     timestamps: false,
@@ -92,6 +92,7 @@ export class IotHotspotInfo extends Model {
   declare country: string;
   declare isActive: boolean;
 }
+
 IotHotspotInfo.init(
   {
     address: {
@@ -110,7 +111,7 @@ IotHotspotInfo.init(
   },
   {
     sequelize,
-    modelName: "iot_hotspot_infos",
+    modelName: "iotHotspotInfo",
     tableName: "iot_hotspot_infos",
     underscored: true,
     timestamps: false,
@@ -125,6 +126,7 @@ export class KeyToAsset extends Model {
   declare iotHotspotInfo?: IotHotspotInfo;
   declare keySerialization: string;
 }
+
 KeyToAsset.init(
   {
     address: {
@@ -137,7 +139,7 @@ KeyToAsset.init(
   },
   {
     sequelize,
-    modelName: "key_to_assets",
+    modelName: "keyToAsset",
     tableName: "key_to_assets",
     underscored: true,
     timestamps: false,
@@ -148,6 +150,7 @@ KeyToAsset.hasOne(IotHotspotInfo, {
   sourceKey: "asset",
   foreignKey: "asset",
 });
+
 KeyToAsset.hasOne(MobileHotspotInfo, {
   sourceKey: "asset",
   foreignKey: "asset",
