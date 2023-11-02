@@ -281,6 +281,8 @@ function locationAttributes(
     { trait_type: `${name}_city`, value: info.city },
     { trait_type: `${name}_state`, value: info.state },
     { trait_type: `${name}_country`, value: info.country },
+    { trait_type: `${name}_lat`, value: info.lat },
+    { trait_type: `${name}_long`, value: info.long },
   ];
 }
 

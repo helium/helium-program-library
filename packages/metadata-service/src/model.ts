@@ -56,6 +56,8 @@ export class MobileHotspotInfo extends Model {
   declare city: string;
   declare state: string;
   declare country: string;
+  declare lat: number;
+  declare long: number;
   declare is_active: boolean;
   declare device_type: string;
 }
@@ -72,6 +74,8 @@ MobileHotspotInfo.init(
     is_active: DataTypes.BOOLEAN,
     device_type: DataTypes.JSONB,
     location: DataTypes.DECIMAL.UNSIGNED,
+    lat: DataTypes.DECIMAL(8, 6),
+    long: DataTypes.DECIMAL(9, 6),
     dc_onboarding_fee_paid: DataTypes.DECIMAL.UNSIGNED,
   },
   {
@@ -90,6 +94,8 @@ export class IotHotspotInfo extends Model {
   declare city: string;
   declare state: string;
   declare country: string;
+  declare lat: number;
+  declare long: number;
   declare is_active: boolean;
 }
 
@@ -105,6 +111,8 @@ IotHotspotInfo.init(
     country: DataTypes.STRING,
     is_active: DataTypes.BOOLEAN,
     location: DataTypes.DECIMAL.UNSIGNED,
+    lat: DataTypes.DECIMAL(8, 6),
+    long: DataTypes.DECIMAL(9, 6),
     dc_onboarding_fee_paid: DataTypes.DECIMAL.UNSIGNED,
     elevation: DataTypes.NUMBER,
     gain: DataTypes.NUMBER,
