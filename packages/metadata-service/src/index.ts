@@ -77,8 +77,8 @@ server.get<{ Params: { wallet: string } }>(
     });
 
     const assetJsons = keyToAssets.map((record) => {
-      const keyStr = decodeEntityKey(record.entityKey, {
-        [record.keySerialization]: {},
+      const keyStr = decodeEntityKey(record.entity_key, {
+        [record.key_serialization]: {},
       });
       return generateAssetJson(record, keyStr!);
     });
@@ -127,7 +127,7 @@ server.get<{ Querystring: { subnetwork: string } }>(
       return ktas.map((kta) => {
         return {
           key_to_asset_key: kta.address,
-          is_active: kta.iotHotspotInfo!.isActive,
+          is_active: kta.iot_hotspot_info!.is_active,
         };
       });
     } else if (subnetwork === "mobile") {
@@ -142,8 +142,8 @@ server.get<{ Querystring: { subnetwork: string } }>(
       return ktas.map((kta) => {
         return {
           key_to_asset_key: kta.address,
-          is_active: kta.mobileHotspotInfo!.isActive,
-          device_type: kta.mobileHotspotInfo!.deviceType,
+          is_active: kta.mobile_hotspot_info!.is_active,
+          device_type: kta.mobile_hotspot_info!.device_type,
         };
       });
     }
@@ -159,10 +159,10 @@ function generateAssetJson(record: KeyToAsset, keyStr: string) {
   const hotspotType = keyStr.length > 100 ? "MOBILE" : "IOT";
   const image = `${SHDW_DRIVE_URL}/${
     hotspotType === "MOBILE"
-      ? record?.mobileHotspotInfo?.isActive
+      ? record?.mobile_hotspot_info?.is_active
         ? "mobile-hotspot-active.png"
         : "mobile-hotspot.png"
-      : record?.iotHotspotInfo?.isActive
+      : record?.iot_hotspot_info?.is_active
       ? "hotspot-active.png"
       : "hotspot.png"
   }`;
@@ -176,11 +176,11 @@ function generateAssetJson(record: KeyToAsset, keyStr: string) {
     key_to_asset_key: record.address,
     image,
     hotspot_infos: {
-      iot: snakeCaseKeys(record?.iotHotspotInfo?.dataValues),
-      mobile: snakeCaseKeys(record?.mobileHotspotInfo?.dataValues),
+      iot: record?.iot_hotspot_info,
+      mobile: record?.mobile_hotspot_info,
     },
-    entity_key_b64: record?.entityKey.toString("base64"),
-    key_serialization: record?.keySerialization,
+    entity_key_b64: record?.entity_key.toString("base64"),
+    key_serialization: record?.key_serialization,
     entity_key_str: keyStr,
     attributes: [
       keyStr && Address.isValid(keyStr)
@@ -189,18 +189,18 @@ function generateAssetJson(record: KeyToAsset, keyStr: string) {
       { trait_type: "entity_key_string", value: keyStr },
       {
         trait_type: "entity_key",
-        value: record?.entityKey?.toString("base64"),
+        value: record?.entity_key?.toString("base64"),
       },
       { trait_type: "rewardable", value: true },
       {
         trait_type: "networks",
         value: [
-          record?.iotHotspotInfo && "iot",
-          record?.mobileHotspotInfo && "mobile",
+          record?.iot_hotspot_info && "iot",
+          record?.mobile_hotspot_info && "mobile",
         ].filter(truthy),
       },
-      ...locationAttributes("iot", record?.iotHotspotInfo),
-      ...locationAttributes("mobile", record?.mobileHotspotInfo),
+      ...locationAttributes("iot", record?.iot_hotspot_info),
+      ...locationAttributes("mobile", record?.mobile_hotspot_info),
     ],
   };
 }
@@ -218,7 +218,7 @@ const getHotspotByKeyToAsset = async (request, reply) => {
     return reply.code(404);
   }
 
-  const { entityKey, keySerialization } = record;
+  const { entity_key: entityKey, key_serialization: keySerialization } = record;
   const keyStr = decodeEntityKey(entityKey, { [keySerialization]: {} });
 
   const assetJson = generateAssetJson(record, keyStr!);
@@ -255,7 +255,7 @@ server.get<{ Params: { eccCompact: string } }>(
 
     const record = await KeyToAsset.findOne({
       where: {
-        entityKey: bs58.decode(eccCompact),
+        entity_key: bs58.decode(eccCompact),
       },
       include: [IotHotspotInfo, MobileHotspotInfo],
     });
@@ -268,25 +268,6 @@ server.get<{ Params: { eccCompact: string } }>(
     return assetJson;
   }
 );
-
-function snakeCaseKeys(obj: any): any {
-  if (obj instanceof Array) {
-    return obj.map((item) => snakeCaseKeys(item));
-  } else if (obj instanceof Object) {
-    const snakeCasedObject: { [key: string]: any } = {};
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        const snakeCasedKey = key
-          .replace(/([A-Z])/g, (match) => `_${match.toLowerCase()}`)
-          .replace(/^_/, ""); // Remove leading underscore
-        snakeCasedObject[snakeCasedKey] = snakeCaseKeys(obj[key]);
-      }
-    }
-    return snakeCasedObject;
-  } else {
-    return obj;
-  }
-}
 
 function locationAttributes(
   name: string,

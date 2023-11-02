@@ -56,8 +56,8 @@ export class MobileHotspotInfo extends Model {
   declare city: string;
   declare state: string;
   declare country: string;
-  declare isActive: boolean;
-  declare deviceType: string;
+  declare is_active: boolean;
+  declare device_type: string;
 }
 MobileHotspotInfo.init(
   {
@@ -69,14 +69,14 @@ MobileHotspotInfo.init(
     city: DataTypes.STRING,
     state: DataTypes.STRING,
     country: DataTypes.STRING,
-    isActive: DataTypes.BOOLEAN,
-    deviceType: DataTypes.JSONB,
+    is_active: DataTypes.BOOLEAN,
+    device_type: DataTypes.JSONB,
     location: DataTypes.DECIMAL.UNSIGNED,
-    dcOnboardingFeePaid: DataTypes.DECIMAL.UNSIGNED,
+    dc_onboarding_fee_paid: DataTypes.DECIMAL.UNSIGNED,
   },
   {
     sequelize,
-    modelName: "mobileHotspotInfo",
+    modelName: "mobile_hotspot_info",
     tableName: "mobile_hotspot_infos",
     underscored: true,
     timestamps: false,
@@ -90,7 +90,7 @@ export class IotHotspotInfo extends Model {
   declare city: string;
   declare state: string;
   declare country: string;
-  declare isActive: boolean;
+  declare is_active: boolean;
 }
 
 IotHotspotInfo.init(
@@ -103,15 +103,15 @@ IotHotspotInfo.init(
     city: DataTypes.STRING,
     state: DataTypes.STRING,
     country: DataTypes.STRING,
-    isActive: DataTypes.BOOLEAN,
+    is_active: DataTypes.BOOLEAN,
     location: DataTypes.DECIMAL.UNSIGNED,
-    dcOnboardingFeePaid: DataTypes.DECIMAL.UNSIGNED,
+    dc_onboarding_fee_paid: DataTypes.DECIMAL.UNSIGNED,
     elevation: DataTypes.NUMBER,
     gain: DataTypes.NUMBER,
   },
   {
     sequelize,
-    modelName: "iotHotspotInfo",
+    modelName: "iot_hotspot_info",
     tableName: "iot_hotspot_infos",
     underscored: true,
     timestamps: false,
@@ -121,10 +121,10 @@ IotHotspotInfo.init(
 export class KeyToAsset extends Model {
   declare address: string;
   declare asset: string;
-  declare entityKey: Buffer;
-  declare mobileHotspotInfo?: MobileHotspotInfo;
-  declare iotHotspotInfo?: IotHotspotInfo;
-  declare keySerialization: string;
+  declare entity_key: Buffer;
+  declare mobile_hotspot_info?: MobileHotspotInfo;
+  declare iot_hotspot_info?: IotHotspotInfo;
+  declare key_serialization: string;
 }
 
 KeyToAsset.init(
@@ -133,13 +133,13 @@ KeyToAsset.init(
       type: STRING,
       primaryKey: true,
     },
-    entityKey: DataTypes.BLOB,
+    entity_key: DataTypes.BLOB,
     asset: STRING,
-    keySerialization: DataTypes.JSONB,
+    key_serialization: DataTypes.JSONB,
   },
   {
     sequelize,
-    modelName: "keyToAsset",
+    modelName: "key_to_asset",
     tableName: "key_to_assets",
     underscored: true,
     timestamps: false,
