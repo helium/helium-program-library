@@ -144,6 +144,7 @@ server.get<{ Querystring: { subnetwork: string } }>(
       });
 
       let result = {
+        pageSize,
         totalItems: count,
         totalPages: Math.ceil(count / pageSize),
       };
@@ -159,7 +160,7 @@ server.get<{ Querystring: { subnetwork: string, page: string } }>(
   "/v2/hotspots",
   async (request, reply) => {
     const { subnetwork, page: pageStr } = request.query;
-    const pageInt = pageStr ? parseInt(pageStr) : 1;
+    const pageInt = pageStr ? Number(pageStr) : 1;
 
     const offset = (pageInt - 1) * pageSize;
     const limit = pageSize;
