@@ -177,6 +177,7 @@ server.get<{ Querystring: { subnetwork: string, page: string } }>(
         ],
         order: [
           [IotHotspotInfo, "created_at", "ASC"],
+          [IotHotspotInfo, "address", "ASC"], // Need to sort additionally by address otherwise there are dupes across pages because of tight created_at coupling
         ],
       });
 
@@ -205,6 +206,7 @@ server.get<{ Querystring: { subnetwork: string, page: string } }>(
         ],
         order: [
           [MobileHotspotInfo, "created_at", "ASC"],
+          [MobileHotspotInfo, "address", "ASC"], // Need to sort additionally by address otherwise there are dupes across pages because of tight created_at coupling
         ],
       });
 
