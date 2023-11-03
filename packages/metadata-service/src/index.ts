@@ -177,6 +177,9 @@ server.get<{ Querystring: { subnetwork: string, page: string } }>(
             required: true,
           },
         ],
+        order: [
+          [IotHotspotInfo, "created_at", "ASC"],
+        ],
       });
 
       let result = {
@@ -201,6 +204,9 @@ server.get<{ Querystring: { subnetwork: string, page: string } }>(
             model: MobileHotspotInfo,
             required: true,
           },
+        ],
+        order: [
+          [MobileHotspotInfo, "created_at", "ASC"],
         ],
       });
 
