@@ -31,7 +31,7 @@ import {
 } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 
-const PAGE_SIZE = 1000;
+const pageSize = Number(process.env.PAGE_SIZE) || 1000;
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -115,10 +115,6 @@ server.get<{ Querystring: { subnetwork: string } }>(
   "/v2/hotspots/pagination-metadata",
   async (request, reply) => {
     const { subnetwork } = request.query;
-    const pageInt = 0;
-
-    const offset = (pageInt - 1) * PAGE_SIZE;
-    const limit = PAGE_SIZE;
 
     if (subnetwork === "iot") {
       const count = await KeyToAsset.count({
@@ -131,8 +127,9 @@ server.get<{ Querystring: { subnetwork: string } }>(
       });
 
       let result = {
+        pageSize,
         totalItems: count,
-        totalPages: Math.ceil(count / PAGE_SIZE),
+        totalPages: Math.ceil(count / pageSize),
       };
 
       return result;
@@ -148,7 +145,7 @@ server.get<{ Querystring: { subnetwork: string } }>(
 
       let result = {
         totalItems: count,
-        totalPages: Math.ceil(count / PAGE_SIZE),
+        totalPages: Math.ceil(count / pageSize),
       };
 
       return result;
@@ -164,8 +161,8 @@ server.get<{ Querystring: { subnetwork: string, page: string } }>(
     const { subnetwork, page: pageStr } = request.query;
     const pageInt = pageStr ? parseInt(pageStr) : 1;
 
-    const offset = (pageInt - 1) * PAGE_SIZE;
-    const limit = PAGE_SIZE;
+    const offset = (pageInt - 1) * pageSize;
+    const limit = pageSize;
 
     if (subnetwork === "iot") {
       const { count, rows: ktas } = await KeyToAsset.findAndCountAll({
