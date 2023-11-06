@@ -31,6 +31,8 @@ import {
 } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 
+const pageSize = Number(process.env.PAGE_SIZE) || 1000;
+
 const server: FastifyInstance = Fastify({
   logger: true,
 });
@@ -110,12 +112,12 @@ server.get<{ Params: { wallet: string } }>(
 );
 
 server.get<{ Querystring: { subnetwork: string } }>(
-  "/v2/hotspots",
+  "/v2/hotspots/pagination-metadata",
   async (request, reply) => {
     const { subnetwork } = request.query;
 
     if (subnetwork === "iot") {
-      const ktas = await KeyToAsset.findAll({
+      const count = await KeyToAsset.count({
         include: [
           {
             model: IotHotspotInfo,
@@ -124,14 +126,15 @@ server.get<{ Querystring: { subnetwork: string } }>(
         ],
       });
 
-      return ktas.map((kta) => {
-        return {
-          key_to_asset_key: kta.address,
-          is_active: kta.iot_hotspot_info!.is_active,
-        };
-      });
+      let result = {
+        pageSize,
+        totalItems: count,
+        totalPages: Math.ceil(count / pageSize),
+      };
+
+      return result;
     } else if (subnetwork === "mobile") {
-      const ktas = await KeyToAsset.findAll({
+      const count = await KeyToAsset.count({
         include: [
           {
             model: MobileHotspotInfo,
@@ -139,13 +142,88 @@ server.get<{ Querystring: { subnetwork: string } }>(
           },
         ],
       });
-      return ktas.map((kta) => {
+
+      let result = {
+        pageSize,
+        totalItems: count,
+        totalPages: Math.ceil(count / pageSize),
+      };
+
+      return result;
+    }
+
+    return reply.code(400).send("Invalid subnetwork");
+  }
+);
+
+server.get<{ Querystring: { subnetwork: string, page: string } }>(
+  "/v2/hotspots",
+  async (request, reply) => {
+    const { subnetwork, page: pageStr } = request.query;
+    const pageInt = pageStr ? Number(pageStr) : 1;
+
+    const offset = (pageInt - 1) * pageSize;
+    const limit = pageSize;
+
+    if (subnetwork === "iot") {
+      const { count, rows: ktas } = await KeyToAsset.findAndCountAll({
+        offset,
+        limit,
+        include: [
+          {
+            model: IotHotspotInfo,
+            required: true,
+          },
+        ],
+        order: [
+          [IotHotspotInfo, "created_at", "ASC"],
+          [IotHotspotInfo, "address", "ASC"], // Need to sort additionally by address otherwise there are dupes across pages because of tight created_at coupling
+        ],
+      });
+
+      let result = {
+        currentPage: pageInt,
+        nextPage: (offset + limit) < count ? pageInt + 1 : null,
+        items: [] as { key_to_asset_key: string; }[]
+      };
+
+      result.items = ktas.map((kta) => {
         return {
           key_to_asset_key: kta.address,
-          is_active: kta.mobile_hotspot_info!.is_active,
+        };
+      });
+
+      return result;
+    } else if (subnetwork === "mobile") {
+      const { count, rows: ktas } = await KeyToAsset.findAndCountAll({
+        offset,
+        limit,
+        include: [
+          {
+            model: MobileHotspotInfo,
+            required: true,
+          },
+        ],
+        order: [
+          [MobileHotspotInfo, "created_at", "ASC"],
+          [MobileHotspotInfo, "address", "ASC"], // Need to sort additionally by address otherwise there are dupes across pages because of tight created_at coupling
+        ],
+      });
+
+      let result = {
+        currentPage: pageInt,
+        nextPage: (offset + limit) < count ? pageInt + 1 : null,
+        items: [] as { key_to_asset_key: string; device_type: string; }[],
+      };
+
+      result.items = ktas.map((kta) => {
+        return {
+          key_to_asset_key: kta.address,
           device_type: kta.mobile_hotspot_info!.device_type,
         };
       });
+
+      return result;
     }
 
     return reply.code(400).send("Invalid subnetwork");
