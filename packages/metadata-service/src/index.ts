@@ -1,4 +1,4 @@
-import { Program } from "@coral-xyz/anchor";
+import { BN, Program } from "@coral-xyz/anchor";
 import cors from "@fastify/cors";
 import Address from "@helium/address/build/Address";
 import {
@@ -156,7 +156,7 @@ server.get<{ Querystring: { subnetwork: string } }>(
   }
 );
 
-server.get<{ Querystring: { subnetwork: string, page: string } }>(
+server.get<{ Querystring: { subnetwork: string; page: string } }>(
   "/v2/hotspots",
   async (request, reply) => {
     const { subnetwork, page: pageStr } = request.query;
@@ -183,8 +183,8 @@ server.get<{ Querystring: { subnetwork: string, page: string } }>(
 
       let result = {
         currentPage: pageInt,
-        nextPage: (offset + limit) < count ? pageInt + 1 : null,
-        items: [] as { key_to_asset_key: string; }[]
+        nextPage: offset + limit < count ? pageInt + 1 : null,
+        items: [] as { key_to_asset_key: string }[],
       };
 
       result.items = ktas.map((kta) => {
@@ -212,8 +212,8 @@ server.get<{ Querystring: { subnetwork: string, page: string } }>(
 
       let result = {
         currentPage: pageInt,
-        nextPage: (offset + limit) < count ? pageInt + 1 : null,
-        items: [] as { key_to_asset_key: string; device_type: string; }[],
+        nextPage: offset + limit < count ? pageInt + 1 : null,
+        items: [] as { key_to_asset_key: string; device_type: string }[],
       };
 
       result.items = ktas.map((kta) => {
@@ -244,22 +244,37 @@ function generateAssetJson(record: KeyToAsset, keyStr: string) {
       ? "hotspot-active.png"
       : "hotspot.png"
   }`;
+
   return {
     name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
     description:
       keyStr === "iot_operations_fund"
         ? "IOT Operations Fund"
         : "A Rewardable NFT on Helium",
+    image,
     asset_id: record.asset,
     key_to_asset_key: record.address,
-    image,
-    hotspot_infos: {
-      iot: record?.iot_hotspot_info,
-      mobile: record?.mobile_hotspot_info,
-    },
     entity_key_b64: record?.entity_key.toString("base64"),
     key_serialization: record?.key_serialization,
     entity_key_str: keyStr,
+    hotspot_infos: {
+      iot: {
+        ...record?.iot_hotspot_info?.dataValues,
+        location: record?.iot_hotspot_info?.location
+          ? new BN(record.iot_hotspot_info.location).toString("hex")
+          : null,
+        lat: record?.iot_hotspot_info?.lat,
+        long: record?.iot_hotspot_info?.long,
+      },
+      mobile: {
+        ...record?.mobile_hotspot_info?.dataValues,
+        location: record?.mobile_hotspot_info?.location
+          ? new BN(record.mobile_hotspot_info.location).toString("hex")
+          : null,
+        lat: record?.mobile_hotspot_info?.lat,
+        long: record?.mobile_hotspot_info?.long,
+      },
+    },
     attributes: [
       keyStr && Address.isValid(keyStr)
         ? { trait_type: "ecc_compact", value: keyStr }

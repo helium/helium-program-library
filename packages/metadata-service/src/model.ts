@@ -1,6 +1,11 @@
 import { Sequelize, STRING, Model, DataTypes } from "sequelize";
 import AWS from "aws-sdk";
 import * as pg from "pg";
+import { cellToLatLng, latLngToCell } from "h3-js";
+import BN from "bn.js";
+
+const parseH3BNLocation = (location: BN) =>
+  cellToLatLng(location.toString("hex"));
 
 const host = process.env.PGHOST || "localhost";
 const port = Number(process.env.PGPORT) || 5432;
@@ -50,14 +55,46 @@ export const sequelize = new Sequelize({
   },
 });
 
-export class MobileHotspotInfo extends Model {
+class WithRes8LatLgn extends Model {
+  declare location: string;
+
+  _lat: number | undefined = undefined;
+  _long: number | undefined = undefined;
+
+  setLatLng() {
+    const [lat, long] = parseH3BNLocation(new BN(this.location));
+    const res8 = latLngToCell(lat, long, 8);
+    const [latRes8, longRes8] = cellToLatLng(res8);
+    this._lat = latRes8;
+    this._long = longRes8;
+  }
+
+  get lat(): number | undefined {
+    if (this._lat) {
+      return this._lat;
+    }
+
+    this.setLatLng();
+    return this._lat;
+  }
+
+  get long(): number | undefined {
+    if (this._long) {
+      return this._long;
+    }
+
+    this.setLatLng();
+    return this._long;
+  }
+}
+
+export class MobileHotspotInfo extends WithRes8LatLgn {
   declare address: string;
   declare street: string;
   declare city: string;
   declare state: string;
   declare country: string;
-  declare lat: number;
-  declare long: number;
+  declare location: string;
   declare is_active: boolean;
   declare device_type: string;
 }
@@ -74,8 +111,6 @@ MobileHotspotInfo.init(
     is_active: DataTypes.BOOLEAN,
     device_type: DataTypes.JSONB,
     location: DataTypes.DECIMAL.UNSIGNED,
-    lat: DataTypes.DECIMAL(8, 6),
-    long: DataTypes.DECIMAL(9, 6),
     dc_onboarding_fee_paid: DataTypes.DECIMAL.UNSIGNED,
   },
   {
@@ -87,15 +122,14 @@ MobileHotspotInfo.init(
   }
 );
 
-export class IotHotspotInfo extends Model {
+export class IotHotspotInfo extends WithRes8LatLgn {
   declare address: string;
   declare asset: string;
   declare street: string;
   declare city: string;
   declare state: string;
   declare country: string;
-  declare lat: number;
-  declare long: number;
+  declare location: string;
   declare is_active: boolean;
 }
 
@@ -111,8 +145,6 @@ IotHotspotInfo.init(
     country: DataTypes.STRING,
     is_active: DataTypes.BOOLEAN,
     location: DataTypes.DECIMAL.UNSIGNED,
-    lat: DataTypes.DECIMAL(8, 6),
-    long: DataTypes.DECIMAL(9, 6),
     dc_onboarding_fee_paid: DataTypes.DECIMAL.UNSIGNED,
     elevation: DataTypes.NUMBER,
     gain: DataTypes.NUMBER,
