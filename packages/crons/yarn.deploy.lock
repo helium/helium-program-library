@@ -138,18 +138,6 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/anchor-resolvers@npm:^0.2.17":
-  version: 0.2.21
-  resolution: "@helium/anchor-resolvers@npm:0.2.21"
-  dependencies:
-    "@solana/spl-token": "npm:^0.3.6"
-    "@solana/web3.js": "npm:^1.43.4"
-  peerDependencies:
-    "@coral-xyz/anchor": ^0.26.0
-  checksum: b8639d000c7a95f47810e62b31e3fd5795ba2152310a0047dc80e09191cd8b56a949eea223f00902c2fcabe47f17090fa2b49b8386d90cd98dded6612992443f
-  languageName: node
-  linkType: hard
-
 "@helium/circuit-breaker-sdk@^0.4.3":
   version: 0.0.0-use.local
   resolution: "@helium/circuit-breaker-sdk@workspace:packages/circuit-breaker-sdk"
@@ -179,12 +167,12 @@ __metadata:
     "@helium/idls": ^0.4.3
     "@helium/lazy-distributor-sdk": ^0.4.3
     "@helium/mobile-entity-manager-sdk": ^0.4.3
-    "@helium/organization-sdk": ^0.0.5
+    "@helium/organization-sdk": 0.0.6
     "@helium/price-oracle-sdk": ^0.4.3
-    "@helium/proposal-sdk": ^0.0.5
+    "@helium/proposal-sdk": 0.0.6
     "@helium/rewards-oracle-sdk": ^0.4.3
     "@helium/spl-utils": ^0.4.3
-    "@helium/state-controller-sdk": ^0.0.5
+    "@helium/state-controller-sdk": 0.0.6
     "@helium/treasury-management-sdk": ^0.4.3
     "@helium/voter-stake-registry-sdk": ^0.4.3
     "@solana/spl-token": ^0.3.8
@@ -348,25 +336,25 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/modular-governance-idls@npm:^0.0.5":
-  version: 0.0.5
-  resolution: "@helium/modular-governance-idls@npm:0.0.5"
+"@helium/modular-governance-idls@npm:^0.0.6":
+  version: 0.0.6
+  resolution: "@helium/modular-governance-idls@npm:0.0.6"
   dependencies:
-    "@coral-xyz/anchor": "npm:^0.28.0"
-    "@solana/web3.js": "npm:^1.43.4"
-  checksum: fd13b16178d67bda5720a3658e6782d7787f73299af60807822fc4e737e2f2424b68e097f642d9e944f247bfb5df9c785c6f060c156dfe89f2ce7aae8a48d411
+    "@coral-xyz/anchor": ^0.28.0
+    "@solana/web3.js": ^1.78.4
+  checksum: 8d244178ee14d5f22b69f7ab07f95e752e459edd8d6ed1eeaa90b3ce809b146fd9aca7245b216f7de6cc16e5fd0e7c73f40c6885544a9edeb46f6b7709376024
   languageName: node
   linkType: hard
 
-"@helium/organization-sdk@npm:^0.0.5":
-  version: 0.0.5
-  resolution: "@helium/organization-sdk@npm:0.0.5"
+"@helium/organization-sdk@npm:0.0.6":
+  version: 0.0.6
+  resolution: "@helium/organization-sdk@npm:0.0.6"
   dependencies:
-    "@coral-xyz/anchor": "npm:^0.28.0"
-    "@helium/anchor-resolvers": "npm:^0.2.17"
-    "@helium/modular-governance-idls": "npm:^0.0.5"
-    "@helium/proposal-sdk": "npm:^0.0.5"
-  checksum: 6ee2034f142d45828db65085ce4a88d0f1bd795492695b6af7530ac021bfc7df469ae66641b0673fde17826cc9f54e2bcd0e9b65f573ec7a0ea21e14045dc6cf
+    "@coral-xyz/anchor": ^0.28.0
+    "@helium/anchor-resolvers": ^0.4.3
+    "@helium/modular-governance-idls": ^0.0.6
+    "@helium/proposal-sdk": ^0.0.6
+  checksum: f477dff14a58028810666e259033c110cc191ef65b590687e7e0a93e4d4de07460f2c8b3c3824d69e76f5f8cda47a5ec9d4ed4e600eab40e6efeaa081ce54ff4
   languageName: node
   linkType: hard
 
@@ -385,14 +373,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/proposal-sdk@npm:^0.0.5":
-  version: 0.0.5
-  resolution: "@helium/proposal-sdk@npm:0.0.5"
+"@helium/proposal-sdk@npm:0.0.6, @helium/proposal-sdk@npm:^0.0.6":
+  version: 0.0.6
+  resolution: "@helium/proposal-sdk@npm:0.0.6"
   dependencies:
-    "@coral-xyz/anchor": "npm:^0.28.0"
-    "@helium/anchor-resolvers": "npm:^0.2.17"
-    "@helium/modular-governance-idls": "npm:^0.0.5"
-  checksum: c774de53273fd51f64d683f0f9d9449d4716bebf3b29178f557c999fd290d632932ede281e85834c34c2496bef0e4b7f732f9f177840f93b464e89e5f48512bb
+    "@coral-xyz/anchor": ^0.28.0
+    "@helium/anchor-resolvers": ^0.4.3
+    "@helium/modular-governance-idls": ^0.0.6
+  checksum: 989d26e6cd2a40867b41f3f09e01a84cb7ecf19302fecde461f9f0da5c2a764cbe63f49e41d1c699df872956f554f7816f26271c926bf82726f0e81cd451b9f3
   languageName: node
   linkType: hard
 
@@ -434,14 +422,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/state-controller-sdk@npm:^0.0.5":
-  version: 0.0.5
-  resolution: "@helium/state-controller-sdk@npm:0.0.5"
+"@helium/state-controller-sdk@npm:0.0.6":
+  version: 0.0.6
+  resolution: "@helium/state-controller-sdk@npm:0.0.6"
   dependencies:
-    "@coral-xyz/anchor": "npm:^0.28.0"
-    "@helium/anchor-resolvers": "npm:^0.2.17"
-    "@helium/modular-governance-idls": "npm:^0.0.5"
-  checksum: 41b864c72ba75764f089d8501f1d1145ca769833519cc81fb4c344093c854c916aeaade55336347dacfe75f5b551acad09fe3ec212c29ee40cbd6711bdf2853e
+    "@coral-xyz/anchor": ^0.28.0
+    "@helium/anchor-resolvers": ^0.4.3
+    "@helium/modular-governance-idls": ^0.0.6
+  checksum: 9d8640eb944997c2167910ce056da9a5d50f8c8dc538cc66e568394d35204acd3433c31b44fb4818584e4b9d29b6fcac62047a7b359bddb5a1800b47b2a90c1d
   languageName: node
   linkType: hard
 
@@ -675,7 +663,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/web3.js@npm:^1.21.0, @solana/web3.js@npm:^1.32.0, @solana/web3.js@npm:^1.43.4, @solana/web3.js@npm:^1.50.1, @solana/web3.js@npm:^1.56.2, @solana/web3.js@npm:^1.66.2, @solana/web3.js@npm:^1.68.0, @solana/web3.js@npm:^1.78.4":
+"@solana/web3.js@npm:^1.21.0, @solana/web3.js@npm:^1.32.0, @solana/web3.js@npm:^1.50.1, @solana/web3.js@npm:^1.56.2, @solana/web3.js@npm:^1.66.2, @solana/web3.js@npm:^1.68.0, @solana/web3.js@npm:^1.78.4":
   version: 1.78.4
   resolution: "@solana/web3.js@npm:1.78.4"
   dependencies:
