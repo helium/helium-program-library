@@ -59,11 +59,14 @@ async function run() {
     totalCounts.forEach((count, i) => {
       const subnetwork = subnetworks[i];
       const countToPageSizeRatio = count / paginationMetadata[i].pageSize;
-      let pagesToInvalidate = Math.ceil(countToPageSizeRatio);
-      while (pagesToInvalidate) {
-        const path = `/v2/hotspots?subnetwork=${subnetwork}&page=${pagesToInvalidate}`;
-        paths.push(path);
-        pagesToInvalidate--;
+      let numOfPagesToInvalidate = Math.ceil(countToPageSizeRatio);
+      while (numOfPagesToInvalidate >= 0) {
+        const page = paginationMetadata[i].totalPages - numOfPagesToInvalidate;
+        if (page > 0) {
+          const path = `/v2/hotspots?subnetwork=${subnetwork}&page=${page}`;
+          paths.push(path);
+        }
+        numOfPagesToInvalidate--;
       }
     });
     console.log("Invalidation paths");
