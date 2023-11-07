@@ -1,11 +1,8 @@
-import { Sequelize, STRING, Model, DataTypes } from "sequelize";
 import AWS from "aws-sdk";
-import * as pg from "pg";
-import { cellToLatLng, latLngToCell } from "h3-js";
 import BN from "bn.js";
-
-const parseH3BNLocation = (location: BN) =>
-  cellToLatLng(location.toString("hex"));
+import { cellToLatLng, cellToParent } from "h3-js";
+import * as pg from "pg";
+import { DataTypes, Model, STRING, Sequelize } from "sequelize";
 
 const host = process.env.PGHOST || "localhost";
 const port = Number(process.env.PGPORT) || 5432;
@@ -62,8 +59,7 @@ class WithRes8LatLgn extends Model {
   _long: number | undefined = undefined;
 
   setLatLng() {
-    const [lat, long] = parseH3BNLocation(new BN(this.location));
-    const res8 = latLngToCell(lat, long, 8);
+    const res8 = cellToParent(new BN(this.location).toString("hex"), 8);
     const [latRes8, longRes8] = cellToLatLng(res8);
     this._lat = latRes8;
     this._long = longRes8;
