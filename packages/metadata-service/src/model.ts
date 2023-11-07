@@ -59,10 +59,16 @@ class WithRes8LatLgn extends Model {
   _long: number | undefined = undefined;
 
   setLatLng() {
-    const res8 = cellToParent(new BN(this.location).toString("hex"), 8);
-    const [latRes8, longRes8] = cellToLatLng(res8);
-    this._lat = latRes8;
-    this._long = longRes8;
+    if (this.location) {
+      try {
+        const res8 = cellToParent(new BN(this.location).toString("hex"), 8);
+        const [latRes8, longRes8] = cellToLatLng(res8);
+        this._lat = latRes8;
+        this._long = longRes8;
+      } catch (e: any) {
+        console.error("Invalid location", e);
+      }
+    }
   }
 
   get lat(): number | undefined {
