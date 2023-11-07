@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.4](https://github.com/helium/helium-program-library/compare/v0.4.1...v0.4.4) (2023-11-07)
+
+
+### Features
+
+* **#451:** Create cloudfront invalidator ([#452](https://github.com/helium/helium-program-library/issues/452)) ([e5d44a0](https://github.com/helium/helium-program-library/commit/e5d44a0d1fcc92fd5a39d1b1dc9b760be27bc19d)), closes [#451](https://github.com/helium/helium-program-library/issues/451) [#441](https://github.com/helium/helium-program-library/issues/441)
+* **#464:** Add metadata service endpoints for wallet, hotspots in bulk ([#465](https://github.com/helium/helium-program-library/issues/465)) ([a5d9721](https://github.com/helium/helium-program-library/commit/a5d97211732ac5d2ab579e016e3575680d534096)), closes [#464](https://github.com/helium/helium-program-library/issues/464) [#464](https://github.com/helium/helium-program-library/issues/464)
+
+
+
+
+
 ## [0.4.3](https://github.com/helium/helium-program-library/compare/v0.4.2...v0.4.3) (2023-10-26)
 
 **Note:** Version bump only for package helium-program-library
