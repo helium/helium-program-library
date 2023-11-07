@@ -509,7 +509,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache-hooks@^0.4.3, @helium/account-fetch-cache-hooks@^0.4.5":
+"@helium/account-fetch-cache-hooks@^0.4.5":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache-hooks@workspace:packages/account-fetch-cache-hooks"
   dependencies:
@@ -525,7 +525,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/account-fetch-cache@^0.4.3, @helium/account-fetch-cache@^0.4.5":
+"@helium/account-fetch-cache@^0.4.5":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -547,7 +547,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@^0.4.3, @helium/anchor-resolvers@^0.4.5":
+"@helium/anchor-resolvers@^0.4.5":
   version: 0.0.0-use.local
   resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
   dependencies:
@@ -577,7 +577,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/helium-react-hooks@^0.4.3, @helium/helium-react-hooks@^0.4.5":
+"@helium/helium-react-hooks@^0.4.5":
   version: 0.0.0-use.local
   resolution: "@helium/helium-react-hooks@workspace:packages/helium-react-hooks"
   dependencies:
@@ -632,54 +632,54 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/modular-governance-hooks@npm:0.0.6":
-  version: 0.0.6
-  resolution: "@helium/modular-governance-hooks@npm:0.0.6"
+"@helium/modular-governance-hooks@npm:^0.0.7":
+  version: 0.0.7
+  resolution: "@helium/modular-governance-hooks@npm:0.0.7"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.4.3
-    "@helium/account-fetch-cache-hooks": ^0.4.3
-    "@helium/helium-react-hooks": ^0.4.3
-    "@helium/modular-governance-idls": ^0.0.6
-    "@helium/organization-sdk": ^0.0.6
+    "@helium/account-fetch-cache": ^0.4.5
+    "@helium/account-fetch-cache-hooks": ^0.4.5
+    "@helium/helium-react-hooks": ^0.4.5
+    "@helium/modular-governance-idls": ^0.0.7
+    "@helium/organization-sdk": ^0.0.7
     "@solana/web3.js": ^1.78.4
   peerDependencies:
     react: ^16.8 || ^17 || ^18
     react-dom: ^16.8 || ^17 || ^18
-  checksum: 955fd091303a4791211b57b54a5aa4a46a3e0d725b82d9069670e8c62030301be48bf9dd559a3d9e8290083dc873c17ed9cc14e87d7651ba5f5d4a0e02f80a7d
+  checksum: 0fb0b90ea2cac5ab2593f3660cd8b7ddaeb0c9d3f093bbaecfe6d3e110fc305970fa14050133b5394c2fc962ac85cc025b071773bb14e95a73191c20f868b2b9
   languageName: node
   linkType: hard
 
-"@helium/modular-governance-idls@npm:^0.0.6":
-  version: 0.0.6
-  resolution: "@helium/modular-governance-idls@npm:0.0.6"
+"@helium/modular-governance-idls@npm:^0.0.7":
+  version: 0.0.7
+  resolution: "@helium/modular-governance-idls@npm:0.0.7"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@solana/web3.js": ^1.78.4
-  checksum: 8d244178ee14d5f22b69f7ab07f95e752e459edd8d6ed1eeaa90b3ce809b146fd9aca7245b216f7de6cc16e5fd0e7c73f40c6885544a9edeb46f6b7709376024
+  checksum: e68fefdbd447ef3d11bb4013467e11daa7d8648b29d05abf1b1a03e5e5a979d02b6ff954b2795f1709182886d900bc36e34e38ed1d5d44dcf33ff561ec736947
   languageName: node
   linkType: hard
 
-"@helium/organization-sdk@npm:^0.0.6":
-  version: 0.0.6
-  resolution: "@helium/organization-sdk@npm:0.0.6"
+"@helium/organization-sdk@npm:^0.0.7":
+  version: 0.0.7
+  resolution: "@helium/organization-sdk@npm:0.0.7"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.4.3
-    "@helium/modular-governance-idls": ^0.0.6
-    "@helium/proposal-sdk": ^0.0.6
-  checksum: f477dff14a58028810666e259033c110cc191ef65b590687e7e0a93e4d4de07460f2c8b3c3824d69e76f5f8cda47a5ec9d4ed4e600eab40e6efeaa081ce54ff4
+    "@helium/anchor-resolvers": ^0.4.5
+    "@helium/modular-governance-idls": ^0.0.7
+    "@helium/proposal-sdk": ^0.0.7
+  checksum: 83a90e64233ea9d7c5c96d8a30a41fae16867e885b7ce154b7696a68d1041992d030e4db8ab3aef06c5cde5d13e4880dcb7092ed108f369760d0b6c7293ae1b0
   languageName: node
   linkType: hard
 
-"@helium/proposal-sdk@npm:^0.0.6":
-  version: 0.0.6
-  resolution: "@helium/proposal-sdk@npm:0.0.6"
+"@helium/proposal-sdk@npm:^0.0.7":
+  version: 0.0.7
+  resolution: "@helium/proposal-sdk@npm:0.0.7"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.4.3
-    "@helium/modular-governance-idls": ^0.0.6
-  checksum: 989d26e6cd2a40867b41f3f09e01a84cb7ecf19302fecde461f9f0da5c2a764cbe63f49e41d1c699df872956f554f7816f26271c926bf82726f0e81cd451b9f3
+    "@helium/anchor-resolvers": ^0.4.5
+    "@helium/modular-governance-idls": ^0.0.7
+  checksum: 71a975bf10c58033439c5d801a1e447b431d59848778ae7519b4a80c912ce43afc437ea10d748a66e92250d7edafb3796147f629ae8763a1f01b1293dede5a54
   languageName: node
   linkType: hard
 
@@ -731,7 +731,7 @@ __metadata:
     "@helium/account-fetch-cache-hooks": ^0.4.5
     "@helium/helium-react-hooks": ^0.4.5
     "@helium/helium-sub-daos-sdk": ^0.4.5
-    "@helium/modular-governance-hooks": 0.0.6
+    "@helium/modular-governance-hooks": ^0.0.7
     "@helium/spl-utils": ^0.4.5
     "@helium/voter-stake-registry-sdk": ^0.4.5
     "@metaplex-foundation/js": ^0.19.4
