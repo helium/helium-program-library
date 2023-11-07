@@ -1166,6 +1166,7 @@ __metadata:
     "@types/deep-equal": ^1.0.1
     "@types/node": ^18.11.11
     "@types/pg": ^8.6.6
+    "@types/uuid": ^9.0.6
     "@types/yargs": ^17.0.24
     aws-sdk: ^2.1344.0
     bn.js: ^5.2.0
@@ -5645,6 +5646,13 @@ __metadata:
     "@types/cookiejar": "npm:*"
     "@types/node": "npm:*"
   checksum: dffbfd1d3e5b9ed3f44d00e388ce9617407f5a3333241ffcfcf9056b446643794e62a09b817df83611e2f6e8a5bf6a50ba6cfe5abb1afb0f2c4771cdf5b68136
+  languageName: node
+  linkType: hard
+
+"@types/uuid@npm:^9.0.6":
+  version: 9.0.6
+  resolution: "@types/uuid@npm:9.0.6"
+  checksum: 739dcb2e620ff097fa916edeab455eb75640c4883a850784fdb15b32f67b719e05275c6d6419bb6da11350d26bd14ed05ba5e992ff228411cdd98cbc772d71ef
   languageName: node
   linkType: hard
 

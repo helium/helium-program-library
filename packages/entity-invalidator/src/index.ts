@@ -17,7 +17,7 @@ async function run() {
   // - /v2/hotspots/pagination-metadata?subnetwork=mobile
   // Or /v2/hotspot* if there is an error
   try {
-    const modelMap = {
+    const modelMap: any = {
       'iot': IotHotspotInfo,
       'mobile': MobileHotspotInfo,
     }
