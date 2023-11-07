@@ -25,7 +25,6 @@ async function run() {
 
     // Fetch pagination data
     const responsePromises = subnetworks.map((subnetwork) => {
-      console.log(`https://${DOMAIN}/v2/hotspots/pagination-metadata?subnetwork=${subnetwork}`);
       return fetch(`https://${DOMAIN}/v2/hotspots/pagination-metadata?subnetwork=${subnetwork}`);
     });
     const jsonPromises = await Promise.all(responsePromises);
