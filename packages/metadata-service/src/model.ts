@@ -96,6 +96,7 @@ class WithRes8LatLgn extends Model {
 
 export class MobileHotspotInfo extends WithRes8LatLgn {
   declare address: string;
+  declare asset: string;
   declare street: string;
   declare city: string;
   declare state: string;
@@ -103,6 +104,8 @@ export class MobileHotspotInfo extends WithRes8LatLgn {
   declare location: string;
   declare is_active: boolean;
   declare device_type: string;
+  declare created_at: Date;
+
 }
 MobileHotspotInfo.init(
   {
@@ -110,6 +113,7 @@ MobileHotspotInfo.init(
       type: STRING,
       primaryKey: true,
     },
+    asset: DataTypes.STRING,
     street: DataTypes.STRING,
     city: DataTypes.STRING,
     state: DataTypes.STRING,
@@ -118,6 +122,7 @@ MobileHotspotInfo.init(
     device_type: DataTypes.JSONB,
     location: DataTypes.DECIMAL.UNSIGNED,
     dc_onboarding_fee_paid: DataTypes.DECIMAL.UNSIGNED,
+    created_at: DataTypes.DATE,
   },
   {
     sequelize,
@@ -137,6 +142,7 @@ export class IotHotspotInfo extends WithRes8LatLgn {
   declare country: string;
   declare location: string;
   declare is_active: boolean;
+  declare created_at: Date;
 }
 
 IotHotspotInfo.init(
@@ -154,6 +160,7 @@ IotHotspotInfo.init(
     dc_onboarding_fee_paid: DataTypes.DECIMAL.UNSIGNED,
     elevation: DataTypes.NUMBER,
     gain: DataTypes.NUMBER,
+    created_at: DataTypes.DATE,
   },
   {
     sequelize,

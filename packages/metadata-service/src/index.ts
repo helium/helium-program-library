@@ -30,8 +30,9 @@ import {
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
+import { Op } from "sequelize";
 
-const pageSize = Number(process.env.PAGE_SIZE) || 1000;
+const pageSize = Number(process.env.PAGE_SIZE) || 10000;
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -156,34 +157,50 @@ server.get<{ Querystring: { subnetwork: string } }>(
   }
 );
 
-server.get<{ Querystring: { subnetwork: string; page: string } }>(
+server.get<{ Querystring: { subnetwork: string; lastCreatedAt: string; lastAsset: string  } }>(
   "/v2/hotspots",
   async (request, reply) => {
-    const { subnetwork, page: pageStr } = request.query;
-    const pageInt = pageStr ? Number(pageStr) : 1;
+    const { subnetwork, lastCreatedAt, lastAsset } = request.query;
 
-    const offset = (pageInt - 1) * pageSize;
+    let where: any = lastCreatedAt && lastAsset ? {
+      [Op.or]: [
+        {
+          created_at: {
+            [Op.gt]: lastCreatedAt
+          }
+        },
+        {
+          [Op.and]: [
+            { created_at: lastCreatedAt },
+            { asset: { [Op.gt]: lastAsset } }
+          ]
+        }
+      ]
+    } : {};
+
     const limit = pageSize;
 
     if (subnetwork === "iot") {
-      const { count, rows: ktas } = await KeyToAsset.findAndCountAll({
-        offset,
+      const ktas = await KeyToAsset.findAll({
         limit,
         include: [
           {
             model: IotHotspotInfo,
             required: true,
+            where,
           },
         ],
         order: [
           [IotHotspotInfo, "created_at", "ASC"],
-          [IotHotspotInfo, "address", "ASC"], // Need to sort additionally by address otherwise there are dupes across pages because of tight created_at coupling
+          [IotHotspotInfo, "asset", "ASC"],
         ],
       });
 
+      const lastItem = ktas[ktas.length - 1];
+
       let result = {
-        currentPage: pageInt,
-        nextPage: offset + limit < count ? pageInt + 1 : null,
+        lastAsset: lastItem.iot_hotspot_info?.asset,
+        lastCreatedAt: lastItem.iot_hotspot_info?.created_at,
         items: [] as { key_to_asset_key: string }[],
       };
 
@@ -193,35 +210,45 @@ server.get<{ Querystring: { subnetwork: string; page: string } }>(
         };
       });
 
+      if (result.items.length < pageSize) {
+        reply.header("Cache-Control", "no-cache");
+      }
+      
       return result;
     } else if (subnetwork === "mobile") {
-      const { count, rows: ktas } = await KeyToAsset.findAndCountAll({
-        offset,
+      const ktas = await KeyToAsset.findAll({
         limit,
         include: [
           {
             model: MobileHotspotInfo,
             required: true,
+            where,
           },
         ],
         order: [
           [MobileHotspotInfo, "created_at", "ASC"],
-          [MobileHotspotInfo, "address", "ASC"], // Need to sort additionally by address otherwise there are dupes across pages because of tight created_at coupling
+          [MobileHotspotInfo, "asset", "ASC"],
         ],
       });
 
+      const lastItem = ktas[ktas.length - 1];
+
       let result = {
-        currentPage: pageInt,
-        nextPage: offset + limit < count ? pageInt + 1 : null,
-        items: [] as { key_to_asset_key: string; device_type: string }[],
+        lastAsset: lastItem.mobile_hotspot_info?.asset,
+        lastCreatedAt: lastItem.mobile_hotspot_info?.created_at,
+        items: [] as { key_to_asset_key: string }[],
       };
 
       result.items = ktas.map((kta) => {
         return {
           key_to_asset_key: kta.address,
-          device_type: kta.mobile_hotspot_info!.device_type,
+          device_type: kta.mobile_hotspot_info?.device_type,
         };
       });
+
+      if (result.items.length < pageSize) {
+        reply.header("Cache-Control", "no-cache");
+      }
 
       return result;
     }
