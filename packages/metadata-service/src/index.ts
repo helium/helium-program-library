@@ -32,7 +32,130 @@ import {
 import { PublicKey } from "@solana/web3.js";
 import { Op } from "sequelize";
 
-const pageSize = Number(process.env.PAGE_SIZE) || 10000;
+const PAGE_SIZE = Number(process.env.PAGE_SIZE) || 10000;
+const MODEL_MAP: any = {
+  "iot": [IotHotspotInfo, "iot_hotspot_info"],
+  "mobile": [MobileHotspotInfo, "mobile_hotspot_info"],
+}
+
+function generateAssetJson(record: KeyToAsset, keyStr: string) {
+  const digest = animalHash(keyStr);
+  // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
+  // In the future, we need to put different symbols on different types of hotspots
+  const hotspotType = keyStr.length > 100 ? "MOBILE" : "IOT";
+  const image = `${SHDW_DRIVE_URL}/${
+    hotspotType === "MOBILE"
+      ? record?.mobile_hotspot_info?.is_active
+        ? "mobile-hotspot-active.png"
+        : "mobile-hotspot.png"
+      : record?.iot_hotspot_info?.is_active
+      ? "hotspot-active.png"
+      : "hotspot.png"
+  }`;
+
+  return {
+    name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
+    description:
+      keyStr === "iot_operations_fund"
+        ? "IOT Operations Fund"
+        : "A Rewardable NFT on Helium",
+    image,
+    asset_id: record.asset,
+    key_to_asset_key: record.address,
+    entity_key_b64: record?.entity_key.toString("base64"),
+    key_serialization: record?.key_serialization,
+    entity_key_str: keyStr,
+    hotspot_infos: {
+      iot: {
+        ...record?.iot_hotspot_info?.dataValues,
+        location: record?.iot_hotspot_info?.location
+          ? new BN(record.iot_hotspot_info.location).toString("hex")
+          : null,
+        lat: record?.iot_hotspot_info?.lat,
+        long: record?.iot_hotspot_info?.long,
+      },
+      mobile: {
+        ...record?.mobile_hotspot_info?.dataValues,
+        location: record?.mobile_hotspot_info?.location
+          ? new BN(record.mobile_hotspot_info.location).toString("hex")
+          : null,
+        lat: record?.mobile_hotspot_info?.lat,
+        long: record?.mobile_hotspot_info?.long,
+      },
+    },
+    attributes: [
+      keyStr && Address.isValid(keyStr)
+        ? { trait_type: "ecc_compact", value: keyStr }
+        : undefined,
+      { trait_type: "entity_key_string", value: keyStr },
+      {
+        trait_type: "entity_key",
+        value: record?.entity_key?.toString("base64"),
+      },
+      { trait_type: "rewardable", value: true },
+      {
+        trait_type: "networks",
+        value: [
+          record?.iot_hotspot_info && "iot",
+          record?.mobile_hotspot_info && "mobile",
+        ].filter(truthy),
+      },
+      ...locationAttributes("iot", record?.iot_hotspot_info),
+      ...locationAttributes("mobile", record?.mobile_hotspot_info),
+    ],
+  };
+}
+
+async function getHotspotByKeyToAsset(request, reply) {
+  program = program || (await init(provider));
+  const { keyToAssetKey } = request.params;
+  const record = await KeyToAsset.findOne({
+    where: {
+      address: keyToAssetKey,
+    },
+    include: [IotHotspotInfo, MobileHotspotInfo],
+  });
+  if (!record) {
+    return reply.code(404);
+  }
+
+  const { entity_key: entityKey, key_serialization: keySerialization } = record;
+  const keyStr = decodeEntityKey(entityKey, { [keySerialization]: {} });
+
+  const assetJson = generateAssetJson(record, keyStr!);
+  return assetJson;
+};
+
+function locationAttributes(
+  name: string,
+  info: MobileHotspotInfo | IotHotspotInfo | undefined
+) {
+  if (!info) {
+    return [];
+  }
+
+  return [
+    { trait_type: `${name}_city`, value: info.city },
+    { trait_type: `${name}_state`, value: info.state },
+    { trait_type: `${name}_country`, value: info.country },
+    { trait_type: `${name}_lat`, value: info.lat },
+    { trait_type: `${name}_long`, value: info.long },
+  ];
+}
+
+function encodeCursor(cursor: string | null) {
+  if (!cursor) return cursor;
+
+  const bufferObj = Buffer.from(cursor, "utf8");
+  return bufferObj.toString("base64");
+};
+
+function decodeCursor(cursor?: string) {
+  if (!cursor) return cursor;
+
+  const bufferObj = Buffer.from(cursor, "base64")
+  return bufferObj.toString("utf8");
+};
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -117,249 +240,109 @@ server.get<{ Querystring: { subnetwork: string } }>(
   async (request, reply) => {
     const { subnetwork } = request.query;
 
-    if (subnetwork === "iot") {
-      const count = await KeyToAsset.count({
-        include: [
-          {
-            model: IotHotspotInfo,
-            required: true,
-          },
-        ],
-      });
-
-      let result = {
-        pageSize,
-        totalItems: count,
-        totalPages: Math.ceil(count / pageSize),
-      };
-
-      return result;
-    } else if (subnetwork === "mobile") {
-      const count = await KeyToAsset.count({
-        include: [
-          {
-            model: MobileHotspotInfo,
-            required: true,
-          },
-        ],
-      });
-
-      let result = {
-        pageSize,
-        totalItems: count,
-        totalPages: Math.ceil(count / pageSize),
-      };
-
-      return result;
+    if (!MODEL_MAP[subnetwork]) {
+      return reply.code(400).send("Invalid subnetwork");
     }
 
-    return reply.code(400).send("Invalid subnetwork");
+    const count = await KeyToAsset.count({
+      include: [
+        {
+          model: MODEL_MAP[subnetwork][0],
+          required: true,
+        },
+      ],
+    });
+
+    let result = {
+      pageSize: PAGE_SIZE,
+      totalItems: count,
+      totalPages: Math.ceil(count / PAGE_SIZE),
+    };
+
+    return result;
   }
 );
 
-server.get<{ Querystring: { subnetwork: string; cursor: string; } }>(
+server.get<{ Querystring: { subnetwork: string; cursor?: string; } }>(
   "/v2/hotspots",
   async (request, reply) => {
     const { subnetwork, cursor } = request.query;
-    const [lastAsset, lastCreatedAt] = cursor && cursor.split('^');
-    console.log(lastAsset, lastCreatedAt);
 
-    let where: any = lastCreatedAt && lastAsset ? {
-      [Op.or]: [
-        {
-          created_at: {
-            [Op.gt]: lastCreatedAt
-          }
-        },
-        {
-          [Op.and]: [
-            { created_at: lastCreatedAt },
-            { asset: { [Op.gt]: lastAsset } }
-          ]
-        }
-      ]
-    } : {};
-
-    const limit = pageSize;
-
-    if (subnetwork === "iot") {
-      const ktas = await KeyToAsset.findAll({
-        limit,
-        include: [
-          {
-            model: IotHotspotInfo,
-            required: true,
-            where,
-          },
-        ],
-        order: [
-          [IotHotspotInfo, "created_at", "ASC"],
-          [IotHotspotInfo, "asset", "ASC"],
-        ],
-      });
-
-      const lastItem = ktas[ktas.length - 1];
-      const isLastPage = ktas.length < pageSize;
-      const cursor = isLastPage 
-        ? null 
-        : `${lastItem.iot_hotspot_info?.asset}^${lastItem.iot_hotspot_info?.created_at}`;
-
-      console.log('\n');
-      console.log(cursor);
-      console.log('\n');
-
-      let result = {
-        cursor,
-        items: [] as { key_to_asset_key: string }[],
-      };
-
-      result.items = ktas.map((kta) => {
-        return {
-          key_to_asset_key: kta.address,
-        };
-      });
-
-      if (isLastPage) {
-        reply.header("Cache-Control", "no-cache");
-      }
-      
-      return result;
-    } else if (subnetwork === "mobile") {
-      const ktas = await KeyToAsset.findAll({
-        limit,
-        include: [
-          {
-            model: MobileHotspotInfo,
-            required: true,
-            where,
-          },
-        ],
-        order: [
-          [MobileHotspotInfo, "created_at", "ASC"],
-          [MobileHotspotInfo, "asset", "ASC"],
-        ],
-      });
-
-      const lastItem = ktas[ktas.length - 1];
-      const isLastPage = ktas.length < pageSize;
-      const cursor = isLastPage 
-        ? null 
-        : `${lastItem.mobile_hotspot_info?.asset}^${lastItem.mobile_hotspot_info?.created_at}`;
-
-      console.log('\n');
-      console.log(cursor);
-      console.log('\n');
-
-      let result = {
-        cursor,
-        items: [] as { key_to_asset_key: string }[],
-      };
-
-      result.items = ktas.map((kta) => {
-        return {
-          key_to_asset_key: kta.address,
-          device_type: kta.mobile_hotspot_info?.device_type,
-        };
-      });
-
-      if (result.items.length < pageSize) {
-        reply.header("Cache-Control", "no-cache");
-      }
-
-      return result;
+    if (!MODEL_MAP[subnetwork]) {
+      return reply.code(400).send("Invalid subnetwork");
     }
 
-    return reply.code(400).send("Invalid subnetwork");
+    const decodedCursor = decodeCursor(cursor);
+
+    if (decodedCursor && !decodedCursor.includes("|")) {
+      return reply.code(400).send("Invalid cursor");
+    }
+
+    let where: any = {}
+    if (decodedCursor?.includes("|")) {
+      const [lastAsset, lastCreatedAt] = decodedCursor.split("|");
+      where = {
+        [Op.or]: [
+          {
+            created_at: {
+              [Op.gt]: lastCreatedAt
+            }
+          },
+          {
+            [Op.and]: [
+              { created_at: lastCreatedAt },
+              { asset: { [Op.gt]: lastAsset } }
+            ]
+          }
+        ]
+      }
+    }
+
+    const ktas = await KeyToAsset.findAll({
+      limit: PAGE_SIZE,
+      include: [
+        {
+          model: MODEL_MAP[subnetwork][0],
+          required: true,
+          where,
+        },
+      ],
+      order: [
+        [MODEL_MAP[subnetwork][0], "created_at", "ASC"],
+        [MODEL_MAP[subnetwork][0], "asset", "ASC"],
+      ],
+    });
+
+    const lastItemTable = MODEL_MAP[subnetwork][1];
+    const lastItem = ktas[ktas.length - 1];
+    const lastItemAsset = lastItem[lastItemTable]?.asset;
+    const lastItemDate = lastItem[lastItemTable]?.created_at.toISOString();
+    const isLastPage = ktas.length < PAGE_SIZE;
+    const nextCursor = isLastPage 
+      ? null 
+      : `${lastItemAsset}|${lastItemDate}`;
+
+    let result = {
+      cursor: encodeCursor(nextCursor),
+      items: [] as { key_to_asset_key: string }[],
+    };
+
+    result.items = ktas.map((kta) => {
+      return {
+        key_to_asset_key: kta.address,
+      };
+    });
+
+    // If we're on the last page of results, tell Cloudfront not to cache
+    // so that origin requests are made and newly added hotspots can be 
+    // returned
+    if (isLastPage) {
+      reply.header("Cache-Control", "no-cache");
+    }
+    
+    return result;
   }
 );
-
-function generateAssetJson(record: KeyToAsset, keyStr: string) {
-  const digest = animalHash(keyStr);
-  // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
-  // In the future, we need to put different symbols on different types of hotspots
-  const hotspotType = keyStr.length > 100 ? "MOBILE" : "IOT";
-  const image = `${SHDW_DRIVE_URL}/${
-    hotspotType === "MOBILE"
-      ? record?.mobile_hotspot_info?.is_active
-        ? "mobile-hotspot-active.png"
-        : "mobile-hotspot.png"
-      : record?.iot_hotspot_info?.is_active
-      ? "hotspot-active.png"
-      : "hotspot.png"
-  }`;
-
-  return {
-    name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
-    description:
-      keyStr === "iot_operations_fund"
-        ? "IOT Operations Fund"
-        : "A Rewardable NFT on Helium",
-    image,
-    asset_id: record.asset,
-    key_to_asset_key: record.address,
-    entity_key_b64: record?.entity_key.toString("base64"),
-    key_serialization: record?.key_serialization,
-    entity_key_str: keyStr,
-    hotspot_infos: {
-      iot: {
-        ...record?.iot_hotspot_info?.dataValues,
-        location: record?.iot_hotspot_info?.location
-          ? new BN(record.iot_hotspot_info.location).toString("hex")
-          : null,
-        lat: record?.iot_hotspot_info?.lat,
-        long: record?.iot_hotspot_info?.long,
-      },
-      mobile: {
-        ...record?.mobile_hotspot_info?.dataValues,
-        location: record?.mobile_hotspot_info?.location
-          ? new BN(record.mobile_hotspot_info.location).toString("hex")
-          : null,
-        lat: record?.mobile_hotspot_info?.lat,
-        long: record?.mobile_hotspot_info?.long,
-      },
-    },
-    attributes: [
-      keyStr && Address.isValid(keyStr)
-        ? { trait_type: "ecc_compact", value: keyStr }
-        : undefined,
-      { trait_type: "entity_key_string", value: keyStr },
-      {
-        trait_type: "entity_key",
-        value: record?.entity_key?.toString("base64"),
-      },
-      { trait_type: "rewardable", value: true },
-      {
-        trait_type: "networks",
-        value: [
-          record?.iot_hotspot_info && "iot",
-          record?.mobile_hotspot_info && "mobile",
-        ].filter(truthy),
-      },
-      ...locationAttributes("iot", record?.iot_hotspot_info),
-      ...locationAttributes("mobile", record?.mobile_hotspot_info),
-    ],
-  };
-}
-
-const getHotspotByKeyToAsset = async (request, reply) => {
-  program = program || (await init(provider));
-  const { keyToAssetKey } = request.params;
-  const record = await KeyToAsset.findOne({
-    where: {
-      address: keyToAssetKey,
-    },
-    include: [IotHotspotInfo, MobileHotspotInfo],
-  });
-  if (!record) {
-    return reply.code(404);
-  }
-
-  const { entity_key: entityKey, key_serialization: keySerialization } = record;
-  const keyStr = decodeEntityKey(entityKey, { [keySerialization]: {} });
-
-  const assetJson = generateAssetJson(record, keyStr!);
-  return assetJson;
-};
 
 let program: Program<HeliumEntityManager>;
 server.get<{ Params: { keyToAssetKey: string } }>(
@@ -404,23 +387,6 @@ server.get<{ Params: { eccCompact: string } }>(
     return assetJson;
   }
 );
-
-function locationAttributes(
-  name: string,
-  info: MobileHotspotInfo | IotHotspotInfo | undefined
-) {
-  if (!info) {
-    return [];
-  }
-
-  return [
-    { trait_type: `${name}_city`, value: info.city },
-    { trait_type: `${name}_state`, value: info.state },
-    { trait_type: `${name}_country`, value: info.country },
-    { trait_type: `${name}_lat`, value: info.lat },
-    { trait_type: `${name}_long`, value: info.long },
-  ];
-}
 
 const start = async () => {
   try {
