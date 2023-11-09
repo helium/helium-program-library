@@ -73,7 +73,7 @@ export const HeliumVsrStateProvider: React.FC<{
         skipPreflight: true,
       });
     }
-  }, [connection, wallet]);
+  }, [connection?.rpcEndpoint, wallet?.publicKey?.toBase58()]);
   /// Allow refetching all NFTs by incrementing call index
   const [callIndex, setCallIndex] = useState(0);
   const refetch = useCallback(() => setCallIndex((i) => i + 1), [setCallIndex]);
