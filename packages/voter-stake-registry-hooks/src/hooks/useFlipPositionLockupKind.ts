@@ -1,18 +1,16 @@
 import { BN, Program } from "@coral-xyz/anchor";
-import {
-  useAnchorProvider,
-  useSolanaUnixNow,
-} from "@helium/helium-react-hooks";
+import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
 import { sendInstructions } from "@helium/spl-utils";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
+import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 
 export const useFlipPositionLockupKind = () => {
   const unixNow = useSolanaUnixNow();
-  const provider = useAnchorProvider();
+  const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,

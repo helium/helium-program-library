@@ -1,16 +1,14 @@
-import { useAnchorProvider } from "@helium/helium-react-hooks";
 import { bulkSendTransactions, chunks, truthy } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@metaplex-foundation/js";
 import { Transaction } from "@solana/web3.js";
+import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
-import { useCallback, useMemo } from "react";
 import { useVoteMarkers } from "./useVoteMarkers";
 
 export const useRelinquishVote = (proposal: PublicKey) => {
-  const provider = useAnchorProvider();
-  const { positions } = useHeliumVsrState();
+  const { positions, provider } = useHeliumVsrState();
   const voteMarkerKeys = useMemo(() => {
     return positions
       ? positions.map((p) => voteMarkerKey(p.mint, proposal)[0])
@@ -77,6 +75,6 @@ export const useRelinquishVote = (proposal: PublicKey) => {
     error,
     loading,
     relinquishVote: execute,
-    canRelinquishVote
+    canRelinquishVote,
   };
 };

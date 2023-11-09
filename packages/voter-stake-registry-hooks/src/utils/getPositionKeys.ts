@@ -1,26 +1,19 @@
-import { Provider } from "@coral-xyz/anchor";
+import { AnchorProvider } from "@coral-xyz/anchor";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import {
   init as initVsr,
   positionKey,
   registrarKey,
 } from "@helium/voter-stake-registry-sdk";
-import {
-  Metadata,
-  Metaplex,
-  Nft,
-  Sft
-} from "@metaplex-foundation/js";
+import { Metadata, Metaplex, Nft, Sft } from "@metaplex-foundation/js";
 import { getMint, Mint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import {
-  Registrar
-} from "../sdk/types";
+import { Registrar } from "../sdk/types";
 
 export interface GetPositionsArgs {
   wallet: PublicKey;
   mint: PublicKey;
-  provider: Provider;
+  provider: AnchorProvider;
 }
 
 export function getRegistrarKey(mint: PublicKey) {

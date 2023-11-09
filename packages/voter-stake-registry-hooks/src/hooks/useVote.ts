@@ -1,10 +1,5 @@
-import { useAnchorProvider } from "@helium/helium-react-hooks";
 import { useProposal } from "@helium/modular-governance-hooks";
-import {
-  bulkSendTransactions,
-  chunks,
-  truthy
-} from "@helium/spl-utils";
+import { bulkSendTransactions, chunks, truthy } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@metaplex-foundation/js";
 import { Transaction } from "@solana/web3.js";
@@ -16,8 +11,7 @@ import { useVoteMarkers } from "./useVoteMarkers";
 
 export const useVote = (proposalKey: PublicKey) => {
   const { info: proposal } = useProposal(proposalKey);
-  const provider = useAnchorProvider();
-  const { positions } = useHeliumVsrState();
+  const { positions, provider } = useHeliumVsrState();
   const voteMarkerKeys = useMemo(() => {
     return positions
       ? positions.map((p) => voteMarkerKey(p.mint, proposalKey)[0])
@@ -45,7 +39,8 @@ export const useVote = (proposalKey: PublicKey) => {
         const maxChoicesReached =
           (m?.info?.choices.length || 0) >= (proposal?.maxChoicesPerVoter || 0);
         const alreadyVotedThisChoice = m.info?.choices.includes(choice);
-        const canVote = noMarker || (!maxChoicesReached && !alreadyVotedThisChoice)
+        const canVote =
+          noMarker || (!maxChoicesReached && !alreadyVotedThisChoice);
         return canVote;
       });
     },
@@ -98,7 +93,6 @@ export const useVote = (proposalKey: PublicKey) => {
       }
     }
   );
-  
 
   return {
     error,
