@@ -157,10 +157,12 @@ server.get<{ Querystring: { subnetwork: string } }>(
   }
 );
 
-server.get<{ Querystring: { subnetwork: string; lastCreatedAt: string; lastAsset: string  } }>(
+server.get<{ Querystring: { subnetwork: string; cursor: string; } }>(
   "/v2/hotspots",
   async (request, reply) => {
-    const { subnetwork, lastCreatedAt, lastAsset } = request.query;
+    const { subnetwork, cursor } = request.query;
+    const [lastAsset, lastCreatedAt] = cursor && cursor.split('^');
+    console.log(lastAsset, lastCreatedAt);
 
     let where: any = lastCreatedAt && lastAsset ? {
       [Op.or]: [
@@ -197,10 +199,17 @@ server.get<{ Querystring: { subnetwork: string; lastCreatedAt: string; lastAsset
       });
 
       const lastItem = ktas[ktas.length - 1];
+      const isLastPage = ktas.length < pageSize;
+      const cursor = isLastPage 
+        ? null 
+        : `${lastItem.iot_hotspot_info?.asset}^${lastItem.iot_hotspot_info?.created_at}`;
+
+      console.log('\n');
+      console.log(cursor);
+      console.log('\n');
 
       let result = {
-        lastAsset: lastItem.iot_hotspot_info?.asset,
-        lastCreatedAt: lastItem.iot_hotspot_info?.created_at,
+        cursor,
         items: [] as { key_to_asset_key: string }[],
       };
 
@@ -210,7 +219,7 @@ server.get<{ Querystring: { subnetwork: string; lastCreatedAt: string; lastAsset
         };
       });
 
-      if (result.items.length < pageSize) {
+      if (isLastPage) {
         reply.header("Cache-Control", "no-cache");
       }
       
@@ -232,10 +241,17 @@ server.get<{ Querystring: { subnetwork: string; lastCreatedAt: string; lastAsset
       });
 
       const lastItem = ktas[ktas.length - 1];
+      const isLastPage = ktas.length < pageSize;
+      const cursor = isLastPage 
+        ? null 
+        : `${lastItem.mobile_hotspot_info?.asset}^${lastItem.mobile_hotspot_info?.created_at}`;
+
+      console.log('\n');
+      console.log(cursor);
+      console.log('\n');
 
       let result = {
-        lastAsset: lastItem.mobile_hotspot_info?.asset,
-        lastCreatedAt: lastItem.mobile_hotspot_info?.created_at,
+        cursor,
         items: [] as { key_to_asset_key: string }[],
       };
 
