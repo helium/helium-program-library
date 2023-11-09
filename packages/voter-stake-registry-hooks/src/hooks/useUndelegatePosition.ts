@@ -1,5 +1,4 @@
 import { Program } from "@coral-xyz/anchor";
-import { useAnchorProvider } from "@helium/helium-react-hooks";
 import {
   PROGRAM_ID,
   delegatedPositionKey,
@@ -8,10 +7,11 @@ import {
 import { sendInstructions } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
+import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 
 export const useUndelegatePosition = () => {
-  const provider = useAnchorProvider();
+  const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,

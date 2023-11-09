@@ -1,18 +1,18 @@
 import { Program } from "@coral-xyz/anchor";
-import { useAnchorProvider } from "@helium/helium-react-hooks";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
 import { sendInstructions } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
+import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 
 export const useExtendPosition = () => {
-  const provider = useAnchorProvider();
+  const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,
       lockupPeriodsInDays,
-      programId = PROGRAM_ID
+      programId = PROGRAM_ID,
     }: {
       position: PositionWithMeta;
       lockupPeriodsInDays: number;
@@ -23,7 +23,6 @@ export const useExtendPosition = () => {
       const idl = await Program.fetchIdl(programId, provider);
       const hsdProgram = await init(provider as any, programId, idl);
       const mint = position.votingMint.mint;
-
 
       if (loading) return;
 
@@ -61,10 +60,7 @@ export const useExtendPosition = () => {
           );
         }
 
-        await sendInstructions(
-          provider,
-          instructions
-        )
+        await sendInstructions(provider, instructions);
       }
     }
   );

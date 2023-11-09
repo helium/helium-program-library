@@ -1,10 +1,6 @@
 import { Program } from "@coral-xyz/anchor";
-import { useAnchorProvider } from "@helium/helium-react-hooks";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
-import {
-  sendMultipleInstructions,
-  toBN
-} from "@helium/spl-utils";
+import { chunks, sendMultipleInstructions, toBN } from "@helium/spl-utils";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
   MintLayout,
@@ -18,12 +14,12 @@ import {
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
-import { chunks } from "@helium/spl-utils";
 import { useAsyncCallback } from "react-async-hook";
+import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 
 export const useSplitPosition = () => {
-  const provider = useAnchorProvider();
+  const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       sourcePosition,
