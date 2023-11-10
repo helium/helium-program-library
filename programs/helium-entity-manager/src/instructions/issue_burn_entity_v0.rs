@@ -7,6 +7,7 @@ use anchor_lang::solana_program::hash::hash;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount};
 use helium_sub_daos::DaoV0;
+use lazy_static;
 use mpl_token_metadata::instructions::{VerifyCreatorV1Cpi, VerifyCreatorV1CpiAccounts};
 use mpl_token_metadata::types::{Creator, DataV2};
 use shared_utils::token_metadata::{
@@ -15,6 +16,10 @@ use shared_utils::token_metadata::{
 use shared_utils::{create_metadata_accounts_v3, Metadata};
 
 pub const BURN: &str = "burn";
+
+lazy_static::lazy_static! {
+  pub static ref BURN_PID: Pubkey = Pubkey::from_str("burnhwK2QgaJnK93i82g8dH1zDjbpwxMukyVit9xYXo").unwrap();
+}
 
 #[derive(Accounts)]
 pub struct IssueBurnEntityV0<'info> {
@@ -45,7 +50,7 @@ pub struct IssueBurnEntityV0<'info> {
     mut,
     seeds = [b"burn"],
     bump,
-    seeds::program = Pubkey::from_str("burnhwK2QgaJnK93i82g8dH1zDjbpwxMukyVit9xYXo").unwrap()
+    seeds::program = BURN_PID
   )]
   pub recipient: AccountInfo<'info>,
   #[account(

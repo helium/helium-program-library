@@ -269,6 +269,7 @@ __metadata:
     "@helium/anchor-resolvers": ^0.5.0
     "@helium/helium-sub-daos-sdk": ^0.5.0
     "@helium/idls": ^0.5.0
+    "@helium/rewards-burn-sdk": ^0.5.0
     "@helium/spl-utils": ^0.5.0
     "@types/crypto-js": ^4.1.1
     bn.js: ^5.2.0
@@ -395,6 +396,22 @@ __metadata:
   checksum: 71a975bf10c58033439c5d801a1e447b431d59848778ae7519b4a80c912ce43afc437ea10d748a66e92250d7edafb3796147f629ae8763a1f01b1293dede5a54
   languageName: node
   linkType: hard
+
+"@helium/rewards-burn-sdk@^0.5.0":
+  version: 0.0.0-use.local
+  resolution: "@helium/rewards-burn-sdk@workspace:packages/rewards-burn-sdk"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@helium/anchor-resolvers": ^0.5.0
+    "@helium/idls": ^0.5.0
+    bn.js: ^5.2.0
+    bs58: ^4.0.1
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@helium/rewards-oracle-sdk@^0.5.0":
   version: 0.0.0-use.local

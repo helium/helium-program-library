@@ -2,7 +2,7 @@ import { RewardsBurn } from "@helium/idls/lib/types/rewards_burn";
 import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
-import { combineResolvers, heliumCommonResolver, resolveIndividual } from "@helium/anchor-resolvers";
+import { ataResolver, combineResolvers, heliumCommonResolver, resolveIndividual } from "@helium/anchor-resolvers";
 
 export * from "./constants";
 export * from "./pdas";
@@ -28,6 +28,12 @@ export async function init(
           if (path[path.length - 1] == "lazyDistributorProgram") {
             return new PublicKey("1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w");
           }
+        }),
+        ataResolver({
+          instruction: "burnV0",
+          account: "tokenAccount",
+          mint: "mint",
+          owner: "burn"
         })
       )
     }

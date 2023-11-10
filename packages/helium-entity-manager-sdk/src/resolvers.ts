@@ -5,10 +5,13 @@ import {
   heliumCommonResolver,
   resolveIndividual,
 } from "@helium/anchor-resolvers";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import {
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { init } from "./init";
 import { iotInfoKey, keyToAssetKey, mobileInfoKey, programApprovalKey } from "./pdas";
+import { burnKey } from "@helium/rewards-burn-sdk";
 
 export const heliumEntityManagerResolvers = combineResolvers(
   heliumCommonResolver,
@@ -69,6 +72,19 @@ export const heliumEntityManagerResolvers = combineResolvers(
           Buffer.from("iot_operations_fund", "utf8")
         )
       )[0];
+    } else if (
+      path[path.length - 1] === "keyToAsset" &&
+      idlIx.name === "issueBurnEntityV0" &&
+      accounts.dao
+    ) {
+      return (
+        await keyToAssetKey(
+          accounts.dao as PublicKey,
+          Buffer.from("burn", "utf8")
+        )
+      )[0];
+    } else if (path[path.length - 1] === "recipient" && idlIx.name === "issueBurnEntityV0") {
+      return burnKey()[0]
     }
   }),
   resolveIndividual(async ({ path, args, provider, accounts }) => {
@@ -123,7 +139,7 @@ export const heliumEntityManagerResolvers = combineResolvers(
       (accounts.owner || accounts.hotspotOwner) &&
       accounts.hotspot
     ) {
-      return getAssociatedTokenAddress(
+      return getAssociatedTokenAddressSync(
         accounts.hotspot as PublicKey,
         (accounts.owner || accounts.hotspotOwner) as PublicKey
       );
@@ -145,6 +161,12 @@ export const heliumEntityManagerResolvers = combineResolvers(
     account: "dcBurner",
     mint: "dcMint",
     owner: "dcFeePayer",
+  }),
+  ataResolver({
+    instruction: "issueBurnEntityV0",
+    mint: "mint",
+    account: "recipientAccount",
+    owner: "recipient"
   }),
   subDaoEpochInfoResolver
 );

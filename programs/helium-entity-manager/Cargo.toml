@@ -34,3 +34,4 @@ data-credits = { path = "../data-credits", features = ["cpi"] }
 helium-sub-daos = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }
+lazy_static = "1"
