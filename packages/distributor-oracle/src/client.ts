@@ -258,8 +258,7 @@ export async function formBulkTransactions({
               lazyDistributor,
               assetEndpoint,
               owner: wallet,
-              // Make the oracle pay for the recipient to avoid newly migrated users not having enough sol to claim rewards
-              payer: lazyDistributorAcc.oracles[0].oracle,
+              payer: wallet,
               getAssetFn: () => Promise.resolve(compressionAssetAccs![idx]), // cache result so we don't hit again
               getAssetProofFn: assetProofsById ? () => Promise.resolve(assetProofsById[compressionAssetAccs![idx].id.toBase58()]) : undefined,
             })
@@ -465,8 +464,7 @@ export async function formTransaction({
           lazyDistributor,
           assetEndpoint,
           owner: wallet,
-          // Make the oracle pay for the recipient to avoid newly migrated users not having enough sol to claim rewards
-          payer: lazyDistributorAcc.oracles[0].oracle,
+          payer: wallet,
           getAssetFn: () => Promise.resolve(assetAcc), // cache result so we don't hit again
           getAssetProofFn,
         })
