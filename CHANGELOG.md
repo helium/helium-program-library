@@ -5,18 +5,13 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 ## [0.6.1](https://github.com/helium/helium-program-library/compare/v0.6.0...v0.6.1) (2023-11-10)
 
-**Note:** Version bump only for package helium-program-library
-
-
-
-
 
 # [0.6.0](https://github.com/helium/helium-program-library/compare/v0.5.0...v0.6.0) (2023-11-10)
 
-**Note:** Version bump only for package helium-program-library
 
+## Breaking
 
-
+ * Fee payer for `RecipientV0` account in `@helium/distributor-oracle` is now the user wallet. The oracle will soon begin rejecting transactions with the oracle as the fee payer.
 
 
 # [0.5.0](https://github.com/helium/helium-program-library/compare/v0.4.6...v0.5.0) (2023-11-09)
