@@ -181,4 +181,8 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     temp_pay_mobile_onboarding_fee_v0::handler(ctx)
   }
+
+  pub fn issue_burn_entity_v0(ctx: Context<IssueBurnEntityV0>) -> Result<()> {
+    issue_burn_entity_v0::handler(ctx)
+  }
 }

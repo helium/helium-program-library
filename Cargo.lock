@@ -3390,6 +3390,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rewards-burn"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "default-env",
+ "helium-entity-manager",
+ "helium-sub-daos",
+ "shared-utils",
+ "solana-security-txt",
+]
+
+[[package]]
 name = "rewards-oracle"
 version = "0.2.0"
 dependencies = [
