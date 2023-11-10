@@ -138,18 +138,6 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/anchor-resolvers@npm:^0.4.5":
-  version: 0.4.6
-  resolution: "@helium/anchor-resolvers@npm:0.4.6"
-  dependencies:
-    "@solana/spl-token": ^0.3.8
-    "@solana/web3.js": ^1.78.4
-  peerDependencies:
-    "@coral-xyz/anchor": ^0.28.0
-  checksum: a29719a75a1c7b1b34253434470626fa10d6d40d2f3a0bdfe69c03cf36e27a6ed7d7bc1b5adb4618b90ba6802d806104bfc59f7e9bc01949883a746075789235
-  languageName: node
-  linkType: hard
-
 "@helium/circuit-breaker-sdk@^0.5.0":
   version: 0.0.0-use.local
   resolution: "@helium/circuit-breaker-sdk@workspace:packages/circuit-breaker-sdk"
@@ -179,12 +167,12 @@ __metadata:
     "@helium/idls": ^0.5.0
     "@helium/lazy-distributor-sdk": ^0.5.0
     "@helium/mobile-entity-manager-sdk": ^0.5.0
-    "@helium/organization-sdk": ^0.0.7
+    "@helium/organization-sdk": ^0.0.8
     "@helium/price-oracle-sdk": ^0.5.0
-    "@helium/proposal-sdk": ^0.0.7
+    "@helium/proposal-sdk": ^0.0.8
     "@helium/rewards-oracle-sdk": ^0.5.0
     "@helium/spl-utils": ^0.5.0
-    "@helium/state-controller-sdk": ^0.0.7
+    "@helium/state-controller-sdk": ^0.0.8
     "@helium/treasury-management-sdk": ^0.5.0
     "@helium/voter-stake-registry-sdk": ^0.5.0
     "@solana/spl-token": ^0.3.8
@@ -348,25 +336,25 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/modular-governance-idls@npm:^0.0.7":
-  version: 0.0.7
-  resolution: "@helium/modular-governance-idls@npm:0.0.7"
+"@helium/modular-governance-idls@npm:^0.0.8":
+  version: 0.0.8
+  resolution: "@helium/modular-governance-idls@npm:0.0.8"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@solana/web3.js": ^1.78.4
-  checksum: e68fefdbd447ef3d11bb4013467e11daa7d8648b29d05abf1b1a03e5e5a979d02b6ff954b2795f1709182886d900bc36e34e38ed1d5d44dcf33ff561ec736947
+  checksum: 3bd1bbbdc88cc154f27717e8830b117004608a7ab91a0d43c90ad6cd9cec607071b48c25626e2e15195f4c7f45585d7d0df426ad50eb63acb2bd018897cc8919
   languageName: node
   linkType: hard
 
-"@helium/organization-sdk@npm:^0.0.7":
-  version: 0.0.7
-  resolution: "@helium/organization-sdk@npm:0.0.7"
+"@helium/organization-sdk@npm:^0.0.8":
+  version: 0.0.8
+  resolution: "@helium/organization-sdk@npm:0.0.8"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.4.5
-    "@helium/modular-governance-idls": ^0.0.7
-    "@helium/proposal-sdk": ^0.0.7
-  checksum: 83a90e64233ea9d7c5c96d8a30a41fae16867e885b7ce154b7696a68d1041992d030e4db8ab3aef06c5cde5d13e4880dcb7092ed108f369760d0b6c7293ae1b0
+    "@helium/anchor-resolvers": ^0.5.0
+    "@helium/modular-governance-idls": ^0.0.8
+    "@helium/proposal-sdk": ^0.0.8
+  checksum: bcbb4ee617d7bc443ea1cae3bbbe2bdafd5515635493344d8235652bc8968a2578b1946aa90eed08bd3933600f869cc07ef372a02e57b970dc6399ace9ec1c4e
   languageName: node
   linkType: hard
 
@@ -385,14 +373,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/proposal-sdk@npm:^0.0.7":
-  version: 0.0.7
-  resolution: "@helium/proposal-sdk@npm:0.0.7"
+"@helium/proposal-sdk@npm:^0.0.8":
+  version: 0.0.8
+  resolution: "@helium/proposal-sdk@npm:0.0.8"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.4.5
-    "@helium/modular-governance-idls": ^0.0.7
-  checksum: 71a975bf10c58033439c5d801a1e447b431d59848778ae7519b4a80c912ce43afc437ea10d748a66e92250d7edafb3796147f629ae8763a1f01b1293dede5a54
+    "@helium/anchor-resolvers": ^0.5.0
+    "@helium/modular-governance-idls": ^0.0.8
+  checksum: c9b3ed21145f450afea00a8778e3125020cf6801a9600bc07ec6d289c4b3988631318868fdb794c63ab8a12133afa38dd2a3d48149a2ccc1507cd0f70b804b35
   languageName: node
   linkType: hard
 
@@ -434,14 +422,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/state-controller-sdk@npm:^0.0.7":
-  version: 0.0.7
-  resolution: "@helium/state-controller-sdk@npm:0.0.7"
+"@helium/state-controller-sdk@npm:^0.0.8":
+  version: 0.0.8
+  resolution: "@helium/state-controller-sdk@npm:0.0.8"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.4.5
-    "@helium/modular-governance-idls": ^0.0.7
-  checksum: f693676305e5052236d7d342408378441c6d2816b53fbd545a784719334badd2651d2d575a8e787fffe42f9ea9b36ea256df09808b53258b64c9e64cc172ac0b
+    "@helium/anchor-resolvers": ^0.5.0
+    "@helium/modular-governance-idls": ^0.0.8
+  checksum: 64ff3e83d47512431bdb15d9bda92225455b00099574d3ac4d523696e21ea1a08430d8c75d47390121920c67eacbde4ec91b02c4a36f2e8be038c36aac2b4c08
   languageName: node
   linkType: hard
 
