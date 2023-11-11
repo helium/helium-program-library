@@ -78,7 +78,7 @@ export function handleAccountWebhook({
         const value = await model.findByPk(account.pubkey);
         const changed =
           !value ||
-          Object.entries(sanitized).some(([k, v]) => v !== value.dataValues[k]);
+          Object.entries(sanitized).some(([k, v]) => v?.toString() !== value.dataValues[k]?.toString());
         if (changed) {
           await model.upsert(
             {
