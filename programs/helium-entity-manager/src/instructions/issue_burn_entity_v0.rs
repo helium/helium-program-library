@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use crate::constants::ENTITY_METADATA_URL;
 use crate::{key_to_asset_seeds, state::*};
 use anchor_lang::prelude::*;
@@ -7,19 +5,15 @@ use anchor_lang::solana_program::hash::hash;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount};
 use helium_sub_daos::DaoV0;
-use lazy_static;
 use mpl_token_metadata::instructions::{VerifyCreatorV1Cpi, VerifyCreatorV1CpiAccounts};
 use mpl_token_metadata::types::{Creator, DataV2};
+use rewards_burn::program::RewardsBurn;
 use shared_utils::token_metadata::{
   create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
 };
 use shared_utils::{create_metadata_accounts_v3, Metadata};
 
 pub const BURN: &str = "burn";
-
-lazy_static::lazy_static! {
-  pub static ref BURN_PID: Pubkey = Pubkey::from_str("burnhwK2QgaJnK93i82g8dH1zDjbpwxMukyVit9xYXo").unwrap();
-}
 
 #[derive(Accounts)]
 pub struct IssueBurnEntityV0<'info> {
@@ -50,7 +44,7 @@ pub struct IssueBurnEntityV0<'info> {
     mut,
     seeds = [b"burn"],
     bump,
-    seeds::program = BURN_PID
+    seeds::program = rewards_burn_program.key()
   )]
   pub recipient: AccountInfo<'info>,
   #[account(
@@ -92,6 +86,7 @@ pub struct IssueBurnEntityV0<'info> {
   pub system_program: Program<'info, System>,
   /// CHECK: Should be checked by the metaplex instruction
   pub instructions: UncheckedAccount<'info>,
+  pub rewards_burn_program: Program<'info, RewardsBurn>,
 }
 
 impl<'info> IssueBurnEntityV0<'info> {
@@ -188,6 +183,14 @@ pub fn handler(ctx: Context<IssueBurnEntityV0>) -> Result<()> {
     Some(0),
   )?;
 
+  ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
+    asset: asset_id,
+    dao: ctx.accounts.dao.key(),
+    entity_key: String::from(BURN).into_bytes(),
+    bump_seed: ctx.bumps["key_to_asset"],
+    key_serialization: KeySerialization::UTF8,
+  });
+
   let mut key_to_asset_creator = ctx.accounts.key_to_asset.to_account_info();
   key_to_asset_creator.is_signer = true;
   let key_to_asset_signer: &[&[u8]] = key_to_asset_seeds!(ctx.accounts.key_to_asset);
@@ -209,14 +212,6 @@ pub fn handler(ctx: Context<IssueBurnEntityV0>) -> Result<()> {
     },
   )
   .invoke_signed(&[key_to_asset_signer])?;
-
-  ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
-    asset: asset_id,
-    dao: ctx.accounts.dao.key(),
-    entity_key: String::from(BURN).into_bytes(),
-    bump_seed: ctx.bumps["key_to_asset"],
-    key_serialization: KeySerialization::UTF8,
-  });
 
   Ok(())
 }

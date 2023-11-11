@@ -1949,8 +1949,8 @@ dependencies = [
  "data-credits",
  "default-env",
  "helium-sub-daos",
- "lazy_static",
  "mpl-token-metadata",
+ "rewards-burn",
  "shared-utils",
  "solana-security-txt",
 ]

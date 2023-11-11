@@ -38,6 +38,7 @@ pub struct BurnV0<'info> {
   )]
   pub token_account: Box<Account<'info, TokenAccount>>,
   #[account(
+    mut,
     // Don't allow burning NFTs, those could be the rewardable entities.
     constraint = mint.decimals != 0
   )]

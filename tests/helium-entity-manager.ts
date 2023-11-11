@@ -113,7 +113,7 @@ describe("helium-entity-manager", () => {
       anchor.workspace.HeliumEntityManager.programId,
       anchor.workspace.HeliumEntityManager.idl
     );
-    // await ensureHEMIdl(hemProgram);
+    await ensureHEMIdl(hemProgram);
 
     const dataCredits = await initTestDataCredits(dcProgram, provider);
     dcMint = dataCredits.dcMint;
@@ -160,26 +160,17 @@ describe("helium-entity-manager", () => {
       .preInstructions(await createMintInstructions(provider, 0, me, me, mint))
       .accounts({
         dao,
-        mint: mint.publicKey,
+        mint: mint.publicKey
       })
       .signers([mint])
       .rpc({ skipPreflight: true });
-      console.log("ISSUED")
 
-    const addr = getAssociatedTokenAddressSync(mint.publicKey, me);
+    const addr = getAssociatedTokenAddressSync(mint.publicKey, burnKey()[0], true);
     const balance = await provider.connection.getTokenAccountBalance(addr);
     expect(balance.value.uiAmount).to.eq(1);
 
     const tokenMint = await createMint(provider, 2, me, me)
-    const burnAta = getAssociatedTokenAddressSync(
-      tokenMint,
-      burnKey()[0],
-      true
-    );
-    await createAtaAndMint(provider, tokenMint, new BN(1000), burnAta)
-    const preBalance = (await getAccount(provider.connection, burnAta)).amount
-    expect(preBalance).to.eq(1000)
-
+    const burnAta = await createAtaAndMint(provider, tokenMint, new BN(1000), burnKey()[0])
     await burnProram.methods.burnV0()
     .accounts({
       mint: tokenMint
@@ -187,7 +178,7 @@ describe("helium-entity-manager", () => {
     .rpc({ skipPreflight: true })
 
     const postBalance = (await getAccount(provider.connection, burnAta)).amount
-    expect(postBalance).to.eq(0)
+    expect(postBalance).to.eq(BigInt(0))
   });
 
   it("initializes a rewardable entity config", async () => {

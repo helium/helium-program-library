@@ -83,11 +83,9 @@ export const heliumEntityManagerResolvers = combineResolvers(
           Buffer.from("burn", "utf8")
         )
       )[0];
-    } else if (path[path.length - 1] === "recipient" && idlIx.name === "issueBurnEntityV0") {
-      return burnKey()[0]
     }
   }),
-  resolveIndividual(async ({ path, args, provider, accounts }) => {
+  resolveIndividual(async ({ path, args, provider, accounts, idlIx }) => {
     if (
       path[path.length - 1] === "iotInfo" &&
       args[args.length - 1].index &&
@@ -105,7 +103,13 @@ export const heliumEntityManagerResolvers = combineResolvers(
           keyToAssetAcc.entityKey
         )
       )[0];
-    } else if (path[path.length - 1] === "recipient") {
+    }
+  }),
+  resolveIndividual(async ({ path, idlIx, provider }) => {
+    if (path[path.length - 1] === "recipient") {
+      if (idlIx.name === "issueBurnEntityV0") {
+        return burnKey()[0];
+      }
       // @ts-ignore
       return provider.wallet?.publicKey;
     }
@@ -128,9 +132,6 @@ export const heliumEntityManagerResolvers = combineResolvers(
           keyToAssetAcc.entityKey
         )
       )[0];
-    } else if (path[path.length - 1] === "recipient") {
-      // @ts-ignore
-      return provider.wallet?.publicKey;
     }
   }),
   resolveIndividual(async ({ path, accounts }) => {
