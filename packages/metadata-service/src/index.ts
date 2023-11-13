@@ -109,14 +109,21 @@ function generateAssetJson(record: KeyToAsset, keyStr: string) {
 async function getHotspotByKeyToAsset(request, reply) {
   program = program || (await init(provider));
   const { keyToAssetKey } = request.params;
+  
   const record = await KeyToAsset.findOne({
     where: {
       address: keyToAssetKey,
     },
     include: [IotHotspotInfo, MobileHotspotInfo],
   });
+
   if (!record) {
-    return reply.code(404);
+    const error = {
+      statusCode: 404,
+      error: "Not Found",
+      message: "Hotspot not found"
+    }
+    return reply.code(404).send(error);
   }
 
   const { entity_key: entityKey, key_serialization: keySerialization } = record;
@@ -241,7 +248,12 @@ server.get<{ Querystring: { subnetwork: string } }>(
     const { subnetwork } = request.query;
 
     if (!MODEL_MAP[subnetwork]) {
-      return reply.code(400).send("Invalid subnetwork");
+      const error = {
+        statusCode: 400,
+        error: "Bad Request",
+        message: "Invalid subnetwork"
+      }
+      return reply.code(400).send(error);
     }
 
     const count = await KeyToAsset.count({
@@ -269,13 +281,23 @@ server.get<{ Querystring: { subnetwork: string; cursor?: string; } }>(
     const { subnetwork, cursor } = request.query;
 
     if (!MODEL_MAP[subnetwork]) {
-      return reply.code(400).send("Invalid subnetwork");
+      const error = {
+        statusCode: 400,
+        error: "Bad Request",
+        message: "Invalid subnetwork"
+      }
+      return reply.code(400).send(error);
     }
 
     const decodedCursor = decodeCursor(cursor);
 
     if (decodedCursor && !decodedCursor.includes("|")) {
-      return reply.code(400).send("Invalid cursor");
+      const error = {
+        statusCode: 400,
+        error: "Bad Request",
+        message: "Invalid cursor"
+      }
+      return reply.code(400).send(error);
     }
 
     let where: any = {}
@@ -380,7 +402,12 @@ server.get<{ Params: { eccCompact: string } }>(
     });
 
     if (!record) {
-      return reply.code(404);
+      const error = {
+        statusCode: 404,
+        error: "Not Found",
+        message: "Hotspot not found"
+      }
+      return reply.code(404).send(error);
     }
 
     const assetJson = generateAssetJson(record, eccCompact);
