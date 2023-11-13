@@ -135,11 +135,11 @@ pub fn handler(ctx: Context<IssueBurnEntityV0>) -> Result<()> {
     DataV2 {
       name: String::from("Burn Entity"),
       symbol: String::from("BURN"),
-      uri: String::from(format!(
+      uri: format!(
         "{}/v2/hotspot/{}",
         ENTITY_METADATA_URL,
-        ctx.accounts.key_to_asset.key().to_string()
-      )),
+        ctx.accounts.key_to_asset.key()
+      ),
       seller_fee_basis_points: 0,
       creators: Some(vec![
         Creator {

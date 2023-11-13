@@ -4,7 +4,7 @@ use mpl_token_metadata::{
     CreateMasterEditionV3Cpi, CreateMasterEditionV3CpiAccounts,
     CreateMasterEditionV3InstructionArgs, CreateMetadataAccountV3Cpi,
     CreateMetadataAccountV3CpiAccounts, CreateMetadataAccountV3InstructionArgs,
-    InstructionAccountInfo, UpdateMetadataAccountV2Cpi, UpdateMetadataAccountV2CpiAccounts,
+    UpdateMetadataAccountV2Cpi, UpdateMetadataAccountV2CpiAccounts,
     UpdateMetadataAccountV2InstructionArgs, VerifyCollectionCpi, VerifyCollectionCpiAccounts,
     VerifySizedCollectionItemCpi, VerifySizedCollectionItemCpiAccounts,
   },
@@ -53,9 +53,7 @@ pub fn create_metadata_accounts_v3<'info>(
     cpi
       .invoke_signed_with_remaining_accounts(
         ctx.signer_seeds,
-        &[InstructionAccountInfo::ReadonlySigner(
-          &ctx.accounts.update_authority,
-        )],
+        &[(&ctx.accounts.update_authority, true, false)],
       )
       .map_err(Into::into)
   } else {
