@@ -11,6 +11,9 @@
       "path": "../fanout-sdk"
     },
     {
+      "path": "../rewards-burn-sdk"
+    },
+    {
       "path": "../helium-sub-daos-sdk"
     },
     {

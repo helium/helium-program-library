@@ -43,6 +43,7 @@
     "@helium/organization-sdk": "^0.0.8",
     "@helium/price-oracle-sdk": "^0.6.1",
     "@helium/proposal-sdk": "^0.0.8",
+    "@helium/rewards-burn-sdk": "^0.6.1",
     "@helium/rewards-oracle-sdk": "^0.6.1",
     "@helium/spl-utils": "^0.6.1",
     "@helium/state-controller-sdk": "^0.0.8",

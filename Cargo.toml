@@ -19,7 +19,7 @@ exclude = [
 [workspace.dependencies]
 anchor-lang = { version = "0.28.0", features = ["init-if-needed"] }
 anchor-spl = { version = "0.28.0", features = ["mint", "token"] }
-mpl-token-metadata = { version = "3.1.0" }
+mpl-token-metadata = { version = "3.2.0" }
 account-compression-cpi = { rev = "a2d12e4a157d91feb73aa40a97fe297fd477dd87", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
 bubblegum-cpi = { rev = "a2d12e4a157d91feb73aa40a97fe297fd477dd87", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
 solana-security-txt = "1.1.1"
@@ -28,3 +28,4 @@ shared-utils = { path = "./utils/shared-utils" }
 circuit-breaker = { path = "./programs/circuit-breaker", features = ["cpi"] }
 helium-sub-daos = { path = "./programs/helium-sub-daos", features = ["cpi"] }
 helium-entity-manager = { path = "./programs/helium-entity-manager", features = ["cpi"] }
+rewards-burn = { path = "./programs/rewards-burn", features = ["cpi"] }

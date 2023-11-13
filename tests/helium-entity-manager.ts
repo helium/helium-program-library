@@ -3,16 +3,19 @@ import { Program } from "@coral-xyz/anchor";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
+import { burnKey, init as initBurn } from "@helium/rewards-burn-sdk";
 import {
   Asset,
   AssetProof,
+  createAtaAndMint,
+  createMint,
   createMintInstructions,
   proofArgsAndAccounts,
   sendInstructions,
   toBN,
 } from "@helium/spl-utils";
 import { AddGatewayV1 } from "@helium/transactions";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { getAssociatedTokenAddressSync, getAccount } from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
   Keypair,
@@ -32,12 +35,14 @@ import {
 } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
+import { RewardsBurn } from "../target/types/rewards_burn";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import {
   DC_FEE,
   ensureDCIdl,
   ensureHSDIdl,
+  ensureHEMIdl,
   initTestDataCredits,
   initTestMaker,
   initTestRewardableEntityConfig,
@@ -70,6 +75,7 @@ describe("helium-entity-manager", () => {
   let dcProgram: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
   let hemProgram: Program<HeliumEntityManager>;
+  let burnProram: Program<RewardsBurn>;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -86,7 +92,13 @@ describe("helium-entity-manager", () => {
       anchor.workspace.DataCredits.idl
     );
 
-    ensureDCIdl(dcProgram);
+    await ensureDCIdl(dcProgram);
+
+    burnProram = await initBurn(
+      provider,
+      anchor.workspace.RewardsBurn.programId,
+      anchor.workspace.RewardsBurn.idl,
+    )
 
     hsdProgram = await initHeliumSubDaos(
       provider,
@@ -94,13 +106,14 @@ describe("helium-entity-manager", () => {
       anchor.workspace.HeliumSubDaos.idl
     );
 
-    ensureHSDIdl(hsdProgram);
+    await ensureHSDIdl(hsdProgram);
 
     hemProgram = await initHeliumEntityManager(
       provider,
       anchor.workspace.HeliumEntityManager.programId,
       anchor.workspace.HeliumEntityManager.idl
     );
+    await ensureHEMIdl(hemProgram);
 
     const dataCredits = await initTestDataCredits(dcProgram, provider);
     dcMint = dataCredits.dcMint;
@@ -138,6 +151,34 @@ describe("helium-entity-manager", () => {
     const addr = getAssociatedTokenAddressSync(mint.publicKey, me);
     const balance = await provider.connection.getTokenAccountBalance(addr);
     expect(balance.value.uiAmount).to.eq(1);
+  });
+
+  it("issues burn entity, and allows burn", async () => {
+    const mint = Keypair.generate();
+    await hemProgram.methods
+      .issueBurnEntityV0()
+      .preInstructions(await createMintInstructions(provider, 0, me, me, mint))
+      .accounts({
+        dao,
+        mint: mint.publicKey
+      })
+      .signers([mint])
+      .rpc({ skipPreflight: true });
+
+    const addr = getAssociatedTokenAddressSync(mint.publicKey, burnKey()[0], true);
+    const balance = await provider.connection.getTokenAccountBalance(addr);
+    expect(balance.value.uiAmount).to.eq(1);
+
+    const tokenMint = await createMint(provider, 2, me, me)
+    const burnAta = await createAtaAndMint(provider, tokenMint, new BN(1000), burnKey()[0])
+    await burnProram.methods.burnV0()
+    .accounts({
+      mint: tokenMint
+    })
+    .rpc({ skipPreflight: true })
+
+    const postBalance = (await getAccount(provider.connection, burnAta)).amount
+    expect(postBalance).to.eq(BigInt(0))
   });
 
   it("initializes a rewardable entity config", async () => {

@@ -1,12 +1,12 @@
 [package]
-name = "helium-entity-manager"
-version = "0.2.1"
+name = "rewards-burn"
+version = "0.0.1"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "helium_entity_manager"
+name = "rewards_burn"
 
 [features]
 devnet = []
@@ -21,17 +21,9 @@ default = []
 overflow-checks = true
 
 [dependencies]
-bs58 = "0.3.1"
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
-bytemuck = "1.12.3"
-angry-purple-tiger = "0.1.0"
-mpl-token-metadata = { workspace = true }
-bubblegum-cpi = { workspace = true }
-account-compression-cpi = { workspace = true }
 shared-utils = { workspace = true }
-data-credits = { path = "../data-credits", features = ["cpi"] }
-helium-sub-daos = { workspace = true }
 solana-security-txt = { workspace = true }
+helium-sub-daos = { workspace = true }
 default-env = { workspace = true }
-rewards-burn = { workspace = true }

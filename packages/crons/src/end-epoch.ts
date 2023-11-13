@@ -1,6 +1,7 @@
 import * as anchor from '@coral-xyz/anchor';
 import * as client from '@helium/distributor-oracle';
 import { fanoutKey, init as initHydra } from '@helium/fanout-sdk';
+import { init as initBurn } from "@helium/rewards-burn-sdk"
 import {
   init as initHem,
   keyToAssetKey,
@@ -22,17 +23,20 @@ import { init as initRewards } from '@helium/rewards-oracle-sdk';
 import {
   HNT_MINT,
   IOT_MINT,
+  MOBILE_MINT,
   chunks,
+  createMintInstructions,
   sendAndConfirmWithRetry,
 } from '@helium/spl-utils';
 import { getAccount } from '@solana/spl-token';
-import { ComputeBudgetProgram as CBP } from '@solana/web3.js';
+import { ComputeBudgetProgram as CBP, Keypair } from '@solana/web3.js';
 import BN from 'bn.js';
 import bs58 from 'bs58';
 
 const FANOUT_NAME = 'HST';
 const IOT_OPERATIONS_FUND = 'iot_operations_fund';
-const MAX_CLAIM_AMOUNT = new BN('207020547945205');
+const BURN = 'burn';
+const MAX_CLAIM_AMOUNT = new BN("207020547945205");
 
 (async () => {
   try {
@@ -250,6 +254,83 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
       );
     } catch (err: any) {
       errors.push(`Failed to distribute iot op funds: ${err}`);
+    }
+
+    // Claim and burn any rewards in the burn entity
+    console.log("Burning everything in the burn entity")
+    const burnProgram = await initBurn(provider)
+    const tokens = [MOBILE_MINT, IOT_MINT]
+    for (const token of tokens) {
+      const [lazyDistributor] = lazyDistributorKey(token);
+      const burnEntityKta = keyToAssetKey(dao, BURN, "utf-8")[0];
+      // Issue the burn entity if it doesn't exist yet.
+      if (!(await provider.connection.getAccountInfo(burnEntityKta))) {
+        const mint = Keypair.generate();
+        await hemProgram.methods
+          .issueBurnEntityV0()
+          .preInstructions(
+            await createMintInstructions(
+              provider,
+              0,
+              provider.wallet.publicKey,
+              provider.wallet.publicKey,
+              mint
+            )
+          )
+          .accounts({
+            dao,
+            mint: mint.publicKey,
+          })
+          .signers([mint])
+          .rpc({ skipPreflight: true });
+      }
+      const assetId = (
+        await hemProgram.account.keyToAssetV0.fetch(burnEntityKta)
+      ).asset;
+      const [recipient] = recipientKey(lazyDistributor, assetId);
+
+      try {
+        if (!(await provider.connection.getAccountInfo(recipient))) {
+          const method = lazyProgram.methods.initializeRecipientV0().accounts({
+            lazyDistributor,
+            mint: assetId,
+          });
+
+          await method.rpc({ skipPreflight: true });
+        }
+
+        const rewards = await client.getCurrentRewards(
+          lazyProgram,
+          lazyDistributor,
+          assetId
+        );
+        const tx = await client.formTransaction({
+          program: lazyProgram,
+          rewardsOracleProgram: rewardsOracleProgram,
+          provider,
+          rewards,
+          asset: assetId,
+          lazyDistributor,
+        });
+        const signed = await provider.wallet.signTransaction(tx);
+        await sendAndConfirmWithRetry(
+          provider.connection,
+          signed.serialize(),
+          { skipPreflight: true },
+          "confirmed"
+        );
+
+        await burnProgram.methods
+          .burnV0()
+          .accounts({
+            mint: token,
+          })
+          .rpc({ skipPreflight: true });
+      } catch (err: any) {
+        errors.push(
+          `Failed to distribute burn funds for mint ${token.toBase58()}: ${err}`
+        );
+      }
     }
 
     if (!errors.length) process.exit(0);

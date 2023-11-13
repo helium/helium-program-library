@@ -8,15 +8,6 @@
       "path": "../anchor-resolvers"
     },
     {
-      "path": "../spl-utils"
-    },
-    {
-      "path": "../helium-sub-daos-sdk"
-    },
-    {
-      "path": "../rewards-burn-sdk"
-    },
-    {
       "path": "./tsconfig.cjs.json"
     },
     {

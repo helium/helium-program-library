@@ -80,6 +80,8 @@
       "path": "./packages/crons"
     }, {
       "path": "./packages/entity-invalidator"
+    }, {
+      "path": "./packages/rewards-burn-sdk"
     }
   ]
 }
