@@ -1,10 +1,10 @@
-import * as anchor from '@coral-xyz/anchor';
-import * as client from '@helium/distributor-oracle';
-import { fanoutKey, init as initHydra } from '@helium/fanout-sdk';
+import * as anchor from "@coral-xyz/anchor";
+import * as client from "@helium/distributor-oracle";
+import { fanoutKey, init as initHydra } from "@helium/fanout-sdk";
 import {
   init as initHem,
   keyToAssetKey,
-} from '@helium/helium-entity-manager-sdk';
+} from "@helium/helium-entity-manager-sdk";
 import {
   EPOCH_LENGTH,
   currentEpoch,
@@ -12,34 +12,35 @@ import {
   daoKey,
   init as initDao,
   subDaoEpochInfoKey,
-} from '@helium/helium-sub-daos-sdk';
+} from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
   lazyDistributorKey,
   recipientKey,
-} from '@helium/lazy-distributor-sdk';
-import { init as initRewards } from '@helium/rewards-oracle-sdk';
+} from "@helium/lazy-distributor-sdk";
+import { init as initRewards } from "@helium/rewards-oracle-sdk";
 import {
   HNT_MINT,
   IOT_MINT,
   chunks,
   sendAndConfirmWithRetry,
-} from '@helium/spl-utils';
-import { getAccount } from '@solana/spl-token';
-import { ComputeBudgetProgram as CBP } from '@solana/web3.js';
-import BN from 'bn.js';
-import bs58 from 'bs58';
+  sendInstructions,
+} from "@helium/spl-utils";
+import { getAccount } from "@solana/spl-token";
+import { ComputeBudgetProgram as CBP } from "@solana/web3.js";
+import BN from "bn.js";
+import bs58 from "bs58";
 
-const FANOUT_NAME = 'HST';
-const IOT_OPERATIONS_FUND = 'iot_operations_fund';
-const MAX_CLAIM_AMOUNT = new BN('207020547945205');
+const FANOUT_NAME = "HST";
+const IOT_OPERATIONS_FUND = "iot_operations_fund";
+const MAX_CLAIM_AMOUNT = new BN("207020547945205");
 
 (async () => {
   try {
     if (!process.env.ANCHOR_WALLET)
-      throw new Error('ANCHOR_WALLET not provided');
+      throw new Error("ANCHOR_WALLET not provided");
 
-    if (!process.env.SOLANA_URL) throw new Error('SOLANA_URL not provided');
+    if (!process.env.SOLANA_URL) throw new Error("SOLANA_URL not provided");
 
     process.env.ANCHOR_PROVIDER_URL = process.env.SOLANA_URL;
     anchor.setProvider(anchor.AnchorProvider.local(process.env.SOLANA_URL));
@@ -85,16 +86,18 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
 
           if (!subDaoEpochInfo?.utilityScore) {
             try {
-              await heliumSubDaosProgram.methods
-                .calculateUtilityScoreV0({ epoch })
-                .accounts({ subDao: subDao.publicKey })
-                .preInstructions([CBP.setComputeUnitLimit({ units: 1000000 })])
-                .rpc({ skipPreflight: true });
+              await sendInstructions(provider, [
+                CBP.setComputeUnitLimit({ units: 1000000 }),
+                await heliumSubDaosProgram.methods
+                  .calculateUtilityScoreV0({ epoch })
+                  .accounts({ subDao: subDao.publicKey })
+                  .instruction(),
+              ]);
             } catch (err: any) {
               const strErr = JSON.stringify(err);
 
               if (
-                strErr.includes('Error Code: EpochNotOver') ||
+                strErr.includes("Error Code: EpochNotOver") ||
                 strErr.includes(`{"Custom":6003}`)
               ) {
                 // epoch not over
@@ -102,7 +105,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
               }
 
               if (
-                !strErr.includes('Error Code: UtilityScoreAlreadyCalculated') ||
+                !strErr.includes("Error Code: UtilityScoreAlreadyCalculated") ||
                 !strErr.includes(`{"Custom":6002}`)
               )
                 errors.push(
@@ -123,10 +126,12 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
 
           if (!subDaoEpochInfo?.rewardsIssuedAt) {
             try {
-              await heliumSubDaosProgram.methods
-                .issueRewardsV0({ epoch })
-                .accounts({ subDao: subDao.publicKey })
-                .rpc({ skipPreflight: true });
+              await sendInstructions(provider, [
+                await heliumSubDaosProgram.methods
+                  .issueRewardsV0({ epoch })
+                  .accounts({ subDao: subDao.publicKey })
+                  .instruction(),
+              ]);
             } catch (err: any) {
               errors.push(
                 `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${err}`
@@ -138,10 +143,12 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
 
       if (!daoEpochInfo?.doneIssuingHstPool) {
         try {
-          await heliumSubDaosProgram.methods
-            .issueHstPoolV0({ epoch })
-            .accounts({ dao })
-            .rpc({ skipPreflight: true });
+          await sendInstructions(provider, [
+            await heliumSubDaosProgram.methods
+              .issueHstPoolV0({ epoch })
+              .accounts({ dao })
+              .instruction(),
+          ]);
         } catch (err: any) {
           errors.push(`Failed to issue hst pool: ${err}`);
         }
@@ -170,15 +177,17 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
             ).owner;
 
             try {
-              await hydraProgram.methods
-                .distributeV0()
-                .accounts({
-                  payer: provider.wallet.publicKey,
-                  fanout: fanoutK,
-                  owner,
-                  mint,
-                })
-                .rpc({ skipPreflight: true });
+              await sendInstructions(provider, [
+                await hydraProgram.methods
+                  .distributeV0()
+                  .accounts({
+                    payer: provider.wallet.publicKey,
+                    fanout: fanoutK,
+                    owner,
+                    mint,
+                  })
+                  .instruction(),
+              ]);
             } catch (err: any) {
               errors.push(
                 `Failed to distribute hst for ${mint.toBase58()}: ${err}`
@@ -194,7 +203,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
     const lazyProgram = await initLazy(provider);
     const rewardsOracleProgram = await initRewards(provider);
     const [lazyDistributor] = lazyDistributorKey(iotMint);
-    const [keyToAsset] = keyToAssetKey(dao, IOT_OPERATIONS_FUND, 'utf8');
+    const [keyToAsset] = keyToAssetKey(dao, IOT_OPERATIONS_FUND, "utf8");
     const assetId = (await hemProgram.account.keyToAssetV0.fetch(keyToAsset))
       .asset;
 
@@ -205,7 +214,12 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
         mint: assetId,
       });
 
-      await method.rpc({ skipPreflight: true });
+      await sendInstructions(
+        provider,
+        [
+          await method.instruction()
+        ]
+      );
     }
 
     const rewards = await client.getCurrentRewards(
@@ -219,7 +233,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
       lazyDistributor,
       daoKey(HNT_MINT)[0],
       [IOT_OPERATIONS_FUND],
-      'utf8'
+      "utf8"
     );
 
     // Avoid claiming too much and tripping the breaker
@@ -246,7 +260,7 @@ const MAX_CLAIM_AMOUNT = new BN('207020547945205');
         provider.connection,
         signed.serialize(),
         { skipPreflight: true },
-        'confirmed'
+        "confirmed"
       );
     } catch (err: any) {
       errors.push(`Failed to distribute iot op funds: ${err}`);
