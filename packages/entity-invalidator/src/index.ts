@@ -8,6 +8,7 @@ import {
   AWS_REGION,
   CLOUDFRONT_DISTRIBUTION,
   LOOKBACK_HOURS,
+  INVALIDATE_ALL_RECORD_THRESHOLD,
 } from "./env";
 import { chunks } from "@helium/spl-utils";
 
@@ -68,6 +69,20 @@ async function run() {
     ],
   });
   console.log(`Found ${totalCount} updated records`);
+
+  if (totalCount >= INVALIDATE_ALL_RECORD_THRESHOLD) {
+    await invalidateAndWait({
+      cloudfront,
+      DistributionId: CLOUDFRONT_DISTRIBUTION,
+      Paths: {
+        Quantity: 1,
+        Items: ["/*"],
+      },
+    });
+
+    return;
+  }
+
   let totalProgress = 0;
   const paths: string[] = [];
 
