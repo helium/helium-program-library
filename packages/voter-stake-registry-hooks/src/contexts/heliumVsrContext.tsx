@@ -1,4 +1,4 @@
-import { AnchorProvider, BN, Wallet } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Program, Wallet } from "@coral-xyz/anchor";
 import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import {
   EPOCH_LENGTH,
@@ -24,6 +24,10 @@ import {
 } from "../utils/getPositionKeys";
 import { truthy } from "@helium/spl-utils";
 import { Connection, PublicKey } from "@solana/web3.js";
+import { delegationKey, init } from "@helium/nft-delegation-sdk";
+import { useDelegations } from "../hooks/useDelegations";
+import { NftDelegation } from "@helium/modular-governance-idls/lib/types/nft_delegation";
+import { positionKey } from "@helium/voter-stake-registry-sdk";
 
 export interface HeliumVsrState {
   amountLocked?: BN;
@@ -74,6 +78,8 @@ export const HeliumVsrStateProvider: React.FC<{
       });
     }
   }, [connection?.rpcEndpoint, wallet?.publicKey?.toBase58()]);
+  const me = useMemo(() => wallet?.publicKey, [wallet?.publicKey?.toBase58()]);
+
   /// Allow refetching all NFTs by incrementing call index
   const [callIndex, setCallIndex] = useState(0);
   const refetch = useCallback(() => setCallIndex((i) => i + 1), [setCallIndex]);
@@ -98,7 +104,7 @@ export const HeliumVsrStateProvider: React.FC<{
   const { result, loading, error } = useAsync(
     async (args: GetPosArgs | undefined) => {
       if (args) {
-        return getPositionKeys(args);
+        return await getPositionKeys(args);
       }
     },
     [args]
@@ -108,9 +114,23 @@ export const HeliumVsrStateProvider: React.FC<{
   }, [result?.positionKeys]);
   const { accounts: delegatedAccounts, loading: loadingDel } =
     useDelegatedPositions(delegatedPositionKeys);
-  const { accounts: positions, loading: loadingPositions } = usePositions(
-    result?.positionKeys
+
+  const delegationKeys = useMemo(() => {
+    return me && result?.nfts.map((nft) => delegationKey(nft.address!, me)[0]);
+  }, [result?.nfts, me?.toBase58()]);
+  const { accounts: delegationAccounts, loading: loadingDelegations } =
+    useDelegations(delegationKeys);
+
+  const allPositions = useMemo(
+    () => [
+      ...(result?.positionKeys || []),
+      ...(result?.votingDelegatedPositionKeys || []),
+    ],
+    [result?.positionKeys, result?.votingDelegatedPositionKeys]
   );
+  const myOwnedPositionsEndIdx = result?.positionKeys?.length;
+  const { accounts: positions, loading: loadingPositions } =
+    usePositions(allPositions);
   const now = useSolanaUnixNow(60 * 5 * 1000);
 
   const { amountLocked, votingPower, positionsWithMeta } = useMemo(() => {
@@ -122,6 +142,7 @@ export const HeliumVsrStateProvider: React.FC<{
         .map((position, idx) => {
           if (position && position.info) {
             const isDelegated = !!delegatedAccounts?.[idx]?.info;
+            const delegation = delegationAccounts?.[idx]?.info;
             const delegatedSubDao = isDelegated
               ? delegatedAccounts[idx]?.info?.subDao
               : null;
@@ -151,6 +172,11 @@ export const HeliumVsrStateProvider: React.FC<{
               hasGenesisMultiplier: position.info.genesisEnd.gt(new BN(now)),
               votingPower: posVotingPower,
               votingMint: mintCfgs[position.info.votingMintConfigIdx],
+              isVotingDelegatedToMe: idx >= (myOwnedPositionsEndIdx || 0),
+              votingDelegation: {
+                ...delegation,
+                address: delegationAccounts?.[idx]?.publicKey,
+              },
             } as PositionWithMeta;
           }
         })
@@ -164,7 +190,13 @@ export const HeliumVsrStateProvider: React.FC<{
     }
 
     return {};
-  }, [positions, registrar, delegatedAccounts]);
+  }, [
+    myOwnedPositionsEndIdx,
+    positions,
+    registrar,
+    delegatedAccounts,
+    delegationAccounts,
+  ]);
   const ret = useMemo(
     () => ({
       loading: loading || loadingPositions || loadingDel,

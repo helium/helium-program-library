@@ -2,6 +2,7 @@
 members = [
   "programs/*",
   "utils/proposal",
+  "utils/nft-delegation",
 ]
 exclude = [
   "deps/metaplex-program-library/bubblegum/program",

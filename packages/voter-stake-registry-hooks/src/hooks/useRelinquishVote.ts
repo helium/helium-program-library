@@ -41,6 +41,23 @@ export const useRelinquishVote = (proposal: PublicKey) => {
               const alreadyVotedThisChoice = marker?.choices.includes(choice);
 
               if (marker && alreadyVotedThisChoice) {
+                if (position.isVotingDelegatedToMe) {
+                  if (marker.delegationIndex < (position.votingDelegation?.index || 0)) {
+                    // Do not vote with a position that has been delegated to us, but voting overidden
+                    return
+                  }
+
+                  return await vsrProgram.methods
+                    .delegatedRelinquishVoteV0({
+                      choice,
+                    })
+                    .accounts({
+                      proposal,
+                      owner: provider.wallet.publicKey,
+                      position: position.pubkey,
+                    })
+                    .instruction();
+                }
                 return await vsrProgram.methods
                   .relinquishVoteV1({
                     choice,
@@ -49,7 +66,6 @@ export const useRelinquishVote = (proposal: PublicKey) => {
                     proposal,
                     voter: provider.wallet.publicKey,
                     position: position.pubkey,
-                    refund: provider.wallet.publicKey,
                   })
                   .instruction();
               }

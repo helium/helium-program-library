@@ -38,6 +38,13 @@ import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 import { getUnixTimestamp, loadKeypair } from "./utils/solana";
 import { random } from "./utils/string";
 import { SPL_GOVERNANCE_PID } from "./utils/vsr";
+import {
+  PROGRAM_ID as DEL_PID,
+  init as initNftDelegation,
+  delegationKey,
+} from "@helium/nft-delegation-sdk";
+import { NftDelegation } from "@helium/modular-governance-idls/lib/types/nft_delegation";
+import { ensureVSRIdl } from "./utils/fixtures";
 
 chai.use(chaiAsPromised);
 
@@ -55,11 +62,13 @@ describe("voter-stake-registry", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
   let program: Program<VoterStakeRegistry>;
+  let delegateProgram: Program<NftDelegation>;
   let proposalProgram: Program<Proposal>;
   let registrar: PublicKey;
   let collection: PublicKey;
   let hntMint: PublicKey;
   let realm: PublicKey;
+  let delegationConfig: PublicKey | undefined;
   let programVersion: number;
   let oneWeekFromNow: number;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
@@ -71,11 +80,10 @@ describe("voter-stake-registry", () => {
       PROGRAM_ID,
       anchor.workspace.VoterStakeRegistry.idl
     );
-    const thing = await Program.fetchIdl(
-      new PublicKey("propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs")
-    );
+    ensureVSRIdl(program);
     // @ts-ignore
     proposalProgram = await initProposal(provider as any);
+    delegateProgram = await initNftDelegation(provider, DEL_PID);
     hntMint = await createMint(provider, 8, me, me);
     await createAtaAndMint(provider, hntMint, toBN(223_000_000, 8));
 
@@ -118,6 +126,19 @@ describe("voter-stake-registry", () => {
       me
     );
 
+    ({
+      pubkeys: { delegationConfig },
+    } = await delegateProgram.methods
+      .initializeDelegationConfigV0({
+        maxDelegationTime: new anchor.BN(1000000000000),
+        name: random(10),
+        seasons: [new anchor.BN(new Date().valueOf() / 1000 + 100000)],
+      })
+      .accounts({
+        authority: me,
+      })
+      .rpcAndKeys());
+
     const {
       instruction: createRegistrar,
       pubkeys: { registrar: rkey, collection: ckey },
@@ -128,6 +149,7 @@ describe("voter-stake-registry", () => {
       .accounts({
         realm: realm,
         realmGoverningTokenMint: hntMint,
+        delegationConfig,
       })
       .prepare();
     registrar = rkey!;
@@ -479,6 +501,156 @@ describe("voter-stake-registry", () => {
       });
     });
 
+    describe("with delegation", async () => {
+      let delegatee = Keypair.generate();
+      let position: PublicKey;
+      let mint: PublicKey;
+
+      beforeEach(async () => {
+        ({ position, mint } = await createAndDeposit(10000, 200));
+        await delegateProgram.methods
+          .delegateV0({
+            expirationTime: new anchor.BN(new Date().valueOf() / 1000 + 10000),
+          })
+          .accounts({
+            delegationConfig,
+            mint,
+            recipient: delegatee.publicKey,
+          })
+          .rpc({ skipPreflight: true });
+      });
+
+      it("allows voting on and relinquishing votes on the proposal", async () => {
+        const {
+          pubkeys: { marker },
+        } = await program.methods
+          .delegatedVoteV0({
+            choice: 0,
+          })
+          .accounts({
+            mint,
+            proposal,
+            position,
+            owner: delegatee.publicKey,
+          })
+          .signers([delegatee])
+          .rpcAndKeys({ skipPreflight: true });
+
+        let acct = await proposalProgram.account.proposalV0.fetch(proposal!);
+        expect(acct.choices[0].weight.toNumber()).to.be.gt(0);
+        let markerA = await program.account.voteMarkerV0.fetchNullable(
+          marker! as PublicKey
+        );
+        expect(markerA?.choices).to.deep.eq([0]);
+
+        await program.methods
+          .delegatedRelinquishVoteV0({
+            choice: 0,
+          })
+          .accounts({
+            mint,
+            proposal,
+            position,
+            owner: delegatee.publicKey,
+          })
+          .signers([delegatee])
+          .rpc({ skipPreflight: true });
+
+        acct = await proposalProgram.account.proposalV0.fetch(proposal!);
+        expect(acct.choices[0].weight.toNumber()).to.eq(0);
+        markerA = await program.account.voteMarkerV0.fetchNullable(
+          marker! as PublicKey
+        );
+        expect(markerA).to.be.null;
+      });
+
+      it("allows earlier delegates to change the vote", async () => {
+        const {
+          pubkeys: { marker },
+        } = await program.methods
+          .delegatedVoteV0({
+            choice: 0,
+          })
+          .accounts({
+            mint,
+            proposal,
+            position,
+            owner: delegatee.publicKey,
+          })
+          .signers([delegatee])
+          .rpcAndKeys({ skipPreflight: true });
+
+        let acct = await proposalProgram.account.proposalV0.fetch(proposal!);
+        expect(acct.choices[0].weight.toNumber()).to.be.gt(0);
+        let markerA = await program.account.voteMarkerV0.fetchNullable(
+          marker! as PublicKey
+        );
+        expect(markerA?.choices).to.deep.eq([0]);
+        expect(markerA?.delegationIndex).to.eq(1);
+
+        await program.methods
+          .delegatedRelinquishVoteV0({
+            choice: 0,
+          })
+          .accounts({
+            mint,
+            proposal,
+            position,
+            owner: me,
+          })
+          .rpc({ skipPreflight: true });
+
+        acct = await proposalProgram.account.proposalV0.fetch(proposal!);
+        expect(acct.choices[0].weight.toNumber()).to.eq(0);
+        markerA = await program.account.voteMarkerV0.fetchNullable(
+          marker! as PublicKey
+        );
+        expect(markerA).to.be.null;
+
+        await program.methods
+          .delegatedVoteV0({
+            choice: 1,
+          })
+          .accounts({
+            mint,
+            proposal,
+            position,
+            owner: me,
+          })
+          .rpcAndKeys({ skipPreflight: true });
+
+        acct = await proposalProgram.account.proposalV0.fetch(proposal!);
+        expect(acct.choices[1].weight.toNumber()).to.be.gt(0);
+        markerA = await program.account.voteMarkerV0.fetchNullable(
+          marker! as PublicKey
+        );
+        expect(markerA?.choices).to.deep.eq([1]);
+        expect(markerA?.delegationIndex).to.eq(0);
+      });
+
+      it("allows the original owner to undelegate", async () => {
+        const toUndelegate = delegationKey(delegationConfig!, mint, delegatee.publicKey)[0];
+        const myDelegation = delegationKey(delegationConfig!, mint, me)[0];
+        await delegateProgram.methods
+          .undelegateV0()
+          .accounts({
+            delegation: toUndelegate,
+            prevDelegation: myDelegation,
+            currentDelegation: myDelegation,
+          })
+          .rpc({ skipPreflight: true });
+
+        expect(
+          (
+            await delegateProgram.account.delegationV0.fetch(myDelegation)
+          ).nextOwner.toBase58()
+        ).to.eq(PublicKey.default.toBase58());
+        expect(
+          await delegateProgram.account.delegationV0.fetchNullable(toUndelegate)
+        ).to.be.null;
+      });
+    });
+
     describe("with an active vote", async () => {
       let position: PublicKey;
       let mint: PublicKey;
@@ -553,7 +725,6 @@ describe("voter-stake-registry", () => {
             })
             .accounts({
               proposal,
-              refund: me,
               position,
             })
             .instruction()

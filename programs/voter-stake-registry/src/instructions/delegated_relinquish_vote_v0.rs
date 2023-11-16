@@ -1,19 +1,14 @@
-use crate::error::VsrError;
+use crate::{error::VsrError, RelinquishVoteArgsV1};
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, TokenAccount};
+use anchor_spl::token::Mint;
+use nft_delegation::DelegationV0;
 use proposal::{ProposalConfigV0, ProposalV0};
 
 use crate::{registrar_seeds, state::*};
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct RelinquishVoteArgsV1 {
-  pub choice: u16,
-}
-
 #[derive(Accounts)]
-pub struct RelinquishVoteV1<'info> {
-  /// CHECK: You're getting sol why do you care?
-  /// Account to receive sol refund if marker is closed
+pub struct DelegatedRelinquishVoteV0<'info> {
+  /// CHECK: has one on the marker gets this
   #[account(mut)]
   pub rent_refund: AccountInfo<'info>,
   #[account(
@@ -26,7 +21,15 @@ pub struct RelinquishVoteV1<'info> {
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
   pub registrar: Box<Account<'info, Registrar>>,
-  pub voter: Signer<'info>,
+  pub owner: Signer<'info>,
+  #[account(
+    has_one = owner,
+    constraint = delegation.delegation_config == registrar.delegation_config,
+    constraint = delegation.expiration_time > Clock::get().unwrap().unix_timestamp,
+    // only the current or earlier delegates can change vote.
+    constraint = delegation.index <= marker.delegation_index
+  )]
+  pub delegation: Box<Account<'info, DelegationV0>>,
   #[account(
     mut,
     has_one = mint,
@@ -34,12 +37,6 @@ pub struct RelinquishVoteV1<'info> {
   )]
   pub position: Box<Account<'info, PositionV0>>,
   pub mint: Box<Account<'info, Mint>>,
-  #[account(
-    associated_token::authority = voter,
-    associated_token::mint = mint,
-    constraint = token_account.amount == 1,
-  )]
-  pub token_account: Box<Account<'info, TokenAccount>>,
   #[account(
     mut,
     has_one = proposal_config,
@@ -65,10 +62,11 @@ pub struct RelinquishVoteV1<'info> {
   pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<RelinquishVoteV1>, args: RelinquishVoteArgsV1) -> Result<()> {
+pub fn handler(ctx: Context<DelegatedRelinquishVoteV0>, args: RelinquishVoteArgsV1) -> Result<()> {
   let marker = &mut ctx.accounts.marker;
+  marker.delegation_index = ctx.accounts.delegation.index;
   marker.proposal = ctx.accounts.proposal.key();
-  marker.voter = ctx.accounts.voter.key();
+  marker.voter = ctx.accounts.owner.key();
   ctx.accounts.position.num_active_votes -= 1;
 
   require!(
@@ -87,7 +85,7 @@ pub fn handler(ctx: Context<RelinquishVoteV1>, args: RelinquishVoteArgsV1) -> Re
     CpiContext::new_with_signer(
       ctx.accounts.proposal_program.to_account_info(),
       proposal::cpi::accounts::VoteV0 {
-        voter: ctx.accounts.voter.to_account_info(),
+        voter: ctx.accounts.owner.to_account_info(),
         vote_controller: ctx.accounts.registrar.to_account_info(),
         state_controller: ctx.accounts.state_controller.to_account_info(),
         proposal_config: ctx.accounts.proposal_config.to_account_info(),

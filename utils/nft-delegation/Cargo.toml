@@ -1,0 +1,20 @@
+[package]
+name = "nft-delegation"
+version = "0.0.2"
+description = "Nft delegation cpi wrapper"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "nft_delegation"
+
+[features]
+default = ["cpi"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+
+[dependencies]
+anchor-gen = { git = "https://github.com/ChewingGlass/anchor-gen.git" }
+anchor-lang = { workspace = true }

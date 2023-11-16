@@ -137,4 +137,19 @@ pub mod voter_stake_registry {
   pub fn relinquish_expired_vote_v0(ctx: Context<RelinquishExpiredVoteV0>) -> Result<()> {
     instructions::relinquish_expired_vote_v0::handler(ctx)
   }
+
+  pub fn delegated_relinquish_vote_v0(
+    ctx: Context<DelegatedRelinquishVoteV0>,
+    args: RelinquishVoteArgsV1,
+  ) -> Result<()> {
+    instructions::delegated_relinquish_vote_v0::handler(ctx, args)
+  }
+
+  pub fn delegated_vote_v0(ctx: Context<DelegatedVoteV0>, args: VoteArgsV0) -> Result<()> {
+    instructions::delegated_vote_v0::handler(ctx, args)
+  }
+
+  pub fn update_registrar_v0(ctx: Context<UpdateRegistrarV0>) -> Result<()> {
+    instructions::update_registrar_v0::handler(ctx)
+  }
 }

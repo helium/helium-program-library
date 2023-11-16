@@ -5,6 +5,7 @@ import {
   positionKey,
   registrarKey,
 } from "@helium/voter-stake-registry-sdk";
+import { init } from "@helium/nft-delegation-sdk";
 import { Metadata, Metaplex, Nft, Sft } from "@metaplex-foundation/js";
 import { getMint, Mint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
@@ -36,9 +37,27 @@ const realmNames: Record<string, string> = {
 };
 export const getPositionKeys = async (
   args: GetPositionsArgs
-): Promise<{ positionKeys: PublicKey[]; nfts: (Metadata | Nft | Sft)[] }> => {
+): Promise<{
+  votingDelegatedPositionKeys: PublicKey[];
+  positionKeys: PublicKey[];
+  nfts: (Metadata | Nft | Sft)[];
+}> => {
   const { mint, wallet, provider } = args;
   const connection = provider.connection;
+
+  const me = wallet;
+  const delegationProgram = await init(provider);
+  const myDelegations = await delegationProgram.account.delegationV0.all([
+    {
+      memcmp: {
+        offset: 0,
+        bytes: me.toBase58(),
+      },
+    },
+  ]);
+  const delegationPositions = myDelegations.map(
+    (del) => positionKey(del.account.asset)[0]
+  );
 
   const metaplex = new Metaplex(connection);
   const registrarPk = getRegistrarKey(mint);
@@ -61,5 +80,9 @@ export const getPositionKeys = async (
     (nft) => positionKey((nft as any).mintAddress)[0]
   );
 
-  return { positionKeys, nfts };
+  return {
+    positionKeys,
+    votingDelegatedPositionKeys: delegationPositions,
+    nfts,
+  };
 };

@@ -2553,6 +2553,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nft-delegation"
+version = "0.0.2"
+dependencies = [
+ "anchor-gen",
+ "anchor-lang",
+]
+
+[[package]]
 name = "nix"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5750,6 +5758,7 @@ dependencies = [
  "itertools",
  "log",
  "mpl-token-metadata",
+ "nft-delegation",
  "proposal",
  "serde",
  "shared-utils",

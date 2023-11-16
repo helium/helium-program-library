@@ -65,6 +65,27 @@ export const useVote = (proposalKey: PublicKey) => {
                 (marker?.choices.length || 0) >=
                 (proposal?.maxChoicesPerVoter || 0);
               if (!marker || (!alreadyVotedThisChoice && !maxChoicesReached)) {
+                if (position.isVotingDelegatedToMe) {
+                  if (
+                    marker?.delegationIndex &&
+                    marker.delegationIndex <
+                      (position.votingDelegation?.index || 0)
+                  ) {
+                    // Do not vote with a position that has been delegated to us, but voting overidden
+                    return;
+                  }
+
+                  return await vsrProgram.methods
+                    .delegatedVoteV0({
+                      choice,
+                    })
+                    .accounts({
+                      proposal: proposalKey,
+                      owner: provider.wallet.publicKey,
+                      position: position.pubkey,
+                    })
+                    .instruction();
+                }
                 return await vsrProgram.methods
                   .voteV0({
                     choice,
