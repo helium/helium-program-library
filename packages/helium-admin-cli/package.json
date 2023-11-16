@@ -51,6 +51,7 @@
     "@helium/mobile-entity-manager-sdk": "^0.6.1",
     "@helium/price-oracle-sdk": "^0.6.1",
     "@helium/spl-utils": "^0.6.1",
+    "@helium/nft-delegation-sdk": "0.0.8-next.5+4c12e2f",
     "@helium/treasury-management-sdk": "^0.6.1",
     "@solana/spl-account-compression": "^0.1.7",
     "@solana/spl-governance": "^0.3.18",
