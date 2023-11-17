@@ -1,27 +1,35 @@
 import { decodeEntityKey } from "@helium/helium-entity-manager-sdk";
 import AWS from "aws-sdk";
 import { Op } from "sequelize";
-import { v4 as uuidv4 } from "uuid";
 import { IotHotspotInfo, KeyToAsset, MobileHotspotInfo } from "./model";
 // @ts-ignore
 import {
-  AWS_REGION,
-  CLOUDFRONT_DISTRIBUTION,
+  CLOUDFLARE_EMAIL,
+  CLOUDFLARE_API_KEY,
+  CLOUDFLARE_ZONE_ID,
   LOOKBACK_HOURS,
-  INVALIDATE_ALL_RECORD_THRESHOLD,
+  DOMAIN,
 } from "./env";
 import { chunks } from "@helium/spl-utils";
 
-// How long to wait to check invalidation status again
-const INVALIDATION_WAIT = 10000;
-// 30 minutes
-const INVALIDATION_WAIT_LIMIT = 30 * 60 * 1000;
+// How long to wait to perform next invalidation
+const INVALIDATION_WAIT = 1000;
+// Cloudflare can only invalidate 30k records per day, so
+// 10k records here since we make 3 invalidations per record
+const INVALIDATE_ALL_RECORD_THRESHOLD = 10000;
+// Headers used across all Cloudflare invalidation requests
+const CLOUDFLARE_HEADERS = {
+  'X-Auth-Email': CLOUDFLARE_EMAIL as string,
+  'X-Auth-Key': CLOUDFLARE_API_KEY as string,
+  'Content-Type': 'application/json',
+};
+// URL used across all Cloudflare invalidation requests
+const CLOUDFLARE_API_URL = `https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache`;
+
 
 async function run() {
   const date = new Date();
   date.setHours(date.getHours() - LOOKBACK_HOURS);
-  AWS.config.update({ region: AWS_REGION });
-  const cloudfront = new AWS.CloudFront();
 
   // Invalidate metadata-service routes:
   // - /v2/hotspot/:keyToAssetKey
@@ -71,14 +79,11 @@ async function run() {
   console.log(`Found ${totalCount} updated records`);
 
   if (totalCount >= INVALIDATE_ALL_RECORD_THRESHOLD) {
-    await invalidateAndWait({
-      cloudfront,
-      DistributionId: CLOUDFRONT_DISTRIBUTION,
-      Paths: {
-        Quantity: 1,
-        Items: ["/*"],
-      },
-    });
+    const arg = {
+      purge_everything: true
+    };
+
+    await invalidate(arg);
 
     return;
   }
@@ -125,20 +130,18 @@ async function run() {
     }
   } while (entities.length === limit);
 
-  // Split the paths into batches of 3000
-  const batches = chunks(paths, 3000)
+  // Split the paths into batches of 30
+  const batches = chunks(paths, 30)
 
   // Process each batch of invalidations
   let i = 0;
   for (const batch of batches) {
-    await invalidateAndWait({
-      cloudfront,
-      DistributionId: CLOUDFRONT_DISTRIBUTION,
-      Paths: {
-        Quantity: batch.length,
-        Items: batch,
-      },
-    })
+    const arg = {
+      files: batch
+    };
+
+    await invalidate(arg);
+    await delay(INVALIDATION_WAIT);
     
     console.log(`Invalidated ${i} / ${batches.length} batches`);
     i++
@@ -149,72 +152,30 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function invalidateAndWait({
-  cloudfront,
-  DistributionId,
-  Paths,
-}: {
-  cloudfront: AWS.CloudFront,
-  DistributionId: string,
-  Paths: {
-    Quantity: number;
-    Items: string[]
-  }
-}) {
-  const invalidationResponse = await cloudfront
-    .createInvalidation({
-      DistributionId,
-      InvalidationBatch: {
-        CallerReference: `${uuidv4()}`,
-        Paths,
-      },
-    })
-    .promise();
-
-  if (invalidationResponse?.Invalidation) {
-    const invalidationId = invalidationResponse.Invalidation.Id;
-
-    // Check the status of the invalidation batch periodically
-    let invalidationStatus = await getInvalidationStatus(
-      cloudfront,
-      invalidationId
-    );
-    let totalWait = 0;
-    while (invalidationStatus !== "Completed") {
-      console.log("Invalidation in progress. Waiting for completion...");
-      totalWait += INVALIDATION_WAIT
-      await delay(INVALIDATION_WAIT); // Wait for 10 seconds before checking the status again
-      invalidationStatus = await getInvalidationStatus(
-        cloudfront,
-        invalidationId
-      );
-
-      if (totalWait > INVALIDATION_WAIT_LIMIT) {
-        throw new Error("Exceeded invalidation wait limit")
-      }
-    }
-  }
-}
-
-async function getInvalidationStatus(cloudfront: AWS.CloudFront, invalidationId: string) {
-  const invalidationResponse = await cloudfront
-    .getInvalidation({
-      DistributionId: CLOUDFRONT_DISTRIBUTION,
-      Id: invalidationId,
-    })
-    .promise();
-
-  return invalidationResponse?.Invalidation?.Status;
-}
-
 function getPaths(entity: KeyToAsset): string[] {
-  const v1 = `/v1/${entity.address}`;
-  const v2 = `/v2/hotspot/${entity.address}`;
+  const v1 = `${DOMAIN}/v1/${entity.address}`;
+  const v2 = `${DOMAIN}/v2/hotspot/${entity.address}`;
   if ((entity.entityKeyStr?.length || 0) >= 200) {
     return [v1, v2];
   }
 
-  return [`/${entity.entityKeyStr!}`, v1, v2];
+  return [`${DOMAIN}/${entity.entityKeyStr!}`, v1, v2];
+}
+
+async function invalidate(arg: any): Promise<void> {
+  try {
+    const body = JSON.stringify(arg);
+
+    const response = await fetch(CLOUDFLARE_API_URL, { method: 'POST', headers: CLOUDFLARE_HEADERS, body: body });
+    const data = await response.json();
+
+    console.log(data);
+
+    return;
+  } catch (error) {
+    console.error('Error:', error);
+    throw error;
+  }
 }
 
 run().catch((e) => {
