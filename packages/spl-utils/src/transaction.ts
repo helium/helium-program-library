@@ -253,11 +253,16 @@ export const awaitTransactionSignatureConfirmation = async (
   };
   let subId = 0;
   status = await new Promise(async (resolve, reject) => {
-    const t = setTimeout(() => {
+    let t: NodeJS.Timeout;
+    function setDone() {
+      done = true
+      clearTimeout(t)
+    }
+    t = setTimeout(() => {
       if (done) {
         return;
       }
-      done = true;
+      setDone()
       console.log("Rejecting for timeout...");
       reject({ timeout: true });
     }, timeout);
@@ -270,7 +275,7 @@ export const awaitTransactionSignatureConfirmation = async (
             slot: context.slot,
             confirmations: 0,
           };
-          done = true
+          setDone()
           if (result.err) {
             console.log("Rejected via websocket", result.err);
             reject(status);
@@ -282,9 +287,9 @@ export const awaitTransactionSignatureConfirmation = async (
       );
     } catch (e) {
       console.error("WS error in setup", txid, e);
-    } finally {
-      done = true
-      clearTimeout(t);
+      if (!queryStatus) {
+        reject(e)
+      }
     }
     while (!done && queryStatus) {
       // eslint-disable-next-line no-loop-func
@@ -298,7 +303,7 @@ export const awaitTransactionSignatureConfirmation = async (
             if (!status) {
             } else if (status.err) {
               console.log("REST error for", txid, status);
-              done = true;
+              setDone()
               reject(status.err);
             } else if (!status.confirmations && !status.confirmationStatus) {
               console.log("REST no confirmations for", txid, status);
@@ -308,7 +313,7 @@ export const awaitTransactionSignatureConfirmation = async (
                 !status.confirmationStatus ||
                 status.confirmationStatus == commitment
               ) {
-                done = true;
+                setDone()
                 resolve(status);
               }
             }
@@ -331,7 +336,7 @@ export const awaitTransactionSignatureConfirmation = async (
   ) {
     connection.removeSignatureListener(subId);
   }
-  done = true;
+  done = true
   return status;
 };
 
