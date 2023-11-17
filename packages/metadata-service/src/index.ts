@@ -130,6 +130,10 @@ async function getHotspotByKeyToAsset(request, reply) {
   const keyStr = decodeEntityKey(entityKey, { [keySerialization]: {} });
 
   const assetJson = generateAssetJson(record, keyStr!);
+
+  // Needed to make CloudFront to cache for longer than 1 day
+  reply.header("Cache-Control", "max-age=31536000");  // 1 year in seconds
+
   return assetJson;
 };
 
@@ -176,7 +180,7 @@ server.get("/health", async () => {
 
 server.get<{ Params: { wallet: string } }>(
   "/v2/wallet/:wallet",
-  async (request) => {
+  async (request, reply) => {
     const { wallet } = request.params;
     let page = 1;
     const limit = 1000;
@@ -234,6 +238,8 @@ server.get<{ Params: { wallet: string } }>(
       })
     );
 
+    reply.header("Cache-Control", "no-cache");
+
     return {
       hotspots_count: assetJsons.length,
       hotspots: assetJsons,
@@ -270,6 +276,8 @@ server.get<{ Querystring: { subnetwork: string } }>(
       totalItems: count,
       totalPages: Math.ceil(count / PAGE_SIZE),
     };
+
+    reply.header("Cache-Control", "no-cache");
 
     return result;
   }
@@ -360,6 +368,9 @@ server.get<{ Querystring: { subnetwork: string; cursor?: string; } }>(
     // returned
     if (isLastPage) {
       reply.header("Cache-Control", "no-cache");
+    } else {
+      // Needed to make CloudFront to cache for longer than 1 day
+      reply.header("Cache-Control", "max-age=31536000");  // 1 year in seconds
     }
     
     return result;
@@ -411,6 +422,10 @@ server.get<{ Params: { eccCompact: string } }>(
     }
 
     const assetJson = generateAssetJson(record, eccCompact);
+
+    // Needed to make CloudFront to cache for longer than 1 day
+    reply.header("Cache-Control", "max-age=31536000");  // 1 year in seconds
+
     return assetJson;
   }
 );
