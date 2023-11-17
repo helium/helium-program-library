@@ -5,6 +5,7 @@ import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
+import BN from "bn.js"
 
 export const useVotingDelegatePositions = () => {
   const { provider } = useHeliumVsrState();
@@ -13,10 +14,12 @@ export const useVotingDelegatePositions = () => {
       positions,
       recipient,
       programId = PROGRAM_ID,
+      expirationTime,
     }: {
       positions: PositionWithMeta[];
       recipient: PublicKey;
       programId?: PublicKey;
+      expirationTime: BN;
     }) => {
       const isInvalid = !provider;
 
@@ -32,9 +35,11 @@ export const useVotingDelegatePositions = () => {
         for (const position of positions) {
           instructions.push(
             await nftDelegationProgram.methods
-              .delegateV0()
+              .delegateV0({
+                expirationTime,
+              })
               .accounts({
-                mint: position.mint,
+                asset: position.mint,
                 recipient,
               })
               .instruction()

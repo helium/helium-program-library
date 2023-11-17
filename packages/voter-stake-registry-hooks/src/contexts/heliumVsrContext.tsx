@@ -116,7 +116,13 @@ export const HeliumVsrStateProvider: React.FC<{
     useDelegatedPositions(delegatedPositionKeys);
 
   const delegationKeys = useMemo(() => {
-    return me && result?.nfts.map((nft) => delegationKey(nft.address!, me)[0]);
+    return (
+      me &&
+      registrar &&
+      result?.nfts.map(
+        (nft) => delegationKey(registrar.delegationConfig, nft.address!, me)[0]
+      )
+    );
   }, [result?.nfts, me?.toBase58()]);
   const { accounts: delegationAccounts, loading: loadingDelegations } =
     useDelegations(delegationKeys);

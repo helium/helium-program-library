@@ -34,7 +34,7 @@
     "@coral-xyz/anchor": "^0.28.0",
     "@helium/anchor-resolvers": "^0.6.1",
     "@helium/idls": "^0.6.1",
-    "@helium/nft-delegation-sdk": "0.0.8-next.5+4c12e2f",
+    "@helium/nft-delegation-sdk": "0.0.8-next.10+84cdd0e",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-token": "^0.3.8",
     "bn.js": "^5.2.0",

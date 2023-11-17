@@ -514,7 +514,7 @@ describe("voter-stake-registry", () => {
           })
           .accounts({
             delegationConfig,
-            mint,
+            asset: mint,
             recipient: delegatee.publicKey,
           })
           .rpc({ skipPreflight: true });
@@ -589,14 +589,13 @@ describe("voter-stake-registry", () => {
         expect(markerA?.delegationIndex).to.eq(1);
 
         await program.methods
-          .delegatedRelinquishVoteV0({
+          .relinquishVoteV1({
             choice: 0,
           })
           .accounts({
             mint,
             proposal,
             position,
-            owner: me,
           })
           .rpc({ skipPreflight: true });
 
@@ -608,14 +607,13 @@ describe("voter-stake-registry", () => {
         expect(markerA).to.be.null;
 
         await program.methods
-          .delegatedVoteV0({
+          .voteV0({
             choice: 1,
           })
           .accounts({
             mint,
             proposal,
             position,
-            owner: me,
           })
           .rpcAndKeys({ skipPreflight: true });
 
@@ -630,7 +628,7 @@ describe("voter-stake-registry", () => {
 
       it("allows the original owner to undelegate", async () => {
         const toUndelegate = delegationKey(delegationConfig!, mint, delegatee.publicKey)[0];
-        const myDelegation = delegationKey(delegationConfig!, mint, me)[0];
+        const myDelegation = delegationKey(delegationConfig!, mint, PublicKey.default)[0];
         await delegateProgram.methods
           .undelegateV0()
           .accounts({
