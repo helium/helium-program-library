@@ -266,83 +266,88 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
     }
 
     // Claim and burn any rewards in the burn entity
-    console.log("Burning everything in the burn entity");
-    const burnProgram = await initBurn(provider);
-    const tokens = [MOBILE_MINT, IOT_MINT];
-    for (const token of tokens) {
-      const [lazyDistributor] = lazyDistributorKey(token);
-      const burnEntityKta = keyToAssetKey(dao, BURN, "utf-8")[0];
-      // Issue the burn entity if it doesn't exist yet.
-      if (!(await provider.connection.getAccountInfo(burnEntityKta))) {
-        const mint = Keypair.generate();
-        await sendInstructions(
-          provider,
-          [
-            ...(await createMintInstructions(
-              provider,
-              0,
-              provider.wallet.publicKey,
-              provider.wallet.publicKey,
-              mint
-            )),
-            await hemProgram.methods
-              .issueBurnEntityV0()
-              .accounts({
-                dao,
-                mint: mint.publicKey,
-              })
-              .instruction(),
-          ],
-          [mint]
-        );
-      }
-      const assetId = (
-        await hemProgram.account.keyToAssetV0.fetch(burnEntityKta)
-      ).asset;
-      const [recipient] = recipientKey(lazyDistributor, assetId);
-
-      try {
-        if (!(await provider.connection.getAccountInfo(recipient))) {
-          const method = lazyProgram.methods.initializeRecipientV0().accounts({
-            lazyDistributor,
-            mint: assetId,
-          });
+    // Only do this if that feature has been deployed
+    if (hemProgram.methods.issueBurnEntityV0) {
+      console.log("Burning everything in the burn entity");
+      const burnProgram = await initBurn(provider);
+      const tokens = [MOBILE_MINT, IOT_MINT];
+      for (const token of tokens) {
+        const [lazyDistributor] = lazyDistributorKey(token);
+        const burnEntityKta = keyToAssetKey(dao, BURN, "utf-8")[0];
+        // Issue the burn entity if it doesn't exist yet.
+        if (!(await provider.connection.getAccountInfo(burnEntityKta))) {
+          const mint = Keypair.generate();
           await sendInstructions(
             provider,
-            [await method.instruction()]
-          )
+            [
+              ...(await createMintInstructions(
+                provider,
+                0,
+                provider.wallet.publicKey,
+                provider.wallet.publicKey,
+                mint
+              )),
+              await hemProgram.methods
+                .issueBurnEntityV0()
+                .accounts({
+                  dao,
+                  mint: mint.publicKey,
+                })
+                .instruction(),
+            ],
+            [mint]
+          );
         }
+        const assetId = (
+          await hemProgram.account.keyToAssetV0.fetch(burnEntityKta)
+        ).asset;
+        const [recipient] = recipientKey(lazyDistributor, assetId);
 
-        const rewards = await client.getCurrentRewards(
-          lazyProgram,
-          lazyDistributor,
-          assetId
-        );
-        const tx = await client.formTransaction({
-          program: lazyProgram,
-          rewardsOracleProgram: rewardsOracleProgram,
-          provider,
-          rewards,
-          asset: assetId,
-          lazyDistributor,
-        });
-        const signed = await provider.wallet.signTransaction(tx);
-        await sendAndConfirmWithRetry(
-          provider.connection,
-          signed.serialize(),
-          { skipPreflight: true },
-          "confirmed"
-        );
+        try {
+          if (!(await provider.connection.getAccountInfo(recipient))) {
+            const method = lazyProgram.methods
+              .initializeRecipientV0()
+              .accounts({
+                lazyDistributor,
+                mint: assetId,
+              });
+            await sendInstructions(provider, [await method.instruction()]);
+          }
 
-        await sendInstructions(provider, [
-          await burnProgram.methods.burnV0().accounts({
-            mint: token,
-          }).instruction()
-        ])
-      } catch (err: any) {
-        errors.push(
-          `Failed to distribute burn funds for mint ${token.toBase58()}: ${err}`
-        );
+          const rewards = await client.getCurrentRewards(
+            lazyProgram,
+            lazyDistributor,
+            assetId
+          );
+          const tx = await client.formTransaction({
+            program: lazyProgram,
+            rewardsOracleProgram: rewardsOracleProgram,
+            provider,
+            rewards,
+            asset: assetId,
+            lazyDistributor,
+          });
+          const signed = await provider.wallet.signTransaction(tx);
+          await sendAndConfirmWithRetry(
+            provider.connection,
+            signed.serialize(),
+            { skipPreflight: true },
+            "confirmed"
+          );
+
+          await sendInstructions(provider, [
+            await burnProgram.methods
+              .burnV0()
+              .accounts({
+                mint: token,
+              })
+              .instruction(),
+          ]);
+        } catch (err: any) {
+          errors.push(
+            `Failed to distribute burn funds for mint ${token.toBase58()}: ${err}`
+          );
+        }
       }
     }
 
