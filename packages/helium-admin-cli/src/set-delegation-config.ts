@@ -37,7 +37,7 @@ export async function run(args: any = process.argv) {
     },
     delegationSeasonsFile: {
       type: "string",
-      default: __dirname + "../delegation-seasons.json",
+      default: `${__dirname}/../../delegation-seasons.json`,
     },
   });
 
@@ -65,7 +65,9 @@ export async function run(args: any = process.argv) {
     argv.delegationSeasonsFile,
     "utf8"
   );
-  const seasons = JSON.parse(delegationSeasonsFile);
+  const seasons = JSON.parse(delegationSeasonsFile).map(
+    (s) => new anchor.BN(Math.floor(Date.parse(s) / 1000))
+  );
 
   const {
     pubkeys: { delegationConfig },
@@ -87,7 +89,7 @@ export async function run(args: any = process.argv) {
     await sendInstructions(provider, [instruction]);
   }
 
-  console.log("Updating registrar to delegation config")
+  console.log("Updating registrar to delegation config");
   await sendInstructionsOrSquads({
     provider,
     instructions: [
@@ -96,6 +98,7 @@ export async function run(args: any = process.argv) {
         .accounts({
           delegationConfig,
           registrar,
+          realmAuthority: authority,
         })
         .instruction(),
     ],
