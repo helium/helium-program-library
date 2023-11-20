@@ -9,7 +9,7 @@ import { init } from "@helium/nft-delegation-sdk";
 import { Metadata, Metaplex, Nft, Sft } from "@metaplex-foundation/js";
 import { getMint, Mint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import { Registrar } from "../sdk/types";
+import { DelegationV0, Registrar } from "../sdk/types";
 
 export interface GetPositionsArgs {
   wallet: PublicKey;
@@ -41,6 +41,7 @@ export const getPositionKeys = async (
   votingDelegatedPositionKeys: PublicKey[];
   positionKeys: PublicKey[];
   nfts: (Metadata | Nft | Sft)[];
+  delegationKeys: PublicKey[];
 }> => {
   const { mint, wallet, provider } = args;
   const connection = provider.connection;
@@ -50,7 +51,7 @@ export const getPositionKeys = async (
   const myDelegations = await delegationProgram.account.delegationV0.all([
     {
       memcmp: {
-        offset: 0,
+        offset: 8,
         bytes: me.toBase58(),
       },
     },
@@ -83,6 +84,7 @@ export const getPositionKeys = async (
   return {
     positionKeys,
     votingDelegatedPositionKeys: delegationPositions,
+    delegationKeys: myDelegations.map((d) => d.publicKey),
     nfts,
   };
 };

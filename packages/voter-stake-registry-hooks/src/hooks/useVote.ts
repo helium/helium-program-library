@@ -8,10 +8,11 @@ import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { useVoteMarkers } from "./useVoteMarkers";
+import { getRegistrarKey } from "../utils/getPositionKeys";
 
 export const useVote = (proposalKey: PublicKey) => {
   const { info: proposal } = useProposal(proposalKey);
-  const { positions, provider } = useHeliumVsrState();
+  const { positions, provider, registrar } = useHeliumVsrState();
   const voteMarkerKeys = useMemo(() => {
     return positions
       ? positions.map((p) => voteMarkerKey(p.mint, proposalKey)[0])
@@ -34,13 +35,22 @@ export const useVote = (proposalKey: PublicKey) => {
     (choice: number) => {
       if (!markers) return false;
 
-      return markers.some((m) => {
+      return markers.some((m, index) => {
+        const position = positions?.[index];
+        const earlierDelegateVoted =
+          position &&
+          position.votingDelegation &&
+          m.info &&
+          position.votingDelegation.index > m.info.delegationIndex;
         const noMarker = !m?.info;
         const maxChoicesReached =
           (m?.info?.choices.length || 0) >= (proposal?.maxChoicesPerVoter || 0);
         const alreadyVotedThisChoice = m.info?.choices.includes(choice);
         const canVote =
-          noMarker || (!maxChoicesReached && !alreadyVotedThisChoice);
+          noMarker ||
+          (!maxChoicesReached &&
+            !alreadyVotedThisChoice &&
+            !earlierDelegateVoted);
         return canVote;
       });
     },
@@ -67,7 +77,7 @@ export const useVote = (proposalKey: PublicKey) => {
               if (!marker || (!alreadyVotedThisChoice && !maxChoicesReached)) {
                 if (position.isVotingDelegatedToMe) {
                   if (
-                    marker?.delegationIndex &&
+                    marker &&
                     marker.delegationIndex <
                       (position.votingDelegation?.index || 0)
                   ) {
@@ -83,6 +93,7 @@ export const useVote = (proposalKey: PublicKey) => {
                       proposal: proposalKey,
                       owner: provider.wallet.publicKey,
                       position: position.pubkey,
+                      registrar: registrar?.pubkey,
                     })
                     .instruction();
                 }

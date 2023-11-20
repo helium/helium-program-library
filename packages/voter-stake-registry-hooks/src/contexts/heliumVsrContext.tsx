@@ -1,9 +1,13 @@
-import { AnchorProvider, BN, Program, Wallet } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, IdlAccounts, Wallet } from "@coral-xyz/anchor";
 import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import {
   EPOCH_LENGTH,
   delegatedPositionKey,
 } from "@helium/helium-sub-daos-sdk";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { delegationKey } from "@helium/nft-delegation-sdk";
+import { truthy } from "@helium/spl-utils";
+import { Connection, PublicKey } from "@solana/web3.js";
 import React, {
   createContext,
   useCallback,
@@ -13,6 +17,7 @@ import React, {
 } from "react";
 import { useAsync } from "react-async-hook";
 import { useDelegatedPositions } from "../hooks/useDelegatedPositions";
+import { useDelegations } from "../hooks/useDelegations";
 import { usePositions } from "../hooks/usePositions";
 import { useRegistrar } from "../hooks/useRegistrar";
 import { PositionWithMeta } from "../sdk/types";
@@ -22,21 +27,18 @@ import {
   getPositionKeys,
   getRegistrarKey,
 } from "../utils/getPositionKeys";
-import { truthy } from "@helium/spl-utils";
-import { Connection, PublicKey } from "@solana/web3.js";
-import { delegationKey, init } from "@helium/nft-delegation-sdk";
-import { useDelegations } from "../hooks/useDelegations";
-import { NftDelegation } from "@helium/modular-governance-idls/lib/types/nft_delegation";
-import { positionKey } from "@helium/voter-stake-registry-sdk";
+
+type Registrar = IdlAccounts<VoterStakeRegistry>["registrar"];
 
 export interface HeliumVsrState {
   amountLocked?: BN;
+  amountVotingDelegationLocked?: BN;
   loading: boolean;
   mint?: PublicKey;
   positions?: PositionWithMeta[];
   provider?: AnchorProvider;
   votingPower?: BN;
-
+  registrar?: Registrar & { pubkey?: PublicKey };
   refetch: () => void;
 }
 
@@ -117,13 +119,20 @@ export const HeliumVsrStateProvider: React.FC<{
 
   const delegationKeys = useMemo(() => {
     return (
-      me &&
       registrar &&
-      result?.nfts.map(
-        (nft) => delegationKey(registrar.delegationConfig, nft.address!, me)[0]
-      )
+      result && [
+        ...result.nfts.map((nft) => {
+          return delegationKey(
+            registrar.delegationConfig,
+            // @ts-ignore
+            nft.mintAddress!,
+            PublicKey.default
+          )[0];
+        }),
+        ...result.delegationKeys,
+      ]
     );
-  }, [result?.nfts, me?.toBase58()]);
+  }, [result?.nfts, result?.delegationKeys]);
   const { accounts: delegationAccounts, loading: loadingDelegations } =
     useDelegations(delegationKeys);
 
@@ -139,9 +148,15 @@ export const HeliumVsrStateProvider: React.FC<{
     usePositions(allPositions);
   const now = useSolanaUnixNow(60 * 5 * 1000);
 
-  const { amountLocked, votingPower, positionsWithMeta } = useMemo(() => {
+  const {
+    amountLocked,
+    votingPower,
+    positionsWithMeta,
+    amountVotingDelegationLocked,
+  } = useMemo(() => {
     if (positions && registrar && delegatedAccounts && now) {
       let amountLocked = new BN(0);
+      let amountVotingDelegationLocked = new BN(0);
       let votingPower = new BN(0);
       const mintCfgs = registrar?.votingMints;
       const positionsWithMeta = positions
@@ -164,9 +179,17 @@ export const HeliumVsrStateProvider: React.FC<{
               unixNow: new BN(now),
             });
 
-            amountLocked = amountLocked.add(
-              position.info.amountDepositedNative
-            );
+            const isVotingDelegatedToMe = idx >= (myOwnedPositionsEndIdx || 0);
+            if (isVotingDelegatedToMe) {
+              amountVotingDelegationLocked = amountVotingDelegationLocked.add(
+                position.info.amountDepositedNative
+              );
+            } else {
+              amountLocked = amountLocked.add(
+                position.info.amountDepositedNative
+              );
+            }
+
             votingPower = votingPower.add(posVotingPower);
 
             return {
@@ -178,11 +201,13 @@ export const HeliumVsrStateProvider: React.FC<{
               hasGenesisMultiplier: position.info.genesisEnd.gt(new BN(now)),
               votingPower: posVotingPower,
               votingMint: mintCfgs[position.info.votingMintConfigIdx],
-              isVotingDelegatedToMe: idx >= (myOwnedPositionsEndIdx || 0),
-              votingDelegation: {
-                ...delegation,
-                address: delegationAccounts?.[idx]?.publicKey,
-              },
+              isVotingDelegatedToMe,
+              votingDelegation: delegation
+                ? {
+                    ...delegation,
+                    address: delegationAccounts?.[idx]?.publicKey,
+                  }
+                : undefined,
             } as PositionWithMeta;
           }
         })
@@ -192,6 +217,7 @@ export const HeliumVsrStateProvider: React.FC<{
         positionsWithMeta,
         amountLocked,
         votingPower,
+        amountVotingDelegationLocked,
       };
     }
 
@@ -208,11 +234,18 @@ export const HeliumVsrStateProvider: React.FC<{
       loading: loading || loadingPositions || loadingDel,
       error,
       amountLocked,
+      amountVotingDelegationLocked,
       mint,
       positions: positionsWithMeta,
       provider,
       refetch,
       votingPower,
+      registrar: registrar
+        ? {
+            ...registrar,
+            pubkey: registrarKey,
+          }
+        : undefined,
     }),
     [
       loadingPositions,
@@ -220,11 +253,13 @@ export const HeliumVsrStateProvider: React.FC<{
       loading,
       error,
       amountLocked,
+      amountVotingDelegationLocked,
       mint,
       positionsWithMeta,
       provider,
       refetch,
       votingPower,
+      registrar,
     ]
   );
   return (

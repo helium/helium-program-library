@@ -8,7 +8,7 @@ import { PositionWithMeta } from "../sdk/types";
 import BN from "bn.js"
 
 export const useVotingDelegatePositions = () => {
-  const { provider } = useHeliumVsrState();
+  const { provider, registrar } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       positions,
@@ -28,7 +28,7 @@ export const useVotingDelegatePositions = () => {
 
       if (loading) return;
 
-      if (isInvalid || !nftDelegationProgram) {
+      if (isInvalid || !nftDelegationProgram || !registrar) {
         throw new Error("Unable to voting delegate, Invalid params");
       } else {
         const instructions: TransactionInstruction[] = [];
@@ -41,6 +41,7 @@ export const useVotingDelegatePositions = () => {
               .accounts({
                 asset: position.mint,
                 recipient,
+                delegationConfig: registrar.delegationConfig,
               })
               .instruction()
           );

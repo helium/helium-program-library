@@ -25,3 +25,4 @@ export { getRegistrarKey, getPositionKeys } from "./utils/getPositionKeys";
 export { useVoteMarkers } from "./hooks/useVoteMarkers";
 export { useVote } from "./hooks/useVote";
 export { useRelinquishVote } from "./hooks/useRelinquishVote";
+export { useVotingDelegatePositions } from "./hooks/useVotingDelegatePositions";

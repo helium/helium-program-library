@@ -19,7 +19,15 @@ export const useRelinquishVote = (proposal: PublicKey) => {
     (choice: number) => {
       if (!markers) return false;
 
-      return markers.some((m) => m.info?.choices.includes(choice));
+      return markers.some((m, index) => {
+        const position = positions?.[index];
+        const earlierDelegateVoted =
+          position &&
+          position.votingDelegation &&
+          m.info &&
+          position.votingDelegation.index > m.info.delegationIndex;
+        return !earlierDelegateVoted && m.info?.choices.includes(choice);
+      });
     },
     [markers]
   );
@@ -42,9 +50,12 @@ export const useRelinquishVote = (proposal: PublicKey) => {
 
               if (marker && alreadyVotedThisChoice) {
                 if (position.isVotingDelegatedToMe) {
-                  if (marker.delegationIndex < (position.votingDelegation?.index || 0)) {
+                  if (
+                    marker.delegationIndex <
+                      (position.votingDelegation?.index || 0)
+                  ) {
                     // Do not vote with a position that has been delegated to us, but voting overidden
-                    return
+                    return;
                   }
 
                   return await vsrProgram.methods
