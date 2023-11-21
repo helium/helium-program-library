@@ -1,4 +1,9 @@
-import { bulkSendTransactions, chunks, truthy } from "@helium/spl-utils";
+import {
+  batchParallelInstructions,
+  bulkSendTransactions,
+  chunks,
+  truthy,
+} from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@metaplex-foundation/js";
 import { Transaction } from "@solana/web3.js";
@@ -52,7 +57,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
                 if (position.isVotingDelegatedToMe) {
                   if (
                     marker.delegationIndex <
-                      (position.votingDelegation?.index || 0)
+                    (position.votingDelegation?.index || 0)
                   ) {
                     // Do not vote with a position that has been delegated to us, but voting overidden
                     return;
@@ -84,16 +89,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
           )
         ).filter(truthy);
 
-        const txs = chunks(instructions, 4).map((ixs) => {
-          const tx = new Transaction({
-            feePayer: provider.wallet.publicKey,
-          });
-          tx.add(...ixs);
-
-          return tx;
-        });
-
-        await bulkSendTransactions(provider, txs);
+        await batchParallelInstructions(provider, instructions);
       }
     }
   );

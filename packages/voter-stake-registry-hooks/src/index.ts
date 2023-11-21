@@ -26,3 +26,4 @@ export { useVoteMarkers } from "./hooks/useVoteMarkers";
 export { useVote } from "./hooks/useVote";
 export { useRelinquishVote } from "./hooks/useRelinquishVote";
 export { useVotingDelegatePositions } from "./hooks/useVotingDelegatePositions";
+export { useVotingUndelegatePositions } from "./hooks/useVotingUndelegatePositions";

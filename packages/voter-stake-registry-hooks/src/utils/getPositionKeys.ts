@@ -48,17 +48,6 @@ export const getPositionKeys = async (
 
   const me = wallet;
   const delegationProgram = await init(provider);
-  const myDelegations = await delegationProgram.account.delegationV0.all([
-    {
-      memcmp: {
-        offset: 8,
-        bytes: me.toBase58(),
-      },
-    },
-  ]);
-  const delegationPositions = myDelegations.map(
-    (del) => positionKey(del.account.asset)[0]
-  );
 
   const metaplex = new Metaplex(connection);
   const registrarPk = getRegistrarKey(mint);
@@ -66,6 +55,23 @@ export const getPositionKeys = async (
   const registrar = (await program.account.registrar.fetch(
     registrarPk
   )) as Registrar;
+    const myDelegations = await delegationProgram.account.delegationV0.all([
+    {
+      memcmp: {
+        offset: 8,
+        bytes: me.toBase58(),
+      },
+    },
+    {
+      memcmp: {
+        offset: 8 + 32,
+        bytes: registrar.delegationConfig.toBase58()
+      }
+    }
+  ]);
+  const delegationPositions = myDelegations.map(
+    (del) => positionKey(del.account.asset)[0]
+  );
   const mintCfgs = registrar.votingMints;
   const mints: Record<string, Mint> = {};
   for (const mcfg of mintCfgs) {

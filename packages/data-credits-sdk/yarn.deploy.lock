@@ -152,7 +152,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/modular-governance-idls@npm:^0.0.8-next.10+84cdd0e":
+"@helium/modular-governance-idls@npm:^0.0.8-next.12+f1b0c8c":
   version: 0.0.8
   resolution: "@helium/modular-governance-idls@npm:0.0.8"
   dependencies:
@@ -162,15 +162,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/nft-delegation-sdk@npm:0.0.8-next.10+84cdd0e":
-  version: 0.0.8-next.10
-  resolution: "@helium/nft-delegation-sdk@npm:0.0.8-next.10"
+"@helium/nft-delegation-sdk@npm:0.0.8-next.12+f1b0c8c":
+  version: 0.0.8-next.12
+  resolution: "@helium/nft-delegation-sdk@npm:0.0.8-next.12"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.2.17
-    "@helium/modular-governance-idls": ^0.0.8-next.10+84cdd0e
+    "@helium/modular-governance-idls": ^0.0.8-next.12+f1b0c8c
     "@solana/spl-token": ^0.3.8
-  checksum: 98d3ac4622bd05d69216f70357adc66dba605058e469ae904130a51c9da5f7c2a896ff2d8ae5063734bdf3bfdc3fea2620facdd2e4ad962b7b0fdc090da794ea
+  checksum: 0c9b8fc24044f30b0e794db24b211c4b888670dcc6f988fc2144d5bc5d653f9f76f9b9b3f6be3091c3b730b7a83df7d1a8ab25211cac02da0e8b6528bef11c2b
   languageName: node
   linkType: hard
 
@@ -198,7 +198,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.6.2
     "@helium/idls": ^0.6.2
-    "@helium/nft-delegation-sdk": 0.0.8-next.10+84cdd0e
+    "@helium/nft-delegation-sdk": 0.0.8-next.12+f1b0c8c
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     bn.js: ^5.2.0

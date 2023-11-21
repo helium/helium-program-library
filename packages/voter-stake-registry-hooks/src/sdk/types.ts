@@ -28,7 +28,7 @@ export interface PositionWithMeta extends Position {
   hasGenesisMultiplier: boolean
   votingPower: BN
   votingMint: VotingMintConfig
-  votingDelegation: DelegationV0 & { address: PublicKey } | null
+  votingDelegation: (DelegationV0 & { address: PublicKey }) | null
 }
 export type LockupKind = IdlTypes<HeliumVoterStakeRegistry>['LockupKind']
 /* export type InitializePositionV0Args = IdlTypes<HeliumVoterStakeRegistry>['InitializePositionArgsV0']

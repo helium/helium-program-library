@@ -1,5 +1,10 @@
 import { useProposal } from "@helium/modular-governance-hooks";
-import { bulkSendTransactions, chunks, truthy } from "@helium/spl-utils";
+import {
+  batchParallelInstructions,
+  bulkSendTransactions,
+  chunks,
+  truthy,
+} from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@metaplex-foundation/js";
 import { Transaction } from "@solana/web3.js";
@@ -78,10 +83,12 @@ export const useVote = (proposalKey: PublicKey) => {
                 if (position.isVotingDelegatedToMe) {
                   if (
                     marker &&
-                    marker.delegationIndex <
-                      (position.votingDelegation?.index || 0)
+                    (marker.delegationIndex <
+                      (position.votingDelegation?.index || 0) ||
+                      marker.choices.includes(choice))
                   ) {
                     // Do not vote with a position that has been delegated to us, but voting overidden
+                    // Also ignore voting for the same choice twice
                     return;
                   }
 
@@ -112,16 +119,7 @@ export const useVote = (proposalKey: PublicKey) => {
           )
         ).filter(truthy);
 
-        const txs = chunks(instructions, 4).map((ixs) => {
-          const tx = new Transaction({
-            feePayer: provider.wallet.publicKey,
-          });
-          tx.add(...ixs);
-
-          return tx;
-        });
-
-        await bulkSendTransactions(provider, txs);
+        await batchParallelInstructions(provider, instructions);
       }
     }
   );

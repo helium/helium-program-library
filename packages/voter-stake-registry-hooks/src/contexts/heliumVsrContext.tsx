@@ -20,7 +20,7 @@ import { useDelegatedPositions } from "../hooks/useDelegatedPositions";
 import { useDelegations } from "../hooks/useDelegations";
 import { usePositions } from "../hooks/usePositions";
 import { useRegistrar } from "../hooks/useRegistrar";
-import { PositionWithMeta } from "../sdk/types";
+import { DelegationV0, PositionWithMeta } from "../sdk/types";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 import {
   GetPositionsArgs as GetPosArgs,
@@ -203,10 +203,10 @@ export const HeliumVsrStateProvider: React.FC<{
               votingMint: mintCfgs[position.info.votingMintConfigIdx],
               isVotingDelegatedToMe,
               votingDelegation: delegation
-                ? {
+                ? ({
                     ...delegation,
                     address: delegationAccounts?.[idx]?.publicKey,
-                  }
+                  } as DelegationV0 & { address: PublicKey })
                 : undefined,
             } as PositionWithMeta;
           }
@@ -229,6 +229,21 @@ export const HeliumVsrStateProvider: React.FC<{
     delegatedAccounts,
     delegationAccounts,
   ]);
+
+  const sortedPositions = useMemo(
+    () =>
+      positionsWithMeta?.sort((a, b) => {
+        if (a.hasGenesisMultiplier || b.hasGenesisMultiplier) {
+          if (b.hasGenesisMultiplier) {
+            return a.amountDepositedNative.gt(b.amountDepositedNative) ? 0 : -1;
+          }
+          return -1;
+        }
+
+        return a.amountDepositedNative.gt(b.amountDepositedNative) ? -1 : 0;
+      }),
+    [positionsWithMeta]
+  );
   const ret = useMemo(
     () => ({
       loading: loading || loadingPositions || loadingDel,
@@ -236,7 +251,7 @@ export const HeliumVsrStateProvider: React.FC<{
       amountLocked,
       amountVotingDelegationLocked,
       mint,
-      positions: positionsWithMeta,
+      positions: sortedPositions,
       provider,
       refetch,
       votingPower,
@@ -255,7 +270,7 @@ export const HeliumVsrStateProvider: React.FC<{
       amountLocked,
       amountVotingDelegationLocked,
       mint,
-      positionsWithMeta,
+      sortedPositions,
       provider,
       refetch,
       votingPower,

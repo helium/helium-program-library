@@ -1,11 +1,11 @@
 import { Program } from "@coral-xyz/anchor";
 import { PROGRAM_ID, init } from "@helium/nft-delegation-sdk";
-import { sendInstructions } from "@helium/spl-utils";
+import { batchParallelInstructions, sendInstructions } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
-import BN from "bn.js"
+import BN from "bn.js";
 
 export const useVotingDelegatePositions = () => {
   const { provider, registrar } = useHeliumVsrState();
@@ -33,20 +33,28 @@ export const useVotingDelegatePositions = () => {
       } else {
         const instructions: TransactionInstruction[] = [];
         for (const position of positions) {
-          instructions.push(
-            await nftDelegationProgram.methods
-              .delegateV0({
-                expirationTime,
-              })
-              .accounts({
-                asset: position.mint,
-                recipient,
-                delegationConfig: registrar.delegationConfig,
-              })
-              .instruction()
-          );
+          const {
+            instruction,
+            pubkeys: { nextDelegation },
+          } = await nftDelegationProgram.methods
+            .delegateV0({
+              expirationTime,
+            })
+            .accounts({
+              asset: position.mint,
+              recipient,
+              delegationConfig: registrar.delegationConfig,
+            })
+            .prepare();
+          // Don't delegate where there's already a delegation.
+          if ((await provider.connection.getAccountInfo(nextDelegation!))) {
+            throw new Error("Recipient wallet is already a proxy to this position")
+          } else {
+            instructions.push(instruction);
+          }
         }
-        await sendInstructions(provider, instructions);
+
+        await batchParallelInstructions(provider, instructions);
       }
     }
   );
