@@ -763,6 +763,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@fastify/accept-negotiator@npm:^1.0.0":
+  version: 1.1.0
+  resolution: "@fastify/accept-negotiator@npm:1.1.0"
+  checksum: 5c8f263680af0aece8c1fdea4d4c094a7f82cc5ed90b709357eb52a01e3388d1ac74a17e5a1d5d53f2d3ca93ae50d283ee451a6435b2cbe1b9847fff4d7d0732
+  languageName: node
+  linkType: hard
+
 "@fastify/ajv-compiler@npm:^3.5.0":
   version: 3.5.0
   resolution: "@fastify/ajv-compiler@npm:3.5.0"
@@ -804,6 +811,33 @@ __metadata:
   dependencies:
     fast-json-stringify: "npm:^5.7.0"
   checksum: 2734afabe2539d3e15d2bd9f8dfee756d9cd969f7303dc085dd91c744ff61742bb0d3ebd3b561cf3c32be54567048a634b4962f943eb6bd9ed3fbd71cbf6a4fa
+  languageName: node
+  linkType: hard
+
+"@fastify/send@npm:^2.0.0":
+  version: 2.1.0
+  resolution: "@fastify/send@npm:2.1.0"
+  dependencies:
+    "@lukeed/ms": ^2.0.1
+    escape-html: ~1.0.3
+    fast-decode-uri-component: ^1.0.1
+    http-errors: 2.0.0
+    mime: ^3.0.0
+  checksum: c0eeddd35c53167e41ee7c25ccbb964e5a1e4a17c827da6486db656581f83f162237d6f8104b698a4a136d8ea054f2d028bfa4c7d1c4126db51584680f43e1f1
+  languageName: node
+  linkType: hard
+
+"@fastify/static@npm:^6":
+  version: 6.12.0
+  resolution: "@fastify/static@npm:6.12.0"
+  dependencies:
+    "@fastify/accept-negotiator": ^1.0.0
+    "@fastify/send": ^2.0.0
+    content-disposition: ^0.5.3
+    fastify-plugin: ^4.0.0
+    glob: ^8.0.1
+    p-limit: ^3.1.0
+  checksum: 1ba2f88665baddc9e67c7ea8aee401b5ec8c207e7fd615b2e68246a7ee2cafcc75e66b66d901abb154566fa7132af2319cd00e15350ed57936b74ee10c8eb9c7
   languageName: node
   linkType: hard
 
@@ -1375,6 +1409,27 @@ __metadata:
     git-format-staged: ^2.1.3
     ts-loader: ^9.2.3
     ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
+
+"@helium/helium-vote-service@workspace:packages/helium-vote-service":
+  version: 0.0.0-use.local
+  resolution: "@helium/helium-vote-service@workspace:packages/helium-vote-service"
+  dependencies:
+    "@fastify/cors": ^8.1.1
+    "@fastify/static": ^6
+    "@helium/spl-utils": ^0.6.2
+    "@helium/voter-stake-registry-sdk": ^0.6.2
+    "@types/bn.js": ^5.1.1
+    dotenv: ^16.0.3
+    fastify: ^4.13.0
+    git-format-staged: ^2.1.3
+    sequelize: ^6.28.0
+    simple-git: ^3.21.0
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    ts-node-dev: ^2.0.0
     typescript: ^5.2.2
   languageName: unknown
   linkType: soft
@@ -1990,6 +2045,22 @@ __metadata:
   version: 6.0.6
   resolution: "@jup-ag/api@npm:6.0.6"
   checksum: 3438ac34675b3f5250755d4d61460b811a64a401bd52b51090c369077f9880f9f02dcbf732a13c5114765daed3711c60461019f66737c46adfda95a766de3f6f
+  languageName: node
+  linkType: hard
+
+"@kwsites/file-exists@npm:^1.1.1":
+  version: 1.1.1
+  resolution: "@kwsites/file-exists@npm:1.1.1"
+  dependencies:
+    debug: ^4.1.1
+  checksum: 4ff945de7293285133aeae759caddc71e73c4a44a12fac710fdd4f574cce2671a3f89d8165fdb03d383cfc97f3f96f677d8de3c95133da3d0e12a123a23109fe
+  languageName: node
+  linkType: hard
+
+"@kwsites/promise-deferred@npm:^1.1.1":
+  version: 1.1.1
+  resolution: "@kwsites/promise-deferred@npm:1.1.1"
+  checksum: 07455477a0123d9a38afb503739eeff2c5424afa8d3dbdcc7f9502f13604488a4b1d9742fc7288832a52a6422cf1e1c0a1d51f69a39052f14d27c9a0420b6629
   languageName: node
   linkType: hard
 
@@ -2852,6 +2923,13 @@ __metadata:
   version: 2.7.11
   resolution: "@lmdb/lmdb-win32-x64@npm:2.7.11"
   conditions: os=win32 & cpu=x64
+  languageName: node
+  linkType: hard
+
+"@lukeed/ms@npm:^2.0.1":
+  version: 2.0.1
+  resolution: "@lukeed/ms@npm:2.0.1"
+  checksum: c7b46933bf7bad3e024dcbbe2ad6201392b4ed2a05a717c0ef7e96a03fb885d44f08b4b749c392cc51c2736a6a45a08c77f1863ace1c072928fbfd9908a13db3
   languageName: node
   linkType: hard
 
@@ -7410,7 +7488,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"content-disposition@npm:0.5.4, content-disposition@npm:^0.5.2":
+"content-disposition@npm:0.5.4, content-disposition@npm:^0.5.2, content-disposition@npm:^0.5.3":
   version: 0.5.4
   resolution: "content-disposition@npm:0.5.4"
   dependencies:
@@ -7815,7 +7893,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"debug@npm:4, debug@npm:^4.0.0, debug@npm:^4.3.3, debug@npm:^4.3.4":
+"debug@npm:4, debug@npm:^4.0.0, debug@npm:^4.1.1, debug@npm:^4.3.3, debug@npm:^4.3.4":
   version: 4.3.4
   resolution: "debug@npm:4.3.4"
   dependencies:
@@ -13020,7 +13098,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"p-limit@npm:3.1.0, p-limit@npm:^3.0.2":
+"p-limit@npm:3.1.0, p-limit@npm:^3.0.2, p-limit@npm:^3.1.0":
   version: 3.1.0
   resolution: "p-limit@npm:3.1.0"
   dependencies:
@@ -14911,6 +14989,17 @@ __metadata:
   version: 4.1.0
   resolution: "signal-exit@npm:4.1.0"
   checksum: 64c757b498cb8629ffa5f75485340594d2f8189e9b08700e69199069c8e3070fb3e255f7ab873c05dc0b3cec412aea7402e10a5990cb6a050bd33ba062a6c549
+  languageName: node
+  linkType: hard
+
+"simple-git@npm:^3.21.0":
+  version: 3.21.0
+  resolution: "simple-git@npm:3.21.0"
+  dependencies:
+    "@kwsites/file-exists": ^1.1.1
+    "@kwsites/promise-deferred": ^1.1.1
+    debug: ^4.3.4
+  checksum: e992d2ac5905c19d385ebb8575db92886c93e677acfb9edb28a842d05b7a3974ef34cc26ccb8057144099a1c5875070867456787aef5bf641a99ebfb9ef656bf
   languageName: node
   linkType: hard
 

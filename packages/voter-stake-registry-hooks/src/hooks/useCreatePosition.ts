@@ -1,6 +1,6 @@
 import { BN } from "@coral-xyz/anchor";
 import { sendInstructions } from "@helium/spl-utils";
-import { positionKey } from "@helium/voter-stake-registry-sdk";
+import { getRegistrarKey, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
   MintLayout,
   TOKEN_PROGRAM_ID,
@@ -15,7 +15,6 @@ import {
 import { useAsync, useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { HeliumVsrClient } from "../sdk/client";
-import { getRegistrarKey } from "../utils/getPositionKeys";
 
 export const useCreatePosition = () => {
   const { provider } = useHeliumVsrState();

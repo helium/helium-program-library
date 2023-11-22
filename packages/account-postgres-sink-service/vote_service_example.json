@@ -1,0 +1,19 @@
+{
+  "configs": [
+    {
+      "programId": "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8",
+      "accounts": [
+        { "type": "PositionV0", "table": "positions", "schema": "public" },
+        { "type": "Registrar", "table": "registrars", "schema": "public" },
+        { "type": "VoteMarkerV0", "table": "vote_markers", "schema": "public" }
+      ]
+    },
+    {
+      "programId": "nde169MVKXLYbtDbrTF8wiJc8KYJRvLXKAzHApZ5vvD",
+      "accounts": [
+        { "type": "DelegationV0", "table": "delegations", "schema": "public" }
+      ]
+    }
+  ],
+  "indexConfigs": []
+}

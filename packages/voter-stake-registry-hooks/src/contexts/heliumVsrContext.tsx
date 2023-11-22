@@ -20,13 +20,18 @@ import { useDelegatedPositions } from "../hooks/useDelegatedPositions";
 import { useDelegations } from "../hooks/useDelegations";
 import { usePositions } from "../hooks/usePositions";
 import { useRegistrar } from "../hooks/useRegistrar";
+import { init as initNftDelegation } from "@helium/nft-delegation-sdk";
 import { DelegationV0, PositionWithMeta } from "../sdk/types";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 import {
   GetPositionsArgs as GetPosArgs,
   getPositionKeys,
-  getRegistrarKey,
 } from "../utils/getPositionKeys";
+import {
+  VoteService,
+  getRegistrarKey,
+  init,
+} from "@helium/voter-stake-registry-sdk";
 
 type Registrar = IdlAccounts<VoterStakeRegistry>["registrar"];
 
@@ -40,6 +45,7 @@ export interface HeliumVsrState {
   votingPower?: BN;
   registrar?: Registrar & { pubkey?: PublicKey };
   refetch: () => void;
+  voteService?: VoteService;
 }
 
 const defaultState: HeliumVsrState = {
@@ -49,6 +55,7 @@ const defaultState: HeliumVsrState = {
   positions: [],
   provider: undefined,
   votingPower: new BN(0),
+  voteService: undefined,
 
   refetch: () => {},
 };
@@ -70,7 +77,8 @@ export const HeliumVsrStateProvider: React.FC<{
   wallet: Wallet | undefined;
   mint: PublicKey | undefined;
   children: React.ReactNode;
-}> = ({ wallet, mint, connection, children }) => {
+  heliumVoteUri?: string;
+}> = ({ heliumVoteUri, wallet, mint, connection, children }) => {
   const provider = useMemo(() => {
     if (connection && wallet) {
       return new AnchorProvider(connection, wallet, {
@@ -85,22 +93,43 @@ export const HeliumVsrStateProvider: React.FC<{
   /// Allow refetching all NFTs by incrementing call index
   const [callIndex, setCallIndex] = useState(0);
   const refetch = useCallback(() => setCallIndex((i) => i + 1), [setCallIndex]);
+  const registrarKey = useMemo(
+    () => mint && getRegistrarKey(mint),
+    [mint?.toBase58()]
+  );
+  // Allow vote service either from native rpc or from api
+  const { result: voteService } = useAsync(async () => {
+    if (registrarKey) {
+      if (heliumVoteUri) {
+        return new VoteService({
+          baseURL: heliumVoteUri,
+          registrar: registrarKey,
+        });
+      } else {
+        const program = await init(provider as any);
+        const nftDelegationProgram = await initNftDelegation(provider as any);
+        new VoteService({
+          registrar: registrarKey,
+          program,
+          nftDelegationProgram,
+        });
+      }
+    }
+  }, [provider, registrarKey]);
   const args = useMemo(
     () =>
       wallet &&
       mint &&
       connection &&
+      voteService &&
       ({
         wallet: provider?.publicKey,
         mint,
         provider,
         callIndex,
+        voteService,
       } as GetPosArgs),
-    [mint, provider, callIndex]
-  );
-  const registrarKey = useMemo(
-    () => mint && getRegistrarKey(mint),
-    [mint?.toBase58()]
+    [mint, provider, callIndex, voteService]
   );
   const { info: registrar } = useRegistrar(registrarKey);
   const { result, loading, error } = useAsync(
@@ -261,6 +290,7 @@ export const HeliumVsrStateProvider: React.FC<{
             pubkey: registrarKey,
           }
         : undefined,
+      voteService,
     }),
     [
       loadingPositions,
@@ -275,6 +305,7 @@ export const HeliumVsrStateProvider: React.FC<{
       refetch,
       votingPower,
       registrar,
+      voteService,
     ]
   );
   return (

@@ -1,40 +1,23 @@
 import { AnchorProvider } from "@coral-xyz/anchor";
-import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import { init } from "@helium/nft-delegation-sdk";
 import {
+  VoteService,
+  getRegistrarKey,
   init as initVsr,
   positionKey,
-  registrarKey,
 } from "@helium/voter-stake-registry-sdk";
-import { init } from "@helium/nft-delegation-sdk";
 import { Metadata, Metaplex, Nft, Sft } from "@metaplex-foundation/js";
-import { getMint, Mint } from "@solana/spl-token";
+import { Mint, getMint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import { DelegationV0, Registrar } from "../sdk/types";
+import { Registrar } from "../sdk/types";
 
 export interface GetPositionsArgs {
   wallet: PublicKey;
   mint: PublicKey;
   provider: AnchorProvider;
+  voteService: VoteService;
 }
 
-export function getRegistrarKey(mint: PublicKey) {
-  return registrarKey(
-    PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("governance", "utf-8"),
-        Buffer.from(realmNames[mint.toBase58()], "utf-8"),
-      ],
-      new PublicKey("hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S")
-    )[0],
-    mint
-  )[0];
-}
-
-const realmNames: Record<string, string> = {
-  [HNT_MINT.toBase58()]: "Helium",
-  [MOBILE_MINT.toBase58()]: "Helium MOBILE",
-  [IOT_MINT.toBase58()]: "Helium IOT",
-};
 export const getPositionKeys = async (
   args: GetPositionsArgs
 ): Promise<{
@@ -43,7 +26,7 @@ export const getPositionKeys = async (
   nfts: (Metadata | Nft | Sft)[];
   delegationKeys: PublicKey[];
 }> => {
-  const { mint, wallet, provider } = args;
+  const { mint, wallet, provider, voteService } = args;
   const connection = provider.connection;
 
   const me = wallet;
@@ -55,22 +38,9 @@ export const getPositionKeys = async (
   const registrar = (await program.account.registrar.fetch(
     registrarPk
   )) as Registrar;
-    const myDelegations = await delegationProgram.account.delegationV0.all([
-    {
-      memcmp: {
-        offset: 8,
-        bytes: me.toBase58(),
-      },
-    },
-    {
-      memcmp: {
-        offset: 8 + 32,
-        bytes: registrar.delegationConfig.toBase58()
-      }
-    }
-  ]);
+  const myDelegations = await voteService.getMyDelegations(me);
   const delegationPositions = myDelegations.map(
-    (del) => positionKey(del.account.asset)[0]
+    (del) => positionKey(new PublicKey(del.asset))[0]
   );
   const mintCfgs = registrar.votingMints;
   const mints: Record<string, Mint> = {};
@@ -90,7 +60,7 @@ export const getPositionKeys = async (
   return {
     positionKeys,
     votingDelegatedPositionKeys: delegationPositions,
-    delegationKeys: myDelegations.map((d) => d.publicKey),
+    delegationKeys: myDelegations.map((d) => new PublicKey(d.address)),
     nfts,
   };
 };
