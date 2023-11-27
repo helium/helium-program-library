@@ -18,6 +18,7 @@ export interface Registrar extends RegistrarV0 {
 export interface Position extends Omit<PositionV0, 'lockup'> {
   lockup: Lockup
 }
+export type Delegation = DelegationV0 & { address: PublicKey };
 export interface PositionWithMeta extends Position {
   pubkey: PublicKey
   isDelegated: boolean
@@ -28,7 +29,7 @@ export interface PositionWithMeta extends Position {
   hasGenesisMultiplier: boolean
   votingPower: BN
   votingMint: VotingMintConfig
-  votingDelegation: (DelegationV0 & { address: PublicKey }) | null
+  votingDelegation: Delegation | null
 }
 export type LockupKind = IdlTypes<HeliumVoterStakeRegistry>['LockupKind']
 /* export type InitializePositionV0Args = IdlTypes<HeliumVoterStakeRegistry>['InitializePositionArgsV0']

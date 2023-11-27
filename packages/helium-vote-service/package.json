@@ -36,6 +36,7 @@
     "@fastify/static": "^6",
     "@helium/spl-utils": "^0.6.2",
     "@helium/voter-stake-registry-sdk": "^0.6.2",
+    "@helium/organization-sdk": "^0.6.2",
     "dotenv": "^16.0.3",
     "fastify": "^4.13.0",
     "sequelize": "^6.28.0",

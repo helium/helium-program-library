@@ -3,10 +3,12 @@ import { NftDelegation } from "@helium/modular-governance-idls/lib/types/nft_del
 import { PublicKey } from "@solana/web3.js";
 
 export const useDelegations = (
-  delegationKeys: PublicKey[] | undefined
+  delegationKeys: PublicKey[] | undefined,
+  isStatic: boolean = false
 ) => {
   return useAnchorAccounts<NftDelegation, "delegationV0">(
     delegationKeys,
-    "delegationV0"
+    "delegationV0",
+    isStatic
   );
 };

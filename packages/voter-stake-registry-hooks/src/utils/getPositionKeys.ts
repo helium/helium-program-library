@@ -1,5 +1,4 @@
 import { AnchorProvider } from "@coral-xyz/anchor";
-import { init } from "@helium/nft-delegation-sdk";
 import {
   VoteService,
   getRegistrarKey,
@@ -9,7 +8,8 @@ import {
 import { Metadata, Metaplex, Nft, Sft } from "@metaplex-foundation/js";
 import { Mint, getMint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import { Registrar } from "../sdk/types";
+import { Delegation, Registrar } from "../sdk/types";
+import { BN } from "bn.js";
 
 export interface GetPositionsArgs {
   wallet: PublicKey;
@@ -24,13 +24,12 @@ export const getPositionKeys = async (
   votingDelegatedPositionKeys: PublicKey[];
   positionKeys: PublicKey[];
   nfts: (Metadata | Nft | Sft)[];
-  delegationKeys: PublicKey[];
+  delegations: Delegation[];
 }> => {
   const { mint, wallet, provider, voteService } = args;
   const connection = provider.connection;
 
   const me = wallet;
-  const delegationProgram = await init(provider);
 
   const metaplex = new Metaplex(connection);
   const registrarPk = getRegistrarKey(mint);
@@ -38,7 +37,7 @@ export const getPositionKeys = async (
   const registrar = (await program.account.registrar.fetch(
     registrarPk
   )) as Registrar;
-  const myDelegations = await voteService.getMyDelegations(me);
+  const myDelegations = await voteService.getDelegationsForWallet(me);
   const delegationPositions = myDelegations.map(
     (del) => positionKey(new PublicKey(del.asset))[0]
   );
@@ -60,7 +59,17 @@ export const getPositionKeys = async (
   return {
     positionKeys,
     votingDelegatedPositionKeys: delegationPositions,
-    delegationKeys: myDelegations.map((d) => new PublicKey(d.address)),
+    delegations: myDelegations.map((d) => ({
+      owner: new PublicKey(d.owner),
+      nextOwner: new PublicKey(d.nextOwner),
+      address: new PublicKey(d.address),
+      asset: new PublicKey(d.asset),
+      rentRefund: new PublicKey(d.rentRefund),
+      delegationConfig: new PublicKey(d.delegationConfig),
+      index: d.index,
+      bumpSeed: d.bumpSeed,
+      expirationTime: new BN(d.expirationTime)
+    })),
     nfts,
   };
 };

@@ -8,7 +8,7 @@ import { PositionWithMeta } from "../sdk/types";
 import BN from "bn.js";
 
 export const useVotingDelegatePositions = () => {
-  const { provider, registrar } = useHeliumVsrState();
+  const { provider, registrar, refetch } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       positions,
@@ -55,6 +55,8 @@ export const useVotingDelegatePositions = () => {
         }
 
         await batchParallelInstructions(provider, instructions);
+        // Wait a couple seconds for changes to hit pg-sink
+        setTimeout(refetch, 2 * 1000)
       }
     }
   );

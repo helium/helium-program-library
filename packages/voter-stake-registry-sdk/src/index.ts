@@ -7,7 +7,14 @@ import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 export * from "./constants";
 export * from "./pdas";
 export * from "./resolvers";
-export { VoteService } from "./voteService"
+export { VoteService } from "./voteService";
+export type {
+  ProposalWithVotes,
+  Delegation,
+  Proxy,
+  EnhancedProxy,
+  EnhancedProxyData,
+} from "./voteService";
 
 export function getRegistrarKey(mint: PublicKey) {
   return registrarKey(
@@ -43,7 +50,7 @@ export const init = async (
     provider,
     undefined,
     () => {
-      return vsrResolvers
+      return vsrResolvers;
     }
   ) as Program<VoterStakeRegistry>;
 

@@ -1,8 +1,8 @@
-import { IdlAccounts, Program } from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { NftDelegation } from "@helium/modular-governance-idls/lib/types/nft_delegation";
-import axios, { AxiosInstance } from "axios";
 import { PublicKey } from "@solana/web3.js";
+import axios, { AxiosInstance } from "axios";
 
 export type Delegation = {
   owner: string;
@@ -10,6 +10,53 @@ export type Delegation = {
   index: number;
   address: string;
   asset: string;
+  delegationConfig: string;
+  bumpSeed: number;
+  rentRefund: string;
+  expirationTime: string;
+};
+
+export type Proxy = {
+  name: string;
+  image: string;
+  wallet: string;
+  description: string;
+  detail: string;
+};
+
+export type EnhancedProxyData = {
+  numDelegations: string;
+  delegatedVeTokens: string;
+  percent: string;
+};
+
+export type EnhancedProxy = Proxy & EnhancedProxyData;
+
+export type Proposal = {
+  address: string;
+  namespace: string;
+  owner: string;
+  state: object;
+  created_at: number;
+  proposal_config: string;
+  max_choices_per_voter: number;
+  seed: Buffer;
+  name: string;
+  uri: string;
+  tags: string[];
+  choices: object[];
+  bump_seed: number;
+  refreshed_at: Date;
+};
+
+export type ProposalWithVotes = Proposal & {
+  votes: {
+    voter: string;
+    registrar: string;
+    weight: string;
+    choice: number;
+    choiceName: string;
+  }[];
 };
 
 export class VoteService {
@@ -39,11 +86,48 @@ export class VoteService {
     this.registrar = registrar;
   }
 
-  async getMyDelegations(wallet: PublicKey): Promise<Delegation[]> {
+  getAssetUrl(baseUrl: string) {
+    return baseUrl.replace(
+      "./",
+      `${this.client!.getUri()}/helium-vote-proxies/`
+    );
+  }
+
+  async getVotesForWallet({
+    wallet,
+    page,
+    limit = 1000,
+  }: {
+    wallet: PublicKey;
+    page: number;
+    limit: number;
+  }): Promise<ProposalWithVotes[]> {
+    if (this.client) {
+      return (
+        await this.client.get(
+          `/registrars/${this.registrar.toBase58()}/votes/${wallet.toBase58()}`,
+          {
+            params: { limit, page },
+          }
+        )
+      ).data;
+    } else {
+      throw new Error("This is not supported without an indexer");
+    }
+  }
+
+  async getDelegationsForWallet(
+    wallet: PublicKey,
+    minDelegationIndex: number = 0
+  ): Promise<Delegation[]> {
     if (this.client) {
       return (
         await this.client.get(`/delegations`, {
-          params: { limit: 10000, owner: wallet.toBase58() },
+          params: {
+            limit: 10000,
+            owner: wallet.toBase58(),
+            minIndex: minDelegationIndex,
+          },
         })
       ).data;
     }
@@ -75,17 +159,24 @@ export class VoteService {
           index: a.account.index,
           address: a.publicKey.toBase58(),
           asset: a.account.asset.toBase58(),
+          delegationConfig: a.account.delegationConfig.toBase58(),
+          rentRefund: a.account.rentRefund.toBase58(),
+          bumpSeed: a.account.bumpSeed,
+          expirationTime: a.account.expirationTime.toString(),
         }));
     } else {
       throw new Error("No nft delegation program or api url");
     }
   }
 
-  async getPositionDelegations(position: PublicKey): Promise<Delegation[]> {
+  async getPositionDelegations(
+    position: PublicKey,
+    minIndex: number
+  ): Promise<Delegation[]> {
     if (this.client) {
       return (
         await this.client.get(`/delegations`, {
-          params: { limit: 10000, position },
+          params: { limit: 10000, position, minIndex },
         })
       ).data;
     }
@@ -111,6 +202,7 @@ export class VoteService {
           },
         ])
       )
+        .filter((a) => a.account.index >= minIndex)
         .sort((a, b) => b.account.index - a.account.index)
         .map((a) => ({
           owner: a.account.owner.toBase58(),
@@ -118,6 +210,10 @@ export class VoteService {
           index: a.account.index,
           address: a.publicKey.toBase58(),
           asset: a.account.asset.toBase58(),
+          delegationConfig: a.account.delegationConfig.toBase58(),
+          rentRefund: a.account.rentRefund.toBase58(),
+          bumpSeed: a.account.bumpSeed,
+          expirationTime: a.account.expirationTime.toString(),
         }));
     } else {
       throw new Error("No nft delegation program or api url");
@@ -130,12 +226,12 @@ export class VoteService {
   }: {
     page: number;
     limit: number;
-  }): Promise<any> {
+  }): Promise<EnhancedProxy[]> {
     if (!this.client) {
       throw new Error("This operation is not supported without an API");
     }
     const response = await this.client.get(
-      `/registrar/${this.registrar.toBase58()}/proxies`,
+      `/registrars/${this.registrar.toBase58()}/proxies`,
       {
         params: { page, limit },
       }
@@ -143,7 +239,17 @@ export class VoteService {
     return response.data;
   }
 
-  async searchProxies({ query }: { query: string }): Promise<any> {
+  async getProxy(wallet: string): Promise<EnhancedProxy> {
+    if (!this.client) {
+      throw new Error("This operation is not supported without an API");
+    }
+    const response = await this.client.get(
+      `/registrars/${this.registrar.toBase58()}/proxies/${wallet}`
+    );
+    return response.data;
+  }
+
+  async searchProxies({ query }: { query: string }): Promise<Proxy[]> {
     if (!this.client) {
       throw new Error("This operation is not supported without an API");
     }

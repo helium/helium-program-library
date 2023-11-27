@@ -13,6 +13,22 @@
       "accounts": [
         { "type": "DelegationV0", "table": "delegations", "schema": "public" }
       ]
+    },
+    {
+      "programId": "propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs",
+      "accounts": [
+        { "type": "ProposalV0", "table": "proposals", "schema": "public" }
+      ]
+    },
+    {
+      "programId": "orgdXvHVLkWgBYerptASkAwkZAE563CJUu717dMNx5f",
+      "accounts": [
+        {
+          "type": "OrganizationV0",
+          "table": "organizations",
+          "schema": "public"
+        }
+      ]
     }
   ],
   "indexConfigs": []

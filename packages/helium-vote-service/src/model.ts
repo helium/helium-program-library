@@ -50,6 +50,52 @@ export const sequelize = new Sequelize({
   },
 });
 
+export class Proposal extends Model {
+  declare address: string;
+  declare namespace: string;
+  declare owner: string;
+  declare state: object;
+  declare created_at: number;
+  declare proposal_config: string;
+  declare max_choices_per_voter: number;
+  declare seed: Buffer;
+  declare name: string;
+  declare uri: string;
+  declare tags: string[];
+  declare choices: object[];
+  declare bump_seed: number;
+  declare refreshed_at: Date;
+}
+
+Proposal.init(
+  {
+    address: {
+      type: DataTypes.STRING,
+      primaryKey: true,
+    },
+    namespace: DataTypes.STRING,
+    owner: DataTypes.STRING,
+    state: DataTypes.JSONB,
+    created_at: DataTypes.DECIMAL,
+    proposal_config: DataTypes.STRING,
+    max_choices_per_voter: DataTypes.INTEGER,
+    seed: DataTypes.BLOB,
+    name: DataTypes.STRING,
+    uri: DataTypes.STRING,
+    tags: DataTypes.ARRAY(DataTypes.STRING),
+    choices: DataTypes.ARRAY(DataTypes.JSONB),
+    bump_seed: DataTypes.INTEGER,
+    refreshed_at: DataTypes.DATE,
+  },
+  {
+    sequelize,
+    modelName: "proposal",
+    tableName: "proposals",
+    underscored: true,
+    timestamps: false,
+  }
+);
+
 export class VoteMarker extends Model {
   declare address: string;
   declare voter: string;
@@ -82,16 +128,24 @@ VoteMarker.init(
     tableName: "vote_markers",
     underscored: true,
     timestamps: false,
+    indexes: [
+      {
+        fields: ["voter"],
+      },
+      {
+        fields: ["proposal"],
+      },
+    ],
   }
 );
 
 export class Registrar extends Model {
   declare address: string;
-  declare governance_program_id: string;
+  declare governanceProgramId: string;
   declare realm: string;
-  declare realm_governing_token_mint: string;
-  declare realm_authority: string;
-  declare voting_mints: {
+  declare realmGoverningTokenMint: string;
+  declare realmAuthority: string;
+  declare votingMints: {
     mint: string;
     baselineVoteWeightScaledFactor: string;
     maxExtraLockupVoteWeightScaledFactor: string;
@@ -107,10 +161,10 @@ Registrar.init(
       type: DataTypes.STRING,
       primaryKey: true,
     },
-    governance_program_id: DataTypes.STRING,
+    governanceProgramId: DataTypes.STRING,
     realm: DataTypes.STRING,
-    realm_governing_token_mint: DataTypes.STRING,
-    realm_authority: DataTypes.STRING,
+    realmGoverningTokenMint: DataTypes.STRING,
+    realmAuthority: DataTypes.STRING,
     voting_mints: DataTypes.JSONB,
   },
   {
@@ -126,6 +180,7 @@ export class Position extends Model {
   declare address: string;
   declare registrar: string;
   declare mint: string;
+  declare asset: string;
   declare lockup: {
     startTs: string;
     endTs: string;
@@ -145,6 +200,7 @@ Position.init(
     },
     registrar: DataTypes.STRING,
     mint: DataTypes.STRING,
+    asset: DataTypes.STRING,
     lockup: DataTypes.JSONB,
     amountDepositedNative: DataTypes.DECIMAL.UNSIGNED,
     votingMintConfigIdx: DataTypes.INTEGER,
@@ -234,6 +290,9 @@ export class Delegation extends Model {
   declare nextOwner: string;
   declare index: number;
   declare asset: string;
+  declare delegationConfig: string
+  declare rentRefund: string;
+  declare bumpSeed: number;
 }
 Delegation.init(
   {
@@ -245,6 +304,10 @@ Delegation.init(
     nextOwner: DataTypes.STRING,
     index: DataTypes.INTEGER,
     asset: DataTypes.STRING,
+    delegationConfig: DataTypes.STRING,
+    rentRefund: DataTypes.STRING,
+    bumpSeed: DataTypes.INTEGER,
+    expirationTime: DataTypes.DECIMAL.UNSIGNED
   },
   {
     sequelize,
@@ -255,8 +318,8 @@ Delegation.init(
   }
 );
 
-Delegation.belongsTo(Position, { foreignKey: "asset", targetKey: "mint" });
-Position.hasMany(Delegation, { foreignKey: "asset", sourceKey: "mint" });
+Delegation.belongsTo(Position, { foreignKey: "asset", targetKey: "asset" });
+Position.hasMany(Delegation, { foreignKey: "asset", sourceKey: "asset" });
 Proxy.hasMany(Delegation, { foreignKey: "owner", sourceKey: "wallet" });
-ProxyRegistrar.hasMany(Proxy, { foreignKey: "wallet", sourceKey: "wallet" })
+ProxyRegistrar.hasMany(Proxy, { foreignKey: "wallet", sourceKey: "wallet" });
 Proxy.hasMany(ProxyRegistrar, { foreignKey: "wallet", sourceKey: "wallet" });

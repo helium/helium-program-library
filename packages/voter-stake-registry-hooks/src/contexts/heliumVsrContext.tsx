@@ -12,6 +12,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -146,35 +147,25 @@ export const HeliumVsrStateProvider: React.FC<{
   const { accounts: delegatedAccounts, loading: loadingDel } =
     useDelegatedPositions(delegatedPositionKeys);
 
-  const delegationKeys = useMemo(() => {
-    return (
-      registrar &&
-      result && [
-        ...result.nfts.map((nft) => {
-          return delegationKey(
-            registrar.delegationConfig,
-            // @ts-ignore
-            nft.mintAddress!,
-            PublicKey.default
-          )[0];
-        }),
-        ...result.delegationKeys,
-      ]
-    );
-  }, [result?.nfts, result?.delegationKeys]);
-  const { accounts: delegationAccounts, loading: loadingDelegations } =
-    useDelegations(delegationKeys);
-
-  const allPositions = useMemo(
-    () => [
-      ...(result?.positionKeys || []),
-      ...(result?.votingDelegatedPositionKeys || []),
-    ],
-    [result?.positionKeys, result?.votingDelegatedPositionKeys]
-  );
+  const votingDelegationAccounts = result?.delegations;
+  const votingDelegationAccountsByAsset = useMemo(() => {
+    return votingDelegationAccounts?.reduce((acc, del) => {
+      acc[del.asset.toBase58()] = del;
+      return acc
+    }, {} as Record<string, DelegationV0>)
+  }, [votingDelegationAccounts])
   const myOwnedPositionsEndIdx = result?.positionKeys?.length;
-  const { accounts: positions, loading: loadingPositions } =
-    usePositions(allPositions);
+  // Assume that my positions are a small amount, so we don't need to say they're static
+  const { accounts: myPositions, loading: loadingMyPositions } = usePositions(
+    result?.positionKeys
+  );
+  // Delegated positions may be a lot, set to static
+  const { accounts: delegatedPositions, loading: loadingDelPositions } =
+    usePositions(result?.votingDelegatedPositionKeys, true);
+  const positions = useMemo(
+    () => [...(myPositions || []), ...(delegatedPositions || [])],
+    [myPositions, delegatedPositions]
+  );
   const now = useSolanaUnixNow(60 * 5 * 1000);
 
   const {
@@ -192,7 +183,7 @@ export const HeliumVsrStateProvider: React.FC<{
         .map((position, idx) => {
           if (position && position.info) {
             const isDelegated = !!delegatedAccounts?.[idx]?.info;
-            const delegation = delegationAccounts?.[idx]?.info;
+            const delegation = votingDelegationAccountsByAsset?.[position.info.mint.toBase58()];
             const delegatedSubDao = isDelegated
               ? delegatedAccounts[idx]?.info?.subDao
               : null;
@@ -231,12 +222,7 @@ export const HeliumVsrStateProvider: React.FC<{
               votingPower: posVotingPower,
               votingMint: mintCfgs[position.info.votingMintConfigIdx],
               isVotingDelegatedToMe,
-              votingDelegation: delegation
-                ? ({
-                    ...delegation,
-                    address: delegationAccounts?.[idx]?.publicKey,
-                  } as DelegationV0 & { address: PublicKey })
-                : undefined,
+              votingDelegation: delegation,
             } as PositionWithMeta;
           }
         })
@@ -256,7 +242,7 @@ export const HeliumVsrStateProvider: React.FC<{
     positions,
     registrar,
     delegatedAccounts,
-    delegationAccounts,
+    votingDelegationAccounts,
   ]);
 
   const sortedPositions = useMemo(
@@ -273,6 +259,7 @@ export const HeliumVsrStateProvider: React.FC<{
       }),
     [positionsWithMeta]
   );
+  const loadingPositions = loadingMyPositions || loadingDelPositions;
   const ret = useMemo(
     () => ({
       loading: loading || loadingPositions || loadingDel,

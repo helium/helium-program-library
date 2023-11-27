@@ -214,7 +214,7 @@ if (!HELIUS_AUTH_SECRET) {
     await database.sync();
     await defineAllIdlModels({ configs, sequelize: database });
     await createPgIndexes({ indexConfigs, sequelize: database });
-    await server.listen({ port: 3000, host: "0.0.0.0" });
+    await server.listen({ port: Number(process.env.PORT || "3000"), host: "0.0.0.0" });
     const address = server.server.address();
     const port = typeof address === "string" ? address : address?.port;
     console.log(`Running on 0.0.0.0:${port}`);
