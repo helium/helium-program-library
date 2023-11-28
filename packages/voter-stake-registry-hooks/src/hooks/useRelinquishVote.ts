@@ -1,4 +1,9 @@
-import { bulkSendTransactions, chunks, truthy } from "@helium/spl-utils";
+import {
+  batchParallelInstructions,
+  bulkSendTransactions,
+  chunks,
+  truthy,
+} from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@metaplex-foundation/js";
 import { Transaction } from "@solana/web3.js";
@@ -19,7 +24,15 @@ export const useRelinquishVote = (proposal: PublicKey) => {
     (choice: number) => {
       if (!markers) return false;
 
-      return markers.some((m) => m.info?.choices.includes(choice));
+      return markers.some((m, index) => {
+        const position = positions?.[index];
+        const earlierDelegateVoted =
+          position &&
+          position.votingDelegation &&
+          m.info &&
+          position.votingDelegation.index > m.info.delegationIndex;
+        return !earlierDelegateVoted && m.info?.choices.includes(choice);
+      });
     },
     [markers]
   );
@@ -41,6 +54,26 @@ export const useRelinquishVote = (proposal: PublicKey) => {
               const alreadyVotedThisChoice = marker?.choices.includes(choice);
 
               if (marker && alreadyVotedThisChoice) {
+                if (position.isVotingDelegatedToMe) {
+                  if (
+                    marker.delegationIndex <
+                    (position.votingDelegation?.index || 0)
+                  ) {
+                    // Do not vote with a position that has been delegated to us, but voting overidden
+                    return;
+                  }
+
+                  return await vsrProgram.methods
+                    .delegatedRelinquishVoteV0({
+                      choice,
+                    })
+                    .accounts({
+                      proposal,
+                      owner: provider.wallet.publicKey,
+                      position: position.pubkey,
+                    })
+                    .instruction();
+                }
                 return await vsrProgram.methods
                   .relinquishVoteV1({
                     choice,
@@ -49,7 +82,6 @@ export const useRelinquishVote = (proposal: PublicKey) => {
                     proposal,
                     voter: provider.wallet.publicKey,
                     position: position.pubkey,
-                    refund: provider.wallet.publicKey,
                   })
                   .instruction();
               }
@@ -57,16 +89,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
           )
         ).filter(truthy);
 
-        const txs = chunks(instructions, 4).map((ixs) => {
-          const tx = new Transaction({
-            feePayer: provider.wallet.publicKey,
-          });
-          tx.add(...ixs);
-
-          return tx;
-        });
-
-        await bulkSendTransactions(provider, txs);
+        await batchParallelInstructions(provider, instructions);
       }
     }
   );

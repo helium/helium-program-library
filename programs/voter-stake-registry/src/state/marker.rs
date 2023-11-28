@@ -12,4 +12,9 @@ pub struct VoteMarkerV0 {
   pub bump_seed: u8,
   /// Whether this vote has been cleared on the position after proposal expireds
   pub relinquished: bool,
+  // Keep track of which delegation index voted on this marker,
+  // earlier delegators can override
+  pub delegation_index: u16,
+  // Ensure the refund goes to whoever paid to create the marker when closing
+  pub rent_refund: Pubkey,
 }

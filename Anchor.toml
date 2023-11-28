@@ -74,6 +74,12 @@ address = "propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs" # Proposal
 [[test.validator.clone]]
 address = "66t3XARU6Ja3zj91gDZ2KoNLJHEMTYPSKqJWYb6PJJBA" # Proposal IDL
 
+[[test.validator.clone]]
+address = "nde169MVKXLYbtDbrTF8wiJc8KYJRvLXKAzHApZ5vvD" # NFT Delegation
+
+[[test.validator.clone]]
+address = "5612ANVGVnwJRuvKJ1uSmky3A2mCfFDAi6DaK9xoZRp9" # NFT Delegation IDL
+
 # Pyth price oracle
 [[test.validator.clone]]
 address = "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"

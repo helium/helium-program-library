@@ -12,16 +12,12 @@ pub struct RelinquishVoteArgsV1 {
 
 #[derive(Accounts)]
 pub struct RelinquishVoteV1<'info> {
-  /// CHECK: You're getting sol why do you care?
-  /// Account to receive sol refund if marker is closed
-  #[account(mut)]
-  pub refund: AccountInfo<'info>,
   #[account(
     mut,
     seeds = [b"marker", mint.key().as_ref(), proposal.key().as_ref()],
     bump = marker.bump_seed,
     has_one = registrar,
-    has_one = mint
+    has_one = mint,
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
   pub registrar: Box<Account<'info, Registrar>>,
@@ -101,10 +97,6 @@ pub fn handler(ctx: Context<RelinquishVoteV1>, args: RelinquishVoteArgsV1) -> Re
       weight: marker.weight,
     },
   )?;
-
-  if marker.choices.is_empty() {
-    marker.close(ctx.accounts.refund.to_account_info())?;
-  }
 
   Ok(())
 }

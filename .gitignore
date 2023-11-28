@@ -25,3 +25,4 @@ accounts
 !.yarn/plugins
 !.yarn/sdks
 !.yarn/versions
+packages/helium-vote-service/helium-vote-proxies/

@@ -1,44 +1,35 @@
 import { AnchorProvider } from "@coral-xyz/anchor";
-import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import {
+  VoteService,
+  getRegistrarKey,
   init as initVsr,
   positionKey,
-  registrarKey,
 } from "@helium/voter-stake-registry-sdk";
 import { Metadata, Metaplex, Nft, Sft } from "@metaplex-foundation/js";
-import { getMint, Mint } from "@solana/spl-token";
+import { Mint, getMint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import { Registrar } from "../sdk/types";
+import { Delegation, Registrar } from "../sdk/types";
+import { BN } from "bn.js";
 
 export interface GetPositionsArgs {
   wallet: PublicKey;
   mint: PublicKey;
   provider: AnchorProvider;
+  voteService: VoteService;
 }
 
-export function getRegistrarKey(mint: PublicKey) {
-  return registrarKey(
-    PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("governance", "utf-8"),
-        Buffer.from(realmNames[mint.toBase58()], "utf-8"),
-      ],
-      new PublicKey("hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S")
-    )[0],
-    mint
-  )[0];
-}
-
-const realmNames: Record<string, string> = {
-  [HNT_MINT.toBase58()]: "Helium",
-  [MOBILE_MINT.toBase58()]: "Helium MOBILE",
-  [IOT_MINT.toBase58()]: "Helium IOT",
-};
 export const getPositionKeys = async (
   args: GetPositionsArgs
-): Promise<{ positionKeys: PublicKey[]; nfts: (Metadata | Nft | Sft)[] }> => {
-  const { mint, wallet, provider } = args;
+): Promise<{
+  votingDelegatedPositionKeys: PublicKey[];
+  positionKeys: PublicKey[];
+  nfts: (Metadata | Nft | Sft)[];
+  delegations: Delegation[];
+}> => {
+  const { mint, wallet, provider, voteService } = args;
   const connection = provider.connection;
+
+  const me = wallet;
 
   const metaplex = new Metaplex(connection);
   const registrarPk = getRegistrarKey(mint);
@@ -46,6 +37,10 @@ export const getPositionKeys = async (
   const registrar = (await program.account.registrar.fetch(
     registrarPk
   )) as Registrar;
+  const myDelegations = await voteService.getDelegationsForWallet(me);
+  const delegationPositions = myDelegations.map(
+    (del) => positionKey(new PublicKey(del.asset))[0]
+  );
   const mintCfgs = registrar.votingMints;
   const mints: Record<string, Mint> = {};
   for (const mcfg of mintCfgs) {
@@ -61,5 +56,20 @@ export const getPositionKeys = async (
     (nft) => positionKey((nft as any).mintAddress)[0]
   );
 
-  return { positionKeys, nfts };
+  return {
+    positionKeys,
+    votingDelegatedPositionKeys: delegationPositions,
+    delegations: myDelegations.map((d) => ({
+      owner: new PublicKey(d.owner),
+      nextOwner: new PublicKey(d.nextOwner),
+      address: new PublicKey(d.address),
+      asset: new PublicKey(d.asset),
+      rentRefund: new PublicKey(d.rentRefund),
+      delegationConfig: new PublicKey(d.delegationConfig),
+      index: d.index,
+      bumpSeed: d.bumpSeed,
+      expirationTime: new BN(d.expirationTime)
+    })),
+    nfts,
+  };
 };

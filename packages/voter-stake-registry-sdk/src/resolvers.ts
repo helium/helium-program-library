@@ -9,11 +9,14 @@ import { getAccount } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { init } from ".";
 import { voterWeightRecordKey } from "./pdas";
+import { delegationKey, nftDelegationResolvers } from "@helium/nft-delegation-sdk";
+
 export * from "./constants";
 export * from "./pdas";
 export * from "./resolvers";
 
 export const vsrResolvers = combineResolvers(
+  nftDelegationResolvers,
   heliumCommonResolver,
   ataResolver({
     instruction: "initializeRegistrarV0",
@@ -103,13 +106,29 @@ export const vsrResolvers = combineResolvers(
     mint: "mint",
     owner: "voter",
   }),
-  resolveIndividual(async ({ accounts, path, provider }) => {
-    if (path[path.length - 1] === "proposalProgram")  {
+  resolveIndividual(async ({ accounts, path, provider, programId }) => {
+    if (path[path.length - 1] === "proposalProgram") {
       return new PublicKey("propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs");
     } else if (path[path.length - 1] === "recipient") {
       // @ts-ignore
       return provider.wallet.publicKey;
+    } else if (
+      path[path.length - 1] == "delegation" &&
+      accounts.registrar &&
+      accounts.owner &&
+      accounts.mint
+    ) {
+      const program = await init(provider as any, programId);
+      const registrar = await program.account.registrar.fetch(
+        accounts.registrar as PublicKey
+      );
+      return delegationKey(
+        registrar.delegationConfig,
+        accounts.mint as PublicKey,
+        accounts.owner as PublicKey
+      )[0];
     }
+
     if (path[path.length - 1] === "solDestination") {
       // @ts-ignore
       return provider.wallet.publicKey;

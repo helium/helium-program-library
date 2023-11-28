@@ -38,6 +38,7 @@ mpl-token-metadata = { workspace = true }
 itertools = "0.10.2"
 spl-governance-tools = { git = "https://github.com/solana-labs/solana-program-library.git", version = "0.1.3" }
 proposal = { path = "../../utils/proposal" }
+nft-delegation = { path = "../../utils/nft-delegation" }
 shared-utils = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }
