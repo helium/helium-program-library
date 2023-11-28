@@ -17,6 +17,7 @@ import { cloneRepo, readProxiesAndUpsert } from "./repo";
 import fastifyStatic from "@fastify/static";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import { organizationKey } from "@helium/organization-sdk";
+import { camelCase, isPlainObject, mapKeys } from "lodash";
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -266,7 +267,7 @@ SELECT
     'registrar', vms.registrar,
     'weight', vms.weight,
     'choice', vms.choice,
-    'choiceName', p.choices[vms.choice]->>'name'
+    'choiceName', p.choices[vms.choice + 1]->>'name'
   )) as votes
 FROM exploded_choice_vote_markers vms
 JOIN proposals p ON vms.proposal = p.address
@@ -277,8 +278,26 @@ GROUP BY p.address
 OFFSET ${offset}
 LIMIT ${limit};
     `);
-  return result[0];
+  return result[0].map(deepCamelCaseKeys);
 });
+
+function deepCamelCaseKeys(obj) {
+  if (Array.isArray(obj)) {
+    return obj.map(deepCamelCaseKeys);
+  } else if (isPlainObject(obj)) {
+    return mapKeys(
+      Object.fromEntries(
+        Object.entries(obj).map(([key, value]) => [
+          camelCase(key),
+          deepCamelCaseKeys(value),
+        ])
+      ),
+      (value, key) => camelCase(key)
+    );
+  } else {
+    return obj;
+  }
+}
 
 const start = async () => {
   try {

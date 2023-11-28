@@ -55,16 +55,16 @@ export class Proposal extends Model {
   declare namespace: string;
   declare owner: string;
   declare state: object;
-  declare created_at: number;
-  declare proposal_config: string;
-  declare max_choices_per_voter: number;
+  declare createdAt: number;
+  declare proposalConfig: string;
+  declare maxChoicesPerVoter: number;
   declare seed: Buffer;
   declare name: string;
   declare uri: string;
   declare tags: string[];
   declare choices: object[];
-  declare bump_seed: number;
-  declare refreshed_at: Date;
+  declare bumpSeed: number;
+  declare refreshedAt: Date;
 }
 
 Proposal.init(
@@ -76,16 +76,16 @@ Proposal.init(
     namespace: DataTypes.STRING,
     owner: DataTypes.STRING,
     state: DataTypes.JSONB,
-    created_at: DataTypes.DECIMAL,
-    proposal_config: DataTypes.STRING,
-    max_choices_per_voter: DataTypes.INTEGER,
+    createdAt: DataTypes.DECIMAL,
+    proposalConfig: DataTypes.STRING,
+    maxChoicesPerVoter: DataTypes.INTEGER,
     seed: DataTypes.BLOB,
     name: DataTypes.STRING,
     uri: DataTypes.STRING,
     tags: DataTypes.ARRAY(DataTypes.STRING),
     choices: DataTypes.ARRAY(DataTypes.JSONB),
-    bump_seed: DataTypes.INTEGER,
-    refreshed_at: DataTypes.DATE,
+    bumpSeed: DataTypes.INTEGER,
+    refreshedAt: DataTypes.DATE,
   },
   {
     sequelize,

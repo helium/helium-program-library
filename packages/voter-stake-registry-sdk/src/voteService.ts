@@ -44,7 +44,7 @@ export type Proposal = {
   name: string;
   uri: string;
   tags: string[];
-  choices: object[];
+  choices: { name: string; weight: string; uri: string }[];
   bump_seed: number;
   refreshed_at: Date;
 };
