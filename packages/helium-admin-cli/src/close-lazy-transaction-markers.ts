@@ -42,18 +42,6 @@ export async function run(args: any = process.argv) {
   const ltKey = lazyTransactionsKey(argv.name)[0];
   const lt = await lazyProgram.account.lazyTransactionsV0.fetch(ltKey);
 
-  const blocks = await lazyProgram.account.block.all();
-  const blocksByKey = new Set(blocks.map((b) => b.publicKey.toString()));
-  const allIndices = new Array(1 << lt.maxDepth)
-    .fill(0)
-    .map((_, i) => i)
-    .map((bi) => ({
-      index: bi,
-      block: blockKey(ltKey, bi)[0],
-    }));
-  const blockIndices = allIndices.filter((bi) =>
-    blocksByKey.has(bi.block.toBase58())
-  );
   if (lt.executedTransactions.equals(PublicKey.default)) {
     const executedTransactions = Keypair.generate();
     const executedTransactionsSize = 1 + getBitmapLen(lt.maxDepth);
@@ -78,12 +66,25 @@ export async function run(args: any = process.argv) {
       .accounts({
         lazyTransactions: ltKey,
         executedTransactions: executedTransactions.publicKey,
+        canopy: lt.canopy,
       })
       .signers([executedTransactions])
       .rpc({ skipPreflight: true });
 
     lt.executedTransactions = executedTransactions.publicKey;
   }
+  const blocks = await lazyProgram.account.block.all();
+  const blocksByKey = new Set(blocks.map((b) => b.publicKey.toString()));
+  const allIndices = new Array(1 << lt.maxDepth)
+    .fill(0)
+    .map((_, i) => i)
+    .map((bi) => ({
+      index: bi,
+      block: blockKey(ltKey, bi)[0],
+    }));
+  const blockIndices = allIndices.filter((bi) =>
+    blocksByKey.has(bi.block.toBase58())
+  );
 
   // Do in chunks so we don't create too many promises
   let instructions: TransactionInstruction[] = [];

@@ -150,7 +150,7 @@ async function getTransactions(
           },
           idx
         ) => {
-          const hasRun = isExecuted(executed, idx);
+          const hasRun = isExecuted(executed, id);
           const compiledTx = decompress(compiled);
           const block = blockKey(lazyTransactions, id)[0];
           const signers = decompressSigners(signersRaw);
