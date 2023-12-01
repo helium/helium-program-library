@@ -196,7 +196,7 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
     update_authority: args.update_authority,
     collection: ctx.accounts.collection.key(),
     merkle_tree: Pubkey::default(),
-    /// Initialized via set_carrier_tree
+    // Initialized via set_carrier_tree
     bump_seed: ctx.bumps["carrier"],
     collection_bump_seed: ctx.bumps["collection"],
     sub_dao: ctx.accounts.sub_dao.key(),
