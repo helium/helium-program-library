@@ -97,5 +97,5 @@ export const useFlipPositionLockupKind = () => {
 };
 
 function secsToDays(secs: number): number {
-  return Math.floor(secs / (60 * 60 * 24));
+  return secs / (60 * 60 * 24);
 }

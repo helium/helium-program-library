@@ -162,7 +162,7 @@ pub fn handler(ctx: Context<InitializeMakerV0>, args: InitializeMakerArgsV0) -> 
     update_authority: args.update_authority,
     collection: ctx.accounts.collection.key(),
     merkle_tree: Pubkey::default(),
-    /// Initialized via set_maker_tree
+    // Initialized via set_maker_tree
     bump_seed: ctx.bumps["maker"],
     collection_bump_seed: ctx.bumps["collection"],
     dao: ctx.accounts.dao.key(),
