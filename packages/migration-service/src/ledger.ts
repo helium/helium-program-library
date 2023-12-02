@@ -3,32 +3,35 @@ import {
   chunks,
   getAssetProof,
   getAssetsByOwner,
-  truthy
+  truthy,
 } from "@helium/spl-utils";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import {
   createTransferInstruction,
-  PROGRAM_ID as BUBBLEGUM_PROGRAM_ID
+  PROGRAM_ID as BUBBLEGUM_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-bubblegum";
 import {
   ConcurrentMerkleTreeAccount,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-  SPL_NOOP_PROGRAM_ID
+  SPL_NOOP_PROGRAM_ID,
 } from "@solana/spl-account-compression";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   createCloseAccountInstruction,
   createTransferCheckedInstruction,
-  createTransferInstruction as createTokenTransfer, getAssociatedTokenAddressSync,
+  createTransferInstruction as createTokenTransfer,
+  getAssociatedTokenAddressSync,
   getMint,
-  TOKEN_PROGRAM_ID
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import {
   AccountInfo,
-  AccountMeta, ParsedAccountData, PublicKey,
+  AccountMeta,
+  ParsedAccountData,
+  PublicKey,
   SystemProgram,
   Transaction,
-  TransactionInstruction
+  TransactionInstruction,
 } from "@solana/web3.js";
 import { provider } from "./solana";
 
@@ -86,10 +89,8 @@ export async function getMigrateTransactions(
           }
         );
         // Hack: Metaplex has a bug, this should be a signer.
-        ixn.keys[1].isSigner = true
-        transferAssetIxns.push(
-          ixn
-        );
+        ixn.keys[1].isSigner = true;
+        transferAssetIxns.push(ixn);
       }
     } else {
       const fromAta = getAssociatedTokenAddressSync(asset.id, from);
@@ -119,7 +120,10 @@ export async function getMigrateTransactions(
       programId: TOKEN_PROGRAM_ID,
     });
   const positions: PublicKey[] = [];
-  const tokens: { pubkey: PublicKey, account: AccountInfo<ParsedAccountData> }[] = [];
+  const tokens: {
+    pubkey: PublicKey;
+    account: AccountInfo<ParsedAccountData>;
+  }[] = [];
   for (const token of tokensResponse.value) {
     const mint = new PublicKey(token.account.data.parsed.info.mint);
     const freezeAuth = (await getMint(provider.connection, mint))
@@ -163,7 +167,7 @@ export async function getMigrateTransactions(
     .flatMap((token) => {
       const mint = new PublicKey(token.account.data.parsed.info.mint);
       const amount = token.account.data.parsed.info.tokenAmount.uiAmount;
-      const frozen = token.account.data.parsed.info.state == 'frozen';
+      const frozen = token.account.data.parsed.info.state == "frozen";
       const fromAta = token.pubkey;
       const toAta = getAssociatedTokenAddressSync(mint, to);
       if (amount > 0 && !frozen) {
@@ -233,20 +237,23 @@ export async function getMigrateTransactions(
     })
   );
 
-  const tx = new Transaction({
-    feePayer: provider.wallet.publicKey,
-    recentBlockhash,
-  });
-  tx.add(...transferTokenInstructions);
-
-  // Do not remove this line. Fun fact, tx.signatures will be empty unless you do this once.
-  tx.serialize({ requireAllSignatures: false });
-  if (
-    tx.signatures.some((sig) => sig.publicKey.equals(provider.wallet.publicKey))
-  ) {
-    transactions.push(await provider.wallet.signTransaction(tx));
-  } else {
-    transactions.push(tx);
+  for (const chunk of chunks(transferTokenInstructions, 3)) {
+    const tx = new Transaction({
+      feePayer: provider.wallet.publicKey,
+      recentBlockhash,
+    });
+    tx.add(...chunk);
+    // Do not remove this line. Fun fact, tx.signatures will be empty unless you do this once.
+    tx.serialize({ requireAllSignatures: false });
+    if (
+      tx.signatures.some((sig) =>
+        sig.publicKey.equals(provider.wallet.publicKey)
+      )
+    ) {
+      transactions.push(await provider.wallet.signTransaction(tx));
+    } else {
+      transactions.push(tx);
+    }
   }
 
   return transactions;
