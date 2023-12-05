@@ -419,7 +419,7 @@ server.get<{ Params: { eccCompact: string } }>(
     const assetJson = generateAssetJson(record, eccCompact);
 
     // Needed to make Cloudflare to cache for longer than 1 day
-    reply.header("Cache-Control", "max-age=31536000");  // 1 year in seconds
+    reply.header("Cloudflare-CDN-Cache-Control", "max-age=31536000");  // 1 year in seconds
 
     return assetJson;
   }
