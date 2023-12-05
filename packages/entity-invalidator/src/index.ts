@@ -1,11 +1,9 @@
 import { decodeEntityKey } from "@helium/helium-entity-manager-sdk";
-import AWS from "aws-sdk";
 import { Op } from "sequelize";
 import { IotHotspotInfo, KeyToAsset, MobileHotspotInfo } from "./model";
 // @ts-ignore
 import {
-  CLOUDFLARE_EMAIL,
-  CLOUDFLARE_API_KEY,
+  CLOUDFLARE_API_TOKEN,
   CLOUDFLARE_ZONE_ID,
   LOOKBACK_HOURS,
   DOMAIN,
@@ -19,8 +17,7 @@ const INVALIDATION_WAIT = 1000;
 const INVALIDATE_ALL_RECORD_THRESHOLD = 10000;
 // Headers used across all Cloudflare invalidation requests
 const CLOUDFLARE_HEADERS = {
-  'X-Auth-Email': CLOUDFLARE_EMAIL as string,
-  'X-Auth-Key': CLOUDFLARE_API_KEY as string,
+  'Authorization': `Bearer ${CLOUDFLARE_API_TOKEN}`,
   'Content-Type': 'application/json',
 };
 // URL used across all Cloudflare invalidation requests
