@@ -360,6 +360,9 @@ server.get<{ Querystring: { subnetwork: string; cursor?: string; } }>(
     result.items = ktas.map((kta) => {
       return {
         key_to_asset_key: kta.address,
+        is_active: kta[lastItemTable]?.is_active,
+        lat: kta[lastItemTable]?.lat,
+        long: kta[lastItemTable]?.long,
       };
     });
 
