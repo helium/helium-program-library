@@ -131,8 +131,8 @@ async function getHotspotByKeyToAsset(request, reply) {
 
   const assetJson = generateAssetJson(record, keyStr!);
 
-  // Needed to make CloudFront to cache for longer than 1 day
-  reply.header("Cache-Control", "max-age=31536000");  // 1 year in seconds
+  // Needed to make Cloudflare to cache for longer than 1 day
+  reply.header("Cloudflare-CDN-Cache-Control", "max-age=31536000");  // 1 year in seconds
 
   return assetJson;
 };
@@ -238,7 +238,7 @@ server.get<{ Params: { wallet: string } }>(
       })
     );
 
-    reply.header("Cache-Control", "no-cache");
+    reply.header("Cloudflare-CDN-Cache-Control", "no-cache");
 
     return {
       hotspots_count: assetJsons.length,
@@ -277,7 +277,7 @@ server.get<{ Querystring: { subnetwork: string } }>(
       totalPages: Math.ceil(count / PAGE_SIZE),
     };
 
-    reply.header("Cache-Control", "no-cache");
+    reply.header("Cloudflare-CDN-Cache-Control", "no-cache");
 
     return result;
   }
@@ -360,18 +360,13 @@ server.get<{ Querystring: { subnetwork: string; cursor?: string; } }>(
     result.items = ktas.map((kta) => {
       return {
         key_to_asset_key: kta.address,
+        is_active: kta[lastItemTable]?.is_active,
+        lat: kta[lastItemTable]?.lat,
+        long: kta[lastItemTable]?.long,
       };
     });
 
-    // If we're on the last page of results, tell Cloudfront not to cache
-    // so that origin requests are made and newly added hotspots can be 
-    // returned
-    if (isLastPage) {
-      reply.header("Cache-Control", "no-cache");
-    } else {
-      // Needed to make CloudFront to cache for longer than 1 day
-      reply.header("Cache-Control", "max-age=31536000");  // 1 year in seconds
-    }
+    reply.header("Cloudflare-CDN-Cache-Control", "no-cache");
     
     return result;
   }
@@ -423,7 +418,7 @@ server.get<{ Params: { eccCompact: string } }>(
 
     const assetJson = generateAssetJson(record, eccCompact);
 
-    // Needed to make CloudFront to cache for longer than 1 day
+    // Needed to make Cloudflare to cache for longer than 1 day
     reply.header("Cache-Control", "max-age=31536000");  // 1 year in seconds
 
     return assetJson;
