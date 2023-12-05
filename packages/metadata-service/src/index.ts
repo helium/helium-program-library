@@ -366,15 +366,7 @@ server.get<{ Querystring: { subnetwork: string; cursor?: string; } }>(
       };
     });
 
-    // If we're on the last page of results, tell Cloudflare not to cache
-    // so that origin requests are made and newly added hotspots can be 
-    // returned
-    if (isLastPage) {
-      reply.header("Cloudflare-CDN-Cache-Control", "no-cache");
-    } else {
-      // Needed to make Cloudflare to cache for longer than 1 day
-      reply.header("Cloudflare-CDN-Cache-Control", "max-age=31536000");  // 1 year in seconds
-    }
+    reply.header("Cloudflare-CDN-Cache-Control", "no-cache");
     
     return result;
   }
