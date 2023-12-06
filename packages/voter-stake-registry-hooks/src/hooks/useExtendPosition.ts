@@ -1,6 +1,7 @@
 import { Program } from "@coral-xyz/anchor";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
 import { sendInstructions } from "@helium/spl-utils";
+import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
@@ -22,6 +23,7 @@ export const useExtendPosition = () => {
 
       const idl = await Program.fetchIdl(programId, provider);
       const hsdProgram = await init(provider as any, programId, idl);
+      const vsrProgram = await initVsr(provider as any);
       const mint = position.votingMint.mint;
 
       if (loading) return;
@@ -48,7 +50,7 @@ export const useExtendPosition = () => {
           );
         } else {
           instructions.push(
-            await hsdProgram.methods
+            await vsrProgram.methods
               .resetLockupV0({
                 kind: position.lockup.kind,
                 periods: lockupPeriodsInDays,

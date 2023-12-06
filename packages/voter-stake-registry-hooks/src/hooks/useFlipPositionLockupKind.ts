@@ -30,11 +30,7 @@ export const useFlipPositionLockupKind = () => {
       const idl = await Program.fetchIdl(programId, provider);
       const hsdProgram = await init(provider as any, programId, idl);
       const vsrProgram = await initVsr(provider as any);
-
-      const registrar = await vsrProgram.account.registrar.fetch(
-        position.registrar
-      );
-      const mint = registrar.votingMints[position.votingMintConfigIdx].mint;
+      const mint = position.votingMint.mint;
 
       if (loading) return;
 
@@ -72,7 +68,7 @@ export const useFlipPositionLockupKind = () => {
           );
         } else {
           instructions.push(
-            await hsdProgram.methods
+            await vsrProgram.methods
               .resetLockupV0({
                 kind,
                 periods: positionLockupPeriodInDays,
