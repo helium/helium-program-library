@@ -30,12 +30,7 @@ export const useTransferPosition = () => {
       const idl = await Program.fetchIdl(programId, provider);
       const hsdProgram = await init(provider as any, programId, idl);
       const vsrProgram = await initVsr(provider as any);
-
-      const registrar = await vsrProgram.account.registrar.fetch(
-        sourcePosition.registrar
-      );
-      const mint =
-        registrar.votingMints[sourcePosition.votingMintConfigIdx].mint;
+      const mint = sourcePosition.votingMint.mint;
 
       if (loading) return;
 
