@@ -8,7 +8,7 @@ export const sequelize = new Sequelize({
   host: host,
   dialect: "postgres",
   port: port,
-  logging: false,
+  logging: console.log,
   dialectModule: pg,
   username: process.env.PGUSER,
   database: process.env.PGDATABASE,
