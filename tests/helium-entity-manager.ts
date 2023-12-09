@@ -97,8 +97,8 @@ describe("helium-entity-manager", () => {
     burnProram = await initBurn(
       provider,
       anchor.workspace.RewardsBurn.programId,
-      anchor.workspace.RewardsBurn.idl,
-    )
+      anchor.workspace.RewardsBurn.idl
+    );
 
     hsdProgram = await initHeliumSubDaos(
       provider,
@@ -131,7 +131,8 @@ describe("helium-entity-manager", () => {
       authority: me,
       dao,
       activeDeviceAuthority: activeDeviceAuthority.publicKey,
-      numTokens: MAKER_STAKING_FEE.mul(new BN(2)),
+      // Add some padding for onboards
+      numTokens: MAKER_STAKING_FEE.mul(new BN(2)).add(new BN(10000000000)),
     }));
   });
 
@@ -160,25 +161,35 @@ describe("helium-entity-manager", () => {
       .preInstructions(await createMintInstructions(provider, 0, me, me, mint))
       .accounts({
         dao,
-        mint: mint.publicKey
+        mint: mint.publicKey,
       })
       .signers([mint])
       .rpc({ skipPreflight: true });
 
-    const addr = getAssociatedTokenAddressSync(mint.publicKey, burnKey()[0], true);
+    const addr = getAssociatedTokenAddressSync(
+      mint.publicKey,
+      burnKey()[0],
+      true
+    );
     const balance = await provider.connection.getTokenAccountBalance(addr);
     expect(balance.value.uiAmount).to.eq(1);
 
-    const tokenMint = await createMint(provider, 2, me, me)
-    const burnAta = await createAtaAndMint(provider, tokenMint, new BN(1000), burnKey()[0])
-    await burnProram.methods.burnV0()
-    .accounts({
-      mint: tokenMint
-    })
-    .rpc({ skipPreflight: true })
+    const tokenMint = await createMint(provider, 2, me, me);
+    const burnAta = await createAtaAndMint(
+      provider,
+      tokenMint,
+      new BN(1000),
+      burnKey()[0]
+    );
+    await burnProram.methods
+      .burnV0()
+      .accounts({
+        mint: tokenMint,
+      })
+      .rpc({ skipPreflight: true });
 
-    const postBalance = (await getAccount(provider.connection, burnAta)).amount
-    expect(postBalance).to.eq(BigInt(0))
+    const postBalance = (await getAccount(provider.connection, burnAta)).amount;
+    expect(postBalance).to.eq(BigInt(0));
   });
 
   it("initializes a rewardable entity config", async () => {
@@ -548,22 +559,28 @@ describe("helium-entity-manager", () => {
         hemProgram,
         subDao,
         {
-          mobileConfigV1: {
+          mobileConfigV2: {
             feesByDevice: [
               {
                 deviceType: { cbrs: {} },
                 dcOnboardingFee: toBN(0, 5),
                 locationStakingFee: toBN(10, 5),
+                mobileOnboardingFeeUsd: toBN(0, 6),
+                reserved: new Array(8).fill(new BN(0)),
               },
               {
                 deviceType: { wifiIndoor: {} },
-                dcOnboardingFee: toBN(0, 5),
+                dcOnboardingFee: toBN(10, 5),
                 locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(10, 6),
+                reserved: new Array(8).fill(new BN(0)),
               },
               {
                 deviceType: { wifiOutdoor: {} },
-                dcOnboardingFee: toBN(0, 5),
+                dcOnboardingFee: toBN(10, 5),
                 locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(20, 6),
+                reserved: new Array(8).fill(new BN(0)),
               },
             ],
           },
@@ -680,6 +697,7 @@ describe("helium-entity-manager", () => {
           rewardableEntityConfig,
           getAssetFn,
           getAssetProofFn,
+          deviceType: "wifiIndoor",
         })
       ).signers([makerKeypair, hotspotOwner]);
 
@@ -691,9 +709,7 @@ describe("helium-entity-manager", () => {
       );
       expect(Boolean(mobileInfoAcc)).to.be.true;
       const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
-      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(
-        0
-      );
+      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(1000000);
     });
 
     describe("with hotspot", () => {
@@ -783,44 +799,51 @@ describe("helium-entity-manager", () => {
         await hemProgram.methods
           .updateRewardableEntityConfigV0({
             settings: {
-              mobileConfigV1: {
+              mobileConfigV2: {
                 feesByDevice: [
                   {
                     deviceType: { cbrs: {} },
                     dcOnboardingFee: toBN(40, 5),
                     locationStakingFee: toBN(10, 5),
+                    mobileOnboardingFeeUsd: toBN(0, 6),
+                    reserved: new Array(8).fill(new BN(0)),
                   },
                   {
                     deviceType: { wifiIndoor: {} },
-                    dcOnboardingFee: toBN(0, 5),
+                    dcOnboardingFee: toBN(10, 5),
                     locationStakingFee: toBN(0, 5),
+                    mobileOnboardingFeeUsd: toBN(10, 6),
+                    reserved: new Array(8).fill(new BN(0)),
                   },
                   {
                     deviceType: { wifiOutdoor: {} },
-                    dcOnboardingFee: toBN(0, 5),
+                    dcOnboardingFee: toBN(10, 5),
                     locationStakingFee: toBN(0, 5),
+                    mobileOnboardingFeeUsd: toBN(20, 6),
+                    reserved: new Array(8).fill(new BN(0)),
                   },
                 ],
               },
             },
             newAuthority: null,
-            stakingRequirement: MAKER_STAKING_FEE
+            stakingRequirement: MAKER_STAKING_FEE,
           })
           .accounts({ rewardableEntityConfig })
           .rpc({ skipPreflight: true });
 
-        const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
+        await method.rpc({ skipPreflight: true });
+
         const postBalance = await provider.connection.getTokenAccountBalance(
           ata
         );
         expect(postBalance.value.uiAmount).to.be.eq(
-          preBalance.value.uiAmount! - subDaoAcc.onboardingDcFee.toNumber()
+          preBalance.value.uiAmount! - toBN(40, 5).toNumber()
         );
         const infoAcc = await hemProgram.account.mobileHotspotInfoV0.fetch(
           infoKey!
         );
         expect(infoAcc.dcOnboardingFeePaid.toNumber()).to.eq(
-          subDaoAcc.onboardingDcFee.toNumber()
+          toBN(40, 5).toNumber()
         );
       });
 
@@ -983,7 +1006,7 @@ describe("helium-entity-manager", () => {
         .updateRewardableEntityConfigV0({
           newAuthority: PublicKey.default,
           settings: null,
-          stakingRequirement: null
+          stakingRequirement: null,
         })
         .accounts({
           rewardableEntityConfig,

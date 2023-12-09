@@ -74,6 +74,9 @@ address = "propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs" # Proposal
 [[test.validator.clone]]
 address = "66t3XARU6Ja3zj91gDZ2KoNLJHEMTYPSKqJWYb6PJJBA" # Proposal IDL
 
+[[test.validator.clone]]
+address = "moraMdsjyPFz8Lp1RJGoW4bQriSF5mHE7Evxt7hytSF" # Mobile price oracle
+
 # Pyth price oracle
 [[test.validator.clone]]
 address = "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"

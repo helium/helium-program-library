@@ -1950,6 +1950,7 @@ dependencies = [
  "default-env",
  "helium-sub-daos",
  "mpl-token-metadata",
+ "price-oracle",
  "rewards-burn",
  "shared-utils",
  "solana-security-txt",
