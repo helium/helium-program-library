@@ -14,7 +14,7 @@ import { HeliumEntityManager } from '@helium/idls/lib/types/helium_entity_manage
 import * as anchor from '@coral-xyz/anchor';
 import fastify from 'fastify';
 import { HNT_MINT, MOBILE_MINT, IOT_MINT } from './env';
-import { register } from './metrics';
+import { register, totalRewardsGauge } from './metrics';
 import {
   monitiorAssociatedTokenBalance,
   monitorSolBalance,
@@ -29,6 +29,11 @@ import { provider } from './solana';
 import { PublicKey } from '@solana/web3.js';
 import { lazySignerKey } from '@helium/lazy-transactions-sdk';
 import { underscore } from 'inflection';
+import { Recipient, sequelize } from './model';
+import { lazyDistributorKey } from '@helium/lazy-distributor-sdk';
+import { BN } from 'bn.js';
+import { toNumber } from '@helium/spl-utils';
+import { monitorVehnt } from './monitors/vehnt';
 
 let hemProgram: anchor.Program<HeliumEntityManager>;
 let hsdProgram: anchor.Program<HeliumSubDaos>;
@@ -38,6 +43,32 @@ const server = fastify();
 server.get('/metrics', async (request, reply) => {
   return register.metrics();
 });
+
+function debounce(func: any, wait: number = 10000) {
+  let timeout: any;
+  return function executedFunction(...args: any[]) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+async function setTotalRewards(mint: PublicKey) {
+  const lazyDistributor = lazyDistributorKey(mint)[0].toBase58();
+  const sum = (await Recipient.findAll({
+    where: {
+      lazyDistributor,
+    },
+    attributes: [
+      [sequelize.fn("SUM", sequelize.col("total_rewards")), "totalRewards"],
+    ],
+  }))[0].totalRewards;
+  const sumActual = toNumber(new BN(sum), 6)
+  totalRewardsGauge.labels(mint.toBase58()).set(sumActual)
+}
 
 async function run() {
   hemProgram = await hemInit(provider);
@@ -60,6 +91,9 @@ async function run() {
   const mobileMint = mobile.dntMint;
   const mobileTreasury = mobile.treasury;
   const mobileRewardsEscrow = mobile.rewardsEscrow;
+  
+  await Recipient.sync()
+  await monitorVehnt()
 
   await monitorSupply(hntMint, 'hnt');
   await monitorSupply(dcMint, 'dc');
@@ -72,8 +106,16 @@ async function run() {
 
   await monitorTokenBalance(iotTreasury, 'iot_treasury');
   await monitorTokenBalance(mobileTreasury, 'mobile_treasury');
-  await monitorTokenBalance(iotRewardsEscrow, 'iot_rewards_escrow');
-  await monitorTokenBalance(mobileRewardsEscrow, 'mobile_rewards_escrow');
+  await setTotalRewards(IOT_MINT)
+  await setTotalRewards(MOBILE_MINT)
+  const resetMobileTotal = debounce(() => setTotalRewards(MOBILE_MINT));
+  const resetIotTotal = debounce(() => setTotalRewards(IOT_MINT));
+  await monitorTokenBalance(iotRewardsEscrow, 'iot_rewards_escrow', false, async () => {
+    resetIotTotal();
+  });
+  await monitorTokenBalance(mobileRewardsEscrow, 'mobile_rewards_escrow', false, async () => {
+    resetMobileTotal();
+  });
   await monitorTokenBalance(
     getAssociatedTokenAddressSync(dao.dcMint, iot.activeDeviceAuthority),
     "iot_active_device_oracle_dc"

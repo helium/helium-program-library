@@ -8,6 +8,12 @@
       "path": "../circuit-breaker-sdk"
     },
     {
+      "path": "../lazy-transactions-sdk"
+    },
+    {
+      "path": "../lazy-distributor-sdk"
+    },
+    {
       "path": "../helium-sub-daos-sdk"
     },
     {
