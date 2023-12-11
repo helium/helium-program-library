@@ -42,6 +42,7 @@
     "@helium/lazy-distributor-sdk": "^0.6.5",
     "@helium/lazy-transactions-sdk": "^0.6.5",
     "@helium/spl-utils": "^0.6.5",
+    "@metaplex-foundation/mpl-bubblegum": "^3.0.0",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-account-compression": "^0.1.7",
     "@solana/spl-token": "^0.3.8",

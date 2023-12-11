@@ -1643,6 +1643,7 @@ __metadata:
     "@helium/lazy-distributor-sdk": ^0.6.5
     "@helium/lazy-transactions-sdk": ^0.6.5
     "@helium/spl-utils": ^0.6.5
+    "@metaplex-foundation/mpl-bubblegum": ^3.0.0
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
@@ -2947,6 +2948,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@metaplex-foundation/digital-asset-standard-api@npm:^1.0.0-alpha.0":
+  version: 1.0.0
+  resolution: "@metaplex-foundation/digital-asset-standard-api@npm:1.0.0"
+  peerDependencies:
+    "@metaplex-foundation/umi": ^0.8.2
+  checksum: f881c38145aad093efffea011b06b1fc68495dfe8bf10299811a6d3a15bac74e24af396a248f3307ff93d644cc1a64d4ee05bc933a30cc402b37dccbbacde43f
+  languageName: node
+  linkType: hard
+
 "@metaplex-foundation/js@npm:^0.19.4":
   version: 0.19.4
   resolution: "@metaplex-foundation/js@npm:0.19.4"
@@ -3026,6 +3036,21 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@metaplex-foundation/mpl-bubblegum@npm:^3.0.0":
+  version: 3.0.0
+  resolution: "@metaplex-foundation/mpl-bubblegum@npm:3.0.0"
+  dependencies:
+    "@metaplex-foundation/digital-asset-standard-api": ^1.0.0-alpha.0
+    "@metaplex-foundation/mpl-token-metadata": 3.0.0-alpha.27
+    "@metaplex-foundation/mpl-toolbox": ^0.9.0
+    "@noble/hashes": ^1.3.1
+    merkletreejs: ^0.3.9
+  peerDependencies:
+    "@metaplex-foundation/umi": ^0.8.9
+  checksum: 61ed8366608b11939bf6f4c701d1c3de0025ba71328700ad5187bea558c9ca5ba818b58a76728f9b473ea93552b2480f14ac7b7d68b934e36c56d88ce888f659
+  languageName: node
+  linkType: hard
+
 "@metaplex-foundation/mpl-candy-guard@npm:^0.3.0":
   version: 0.3.2
   resolution: "@metaplex-foundation/mpl-candy-guard@npm:0.3.2"
@@ -3065,6 +3090,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@metaplex-foundation/mpl-token-metadata@npm:3.0.0-alpha.27":
+  version: 3.0.0-alpha.27
+  resolution: "@metaplex-foundation/mpl-token-metadata@npm:3.0.0-alpha.27"
+  dependencies:
+    "@metaplex-foundation/mpl-toolbox": ^0.9.0
+  peerDependencies:
+    "@metaplex-foundation/umi": ^0.8.2
+  checksum: ec79071615b418a4efcfac50616dc6a873f6a827589a5c83990e68e8aa3617813893f8574268cdd53d0cb0330997a979913494ee2e1a722b7716f5536dd579a4
+  languageName: node
+  linkType: hard
+
 "@metaplex-foundation/mpl-token-metadata@npm:^2.10.0, @metaplex-foundation/mpl-token-metadata@npm:^2.11.0, @metaplex-foundation/mpl-token-metadata@npm:^2.5.2":
   version: 2.13.0
   resolution: "@metaplex-foundation/mpl-token-metadata@npm:2.13.0"
@@ -3077,6 +3113,15 @@ __metadata:
     bn.js: "npm:^5.2.0"
     debug: "npm:^4.3.4"
   checksum: 89f82980f435ac45d961e6ab03859c7e4ab9809ad2d9f84aca91bcf50fdc60e210d0596d8856adf63e474ca69d971c51a4c27d0fe4dab115fcef64d57f3be611
+  languageName: node
+  linkType: hard
+
+"@metaplex-foundation/mpl-toolbox@npm:^0.9.0":
+  version: 0.9.1
+  resolution: "@metaplex-foundation/mpl-toolbox@npm:0.9.1"
+  peerDependencies:
+    "@metaplex-foundation/umi": ^0.8.2
+  checksum: d2bb9bed47fdba70f9a16b18113f3e4dbe7d7a52a36926bd55511c9c3f4c10d5847620dfd48c20c64e7904f187073e381e78d03bf1001ae13c1204693236129d
   languageName: node
   linkType: hard
 
@@ -7767,6 +7812,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"crypto-js@npm:^4.2.0":
+  version: 4.2.0
+  resolution: "crypto-js@npm:4.2.0"
+  checksum: f051666dbc077c8324777f44fbd3aaea2986f198fe85092535130d17026c7c2ccf2d23ee5b29b36f7a4a07312db2fae23c9094b644cc35f7858b1b4fcaf27774
+  languageName: node
+  linkType: hard
+
 "css-select@npm:^4.1.3":
   version: 4.3.0
   resolution: "css-select@npm:4.3.0"
@@ -11865,6 +11917,19 @@ __metadata:
     treeify: "npm:^1.1.0"
     web3-utils: "npm:^1.3.4"
   checksum: 041b235adde94de584fdf5ef60138baca8d6f16bb48b3b7f714b607eaa76e4207ed5fef501ee5967371c56c5876804c4ff6da4705707f8cc0362d5c1e0358425
+  languageName: node
+  linkType: hard
+
+"merkletreejs@npm:^0.3.9":
+  version: 0.3.11
+  resolution: "merkletreejs@npm:0.3.11"
+  dependencies:
+    bignumber.js: ^9.0.1
+    buffer-reverse: ^1.0.1
+    crypto-js: ^4.2.0
+    treeify: ^1.1.0
+    web3-utils: ^1.3.4
+  checksum: 93edb8ec66aa6c9f59aa0902e675590e3791692893bb3e8c1018f758367ded1bf7d6b1057ccde3729b283ca946a316838a631a922960b76889b3be528c43ef4e
   languageName: node
   linkType: hard
 
