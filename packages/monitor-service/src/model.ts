@@ -71,11 +71,5 @@ Recipient.init(
     tableName: "recipients",
     underscored: true,
     timestamps: false,
-    indexes: [
-      {
-        name: "recipients_lazy_distributor_index",
-        fields: ["lazy_distributor"],
-      },
-    ],
   }
 );
