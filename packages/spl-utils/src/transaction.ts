@@ -409,6 +409,7 @@ export async function sendAndConfirmWithRetry(
     if (confirmation.err) {
       const tx = await connection.getTransaction(txid, {
         commitment: "confirmed",
+        maxSupportedTransactionVersion: 0
       });
       console.error(tx?.meta?.logMessages?.join("\n"));
       console.error(confirmation.err);
@@ -424,6 +425,7 @@ export async function sendAndConfirmWithRetry(
 
     const tx = await connection.getTransaction(txid, {
       commitment: "confirmed",
+      maxSupportedTransactionVersion: 0
     });
     if (tx && tx.meta && tx.meta.logMessages) {
       console.error(tx.meta.logMessages.join("\n"));
