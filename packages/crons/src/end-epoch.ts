@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import * as client from "@helium/distributor-oracle";
 import { fanoutKey, init as initHydra } from "@helium/fanout-sdk";
-import { init as initBurn } from "@helium/rewards-burn-sdk";
+import { init as initBurn } from "@helium/no-emit-sdk";
 import {
   init as initHem,
   keyToAssetKey,
@@ -36,7 +36,7 @@ import bs58 from "bs58";
 
 const FANOUT_NAME = "HST";
 const IOT_OPERATIONS_FUND = "iot_operations_fund";
-const BURN = "burn";
+const NOT_EMITTED = "not_emitted";
 const MAX_CLAIM_AMOUNT = new BN("207020547945205");
 
 (async () => {
@@ -265,17 +265,16 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
       errors.push(`Failed to distribute iot op funds: ${err}`);
     }
 
-    // Claim and burn any rewards in the burn entity
     // Only do this if that feature has been deployed
-    if (hemProgram.methods.issueBurnEntityV0) {
-      console.log("Burning everything in the burn entity");
-      const burnProgram = await initBurn(provider);
+    if (hemProgram.methods.issueNotEmittedEntityV0) {
+      console.log("Issuing no_emit");
+      const noEmitProgram = await initBurn(provider);
       const tokens = [MOBILE_MINT, IOT_MINT];
       for (const token of tokens) {
         const [lazyDistributor] = lazyDistributorKey(token);
-        const burnEntityKta = keyToAssetKey(dao, BURN, "utf-8")[0];
+        const notEmittedEntityKta = keyToAssetKey(dao, NOT_EMITTED, "utf-8")[0];
         // Issue the burn entity if it doesn't exist yet.
-        if (!(await provider.connection.getAccountInfo(burnEntityKta))) {
+        if (!(await provider.connection.getAccountInfo(notEmittedEntityKta))) {
           const mint = Keypair.generate();
           await sendInstructions(
             provider,
@@ -288,7 +287,7 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
                 mint
               )),
               await hemProgram.methods
-                .issueBurnEntityV0()
+                .issueNotEmittedEntityV0()
                 .accounts({
                   dao,
                   mint: mint.publicKey,
@@ -299,7 +298,7 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
           );
         }
         const assetId = (
-          await hemProgram.account.keyToAssetV0.fetch(burnEntityKta)
+          await hemProgram.account.keyToAssetV0.fetch(notEmittedEntityKta)
         ).asset;
         const [recipient] = recipientKey(lazyDistributor, assetId);
 
@@ -336,8 +335,8 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
           );
 
           await sendInstructions(provider, [
-            await burnProgram.methods
-              .burnV0()
+            await noEmitProgram.methods
+              .noEmitV0()
               .accounts({
                 mint: token,
               })

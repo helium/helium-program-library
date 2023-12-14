@@ -83,9 +83,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/rewards-burn-sdk@workspace:.":
+"@helium/no-emit-sdk@workspace:.":
   version: 0.0.0-use.local
-  resolution: "@helium/rewards-burn-sdk@workspace:."
+  resolution: "@helium/no-emit-sdk@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.5.0

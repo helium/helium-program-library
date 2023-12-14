@@ -11,7 +11,7 @@ import {
 import { PublicKey } from "@solana/web3.js";
 import { init } from "./init";
 import { iotInfoKey, keyToAssetKey, mobileInfoKey, programApprovalKey } from "./pdas";
-import { burnKey } from "@helium/rewards-burn-sdk";
+import { notEmittedKey } from "@helium/no-emit-sdk";
 
 export const heliumEntityManagerResolvers = combineResolvers(
   heliumCommonResolver,
@@ -74,13 +74,13 @@ export const heliumEntityManagerResolvers = combineResolvers(
       )[0];
     } else if (
       path[path.length - 1] === "keyToAsset" &&
-      idlIx.name === "issueBurnEntityV0" &&
+      idlIx.name === "issueNotEmittedEntityV0" &&
       accounts.dao
     ) {
       return (
         await keyToAssetKey(
           accounts.dao as PublicKey,
-          Buffer.from("burn", "utf8")
+          Buffer.from("not_emitted", "utf8")
         )
       )[0];
     }
@@ -107,8 +107,8 @@ export const heliumEntityManagerResolvers = combineResolvers(
   }),
   resolveIndividual(async ({ path, idlIx, provider }) => {
     if (path[path.length - 1] === "recipient") {
-      if (idlIx.name === "issueBurnEntityV0") {
-        return burnKey()[0];
+      if (idlIx.name === "issueNotEmittedEntityV0") {
+        return notEmittedKey()[0];
       }
       // @ts-ignore
       return provider.wallet?.publicKey;
@@ -164,7 +164,7 @@ export const heliumEntityManagerResolvers = combineResolvers(
     owner: "dcFeePayer",
   }),
   ataResolver({
-    instruction: "issueBurnEntityV0",
+    instruction: "issueNotEmittedEntityV0",
     mint: "mint",
     account: "recipientAccount",
     owner: "recipient"

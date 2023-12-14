@@ -28,4 +28,4 @@ shared-utils = { path = "./utils/shared-utils" }
 circuit-breaker = { path = "./programs/circuit-breaker", features = ["cpi"] }
 helium-sub-daos = { path = "./programs/helium-sub-daos", features = ["cpi"] }
 helium-entity-manager = { path = "./programs/helium-entity-manager", features = ["cpi"] }
-rewards-burn = { path = "./programs/rewards-burn", features = ["cpi"] }
+no-emit = { path = "./programs/no-emit", features = ["cpi"] }

@@ -5,7 +5,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 ## [0.6.6](https://github.com/helium/helium-program-libary/compare/v0.6.5...v0.6.6) (2023-12-13)
 
-**Note:** Version bump only for package @helium/rewards-burn-sdk
+**Note:** Version bump only for package @helium/no-emit-sdk
 
 
 
@@ -13,7 +13,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 ## [0.6.5](https://github.com/helium/helium-program-libary/compare/v0.6.2...v0.6.5) (2023-12-08)
 
-**Note:** Version bump only for package @helium/rewards-burn-sdk
+**Note:** Version bump only for package @helium/no-emit-sdk
 
 
 
