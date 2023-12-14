@@ -12,6 +12,7 @@ import {
   Registrar,
   VoteMarker,
   sequelize,
+  setRelations,
 } from "./model";
 import { cloneRepo, readProxiesAndUpsert } from "./repo";
 import fastifyStatic from "@fastify/static";
@@ -310,8 +311,9 @@ const start = async () => {
     server.server.address();
     console.log(`Started server on 0.0.0.0:${port}`);
 
-    await Proxy.sync({ alter: true });
     await ProxyRegistrar.sync({ alter: true });
+    await Proxy.sync({ alter: true });
+    setRelations()
     // Read SQL file
     const sqlFilePath = path.join(
       __dirname,
@@ -322,6 +324,7 @@ const start = async () => {
 
     // Execute SQL query
     await sequelize.query(sqlQuery);
+    console.log("Created models");
   } catch (err) {
     server.log.error(err);
     process.exit(1);

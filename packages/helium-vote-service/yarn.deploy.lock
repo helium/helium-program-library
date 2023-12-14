@@ -190,6 +190,7 @@ __metadata:
   dependencies:
     "@fastify/cors": ^8.1.1
     "@fastify/static": ^6
+    "@helium/organization-sdk": ^0.0.5
     "@helium/spl-utils": ^0.6.2
     "@helium/voter-stake-registry-sdk": ^0.6.2
     "@types/bn.js": ^5.1.1
@@ -219,6 +220,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@helium/modular-governance-idls@npm:^0.0.5":
+  version: 0.0.5
+  resolution: "@helium/modular-governance-idls@npm:0.0.5"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@solana/web3.js": ^1.43.4
+  checksum: fd13b16178d67bda5720a3658e6782d7787f73299af60807822fc4e737e2f2424b68e097f642d9e944f247bfb5df9c785c6f060c156dfe89f2ce7aae8a48d411
+  languageName: node
+  linkType: hard
+
 "@helium/modular-governance-idls@npm:^0.0.8-next.12+f1b0c8c":
   version: 0.0.8
   resolution: "@helium/modular-governance-idls@npm:0.0.8"
@@ -238,6 +249,29 @@ __metadata:
     "@helium/modular-governance-idls": ^0.0.8-next.12+f1b0c8c
     "@solana/spl-token": ^0.3.8
   checksum: 0c9b8fc24044f30b0e794db24b211c4b888670dcc6f988fc2144d5bc5d653f9f76f9b9b3f6be3091c3b730b7a83df7d1a8ab25211cac02da0e8b6528bef11c2b
+  languageName: node
+  linkType: hard
+
+"@helium/organization-sdk@npm:^0.0.5":
+  version: 0.0.5
+  resolution: "@helium/organization-sdk@npm:0.0.5"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@helium/anchor-resolvers": ^0.2.17
+    "@helium/modular-governance-idls": ^0.0.5
+    "@helium/proposal-sdk": ^0.0.5
+  checksum: 6ee2034f142d45828db65085ce4a88d0f1bd795492695b6af7530ac021bfc7df469ae66641b0673fde17826cc9f54e2bcd0e9b65f573ec7a0ea21e14045dc6cf
+  languageName: node
+  linkType: hard
+
+"@helium/proposal-sdk@npm:^0.0.5":
+  version: 0.0.5
+  resolution: "@helium/proposal-sdk@npm:0.0.5"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@helium/anchor-resolvers": ^0.2.17
+    "@helium/modular-governance-idls": ^0.0.5
+  checksum: c774de53273fd51f64d683f0f9d9449d4716bebf3b29178f557c999fd290d632932ede281e85834c34c2496bef0e4b7f732f9f177840f93b464e89e5f48512bb
   languageName: node
   linkType: hard
 

@@ -29,22 +29,6 @@ export const readProxiesAndUpsert = async () => {
   );
   const proxies = JSON.parse(proxiesJson);
   for (const proxy of proxies) {
-    for (const network of proxy.networks) {
-      const registrar = networksToRegistrars[network];
-      if (registrar) {
-        const proxyRegistrar = {
-          registrar,
-          wallet: proxy.wallet,
-        };
-        const existing = await ProxyRegistrar.findOne({
-          where: proxyRegistrar,
-        });
-        if (!existing) {
-          await ProxyRegistrar.create(proxyRegistrar)
-        }
-      }
-    }
-    delete proxy.networks
     const existingProxy = await Proxy.findOne({
       where: {
         [Op.or]: [{ name: proxy.name }, { wallet: proxy.wallet }],
@@ -60,6 +44,23 @@ export const readProxiesAndUpsert = async () => {
     } else {
       await Proxy.create(proxy);
     }
+    for (const network of proxy.networks) {
+      const registrar = networksToRegistrars[network];
+      if (registrar) {
+        const proxyRegistrar = {
+          registrar,
+          wallet: proxy.wallet,
+        };
+        const existing = await ProxyRegistrar.findOne({
+          where: proxyRegistrar,
+        });
+        console.log(registrar);
+        if (!existing) {
+          await ProxyRegistrar.create(proxyRegistrar);
+        }
+      }
+    }
+    delete proxy.networks;
   }
 };
 

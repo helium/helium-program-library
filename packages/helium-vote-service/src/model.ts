@@ -318,8 +318,11 @@ Delegation.init(
   }
 );
 
-Delegation.belongsTo(Position, { foreignKey: "asset", targetKey: "asset" });
-Position.hasMany(Delegation, { foreignKey: "asset", sourceKey: "asset" });
-Proxy.hasMany(Delegation, { foreignKey: "owner", sourceKey: "wallet" });
-ProxyRegistrar.hasMany(Proxy, { foreignKey: "wallet", sourceKey: "wallet" });
-Proxy.hasMany(ProxyRegistrar, { foreignKey: "wallet", sourceKey: "wallet" });
+
+export function setRelations() {
+  Delegation.belongsTo(Position, { foreignKey: "asset", targetKey: "asset" });
+  Position.hasMany(Delegation, { foreignKey: "asset", sourceKey: "asset" });
+  Proxy.hasMany(Delegation, { foreignKey: "owner", sourceKey: "wallet" });
+  ProxyRegistrar.hasMany(Proxy, { foreignKey: "wallet", sourceKey: "wallet" });
+  Proxy.hasMany(ProxyRegistrar, { foreignKey: "wallet", sourceKey: "wallet" });
+}
