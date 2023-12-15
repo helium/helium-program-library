@@ -1,3 +1,4 @@
+use crate::error::ErrorCode;
 use anchor_lang::prelude::*;
 
 use crate::EPOCH_LENGTH;
@@ -126,10 +127,47 @@ pub struct DelegatedPositionV0 {
   pub position: Pubkey,
   pub hnt_amount: u64,
   pub sub_dao: Pubkey,
-  pub last_claimed_epoch: u64, // the epoch number that the dnt rewards were last claimed at
+  pub last_claimed_epoch: u64, // the latest epoch not included claimed_epochs_bitmap
   pub start_ts: i64,
   pub purged: bool, // if true, this position has been removed from subdao calculations. rewards can still be claimed.
   pub bump_seed: u8,
+  // A bitmap of epochs past last_claimed_epoch (exclusive) that have been claimed.
+  // This bitmap gets rotated as last_claimed_epoch increases.
+  // This allows for claiming ~128 epochs worth of rewards in parallel.
+  pub claimed_epochs_bitmap: u128,
+}
+
+impl DelegatedPositionV0 {
+  pub fn is_claimed(&self, epoch: u64) -> Result<bool> {
+    if epoch <= self.last_claimed_epoch {
+      Ok(true)
+    } else if epoch > self.last_claimed_epoch + 128 {
+      Err(error!(ErrorCode::InvalidClaimEpoch))
+    } else {
+      let bit_index = (epoch - self.last_claimed_epoch - 1) as u128;
+      Ok(self.claimed_epochs_bitmap >> (127_u128 - bit_index) & 1 == 1)
+    }
+  }
+
+  pub fn set_claimed(&mut self, epoch: u64) -> Result<()> {
+    if epoch <= self.last_claimed_epoch {
+      Err(error!(ErrorCode::InvalidClaimEpoch))
+    } else if epoch > self.last_claimed_epoch + 128 {
+      Err(error!(ErrorCode::InvalidClaimEpoch))
+    } else {
+      let bit_index = (epoch - self.last_claimed_epoch - 1) as u128;
+      // Set the bit at bit_index to 1
+      self.claimed_epochs_bitmap |= 1_u128 << (127_u128 - bit_index);
+
+      // Shift claimed_epochs_bitmap to the left until the first bit is 0
+      while self.claimed_epochs_bitmap & (1_u128 << 127) != 0 {
+        self.claimed_epochs_bitmap <<= 1;
+        self.last_claimed_epoch += 1;
+      }
+
+      Ok(())
+    }
+  }
 }
 
 #[account]
@@ -194,4 +232,27 @@ pub struct SubDaoV0 {
   pub onboarding_data_only_dc_fee: u64,
   pub dc_onboarding_fees_paid: u64, // the total amount of dc onboarding fees paid to this subdao by active hotspots (inactive hotspots are excluded)
   pub active_device_authority: Pubkey, // authority that can mark hotspots as active/inactive
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_claimed() {
+    let mut position = DelegatedPositionV0::default();
+    let mut epoch = 2;
+
+    assert_eq!(position.is_claimed(epoch).unwrap(), false);
+    position.set_claimed(epoch).unwrap();
+    assert_eq!(position.is_claimed(epoch).unwrap(), true);
+    assert_eq!(position.last_claimed_epoch, 0);
+
+    epoch = 1;
+    assert_eq!(position.is_claimed(epoch).unwrap(), false);
+    position.set_claimed(epoch).unwrap();
+    assert_eq!(position.is_claimed(epoch).unwrap(), true);
+    assert_eq!(position.last_claimed_epoch, 2);
+    assert_eq!(position.claimed_epochs_bitmap, 0);
+  }
 }
