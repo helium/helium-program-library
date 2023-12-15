@@ -76,8 +76,8 @@ pub mod helium_entity_manager {
     issue_program_entity_v0::handler(ctx, args)
   }
 
-  pub fn issue_burn_entity_v0(ctx: Context<IssueBurnEntityV0>) -> Result<()> {
-    issue_burn_entity_v0::handler(ctx)
+  pub fn issue_not_emitted_entity_v0(ctx: Context<IssueNotEmittedEntityV0>) -> Result<()> {
+    issue_not_emitted_entity_v0::handler(ctx)
   }
 
   pub fn issue_iot_operations_fund_v0(ctx: Context<IssueIotOperationsFundV0>) -> Result<()> {

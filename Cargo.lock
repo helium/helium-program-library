@@ -1950,7 +1950,7 @@ dependencies = [
  "default-env",
  "helium-sub-daos",
  "mpl-token-metadata",
- "rewards-burn",
+ "no-emit",
  "shared-utils",
  "solana-security-txt",
 ]
@@ -2563,6 +2563,18 @@ dependencies = [
  "libc",
  "memoffset 0.7.1",
  "pin-utils",
+]
+
+[[package]]
+name = "no-emit"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "default-env",
+ "helium-sub-daos",
+ "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -3388,18 +3400,6 @@ dependencies = [
  "web-sys",
  "webpki-roots 0.25.2",
  "winreg",
-]
-
-[[package]]
-name = "rewards-burn"
-version = "0.0.1"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "default-env",
- "helium-sub-daos",
- "shared-utils",
- "solana-security-txt",
 ]
 
 [[package]]
