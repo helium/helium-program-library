@@ -31,11 +31,13 @@ server.get<{ Params: { mintKey: string } }>("/:mintKey", async (request, reply) 
   ).toLocaleDateString();
   const kind = Object.keys(positionAcc.lockup.kind)[0];
 
-  const name = `${uiAmount} (${kind}), ${lockEndDate}`
+  const name = `${uiAmount} (${kind})${
+    kind === "constant" ? "" : `, ${lockEndDate}`
+  }`;
 
   return {
     name,
-    description: `Voting Escrow Token Position of ${uiAmount} tokens locked until ${lockEndDate} with kind ${kind}`,
+    description: `Voting Escrow Token Position of ${uiAmount} tokens${kind === 'constant' ? '.' : `locked until ${lockEndDate} with kind ${kind}`}`,
     image:
       "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/vsr.png",
     attributes: [
