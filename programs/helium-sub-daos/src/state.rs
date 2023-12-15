@@ -243,15 +243,15 @@ mod tests {
     let mut position = DelegatedPositionV0::default();
     let mut epoch = 2;
 
-    assert_eq!(position.is_claimed(epoch).unwrap(), false);
+    assert!(!position.is_claimed(epoch).unwrap());
     position.set_claimed(epoch).unwrap();
-    assert_eq!(position.is_claimed(epoch).unwrap(), true);
+    assert!(position.is_claimed(epoch).unwrap());
     assert_eq!(position.last_claimed_epoch, 0);
 
     epoch = 1;
-    assert_eq!(position.is_claimed(epoch).unwrap(), false);
+    assert!(!position.is_claimed(epoch).unwrap());
     position.set_claimed(epoch).unwrap();
-    assert_eq!(position.is_claimed(epoch).unwrap(), true);
+    assert!(position.is_claimed(epoch).unwrap());
     assert_eq!(position.last_claimed_epoch, 2);
     assert_eq!(position.claimed_epochs_bitmap, 0);
   }
