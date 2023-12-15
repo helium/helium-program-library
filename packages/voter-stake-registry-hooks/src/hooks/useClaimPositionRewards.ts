@@ -6,7 +6,7 @@ import {
   delegatedPositionKey,
   init,
 } from "@helium/helium-sub-daos-sdk";
-import { chunks, sendMultipleInstructions } from "@helium/spl-utils";
+import { batchParallelInstructions, Status } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
@@ -19,9 +19,11 @@ export const useClaimPositionRewards = () => {
     async ({
       position,
       programId = PROGRAM_ID,
+      onProgress,
     }: {
       position: PositionWithMeta;
       programId?: PublicKey;
+      onProgress?: (status: Status) => void;
     }) => {
       const isInvalid = !unixNow || !provider || !position.hasRewards;
 
@@ -60,13 +62,7 @@ export const useClaimPositionRewards = () => {
           )
         );
 
-        // This is an arbitrary threshold and we assume that up to 4 instructions can be inserted as a single Tx
-        const ixsChunks = chunks(instructions, 4);
-        await sendMultipleInstructions(
-          provider,
-          ixsChunks,
-          ixsChunks.map((_) => [])
-        );
+        await batchParallelInstructions(provider, instructions, onProgress);
       }
     }
   );
