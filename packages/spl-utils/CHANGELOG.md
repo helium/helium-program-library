@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.7](https://github.com/helium/helium-program-library/compare/v0.6.6...v0.6.7) (2023-12-19)
+
+
+### Features
+
+* **#504:** Parallelize claim delegation rewards  ([#509](https://github.com/helium/helium-program-library/issues/509)) ([01b5f3d](https://github.com/helium/helium-program-library/commit/01b5f3dbd35345302e5fc6a83667b5e5e017d4ec)), closes [#504](https://github.com/helium/helium-program-library/issues/504)
+
+
+
+
+
 ## [0.6.6](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.6) (2023-12-13)
 
 **Note:** Version bump only for package @helium/spl-utils
