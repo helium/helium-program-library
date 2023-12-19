@@ -360,13 +360,19 @@ server.get<{ Querystring: { subnetwork: string; cursor?: string; } }>(
     result.items = ktas.map((kta) => {
       return {
         key_to_asset_key: kta.address,
+        entity_key_str: decodeEntityKey(kta.entity_key, { [kta.key_serialization]: {} }),
         is_active: kta[lastItemTable]?.is_active,
         lat: kta[lastItemTable]?.lat,
         long: kta[lastItemTable]?.long,
       };
     });
 
-    reply.header("Cloudflare-CDN-Cache-Control", "no-cache");
+    if (isLastPage) {
+      reply.header("Cloudflare-CDN-Cache-Control", "no-cache");
+    } else {
+      reply.header("Cloudflare-CDN-Cache-Control", "max-age=86400");  // 1 day in seconds
+
+    }
     
     return result;
   }

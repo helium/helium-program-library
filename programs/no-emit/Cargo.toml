@@ -1,12 +1,12 @@
 [package]
-name = "rewards-burn"
+name = "no-emit"
 version = "0.0.1"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "rewards_burn"
+name = "no_emit"
 
 [features]
 devnet = []

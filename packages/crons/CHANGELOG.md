@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.6](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.6) (2023-12-13)
+
+
+### Features
+
+* **#495:** Add monitoring for claimable rewards and vehnt ([#507](https://github.com/helium/helium-program-library/issues/507)) ([efc6813](https://github.com/helium/helium-program-library/commit/efc6813839be4b323bea8110ad7762423dd13b82)), closes [#495](https://github.com/helium/helium-program-library/issues/495) [#495](https://github.com/helium/helium-program-library/issues/495)
+
+
+
+
+
 ## [0.6.5](https://github.com/helium/helium-program-library/compare/v0.6.2...v0.6.5) (2023-12-08)
 
 **Note:** Version bump only for package @helium/crons

@@ -1,11 +1,11 @@
 {
-  "name": "@helium/rewards-burn-sdk",
+  "name": "@helium/no-emit-sdk",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "description": "Interface to the rewards burn smart contract",
   "repository": {
     "type": "git",

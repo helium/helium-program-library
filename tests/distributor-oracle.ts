@@ -97,6 +97,10 @@ export class DatabaseMock implements Database {
     };
   }
 
+  async getTotalRewards() {
+    return "0"
+  }
+
   async getCurrentRewardsByEntity(entityKey: string): Promise<string> {
     const pubkey = Address.fromB58(entityKey);
     return Math.floor(

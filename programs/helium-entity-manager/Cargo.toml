@@ -34,5 +34,5 @@ data-credits = { path = "../data-credits", features = ["cpi"] }
 helium-sub-daos = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }
-rewards-burn = { workspace = true }
 price-oracle = { workspace = true }
+no-emit = { workspace = true }

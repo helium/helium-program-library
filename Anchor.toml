@@ -15,7 +15,7 @@ rewards_oracle = "rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF"
 voter_stake_registry = "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8"
 fanout = "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6"
 mobile_entity_manager = "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr"
-rewards_burn = "burnhwK2QgaJnK93i82g8dH1zDjbpwxMukyVit9xYXo"
+no_emit = "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv"
 
 [workspace]
 members = [
@@ -31,7 +31,7 @@ members = [
   "programs/voter-stake-registry",
   "programs/fanout",
   "programs/mobile-entity-manager",
-  "programs/rewards-burn",
+  "programs/no-emit",
 ]
 
 [registry]

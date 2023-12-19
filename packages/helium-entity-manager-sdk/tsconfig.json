@@ -14,7 +14,7 @@
       "path": "../helium-sub-daos-sdk"
     },
     {
-      "path": "../rewards-burn-sdk"
+      "path": "../no-emit-sdk"
     },
     {
       "path": "./tsconfig.cjs.json"

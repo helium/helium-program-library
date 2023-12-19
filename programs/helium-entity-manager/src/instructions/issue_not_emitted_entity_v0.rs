@@ -7,16 +7,16 @@ use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount};
 use helium_sub_daos::DaoV0;
 use mpl_token_metadata::instructions::{VerifyCreatorV1Cpi, VerifyCreatorV1CpiAccounts};
 use mpl_token_metadata::types::{Creator, DataV2};
-use rewards_burn::program::RewardsBurn;
+use no_emit::program::NoEmit;
 use shared_utils::token_metadata::{
   create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
 };
 use shared_utils::{create_metadata_accounts_v3, Metadata};
 
-pub const BURN: &str = "burn";
+pub const NOT_EMITTED: &str = "not_emitted";
 
 #[derive(Accounts)]
-pub struct IssueBurnEntityV0<'info> {
+pub struct IssueNotEmittedEntityV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   pub authority: Signer<'info>,
@@ -30,11 +30,11 @@ pub struct IssueBurnEntityV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 8 + std::mem::size_of::<KeyToAssetV0>() + 1 + BURN.len(),
+    space = 8 + std::mem::size_of::<KeyToAssetV0>() + 1 + NOT_EMITTED.len(),
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
-      &hash(&String::from(BURN).into_bytes()).to_bytes()
+      &hash(&String::from(NOT_EMITTED).into_bytes()).to_bytes()
     ],
     bump
   )]
@@ -42,9 +42,9 @@ pub struct IssueBurnEntityV0<'info> {
   /// CHECK: Checked by seeds
   #[account(
     mut,
-    seeds = [b"burn"],
+    seeds = [b"not_emitted"],
     bump,
-    seeds::program = rewards_burn_program.key()
+    seeds::program = no_emit_program.key()
   )]
   pub recipient: AccountInfo<'info>,
   #[account(
@@ -86,10 +86,10 @@ pub struct IssueBurnEntityV0<'info> {
   pub system_program: Program<'info, System>,
   /// CHECK: Should be checked by the metaplex instruction
   pub instructions: UncheckedAccount<'info>,
-  pub rewards_burn_program: Program<'info, RewardsBurn>,
+  pub no_emit_program: Program<'info, NoEmit>,
 }
 
-impl<'info> IssueBurnEntityV0<'info> {
+impl<'info> IssueNotEmittedEntityV0<'info> {
   fn mint_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintTo<'info>> {
     let cpi_accounts = MintTo {
       mint: self.mint.to_account_info(),
@@ -100,7 +100,7 @@ impl<'info> IssueBurnEntityV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<IssueBurnEntityV0>) -> Result<()> {
+pub fn handler(ctx: Context<IssueNotEmittedEntityV0>) -> Result<()> {
   let asset_id = ctx.accounts.mint.key();
   msg!("minting");
   token::mint_to(ctx.accounts.mint_ctx(), 1)?;
@@ -133,8 +133,8 @@ pub fn handler(ctx: Context<IssueBurnEntityV0>) -> Result<()> {
       signer_seeds,
     ),
     DataV2 {
-      name: String::from("Burn Entity"),
-      symbol: String::from("BURN"),
+      name: String::from("Not Emitted Entity"),
+      symbol: String::from("NOEMIT"),
       uri: format!(
         "{}/v2/hotspot/{}",
         ENTITY_METADATA_URL,
@@ -186,7 +186,7 @@ pub fn handler(ctx: Context<IssueBurnEntityV0>) -> Result<()> {
   ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
     asset: asset_id,
     dao: ctx.accounts.dao.key(),
-    entity_key: String::from(BURN).into_bytes(),
+    entity_key: String::from(NOT_EMITTED).into_bytes(),
     bump_seed: ctx.bumps["key_to_asset"],
     key_serialization: KeySerialization::UTF8,
   });
