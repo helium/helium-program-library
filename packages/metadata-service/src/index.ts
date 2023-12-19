@@ -370,7 +370,7 @@ server.get<{ Querystring: { subnetwork: string; cursor?: string; } }>(
     if (isLastPage) {
       reply.header("Cloudflare-CDN-Cache-Control", "no-cache");
     } else {
-      reply.header("Cloudflare-CDN-Cache-Control", "max-age=86400");
+      reply.header("Cloudflare-CDN-Cache-Control", "max-age=86400");  // 1 day in seconds
 
     }
     
