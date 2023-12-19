@@ -51,6 +51,7 @@ import {
   parseEmissionsSchedule,
   sendInstructionsOrSquads,
 } from './utils';
+import { BN } from 'bn.js';
 
 const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
@@ -539,22 +540,28 @@ export async function run(args: any = process.argv) {
       };
     } else {
       settings = {
-        mobileConfigV1: {
+        mobileConfigV2: {
           feesByDevice: [
             {
               deviceType: { cbrs: {} },
               dcOnboardingFee: toBN(40, 5),
               locationStakingFee: toBN(10, 5),
+              mobileOnboardingFeeUsd: toBN(0, 6),
+              reserved: new Array(8).fill(new BN(0)),
             },
             {
               deviceType: { wifiIndoor: {} },
-              dcOnboardingFee: toBN(0, 5),
+              dcOnboardingFee: toBN(10, 5),
               locationStakingFee: toBN(0, 5),
+              mobileOnboardingFeeUsd: toBN(10, 6),
+              reserved: new Array(8).fill(new BN(0)),
             },
             {
               deviceType: { wifiOutdoor: {} },
-              dcOnboardingFee: toBN(0, 5),
+              dcOnboardingFee: toBN(10, 5),
               locationStakingFee: toBN(0, 5),
+              mobileOnboardingFeeUsd: toBN(20, 6),
+              reserved: new Array(8).fill(new BN(0)),
             },
           ],
         },

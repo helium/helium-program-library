@@ -45,4 +45,6 @@ pub enum ErrorCode {
   InvalidSymbol,
   #[msg("Mobile device type not found")]
   InvalidDeviceType,
+  #[msg("No mobile oracle price")]
+  NoOraclePrice,
 }

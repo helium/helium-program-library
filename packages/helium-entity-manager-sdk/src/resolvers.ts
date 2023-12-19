@@ -33,6 +33,11 @@ export const heliumEntityManagerResolvers = combineResolvers(
     mint: "dntMint",
     owner: "maker",
   }),
+  resolveIndividual(async ({ path }) => {
+    if (path[path.length - 1] == "dntPrice") {
+      return new PublicKey("moraMdsjyPFz8Lp1RJGoW4bQriSF5mHE7Evxt7hytSF");
+    }
+  }),
   resolveIndividual(async ({ path, args, accounts, provider }) => {
     if (path[path.length - 1] == "programApproval" && accounts.dao) {
       let programId = args[args.length - 1] && args[args.length - 1].programId;
@@ -167,7 +172,13 @@ export const heliumEntityManagerResolvers = combineResolvers(
     instruction: "issueNotEmittedEntityV0",
     mint: "mint",
     account: "recipientAccount",
-    owner: "recipient"
+    owner: "recipient",
+  }),
+  ataResolver({
+    instruction: "onboardMobileHotspotV0",
+    mint: "dntMint",
+    account: "dntBurner",
+    owner: "payer",
   }),
   subDaoEpochInfoResolver
 );

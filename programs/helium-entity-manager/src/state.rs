@@ -27,6 +27,28 @@ pub struct DeviceFeesV0 {
   pub location_staking_fee: u64,
 }
 
+impl From<DeviceFeesV0> for DeviceFeesV1 {
+  fn from(value: DeviceFeesV0) -> Self {
+    DeviceFeesV1 {
+      device_type: value.device_type,
+      dc_onboarding_fee: value.dc_onboarding_fee,
+      location_staking_fee: value.location_staking_fee,
+      mobile_onboarding_fee_usd: 0,
+      reserved: [0_u64; 8],
+    }
+  }
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
+pub struct DeviceFeesV1 {
+  pub device_type: MobileDeviceTypeV0,
+  pub dc_onboarding_fee: u64,
+  pub location_staking_fee: u64,
+  // mobile onboarding fee in usd with 6 decimals of precision
+  pub mobile_onboarding_fee_usd: u64,
+  pub reserved: [u64; 8],
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 #[allow(deprecated)]
 pub enum ConfigSettingsV0 {
@@ -36,29 +58,40 @@ pub enum ConfigSettingsV0 {
     full_location_staking_fee: u64,
     dataonly_location_staking_fee: u64,
   },
-  // Deprecated, use MobileConfigV1
+  // Deprecated, use MobileConfigV2
   MobileConfig {
     full_location_staking_fee: u64,
     dataonly_location_staking_fee: u64,
   },
+  // Deprecated, use MobileConfigV2
   MobileConfigV1 {
     fees_by_device: Vec<DeviceFeesV0>,
+  },
+  MobileConfigV2 {
+    fees_by_device: Vec<DeviceFeesV1>,
   },
 }
 
 impl ConfigSettingsV0 {
   #[allow(deprecated)]
-  pub fn mobile_device_fees(&self, device: MobileDeviceTypeV0) -> Option<DeviceFeesV0> {
+  pub fn mobile_device_fees(&self, device: MobileDeviceTypeV0) -> Option<DeviceFeesV1> {
     match self {
       ConfigSettingsV0::MobileConfig {
         full_location_staking_fee,
         ..
-      } => Some(DeviceFeesV0 {
-        device_type: MobileDeviceTypeV0::Cbrs,
-        dc_onboarding_fee: 4000000_u64,
-        location_staking_fee: *full_location_staking_fee,
-      }),
+      } => Some(
+        DeviceFeesV0 {
+          device_type: MobileDeviceTypeV0::Cbrs,
+          dc_onboarding_fee: 4000000_u64,
+          location_staking_fee: *full_location_staking_fee,
+        }
+        .into(),
+      ),
       ConfigSettingsV0::MobileConfigV1 { fees_by_device, .. } => fees_by_device
+        .iter()
+        .find(|d| d.device_type == device)
+        .map(|i| (*i).into()),
+      ConfigSettingsV0::MobileConfigV2 { fees_by_device, .. } => fees_by_device
         .iter()
         .find(|d| d.device_type == device)
         .copied(),
@@ -79,7 +112,8 @@ impl ConfigSettingsV0 {
     }
   }
   pub fn is_mobile(&self) -> bool {
-    matches!(self, ConfigSettingsV0::MobileConfigV1 { .. })
+    matches!(self, ConfigSettingsV0::MobileConfigV2 { .. })
+      || matches!(self, ConfigSettingsV0::MobileConfigV1 { .. })
       || matches!(self, ConfigSettingsV0::MobileConfig { .. })
   }
 
