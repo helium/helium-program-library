@@ -467,7 +467,7 @@ async function withRetries<A>(
   throw new Error("Failed after retries")
 }
 
-type Status = {
+export type Status = {
   totalProgress: number;
   currentBatchProgress: number;
   currentBatchSize: number;
@@ -636,4 +636,66 @@ async function getAllTxns(
       )
     )
   ).flat();
+}
+
+// Batch instructions parallel into as many txs as it takes
+export async function batchParallelInstructions(
+  provider: AnchorProvider,
+  instructions: TransactionInstruction[],
+  onProgress?: (status: Status) => void,
+  triesRemaining: number = 10 // Number of blockhashes to try resending txs with before giving up
+): Promise<void> {
+  let currentTxInstructions: TransactionInstruction[] = [];
+  const blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
+  const transactions: Transaction[] = [];
+
+  for (const instruction of instructions) {
+    currentTxInstructions.push(instruction);
+    const tx = new Transaction({
+      feePayer: provider.wallet.publicKey,
+      recentBlockhash: blockhash,
+    });
+    tx.add(...currentTxInstructions);
+    try {
+      if (
+        tx.serialize({
+          requireAllSignatures: false,
+          verifySignatures: false,
+        }).length >=
+        1232 - (64 + 32) * tx.signatures.length
+      ) {
+        // yes it's ugly to throw and catch, but .serialize can _also_ throw this error
+        throw new Error("Transaction too large");
+      }
+    } catch (e: any) {
+      if (e.toString().includes("Transaction too large")) {
+        currentTxInstructions.pop();
+        const tx = new Transaction({
+          feePayer: provider.wallet.publicKey,
+          recentBlockhash: blockhash,
+        });
+        tx.add(...currentTxInstructions);
+        transactions.push(tx);
+        currentTxInstructions = [instruction];
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  if (currentTxInstructions.length > 0) {
+    const tx = new Transaction({
+      feePayer: provider.wallet.publicKey,
+      recentBlockhash: blockhash,
+    });
+    tx.add(...currentTxInstructions);
+    transactions.push(tx);
+  }
+
+  await bulkSendTransactions(
+    provider,
+    transactions,
+    onProgress,
+    triesRemaining
+  );
 }
