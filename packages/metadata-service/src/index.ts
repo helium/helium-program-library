@@ -367,7 +367,12 @@ server.get<{ Querystring: { subnetwork: string; cursor?: string; } }>(
       };
     });
 
-    reply.header("Cloudflare-CDN-Cache-Control", "no-cache");
+    if (isLastPage) {
+      reply.header("Cloudflare-CDN-Cache-Control", "no-cache");
+    } else {
+      reply.header("Cloudflare-CDN-Cache-Control", "max-age=86400");
+
+    }
     
     return result;
   }
