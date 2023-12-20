@@ -246,7 +246,11 @@ pub fn handler<'info>(
     Clock::get()?.unix_timestamp,
   )
   .ok_or_else(|| error!(ErrorCode::NoOraclePrice))?;
-  let mobile_fee = dnt_fee.checked_div(mobile_price).unwrap();
+  let mobile_fee = dnt_fee
+    .checked_mul(1000000)
+    .unwrap()
+    .checked_div(mobile_price)
+    .unwrap();
   burn(ctx.accounts.mobile_burn_ctx(), mobile_fee)?;
 
   Ok(())
