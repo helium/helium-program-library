@@ -6,7 +6,7 @@ import {
   delegatedPositionKey,
   init,
 } from "@helium/helium-sub-daos-sdk";
-import { batchParallelInstructions, chunks, sendMultipleInstructions, Status } from "@helium/spl-utils";
+import { batchParallelInstructions, Status } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
@@ -75,16 +75,6 @@ export const useClaimAllPositionsRewards = () => {
           multiDemArray.flat(),
           onProgress
         );
-
-        for (const positionInsturctions of multiDemArray) {
-          // This is an arbitrary threshold and we assume that up to 4 instructions can be inserted as a single Tx
-          const ixsChunks = chunks(positionInsturctions, 4);
-          await sendMultipleInstructions(
-            provider,
-            ixsChunks,
-            ixsChunks.map(() => [])
-          );
-        }
       }
     }
   );
