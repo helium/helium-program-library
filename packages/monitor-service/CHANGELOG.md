@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.9](https://github.com/helium/helium-program-libary/compare/v0.6.5...v0.6.9) (2023-12-21)
+
+
+### Features
+
+* **#495:** Add monitoring for claimable rewards and vehnt ([#507](https://github.com/helium/helium-program-libary/issues/507)) ([efc6813](https://github.com/helium/helium-program-libary/commit/efc6813839be4b323bea8110ad7762423dd13b82)), closes [#495](https://github.com/helium/helium-program-libary/issues/495) [#495](https://github.com/helium/helium-program-libary/issues/495)
+
+
+
+
+
 ## [0.6.8](https://github.com/helium/helium-program-libary/compare/v0.6.7...v0.6.8) (2023-12-21)
 
 **Note:** Version bump only for package @helium/monitor-service

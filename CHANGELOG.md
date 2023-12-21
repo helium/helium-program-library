@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.9](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.9) (2023-12-21)
+
+
+### Features
+
+* **#494:** Implement HIP-96 wifi onboarding fees ([#506](https://github.com/helium/helium-program-library/issues/506)) ([50471c3](https://github.com/helium/helium-program-library/commit/50471c33d06ba7f55e605ed7dbba02119af5e3cd)), closes [#494](https://github.com/helium/helium-program-library/issues/494)
+* **#495:** Add monitoring for claimable rewards and vehnt ([#507](https://github.com/helium/helium-program-library/issues/507)) ([efc6813](https://github.com/helium/helium-program-library/commit/efc6813839be4b323bea8110ad7762423dd13b82)), closes [#495](https://github.com/helium/helium-program-library/issues/495) [#495](https://github.com/helium/helium-program-library/issues/495)
+* **#504:** Parallelize claim delegation rewards  ([#509](https://github.com/helium/helium-program-library/issues/509)) ([01b5f3d](https://github.com/helium/helium-program-library/commit/01b5f3dbd35345302e5fc6a83667b5e5e017d4ec)), closes [#504](https://github.com/helium/helium-program-library/issues/504)
+
+
+
+
+
 ## [0.6.8](https://github.com/helium/helium-program-library/compare/v0.6.7...v0.6.8) (2023-12-21)
 
 **Note:** Version bump only for package helium-program-library
