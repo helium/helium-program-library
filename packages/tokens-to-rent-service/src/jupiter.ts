@@ -1,4 +1,4 @@
-import { HNT_MINT, IOT_MINT, MOBILE_MINT, toBN } from "@helium/spl-utils";
+import { HNT_MINT, IOT_MINT, MOBILE_MINT, toBN, truthy } from "@helium/spl-utils";
 import {
   Configuration,
   DefaultApi,
@@ -162,14 +162,30 @@ export const fundFees = async ({
     instructionDataToTransactionInstruction
   );
   let fee = 10000;
-  if (budgetInstructions.length == 2) {
-    const units = ComputeBudgetInstruction.decodeRequestUnits(
-      budgetInstructions[0]!
-    );
-    const limit = ComputeBudgetInstruction.decodeSetComputeUnitPrice(
-      budgetInstructions[1]!
-    );
-    fee += Math.ceil(units.units * Number(limit.microLamports)) / 1000000;
+  if (budgetInstructions.length >= 0) {
+    let units = 0;
+    let price = 0;
+    budgetInstructions.filter(truthy).forEach((instr) => {
+      const type = ComputeBudgetInstruction.decodeInstructionType(instr);
+      switch (type) {
+        case "RequestHeapFrame":
+          break;
+        case "SetComputeUnitLimit":
+          units =
+            ComputeBudgetInstruction.decodeSetComputeUnitLimit(instr).units;
+            break;
+        case "RequestUnits":
+          units = ComputeBudgetInstruction.decodeRequestUnits(instr).units;
+            break;
+        case "SetComputeUnitPrice":
+          price = Number(
+            ComputeBudgetInstruction.decodeSetComputeUnitPrice(instr)
+              .microLamports
+          );
+          break;
+      }
+    });
+    fee += Math.ceil((units * price) / 1000000);
     if (fee / LAMPORTS_PER_SOL > 0.01) {
       throw new Error("Priority fees are too high right now, try again later");
     }
