@@ -1,4 +1,5 @@
 import { Creator, Uses } from "@metaplex-foundation/mpl-bubblegum";
+import { collectInstructionDiscriminator } from "@metaplex-foundation/mpl-token-metadata";
 import { PublicKey } from "@solana/web3.js";
 import axios from "axios";
 // @ts-ignore
@@ -300,10 +301,17 @@ export async function getAssetsByOwner(
 export type SearchAssetsOpts = {
   sortBy?: { sortBy: "created"; sortDirection: "asc" | "desc" };
   page?: number;
+  limit?: number;
   collection?: string;
   ownerAddress: string;
-  creatorAddress: string;
+  creatorAddress?: string;
   creatorVerified?: boolean;
+  tokenType?:
+    | "all"
+    | "compressedNft"
+    | "regularNft"
+    | "nonFungible"
+    | "fungible";
 } & { [key: string]: unknown };
 
 export async function searchAssets(
@@ -312,20 +320,32 @@ export async function searchAssets(
     creatorVerified = true,
     sortBy = { sortBy: "created", sortDirection: "asc" },
     page = 1,
+    limit = 1000,
+    collection,
+    tokenType,
     ...rest
   }: SearchAssetsOpts
 ): Promise<Asset[]> {
+  const params = {
+    page,
+    limit,
+    sortBy:
+      tokenType && ["all", "fungible"].includes(tokenType) ? null : sortBy,
+    creatorVerified:
+      tokenType && ["all", "fungible"].includes(tokenType)
+        ? null
+        : creatorVerified,
+    tokenType,
+    ...(collection ? { grouping: ["collection", collection] } : {}),
+    ...rest,
+  };
+
   try {
     const response = await axios.post(url, {
       jsonrpc: "2.0",
       method: "searchAssets",
       id: "get-assets-op-1",
-      params: {
-        page,
-        creatorVerified,
-        sortBy,
-        ...rest,
-      },
+      params,
       headers: {
         "Cache-Control": "no-cache",
         Pragma: "no-cache",
