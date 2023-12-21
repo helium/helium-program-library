@@ -8,6 +8,8 @@ import {
 import { ACCOUNT_SIZE, NATIVE_MINT, getMint } from "@solana/spl-token";
 import {
   AddressLookupTableAccount,
+  ComputeBudgetInstruction,
+  LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
@@ -156,14 +158,31 @@ export const fundFees = async ({
     lamports: ataRent,
   });
 
+  const budgetInstructions = computeBudgetInstructions.map(
+    instructionDataToTransactionInstruction
+  );
+  let fee = 10000;
+  if (budgetInstructions.length == 2) {
+    const units = ComputeBudgetInstruction.decodeRequestUnits(
+      budgetInstructions[0]!
+    );
+    const limit = ComputeBudgetInstruction.decodeSetComputeUnitPrice(
+      budgetInstructions[1]!
+    );
+    fee += Math.ceil(units.units * Number(limit.microLamports)) / 1000000;
+    if (fee / LAMPORTS_PER_SOL > 0.01) {
+      throw new Error("Priority fees are too high right now, try again later");
+    }
+  }
+
   const repayIx = SystemProgram.transfer({
     fromPubkey: userWallet,
     toPubkey: platformWallet.publicKey,
-    lamports: ataRent + 10000,
+    lamports: ataRent + fee,
   });
 
   const instructions: TransactionInstruction[] = [
-    ...computeBudgetInstructions.map(instructionDataToTransactionInstruction),
+    ...budgetInstructions,
     borrowIx,
     ...setupInstructions.map(instructionDataToTransactionInstruction),
     instructionDataToTransactionInstruction(swapInstruction),
