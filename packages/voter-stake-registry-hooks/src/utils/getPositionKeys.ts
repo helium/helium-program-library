@@ -6,7 +6,6 @@ import {
   registrarKey,
 } from "@helium/voter-stake-registry-sdk";
 import { Metadata, Metaplex, Nft, Sft } from "@metaplex-foundation/js";
-import { getMint, Mint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { Registrar } from "../sdk/types";
 
@@ -46,12 +45,6 @@ export const getPositionKeys = async (
   const registrar = (await program.account.registrar.fetch(
     registrarPk
   )) as Registrar;
-  const mintCfgs = registrar.votingMints;
-  const mints: Record<string, Mint> = {};
-  for (const mcfg of mintCfgs) {
-    const mint = await getMint(connection, mcfg.mint);
-    mints[mcfg.mint.toBase58()] = mint;
-  }
 
   const nfts = (await metaplex.nfts().findAllByOwner({ owner: wallet })).filter(
     (nft) => nft.collection?.address.equals(registrar.collection)
