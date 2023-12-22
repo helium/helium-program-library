@@ -513,6 +513,7 @@ export async function bulkSendTransactions(
           onProgress &&
           onProgress({
             ...rest,
+            totalTxs: txs.length,
             totalProgress: totalProgress + ret.length + thisRet.length,
           }),
         recentBlockhash.lastValidBlockHeight,
