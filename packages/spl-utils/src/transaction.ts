@@ -255,14 +255,14 @@ export const awaitTransactionSignatureConfirmation = async (
   status = await new Promise(async (resolve, reject) => {
     let t: NodeJS.Timeout;
     function setDone() {
-      done = true
-      clearTimeout(t)
+      done = true;
+      clearTimeout(t);
     }
     t = setTimeout(() => {
       if (done) {
         return;
       }
-      setDone()
+      setDone();
       console.log("Rejecting for timeout...");
       reject({ timeout: true });
     }, timeout);
@@ -275,7 +275,7 @@ export const awaitTransactionSignatureConfirmation = async (
             slot: context.slot,
             confirmations: 0,
           };
-          setDone()
+          setDone();
           if (result.err) {
             console.log("Rejected via websocket", result.err);
             reject(status);
@@ -288,7 +288,7 @@ export const awaitTransactionSignatureConfirmation = async (
     } catch (e) {
       console.error("WS error in setup", txid, e);
       if (!queryStatus) {
-        reject(e)
+        reject(e);
       }
     }
     while (!done && queryStatus) {
@@ -303,7 +303,7 @@ export const awaitTransactionSignatureConfirmation = async (
             if (!status) {
             } else if (status.err) {
               console.log("REST error for", txid, status);
-              setDone()
+              setDone();
               reject(status.err);
             } else if (!status.confirmations && !status.confirmationStatus) {
               console.log("REST no confirmations for", txid, status);
@@ -313,7 +313,7 @@ export const awaitTransactionSignatureConfirmation = async (
                 !status.confirmationStatus ||
                 status.confirmationStatus == commitment
               ) {
-                setDone()
+                setDone();
                 resolve(status);
               }
             }
@@ -336,7 +336,7 @@ export const awaitTransactionSignatureConfirmation = async (
   ) {
     connection.removeSignatureListener(subId);
   }
-  done = true
+  done = true;
   return status;
 };
 
@@ -386,7 +386,7 @@ export async function sendAndConfirmWithRetry(
   let done = false;
   let slot = 0;
   const txid = await connection.sendRawTransaction(txn, sendOptions);
-  console.log("txid", txid)
+  console.log("txid", txid);
   const startTime = getUnixTime();
   (async () => {
     while (!done && getUnixTime() - startTime < timeout) {
@@ -409,7 +409,7 @@ export async function sendAndConfirmWithRetry(
     if (confirmation.err) {
       const tx = await connection.getTransaction(txid, {
         commitment: "confirmed",
-        maxSupportedTransactionVersion: 0
+        maxSupportedTransactionVersion: 0,
       });
       console.error(tx?.meta?.logMessages?.join("\n"));
       console.error(confirmation.err);
@@ -425,7 +425,7 @@ export async function sendAndConfirmWithRetry(
 
     const tx = await connection.getTransaction(txid, {
       commitment: "confirmed",
-      maxSupportedTransactionVersion: 0
+      maxSupportedTransactionVersion: 0,
     });
     if (tx && tx.meta && tx.meta.logMessages) {
       console.error(tx.meta.logMessages.join("\n"));
@@ -464,10 +464,11 @@ async function withRetries<A>(
       console.log(`Retrying ${i}...`, e);
     }
   }
-  throw new Error("Failed after retries")
+  throw new Error("Failed after retries");
 }
 
 export type Status = {
+  totalTxs: number;
   totalProgress: number;
   currentBatchProgress: number;
   currentBatchSize: number;
@@ -495,9 +496,9 @@ export async function bulkSendTransactions(
           return tx;
         })
       );
-      const signedTxs = await (provider as AnchorProvider).wallet.signAllTransactions(
-        blockhashedTxs
-      );
+      const signedTxs = await (
+        provider as AnchorProvider
+      ).wallet.signAllTransactions(blockhashedTxs);
 
       const txsWithSigs = signedTxs.map((tx, index) => {
         return {
@@ -510,7 +511,11 @@ export async function bulkSendTransactions(
         signedTxs.map((s) => s.serialize()),
         ({ totalProgress, ...rest }) =>
           onProgress &&
-          onProgress({ ...rest, totalProgress: totalProgress + ret.length + thisRet.length}),
+          onProgress({
+            ...rest,
+            totalTxs: txs.length,
+            totalProgress: totalProgress + ret.length + thisRet.length,
+          }),
         recentBlockhash.lastValidBlockHeight,
         // Hail mary, try with preflight enabled. Sometimes this causes
         // errors that wouldn't otherwise happen
@@ -530,7 +535,9 @@ export async function bulkSendTransactions(
       triesRemaining--;
       if (triesRemaining <= 0) {
         throw new Error(
-          `Failed to submit all txs after blockhashes expired, ${signedTxs.length - confirmedTxs.length} remain`
+          `Failed to submit all txs after blockhashes expired, ${
+            signedTxs.length - confirmedTxs.length
+          } remain`
         );
       }
     }
@@ -594,6 +601,7 @@ export async function bulkSendRawTransactions(
       currentBatchProgress += completed.length;
       onProgress &&
         onProgress({
+          totalTxs: txs.length,
           totalProgress: totalProgress,
           currentBatchProgress: currentBatchProgress,
           currentBatchSize: txBatchSize,
@@ -608,7 +616,7 @@ export async function bulkSendRawTransactions(
       }
       ret.push(
         ...txids
-          .map((txid, idx) => statuses[idx] == null ? null : txid)
+          .map((txid, idx) => (statuses[idx] == null ? null : txid))
           .filter(truthy)
       );
       chunk = chunk.filter((_, index) => statuses[index] === null);
