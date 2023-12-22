@@ -130,6 +130,7 @@ export const fundFees = async ({
     slippageBps: 100, // 1%
     platformFeeBps: Number(JUPITER_FEE_BPS) || 0,
     maxAccounts: 20,
+    onlyDirectRoutes: true
   });
 
   // Tx contains instructions to create/close WSOL token account
