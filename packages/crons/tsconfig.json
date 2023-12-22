@@ -11,6 +11,9 @@
       "path": "../fanout-sdk"
     },
     {
+      "path": "../no-emit-sdk"
+    },
+    {
       "path": "../helium-sub-daos-sdk"
     },
     {

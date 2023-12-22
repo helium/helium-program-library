@@ -1,26 +1,23 @@
-import { Provider } from "@coral-xyz/anchor";
-import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import { AnchorProvider } from "@coral-xyz/anchor";
+import {
+  Asset,
+  HNT_MINT,
+  IOT_MINT,
+  MOBILE_MINT,
+  searchAssets,
+} from "@helium/spl-utils";
 import {
   init as initVsr,
   positionKey,
   registrarKey,
 } from "@helium/voter-stake-registry-sdk";
-import {
-  Metadata,
-  Metaplex,
-  Nft,
-  Sft
-} from "@metaplex-foundation/js";
-import { getMint, Mint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import {
-  Registrar
-} from "../sdk/types";
+import { Registrar } from "../sdk/types";
 
 export interface GetPositionsArgs {
   wallet: PublicKey;
   mint: PublicKey;
-  provider: Provider;
+  provider: AnchorProvider;
 }
 
 export function getRegistrarKey(mint: PublicKey) {
@@ -43,30 +40,44 @@ const realmNames: Record<string, string> = {
 };
 export const getPositionKeys = async (
   args: GetPositionsArgs
-): Promise<{ positionKeys: PublicKey[]; nfts: (Metadata | Nft | Sft)[] }> => {
+): Promise<{ positionKeys: PublicKey[] }> => {
   const { mint, wallet, provider } = args;
-  const connection = provider.connection;
-
-  const metaplex = new Metaplex(connection);
   const registrarPk = getRegistrarKey(mint);
   const program = await initVsr(provider as any);
   const registrar = (await program.account.registrar.fetch(
     registrarPk
   )) as Registrar;
-  const mintCfgs = registrar.votingMints;
-  const mints: Record<string, Mint> = {};
-  for (const mcfg of mintCfgs) {
-    const mint = await getMint(connection, mcfg.mint);
-    mints[mcfg.mint.toBase58()] = mint;
+
+  let page = 1;
+  const limit = 1000;
+  let allAssets: Asset[] = [];
+  while (true) {
+    const assets =
+      (await searchAssets(provider.connection.rpcEndpoint, {
+        page,
+        limit,
+        ownerAddress: wallet.toBase58(),
+        tokenType: "fungible",
+      })) || [];
+
+    allAssets = allAssets.concat(assets);
+
+    if (assets.length < limit) {
+      break;
+    }
+
+    page++;
   }
 
-  const nfts = (await metaplex.nfts().findAllByOwner({ owner: wallet })).filter(
-    (nft) => nft.collection?.address.equals(registrar.collection)
-  );
+  const positionKeys = allAssets
+    .filter((asset) =>
+      asset.grouping?.find(
+        (group) =>
+          group.group_key === "collection" &&
+          group.group_value.equals(registrar.collection)
+      )
+    )
+    .map((asset) => positionKey(asset.id)[0]);
 
-  const positionKeys = nfts.map(
-    (nft) => positionKey((nft as any).mintAddress)[0]
-  );
-
-  return { positionKeys, nfts };
+  return { positionKeys };
 };

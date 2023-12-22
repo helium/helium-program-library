@@ -5,10 +5,13 @@ import {
   heliumCommonResolver,
   resolveIndividual,
 } from "@helium/anchor-resolvers";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import {
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { init } from "./init";
 import { iotInfoKey, keyToAssetKey, mobileInfoKey, programApprovalKey } from "./pdas";
+import { notEmittedKey } from "@helium/no-emit-sdk";
 
 export const heliumEntityManagerResolvers = combineResolvers(
   heliumCommonResolver,
@@ -29,6 +32,11 @@ export const heliumEntityManagerResolvers = combineResolvers(
     account: "escrow",
     mint: "dntMint",
     owner: "maker",
+  }),
+  resolveIndividual(async ({ path }) => {
+    if (path[path.length - 1] == "dntPrice") {
+      return new PublicKey("moraMdsjyPFz8Lp1RJGoW4bQriSF5mHE7Evxt7hytSF");
+    }
   }),
   resolveIndividual(async ({ path, args, accounts, provider }) => {
     if (path[path.length - 1] == "programApproval" && accounts.dao) {
@@ -69,9 +77,20 @@ export const heliumEntityManagerResolvers = combineResolvers(
           Buffer.from("iot_operations_fund", "utf8")
         )
       )[0];
+    } else if (
+      path[path.length - 1] === "keyToAsset" &&
+      idlIx.name === "issueNotEmittedEntityV0" &&
+      accounts.dao
+    ) {
+      return (
+        await keyToAssetKey(
+          accounts.dao as PublicKey,
+          Buffer.from("not_emitted", "utf8")
+        )
+      )[0];
     }
   }),
-  resolveIndividual(async ({ path, args, provider, accounts }) => {
+  resolveIndividual(async ({ path, args, provider, accounts, idlIx }) => {
     if (
       path[path.length - 1] === "iotInfo" &&
       args[args.length - 1].index &&
@@ -89,7 +108,13 @@ export const heliumEntityManagerResolvers = combineResolvers(
           keyToAssetAcc.entityKey
         )
       )[0];
-    } else if (path[path.length - 1] === "recipient") {
+    }
+  }),
+  resolveIndividual(async ({ path, idlIx, provider }) => {
+    if (path[path.length - 1] === "recipient") {
+      if (idlIx.name === "issueNotEmittedEntityV0") {
+        return notEmittedKey()[0];
+      }
       // @ts-ignore
       return provider.wallet?.publicKey;
     }
@@ -112,9 +137,6 @@ export const heliumEntityManagerResolvers = combineResolvers(
           keyToAssetAcc.entityKey
         )
       )[0];
-    } else if (path[path.length - 1] === "recipient") {
-      // @ts-ignore
-      return provider.wallet?.publicKey;
     }
   }),
   resolveIndividual(async ({ path, accounts }) => {
@@ -123,7 +145,7 @@ export const heliumEntityManagerResolvers = combineResolvers(
       (accounts.owner || accounts.hotspotOwner) &&
       accounts.hotspot
     ) {
-      return getAssociatedTokenAddress(
+      return getAssociatedTokenAddressSync(
         accounts.hotspot as PublicKey,
         (accounts.owner || accounts.hotspotOwner) as PublicKey
       );
@@ -145,6 +167,18 @@ export const heliumEntityManagerResolvers = combineResolvers(
     account: "dcBurner",
     mint: "dcMint",
     owner: "dcFeePayer",
+  }),
+  ataResolver({
+    instruction: "issueNotEmittedEntityV0",
+    mint: "mint",
+    account: "recipientAccount",
+    owner: "recipient",
+  }),
+  ataResolver({
+    instruction: "onboardMobileHotspotV0",
+    mint: "dntMint",
+    account: "dntBurner",
+    owner: "payer",
   }),
   subDaoEpochInfoResolver
 );

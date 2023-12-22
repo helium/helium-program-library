@@ -1,15 +1,15 @@
 import { Program } from "@coral-xyz/anchor";
-import { useAnchorProvider } from "@helium/helium-react-hooks";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import { getMint } from "@solana/spl-token";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
+import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 
 export const useTransferPosition = () => {
-  const provider = useAnchorProvider();
+  const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       sourcePosition,
@@ -30,26 +30,20 @@ export const useTransferPosition = () => {
       const idl = await Program.fetchIdl(programId, provider);
       const hsdProgram = await init(provider as any, programId, idl);
       const vsrProgram = await initVsr(provider as any);
-
-      const registrar = await vsrProgram.account.registrar.fetch(
-        sourcePosition.registrar
-      );
-      const mint =
-        registrar.votingMints[sourcePosition.votingMintConfigIdx].mint;
+      const mint = sourcePosition.votingMint.mint;
 
       if (loading) return;
 
       if (isInvalid || !hsdProgram) {
-        throw new Error("Unable to Transfer Position, position has active votes");
+        throw new Error(
+          "Unable to Transfer Position, position has active votes"
+        );
       } else {
         const instructions: TransactionInstruction[] = [];
         const [dao] = daoKey(mint);
         const isDao = Boolean(await provider.connection.getAccountInfo(dao));
         const mintAcc = await getMint(provider.connection, mint);
-        const amountToTransfer = toBN(
-          amount,
-          mintAcc!.decimals
-        );
+        const amountToTransfer = toBN(amount, mintAcc!.decimals);
 
         if (isDao) {
           instructions.push(
@@ -91,7 +85,7 @@ export const useTransferPosition = () => {
           );
         }
 
-        await sendInstructions(provider, instructions)
+        await sendInstructions(provider, instructions);
       }
     }
   );

@@ -1125,7 +1125,7 @@ dependencies = [
 
 [[package]]
 name = "circuit-breaker"
-version = "0.0.2"
+version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1585,7 +1585,7 @@ dependencies = [
 
 [[package]]
 name = "data-credits"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2264,7 +2264,7 @@ dependencies = [
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.1.4"
+version = "0.2.1"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -2277,13 +2277,14 @@ dependencies = [
  "default-env",
  "helium-sub-daos",
  "mpl-token-metadata",
+ "no-emit",
  "shared-utils",
  "solana-security-txt",
 ]
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.0.16"
+version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2695,7 +2696,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-distributor"
-version = "0.0.3"
+version = "0.1.0"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -2710,7 +2711,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-transactions"
-version = "0.0.2"
+version = "0.1.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2949,9 +2950,9 @@ dependencies = [
 
 [[package]]
 name = "mpl-token-metadata"
-version = "3.0.1"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "651388b8ccae4805f240ebd495172eb44ea10153e018623b628df7034e042a96"
+checksum = "cc9e782878c85bfb68eef56a6732ebdf375cf116061d3d0a11884c3cdb61f2c4"
 dependencies = [
  "borsh 0.10.3",
  "num-derive 0.3.3",
@@ -3532,7 +3533,7 @@ dependencies = [
 
 [[package]]
 name = "proposal"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "anchor-gen",
  "anchor-lang",
@@ -3840,8 +3841,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "no-emit"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "default-env",
+ "helium-sub-daos",
+ "shared-utils",
+ "solana-security-txt",
+]
+
+[[package]]
 name = "rewards-oracle"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "default-env",
@@ -5899,7 +5912,7 @@ dependencies = [
 
 [[package]]
 name = "treasury-management"
-version = "0.0.2"
+version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -6122,7 +6135,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.0.8"
+version = "0.2.4"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

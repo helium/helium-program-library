@@ -1,18 +1,16 @@
 import { BN, Program } from "@coral-xyz/anchor";
-import {
-  useAnchorProvider,
-  useSolanaUnixNow,
-} from "@helium/helium-react-hooks";
+import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
 import { sendInstructions } from "@helium/spl-utils";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
+import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 
 export const useFlipPositionLockupKind = () => {
   const unixNow = useSolanaUnixNow();
-  const provider = useAnchorProvider();
+  const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,
@@ -32,11 +30,7 @@ export const useFlipPositionLockupKind = () => {
       const idl = await Program.fetchIdl(programId, provider);
       const hsdProgram = await init(provider as any, programId, idl);
       const vsrProgram = await initVsr(provider as any);
-
-      const registrar = await vsrProgram.account.registrar.fetch(
-        position.registrar
-      );
-      const mint = registrar.votingMints[position.votingMintConfigIdx].mint;
+      const mint = position.votingMint.mint;
 
       if (loading) return;
 
@@ -74,7 +68,7 @@ export const useFlipPositionLockupKind = () => {
           );
         } else {
           instructions.push(
-            await hsdProgram.methods
+            await vsrProgram.methods
               .resetLockupV0({
                 kind,
                 periods: positionLockupPeriodInDays,
@@ -99,5 +93,5 @@ export const useFlipPositionLockupKind = () => {
 };
 
 function secsToDays(secs: number): number {
-  return Math.floor(secs / (60 * 60 * 24));
+  return secs / (60 * 60 * 24);
 }

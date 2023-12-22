@@ -1950,6 +1950,8 @@ dependencies = [
  "default-env",
  "helium-sub-daos",
  "mpl-token-metadata",
+ "no-emit",
+ "price-oracle",
  "shared-utils",
  "solana-security-txt",
 ]
@@ -2552,9 +2554,9 @@ dependencies = [
 
 [[package]]
 name = "mpl-token-metadata"
-version = "3.1.0"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "177204bbe7486b22ac35af2c91a82630f830a6ddd3392651aefde1ef346aba3d"
+checksum = "cc9e782878c85bfb68eef56a6732ebdf375cf116061d3d0a11884c3cdb61f2c4"
 dependencies = [
  "borsh 0.10.3",
  "num-derive 0.3.3",
@@ -2574,6 +2576,18 @@ dependencies = [
  "libc",
  "memoffset 0.7.1",
  "pin-utils",
+]
+
+[[package]]
+name = "no-emit"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "default-env",
+ "helium-sub-daos",
+ "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]

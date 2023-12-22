@@ -818,15 +818,6 @@ describe("helium-sub-daos", () => {
                 await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
               ).epoch;
 
-              const thread = PublicKey.findProgramAddressSync(
-                [
-                  Buffer.from("thread", "utf8"),
-                  subDao.toBuffer(),
-                  Buffer.from("end-epoch", "utf8"),
-                ],
-                THREAD_PID
-              )[0];
-
               await program.methods
                 .calculateUtilityScoreV0({
                   epoch,

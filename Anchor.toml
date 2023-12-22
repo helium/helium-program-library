@@ -16,6 +16,7 @@ voter_stake_registry = "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8"
 fanout = "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6"
 mobile_entity_manager = "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr"
 hexboosting = "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ"
+no_emit = "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv"
 
 [workspace]
 members = [
@@ -31,7 +32,8 @@ members = [
   "programs/voter-stake-registry",
   "programs/fanout",
   "programs/mobile-entity-manager",
-  "programs/hexboosting"
+  "programs/hexboosting",
+  "programs/no-emit",
 ]
 
 [registry]
@@ -73,6 +75,9 @@ address = "propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs" # Proposal
 
 [[test.validator.clone]]
 address = "66t3XARU6Ja3zj91gDZ2KoNLJHEMTYPSKqJWYb6PJJBA" # Proposal IDL
+
+[[test.validator.clone]]
+address = "moraMdsjyPFz8Lp1RJGoW4bQriSF5mHE7Evxt7hytSF" # Mobile price oracle
 
 # Pyth price oracle
 [[test.validator.clone]]

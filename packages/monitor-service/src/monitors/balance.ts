@@ -1,6 +1,7 @@
 import { toNumber } from "@helium/spl-utils";
 import {
   AccountLayout,
+  RawAccount,
   getAccount,
   getAssociatedTokenAddress,
   getMint,
@@ -14,7 +15,8 @@ import { watch } from "./watch";
 export async function monitorTokenBalance(
   account: PublicKey,
   label: string,
-  isMaker = false
+  isMaker = false,
+  extraFn: (acc: RawAccount) => void = () => {}
 ) {
   const acc = await getAccount(provider.connection, account);
   const mint = await getMint(provider.connection, acc.mint);
@@ -29,6 +31,7 @@ export async function monitorTokenBalance(
       },
       toNumber(new BN(rawAccount.amount.toString()), mint.decimals)
     );
+    extraFn(rawAccount);
   });
 }
 
