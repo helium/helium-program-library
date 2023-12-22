@@ -1,5 +1,9 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::Mint;
 use helium_sub_daos::SubDaoV0;
+use price_oracle::PriceOracleV0;
+
+use crate::BoostConfigV0;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeBoostConfigArgsV0 {
@@ -40,18 +44,15 @@ pub fn handler(
   ctx: Context<InitializeBoostConfigV0>,
   args: InitializeBoostConfigArgsV0,
 ) -> Result<()> {
-  ctx
-    .accounts
-    .boost_config
-    .set_inner(BoostConfigV0 {
-      authority: ctx.accounts.authority.key(),
-      price_oracle: ctx.accounts.price_oracle.key(),
-      payment_mint: args.payment_mint.clone(),
-      boost_price: args.boost_price,
-      period_length: args.period_length,
-      minimum_periods: args.minimum_periods,
-      bump_seed: ctx.bumps["boost_config"],
-    });
+  ctx.accounts.boost_config.set_inner(BoostConfigV0 {
+    authority: ctx.accounts.authority.key(),
+    price_oracle: ctx.accounts.price_oracle.key(),
+    payment_mint: ctx.accounts.payment_mint.key(),
+    boost_price: args.boost_price,
+    period_length: args.period_length,
+    minimum_periods: args.minimum_periods,
+    bump_seed: ctx.bumps["boost_config"],
+  });
 
   Ok(())
 }

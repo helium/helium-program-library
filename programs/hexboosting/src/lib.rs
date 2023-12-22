@@ -29,5 +29,16 @@ security_txt! {
 
 #[program]
 pub mod hexboosting {
+  use super::*;
 
+  pub fn boost_v0(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
+    boost_v0::handler(ctx, args)
+  }
+
+  pub fn initialize_boost_config_v0(
+    ctx: Context<InitializeBoostConfigV0>,
+    args: InitializeBoostConfigArgsV0,
+  ) -> Result<()> {
+    initialize_boost_config_v0::handler(ctx, args)
+  }
 }

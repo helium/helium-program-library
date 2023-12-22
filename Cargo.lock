@@ -2006,6 +2006,8 @@ dependencies = [
  "anchor-spl",
  "bytemuck",
  "default-env",
+ "helium-sub-daos",
+ "price-oracle",
  "shared-utils",
  "solana-security-txt",
 ]

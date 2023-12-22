@@ -7,6 +7,7 @@ pub struct BoostConfigV0 {
   pub payment_mint: Pubkey,
   pub authority: Pubkey,
   /// The price in the payment_mint to burn boost
+  /// For simplicity, this should have the same number of decimals as the price oracle
   pub boost_price: u64,
   /// The length of a period (defined as a month in the HIP)
   pub period_length: u32,
@@ -17,7 +18,7 @@ pub struct BoostConfigV0 {
 
 #[account]
 pub struct BoostedHexV0 {
-  pub boost_config: u64,
+  pub boost_config: Pubkey,
   pub location: u64,
   // 0 if the boosting has not yet started. Avoding using an option here to keep serialization length
   // consistent
@@ -26,6 +27,6 @@ pub struct BoostedHexV0 {
   // Extra space in case we need it later
   pub reserved: [u64; 8],
   pub bump_seed: u8,
-  // Not shown: After the account data, the rest of the bytes are used to indicate the boost amount
-  // per period after `start_ts`
+  /// Each entry represents the boost multiplier for a given period
+  pub boosts_by_period: Vec<u8>,
 }
