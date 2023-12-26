@@ -17,9 +17,9 @@ export async function watch(
     }
   });
 
-  // Force a requery every 30 seconds to ensure accuracy
+  // Force a requery every 5 minutes to ensure accuracy
   setInterval(async () => {
     // @ts-ignore
     onChange((await cache.search(account, undefined, false, true))?.account);
-  }, 30 * 1000);
+  }, 5 * 60 * 1000);
 }

@@ -11,6 +11,9 @@
       "path": "../lazy-transactions-sdk"
     },
     {
+      "path": "../price-oracle-sdk"
+    },
+    {
       "path": "../lazy-distributor-sdk"
     },
     {
