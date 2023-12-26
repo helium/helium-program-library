@@ -7,7 +7,7 @@ use crate::BoostConfigV0;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeBoostConfigArgsV0 {
-  /// The price in the payment_mint to burn boost
+  /// The price in the oracle (usd) to burn boost
   pub boost_price: u64,
   /// The length of a period (defined as a month in the HIP)
   pub period_length: u32,

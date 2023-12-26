@@ -6,7 +6,7 @@ pub struct BoostConfigV0 {
   pub price_oracle: Pubkey,
   pub payment_mint: Pubkey,
   pub authority: Pubkey,
-  /// The price in the payment_mint to burn boost
+  /// The price in the oracle (usd) to burn boost
   /// For simplicity, this should have the same number of decimals as the price oracle
   pub boost_price: u64,
   /// The length of a period (defined as a month in the HIP)

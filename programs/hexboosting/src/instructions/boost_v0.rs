@@ -5,6 +5,7 @@ use anchor_spl::{
   token::{burn, Burn, Mint, Token, TokenAccount},
 };
 use price_oracle::{calculate_current_price, PriceOracleV0};
+use shared_utils::resize_to_fit;
 
 use crate::{BoostConfigV0, BoostedHexV0};
 
@@ -35,7 +36,9 @@ pub struct BoostV0<'info> {
   pub payer: Signer<'info>,
   #[account(
     has_one = payment_mint,
-    has_one = price_oracle
+    has_one = price_oracle,
+    seeds = ["boost_config".as_bytes(), payment_mint.key().as_ref()],
+    bump = boost_config.bump_seed,
   )]
   pub boost_config: Box<Account<'info, BoostConfigV0>>,
   pub price_oracle: Box<Account<'info, PriceOracleV0>>,
@@ -60,9 +63,28 @@ pub struct BoostV0<'info> {
 }
 
 pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
-  let is_initialized = ctx.accounts.boosted_hex.location != 0;
+  let mut is_initialized = ctx.accounts.boosted_hex.location != 0;
   ctx.accounts.boosted_hex.boost_config = ctx.accounts.boost_config.key();
   ctx.accounts.boosted_hex.location = args.location;
+  ctx.accounts.boosted_hex.bump_seed = ctx.bumps["boosted_hex"];
+
+  // Shift the periods left to discard past periods
+  let now = Clock::get()?.unix_timestamp;
+  if ctx.accounts.boosted_hex.start_ts != 0 {
+    let elapsed_time = now - ctx.accounts.boosted_hex.start_ts;
+    let elapsed_periods = elapsed_time
+      .checked_div(ctx.accounts.boost_config.period_length as i64)
+      .unwrap();
+    if elapsed_periods > 0 {
+      let shifts = elapsed_periods as usize;
+      if shifts < ctx.accounts.boosted_hex.boosts_by_period.len() {
+        ctx.accounts.boosted_hex.boosts_by_period.drain(0..shifts);
+      } else {
+        ctx.accounts.boosted_hex.boosts_by_period.clear();
+        is_initialized = false;
+      }
+    }
+  }
 
   // Enforce minimum
   if !is_initialized {
@@ -104,12 +126,31 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
     dnt_fee,
   )?;
 
+  let max_period = args
+    .amounts
+    .iter()
+    .map(|amount| amount.period)
+    .max()
+    .unwrap_or(0) as usize;
+  if ctx.accounts.boosted_hex.boosts_by_period.len() <= max_period {
+    ctx
+      .accounts
+      .boosted_hex
+      .boosts_by_period
+      .resize(max_period + 1, 0);
+  }
   for amount in args.amounts {
     if ctx.accounts.boosted_hex.boosts_by_period[amount.period as usize] == u8::MAX {
       return Err(error!(ErrorCode::MaxBoostExceeded));
     }
     ctx.accounts.boosted_hex.boosts_by_period[amount.period as usize] += amount.amount;
   }
+
+  resize_to_fit(
+    &ctx.accounts.payer,
+    &ctx.accounts.system_program,
+    &ctx.accounts.boosted_hex,
+  )?;
 
   Ok(())
 }
