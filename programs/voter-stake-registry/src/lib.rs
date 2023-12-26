@@ -55,10 +55,6 @@ pub mod voter_stake_registry {
     instructions::configure_voting_mint_v0::handler(ctx, args)
   }
 
-  pub fn update_max_voter_weight_v0(ctx: Context<UpdateMaxVoterWeightV0>) -> Result<()> {
-    instructions::update_max_voter_weight_v0::handler(ctx)
-  }
-
   pub fn initialize_position_v0(
     ctx: Context<InitializePositionV0>,
     args: InitializePositionArgsV0,
@@ -86,22 +82,8 @@ pub mod voter_stake_registry {
     instructions::transfer_v0::handler(ctx, args)
   }
 
-  pub fn update_voter_weight_record_v0(
-    ctx: Context<UpdateVoterWeightRecordV0>,
-    args: UpdateVoterWeightRecordArgsV0,
-  ) -> Result<()> {
-    instructions::update_voter_weight_record_v0::handler(ctx, args)
-  }
-
   pub fn set_time_offset_v0(ctx: Context<SetTimeOffsetV0>, time_offset: i64) -> Result<()> {
     instructions::set_time_offset_v0::handler(ctx, time_offset)
-  }
-
-  pub fn cast_vote_v0<'info>(
-    ctx: Context<'_, '_, '_, 'info, CastVoteV0<'info>>,
-    args: CastVoteArgsV0,
-  ) -> Result<()> {
-    instructions::cast_vote_v0::handler(ctx, args)
   }
 
   pub fn relinquish_vote_v0(ctx: Context<RelinquishVoteV0>) -> Result<()> {

@@ -327,7 +327,6 @@ export async function run(args: any = process.argv) {
     await heliumVsrProgram.methods
       .configureVotingMintV0({
         idx: 0, // idx
-        digitShift: 0, // digit shift
         baselineVoteWeightScaledFactor: new anchor.BN(BASELINE * 1e9),
         maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE * 1e9),
         genesisVotePowerMultiplier: GENESIS_MULTIPLIER,
@@ -351,16 +350,6 @@ export async function run(args: any = process.argv) {
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
-  console.log('Creating max voter record');
-  instructions.push(
-    await heliumVsrProgram.methods
-      .updateMaxVoterWeightV0()
-      .accounts({
-        registrar,
-        realmGoverningTokenMint: hntKeypair.publicKey,
-      })
-      .instruction()
-  );
   console.log(registrar.toString());
   await sendInstructions(provider, instructions, []);
   instructions = [];

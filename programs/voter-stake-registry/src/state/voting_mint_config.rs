@@ -1,7 +1,6 @@
 use crate::error::*;
 use anchor_lang::__private::bytemuck::Zeroable;
 use anchor_lang::prelude::*;
-use std::convert::TryFrom;
 
 const SCALED_FACTOR_BASE: u64 = 1_000_000_000;
 
@@ -40,35 +39,17 @@ pub struct VotingMintConfigV0 {
   // Number of seconds of lockup needed to reach the maximum lockup bonus.
   pub lockup_saturation_secs: u64,
 
-  // Number of digits to shift native amounts, applying a 10^digit_shift factor.
-  pub digit_shift: i8,
+  // Used to be digit shift, now reserved
+  pub reserved: i8,
 }
 
 impl VotingMintConfigV0 {
-  // Converts an amount in this voting mints's native currency
-  // to the base vote weight (without the deposit or lockup scalings)
-  // by applying the digit_shift factor.
-  fn digit_shift_native(&self, amount_native: u64) -> Result<u64> {
-    let compute = || -> Option<u64> {
-      let val = if self.digit_shift < 0 {
-        (amount_native as u128).checked_div(10u128.pow((-self.digit_shift) as u32))?
-      } else {
-        (amount_native as u128).checked_mul(10u128.pow(self.digit_shift as u32))?
-      };
-      u64::try_from(val).ok()
-    };
-    compute().ok_or_else(|| error!(VsrError::VoterWeightOverflow))
-  }
-
   // Apply a factor in SCALED_FACTOR_BASE units.
-  fn apply_factor(base: u64, factor: u64) -> Result<u64> {
-    let compute = || -> Option<u64> {
-      u64::try_from(
-        (base as u128)
-          .checked_mul(factor as u128)?
-          .checked_div(SCALED_FACTOR_BASE as u128)?,
-      )
-      .ok()
+  fn apply_factor(base: u64, factor: u64) -> Result<u128> {
+    let compute = || -> Option<u128> {
+      (base as u128)
+        .checked_mul(factor as u128)?
+        .checked_div(SCALED_FACTOR_BASE as u128)
     };
     compute().ok_or_else(|| error!(VsrError::VoterWeightOverflow))
   }
@@ -77,18 +58,15 @@ impl VotingMintConfigV0 {
   //
   // This vote_weight is a component for all funds in a voter account, no
   // matter if locked up or not.//
-  pub fn baseline_vote_weight(&self, amount_native: u64) -> Result<u64> {
-    Self::apply_factor(
-      self.digit_shift_native(amount_native)?,
-      self.baseline_vote_weight_scaled_factor,
-    )
+  pub fn baseline_vote_weight(&self, amount_native: u64) -> Result<u128> {
+    Self::apply_factor(amount_native, self.baseline_vote_weight_scaled_factor)
   }
 
   // The maximum extra vote weight a number of locked up native tokens can have.
   // Will be multiplied with a factor between 0 and 1 for the lockup duration.
-  pub fn max_extra_lockup_vote_weight(&self, amount_native: u64) -> Result<u64> {
+  pub fn max_extra_lockup_vote_weight(&self, amount_native: u64) -> Result<u128> {
     Self::apply_factor(
-      self.digit_shift_native(amount_native)?,
+      amount_native,
       self.max_extra_lockup_vote_weight_scaled_factor,
     )
   }

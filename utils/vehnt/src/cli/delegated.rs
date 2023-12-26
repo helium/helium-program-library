@@ -31,7 +31,7 @@ pub struct Delegated {
 use anchor_lang::prelude::*;
 use helium_sub_daos::{
   caclulate_vhnt_info, current_epoch, DelegatedPositionV0,
-  PrecisePosition, SubDaoEpochInfoV0, SubDaoV0,
+  SubDaoEpochInfoV0, SubDaoV0,
 };
 
 #[allow(unused)]
@@ -188,7 +188,7 @@ impl Delegated {
       )?;
       let vehnt = position
         .position
-        .voting_power_precise(&voting_mint_config, curr_ts)?;
+        .voting_power(&voting_mint_config, curr_ts)?;
 
       total_vehnt += vehnt;
       let epoch_infos_by_epoch = epoch_infos_by_subdao_and_epoch
