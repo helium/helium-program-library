@@ -126,7 +126,7 @@ impl PositionV0 {
   ) -> Result<u128> {
     let remaining = min(self.lockup.seconds_left(curr_ts), lockup_saturation_secs);
     Ok(
-      (max_locked_vote_weight as u128)
+      max_locked_vote_weight
         .checked_mul(remaining as u128)
         .unwrap()
         .checked_div(lockup_saturation_secs as u128)
