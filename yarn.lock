@@ -1641,6 +1641,7 @@ __metadata:
     "@helium/idls": ^0.6.10
     "@helium/lazy-distributor-sdk": ^0.6.10
     "@helium/lazy-transactions-sdk": ^0.6.10
+    "@helium/price-oracle-sdk": ^0.6.10
     "@helium/spl-utils": ^0.6.10
     "@metaplex-foundation/mpl-bubblegum": ^3.0.0
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
