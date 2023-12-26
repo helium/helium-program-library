@@ -3,6 +3,7 @@ import { Program } from "@coral-xyz/anchor";
 import { Hexboosting } from "@helium/idls/lib/types/hexboosting";
 import { PROGRAM_ID, init } from "../packages/hexboosting-sdk";
 import { toBN } from "@helium/spl-utils";
+import { getAssociatedTokenAddressSync, getAccount } from "@solana/spl-token";
 import {
   ensureDCIdl,
   ensureHEMIdl,
@@ -28,6 +29,7 @@ import { PublicKey, Keypair } from "@solana/web3.js";
 import { expect } from "chai";
 import { init as initPo } from "@helium/price-oracle-sdk";
 import { PriceOracle } from "@helium/idls/lib/types/price_oracle";
+import { BN } from "bn.js";
 
 describe("hexboosting", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -171,7 +173,153 @@ describe("hexboosting", () => {
     });
 
     it("does the initial boost", async () => {
+      const preBalance = (
+        await getAccount(
+          provider.connection,
+          getAssociatedTokenAddressSync(mint, me)
+        )
+      ).amount;
+      const {
+        pubkeys: { boostedHex },
+      } = await program.methods
+        .boostV0({
+          location: new BN(1),
+          amounts: [
+            {
+              period: 0,
+              amount: 1,
+            },
+            {
+              period: 1,
+              amount: 1,
+            },
+            {
+              period: 2,
+              amount: 1,
+            },
+            {
+              period: 3,
+              amount: 1,
+            },
+            {
+              period: 4,
+              amount: 1,
+            },
+            {
+              period: 5,
+              amount: 1,
+            },
+          ],
+        })
+        .accounts({
+          paymentMint: mint,
+        })
+        .rpcAndKeys({ skipPreflight: true });
 
-    })
+      const postBalance = (
+        await getAccount(
+          provider.connection,
+          getAssociatedTokenAddressSync(mint, me)
+        )
+      ).amount;
+
+      expect(preBalance - postBalance).to.eq(BigInt(toBN(15, 6).toNumber()));
+
+      const hex = await program.account.boostedHexV0.fetch(boostedHex!);
+
+      expect(hex.location.toNumber()).to.eq(1);
+      expect(hex.startTs.toNumber()).to.eq(0);
+      expect(hex.boostsByPeriod.toJSON().data).to.deep.eq([1, 1, 1, 1, 1, 1]);
+    });
+
+    describe("with initial minimum boost", () => {
+      beforeEach(async () => {
+        await program.methods
+          .boostV0({
+            location: new BN(1),
+            amounts: [
+              {
+                period: 0,
+                amount: 1,
+              },
+              {
+                period: 1,
+                amount: 1,
+              },
+              {
+                period: 2,
+                amount: 1,
+              },
+              {
+                period: 3,
+                amount: 1,
+              },
+              {
+                period: 4,
+                amount: 1,
+              },
+              {
+                period: 5,
+                amount: 1,
+              },
+            ],
+          })
+          .accounts({
+            paymentMint: mint,
+          })
+          .rpcAndKeys({ skipPreflight: true });
+      });
+
+      it("allows adding additional boost to arbitrary other hexes", async () => {
+        const preBalance = (
+          await getAccount(
+            provider.connection,
+            getAssociatedTokenAddressSync(mint, me)
+          )
+        ).amount;
+        const {
+          pubkeys: { boostedHex },
+        } = await program.methods
+          .boostV0({
+            location: new BN(1),
+            amounts: [
+              {
+                period: 2,
+                amount: 1,
+              },
+              {
+                period: 50,
+                amount: 2,
+              },
+            ],
+          })
+          .accounts({
+            paymentMint: mint,
+          })
+          .rpcAndKeys({ skipPreflight: true });
+
+        const postBalance = (
+          await getAccount(
+            provider.connection,
+            getAssociatedTokenAddressSync(mint, me)
+          )
+        ).amount;
+
+        expect(preBalance - postBalance).to.eq(BigInt(toBN(7.5, 6).toNumber()));
+
+        const hex = await program.account.boostedHexV0.fetch(boostedHex!);
+
+        expect(hex.boostsByPeriod.toJSON().data).to.deep.eq([
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          ...new Array(44).fill(0),
+          2,
+        ]);
+      });
+    });
   });
 });

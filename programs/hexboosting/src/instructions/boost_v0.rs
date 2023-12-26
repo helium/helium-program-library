@@ -45,6 +45,7 @@ pub struct BoostV0<'info> {
   #[account(mut)]
   pub payment_mint: Box<Account<'info, Mint>>,
   #[account(
+    mut,
     associated_token::authority = payer,
     associated_token::mint = payment_mint,
   )]
@@ -53,7 +54,7 @@ pub struct BoostV0<'info> {
     init_if_needed,
     payer = payer,
     space = get_space(boosted_hex),
-    seeds = [b"boosted_hex", payment_mint.key().as_ref(), &args.location.to_le_bytes()],
+    seeds = [b"boosted_hex", boost_config.key().as_ref(), &args.location.to_le_bytes()],
     bump
   )]
   pub boosted_hex: Box<Account<'info, BoostedHexV0>>,
@@ -108,10 +109,10 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
     Clock::get()?.unix_timestamp,
   )
   .ok_or_else(|| error!(ErrorCode::NoOraclePrice))?;
-  let dnt_fee = price
+  let dnt_fee = total_fee
     .checked_mul(1000000)
     .unwrap()
-    .checked_div(total_fee)
+    .checked_div(price)
     .unwrap();
 
   burn(

@@ -23,7 +23,6 @@ pub struct BoostedHexV0 {
   // 0 if the boosting has not yet started. Avoding using an option here to keep serialization length
   // consistent
   pub start_ts: i64,
-  pub num_periods: u16,
   // Extra space in case we need it later
   pub reserved: [u64; 8],
   pub bump_seed: u8,
