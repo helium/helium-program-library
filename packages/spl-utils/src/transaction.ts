@@ -1,6 +1,7 @@
 import { AnchorProvider, Program, Provider } from "@coral-xyz/anchor";
 import {
   Commitment,
+  ComputeBudgetProgram,
   Connection,
   Finality,
   PublicKey,
@@ -17,6 +18,7 @@ import {
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
+import { estimatePrioritizationFee } from "./priorityFees";
 
 export const chunks = <T>(array: T[], size: number): T[][] =>
   Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
@@ -48,6 +50,42 @@ export interface BigInstructionResult<A> {
   instructions: TransactionInstruction[][];
   signers: Signer[][];
   output: A;
+}
+
+export async function sendInstructionsWithPriorityFee(
+  provider: AnchorProvider,
+  instructions: TransactionInstruction[],
+  {
+    signers = [],
+    payer = provider.wallet.publicKey,
+    commitment = "confirmed",
+    idlErrors = new Map(),
+    computeUnitLimit = 200000,
+  }: {
+    signers?: Signer[];
+    payer?: PublicKey;
+    commitment?: Commitment;
+    idlErrors?: Map<number, string>;
+    computeUnitLimit?: number;
+  } = {}
+): Promise<string> {
+  return await sendInstructions(
+    provider,
+    [
+      ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnitLimit }),
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: await estimatePrioritizationFee(
+          provider.connection,
+          instructions
+        ),
+      }),
+      ...instructions,
+    ],
+    signers,
+    payer,
+    commitment,
+    idlErrors
+  );
 }
 
 export async function sendInstructions(
@@ -683,6 +721,85 @@ export async function batchParallelInstructions(
           recentBlockhash: blockhash,
         });
         tx.add(...currentTxInstructions);
+        transactions.push(tx);
+        currentTxInstructions = [instruction];
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  if (currentTxInstructions.length > 0) {
+    const tx = new Transaction({
+      feePayer: provider.wallet.publicKey,
+      recentBlockhash: blockhash,
+    });
+    tx.add(...currentTxInstructions);
+    transactions.push(tx);
+  }
+
+  await bulkSendTransactions(
+    provider,
+    transactions,
+    onProgress,
+    triesRemaining
+  );
+}
+
+export async function batchParallelInstructionsWithPriorityFee(
+  provider: AnchorProvider,
+  instructions: TransactionInstruction[],
+  {
+    onProgress,
+    triesRemaining = 10,
+    computeUnitLimit = 1000000,
+  }: {
+    onProgress?: (status: Status) => void;
+    triesRemaining?: number; // Number of blockhashes to try resending txs with before giving up
+    computeUnitLimit?: number;
+  } = {}
+): Promise<void> {
+  let currentTxInstructions: TransactionInstruction[] = [];
+  const blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
+  const transactions: Transaction[] = [];
+
+  for (const instruction of instructions) {
+    currentTxInstructions.push(instruction);
+    const tx = new Transaction({
+      feePayer: provider.wallet.publicKey,
+      recentBlockhash: blockhash,
+    });
+    tx.add(...currentTxInstructions);
+    try {
+      if (
+        tx.serialize({
+          requireAllSignatures: false,
+          verifySignatures: false,
+        }).length >=
+        1232 - (64 + 32) * tx.signatures.length - 60 // 60 to leave room for compute budget stuff
+      ) {
+        // yes it's ugly to throw and catch, but .serialize can _also_ throw this error
+        throw new Error("Transaction too large");
+      }
+    } catch (e: any) {
+      if (e.toString().includes("Transaction too large")) {
+        currentTxInstructions.pop();
+        const tx = new Transaction({
+          feePayer: provider.wallet.publicKey,
+          recentBlockhash: blockhash,
+        });
+        tx.add(
+          ComputeBudgetProgram.setComputeUnitLimit({
+            units: computeUnitLimit,
+          }),
+          ComputeBudgetProgram.setComputeUnitPrice({
+            microLamports: await estimatePrioritizationFee(
+              provider.connection,
+              currentTxInstructions
+            ),
+          }),
+          ...currentTxInstructions
+        );
         transactions.push(tx);
         currentTxInstructions = [instruction];
       } else {

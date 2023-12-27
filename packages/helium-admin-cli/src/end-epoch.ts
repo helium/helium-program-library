@@ -11,6 +11,7 @@ import { BN } from "bn.js";
 import b58 from "bs58";
 import os from "os";
 import yargs from "yargs/yargs";
+import { sendInstructionsWithPriorityFee } from "@helium/spl-utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -61,17 +62,18 @@ export async function run(args: any = process.argv) {
     if (!daoEpochInfo?.doneCalculatingScores) {
       for (const subDao of subdaos) {
         try {
-          await heliumSubDaosProgram.methods
-            .calculateUtilityScoreV0({
-              epoch,
-            })
-            .preInstructions([
-              ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-            ])
-            .accounts({
-              subDao: subDao.publicKey,
-            })
-            .rpc({ skipPreflight: true });
+          await sendInstructionsWithPriorityFee(
+            provider,
+            [
+              await heliumSubDaosProgram.methods
+                .calculateUtilityScoreV0({ epoch })
+                .accounts({ subDao: subDao.publicKey })
+                .instruction(),
+            ],
+            {
+              computeUnitLimit: 1000000,
+            }
+          );
         } catch (e: any) {
           console.log(
             `Failed to calculate utility score for ${subDao.account.dntMint.toBase58()}: ${
@@ -84,14 +86,12 @@ export async function run(args: any = process.argv) {
     if (!daoEpochInfo?.doneIssuingRewards) {
       for (const subDao of subdaos) {
         try {
-          await heliumSubDaosProgram.methods
-            .issueRewardsV0({
-              epoch,
-            })
-            .accounts({
-              subDao: subDao.publicKey,
-            })
-            .rpc({ skipPreflight: true });
+          await sendInstructionsWithPriorityFee(provider, [
+            await heliumSubDaosProgram.methods
+              .issueRewardsV0({ epoch })
+              .accounts({ subDao: subDao.publicKey })
+              .instruction(),
+          ]);
         } catch (e: any) {
           console.log(
             `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${
@@ -105,14 +105,12 @@ export async function run(args: any = process.argv) {
     }
     try {
       if (!daoEpochInfo?.doneIssuingHstPool) {
-        await heliumSubDaosProgram.methods
-          .issueHstPoolV0({
-            epoch,
-          })
-          .accounts({
-            dao,
-          })
-          .rpc({ skipPreflight: true });
+        await sendInstructionsWithPriorityFee(provider, [
+          await heliumSubDaosProgram.methods
+            .issueHstPoolV0({ epoch })
+            .accounts({ dao })
+            .instruction(),
+        ]);
       }
     } catch (e: any) {
       console.log(`Failed to issue hst pool: ${e.message}`);
