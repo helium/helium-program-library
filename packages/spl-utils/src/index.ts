@@ -21,6 +21,7 @@ export {
   getAssetBatch,
   getAssetProofBatch,
 } from './mplAssetAPI';
+export { estimatePrioritizationFee } from "./priorityFees";
 
 export { proofArgsAndAccounts } from './proofArgsAndAccounts';
 export type { ProofArgsAndAccountsArgs } from './proofArgsAndAccounts';

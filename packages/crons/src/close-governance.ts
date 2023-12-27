@@ -6,7 +6,10 @@ import {
   proposalKey,
 } from "@helium/organization-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";
-import { bulkSendTransactions } from "@helium/spl-utils";
+import {
+  bulkSendTransactions,
+  batchParallelInstructionsWithPriorityFee,
+} from "@helium/spl-utils";
 import { init as initState } from "@helium/state-controller-sdk";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import { SystemProgram, Transaction } from "@solana/web3.js";
@@ -78,15 +81,10 @@ import pLimit from "p-limit";
           closedProposals.add(proposal.pubkey.toBase58());
         }
       }
-      const txs = chunks(resolveIxs, 10).map((ixs) => {
-        const tx = new Transaction({
-          feePayer: provider.wallet.publicKey,
-        });
-        tx.add(...ixs);
-        return tx;
-      });
-
-      await bulkSendTransactions(provider, txs);
+      await batchParallelInstructionsWithPriorityFee(
+        provider,
+        resolveIxs
+      );
     }
 
     const markers = (await vsrProgram.account.voteMarkerV0.all()).filter(
@@ -110,14 +108,7 @@ import pLimit from "p-limit";
         })
       )
     );
-    const txns = chunks(relinquishIxns, 10).map((ixs) => {
-      const tx = new Transaction({
-        feePayer: provider.wallet.publicKey,
-      });
-      tx.add(...ixs);
-      return tx;
-    });
-    await bulkSendTransactions(provider, txns);
+    await batchParallelInstructionsWithPriorityFee(provider, relinquishIxns);
 
     process.exit(0);
   } catch (err) {
