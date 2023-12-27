@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.11](https://github.com/helium/helium-program-libary/compare/v0.6.8...v0.6.11) (2023-12-27)
+
+
+### Features
+
+* **#525:** Add prom metrics for price oracles, fix distributor oracle total rewards metric ([#528](https://github.com/helium/helium-program-libary/issues/528)) ([13a5cb8](https://github.com/helium/helium-program-libary/commit/13a5cb8d8936d1b5929379dafafd2907322dd473))
+
+
+
+
+
 ## [0.6.10](https://github.com/helium/helium-program-libary/compare/v0.6.5...v0.6.10) (2023-12-22)
 
 
