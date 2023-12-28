@@ -353,7 +353,7 @@ export async function formBulkTransactions({
       return await withPriorityFees({
         connection: provider.connection,
         instructions: [...setRewardIxs, distributeIx],
-        computeUnits: 200000,
+        computeUnits: 300000,
       });
     })
   );
@@ -520,7 +520,7 @@ export async function formTransaction({
   tx.add(
     ...(await withPriorityFees({
       connection: provider.connection,
-      computeUnits: 200000,
+      computeUnits: 300000,
       instructions: ixs,
     }))
   );
