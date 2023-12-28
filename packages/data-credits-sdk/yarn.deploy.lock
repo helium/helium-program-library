@@ -58,40 +58,45 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/anchor-resolvers@npm:0.6.11"
+"@helium/anchor-resolvers@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
   dependencies:
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.78.4
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
   peerDependencies:
     "@coral-xyz/anchor": ^0.28.0
-  checksum: 89745fb73e607e9ac3c542f7e537c53fbfbef09940ea3540704995fb755c3b2ba78836339a2247c5d85860527b439411c9a1f8222257c944feca2a5c3347ae29
-  languageName: node
-  linkType: hard
+  languageName: unknown
+  linkType: soft
 
-"@helium/circuit-breaker-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/circuit-breaker-sdk@npm:0.6.11"
+"@helium/circuit-breaker-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/circuit-breaker-sdk@workspace:packages/circuit-breaker-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/idls": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/idls": ^0.6.12-next.0+C50F3444
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 58c22e90fcbb3e86da422c2f1cc7fc5da94de43424b0a9fca9eaee01b5873afa6fc2adab7563fcbe2c8a6d4da1d181e0d85b206a6e004d09444781061e469832
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@helium/data-credits-sdk@workspace:.":
   version: 0.0.0-use.local
   resolution: "@helium/data-credits-sdk@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/circuit-breaker-sdk": ^0.6.11
-    "@helium/helium-sub-daos-sdk": ^0.6.11
-    "@helium/idls": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/circuit-breaker-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/helium-sub-daos-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/idls": ^0.6.12-next.0+C50F3444
     "@types/crypto-js": ^4.1.1
     bn.js: ^5.2.0
     bs58: ^4.0.1
@@ -103,62 +108,72 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/helium-sub-daos-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/helium-sub-daos-sdk@npm:0.6.11"
+"@helium/helium-sub-daos-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/helium-sub-daos-sdk@workspace:packages/helium-sub-daos-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/circuit-breaker-sdk": ^0.6.11
-    "@helium/treasury-management-sdk": ^0.6.11
-    "@helium/voter-stake-registry-sdk": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/circuit-breaker-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/treasury-management-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/voter-stake-registry-sdk": ^0.6.12-next.0+C50F3444
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 449e306ea5415ef1e6675e5f2a47ec7fc489a608b13b11578977243c6c13b18c7b412e9a5f245db11b26488afa286c477c663dac7b986b47a055f8e6404aee89
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
-"@helium/idls@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/idls@npm:0.6.11"
+"@helium/idls@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/idls@workspace:packages/idls"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@solana/web3.js": ^1.78.4
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-  checksum: a3e4217b52086fbed5f6497316cb5db61f1a25e4a0f673c850498fe5a0188e8adc204034346775bf420b0ce10ac89ecbc941dce945738d4b933b85a749b262db
-  languageName: node
-  linkType: hard
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
-"@helium/treasury-management-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/treasury-management-sdk@npm:0.6.11"
+"@helium/treasury-management-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/treasury-management-sdk@workspace:packages/treasury-management-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/circuit-breaker-sdk": ^0.6.11
-    "@helium/idls": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/circuit-breaker-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/idls": ^0.6.12-next.0+C50F3444
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 69d994a7d8f2453bd0eb1ca16c6c33b2cf0bb7be8bbce55ea9ca44aeda2e786fe5ada1f01f52154bc1e387914539c627d1125b9865f4aaf11ae2fed5f6b71637
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
-"@helium/voter-stake-registry-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/voter-stake-registry-sdk@npm:0.6.11"
+"@helium/voter-stake-registry-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/idls": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/idls": ^0.6.12-next.0+C50F3444
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 37c3596a6eaadd76fd1ccb29ced326f90cb3ea0e8e79918199f471b171bbef7b095ae8fb862cded152f155b4608b0902824f0159e4e9ee418142a68a1ee5f7f3
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@isaacs/cliui@npm:^8.0.2":
   version: 8.0.2

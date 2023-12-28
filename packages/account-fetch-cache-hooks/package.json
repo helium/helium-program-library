@@ -31,7 +31,7 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@helium/account-fetch-cache": "^0.6.11",
+    "@helium/account-fetch-cache": "^0.6.12-next.0+C50F3444",
     "@solana/web3.js": "^1.78.4",
     "react-async-hook": "^4.0.0"
   },

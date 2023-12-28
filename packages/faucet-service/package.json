@@ -35,8 +35,8 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
     "@fastify/cors": "^8.1.1",
-    "@helium/idls": "^0.6.11",
-    "@helium/spl-utils": "^0.6.11",
+    "@helium/idls": "^0.6.12-next.0+C50F3444",
+    "@helium/spl-utils": "^0.6.12-next.0+C50F3444",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.78.4",

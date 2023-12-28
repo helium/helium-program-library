@@ -78,6 +78,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@cspotcode/source-map-support@npm:^0.8.0":
+  version: 0.8.1
+  resolution: "@cspotcode/source-map-support@npm:0.8.1"
+  dependencies:
+    "@jridgewell/trace-mapping": "npm:0.3.9"
+  checksum: 5718f267085ed8edb3e7ef210137241775e607ee18b77d95aa5bd7514f47f5019aa2d82d96b3bf342ef7aa890a346fa1044532ff7cc3009e7d24fce3ce6200fa
+  languageName: node
+  linkType: hard
+
 "@ethereumjs/rlp@npm:^4.0.1":
   version: 4.0.1
   resolution: "@ethereumjs/rlp@npm:4.0.1"
@@ -500,6 +509,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@helium/account-fetch-cache-hooks@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/account-fetch-cache-hooks@workspace:packages/account-fetch-cache-hooks"
+  dependencies:
+    "@helium/account-fetch-cache": ^0.6.12-next.0+C50F3444
+    "@solana/web3.js": ^1.78.4
+    git-format-staged: ^2.1.3
+    react-async-hook: ^4.0.0
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  peerDependencies:
+    react: ^16.8 || ^17 || ^18
+    react-dom: ^16.8 || ^17 || ^18
+  languageName: unknown
+  linkType: soft
+
 "@helium/account-fetch-cache-hooks@npm:^0.5.0":
   version: 0.5.0
   resolution: "@helium/account-fetch-cache-hooks@npm:0.5.0"
@@ -514,19 +539,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache-hooks@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/account-fetch-cache-hooks@npm:0.6.11"
+"@helium/account-fetch-cache@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
-    "@helium/account-fetch-cache": ^0.6.11
     "@solana/web3.js": ^1.78.4
-    react-async-hook: ^4.0.0
-  peerDependencies:
-    react: ^16.8 || ^17 || ^18
-    react-dom: ^16.8 || ^17 || ^18
-  checksum: 647b93aff3084775b1f39ecde64325c243fe46ca0e5bb3ecc0dee8d43136e29c8f8b75706273fb22c9d0e899a8fdc9ab80beb213e7df3673440b09d99c3a72dd
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@helium/account-fetch-cache@npm:^0.5.0":
   version: 0.5.0
@@ -534,15 +556,6 @@ __metadata:
   dependencies:
     "@solana/web3.js": ^1.78.4
   checksum: a6b97424eff96240a0fbe8f7b2890432cb0f4a9ed0a369506c0f6905e8879f4ad13a82a9093ebe005c062bfdedce6e37f03b5bc569a184acbba22ac7d9d8c6dc
-  languageName: node
-  linkType: hard
-
-"@helium/account-fetch-cache@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/account-fetch-cache@npm:0.6.11"
-  dependencies:
-    "@solana/web3.js": ^1.78.4
-  checksum: 194471db314ffc8e2aea4966235f8e088d4016be274adfb73586764c74a5b826198499e1a72419b041c2de75391c7d9a0994700528d1e0c7223293e8d086ca06
   languageName: node
   linkType: hard
 
@@ -557,6 +570,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@helium/anchor-resolvers@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
+  dependencies:
+    "@solana/spl-token": ^0.3.8
+    "@solana/web3.js": ^1.78.4
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  peerDependencies:
+    "@coral-xyz/anchor": ^0.28.0
+  languageName: unknown
+  linkType: soft
+
 "@helium/anchor-resolvers@npm:^0.5.0":
   version: 0.5.0
   resolution: "@helium/anchor-resolvers@npm:0.5.0"
@@ -569,30 +596,44 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/anchor-resolvers@npm:0.6.11"
-  dependencies:
-    "@solana/spl-token": ^0.3.8
-    "@solana/web3.js": ^1.78.4
-  peerDependencies:
-    "@coral-xyz/anchor": ^0.28.0
-  checksum: 89745fb73e607e9ac3c542f7e537c53fbfbef09940ea3540704995fb755c3b2ba78836339a2247c5d85860527b439411c9a1f8222257c944feca2a5c3347ae29
-  languageName: node
-  linkType: hard
-
-"@helium/circuit-breaker-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/circuit-breaker-sdk@npm:0.6.11"
+"@helium/circuit-breaker-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/circuit-breaker-sdk@workspace:packages/circuit-breaker-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/idls": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/idls": ^0.6.12-next.0+C50F3444
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 58c22e90fcbb3e86da422c2f1cc7fc5da94de43424b0a9fca9eaee01b5873afa6fc2adab7563fcbe2c8a6d4da1d181e0d85b206a6e004d09444781061e469832
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
+
+"@helium/helium-react-hooks@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/helium-react-hooks@workspace:packages/helium-react-hooks"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@helium/account-fetch-cache": ^0.6.12-next.0+C50F3444
+    "@helium/account-fetch-cache-hooks": ^0.6.12-next.0+C50F3444
+    "@solana/spl-token": ^0.3.8
+    "@solana/wallet-adapter-react": ^0.15.32
+    "@solana/web3.js": ^1.78.4
+    bs58: ^4.0.1
+    git-format-staged: ^2.1.3
+    pako: ^2.0.3
+    react-async-hook: ^4.0.0
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  peerDependencies:
+    "@solana/wallet-adapter-react": ^0.15.32
+    react: ^16.8 || ^17 || ^18
+    react-dom: ^16.8 || ^17 || ^18
+  languageName: unknown
+  linkType: soft
 
 "@helium/helium-react-hooks@npm:^0.5.0":
   version: 0.5.0
@@ -614,53 +655,37 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/helium-react-hooks@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/helium-react-hooks@npm:0.6.11"
+"@helium/helium-sub-daos-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/helium-sub-daos-sdk@workspace:packages/helium-sub-daos-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.6.11
-    "@helium/account-fetch-cache-hooks": ^0.6.11
-    "@solana/spl-token": ^0.3.8
-    "@solana/web3.js": ^1.78.4
-    bs58: ^4.0.1
-    pako: ^2.0.3
-    react-async-hook: ^4.0.0
-  peerDependencies:
-    "@solana/wallet-adapter-react": ^0.15.32
-    react: ^16.8 || ^17 || ^18
-    react-dom: ^16.8 || ^17 || ^18
-  checksum: 13ff683945d40b83fc3b492c7a3d9a255bb4791cc933d22cc1f1a5f265cdfd67815cd374f4e4e4b8bafb943d30507074f13ab831f84dca9473aee14d1dc53fd1
-  languageName: node
-  linkType: hard
-
-"@helium/helium-sub-daos-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/helium-sub-daos-sdk@npm:0.6.11"
-  dependencies:
-    "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/circuit-breaker-sdk": ^0.6.11
-    "@helium/treasury-management-sdk": ^0.6.11
-    "@helium/voter-stake-registry-sdk": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/circuit-breaker-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/treasury-management-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/voter-stake-registry-sdk": ^0.6.12-next.0+C50F3444
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 449e306ea5415ef1e6675e5f2a47ec7fc489a608b13b11578977243c6c13b18c7b412e9a5f245db11b26488afa286c477c663dac7b986b47a055f8e6404aee89
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
-"@helium/idls@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/idls@npm:0.6.11"
+"@helium/idls@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/idls@workspace:packages/idls"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@solana/web3.js": ^1.78.4
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-  checksum: a3e4217b52086fbed5f6497316cb5db61f1a25e4a0f673c850498fe5a0188e8adc204034346775bf420b0ce10ac89ecbc941dce945738d4b933b85a749b262db
-  languageName: node
-  linkType: hard
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@helium/modular-governance-hooks@npm:^0.0.8":
   version: 0.0.8
@@ -713,14 +738,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/spl-utils@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/spl-utils@npm:0.6.11"
+"@helium/spl-utils@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.6.11
+    "@helium/account-fetch-cache": ^0.6.12-next.0+C50F3444
     "@helium/address": ^4.10.2
-    "@helium/anchor-resolvers": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
@@ -729,36 +754,41 @@ __metadata:
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-  checksum: 27772fb25031aff0e8dd11b85dd052955e2d4f85fd55a1ca0e46e710184974fc82fd2d489021d118d7ba2fa15bf0aafaedafe6bb07e61a56987a6675a8838eaf
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
-"@helium/treasury-management-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/treasury-management-sdk@npm:0.6.11"
+"@helium/treasury-management-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/treasury-management-sdk@workspace:packages/treasury-management-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/circuit-breaker-sdk": ^0.6.11
-    "@helium/idls": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/circuit-breaker-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/idls": ^0.6.12-next.0+C50F3444
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 69d994a7d8f2453bd0eb1ca16c6c33b2cf0bb7be8bbce55ea9ca44aeda2e786fe5ada1f01f52154bc1e387914539c627d1125b9865f4aaf11ae2fed5f6b71637
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@helium/voter-stake-registry-hooks@workspace:.":
   version: 0.0.0-use.local
   resolution: "@helium/voter-stake-registry-hooks@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.6.11
-    "@helium/account-fetch-cache-hooks": ^0.6.11
-    "@helium/helium-react-hooks": ^0.6.11
-    "@helium/helium-sub-daos-sdk": ^0.6.11
+    "@helium/account-fetch-cache": ^0.6.12-next.0+C50F3444
+    "@helium/account-fetch-cache-hooks": ^0.6.12-next.0+C50F3444
+    "@helium/helium-react-hooks": ^0.6.12-next.0+C50F3444
+    "@helium/helium-sub-daos-sdk": ^0.6.12-next.0+C50F3444
     "@helium/modular-governance-hooks": ^0.0.8
-    "@helium/spl-utils": ^0.6.11
-    "@helium/voter-stake-registry-sdk": ^0.6.11
+    "@helium/spl-utils": ^0.6.12-next.0+C50F3444
+    "@helium/voter-stake-registry-sdk": ^0.6.12-next.0+C50F3444
     "@metaplex-foundation/js": ^0.19.4
     "@solana/wallet-adapter-base": ^0.9.22
     "@solana/wallet-adapter-react": ^0.15.32
@@ -775,20 +805,23 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/voter-stake-registry-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/voter-stake-registry-sdk@npm:0.6.11"
+"@helium/voter-stake-registry-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/idls": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/idls": ^0.6.12-next.0+C50F3444
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 37c3596a6eaadd76fd1ccb29ced326f90cb3ea0e8e79918199f471b171bbef7b095ae8fb862cded152f155b4608b0902824f0159e4e9ee418142a68a1ee5f7f3
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@isaacs/cliui@npm:^8.0.2":
   version: 8.0.2
@@ -801,6 +834,30 @@ __metadata:
     wrap-ansi: "npm:^8.1.0"
     wrap-ansi-cjs: "npm:wrap-ansi@^7.0.0"
   checksum: 4a473b9b32a7d4d3cfb7a614226e555091ff0c5a29a1734c28c72a182c2f6699b26fc6b5c2131dfd841e86b185aea714c72201d7c98c2fba5f17709333a67aeb
+  languageName: node
+  linkType: hard
+
+"@jridgewell/resolve-uri@npm:^3.0.3":
+  version: 3.1.1
+  resolution: "@jridgewell/resolve-uri@npm:3.1.1"
+  checksum: f5b441fe7900eab4f9155b3b93f9800a916257f4e8563afbcd3b5a5337b55e52bd8ae6735453b1b745457d9f6cdb16d74cd6220bbdd98cf153239e13f6cbb653
+  languageName: node
+  linkType: hard
+
+"@jridgewell/sourcemap-codec@npm:^1.4.10":
+  version: 1.4.15
+  resolution: "@jridgewell/sourcemap-codec@npm:1.4.15"
+  checksum: b881c7e503db3fc7f3c1f35a1dd2655a188cc51a3612d76efc8a6eb74728bef5606e6758ee77423e564092b4a518aba569bbb21c9bac5ab7a35b0c6ae7e344c8
+  languageName: node
+  linkType: hard
+
+"@jridgewell/trace-mapping@npm:0.3.9":
+  version: 0.3.9
+  resolution: "@jridgewell/trace-mapping@npm:0.3.9"
+  dependencies:
+    "@jridgewell/resolve-uri": "npm:^3.0.3"
+    "@jridgewell/sourcemap-codec": "npm:^1.4.10"
+  checksum: d89597752fd88d3f3480845691a05a44bd21faac18e2185b6f436c3b0fd0c5a859fbbd9aaa92050c4052caf325ad3e10e2e1d1b64327517471b7d51babc0ddef
   languageName: node
   linkType: hard
 
@@ -1323,6 +1380,34 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tsconfig/node10@npm:^1.0.7":
+  version: 1.0.9
+  resolution: "@tsconfig/node10@npm:1.0.9"
+  checksum: a33ae4dc2a621c0678ac8ac4bceb8e512ae75dac65417a2ad9b022d9b5411e863c4c198b6ba9ef659e14b9fb609bbec680841a2e84c1172df7a5ffcf076539df
+  languageName: node
+  linkType: hard
+
+"@tsconfig/node12@npm:^1.0.7":
+  version: 1.0.11
+  resolution: "@tsconfig/node12@npm:1.0.11"
+  checksum: 5ce29a41b13e7897a58b8e2df11269c5395999e588b9a467386f99d1d26f6c77d1af2719e407621412520ea30517d718d5192a32403b8dfcc163bf33e40a338a
+  languageName: node
+  linkType: hard
+
+"@tsconfig/node14@npm:^1.0.0":
+  version: 1.0.3
+  resolution: "@tsconfig/node14@npm:1.0.3"
+  checksum: 19275fe80c4c8d0ad0abed6a96dbf00642e88b220b090418609c4376e1cef81bf16237bf170ad1b341452feddb8115d8dd2e5acdfdea1b27422071163dc9ba9d
+  languageName: node
+  linkType: hard
+
+"@tsconfig/node16@npm:^1.0.2":
+  version: 1.0.4
+  resolution: "@tsconfig/node16@npm:1.0.4"
+  checksum: 202319785901f942a6e1e476b872d421baec20cf09f4b266a1854060efbf78cde16a4d256e8bc949d31e6cd9a90f1e8ef8fb06af96a65e98338a2b6b0de0a0ff
+  languageName: node
+  linkType: hard
+
 "@types/connect@npm:^3.4.33":
   version: 3.4.35
   resolution: "@types/connect@npm:3.4.35"
@@ -1412,6 +1497,22 @@ __metadata:
   version: 1.1.1
   resolution: "abbrev@npm:1.1.1"
   checksum: a4a97ec07d7ea112c517036882b2ac22f3109b7b19077dc656316d07d308438aac28e4d9746dc4d84bf6b1e75b4a7b0a5f3cb30592419f128ca9a8cee3bcfa17
+  languageName: node
+  linkType: hard
+
+"acorn-walk@npm:^8.1.1":
+  version: 8.2.0
+  resolution: "acorn-walk@npm:8.2.0"
+  checksum: 1715e76c01dd7b2d4ca472f9c58968516a4899378a63ad5b6c2d668bba8da21a71976c14ec5f5b75f887b6317c4ae0b897ab141c831d741dc76024d8745f1ad1
+  languageName: node
+  linkType: hard
+
+"acorn@npm:^8.4.1":
+  version: 8.10.0
+  resolution: "acorn@npm:8.10.0"
+  bin:
+    acorn: bin/acorn
+  checksum: 538ba38af0cc9e5ef983aee196c4b8b4d87c0c94532334fa7e065b2c8a1f85863467bb774231aae91613fcda5e68740c15d97b1967ae3394d20faddddd8af61d
   languageName: node
   linkType: hard
 
@@ -1568,6 +1669,13 @@ __metadata:
     delegates: "npm:^1.0.0"
     readable-stream: "npm:^3.6.0"
   checksum: 52590c24860fa7173bedeb69a4c05fb573473e860197f618b9a28432ee4379049336727ae3a1f9c4cb083114601c1140cee578376164d0e651217a9843f9fe83
+  languageName: node
+  linkType: hard
+
+"arg@npm:^4.1.0":
+  version: 4.1.3
+  resolution: "arg@npm:4.1.3"
+  checksum: 544af8dd3f60546d3e4aff084d451b96961d2267d668670199692f8d054f0415d86fc5497d0e641e91546f0aa920e7c29e5250e99fc89f5552a34b5d93b77f43
   languageName: node
   linkType: hard
 
@@ -2102,6 +2210,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"create-require@npm:^1.1.0":
+  version: 1.1.1
+  resolution: "create-require@npm:1.1.1"
+  checksum: a9a1503d4390d8b59ad86f4607de7870b39cad43d929813599a23714831e81c520bddf61bcdd1f8e30f05fd3a2b71ae8538e946eb2786dc65c2bbc520f692eff
+  languageName: node
+  linkType: hard
+
 "cross-fetch@npm:^3.1.5":
   version: 3.1.8
   resolution: "cross-fetch@npm:3.1.8"
@@ -2222,6 +2337,13 @@ __metadata:
   version: 1.1.2
   resolution: "depd@npm:1.1.2"
   checksum: 6b406620d269619852885ce15965272b829df6f409724415e0002c8632ab6a8c0a08ec1f0bd2add05dc7bd7507606f7e2cc034fa24224ab829580040b835ecd9
+  languageName: node
+  linkType: hard
+
+"diff@npm:^4.0.1":
+  version: 4.0.2
+  resolution: "diff@npm:4.0.2"
+  checksum: f2c09b0ce4e6b301c221addd83bf3f454c0bc00caa3dd837cf6c127d6edf7223aa2bbe3b688feea110b7f262adbfc845b757c44c8a9f8c0c5b15d8fa9ce9d20d
   languageName: node
   linkType: hard
 
@@ -3007,6 +3129,13 @@ __metadata:
   version: 10.0.1
   resolution: "lru-cache@npm:10.0.1"
   checksum: 06f8d0e1ceabd76bb6f644a26dbb0b4c471b79c7b514c13c6856113879b3bf369eb7b497dad4ff2b7e2636db202412394865b33c332100876d838ad1372f0181
+  languageName: node
+  linkType: hard
+
+"make-error@npm:^1.1.1":
+  version: 1.3.6
+  resolution: "make-error@npm:1.3.6"
+  checksum: b86e5e0e25f7f777b77fabd8e2cbf15737972869d852a22b7e73c17623928fccb826d8e46b9951501d3f20e51ad74ba8c59ed584f610526a48f8ccf88aaec402
   languageName: node
   linkType: hard
 
@@ -4041,6 +4170,44 @@ __metadata:
   languageName: node
   linkType: hard
 
+"ts-node@npm:^10.9.1":
+  version: 10.9.1
+  resolution: "ts-node@npm:10.9.1"
+  dependencies:
+    "@cspotcode/source-map-support": "npm:^0.8.0"
+    "@tsconfig/node10": "npm:^1.0.7"
+    "@tsconfig/node12": "npm:^1.0.7"
+    "@tsconfig/node14": "npm:^1.0.0"
+    "@tsconfig/node16": "npm:^1.0.2"
+    acorn: "npm:^8.4.1"
+    acorn-walk: "npm:^8.1.1"
+    arg: "npm:^4.1.0"
+    create-require: "npm:^1.1.0"
+    diff: "npm:^4.0.1"
+    make-error: "npm:^1.1.1"
+    v8-compile-cache-lib: "npm:^3.0.1"
+    yn: "npm:3.1.1"
+  peerDependencies:
+    "@swc/core": ">=1.2.50"
+    "@swc/wasm": ">=1.2.50"
+    "@types/node": "*"
+    typescript: ">=2.7"
+  peerDependenciesMeta:
+    "@swc/core":
+      optional: true
+    "@swc/wasm":
+      optional: true
+  bin:
+    ts-node: dist/bin.js
+    ts-node-cwd: dist/bin-cwd.js
+    ts-node-esm: dist/bin-esm.js
+    ts-node-script: dist/bin-script.js
+    ts-node-transpile-only: dist/bin-transpile.js
+    ts-script: dist/bin-script-deprecated.js
+  checksum: 090adff1302ab20bd3486e6b4799e90f97726ed39e02b39e566f8ab674fd5bd5f727f43615debbfc580d33c6d9d1c6b1b3ce7d8e3cca3e20530a145ffa232c35
+  languageName: node
+  linkType: hard
+
 "tslib@npm:^2.0.3, tslib@npm:^2.1.0":
   version: 2.6.2
   resolution: "tslib@npm:2.6.2"
@@ -4144,6 +4311,13 @@ __metadata:
   bin:
     uuid: dist/bin/uuid
   checksum: 5575a8a75c13120e2f10e6ddc801b2c7ed7d8f3c8ac22c7ed0c7b2ba6383ec0abda88c905085d630e251719e0777045ae3236f04c812184b7c765f63a70e58df
+  languageName: node
+  linkType: hard
+
+"v8-compile-cache-lib@npm:^3.0.1":
+  version: 3.0.1
+  resolution: "v8-compile-cache-lib@npm:3.0.1"
+  checksum: 78089ad549e21bcdbfca10c08850022b22024cdcc2da9b168bcf5a73a6ed7bf01a9cebb9eac28e03cd23a684d81e0502797e88f3ccd27a32aeab1cfc44c39da0
   languageName: node
   linkType: hard
 
@@ -4305,5 +4479,12 @@ __metadata:
   version: 4.0.0
   resolution: "yallist@npm:4.0.0"
   checksum: 343617202af32df2a15a3be36a5a8c0c8545208f3d3dfbc6bb7c3e3b7e8c6f8e7485432e4f3b88da3031a6e20afa7c711eded32ddfb122896ac5d914e75848d5
+  languageName: node
+  linkType: hard
+
+"yn@npm:3.1.1":
+  version: 3.1.1
+  resolution: "yn@npm:3.1.1"
+  checksum: 2c487b0e149e746ef48cda9f8bad10fc83693cd69d7f9dcd8be4214e985de33a29c9e24f3c0d6bcf2288427040a8947406ab27f7af67ee9456e6b84854f02dd6
   languageName: node
   linkType: hard

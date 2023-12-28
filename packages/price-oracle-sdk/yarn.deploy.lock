@@ -58,25 +58,26 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/idls@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/idls@npm:0.6.11"
+"@helium/idls@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/idls@workspace:packages/idls"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@solana/web3.js": ^1.78.4
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-  checksum: a3e4217b52086fbed5f6497316cb5db61f1a25e4a0f673c850498fe5a0188e8adc204034346775bf420b0ce10ac89ecbc941dce945738d4b933b85a749b262db
-  languageName: node
-  linkType: hard
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@helium/price-oracle-sdk@workspace:.":
   version: 0.0.0-use.local
   resolution: "@helium/price-oracle-sdk@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/idls": ^0.6.11
+    "@helium/idls": ^0.6.12-next.0+C50F3444
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3

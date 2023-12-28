@@ -112,14 +112,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/account-fetch-cache@npm:0.6.11"
+"@helium/account-fetch-cache@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
     "@solana/web3.js": ^1.78.4
-  checksum: 194471db314ffc8e2aea4966235f8e088d4016be274adfb73586764c74a5b826198499e1a72419b041c2de75391c7d9a0994700528d1e0c7223293e8d086ca06
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@helium/address@npm:^4.10.2":
   version: 4.10.2
@@ -131,6 +133,20 @@ __metadata:
   checksum: 4d83df57c638ed1496a92241a2f45da671e11b6397f02ab65c5281cbd1a435548e7ffd5be969d8d214b5af045e9be4bdd2d89f41744289c17e6410d458b03bcc
   languageName: node
   linkType: hard
+
+"@helium/anchor-resolvers@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
+  dependencies:
+    "@solana/spl-token": ^0.3.8
+    "@solana/web3.js": ^1.78.4
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  peerDependencies:
+    "@coral-xyz/anchor": ^0.28.0
+  languageName: unknown
+  linkType: soft
 
 "@helium/anchor-resolvers@npm:^0.5.0":
   version: 0.5.0
@@ -144,80 +160,96 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/anchor-resolvers@npm:0.6.11"
-  dependencies:
-    "@solana/spl-token": ^0.3.8
-    "@solana/web3.js": ^1.78.4
-  peerDependencies:
-    "@coral-xyz/anchor": ^0.28.0
-  checksum: 89745fb73e607e9ac3c542f7e537c53fbfbef09940ea3540704995fb755c3b2ba78836339a2247c5d85860527b439411c9a1f8222257c944feca2a5c3347ae29
-  languageName: node
-  linkType: hard
-
-"@helium/circuit-breaker-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/circuit-breaker-sdk@npm:0.6.11"
+"@helium/circuit-breaker-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/circuit-breaker-sdk@workspace:packages/circuit-breaker-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/idls": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/idls": ^0.6.12-next.0+C50F3444
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 58c22e90fcbb3e86da422c2f1cc7fc5da94de43424b0a9fca9eaee01b5873afa6fc2adab7563fcbe2c8a6d4da1d181e0d85b206a6e004d09444781061e469832
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
-"@helium/data-credits-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/data-credits-sdk@npm:0.6.11"
+"@helium/data-credits-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/data-credits-sdk@workspace:packages/data-credits-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/circuit-breaker-sdk": ^0.6.11
-    "@helium/helium-sub-daos-sdk": ^0.6.11
-    "@helium/idls": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/circuit-breaker-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/helium-sub-daos-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/idls": ^0.6.12-next.0+C50F3444
+    "@types/crypto-js": ^4.1.1
     bn.js: ^5.2.0
     bs58: ^4.0.1
     crypto-js: ^4.1.1
-  checksum: 16a9bc357bbecfa2aeb7a967e131c4af05521bcce969bcc75f650877fa6d61566c520e586e67a33c99d6e36219e218ffbcb268489b52c15ff733be9a151de8f5
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
-"@helium/helium-entity-manager-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/helium-entity-manager-sdk@npm:0.6.11"
+"@helium/helium-entity-manager-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/helium-entity-manager-sdk@workspace:packages/helium-entity-manager-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/address": ^4.10.2
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/helium-sub-daos-sdk": ^0.6.11
-    "@helium/idls": ^0.6.11
-    "@helium/no-emit-sdk": ^0.6.11
-    "@helium/spl-utils": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/helium-sub-daos-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/idls": ^0.6.12-next.0+C50F3444
+    "@helium/no-emit-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/spl-utils": ^0.6.12-next.0+C50F3444
+    "@types/crypto-js": ^4.1.1
     bn.js: ^5.2.0
     bs58: ^4.0.1
     crypto-js: ^4.1.1
+    git-format-staged: ^2.1.3
     js-sha256: ^0.9.0
-  checksum: ee16c47f4cf7533456448d1f98927d02c37ccb4127486467308672523dd271ab0ad5c857997faabc770d02cad8436ebd447cc33d3aaa70b988b4834d87043e37
-  languageName: node
-  linkType: hard
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
-"@helium/helium-sub-daos-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/helium-sub-daos-sdk@npm:0.6.11"
+"@helium/helium-sub-daos-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/helium-sub-daos-sdk@workspace:packages/helium-sub-daos-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/circuit-breaker-sdk": ^0.6.11
-    "@helium/treasury-management-sdk": ^0.6.11
-    "@helium/voter-stake-registry-sdk": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/circuit-breaker-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/treasury-management-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/voter-stake-registry-sdk": ^0.6.12-next.0+C50F3444
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 449e306ea5415ef1e6675e5f2a47ec7fc489a608b13b11578977243c6c13b18c7b412e9a5f245db11b26488afa286c477c663dac7b986b47a055f8e6404aee89
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
+
+"@helium/idls@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/idls@workspace:packages/idls"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@solana/web3.js": ^1.78.4
+    bn.js: ^5.2.0
+    borsh: ^0.7.0
+    bs58: ^4.0.1
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@helium/idls@npm:^0.5.0":
   version: 0.5.0
@@ -232,62 +264,55 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/idls@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/idls@npm:0.6.11"
+"@helium/lazy-distributor-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/lazy-distributor-sdk@workspace:packages/lazy-distributor-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@solana/web3.js": ^1.78.4
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/circuit-breaker-sdk": ^0.6.12-next.0+C50F3444
     bn.js: ^5.2.0
-    borsh: ^0.7.0
     bs58: ^4.0.1
-  checksum: a3e4217b52086fbed5f6497316cb5db61f1a25e4a0f673c850498fe5a0188e8adc204034346775bf420b0ce10ac89ecbc941dce945738d4b933b85a749b262db
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
-"@helium/lazy-distributor-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/lazy-distributor-sdk@npm:0.6.11"
+"@helium/lazy-transactions-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/lazy-transactions-sdk@workspace:packages/lazy-transactions-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/circuit-breaker-sdk": ^0.6.11
+    "@helium/idls": ^0.6.12-next.0+C50F3444
+    "@helium/spl-utils": ^0.6.12-next.0+C50F3444
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 6abf31660c85dee5d4ddfc6d2d4850ecdc01c77b510e632aaacb236b01dcfecb8c6d1d123f4ce0fdda8dc48925d45237c6ca6035f196bb3bdcdb5d19a4a37e07
-  languageName: node
-  linkType: hard
-
-"@helium/lazy-transactions-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/lazy-transactions-sdk@npm:0.6.11"
-  dependencies:
-    "@coral-xyz/anchor": ^0.28.0
-    "@helium/idls": ^0.6.11
-    "@helium/spl-utils": ^0.6.11
-    bn.js: ^5.2.0
-    bs58: ^4.0.1
+    git-format-staged: ^2.1.3
     js-sha3: ^0.8.0
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
     typescript-collections: ^1.3.3
-  checksum: 764c53b0d038a283098dd2398593f994e4f6f2defb8c39f9b3e452df433f595c94644726bb0103137c8ec35441b87871dded97eefb7058e5c3aa6ea7cfd62f88
-  languageName: node
-  linkType: hard
+  languageName: unknown
+  linkType: soft
 
 "@helium/monitor-service@workspace:.":
   version: 0.0.0-use.local
   resolution: "@helium/monitor-service@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.6.11
-    "@helium/circuit-breaker-sdk": ^0.6.11
-    "@helium/data-credits-sdk": ^0.6.11
-    "@helium/helium-entity-manager-sdk": ^0.6.11
-    "@helium/helium-sub-daos-sdk": ^0.6.11
-    "@helium/idls": ^0.6.11
-    "@helium/lazy-distributor-sdk": ^0.6.11
-    "@helium/lazy-transactions-sdk": ^0.6.11
-    "@helium/price-oracle-sdk": ^0.6.11
-    "@helium/spl-utils": ^0.6.11
+    "@helium/account-fetch-cache": ^0.6.12-next.0+C50F3444
+    "@helium/circuit-breaker-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/data-credits-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/helium-entity-manager-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/helium-sub-daos-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/idls": ^0.6.12-next.0+C50F3444
+    "@helium/lazy-distributor-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/lazy-transactions-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/price-oracle-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/spl-utils": ^0.6.12-next.0+C50F3444
     "@metaplex-foundation/mpl-bubblegum": ^3.0.0
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
@@ -314,39 +339,45 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/no-emit-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/no-emit-sdk@npm:0.6.11"
+"@helium/no-emit-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/no-emit-sdk@workspace:packages/no-emit-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.5.0
     "@helium/idls": ^0.5.0
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: dc8c42b46f76371cfea9f4e998aac38168992e1bab47ab4606f1d40a8eb053897d80b3a1aacd2ca4fb65b16df77619ce8ea1ec50675146feae10976625a95ecb
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
-"@helium/price-oracle-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/price-oracle-sdk@npm:0.6.11"
+"@helium/price-oracle-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/price-oracle-sdk@workspace:packages/price-oracle-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/idls": ^0.6.11
+    "@helium/idls": ^0.6.12-next.0+C50F3444
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 409ce4a3e7825604907efb68656db5e1ecd18d5feec9aaed57bd357748fdf14933bbf87470130aaf8cfe0025676b5a8d9f9beaecc2ff60d8530749742a6f6c87
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
-"@helium/spl-utils@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/spl-utils@npm:0.6.11"
+"@helium/spl-utils@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.6.11
+    "@helium/account-fetch-cache": ^0.6.12-next.0+C50F3444
     "@helium/address": ^4.10.2
-    "@helium/anchor-resolvers": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
@@ -355,38 +386,46 @@ __metadata:
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-  checksum: 27772fb25031aff0e8dd11b85dd052955e2d4f85fd55a1ca0e46e710184974fc82fd2d489021d118d7ba2fa15bf0aafaedafe6bb07e61a56987a6675a8838eaf
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
-"@helium/treasury-management-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/treasury-management-sdk@npm:0.6.11"
+"@helium/treasury-management-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/treasury-management-sdk@workspace:packages/treasury-management-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/circuit-breaker-sdk": ^0.6.11
-    "@helium/idls": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/circuit-breaker-sdk": ^0.6.12-next.0+C50F3444
+    "@helium/idls": ^0.6.12-next.0+C50F3444
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 69d994a7d8f2453bd0eb1ca16c6c33b2cf0bb7be8bbce55ea9ca44aeda2e786fe5ada1f01f52154bc1e387914539c627d1125b9865f4aaf11ae2fed5f6b71637
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
-"@helium/voter-stake-registry-sdk@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/voter-stake-registry-sdk@npm:0.6.11"
+"@helium/voter-stake-registry-sdk@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.11
-    "@helium/idls": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
+    "@helium/idls": ^0.6.12-next.0+C50F3444
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 37c3596a6eaadd76fd1ccb29ced326f90cb3ea0e8e79918199f471b171bbef7b095ae8fb862cded152f155b4608b0902824f0159e4e9ee418142a68a1ee5f7f3
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@isaacs/cliui@npm:^8.0.2":
   version: 8.0.2
@@ -714,6 +753,13 @@ __metadata:
   dependencies:
     "@types/node": "npm:*"
   checksum: fe81351470f2d3165e8b12ce33542eef89ea893e36dd62e8f7d72566dfb7e448376ae962f9f3ea888547ce8b55a40020ca0e01d637fab5d99567673084542641
+  languageName: node
+  linkType: hard
+
+"@types/crypto-js@npm:^4.1.1":
+  version: 4.1.1
+  resolution: "@types/crypto-js@npm:4.1.1"
+  checksum: ea3d6a67b69f88baeb6af96004395903d2367a41bd5cd86306da23a44dd96589749495da50974a9b01bb5163c500764c8a33706831eade036bddae016417e3ea
   languageName: node
   linkType: hard
 

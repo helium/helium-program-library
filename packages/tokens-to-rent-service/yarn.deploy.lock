@@ -102,14 +102,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/account-fetch-cache@npm:0.6.11"
+"@helium/account-fetch-cache@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
     "@solana/web3.js": ^1.78.4
-  checksum: 194471db314ffc8e2aea4966235f8e088d4016be274adfb73586764c74a5b826198499e1a72419b041c2de75391c7d9a0994700528d1e0c7223293e8d086ca06
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@helium/address@npm:^4.10.2":
   version: 4.10.2
@@ -122,26 +124,28 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/anchor-resolvers@npm:0.6.11"
+"@helium/anchor-resolvers@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
   dependencies:
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.78.4
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
   peerDependencies:
     "@coral-xyz/anchor": ^0.28.0
-  checksum: 89745fb73e607e9ac3c542f7e537c53fbfbef09940ea3540704995fb755c3b2ba78836339a2247c5d85860527b439411c9a1f8222257c944feca2a5c3347ae29
-  languageName: node
-  linkType: hard
+  languageName: unknown
+  linkType: soft
 
-"@helium/spl-utils@npm:^0.6.11":
-  version: 0.6.11
-  resolution: "@helium/spl-utils@npm:0.6.11"
+"@helium/spl-utils@^0.6.12-next.0+C50F3444":
+  version: 0.0.0-use.local
+  resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.6.11
+    "@helium/account-fetch-cache": ^0.6.12-next.0+C50F3444
     "@helium/address": ^4.10.2
-    "@helium/anchor-resolvers": ^0.6.11
+    "@helium/anchor-resolvers": ^0.6.12-next.0+C50F3444
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
@@ -150,9 +154,11 @@ __metadata:
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-  checksum: 27772fb25031aff0e8dd11b85dd052955e2d4f85fd55a1ca0e46e710184974fc82fd2d489021d118d7ba2fa15bf0aafaedafe6bb07e61a56987a6675a8838eaf
-  languageName: node
-  linkType: hard
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@helium/tokens-to-rent-service@workspace:.":
   version: 0.0.0-use.local
@@ -160,9 +166,9 @@ __metadata:
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@fastify/cors": ^8.1.1
-    "@helium/account-fetch-cache": ^0.6.11
+    "@helium/account-fetch-cache": ^0.6.12-next.0+C50F3444
     "@helium/address": ^4.10.2
-    "@helium/spl-utils": ^0.6.11
+    "@helium/spl-utils": ^0.6.12-next.0+C50F3444
     "@jup-ag/api": ^6.0.6
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.78.4
