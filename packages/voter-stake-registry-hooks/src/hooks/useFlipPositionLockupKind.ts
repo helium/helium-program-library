@@ -15,9 +15,14 @@ export const useFlipPositionLockupKind = () => {
     async ({
       position,
       programId = PROGRAM_ID,
+      onInstructions,
     }: {
       position: PositionWithMeta;
       programId?: PublicKey;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
     }) => {
       const isInvalid =
         !provider ||
@@ -80,7 +85,11 @@ export const useFlipPositionLockupKind = () => {
           );
         }
 
-        await sendInstructions(provider, instructions);
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await sendInstructions(provider, instructions);
+        }
       }
     }
   );

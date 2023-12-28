@@ -1,6 +1,11 @@
 import { Program } from "@coral-xyz/anchor";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
-import { chunks, sendMultipleInstructions, toBN } from "@helium/spl-utils";
+import {
+  batchParallelInstructions,
+  chunks,
+  sendMultipleInstructions,
+  toBN,
+} from "@helium/spl-utils";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
   MintLayout,
@@ -27,12 +32,17 @@ export const useSplitPosition = () => {
       lockupKind = { cliff: {} },
       lockupPeriodsInDays,
       programId = PROGRAM_ID,
+      onInstructions,
     }: {
       sourcePosition: PositionWithMeta;
       amount: number;
       lockupKind: any;
       lockupPeriodsInDays: number;
       programId?: PublicKey;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
     }) => {
       const isInvalid = !provider || !provider.wallet;
 
@@ -133,13 +143,11 @@ export const useSplitPosition = () => {
           );
         }
 
-        // This is an arbitrary threshold and we assume that up to 2 instructions can be inserted as a single Tx
-        const ixsChunks = chunks(instructions, 2);
-
-        await sendMultipleInstructions(provider, ixsChunks, [
-          [mintKeypair],
-          ...ixsChunks.slice(1).map(() => []),
-        ]);
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await batchParallelInstructions(provider, instructions);
+        }
       }
     }
   );

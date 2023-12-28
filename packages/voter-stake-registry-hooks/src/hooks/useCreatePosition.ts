@@ -29,11 +29,16 @@ export const useCreatePosition = () => {
       lockupKind = { cliff: {} },
       lockupPeriodsInDays,
       mint,
+      onInstructions,
     }: {
       amount: BN;
       lockupKind: any;
       lockupPeriodsInDays: number;
       mint: PublicKey;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
     }) => {
       const isInvalid = !provider || !client;
       const registrar = getRegistrarKey(mint);
@@ -96,7 +101,11 @@ export const useCreatePosition = () => {
             .instruction()
         );
 
-        await sendInstructions(provider, instructions, [mintKeypair]);
+        if (onInstructions) {
+          await onInstructions(instructions)
+        } else {
+          await sendInstructions(provider, instructions, [mintKeypair]);
+        }
       }
     }
   );
