@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.6.11",
+  "version": "0.6.12-next.0+C50F3444",
   "description": "Mint metadata of fanout positions",
   "repository": {
     "type": "git",
