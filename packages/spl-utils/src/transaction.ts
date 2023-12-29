@@ -746,19 +746,17 @@ export async function batchParallelInstructions(
   );
 }
 
-export async function batchParallelInstructionsWithPriorityFee(
+export async function batchInstructionsToTxsWithPriorityFee(
   provider: AnchorProvider,
   instructions: TransactionInstruction[],
   {
-    onProgress,
-    triesRemaining = 10,
     computeUnitLimit = 1000000,
+    basePriorityFee,
   }: {
-    onProgress?: (status: Status) => void;
-    triesRemaining?: number; // Number of blockhashes to try resending txs with before giving up
     computeUnitLimit?: number;
+    basePriorityFee?: number;
   } = {}
-): Promise<void> {
+): Promise<Transaction[]> {
   let currentTxInstructions: TransactionInstruction[] = [];
   const blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
   const transactions: Transaction[] = [];
@@ -795,7 +793,8 @@ export async function batchParallelInstructionsWithPriorityFee(
           ComputeBudgetProgram.setComputeUnitPrice({
             microLamports: await estimatePrioritizationFee(
               provider.connection,
-              currentTxInstructions
+              currentTxInstructions,
+              basePriorityFee
             ),
           }),
           ...currentTxInstructions
@@ -816,6 +815,33 @@ export async function batchParallelInstructionsWithPriorityFee(
     tx.add(...currentTxInstructions);
     transactions.push(tx);
   }
+
+  return transactions;
+}
+
+export async function batchParallelInstructionsWithPriorityFee(
+  provider: AnchorProvider,
+  instructions: TransactionInstruction[],
+  {
+    onProgress,
+    triesRemaining = 10,
+    computeUnitLimit = 1000000,
+    basePriorityFee,
+  }: {
+    onProgress?: (status: Status) => void;
+    triesRemaining?: number; // Number of blockhashes to try resending txs with before giving up
+    computeUnitLimit?: number;
+    basePriorityFee?: number;
+  } = {}
+): Promise<void> {
+  const transactions = await batchInstructionsToTxsWithPriorityFee(
+    provider,
+    instructions,
+    {
+      computeUnitLimit,
+      basePriorityFee,
+    }
+  );
 
   await bulkSendTransactions(
     provider,
