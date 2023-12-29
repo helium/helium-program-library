@@ -37,7 +37,7 @@ export const useCreatePosition = () => {
       mint: PublicKey;
       // Instead of sending the transaction, let the caller decide
       onInstructions?: (
-        instructions: TransactionInstruction[]
+        instructions: TransactionInstruction[], signers: Keypair[]
       ) => Promise<void>;
     }) => {
       const isInvalid = !provider || !client;
@@ -102,7 +102,7 @@ export const useCreatePosition = () => {
         );
 
         if (onInstructions) {
-          await onInstructions(instructions)
+          await onInstructions(instructions, [mintKeypair])
         } else {
           await sendInstructions(provider, instructions, [mintKeypair]);
         }

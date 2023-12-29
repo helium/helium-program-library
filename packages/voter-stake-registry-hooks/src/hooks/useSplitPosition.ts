@@ -1,10 +1,10 @@
 import { Program } from "@coral-xyz/anchor";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
 import {
-  batchParallelInstructions,
-  chunks,
-  sendMultipleInstructions,
-  toBN,
+  batchInstructionsToTxsWithPriorityFee,
+  sendAndConfirmWithRetry,
+  sendInstructions,
+  toBN
 } from "@helium/spl-utils";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
@@ -41,7 +41,8 @@ export const useSplitPosition = () => {
       programId?: PublicKey;
       // Instead of sending the transaction, let the caller decide
       onInstructions?: (
-        instructions: TransactionInstruction[]
+        instructions: TransactionInstruction[],
+        signers: Keypair[]
       ) => Promise<void>;
     }) => {
       const isInvalid = !provider || !provider.wallet;
@@ -144,9 +145,19 @@ export const useSplitPosition = () => {
         }
 
         if (onInstructions) {
-          await onInstructions(instructions);
+          await onInstructions(instructions, [mintKeypair]);
         } else {
-          await batchParallelInstructions(provider, instructions);
+          const transactions = await batchInstructionsToTxsWithPriorityFee(provider, instructions)
+          for (const tx of transactions) {
+            await sendAndConfirmWithRetry(
+              provider.connection,
+              tx.serialize(),
+              {
+                skipPreflight: true,
+              },
+              "confirmed"
+            );
+          }
         }
       }
     }

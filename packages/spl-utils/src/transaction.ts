@@ -4,6 +4,7 @@ import {
   ComputeBudgetProgram,
   Connection,
   Finality,
+  Keypair,
   PublicKey,
   RpcResponseAndContext,
   SendOptions,
@@ -516,7 +517,8 @@ export async function bulkSendTransactions(
   provider: Provider,
   txs: Transaction[],
   onProgress?: (status: Status) => void,
-  triesRemaining: number = 10 // Number of blockhashes to try resending txs with before giving up
+  triesRemaining: number = 10, // Number of blockhashes to try resending txs with before giving up
+  extraSigners: Keypair[] = []
 ): Promise<string[]> {
   let ret: string[] = [];
 
@@ -534,9 +536,20 @@ export async function bulkSendTransactions(
           return tx;
         })
       );
-      const signedTxs = await (
-        provider as AnchorProvider
-      ).wallet.signAllTransactions(blockhashedTxs);
+      const signedTxs = (
+        await (provider as AnchorProvider).wallet.signAllTransactions(
+          blockhashedTxs
+        )
+      ).map((tx) => {
+        extraSigners.forEach((signer: Keypair) => {
+          if (
+            tx.signatures.some((sig) => sig.publicKey.equals(signer.publicKey))
+          ) {
+            tx.partialSign(signer);
+          }
+        }, tx);
+        return tx;
+      });
 
       const txsWithSigs = signedTxs.map((tx, index) => {
         return {
@@ -689,7 +702,8 @@ export async function batchParallelInstructions(
   provider: AnchorProvider,
   instructions: TransactionInstruction[],
   onProgress?: (status: Status) => void,
-  triesRemaining: number = 10 // Number of blockhashes to try resending txs with before giving up
+  triesRemaining: number = 10, // Number of blockhashes to try resending txs with before giving up
+  extraSigners: Keypair[] = []
 ): Promise<void> {
   let currentTxInstructions: TransactionInstruction[] = [];
   const blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
@@ -742,7 +756,8 @@ export async function batchParallelInstructions(
     provider,
     transactions,
     onProgress,
-    triesRemaining
+    triesRemaining,
+    extraSigners
   );
 }
 
@@ -812,7 +827,19 @@ export async function batchInstructionsToTxsWithPriorityFee(
       feePayer: provider.wallet.publicKey,
       recentBlockhash: blockhash,
     });
-    tx.add(...currentTxInstructions);
+    tx.add(
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: computeUnitLimit,
+      }),
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: await estimatePrioritizationFee(
+          provider.connection,
+          currentTxInstructions,
+          basePriorityFee
+        ),
+      }),
+      ...currentTxInstructions
+    );
     transactions.push(tx);
   }
 
@@ -827,11 +854,13 @@ export async function batchParallelInstructionsWithPriorityFee(
     triesRemaining = 10,
     computeUnitLimit = 1000000,
     basePriorityFee,
+    extraSigners,
   }: {
     onProgress?: (status: Status) => void;
     triesRemaining?: number; // Number of blockhashes to try resending txs with before giving up
     computeUnitLimit?: number;
     basePriorityFee?: number;
+    extraSigners?: Keypair[];
   } = {}
 ): Promise<void> {
   const transactions = await batchInstructionsToTxsWithPriorityFee(
@@ -847,6 +876,7 @@ export async function batchParallelInstructionsWithPriorityFee(
     provider,
     transactions,
     onProgress,
-    triesRemaining
+    triesRemaining,
+    extraSigners
   );
 }
