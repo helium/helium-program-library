@@ -17,7 +17,7 @@ pub struct InitializeLazyTransactionsV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 8 + 60 + std::mem::size_of::<LazyTransactionsV0>() + get_bitmap_len(args.max_depth),
+    space = 8 + 60 + std::mem::size_of::<LazyTransactionsV0>() + args.name.len(),
     seeds = ["lazy_transactions".as_bytes(), args.name.as_bytes()],
     bump,
   )]
@@ -34,8 +34,8 @@ pub struct InitializeLazyTransactionsV0<'info> {
   #[account(
     mut,
     owner = id(),
-    constraint = executed_transactions.key() == lazy_transactions.executed_transactions || executed_transactions.data.borrow()[0] == 0,
-    constraint = executed_transactions.data.borrow().len() == 1 + get_bitmap_len(lazy_transactions.max_depth),
+    constraint = executed_transactions.data.borrow()[0] == 0,
+    constraint = executed_transactions.data.borrow().len() == 1 + get_bitmap_len(args.max_depth),
   )]
   pub executed_transactions: AccountInfo<'info>,
   pub system_program: Program<'info, System>,

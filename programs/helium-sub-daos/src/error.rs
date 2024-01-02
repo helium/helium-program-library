@@ -49,4 +49,7 @@ pub enum ErrorCode {
 
   #[msg("This epoch was not closed, cannot claim rewards.")]
   EpochNotClosed,
+
+  #[msg("Cannot delegate on a position ending this epoch")]
+  NoDelegateEndingPosition,
 }

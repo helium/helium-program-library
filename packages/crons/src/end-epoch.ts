@@ -69,7 +69,8 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
 
     let targetTs = subDaos.reduce(
       (acc, subDao) => BN.min(acc, subDao.account.vehntLastCalculatedTs),
-      new BN(unixNow)
+      // Start one day back to ensure we at least close the epoch that the job is running in.
+      new BN(unixNow - 24 * 60 * 60)
     );
 
     mainLoop: while (targetTs.toNumber() < unixNow) {
