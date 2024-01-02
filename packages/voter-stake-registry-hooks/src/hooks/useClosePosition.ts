@@ -15,7 +15,16 @@ export const useClosePosition = () => {
     [provider]
   );
   const { error, loading, execute } = useAsyncCallback(
-    async ({ position }: { position: PositionWithMeta }) => {
+    async ({
+      position,
+      onInstructions,
+    }: {
+      position: PositionWithMeta;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
+    }) => {
       const lockup = position.lockup;
       const lockupKind = Object.keys(lockup.kind)[0];
       const isInvalid =
@@ -61,7 +70,11 @@ export const useClosePosition = () => {
             .instruction()
         );
 
-        await sendInstructions(provider, instructions);
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await sendInstructions(provider, instructions);
+        }
       }
     }
   );

@@ -42,6 +42,7 @@ import {
   PublicKey,
   Transaction,
   TransactionInstruction,
+  ComputeBudgetProgram,
 } from "@solana/web3.js";
 import { Op } from "sequelize";
 import fs from "fs";
@@ -358,6 +359,9 @@ export class OracleServer {
       )!;
 
     for (const ix of tx.instructions) {
+      if (ix.programId.equals(ComputeBudgetProgram.programId)) {
+        continue;
+      }
       if (!(ix.programId.equals(LD_PID) || ix.programId.equals(RO_PID))) {
         return {
           success: false,
