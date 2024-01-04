@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -33,8 +35,28 @@ pub fn handler(ctx: Context<UpdatePriceOracleV0>, args: UpdatePriceOracleArgsV0)
         ErrorCode::InvalidArgs
       );
     }
-    ctx.accounts.price_oracle.num_oracles = oracles.len().try_into().unwrap();
-    ctx.accounts.price_oracle.oracles = oracles;
+
+    let authorities: HashMap<String, &OracleV0> = ctx
+      .accounts
+      .price_oracle
+      .oracles
+      .iter()
+      .map(|oracle| (oracle.authority.to_string(), oracle))
+      .collect::<HashMap<_, _>>();
+    // If keeping an existing oracle, keep their price
+    let new_oracles = oracles
+      .into_iter()
+      .map(|oracle| {
+        if let Some(existing) = authorities.get(&oracle.authority.to_string()) {
+          (*existing).clone()
+        } else {
+          oracle
+        }
+      })
+      .collect::<Vec<_>>();
+
+    ctx.accounts.price_oracle.num_oracles = new_oracles.len().try_into().unwrap();
+    ctx.accounts.price_oracle.oracles = new_oracles;
     ctx.accounts.price_oracle.current_price = None;
     ctx.accounts.price_oracle.last_calculated_timestamp = None;
   }
