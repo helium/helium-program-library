@@ -1,4 +1,4 @@
-import { HNT_MINT, IOT_MINT, MOBILE_MINT, toBN } from "@helium/spl-utils";
+import { HNT_MINT, IOT_MINT, MOBILE_MINT, toBN, truthy } from "@helium/spl-utils";
 import {
   Configuration,
   DefaultApi,
@@ -8,6 +8,8 @@ import {
 import { ACCOUNT_SIZE, NATIVE_MINT, getMint } from "@solana/spl-token";
 import {
   AddressLookupTableAccount,
+  ComputeBudgetInstruction,
+  LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
@@ -128,6 +130,7 @@ export const fundFees = async ({
     slippageBps: 100, // 1%
     platformFeeBps: Number(JUPITER_FEE_BPS) || 0,
     maxAccounts: 20,
+    onlyDirectRoutes: true
   });
 
   // Tx contains instructions to create/close WSOL token account
@@ -156,14 +159,47 @@ export const fundFees = async ({
     lamports: ataRent,
   });
 
+  const budgetInstructions = computeBudgetInstructions.map(
+    instructionDataToTransactionInstruction
+  );
+  let fee = 10000;
+  if (budgetInstructions.length >= 0) {
+    let units = 0;
+    let price = 0;
+    budgetInstructions.filter(truthy).forEach((instr) => {
+      const type = ComputeBudgetInstruction.decodeInstructionType(instr);
+      switch (type) {
+        case "RequestHeapFrame":
+          break;
+        case "SetComputeUnitLimit":
+          units =
+            ComputeBudgetInstruction.decodeSetComputeUnitLimit(instr).units;
+            break;
+        case "RequestUnits":
+          units = ComputeBudgetInstruction.decodeRequestUnits(instr).units;
+            break;
+        case "SetComputeUnitPrice":
+          price = Number(
+            ComputeBudgetInstruction.decodeSetComputeUnitPrice(instr)
+              .microLamports
+          );
+          break;
+      }
+    });
+    fee += Math.ceil((units * price) / 1000000);
+    if (fee / LAMPORTS_PER_SOL > 0.01) {
+      throw new Error("Priority fees are too high right now, try again later");
+    }
+  }
+
   const repayIx = SystemProgram.transfer({
     fromPubkey: userWallet,
     toPubkey: platformWallet.publicKey,
-    lamports: ataRent + 10000,
+    lamports: ataRent + fee,
   });
 
   const instructions: TransactionInstruction[] = [
-    ...computeBudgetInstructions.map(instructionDataToTransactionInstruction),
+    ...budgetInstructions,
     borrowIx,
     ...setupInstructions.map(instructionDataToTransactionInstruction),
     instructionDataToTransactionInstruction(swapInstruction),

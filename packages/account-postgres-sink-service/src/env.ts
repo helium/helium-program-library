@@ -1,4 +1,8 @@
 import os from 'os';
+import dotenv from "dotenv";
+
+dotenv.config();
+
 
 process.env.ANCHOR_WALLET =
   process.env.ANCHOR_WALLET || os.homedir() + '/.config/solana/id.json';

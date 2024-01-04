@@ -75,14 +75,20 @@ export function handleAccountWebhook({
           }
         }
         const model = sequelize.models[accName];
-        await model.upsert(
-          {
-            address: account.pubkey,
-            refreshed_at: now,
-            ...sanitized,
-          },
-          { transaction: t }
-        );
+        const value = await model.findByPk(account.pubkey);
+        const changed =
+          !value ||
+          Object.entries(sanitized).some(([k, v]) => v?.toString() !== value.dataValues[k]?.toString());
+        if (changed) {
+          await model.upsert(
+            {
+              address: account.pubkey,
+              refreshed_at: now,
+              ...sanitized,
+            },
+            { transaction: t }
+          );
+        }
       }
 
       await t.commit();

@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.4.3",
+  "version": "0.6.12",
   "description": "Mint metadata of hotspots",
   "repository": {
     "type": "git",
@@ -29,17 +29,17 @@
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
     "build": "tsc -p tsconfig.json",
     "start": "node lib/esm/index.js",
-    "dev": "npx ts-node --project tsconfig.cjs.json src/index.ts"
+    "dev": "ts-node-dev --respawn --project tsconfig.cjs.json src/index.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
     "@fastify/cors": "^8.1.1",
-    "@helium/account-fetch-cache": "^0.4.3",
+    "@helium/account-fetch-cache": "^0.6.12",
     "@helium/address": "^4.10.2",
-    "@helium/helium-entity-manager-sdk": "^0.4.3",
-    "@helium/helium-sub-daos-sdk": "^0.4.3",
-    "@helium/idls": "^0.4.3",
-    "@helium/spl-utils": "^0.4.3",
+    "@helium/helium-entity-manager-sdk": "^0.6.12",
+    "@helium/helium-sub-daos-sdk": "^0.6.12",
+    "@helium/idls": "^0.6.12",
+    "@helium/spl-utils": "^0.6.12",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.78.4",
@@ -48,7 +48,9 @@
     "axios": "^1.3.6",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1",
+    "dotenv": "^16.3.1",
     "fastify": "^4.13.0",
+    "h3-js": "^4.1.0",
     "pg": "^8.11.3",
     "sequelize": "^6.33.0"
   },

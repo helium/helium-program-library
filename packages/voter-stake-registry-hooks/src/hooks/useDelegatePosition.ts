@@ -1,27 +1,29 @@
 import { Program } from "@coral-xyz/anchor";
-import { useAnchorProvider } from "@helium/helium-react-hooks";
 import { PROGRAM_ID, init } from "@helium/helium-sub-daos-sdk";
 import { sendInstructions } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
+import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta, SubDaoWithMeta } from "../sdk/types";
 
 export const useDelegatePosition = () => {
-  const provider = useAnchorProvider();
+  const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,
       subDao,
       programId = PROGRAM_ID,
+      onInstructions,
     }: {
       position: PositionWithMeta;
       subDao: SubDaoWithMeta;
       programId?: PublicKey;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
     }) => {
-      const isInvalid =
-        !provider ||
-        !provider.wallet ||
-        position.isDelegated;
+      const isInvalid = !provider || !provider.wallet || position.isDelegated;
 
       const idl = await Program.fetchIdl(programId, provider);
       const hsdProgram = await init(provider as any, programId, idl);
@@ -43,10 +45,11 @@ export const useDelegatePosition = () => {
             .instruction()
         );
 
-        await sendInstructions(
-          provider,
-          instructions
-        )
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await sendInstructions(provider, instructions);
+        }
       }
     }
   );

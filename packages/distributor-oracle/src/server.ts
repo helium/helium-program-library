@@ -1,5 +1,4 @@
 import dotenv from "dotenv";
-import bs58 from "bs58";
 dotenv.config();
 // @ts-ignore
 import {
@@ -9,7 +8,7 @@ import {
   getProvider,
   Instruction,
   Program,
-  setProvider
+  setProvider,
 } from "@coral-xyz/anchor";
 import {
   decodeEntityKey,
@@ -19,23 +18,35 @@ import {
   keyToAssetForAsset,
 } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
-import {
-  HeliumEntityManager,
-} from "@helium/idls/lib/types/helium_entity_manager";
+import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { init as initLazy, lazyDistributorKey, PROGRAM_ID as LD_PID } from "@helium/lazy-distributor-sdk";
-import { init as initRewards, PROGRAM_ID as RO_PID} from "@helium/rewards-oracle-sdk";
-import { Asset, getAsset, HNT_MINT, IOT_MINT } from "@helium/spl-utils";
+import {
+  init as initLazy,
+  lazyDistributorKey,
+  PROGRAM_ID as LD_PID,
+} from "@helium/lazy-distributor-sdk";
+import {
+  init as initRewards,
+  PROGRAM_ID as RO_PID,
+} from "@helium/rewards-oracle-sdk";
+import {
+  Asset,
+  getAsset,
+  HNT_MINT,
+  IOT_MINT,
+  toNumber,
+} from "@helium/spl-utils";
 import { AccountFetchCache } from "@helium/account-fetch-cache";
 import {
   Keypair,
   PublicKey,
   Transaction,
-  TransactionInstruction
+  TransactionInstruction,
+  ComputeBudgetProgram,
 } from "@solana/web3.js";
 import { Op } from "sequelize";
 import fs from "fs";
-import { Reward } from "./model";
+import { Reward, sequelize } from "./model";
 import Fastify, {
   FastifyInstance,
   FastifyRequest,
@@ -44,18 +55,24 @@ import Fastify, {
 import cors from "@fastify/cors";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
+import { register, totalRewardsGauge } from "./metrics";
 
-const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
+const HNT = process.env.HNT_MINT
+  ? new PublicKey(process.env.HNT_MINT)
+  : HNT_MINT;
+const DNT = process.env.DNT_MINT
+  ? new PublicKey(process.env.DNT_MINT)
+  : IOT_MINT;
 const DAO = daoKey(HNT)[0];
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
 export interface Database {
+  getTotalRewards(): Promise<string>;
   getCurrentRewardsByEntity: (entityKey: string) => Promise<string>;
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
   getBulkRewards: (entityKeys: string[]) => Promise<Record<string, string>>;
   getActiveDevices(): Promise<number>;
 }
-
 
 export class PgDatabase implements Database {
   constructor(
@@ -65,6 +82,17 @@ export class PgDatabase implements Database {
       asset: PublicKey
     ) => Promise<Asset | undefined> = getAsset
   ) {}
+
+  async getTotalRewards(): Promise<string> {
+    const totalRewards = (
+      await Reward.findAll({
+        attributes: [
+          [sequelize.fn("SUM", sequelize.col("rewards")), "rewards"],
+        ],
+      })
+    )[0].rewards;
+    return totalRewards;
+  }
 
   getActiveDevices(): Promise<number> {
     return Reward.count({
@@ -167,6 +195,21 @@ export class OracleServer {
     server.get("/health", async () => {
       return { ok: true };
     });
+    let lastCall = 0;
+    async function getTotalRewards() {
+      const currTs = new Date().valueOf();
+      // Only update once every 10m
+      if (currTs - lastCall > 10 * 60 * 1000) {
+        console.log("Updating total rewards");
+        const rewards = toNumber(new BN(await db.getTotalRewards()), 6);
+        totalRewardsGauge.labels(DNT.toBase58()).set(Number(rewards));
+        lastCall = currTs;
+      }
+    }
+    server.get("/metrics", async (request, reply) => {
+      await getTotalRewards();
+      return register.metrics();
+    });
 
     this.app = server;
     this.addRoutes();
@@ -187,10 +230,13 @@ export class OracleServer {
   private addRoutes() {
     this.app.get("/active-devices", this.getActiveDevicesHandler.bind(this));
     this.app.post("/bulk-rewards", this.getAllRewardsHandler.bind(this));
-    this.app.get<{ Querystring: { assetId?: string; entityKey?: string, keySerialization?: BufferEncoding | "b58" } }>(
-      "/",
-      this.getCurrentRewardsHandler.bind(this)
-    );
+    this.app.get<{
+      Querystring: {
+        assetId?: string;
+        entityKey?: string;
+        keySerialization?: BufferEncoding | "b58";
+      };
+    }>("/", this.getCurrentRewardsHandler.bind(this));
     this.app.post("/", this.signTransactionHandler.bind(this));
     this.app.post("/bulk-sign", this.signBulkTransactionsHandler.bind(this));
   }
@@ -232,8 +278,12 @@ export class OracleServer {
     }
 
     if (entityKey) {
-      const [key] = await keyToAssetKey(this.dao, entityKey as string, keySerialization);
-      console.log(key.toBase58())
+      const [key] = await keyToAssetKey(
+        this.dao,
+        entityKey as string,
+        keySerialization
+      );
+      console.log(key.toBase58());
       const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(key);
       assetId = keyToAsset.asset.toBase58();
     }
@@ -309,6 +359,9 @@ export class OracleServer {
       )!;
 
     for (const ix of tx.instructions) {
+      if (ix.programId.equals(ComputeBudgetProgram.programId)) {
+        continue;
+      }
       if (!(ix.programId.equals(LD_PID) || ix.programId.equals(RO_PID))) {
         return {
           success: false,
@@ -432,10 +485,15 @@ export class OracleServer {
         keyToAssetK = ix.keys[wrapperKeyToAssetIdx].pubkey;
         //@ts-ignore
         proposedCurrentRewards = decoded.data.args.currentRewards;
-        entityKey = (await this.hemProgram.account.keyToAssetV0.fetch(keyToAssetK)).entityKey;
+        entityKey = (
+          await this.hemProgram.account.keyToAssetV0.fetch(keyToAssetK)
+        ).entityKey;
         // A sneaky RPC could return incorrect data. Verify that the entity key is correct for the key to asset
         if (!keyToAssetKey(this.dao, entityKey)[0].equals(keyToAssetK)) {
-          return { success: false, message: "RPC lied about the entity key for this asset." };
+          return {
+            success: false,
+            message: "RPC lied about the entity key for this asset.",
+          };
         }
       } else if (
         ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey) &&
@@ -467,14 +525,13 @@ export class OracleServer {
         }
         mint = recipientAcc.asset;
       }
-      let keySerialization: any = { b58: {} }
+      let keySerialization: any = { b58: {} };
       if (keyToAssetK) {
         const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
           keyToAssetK
         );
         keySerialization = keyToAsset.keySerialization;
       }
-      
 
       // @ts-ignore
       const currentRewards = entityKey
@@ -483,7 +540,10 @@ export class OracleServer {
           )
         : await this.db.getCurrentRewards(mint);
       if (proposedCurrentRewards.gt(new BN(currentRewards))) {
-        return { success: false, message: `Invalid amount, ${proposedCurrentRewards} is greater than actual rewards ${currentRewards}` };
+        return {
+          success: false,
+          message: `Invalid amount, ${proposedCurrentRewards} is greater than actual rewards ${currentRewards}`,
+        };
       }
     }
 
@@ -527,13 +587,11 @@ export class OracleServer {
 
     const errIdx = results.findIndex((x) => !x.success);
     if (errIdx > -1) {
-      res
-        .status(400)
-        .send({
-          error: results[errIdx].message
-            ? `${results[errIdx].message}\n\nTransaction index: ${errIdx}`
-            : `Error signing transaction index: ${errIdx}`,
-        });
+      res.status(400).send({
+        error: results[errIdx].message
+          ? `${results[errIdx].message}\n\nTransaction index: ${errIdx}`
+          : `Error signing transaction index: ${errIdx}`,
+      });
       return;
     }
 
@@ -583,9 +641,7 @@ export class OracleServer {
     const ldProgram = await initLazy(provider);
     const roProgram = await initRewards(provider);
     const hemProgram = await initHeliumEntityManager(provider);
-    const DNT = process.env.DNT_MINT
-      ? new PublicKey(process.env.DNT_MINT)
-      : IOT_MINT;
+
     const LAZY_DISTRIBUTOR = lazyDistributorKey(DNT)[0];
     const server = new OracleServer(
       ldProgram,
@@ -593,7 +649,7 @@ export class OracleServer {
       hemProgram,
       oracleKeypair,
       new PgDatabase(hemProgram),
-      LAZY_DISTRIBUTOR,
+      LAZY_DISTRIBUTOR
     );
     // For performance
     new AccountFetchCache({

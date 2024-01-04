@@ -1,13 +1,13 @@
-import { useAnchorProvider } from "@helium/helium-react-hooks";
 import { useProposal } from "@helium/modular-governance-hooks";
 import {
+  batchParallelInstructions,
   bulkSendTransactions,
   chunks,
-  truthy
+  truthy,
 } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@metaplex-foundation/js";
-import { Transaction } from "@solana/web3.js";
+import { Transaction, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
@@ -16,8 +16,7 @@ import { useVoteMarkers } from "./useVoteMarkers";
 
 export const useVote = (proposalKey: PublicKey) => {
   const { info: proposal } = useProposal(proposalKey);
-  const provider = useAnchorProvider();
-  const { positions } = useHeliumVsrState();
+  const { positions, provider } = useHeliumVsrState();
   const voteMarkerKeys = useMemo(() => {
     return positions
       ? positions.map((p) => voteMarkerKey(p.mint, proposalKey)[0])
@@ -45,14 +44,23 @@ export const useVote = (proposalKey: PublicKey) => {
         const maxChoicesReached =
           (m?.info?.choices.length || 0) >= (proposal?.maxChoicesPerVoter || 0);
         const alreadyVotedThisChoice = m.info?.choices.includes(choice);
-        const canVote = noMarker || (!maxChoicesReached && !alreadyVotedThisChoice)
+        const canVote =
+          noMarker || (!maxChoicesReached && !alreadyVotedThisChoice);
         return canVote;
       });
     },
     [markers]
   );
   const { error, loading, execute } = useAsyncCallback(
-    async ({ choice }: { choice: number }) => {
+    async ({
+      choice,
+      onInstructions,
+    }: {
+      choice: number; // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
+    }) => {
       const isInvalid = !provider || !positions || positions.length === 0;
 
       if (isInvalid) {
@@ -85,20 +93,14 @@ export const useVote = (proposalKey: PublicKey) => {
           )
         ).filter(truthy);
 
-        const txs = chunks(instructions, 4).map((ixs) => {
-          const tx = new Transaction({
-            feePayer: provider.wallet.publicKey,
-          });
-          tx.add(...ixs);
-
-          return tx;
-        });
-
-        await bulkSendTransactions(provider, txs);
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await batchParallelInstructions(provider, instructions);
+        }
       }
     }
   );
-  
 
   return {
     error,

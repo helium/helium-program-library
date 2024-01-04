@@ -8,6 +8,7 @@ export async function distributeCompressionRewards<IDL extends Idl>({
   assetId,
   lazyDistributor,
   rewardsMint,
+  payer,
   ...rest
 }: {
   program: Program<LazyDistributor>;
@@ -16,6 +17,7 @@ export async function distributeCompressionRewards<IDL extends Idl>({
   assetEndpoint?: string;
   lazyDistributor: PublicKey;
   owner?: PublicKey;
+  payer?: PublicKey;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
   getAssetProofFn?: (
     url: string,
@@ -42,6 +44,7 @@ export async function distributeCompressionRewards<IDL extends Idl>({
     .accounts({
       ...accounts,
       common: {
+        payer,
         lazyDistributor,
         rewardsMint,
         owner,

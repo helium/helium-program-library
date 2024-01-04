@@ -1,25 +1,32 @@
-import { BN } from '@coral-xyz/anchor'
-import { useAnchorProvider, useSolanaUnixNow } from '@helium/helium-react-hooks'
-import {
-  sendInstructions
-} from '@helium/spl-utils'
-import { TransactionInstruction } from '@solana/web3.js'
-import { useAsync, useAsyncCallback } from 'react-async-hook'
-import { HeliumVsrClient } from '../sdk/client'
-import { PositionWithMeta } from '../sdk/types'
+import { BN } from "@coral-xyz/anchor";
+import { useSolanaUnixNow } from "@helium/helium-react-hooks";
+import { sendInstructions } from "@helium/spl-utils";
+import { TransactionInstruction } from "@solana/web3.js";
+import { useAsync, useAsyncCallback } from "react-async-hook";
+import { useHeliumVsrState } from "../contexts/heliumVsrContext";
+import { HeliumVsrClient } from "../sdk/client";
+import { PositionWithMeta } from "../sdk/types";
 
 export const useClosePosition = () => {
-  const unixNow = useSolanaUnixNow()
-  const provider = useAnchorProvider()
-  const { result: client } = useAsync((provider) => HeliumVsrClient.connect(provider), [provider])
+  const { provider } = useHeliumVsrState();
+  const unixNow = useSolanaUnixNow();
+  const { result: client } = useAsync(
+    (provider) => HeliumVsrClient.connect(provider),
+    [provider]
+  );
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,
+      onInstructions,
     }: {
-      position: PositionWithMeta
+      position: PositionWithMeta;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
     }) => {
-      const lockup = position.lockup
-      const lockupKind = Object.keys(lockup.kind)[0]
+      const lockup = position.lockup;
+      const lockupKind = Object.keys(lockup.kind)[0];
       const isInvalid =
         !provider ||
         !client ||
@@ -27,18 +34,20 @@ export const useClosePosition = () => {
         position.numActiveVotes > 0 ||
         // lockupExpired
         !(
-          lockupKind !== 'constant' &&
+          lockupKind !== "constant" &&
           lockup.endTs.sub(new BN(unixNow!)).lt(new BN(0))
-        )
+        );
 
-      if (loading) return
+      if (loading) return;
 
       if (isInvalid) {
-        throw new Error('Unable to Close Position, Invalid params')
+        throw new Error("Unable to Close Position, Invalid params");
       } else {
-        const instructions: TransactionInstruction[] = []
+        const instructions: TransactionInstruction[] = [];
 
-        const registrar = await client.program.account.registrar.fetch(position.registrar)
+        const registrar = await client.program.account.registrar.fetch(
+          position.registrar
+        );
         instructions.push(
           await client.program.methods
             .withdrawV0({
@@ -46,10 +55,11 @@ export const useClosePosition = () => {
             })
             .accounts({
               position: position.pubkey,
-              depositMint: registrar.votingMints[position.votingMintConfigIdx].mint,
+              depositMint:
+                registrar.votingMints[position.votingMintConfigIdx].mint,
             })
             .instruction()
-        )
+        );
 
         instructions.push(
           await client.program.methods
@@ -58,16 +68,20 @@ export const useClosePosition = () => {
               position: position.pubkey,
             })
             .instruction()
-        )
+        );
 
-        await sendInstructions(provider, instructions)
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await sendInstructions(provider, instructions);
+        }
       }
     }
-  )
+  );
 
   return {
     error,
     loading,
     closePosition: execute,
-  }
-}
+  };
+};

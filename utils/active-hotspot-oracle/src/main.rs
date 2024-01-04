@@ -10,7 +10,7 @@ use deltalake::{datafusion::prelude::SessionContext, DeltaTableBuilder};
 use helium_entity_manager::KeyToAssetV0;
 use helium_entity_manager::{accounts::SetEntityActiveV0, SetEntityActiveArgsV0};
 use helium_entity_manager::{
-  accounts::TempPayMobileOnboardingFeeV0, IotHotspotInfoV0, MobileHotspotInfoV0, MobileDeviceTypeV0
+  accounts::TempPayMobileOnboardingFeeV0, IotHotspotInfoV0, MobileDeviceTypeV0, MobileHotspotInfoV0,
 };
 use hpl_utils::dao::Dao;
 use hpl_utils::token::Token;
@@ -22,6 +22,7 @@ use solana_connection_cache::connection_cache::{
   ConnectionManager, ConnectionPool, NewConnectionConfig,
 };
 use solana_sdk::commitment_config::CommitmentConfig;
+use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::signature::Keypair;
 use solana_sdk::signer::Signer;
 use solana_sdk::transaction::Transaction;
@@ -175,7 +176,9 @@ async fn main() -> Result<()> {
       .collect::<HashMap<Pubkey, KeyToAssetV0>>();
     last_active_pub_keys = match args.sub_dao {
       SubDao::Iot => {
-        let infos = helium_entity_program.accounts::<IotHotspotInfoV0>(vec![]).await?;
+        let infos = helium_entity_program
+          .accounts::<IotHotspotInfoV0>(vec![])
+          .await?;
         infos
           .iter()
           .filter(|i| i.1.is_active)
@@ -183,7 +186,9 @@ async fn main() -> Result<()> {
           .collect::<HashSet<_>>()
       }
       SubDao::Mobile => {
-        let infos = helium_entity_program.accounts::<MobileHotspotInfoV0>(vec![]).await?;
+        let infos = helium_entity_program
+          .accounts::<MobileHotspotInfoV0>(vec![])
+          .await?;
         infos
           .iter()
           .filter(|i| i.1.is_active)
@@ -366,8 +371,19 @@ fn construct_and_send_txs<
   // send transactions in batches so blockhash doesn't expire
   let transaction_batch_size = 100;
   println!("Ixs to execute: {}", ixs.len());
-
-  let mut instructions = Vec::new();
+  let priority_fee_lamports: u32 = env::var("PRIORITY_FEE_LAMPORTS")
+    .context("Failed to get env var PRIORITY_FEE_LAMPORTS")
+    .and_then(|v| {
+      v.parse::<u32>()
+        .map_err(|e| anyhow!("Failed to parse PRIORITY_FEE_LAMPORTS: {}", e))
+    })
+    .unwrap_or(1);
+  let mut instructions = vec![
+    ComputeBudgetInstruction::set_compute_unit_limit(600000),
+    ComputeBudgetInstruction::set_compute_unit_price(
+      (f64::from(priority_fee_lamports) / (600000_f64 * 0.000001_f64)).ceil() as u64,
+    ),
+  ];
   let mut txs = Vec::new();
   let mut blockhash = helium_entity_program.rpc().get_latest_blockhash()?;
   // Pack as many ixs as possible into a tx, then send batches of 100

@@ -1,5 +1,4 @@
 import { Program } from "@coral-xyz/anchor";
-import { useAnchorProvider } from "@helium/helium-react-hooks";
 import {
   PROGRAM_ID,
   delegatedPositionKey,
@@ -8,17 +7,23 @@ import {
 import { sendInstructions } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
+import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 
 export const useUndelegatePosition = () => {
-  const provider = useAnchorProvider();
+  const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,
       programId = PROGRAM_ID,
+      onInstructions,
     }: {
       position: PositionWithMeta;
       programId?: PublicKey;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
     }) => {
       const isInvalid = !provider || !position.isDelegated;
 
@@ -45,7 +50,11 @@ export const useUndelegatePosition = () => {
             .instruction()
         );
 
-        await sendInstructions(provider, instructions);
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await sendInstructions(provider, instructions);
+        }
       }
     }
   );

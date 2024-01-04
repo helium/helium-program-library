@@ -1,10 +1,11 @@
 use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::{prelude::*, solana_program::hash::hash};
+use std::str::FromStr;
 
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{Mint, Token},
+  token::{burn, Burn, Mint, Token, TokenAccount},
 };
 use data_credits::{
   cpi::{
@@ -22,6 +23,7 @@ use helium_sub_daos::{
 
 use account_compression_cpi::program::SplAccountCompression;
 use bubblegum_cpi::get_asset_id;
+use price_oracle::{calculate_current_price, PriceOracleV0};
 use shared_utils::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -61,6 +63,12 @@ pub struct OnboardMobileHotspotV0<'info> {
   /// CHECK: Only loaded if location is being asserted
   #[account(mut)]
   pub dc_burner: UncheckedAccount<'info>,
+  #[account(
+    mut,
+    associated_token::authority = payer,
+    associated_token::mint = dnt_mint
+  )]
+  pub dnt_burner: Account<'info, TokenAccount>,
 
   #[account(
     has_one = sub_dao,
@@ -92,10 +100,17 @@ pub struct OnboardMobileHotspotV0<'info> {
   #[account(
     mut,
     has_one = dao,
+    has_one = dnt_mint,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,
+  #[account(mut)]
+  pub dnt_mint: Box<Account<'info, Mint>>,
+  #[account(
+    address = Pubkey::from_str("moraMdsjyPFz8Lp1RJGoW4bQriSF5mHE7Evxt7hytSF").unwrap()
+  )]
+  pub dnt_price: Box<Account<'info, PriceOracleV0>>,
 
   #[account(
     seeds=[
@@ -131,6 +146,16 @@ impl<'info> OnboardMobileHotspotV0<'info> {
     };
 
     CpiContext::new(self.data_credits_program.to_account_info(), cpi_accounts)
+  }
+
+  pub fn mobile_burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Burn<'info>> {
+    let cpi_accounts = Burn {
+      mint: self.dnt_mint.to_account_info(),
+      from: self.dnt_burner.to_account_info(),
+      authority: self.payer.to_account_info(),
+    };
+
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
   }
 }
 
@@ -213,6 +238,20 @@ pub fn handler<'info>(
     ctx.accounts.burn_ctx(),
     BurnWithoutTrackingArgsV0 { amount: dc_fee },
   )?;
+
+  // Burn the mobile tokens
+  let dnt_fee = fees.mobile_onboarding_fee_usd;
+  let mobile_price = calculate_current_price(
+    &ctx.accounts.dnt_price.oracles,
+    Clock::get()?.unix_timestamp,
+  )
+  .ok_or_else(|| error!(ErrorCode::NoOraclePrice))?;
+  let mobile_fee = dnt_fee
+    .checked_mul(1000000)
+    .unwrap()
+    .checked_div(mobile_price)
+    .unwrap();
+  burn(ctx.accounts.mobile_burn_ctx(), mobile_fee)?;
 
   Ok(())
 }
