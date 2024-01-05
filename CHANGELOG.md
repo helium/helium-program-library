@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.13](https://github.com/helium/helium-program-library/compare/v0.6.12...v0.6.13) (2024-01-05)
+
+
+### Features
+
+* Avoid purging prices when purging oracles ([#533](https://github.com/helium/helium-program-library/issues/533)) ([622ec12](https://github.com/helium/helium-program-library/commit/622ec12e18cde8b201018bb723c0d0df09cb4a33))
+
+
+
+
+
 ## [0.6.12](https://github.com/helium/helium-program-library/compare/v0.6.11...v0.6.12) (2024-01-02)
 
 **Note:** Version bump only for package helium-program-library
