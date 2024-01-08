@@ -135,7 +135,7 @@ export async function getMigrateTransactions(
       .freezeAuthority;
     const freezeAuthOwner =
       freezeAuth &&
-      (await provider.connection.getAccountInfo(freezeAuth))!.owner;
+      (await provider.connection.getAccountInfo(freezeAuth))?.owner;
     if (freezeAuthOwner && freezeAuthOwner.equals(vsrProgram.programId)) {
       positions.push(mint);
     } else {
