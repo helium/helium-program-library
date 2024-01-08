@@ -16,9 +16,14 @@ export const useUndelegatePosition = () => {
     async ({
       position,
       programId = PROGRAM_ID,
+      onInstructions,
     }: {
       position: PositionWithMeta;
       programId?: PublicKey;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
     }) => {
       const isInvalid = !provider || !position.isDelegated;
 
@@ -45,7 +50,11 @@ export const useUndelegatePosition = () => {
             .instruction()
         );
 
-        await sendInstructions(provider, instructions);
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await sendInstructions(provider, instructions);
+        }
       }
     }
   );

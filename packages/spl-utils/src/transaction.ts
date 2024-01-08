@@ -1,8 +1,10 @@
 import { AnchorProvider, Program, Provider } from "@coral-xyz/anchor";
 import {
   Commitment,
+  ComputeBudgetProgram,
   Connection,
   Finality,
+  Keypair,
   PublicKey,
   RpcResponseAndContext,
   SendOptions,
@@ -17,6 +19,7 @@ import {
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
+import { estimatePrioritizationFee } from "./priorityFees";
 
 export const chunks = <T>(array: T[], size: number): T[][] =>
   Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
@@ -48,6 +51,42 @@ export interface BigInstructionResult<A> {
   instructions: TransactionInstruction[][];
   signers: Signer[][];
   output: A;
+}
+
+export async function sendInstructionsWithPriorityFee(
+  provider: AnchorProvider,
+  instructions: TransactionInstruction[],
+  {
+    signers = [],
+    payer = provider.wallet.publicKey,
+    commitment = "confirmed",
+    idlErrors = new Map(),
+    computeUnitLimit = 200000,
+  }: {
+    signers?: Signer[];
+    payer?: PublicKey;
+    commitment?: Commitment;
+    idlErrors?: Map<number, string>;
+    computeUnitLimit?: number;
+  } = {}
+): Promise<string> {
+  return await sendInstructions(
+    provider,
+    [
+      ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnitLimit }),
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: await estimatePrioritizationFee(
+          provider.connection,
+          instructions
+        ),
+      }),
+      ...instructions,
+    ],
+    signers,
+    payer,
+    commitment,
+    idlErrors
+  );
 }
 
 export async function sendInstructions(
@@ -478,7 +517,8 @@ export async function bulkSendTransactions(
   provider: Provider,
   txs: Transaction[],
   onProgress?: (status: Status) => void,
-  triesRemaining: number = 10 // Number of blockhashes to try resending txs with before giving up
+  triesRemaining: number = 10, // Number of blockhashes to try resending txs with before giving up
+  extraSigners: Keypair[] = []
 ): Promise<string[]> {
   let ret: string[] = [];
 
@@ -496,9 +536,20 @@ export async function bulkSendTransactions(
           return tx;
         })
       );
-      const signedTxs = await (
-        provider as AnchorProvider
-      ).wallet.signAllTransactions(blockhashedTxs);
+      const signedTxs = (
+        await (provider as AnchorProvider).wallet.signAllTransactions(
+          blockhashedTxs
+        )
+      ).map((tx) => {
+        extraSigners.forEach((signer: Keypair) => {
+          if (
+            tx.signatures.some((sig) => sig.publicKey.equals(signer.publicKey))
+          ) {
+            tx.partialSign(signer);
+          }
+        }, tx);
+        return tx;
+      });
 
       const txsWithSigs = signedTxs.map((tx, index) => {
         return {
@@ -651,7 +702,8 @@ export async function batchParallelInstructions(
   provider: AnchorProvider,
   instructions: TransactionInstruction[],
   onProgress?: (status: Status) => void,
-  triesRemaining: number = 10 // Number of blockhashes to try resending txs with before giving up
+  triesRemaining: number = 10, // Number of blockhashes to try resending txs with before giving up
+  extraSigners: Keypair[] = []
 ): Promise<void> {
   let currentTxInstructions: TransactionInstruction[] = [];
   const blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
@@ -704,6 +756,127 @@ export async function batchParallelInstructions(
     provider,
     transactions,
     onProgress,
-    triesRemaining
+    triesRemaining,
+    extraSigners
+  );
+}
+
+export async function batchInstructionsToTxsWithPriorityFee(
+  provider: AnchorProvider,
+  instructions: TransactionInstruction[],
+  {
+    computeUnitLimit = 1000000,
+    basePriorityFee,
+  }: {
+    computeUnitLimit?: number;
+    basePriorityFee?: number;
+  } = {}
+): Promise<Transaction[]> {
+  let currentTxInstructions: TransactionInstruction[] = [];
+  const blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
+  const transactions: Transaction[] = [];
+
+  for (const instruction of instructions) {
+    currentTxInstructions.push(instruction);
+    const tx = new Transaction({
+      feePayer: provider.wallet.publicKey,
+      recentBlockhash: blockhash,
+    });
+    tx.add(...currentTxInstructions);
+    try {
+      if (
+        tx.serialize({
+          requireAllSignatures: false,
+          verifySignatures: false,
+        }).length >=
+        1232 - (64 + 32) * tx.signatures.length - 60 // 60 to leave room for compute budget stuff
+      ) {
+        // yes it's ugly to throw and catch, but .serialize can _also_ throw this error
+        throw new Error("Transaction too large");
+      }
+    } catch (e: any) {
+      if (e.toString().includes("Transaction too large")) {
+        currentTxInstructions.pop();
+        const tx = new Transaction({
+          feePayer: provider.wallet.publicKey,
+          recentBlockhash: blockhash,
+        });
+        tx.add(
+          ComputeBudgetProgram.setComputeUnitLimit({
+            units: computeUnitLimit,
+          }),
+          ComputeBudgetProgram.setComputeUnitPrice({
+            microLamports: await estimatePrioritizationFee(
+              provider.connection,
+              currentTxInstructions,
+              basePriorityFee
+            ),
+          }),
+          ...currentTxInstructions
+        );
+        transactions.push(tx);
+        currentTxInstructions = [instruction];
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  if (currentTxInstructions.length > 0) {
+    const tx = new Transaction({
+      feePayer: provider.wallet.publicKey,
+      recentBlockhash: blockhash,
+    });
+    tx.add(
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: computeUnitLimit,
+      }),
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: await estimatePrioritizationFee(
+          provider.connection,
+          currentTxInstructions,
+          basePriorityFee
+        ),
+      }),
+      ...currentTxInstructions
+    );
+    transactions.push(tx);
+  }
+
+  return transactions;
+}
+
+export async function batchParallelInstructionsWithPriorityFee(
+  provider: AnchorProvider,
+  instructions: TransactionInstruction[],
+  {
+    onProgress,
+    triesRemaining = 10,
+    computeUnitLimit = 1000000,
+    basePriorityFee,
+    extraSigners,
+  }: {
+    onProgress?: (status: Status) => void;
+    triesRemaining?: number; // Number of blockhashes to try resending txs with before giving up
+    computeUnitLimit?: number;
+    basePriorityFee?: number;
+    extraSigners?: Keypair[];
+  } = {}
+): Promise<void> {
+  const transactions = await batchInstructionsToTxsWithPriorityFee(
+    provider,
+    instructions,
+    {
+      computeUnitLimit,
+      basePriorityFee,
+    }
+  );
+
+  await bulkSendTransactions(
+    provider,
+    transactions,
+    onProgress,
+    triesRemaining,
+    extraSigners
   );
 }

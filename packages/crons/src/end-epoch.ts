@@ -28,6 +28,7 @@ import {
   createMintInstructions,
   sendAndConfirmWithRetry,
   sendInstructions,
+  sendInstructionsWithPriorityFee,
 } from "@helium/spl-utils";
 import { getAccount } from "@solana/spl-token";
 import { ComputeBudgetProgram as CBP, Keypair } from "@solana/web3.js";
@@ -91,13 +92,14 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
 
           if (!subDaoEpochInfo?.utilityScore) {
             try {
-              await sendInstructions(provider, [
-                CBP.setComputeUnitLimit({ units: 1000000 }),
+              await sendInstructionsWithPriorityFee(provider, [
                 await heliumSubDaosProgram.methods
                   .calculateUtilityScoreV0({ epoch })
                   .accounts({ subDao: subDao.publicKey })
                   .instruction(),
-              ]);
+              ], {
+                computeUnitLimit: 1000000
+              });
             } catch (err: any) {
               const strErr = JSON.stringify(err);
 
@@ -131,7 +133,7 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
 
           if (!subDaoEpochInfo?.rewardsIssuedAt) {
             try {
-              await sendInstructions(provider, [
+              await sendInstructionsWithPriorityFee(provider, [
                 await heliumSubDaosProgram.methods
                   .issueRewardsV0({ epoch })
                   .accounts({ subDao: subDao.publicKey })
@@ -148,7 +150,7 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
 
       if (!daoEpochInfo?.doneIssuingHstPool) {
         try {
-          await sendInstructions(provider, [
+          await sendInstructionsWithPriorityFee(provider, [
             await heliumSubDaosProgram.methods
               .issueHstPoolV0({ epoch })
               .accounts({ dao })
@@ -182,7 +184,7 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
             ).owner;
 
             try {
-              await sendInstructions(provider, [
+              await sendInstructionsWithPriorityFee(provider, [
                 await hydraProgram.methods
                   .distributeV0()
                   .accounts({

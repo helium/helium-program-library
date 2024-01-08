@@ -1,5 +1,6 @@
 import {
   AssetProof,
+  batchInstructionsToTxsWithPriorityFee,
   chunks,
   getAssetProof,
   getAssetsByOwner,
@@ -68,6 +69,10 @@ export async function getMigrateTransactions(
           0,
           proofPath.length - (canopyHeight || 0)
         );
+        if (anchorRemainingAccounts.length > 10) {
+          console.log(`Asset ${asset.id} skipped due to having insufficient canopy`)
+          continue
+        }
 
         const ixn = createTransferInstruction(
           {
@@ -130,7 +135,7 @@ export async function getMigrateTransactions(
       .freezeAuthority;
     const freezeAuthOwner =
       freezeAuth &&
-      (await provider.connection.getAccountInfo(freezeAuth))!.owner;
+      (await provider.connection.getAccountInfo(freezeAuth))?.owner;
     if (freezeAuthOwner && freezeAuthOwner.equals(vsrProgram.programId)) {
       positions.push(mint);
     } else {
@@ -199,64 +204,32 @@ export async function getMigrateTransactions(
 
   const lamports = await provider.connection.getBalance(from);
 
-  const recentBlockhash = (await provider.connection.getLatestBlockhash())
-    .blockhash;
-  const transactions: Transaction[] = [];
-  for (const chunk of chunks(transferAssetIxns, 2)) {
-    const tx = new Transaction({
-      feePayer: provider.wallet.publicKey,
-      recentBlockhash,
-    });
-    tx.add(...chunk);
-    transactions.push(await provider.wallet.signTransaction(tx));
-  }
-
-  for (const chunk of chunks(transferPositionIxns, 4)) {
-    const tx = new Transaction({
-      feePayer: provider.wallet.publicKey,
-      recentBlockhash,
-    });
-    tx.add(...chunk);
-    transactions.push(await provider.wallet.signTransaction(tx));
-  }
-
-  for (const chunk of chunks(transferPositionIxns, 2)) {
-    const tx = new Transaction({
-      feePayer: provider.wallet.publicKey,
-      recentBlockhash,
-    });
-    tx.add(...chunk);
-    transactions.push(await provider.wallet.signTransaction(tx));
-  }
-
-  transferTokenInstructions.push(
+  const transactions = await batchInstructionsToTxsWithPriorityFee(provider, [
+    ...transferAssetIxns,
+    ...transferPositionIxns,
+    ...transferTokenInstructions,
     SystemProgram.transfer({
       fromPubkey: from,
       toPubkey: to,
       lamports,
+    }),
+  ]);
+
+  return await Promise.all(
+    transactions.map((tx) => {
+      // Do not remove this line. Fun fact, tx.signatures will be empty unless you do this once.
+      tx.serialize({ requireAllSignatures: false });
+      if (
+        tx.signatures.some((sig) =>
+          sig.publicKey.equals(provider.wallet.publicKey)
+        )
+      ) {
+        return provider.wallet.signTransaction(tx);
+      }
+
+      return tx
     })
   );
-
-  for (const chunk of chunks(transferTokenInstructions, 3)) {
-    const tx = new Transaction({
-      feePayer: provider.wallet.publicKey,
-      recentBlockhash,
-    });
-    tx.add(...chunk);
-    // Do not remove this line. Fun fact, tx.signatures will be empty unless you do this once.
-    tx.serialize({ requireAllSignatures: false });
-    if (
-      tx.signatures.some((sig) =>
-        sig.publicKey.equals(provider.wallet.publicKey)
-      )
-    ) {
-      transactions.push(await provider.wallet.signTransaction(tx));
-    } else {
-      transactions.push(tx);
-    }
-  }
-
-  return transactions;
 }
 
 const mapProof = (assetProof: AssetProof): AccountMeta[] => {

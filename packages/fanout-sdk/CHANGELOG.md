@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.13](https://github.com/helium/helium-program-libary/compare/v0.6.12...v0.6.13) (2024-01-05)
+
+**Note:** Version bump only for package @helium/fanout-sdk
+
+
+
+
+
+## [0.6.12](https://github.com/helium/helium-program-libary/compare/v0.6.11...v0.6.12) (2024-01-02)
+
+**Note:** Version bump only for package @helium/fanout-sdk
+
+
+
+
+
+## [0.6.11](https://github.com/helium/helium-program-libary/compare/v0.6.8...v0.6.11) (2023-12-27)
+
+**Note:** Version bump only for package @helium/fanout-sdk
+
+
+
+
+
 ## [0.6.10](https://github.com/helium/helium-program-libary/compare/v0.6.5...v0.6.10) (2023-12-22)
 
 **Note:** Version bump only for package @helium/fanout-sdk

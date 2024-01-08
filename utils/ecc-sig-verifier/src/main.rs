@@ -68,13 +68,20 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
     return Err(Status::BadRequest);
   }
 
-  // First ix is always a compute budget ix
-  let compute_ixn = &solana_txn.message.instructions[0];
-  let compute_program_id = account_keys[compute_ixn.program_id_index as usize];
-  if compute_program_id != Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap()
-  {
-    error!("First instruction is not compute budget");
-    return Err(Status::BadRequest);
+  // Up to the first 2 instructions are compute budget
+  let mut compute_end_ix = 0;
+  for i in 0..2 {
+    compute_end_ix = i;
+    if i >= solana_txn.message.instructions.len() {
+      break;
+    }
+    let compute_ixn = &solana_txn.message.instructions[i];
+    let compute_program_id = account_keys[compute_ixn.program_id_index as usize];
+    if compute_program_id
+      != Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap()
+    {
+      break;
+    }
   }
 
   let keypair = read_keypair_file(env::var("ANCHOR_WALLET").unwrap_or("keypair.json".to_string()))
@@ -83,13 +90,14 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
       Status::InternalServerError
     })?;
 
-  // Third ix (may) be a transfer
-  if solana_txn.message.instructions.len() > 2 {
-    let transfer_ixn = &solana_txn.message.instructions[2];
+  let start_index = compute_end_ix + 1;
+  // Second real ix (may) be a transfer
+  if solana_txn.message.instructions.len() - (compute_end_ix + 1) > 1 {
+    let transfer_ixn = &solana_txn.message.instructions[start_index + 1];
     let transfer_program_id = account_keys[transfer_ixn.program_id_index as usize];
     let transfer_from_acct = account_keys[transfer_ixn.accounts[0] as usize];
     if transfer_program_id != Pubkey::from_str("11111111111111111111111111111111").unwrap() {
-      error!("Third instruction is not System transfer");
+      error!("Second instruction is not System transfer");
       return Err(Status::BadRequest);
     }
     if transfer_from_acct == keypair.pubkey() {
@@ -99,7 +107,7 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
   }
 
   // Verify it's entity manager instruction
-  let ixn = &solana_txn.message.instructions[1];
+  let ixn = &solana_txn.message.instructions[start_index];
   let program_id = account_keys[ixn.program_id_index as usize];
   if program_id != Pubkey::from_str("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8").unwrap() {
     error!("Pubkey mismatch");

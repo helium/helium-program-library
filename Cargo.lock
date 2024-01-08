@@ -1958,7 +1958,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3027,7 +3027,7 @@ checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 
 [[package]]
 name = "price-oracle"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anchor-lang",
  "default-env",
@@ -5753,7 +5753,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

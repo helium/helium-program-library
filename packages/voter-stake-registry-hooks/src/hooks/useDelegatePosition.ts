@@ -13,10 +13,15 @@ export const useDelegatePosition = () => {
       position,
       subDao,
       programId = PROGRAM_ID,
+      onInstructions,
     }: {
       position: PositionWithMeta;
       subDao: SubDaoWithMeta;
       programId?: PublicKey;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
     }) => {
       const isInvalid = !provider || !provider.wallet || position.isDelegated;
 
@@ -40,7 +45,11 @@ export const useDelegatePosition = () => {
             .instruction()
         );
 
-        await sendInstructions(provider, instructions);
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await sendInstructions(provider, instructions);
+        }
       }
     }
   );

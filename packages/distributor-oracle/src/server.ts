@@ -1,5 +1,4 @@
 import dotenv from "dotenv";
-import fastifyCron from "fastify-cron";
 dotenv.config();
 // @ts-ignore
 import {
@@ -43,6 +42,7 @@ import {
   PublicKey,
   Transaction,
   TransactionInstruction,
+  ComputeBudgetProgram,
 } from "@solana/web3.js";
 import { Op } from "sequelize";
 import fs from "fs";
@@ -195,22 +195,19 @@ export class OracleServer {
     server.get("/health", async () => {
       return { ok: true };
     });
-    server.register(fastifyCron, {
-      jobs: [
-        {
-          cronTime: "0 * * * *",
-          runOnInit: true,
-          onTick: async () => {
-            console.log("Updating total rewards");
-            const rewards = toNumber(new BN(await db.getTotalRewards()), 6);
-            totalRewardsGauge
-              .labels(DNT.toBase58())
-              .set(Number(rewards));
-          },
-        },
-      ],
-    });
+    let lastCall = 0;
+    async function getTotalRewards() {
+      const currTs = new Date().valueOf();
+      // Only update once every 10m
+      if (currTs - lastCall > 10 * 60 * 1000) {
+        console.log("Updating total rewards");
+        const rewards = toNumber(new BN(await db.getTotalRewards()), 6);
+        totalRewardsGauge.labels(DNT.toBase58()).set(Number(rewards));
+        lastCall = currTs;
+      }
+    }
     server.get("/metrics", async (request, reply) => {
+      await getTotalRewards();
       return register.metrics();
     });
 
@@ -362,6 +359,9 @@ export class OracleServer {
       )!;
 
     for (const ix of tx.instructions) {
+      if (ix.programId.equals(ComputeBudgetProgram.programId)) {
+        continue;
+      }
       if (!(ix.programId.equals(LD_PID) || ix.programId.equals(RO_PID))) {
         return {
           success: false,

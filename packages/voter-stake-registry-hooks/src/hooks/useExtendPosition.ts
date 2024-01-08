@@ -14,10 +14,15 @@ export const useExtendPosition = () => {
       position,
       lockupPeriodsInDays,
       programId = PROGRAM_ID,
+      onInstructions,
     }: {
       position: PositionWithMeta;
       lockupPeriodsInDays: number;
       programId?: PublicKey;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
     }) => {
       const isInvalid = !provider;
 
@@ -62,7 +67,11 @@ export const useExtendPosition = () => {
           );
         }
 
-        await sendInstructions(provider, instructions);
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await sendInstructions(provider, instructions);
+        }
       }
     }
   );

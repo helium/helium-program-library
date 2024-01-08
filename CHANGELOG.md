@@ -3,6 +3,36 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.13](https://github.com/helium/helium-program-library/compare/v0.6.12...v0.6.13) (2024-01-05)
+
+
+### Features
+
+* Avoid purging prices when purging oracles ([#533](https://github.com/helium/helium-program-library/issues/533)) ([622ec12](https://github.com/helium/helium-program-library/commit/622ec12e18cde8b201018bb723c0d0df09cb4a33))
+
+
+
+
+
+## [0.6.12](https://github.com/helium/helium-program-library/compare/v0.6.11...v0.6.12) (2024-01-02)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.11](https://github.com/helium/helium-program-library/compare/v0.6.8...v0.6.11) (2023-12-27)
+
+
+### Features
+
+* **#525:** Add prom metrics for price oracles, fix distributor oracle total rewards metric ([#528](https://github.com/helium/helium-program-library/issues/528)) ([13a5cb8](https://github.com/helium/helium-program-library/commit/13a5cb8d8936d1b5929379dafafd2907322dd473))
+
+
+
+
+
 ## [0.6.10](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.10) (2023-12-22)
 
 
