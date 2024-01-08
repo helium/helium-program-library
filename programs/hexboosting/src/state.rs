@@ -6,6 +6,10 @@ pub struct BoostConfigV0 {
   pub price_oracle: Pubkey,
   pub payment_mint: Pubkey,
   pub authority: Pubkey,
+  /// Authority to reclaim rent from hexes no longer boosted
+  pub rent_reclaim_authority: Pubkey,
+  /// Authority to start boosted hexes
+  pub start_authority: Pubkey,
   /// The price in the oracle (usd) to burn boost
   /// For simplicity, this should have the same number of decimals as the price oracle
   pub boost_price: u64,
@@ -28,4 +32,22 @@ pub struct BoostedHexV0 {
   pub bump_seed: u8,
   /// Each entry represents the boost multiplier for a given period
   pub boosts_by_period: Vec<u8>,
+}
+
+impl BoostedHexV0 {
+  pub fn is_expired(&self, boost_config: &BoostConfigV0) -> bool {
+    if self.start_ts == 0 {
+      true
+    } else {
+      let now = Clock::get().unwrap().unix_timestamp;
+      let elapsed_time = now - self.start_ts;
+      let elapsed_periods = elapsed_time
+        .checked_div(boost_config.period_length as i64)
+        .unwrap();
+
+      // This is true so long as there are never any 0's appended to the end
+      // of boosts_by_period
+      self.boosts_by_period.len() as i64 == elapsed_periods
+    }
+  }
 }

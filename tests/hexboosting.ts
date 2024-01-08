@@ -1,7 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Hexboosting } from "@helium/idls/lib/types/hexboosting";
-import { PROGRAM_ID, init } from "../packages/hexboosting-sdk";
+import {
+  PROGRAM_ID,
+  boostConfigKey,
+  boostedHexKey,
+  init,
+} from "../packages/hexboosting-sdk";
 import { toBN } from "@helium/spl-utils";
 import { getAssociatedTokenAddressSync, getAccount } from "@solana/spl-token";
 import {
@@ -37,6 +42,7 @@ describe("hexboosting", () => {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
   let mint: PublicKey;
+  let periodLength = 60 * 60 * 24 * 30; // roughly one month
 
   let hemProgram: Program<HeliumEntityManager>;
   let hsdProgram: Program<HeliumSubDaos>;
@@ -107,7 +113,7 @@ describe("hexboosting", () => {
     } = await program.methods
       .initializeBoostConfigV0({
         boostPrice: toBN(0.005, 6),
-        periodLength: 60 * 60 * 24 * 30, // roughly one month,
+        periodLength,
         minimumPeriods: 6,
       })
       .accounts({
@@ -158,6 +164,8 @@ describe("hexboosting", () => {
         .accounts({
           paymentMint: mint,
           priceOracle,
+          rentReclaimAuthority: me,
+          startAuthority: me,
         })
         .rpcAndKeys({ skipPreflight: true });
 
@@ -184,6 +192,7 @@ describe("hexboosting", () => {
       } = await program.methods
         .boostV0({
           location: new BN(1),
+          startTs: new BN(0),
           amounts: [
             {
               period: 0,
@@ -237,6 +246,7 @@ describe("hexboosting", () => {
         await program.methods
           .boostV0({
             location: new BN(1),
+            startTs: new BN(0),
             amounts: [
               {
                 period: 0,
@@ -282,6 +292,7 @@ describe("hexboosting", () => {
         } = await program.methods
           .boostV0({
             location: new BN(1),
+            startTs: new BN(0),
             amounts: [
               {
                 period: 2,
@@ -319,6 +330,55 @@ describe("hexboosting", () => {
           ...new Array(44).fill(0),
           2,
         ]);
+      });
+
+      it("allows starting a boost", async () => {
+        const boostedHex = boostedHexKey(boostConfigKey(mint)[0], new BN(1))[0];
+        await program.methods
+          .startBoostV0()
+          .accounts({
+            boostedHex,
+          })
+          .rpc({ skipPreflight: true });
+        const acc = await program.account.boostedHexV0.fetch(boostedHex!);
+        expect(acc.startTs.toNumber()).to.not.eq(0);
+      });
+
+      describe("with started boost", () => {
+        // Make periods one second so we can retire this
+        periodLength = 1;
+        beforeEach(async () => {
+          const boostedHex = boostedHexKey(
+            boostConfigKey(mint)[0],
+            new BN(1)
+          )[0];
+          await program.methods
+            .startBoostV0()
+            .accounts({
+              boostedHex,
+            })
+            .rpc({ skipPreflight: true });
+        });
+
+        it("allows closing the boost when it's done", async () => {
+          const boostedHex = boostedHexKey(
+            boostConfigKey(mint)[0],
+            new BN(1)
+          )[0];
+          // Wait 7 seconds so it is fully expired
+          await new Promise((resolve) => {
+            setTimeout(resolve, 6000);
+          });
+
+          await program.methods
+            .closeBoostV0()
+            .accounts({
+              boostedHex,
+            })
+            .rpc({ skipPreflight: true });
+
+          expect(await provider.connection.getAccountInfo(boostedHex)).to.be.null;
+        });
       });
     });
   });

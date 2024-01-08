@@ -1,49 +1,26 @@
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
-import { sha256 } from "js-sha256";
+import BN from "bn.js";
 
-export function dataCreditsKey(dcMint: PublicKey, programId = PROGRAM_ID): [PublicKey, number] {
+export function boostedHexKey(
+  boostConfig: PublicKey,
+  location: BN,
+  programId: PublicKey = PROGRAM_ID
+) {
+  const locBuffer = Buffer.alloc(8);
+  locBuffer.writeBigUint64LE(BigInt(location.toString()));
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("dc", "utf-8"), dcMint.toBuffer()],
+    [Buffer.from("boosted_hex", "utf-8"), boostConfig.toBuffer(), locBuffer],
     programId
   );
 }
 
-export function accountPayerKey(
+export function boostConfigKey(
+  paymentMint: PublicKey,
   programId: PublicKey = PROGRAM_ID
-): [PublicKey, number] {
+) {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("account_payer", "utf-8")],
+    [Buffer.from("boost_config", "utf-8"), paymentMint.toBuffer()],
     programId
-  )
+  );
 }
-
-export function delegatedDataCreditsKey(
-  subDao: PublicKey,
-  routerKey: string,
-  programId: PublicKey = PROGRAM_ID
-) {
-  const hash = sha256(routerKey);
-
-  return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("delegated_data_credits", "utf-8"),
-      subDao.toBuffer(),
-      Buffer.from(hash, "hex"),
-    ],
-    programId
-  );
-};
-
-export function escrowAccountKey(
-  delegatedDataCredits: PublicKey,
-  programId: PublicKey = PROGRAM_ID
-) {
-  return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("escrow_dc_account", "utf-8"),
-      delegatedDataCredits.toBuffer(),
-    ],
-    programId
-  );
-};

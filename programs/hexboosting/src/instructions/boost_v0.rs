@@ -12,6 +12,10 @@ use crate::{BoostConfigV0, BoostedHexV0};
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct BoostArgsV0 {
   pub location: u64,
+  // Ensure that the start_ts they created this periods from is the
+  // same as what's on chain. Otherwise a shift lift could make these offsets
+  // invalid
+  pub start_ts: i64,
   pub amounts: Vec<BoostAmountV0>,
 }
 
@@ -64,10 +68,38 @@ pub struct BoostV0<'info> {
 }
 
 pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
+  // Ensure that the start_ts they created this periods from is the
+  // same as what's on chain. Otherwise a shift lift could make these offsets
+  // invalid
+  require_eq!(args.start_ts, ctx.accounts.boosted_hex.start_ts);
+
   let mut is_initialized = ctx.accounts.boosted_hex.location != 0;
   ctx.accounts.boosted_hex.boost_config = ctx.accounts.boost_config.key();
   ctx.accounts.boosted_hex.location = args.location;
   ctx.accounts.boosted_hex.bump_seed = ctx.bumps["boosted_hex"];
+
+  // Insert the new periods
+  let max_period = args
+    .amounts
+    .iter()
+    .map(|amount| amount.period)
+    .max()
+    .unwrap_or(0) as usize;
+  if ctx.accounts.boosted_hex.boosts_by_period.len() <= max_period {
+    ctx
+      .accounts
+      .boosted_hex
+      .boosts_by_period
+      .resize(max_period + 1, 0);
+  }
+  for amount in args.amounts.clone() {
+    if ctx.accounts.boosted_hex.boosts_by_period[amount.period as usize] == u8::MAX {
+      return Err(error!(ErrorCode::MaxBoostExceeded));
+    }
+    // Amounts must be > 1 or you could append 0's infinitely to the end of the boosts_by_period
+    require_gt!(amount.amount, 0);
+    ctx.accounts.boosted_hex.boosts_by_period[amount.period as usize] += amount.amount;
+  }
 
   // Shift the periods left to discard past periods
   let now = Clock::get()?.unix_timestamp;
@@ -84,6 +116,8 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
         ctx.accounts.boosted_hex.boosts_by_period.clear();
         is_initialized = false;
       }
+      ctx.accounts.boosted_hex.start_ts +=
+        elapsed_periods * i64::try_from(ctx.accounts.boost_config.period_length).unwrap();
     }
   }
 
@@ -126,26 +160,6 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
     ),
     dnt_fee,
   )?;
-
-  let max_period = args
-    .amounts
-    .iter()
-    .map(|amount| amount.period)
-    .max()
-    .unwrap_or(0) as usize;
-  if ctx.accounts.boosted_hex.boosts_by_period.len() <= max_period {
-    ctx
-      .accounts
-      .boosted_hex
-      .boosts_by_period
-      .resize(max_period + 1, 0);
-  }
-  for amount in args.amounts {
-    if ctx.accounts.boosted_hex.boosts_by_period[amount.period as usize] == u8::MAX {
-      return Err(error!(ErrorCode::MaxBoostExceeded));
-    }
-    ctx.accounts.boosted_hex.boosts_by_period[amount.period as usize] += amount.amount;
-  }
 
   resize_to_fit(
     &ctx.accounts.payer,
