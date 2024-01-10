@@ -2007,6 +2007,7 @@ dependencies = [
  "bytemuck",
  "default-env",
  "helium-sub-daos",
+ "mobile-entity-manager",
  "price-oracle",
  "shared-utils",
  "solana-security-txt",

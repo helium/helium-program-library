@@ -4,6 +4,7 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{burn, Burn, Mint, Token, TokenAccount},
 };
+use mobile_entity_manager::CarrierV0;
 use price_oracle::{calculate_current_price, PriceOracleV0};
 use shared_utils::resize_to_fit;
 
@@ -45,6 +46,13 @@ pub struct BoostV0<'info> {
     bump = boost_config.bump_seed,
   )]
   pub boost_config: Box<Account<'info, BoostConfigV0>>,
+  #[account(
+    has_one = hexboost_authority,
+    constraint = carrier.sub_dao == boost_config.sub_dao,
+    constraint = carrier.approved,
+  )]
+  pub carrier: Box<Account<'info, CarrierV0>>,
+  pub hexboost_authority: Signer<'info>,
   pub price_oracle: Box<Account<'info, PriceOracleV0>>,
   #[account(mut)]
   pub payment_mint: Box<Account<'info, Mint>>,

@@ -66,4 +66,8 @@ pub mod mobile_entity_manager {
   ) -> Result<()> {
     update_carrier_tree_v0::handler(ctx, args)
   }
+
+  pub fn update_carrier_v0(ctx: Context<UpdateCarrierV0>, args: UpdateCarrierArgsV0) -> Result<()> {
+    update_carrier_v0::handler(ctx, args)
+  }
 }

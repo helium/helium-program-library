@@ -28,8 +28,6 @@ pub struct InitializeBoostConfigV0<'info> {
   pub authority: Signer<'info>,
   /// CHECK: Just for settings
   pub rent_reclaim_authority: AccountInfo<'info>,
-  /// CHECK: Just for settings
-  pub start_authority: AccountInfo<'info>,
   pub price_oracle: Box<Account<'info, PriceOracleV0>>,
   pub payment_mint: Box<Account<'info, Mint>>,
 
@@ -49,14 +47,13 @@ pub fn handler(
   args: InitializeBoostConfigArgsV0,
 ) -> Result<()> {
   ctx.accounts.boost_config.set_inner(BoostConfigV0 {
-    authority: ctx.accounts.authority.key(),
+    sub_dao: ctx.accounts.sub_dao.key(),
     price_oracle: ctx.accounts.price_oracle.key(),
     payment_mint: ctx.accounts.payment_mint.key(),
     boost_price: args.boost_price,
     period_length: args.period_length,
     minimum_periods: args.minimum_periods,
     rent_reclaim_authority: ctx.accounts.rent_reclaim_authority.key(),
-    start_authority: ctx.accounts.start_authority.key(),
     bump_seed: ctx.bumps["boost_config"],
   });
 

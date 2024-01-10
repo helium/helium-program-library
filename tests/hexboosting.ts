@@ -13,6 +13,8 @@ import {
   ensureDCIdl,
   ensureHEMIdl,
   ensureHSDIdl,
+  ensureMemIdl,
+  initTestDataCredits,
   initWorld,
 } from "./utils/fixtures";
 import { init as initDataCredits } from "@helium/data-credits-sdk";
@@ -30,11 +32,24 @@ import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { NoEmit } from "../target/types/no_emit";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
-import { PublicKey, Keypair } from "@solana/web3.js";
+import {
+  PublicKey,
+  Keypair,
+  ComputeBudgetProgram,
+  SystemProgram,
+} from "@solana/web3.js";
 import { expect } from "chai";
 import { init as initPo } from "@helium/price-oracle-sdk";
 import { PriceOracle } from "@helium/idls/lib/types/price_oracle";
 import { BN } from "bn.js";
+import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
+import { init as initMobileEntityManager } from "../packages/mobile-entity-manager-sdk/src";
+import {
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  getConcurrentMerkleTreeAccountSize,
+} from "@solana/spl-account-compression";
+import { random } from "./utils/string";
+import { initTestDao, initTestSubdao } from "./utils/daos";
 
 describe("hexboosting", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -48,9 +63,18 @@ describe("hexboosting", () => {
   let hsdProgram: Program<HeliumSubDaos>;
   let dcProgram: Program<DataCredits>;
   let poProgram: Program<PriceOracle>;
+  let memProgram: Program<MobileEntityManager>;
+  let carrier: PublicKey;
+  let merkle: Keypair;
+  let subDao: PublicKey;
 
   let program: Program<Hexboosting>;
   beforeEach(async () => {
+    program = await init(
+      provider,
+      anchor.workspace.Hexboosting.programId,
+      anchor.workspace.Hexboosting.idl
+    );
     poProgram = await initPo(
       provider,
       anchor.workspace.PriceOracle.programId,
@@ -62,6 +86,13 @@ describe("hexboosting", () => {
       anchor.workspace.DataCredits.idl
     );
     await ensureDCIdl(dcProgram);
+
+    memProgram = await initMobileEntityManager(
+      provider,
+      anchor.workspace.MobileEntityManager.programId,
+      anchor.workspace.MobileEntityManager.idl
+    );
+    ensureMemIdl(memProgram);
 
     hsdProgram = await initHeliumSubDaos(
       provider,
@@ -76,14 +107,65 @@ describe("hexboosting", () => {
       anchor.workspace.HeliumEntityManager.idl
     );
     await ensureHEMIdl(hemProgram);
-    program = await init(
+    const dataCredits = await initTestDataCredits(dcProgram, provider);
+    const { dao } = await initTestDao(
+      hsdProgram,
       provider,
-      PROGRAM_ID,
-      anchor.workspace.Hexboosting.idl
+      100,
+      me,
+      dataCredits.dcMint
     );
-    ({
-      subDao: { mint },
-    } = await initWorld(provider, hemProgram, hsdProgram, dcProgram, 0, 0));
+    ({ subDao, mint } = await initTestSubdao({
+      hsdProgram,
+      provider,
+      authority: me,
+      dao,
+      numTokens: new anchor.BN("1000000000000000"),
+    }));
+    const name = random();
+    const {
+      pubkeys: { carrier: carrierK },
+    } = await memProgram.methods
+      .initializeCarrierV0({
+        name,
+        issuingAuthority: me,
+        updateAuthority: me,
+        hexboostAuthority: me,
+        metadataUrl: "https://some/url",
+      })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+      ])
+      .accounts({
+        subDao,
+      })
+      .rpcAndKeys({ skipPreflight: true });
+    carrier = carrierK!;
+    merkle = Keypair.generate();
+    // Testing -- small tree
+    const space = getConcurrentMerkleTreeAccountSize(3, 8);
+    const createMerkle = SystemProgram.createAccount({
+      fromPubkey: provider.wallet.publicKey,
+      newAccountPubkey: merkle.publicKey,
+      lamports: await provider.connection.getMinimumBalanceForRentExemption(
+        space
+      ),
+      space: space,
+      programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+    });
+    await memProgram.methods
+      .updateCarrierTreeV0({
+        maxDepth: 3,
+        maxBufferSize: 8,
+      })
+      .accounts({ carrier, newMerkleTree: merkle.publicKey })
+      .preInstructions([createMerkle])
+      .signers([merkle])
+      .rpc({ skipPreflight: true });
+    await memProgram.methods
+      .approveCarrierV0()
+      .accounts({ carrier })
+      .rpc({ skipPreflight: true });
   });
 
   it("allows initialize a boost config", async () => {
@@ -119,6 +201,7 @@ describe("hexboosting", () => {
       .accounts({
         paymentMint: mint,
         priceOracle,
+        rentReclaimAuthority: me,
       })
       .rpcAndKeys({ skipPreflight: true });
 
@@ -165,7 +248,6 @@ describe("hexboosting", () => {
           paymentMint: mint,
           priceOracle,
           rentReclaimAuthority: me,
-          startAuthority: me,
         })
         .rpcAndKeys({ skipPreflight: true });
 
@@ -222,6 +304,7 @@ describe("hexboosting", () => {
         })
         .accounts({
           paymentMint: mint,
+          carrier,
         })
         .rpcAndKeys({ skipPreflight: true });
 
@@ -276,6 +359,7 @@ describe("hexboosting", () => {
           })
           .accounts({
             paymentMint: mint,
+            carrier,
           })
           .rpcAndKeys({ skipPreflight: true });
       });
@@ -306,6 +390,7 @@ describe("hexboosting", () => {
           })
           .accounts({
             paymentMint: mint,
+            carrier,
           })
           .rpcAndKeys({ skipPreflight: true });
 
@@ -338,6 +423,7 @@ describe("hexboosting", () => {
           .startBoostV0()
           .accounts({
             boostedHex,
+            carrier,
           })
           .rpc({ skipPreflight: true });
         const acc = await program.account.boostedHexV0.fetch(boostedHex!);
@@ -345,8 +431,11 @@ describe("hexboosting", () => {
       });
 
       describe("with started boost", () => {
-        // Make periods one second so we can retire this
-        periodLength = 1;
+        before(() => {
+          // Make periods one second so we can retire this
+          periodLength = 1;
+        })
+
         beforeEach(async () => {
           const boostedHex = boostedHexKey(
             boostConfigKey(mint)[0],
@@ -356,6 +445,7 @@ describe("hexboosting", () => {
             .startBoostV0()
             .accounts({
               boostedHex,
+              carrier,
             })
             .rpc({ skipPreflight: true });
         });
@@ -377,7 +467,8 @@ describe("hexboosting", () => {
             })
             .rpc({ skipPreflight: true });
 
-          expect(await provider.connection.getAccountInfo(boostedHex)).to.be.null;
+          expect(await provider.connection.getAccountInfo(boostedHex)).to.be
+            .null;
         });
       });
     });

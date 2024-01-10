@@ -28,4 +28,5 @@ solana-security-txt = { workspace = true }
 default-env = { workspace = true }
 helium-sub-daos = { workspace = true }
 price-oracle = { workspace = true }
+mobile-entity-manager = { workspace = true }
 bytemuck = "1.14.0"
