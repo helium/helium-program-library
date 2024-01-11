@@ -125,7 +125,7 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
         is_initialized = false;
       }
       ctx.accounts.boosted_hex.start_ts +=
-        elapsed_periods * i64::try_from(ctx.accounts.boost_config.period_length).unwrap();
+        elapsed_periods * i64::from(ctx.accounts.boost_config.period_length);
     }
   }
 
