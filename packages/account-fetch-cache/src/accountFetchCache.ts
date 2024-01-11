@@ -59,6 +59,30 @@ function setSingleton(conn: Connection, cache: AccountFetchCache) {
   singletons[endp + commitment] = cache;
 }
 
+export interface AccountCache {
+  delete(key: string): void;
+  has(key: string): boolean;
+  get(key: string): ParsedAccountBase<unknown> | null | undefined;
+  set(key: string, value: ParsedAccountBase<unknown> | null): void;
+}
+
+export class MapAccountCache implements AccountCache {
+  cache = new Map<string, ParsedAccountBase<unknown> | null>() as AccountCache;
+
+  delete(key: string): void {
+    this.cache.delete(key)
+  }
+  has(key: string): boolean {
+    return this.cache.has(key);
+  }
+  get(key: string): ParsedAccountBase<unknown> | null | undefined {
+    return this.cache.get(key);
+  }
+  set(key: string, value: ParsedAccountBase<unknown> | null): void {
+    this.cache.set(key, value);
+  }
+}
+
 export class AccountFetchCache {
   connection: Connection;
   chunkSize: number;
@@ -68,7 +92,7 @@ export class AccountFetchCache {
   accountChangeListeners = new Map<string, number>();
   statics = new Set<string>();
   missingAccounts = new Map<string, AccountParser<unknown> | undefined>();
-  genericCache = new Map<string, ParsedAccountBase<unknown> | null>();
+  genericCache: AccountCache;
   keyToAccountParser = new Map<string, AccountParser<unknown> | undefined>();
   timeout: NodeJS.Timeout | null = null;
   currentBatch = new Set<string>();
@@ -99,6 +123,7 @@ export class AccountFetchCache {
     commitment,
     missingRefetchDelay = 10000,
     extendConnection = false,
+    cache,
   }: {
     connection: Connection;
     chunkSize?: number;
@@ -107,7 +132,10 @@ export class AccountFetchCache {
     missingRefetchDelay?: number;
     /** Add functionatility to getAccountInfo that uses the cache */
     extendConnection?: boolean;
+    cache?: AccountCache;
   }) {
+    this.genericCache = cache || new MapAccountCache();
+
     this.id = ++id;
     this.connection = connection;
     this.chunkSize = chunkSize;
@@ -267,7 +295,7 @@ export class AccountFetchCache {
     } else {
       this.timeout = setTimeout(() => this.fetchBatch(), this.delay);
     }
-    return undefined
+    return undefined;
   }
 
   async addToBatch(id: PublicKey): Promise<AccountInfo<Buffer>> {
@@ -322,15 +350,22 @@ export class AccountFetchCache {
     const dispose = this.watch(id, parser, !!data);
     const cacheEntry = this.genericCache.get(address);
     if (!this.genericCache.has(address) || cacheEntry != data) {
-      this.updateCache<T>(address, data || null);
+      this.updateCacheAndRaiseUpdated<T>(address, data || null);
     }
 
     return [data, dispose];
   }
 
-  async updateCache<T>(id: string, data: ParsedAccountBase<T> | null) {
-    const isNew = !this.genericCache.has(id);
+  updateCache<T>(id: string, data: ParsedAccountBase<T> | null) {
     this.genericCache.set(id, data || null);
+  }
+
+  async updateCacheAndRaiseUpdated<T>(
+    id: string,
+    data: ParsedAccountBase<T> | null
+  ) {
+    const isNew = !this.genericCache.has(id);
+    this.updateCache(id, data);
 
     this.emitter.raiseCacheUpdated(id, isNew, this.keyToAccountParser.get(id));
   }
@@ -393,7 +428,7 @@ export class AccountFetchCache {
       // Never update the cache with an account that isn't being watched. This could cause
       // stale data to be returned.
       if (isStatic && result && result.info) {
-        this.updateCache(address, result);
+        this.updateCacheAndRaiseUpdated(address, result);
       }
 
       return result;
@@ -411,7 +446,7 @@ export class AccountFetchCache {
   ): Promise<(ParsedAccountBase<T> | undefined)[]> {
     // Store results of batch fetches in this map. If isStatic is false, genericCache will have none of the
     // results of our searches in the batch. So need to accumulate them here
-    const result: Record<string, ParsedAccountBase<T>> = {}
+    const result: Record<string, ParsedAccountBase<T>> = {};
     const searched = new Set(pubKeys.map((p) => p.toBase58()));
     for (const key of pubKeys) {
       this.registerParser(key, parser);
@@ -436,7 +471,7 @@ export class AccountFetchCache {
               const parsed = this.getParsed(key, item, parser) || null;
               // Cache these results if they aren't going to change
               if (isStatic) {
-                this.genericCache.set(key, parsed);
+                this.updateCache(key, parsed);
               }
               if (parsed) {
                 result[key] = parsed;
@@ -457,7 +492,7 @@ export class AccountFetchCache {
           const parsed = this.getParsed(key, item, parser) || null;
           // Cache these results if they aren't going to change
           if (isStatic) {
-            this.genericCache.set(key, parsed);
+            this.updateCache(key, parsed);
           }
           if (parsed) {
             result[key] = parsed;
@@ -468,9 +503,10 @@ export class AccountFetchCache {
 
     return pubKeys.map(
       (key) =>
-        result[key.toBase58()] || this.genericCache.get(key.toBase58()) as
+        result[key.toBase58()] ||
+        (this.genericCache.get(key.toBase58()) as
           | ParsedAccountBase<T>
-          | undefined
+          | undefined)
     );
   }
 
@@ -482,7 +518,7 @@ export class AccountFetchCache {
     try {
       const parsed = this.getParsed(key, account, parser);
       const address = key.toBase58();
-      this.updateCache(address, parsed || null);
+      this.updateCacheAndRaiseUpdated(address, parsed || null);
     } catch (e: any) {
       console.error("accountFetchCache", "Failed to update account", e);
     }
@@ -657,7 +693,7 @@ export class AccountFetchCache {
         if (cached) {
           const parsed = parser(cached.pubkey, cached.account);
           if (parsed) {
-            this.genericCache.set(address, parsed);
+            this.updateCache(address, parsed);
           }
         }
       }
