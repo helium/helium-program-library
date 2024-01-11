@@ -156,7 +156,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
   // dc = price * hnt_amount * 10^(expo - hnt_decimals + dc_exponent)
   // dc = price * hnt_amount / 10^(hnt_decimals - expo - dc_exponent)
   // hnt_amount = dc * 10^(hnt_decimals - expo - dc_exponent) / price
-  let exponent = i32::try_from(ctx.accounts.hnt_mint.decimals).unwrap() - hnt_price.expo - 5;
+  let exponent = i32::from(ctx.accounts.hnt_mint.decimals) - hnt_price.expo - 5;
   let decimals_factor = 10_u128
     .checked_pow(u32::try_from(exponent).unwrap())
     .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?;
