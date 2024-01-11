@@ -163,10 +163,7 @@ pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, OnboardMobileHotspotV0<'info>>,
   args: OnboardMobileHotspotArgsV0,
 ) -> Result<()> {
-  let asset_id = get_asset_id(
-    &ctx.accounts.merkle_tree.key(),
-    u64::try_from(args.index).unwrap(),
-  );
+  let asset_id = get_asset_id(&ctx.accounts.merkle_tree.key(), u64::from(args.index));
 
   verify_compressed_nft(VerifyCompressedNftArgs {
     data_hash: args.data_hash,

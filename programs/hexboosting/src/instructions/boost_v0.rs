@@ -26,7 +26,7 @@ pub struct BoostAmountV0 {
   pub amount: u8,
 }
 
-fn get_space<'info>(boosted_hex: &AccountInfo<'info>) -> usize {
+fn get_space(boosted_hex: &AccountInfo) -> usize {
   if boosted_hex.data_len() == 0 {
     8 + 60 + std::mem::size_of::<BoostedHexV0>()
   } else {
@@ -125,7 +125,7 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
         is_initialized = false;
       }
       ctx.accounts.boosted_hex.start_ts +=
-        elapsed_periods * i64::try_from(ctx.accounts.boost_config.period_length).unwrap();
+        elapsed_periods * i64::from(ctx.accounts.boost_config.period_length);
     }
   }
 

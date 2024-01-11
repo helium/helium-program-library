@@ -18,6 +18,6 @@ pub struct CloseBoostV0<'info> {
   pub boosted_hex: Box<Account<'info, BoostedHexV0>>,
 }
 
-pub fn handler(ctx: Context<CloseBoostV0>) -> Result<()> {
+pub fn handler(_ctx: Context<CloseBoostV0>) -> Result<()> {
   Ok(())
 }
