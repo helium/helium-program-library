@@ -164,7 +164,7 @@ export const HeliumVsrStateProvider: React.FC<{
     }
 
     return {};
-  }, [positions, registrar, delegatedAccounts]);
+  }, [positions, registrar, delegatedAccounts, now]);
   const ret = useMemo(
     () => ({
       loading: loading || loadingPositions || loadingDel,
