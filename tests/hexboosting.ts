@@ -199,7 +199,7 @@ describe("hexboosting", () => {
         minimumPeriods: 6,
       })
       .accounts({
-        paymentMint: mint,
+        dntMint: mint,
         priceOracle,
         rentReclaimAuthority: me,
       })
@@ -245,7 +245,7 @@ describe("hexboosting", () => {
           minimumPeriods: 6,
         })
         .accounts({
-          paymentMint: mint,
+          dntMint: mint,
           priceOracle,
           rentReclaimAuthority: me,
         })

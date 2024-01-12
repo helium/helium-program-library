@@ -10,8 +10,8 @@ import { PublicKey } from "@solana/web3.js";
 export const hexboostingResolvers = combineResolvers(
   heliumCommonResolver,
   resolveIndividual(async ({ path, accounts }) => {
-    if (path[path.length - 1] === "subDao" && accounts.paymentMint) {
-      return subDaoKey(accounts.paymentMint as PublicKey)[0];
+    if (path[path.length - 1] === "subDao" && accounts.dntMint) {
+      return subDaoKey(accounts.dntMint as PublicKey)[0];
     }
   }),
   ataResolver({

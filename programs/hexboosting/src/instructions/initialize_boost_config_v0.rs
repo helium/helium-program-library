@@ -22,20 +22,21 @@ pub struct InitializeBoostConfigV0<'info> {
   pub payer: Signer<'info>,
 
   #[account(
-    has_one = authority
+    has_one = authority,
+    has_one = dnt_mint
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   pub authority: Signer<'info>,
   /// CHECK: Just for settings
   pub rent_reclaim_authority: AccountInfo<'info>,
   pub price_oracle: Box<Account<'info, PriceOracleV0>>,
-  pub payment_mint: Box<Account<'info, Mint>>,
+  pub dnt_mint: Box<Account<'info, Mint>>,
 
   #[account(
     init,
     payer = payer,
     space = 8 + 60 + std::mem::size_of::<BoostConfigV0>(),
-    seeds = ["boost_config".as_bytes(), payment_mint.key().as_ref()],
+    seeds = ["boost_config".as_bytes(), dnt_mint.key().as_ref()],
     bump,
   )]
   pub boost_config: Box<Account<'info, BoostConfigV0>>,
@@ -49,7 +50,7 @@ pub fn handler(
   ctx.accounts.boost_config.set_inner(BoostConfigV0 {
     sub_dao: ctx.accounts.sub_dao.key(),
     price_oracle: ctx.accounts.price_oracle.key(),
-    payment_mint: ctx.accounts.payment_mint.key(),
+    payment_mint: ctx.accounts.dnt_mint.key(),
     boost_price: args.boost_price,
     period_length: args.period_length,
     minimum_periods: args.minimum_periods,
