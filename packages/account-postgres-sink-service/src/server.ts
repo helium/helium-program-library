@@ -224,7 +224,7 @@ if (!HELIUS_AUTH_SECRET) {
             );
             const transaction = await database.transaction();
             for (const table of tables) {
-              database.query(
+              await database.query(
                 `
                   DELETE FROM ${table} WHERE address = ${database.escape(
                   pubkey.toBase58()
@@ -235,6 +235,7 @@ if (!HELIUS_AUTH_SECRET) {
                 }
               );
             }
+            await transaction.commit()
             continue;
           }
 
