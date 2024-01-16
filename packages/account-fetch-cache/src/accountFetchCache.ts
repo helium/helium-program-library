@@ -70,7 +70,7 @@ export class MapAccountCache implements AccountCache {
   cache = new Map<string, ParsedAccountBase<unknown> | null>() as AccountCache;
 
   delete(key: string): void {
-    this.cache.delete(key)
+    this.cache.delete(key);
   }
   has(key: string): boolean {
     return this.cache.has(key);
@@ -84,6 +84,7 @@ export class MapAccountCache implements AccountCache {
 }
 
 export class AccountFetchCache {
+  enableLogging: boolean;
   connection: Connection;
   chunkSize: number;
   delay: number;
@@ -124,6 +125,7 @@ export class AccountFetchCache {
     missingRefetchDelay = 10000,
     extendConnection = false,
     cache,
+    enableLogging = false,
   }: {
     connection: Connection;
     chunkSize?: number;
@@ -133,7 +135,9 @@ export class AccountFetchCache {
     /** Add functionatility to getAccountInfo that uses the cache */
     extendConnection?: boolean;
     cache?: AccountCache;
+    enableLogging?: boolean;
   }) {
+    this.enableLogging = enableLogging;
     this.genericCache = cache || new MapAccountCache();
 
     this.id = ++id;
@@ -262,6 +266,9 @@ export class AccountFetchCache {
   async fetchBatch() {
     const currentBatch = this.currentBatch;
     this.currentBatch = new Set(); // Erase current batch from state, so we can fetch multiple at a time
+    if (this.enableLogging) {
+      console.log(`Fetching batch of ${currentBatch.size} accounts`);
+    }
     try {
       const keys = Array.from(currentBatch);
       const { array } = await getMultipleAccounts(
