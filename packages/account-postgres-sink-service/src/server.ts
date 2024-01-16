@@ -3,11 +3,19 @@ import fastifyCron from "fastify-cron";
 import cors from "@fastify/cors";
 import fs from "fs";
 import { StatusCodes, ReasonPhrases } from "http-status-codes";
-import { PublicKey } from "@solana/web3.js";
 import {
+  Connection,
+  PublicKey,
+  SystemProgram,
+  TransactionMessage,
+  TransactionResponse,
+} from "@solana/web3.js";
+import {
+  FETCH_DELAY_SECONDS,
   HELIUS_AUTH_SECRET,
   PROGRAM_ACCOUNT_CONFIGS,
   RUN_JOBS_AT_STARTUP,
+  SOLANA_URL,
 } from "./env";
 import database from "./utils/database";
 import { defineAllIdlModels } from "./utils/defineIdlModels";
@@ -19,6 +27,8 @@ import { metrics } from "./plugins/metrics";
 import { IConfig, IInitedPlugin } from "./types";
 import { EventEmitter } from "events";
 import { initPlugins } from "./plugins";
+import { AccountFetchCache } from "@helium/account-fetch-cache";
+const { BloomFilter } = require("bloom-filters");
 
 if (!HELIUS_AUTH_SECRET) {
   throw new Error("Helius auth secret not available");
@@ -28,13 +38,14 @@ if (!HELIUS_AUTH_SECRET) {
   const { configs, indexConfigs } = (() => {
     const dbConfigs: null | {
       configs: IConfig[];
-      indexConfigs?: string[]
+      indexConfigs?: string[];
     } = JSON.parse(fs.readFileSync(PROGRAM_ACCOUNT_CONFIGS, "utf8"));
 
     return {
       configs: dbConfigs && dbConfigs.configs ? dbConfigs.configs : [],
-      indexConfigs: dbConfigs && dbConfigs.indexConfigs ? dbConfigs.indexConfigs : [],
-    }
+      indexConfigs:
+        dbConfigs && dbConfigs.indexConfigs ? dbConfigs.indexConfigs : [],
+    };
   })();
 
   const customJobs = configs
@@ -160,6 +171,108 @@ if (!HELIUS_AUTH_SECRET) {
     return acc;
   }, {} as Record<string, Record<string, IInitedPlugin[]>>);
 
+  // Assume 10 million accounts we might not want to watch (token accounts, etc)
+  const nonWatchedAccountsFilter = BloomFilter.create(10000000, 0.05);
+  const cache = new AccountFetchCache({
+    connection: new Connection(SOLANA_URL),
+    commitment: "confirmed",
+    extendConnection: false,
+    enableLogging: true,
+    // One fetch every x second limit
+    delay: FETCH_DELAY_SECONDS * 1000,
+  });
+  server.post<{ Body: any[] }>("/transaction-webhook", async (req, res) => {
+    if (req.headers.authorization != HELIUS_AUTH_SECRET) {
+      res.code(StatusCodes.FORBIDDEN).send({
+        message: "Invalid authorization",
+      });
+      return;
+    }
+    if (refreshing) {
+      res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
+        message: "Refresh is happening, cannot create transactions",
+      });
+      return;
+    }
+
+    try {
+      const transactions = req.body as TransactionResponse[];
+      const writableAccountKeys = transactions
+        .flatMap((tx) =>
+          tx.transaction.message.accountKeys.slice(
+            0,
+            tx.transaction.message.accountKeys.length -
+              (tx.transaction.message.header.numReadonlySignedAccounts +
+                tx.transaction.message.header.numReadonlyUnsignedAccounts)
+          )
+        )
+        .map((k) => new PublicKey(k));
+      const accounts = await Promise.all(
+        writableAccountKeys.map((key) => cache.search(key))
+      );
+
+      if (configs) {
+        let index = 0;
+        for (const account of accounts) {
+          const pubkey = writableAccountKeys[index];
+          index++;
+
+          // Account not found, delete it from any and all tables
+          if (!account) {
+            const tables = configs.flatMap((config) =>
+              config.accounts.map((acc) => acc.table)
+            );
+            const transaction = await database.transaction();
+            for (const table of tables) {
+              database.query(
+                `
+                  DELETE FROM ${table} WHERE address = ${database.escape(
+                  pubkey.toBase58()
+                )}
+                `,
+                {
+                  transaction,
+                }
+              );
+            }
+            continue;
+          }
+
+          // If the owner isn't of a program we're watching, break
+          const owner = account.account.owner.toBase58();
+          if (nonWatchedAccountsFilter.has(owner)) {
+            continue;
+          }
+
+          const config = configs.find((x) => x.programId == owner);
+          if (!config) {
+            if (owner) nonWatchedAccountsFilter.add(owner);
+            continue;
+          }
+
+          try {
+            await handleAccountWebhook({
+              fastify: server,
+              programId: new PublicKey(config.programId),
+              accounts: config.accounts,
+              account: {
+                pubkey: account.pubkey.toBase58(),
+                data: [account.account.data, undefined],
+              },
+              pluginsByAccountType: pluginsByAccountTypeByProgram[owner] || {},
+            });
+          } catch (err) {
+            throw err;
+          }
+        }
+      }
+      res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+    } catch (err) {
+      res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
+      console.error(err);
+    }
+  });
+
   server.post("/account-webhook", async (req, res) => {
     if (req.headers.authorization != HELIUS_AUTH_SECRET) {
       res.code(StatusCodes.FORBIDDEN).send({
@@ -171,7 +284,7 @@ if (!HELIUS_AUTH_SECRET) {
       res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
         message: "Refresh is happening, cannot create transactions",
       });
-      return
+      return;
     }
 
     try {
