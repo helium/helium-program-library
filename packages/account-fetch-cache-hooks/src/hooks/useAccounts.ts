@@ -158,9 +158,16 @@ export function useAccounts<T>(
   // Start watchers
   useEffect(() => {
     if (result) {
-      setAccounts(result);
+      if (JSON.stringify(accounts) !== JSON.stringify(result)) {
+        setAccounts(result);
+      }
+
       const disposers = result.map((account) => {
-        return cache.watch(account.publicKey, account.parser, !!account.account);
+        return cache.watch(
+          account.publicKey,
+          account.parser,
+          !!account.account
+        );
       });
 
       return () => {
@@ -194,7 +201,10 @@ export function useAccounts<T>(
             },
             ...accounts.slice(index + 1),
           ];
-          setAccounts(newAccounts);
+
+          if (JSON.stringify(accounts) !== JSON.stringify(newAccounts)) {
+            setAccounts(newAccounts);
+          }
         }
       }
     });
