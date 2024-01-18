@@ -39,7 +39,7 @@
     "@helium/modular-governance-hooks": "^0.0.8",
     "@helium/spl-utils": "^0.6.16",
     "@helium/voter-stake-registry-sdk": "^0.6.16",
-    "@metaplex-foundation/js": "^0.19.4",
+    "@metaplex-foundation/js": "^0.20.1",
     "@solana/wallet-adapter-base": "^0.9.22",
     "@solana/wallet-adapter-react": "^0.15.32",
     "@solana/web3.js": "^1.78.4",
