@@ -111,7 +111,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@^0.6.10":
+"@helium/account-fetch-cache@^0.6.17":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -128,7 +128,7 @@ __metadata:
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@fastify/cors": ^8.1.1
-    "@helium/account-fetch-cache": ^0.6.10
+    "@helium/account-fetch-cache": ^0.6.17
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/web3.js": ^1.78.4
     "@types/bn.js": ^5.1.1
@@ -140,6 +140,7 @@ __metadata:
     aws-sdk: ^2.1344.0
     axios: ^1.3.6
     axios-retry: ^3.8.0
+    bloom-filters: ^3.0.1
     bn.js: ^5.2.0
     bs58: ^4.0.1
     deep-equal: ^2.2.2
@@ -801,6 +802,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"base64-arraybuffer@npm:^1.0.2":
+  version: 1.0.2
+  resolution: "base64-arraybuffer@npm:1.0.2"
+  checksum: 15e6400d2d028bf18be4ed97702b11418f8f8779fb8c743251c863b726638d52f69571d4cc1843224da7838abef0949c670bde46936663c45ad078e89fee5c62
+  languageName: node
+  linkType: hard
+
 "base64-js@npm:^1.0.2, base64-js@npm:^1.3.1, base64-js@npm:^1.5.1":
   version: 1.5.1
   resolution: "base64-js@npm:1.5.1"
@@ -845,6 +853,23 @@ __metadata:
   version: 1.0.2
   resolution: "bintrees@npm:1.0.2"
   checksum: 56a52b7d3634e30002b1eda740d2517a22fa8e9e2eb088e919f37c030a0ed86e364ab59e472fc770fc8751308054bb1c892979d150e11d9e11ac33bcc1b5d16e
+  languageName: node
+  linkType: hard
+
+"bloom-filters@npm:^3.0.1":
+  version: 3.0.1
+  resolution: "bloom-filters@npm:3.0.1"
+  dependencies:
+    base64-arraybuffer: ^1.0.2
+    is-buffer: ^2.0.5
+    lodash: ^4.17.15
+    lodash.eq: ^4.0.0
+    lodash.indexof: ^4.0.5
+    long: ^5.2.0
+    reflect-metadata: ^0.1.13
+    seedrandom: ^3.0.5
+    xxhashjs: ^0.2.2
+  checksum: 920d72607780dcbee4fb5e90a26f725b8626c637a841439a4e06ec9ce724248d2facfd5cb8610a38245e3f7c54002c89fc457bb4b9cc3713abc659bfe585d266
   languageName: node
   linkType: hard
 
@@ -1158,6 +1183,13 @@ __metadata:
   version: 1.3.0
   resolution: "crypto-hash@npm:1.3.0"
   checksum: a3a507e0d2b18fbd2da8088a1c62d0c53c009a99bbfa6d851cac069734ffa546922fa51bdd776d006459701cdda873463e5059ece3431aca048fd99e7573d138
+  languageName: node
+  linkType: hard
+
+"cuint@npm:^0.2.2":
+  version: 0.2.2
+  resolution: "cuint@npm:0.2.2"
+  checksum: b8127a93a7f16ce120ffcb22108014327c9808b258ee20e7dbb4c6740d7cb0f0c12d18a054eb716b0f2470090666abaae8a082d3cd5ef0e94fa447dd155842c4
   languageName: node
   linkType: hard
 
@@ -2028,6 +2060,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"is-buffer@npm:^2.0.5":
+  version: 2.0.5
+  resolution: "is-buffer@npm:2.0.5"
+  checksum: 764c9ad8b523a9f5a32af29bdf772b08eb48c04d2ad0a7240916ac2688c983bf5f8504bf25b35e66240edeb9d9085461f9b5dae1f3d2861c6b06a65fe983de42
+  languageName: node
+  linkType: hard
+
 "is-callable@npm:^1.1.3":
   version: 1.2.7
   resolution: "is-callable@npm:1.2.7"
@@ -2303,10 +2342,31 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lodash@npm:^4.17.21":
+"lodash.eq@npm:^4.0.0":
+  version: 4.0.0
+  resolution: "lodash.eq@npm:4.0.0"
+  checksum: c46d45b8da669151cdf4fcb996056c8847c1c32723fa3c60ef87433ee41b01b8e1ee615c4c433b6f27391fa9c1793ad6d892dd30bac4c9c3508be3fa5f3d5def
+  languageName: node
+  linkType: hard
+
+"lodash.indexof@npm:^4.0.5":
+  version: 4.0.5
+  resolution: "lodash.indexof@npm:4.0.5"
+  checksum: 4f3ead786c2941f18f1ef250459bcc6182ac00f04e76a2b94d3933349c879cd4b79444d59b0de835ad93d7b01626c1bc8ee55d7776879f099c0617d896a29f28
+  languageName: node
+  linkType: hard
+
+"lodash@npm:^4.17.15, lodash@npm:^4.17.21":
   version: 4.17.21
   resolution: "lodash@npm:4.17.21"
   checksum: eb835a2e51d381e561e508ce932ea50a8e5a68f4ebdd771ea240d3048244a8d13658acbd502cd4829768c56f2e16bdd4340b9ea141297d472517b83868e677f7
+  languageName: node
+  linkType: hard
+
+"long@npm:^5.2.0":
+  version: 5.2.3
+  resolution: "long@npm:5.2.3"
+  checksum: 885ede7c3de4facccbd2cacc6168bae3a02c3e836159ea4252c87b6e34d40af819824b2d4edce330bfb5c4d6e8ce3ec5864bdcf9473fa1f53a4f8225860e5897
   languageName: node
   linkType: hard
 
@@ -3119,6 +3179,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"reflect-metadata@npm:^0.1.13":
+  version: 0.1.14
+  resolution: "reflect-metadata@npm:0.1.14"
+  checksum: 155ad339319cec3c2d9d84719f730f8b6a6cd2a074733ec29dbae6c89d48a2914c7d07a2350212594f3aae160fa4da4f903e6512f27ceaf968443a7c692bcad0
+  languageName: node
+  linkType: hard
+
 "regenerator-runtime@npm:^0.14.0":
   version: 0.14.0
   resolution: "regenerator-runtime@npm:0.14.0"
@@ -3301,6 +3368,13 @@ __metadata:
   version: 2.7.0
   resolution: "secure-json-parse@npm:2.7.0"
   checksum: d9d7d5a01fc6db6115744ba23cf9e67ecfe8c524d771537c062ee05ad5c11b64c730bc58c7f33f60bd6877f96b86f0ceb9ea29644e4040cb757f6912d4dd6737
+  languageName: node
+  linkType: hard
+
+"seedrandom@npm:^3.0.5":
+  version: 3.0.5
+  resolution: "seedrandom@npm:3.0.5"
+  checksum: 728b56bc3bc1b9ddeabd381e449b51cb31bdc0aa86e27fcd0190cea8c44613d5bcb2f6bb63ed79f78180cbe791c20b8ec31a9627f7b7fc7f476fd2bdb7e2da9f
   languageName: node
   linkType: hard
 
@@ -4083,6 +4157,15 @@ __metadata:
   version: 4.0.2
   resolution: "xtend@npm:4.0.2"
   checksum: ac5dfa738b21f6e7f0dd6e65e1b3155036d68104e67e5d5d1bde74892e327d7e5636a076f625599dc394330a731861e87343ff184b0047fef1360a7ec0a5a36a
+  languageName: node
+  linkType: hard
+
+"xxhashjs@npm:^0.2.2":
+  version: 0.2.2
+  resolution: "xxhashjs@npm:0.2.2"
+  dependencies:
+    cuint: ^0.2.2
+  checksum: cf6baf05bafe5651dbf108008bafdb1ebe972f65228633f00b56c49d7a1e614a821fe3345c4eb27462994c7c954d982eae05871be6a48146f30803dd87f3c3b6
   languageName: node
   linkType: hard
 

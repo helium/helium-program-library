@@ -1937,7 +1937,7 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -1996,6 +1996,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "hexboosting"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "default-env",
+ "helium-sub-daos",
+ "mobile-entity-manager",
+ "price-oracle",
+ "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -2295,7 +2310,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-transactions"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3013,7 +3028,7 @@ checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 
 [[package]]
 name = "price-oracle"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anchor-lang",
  "default-env",
@@ -5739,7 +5754,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.3.0"
+version = "0.2.5"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

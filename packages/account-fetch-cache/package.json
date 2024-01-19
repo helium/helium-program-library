@@ -1,6 +1,6 @@
 {
   "name": "@helium/account-fetch-cache",
-  "version": "0.6.10",
+  "version": "0.6.17",
   "description": "Solana account fetch cache to eliminate reduntant fetching, and batch fetches",
   "publishConfig": {
     "access": "public",

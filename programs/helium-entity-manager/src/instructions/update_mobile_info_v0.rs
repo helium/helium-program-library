@@ -34,7 +34,7 @@ pub struct UpdateMobileInfoV0<'info> {
   pub dc_fee_payer: Signer<'info>,
   #[account(
     mut,
-    constraint = mobile_info.asset == get_asset_id(&merkle_tree.key(), u64::try_from(args.index).unwrap())
+    constraint = mobile_info.asset == get_asset_id(&merkle_tree.key(), u64::from(args.index))
   )]
   pub mobile_info: Box<Account<'info, MobileHotspotInfoV0>>,
   #[account(mut)]

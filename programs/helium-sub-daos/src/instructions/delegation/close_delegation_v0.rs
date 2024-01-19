@@ -226,5 +226,34 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   ctx.accounts.sub_dao_epoch_info.bump_seed = *ctx.bumps.get("sub_dao_epoch_info").unwrap();
   ctx.accounts.sub_dao_epoch_info.initialized = true;
 
+  // EDGE CASE: When the closing time epoch infos are the same as the current epoch info,
+  // update_subdao_vehnt will have already removed the fall rates and vehnt from the sub dao.
+  // Unfortunately, these changes aren't persisted across the various clones of the account, only
+  // on the main sub_dao_epoch_info. When the accounts are exited after this call, they will save
+  // with non-zero fall rates and vehnt in closing positions, causing a double-count.
+  // Example txs here:
+  // https://explorer.solana.com/tx/2Mcj4y7K5rE5ioFLKGBynNyX6S56NkfhQscdB3tB9M7wBsWFxWFg6R7vLGRnohsCyLt1U2ba166GUwd9DhU9Af9H
+  // https://explorer.solana.com/tx/T1TLfyfZyE6iJE9BhjMXkMVRtEUsS1jP3Q9AbNKvvtDpe5HxmVmqp9yT4H7HjdLKt6Q553Vrc7JcQCJeqpqZkK3
+  if ctx.accounts.closing_time_sub_dao_epoch_info.key() == ctx.accounts.sub_dao_epoch_info.key() {
+    ctx
+      .accounts
+      .closing_time_sub_dao_epoch_info
+      .vehnt_in_closing_positions = 0;
+    ctx
+      .accounts
+      .closing_time_sub_dao_epoch_info
+      .fall_rates_from_closing_positions = 0;
+  }
+
+  if ctx.accounts.genesis_end_sub_dao_epoch_info.key() == ctx.accounts.sub_dao_epoch_info.key() {
+    ctx
+      .accounts
+      .genesis_end_sub_dao_epoch_info
+      .vehnt_in_closing_positions = 0;
+    ctx
+      .accounts
+      .genesis_end_sub_dao_epoch_info
+      .fall_rates_from_closing_positions = 0;
+  }
   Ok(())
 }

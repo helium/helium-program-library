@@ -78,3 +78,17 @@ export const delegationsGauge = new client.Gauge({
 });
 register.registerMetric(delegationsGauge);
 
+export const oraclePrice = new client.Gauge({
+  name: "solana_price_oracle_price",
+  help: "The current price set by a price oracle wallet",
+  labelNames: ["oracle", "wallet"],
+});
+register.registerMetric(oraclePrice);
+
+export const oracleTimeSinceSubmitted = new client.Gauge({
+  name: "solana_price_oracle_time_since_submitted",
+  help: "The time since this oracle has submitted a price",
+  labelNames: ["oracle", "wallet"],
+});
+register.registerMetric(oracleTimeSinceSubmitted);
+

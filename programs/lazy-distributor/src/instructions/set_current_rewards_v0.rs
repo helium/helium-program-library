@@ -22,7 +22,7 @@ pub struct SetCurrentRewardsV0<'info> {
   pub recipient: Box<Account<'info, RecipientV0>>,
   #[account(
     constraint = args.oracle_index < lazy_distributor.oracles.len() as u16 @ ErrorCode::InvalidOracleIndex,
-    constraint = oracle.key() == lazy_distributor.oracles[usize::try_from(args.oracle_index).unwrap()].oracle
+    constraint = oracle.key() == lazy_distributor.oracles[usize::from(args.oracle_index)].oracle
   )]
   pub oracle: Signer<'info>,
   pub system_program: Program<'info, System>,
@@ -49,7 +49,7 @@ pub fn handler(ctx: Context<SetCurrentRewardsV0>, args: SetCurrentRewardsArgsV0)
       vec![None; ctx.accounts.lazy_distributor.oracles.len()];
   }
 
-  ctx.accounts.recipient.current_rewards[usize::try_from(args.oracle_index).unwrap()] =
+  ctx.accounts.recipient.current_rewards[usize::from(args.oracle_index)] =
     Some(args.current_rewards);
 
   resize_to_fit(

@@ -20,10 +20,15 @@ export const useClaimAllPositionsRewards = () => {
       positions,
       programId = PROGRAM_ID,
       onProgress,
+      onInstructions,
     }: {
       positions: PositionWithMeta[];
       programId?: PublicKey;
       onProgress?: (status: Status) => void;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
     }) => {
       const isInvalid =
         !unixNow || !provider || !positions.every((pos) => pos.hasRewards);
@@ -70,11 +75,15 @@ export const useClaimAllPositionsRewards = () => {
           );
         }
 
-        await batchParallelInstructions(
-          provider,
-          multiDemArray.flat(),
-          onProgress
-        );
+        if (onInstructions) {
+          await onInstructions(multiDemArray.flat());
+        } else {
+          await batchParallelInstructions(
+            provider,
+            multiDemArray.flat(),
+            onProgress
+          );
+        }
       }
     }
   );

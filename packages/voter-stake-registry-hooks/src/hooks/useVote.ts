@@ -1,8 +1,13 @@
 import { useProposal } from "@helium/modular-governance-hooks";
-import { bulkSendTransactions, chunks, truthy } from "@helium/spl-utils";
+import {
+  batchParallelInstructions,
+  bulkSendTransactions,
+  chunks,
+  truthy,
+} from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@metaplex-foundation/js";
-import { Transaction } from "@solana/web3.js";
+import { Transaction, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
@@ -47,7 +52,15 @@ export const useVote = (proposalKey: PublicKey) => {
     [markers]
   );
   const { error, loading, execute } = useAsyncCallback(
-    async ({ choice }: { choice: number }) => {
+    async ({
+      choice,
+      onInstructions,
+    }: {
+      choice: number; // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
+    }) => {
       const isInvalid = !provider || !positions || positions.length === 0;
 
       if (isInvalid) {
@@ -80,16 +93,11 @@ export const useVote = (proposalKey: PublicKey) => {
           )
         ).filter(truthy);
 
-        const txs = chunks(instructions, 4).map((ixs) => {
-          const tx = new Transaction({
-            feePayer: provider.wallet.publicKey,
-          });
-          tx.add(...ixs);
-
-          return tx;
-        });
-
-        await bulkSendTransactions(provider, txs);
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await batchParallelInstructions(provider, instructions);
+        }
       }
     }
   );

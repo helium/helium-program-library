@@ -58,6 +58,7 @@ export const getPositionKeys = async (
         limit,
         ownerAddress: wallet.toBase58(),
         tokenType: "fungible",
+        collection: registrar.collection.toBase58(),
       })) || [];
 
     allAssets = allAssets.concat(assets);

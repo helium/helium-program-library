@@ -20,10 +20,15 @@ export const useClaimPositionRewards = () => {
       position,
       programId = PROGRAM_ID,
       onProgress,
+      onInstructions,
     }: {
       position: PositionWithMeta;
       programId?: PublicKey;
       onProgress?: (status: Status) => void;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
     }) => {
       const isInvalid = !unixNow || !provider || !position.hasRewards;
 
@@ -62,7 +67,11 @@ export const useClaimPositionRewards = () => {
           )
         );
 
-        await batchParallelInstructions(provider, instructions, onProgress);
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await batchParallelInstructions(provider, instructions, onProgress);
+        }
       }
     }
   );
