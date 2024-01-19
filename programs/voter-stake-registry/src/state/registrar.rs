@@ -43,11 +43,11 @@ impl Registrar {
       .ok_or_else(|| error!(VsrError::VotingMintNotFound))
   }
 
-  pub fn max_vote_weight(&self, mint_accounts: &[AccountInfo]) -> Result<u64> {
+  pub fn max_vote_weight(&self, mint_accounts: &[AccountInfo]) -> Result<u128> {
     self
       .voting_mints
       .iter()
-      .try_fold(0u64, |mut sum, voting_mint_config| -> Result<u64> {
+      .try_fold(0u128, |mut sum, voting_mint_config| -> Result<u128> {
         if !voting_mint_config.in_use() {
           return Ok(sum);
         }
@@ -68,7 +68,7 @@ impl Registrar {
           .checked_add(voting_mint_config.max_extra_lockup_vote_weight(mint.supply)?)
           .ok_or_else(|| error!(VsrError::VoterWeightOverflow))?;
         sum = sum
-          .checked_mul(genesis_multiplier as u64)
+          .checked_mul(genesis_multiplier as u128)
           .ok_or_else(|| error!(VsrError::VoterWeightOverflow))?;
         Ok(sum)
       })

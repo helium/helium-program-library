@@ -44,7 +44,6 @@ chai.use(chaiAsPromised);
 const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
 const MAX_LOCKUP = 4 * SECS_PER_YEAR;
-const DIGIT_SHIFT = 0;
 const BASELINE = 0;
 const SCALE = 100;
 const GENESIS_MULTIPLIER = 3;
@@ -141,7 +140,6 @@ describe("voter-stake-registry", () => {
       await program.methods
         .configureVotingMintV0({
           idx: 0, // idx
-          digitShift: DIGIT_SHIFT, // digit shift
           baselineVoteWeightScaledFactor: new anchor.BN(BASELINE * 1e9),
           maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE * 1e9),
           genesisVotePowerMultiplier: GENESIS_MULTIPLIER,
@@ -220,32 +218,6 @@ describe("voter-stake-registry", () => {
     return { position, mint: mintKeypair.publicKey };
   }
 
-  it("should create a maxVoterWeightRecord correctly", async () => {
-    const instructions: TransactionInstruction[] = [];
-
-    const {
-      pubkeys: { maxVoterWeightRecord },
-      instruction,
-    } = await program.methods
-      .updateMaxVoterWeightV0()
-      .accounts({
-        registrar,
-      })
-      .prepare();
-    instructions.push(instruction);
-
-    await sendInstructions(provider, instructions, []);
-    const maxVoterWeightAcc = await program.account.maxVoterWeightRecord.fetch(
-      maxVoterWeightRecord!
-    );
-
-    expectBnAccuracy(
-      toBN(223_000_000 * SCALE * GENESIS_MULTIPLIER, 8),
-      maxVoterWeightAcc.maxVoterWeight,
-      0.00001
-    );
-  });
-
   it("should configure a votingMint correctly", async () => {
     const registrarAcc = await program.account.registrar.fetch(registrar);
     console.log(registrarAcc.collection.toBase58());
@@ -253,7 +225,6 @@ describe("voter-stake-registry", () => {
       registrarAcc.votingMints as VotingMintConfig[]
     )[0] as VotingMintConfig;
 
-    expect(votingMint0.digitShift).to.eq(DIGIT_SHIFT);
     expect(
       votingMint0.baselineVoteWeightScaledFactor.eq(
         new anchor.BN(BASELINE * 1e9)
@@ -343,18 +314,6 @@ describe("voter-stake-registry", () => {
         .rpc({ skipPreflight: true });
     });
 
-    const applyDigitShift = (amountNative: number, digitShift: number) => {
-      let val = 0;
-
-      if (digitShift < 0) {
-        val = amountNative / 10 ** digitShift;
-      } else {
-        val = amountNative * 10 ** digitShift;
-      }
-
-      return val;
-    };
-
     let voteTestCases = [
       {
         name: "genesis constant 1 position (within genesis)",
@@ -368,7 +327,7 @@ describe("voter-stake-registry", () => {
           },
         ],
         expectedVeHnt:
-          applyDigitShift(10000, DIGIT_SHIFT) *
+          10000 *
           (GENESIS_MULTIPLIER || 1) *
           (BASELINE + Math.min((SECS_PER_DAY * 200) / MAX_LOCKUP, 1) * SCALE),
       },
@@ -384,7 +343,7 @@ describe("voter-stake-registry", () => {
           },
         ],
         expectedVeHnt:
-          applyDigitShift(10000, DIGIT_SHIFT) *
+          10000 *
           (GENESIS_MULTIPLIER || 1) *
           (BASELINE +
             Math.min((SECS_PER_DAY * (200 - 60)) / MAX_LOCKUP, 1) * SCALE),
@@ -401,7 +360,7 @@ describe("voter-stake-registry", () => {
           },
         ],
         expectedVeHnt:
-          applyDigitShift(10000, DIGIT_SHIFT) *
+          10000 *
           (BASELINE + Math.min((SECS_PER_DAY * 200) / MAX_LOCKUP, 1) * SCALE),
       },
       {
@@ -416,7 +375,7 @@ describe("voter-stake-registry", () => {
           },
         ],
         expectedVeHnt:
-          applyDigitShift(10000, DIGIT_SHIFT) *
+          10000 *
           (BASELINE +
             Math.min((SECS_PER_DAY * (200 - 60)) / MAX_LOCKUP, 1) * SCALE),
       },

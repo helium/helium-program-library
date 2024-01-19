@@ -61,7 +61,11 @@ impl PositionV0 {
   // each point in time the lockup should be equivalent to a new lockup
   // made for the remaining time period.
   //
-  pub fn voting_power(&self, voting_mint_config: &VotingMintConfigV0, curr_ts: i64) -> Result<u64> {
+  pub fn voting_power(
+    &self,
+    voting_mint_config: &VotingMintConfigV0,
+    curr_ts: i64,
+  ) -> Result<u128> {
     let baseline_vote_weight =
       voting_mint_config.baseline_vote_weight(self.amount_deposited_native)?;
     let max_locked_vote_weight =
@@ -88,7 +92,7 @@ impl PositionV0 {
     baseline_vote_weight
       .checked_add(locked_vote_weight)
       .unwrap()
-      .checked_mul(genesis_multiplier as u64)
+      .checked_mul(genesis_multiplier as u128)
       .ok_or_else(|| error!(VsrError::VoterWeightOverflow))
   }
 
@@ -96,9 +100,9 @@ impl PositionV0 {
   pub fn voting_power_locked(
     &self,
     curr_ts: i64,
-    max_locked_vote_weight: u64,
+    max_locked_vote_weight: u128,
     lockup_saturation_secs: u64,
-  ) -> Result<u64> {
+  ) -> Result<u128> {
     if self.lockup.expired(curr_ts) || (max_locked_vote_weight == 0) {
       return Ok(0);
     }
@@ -117,19 +121,16 @@ impl PositionV0 {
   fn voting_power_cliff(
     &self,
     curr_ts: i64,
-    max_locked_vote_weight: u64,
+    max_locked_vote_weight: u128,
     lockup_saturation_secs: u64,
-  ) -> Result<u64> {
+  ) -> Result<u128> {
     let remaining = min(self.lockup.seconds_left(curr_ts), lockup_saturation_secs);
     Ok(
-      u64::try_from(
-        (max_locked_vote_weight as u128)
-          .checked_mul(remaining as u128)
-          .unwrap()
-          .checked_div(lockup_saturation_secs as u128)
-          .unwrap(),
-      )
-      .unwrap(),
+      max_locked_vote_weight
+        .checked_mul(remaining as u128)
+        .unwrap()
+        .checked_div(lockup_saturation_secs as u128)
+        .unwrap(),
     )
   }
 
