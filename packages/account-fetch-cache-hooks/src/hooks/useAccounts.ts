@@ -160,6 +160,7 @@ export function useAccounts<T>(
     if (
       result &&
       (!eagerResult ||
+        result.length !== eagerResult.length ||
         result.some(
           (item, index) => item.account !== eagerResult[index]?.account
         ))
