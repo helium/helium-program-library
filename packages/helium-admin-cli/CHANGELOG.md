@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.20](https://github.com/helium/helium-program-libary/compare/v0.6.19...v0.6.20) (2024-01-19)
+
+
+### Features
+
+* **#526:** Remove digit shift from VSR ([#527](https://github.com/helium/helium-program-libary/issues/527)) ([651e629](https://github.com/helium/helium-program-libary/commit/651e62905e53cbf67f4c4318ca683396b5511b14)), closes [#526](https://github.com/helium/helium-program-libary/issues/526)
+
+
+
+
+
 ## [0.6.19](https://github.com/helium/helium-program-libary/compare/v0.6.17...v0.6.19) (2024-01-19)
 
 **Note:** Version bump only for package @helium/helium-admin-cli
