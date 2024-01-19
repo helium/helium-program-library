@@ -161,10 +161,14 @@ export function useAccounts<T>(
       result &&
       (!eagerResult ||
         result.some(
-          (item, index) => item.account !== eagerResult[index]?.account
+          (item, index) =>
+            item.info !== eagerResult[index]?.info ||
+            item.account !== eagerResult[index]?.account
         ))
     ) {
       setAccounts(result);
+    }
+    if (result) {
       const disposers = result.map((account) => {
         return cache.watch(
           account.publicKey,
