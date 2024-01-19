@@ -1999,6 +1999,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "hexboosting"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "default-env",
+ "helium-sub-daos",
+ "mobile-entity-manager",
+ "price-oracle",
+ "shared-utils",
+ "solana-security-txt",
+]
+
+[[package]]
 name = "histogram"
 version = "0.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5739,7 +5754,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.2.5"
+version = "0.3.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

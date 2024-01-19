@@ -37,7 +37,7 @@ pub struct UpdateIotInfoV0<'info> {
   pub dc_fee_payer: Signer<'info>,
   #[account(
     mut,
-    constraint = iot_info.asset == get_asset_id(&merkle_tree.key(), u64::try_from(args.index).unwrap())
+    constraint = iot_info.asset == get_asset_id(&merkle_tree.key(), u64::from(args.index))
   )]
   pub iot_info: Box<Account<'info, IotHotspotInfoV0>>,
   #[account(mut)]

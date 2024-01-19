@@ -114,6 +114,7 @@ describe('mobile-entity-manager', () => {
         name,
         issuingAuthority: me,
         updateAuthority: me,
+        hexboostAuthority: me,
         metadataUrl: 'https://some/url',
       })
       .preInstructions([
@@ -147,6 +148,7 @@ describe('mobile-entity-manager', () => {
           name,
           issuingAuthority: me,
           updateAuthority: me,
+          hexboostAuthority: me,
           metadataUrl: 'https://some/url',
         })
         .preInstructions([

@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{burn, Burn, Mint, Token, TokenAccount},
+  token::{burn, Burn, Mint, Token},
 };
 use data_credits::{
   cpi::{
@@ -63,12 +63,9 @@ pub struct OnboardMobileHotspotV0<'info> {
   /// CHECK: Only loaded if location is being asserted
   #[account(mut)]
   pub dc_burner: UncheckedAccount<'info>,
-  #[account(
-    mut,
-    associated_token::authority = payer,
-    associated_token::mint = dnt_mint
-  )]
-  pub dnt_burner: Account<'info, TokenAccount>,
+  /// CHECK: Checked by spl token when the burn command is issued (which it may not be)
+  #[account(mut)]
+  pub dnt_burner: UncheckedAccount<'info>,
 
   #[account(
     has_one = sub_dao,
@@ -163,10 +160,7 @@ pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, OnboardMobileHotspotV0<'info>>,
   args: OnboardMobileHotspotArgsV0,
 ) -> Result<()> {
-  let asset_id = get_asset_id(
-    &ctx.accounts.merkle_tree.key(),
-    u64::try_from(args.index).unwrap(),
-  );
+  let asset_id = get_asset_id(&ctx.accounts.merkle_tree.key(), u64::from(args.index));
 
   verify_compressed_nft(VerifyCompressedNftArgs {
     data_hash: args.data_hash,
@@ -251,7 +245,9 @@ pub fn handler<'info>(
     .unwrap()
     .checked_div(mobile_price)
     .unwrap();
-  burn(ctx.accounts.mobile_burn_ctx(), mobile_fee)?;
+  if mobile_fee > 0 {
+    burn(ctx.accounts.mobile_burn_ctx(), mobile_fee)?;
+  }
 
   Ok(())
 }

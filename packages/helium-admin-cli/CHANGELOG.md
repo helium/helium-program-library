@@ -3,6 +3,73 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.20](https://github.com/helium/helium-program-libary/compare/v0.6.19...v0.6.20) (2024-01-19)
+
+
+### Features
+
+* **#526:** Remove digit shift from VSR ([#527](https://github.com/helium/helium-program-libary/issues/527)) ([651e629](https://github.com/helium/helium-program-libary/commit/651e62905e53cbf67f4c4318ca683396b5511b14)), closes [#526](https://github.com/helium/helium-program-libary/issues/526)
+
+
+
+
+
+## [0.6.19](https://github.com/helium/helium-program-libary/compare/v0.6.17...v0.6.19) (2024-01-19)
+
+**Note:** Version bump only for package @helium/helium-admin-cli
+
+
+
+
+
+## [0.6.18](https://github.com/helium/helium-program-libary/compare/v0.6.17...v0.6.18) (2024-01-19)
+
+**Note:** Version bump only for package @helium/helium-admin-cli
+
+
+
+
+
+## [0.6.17](https://github.com/helium/helium-program-libary/compare/v0.6.16...v0.6.17) (2024-01-19)
+
+**Note:** Version bump only for package @helium/helium-admin-cli
+
+
+
+
+
+## [0.6.16](https://github.com/helium/helium-program-libary/compare/v0.6.15...v0.6.16) (2024-01-16)
+
+**Note:** Version bump only for package @helium/helium-admin-cli
+
+
+
+
+
+## [0.6.15](https://github.com/helium/helium-program-libary/compare/v0.6.14...v0.6.15) (2024-01-12)
+
+**Note:** Version bump only for package @helium/helium-admin-cli
+
+
+
+
+
+## [0.6.14](https://github.com/helium/helium-program-libary/compare/v0.6.13...v0.6.14) (2024-01-11)
+
+**Note:** Version bump only for package @helium/helium-admin-cli
+
+
+
+
+
+## [0.6.13](https://github.com/helium/helium-program-libary/compare/v0.6.12...v0.6.13) (2024-01-05)
+
+**Note:** Version bump only for package @helium/helium-admin-cli
+
+
+
+
+
 ## [0.6.12](https://github.com/helium/helium-program-libary/compare/v0.6.11...v0.6.12) (2024-01-02)
 
 **Note:** Version bump only for package @helium/helium-admin-cli

@@ -3,6 +3,85 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.20](https://github.com/helium/helium-program-library/compare/v0.6.19...v0.6.20) (2024-01-19)
+
+
+### Features
+
+* **#526:** Remove digit shift from VSR ([#527](https://github.com/helium/helium-program-library/issues/527)) ([651e629](https://github.com/helium/helium-program-library/commit/651e62905e53cbf67f4c4318ca683396b5511b14)), closes [#526](https://github.com/helium/helium-program-library/issues/526)
+
+
+
+
+
+## [0.6.19](https://github.com/helium/helium-program-library/compare/v0.6.17...v0.6.19) (2024-01-19)
+
+
+### Bug Fixes
+
+* Do not require initialized token account if no mobile burn ([#542](https://github.com/helium/helium-program-library/issues/542)) ([a7334ed](https://github.com/helium/helium-program-library/commit/a7334ed0f916e8265a6f5955bd4fe837fc1dedb5))
+
+
+
+
+
+## [0.6.18](https://github.com/helium/helium-program-library/compare/v0.6.17...v0.6.18) (2024-01-19)
+
+
+### Bug Fixes
+
+* Do not require initialized token account if no mobile burn ([#542](https://github.com/helium/helium-program-library/issues/542)) ([a7334ed](https://github.com/helium/helium-program-library/commit/a7334ed0f916e8265a6f5955bd4fe837fc1dedb5))
+
+
+
+
+
+## [0.6.17](https://github.com/helium/helium-program-library/compare/v0.6.16...v0.6.17) (2024-01-19)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.16](https://github.com/helium/helium-program-library/compare/v0.6.15...v0.6.16) (2024-01-16)
+
+
+### Features
+
+* **#543:** Add transaction webhook capability to account-postgres-sink ([#544](https://github.com/helium/helium-program-library/issues/544)) ([a0d7bd9](https://github.com/helium/helium-program-library/commit/a0d7bd9cbf6e5a28c467d8df67c9702cef705dae)), closes [#543](https://github.com/helium/helium-program-library/issues/543)
+
+
+
+
+
+## [0.6.15](https://github.com/helium/helium-program-library/compare/v0.6.14...v0.6.15) (2024-01-12)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.14](https://github.com/helium/helium-program-library/compare/v0.6.13...v0.6.14) (2024-01-11)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.13](https://github.com/helium/helium-program-library/compare/v0.6.12...v0.6.13) (2024-01-05)
+
+
+### Features
+
+* Avoid purging prices when purging oracles ([#533](https://github.com/helium/helium-program-library/issues/533)) ([622ec12](https://github.com/helium/helium-program-library/commit/622ec12e18cde8b201018bb723c0d0df09cb4a33))
+
+
+
+
+
 ## [0.6.12](https://github.com/helium/helium-program-library/compare/v0.6.11...v0.6.12) (2024-01-02)
 
 **Note:** Version bump only for package helium-program-library

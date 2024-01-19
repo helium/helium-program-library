@@ -16,3 +16,5 @@ export const PROGRAM_ACCOUNT_CONFIGS =
 export const HELIUS_AUTH_SECRET = process.env.HELIUS_AUTH_SECRET;
 
 export const RUN_JOBS_AT_STARTUP = process.env.RUN_JOBS_AT_STARTUP === 'true';
+
+export const FETCH_DELAY_SECONDS = Number(process.env.FETCH_DELAY_SECONDS || "10")

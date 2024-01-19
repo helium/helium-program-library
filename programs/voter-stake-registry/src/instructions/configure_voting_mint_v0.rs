@@ -25,7 +25,6 @@ pub struct ConfigureVotingMintV0<'info> {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ConfigureVotingMintArgsV0 {
   pub idx: u16,
-  pub digit_shift: i8,
   pub baseline_vote_weight_scaled_factor: u64,
   pub max_extra_lockup_vote_weight_scaled_factor: u64,
   pub genesis_vote_power_multiplier: u8,
@@ -91,7 +90,6 @@ pub struct ConfigureVotingMintArgsV0 {
 pub fn handler(ctx: Context<ConfigureVotingMintV0>, args: ConfigureVotingMintArgsV0) -> Result<()> {
   let ConfigureVotingMintArgsV0 {
     idx,
-    digit_shift,
     baseline_vote_weight_scaled_factor,
     max_extra_lockup_vote_weight_scaled_factor,
     genesis_vote_power_multiplier,
@@ -134,18 +132,18 @@ pub fn handler(ctx: Context<ConfigureVotingMintV0>, args: ConfigureVotingMintArg
     Some(_) => {
       registrar.voting_mints[idx] = VotingMintConfigV0 {
         mint,
-        digit_shift,
         baseline_vote_weight_scaled_factor,
         max_extra_lockup_vote_weight_scaled_factor,
         genesis_vote_power_multiplier,
         genesis_vote_power_multiplier_expiration_ts,
         lockup_saturation_secs,
+        reserved: 0,
       }
     }
 
     None => registrar.voting_mints.push(VotingMintConfigV0 {
+      reserved: 0,
       mint,
-      digit_shift,
       baseline_vote_weight_scaled_factor,
       max_extra_lockup_vote_weight_scaled_factor,
       genesis_vote_power_multiplier,

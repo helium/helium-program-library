@@ -165,14 +165,14 @@ pub trait PrecisePosition {
   fn voting_power_precise_locked_precise(
     &self,
     curr_ts: i64,
-    max_locked_vote_weight: u64,
+    max_locked_vote_weight: u128,
     lockup_saturation_secs: u64,
   ) -> Result<u128>;
 
   fn voting_power_precise_cliff_precise(
     &self,
     curr_ts: i64,
-    max_locked_vote_weight: u64,
+    max_locked_vote_weight: u128,
     lockup_saturation_secs: u64,
   ) -> Result<u128>;
 }
@@ -184,9 +184,9 @@ impl PrecisePosition for PositionV0 {
     curr_ts: i64,
   ) -> Result<u128> {
     let baseline_vote_weight = (voting_mint_config
-      .baseline_vote_weight(self.amount_deposited_native)? as u128)
-      .checked_mul(FALL_RATE_FACTOR)
-      .unwrap();
+      .baseline_vote_weight(self.amount_deposited_native)?)
+    .checked_mul(FALL_RATE_FACTOR)
+    .unwrap();
     let max_locked_vote_weight =
       voting_mint_config.max_extra_lockup_vote_weight(self.amount_deposited_native)?;
     let genesis_multiplier =
@@ -213,7 +213,7 @@ impl PrecisePosition for PositionV0 {
   fn voting_power_precise_locked_precise(
     &self,
     curr_ts: i64,
-    max_locked_vote_weight: u64,
+    max_locked_vote_weight: u128,
     lockup_saturation_secs: u64,
   ) -> Result<u128> {
     if self.lockup.expired(curr_ts) || (max_locked_vote_weight == 0) {
@@ -238,12 +238,12 @@ impl PrecisePosition for PositionV0 {
   fn voting_power_precise_cliff_precise(
     &self,
     curr_ts: i64,
-    max_locked_vote_weight: u64,
+    max_locked_vote_weight: u128,
     lockup_saturation_secs: u64,
   ) -> Result<u128> {
     let remaining = min(self.lockup.seconds_left(curr_ts), lockup_saturation_secs);
     Ok(
-      (max_locked_vote_weight as u128)
+      (max_locked_vote_weight)
         .checked_mul(remaining as u128)
         .unwrap()
         .checked_mul(FALL_RATE_FACTOR)

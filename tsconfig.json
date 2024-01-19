@@ -8,6 +8,9 @@
       "path": "./packages/fanout-sdk"
     },
     {
+      "path": "./packages/hexboosting-sdk"
+    },
+    {
       "path": "./packages/spl-utils"
     },
     {
