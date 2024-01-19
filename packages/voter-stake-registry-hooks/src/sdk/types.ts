@@ -1,7 +1,6 @@
 import { BN, IdlAccounts, IdlTypes } from '@coral-xyz/anchor'
 import { HeliumSubDaos } from '@helium/idls/lib/types/helium_sub_daos'
 import { VoterStakeRegistry as HeliumVoterStakeRegistry } from '@helium/idls/lib/types/voter_stake_registry'
-import { Sft } from '@metaplex-foundation/js'
 import { PublicKey } from '@solana/web3.js'
 
 export type VotingMintConfig = IdlTypes<HeliumVoterStakeRegistry>['VotingMintConfigV0']
@@ -30,5 +29,10 @@ export type LockupKind = IdlTypes<HeliumVoterStakeRegistry>['LockupKind']
 export type SubDao = IdlAccounts<HeliumSubDaos>['subDaoV0']
 export interface SubDaoWithMeta extends Omit<SubDao, 'dntMint'> {
   pubkey: PublicKey
-  dntMetadata: Sft
+  dntMetadata: {
+    name: string;
+    symbol: string;
+    uri: string;
+    json: any;
+  }
 }
