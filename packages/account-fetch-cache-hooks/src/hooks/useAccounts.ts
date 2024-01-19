@@ -55,7 +55,9 @@ export function useAccounts<T>(
             info: undefined,
           };
         } catch (e) {
-          console.error(`Error while parsing: ${(e as Error).message}`);
+          if (cache.enableLogging) {
+            console.error(`Error while parsing: ${(e as Error).message}`);
+          }
           return {
             pubkey,
             account: data,
@@ -101,6 +103,13 @@ export function useAccounts<T>(
       publicKey: PublicKey;
     }[]
   >(eagerResult || []);
+
+  // Sometimes eager result never gets set because cache or keys is undefined
+  useEffect(() => {
+    if (eagerResult && accounts.length == 0 && (eagerResult?.length || 0) != 0) {
+      setAccounts(eagerResult);
+    }
+  }, [accounts, eagerResult])
 
   const prevKeys = usePrevious(keys);
   const { result, loading, error, status } = useAsync(
@@ -162,7 +171,9 @@ export function useAccounts<T>(
       (!eagerResult ||
         result.length !== eagerResult.length ||
         result.some(
-          (item, index) => item.account !== eagerResult[index]?.account
+          (item, index) =>
+            item.account !== eagerResult[index]?.account ||
+            item.info !== eagerResult[index]?.info
         ))
     ) {
       setAccounts(result);

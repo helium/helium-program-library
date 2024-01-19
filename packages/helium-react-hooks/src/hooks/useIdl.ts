@@ -2,7 +2,11 @@ import { Idl } from "@coral-xyz/anchor";
 import { decodeIdlAccount } from "@coral-xyz/anchor/dist/cjs/idl";
 import { utf8 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import { TypedAccountParser } from "@helium/account-fetch-cache";
-import { UseAccountState, useAccount } from "@helium/account-fetch-cache-hooks";
+import {
+  UseAccountState,
+  useAccount,
+  useAccountFetchCache,
+} from "@helium/account-fetch-cache-hooks";
 import { sha256 } from "@noble/hashes/sha256";
 import { PublicKey } from "@solana/web3.js";
 import { inflate } from "pako";
@@ -24,6 +28,7 @@ export function useIdl<IDL extends Idl>(
       return new PublicKey(publicKeyBytes);
     }
   }, [programId?.toBase58()]);
+  const cache = useAccountFetchCache();
   const idlParser: TypedAccountParser<IDL> = useMemo(() => {
     return (_, data) => {
       try {
@@ -31,7 +36,9 @@ export function useIdl<IDL extends Idl>(
         const inflatedIdl = inflate(idlData.data);
         return JSON.parse(utf8.decode(inflatedIdl));
       } catch (e: any) {
-        console.error(e);
+        if (cache.enableLogging) {
+          console.error(e);
+        }
         setIdlError(e);
       }
     };
