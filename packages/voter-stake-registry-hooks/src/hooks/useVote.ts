@@ -1,13 +1,10 @@
 import { useProposal } from "@helium/modular-governance-hooks";
 import {
   batchParallelInstructions,
-  bulkSendTransactions,
-  chunks,
-  truthy,
+  truthy
 } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
-import { PublicKey } from "@metaplex-foundation/js";
-import { Transaction, TransactionInstruction } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
