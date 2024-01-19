@@ -157,10 +157,20 @@ export function useAccounts<T>(
 
   // Start watchers
   useEffect(() => {
-    if (result) {
+    if (
+      result &&
+      (!eagerResult ||
+        result.some(
+          (item, index) => item.account !== eagerResult[index]?.account
+        ))
+    ) {
       setAccounts(result);
       const disposers = result.map((account) => {
-        return cache.watch(account.publicKey, account.parser, !!account.account);
+        return cache.watch(
+          account.publicKey,
+          account.parser,
+          !!account.account
+        );
       });
 
       return () => {
