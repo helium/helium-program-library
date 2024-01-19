@@ -1,9 +1,6 @@
-import { IdlAccounts } from "@coral-xyz/anchor";
-import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { init as initOrg, proposalKey } from "@helium/organization-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";
 import { batchParallelInstructions, truthy } from "@helium/spl-utils";
-import { init as initState } from "@helium/state-controller-sdk";
 import {
   init as initVsr,
   voteMarkerKey,
@@ -13,7 +10,6 @@ import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 
-type VoteMakerV0 = IdlAccounts<VoterStakeRegistry>["voteMarkerV0"];
 export const useRelinquishPositionVotes = () => {
   const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
