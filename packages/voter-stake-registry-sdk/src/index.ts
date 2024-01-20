@@ -1,5 +1,5 @@
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
-import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { vsrResolvers } from "./resolvers";
 import { PROGRAM_ID } from "./constants";
@@ -22,9 +22,28 @@ export const init = async (
     provider,
     undefined,
     () => {
-      return vsrResolvers
+      return vsrResolvers;
     }
   ) as Program<VoterStakeRegistry>;
 
   return heliumVoterStakeRegistry;
 };
+
+export function isClaimed({
+  epoch,
+  lastClaimedEpoch,
+  claimedEpochsBitmap
+}: {
+  epoch: number,
+  lastClaimedEpoch: number,
+  claimedEpochsBitmap: BN,
+}): boolean {
+  if (epoch <= lastClaimedEpoch) {
+    return true
+  } else if (epoch > lastClaimedEpoch + 128) {
+    return false
+  } else {
+    const bitIndex: number = epoch - lastClaimedEpoch - 1;
+    return claimedEpochsBitmap.shrn(127 - bitIndex).and(new BN(1)).toNumber() === 1;
+  }
+}

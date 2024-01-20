@@ -11,6 +11,7 @@ import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
+import { isClaimed } from "@helium/voter-stake-registry-sdk";
 
 export const useClaimPositionRewards = () => {
   const { provider } = useHeliumVsrState();
@@ -45,11 +46,18 @@ export const useClaimPositionRewards = () => {
         const delegatedPosAcc =
           await hsdProgram.account.delegatedPositionV0.fetch(delegatedPosKey);
 
-        const { lastClaimedEpoch } = delegatedPosAcc;
+        const { lastClaimedEpoch, claimedEpochsBitmap } = delegatedPosAcc;
         const epoch = lastClaimedEpoch.add(new BN(1));
         const epochsToClaim = Array.from(
           { length: currentEpoch.sub(epoch).toNumber() },
           (_v, k) => epoch.addn(k)
+        ).filter(
+          (epoch) =>
+            !isClaimed({
+              epoch: epoch.toNumber(),
+              lastClaimedEpoch: lastClaimedEpoch.toNumber(),
+              claimedEpochsBitmap,
+            })
         );
 
         const instructions: TransactionInstruction[] = await Promise.all(
