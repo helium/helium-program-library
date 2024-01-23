@@ -8,6 +8,9 @@
       "path": "./packages/fanout-sdk"
     },
     {
+      "path": "./packages/sus"
+    },
+    {
       "path": "./packages/hexboosting-sdk"
     },
     {
@@ -81,9 +84,11 @@
     },
     {
       "path": "./packages/crons"
-    }, {
+    },
+    {
       "path": "./packages/entity-invalidator"
-    }, {
+    },
+    {
       "path": "./packages/no-emit-sdk"
     }
   ]
