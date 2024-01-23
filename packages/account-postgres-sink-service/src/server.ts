@@ -207,10 +207,10 @@ if (!HELIUS_AUTH_SECRET) {
             )
             .filter(
               (_, index) =>
-                index < tx.transaction.message.header.numRequiredSignatures ||
-                index >
-                  tx.transaction.message.header.numReadonlySignedAccounts +
-                    tx.transaction.message.header.numRequiredSignatures
+                index <
+                  tx.transaction.message.header.numRequiredSignatures -
+                    tx.transaction.message.header.numReadonlySignedAccounts ||
+                index >= tx.transaction.message.header.numRequiredSignatures
             )
         )
         .map((k) => new PublicKey(k));
