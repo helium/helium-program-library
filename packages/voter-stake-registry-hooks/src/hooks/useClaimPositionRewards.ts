@@ -15,8 +15,7 @@ import { isClaimed } from "@helium/voter-stake-registry-sdk";
 import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 
 export const useClaimPositionRewards = () => {
-  const { provider } = useHeliumVsrState();
-  const unixNow = useSolanaUnixNow();
+  const { provider, unixNow } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,

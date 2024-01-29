@@ -9,8 +9,7 @@ import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 
 export const useFlipPositionLockupKind = () => {
-  const unixNow = useSolanaUnixNow();
-  const { provider } = useHeliumVsrState();
+  const { provider, unixNow } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,
