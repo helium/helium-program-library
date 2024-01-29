@@ -21,6 +21,8 @@ export const useClaimAllPositionsRewards = () => {
       programId = PROGRAM_ID,
       onProgress,
       onInstructions,
+      // Make a smaller batch for the sake of ledger.
+      maxSignatureBatch = 10,
     }: {
       positions: PositionWithMeta[];
       programId?: PublicKey;
@@ -29,6 +31,7 @@ export const useClaimAllPositionsRewards = () => {
       onInstructions?: (
         instructions: TransactionInstruction[]
       ) => Promise<void>;
+      maxSignatureBatch?: number;
     }) => {
       const isInvalid =
         !unixNow || !provider || !positions.every((pos) => pos.hasRewards);
@@ -81,7 +84,10 @@ export const useClaimAllPositionsRewards = () => {
           await batchParallelInstructions(
             provider,
             multiDemArray.flat(),
-            onProgress
+            onProgress,
+            10,
+            [],
+            maxSignatureBatch
           );
         }
       }

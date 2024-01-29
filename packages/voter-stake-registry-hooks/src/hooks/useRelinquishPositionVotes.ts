@@ -1,6 +1,6 @@
 import { init as initOrg, proposalKey } from "@helium/organization-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";
-import { batchParallelInstructions, truthy } from "@helium/spl-utils";
+import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
 import {
   init as initVsr,
   voteMarkerKey,
@@ -17,6 +17,9 @@ export const useRelinquishPositionVotes = () => {
       position,
       organization,
       onInstructions,
+      // Make a smaller batch for the sake of ledger.
+      maxSignatureBatch = 10,
+      onProgress,
     }: {
       position: PositionWithMeta;
       organization: PublicKey;
@@ -24,6 +27,8 @@ export const useRelinquishPositionVotes = () => {
       onInstructions?: (
         instructions: TransactionInstruction[]
       ) => Promise<void>;
+      maxSignatureBatch?: number;
+      onProgress?: (status: Status) => void;
     }) => {
       const isInvalid =
         !provider || !provider.wallet || position.numActiveVotes === 0;
@@ -100,7 +105,14 @@ export const useRelinquishPositionVotes = () => {
         if (onInstructions) {
           await onInstructions(instructions);
         } else {
-          await batchParallelInstructions(provider, instructions);
+          await batchParallelInstructions(
+            provider,
+            instructions,
+            onProgress,
+            10,
+            [],
+            maxSignatureBatch
+          );
         }
       }
     }

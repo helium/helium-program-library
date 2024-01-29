@@ -1,4 +1,5 @@
 import {
+  Status,
   batchParallelInstructions,
   truthy
 } from "@helium/spl-utils";
@@ -30,11 +31,16 @@ export const useRelinquishVote = (proposal: PublicKey) => {
     async ({
       choice,
       onInstructions,
+      onProgress,
+      // Make a smaller batch for the sake of ledger.
+      maxSignatureBatch = 10,
     }: {
       choice: number; // Instead of sending the transaction, let the caller decide
       onInstructions?: (
         instructions: TransactionInstruction[]
       ) => Promise<void>;
+      onProgress?: (status: Status) => void;
+      maxSignatureBatch?: number;
     }) => {
       const isInvalid = !provider || !positions || positions.length === 0;
 
@@ -70,7 +76,14 @@ export const useRelinquishVote = (proposal: PublicKey) => {
         if (onInstructions) {
           await onInstructions(instructions);
         } else {
-          await batchParallelInstructions(provider, instructions);
+          await batchParallelInstructions(
+            provider,
+            instructions,
+            onProgress,
+            10,
+            [],
+            maxSignatureBatch
+          );
         }
       }
     }
