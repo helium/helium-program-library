@@ -1,5 +1,6 @@
 import { useProposal } from "@helium/modular-governance-hooks";
 import {
+  Status,
   batchParallelInstructions,
   truthy
 } from "@helium/spl-utils";
@@ -52,11 +53,15 @@ export const useVote = (proposalKey: PublicKey) => {
     async ({
       choice,
       onInstructions,
+      onProgress,
+      maxSignatureBatch
     }: {
       choice: number; // Instead of sending the transaction, let the caller decide
       onInstructions?: (
         instructions: TransactionInstruction[]
       ) => Promise<void>;
+      onProgress?: (status: Status) => void;
+      maxSignatureBatch?: number;
     }) => {
       const isInvalid = !provider || !positions || positions.length === 0;
 
@@ -93,7 +98,14 @@ export const useVote = (proposalKey: PublicKey) => {
         if (onInstructions) {
           await onInstructions(instructions);
         } else {
-          await batchParallelInstructions(provider, instructions);
+          await batchParallelInstructions(
+            provider,
+            instructions,
+            onProgress,
+            10,
+            [],
+            maxSignatureBatch
+          );
         }
       }
     }

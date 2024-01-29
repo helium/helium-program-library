@@ -1,4 +1,5 @@
 import {
+  Status,
   batchParallelInstructions,
   truthy
 } from "@helium/spl-utils";
@@ -8,6 +9,7 @@ import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { useVoteMarkers } from "./useVoteMarkers";
+import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 
 export const useRelinquishVote = (proposal: PublicKey) => {
   const { positions, provider } = useHeliumVsrState();
@@ -30,11 +32,15 @@ export const useRelinquishVote = (proposal: PublicKey) => {
     async ({
       choice,
       onInstructions,
+      onProgress,
+      maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
     }: {
       choice: number; // Instead of sending the transaction, let the caller decide
       onInstructions?: (
         instructions: TransactionInstruction[]
       ) => Promise<void>;
+      onProgress?: (status: Status) => void;
+      maxSignatureBatch?: number;
     }) => {
       const isInvalid = !provider || !positions || positions.length === 0;
 
@@ -70,7 +76,14 @@ export const useRelinquishVote = (proposal: PublicKey) => {
         if (onInstructions) {
           await onInstructions(instructions);
         } else {
-          await batchParallelInstructions(provider, instructions);
+          await batchParallelInstructions(
+            provider,
+            instructions,
+            onProgress,
+            10,
+            [],
+            maxSignatureBatch
+          );
         }
       }
     }

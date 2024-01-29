@@ -11,6 +11,7 @@ import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
+import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 
 export const useClaimAllPositionsRewards = () => {
   const { provider } = useHeliumVsrState();
@@ -21,6 +22,7 @@ export const useClaimAllPositionsRewards = () => {
       programId = PROGRAM_ID,
       onProgress,
       onInstructions,
+      maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
     }: {
       positions: PositionWithMeta[];
       programId?: PublicKey;
@@ -29,6 +31,7 @@ export const useClaimAllPositionsRewards = () => {
       onInstructions?: (
         instructions: TransactionInstruction[]
       ) => Promise<void>;
+      maxSignatureBatch?: number;
     }) => {
       const isInvalid =
         !unixNow || !provider || !positions.every((pos) => pos.hasRewards);
@@ -81,7 +84,10 @@ export const useClaimAllPositionsRewards = () => {
           await batchParallelInstructions(
             provider,
             multiDemArray.flat(),
-            onProgress
+            onProgress,
+            10,
+            [],
+            maxSignatureBatch
           );
         }
       }

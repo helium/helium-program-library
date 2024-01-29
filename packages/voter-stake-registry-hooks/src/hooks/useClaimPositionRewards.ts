@@ -12,6 +12,7 @@ import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 import { isClaimed } from "@helium/voter-stake-registry-sdk";
+import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 
 export const useClaimPositionRewards = () => {
   const { provider } = useHeliumVsrState();
@@ -22,6 +23,7 @@ export const useClaimPositionRewards = () => {
       programId = PROGRAM_ID,
       onProgress,
       onInstructions,
+      maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
     }: {
       position: PositionWithMeta;
       programId?: PublicKey;
@@ -30,6 +32,7 @@ export const useClaimPositionRewards = () => {
       onInstructions?: (
         instructions: TransactionInstruction[]
       ) => Promise<void>;
+      maxSignatureBatch?: number;
     }) => {
       const isInvalid = !unixNow || !provider || !position.hasRewards;
 
@@ -78,7 +81,14 @@ export const useClaimPositionRewards = () => {
         if (onInstructions) {
           await onInstructions(instructions);
         } else {
-          await batchParallelInstructions(provider, instructions, onProgress);
+          await batchParallelInstructions(
+            provider,
+            instructions,
+            onProgress,
+            10,
+            [],
+            maxSignatureBatch
+          );
         }
       }
     }
