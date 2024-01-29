@@ -9,6 +9,7 @@ import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { useVoteMarkers } from "./useVoteMarkers";
+import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 
 export const useRelinquishVote = (proposal: PublicKey) => {
   const { positions, provider } = useHeliumVsrState();
@@ -32,8 +33,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
       choice,
       onInstructions,
       onProgress,
-      // Make a smaller batch for the sake of ledger.
-      maxSignatureBatch = 10,
+      maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
     }: {
       choice: number; // Instead of sending the transaction, let the caller decide
       onInstructions?: (

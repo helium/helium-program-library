@@ -9,6 +9,7 @@ import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
+import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 
 export const useRelinquishPositionVotes = () => {
   const { provider } = useHeliumVsrState();
@@ -17,8 +18,7 @@ export const useRelinquishPositionVotes = () => {
       position,
       organization,
       onInstructions,
-      // Make a smaller batch for the sake of ledger.
-      maxSignatureBatch = 10,
+      maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
       onProgress,
     }: {
       position: PositionWithMeta;

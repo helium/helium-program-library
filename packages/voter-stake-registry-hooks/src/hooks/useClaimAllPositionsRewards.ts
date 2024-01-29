@@ -11,6 +11,7 @@ import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
+import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 
 export const useClaimAllPositionsRewards = () => {
   const { provider } = useHeliumVsrState();
@@ -21,8 +22,7 @@ export const useClaimAllPositionsRewards = () => {
       programId = PROGRAM_ID,
       onProgress,
       onInstructions,
-      // Make a smaller batch for the sake of ledger.
-      maxSignatureBatch = 10,
+      maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
     }: {
       positions: PositionWithMeta[];
       programId?: PublicKey;
