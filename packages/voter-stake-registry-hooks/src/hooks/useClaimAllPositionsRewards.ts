@@ -14,8 +14,7 @@ import { PositionWithMeta } from "../sdk/types";
 import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 
 export const useClaimAllPositionsRewards = () => {
-  const { provider } = useHeliumVsrState();
-  const unixNow = useSolanaUnixNow();
+  const { provider, unixNow } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       positions,

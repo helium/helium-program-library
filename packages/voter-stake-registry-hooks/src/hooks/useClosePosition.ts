@@ -8,8 +8,7 @@ import { HeliumVsrClient } from "../sdk/client";
 import { PositionWithMeta } from "../sdk/types";
 
 export const useClosePosition = () => {
-  const { provider } = useHeliumVsrState();
-  const unixNow = useSolanaUnixNow();
+  const { provider, unixNow } = useHeliumVsrState();
   const { result: client } = useAsync(
     (provider) => HeliumVsrClient.connect(provider),
     [provider]
