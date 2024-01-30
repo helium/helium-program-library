@@ -49,4 +49,11 @@ pub mod hexboosting {
   pub fn close_boost_v0(ctx: Context<CloseBoostV0>) -> Result<()> {
     close_boost_v0::handler(ctx)
   }
+
+  pub fn update_boost_config_v0(
+    ctx: Context<UpdateBoostConfigV0>,
+    args: UpdateBoostConfigArgsV0,
+  ) -> Result<()> {
+    update_boost_config_v0::handler(ctx, args)
+  }
 }

@@ -199,6 +199,7 @@ describe("hexboosting", () => {
         minimumPeriods: 6,
       })
       .accounts({
+        startAuthority: me,
         dntMint: mint,
         priceOracle,
         rentReclaimAuthority: me,
@@ -245,6 +246,7 @@ describe("hexboosting", () => {
           minimumPeriods: 6,
         })
         .accounts({
+          startAuthority: me,
           dntMint: mint,
           priceOracle,
           rentReclaimAuthority: me,
@@ -261,6 +263,34 @@ describe("hexboosting", () => {
         })
         .rpc({ skipPreflight: true });
     });
+
+    it("allows updating boost config", async () => {
+      const boostConfig = boostConfigKey(mint)[0]
+      await program.methods
+        .updateBoostConfigV0({
+          boostPrice: toBN(0.006, 6),
+          startAuthority: PublicKey.default,
+          rentReclaimAuthority: PublicKey.default,
+          minimumPeriods: 4,
+          priceOracle: PublicKey.default
+        })
+        .accounts({
+          boostConfig
+        })
+        .rpcAndKeys({ skipPreflight: true });
+      const account = await program.account.boostConfigV0.fetch(boostConfig)
+      expect(account.boostPrice.toNumber()).to.eq(6000);
+      expect(account.startAuthority.toString()).to.eq(
+        PublicKey.default.toBase58()
+      );
+      expect(account.rentReclaimAuthority.toString()).to.eq(
+        PublicKey.default.toBase58()
+      );
+      expect(account.priceOracle.toString()).to.eq(
+        PublicKey.default.toBase58()
+      );
+      expect(account.minimumPeriods).to.eq(4);
+    })
 
     it("does the initial boost", async () => {
       const preBalance = (

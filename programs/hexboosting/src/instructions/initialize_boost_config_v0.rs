@@ -29,6 +29,8 @@ pub struct InitializeBoostConfigV0<'info> {
   pub authority: Signer<'info>,
   /// CHECK: Just for settings
   pub rent_reclaim_authority: AccountInfo<'info>,
+  /// CHECK: Just for settings
+  pub start_authority: AccountInfo<'info>,
   pub price_oracle: Box<Account<'info, PriceOracleV0>>,
   pub dnt_mint: Box<Account<'info, Mint>>,
 
@@ -56,6 +58,7 @@ pub fn handler(
     minimum_periods: args.minimum_periods,
     rent_reclaim_authority: ctx.accounts.rent_reclaim_authority.key(),
     bump_seed: ctx.bumps["boost_config"],
+    start_authority: ctx.accounts.start_authority.key(),
   });
 
   Ok(())
