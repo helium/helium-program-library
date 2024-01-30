@@ -13,10 +13,10 @@ use crate::{BoostConfigV0, BoostedHexV0};
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct BoostArgsV0 {
   pub location: u64,
-  // Ensure that the start_ts they created this periods from is the
+  // Ensure that the version they created this periods from is the
   // same as what's on chain. Otherwise a shift lift could make these offsets
   // invalid
-  pub start_ts: i64,
+  pub version: u32,
   pub amounts: Vec<BoostAmountV0>,
 }
 
@@ -67,7 +67,8 @@ pub struct BoostV0<'info> {
     payer = payer,
     space = get_space(boosted_hex),
     seeds = [b"boosted_hex", boost_config.key().as_ref(), &args.location.to_le_bytes()],
-    bump
+    bump,
+    constraint = boosted_hex.version == args.version @ ErrorCode::InvalidVersion,
   )]
   pub boosted_hex: Box<Account<'info, BoostedHexV0>>,
   pub system_program: Program<'info, System>,
@@ -76,15 +77,11 @@ pub struct BoostV0<'info> {
 }
 
 pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
-  // Ensure that the start_ts they created this periods from is the
-  // same as what's on chain. Otherwise a shift lift could make these offsets
-  // invalid
-  require_eq!(args.start_ts, ctx.accounts.boosted_hex.start_ts);
-
   let mut is_initialized = ctx.accounts.boosted_hex.location != 0;
   ctx.accounts.boosted_hex.boost_config = ctx.accounts.boost_config.key();
   ctx.accounts.boosted_hex.location = args.location;
   ctx.accounts.boosted_hex.bump_seed = ctx.bumps["boosted_hex"];
+  ctx.accounts.boosted_hex.version += 1;
 
   // Insert the new periods
   let max_period = args
