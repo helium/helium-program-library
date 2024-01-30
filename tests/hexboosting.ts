@@ -274,7 +274,7 @@ describe("hexboosting", () => {
       } = await program.methods
         .boostV0({
           location: new BN(1),
-          startTs: new BN(0),
+          version: 0,
           amounts: [
             {
               period: 0,
@@ -329,7 +329,7 @@ describe("hexboosting", () => {
         await program.methods
           .boostV0({
             location: new BN(1),
-            startTs: new BN(0),
+            version: 0,
             amounts: [
               {
                 period: 0,
@@ -376,7 +376,7 @@ describe("hexboosting", () => {
         } = await program.methods
           .boostV0({
             location: new BN(1),
-            startTs: new BN(0),
+            version: 1,
             amounts: [
               {
                 period: 2,
@@ -420,7 +420,9 @@ describe("hexboosting", () => {
       it("allows starting a boost", async () => {
         const boostedHex = boostedHexKey(boostConfigKey(mint)[0], new BN(1))[0];
         await program.methods
-          .startBoostV0()
+          .startBoostV0({
+            startTs: new BN(1)
+          })
           .accounts({
             boostedHex,
             carrier,
@@ -442,7 +444,9 @@ describe("hexboosting", () => {
             new BN(1)
           )[0];
           await program.methods
-            .startBoostV0()
+            .startBoostV0({
+              startTs: new BN(1),
+            })
             .accounts({
               boostedHex,
               carrier,
