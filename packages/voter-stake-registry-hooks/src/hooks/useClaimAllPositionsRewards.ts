@@ -1,5 +1,4 @@
 import { BN, Program } from "@coral-xyz/anchor";
-import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import {
   EPOCH_LENGTH,
   PROGRAM_ID,
