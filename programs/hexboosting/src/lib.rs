@@ -42,8 +42,8 @@ pub mod hexboosting {
     initialize_boost_config_v0::handler(ctx, args)
   }
 
-  pub fn start_boost_v0(ctx: Context<StartBoostV0>) -> Result<()> {
-    start_boost_v0::handler(ctx)
+  pub fn start_boost_v0(ctx: Context<StartBoostV0>, args: StartBoostArgsV0) -> Result<()> {
+    start_boost_v0::handler(ctx, args)
   }
 
   pub fn close_boost_v0(ctx: Context<CloseBoostV0>) -> Result<()> {

@@ -30,6 +30,8 @@ pub struct BoostedHexV0 {
   pub bump_seed: u8,
   /// Each entry represents the boost multiplier for a given period
   pub boosts_by_period: Vec<u8>,
+  // Track changes to the boosted hex so client can pass what version it made a change to
+  pub version: u32,
 }
 
 impl BoostedHexV0 {
