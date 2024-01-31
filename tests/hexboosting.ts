@@ -199,6 +199,7 @@ describe("hexboosting", () => {
         minimumPeriods: 6,
       })
       .accounts({
+        startAuthority: me,
         dntMint: mint,
         priceOracle,
         rentReclaimAuthority: me,
@@ -245,6 +246,7 @@ describe("hexboosting", () => {
           minimumPeriods: 6,
         })
         .accounts({
+          startAuthority: me,
           dntMint: mint,
           priceOracle,
           rentReclaimAuthority: me,
@@ -262,6 +264,34 @@ describe("hexboosting", () => {
         .rpc({ skipPreflight: true });
     });
 
+    it("allows updating boost config", async () => {
+      const boostConfig = boostConfigKey(mint)[0]
+      await program.methods
+        .updateBoostConfigV0({
+          boostPrice: toBN(0.006, 6),
+          startAuthority: PublicKey.default,
+          rentReclaimAuthority: PublicKey.default,
+          minimumPeriods: 4,
+          priceOracle: PublicKey.default
+        })
+        .accounts({
+          boostConfig
+        })
+        .rpcAndKeys({ skipPreflight: true });
+      const account = await program.account.boostConfigV0.fetch(boostConfig)
+      expect(account.boostPrice.toNumber()).to.eq(6000);
+      expect(account.startAuthority.toString()).to.eq(
+        PublicKey.default.toBase58()
+      );
+      expect(account.rentReclaimAuthority.toString()).to.eq(
+        PublicKey.default.toBase58()
+      );
+      expect(account.priceOracle.toString()).to.eq(
+        PublicKey.default.toBase58()
+      );
+      expect(account.minimumPeriods).to.eq(4);
+    })
+
     it("does the initial boost", async () => {
       const preBalance = (
         await getAccount(
@@ -274,7 +304,7 @@ describe("hexboosting", () => {
       } = await program.methods
         .boostV0({
           location: new BN(1),
-          startTs: new BN(0),
+          version: 0,
           amounts: [
             {
               period: 0,
@@ -329,7 +359,7 @@ describe("hexboosting", () => {
         await program.methods
           .boostV0({
             location: new BN(1),
-            startTs: new BN(0),
+            version: 0,
             amounts: [
               {
                 period: 0,
@@ -376,7 +406,7 @@ describe("hexboosting", () => {
         } = await program.methods
           .boostV0({
             location: new BN(1),
-            startTs: new BN(0),
+            version: 1,
             amounts: [
               {
                 period: 2,
@@ -420,7 +450,9 @@ describe("hexboosting", () => {
       it("allows starting a boost", async () => {
         const boostedHex = boostedHexKey(boostConfigKey(mint)[0], new BN(1))[0];
         await program.methods
-          .startBoostV0()
+          .startBoostV0({
+            startTs: new BN(1)
+          })
           .accounts({
             boostedHex,
             carrier,
@@ -442,7 +474,9 @@ describe("hexboosting", () => {
             new BN(1)
           )[0];
           await program.methods
-            .startBoostV0()
+            .startBoostV0({
+              startTs: new BN(1),
+            })
             .accounts({
               boostedHex,
               carrier,
