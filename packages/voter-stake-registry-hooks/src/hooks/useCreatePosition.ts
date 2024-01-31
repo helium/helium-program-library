@@ -60,6 +60,7 @@ export const useCreatePosition = () => {
         const mintKeypair = Keypair.generate();
         const position = positionKey(mintKeypair.publicKey)[0];
         const instructions: TransactionInstruction[] = [];
+        const delegateInstructions: TransactionInstruction[] = [];
         const mintRent =
           await provider.connection.getMinimumBalanceForRentExemption(
             MintLayout.span
@@ -128,7 +129,7 @@ export const useCreatePosition = () => {
             endTs
           );
 
-          instructions.push(
+          delegateInstructions.push(
             await hsdProgram.methods
               .delegateV0()
               .accounts({
@@ -146,9 +147,15 @@ export const useCreatePosition = () => {
         }
 
         if (onInstructions) {
-          await onInstructions(instructions, [mintKeypair]);
+          await onInstructions(
+            [...instructions, ...delegateInstructions],
+            [mintKeypair]
+          );
         } else {
           await sendInstructions(provider, instructions, [mintKeypair]);
+          if (delegateInstructions.length > 0) {
+            await sendInstructions(provider, delegateInstructions);
+          }
         }
       }
     }
