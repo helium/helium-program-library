@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.26](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.26) (2024-01-31)
+
+
+### Bug Fixes
+
+* Do not require initialized token account if no mobile burn ([#542](https://github.com/helium/helium-program-library/issues/542)) ([a7334ed](https://github.com/helium/helium-program-library/commit/a7334ed0f916e8265a6f5955bd4fe837fc1dedb5))
+
+
+### Features
+
+* **#494:** Implement HIP-96 wifi onboarding fees ([#506](https://github.com/helium/helium-program-library/issues/506)) ([50471c3](https://github.com/helium/helium-program-library/commit/50471c33d06ba7f55e605ed7dbba02119af5e3cd)), closes [#494](https://github.com/helium/helium-program-library/issues/494)
+* **#495:** Add monitoring for claimable rewards and vehnt ([#507](https://github.com/helium/helium-program-library/issues/507)) ([efc6813](https://github.com/helium/helium-program-library/commit/efc6813839be4b323bea8110ad7762423dd13b82)), closes [#495](https://github.com/helium/helium-program-library/issues/495) [#495](https://github.com/helium/helium-program-library/issues/495)
+* **#504:** Parallelize claim delegation rewards  ([#509](https://github.com/helium/helium-program-library/issues/509)) ([01b5f3d](https://github.com/helium/helium-program-library/commit/01b5f3dbd35345302e5fc6a83667b5e5e017d4ec)), closes [#504](https://github.com/helium/helium-program-library/issues/504)
+* **#525:** Add prom metrics for price oracles, fix distributor oracle total rewards metric ([#528](https://github.com/helium/helium-program-library/issues/528)) ([13a5cb8](https://github.com/helium/helium-program-library/commit/13a5cb8d8936d1b5929379dafafd2907322dd473))
+* **#526:** Remove digit shift from VSR ([#527](https://github.com/helium/helium-program-library/issues/527)) ([651e629](https://github.com/helium/helium-program-library/commit/651e62905e53cbf67f4c4318ca683396b5511b14)), closes [#526](https://github.com/helium/helium-program-library/issues/526)
+* **#543:** Add transaction webhook capability to account-postgres-sink ([#544](https://github.com/helium/helium-program-library/issues/544)) ([a0d7bd9](https://github.com/helium/helium-program-library/commit/a0d7bd9cbf6e5a28c467d8df67c9702cef705dae)), closes [#543](https://github.com/helium/helium-program-library/issues/543)
+* Avoid purging prices when purging oracles ([#533](https://github.com/helium/helium-program-library/issues/533)) ([622ec12](https://github.com/helium/helium-program-library/commit/622ec12e18cde8b201018bb723c0d0df09cb4a33))
+
+
+
+
+
 ## [0.6.25](https://github.com/helium/helium-program-library/compare/v0.6.24...v0.6.25) (2024-01-29)
 
 **Note:** Version bump only for package helium-program-library
