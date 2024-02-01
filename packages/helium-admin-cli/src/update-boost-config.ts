@@ -6,6 +6,10 @@ import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
 import { loadKeypair, sendInstructionsOrSquads } from "./utils";
+import {
+  init as initHsd,
+  subDaoKey,
+} from "@helium/helium-sub-daos-sdk";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -18,12 +22,6 @@ export async function run(args: any = process.argv) {
       alias: "u",
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
-    },
-    name: {
-      alias: "n",
-      type: "string",
-      required: true,
-      describe: "Name of the carrier, case sensitive",
     },
     executeTransaction: {
       type: "boolean",
@@ -71,10 +69,13 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const program = await initHex(provider);
+  const hsdProgram = await initHsd(provider);
 
   const instructions: TransactionInstruction[] = [];
 
   const dntMint = new PublicKey(argv.dntMint);
+  const subDaoK = subDaoKey(dntMint)[0]
+  const subDao = await hsdProgram.account.subDaoV0.fetch(subDaoK)
 
   instructions.push(
     await program.methods
@@ -82,15 +83,16 @@ export async function run(args: any = process.argv) {
         startAuthority: argv.startAuthority
           ? new PublicKey(argv.startAuthority)
           : null,
-        rentReclaimAuthority: argv.startAuthority
-          ? new PublicKey(argv.startAuthority)
+        rentReclaimAuthority: argv.rentReclaimAuthority
+          ? new PublicKey(argv.rentReclaimAuthority)
           : null,
         priceOracle: argv.priceOracle ? new PublicKey(argv.priceOracle) : null,
         minimumPeriods: argv.minimumPeriods || null,
         boostPrice: argv.boostPrice ? new anchor.BN(argv.boostPrice) : null,
       })
       .accounts({
-        boostConfig: boostConfigKey(dntMint)[0]
+        boostConfig: boostConfigKey(dntMint)[0],
+        authority: subDao.authority,
       })
       .instruction()
   );

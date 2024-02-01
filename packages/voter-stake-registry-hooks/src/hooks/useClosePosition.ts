@@ -1,5 +1,4 @@
 import { BN } from "@coral-xyz/anchor";
-import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import { sendInstructions } from "@helium/spl-utils";
 import { TransactionInstruction } from "@solana/web3.js";
 import { useAsync, useAsyncCallback } from "react-async-hook";

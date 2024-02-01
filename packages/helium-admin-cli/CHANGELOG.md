@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.26](https://github.com/helium/helium-program-libary/compare/v0.6.5...v0.6.26) (2024-01-31)
+
+
+### Features
+
+* **#494:** Implement HIP-96 wifi onboarding fees ([#506](https://github.com/helium/helium-program-libary/issues/506)) ([50471c3](https://github.com/helium/helium-program-libary/commit/50471c33d06ba7f55e605ed7dbba02119af5e3cd)), closes [#494](https://github.com/helium/helium-program-libary/issues/494)
+* **#495:** Add monitoring for claimable rewards and vehnt ([#507](https://github.com/helium/helium-program-libary/issues/507)) ([efc6813](https://github.com/helium/helium-program-libary/commit/efc6813839be4b323bea8110ad7762423dd13b82)), closes [#495](https://github.com/helium/helium-program-libary/issues/495) [#495](https://github.com/helium/helium-program-libary/issues/495)
+* **#525:** Add prom metrics for price oracles, fix distributor oracle total rewards metric ([#528](https://github.com/helium/helium-program-libary/issues/528)) ([13a5cb8](https://github.com/helium/helium-program-libary/commit/13a5cb8d8936d1b5929379dafafd2907322dd473))
+* **#526:** Remove digit shift from VSR ([#527](https://github.com/helium/helium-program-libary/issues/527)) ([651e629](https://github.com/helium/helium-program-libary/commit/651e62905e53cbf67f4c4318ca683396b5511b14)), closes [#526](https://github.com/helium/helium-program-libary/issues/526)
+
+
+
+
+
 ## [0.6.25](https://github.com/helium/helium-program-libary/compare/v0.6.24...v0.6.25) (2024-01-29)
 
 **Note:** Version bump only for package @helium/helium-admin-cli
