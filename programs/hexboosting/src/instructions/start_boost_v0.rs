@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use mobile_entity_manager::CarrierV0;
 
 use crate::{BoostConfigV0, BoostedHexV0};
 
@@ -15,13 +14,6 @@ pub struct StartBoostV0<'info> {
     has_one = start_authority
   )]
   pub boost_config: Box<Account<'info, BoostConfigV0>>,
-  #[account(
-    has_one = hexboost_authority,
-    constraint = carrier.sub_dao == boost_config.sub_dao,
-    constraint = carrier.approved,
-  )]
-  pub carrier: Box<Account<'info, CarrierV0>>,
-  pub hexboost_authority: Signer<'info>,
   #[account(
     mut,
     has_one = boost_config,
