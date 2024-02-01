@@ -3,11 +3,11 @@ use crate::state::*;
 use crate::TESTING;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token;
-use anchor_spl::token::FreezeAccount;
-use anchor_spl::token::ThawAccount;
-use anchor_spl::token::Transfer;
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use anchor_spl::token_interface;
+use anchor_spl::token_interface::{
+  FreezeAccount, Mint, ThawAccount, TokenAccount, TokenInterface, TokenMetadataInitializeArgs,
+  Transfer,
+};
 use std::str::FromStr;
 
 // In practice, this is the migration service which approves the legal attestation that
@@ -36,21 +36,21 @@ pub struct LedgerTransferPositionV0<'info> {
     mint::authority = position,
     mint::freeze_authority = position,
   )]
-  pub mint: Box<Account<'info, Mint>>,
+  pub mint: Box<InterfaceAccount<'info, Mint>>,
 
   #[account(
     mut,
     associated_token::mint = mint,
     associated_token::authority = from,
   )]
-  pub from_token_account: Box<Account<'info, TokenAccount>>,
+  pub from_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
   #[account(
     init_if_needed,
     payer = payer,
     associated_token::mint = mint,
     associated_token::authority = to,
   )]
-  pub to_token_account: Box<Account<'info, TokenAccount>>,
+  pub to_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
   pub from: Signer<'info>,
   pub to: Signer<'info>,
@@ -61,7 +61,7 @@ pub struct LedgerTransferPositionV0<'info> {
   pub approver: Signer<'info>,
 
   pub system_program: Program<'info, System>,
-  pub token_program: Program<'info, Token>,
+  pub token_program: Interface<'info, TokenInterface>,
   pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
@@ -100,11 +100,11 @@ pub fn handler(ctx: Context<LedgerTransferPositionV0>) -> Result<()> {
   let signer_seeds: &[&[&[u8]]] = &[position_seeds!(ctx.accounts.position)];
 
   // Thaw the source
-  token::thaw_account(ctx.accounts.thaw_ctx().with_signer(signer_seeds))?;
+  token_interface::thaw_account(ctx.accounts.thaw_ctx().with_signer(signer_seeds))?;
   // Transfer to dest
-  token::transfer(ctx.accounts.transfer_ctx(), 1)?;
+  token_interface::transfer(ctx.accounts.transfer_ctx(), 1)?;
   // Freeze the dest
-  token::freeze_account(ctx.accounts.freeze_ctx().with_signer(signer_seeds))?;
+  token_interface::freeze_account(ctx.accounts.freeze_ctx().with_signer(signer_seeds))?;
 
   Ok(())
 }

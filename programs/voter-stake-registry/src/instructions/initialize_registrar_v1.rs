@@ -1,6 +1,7 @@
 use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
+use anchor_spl::token_interface::Token2022;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
@@ -20,12 +21,10 @@ pub struct InitializeRegistrarArgsV0 {
 }
 
 #[derive(Accounts)]
-pub struct InitializeRegistrarV0<'info> {
-  /// The voting registrar. There can only be a single registrar
-  /// per governance realm and governing mint.
+pub struct InitializeRegistrarV1<'info> {
   #[account(
     init,
-    seeds = [realm.key().as_ref(), b"registrar".as_ref(), realm_governing_token_mint.key().as_ref()],
+    seeds = [b"registrar".as_ref(), mint.key().as_ref()],
     bump,
     payer = payer,
     space = 8 + size_of::<Registrar>() + 60
@@ -35,12 +34,19 @@ pub struct InitializeRegistrarV0<'info> {
     init,
     payer = payer,
     mint::decimals = 0,
+    mint::token_program = token_program,
+    mint::decimals = 0,
     mint::authority = registrar,
     mint::freeze_authority = registrar,
+    mint::extensions = MINT_EXTENSIONS.to_vec(),
+    mint::metadata_pointer_data = MetadataPointerInitializeArgs {
+        authority: Some(authority.key()),
+        metadata_address: Some(mint.key())
+    },
     seeds = ["collection".as_bytes(), registrar.key().as_ref()],
     bump
   )]
-  pub collection: Box<Account<'info, Mint>>,
+  pub collection: Box<InterfaceAccount<'info, Mint>>,
   /// CHECK: Handled by cpi
   #[account(
     mut,
@@ -86,10 +92,10 @@ pub struct InitializeRegistrarV0<'info> {
   pub token_metadata_program: Program<'info, Metadata>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
-  pub token_program: Program<'info, Token>,
+  pub token_program: Program<'info, Token2022>,
 }
 
-impl<'info> InitializeRegistrarV0<'info> {
+impl<'info> InitializeRegistrarV1<'info> {
   fn mint_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintTo<'info>> {
     let cpi_accounts = MintTo {
       mint: self.collection.to_account_info(),
@@ -107,7 +113,7 @@ impl<'info> InitializeRegistrarV0<'info> {
 ///
 /// To use the registrar, call ConfigVotingMint to register token mints that may be
 /// used for voting.
-pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<InitializeRegistrarV1>, args: InitializeRegistrarArgsV0) -> Result<()> {
   let signer_seeds: &[&[&[u8]]] = &[&[
     ctx.accounts.realm.to_account_info().key.as_ref(),
     b"registrar",

@@ -3,10 +3,7 @@ use crate::position_seeds;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token;
-use anchor_spl::token::Mint;
-use anchor_spl::token::Token;
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface};
 
 #[derive(Accounts)]
 pub struct TransferV0<'info> {
@@ -28,33 +25,33 @@ pub struct TransferV0<'info> {
     constraint = source_position.key() != target_position.key() @ VsrError::SamePosition,
   )]
   pub source_position: Box<Account<'info, PositionV0>>,
-  pub mint: Box<Account<'info, Mint>>,
+  pub mint: Box<InterfaceAccount<'info, Mint>>,
   #[account(
     token::mint = mint,
     token::authority = position_authority,
     constraint = position_token_account.amount > 0
   )]
-  pub position_token_account: Box<Account<'info, TokenAccount>>,
+  pub position_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
   pub position_authority: Signer<'info>,
   #[account(
     mut,
     has_one = registrar,
   )]
   pub target_position: Box<Account<'info, PositionV0>>,
-  pub deposit_mint: Box<Account<'info, Mint>>,
+  pub deposit_mint: Box<InterfaceAccount<'info, Mint>>,
   #[account(
     mut,
     associated_token::authority = source_position,
     associated_token::mint = deposit_mint,
   )]
-  pub source_vault: Box<Account<'info, TokenAccount>>,
+  pub source_vault: Box<InterfaceAccount<'info, TokenAccount>>,
   #[account(
     mut,
     associated_token::authority = target_position,
     associated_token::mint = deposit_mint,
   )]
-  pub target_vault: Box<Account<'info, TokenAccount>>,
-  pub token_program: Program<'info, Token>,
+  pub target_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+  pub token_program: Interface<'info, TokenInterface>,
   pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
@@ -64,9 +61,9 @@ pub struct TransferArgsV0 {
 }
 
 impl<'info> TransferV0<'info> {
-  pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
+  pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token_interface::Transfer<'info>> {
     let program = self.token_program.to_account_info();
-    let accounts = token::Transfer {
+    let accounts = token_interface::Transfer {
       from: self.source_vault.to_account_info(),
       to: self.target_vault.to_account_info(),
       authority: self.source_position.to_account_info(),
@@ -137,7 +134,7 @@ pub fn handler(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
     .checked_add(amount)
     .unwrap();
 
-  token::transfer(
+  token_interface::transfer(
     ctx
       .accounts
       .transfer_ctx()

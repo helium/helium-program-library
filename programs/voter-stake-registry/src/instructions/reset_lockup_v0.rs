@@ -1,8 +1,7 @@
 use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token_interface::{Mint, TokenAccount};
 
 #[derive(Accounts)]
 pub struct ResetLockupV0<'info> {
@@ -22,13 +21,13 @@ pub struct ResetLockupV0<'info> {
     has_one = mint
   )]
   pub position: Box<Account<'info, PositionV0>>,
-  pub mint: Box<Account<'info, Mint>>,
+  pub mint: Box<InterfaceAccount<'info, Mint>>,
   #[account(
     token::mint = mint,
     token::authority = position_authority,
     constraint = position_token_account.amount > 0
   )]
-  pub position_token_account: Box<Account<'info, TokenAccount>>,
+  pub position_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
   pub position_authority: Signer<'info>,
 }
 

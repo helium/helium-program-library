@@ -1,6 +1,6 @@
 use crate::error::VsrError;
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, TokenAccount};
+use anchor_spl::token_interface::{Mint, TokenAccount};
 use proposal::{ProposalConfigV0, ProposalV0};
 
 use crate::{registrar_seeds, state::*};
@@ -32,13 +32,13 @@ pub struct RelinquishVoteV1<'info> {
     has_one = registrar
   )]
   pub position: Box<Account<'info, PositionV0>>,
-  pub mint: Box<Account<'info, Mint>>,
+  pub mint: Box<InterfaceAccount<'info, Mint>>,
   #[account(
     associated_token::authority = voter,
     associated_token::mint = mint,
     constraint = token_account.amount == 1,
   )]
-  pub token_account: Box<Account<'info, TokenAccount>>,
+  pub token_account: Box<InterfaceAccount<'info, TokenAccount>>,
   #[account(
     mut,
     has_one = proposal_config,

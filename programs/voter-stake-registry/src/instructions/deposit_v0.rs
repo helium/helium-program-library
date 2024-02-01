@@ -1,8 +1,8 @@
 use crate::error::VsrError;
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
-use anchor_spl::token::{self, Token, TokenAccount};
+use anchor_spl::token_interface::Mint;
+use anchor_spl::token_interface::{self, TokenAccount, TokenInterface};
 
 #[derive(Accounts)]
 pub struct DepositV0<'info> {
@@ -19,25 +19,25 @@ pub struct DepositV0<'info> {
         associated_token::authority = position,
         associated_token::mint = mint.key(),
     )]
-  pub vault: Box<Account<'info, TokenAccount>>,
+  pub vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
-  pub mint: Box<Account<'info, Mint>>,
+  pub mint: Box<InterfaceAccount<'info, Mint>>,
 
   #[account(
         mut,
         token::authority = deposit_authority,
         has_one = mint
     )]
-  pub deposit_token: Box<Account<'info, TokenAccount>>,
+  pub deposit_token: Box<InterfaceAccount<'info, TokenAccount>>,
   pub deposit_authority: Signer<'info>,
 
-  pub token_program: Program<'info, Token>,
+  pub token_program: Interface<'info, TokenInterface>,
 }
 
 impl<'info> DepositV0<'info> {
-  pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
+  pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token_interface::Transfer<'info>> {
     let program = self.token_program.to_account_info();
-    let accounts = token::Transfer {
+    let accounts = token_interface::Transfer {
       from: self.deposit_token.to_account_info(),
       to: self.vault.to_account_info(),
       authority: self.deposit_authority.to_account_info(),
@@ -65,7 +65,7 @@ pub fn handler(ctx: Context<DepositV0>, args: DepositArgsV0) -> Result<()> {
   }
 
   // Deposit tokens into the vault and increase the lockup amount too.
-  token::transfer(ctx.accounts.transfer_ctx(), amount)?;
+  token_interface::transfer(ctx.accounts.transfer_ctx(), amount)?;
 
   let registrar = &ctx.accounts.registrar;
   let position = &mut ctx.accounts.position;

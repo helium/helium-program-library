@@ -26,53 +26,45 @@ pub struct Registrar {
   pub voting_mints: Vec<VotingMintConfigV0>,
 }
 
-impl Registrar {
-  pub fn clock_unix_timestamp(&self) -> i64 {
-    Clock::get()
-      .unwrap()
-      .unix_timestamp
-      .checked_add(self.time_offset)
-      .unwrap()
-  }
+// Instance of a voting rights distributor.
+#[account]
+#[derive(Default)]
+pub struct RegistrarV1 {
+  pub mint: Pubkey,
+  pub authority: Pubkey,
+  // Debug only: time offset, to allow tests to move forward in time.
+  pub time_offset: i64,
+  // Allows a program to wrap updates to the position (transfer or reset lockup)
+  pub position_update_authority: Option<Pubkey>,
+  // Storage for voting mints and their configuration.
+  pub collection: Pubkey, // The t22 gruping
+  // Vote weight factor for all funds in the account, no matter if locked or not.
+  //
+  // In 1/SCALED_FACTOR_BASE units.
+  pub baseline_vote_weight_scaled_factor: u64,
 
-  pub fn voting_mint_config_index(&self, mint: Pubkey) -> Result<usize> {
-    self
-      .voting_mints
-      .iter()
-      .position(|r| r.mint == mint)
-      .ok_or_else(|| error!(VsrError::VotingMintNotFound))
-  }
+  // Maximum extra vote weight factor for lockups.
+  //
+  // This is the extra votes gained for lockups lasting lockup_saturation_secs or
+  // longer. Shorter lockups receive only a fraction of the maximum extra vote weight,
+  // based on lockup_time divided by lockup_saturation_secs.
+  //
+  // In 1/SCALED_FACTOR_BASE units.
+  pub max_extra_lockup_vote_weight_scaled_factor: u64,
 
-  pub fn max_vote_weight(&self, mint_accounts: &[AccountInfo]) -> Result<u128> {
-    self
-      .voting_mints
-      .iter()
-      .try_fold(0u128, |mut sum, voting_mint_config| -> Result<u128> {
-        if !voting_mint_config.in_use() {
-          return Ok(sum);
-        }
-        let genesis_multiplier = if voting_mint_config.genesis_vote_power_multiplier > 0 {
-          voting_mint_config.genesis_vote_power_multiplier
-        } else {
-          1
-        };
-        let mint_account = mint_accounts
-          .iter()
-          .find(|a| a.key() == voting_mint_config.mint)
-          .ok_or_else(|| error!(VsrError::VotingMintNotFound))?;
-        let mint = Account::<Mint>::try_from(mint_account)?;
-        sum = sum
-          .checked_add(voting_mint_config.baseline_vote_weight(mint.supply)?)
-          .ok_or_else(|| error!(VsrError::VoterWeightOverflow))?;
-        sum = sum
-          .checked_add(voting_mint_config.max_extra_lockup_vote_weight(mint.supply)?)
-          .ok_or_else(|| error!(VsrError::VoterWeightOverflow))?;
-        sum = sum
-          .checked_mul(genesis_multiplier as u128)
-          .ok_or_else(|| error!(VsrError::VoterWeightOverflow))?;
-        Ok(sum)
-      })
-  }
+  // Genesis vote power multipliers for lockups.
+  //
+  // This is a multiplier applied to voting power for lockups created before
+  // genesis_extra_lockup_expiration
+  pub genesis_vote_power_multiplier: u8,
+
+  // Timestamp of when to stop applying the genesis_extra_lockup_vote_weight_scaled_factor
+  pub genesis_vote_power_multiplier_expiration_ts: i64,
+
+  // Number of seconds of lockup needed to reach the maximum lockup bonus.
+  pub lockup_saturation_secs: u64,
+  pub bump_seed: u8,
+  pub collection_bump_seed: u8,
 }
 
 // Resolves governing_token_owner from voter TokenOwnerRecord and

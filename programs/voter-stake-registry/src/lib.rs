@@ -42,10 +42,10 @@ pub mod voter_stake_registry {
   use super::*;
 
   pub fn initialize_registrar_v0(
-    ctx: Context<InitializeRegistrarV0>,
+    ctx: Context<InitializeRegistrarV1>,
     args: InitializeRegistrarArgsV0,
   ) -> Result<()> {
-    instructions::initialize_registrar_v0::handler(ctx, args)
+    instructions::initialize_registrar_v1::handler(ctx, args)
   }
 
   pub fn configure_voting_mint_v0(
