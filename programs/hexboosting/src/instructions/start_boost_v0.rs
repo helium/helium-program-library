@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use mobile_entity_manager::CarrierV0;
 
 use crate::{BoostConfigV0, BoostedHexV0};
 
