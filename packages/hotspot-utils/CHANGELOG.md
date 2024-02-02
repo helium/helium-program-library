@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.27](https://github.com/helium/helium-program-library/compare/v0.6.25...v0.6.27) (2024-02-01)
+
+**Note:** Version bump only for package @helium/hotspot-utils
+
+
+
+
+
 ## [0.6.26](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.26) (2024-01-31)
 
 **Note:** Version bump only for package @helium/hotspot-utils
