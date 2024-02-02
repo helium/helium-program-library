@@ -21,6 +21,7 @@ default = []
 overflow-checks = true
 
 [dependencies]
+ahash = { workspace = true }
 bs58 = "0.3.1"
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
@@ -35,4 +36,4 @@ helium-sub-daos = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }
 no-emit = { workspace = true }
-pyth-sdk-solana = { version = "0.8.0" }
+pyth-sdk-solana = { version = "0.9.0" }

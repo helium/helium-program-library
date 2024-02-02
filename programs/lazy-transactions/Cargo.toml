@@ -21,6 +21,7 @@ default = []
 overflow-checks = true
 
 [dependencies]
+ahash = { workspace = true }
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 spl-concurrent-merkle-tree = "0.2.0"

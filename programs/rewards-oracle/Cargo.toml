@@ -18,6 +18,7 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
+ahash = { workspace = true }
 anchor-lang = { workspace = true }
 lazy-distributor = { path = "../lazy-distributor", features = ["cpi"] }
 helium-entity-manager = { workspace = true }

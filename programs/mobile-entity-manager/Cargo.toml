@@ -21,6 +21,7 @@ default = []
 overflow-checks = true
 
 [dependencies]
+ahash = { workspace = true }
 bs58 = "0.3.1"
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }

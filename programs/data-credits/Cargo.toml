@@ -21,11 +21,12 @@ default = []
 overflow-checks = true
 
 [dependencies]
+ahash = { workspace = true }
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 helium-sub-daos = { workspace = true }
 circuit-breaker = { workspace = true }
-pyth-sdk-solana = { version = "0.8.0" }
+pyth-sdk-solana = { version = "0.9.0" }
 lazy-transactions = { path = "../lazy-transactions", features = ["cpi"] }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }
