@@ -162,7 +162,7 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
   // https://docs.pyth.network/pythnet-price-feeds/best-practices
   let mobile_price_with_conf = mobile_price
     .price
-    .checked_add(i64::try_from(mobile_price.conf.checked_mul(2).unwrap()).unwrap())
+    .checked_sub(i64::try_from(mobile_price.conf.checked_mul(2).unwrap()).unwrap())
     .unwrap();
   // Exponent is a negative number, likely -8
   // Since the price is multiplied by an extra 10^8, and we're dividing by that price, need to also multiply
