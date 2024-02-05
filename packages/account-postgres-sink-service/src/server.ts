@@ -199,12 +199,19 @@ if (!HELIUS_AUTH_SECRET) {
       const transactions = req.body as TransactionResponse[];
       const writableAccountKeys = transactions
         .flatMap((tx) =>
-          tx.transaction.message.accountKeys.slice(
-            0,
-            tx.transaction.message.accountKeys.length -
-              (tx.transaction.message.header.numReadonlySignedAccounts +
-                tx.transaction.message.header.numReadonlyUnsignedAccounts)
-          )
+          tx.transaction.message.accountKeys
+            .slice(
+              0,
+              tx.transaction.message.accountKeys.length -
+                tx.transaction.message.header.numReadonlyUnsignedAccounts
+            )
+            .filter(
+              (_, index) =>
+                index <
+                  tx.transaction.message.header.numRequiredSignatures -
+                    tx.transaction.message.header.numReadonlySignedAccounts ||
+                index >= tx.transaction.message.header.numRequiredSignatures
+            )
         )
         .map((k) => new PublicKey(k));
       const accounts = await Promise.all(
@@ -235,7 +242,7 @@ if (!HELIUS_AUTH_SECRET) {
                 }
               );
             }
-            await transaction.commit()
+            await transaction.commit();
             continue;
           }
 

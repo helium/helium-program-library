@@ -77,7 +77,7 @@ export const initTestDataCredits = async (
 
   const dcKey = (await initDataCredits.pubkeys()).dataCredits!;
 
-  await initDataCredits.rpc();
+  await initDataCredits.rpc({ skipPreflight: true });
 
   return { dcKey, hntMint, hntBal, dcMint, dcBal };
 };

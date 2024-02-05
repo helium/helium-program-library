@@ -16,6 +16,8 @@ pub struct BoostConfigV0 {
   /// The minimum of periods to boost
   pub minimum_periods: u16,
   pub bump_seed: u8,
+  /// Authority to start the hex
+  pub start_authority: Pubkey,
 }
 
 #[account]
@@ -30,12 +32,14 @@ pub struct BoostedHexV0 {
   pub bump_seed: u8,
   /// Each entry represents the boost multiplier for a given period
   pub boosts_by_period: Vec<u8>,
+  // Track changes to the boosted hex so client can pass what version it made a change to
+  pub version: u32,
 }
 
 impl BoostedHexV0 {
   pub fn is_expired(&self, boost_config: &BoostConfigV0) -> bool {
     if self.start_ts == 0 {
-      true
+      false
     } else {
       let now = Clock::get().unwrap().unix_timestamp;
       let elapsed_time = now - self.start_ts;
@@ -45,7 +49,7 @@ impl BoostedHexV0 {
 
       // This is true so long as there are never any 0's appended to the end
       // of boosts_by_period
-      self.boosts_by_period.len() as i64 == elapsed_periods
+      self.boosts_by_period.len() as i64 <= elapsed_periods
     }
   }
 }

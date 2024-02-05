@@ -106,7 +106,7 @@ export function useAccounts<T>(
 
   // Sometimes eager result never gets set because cache or keys is undefined
   useEffect(() => {
-    if (eagerResult && accounts.length == 0 && (eagerResult?.length || 0) != 0) {
+    if (eagerResult && accounts.length != keys?.length && (eagerResult?.length || 0) == keys?.length) {
       setAccounts(eagerResult);
     }
   }, [accounts, eagerResult])

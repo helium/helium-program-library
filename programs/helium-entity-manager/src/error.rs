@@ -45,6 +45,15 @@ pub enum ErrorCode {
   InvalidSymbol,
   #[msg("Mobile device type not found")]
   InvalidDeviceType,
-  #[msg("No mobile oracle price")]
-  NoOraclePrice,
+  #[msg("Error loading Pyth data")]
+  PythError,
+
+  #[msg("Pyth price is not available")]
+  PythPriceNotFound,
+
+  #[msg("Pyth price is stale")]
+  PythPriceFeedStale,
+
+  #[msg("Arithmetic error")]
+  ArithmeticError,
 }

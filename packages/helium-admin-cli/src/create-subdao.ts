@@ -33,7 +33,6 @@ import {
 } from '@solana/spl-governance';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import {
-  ComputeBudgetProgram,
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
@@ -331,9 +330,6 @@ export async function run(args: any = process.argv) {
         .initializeRegistrarV0({
           positionUpdateAuthority: null,
         })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-        ])
         .accounts({
           realm,
           realmGoverningTokenMint: subdaoKeypair.publicKey,
@@ -459,7 +455,6 @@ export async function run(args: any = process.argv) {
     await sendInstructionsOrSquads({
       provider,
       instructions: [
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         await initSubdaoMethod.instruction(),
       ],
       executeTransaction: true,
