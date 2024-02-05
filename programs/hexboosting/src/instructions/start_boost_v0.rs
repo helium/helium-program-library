@@ -22,6 +22,9 @@ pub struct StartBoostV0<'info> {
 }
 
 pub fn handler(ctx: Context<StartBoostV0>, args: StartBoostArgsV0) -> Result<()> {
+  require_eq!(ctx.accounts.boosted_hex.start_ts, 0);
+  require_gt!(args.start_ts, 0);
+
   ctx.accounts.boosted_hex.start_ts = args.start_ts;
 
   Ok(())

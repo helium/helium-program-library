@@ -10,4 +10,10 @@ pub enum ErrorCode {
   MaxBoostExceeded,
   #[msg("Hexboost version has changed since this instruction was formed, transaction rejected for safety")]
   InvalidVersion,
+  #[msg("Error from pyth")]
+  PythError,
+  #[msg("No pyth price found")]
+  PythPriceNotFound,
+  #[msg("Error in arithmetic")]
+  ArithmeticError,
 }
