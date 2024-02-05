@@ -51,6 +51,14 @@ jobs:
           devnet: false
           program: ${{ env.PROGRAM_NAME }}
 
+      - name: Push IDL to Github
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            target/idl/${{ env.PROGRAM_NAME }}.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: ./.github/actions/build-verified/
         id: build-verified
         with:
