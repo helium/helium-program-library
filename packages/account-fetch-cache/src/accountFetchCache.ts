@@ -180,7 +180,6 @@ export class AccountFetchCache {
     connection.sendTransaction = async function overloadedSendTransaction(
       ...args: any[]
     ) {
-      console.log("Wrapped sendTx");
       const result = await self.oldSendTransaction(...args);
       // First try to requery when confirmed. Then mop up any that didn't change during confirmed.
       this.confirmTransaction(result, "confirmed")
@@ -583,13 +582,11 @@ export class AccountFetchCache {
       // xNFT doesn't support onAccountChange, so we have to make a new usable connection.
       if (!this.accountChangeListeners.has(address)) {
         try {
-          console.log("Tryin to watch", id.toBase58());
           this.accountChangeListeners.set(
             address,
             this.connection.onAccountChange(
               id,
               (account) => {
-                console.log("GOT AN ACCOUNT CHANGE FOR", id.toBase58());
                 this.onAccountChange(id, undefined, account);
               },
               this.commitment
