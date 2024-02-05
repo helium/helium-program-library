@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use helium_sub_daos::SubDaoV0;
-use price_oracle::PriceOracleV0;
 
 use crate::BoostConfigV0;
 
@@ -31,7 +30,8 @@ pub struct InitializeBoostConfigV0<'info> {
   pub rent_reclaim_authority: AccountInfo<'info>,
   /// CHECK: Just for settings
   pub start_authority: AccountInfo<'info>,
-  pub price_oracle: Box<Account<'info, PriceOracleV0>>,
+  /// CHECK: Pyth price oracle
+  pub price_oracle: AccountInfo<'info>,
   pub dnt_mint: Box<Account<'info, Mint>>,
 
   #[account(
@@ -49,6 +49,8 @@ pub fn handler(
   ctx: Context<InitializeBoostConfigV0>,
   args: InitializeBoostConfigArgsV0,
 ) -> Result<()> {
+  require_gt!(args.period_length, 0);
+
   ctx.accounts.boost_config.set_inner(BoostConfigV0 {
     sub_dao: ctx.accounts.sub_dao.key(),
     price_oracle: ctx.accounts.price_oracle.key(),
