@@ -1951,7 +1951,7 @@ dependencies = [
  "helium-sub-daos",
  "mpl-token-metadata",
  "no-emit",
- "price-oracle",
+ "pyth-sdk-solana",
  "shared-utils",
  "solana-security-txt",
 ]
