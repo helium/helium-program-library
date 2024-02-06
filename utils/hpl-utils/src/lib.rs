@@ -14,7 +14,7 @@ use solana_client::{
 use solana_connection_cache::connection_cache::{
   ConnectionManager, ConnectionPool, NewConnectionConfig,
 };
-use solana_sdk::transaction::{TransactionError, VersionedTransaction};
+use solana_sdk::{signature::Signature, transaction::{TransactionError, VersionedTransaction}};
 
 pub mod dao;
 pub mod program;
@@ -23,6 +23,12 @@ pub mod token;
 pub const TRANSACTION_RESEND_INTERVAL: Duration = Duration::from_secs(4);
 pub const MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS: usize = 256;
 pub const SEND_TRANSACTION_INTERVAL: Duration = Duration::from_millis(10);
+
+pub struct SendResult {
+  pub failure_count: i32,
+  pub failures: Vec<Option<TransactionError>>,
+  pub confirmed_signatures: Vec<Option<Signature>>
+}
 
 // This is based on tpu_client but rewritten to work with raw versioned txs
 pub fn send_and_confirm_messages_with_spinner<
@@ -33,9 +39,13 @@ pub fn send_and_confirm_messages_with_spinner<
   rpc_client: Arc<RpcClient>,
   tpu_client: &TpuClient<P, M, C>,
   messages: &Vec<Vec<u8>>,
-) -> Result<(Vec<Option<TransactionError>>, i32), TpuSenderError> {
+) -> Result<SendResult, TpuSenderError> {
   if messages.is_empty() {
-    return Ok((vec![], 0));
+    return Ok(SendResult {
+      failure_count: 0,
+      failures: vec![],
+      confirmed_signatures: vec![]
+    });
   }
   let mut failed_tx_count: i32 = 0;
   let progress_bar = ProgressBar::new(42);
@@ -57,6 +67,7 @@ pub fn send_and_confirm_messages_with_spinner<
     .collect();
   let total_transactions = transactions_with_sigs.len();
   let mut transaction_errors = vec![None; transactions_with_sigs.len()];
+  let mut confirmed_signatures = vec![None; transactions_with_sigs.len()];
   let mut confirmed_transactions = 0;
   let mut block_height = rpc_client.get_block_height()?;
 
@@ -139,6 +150,7 @@ pub fn send_and_confirm_messages_with_spinner<
 
                   progress_bar.println(format!("Failed transaction: {} {:?}", signature, status));
                 }
+                confirmed_signatures[i] = Some(signature.clone());
                 transaction_errors[i] = status.err;
               }
             }
@@ -154,14 +166,15 @@ pub fn send_and_confirm_messages_with_spinner<
         "Checking transaction status...",
       );
     }
-
-    if pending_transactions.is_empty() {
-      return Ok((transaction_errors, failed_tx_count));
-    }
   }
 
-  progress_bar.println(format!("Blockhash expired",));
-  Err(TpuSenderError::Custom("Max retries exceeded".into()))
+
+
+  Ok(SendResult {
+    failure_count: failed_tx_count,
+    failures: transaction_errors,
+    confirmed_signatures
+  })
 }
 
 fn set_message_for_confirmed_transactions(
