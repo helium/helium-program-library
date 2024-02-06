@@ -3195,11 +3195,10 @@ dependencies = [
 [[package]]
 name = "hpl-utils"
 version = "0.1.0"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#4a03f3f7e536dba0d4263b655fbcd1eba1ebe97e"
 dependencies = [
  "anyhow",
  "bincode",
- "bs58 0.5.0",
+ "bs58 0.3.1",
  "clap 4.4.5",
  "futures",
  "indicatif",
@@ -3211,7 +3210,7 @@ dependencies = [
  "solana-client",
  "solana-connection-cache",
  "solana-sdk",
- "spl-associated-token-account 2.2.0",
+ "spl-associated-token-account 1.1.3",
  "thiserror",
  "warp",
 ]
