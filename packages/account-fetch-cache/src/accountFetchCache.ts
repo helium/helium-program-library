@@ -181,12 +181,19 @@ export class AccountFetchCache {
       ...args: any[]
     ) {
       const result = await self.oldSendTransaction(...args);
-
-      this.confirmTransaction(result, "finalized")
+      // First try to requery when confirmed. Then mop up any that didn't change during confirmed.
+      this.confirmTransaction(result, "confirmed")
         .then(() => {
           return self.requeryMissing(args[0].instructions);
         })
+        .then(async (unchanged) => {
+          if (unchanged.length > 0) {
+            await this.confirmTransaction(result, "finalized");
+            return self.requeryMissingByAccount(unchanged);
+          }
+        })
         .catch(console.error);
+
       return result;
     };
 
@@ -199,9 +206,16 @@ export class AccountFetchCache {
       try {
         const instructions = Transaction.from(rawTransaction).instructions;
 
-        this.confirmTransaction(result, "finalized")
+        // First try to requery when confirmed. Then mop up any that didn't change during confirmed.
+        this.confirmTransaction(result, "confirmed")
           .then(() => {
             return self.requeryMissing(instructions);
+          })
+          .then(async unchanged => {
+            if (unchanged.length > 0) {
+              await this.confirmTransaction(result, "finalized");
+              return self.requeryMissingByAccount(unchanged);
+            }
           })
           .catch(console.error);
       } catch (e: any) {
@@ -214,13 +228,25 @@ export class AccountFetchCache {
     setSingleton(connection, this);
   }
 
-  async requeryMissing(instructions: TransactionInstruction[]) {
-    const writeableAccounts = getWriteableAccounts(instructions).map((a) =>
-      a.toBase58()
+  // Requeries missin accounts and returns the ones that didn't change
+  async requeryMissing(
+    instructions: TransactionInstruction[]
+  ): Promise<PublicKey[]> {
+    const writeableAccounts = Array.from(
+      new Set(getWriteableAccounts(instructions).map((a) => a.toBase58()))
     );
+    return this.requeryMissingByAccount(writeableAccounts.map(a => new PublicKey(a)));
+  }
+
+  async requeryMissingByAccount(
+    accounts: PublicKey[]
+  ): Promise<PublicKey[]> {
+    const writeableAccounts = accounts.map(a => a.toBase58())
+    const unchanged: PublicKey[] = [];
     await Promise.all(
       writeableAccounts.map(async (account) => {
         const parser = this.missingAccounts.get(account);
+        const prevAccount = this.genericCache.get(account);
         const [found, dispose] = await this.searchAndWatch(
           new PublicKey(account),
           parser,
@@ -228,11 +254,20 @@ export class AccountFetchCache {
           true
         );
         dispose();
+        const changed =
+          (prevAccount && !found) ||
+          (found && !prevAccount) ||
+          (prevAccount && !found?.account.data.equals(prevAccount.account.data));
+        if (!changed) {
+          unchanged.push(new PublicKey(account));
+        }
         if (found) {
           this.missingAccounts.delete(account);
         }
       })
     );
+
+    return unchanged;
   }
 
   async fetchMissing() {
@@ -551,7 +586,9 @@ export class AccountFetchCache {
             address,
             this.connection.onAccountChange(
               id,
-              (account) => this.onAccountChange(id, undefined, account),
+              (account) => {
+                this.onAccountChange(id, undefined, account);
+              },
               this.commitment
             )
           );
