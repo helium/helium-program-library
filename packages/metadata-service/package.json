@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.6.28",
+  "version": "0.6.29",
   "description": "Mint metadata of hotspots",
   "repository": {
     "type": "git",
@@ -34,12 +34,12 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
     "@fastify/cors": "^8.1.1",
-    "@helium/account-fetch-cache": "^0.6.28",
+    "@helium/account-fetch-cache": "^0.6.29",
     "@helium/address": "^4.10.2",
-    "@helium/helium-entity-manager-sdk": "^0.6.28",
-    "@helium/helium-sub-daos-sdk": "^0.6.28",
-    "@helium/idls": "^0.6.28",
-    "@helium/spl-utils": "^0.6.28",
+    "@helium/helium-entity-manager-sdk": "^0.6.29",
+    "@helium/helium-sub-daos-sdk": "^0.6.29",
+    "@helium/idls": "^0.6.29",
+    "@helium/spl-utils": "^0.6.29",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.78.4",
