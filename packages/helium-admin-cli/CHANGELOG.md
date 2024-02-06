@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.28](https://github.com/helium/helium-program-libary/compare/v0.6.27...v0.6.28) (2024-02-06)
+
+
+### Features
+
+* **#559:** Use pyth oracle for mobile onboarding ([#566](https://github.com/helium/helium-program-libary/issues/566)) ([1b751e9](https://github.com/helium/helium-program-libary/commit/1b751e9a1aabbbe851ce828c4b2dfff46d18615a)), closes [#559](https://github.com/helium/helium-program-libary/issues/559)
+
+
+
+
+
 ## [0.6.27](https://github.com/helium/helium-program-libary/compare/v0.6.25...v0.6.27) (2024-02-01)
 
 **Note:** Version bump only for package @helium/helium-admin-cli
