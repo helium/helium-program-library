@@ -186,6 +186,7 @@ export async function formBulkTransactions({
   assetEndpoint,
   getAssetBatchFn = getAssetBatch,
   getAssetProofBatchFn = getAssetProofBatch,
+  basePriorityFee,
 }: {
   program: Program<LazyDistributor>;
   rewardsOracleProgram?: Program<RewardsOracle>;
@@ -199,6 +200,7 @@ export async function formBulkTransactions({
   assetEndpoint?: string;
   skipOracleSign?: boolean;
   payer?: PublicKey;
+  basePriorityFee?: number;
 
   getAssetBatchFn?: (
     url: string,
@@ -354,6 +356,7 @@ export async function formBulkTransactions({
         connection: provider.connection,
         instructions: [...setRewardIxs, distributeIx],
         computeUnits: 300000,
+        basePriorityFee,
       });
     })
   );
@@ -419,6 +422,7 @@ export async function formTransaction({
   assetEndpoint,
   getAssetFn = getAsset,
   getAssetProofFn = getAssetProof,
+  basePriorityFee,
 }: {
   program: Program<LazyDistributor>;
   rewardsOracleProgram?: Program<RewardsOracle>;
@@ -432,6 +436,7 @@ export async function formTransaction({
   payer?: PublicKey;
   assetEndpoint?: string;
   skipOracleSign?: boolean;
+  basePriorityFee?: number;
   getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
   getAssetProofFn?: (
     url: string,
@@ -522,6 +527,7 @@ export async function formTransaction({
       connection: provider.connection,
       computeUnits: 300000,
       instructions: ixs,
+      basePriorityFee,
     }))
   );
 

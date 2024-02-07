@@ -140,9 +140,12 @@ jobs:
           - tests/distributor-oracle.ts
           - tests/helium-entity-manager.ts
           - tests/mobile-entity-manager.ts
+          - tests/helium-sub-daos.ts
+          - tests/hexboosting.ts
           - tests/lazy-distributor.ts
           - tests/lazy-transactions.ts
           - tests/treasury-management.ts
+          - tests/price-oracle.ts
           - tests/voter-stake-registry.ts
           - tests/fanout.ts
     steps:

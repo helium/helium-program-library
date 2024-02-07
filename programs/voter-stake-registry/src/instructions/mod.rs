@@ -1,3 +1,4 @@
+pub use admin_close_nft_vote_record::*;
 pub use close_position_v0::*;
 pub use configure_voting_mint_v0::*;
 pub use deposit_v0::*;
@@ -14,6 +15,7 @@ pub use update_registrar_authority_v0::*;
 pub use vote_v0::*;
 pub use withdraw_v0::*;
 
+pub mod admin_close_nft_vote_record;
 pub mod close_position_v0;
 pub mod configure_voting_mint_v0;
 pub mod deposit_v0;

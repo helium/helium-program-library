@@ -35,6 +35,11 @@ export async function run(args: any = process.argv) {
       required: true,
       describe: "The authority to reclaim rent",
     },
+    startAuthority: {
+      type: "string",
+      required: true,
+      describe: "The authority to start hexes",
+    },
     boostPrice: {
       required: true,
       type: "number",
@@ -98,7 +103,8 @@ export async function run(args: any = process.argv) {
         priceOracle: new PublicKey(argv.priceOracle),
         rentReclaimAuthority: new PublicKey(argv.rentReclaimAuthority),
         authority: subDaoAuth,
-        subDao
+        subDao,
+        startAuthority: new PublicKey(argv.startAuthority)
       })
       .instruction(),
   ];

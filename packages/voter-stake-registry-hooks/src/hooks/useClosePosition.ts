@@ -1,5 +1,4 @@
 import { BN } from "@coral-xyz/anchor";
-import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import { sendInstructions } from "@helium/spl-utils";
 import { TransactionInstruction } from "@solana/web3.js";
 import { useAsync, useAsyncCallback } from "react-async-hook";
@@ -8,8 +7,7 @@ import { HeliumVsrClient } from "../sdk/client";
 import { PositionWithMeta } from "../sdk/types";
 
 export const useClosePosition = () => {
-  const { provider } = useHeliumVsrState();
-  const unixNow = useSolanaUnixNow();
+  const { provider, unixNow } = useHeliumVsrState();
   const { result: client } = useAsync(
     (provider) => HeliumVsrClient.connect(provider),
     [provider]

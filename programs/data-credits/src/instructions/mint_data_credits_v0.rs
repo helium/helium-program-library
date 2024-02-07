@@ -144,7 +144,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
   require_gt!(hnt_price.price, 0);
 
   // Remove the confidence from the price to use the most conservative price
-  // https://docs.pyth.network/pythnet-price-feeds/best-practices
+  // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
   let hnt_price_with_conf = hnt_price
     .price
     .checked_sub(i64::try_from(hnt_price.conf.checked_mul(2).unwrap()).unwrap())

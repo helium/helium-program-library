@@ -32,6 +32,7 @@ export interface HeliumVsrState {
   positions?: PositionWithMeta[];
   provider?: AnchorProvider;
   votingPower?: BN;
+  unixNow?: number;
 
   refetch: () => void;
 }
@@ -175,6 +176,7 @@ export const HeliumVsrStateProvider: React.FC<{
       provider,
       refetch,
       votingPower,
+      unixNow: now
     }),
     [
       loadingPositions,
@@ -187,6 +189,7 @@ export const HeliumVsrStateProvider: React.FC<{
       provider,
       refetch,
       votingPower,
+      now,
     ]
   );
   return (

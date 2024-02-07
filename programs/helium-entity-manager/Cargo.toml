@@ -1,6 +1,6 @@
 [package]
 name = "helium-entity-manager"
-version = "0.2.3"
+version = "0.2.4"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -34,5 +34,5 @@ data-credits = { path = "../data-credits", features = ["cpi"] }
 helium-sub-daos = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }
-price-oracle = { workspace = true }
 no-emit = { workspace = true }
+pyth-sdk-solana = { version = "0.8.0" }

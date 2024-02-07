@@ -166,7 +166,7 @@ async fn run_transactions(
       );
       if result.is_ok() {
         offset += limit;
-        FAILED_TX.inc_by(result.unwrap().1.try_into().unwrap());
+        FAILED_TX.inc_by(result.unwrap().failure_count.try_into().unwrap());
       }
       NUM_SENT.inc_by(response.transactions.len() as u64);
     }
@@ -199,7 +199,7 @@ async fn run_transactions(
       );
       if result.is_ok() {
         offset += limit;
-        FAILED_TX.inc_by(result.unwrap().1.try_into().unwrap());
+        FAILED_TX.inc_by(result.unwrap().failure_count.try_into().unwrap());
       }
       NUM_SENT.inc_by(response.transactions.len() as u64);
     }
@@ -223,7 +223,7 @@ async fn run_transactions(
       &tpu_client,
       &response.transactions,
     );
-    FAILED_TX.inc_by(result.unwrap().1.try_into().unwrap());
+    FAILED_TX.inc_by(result.unwrap().failure_count.try_into().unwrap());
     NUM_SENT.inc_by(response.transactions.len() as u64);
     
   } else {
@@ -257,7 +257,7 @@ async fn run_transactions(
         );
         if result.is_ok() {
           offset += limit;
-          FAILED_TX.inc_by(result.unwrap().1.try_into().unwrap());
+          FAILED_TX.inc_by(result.unwrap().failure_count.try_into().unwrap());
         }
         NUM_SENT.inc_by(response.transactions.len() as u64);
       }

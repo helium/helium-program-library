@@ -3,6 +3,61 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.29](https://github.com/helium/helium-program-libary/compare/v0.6.28...v0.6.29) (2024-02-06)
+
+**Note:** Version bump only for package @helium/monitor-service
+
+
+
+
+
+## [0.6.28](https://github.com/helium/helium-program-libary/compare/v0.6.27...v0.6.28) (2024-02-06)
+
+
+### Features
+
+* **#559:** Use pyth oracle for mobile onboarding ([#566](https://github.com/helium/helium-program-libary/issues/566)) ([1b751e9](https://github.com/helium/helium-program-libary/commit/1b751e9a1aabbbe851ce828c4b2dfff46d18615a)), closes [#559](https://github.com/helium/helium-program-libary/issues/559)
+
+
+
+
+
+## [0.6.27](https://github.com/helium/helium-program-libary/compare/v0.6.25...v0.6.27) (2024-02-01)
+
+**Note:** Version bump only for package @helium/monitor-service
+
+
+
+
+
+## [0.6.26](https://github.com/helium/helium-program-libary/compare/v0.6.5...v0.6.26) (2024-01-31)
+
+
+### Features
+
+* **#495:** Add monitoring for claimable rewards and vehnt ([#507](https://github.com/helium/helium-program-libary/issues/507)) ([efc6813](https://github.com/helium/helium-program-libary/commit/efc6813839be4b323bea8110ad7762423dd13b82)), closes [#495](https://github.com/helium/helium-program-libary/issues/495) [#495](https://github.com/helium/helium-program-libary/issues/495)
+* **#525:** Add prom metrics for price oracles, fix distributor oracle total rewards metric ([#528](https://github.com/helium/helium-program-libary/issues/528)) ([13a5cb8](https://github.com/helium/helium-program-libary/commit/13a5cb8d8936d1b5929379dafafd2907322dd473))
+
+
+
+
+
+## [0.6.25](https://github.com/helium/helium-program-libary/compare/v0.6.24...v0.6.25) (2024-01-29)
+
+**Note:** Version bump only for package @helium/monitor-service
+
+
+
+
+
+## [0.6.24](https://github.com/helium/helium-program-libary/compare/v0.6.23...v0.6.24) (2024-01-29)
+
+**Note:** Version bump only for package @helium/monitor-service
+
+
+
+
+
 ## [0.6.23](https://github.com/helium/helium-program-libary/compare/v0.6.20...v0.6.23) (2024-01-20)
 
 **Note:** Version bump only for package @helium/monitor-service

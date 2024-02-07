@@ -5,18 +5,20 @@ use anchor_spl::{
   token::{burn, Burn, Mint, Token, TokenAccount},
 };
 use mobile_entity_manager::CarrierV0;
-use price_oracle::{calculate_current_price, PriceOracleV0};
+use pyth_sdk_solana::load_price_feed_from_account_info;
 use shared_utils::resize_to_fit;
 
 use crate::{BoostConfigV0, BoostedHexV0};
 
+pub const TESTING: bool = std::option_env!("TESTING").is_some();
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct BoostArgsV0 {
   pub location: u64,
-  // Ensure that the start_ts they created this periods from is the
+  // Ensure that the version they created this periods from is the
   // same as what's on chain. Otherwise a shift lift could make these offsets
   // invalid
-  pub start_ts: i64,
+  pub version: u32,
   pub amounts: Vec<BoostAmountV0>,
 }
 
@@ -53,7 +55,8 @@ pub struct BoostV0<'info> {
   )]
   pub carrier: Box<Account<'info, CarrierV0>>,
   pub hexboost_authority: Signer<'info>,
-  pub price_oracle: Box<Account<'info, PriceOracleV0>>,
+  /// CHECK: Pyth price oracle
+  pub price_oracle: AccountInfo<'info>,
   #[account(mut)]
   pub payment_mint: Box<Account<'info, Mint>>,
   #[account(
@@ -67,7 +70,8 @@ pub struct BoostV0<'info> {
     payer = payer,
     space = get_space(boosted_hex),
     seeds = [b"boosted_hex", boost_config.key().as_ref(), &args.location.to_le_bytes()],
-    bump
+    bump,
+    constraint = boosted_hex.version == args.version @ ErrorCode::InvalidVersion,
   )]
   pub boosted_hex: Box<Account<'info, BoostedHexV0>>,
   pub system_program: Program<'info, System>,
@@ -76,15 +80,13 @@ pub struct BoostV0<'info> {
 }
 
 pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
-  // Ensure that the start_ts they created this periods from is the
-  // same as what's on chain. Otherwise a shift lift could make these offsets
-  // invalid
-  require_eq!(args.start_ts, ctx.accounts.boosted_hex.start_ts);
+  require_gt!(args.location, 0);
 
   let mut is_initialized = ctx.accounts.boosted_hex.location != 0;
   ctx.accounts.boosted_hex.boost_config = ctx.accounts.boost_config.key();
   ctx.accounts.boosted_hex.location = args.location;
   ctx.accounts.boosted_hex.bump_seed = ctx.bumps["boosted_hex"];
+  ctx.accounts.boosted_hex.version += 1;
 
   // Insert the new periods
   let max_period = args
@@ -104,7 +106,7 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
     if ctx.accounts.boosted_hex.boosts_by_period[amount.period as usize] == u8::MAX {
       return Err(error!(ErrorCode::MaxBoostExceeded));
     }
-    // Amounts must be > 1 or you could append 0's infinitely to the end of the boosts_by_period
+    // Amounts must be > 0 or you could append 0's infinitely to the end of the boosts_by_period
     require_gt!(amount.amount, 0);
     ctx.accounts.boosted_hex.boosts_by_period[amount.period as usize] += amount.amount;
   }
@@ -120,12 +122,13 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
       let shifts = elapsed_periods as usize;
       if shifts < ctx.accounts.boosted_hex.boosts_by_period.len() {
         ctx.accounts.boosted_hex.boosts_by_period.drain(0..shifts);
+        ctx.accounts.boosted_hex.start_ts +=
+          elapsed_periods * i64::from(ctx.accounts.boost_config.period_length);
       } else {
         ctx.accounts.boosted_hex.boosts_by_period.clear();
         is_initialized = false;
+        ctx.accounts.boosted_hex.start_ts = 0
       }
-      ctx.accounts.boosted_hex.start_ts +=
-        elapsed_periods * i64::from(ctx.accounts.boost_config.period_length);
     }
   }
 
@@ -146,15 +149,32 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
     .iter()
     .map(|amount| amount.amount as u64 * ctx.accounts.boost_config.boost_price)
     .sum();
-  let price = calculate_current_price(
-    &ctx.accounts.price_oracle.oracles,
-    Clock::get()?.unix_timestamp,
-  )
-  .ok_or_else(|| error!(ErrorCode::NoOraclePrice))?;
+  let mobile_price_oracle =
+    load_price_feed_from_account_info(&ctx.accounts.price_oracle).map_err(|e| {
+      msg!("Pyth error {}", e);
+      error!(ErrorCode::PythError)
+    })?;
+  let current_time = Clock::get()?.unix_timestamp;
+  let mobile_price = mobile_price_oracle
+    .get_ema_price_no_older_than(current_time, if TESTING { 6000000 } else { 10 * 60 })
+    .ok_or_else(|| error!(ErrorCode::PythPriceNotFound))?;
+  // Remove the confidence from the price to use the most conservative price
+  // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
+  let mobile_price_with_conf = mobile_price
+    .price
+    .checked_sub(i64::try_from(mobile_price.conf.checked_mul(2).unwrap()).unwrap())
+    .unwrap();
+  // Exponent is a negative number, likely -8
+  // Since the price is multiplied by an extra 10^8, and we're dividing by that price, need to also multiply
+  // by the exponent
+  let exponent_dec = 10_u64
+    .checked_pow(u32::try_from(-mobile_price.expo).unwrap())
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
+
   let dnt_fee = total_fee
-    .checked_mul(1000000)
+    .checked_mul(exponent_dec)
     .unwrap()
-    .checked_div(price)
+    .checked_div(mobile_price_with_conf.try_into().unwrap())
     .unwrap();
 
   burn(

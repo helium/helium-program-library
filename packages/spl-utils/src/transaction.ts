@@ -13,7 +13,6 @@ import {
   SimulatedTransactionResponse,
   Transaction,
   TransactionInstruction,
-  TransactionResponse,
   TransactionSignature,
   VersionedTransactionResponse,
 } from "@solana/web3.js";
@@ -428,7 +427,7 @@ export async function sendAndConfirmWithRetry(
   console.log("txid", txid);
   const startTime = getUnixTime();
   (async () => {
-    while (!done && getUnixTime() - startTime < timeout) {
+    while (!done && getUnixTime() - startTime < (timeout / 1000)) {
       await connection.sendRawTransaction(txn, sendOptions);
       await sleep(500);
     }
@@ -518,12 +517,13 @@ export async function bulkSendTransactions(
   txs: Transaction[],
   onProgress?: (status: Status) => void,
   triesRemaining: number = 10, // Number of blockhashes to try resending txs with before giving up
-  extraSigners: Keypair[] = []
+  extraSigners: Keypair[] = [],
+  maxSignatureBatch: number = TX_BATCH_SIZE,
 ): Promise<string[]> {
   let ret: string[] = [];
 
   // attempt to chunk by blockhash bounds (so signing doesn't take too long)
-  for (let chunk of chunks(txs, TX_BATCH_SIZE)) {
+  for (let chunk of chunks(txs, maxSignatureBatch)) {
     const thisRet: string[] = [];
     // Continually send in bulk while resetting blockhash until we send them all
     while (true) {
@@ -536,20 +536,20 @@ export async function bulkSendTransactions(
           return tx;
         })
       );
-      const signedTxs = (
-        await (provider as AnchorProvider).wallet.signAllTransactions(
-          blockhashedTxs
-        )
-      ).map((tx) => {
-        extraSigners.forEach((signer: Keypair) => {
-          if (
-            tx.signatures.some((sig) => sig.publicKey.equals(signer.publicKey))
-          ) {
-            tx.partialSign(signer);
-          }
-        }, tx);
-        return tx;
-      });
+      const signedTxs = (await(provider as AnchorProvider)
+        .wallet.signAllTransactions(blockhashedTxs))
+        .map((tx) => {
+          extraSigners.forEach((signer: Keypair) => {
+            if (
+              tx.signatures.some((sig) =>
+                sig.publicKey.equals(signer.publicKey)
+              )
+            ) {
+              tx.partialSign(signer);
+            }
+          }, tx);
+          return tx;
+        });
 
       const txsWithSigs = signedTxs.map((tx, index) => {
         return {
@@ -703,7 +703,8 @@ export async function batchParallelInstructions(
   instructions: TransactionInstruction[],
   onProgress?: (status: Status) => void,
   triesRemaining: number = 10, // Number of blockhashes to try resending txs with before giving up
-  extraSigners: Keypair[] = []
+  extraSigners: Keypair[] = [],
+  maxSignatureBatch: number = TX_BATCH_SIZE
 ): Promise<void> {
   let currentTxInstructions: TransactionInstruction[] = [];
   const blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
@@ -757,7 +758,8 @@ export async function batchParallelInstructions(
     transactions,
     onProgress,
     triesRemaining,
-    extraSigners
+    extraSigners,
+    maxSignatureBatch
   );
 }
 
@@ -855,12 +857,14 @@ export async function batchParallelInstructionsWithPriorityFee(
     computeUnitLimit = 1000000,
     basePriorityFee,
     extraSigners,
+    maxSignatureBatch = TX_BATCH_SIZE,
   }: {
     onProgress?: (status: Status) => void;
     triesRemaining?: number; // Number of blockhashes to try resending txs with before giving up
     computeUnitLimit?: number;
     basePriorityFee?: number;
     extraSigners?: Keypair[];
+    maxSignatureBatch?: number;
   } = {}
 ): Promise<void> {
   const transactions = await batchInstructionsToTxsWithPriorityFee(
@@ -877,6 +881,7 @@ export async function batchParallelInstructionsWithPriorityFee(
     transactions,
     onProgress,
     triesRemaining,
-    extraSigners
+    extraSigners,
+    maxSignatureBatch
   );
 }

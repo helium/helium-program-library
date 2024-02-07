@@ -33,9 +33,12 @@ export const heliumEntityManagerResolvers = combineResolvers(
     mint: "dntMint",
     owner: "maker",
   }),
-  resolveIndividual(async ({ path }) => {
+  resolveIndividual(async ({ path, provider }) => {
     if (path[path.length - 1] == "dntPrice") {
-      return new PublicKey("moraMdsjyPFz8Lp1RJGoW4bQriSF5mHE7Evxt7hytSF");
+      if (provider.connection.rpcEndpoint.includes("devnet") || provider.connection.rpcEndpoint.includes("test")) {
+        return new PublicKey("BmUdxoioVgoRTontomX8nBjWbnLevtxeuBYaLipP8GTQ");
+      }
+      return new PublicKey("JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5");
     }
   }),
   resolveIndividual(async ({ path, args, accounts, provider }) => {

@@ -1,27 +1,27 @@
 import { BN, Program } from "@coral-xyz/anchor";
-import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import {
   EPOCH_LENGTH,
   PROGRAM_ID,
   delegatedPositionKey,
   init,
 } from "@helium/helium-sub-daos-sdk";
-import { batchParallelInstructions, Status } from "@helium/spl-utils";
+import { Status, batchParallelInstructions } from "@helium/spl-utils";
+import { isClaimed } from "@helium/voter-stake-registry-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
+import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
-import { isClaimed } from "@helium/voter-stake-registry-sdk";
 
 export const useClaimPositionRewards = () => {
-  const { provider } = useHeliumVsrState();
-  const unixNow = useSolanaUnixNow();
+  const { provider, unixNow } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,
       programId = PROGRAM_ID,
       onProgress,
       onInstructions,
+      maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
     }: {
       position: PositionWithMeta;
       programId?: PublicKey;
@@ -30,6 +30,7 @@ export const useClaimPositionRewards = () => {
       onInstructions?: (
         instructions: TransactionInstruction[]
       ) => Promise<void>;
+      maxSignatureBatch?: number;
     }) => {
       const isInvalid = !unixNow || !provider || !position.hasRewards;
 
@@ -78,7 +79,14 @@ export const useClaimPositionRewards = () => {
         if (onInstructions) {
           await onInstructions(instructions);
         } else {
-          await batchParallelInstructions(provider, instructions, onProgress);
+          await batchParallelInstructions(
+            provider,
+            instructions,
+            onProgress,
+            10,
+            [],
+            maxSignatureBatch
+          );
         }
       }
     }

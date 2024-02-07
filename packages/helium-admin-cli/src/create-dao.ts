@@ -500,7 +500,6 @@ export async function run(args: any = process.argv) {
     await sendInstructionsOrSquads({
       provider,
       instructions: [
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
         await hemProgram.methods
           .initializeDataOnlyV0({
             authority,

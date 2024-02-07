@@ -8,4 +8,12 @@ pub enum ErrorCode {
   NoOraclePrice,
   #[msg("Hex is already boosted the maximum amount of 256x")]
   MaxBoostExceeded,
+  #[msg("Hexboost version has changed since this instruction was formed, transaction rejected for safety")]
+  InvalidVersion,
+  #[msg("Error from pyth")]
+  PythError,
+  #[msg("No pyth price found")]
+  PythPriceNotFound,
+  #[msg("Error in arithmetic")]
+  ArithmeticError,
 }

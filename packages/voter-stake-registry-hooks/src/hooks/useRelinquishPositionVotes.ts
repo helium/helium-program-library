@@ -1,6 +1,6 @@
 import { init as initOrg, proposalKey } from "@helium/organization-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";
-import { batchParallelInstructions, truthy } from "@helium/spl-utils";
+import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
 import {
   init as initVsr,
   voteMarkerKey,
@@ -9,6 +9,7 @@ import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
+import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 
 export const useRelinquishPositionVotes = () => {
   const { provider } = useHeliumVsrState();
@@ -17,6 +18,8 @@ export const useRelinquishPositionVotes = () => {
       position,
       organization,
       onInstructions,
+      maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
+      onProgress,
     }: {
       position: PositionWithMeta;
       organization: PublicKey;
@@ -24,6 +27,8 @@ export const useRelinquishPositionVotes = () => {
       onInstructions?: (
         instructions: TransactionInstruction[]
       ) => Promise<void>;
+      maxSignatureBatch?: number;
+      onProgress?: (status: Status) => void;
     }) => {
       const isInvalid =
         !provider || !provider.wallet || position.numActiveVotes === 0;
@@ -100,7 +105,14 @@ export const useRelinquishPositionVotes = () => {
         if (onInstructions) {
           await onInstructions(instructions);
         } else {
-          await batchParallelInstructions(provider, instructions);
+          await batchParallelInstructions(
+            provider,
+            instructions,
+            onProgress,
+            10,
+            [],
+            maxSignatureBatch
+          );
         }
       }
     }

@@ -12,7 +12,7 @@ pub struct CloseBoostV0<'info> {
   #[account(
     mut,
     close = rent_reclaim_authority,
-    constraint = !boosted_hex.is_expired(&boost_config),
+    constraint = boosted_hex.is_expired(&boost_config),
     has_one = boost_config
   )]
   pub boosted_hex: Box<Account<'info, BoostedHexV0>>,
