@@ -48,7 +48,7 @@ export async function run(args: any = process.argv) {
     );
   }
 
-  batchParallelInstructionsWithPriorityFee(provider, instructions, {
+  await batchParallelInstructionsWithPriorityFee(provider, instructions, {
     onProgress: (status) => {
       console.log(
         `Sending ${status.currentBatchProgress} / ${status.currentBatchSize} batch. ${status.totalProgress} / ${status.totalTxs}`

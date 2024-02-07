@@ -5,6 +5,7 @@ use {default_env::default_env, solana_security_txt::security_txt};
 declare_id!("hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR");
 
 pub mod circuit_breaker;
+pub mod create_account;
 pub mod error;
 pub mod instructions;
 pub mod state;

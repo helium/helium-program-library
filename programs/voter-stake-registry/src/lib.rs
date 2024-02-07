@@ -7,7 +7,6 @@ pub mod error;
 pub mod governance;
 pub mod instructions;
 pub mod state;
-pub mod util;
 
 // The program address.
 declare_id!("hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8");
@@ -86,16 +85,15 @@ pub mod voter_stake_registry {
     instructions::set_time_offset_v0::handler(ctx, time_offset)
   }
 
-  pub fn relinquish_vote_v0(ctx: Context<RelinquishVoteV0>) -> Result<()> {
-    instructions::relinquish_vote_v0::handler(ctx)
-  }
-
   pub fn ledger_transfer_position_v0(ctx: Context<LedgerTransferPositionV0>) -> Result<()> {
     instructions::ledger_transfer_position_v0::handler(ctx)
   }
 
-  pub fn update_registrar_authority_v0(ctx: Context<UpdateRegistrarAuthorityV0>) -> Result<()> {
-    instructions::update_registrar_authority_v0::handler(ctx)
+  pub fn update_registrar_authority_v0(
+    ctx: Context<UpdateRegistrarAuthorityV0>,
+    args: UpdateRegistrarAuthorityArgsV0,
+  ) -> Result<()> {
+    instructions::update_registrar_authority_v0::handler(ctx, args)
   }
 
   pub fn vote_v0<'info>(
@@ -114,9 +112,5 @@ pub mod voter_stake_registry {
 
   pub fn relinquish_expired_vote_v0(ctx: Context<RelinquishExpiredVoteV0>) -> Result<()> {
     instructions::relinquish_expired_vote_v0::handler(ctx)
-  }
-
-  pub fn admin_close_nft_vote_record(ctx: Context<AdminCloseNftVoteRecord>) -> Result<()> {
-    instructions::admin_close_nft_vote_record::handler(ctx)
   }
 }
