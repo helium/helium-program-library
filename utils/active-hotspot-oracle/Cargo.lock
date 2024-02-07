@@ -49,7 +49,6 @@ dependencies = [
  "solana-connection-cache",
  "solana-sdk",
  "spl-associated-token-account 2.2.0",
- "spl-governance-tools",
  "spl-token 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio",
  "warp",
@@ -1424,7 +1423,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4114279215a005bc675e386011e594e1d9b800918cea18fcadadcce864a2046b"
 dependencies = [
  "borsh-derive 0.10.3",
- "hashbrown 0.13.2",
+ "hashbrown 0.12.3",
 ]
 
 [[package]]
@@ -1703,7 +1702,7 @@ dependencies = [
 [[package]]
 name = "circuit-breaker"
 version = "0.1.0"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#4a03f3f7e536dba0d4263b655fbcd1eba1ebe97e"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2149,8 +2148,8 @@ dependencies = [
 
 [[package]]
 name = "data-credits"
-version = "0.2.0"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#4a03f3f7e536dba0d4263b655fbcd1eba1ebe97e"
+version = "0.2.1"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3086,8 +3085,8 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.2.0"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#4a03f3f7e536dba0d4263b655fbcd1eba1ebe97e"
+version = "0.2.4"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -3100,14 +3099,16 @@ dependencies = [
  "default-env",
  "helium-sub-daos",
  "mpl-token-metadata",
+ "no-emit",
+ "pyth-sdk-solana",
  "shared-utils",
  "solana-security-txt",
 ]
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.1.0"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#4a03f3f7e536dba0d4263b655fbcd1eba1ebe97e"
+version = "0.1.4"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3195,10 +3196,11 @@ dependencies = [
 [[package]]
 name = "hpl-utils"
 version = "0.1.0"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
 dependencies = [
  "anyhow",
  "bincode",
- "bs58 0.3.1",
+ "bs58 0.5.0",
  "clap 4.4.5",
  "futures",
  "indicatif",
@@ -3210,7 +3212,7 @@ dependencies = [
  "solana-client",
  "solana-connection-cache",
  "solana-sdk",
- "spl-associated-token-account 1.1.3",
+ "spl-associated-token-account 2.2.0",
  "thiserror",
  "warp",
 ]
@@ -3506,8 +3508,8 @@ dependencies = [
 
 [[package]]
 name = "lazy-transactions"
-version = "0.1.0"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#4a03f3f7e536dba0d4263b655fbcd1eba1ebe97e"
+version = "0.2.0"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3843,9 +3845,9 @@ dependencies = [
 
 [[package]]
 name = "mpl-token-metadata"
-version = "3.0.2"
+version = "3.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9eefd9179d205bfedf07eb243959ae33ff6f76488f791f2d1cb1f895f17d0824"
+checksum = "ba8ee05284d79b367ae8966d558e1a305a781fc80c9df51f37775169117ba64f"
 dependencies = [
  "borsh 0.10.3",
  "num-derive 0.3.3",
@@ -3901,6 +3903,19 @@ dependencies = [
  "libc",
  "memoffset 0.7.1",
  "pin-utils",
+]
+
+[[package]]
+name = "no-emit"
+version = "0.0.1"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "default-env",
+ "helium-sub-daos",
+ "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -4572,8 +4587,8 @@ dependencies = [
 
 [[package]]
 name = "proposal"
-version = "0.0.1"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#4a03f3f7e536dba0d4263b655fbcd1eba1ebe97e"
+version = "0.1.0"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
 dependencies = [
  "anchor-gen",
  "anchor-lang",
@@ -5559,7 +5574,7 @@ dependencies = [
 [[package]]
 name = "shared-utils"
 version = "0.0.1"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#4a03f3f7e536dba0d4263b655fbcd1eba1ebe97e"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -6547,7 +6562,7 @@ dependencies = [
 [[package]]
 name = "spl-governance"
 version = "3.1.1"
-source = "git+https://github.com/solana-labs/solana-program-library.git#7266486068f35619b1167e06fed0bc49862bb144"
+source = "git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e#0377e6452fef0c84148e2d4de6bef08dac7ca16e"
 dependencies = [
  "arrayref",
  "bincode",
@@ -6559,14 +6574,14 @@ dependencies = [
  "solana-program",
  "spl-governance-addin-api",
  "spl-governance-tools",
- "spl-token 4.0.0 (git+https://github.com/solana-labs/solana-program-library.git)",
+ "spl-token 4.0.0 (git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e)",
  "thiserror",
 ]
 
 [[package]]
 name = "spl-governance-addin-api"
 version = "0.1.3"
-source = "git+https://github.com/solana-labs/solana-program-library.git#7266486068f35619b1167e06fed0bc49862bb144"
+source = "git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e#0377e6452fef0c84148e2d4de6bef08dac7ca16e"
 dependencies = [
  "borsh 0.10.3",
  "solana-program",
@@ -6576,7 +6591,7 @@ dependencies = [
 [[package]]
 name = "spl-governance-tools"
 version = "0.1.3"
-source = "git+https://github.com/solana-labs/solana-program-library.git#7266486068f35619b1167e06fed0bc49862bb144"
+source = "git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e#0377e6452fef0c84148e2d4de6bef08dac7ca16e"
 dependencies = [
  "arrayref",
  "bincode",
@@ -6586,7 +6601,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "solana-program",
- "spl-token 4.0.0 (git+https://github.com/solana-labs/solana-program-library.git)",
+ "spl-token 4.0.0 (git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e)",
  "thiserror",
 ]
 
@@ -6693,7 +6708,7 @@ dependencies = [
 [[package]]
 name = "spl-token"
 version = "4.0.0"
-source = "git+https://github.com/solana-labs/solana-program-library.git#7266486068f35619b1167e06fed0bc49862bb144"
+source = "git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e#0377e6452fef0c84148e2d4de6bef08dac7ca16e"
 dependencies = [
  "arrayref",
  "bytemuck",
@@ -7250,7 +7265,7 @@ dependencies = [
 [[package]]
 name = "treasury-management"
 version = "0.2.0"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#4a03f3f7e536dba0d4263b655fbcd1eba1ebe97e"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -7489,8 +7504,8 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.2.0"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#4a03f3f7e536dba0d4263b655fbcd1eba1ebe97e"
+version = "0.3.0"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
