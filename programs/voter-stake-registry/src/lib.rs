@@ -115,4 +115,8 @@ pub mod voter_stake_registry {
   pub fn relinquish_expired_vote_v0(ctx: Context<RelinquishExpiredVoteV0>) -> Result<()> {
     instructions::relinquish_expired_vote_v0::handler(ctx)
   }
+
+  pub fn admin_close_nft_vote_record(ctx: Context<AdminCloseNftVoteRecord>) -> Result<()> {
+    instructions::admin_close_nft_vote_record::handler(ctx)
+  }
 }
