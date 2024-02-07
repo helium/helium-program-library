@@ -102,17 +102,33 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
       .boosts_by_period
       .resize(max_period + 1, 0);
   }
+  let now = Clock::get()?.unix_timestamp;
+
   for amount in args.amounts.clone() {
     if ctx.accounts.boosted_hex.boosts_by_period[amount.period as usize] == u8::MAX {
       return Err(error!(ErrorCode::MaxBoostExceeded));
     }
+
+    if ctx.accounts.boosted_hex.start_ts > 0 {
+      let period_start = ctx.accounts.boosted_hex.start_ts
+        + i64::from(amount.period) * i64::from(ctx.accounts.boost_config.period_length);
+      require_gt!(period_start, now, ErrorCode::BoostPeriodOver)
+    }
+
     // Amounts must be > 0 or you could append 0's infinitely to the end of the boosts_by_period
     require_gt!(amount.amount, 0);
+    if amount.period > 0 {
+      require_gt!(
+        ctx.accounts.boosted_hex.boosts_by_period[(amount.period - 1) as usize],
+        0,
+        ErrorCode::NoEmptyPeriods
+      )
+    }
+
     ctx.accounts.boosted_hex.boosts_by_period[amount.period as usize] += amount.amount;
   }
 
   // Shift the periods left to discard past periods
-  let now = Clock::get()?.unix_timestamp;
   if ctx.accounts.boosted_hex.start_ts != 0 {
     let elapsed_time = now - ctx.accounts.boosted_hex.start_ts;
     let elapsed_periods = elapsed_time

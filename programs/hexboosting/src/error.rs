@@ -16,4 +16,8 @@ pub enum ErrorCode {
   PythPriceNotFound,
   #[msg("Error in arithmetic")]
   ArithmeticError,
+  #[msg("Cannot boost a period that is in progress or over")]
+  BoostPeriodOver,
+  #[msg("Cannot leave a gap in boost periods")]
+  NoEmptyPeriods,
 }
