@@ -113,15 +113,15 @@ async fn main() -> Result<()> {
       .collect::<Result<Vec<_>, anyhow::Error>>()
       .context("Failed to serialize txs")?;
 
-    let (_, failed_tx_count) = send_and_confirm_messages_with_spinner(
+    let SendResult { failure_count, .. } = send_and_confirm_messages_with_spinner(
       helium_entity_program.rpc().into(),
       &tpu_client,
       &serialized_txs,
     )
     .context("Failed sending transactions")?;
 
-    if failed_tx_count > 0 {
-      return Err(anyhow!("{} transactions failed", failed_tx_count));
+    if failure_count > 0 {
+      return Err(anyhow!("{} transactions failed", failure_count));
     }
   }
 

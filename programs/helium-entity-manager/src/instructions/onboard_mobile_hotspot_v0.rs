@@ -252,7 +252,7 @@ pub fn handler<'info>(
     .get_ema_price_no_older_than(current_time, if TESTING { 6000000 } else { 10 * 60 })
     .ok_or_else(|| error!(ErrorCode::PythPriceNotFound))?;
   // Remove the confidence from the price to use the most conservative price
-  // https://docs.pyth.network/pythnet-price-feeds/best-practices
+  // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
   let mobile_price_with_conf = mobile_price
     .price
     .checked_sub(i64::try_from(mobile_price.conf.checked_mul(2).unwrap()).unwrap())

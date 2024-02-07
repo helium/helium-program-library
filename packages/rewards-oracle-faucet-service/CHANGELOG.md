@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.29](https://github.com/helium/helium-program-libary/compare/v0.6.28...v0.6.29) (2024-02-06)
+
+**Note:** Version bump only for package @helium/rewards-oracle-faucet-service
+
+
+
+
+
+## [0.6.28](https://github.com/helium/helium-program-libary/compare/v0.6.27...v0.6.28) (2024-02-06)
+
+**Note:** Version bump only for package @helium/rewards-oracle-faucet-service
+
+
+
+
+
 ## [0.6.27](https://github.com/helium/helium-program-libary/compare/v0.6.25...v0.6.27) (2024-02-01)
 
 **Note:** Version bump only for package @helium/rewards-oracle-faucet-service

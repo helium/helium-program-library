@@ -14,6 +14,7 @@ use helium_entity_manager::{
 };
 use hpl_utils::dao::Dao;
 use hpl_utils::token::Token;
+use hpl_utils::SendResult;
 use hpl_utils::{dao::SubDao, send_and_confirm_messages_with_spinner};
 use s3::{bucket::Bucket, creds::Credentials, region::Region};
 use serde::{Deserialize, Serialize};
@@ -257,7 +258,7 @@ async fn main() -> Result<()> {
 
     count += pub_keys.len();
     for pk in pub_keys {
-      let pub_key = pk.unwrap_or("").clone().to_string();
+      let pub_key = pk.unwrap_or("").to_string();
       active_pub_keys.insert(pub_key);
     }
   }
@@ -355,6 +356,7 @@ fn check_validity<C: Deref<Target = impl Signer> + Clone>(
 }
 
 const MAX_TX_LEN: usize = 1232;
+const MAX_BLOCKHASH_RETRIES: usize = 10;
 
 fn construct_and_send_txs<
   P: ConnectionPool<NewConnectionConfig = C>,
@@ -368,6 +370,9 @@ fn construct_and_send_txs<
   payer: &Keypair,
   dry_run: bool,
 ) -> Result<()> {
+  if ixs.is_empty() {
+    return Ok(());
+  }
   // send transactions in batches so blockhash doesn't expire
   let transaction_batch_size = 100;
   println!("Ixs to execute: {}", ixs.len());
@@ -384,8 +389,8 @@ fn construct_and_send_txs<
       (f64::from(priority_fee_lamports) / (600000_f64 * 0.000001_f64)).ceil() as u64,
     ),
   ];
-  let mut txs = Vec::new();
-  let mut blockhash = helium_entity_program.rpc().get_latest_blockhash()?;
+  let mut ix_groups = Vec::new();
+  let blockhash = helium_entity_program.rpc().get_latest_blockhash()?;
   // Pack as many ixs as possible into a tx, then send batches of 100
   for ix in ixs {
     instructions.push(ix.clone());
@@ -397,65 +402,83 @@ fn construct_and_send_txs<
     if tx_len > MAX_TX_LEN || tx.message.account_keys.len() > 64 {
       // clear instructions except for last one
       instructions.pop();
-      let mut tx = Transaction::new_with_payer(&instructions, Some(&helium_entity_program.payer()));
-      tx.try_sign(&[payer], blockhash)
-        .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
-      txs.push(tx);
+      ix_groups.push(instructions);
+
       // clear instructions except for last one
-      instructions = vec![ix.clone()];
-    }
-
-    if dry_run {
-      continue;
-    }
-
-    // send batch of txns
-    if txs.len() >= transaction_batch_size {
-      let (_, failed_tx_count) = send_and_confirm_messages_with_spinner(
-        helium_entity_program.rpc().into(),
-        &tpu_client,
-        &txs
-          .iter()
-          .map(|tx| {
-            bincode::serialize(&tx.clone()).map_err(|e| anyhow!("Failed to serialize tx: {e}"))
-          })
-          .collect::<Result<Vec<_>, anyhow::Error>>()
-          .context("Failed to serialize txs")?,
-      )
-      .context("Failed sending transactions")?;
-
-      if failed_tx_count > 0 {
-        return Err(anyhow!("{} transactions failed", failed_tx_count));
-      }
-
-      txs = Vec::new();
-      blockhash = helium_entity_program.rpc().get_latest_blockhash()?;
+      instructions = vec![
+        ComputeBudgetInstruction::set_compute_unit_limit(600000),
+        ComputeBudgetInstruction::set_compute_unit_price(
+          (f64::from(priority_fee_lamports) / (600000_f64 * 0.000001_f64)).ceil() as u64,
+        ),
+        ix.clone(),
+      ];
     }
   }
 
   // Send last group of txns
   if instructions.len() > 0 {
-    let mut tx = Transaction::new_with_payer(&instructions, Some(&helium_entity_program.payer()));
-    tx.try_sign(&[payer], blockhash)
-      .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
-    txs.push(tx)
+    ix_groups.push(instructions);
   }
-  if txs.len() > 0 {
-    let (_, failed_tx_count) = send_and_confirm_messages_with_spinner(
-      helium_entity_program.rpc().into(),
-      &tpu_client,
-      &txs
-        .iter()
-        .map(|tx| {
-          bincode::serialize(&tx.clone()).map_err(|e| anyhow!("Failed to serialize tx: {e}"))
-        })
-        .collect::<Result<Vec<_>, anyhow::Error>>()
-        .context("Failed to serialize txs")?,
-    )
-    .context("Failed sending transactions")?;
 
-    if failed_tx_count > 0 {
-      return Err(anyhow!("{} transactions failed", failed_tx_count));
+  if !dry_run {
+    for tx_ix_group in ix_groups.chunks(transaction_batch_size) {
+      let mut retries = 0;
+      let confirmed_indexes: Vec<usize> = vec![];
+      let mut group_to_send = tx_ix_group.to_vec();
+
+      // Continually retry forming instruction groups into transactions and sending them until all are confirmed,
+      // or blockhashes have expired too many times.
+      while retries < MAX_BLOCKHASH_RETRIES {
+        let blockhash = helium_entity_program.rpc().get_latest_blockhash()?;
+        let txs: Vec<Transaction> = group_to_send
+          .iter()
+          .map(|group| {
+            let mut tx = Transaction::new_with_payer(group, Some(&helium_entity_program.payer()));
+            tx.try_sign(&[payer], blockhash)
+              .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
+            Ok(tx)
+          })
+          .collect::<Result<Vec<_>, anyhow::Error>>()?;
+
+        let SendResult {
+          failure_count,
+          confirmed_signatures,
+          ..
+        } = send_and_confirm_messages_with_spinner(
+          helium_entity_program.rpc().into(),
+          &tpu_client,
+          &txs
+            .iter()
+            .map(|tx| {
+              bincode::serialize(&tx.clone()).map_err(|e| anyhow!("Failed to serialize tx: {e}"))
+            })
+            .collect::<Result<Vec<_>, anyhow::Error>>()
+            .context("Failed to serialize txs")?,
+        )
+        .context("Failed sending transactions")?;
+
+        if failure_count > 0 {
+          return Err(anyhow!("{} transactions failed", failure_count));
+        }
+
+        group_to_send = group_to_send
+          .into_iter()
+          .enumerate()
+          .filter_map(|(i, group)| {
+            if confirmed_signatures.get(i).is_some() {
+              Some(group)
+            } else {
+              None
+            }
+          })
+          .collect();
+
+        if confirmed_indexes.is_empty() {
+          break;
+        }
+
+        retries += 1;
+      }
     }
   }
 
