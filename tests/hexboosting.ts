@@ -218,7 +218,7 @@ describe("hexboosting", () => {
       const pythData = (await provider.connection.getAccountInfo(priceOracle))!
         .data;
       const price = parsePriceData(pythData);
-      pythPrice = price.emaPrice.value + price.emaConfidence!.value * 2;
+      pythPrice = price.emaPrice.value - price.emaConfidence!.value * 2;
     });
 
     it("allows updating boost config", async () => {
