@@ -1,56 +1,47 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
+import { init as initDataCredits } from "@helium/data-credits-sdk";
+import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { Hexboosting } from "@helium/idls/lib/types/hexboosting";
+import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
+import { PriceOracle } from "@helium/idls/lib/types/price_oracle";
+import { init as initPo } from "@helium/price-oracle-sdk";
+import { toBN } from "@helium/spl-utils";
+import { parsePriceData } from "@pythnetwork/client";
 import {
-  PROGRAM_ID,
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  getConcurrentMerkleTreeAccountSize,
+} from "@solana/spl-account-compression";
+import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
+import {
+  ComputeBudgetProgram,
+  Keypair,
+  PublicKey,
+  SystemProgram,
+} from "@solana/web3.js";
+import { BN } from "bn.js";
+import { expect } from "chai";
+import {
+  init as initHeliumEntityManager
+} from "../packages/helium-entity-manager-sdk/src";
+import {
   boostConfigKey,
   boostedHexKey,
-  init,
+  init
 } from "../packages/hexboosting-sdk";
-import { toBN } from "@helium/spl-utils";
-import { getAssociatedTokenAddressSync, getAccount } from "@solana/spl-token";
+import { init as initMobileEntityManager } from "../packages/mobile-entity-manager-sdk/src";
+import { DataCredits } from "../target/types/data_credits";
+import { HeliumEntityManager } from "../target/types/helium_entity_manager";
+import { HeliumSubDaos } from "../target/types/helium_sub_daos";
+import { initTestDao, initTestSubdao } from "./utils/daos";
 import {
   ensureDCIdl,
   ensureHEMIdl,
   ensureHSDIdl,
   ensureMemIdl,
-  initTestDataCredits,
-  initWorld,
+  initTestDataCredits
 } from "./utils/fixtures";
-import { init as initDataCredits } from "@helium/data-credits-sdk";
-import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
-import {
-  dataOnlyConfigKey,
-  init as initHeliumEntityManager,
-  iotInfoKey,
-  onboardIotHotspot,
-  onboardMobileHotspot,
-  updateIotMetadata,
-  updateMobileMetadata,
-} from "../packages/helium-entity-manager-sdk/src";
-import { DataCredits } from "../target/types/data_credits";
-import { HeliumEntityManager } from "../target/types/helium_entity_manager";
-import { NoEmit } from "../target/types/no_emit";
-import { HeliumSubDaos } from "../target/types/helium_sub_daos";
-import {
-  PublicKey,
-  Keypair,
-  ComputeBudgetProgram,
-  SystemProgram,
-} from "@solana/web3.js";
-import { expect } from "chai";
-import { init as initPo } from "@helium/price-oracle-sdk";
-import { PriceOracle } from "@helium/idls/lib/types/price_oracle";
-import { BN } from "bn.js";
-import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
-import { init as initMobileEntityManager } from "../packages/mobile-entity-manager-sdk/src";
-import {
-  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-  getConcurrentMerkleTreeAccountSize,
-} from "@solana/spl-account-compression";
 import { random } from "./utils/string";
-import { initTestDao, initTestSubdao } from "./utils/daos";
-import { parsePriceData } from "@pythnetwork/client";
 
 describe("hexboosting", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -377,7 +368,7 @@ describe("hexboosting", () => {
                 amount: 1,
               },
               {
-                period: 50,
+                period: 6,
                 amount: 2,
               },
             ],
@@ -411,7 +402,6 @@ describe("hexboosting", () => {
           1,
           1,
           1,
-          ...new Array(44).fill(0),
           2,
         ]);
       });
@@ -424,7 +414,6 @@ describe("hexboosting", () => {
           })
           .accounts({
             boostedHex,
-            carrier,
           })
           .rpc({ skipPreflight: true });
         const acc = await program.account.boostedHexV0.fetch(boostedHex!);
@@ -448,7 +437,6 @@ describe("hexboosting", () => {
             })
             .accounts({
               boostedHex,
-              carrier,
             })
             .rpc({ skipPreflight: true });
         });
