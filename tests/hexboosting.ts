@@ -368,7 +368,7 @@ describe("hexboosting", () => {
                 amount: 1,
               },
               {
-                period: 50,
+                period: 6,
                 amount: 2,
               },
             ],
@@ -402,7 +402,6 @@ describe("hexboosting", () => {
           1,
           1,
           1,
-          ...new Array(44).fill(0),
           2,
         ]);
       });
