@@ -5,10 +5,11 @@ import { HNT_MINT, MOBILE_MINT, toBN } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrSquads } from "./utils";
+import { loadKeypair } from "./utils";
 import { init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { getMint } from "@solana/spl-token";
 import Squads from "@sqds/sdk";
+import { sendInstructionsOrSquads } from "@helium/spl-utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -90,7 +91,8 @@ export async function run(args: any = process.argv) {
   const mint = await getMint(program.provider.connection, dntMint);
   const subDao = (await subDaoKey(dntMint))[0];
 
-  const subDaoAuth = (await hsdProgram.account.subDaoV0.fetch(subDao)).authority
+  const subDaoAuth = (await hsdProgram.account.subDaoV0.fetch(subDao))
+    .authority;
   const instructions = [
     await program.methods
       .initializeBoostConfigV0({
@@ -104,7 +106,7 @@ export async function run(args: any = process.argv) {
         rentReclaimAuthority: new PublicKey(argv.rentReclaimAuthority),
         authority: subDaoAuth,
         subDao,
-        startAuthority: new PublicKey(argv.startAuthority)
+        startAuthority: new PublicKey(argv.startAuthority),
       })
       .instruction(),
   ];

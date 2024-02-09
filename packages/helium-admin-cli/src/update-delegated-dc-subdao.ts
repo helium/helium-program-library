@@ -1,55 +1,56 @@
-import * as anchor from '@coral-xyz/anchor';
+import * as anchor from "@coral-xyz/anchor";
 import {
   delegatedDataCreditsKey,
   init as initDc,
-} from '@helium/data-credits-sdk';
-import { PublicKey, TransactionInstruction } from '@solana/web3.js';
-import Squads from '@sqds/sdk';
-import { BN } from 'bn.js';
-import os from 'os';
-import yargs from 'yargs/yargs';
-import { loadKeypair, sendInstructionsOrSquads } from './utils';
-import { subDaoKey, init as initHsd } from '@helium/helium-sub-daos-sdk';
+} from "@helium/data-credits-sdk";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import Squads from "@sqds/sdk";
+import { BN } from "bn.js";
+import os from "os";
+import yargs from "yargs/yargs";
+import { loadKeypair } from "./utils";
+import { subDaoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
+import { sendInstructionsOrSquads } from "@helium/spl-utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     sourceDntMint: {
-      type: 'string',
+      type: "string",
       required: true,
     },
     destinationDntMint: {
-      type: 'string',
+      type: "string",
       required: true,
     },
     routerKey: {
-      type: 'string',
+      type: "string",
       required: true,
     },
     amount: {
-      type: 'number',
+      type: "number",
       required: true,
     },
     executeTransaction: {
-      type: 'boolean',
+      type: "boolean",
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
     authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
   });
@@ -102,7 +103,7 @@ export async function run(args: any = process.argv) {
   instructions.push(await method.instruction());
 
   const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
+    commitmentOrConfig: "finalized",
   });
 
   await sendInstructionsOrSquads({

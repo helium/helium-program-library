@@ -5,8 +5,8 @@ import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrSquads } from "./utils";
-import { MOBILE_MINT } from "@helium/spl-utils";
+import { loadKeypair } from "./utils";
+import { MOBILE_MINT, sendInstructionsOrSquads } from "@helium/spl-utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -71,7 +71,7 @@ export async function run(args: any = process.argv) {
   const dntMint = new PublicKey(argv.dntMint);
   const subDao = subDaoKey(dntMint)[0];
   const carrier = carrierKey(subDao, argv.name)[0];
-  const carrierAcc = await program.account.carrierV0.fetch(carrier)
+  const carrierAcc = await program.account.carrierV0.fetch(carrier);
 
   instructions.push(
     await program.methods

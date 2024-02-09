@@ -1,108 +1,104 @@
-import Address from '@helium/address';
-import { ED25519_KEY_TYPE } from '@helium/address/build/KeyTypes';
+import Address from "@helium/address";
+import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
 import {
   init as initHem,
   makerKey,
   rewardableEntityConfigKey,
   makerApprovalKey,
-} from '@helium/helium-entity-manager-sdk';
-import { init as initHsd, subDaoKey } from '@helium/helium-sub-daos-sdk';
-import { init as initVsr } from '@helium/voter-stake-registry-sdk';
+} from "@helium/helium-entity-manager-sdk";
+import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import {
   chunks,
   humanReadable,
   sendInstructions,
   truthy,
-} from '@helium/spl-utils';
-import * as anchor from '@coral-xyz/anchor';
+  sendInstructionsOrSquads,
+} from "@helium/spl-utils";
+import * as anchor from "@coral-xyz/anchor";
 import {
   getConcurrentMerkleTreeAccountSize,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-} from '@solana/spl-account-compression';
+} from "@solana/spl-account-compression";
 import {
   Keypair,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
-} from '@solana/web3.js';
-import fs from 'fs';
-import os from 'os';
-import yargs from 'yargs/yargs';
-import {
-  exists,
-  loadKeypair,
-  sendInstructionsOrSquads,
-  merkleSizes,
-} from './utils';
-import Squads from '@sqds/sdk';
+} from "@solana/web3.js";
+import fs from "fs";
+import os from "os";
+import yargs from "yargs/yargs";
+import { exists, loadKeypair, merkleSizes } from "./utils";
+import Squads from "@sqds/sdk";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     executeTransaction: {
-      type: 'boolean',
+      type: "boolean",
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     subdaoMint: {
       required: true,
-      describe: 'Public Key of the subdao mint',
-      type: 'string',
+      describe: "Public Key of the subdao mint",
+      type: "string",
     },
     govProgramId: {
-      type: 'string',
-      describe: 'Pubkey of the GOV program',
-      default: 'hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S',
+      type: "string",
+      describe: "Pubkey of the GOV program",
+      default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
     },
     fromFile: {
-      describe: 'Load makers from a json file and create in bulk',
+      describe: "Load makers from a json file and create in bulk",
       required: false,
-      type: 'string',
+      type: "string",
     },
     name: {
-      alias: 'n',
-      type: 'string',
+      alias: "n",
+      type: "string",
       required: false,
-      describe: 'The name of the maker',
+      describe: "The name of the maker",
     },
     makerKey: {
-      alias: 'm',
-      type: 'string',
-      describe: '*Helium* Public Key of a maker',
+      alias: "m",
+      type: "string",
+      describe: "*Helium* Public Key of a maker",
       required: false,
     },
     makerCount: {
-      alias: 'c',
-      type: 'number',
-      describe: 'Estimated number of hotspots this maker will have',
+      alias: "c",
+      type: "number",
+      describe: "Estimated number of hotspots this maker will have",
       required: false,
     },
     merkleBasePath: {
-      type: 'string',
-      describe: 'Base path for merkle keypairs',
+      type: "string",
+      describe: "Base path for merkle keypairs",
       default: `${__dirname}/../keypairs`,
     },
     symbol: {
-      alias: 's',
-      type: 'string',
+      alias: "s",
+      type: "string",
       required: true,
-      describe: 'The symbol of the entity config',
+      describe: "The symbol of the entity config",
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
     authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
   });
@@ -127,12 +123,12 @@ export async function run(args: any = process.argv) {
   ];
 
   if (argv.fromFile) {
-    makers = JSON.parse(fs.readFileSync(argv.fromFile, 'utf-8'));
+    makers = JSON.parse(fs.readFileSync(argv.fromFile, "utf-8"));
     // Append a special fallthrough maker for hotspots that don't have a maker
     const solAddr = provider.wallet.publicKey;
     const helAddr = new Address(0, 0, ED25519_KEY_TYPE, solAddr.toBuffer());
     makers.push({
-      name: 'Migrated Helium Hotspot',
+      name: "Migrated Helium Hotspot",
       address: helAddr.b58,
       count: 50000,
       staked: true,
@@ -154,7 +150,7 @@ export async function run(args: any = process.argv) {
   let subdaoPayer = provider.wallet.publicKey;
   let daoPayer = provider.wallet.publicKey;
   const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
+    commitmentOrConfig: "finalized",
   });
   let authority = provider.wallet.publicKey;
   let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
@@ -162,7 +158,7 @@ export async function run(args: any = process.argv) {
     authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
     subdaoPayer = authority;
     daoPayer = authority;
-    console.log('SQUAD AUTH', authority.toBase58());
+    console.log("SQUAD AUTH", authority.toBase58());
   }
 
   const createInstructions: TransactionInstruction[][] = [];
@@ -214,7 +210,7 @@ export async function run(args: any = process.argv) {
       const create = await hemProgram.methods
         .initializeMakerV0({
           name: name!,
-          metadataUrl: 'todo',
+          metadataUrl: "todo",
           issuingAuthority: makerAuthority,
           updateAuthority,
         })
@@ -329,7 +325,7 @@ export async function run(args: any = process.argv) {
     approveInstructions.push(innerApproveInstrs);
   }
 
-  console.log('Total sol needed: ', humanReadable(new anchor.BN(totalSol), 9));
+  console.log("Total sol needed: ", humanReadable(new anchor.BN(totalSol), 9));
 
   if (multisig) {
     // Approve instructions must execute after ALL create instructions

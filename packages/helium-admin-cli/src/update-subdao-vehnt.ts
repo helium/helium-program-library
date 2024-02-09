@@ -1,71 +1,71 @@
-import * as anchor from '@coral-xyz/anchor';
-import { init as initHsd, subDaoKey } from '@helium/helium-sub-daos-sdk';
-import { PublicKey, TransactionInstruction } from '@solana/web3.js';
-import Squads from '@sqds/sdk';
-import AWS from 'aws-sdk';
-import { BN } from 'bn.js';
-import os from 'os';
-import { Client } from 'pg';
-import yargs from 'yargs/yargs';
-import { loadKeypair, sendInstructionsOrSquads } from './utils';
-import fs from 'fs';
+import * as anchor from "@coral-xyz/anchor";
+import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import Squads from "@sqds/sdk";
+import AWS from "aws-sdk";
+import { BN } from "bn.js";
+import os from "os";
+import { Client } from "pg";
+import yargs from "yargs/yargs";
+import { loadKeypair } from "./utils";
+import { sendInstructionsOrSquads } from "@helium/spl-utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     dntMint: {
       required: true,
-      type: 'string',
-      describe: 'DNT mint of the subdao to be updated',
+      type: "string",
+      describe: "DNT mint of the subdao to be updated",
     },
     name: {
-      alias: 'n',
-      type: 'string',
+      alias: "n",
+      type: "string",
       required: false,
-      describe: 'The name of the entity config',
+      describe: "The name of the entity config",
     },
     executeTransaction: {
-      type: 'boolean',
+      type: "boolean",
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
     authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
     pgUser: {
-      default: 'postgres',
+      default: "postgres",
     },
     pgPassword: {
-      type: 'string',
+      type: "string",
     },
     pgDatabase: {
-      type: 'string',
+      type: "string",
     },
     pgHost: {
-      default: 'localhost',
+      default: "localhost",
     },
     pgPort: {
-      default: '5432',
+      default: "5432",
     },
     awsRegion: {
-      default: 'us-east-1',
+      default: "us-east-1",
     },
     noSsl: {
-      type: 'boolean',
+      type: "boolean",
       default: false,
     },
   });
@@ -78,7 +78,7 @@ export async function run(args: any = process.argv) {
   const program = await initHsd(provider);
 
   // configure pg connection
-  const isRds = argv.pgHost.includes('rds.amazonaws.com');
+  const isRds = argv.pgHost.includes("rds.amazonaws.com");
   let password = argv.pgPassword;
   if (isRds && !password) {
     const signer = new AWS.RDS.Signer({
@@ -236,14 +236,14 @@ export async function run(args: any = process.argv) {
 
   const subDao = subDaoKey(new PublicKey(argv.dntMint))[0];
   const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
-  console.log('Subdao', subDao.toBase58());
+  console.log("Subdao", subDao.toBase58());
 
   instructions.push(
     await program.methods
       .updateSubDaoVehntV0({
-        vehntDelegated: new BN(row.real_ve_tokens.split('.')[0]),
+        vehntDelegated: new BN(row.real_ve_tokens.split(".")[0]),
         vehntLastCalculatedTs: new BN(row.current_ts),
-        vehntFallRate: new BN(row.real_fall_rate.split('.')[0]),
+        vehntFallRate: new BN(row.real_fall_rate.split(".")[0]),
       })
       .accounts({
         subDao,
@@ -253,7 +253,7 @@ export async function run(args: any = process.argv) {
   );
 
   const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
+    commitmentOrConfig: "finalized",
   });
   await sendInstructionsOrSquads({
     provider,

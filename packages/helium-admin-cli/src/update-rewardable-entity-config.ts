@@ -8,10 +8,10 @@ import { PublicKey } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrSquads } from "./utils";
+import { loadKeypair } from "./utils";
 import BN from "bn.js";
 import { getMint } from "@solana/spl-token";
-import { toBN } from "@helium/spl-utils";
+import { toBN, sendInstructionsOrSquads } from "@helium/spl-utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -65,20 +65,20 @@ export async function run(args: any = process.argv) {
         "The staking requirement for the entity, numeric. Decimals will be added automatically",
     },
     cbrsDcOnboardingFee: {
-      type: 'number',
-      describe: 'The cbrs dc onboarding fee',
+      type: "number",
+      describe: "The cbrs dc onboarding fee",
     },
     cbrsDcLocationStakingFee: {
-      type: 'number',
-      describe: 'The cbrs dc location staking fee',
+      type: "number",
+      describe: "The cbrs dc location staking fee",
     },
     wifiDcOnboardingFee: {
-      type: 'number',
-      describe: 'The wifi dc onboarding fee',
+      type: "number",
+      describe: "The wifi dc onboarding fee",
     },
     wifiDcLocationStakingFee: {
-      type: 'number',
-      describe: 'The wifi dc location staking fee',
+      type: "number",
+      describe: "The wifi dc location staking fee",
     },
   });
   const argv = await yarg.argv;

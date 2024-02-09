@@ -1,77 +1,74 @@
-import * as anchor from '@coral-xyz/anchor';
+import * as anchor from "@coral-xyz/anchor";
 import {
   init as initCb,
   mintWindowedBreakerKey,
-} from '@helium/circuit-breaker-sdk';
-import { daoKey, init as initHsd } from '@helium/helium-sub-daos-sdk';
-import { PublicKey, TransactionInstruction } from '@solana/web3.js';
-import Squads from '@sqds/sdk';
-import os from 'os';
-import yargs from 'yargs/yargs';
-import {
-  loadKeypair,
-  parseEmissionsSchedule,
-  sendInstructionsOrSquads,
-} from './utils';
+} from "@helium/circuit-breaker-sdk";
+import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import Squads from "@sqds/sdk";
+import os from "os";
+import yargs from "yargs/yargs";
+import { loadKeypair, parseEmissionsSchedule } from "./utils";
+import { sendInstructionsOrSquads } from "@helium/spl-utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     hntMint: {
       required: true,
-      type: 'string',
-      describe: 'HNT mint of the dao to be updated',
+      type: "string",
+      describe: "HNT mint of the dao to be updated",
     },
     newAuthority: {
       required: false,
-      describe: 'New DAO authority',
-      type: 'string',
+      describe: "New DAO authority",
+      type: "string",
       default: null,
     },
     newEmissionsSchedulePath: {
       required: false,
-      describe: 'Path to file that contains the new emissions schedule',
-      type: 'string',
+      describe: "Path to file that contains the new emissions schedule",
+      type: "string",
       default: null,
     },
     newHstEmissionsSchedulePath: {
       required: false,
-      describe: 'Path to file that contains the new HST emissions schedule',
-      type: 'string',
+      describe: "Path to file that contains the new HST emissions schedule",
+      type: "string",
       default: null,
     },
     newNetEmissionsCap: {
       required: false,
-      describe: 'New net emissions cap, without decimals',
-      type: 'string',
+      describe: "New net emissions cap, without decimals",
+      type: "string",
       default: null,
     },
     newHstPool: {
       required: false,
-      describe: 'New HST Pool',
-      type: 'string',
+      describe: "New HST Pool",
+      type: "string",
       default: null,
     },
     executeTransaction: {
-      type: 'boolean',
+      type: "boolean",
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
     authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
   });
@@ -131,7 +128,7 @@ export async function run(args: any = process.argv) {
   );
 
   const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
+    commitmentOrConfig: "finalized",
   });
   await sendInstructionsOrSquads({
     provider,
