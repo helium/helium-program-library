@@ -133,10 +133,6 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
   require!(args.name.len() <= 32, ErrorCode::InvalidStringLength);
   require!(args.symbol.len() <= 10, ErrorCode::InvalidStringLength);
 
-  let key_str = match args.key_serialization {
-    KeySerialization::B58 => bs58::encode(&args.entity_key).into_string(),
-    KeySerialization::UTF8 => std::str::from_utf8(&args.entity_key).unwrap().to_string(),
-  };
   let asset_id = get_asset_id(
     &ctx.accounts.merkle_tree.key(),
     ctx.accounts.tree_authority.num_minted,
@@ -149,9 +145,17 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     key_serialization: args.key_serialization,
   });
 
-  let mut metadata_uri = format!("{}/{}", ENTITY_METADATA_URL, key_str);
+  let mut metadata_uri = format!(
+    "{}/v2/entity/{}",
+    ENTITY_METADATA_URL,
+    ctx.accounts.key_to_asset.key().to_string()
+  );
   if let Some(metadata_url) = args.metadata_url {
-    let formated_metadata_url = format!("{}/{}", metadata_url, key_str);
+    let formated_metadata_url = format!(
+      "{}/{}",
+      metadata_url,
+      ctx.accounts.key_to_asset.key().to_string()
+    );
 
     require!(
       formated_metadata_url.len() <= 200,

@@ -159,17 +159,11 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
   ]];
 
   let name = animal_name.to_string();
-  let mut uri = format!("{}/{}", ENTITY_METADATA_URL, key_str);
-
-  // HACK: Handle wifi hotspots with v1 uri. TODO: Find a way to do this for all hotspots after migration
-  // https://docs.google.com/document/d/1Q6VdcDA3McehQYb1MzWL8Iy421D84T7UrmJE7Z9Vc_Y/edit?usp=sharing
-  if uri.len() > 200 {
-    uri = format!(
-      "{}/v1/{}",
-      ENTITY_METADATA_URL,
-      ctx.accounts.key_to_asset.key()
-    );
-  }
+  let uri = format!(
+    "{}/v2/hotspot/{}",
+    ENTITY_METADATA_URL,
+    ctx.accounts.key_to_asset.key(),
+  );
   let metadata = MetadataArgs {
     name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),

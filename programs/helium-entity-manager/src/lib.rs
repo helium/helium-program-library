@@ -173,4 +173,11 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     temp_pay_mobile_onboarding_fee_v0::handler(ctx)
   }
+
+  pub fn temp_standardize_entity<'info>(
+    ctx: Context<'_, '_, '_, 'info, TempStandardizeEntity<'info>>,
+    args: TempStandardizeEntityArgs,
+  ) -> Result<()> {
+    temp_standardize_entity::handler(ctx, args)
+  }
 }
