@@ -1,4 +1,5 @@
 import { init } from "@helium/price-oracle-sdk";
+import { sendInstructionsWithPriorityFee } from "@helium/spl-utils";
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import os from "os";
@@ -96,16 +97,20 @@ export async function run(args: any = process.argv) {
 
   const decimalShiftedPrice = new BN(price! * 10 ** priceOracleAcc.decimals);
 
-  await program.methods
-    .submitPriceV0({
-      oracleIndex,
-      price: decimalShiftedPrice,
-    })
-    .accounts({
-      priceOracle,
-      oracle: provider.wallet.publicKey,
-    })
-    .rpc({ skipPreflight: true });
+  await sendInstructionsWithPriorityFee(provider, [
+    await program.methods
+      .submitPriceV0({
+        oracleIndex,
+        price: decimalShiftedPrice,
+      })
+      .accounts({
+        priceOracle,
+        oracle: provider.wallet.publicKey,
+      })
+      .instruction(),
+  ], {
+    computeUnitLimit: 1000000
+  });
 
   console.log(`Submitted price: ${price}`);
 }
