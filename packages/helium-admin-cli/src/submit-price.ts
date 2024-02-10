@@ -6,21 +6,6 @@ import yargs from "yargs/yargs";
 import { BN } from "bn.js";
 import axios from "axios";
 
-async function findBinancePrice(symbol: string): Promise<number> {
-  try {
-    const response = await axios.get(
-      `https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`
-    );
-    const data = response.data;
-    return parseFloat(data.price);
-  } catch (error: any) {
-    console.error(
-      `Error fetching ticker price for ${symbol}: ${error.message}`
-    );
-    throw error;
-  }
-}
-
 export async function findCoingeckoPrice(token: string): Promise<number> {
   try {
     const response = await axios.get(
@@ -59,13 +44,6 @@ export async function run(args: any = process.argv) {
       describe:
         "Name or Address of the price oracle to submit a price to. Example: hnt, iot, mobile, horUtvuHQFWxPFrZ35YZUmXUZ2TSQdSXhcD4kkCVNKi",
     },
-    useBinancePrice: {
-      type: "string",
-      required: false,
-      describe:
-        "If supplied, will try and find the binance price for this pair. E.g. 'HNTUSDT' will submit the binance HNT-USDT price",
-      default: null,
-    },
     useCoingeckoPrice: {
       type: "string",
       required: false,
@@ -83,7 +61,7 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const program = await init(provider);
 
-  if (!argv.useBinancePrice && !argv.price && !argv.useCoingeckoPrice) {
+  if (!argv.price && !argv.useCoingeckoPrice) {
     throw new Error("Need to supply a price");
   }
 
@@ -91,8 +69,6 @@ export async function run(args: any = process.argv) {
     ? argv.price
     : argv.useCoingeckoPrice
     ? await findCoingeckoPrice(argv.useCoingeckoPrice)
-    : argv.useBinancePrice
-    ? await findBinancePrice(argv.useBinancePrice)
     : null;
 
   switch (argv.priceOracle) {
