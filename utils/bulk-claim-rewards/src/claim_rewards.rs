@@ -504,7 +504,7 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
     if serialized_txs.len() > 0 {
       println!("Sending init recipient transactions");
       send_and_confirm_messages_with_spinner(
-        lazy_distributor_program.rpc().into(),
+        &lazy_distributor_program.rpc(),
         &tpu_client,
         &serialized_txs,
       )
@@ -588,7 +588,7 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
 
     // submit the batch of txs
     send_and_confirm_messages_with_spinner(
-      lazy_distributor_program.rpc().into(),
+      &lazy_distributor_program.rpc(),
       &tpu_client,
       &deserialized_txs,
     )
