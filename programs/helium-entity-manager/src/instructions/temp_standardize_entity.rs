@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use account_compression_cpi::{program::SplAccountCompression, ConcurrentMerkleTreeHeader, Noop};
+use account_compression_cpi::{program::SplAccountCompression, Noop};
 use anchor_lang::{prelude::*, solana_program::keccak};
 use anchor_spl::token::Mint;
 use bubblegum_cpi::{
@@ -14,7 +14,10 @@ use bubblegum_cpi::{
   TokenStandard, TreeConfig, UpdateArgs,
 };
 
-use crate::{constants::ENTITY_METADATA_URL, key_to_asset_seeds, KeyToAssetV0, MakerV0};
+use crate::{
+  constants::ENTITY_METADATA_URL, data_only_config_seeds, key_to_asset_seeds, DataOnlyConfigV0,
+  KeyToAssetV0, MakerV0,
+};
 
 pub const CONCURRENT_MERKLE_TREE_HEADER_SIZE_V1: usize = 2 + 54;
 
@@ -57,11 +60,9 @@ pub struct TempStandardizeEntity<'info> {
   #[account(mut)]
   pub merkle_tree: AccountInfo<'info>,
   /// CHECK: Signs as a verified creator to make searching easier
-  #[account(
-    mut,
-    has_one = collection,
-  )]
-  pub maker: Box<Account<'info, MakerV0>>,
+  #[account(mut)]
+  pub maker: Option<Account<'info, MakerV0>>,
+  pub data_only_config: Box<Account<'info, DataOnlyConfigV0>>,
   #[account(
       seeds = [merkle_tree.key().as_ref()],
       seeds::program = bubblegum_program.key(),
@@ -129,12 +130,24 @@ pub fn handler<'info>(
       .collect(),
     seller_fee_basis_points: 0,
   };
-  let maker_seeds: &[&[&[u8]]] = &[&[
-    b"maker",
-    ctx.accounts.maker.dao.as_ref(),
-    ctx.accounts.maker.name.as_bytes(),
-    &[ctx.accounts.maker.bump_seed],
-  ]];
+  let maker_seeds: Option<Vec<Vec<u8>>> = ctx.accounts.maker.clone().map(|maker| {
+    vec![
+      b"maker".to_vec(),
+      maker.dao.as_ref().to_vec(),
+      maker.name.as_bytes().to_vec(),
+      vec![maker.bump_seed],
+    ]
+  });
+
+  let collection_seeds = maker_seeds.unwrap_or_else(|| {
+    data_only_config_seeds!(ctx.accounts.data_only_config)
+      .iter()
+      .map(|slice| slice.to_vec())
+      .collect()
+  });
+  let collection_seeds_slices: Vec<&[u8]> =
+    collection_seeds.iter().map(|vec| vec.as_slice()).collect();
+  let signer_seeds: &[&[u8]] = &collection_seeds_slices;
   let new_creators = vec![
     BCreator {
       address: args.current_metadata.creators[0].address,
@@ -152,7 +165,10 @@ pub fn handler<'info>(
       ctx.accounts.bubblegum_program.to_account_info(),
       UpdateMetadata {
         tree_authority: ctx.accounts.tree_authority.to_account_info(),
-        authority: ctx.accounts.maker.to_account_info(),
+        authority: ctx.accounts.maker.as_ref().map_or_else(
+          || ctx.accounts.data_only_config.to_account_info(),
+          |f| f.to_account_info(),
+        ),
         collection_mint: ctx.accounts.collection.to_account_info(),
         collection_metadata: ctx.accounts.collection_metadata.to_account_info(),
         collection_authority_record_pda: ctx.accounts.bubblegum_program.to_account_info(),
@@ -167,7 +183,7 @@ pub fn handler<'info>(
       },
     )
     .with_remaining_accounts(ctx.remaining_accounts.to_vec())
-    .with_signer(maker_seeds),
+    .with_signer(&[signer_seeds]),
     args.root,
     u64::from(args.index),
     args.index,
@@ -239,7 +255,7 @@ pub fn handler<'info>(
 
     verify_creator(
       context,
-      new_root.clone(),
+      new_root,
       hash_metadata(&new_metadata)?,
       hash_creators(&new_metadata.creators)?,
       u64::from(args.index),

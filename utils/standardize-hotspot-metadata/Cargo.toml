@@ -19,7 +19,7 @@ lazy_static = "1.4.0"
 anchor-lang = "0.28.0"
 clap = { version = "4.3.9", features = ["derive"] }
 tokio = "1.29.0"
-anchor-client = "0.28.0"
+anchor-client = { version = "0.28.0", features = ["async"] }
 anyhow = "1.0.71"
 chrono = "0.4.26"
 helium-entity-manager = { path = "../../programs/helium-entity-manager" }

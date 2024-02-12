@@ -166,7 +166,7 @@ pub fn handler(ctx: Context<IssueDataOnlyEntityV0>, args: IssueDataOnlyEntityArg
     uri: format!(
       "{}/v2/hotspot/{}",
       ENTITY_METADATA_URL,
-      ctx.accounts.key_to_asset.key().to_string()
+      ctx.accounts.key_to_asset.key()
     ),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),

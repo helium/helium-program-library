@@ -1,28 +1,24 @@
 use std::{collections::HashMap, rc::Rc, str::FromStr};
 
 use anchor_client::{Client, Cluster};
-use anchor_lang::solana_program::hash;
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use helium_entity_manager::{
-  accounts::TempStandardizeEntity, MakerV0, MetadataArgs, TempStandardizeEntityArgs
+  accounts::TempStandardizeEntity, MakerV0, MetadataArgs, TempStandardizeEntityArgs,
 };
-use hpl_utils::{
-  dao::{Dao, SubDao},
-  send_and_confirm_messages_with_spinner,
-};
+use hpl_utils::construct_and_send_txs;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use solana_client::tpu_client::{TpuClient, TpuClientConfig};
 use solana_sdk::{
-  commitment_config::CommitmentConfig, instruction::Instruction, pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction
+  commitment_config::CommitmentConfig, instruction::Instruction, pubkey::Pubkey,
+  signature::read_keypair_file, signer::Signer,
 };
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
 
 const BUBBLEGUM_PROGRAM_ID: &str = "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY";
 const TM_PROGRAM_ID: &str = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s";
 const LOG_WRAPPER_PROGRAM_ID: &str = "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV";
 const COMPRESSION_PROGRAM_ID: &str = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK";
-
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -52,13 +48,8 @@ struct JsonRpcResponse<T> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ProofsResponse {
-  items: Vec<ProofResponse>
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 struct AssetsResponse {
-  items: Vec<AssetResponse>
+  items: Vec<AssetResponse>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -66,32 +57,33 @@ struct ProofResponse {
   root: String,
   proof: Vec<String>,
   tree_id: String,
-  node_index: u32
+  node_index: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct AssetResponse {
   id: String,
   content: Content,
-  grouping: Grouping,
+  grouping: Vec<Grouping>,
   creators: Vec<Creator>,
-  ownership: Ownership
+  ownership: Ownership,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Ownership {
-  owner: String
+  owner: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Content {
   json_uri: String,
-  metadata: Metadata
+  metadata: Metadata,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Metadata {
-  symbol: String
+  name: String,
+  symbol: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -104,9 +96,8 @@ struct Creator {
 #[derive(Debug, Serialize, Deserialize)]
 struct Grouping {
   group_key: String,
-  group_value: String
+  group_value: String,
 }
-
 
 #[derive(Debug, Serialize, Deserialize)]
 struct JsonRpcError {
@@ -158,167 +149,179 @@ async fn main() -> Result<()> {
     TpuClientConfig::default(),
   )
   .unwrap();
-  let makers = helium_entity_program.accounts::<MakerV0>(vec![])?;
+  let makers = helium_entity_program.accounts::<MakerV0>(vec![]).await?;
   let makers_by_collection: HashMap<_, _> = makers
     .iter()
     .map(|(k, maker)| (maker.collection, (k, maker)))
     .collect();
   let entity_creator = Pubkey::from_str("Fv5hf1Fg58htfC7YEXKNEfkpuogUUQDDTLgjGWxxv48H").unwrap();
   let dao = Pubkey::from_str("Fv5hf1Fg58htfC7YEXKNEfkpuogUUQDDTLgjGWxxv48H").unwrap();
+  let data_only_config = Pubkey::find_program_address(
+    &["data_only_config".as_bytes(), dao.as_ref()],
+    &helium_entity_program.id(),
+  )
+  .0;
+  let data_only_collection = Pubkey::find_program_address(
+    &["collection".as_bytes(), data_only_config.as_ref()],
+    &helium_entity_program.id(),
+  )
+  .0;
   let mut counter = 1;
-  let batch_size = 64 / 2; // Max buffer size on our trees.
+  let batch_size = 100; // 64 / 2; // Max buffer size on our trees.
   let req_client = reqwest::Client::new();
   loop {
-  // get all nfts owned by user from the das
-  let get_asset_response = req_client
-    .post(helium_entity_program.rpc().url())
-    .header("Cache-Control", "no-cache")
-    .header("Pragma", "no-cache")
-    .header("Expires", "0")
-    .json(&JsonRpcRequest {
-      jsonrpc: "2.0".to_string(),
-      method: "searchAssets".to_string(),
-      params: json!({
-          "creatorAddress": entity_creator.to_string(),
-          "creatorVerified": true,
-          "page": counter,
-          "limit": batch_size,
-      }),
-      id: "rpd-op-123".to_string(),
-    })
-    .send()
-    .await
-    .map_err(|e| anyhow!("Failed to get asset: {e}"))?
-    .json::<JsonRpcResponse<AssetsResponse>>()
-    .await
-    .map_err(|e| anyhow!("Failed to parse asset response: {e}"))?;
+    // get all nfts owned by user from the das
+    let get_asset_response = req_client
+      .post(helium_entity_program.rpc().url())
+      .header("Cache-Control", "no-cache")
+      .header("Pragma", "no-cache")
+      .header("Expires", "0")
+      .json(&JsonRpcRequest {
+        jsonrpc: "2.0".to_string(),
+        method: "searchAssets".to_string(),
+        params: json!({
+            "creatorAddress": entity_creator.to_string(),
+            "creatorVerified": true,
+            "page": counter,
+            "limit": batch_size,
+        }),
+        id: "rpd-op-123".to_string(),
+      })
+      .send()
+      .await
+      .map_err(|e| anyhow!("Failed to get asset: {e}"))?
+      .json::<JsonRpcResponse<AssetsResponse>>()
+      .await
+      .map_err(|e| anyhow!("Failed to parse asset response: {e}"))?;
+    if let Some(err) = get_asset_response.error {
+      return Err(anyhow!("Json error {}", err.message));
+    }
     let assets = get_asset_response.result.unwrap().items;
     if assets.len() == 0 {
       println!("Done");
       break;
     }
-    let ids = assets.iter().map(|a| a.id).collect();
+    println!("Batching {} assets", assets.len());
+    let ids: Vec<String> = assets.iter().map(|a| a.id.clone()).collect();
     // get all nfts owned by user from the das
-  let get_proofs_response = req_client
-    .post(helium_entity_program.rpc().url())
-    .header("Cache-Control", "no-cache")
-    .header("Pragma", "no-cache")
-    .header("Expires", "0")
-    .json(&JsonRpcRequest {
-      jsonrpc: "2.0".to_string(),
-      method: "getAssetProofBatch".to_string(),
-      params: json!({
-          "ids": ids
-      }),
-      id: "rpd-op-123".to_string(),
-    })
-    .send()
-    .await
-    .map_err(|e| anyhow!("Failed to get proof: {e}"))?
-    .json::<JsonRpcResponse<ProofsResponse>>()
-    .await
-    .map_err(|e| anyhow!("Failed to parse proof response: {e}"))?;
+    let get_proofs_response = req_client
+      .post(helium_entity_program.rpc().url())
+      .header("Cache-Control", "no-cache")
+      .header("Pragma", "no-cache")
+      .header("Expires", "0")
+      .json(&JsonRpcRequest {
+        jsonrpc: "2.0".to_string(),
+        method: "getAssetProofBatch".to_string(),
+        params: json!({
+            "ids": ids
+        }),
+        id: "rpd-op-123".to_string(),
+      })
+      .send()
+      .await
+      .map_err(|e| anyhow!("Failed to get proof: {e}"))?
+      .json::<JsonRpcResponse<HashMap<String, ProofResponse>>>()
+      .await
+      .map_err(|e| anyhow!("Failed to parse proof response: {e}"))?;
+    if let Some(err) = get_proofs_response.error {
+      return Err(anyhow!("Json error {}", err.message));
+    }
     let proof_result = get_proofs_response.result.unwrap();
-    let proofs: Vec<ProofResponse> = proof_result.items;
+    let proofs: HashMap<String, ProofResponse> = proof_result;
 
-    println!("Found {} assets", assets.len());
     let instructions: Vec<Instruction> = assets
       .iter()
-      .zip(proofs)
+      .map(|asset| (asset, proofs.get(&asset.id).unwrap()))
+      .filter(|(asset, _)| !asset.content.json_uri.contains("/v2/") || asset.creators.len() == 1)
       .map(|(asset, proof)| {
-        let id = asset.id;
         let key_to_asset = key_to_asset_for_asset(asset, dao)?;
         let root = Pubkey::from_str(&proof.root)?;
         let merkle_tree = Pubkey::from_str(&proof.tree_id)?;
-        let (maker, maker_acc) = makers_by_collection.get(&Pubkey::from_str(&asset.grouping.group_value).unwrap()).unwrap();
+        let maker_opt =
+          makers_by_collection.get(&Pubkey::from_str(&asset.grouping[0].group_value).unwrap());
+        let collection = maker_opt
+          .map(|m| m.1.collection)
+          .unwrap_or_else(|| data_only_collection);
 
         Ok(
-          helium_entity_program.request()
-          .args(helium_entity_manager::instruction::TempStandardizeEntity {
-            args: TempStandardizeEntityArgs {
-              root: root.to_bytes(),
-              index: proof.node_index,
-              current_metadata: MetadataArgs {
-                name: asset.content.metadata.name,
-                symbol: asset.content.metadata.symbol,
-                uri: asset.content.metadata.uri,
-                creators: asset.creators.map(|c| helium_entity_manager::Creator {
-                  address: Pubkey::from_str(c.address)?,
-                  verified: c.verified,
-                  share: c.share
-                })
-              }
-            }
-          })
-          .accounts(TempStandardizeEntity {
-            key_to_asset,
-            merkle_tree,
-            maker: **maker,
-            collection: maker_acc.collection,
-            tree_authority: Pubkey::find_program_address(&[merkle_tree.as_ref()], &bubblegum_program_id).0,
-            authority: me,
-            collection_metadata: Pubkey::find_program_address(&["metadata".as_bytes(), tm_program_id.as_ref(), maker_acc.collection.as_ref()], &tm_program_id).0,
-            leaf_owner: Pubkey::from_str(&asset.ownership.owner).unwrap(),
-            payer: me,
-            log_wrapper: log_wrapper_program_id,
-            compression_program: compression_program_id,
-            bubblegum_program: bubblegum_program_id,
-            token_metadata_program: tm_program_id,
-            system_program: solana_sdk::system_program::id(),
-
-          })
-          .instructions()?.get(0).unwrap()
+          helium_entity_program
+            .request()
+            .args(helium_entity_manager::instruction::TempStandardizeEntity {
+              args: TempStandardizeEntityArgs {
+                root: root.to_bytes(),
+                index: proof.node_index,
+                current_metadata: MetadataArgs {
+                  name: asset.content.metadata.name.clone(),
+                  symbol: asset.content.metadata.symbol.clone(),
+                  uri: asset.content.json_uri.clone(),
+                  creators: asset
+                    .creators
+                    .iter()
+                    .map(|c| helium_entity_manager::Creator {
+                      address: Pubkey::from_str(&c.address).unwrap(),
+                      verified: c.verified,
+                      share: c.share,
+                    })
+                    .collect(),
+                },
+              },
+            })
+            .accounts(TempStandardizeEntity {
+              key_to_asset,
+              merkle_tree,
+              maker: maker_opt.map(|m| *m.0),
+              collection,
+              data_only_config,
+              tree_authority: Pubkey::find_program_address(
+                &[merkle_tree.as_ref()],
+                &bubblegum_program_id,
+              )
+              .0,
+              authority: me,
+              collection_metadata: Pubkey::find_program_address(
+                &[
+                  "metadata".as_bytes(),
+                  tm_program_id.as_ref(),
+                  collection.as_ref(),
+                ],
+                &tm_program_id,
+              )
+              .0,
+              leaf_owner: Pubkey::from_str(&asset.ownership.owner).unwrap(),
+              payer: me,
+              log_wrapper: log_wrapper_program_id,
+              compression_program: compression_program_id,
+              bubblegum_program: bubblegum_program_id,
+              token_metadata_program: tm_program_id,
+              system_program: solana_sdk::system_program::id(),
+            })
+            .instructions()?,
         )
       })
-      .collect()?;
-  }
+      .collect::<Result<Vec<Vec<Instruction>>>>()?
+      .into_iter()
+      .flatten()
+      .collect();
 
-  println!("Found {} iot hotspots", infos.len());
-  for i in (0..ixs.len()).step_by(transaction_batch_size * ixs_per_tx) {
-    let tx_start = i;
-    let tx_end = (i + transaction_batch_size * ixs_per_tx).min(ixs.len());
-    let blockhash = helium_entity_program.rpc().get_latest_blockhash()?;
-    let mut txs = Vec::new();
-    for j in (tx_start..tx_end).step_by(ixs_per_tx) {
-      let ix_start = j;
-      let ix_end = (j + ixs_per_tx).min(ixs.len());
-      let ixs_to_send = &ixs[ix_start..ix_end];
-      let mut tx = Transaction::new_with_payer(ixs_to_send, Some(&helium_entity_program.payer()));
-      tx.try_sign(&[kp.as_ref()], blockhash)
-        .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
-      txs.push(tx);
-    }
-
-    let serialized_txs = txs
-      .iter()
-      .map(|tx| bincode::serialize(&tx.clone()).map_err(|e| anyhow!("Failed to serialize tx: {e}")))
-      .collect::<Result<Vec<_>, anyhow::Error>>()
-      .context("Failed to serialize txs")?;
-
-    let SendResult { failure_count, .. } = send_and_confirm_messages_with_spinner(
-      helium_entity_program.rpc().into(),
+    construct_and_send_txs(
+      &helium_entity_program.rpc(),
       &tpu_client,
-      &serialized_txs,
-    )
-    .context("Failed sending transactions")?;
-
-    if failure_count > 0 {
-      return Err(anyhow!("{} transactions failed", failure_count));
-    }
+      instructions,
+      &kp,
+      false,
+    )?;
+    counter += 1;
   }
 
   Ok(())
 }
 
-pub fn key_to_asset_for_asset(asset: &AssetResponse, dao: Pubkey) -> Result<Pubkey, anyhow::Error> {
+fn key_to_asset_for_asset(asset: &AssetResponse, dao: Pubkey) -> Result<Pubkey, anyhow::Error> {
   let creator = asset.creators.get(1);
   match creator {
-    Some(v) => Pubkey::from_str(
-      &v.address
-    )
-    .map_err(anyhow::Error::from),
+    Some(v) => Pubkey::from_str(&v.address).map_err(anyhow::Error::from),
     _ => {
-      let json_uri = asset.content.json_uri
+      let json_uri = asset.content.json_uri.clone();
       let entity_key = json_uri
         .split("/")
         .collect::<Vec<_>>()
@@ -326,7 +329,7 @@ pub fn key_to_asset_for_asset(asset: &AssetResponse, dao: Pubkey) -> Result<Pubk
         .context(parse_err!(json_uri))?
         .to_string();
 
-      let symbol = asset.content.metadata.symbol;
+      let symbol = asset.content.metadata.symbol.clone();
 
       let entity_key_bytes = if symbol == "IOT OPS" || symbol == "CARRIER" {
         entity_key.as_bytes().to_vec()

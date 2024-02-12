@@ -148,14 +148,10 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
   let mut metadata_uri = format!(
     "{}/v2/entity/{}",
     ENTITY_METADATA_URL,
-    ctx.accounts.key_to_asset.key().to_string()
+    ctx.accounts.key_to_asset.key()
   );
   if let Some(metadata_url) = args.metadata_url {
-    let formated_metadata_url = format!(
-      "{}/{}",
-      metadata_url,
-      ctx.accounts.key_to_asset.key().to_string()
-    );
+    let formated_metadata_url = format!("{}/{}", metadata_url, ctx.accounts.key_to_asset.key());
 
     require!(
       formated_metadata_url.len() <= 200,
