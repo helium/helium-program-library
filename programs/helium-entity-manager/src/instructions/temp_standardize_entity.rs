@@ -70,7 +70,8 @@ pub struct TempStandardizeEntity<'info> {
   )]
   pub tree_authority: Box<Account<'info, TreeConfig>>,
   #[account(
-    address = Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW").unwrap()
+    // Key grinded specifically to do this update
+    address = Pubkey::from_str("up8dLZtZFdPCqmnRTeQm3eGAyPq4kEvUrivMWyQNaxH").unwrap()
   )]
   pub authority: Signer<'info>,
   pub collection: Box<Account<'info, Mint>>,
