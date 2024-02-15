@@ -15,7 +15,7 @@ dependencies = [
 [[package]]
 name = "account-compression-cpi"
 version = "0.1.2"
-source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=a2d12e4a157d91feb73aa40a97fe297fd477dd87#a2d12e4a157d91feb73aa40a97fe297fd477dd87"
+source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=a499196#a499196fd0f57227dce46c59d6f5a92d0a46ea84"
 dependencies = [
  "anchor-gen",
  "anchor-lang",
@@ -874,7 +874,7 @@ dependencies = [
 [[package]]
 name = "bubblegum-cpi"
 version = "0.9.2"
-source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=a2d12e4a157d91feb73aa40a97fe297fd477dd87#a2d12e4a157d91feb73aa40a97fe297fd477dd87"
+source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=a499196#a499196fd0f57227dce46c59d6f5a92d0a46ea84"
 dependencies = [
  "anchor-gen",
  "anchor-lang",
@@ -5661,7 +5661,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

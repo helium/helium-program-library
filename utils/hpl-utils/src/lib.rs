@@ -1,8 +1,5 @@
 use std::{
-  collections::HashMap,
-  sync::Arc,
-  thread::sleep,
-  time::{Duration, Instant},
+  collections::HashMap, env, thread::sleep, time::{Duration, Instant}
 };
 
 use indicatif::{ProgressBar, ProgressStyle};
@@ -11,10 +8,11 @@ use solana_client::{
   rpc_config::RpcSendTransactionConfig,
   tpu_client::{TpuClient, TpuSenderError},
 };
+use anyhow::{anyhow, Context};
 use solana_connection_cache::connection_cache::{
   ConnectionManager, ConnectionPool, NewConnectionConfig,
 };
-use solana_sdk::{signature::Signature, transaction::{TransactionError, VersionedTransaction}};
+use solana_sdk::{compute_budget::ComputeBudgetInstruction, instruction::Instruction, signature::{Keypair, Signature}, signer::Signer, transaction::{Transaction, TransactionError, VersionedTransaction}};
 
 pub mod dao;
 pub mod program;
@@ -36,7 +34,7 @@ pub fn send_and_confirm_messages_with_spinner<
   M: ConnectionManager<ConnectionPool = P, NewConnectionConfig = C>,
   C: NewConnectionConfig,
 >(
-  rpc_client: Arc<RpcClient>,
+  rpc_client: &RpcClient,
   tpu_client: &TpuClient<P, M, C>,
   messages: &Vec<Vec<u8>>,
 ) -> Result<SendResult, TpuSenderError> {
@@ -198,4 +196,133 @@ fn set_message_for_confirmed_transactions(
       None => String::new(),
     },
   ));
+}
+
+const MAX_TX_LEN: usize = 1232;
+const MAX_BLOCKHASH_RETRIES: usize = 10;
+
+pub fn construct_and_send_txs<
+  P: ConnectionPool<NewConnectionConfig = C>,
+  M: ConnectionManager<ConnectionPool = P, NewConnectionConfig = C>,
+  C: NewConnectionConfig,
+>(
+  rpc: &RpcClient,
+  tpu_client: &TpuClient<P, M, C>,
+  ixs: Vec<Instruction>,
+  payer: &Keypair,
+  dry_run: bool,
+) -> Result<(), anyhow::Error> {
+  if ixs.is_empty() {
+    return Ok(());
+  }
+  // send transactions in batches so blockhash doesn't expire
+  let transaction_batch_size = 100;
+  println!("Ixs to execute: {}", ixs.len());
+  let priority_fee_lamports: u32 = env::var("PRIORITY_FEE_LAMPORTS")
+    .context("Failed to get env var PRIORITY_FEE_LAMPORTS")
+    .and_then(|v| {
+      v.parse::<u32>()
+        .map_err(|e| anyhow!("Failed to parse PRIORITY_FEE_LAMPORTS: {}", e))
+    })
+    .unwrap_or(1);
+  let mut instructions = vec![
+    ComputeBudgetInstruction::set_compute_unit_limit(600000),
+    ComputeBudgetInstruction::set_compute_unit_price(
+      (f64::from(priority_fee_lamports) / (600000_f64 * 0.000001_f64)).ceil() as u64,
+    ),
+  ];
+  let mut ix_groups = Vec::new();
+  let blockhash = rpc.get_latest_blockhash()?;
+  // Pack as many ixs as possible into a tx, then send batches of 100
+  for ix in ixs {
+    instructions.push(ix.clone());
+    let mut tx = Transaction::new_with_payer(&instructions, Some(&payer.pubkey()));
+    tx.try_sign(&[payer], blockhash)
+      .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
+    let tx_len = bincode::serialize(&tx).unwrap().len();
+
+    if tx_len > MAX_TX_LEN || tx.message.account_keys.len() > 64 {
+      // clear instructions except for last one
+      instructions.pop();
+      ix_groups.push(instructions);
+
+      // clear instructions except for last one
+      instructions = vec![
+        ComputeBudgetInstruction::set_compute_unit_limit(600000),
+        ComputeBudgetInstruction::set_compute_unit_price(
+          (f64::from(priority_fee_lamports) / (600000_f64 * 0.000001_f64)).ceil() as u64,
+        ),
+        ix.clone(),
+      ];
+    }
+  }
+
+  // Send last group of txns
+  if instructions.len() > 0 {
+    ix_groups.push(instructions);
+  }
+
+  if !dry_run {
+    for tx_ix_group in ix_groups.chunks(transaction_batch_size) {
+      let mut retries = 0;
+      let confirmed_indexes: Vec<usize> = vec![];
+      let mut group_to_send = tx_ix_group.to_vec();
+
+      // Continually retry forming instruction groups into transactions and sending them until all are confirmed,
+      // or blockhashes have expired too many times.
+      while retries < MAX_BLOCKHASH_RETRIES {
+        let blockhash = rpc.get_latest_blockhash()?;
+        let txs: Vec<Transaction> = group_to_send
+          .iter()
+          .map(|group| {
+            let mut tx = Transaction::new_with_payer(group, Some(&payer.pubkey()));
+            tx.try_sign(&[payer], blockhash)
+              .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
+            Ok(tx)
+          })
+          .collect::<Result<Vec<_>, anyhow::Error>>()?;
+
+        let SendResult {
+          failure_count,
+          confirmed_signatures,
+          ..
+        } = send_and_confirm_messages_with_spinner(
+          rpc,
+          &tpu_client,
+          &txs
+            .iter()
+            .map(|tx| {
+              bincode::serialize(&tx.clone()).map_err(|e| anyhow!("Failed to serialize tx: {e}"))
+            })
+            .collect::<Result<Vec<_>, anyhow::Error>>()
+            .context("Failed to serialize txs")?,
+        )
+        .context("Failed sending transactions")?;
+
+        if failure_count > 0 {
+          return Err(anyhow!("{} transactions failed", failure_count));
+        }
+
+        group_to_send = group_to_send
+          .into_iter()
+          .enumerate()
+          .filter_map(|(i, group)| {
+            if confirmed_signatures.get(i).is_some() {
+              Some(group)
+            } else {
+              None
+            }
+          })
+          .collect();
+
+        if confirmed_indexes.is_empty() {
+          break;
+        }
+
+        retries += 1;
+      }
+    }
+  }
+
+  Ok(())
 }
