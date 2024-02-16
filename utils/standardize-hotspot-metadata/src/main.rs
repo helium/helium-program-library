@@ -317,13 +317,15 @@ async fn main() -> Result<()> {
       .flatten()
       .collect();
 
-    construct_and_send_txs(
+    if let Err(r) = construct_and_send_txs(
       &helium_entity_program.rpc(),
       &tpu_client,
       instructions,
       &kp,
       false,
-    )?;
+    ) {
+      println!("Failed to send txs: {:?}", r);
+    };
     counter += 1;
   }
 

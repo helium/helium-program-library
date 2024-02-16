@@ -7,11 +7,11 @@ edition = "2021"
 overflow-checks = true
 
 [dependencies]
-solana-client = "1.16.13"
+solana-client = "1.17.22"
 serde_json = "1.0"
 reqwest = { version = "0.11.13", features = ["blocking", "json"]  }
 serde = "1.0.152"
-solana-sdk = "1.16.13"
+solana-sdk = "1.17.22"
 bincode = "1.3.3"
 warp = "0.3.3"
 futures = "0.3.25"
