@@ -1,0 +1,121 @@
+@import 'tailwindcss/base';
+@import './fonts.css';
+@import './prism.css';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+@layer base {
+  [inert] ::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+:root {
+  --bg-opacity-light: 0.5;
+  --bg-opacity-dark: 0.2;
+  --color-borders: #333333;
+  --color-nav-drawer-bg: #202020;
+  --hero-shape-stroke: red;
+}
+
+#trail-nav::before {
+  clip-path: inset(0 95% 0 0);
+  content: '';
+  border-left: 2px solid var(--color-borders);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  height: calc(100% - 10px);
+}
+
+#trail-nav-link::before {
+  clip-path: inset(0 10% 0 0);
+  position: absolute;
+  content: '';
+  border-left: 2px solid var(--color-borders);
+  border-bottom: 2px solid var(--color-borders);
+  border-bottom-left-radius: 0.625rem;
+  top: 0;
+  left: 0;
+  width: 10px;
+  pointer-events: none;
+  height: 50px;
+  height: 0.875rem;
+}
+
+.trail-nav-link::before {
+  clip-path: inset(0 10% 0 0);
+  position: absolute;
+  content: '';
+  border-left: 2px solid var(--color-borders);
+  border-bottom: 2px solid var(--color-borders);
+  border-bottom-left-radius: 0.625rem;
+  top: 0;
+  left: 0;
+  width: 10px;
+  pointer-events: none;
+  height: 0.875rem;
+}
+
+#trail-nav li:last-child::after {
+  content: '';
+  border-radius: 10px;
+  background: var(--color-nav-drawer-bg);
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  height: calc(100% - 0.65rem);
+}
+
+* {
+  -webkit-perspective: 1000;
+  -webkit-backface-visibility: hidden;
+  will-change: transform;
+}
+
+.animate-breathe, .animation-wrapper {
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden; /* For older versions of Chrome */
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d; /* For older versions of Chrome */
+}
+
+.hex {
+  position: relative;
+  background: inherit;
+  border-radius: 40px;
+  height: 325px;
+  width: 220px;
+}
+
+.hex:before,
+.hex:after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: inherit;
+  border-radius: inherit;
+  height: 100%;
+  width: 100%;
+  top: 0;
+  left: 0;
+}
+.hex:before {
+  -webkit-transform: rotate(60deg);
+  -moz-transform: rotate(60deg);
+  -webkit-transform: rotate(-60deg);
+  -moz-transform: rotate(-60deg);
+  transform: rotate(60deg);
+}
+.hex:after {
+  -webkit-transform: rotate(60deg);
+  -moz-transform: rotate(60deg);
+  -webkit-transform: rotate(-60deg);
+  -moz-transform: rotate(-60deg);
+  transform: rotate(-60deg);
+}

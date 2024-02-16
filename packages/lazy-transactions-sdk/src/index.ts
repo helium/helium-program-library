@@ -4,7 +4,7 @@ import { LazyTransactions } from "@helium/idls/lib/types/lazy_transactions";
 import {
   AccountMeta,
   PublicKey,
-  TransactionInstruction
+  TransactionInstruction,
 } from "@solana/web3.js";
 import { keccak_256 } from "js-sha3";
 import { PROGRAM_ID } from "./constants";
@@ -208,7 +208,7 @@ export function getCanopy({
   }
   canopy.shift(); // remove root
   return canopy;
-};
+}
 
 export async function fillCanopy({
   program,
@@ -290,7 +290,11 @@ export function compile(
   merkleTree: MerkleTree;
   compiledTransactions: CompiledTransaction[];
 } {
-  const compiledTransactions = compileNoMerkle(lazySigner, transactions, programId)
+  const compiledTransactions = compileNoMerkle(
+    lazySigner,
+    transactions,
+    programId
+  );
   const merkleTree = new MerkleTree(compiledTransactions.map(toLeaf));
 
   return {
@@ -321,13 +325,10 @@ export function compileNoMerkle(
     };
   });
 
-  return compiledTransactions
+  return compiledTransactions;
 }
 
-export function isExecuted(
-  executed: Buffer,
-  index: number,
-): boolean {
+export function isExecuted(executed: Buffer, index: number): boolean {
   const byteIndex = Math.floor(index / 8);
   const bitIndex = index % 8;
   const byte = executed[byteIndex];
