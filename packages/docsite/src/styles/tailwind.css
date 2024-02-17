@@ -70,12 +70,6 @@
   height: calc(100% - 0.65rem);
 }
 
-* {
-  -webkit-perspective: 1000;
-  -webkit-backface-visibility: hidden;
-  will-change: transform;
-}
-
 .animate-breathe, .animation-wrapper {
   will-change: transform;
   backface-visibility: hidden;
