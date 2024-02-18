@@ -11,8 +11,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use solana_client::tpu_client::{TpuClient, TpuClientConfig};
 use solana_sdk::{
-  commitment_config::CommitmentConfig, instruction::Instruction, pubkey::Pubkey,
-  signature::read_keypair_file, signer::Signer,
+  commitment_config::CommitmentConfig,
+  instruction::{AccountMeta, Instruction},
+  pubkey::Pubkey,
+  signature::read_keypair_file,
+  signer::Signer,
 };
 
 const BUBBLEGUM_PROGRAM_ID: &str = "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY";
@@ -67,6 +70,12 @@ struct AssetResponse {
   grouping: Vec<Grouping>,
   creators: Vec<Creator>,
   ownership: Ownership,
+  compression: Compression,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Compression {
+  leaf_id: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -155,7 +164,7 @@ async fn main() -> Result<()> {
     .map(|(k, maker)| (maker.collection, (k, maker)))
     .collect();
   let entity_creator = Pubkey::from_str("Fv5hf1Fg58htfC7YEXKNEfkpuogUUQDDTLgjGWxxv48H").unwrap();
-  let dao = Pubkey::from_str("Fv5hf1Fg58htfC7YEXKNEfkpuogUUQDDTLgjGWxxv48H").unwrap();
+  let dao = Pubkey::from_str("BQ3MCuTT5zVBhNfQ4SjMh3NPVhFy73MPV8rjfq5d1zie").unwrap();
   let data_only_config = Pubkey::find_program_address(
     &["data_only_config".as_bytes(), dao.as_ref()],
     &helium_entity_program.id(),
@@ -242,74 +251,81 @@ async fn main() -> Result<()> {
         let collection = maker_opt
           .map(|m| m.1.collection)
           .unwrap_or_else(|| data_only_collection);
-
-        Ok(
-          helium_entity_program
-            .request()
-            .args(helium_entity_manager::instruction::TempStandardizeEntity {
-              args: TempStandardizeEntityArgs {
-                root: root.to_bytes(),
-                index: proof.node_index,
-                current_metadata: MetadataArgs {
-                  name: asset.content.metadata.name.clone(),
-                  symbol: asset.content.metadata.symbol.clone(),
-                  uri: asset.content.json_uri.clone(),
-                  creators: asset
-                    .creators
-                    .iter()
-                    .map(|c| helium_entity_manager::Creator {
-                      address: Pubkey::from_str(&c.address).unwrap(),
-                      verified: c.verified,
-                      share: c.share,
-                    })
-                    .collect(),
-                },
+        let mut instructions = helium_entity_program
+          .request()
+          .args(helium_entity_manager::instruction::TempStandardizeEntity {
+            args: TempStandardizeEntityArgs {
+              root: root.to_bytes(),
+              index: asset.compression.leaf_id,
+              current_metadata: MetadataArgs {
+                name: asset.content.metadata.name.clone(),
+                symbol: asset.content.metadata.symbol.clone(),
+                uri: asset.content.json_uri.clone(),
+                creators: asset
+                  .creators
+                  .iter()
+                  .map(|c| helium_entity_manager::Creator {
+                    address: Pubkey::from_str(&c.address).unwrap(),
+                    verified: c.verified,
+                    share: c.share,
+                  })
+                  .collect(),
               },
-            })
-            .accounts(TempStandardizeEntity {
-              key_to_asset,
-              merkle_tree,
-              maker: maker_opt.map(|m| *m.0),
-              collection,
-              data_only_config,
-              tree_authority: Pubkey::find_program_address(
-                &[merkle_tree.as_ref()],
-                &bubblegum_program_id,
-              )
-              .0,
-              authority: me,
-              collection_metadata: Pubkey::find_program_address(
-                &[
-                  "metadata".as_bytes(),
-                  tm_program_id.as_ref(),
-                  collection.as_ref(),
-                ],
-                &tm_program_id,
-              )
-              .0,
-              leaf_owner: Pubkey::from_str(&asset.ownership.owner).unwrap(),
-              payer: me,
-              log_wrapper: log_wrapper_program_id,
-              compression_program: compression_program_id,
-              bubblegum_program: bubblegum_program_id,
-              token_metadata_program: tm_program_id,
-              system_program: solana_sdk::system_program::id(),
-            })
-            .instructions()?,
-        )
+            },
+          })
+          .accounts(TempStandardizeEntity {
+            key_to_asset,
+            merkle_tree,
+            maker: maker_opt.map(|m| *m.0),
+            collection,
+            data_only_config,
+            tree_authority: Pubkey::find_program_address(
+              &[merkle_tree.as_ref()],
+              &bubblegum_program_id,
+            )
+            .0,
+            authority: me,
+            collection_metadata: Pubkey::find_program_address(
+              &[
+                "metadata".as_bytes(),
+                tm_program_id.as_ref(),
+                collection.as_ref(),
+              ],
+              &tm_program_id,
+            )
+            .0,
+            leaf_owner: Pubkey::from_str(&asset.ownership.owner).unwrap(),
+            payer: me,
+            log_wrapper: log_wrapper_program_id,
+            compression_program: compression_program_id,
+            bubblegum_program: bubblegum_program_id,
+            token_metadata_program: tm_program_id,
+            system_program: solana_sdk::system_program::id(),
+          })
+          .instructions()?;
+        instructions[0]
+          .accounts
+          .extend(proof.proof.iter().take(3).map(|p| AccountMeta {
+            pubkey: Pubkey::from_str(p).unwrap(),
+            is_signer: false,
+            is_writable: false,
+          }));
+        Ok(instructions)
       })
       .collect::<Result<Vec<Vec<Instruction>>>>()?
       .into_iter()
       .flatten()
       .collect();
 
-    construct_and_send_txs(
+    if let Err(r) = construct_and_send_txs(
       &helium_entity_program.rpc(),
       &tpu_client,
       instructions,
       &kp,
       false,
-    )?;
+    ) {
+      println!("Failed to send txs: {:?}", r);
+    };
     counter += 1;
   }
 

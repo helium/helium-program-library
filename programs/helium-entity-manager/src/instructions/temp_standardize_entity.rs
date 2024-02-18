@@ -99,9 +99,13 @@ pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, TempStandardizeEntity<'info>>,
   args: TempStandardizeEntityArgs,
 ) -> Result<()> {
+  let mut sub_uri = ENTITY_METADATA_URL;
+  if args.current_metadata.symbol.to_lowercase() == "subscriber" {
+    sub_uri = "https://sol.hellohelium.com/api/metadata"
+  }
   let uri = format!(
     "{}/v2/{}/{}",
-    ENTITY_METADATA_URL,
+    sub_uri,
     args.current_metadata.symbol.to_lowercase(),
     ctx.accounts.key_to_asset.key()
   );

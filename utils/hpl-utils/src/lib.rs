@@ -78,7 +78,7 @@ pub fn send_and_confirm_messages_with_spinner<
   }
 
   let mut last_resend = Instant::now() - TRANSACTION_RESEND_INTERVAL;
-  while block_height <= last_valid_block_height {
+  while block_height <= last_valid_block_height && pending_transactions.len() > 0 {
     let num_transactions = pending_transactions.len();
 
     // Periodically re-send all pending transactions
