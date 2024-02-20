@@ -123,7 +123,13 @@ export type SusResult = {
   rawSimulation: SimulatedTransactionResponse;
   error?: TransactionError;
   // Warnings about potential sus things in this transaction
-  warnings: string[];
+  warnings: Warning[];
+};
+
+type Warning = {
+  severity: "critical" | "warning";
+  shortMessage: string;
+  message: string;
 };
 
 export async function sus({
@@ -148,7 +154,7 @@ export async function sus({
   cNfts?: Asset[];
   cluster?: string;
 }): Promise<SusResult> {
-  const warnings: string[] = [];
+  const warnings: Warning[] = [];
   const transaction = VersionedTransaction.deserialize(serializedTransaction);
   const message = transaction.message.serialize().toString("base64");
   const explorerLink = `https://explorer.solana.com/tx/inspector?cluster=${cluster}&message=${encodeURIComponent(
@@ -252,19 +258,29 @@ export async function sus({
   if (
     instructions.some((ix) => ix.parsed?.name === "ledgerTransferPositionV0")
   ) {
-    warnings.push(
-      "This transaction is attempting to steal your locked HNT positions"
-    );
+    warnings.push({
+      severity: 'critical',
+      shortMessage: 'Theft of Locked HNT',
+      message: "This transaction is attempting to steal your locked HNT positions"
+    });
   }
 
   if (instructions.some((ix) => isBurnHotspot(connection, ix))) {
-    warnings.push("This transaction will brick your Hotspot!");
+    warnings.push({
+      severity: 'critical',
+      shortMessage: 'Hotspot Destroyed',
+      message: "This transaction will brick your Hotspot!"
+    });
   }
 
   const logs = simulatedTxn.value.logs;
   if (simulatedTxn?.value.err) {
     if (isInsufficientBal(simulatedTxn?.value.err)) {
-      warnings.push("Transaction failed in simulation");
+      warnings.push({
+        severity: 'warning',
+        shortMessage: 'Simulation Failed',
+        message: "Transaction failed in simulation"
+      });
       return {
         instructions,
         error: simulatedTxn.value.err,
@@ -295,9 +311,18 @@ export async function sus({
       switch (type) {
         case "TokenAccount":
           if (acc.post.parsed?.delegate && !acc.pre.parsed?.delegate) {
-            warnings.push(
-              `Delegation was taken on ${acc.name}. This gives permission to withdraw tokens without the owner's permission.`
-            );
+            warnings.push({
+              severity: 'warning',
+              shortMessage: 'Withdraw Authority Given',
+              message: `Delegation was taken on ${acc.name}. This gives permission to withdraw tokens without the owner's permission.`
+            });
+          }
+          if (acc.post.parsed && acc.pre.parsed && !acc.post.parsed.owner.equals(acc.pre.parsed.owner)) {
+            warnings.push({
+              severity: 'warning',
+              shortMessage: 'Account Owner Changed',
+              message: `The owner of ${acc.name} changed from ${acc.pre.parsed?.owner} to ${acc.post.parsed?.owner}`
+            })
           }
           return {
             owner: acc.post.parsed?.owner || acc.pre.parsed?.owner,
@@ -332,9 +357,11 @@ export async function sus({
     balanceChanges.filter((b) => b.owner.equals(wallet) && b.amount < BigInt(0))
       .length > 2
   ) {
-    warnings.push(
-      "More than 2 accounts with negative balance change. Is this emptying your wallet?"
-    );
+    warnings.push({
+      severity: 'warning',
+      shortMessage: 'Potential Drain Risk',
+      message: "More than 2 accounts with negative balance change. Is this emptying your wallet?"
+    });
   }
 
   let possibleCNftChanges: Asset[] = [];
