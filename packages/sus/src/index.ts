@@ -93,6 +93,7 @@ export type WritableAccount = {
   // For anchor accounts, will be the name of the struct
   name: string;
   changedInSimulation: boolean;
+  warnings: Warning[];
   pre: {
     type: "TokenAccount" | string;
     account: AccountInfo<Buffer> | null;
@@ -122,7 +123,8 @@ export type SusResult = {
   writableAccounts: WritableAccount[];
   rawSimulation: SimulatedTransactionResponse;
   error?: TransactionError;
-  // Warnings about potential sus things in this transaction
+  /// Warnings about potential sus things in this transaction
+  /// Note that individual writable accounts may have their own warnings NOT included in this list
   warnings: Warning[];
 };
 
@@ -301,6 +303,7 @@ export async function sus({
   let solFee = (transaction?.signatures.length || 1) * 5000;
   let priorityFee = 0;
 
+  const warningsByWritableAcc: Record<string, Warning[]> = {}
   const fee =
     (await connection?.getFeeForMessage(transaction.message, "confirmed"))
       .value || solFee;
@@ -310,19 +313,20 @@ export async function sus({
       const type = acc.pre.type || acc.post.type;
       switch (type) {
         case "TokenAccount":
+          warningsByWritableAcc[acc.address.toBase58()] = []
           if (acc.post.parsed?.delegate && !acc.pre.parsed?.delegate) {
-            warnings.push({
-              severity: 'warning',
-              shortMessage: 'Withdraw Authority Given',
-              message: `Delegation was taken on ${acc.name}. This gives permission to withdraw tokens without the owner's permission.`
+            warningsByWritableAcc[acc.address.toBase58()].push({
+              severity: "warning",
+              shortMessage: "Withdraw Authority Given",
+              message: `Delegation was taken. This gives permission to withdraw tokens without the owner's permission.`,
             });
           }
           if (acc.post.parsed && acc.pre.parsed && !acc.post.parsed.owner.equals(acc.pre.parsed.owner)) {
-            warnings.push({
-              severity: 'warning',
-              shortMessage: 'Account Owner Changed',
-              message: `The owner of ${acc.name} changed from ${acc.pre.parsed?.owner} to ${acc.post.parsed?.owner}`
-            })
+            warningsByWritableAcc[acc.address.toBase58()].push({
+              severity: "warning",
+              shortMessage: "Account Owner Changed",
+              message: `The owner changed to ${acc.post.parsed?.owner}. This gives that wallet full custody of these tokens.`,
+            });
           }
           return {
             owner: acc.post.parsed?.owner || acc.pre.parsed?.owner,
@@ -331,6 +335,7 @@ export async function sus({
               ((acc.post.parsed?.amount as bigint) || BigInt(0)) -
               ((acc.pre.parsed?.amount as bigint) || BigInt(0)),
             metadata: acc.metadata,
+
           } as BalanceChange;
         case "NativeAccount":
           return {
@@ -359,7 +364,7 @@ export async function sus({
   ) {
     warnings.push({
       severity: 'warning',
-      shortMessage: 'Potential Drain Risk',
+      shortMessage: '2+ Writable Accounts',
       message: "More than 2 accounts with negative balance change. Is this emptying your wallet?"
     });
   }
@@ -409,7 +414,10 @@ export async function sus({
     explorerLink,
     balanceChanges,
     possibleCNftChanges,
-    writableAccounts,
+    writableAccounts: writableAccounts.map((wa) => ({
+      ...wa,
+      warnings: warningsByWritableAcc[wa.address.toBase58()] || [],
+    })),
     rawSimulation: simulatedTxn.value,
     warnings,
   };
