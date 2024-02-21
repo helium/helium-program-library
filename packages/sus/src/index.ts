@@ -49,7 +49,7 @@ export type BalanceChange = {
   metadata: TokenMetadata;
 };
 
-type TokenMetadata = {
+export type TokenMetadata = {
   mint: PublicKey;
   decimals: number;
   name?: string;
@@ -126,7 +126,7 @@ export type SusResult = {
   warnings: Warning[];
 };
 
-type Warning = {
+export type Warning = {
   severity: "critical" | "warning";
   shortMessage: string;
   message: string;
