@@ -25,7 +25,6 @@ import {
   AddressLookupTableAccount,
   Connection,
   PublicKey,
-  SimulatedTransactionAccountInfo,
   SimulatedTransactionResponse,
   SystemProgram,
   TransactionError,
@@ -100,7 +99,7 @@ export type WritableAccount = {
   };
   post: {
     type: "TokenAccount" | string;
-    account: SimulatedTransactionAccountInfo | null;
+    account: AccountInfo<Buffer> | null;
     parsed: any | null;
   };
   metadata?: TokenMetadata;
@@ -130,7 +129,7 @@ export type Warning = {
   severity: "critical" | "warning";
   shortMessage: string;
   message: string;
-  account?: PublicKey
+  account?: PublicKey;
 };
 
 export async function sus({
@@ -202,11 +201,20 @@ export async function sus({
       addresses: simulationAccounts?.map((account) => account.toBase58()) || [],
     },
   });
-  const fullAccounts = simulationAccounts.map((account, index) => ({
-    address: account,
-    post: simulatedTxn.value.accounts?.[index],
-    pre: fetchedAccounts[index],
-  }));
+  const fullAccounts = simulationAccounts.map((account, index) => {
+    const post = simulatedTxn.value.accounts?.[index];
+    return {
+      address: account,
+      post: post
+        ? {
+            ...post,
+            owner: new PublicKey(post.owner),
+            data: Buffer.from(post.data[0], post.data[1] as any),
+          }
+        : undefined,
+      pre: fetchedAccounts[index],
+    };
+  });
 
   const programKeys = fullAccounts
     .map(
@@ -321,7 +329,7 @@ export async function sus({
               severity: "warning",
               shortMessage: "Withdraw Authority Given",
               message: `Delegation was taken on ${acc.name}. This gives permission to withdraw tokens without the owner's permission.`,
-              account: acc.address
+              account: acc.address,
             });
           }
           if (
@@ -519,7 +527,7 @@ export async function getDetailedWritableAccounts({
   accounts: {
     address: PublicKey;
     pre: AccountInfo<Buffer> | null | undefined;
-    post: SimulatedTransactionAccountInfo | null | undefined;
+    post: AccountInfo<Buffer> | null | undefined;
   }[];
   idls: Record<string, Idl>;
 }): Promise<WritableAccount[]> {
@@ -531,14 +539,7 @@ export async function getDetailedWritableAccounts({
     let postParsed: null | any = null;
     let accountOwner: PublicKey | undefined = undefined;
 
-    const postData =
-      post &&
-      Buffer.from(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        post.data[0] as any,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        post.data[1] as any
-      );
+    const postData = post && post.data;
     const postAccount =
       post && postData
         ? {
