@@ -261,17 +261,22 @@ export async function sus({
     instructions.some((ix) => ix.parsed?.name === "ledgerTransferPositionV0")
   ) {
     warnings.push({
-      severity: 'critical',
-      shortMessage: 'Theft of Locked HNT',
-      message: "This transaction is attempting to steal your locked HNT positions"
+      severity: "critical",
+      shortMessage: "Theft of Locked HNT",
+      message:
+        "This transaction is attempting to steal your locked HNT positions",
     });
   }
 
-  if (instructions.some((ix) => isBurnHotspot(connection, ix))) {
+  if (
+    (
+      await Promise.all(instructions.map((ix) => isBurnHotspot(connection, ix)))
+    ).some((isBurn) => isBurn)
+  ) {
     warnings.push({
-      severity: 'critical',
-      shortMessage: 'Hotspot Destroyed',
-      message: "This transaction will brick your Hotspot!"
+      severity: "critical",
+      shortMessage: "Hotspot Destroyed",
+      message: "This transaction will brick your Hotspot!",
     });
   }
 
@@ -279,9 +284,9 @@ export async function sus({
   if (simulatedTxn?.value.err) {
     if (isInsufficientBal(simulatedTxn?.value.err)) {
       warnings.push({
-        severity: 'warning',
-        shortMessage: 'Simulation Failed',
-        message: "Transaction failed in simulation"
+        severity: "warning",
+        shortMessage: "Simulation Failed",
+        message: "Transaction failed in simulation",
       });
       return {
         instructions,
@@ -303,7 +308,7 @@ export async function sus({
   let solFee = (transaction?.signatures.length || 1) * 5000;
   let priorityFee = 0;
 
-  const warningsByWritableAcc: Record<string, Warning[]> = {}
+  const warningsByWritableAcc: Record<string, Warning[]> = {};
   const fee =
     (await connection?.getFeeForMessage(transaction.message, "confirmed"))
       .value || solFee;
@@ -313,7 +318,7 @@ export async function sus({
       const type = acc.pre.type || acc.post.type;
       switch (type) {
         case "TokenAccount":
-          warningsByWritableAcc[acc.address.toBase58()] = []
+          warningsByWritableAcc[acc.address.toBase58()] = [];
           if (acc.post.parsed?.delegate && !acc.pre.parsed?.delegate) {
             warningsByWritableAcc[acc.address.toBase58()].push({
               severity: "warning",
@@ -321,7 +326,11 @@ export async function sus({
               message: `Delegation was taken. This gives permission to withdraw tokens without the owner's permission.`,
             });
           }
-          if (acc.post.parsed && acc.pre.parsed && !acc.post.parsed.owner.equals(acc.pre.parsed.owner)) {
+          if (
+            acc.post.parsed &&
+            acc.pre.parsed &&
+            !acc.post.parsed.owner.equals(acc.pre.parsed.owner)
+          ) {
             warningsByWritableAcc[acc.address.toBase58()].push({
               severity: "warning",
               shortMessage: "Account Owner Changed",
@@ -335,7 +344,6 @@ export async function sus({
               ((acc.post.parsed?.amount as bigint) || BigInt(0)) -
               ((acc.pre.parsed?.amount as bigint) || BigInt(0)),
             metadata: acc.metadata,
-
           } as BalanceChange;
         case "NativeAccount":
           return {
@@ -363,9 +371,10 @@ export async function sus({
       .length > 2
   ) {
     warnings.push({
-      severity: 'warning',
-      shortMessage: '2+ Writable Accounts',
-      message: "More than 2 accounts with negative balance change. Is this emptying your wallet?"
+      severity: "warning",
+      shortMessage: "2+ Writable Accounts",
+      message:
+        "More than 2 accounts with negative balance change. Is this emptying your wallet?",
     });
   }
 
