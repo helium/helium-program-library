@@ -193,7 +193,7 @@ export async function sus({
             : []
         )
     ),
-  ].filter((a) => accountBlacklist?.has(a.toBase58()));
+  ].filter((a) => !accountBlacklist?.has(a.toBase58()));
   const fetchedAccounts = await connection.getMultipleAccountsInfo(
     simulationAccounts
   );
