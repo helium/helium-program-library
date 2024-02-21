@@ -404,6 +404,7 @@ export async function sus({
           // limit to checking 200 assets
           limit: 200,
           compressed: true,
+          ownerAddress: wallet.toBase58(),
           ...extraSearchAssetParams,
         },
         headers: {
