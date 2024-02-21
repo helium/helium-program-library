@@ -156,7 +156,7 @@ export async function sus({
   cluster?: string;
   /// Disallow fetching on this set of accounts. This is useful for cases like avoiding fetching
   /// known massive merkle trees to save on data.
-  accountBlacklist: Set<string>;
+  accountBlacklist?: Set<string>;
 }): Promise<SusResult> {
   const warnings: Warning[] = [];
   const transaction = VersionedTransaction.deserialize(serializedTransaction);
@@ -193,7 +193,7 @@ export async function sus({
             : []
         )
     ),
-  ].filter((a) => accountBlacklist.has(a.toBase58()));
+  ].filter((a) => accountBlacklist?.has(a.toBase58()));
   const fetchedAccounts = await connection.getMultipleAccountsInfo(
     simulationAccounts
   );
