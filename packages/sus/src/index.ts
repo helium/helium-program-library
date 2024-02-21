@@ -434,6 +434,7 @@ export function isInsufficientBal(e: any) {
 
 export type ParsedInstruction = {
   name: string;
+  programName: string;
   data: any;
   accounts: {
     name?: string;
@@ -467,6 +468,7 @@ async function parseInstructions({
             return {
               parsed: {
                 name: parsed.name,
+                programName: idl.name,
                 data: parsed.data,
                 accounts: formatted.accounts,
               },
