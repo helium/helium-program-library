@@ -143,6 +143,7 @@ export async function sus({
   cNfts,
   // Cluster for explorer
   cluster = "mainnet-beta",
+  accountBlacklist,
 }: {
   connection: Connection;
   wallet: PublicKey;
@@ -153,6 +154,9 @@ export async function sus({
   /// Optionally pass cnfts to check instead of searchAssets it
   cNfts?: Asset[];
   cluster?: string;
+  /// Disallow fetching on this set of accounts. This is useful for cases like avoiding fetching
+  /// known massive merkle trees to save on data.
+  accountBlacklist: Set<string>;
 }): Promise<SusResult> {
   const warnings: Warning[] = [];
   const transaction = VersionedTransaction.deserialize(serializedTransaction);
@@ -189,7 +193,7 @@ export async function sus({
             : []
         )
     ),
-  ];
+  ].filter((a) => accountBlacklist.has(a.toBase58()));
   const fetchedAccounts = await connection.getMultipleAccountsInfo(
     simulationAccounts
   );
