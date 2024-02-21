@@ -250,6 +250,17 @@ export async function sus({
     accounts: fullAccounts,
     idls,
   });
+  writableAccounts.forEach((acc) => {
+    if (!acc.changedInSimulation) {
+      warnings.push({
+        severity: "warning",
+        shortMessage: "Unchanged",
+        message:
+          "Account did not change in simulation but was labeled as writable. The behavior of the transaction may differ from the simulation.",
+        account: acc.address,
+      });
+    }
+  });
 
   const instructions = await parseInstructions({
     idls,
