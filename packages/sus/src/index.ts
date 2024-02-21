@@ -289,27 +289,25 @@ export async function sus({
 
   const logs = simulatedTxn.value.logs;
   if (simulatedTxn?.value.err) {
-    if (isInsufficientBal(simulatedTxn?.value.err)) {
-      warnings.push({
-        severity: "warning",
-        shortMessage: "Simulation Failed",
-        message: "Transaction failed in simulation",
-      });
-      return {
-        instructions,
-        error: simulatedTxn.value.err,
-        logs,
-        solFee: 0,
-        priorityFee: 0,
-        insufficientFunds: true,
-        explorerLink,
-        balanceChanges: [],
-        possibleCNftChanges: [],
-        writableAccounts,
-        rawSimulation: simulatedTxn.value,
-        warnings,
-      };
-    }
+    warnings.push({
+      severity: "warning",
+      shortMessage: "Simulation Failed",
+      message: "Transaction failed in simulation",
+    });
+    return {
+      instructions,
+      error: simulatedTxn.value.err,
+      logs,
+      solFee: 0,
+      priorityFee: 0,
+      insufficientFunds: isInsufficientBal(simulatedTxn?.value.err),
+      explorerLink,
+      balanceChanges: [],
+      possibleCNftChanges: [],
+      writableAccounts,
+      rawSimulation: simulatedTxn.value,
+      warnings,
+    };
   }
 
   let solFee = (transaction?.signatures.length || 1) * 5000;
