@@ -371,15 +371,12 @@ export async function sus({
     })
     .filter(truthy);
 
-  if (
-    balanceChanges.filter((b) => b.owner.equals(wallet) && b.amount < BigInt(0))
-      .length > 2
-  ) {
+  if (balanceChanges.filter((b) => b.owner.equals(wallet)).length >= 2) {
     warnings.push({
       severity: "warning",
-      shortMessage: "2+ Writable Accounts",
+      shortMessage: "3+ Token Accounts",
       message:
-        "More than 2 accounts with negative balance change. Is this emptying your wallet?",
+        "3 or more token accounts are impacted by this transaction. Any token account listed as writable can be emptied by the transaction, is this okay?",
     });
   }
 
