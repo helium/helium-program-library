@@ -93,7 +93,7 @@ export type WritableAccount = {
   // For anchor accounts, will be the name of the struct
   name: string;
   changedInSimulation: boolean;
-  warnings: Warning[];
+  warnings?: Warning[];
   pre: {
     type: "TokenAccount" | string;
     account: AccountInfo<Buffer> | null;
