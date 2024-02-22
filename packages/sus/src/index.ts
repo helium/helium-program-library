@@ -903,22 +903,28 @@ export async function fetchMetadatas(
   const metadataAccounts = all.slice(0, metadatas.length);
   const mintAccounts = all.slice(metadatas.length, metadatas.length * 2);
   return metadataAccounts.map((acc, index) => {
-    const mint = unpackMint(tokens[index], mintAccounts[index]);
-    if (acc) {
-      const collectable = Metadata.fromAccountInfo(acc)[0];
+    try {
+      const mint = unpackMint(tokens[index], mintAccounts[index]);
+      if (acc) {
+        const collectable = Metadata.fromAccountInfo(acc)[0];
+        return {
+          name: collectable.data.name.replace(/\0/g, ""),
+          symbol: collectable.data.symbol.replace(/\0/g, ""),
+          uri: collectable.data.uri.replace(/\0/g, ""),
+          decimals: mint.decimals,
+          mint: tokens[index],
+        };
+      }
+
       return {
-        name: collectable.data.name.replace(/\0/g, ""),
-        symbol: collectable.data.symbol.replace(/\0/g, ""),
-        uri: collectable.data.uri.replace(/\0/g, ""),
-        decimals: mint.decimals,
         mint: tokens[index],
+        decimals: mint.decimals,
       };
+    } catch (e: any) {
+      // Ignore, not a valid mint
     }
 
-    return {
-      mint: tokens[index],
-      decimals: mint.decimals,
-    };
+    return null
   });
 }
 
