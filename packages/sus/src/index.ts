@@ -477,7 +477,7 @@ export async function sus({
     let result: SusResult;
     if (simulatedTxn?.value.err) {
       warnings.push({
-        severity: "warning",
+        severity: "critical",
         shortMessage: "Simulation Failed",
         message: "Transaction failed in simulation",
       });
