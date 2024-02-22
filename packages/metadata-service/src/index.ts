@@ -31,6 +31,8 @@ import {
 } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { Op } from "sequelize";
+import grpc from "@grpc/grpc-js";
+import { orgClient } from "../proto/generated/iot_config_grpc_pb";
 
 const PAGE_SIZE = Number(process.env.PAGE_SIZE) || 10000;
 const MODEL_MAP: any = {
