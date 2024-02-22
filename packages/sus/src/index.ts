@@ -509,7 +509,9 @@ export async function sus({
       priorityFee = fee - solFee;
       const balanceChanges = writableAccounts
         .map((acc) => {
-          const type = acc.pre.type || acc.post.type;
+          const type =
+            (acc.pre.type !== "Unknown" && acc.pre.type) ||
+            (acc.post.type !== "Unknown" && acc.post.type);
           switch (type) {
             case "TokenAccount":
               if (acc.post.parsed?.delegate && !acc.pre.parsed?.delegate) {
@@ -528,7 +530,9 @@ export async function sus({
                 warnings.push({
                   severity: "warning",
                   shortMessage: "Owner Changed",
-                  message: `The owner of ${acc.name} changed to ${acc.post.parsed?.owner?.toBase58()}. This gives that wallet full custody of these tokens.`,
+                  message: `The owner of ${
+                    acc.name
+                  } changed to ${acc.post.parsed?.owner?.toBase58()}. This gives that wallet full custody of these tokens.`,
                   account: acc.address,
                 });
               }
@@ -760,15 +764,12 @@ export function getDetailedWritableAccountsWithoutTM({
         if (owner) {
           const idl = idls[owner.toBase58()];
           if (idl) {
-            ({ parsed: preParsed, type } = decodeIdlStruct(idl, pre) || {
-              type: "Unknown",
-            });
-            ({ parsed: postParsed, type } = decodeIdlStruct(
+            const decodedPre = decodeIdlStruct(idl, pre)
+            const decodedPost = decodeIdlStruct(
               idl,
               postAccount
-            ) || {
-              type: "Unknown",
-            });
+            )
+            type = decodedPre?.type || decodedPost?.type || "Unknown"
             name = type;
           }
         }
