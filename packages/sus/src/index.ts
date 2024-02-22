@@ -557,7 +557,8 @@ export async function sus({
         })
         .filter(truthy);
 
-      if (balanceChanges.filter((b) => b.owner.equals(wallet)).length >= 3) {
+      // Don't count new mints being created, as this might flag on candymachine txs
+      if (balanceChanges.filter((b) => b.owner.equals(wallet) && fetchedAccountsByAddr[b.address.toBase58()]).length >= 3) {
         warnings.push({
           severity: "warning",
           shortMessage: "3+ Token Accounts",
