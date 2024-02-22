@@ -557,7 +557,7 @@ export async function sus({
         })
         .filter(truthy);
 
-      if (balanceChanges.filter((b) => b.owner.equals(wallet)).length >= 2) {
+      if (balanceChanges.filter((b) => b.owner.equals(wallet)).length >= 3) {
         warnings.push({
           severity: "warning",
           shortMessage: "3+ Token Accounts",
