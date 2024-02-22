@@ -397,6 +397,20 @@ export async function sus({
             account: acc.address,
           });
         }
+
+        // Catch malicious sol ownwer change
+        const sysProg = new PublicKey("11111111111111111111111111111111")
+        const postOwner = acc.post.account?.owner || sysProg
+        const preOwner = acc.pre.account?.owner || sysProg
+        const accountOwnerChanged = !preOwner.equals(postOwner)
+        if (acc.name === "Native SOL Account" && acc.owner && acc.owner.equals(wallet) && accountOwnerChanged) {
+          warningsByTx[index].push({
+            severity: "critical",
+            shortMessage: "Owner Changed",
+            message: `The owner of ${acc.name} changed to ${acc.post.parsed?.owner?.toBase58()}. This gives that wallet full custody of these tokens.`,
+            account: acc.address,
+          });
+        }
       });
 
       return writableAccounts;
@@ -510,7 +524,7 @@ export async function sus({
                 warnings.push({
                   severity: "warning",
                   shortMessage: "Owner Changed",
-                  message: `The owner of ${acc.name} changed to ${acc.post.parsed?.owner}. This gives that wallet full custody of these tokens.`,
+                  message: `The owner of ${acc.name} changed to ${acc.post.parsed?.owner?.toBase58()}. This gives that wallet full custody of these tokens.`,
                   account: acc.address,
                 });
               }
