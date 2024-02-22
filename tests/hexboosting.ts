@@ -424,7 +424,6 @@ describe("hexboosting", () => {
           })
           .accounts({
             boostedHex,
-            carrier,
           })
           .rpc({ skipPreflight: true });
         const acc = await program.account.boostedHexV0.fetch(boostedHex!);
@@ -448,7 +447,6 @@ describe("hexboosting", () => {
             })
             .accounts({
               boostedHex,
-              carrier,
             })
             .rpc({ skipPreflight: true });
         });

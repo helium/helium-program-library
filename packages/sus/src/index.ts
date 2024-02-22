@@ -1,4 +1,5 @@
 import {
+  BN,
   BorshAccountsCoder,
   BorshInstructionCoder,
   Idl,
@@ -24,7 +25,9 @@ import {
   AccountMeta,
   AddressLookupTableAccount,
   Connection,
+  MessageAccountKeys,
   PublicKey,
+  RpcResponseAndContext,
   SimulatedTransactionResponse,
   SystemProgram,
   TransactionError,
@@ -132,38 +135,13 @@ export type Warning = {
   account?: PublicKey;
 };
 
-export async function sus({
+async function getAccountKeys({
   connection,
-  wallet,
-  serializedTransaction,
-
-  /// CNFT specific params
-  checkCNfts = false,
-  extraSearchAssetParams,
-  cNfts,
-  // Cluster for explorer
-  cluster = "mainnet-beta",
-  accountBlacklist,
+  transaction,
 }: {
   connection: Connection;
-  wallet: PublicKey;
-  serializedTransaction: Buffer;
-  /// See docs for SusResult `possibleCNftChanges`
-  checkCNfts?: boolean;
-  extraSearchAssetParams?: any;
-  /// Optionally pass cnfts to check instead of searchAssets it
-  cNfts?: Asset[];
-  cluster?: string;
-  /// Disallow fetching on this set of accounts. This is useful for cases like avoiding fetching
-  /// known massive merkle trees to save on data.
-  accountBlacklist?: Set<string>;
-}): Promise<SusResult> {
-  const warnings: Warning[] = [];
-  const transaction = VersionedTransaction.deserialize(serializedTransaction);
-  const message = transaction.message.serialize().toString("base64");
-  const explorerLink = `https://explorer.solana.com/tx/inspector?cluster=${cluster}&message=${encodeURIComponent(
-    message
-  )}`;
+  transaction: VersionedTransaction;
+}): Promise<MessageAccountKeys> {
   const addressLookupTableAccounts: Array<AddressLookupTableAccount> = [];
   const { addressTableLookups } = transaction.message;
   if (addressTableLookups.length > 0) {
@@ -178,226 +156,57 @@ export async function sus({
       }
     }
   }
-  const accountKeys = transaction.message.getAccountKeys({
+  return transaction.message.getAccountKeys({
     addressLookupTableAccounts,
   });
+}
 
-  const simulationAccounts = [
-    ...new Set(
-      accountKeys.staticAccountKeys
-        .filter((_, index) => transaction.message.isAccountWritable(index))
-        .concat(
-          accountKeys.accountKeysFromLookups
-            ? // Only writable accounts will contribute to balance changes
-              accountKeys.accountKeysFromLookups.writable
-            : []
-        )
-    ),
-  ].filter((a) => !accountBlacklist?.has(a.toBase58()));
-  const fetchedAccounts = await connection.getMultipleAccountsInfo(
-    simulationAccounts
-  );
-  const { blockhash } = await connection?.getLatestBlockhash();
-  transaction.message.recentBlockhash = blockhash;
-  const simulatedTxn = await connection?.simulateTransaction(transaction, {
-    accounts: {
-      encoding: "base64",
-      addresses: simulationAccounts?.map((account) => account.toBase58()) || [],
-    },
-  });
-  const fullAccounts = simulationAccounts.map((account, index) => {
-    const post = simulatedTxn.value.accounts?.[index];
-    return {
-      address: account,
-      post: post
-        ? {
-            ...post,
-            owner: new PublicKey(post.owner),
-            data: Buffer.from(post.data[0], post.data[1] as any),
-          }
-        : undefined,
-      pre: fetchedAccounts[index],
-    };
-  });
+async function getMultipleAccounts({
+  connection,
+  keys,
+}): Promise<AccountInfo<Buffer>[]> {
+  const batchSize = 100;
+  const batches = Math.ceil(keys.length / batchSize);
+  const results: AccountInfo<Buffer>[] = [];
 
-  const programKeys = fullAccounts
-    .map(
-      (acc) =>
-        acc?.pre?.owner || (acc.post ? new PublicKey(acc.post.owner) : null)
-    )
-    .concat(
-      ...transaction.message.compiledInstructions.map(
-        (ix) => accountKeys.get(ix.programIdIndex) || null
-      )
-    )
-    .filter(truthy);
-  const idlKeys = programKeys.map(getIdlKey);
-  const idls = (await connection.getMultipleAccountsInfo(idlKeys))
-    .map((acc, index) => {
-      if (acc) {
-        return {
-          program: programKeys[index],
-          idl: decodeIdl(acc),
-        };
-      }
-    })
-    .filter(truthy)
-    .reduce((acc, { program, idl }) => {
-      if (idl) {
-        acc[program.toBase58()] = idl;
-      }
-      return acc;
-    }, {} as Record<string, Idl>);
-
-  const writableAccounts = await getDetailedWritableAccounts({
-    connection,
-    accounts: fullAccounts,
-    idls,
-  });
-  writableAccounts.forEach((acc) => {
-    if (!acc.changedInSimulation) {
-      warnings.push({
-        severity: "warning",
-        shortMessage: "Unchanged",
-        message:
-          "Account did not change in simulation but was labeled as writable. The behavior of the transaction may differ from the simulation.",
-        account: acc.address,
-      });
-    }
-  });
-
-  const instructions = await parseInstructions({
-    idls,
-    instructions: transaction.message.compiledInstructions.map((ix) => ({
-      data: Buffer.from(ix.data),
-      programId: accountKeys.get(ix.programIdIndex)!,
-      accounts: ix.accountKeyIndexes.map((ix) => ({
-        pubkey: accountKeys.get(ix)!,
-        isSigner: transaction.message.isAccountSigner(ix),
-        isWritable: transaction.message.isAccountWritable(ix),
-      })),
-    })),
-  });
-
-  if (
-    instructions.some((ix) => ix.parsed?.name === "ledgerTransferPositionV0")
-  ) {
-    warnings.push({
-      severity: "critical",
-      shortMessage: "Theft of Locked HNT",
-      message:
-        "This transaction is attempting to steal your locked HNT positions",
-    });
+  for (let i = 0; i < batches; i++) {
+    const batchKeys = keys.slice(i * batchSize, (i + 1) * batchSize);
+    const batchResults = await connection.getMultipleAccountsInfo(batchKeys);
+    results.push(...batchResults);
   }
 
-  if (
-    (
-      await Promise.all(instructions.map((ix) => isBurnHotspot(connection, ix)))
-    ).some((isBurn) => isBurn)
-  ) {
-    warnings.push({
-      severity: "critical",
-      shortMessage: "Hotspot Destroyed",
-      message: "This transaction will brick your Hotspot!",
-    });
-  }
+  return results;
+}
 
-  const logs = simulatedTxn.value.logs;
-  if (simulatedTxn?.value.err) {
-    warnings.push({
-      severity: "warning",
-      shortMessage: "Simulation Failed",
-      message: "Transaction failed in simulation",
-    });
-    return {
-      instructions,
-      error: simulatedTxn.value.err,
-      logs,
-      solFee: 0,
-      priorityFee: 0,
-      insufficientFunds: isInsufficientBal(simulatedTxn?.value.err),
-      explorerLink,
-      balanceChanges: [],
-      possibleCNftChanges: [],
-      writableAccounts,
-      rawSimulation: simulatedTxn.value,
-      warnings,
-    };
-  }
+export async function sus({
+  connection,
+  wallet,
+  serializedTransactions,
 
-  let solFee = (transaction?.signatures.length || 1) * 5000;
-  let priorityFee = 0;
-
-  const fee =
-    (await connection?.getFeeForMessage(transaction.message, "confirmed"))
-      .value || solFee;
-  priorityFee = fee - solFee;
-  const balanceChanges = writableAccounts
-    .map((acc) => {
-      const type = acc.pre.type || acc.post.type;
-      switch (type) {
-        case "TokenAccount":
-          if (acc.post.parsed?.delegate && !acc.pre.parsed?.delegate) {
-            warnings.push({
-              severity: "warning",
-              shortMessage: "Withdraw Authority Given",
-              message: `Delegation was taken on ${acc.name}. This gives permission to withdraw tokens without the owner's permission.`,
-              account: acc.address,
-            });
-          }
-          if (
-            acc.post.parsed &&
-            acc.pre.parsed &&
-            !acc.post.parsed.owner.equals(acc.pre.parsed.owner)
-          ) {
-            warnings.push({
-              severity: "warning",
-              shortMessage: "Owner Changed",
-              message: `The owner of ${acc.name} changed to ${acc.post.parsed?.owner}. This gives that wallet full custody of these tokens.`,
-              account: acc.address,
-            });
-          }
-          return {
-            owner: acc.post.parsed?.owner || acc.pre.parsed?.owner,
-            address: acc.address,
-            amount:
-              ((acc.post.parsed?.amount as bigint) || BigInt(0)) -
-              ((acc.pre.parsed?.amount as bigint) || BigInt(0)),
-            metadata: acc.metadata,
-          } as BalanceChange;
-        case "NativeAccount":
-          return {
-            owner: acc.address,
-            address: acc.address,
-            amount: BigInt(
-              (acc.post.account?.lamports || 0) -
-                (acc.pre.account?.lamports || 0)
-            ),
-            metadata: {
-              mint: NATIVE_MINT,
-              decimals: 9,
-              name: "SOL",
-              symbol: "SOL",
-            },
-          } as BalanceChange;
-        default:
-          return null;
-      }
-    })
-    .filter(truthy);
-
-  if (balanceChanges.filter((b) => b.owner.equals(wallet)).length >= 2) {
-    warnings.push({
-      severity: "warning",
-      shortMessage: "3+ Token Accounts",
-      message:
-        "3 or more token accounts are impacted by this transaction. Any token account listed as writable can be emptied by the transaction, is this okay?",
-    });
-  }
-
-  let possibleCNftChanges: Asset[] = [];
+  /// CNFT specific params
+  checkCNfts = false,
+  extraSearchAssetParams,
+  cNfts,
+  // Cluster for explorer
+  cluster = "mainnet-beta",
+  accountBlacklist,
+}: {
+  connection: Connection;
+  wallet: PublicKey;
+  serializedTransactions: Buffer[];
+  /// See docs for SusResult `possibleCNftChanges`
+  checkCNfts?: boolean;
+  extraSearchAssetParams?: any;
+  /// Optionally pass cnfts to check instead of searchAssets. This can save on RPC calls, or keep from needing
+  /// An rpc that supports DAS
+  cNfts?: Asset[];
+  cluster?: string;
+  /// Disallow fetching on this set of accounts. This is useful for cases like avoiding fetching
+  /// known massive merkle trees to save on data.
+  accountBlacklist?: Set<string>;
+}): Promise<SusResult[]> {
+  let assets = cNfts;
   if (checkCNfts) {
-    let assets = cNfts;
     if (!assets) {
       const assetsResponse = await axios.post(connection.rpcEndpoint, {
         jsonrpc: "2.0",
@@ -419,32 +228,363 @@ export async function sus({
       });
       assets = assetsResponse.data.result?.items as Asset[];
     }
+  }
+  const warningsByTx: Warning[][] = serializedTransactions.map(() => []);
+  const transactions = serializedTransactions.map((t) =>
+    VersionedTransaction.deserialize(t)
+  );
 
-    const possibleMerkles = new Set(
-      writableAccounts
-        .filter((acc) => acc.name === "Merkle Tree")
-        .map((a) => a.address.toBase58())
-    );
+  const accountKeysByTx = await Promise.all(
+    transactions.map((transaction) =>
+      getAccountKeys({ connection, transaction })
+    )
+  );
 
-    possibleCNftChanges = (assets || []).filter(
-      (item) =>
-        item.compression.tree && possibleMerkles.has(item.compression.tree)
-    );
+  const simulationAccountsByTx = accountKeysByTx.map((accountKeys, txIndex) =>
+    [
+      ...new Set(
+        accountKeys.staticAccountKeys
+          .filter((_, index) =>
+            transactions[txIndex].message.isAccountWritable(index)
+          )
+          .concat(
+            accountKeys.accountKeysFromLookups
+              ? // Only writable accounts will contribute to balance changes
+                accountKeys.accountKeysFromLookups.writable
+              : []
+          )
+      ),
+    ].filter((a) => !accountBlacklist?.has(a.toBase58()))
+  );
+  const allAccounts = [...new Set(simulationAccountsByTx.flat())];
+  const fetchedAccounts = await getMultipleAccounts({
+    connection,
+    keys: allAccounts,
+  });
+  const fetchedAccountsByAddr = fetchedAccounts.reduce((acc, account, index) => {
+    acc[allAccounts[index].toBase58()] = account
+    return acc
+  }, {} as Record<string, AccountInfo<Buffer>>)
+  const { blockhash } = await connection?.getLatestBlockhash();
+  const simulatedTxs: RpcResponseAndContext<SimulatedTransactionResponse>[] =
+    [];
+  // Linearly simulate txs so as not to hit rate limits
+  for (const [index, transaction] of transactions.entries()) {
+    transaction.message.recentBlockhash = blockhash;
+    const simulatedTxn = await connection?.simulateTransaction(transaction, {
+      accounts: {
+        encoding: "base64",
+        addresses:
+          simulationAccountsByTx[index]?.map((account) => account.toBase58()) ||
+          [],
+      },
+    });
+    simulatedTxs.push(simulatedTxn);
   }
 
-  return {
-    instructions,
-    logs,
-    solFee,
-    priorityFee,
-    insufficientFunds: false,
-    explorerLink,
-    balanceChanges,
-    possibleCNftChanges,
-    writableAccounts,
-    rawSimulation: simulatedTxn.value,
-    warnings,
-  };
+  const fullAccountsByTxn = simulationAccountsByTx.map(
+    (simulationAccounts, transactionIndex) => {
+      const simulatedTxn = simulatedTxs[transactionIndex];
+      return simulationAccounts.map((account, index) => {
+        const post = simulatedTxn.value.accounts?.[index];
+        return {
+          address: account,
+          post: post
+            ? {
+                ...post,
+                owner: new PublicKey(post.owner),
+                data: Buffer.from(post.data[0], post.data[1] as any),
+              }
+            : undefined,
+          pre: fetchedAccountsByAddr[account.toBase58()],
+        };
+      });
+    }
+  );
+
+  const instructionProgramIds = transactions
+    .flatMap((transaction, index) =>
+      transaction.message.compiledInstructions.map(
+        (ix) => accountKeysByTx[index].get(ix.programIdIndex) || null
+      )
+    )
+    .filter(truthy);
+  const programKeys = fullAccountsByTxn
+    .flat()
+    .map(
+      (acc) =>
+        acc?.pre?.owner || (acc.post ? new PublicKey(acc.post.owner) : null)
+    )
+    .concat(...instructionProgramIds)
+    .filter(truthy);
+  const idlKeys = programKeys.map(getIdlKey);
+  const idls = (await getMultipleAccounts({ connection, keys: idlKeys }))
+    .map((acc, index) => {
+      if (acc) {
+        return {
+          program: programKeys[index],
+          idl: decodeIdl(acc),
+        };
+      }
+    })
+    .filter(truthy)
+    .reduce((acc, { program, idl }) => {
+      if (idl) {
+        acc[program.toBase58()] = idl;
+      }
+      return acc;
+    }, {} as Record<string, Idl>);
+
+  const writableAccountsByTxRaw = fullAccountsByTxn.map((accounts) =>
+    getDetailedWritableAccountsWithoutTM({
+      accounts,
+      idls,
+    })
+  );
+  const tokens = [
+    ...new Set(
+      writableAccountsByTxRaw.flatMap((w) => w.tokens).map((t) => t.toBase58())
+    ),
+  ].map((t) => new PublicKey(t));
+  const metadatas = (await fetchMetadatas(connection, tokens)).reduce(
+    (acc, m, index) => {
+      if (m) {
+        acc[tokens[index].toBase58()] = m;
+      }
+      return acc;
+    },
+    {} as Record<string, TokenMetadata>
+  );
+  const writableAccountsByTx = writableAccountsByTxRaw.map(
+    ({ withoutMetadata }, index) => {
+      const writableAccounts = withoutMetadata.map((acc) => {
+        let name = acc.name;
+        let metadata;
+        const type = acc.pre.type || acc.post.type;
+        // If token, get the name based on the metadata
+        if (type === "Mint") {
+          metadata = metadatas[acc.address.toBase58()];
+          if (metadata) {
+            name = `${metadata.symbol} Mint`;
+          } else {
+            name = `Unknown Mint`;
+          }
+        } else if (type === "TokenAccount") {
+          metadata =
+            metadatas[
+              (acc.pre.parsed?.mint || acc.post.parsed?.mint).toBase58()
+            ];
+          if (metadata) {
+            name = `${metadata.symbol} Token Account`;
+          } else {
+            name = `Unknown Token Account`;
+          }
+        }
+
+        return {
+          ...acc,
+          name,
+          metadata,
+        };
+      });
+      writableAccounts.forEach((acc) => {
+        if (!acc.changedInSimulation) {
+          warningsByTx[index].push({
+            severity: "warning",
+            shortMessage: "Unchanged",
+            message:
+              "Account did not change in simulation but was labeled as writable. The behavior of the transaction may differ from the simulation.",
+            account: acc.address,
+          });
+        }
+      });
+
+      return writableAccounts;
+    }
+  );
+
+  const instructionsByTx = await Promise.all(
+    transactions.map(async (transaction, index) => {
+      const instructions = parseInstructions({
+        idls,
+        instructions: transaction.message.compiledInstructions.map((ix) => ({
+          data: Buffer.from(ix.data),
+          programId: accountKeysByTx[index].get(ix.programIdIndex)!,
+          accounts: ix.accountKeyIndexes.map((ix) => ({
+            pubkey: accountKeysByTx[index].get(ix)!,
+            isSigner: transaction.message.isAccountSigner(ix),
+            isWritable: transaction.message.isAccountWritable(ix),
+          })),
+        })),
+      });
+      if (
+        instructions.some(
+          (ix) => ix.parsed?.name === "ledgerTransferPositionV0"
+        )
+      ) {
+        warningsByTx[index].push({
+          severity: "critical",
+          shortMessage: "Theft of Locked HNT",
+          message:
+            "This transaction is attempting to steal your locked HNT positions",
+        });
+      }
+      if (
+        (
+          await Promise.all(
+            instructions.map((ix) => isBurnHotspot(connection, ix, assets))
+          )
+        ).some((isBurn) => isBurn)
+      ) {
+        warningsByTx[index].push({
+          severity: "critical",
+          shortMessage: "Hotspot Destroyed",
+          message: "This transaction will brick your Hotspot!",
+        });
+      }
+
+      return instructions;
+    })
+  );
+
+  const results: SusResult[] = [];
+  for (const [index, simulatedTxn] of simulatedTxs.entries()) {
+    const warnings = warningsByTx[index];
+    const instructions = instructionsByTx[index];
+    const writableAccounts = writableAccountsByTx[index];
+    const transaction = transactions[index];
+
+    const message = transaction.message.serialize().toString("base64");
+    const explorerLink = `https://explorer.solana.com/tx/inspector?cluster=${cluster}&message=${encodeURIComponent(
+      message
+    )}`;
+
+    const logs = simulatedTxn.value.logs;
+    let result: SusResult;
+    if (simulatedTxn?.value.err) {
+      warnings.push({
+        severity: "warning",
+        shortMessage: "Simulation Failed",
+        message: "Transaction failed in simulation",
+      });
+      result = {
+        instructions,
+        error: simulatedTxn.value.err,
+        logs,
+        solFee: 0,
+        priorityFee: 0,
+        insufficientFunds: isInsufficientBal(simulatedTxn?.value.err),
+        explorerLink,
+        balanceChanges: [],
+        possibleCNftChanges: [],
+        writableAccounts,
+        rawSimulation: simulatedTxn.value,
+        warnings,
+      };
+    } else {
+      let solFee = (transaction?.signatures.length || 1) * 5000;
+      let priorityFee = 0;
+
+      const fee =
+        (await connection?.getFeeForMessage(transaction.message, "confirmed"))
+          .value || solFee;
+      priorityFee = fee - solFee;
+      const balanceChanges = writableAccounts
+        .map((acc) => {
+          const type = acc.pre.type || acc.post.type;
+          switch (type) {
+            case "TokenAccount":
+              if (acc.post.parsed?.delegate && !acc.pre.parsed?.delegate) {
+                warnings.push({
+                  severity: "warning",
+                  shortMessage: "Withdraw Authority Given",
+                  message: `Delegation was taken on ${acc.name}. This gives permission to withdraw tokens without the owner's permission.`,
+                  account: acc.address,
+                });
+              }
+              if (
+                acc.post.parsed &&
+                acc.pre.parsed &&
+                !acc.post.parsed.owner.equals(acc.pre.parsed.owner)
+              ) {
+                warnings.push({
+                  severity: "warning",
+                  shortMessage: "Owner Changed",
+                  message: `The owner of ${acc.name} changed to ${acc.post.parsed?.owner}. This gives that wallet full custody of these tokens.`,
+                  account: acc.address,
+                });
+              }
+              return {
+                owner: acc.post.parsed?.owner || acc.pre.parsed?.owner,
+                address: acc.address,
+                amount:
+                  ((acc.post.parsed?.amount as bigint) || BigInt(0)) -
+                  ((acc.pre.parsed?.amount as bigint) || BigInt(0)),
+                metadata: acc.metadata,
+              } as BalanceChange;
+            case "NativeAccount":
+              return {
+                owner: acc.address,
+                address: acc.address,
+                amount: BigInt(
+                  (acc.post.account?.lamports || 0) -
+                    (acc.pre.account?.lamports || 0)
+                ),
+                metadata: {
+                  mint: NATIVE_MINT,
+                  decimals: 9,
+                  name: "SOL",
+                  symbol: "SOL",
+                },
+              } as BalanceChange;
+            default:
+              return null;
+          }
+        })
+        .filter(truthy);
+
+      if (balanceChanges.filter((b) => b.owner.equals(wallet)).length >= 2) {
+        warnings.push({
+          severity: "warning",
+          shortMessage: "3+ Token Accounts",
+          message:
+            "3 or more token accounts are impacted by this transaction. Any token account listed as writable can be emptied by the transaction, is this okay?",
+        });
+      }
+
+      let possibleCNftChanges: Asset[] = [];
+      if (checkCNfts) {
+        const possibleMerkles = new Set(
+          writableAccounts
+            .filter((acc) => acc.name === "Merkle Tree")
+            .map((a) => a.address.toBase58())
+        );
+
+        possibleCNftChanges = (assets || []).filter(
+          (item) =>
+            item.compression.tree && possibleMerkles.has(item.compression.tree)
+        );
+      }
+
+      result = {
+        instructions,
+        logs,
+        solFee,
+        priorityFee,
+        insufficientFunds: false,
+        explorerLink,
+        balanceChanges,
+        possibleCNftChanges,
+        writableAccounts,
+        rawSimulation: simulatedTxn.value,
+        warnings,
+      };
+    }
+
+    results.push(result);
+  }
+
+  return results
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -473,13 +613,13 @@ export type RawInstruction = {
   programId: PublicKey;
   accounts: AccountMeta[];
 };
-async function parseInstructions({
+function parseInstructions({
   idls,
   instructions,
 }: {
   idls: Record<string, Idl>;
   instructions: RawInstruction[];
-}): Promise<{ parsed?: ParsedInstruction; raw: RawInstruction }[]> {
+}): { parsed?: ParsedInstruction; raw: RawInstruction }[] {
   return instructions.map((ix) => {
     const idl = idls[ix.programId.toBase58()];
     if (idl) {
@@ -529,19 +669,17 @@ function decodeIdl(account: AccountInfo<Buffer>): Idl | undefined {
   }
 }
 
-export async function getDetailedWritableAccounts({
-  connection,
+export function getDetailedWritableAccountsWithoutTM({
   accounts,
   idls,
 }: {
-  connection: Connection;
   accounts: {
     address: PublicKey;
     pre: AccountInfo<Buffer> | null | undefined;
     post: AccountInfo<Buffer> | null | undefined;
   }[];
   idls: Record<string, Idl>;
-}): Promise<WritableAccount[]> {
+}): { withoutMetadata: WritableAccount[]; tokens: PublicKey[] } {
   const uniqueTokens: Set<string> = new Set();
   const withoutMetadata = accounts.map(({ address, pre, post }) => {
     let name = "Unknown";
@@ -659,43 +797,10 @@ export async function getDetailedWritableAccounts({
   });
 
   const tokens = [...uniqueTokens].map((t) => new PublicKey(t));
-  const metadatas = (await fetchMetadatas(connection, tokens)).reduce(
-    (acc, m, index) => {
-      if (m) {
-        acc[tokens[index].toBase58()] = m;
-      }
-      return acc;
-    },
-    {} as Record<string, TokenMetadata>
-  );
-  return withoutMetadata.map((acc) => {
-    let name = acc.name;
-    let metadata;
-    const type = acc.pre.type || acc.post.type;
-    // If token, get the name based on the metadata
-    if (type === "Mint") {
-      metadata = metadatas[acc.address.toBase58()];
-      if (metadata) {
-        name = `${metadata.symbol} Mint`;
-      } else {
-        name = `Unknown Mint`;
-      }
-    } else if (type === "TokenAccount") {
-      metadata =
-        metadatas[(acc.pre.parsed?.mint || acc.post.parsed?.mint).toBase58()];
-      if (metadata) {
-        name = `${metadata.symbol} Token Account`;
-      } else {
-        name = `Unknown Token Account`;
-      }
-    }
-
-    return {
-      ...acc,
-      name,
-      metadata,
-    };
-  });
+  return {
+    withoutMetadata,
+    tokens,
+  };
 }
 
 function decodeIdlStruct(
@@ -777,10 +882,10 @@ export async function fetchMetadatas(
   tokens: PublicKey[]
 ): Promise<(TokenMetadata | null)[]> {
   const metadatas = tokens.map(getMetadataId);
-  const all = await connection.getMultipleAccountsInfo([
-    ...metadatas,
-    ...tokens,
-  ]);
+  const all = await getMultipleAccounts({
+    keys: [...metadatas, ...tokens],
+    connection,
+  });
   const metadataAccounts = all.slice(0, metadatas.length);
   const mintAccounts = all.slice(metadatas.length, metadatas.length * 2);
   return metadataAccounts.map((acc, index) => {
@@ -809,31 +914,38 @@ const truthy = <T>(value: T): value is Truthy<T> => !!value;
 
 async function isBurnHotspot(
   connection: Connection,
-  ix: { parsed?: ParsedInstruction | undefined; raw: RawInstruction }
+  ix: { parsed?: ParsedInstruction | undefined; raw: RawInstruction },
+  assets?: Asset[]
 ): Promise<boolean> {
   if (
     ix.raw.programId.equals(BUBBLEGUM_PROGRAM_ID) &&
     ix.parsed?.name === "burn"
   ) {
     const tree = ix.parsed?.accounts.find(
-      (acc) => acc.name === "merkleTree"
+      (acc) => acc.name === "Merkle Tree"
     )?.pubkey;
     if (tree) {
-      const assetId = await getLeafAssetId(tree, ix.parsed?.data[4]);
-      const assetResponse = await axios.post(connection.rpcEndpoint, {
-        jsonrpc: "2.0",
-        method: "getAsset",
-        id: "get-asset-op-1",
-        params: {
-          id: assetId.toBase58(),
-        },
-        headers: {
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-          Expires: "0",
-        },
-      });
-      const asset = assetResponse.data.result;
+      const index = ix.parsed?.data?.index;
+      const assetId = await getLeafAssetId(tree, new BN(index));
+      let asset
+      if (assets) {
+        asset = assets.find(a => a.id === assetId.toBase58())
+      } else {
+        const assetResponse = await axios.post(connection.rpcEndpoint, {
+          jsonrpc: "2.0",
+          method: "getAsset",
+          id: "get-asset-op-1",
+          params: {
+            id: assetId.toBase58(),
+          },
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        });
+        asset = assetResponse.data.result
+      }
       return (
         asset &&
         asset.creators[0]?.address == HELIUM_ENTITY_CREATOR.toBase58() &&

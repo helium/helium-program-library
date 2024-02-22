@@ -14,6 +14,7 @@ Features:
   * Explorer link to simulated transaction
   * Parse out base and priority fees
   * Flag writable accounts that did not change in simulation
+  * Batch as many fetches as possible into getMultipleAccounts to reduce load on RPC
 
 ## Usage
 
@@ -23,10 +24,10 @@ import { sus } from "@helium/sus"
 const result = await sus({
   connection,
   wallet,
-  serializedTransaction: transaction.serialize({
+  serializedTransactions: [transaction.serialize({
     verifySignatures: false,
     requireAllSignatures: false,
-  }),
+  })],
   // Check for cNFT changes, this only works if you have an RPC with DAS support
   checkCNfts: true,
   // Necessary for explorer link
@@ -47,16 +48,16 @@ This feature also allows us to show a detailed diff on fields that change on anc
 const result = await sus({
   connection,
   wallet,
-  serializedTransaction: transaction.serialize({
+  serializedTransactions: [transaction.serialize({
     verifySignatures: false,
     requireAllSignatures: false,
-  }),
+  })],
   // Check for cNFT changes, this only works if you have an RPC with DAS support
   checkCNfts: true,
   // Necessary for explorer link
   cluster: "devnet"
 })
-console.log(result.writableAccounts)
+console.log(result[0].writableAccounts)
 ```
 
 Consider a transaction that mints helium data credits by burning HNT. This will return something like this. Note the owner field is best-effort but allows a UI to display which accounts may be owned by the user.:
@@ -197,16 +198,16 @@ Sus attempts to parse the instructions of any program with an anchor-compliant I
 const result = await sus({
   connection,
   wallet,
-  serializedTransaction: transaction.serialize({
+  serializedTransaction: [transaction.serialize({
     verifySignatures: false,
     requireAllSignatures: false,
-  }),
+  })],
   // Check for cNFT changes, this only works if you have an RPC with DAS support
   checkCNfts: true,
   // Necessary for explorer link
   cluster: "devnet"
 })
-console.log(result.instructions)
+console.log(result[0].instructions)
 ```
 
 Parsing results in the following data:
@@ -327,21 +328,25 @@ Sus attempts to warn for various suspicious transactions. One example is a trans
 const result = await sus({
   connection,
   wallet,
-  serializedTransaction: transaction.serialize({
+  serializedTransaction: [transaction.serialize({
     verifySignatures: false,
     requireAllSignatures: false,
-  }),
+  })],
   // Check for cNFT changes, this only works if you have an RPC with DAS support
   checkCNfts: true,
   // Necessary for explorer link
   cluster: "devnet"
 })
-console.log(result.warnings)
+console.log(result[0].warnings)
 ```
 
 ```javascript
 [
-  "More than 2 accounts with negative balance change. Is this emptying your wallet?"
+  {
+    severity: 'warning',
+    message: "More than 2 accounts with negative balance change. Is this emptying your wallet?",
+    shortMessage: '2+ Writable'
+  }
 ]
 ```
 
@@ -355,16 +360,16 @@ import { sus } from "@helium/sus"
 const result = await sus({
   connection,
   wallet,
-  serializedTransaction: transaction.serialize({
+  serializedTransaction: [transaction.serialize({
     verifySignatures: false,
     requireAllSignatures: false,
-  }),
+  })],
   // Check for cNFT changes, this only works if you have an RPC with DAS support
   checkCNfts: true,
   // Necessary for explorer link
   cluster: "devnet"
 })
-console.log(result.balanceChanges)
+console.log(result[0].balanceChanges)
 ```
 
 ```javascript
@@ -431,16 +436,16 @@ import { sus } from "@helium/sus"
 const result = await sus({
   connection,
   wallet,
-  serializedTransaction: transaction.serialize({
+  serializedTransaction: [transaction.serialize({
     verifySignatures: false,
     requireAllSignatures: false,
-  }),
+  })],
   // Check for cNFT changes, this only works if you have an RPC with DAS support
   checkCNfts: true,
   // Necessary for explorer link
   cluster: "devnet"
 })
-console.log(result.possibleCNftChanges)
+console.log(result[0].possibleCNftChanges)
 ```
 
 Unfortunately, this method is limited by how much data can be fetched from DAS. If a user has more than 200 hotspots, for example, Sus will not be able to check all hotspots past that limit for matches to a mutable tree in the transaction.

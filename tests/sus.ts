@@ -1,35 +1,34 @@
-import {
-  TransactionInstruction,
-  PublicKey,
-  Connection,
-  Transaction,
-  AccountMeta,
-} from "@solana/web3.js";
-import bs58 from "bs58";
+import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
+import { init as initDc } from "@helium/data-credits-sdk";
+import { subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { DC_MINT, HNT_MINT, IOT_MINT } from "@helium/spl-utils";
+import { Asset, sus } from "@helium/sus";
 import {
   PROGRAM_ID as BUBBLEGUM_PROGRAM_ID,
-  TreeConfig,
-  createTransferInstruction as createBubblegumTransferInstruction,
   createBurnInstruction as createBubblegumBurnInstruction,
+  createTransferInstruction as createBubblegumTransferInstruction
 } from "@metaplex-foundation/mpl-bubblegum";
-import {
-  createTransferInstruction,
-  getAssociatedTokenAddressSync,
-  createAssociatedTokenAccountIdempotentInstruction,
-} from "@solana/spl-token";
-import { DC_MINT, HNT_MINT, IOT_MINT } from "@helium/spl-utils";
-import { sus, Asset } from "@helium/sus";
-import { assert, expect } from "chai";
-import axios from "axios";
-import { init as initDc } from "@helium/data-credits-sdk";
-import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
-import { BN } from "bn.js";
-import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import {
   ConcurrentMerkleTreeAccount,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   SPL_NOOP_PROGRAM_ID,
 } from "@solana/spl-account-compression";
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  createTransferInstruction,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
+import {
+  AccountMeta,
+  Connection,
+  PublicKey,
+  Transaction,
+  TransactionInstruction,
+} from "@solana/web3.js";
+import axios from "axios";
+import { BN } from "bn.js";
+import bs58 from "bs58";
+import { expect } from "chai";
 
 const SUS = new PublicKey("sustWW3deA7acADNGJnkYj2EAf65EmqUNLxKekDpu6w");
 const hotspot = "9Cyj2K3Fi7xH8fZ1xrp4gtr1CU6Zk8VFM4fZN9NR9ncz";
@@ -60,15 +59,14 @@ describe("sus", () => {
     const susR = await sus({
       connection,
       wallet: SUS,
-      serializedTransaction: transaction.serialize({
+      serializedTransactions: [transaction.serialize({
         verifySignatures: false,
         requireAllSignatures: false,
-      }),
+      })],
       cluster: "devnet"
     });
 
-    console.log(susR.balanceChanges)
-    const { writableAccounts, balanceChanges } = susR;
+    const { writableAccounts, balanceChanges } = susR[0];
     expect(writableAccounts[0].name).to.eq("Native SOL Account");
     expect(writableAccounts[0].address.toBase58()).to.eq(SUS.toBase58());
     expect(writableAccounts[0].changedInSimulation).to.be.true;
@@ -82,6 +80,7 @@ describe("sus", () => {
     expect(writableAccounts[2].owner?.toBase58()).to.eq(SUS.toBase58());
     expect(writableAccounts[2].metadata?.decimals).to.eq(8);
 
+    console.log(balanceChanges[0])
     expect(balanceChanges[0].owner.toBase58()).to.eq(SUS.toBase58());
     expect(balanceChanges[0].amount).to.eq(BigInt(-2044280));
 
@@ -129,13 +128,13 @@ describe("sus", () => {
         })
         .instruction()
     );
-    const susR = await sus({
+    const [susR] = await sus({
       connection,
       wallet: SUS,
-      serializedTransaction: transaction.serialize({
+      serializedTransactions: [transaction.serialize({
         verifySignatures: false,
         requireAllSignatures: false,
-      }),
+      })],
       cluster: "devnet"
     });
     console.log(susR.instructions[0].parsed);
@@ -177,13 +176,13 @@ describe("sus", () => {
       asset,
       PublicKey.default
     );
-    const susR = await sus({
+    const [susR] = await sus({
       connection,
       wallet: SUS,
-      serializedTransaction: transaction.serialize({
+      serializedTransactions: [transaction.serialize({
         verifySignatures: false,
         requireAllSignatures: false,
-      }),
+      })],
       checkCNfts: true,
       cNfts: [asset],
     });
@@ -211,13 +210,13 @@ describe("sus", () => {
       SUS,
       asset,
     );
-    const susR = await sus({
+    const [susR] = await sus({
       connection,
       wallet: SUS,
-      serializedTransaction: transaction.serialize({
+      serializedTransactions: [transaction.serialize({
         verifySignatures: false,
         requireAllSignatures: false,
-      }),
+      })],
       checkCNfts: true,
       cNfts: [asset],
       cluster: "devnet"
@@ -225,7 +224,9 @@ describe("sus", () => {
     console.log(susR.explorerLink)
 
     expect(susR.possibleCNftChanges[0]).to.eq(asset);
-    expect(susR.warnings[0]).to.eq("This transaction will brick your Hotspot!");
+    expect(susR.warnings[0].message).to.eq(
+      "This transaction will brick your Hotspot!"
+    );
   });
 });
 
