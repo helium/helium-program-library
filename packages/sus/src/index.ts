@@ -769,6 +769,8 @@ export function getDetailedWritableAccountsWithoutTM({
               idl,
               postAccount
             )
+            preParsed = decodedPre?.parsed
+            postParsed = decodedPost?.parsed
             type = decodedPre?.type || decodedPost?.type || "Unknown"
             name = type;
           }
