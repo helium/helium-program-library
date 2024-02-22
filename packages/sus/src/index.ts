@@ -360,7 +360,11 @@ export async function sus({
       const writableAccounts = withoutMetadata.map((acc) => {
         let name = acc.name;
         let metadata;
-        const type = acc.pre.type || acc.post.type;
+        // Attempt to take last known type
+        const type =
+          (acc.pre.type !== "Unknown" && acc.pre.type) ||
+          (acc.post.type !== "Unknown" && acc.post.type) ||
+          "Unknown";
         // If token, get the name based on the metadata
         if (type === "Mint") {
           metadata = metadatas[acc.address.toBase58()];
@@ -757,13 +761,13 @@ export function getDetailedWritableAccountsWithoutTM({
           const idl = idls[owner.toBase58()];
           if (idl) {
             ({ parsed: preParsed, type } = decodeIdlStruct(idl, pre) || {
-              type: "No Published IDL",
+              type: "Unknown",
             });
             ({ parsed: postParsed, type } = decodeIdlStruct(
               idl,
               postAccount
             ) || {
-              type: "No Published IDL",
+              type: "Unknown",
             });
             name = type;
           }
