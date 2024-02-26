@@ -4,7 +4,7 @@
 // file: iot_config.proto
 
 import * as iot_config_pb from "./iot_config_pb";
-import * as grpc from "grpc";
+import * as grpc from "@grpc/grpc-js";
 
 interface IorgService extends grpc.ServiceDefinition<grpc.UntypedServiceImplementation> {
   list: grpc.MethodDefinition<iot_config_pb.org_list_req_v1, iot_config_pb.org_list_res_v1>;

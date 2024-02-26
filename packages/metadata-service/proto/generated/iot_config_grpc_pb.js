@@ -1,7 +1,7 @@
 // GENERATED CODE -- DO NOT EDIT!
 
 'use strict';
-var grpc = require('grpc');
+var grpc = require('@grpc/grpc-js');
 var iot_config_pb = require('./iot_config_pb.js');
 var blockchain_region_param_v1_pb = require('./blockchain_region_param_v1_pb.js');
 var region_pb = require('./region_pb.js');
