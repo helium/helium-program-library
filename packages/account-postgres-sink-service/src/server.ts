@@ -1,33 +1,41 @@
+import { createGrpcTransport } from "@connectrpc/connect-node";
+import cors from "@fastify/cors";
+import { AccountFetchCache } from "@helium/account-fetch-cache";
+import { Connection, PublicKey, TransactionResponse } from "@solana/web3.js";
+import {
+  applyParams,
+  authIssue,
+  createAuthInterceptor,
+  createRegistry,
+  createRequest,
+  fetchSubstream,
+  isEmptyMessage,
+  streamBlocks,
+  unpackMapOutput,
+} from "@substreams/core";
+import { EventEmitter } from "events";
 import Fastify, { FastifyInstance } from "fastify";
 import fastifyCron from "fastify-cron";
-import cors from "@fastify/cors";
 import fs from "fs";
-import { StatusCodes, ReasonPhrases } from "http-status-codes";
-import {
-  Connection,
-  PublicKey,
-  SystemProgram,
-  TransactionMessage,
-  TransactionResponse,
-} from "@solana/web3.js";
+import { ReasonPhrases, StatusCodes } from "http-status-codes";
 import {
   FETCH_DELAY_SECONDS,
   HELIUS_AUTH_SECRET,
   PROGRAM_ACCOUNT_CONFIGS,
   RUN_JOBS_AT_STARTUP,
   SOLANA_URL,
+  USE_SUBSTREAMS,
 } from "./env";
-import database from "./utils/database";
-import { defineAllIdlModels } from "./utils/defineIdlModels";
-import { createPgIndexes } from "./utils/createPgIndexes";
-import { truthy, upsertProgramAccounts } from "./utils/upsertProgramAccounts";
-import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAccounts";
-import { handleAccountWebhook } from "./utils/handleAccountWebhook";
+import { initPlugins } from "./plugins";
 import { metrics } from "./plugins/metrics";
 import { IConfig, IInitedPlugin } from "./types";
-import { EventEmitter } from "events";
-import { initPlugins } from "./plugins";
-import { AccountFetchCache } from "@helium/account-fetch-cache";
+import { createPgIndexes } from "./utils/createPgIndexes";
+import database, { Cursor } from "./utils/database";
+import { defineAllIdlModels } from "./utils/defineIdlModels";
+import { handleAccountWebhook } from "./utils/handleAccountWebhook";
+import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAccounts";
+import { provider } from "./utils/solana";
+import { truthy, upsertProgramAccounts } from "./utils/upsertProgramAccounts";
 const { BloomFilter } = require("bloom-filters");
 
 if (!HELIUS_AUTH_SECRET) {
@@ -178,9 +186,70 @@ if (!HELIUS_AUTH_SECRET) {
     commitment: "confirmed",
     extendConnection: false,
     enableLogging: true,
-    // One fetch every x second limit
-    delay: FETCH_DELAY_SECONDS * 1000,
+    // One fetch every x second limit. When using substreams, we already batch accounts by block
+    // so adding a fetch delay will just cause us to fall behind
+    delay: USE_SUBSTREAMS ? 50 : FETCH_DELAY_SECONDS * 1000,
   });
+  async function insertTransactionAccounts(writableAccountKeys: PublicKey[]) {
+    const accounts = await Promise.all(
+      writableAccountKeys
+        .filter((wa) => !nonWatchedAccountsFilter.has(wa.toBase58()))
+        .map((key) => cache.search(key))
+    );
+
+    if (configs) {
+      let index = 0;
+      for (const account of accounts) {
+        const pubkey = writableAccountKeys[index];
+        index++;
+
+        // Account not found, delete it from any and all tables
+        if (!account) {
+          const tables = configs.flatMap((config) =>
+            config.accounts.map((acc) => acc.table)
+          );
+          const transaction = await database.transaction();
+          for (const table of tables) {
+            await database.query(
+              `
+                  DELETE FROM ${table} WHERE address = ${database.escape(
+                pubkey.toBase58()
+              )}
+                `,
+              {
+                transaction,
+              }
+            );
+          }
+          await transaction.commit();
+          continue;
+        }
+
+        // If the owner isn't of a program we're watching, break
+        const owner = account.account.owner.toBase58();
+        const config = configs.find((x) => x.programId == owner);
+        if (!config) {
+          if (owner) nonWatchedAccountsFilter.add(account.pubkey.toBase58());
+          continue;
+        }
+
+        try {
+          await handleAccountWebhook({
+            fastify: server,
+            programId: new PublicKey(config.programId),
+            accounts: config.accounts,
+            account: {
+              pubkey: account.pubkey.toBase58(),
+              data: [account.account.data, undefined],
+            },
+            pluginsByAccountType: pluginsByAccountTypeByProgram[owner] || {},
+          });
+        } catch (err) {
+          throw err;
+        }
+      }
+    }
+  }
   server.post<{ Body: any[] }>("/transaction-webhook", async (req, res) => {
     if (req.headers.authorization != HELIUS_AUTH_SECRET) {
       res.code(StatusCodes.FORBIDDEN).send({
@@ -214,66 +283,7 @@ if (!HELIUS_AUTH_SECRET) {
             )
         )
         .map((k) => new PublicKey(k));
-      const accounts = await Promise.all(
-        writableAccountKeys.map((key) => cache.search(key))
-      );
-
-      if (configs) {
-        let index = 0;
-        for (const account of accounts) {
-          const pubkey = writableAccountKeys[index];
-          index++;
-
-          // Account not found, delete it from any and all tables
-          if (!account) {
-            const tables = configs.flatMap((config) =>
-              config.accounts.map((acc) => acc.table)
-            );
-            const transaction = await database.transaction();
-            for (const table of tables) {
-              await database.query(
-                `
-                  DELETE FROM ${table} WHERE address = ${database.escape(
-                  pubkey.toBase58()
-                )}
-                `,
-                {
-                  transaction,
-                }
-              );
-            }
-            await transaction.commit();
-            continue;
-          }
-
-          // If the owner isn't of a program we're watching, break
-          const owner = account.account.owner.toBase58();
-          if (nonWatchedAccountsFilter.has(owner)) {
-            continue;
-          }
-
-          const config = configs.find((x) => x.programId == owner);
-          if (!config) {
-            if (owner) nonWatchedAccountsFilter.add(owner);
-            continue;
-          }
-
-          try {
-            await handleAccountWebhook({
-              fastify: server,
-              programId: new PublicKey(config.programId),
-              accounts: config.accounts,
-              account: {
-                pubkey: account.pubkey.toBase58(),
-                data: [account.account.data, undefined],
-              },
-              pluginsByAccountType: pluginsByAccountTypeByProgram[owner] || {},
-            });
-          } catch (err) {
-            throw err;
-          }
-        }
-      }
+      await insertTransactionAccounts(writableAccountKeys);
       res.code(StatusCodes.OK).send(ReasonPhrases.OK);
     } catch (err) {
       res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
@@ -346,5 +356,64 @@ if (!HELIUS_AUTH_SECRET) {
   } catch (err) {
     console.error(err);
     process.exit(1);
+  }
+
+  if (USE_SUBSTREAMS) {
+    await Cursor.sync();
+    const lastCursor = await Cursor.findOne({
+      order: [["createdAt", "DESC"]],
+    });
+    const SUBSTREAM =
+      "https://github.com/helium/substreams-explorers/releases/download/v0.2.0/solana-explorer-v0.2.0.spkg";
+    const MODULE = "map_filter_instructions";
+    const substream = await fetchSubstream(SUBSTREAM);
+    const registry = createRegistry(substream);
+    const { token } = await authIssue(
+      "server_e80b2b1b926856ef43c7f50310b85e6f"
+    );
+    const transport = createGrpcTransport({
+      baseUrl: "https://mainnet.sol.streamingfast.io",
+      httpVersion: "2",
+
+      interceptors: [createAuthInterceptor(token)],
+      useBinaryFormat: true,
+      jsonOptions: {
+        typeRegistry: registry,
+      },
+    });
+    applyParams(
+      [`${MODULE}=accounts[0]=1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w`],
+      substream.modules!.modules
+    );
+    const currentBlock = await provider.connection.getBlockHeight("finalized");
+    const request = createRequest({
+      substreamPackage: substream,
+      outputModule: "map_filter_instructions",
+      startBlockNum: currentBlock,
+      startCursor: lastCursor ? lastCursor.cursor : undefined,
+    });
+    console.log(
+      `streaming from ${
+        lastCursor ? `cursor ${lastCursor.cursor}` : `block ${currentBlock}`
+      }`
+    );
+    for await (const response of streamBlocks(transport, request)) {
+      const output = unpackMapOutput(response, registry);
+      let cursor;
+      if (response.message.case === "blockScopedData") {
+        cursor = response.message.value.cursor;
+      }
+      if (output !== undefined && !isEmptyMessage(output)) {
+        await Promise.all(
+          (output as any).instructions.map((ix) =>
+            insertTransactionAccounts(ix.accounts.map((a) => new PublicKey(a)))
+          )
+        );
+        await Cursor.create({
+          cursor,
+        });
+        await lastCursor?.destroy();
+      }
+    }
   }
 })();

@@ -23,6 +23,34 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@bufbuild/protobuf@npm:^1.7.2":
+  version: 1.7.2
+  resolution: "@bufbuild/protobuf@npm:1.7.2"
+  checksum: f91e2574c97a64cceba04f7e697279fee621eb76cf5d049047184e3d08bd2c52d4a7e9afbe8560cfd49948bd61a24dc9013d6ca56fc10302e948de09afd7acff
+  languageName: node
+  linkType: hard
+
+"@connectrpc/connect-node@npm:^1.3.0":
+  version: 1.3.0
+  resolution: "@connectrpc/connect-node@npm:1.3.0"
+  dependencies:
+    undici: ^5.28.2
+  peerDependencies:
+    "@bufbuild/protobuf": ^1.4.2
+    "@connectrpc/connect": 1.3.0
+  checksum: 4e53cc5057b9a2fbd533e2209833881a0e27dc9079c3f56566eedf5667978436d9aaf1bb6d0509874d627dbd4491413eff8e5bad06c50ff049eed824a5a2e1e3
+  languageName: node
+  linkType: hard
+
+"@connectrpc/connect@npm:^1.3.0":
+  version: 1.3.0
+  resolution: "@connectrpc/connect@npm:1.3.0"
+  peerDependencies:
+    "@bufbuild/protobuf": ^1.4.2
+  checksum: a68bfffedd817a7db3563c00e5efc5eb510cc00a93c722d81fa1f52b71a96300d7175b0c0710a9d2ef2e8aaabee36921c90470a80343e7a9fbccffd3cc83f868
+  languageName: node
+  linkType: hard
+
 "@coral-xyz/anchor@npm:^0.28.0":
   version: 0.28.0
   resolution: "@coral-xyz/anchor@npm:0.28.0"
@@ -78,6 +106,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@fastify/busboy@npm:^2.0.0":
+  version: 2.1.0
+  resolution: "@fastify/busboy@npm:2.1.0"
+  checksum: 3233abd10f73e50668cb4bb278a79b7b3fadd30215ac6458299b0e5a09a29c3586ec07597aae6bd93f5cbedfcef43a8aeea51829cd28fc13850cdbcd324c28d5
+  languageName: node
+  linkType: hard
+
 "@fastify/cors@npm:^8.1.1":
   version: 8.3.0
   resolution: "@fastify/cors@npm:8.3.0"
@@ -126,11 +161,15 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/account-postgres-sink-service@workspace:."
   dependencies:
+    "@bufbuild/protobuf": ^1.7.2
+    "@connectrpc/connect": ^1.3.0
+    "@connectrpc/connect-node": ^1.3.0
     "@coral-xyz/anchor": ^0.28.0
     "@fastify/cors": ^8.1.1
     "@helium/account-fetch-cache": ^0.6.30
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/web3.js": ^1.78.4
+    "@substreams/core": ^0.15.1
     "@types/bn.js": ^5.1.1
     "@types/deep-equal": ^1.0.1
     "@types/lodash": ^4.14.195
@@ -335,6 +374,16 @@ __metadata:
     rpc-websockets: "npm:^7.5.1"
     superstruct: "npm:^0.14.2"
   checksum: e1c44c6cbec87cdfd4d6d23b4241b746e14ed3a9ca73d596693758d91ac825cecf579345da3b0b7bb5e54b6794791bc0eac02cadf11f1ec79e859b6536f26f11
+  languageName: node
+  linkType: hard
+
+"@substreams/core@npm:^0.15.1":
+  version: 0.15.1
+  resolution: "@substreams/core@npm:0.15.1"
+  peerDependencies:
+    "@bufbuild/protobuf": ^1.7.2
+    "@connectrpc/connect": ^1.3.0
+  checksum: e8eefd77a66ea09e10cf1f788d11a7af31af04cecad1a18c64cf489aca878264bb80e09e14667d04e8fca4ccb5213515d6f702a3aac814d009985e5348fb496b
   languageName: node
   linkType: hard
 
@@ -3891,6 +3940,15 @@ __metadata:
     tsc: bin/tsc
     tsserver: bin/tsserver
   checksum: 0f4da2f15e6f1245e49db15801dbee52f2bbfb267e1c39225afdab5afee1a72839cd86000e65ee9d7e4dfaff12239d28beaf5ee431357fcced15fb08583d72ca
+  languageName: node
+  linkType: hard
+
+"undici@npm:^5.28.2":
+  version: 5.28.3
+  resolution: "undici@npm:5.28.3"
+  dependencies:
+    "@fastify/busboy": ^2.0.0
+  checksum: fa1e65aff896c5e2ee23637b632e306f9e3a2b32a3dc0b23ea71e5555ad350bcc25713aea894b3dccc0b7dc2c5e92a5a58435ebc2033b731a5524506f573dfd2
   languageName: node
   linkType: hard
 
