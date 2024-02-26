@@ -381,8 +381,9 @@ if (!HELIUS_AUTH_SECRET) {
         typeRegistry: registry,
       },
     });
+    const accounts = configs.map((config, idx) => `accounts[${idx}]=${config.programId}`).join("&")
     applyParams(
-      [`${MODULE}=accounts[0]=1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w`],
+      [`${MODULE}=${accounts}`],
       substream.modules!.modules
     );
     const currentBlock = await provider.connection.getBlockHeight("finalized");
