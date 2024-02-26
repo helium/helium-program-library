@@ -405,8 +405,10 @@ if (!HELIUS_AUTH_SECRET) {
       }
       if (output !== undefined && !isEmptyMessage(output)) {
         await Promise.all(
-          (output as any).instructions.map((ix) =>
-            insertTransactionAccounts(ix.accounts.map((a) => new PublicKey(a)))
+          (output as any).instructions.map((ix: any) =>
+            insertTransactionAccounts(
+              ix.accounts.map((a: any) => new PublicKey(a))
+            )
           )
         );
         await Cursor.create({
