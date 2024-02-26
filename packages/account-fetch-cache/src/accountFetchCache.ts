@@ -271,6 +271,8 @@ export class AccountFetchCache {
   }
 
   async fetchMissing() {
+    console.log("Requerying missing", this.missingAccounts);
+
     try {
       await Promise.all(
         [...this.missingAccounts].map(

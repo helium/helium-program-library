@@ -62,8 +62,8 @@ Cursor.init(
   },
   {
     sequelize: database,
-    modelName: "reward_index",
-    tableName: "reward_index",
+    modelName: "cursor",
+    tableName: "cursor",
     underscored: true,
     timestamps: true,
   }
