@@ -36,6 +36,7 @@ import { handleAccountWebhook } from "./utils/handleAccountWebhook";
 import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAccounts";
 import { provider } from "./utils/solana";
 import { truthy, upsertProgramAccounts } from "./utils/upsertProgramAccounts";
+import { Op } from "sequelize";
 const { BloomFilter } = require("bloom-filters");
 
 if (!HELIUS_AUTH_SECRET) {
@@ -229,7 +230,7 @@ if (!HELIUS_AUTH_SECRET) {
         const owner = account.account.owner.toBase58();
         const config = configs.find((x) => x.programId == owner);
         if (!config) {
-          // if (owner) nonWatchedAccountsFilter.add(account.pubkey.toBase58());
+          if (owner) nonWatchedAccountsFilter.add(account.pubkey.toBase58());
           continue;
         }
 
@@ -381,17 +382,17 @@ if (!HELIUS_AUTH_SECRET) {
         typeRegistry: registry,
       },
     });
-    const accounts = configs.map((config, idx) => `accounts[${idx}]=${config.programId}`).join("&")
-    applyParams(
-      [`${MODULE}=${accounts}`],
-      substream.modules!.modules
-    );
+    const accounts = configs
+      .map((config, idx) => `accounts[${idx}]=${config.programId}`)
+      .join("&");
+    applyParams([`${MODULE}=${accounts}`], substream.modules!.modules);
     const currentBlock = await provider.connection.getBlockHeight("finalized");
     const request = createRequest({
       substreamPackage: substream,
       outputModule: "map_filter_instructions",
       startBlockNum: currentBlock,
       startCursor: lastCursor ? lastCursor.cursor : undefined,
+      productionMode: true
     });
     console.log(
       `streaming from ${
@@ -415,7 +416,13 @@ if (!HELIUS_AUTH_SECRET) {
         await Cursor.create({
           cursor,
         });
-        await lastCursor?.destroy();
+        await Cursor.destroy({
+          where: {
+            cursor: {
+              [Op.ne]: cursor,
+            },
+          },
+        });
       }
     }
   }

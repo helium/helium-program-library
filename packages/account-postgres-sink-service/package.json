@@ -29,7 +29,7 @@
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
     "build": "tsc -p tsconfig.json",
     "start": "node lib/esm/server.js",
-    "dev": "ts-node-dev --respawn --project tsconfig.cjs.json src/server.ts"
+    "dev": "ts-node-dev --inspect --respawn --project tsconfig.cjs.json src/server.ts"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^1.7.2",
