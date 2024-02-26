@@ -229,7 +229,7 @@ if (!HELIUS_AUTH_SECRET) {
         const owner = account.account.owner.toBase58();
         const config = configs.find((x) => x.programId == owner);
         if (!config) {
-          if (owner) nonWatchedAccountsFilter.add(account.pubkey.toBase58());
+          // if (owner) nonWatchedAccountsFilter.add(account.pubkey.toBase58());
           continue;
         }
 
