@@ -25,14 +25,17 @@ import { SHDW_DRIVE_URL } from "./constants";
 import { IotHotspotInfo, KeyToAsset, MobileHotspotInfo } from "./model";
 import { provider } from "./solana";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
+import { delegatedDataCreditsKey, escrowAccountKey } from '@helium/data-credits-sdk'
+import { subDaoKey } from '@helium/helium-sub-daos-sdk'
 import {
   AccountLayout,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { Op } from "sequelize";
-import grpc from "@grpc/grpc-js";
+import { credentials } from "@grpc/grpc-js";
 import { orgClient } from "../proto/generated/iot_config_grpc_pb";
+import { org_get_req_v1, org_list_req_v1, org_v1 } from "../proto/generated/iot_config_pb";
 
 const PAGE_SIZE = Number(process.env.PAGE_SIZE) || 10000;
 const MODEL_MAP: any = {
@@ -170,6 +173,44 @@ function decodeCursor(cursor?: string) {
   return bufferObj.toString("utf8");
 };
 
+function createHeliumAddress(buf: Uint8Array): Address {
+  const payerKeyFirstByte = buf[0];
+  const payerWithoutFirstByte = buf.slice(1);
+
+  const solanaAddress = new PublicKey(payerWithoutFirstByte);
+  const heliumAddress = new Address(0, 0, payerKeyFirstByte, solanaAddress.toBytes());
+
+  return heliumAddress;
+}
+
+function processOrg(org: org_v1) {
+  const oui = org?.getOui();
+  const payerU8 = org?.getPayer_asU8() as Uint8Array;
+  const ownerU8 = org?.getOwner_asU8() as Uint8Array;
+  const delegateKeysU8Arr = org?.getDelegateKeysList_asU8() as Uint8Array[];
+  const locked = org?.getLocked();
+
+  const payerAddress = createHeliumAddress(payerU8);
+  const ownerAddress = createHeliumAddress(ownerU8);
+  const delegateKeysB58Arr = delegateKeysU8Arr.map((key) => {
+    const delegateAddress = createHeliumAddress(key);
+    return delegateAddress.b58;
+  })
+
+  const IOT_SUB_DAO_KEY = subDaoKey(IOT_MINT)[0];
+  const delegatedDataCredits = delegatedDataCreditsKey(IOT_SUB_DAO_KEY, payerAddress.b58)[0];
+  const escrowTokenAccount = escrowAccountKey(delegatedDataCredits)[0];
+
+  return {
+    oui,
+    owner: ownerAddress.b58,
+    payer: payerAddress.b58,
+    escrow: escrowTokenAccount.toBase58(),
+    delegate_keys: delegateKeysB58Arr,
+    locked,
+  }
+}
+
 const server: FastifyInstance = Fastify({
   logger: true,
 });
@@ -179,6 +220,57 @@ server.register(cors, {
 server.get("/health", async () => {
   return { ok: true };
 });
+
+server.get<{ Params: { oui: string } }>(
+  "/v2/oui/list",
+  async (request, reply) => {
+    const client = new orgClient("dns:config.iot.mainnet.helium.io:6080", credentials.createSsl());
+
+    const rpcReq = new org_list_req_v1();
+
+    client.list(rpcReq, (err, resp) => {
+      if (err) {
+        console.log(err);
+        reply.code(500).send(err);
+      };
+      if (resp) {
+        const orgList = resp.getOrgsList();
+        const orgListJson = orgList.map((org) => processOrg(org));
+
+        reply.send({ org: orgListJson });
+      }
+    });
+
+    return reply;
+  }
+);
+
+server.get<{ Params: { oui: string } }>(
+  "/v2/oui/:oui",
+  async (request, reply) => {
+    const { oui } = request.params;
+
+    const client = new orgClient("dns:config.iot.mainnet.helium.io:6080", credentials.createSsl());
+
+    const rpcReq = new org_get_req_v1();
+    rpcReq.setOui(parseInt(oui));
+
+    client.get(rpcReq, (err, resp) => {
+      if (err) {
+        console.log(err);
+        reply.code(500).send(err);
+      };
+      if (resp) {
+        const org = resp.getOrg() as org_v1;
+        const orgJson = processOrg(org);
+
+        reply.send(orgJson);
+      }
+    });
+
+    return reply;
+  }
+);
 
 server.get<{ Params: { wallet: string } }>(
   "/v2/wallet/:wallet",

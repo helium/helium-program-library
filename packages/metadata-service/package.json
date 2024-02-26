@@ -37,6 +37,7 @@
     "@grpc/grpc-js": "^1.10.1",
     "@helium/account-fetch-cache": "^0.6.29",
     "@helium/address": "^4.10.2",
+    "@helium/data-credits-sdk": "workspace:^",
     "@helium/helium-entity-manager-sdk": "^0.6.29",
     "@helium/helium-sub-daos-sdk": "^0.6.29",
     "@helium/idls": "^0.6.29",
