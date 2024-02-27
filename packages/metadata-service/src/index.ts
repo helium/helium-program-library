@@ -223,7 +223,7 @@ server.get("/health", async () => {
 });
 
 server.get<{ Params: { oui: string } }>(
-  "/v2/oui/list",
+  "/v2/oui/all",
   async (request, reply) => {
     try {
       const client = new orgClient(RPC_HOST, credentials.createSsl());
