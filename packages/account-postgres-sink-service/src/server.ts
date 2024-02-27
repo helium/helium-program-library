@@ -234,6 +234,7 @@ if (!HELIUS_AUTH_SECRET) {
           continue;
         }
 
+        console.log(account.account)
         try {
           await handleAccountWebhook({
             fastify: server,
@@ -386,7 +387,7 @@ if (!HELIUS_AUTH_SECRET) {
       .map((config, idx) => `accounts[${idx}]=${config.programId}`)
       .join("&");
     applyParams([`${MODULE}=${accounts}`], substream.modules!.modules);
-    const currentBlock = await provider.connection.getBlockHeight("finalized");
+    const currentBlock = await provider.connection.getSlot("finalized");
     const request = createRequest({
       substreamPackage: substream,
       outputModule: "map_filter_instructions",
