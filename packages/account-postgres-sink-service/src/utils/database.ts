@@ -63,11 +63,11 @@ Cursor.init(
   {
     sequelize: database,
     modelName: "cursor",
-    tableName: "cursor",
+    tableName: "cursors",
     underscored: true,
     timestamps: true,
   }
-  
+
 );
 
 
