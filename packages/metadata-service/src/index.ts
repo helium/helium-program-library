@@ -37,6 +37,7 @@ import { credentials } from "@grpc/grpc-js";
 import { orgClient } from "../proto/generated/iot_config_grpc_pb";
 import { org_get_req_v1, org_list_req_v1, org_v1 } from "../proto/generated/iot_config_pb";
 
+const RPC_HOST = process.env.RPC_HOST as string;
 const PAGE_SIZE = Number(process.env.PAGE_SIZE) || 10000;
 const MODEL_MAP: any = {
   "iot": [IotHotspotInfo, "iot_hotspot_info"],
@@ -224,51 +225,92 @@ server.get("/health", async () => {
 server.get<{ Params: { oui: string } }>(
   "/v2/oui/list",
   async (request, reply) => {
-    const client = new orgClient("dns:config.iot.mainnet.helium.io:6080", credentials.createSsl());
-
-    const rpcReq = new org_list_req_v1();
-
-    client.list(rpcReq, (err, resp) => {
-      if (err) {
-        console.log(err);
-        reply.code(500).send(err);
-      };
-      if (resp) {
-        const orgList = resp.getOrgsList();
-        const orgListJson = orgList.map((org) => processOrg(org));
-
-        reply.send({ org: orgListJson });
+    try {
+      const client = new orgClient(RPC_HOST, credentials.createSsl());
+      const rpcReq = new org_list_req_v1();
+  
+      client.list(rpcReq, (err, resp) => {
+        if (err) {
+          const errMessage = {
+            statusCode: 500,
+            error: "Internal Server Error",
+            message: err.message ? err.message : "Error making RPC request"
+          }
+          reply.code(500).send(errMessage);
+        }
+        if (resp) {
+          try {
+            const orgList = resp.getOrgsList();
+            const orgListJson = orgList.map((org) => processOrg(org));
+    
+            reply.header("Cloudflare-CDN-Cache-Control", "max-age=3600"); // 1 hour
+            reply.send({ orgs: orgListJson });
+          } catch (error: any) {
+            const errorMessage = {
+              statusCode: 500,
+              error: "Internal Server Error",
+              message: error.message ? error.message : "Error processing RPC response"
+            }
+            reply.code(500).send(errorMessage);
+          }
+        }
+      });
+    } catch (error: any) {
+      const errorMessage = {
+        statusCode: 500,
+        error: "Internal Server Error",
+        message: error.message ? error.message : "Error creating RPC connection"
       }
-    });
-
-    return reply;
+      reply.code(500).send(errorMessage);
+    }
   }
 );
 
 server.get<{ Params: { oui: string } }>(
   "/v2/oui/:oui",
   async (request, reply) => {
-    const { oui } = request.params;
+    try {
+      const { oui } = request.params;
 
-    const client = new orgClient("dns:config.iot.mainnet.helium.io:6080", credentials.createSsl());
+      const client = new orgClient(RPC_HOST, credentials.createSsl());
 
-    const rpcReq = new org_get_req_v1();
-    rpcReq.setOui(parseInt(oui));
+      const rpcReq = new org_get_req_v1();
+      rpcReq.setOui(parseInt(oui));
 
-    client.get(rpcReq, (err, resp) => {
-      if (err) {
-        console.log(err);
-        reply.code(500).send(err);
-      };
-      if (resp) {
-        const org = resp.getOrg() as org_v1;
-        const orgJson = processOrg(org);
-
-        reply.send(orgJson);
+      client.get(rpcReq, (err, resp) => {
+        if (err) {
+          const errMessage = {
+            statusCode: 500,
+            error: "Internal Server Error",
+            message: err.message ? err.message : "Error making RPC request"
+          }
+          reply.code(500).send(errMessage);
+        };
+        if (resp) {
+          try {
+            const org = resp.getOrg() as org_v1;
+            const orgJson = processOrg(org);
+    
+            reply.header("Cloudflare-CDN-Cache-Control", "max-age=3600"); // 1 hour
+            reply.send(orgJson);
+          } catch (error: any) {
+            const errorMessage = {
+              statusCode: 500,
+              error: "Internal Server Error",
+              message: error.message ? error.message : "Error processing RPC response"
+            }
+            reply.code(500).send(errorMessage);
+          }
+        }
+      });
+    } catch (error: any) {
+      const errorMessage = {
+        statusCode: 500,
+        error: "Internal Server Error",
+        message: error.message ? error.message : "Error creating RPC connection"
       }
-    });
-
-    return reply;
+      reply.code(500).send(errorMessage);
+    }
   }
 );
 
