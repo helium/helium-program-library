@@ -234,7 +234,6 @@ if (!HELIUS_AUTH_SECRET) {
           continue;
         }
 
-        console.log(account.account)
         try {
           await handleAccountWebhook({
             fastify: server,
