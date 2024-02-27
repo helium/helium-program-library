@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.30](https://github.com/helium/helium-program-library/compare/v0.6.29...v0.6.30) (2024-02-22)
+
+
+### Features
+
+* **#575:** Standardize all rewardable entities in url and creators ([#584](https://github.com/helium/helium-program-library/issues/584)) ([8560ad2](https://github.com/helium/helium-program-library/commit/8560ad26916fc5ac750599312138a8366947635f)), closes [#575](https://github.com/helium/helium-program-library/issues/575)
+* **#644:** Add helium/sus package to preview transactions ([09c4c70](https://github.com/helium/helium-program-library/commit/09c4c7031146b2871fe8b3607f9210f77e7851e1)), closes [#644](https://github.com/helium/helium-program-library/issues/644)
+
+
+
+
+
 ## [0.6.29](https://github.com/helium/helium-program-library/compare/v0.6.28...v0.6.29) (2024-02-06)
 
 **Note:** Version bump only for package helium-program-library
