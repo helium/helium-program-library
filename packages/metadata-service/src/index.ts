@@ -263,6 +263,8 @@ server.get<{ Params: { oui: string } }>(
       }
       reply.code(500).send(errorMessage);
     }
+
+    return reply;
   }
 );
 
@@ -311,6 +313,8 @@ server.get<{ Params: { oui: string } }>(
       }
       reply.code(500).send(errorMessage);
     }
+
+    return reply
   }
 );
 
