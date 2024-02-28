@@ -739,12 +739,12 @@ export function getDetailedWritableAccountsWithoutTM({
           address,
           pre,
           TOKEN_2022_PROGRAM_ID
-        ) || { type: "Unknown Token Program" });
+        ) || { type });
         ({ parsed: postParsed, type } = decodeTokenStruct(
           address,
           postAccount,
           TOKEN_2022_PROGRAM_ID
-        ) || { type: "Unknown Token Program" });
+        ) || { type });
 
         break;
       case TOKEN_PROGRAM_ID.toBase58():
@@ -752,12 +752,12 @@ export function getDetailedWritableAccountsWithoutTM({
           address,
           pre,
           TOKEN_PROGRAM_ID
-        ) || { type: "Unknown Token Program" });
+        ) || { type });
         ({ parsed: postParsed, type } = decodeTokenStruct(
           address,
           postAccount,
           TOKEN_PROGRAM_ID
-        ) || { type: "Unknown Token Program" });
+        ) || { type });
 
         break;
       default:
@@ -771,7 +771,10 @@ export function getDetailedWritableAccountsWithoutTM({
             )
             preParsed = decodedPre?.parsed
             postParsed = decodedPost?.parsed
-            type = decodedPre?.type || decodedPost?.type || "Unknown"
+            type =
+              (decodedPre?.type !== "Unknown" && decodedPre?.type) ||
+              (decodedPost?.type !== "Unknown" && decodedPost?.type) ||
+              "Unknown";
             name = type;
           }
         }
