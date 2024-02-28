@@ -385,23 +385,24 @@ if (!HELIUS_AUTH_SECRET) {
       .map((config, idx) => `accounts[${idx}]=${config.programId}`)
       .join("&");
     applyParams([`${MODULE}=${accounts}`], substream.modules!.modules);
-    const currentBlock = await provider.connection.getSlot("finalized");
-    const request = createRequest({
-      substreamPackage: substream,
-      outputModule: "map_filter_instructions",
-      startBlockNum: currentBlock,
-      startCursor: lastCursor ? lastCursor.cursor : undefined,
-      productionMode: true
-    });
-    console.log(
-      `streaming from ${
-        lastCursor ? `cursor ${lastCursor.cursor}` : `block ${currentBlock}`
-      }`
-    );
+    
     let running = true;
     while (running) {
       try {
         running = false;
+        const currentBlock = await provider.connection.getSlot("finalized");
+        const request = createRequest({
+          substreamPackage: substream,
+          outputModule: "map_filter_instructions",
+          startBlockNum: currentBlock,
+          startCursor: lastCursor ? lastCursor.cursor : undefined,
+          productionMode: true,
+        });
+        console.log(
+          `streaming from ${
+            lastCursor ? `cursor ${lastCursor.cursor}` : `block ${currentBlock}`
+          }`
+        );
         for await (const response of streamBlocks(transport, request)) {
           const output = unpackMapOutput(response, registry);
           let cursor;
@@ -424,7 +425,7 @@ if (!HELIUS_AUTH_SECRET) {
                 )
               )
             );
-            await Cursor.create({
+            await Cursor.upsert({
               cursor,
             });
             await Cursor.destroy({
@@ -439,9 +440,9 @@ if (!HELIUS_AUTH_SECRET) {
       } catch (e: any) {
         if (e.message !== "UNRESOLVABLE_ERROR") {
           running = true;
+        } else {
+          throw e
         }
-
-        console.log(e);
       }
     }
   }
