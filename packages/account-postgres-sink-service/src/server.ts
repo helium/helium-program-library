@@ -394,7 +394,7 @@ if (!HELIUS_AUTH_SECRET) {
         const request = createRequest({
           substreamPackage: substream,
           outputModule: "map_filter_instructions",
-          startBlockNum: currentBlock,
+          startBlockNum: lastCursor ? undefined : currentBlock,
           startCursor: lastCursor ? lastCursor.cursor : undefined,
           productionMode: true,
         });
