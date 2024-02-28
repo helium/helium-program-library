@@ -391,7 +391,7 @@ if (!HELIUS_AUTH_SECRET) {
       outputModule: "map_filter_instructions",
       startBlockNum: currentBlock,
       startCursor: lastCursor ? lastCursor.cursor : undefined,
-      productionMode: false
+      productionMode: true
     });
     console.log(
       `streaming from ${
