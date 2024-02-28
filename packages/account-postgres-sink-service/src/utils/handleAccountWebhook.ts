@@ -79,6 +79,8 @@ export function handleAccountWebhook({
         const changed =
           !value ||
           Object.entries(sanitized).some(([k, v]) => v?.toString() !== value.dataValues[k]?.toString());
+       console.log(`Data ${accName} ${account.pubkey}`, changed, sanitized);
+
         if (changed) {
           await model.upsert(
             {

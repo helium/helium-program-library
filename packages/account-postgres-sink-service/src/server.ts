@@ -25,6 +25,7 @@ import {
   RUN_JOBS_AT_STARTUP,
   SOLANA_URL,
   USE_SUBSTREAMS,
+  SUBSTREAM,
 } from "./env";
 import { initPlugins } from "./plugins";
 import { metrics } from "./plugins/metrics";
@@ -364,8 +365,6 @@ if (!HELIUS_AUTH_SECRET) {
     const lastCursor = await Cursor.findOne({
       order: [["createdAt", "DESC"]],
     });
-    const SUBSTREAM =
-      "https://github.com/helium/substreams-explorers/releases/download/v0.2.0/solana-explorer-v0.2.0.spkg";
     const MODULE = "map_filter_instructions";
     const substream = await fetchSubstream(SUBSTREAM);
     const registry = createRegistry(substream);
@@ -392,37 +391,57 @@ if (!HELIUS_AUTH_SECRET) {
       outputModule: "map_filter_instructions",
       startBlockNum: currentBlock,
       startCursor: lastCursor ? lastCursor.cursor : undefined,
-      productionMode: true
+      productionMode: false
     });
     console.log(
       `streaming from ${
         lastCursor ? `cursor ${lastCursor.cursor}` : `block ${currentBlock}`
       }`
     );
-    for await (const response of streamBlocks(transport, request)) {
-      const output = unpackMapOutput(response, registry);
-      let cursor;
-      if (response.message.case === "blockScopedData") {
-        cursor = response.message.value.cursor;
-      }
-      if (output !== undefined && !isEmptyMessage(output)) {
-        await Promise.all(
-          (output as any).instructions.map((ix: any) =>
-            insertTransactionAccounts(
-              ix.accounts.map((a: any) => new PublicKey(a))
-            )
-          )
-        );
-        await Cursor.create({
-          cursor,
-        });
-        await Cursor.destroy({
-          where: {
-            cursor: {
-              [Op.ne]: cursor,
-            },
-          },
-        });
+    let running = true;
+    while (running) {
+      try {
+        running = false;
+        for await (const response of streamBlocks(transport, request)) {
+          const output = unpackMapOutput(response, registry);
+          let cursor;
+          if (response.message.case === "blockScopedData") {
+            cursor = response.message.value.cursor;
+          }
+          if (output !== undefined && !isEmptyMessage(output)) {
+            const slot: bigint = (output as any).slot;
+            if (slot % BigInt(100) == BigInt(0)) {
+              console.log("Slot", slot);
+              const diff = currentBlock - Number(slot)
+              if (diff > 0) {
+                console.log(`${(diff * 400) / 1000} Seconds behind`)
+              }
+            }
+            await Promise.all(
+              (output as any).instructions.map((ix: any) =>
+                insertTransactionAccounts(
+                  ix.accounts.filter(acc => acc.isWritable).map((a: any) => new PublicKey(a.pubkey))
+                )
+              )
+            );
+            await Cursor.create({
+              cursor,
+            });
+            await Cursor.destroy({
+              where: {
+                cursor: {
+                  [Op.ne]: cursor,
+                },
+              },
+            });
+          }
+        }
+      } catch (e: any) {
+        if (e.message !== "UNRESOLVABLE_ERROR") {
+          running = true;
+        }
+
+        console.log(e);
       }
     }
   }
