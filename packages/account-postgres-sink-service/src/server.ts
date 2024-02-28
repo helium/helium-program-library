@@ -420,7 +420,7 @@ if (!HELIUS_AUTH_SECRET) {
             await Promise.all(
               (output as any).instructions.map((ix: any) =>
                 insertTransactionAccounts(
-                  ix.accounts.filter(acc => acc.isWritable).map((a: any) => new PublicKey(a.pubkey))
+                  ix.accounts.filter((acc: any) => acc.isWritable).map((a: any) => new PublicKey(a.pubkey))
                 )
               )
             );
