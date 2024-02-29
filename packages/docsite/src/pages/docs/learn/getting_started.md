@@ -119,175 +119,102 @@ export async function annotateWithPendingRewards(
 }
 ```
 
-### Generate claim txns and send txns in batches
+### Generate and send claim txn for a hotspot
 
-```js async name=generate-claim-txns
+```js async name=claim-hotspot-reward
 import { AnchorProvider } from '@coral-xyz/anchor'
-import { Asset, HNT_MINT } from '@helium/spl-utils'
-import * as lz from '@helium/lazy-distributor-sdk'
-import { init, keyToAssetForAsset, decodeEntityKey } from '@helium/helium-entity-manager-sdk'
 import { daoKey } from '@helium/helium-sub-daos-sdk'
-import { getPendingRewards, formBulkTransactions, getBulkRewards } from '@helium/distributor-oracle'
+import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes'
+import {
+  init as initHem,
+  keyToAssetKey,
+} from '@helium/helium-entity-manager-sdk'
+import * as client from '@helium/distributor-oracle'
+import { init as initLazy, recipientKey } from '@helium/lazy-distributor-sdk'
+import {
+  bulkSendRawTransactions,
+  Asset,
+  HNT_MINT,
+  MOBILE_MINT,
+} from '@helium/spl-utils'
+import { lazyDistributorKey } from '@helium/lazy-distributor-sdk'
+import { PublicKey } from '@solana/web3.js'
 
-export const claimAllRewards =
-  async (
-    {
-      account,
-      anchorProvider,
-      cluster,
-      lazyDistributors,
-      hotspots,
-    } : {
-      account: string,
-      anchorProvider: AnchorProvider,
-      cluster: string,
-      lazyDistributors: PublicKey[],
-      hotspots: HotspotWithPendingRewards[],
-    }
-  ) => {
-    try {
-      const ret: string[] = []
-      let triesRemaining = 10
-      const program = await lz.init(anchorProvider)
-      const hemProgram = await init(anchorProvider)
+export const MOBILE_LAZY_KEY = lazyDistributorKey(MOBILE_MINT)[0]
 
-      const mints = await Promise.all(
-        lazyDistributors.map(async (d) => {
-          return (await program.account.lazyDistributorV0.fetch(d)).rewardsMint
-        }),
-      )
-      const ldToMint = lazyDistributors.reduce((acc, ld, index) => {
-        acc[ld.toBase58()] = mints[index]
-        return acc
-      }, {} as Record<string, PublicKey>)
-      // One tx per hotspot per mint/lazy dist
-      const totalTxns = hotspots.reduce((acc, hotspot) => {
-        mints.forEach((mint) => {
-          if (
-            hotspot.pendingRewards &&
-            hotspot.pendingRewards[mint.toString()] &&
-            new BN(hotspot.pendingRewards[mint.toString()]).gt(new BN(0))
-          )
-            acc += 1
-        })
-        return acc
-      }, 0)
+export type HotspotWithPendingRewards = Asset & {
+  // mint id to pending rewards
+  pendingRewards: Record<string, string> | undefined,
+}
 
-      console.log('Preparing transactions...')
+export const claimHotspotReward = async ({
+  publicAddress,
+  provider,
+  hotspot,
+}: {
+  publicAddress: string,
+  provider: AnchorProvider,
+  hotspot: HotspotWithPendingRewards,
+}) => {
+  const hemProgram = await initHem(provider)
 
-      for (const lazyDistributor of lazyDistributors) {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const mint = ldToMint[lazyDistributor.toBase58()]!
-        const hotspotsWithRewards = hotspots.filter(
-          (hotspot) =>
-            hotspot.pendingRewards &&
-            new BN(hotspot.pendingRewards[mint.toBase58()]).gt(new BN(0)),
-        )
-        for (let chunk of chunks(hotspotsWithRewards, CHUNK_SIZE)) {
-          const thisRet: string[] = []
-          // Continually send in bulk while resetting blockhash until we send them all
-          // eslint-disable-next-line no-constant-condition
-          while (true) {
-            console.log('percent => ', ((ret.length + thisRet.length) * 100) / totalTxns)
-            console.log(`Preparing batch of ${chunk.length} transactions.\n${
-                  totalTxns - ret.length
-                } total transactions remaining.`)
+  const [entityKey] = keyToAssetKey(
+    daoKey(HNT_MINT)[0],
+    bs58.decode(hotspot?.content?.json_uri?.split('/')?.slice(-1)?.[0])
+  )
 
-            const recentBlockhash =
-              // eslint-disable-next-line no-await-in-loop
-              await anchorProvider.connection.getLatestBlockhash('confirmed')
+  const keyToAsset = await hemProgram.account.keyToAssetV0.fetchNullable(
+    entityKey
+  )
 
-            const keyToAssets = chunk.map((h) =>
-              keyToAssetForAsset(solUtils.toAsset(h)),
-            )
-            const ktaAccs = await solUtils.getCachedKeyToAssets(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              hemProgram as any,
-              keyToAssets,
-            )
-            const entityKeys = ktaAccs.map(
-              (kta) =>
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                decodeEntityKey(kta.entityKey, kta.keySerialization)!,
-            )
+  const recipient = new PublicKey(publicAddress)
 
-            const rewards = await getBulkRewards(
-              program,
-              lazyDistributor,
-              entityKeys,
-            )
+  const asset = keyToAsset?.asset
 
-            const txns = await formBulkTransactions({
-              program,
-              rewards,
-              assets: chunk.map((h) => new PublicKey(h.id)),
-              compressionAssetAccs: chunk.map(solUtils.toAsset),
-              lazyDistributor,
-              assetEndpoint: anchorProvider.connection.rpcEndpoint,
-              wallet: anchorProvider.wallet.publicKey,
-            })
+  const lazyDistributorProgram = await initLazy(provider)
 
-            const signedTxs = await anchorProvider.wallet.signAllTransactions(
-              txns,
-            )
+  const lazyDistributor = MOBILE_LAZY_KEY
 
-            // eslint-disable-next-line @typescript-eslint/no-loop-func
-            const txsWithSigs = signedTxs.map((tx, index) => ({
-              transaction: chunk[index],
-              sig: bs58.encode(
-                !solUtils.isVersionedTransaction(tx)
-                  ? // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                    tx.signatures[0]!.signature!
-                  : tx.signatures[0],
-              ),
-            }))
-
-            // eslint-disable-next-line no-await-in-loop
-            const confirmedTxs = await bulkSendRawTransactions(
-              anchorProvider.connection,
-              signedTxs.map((s) => s.serialize()),
-              ({ totalProgress }) => {
-                console.log('percent => ', ((totalProgress + ret.length + thisRet.length) * 100) / totalTxns)
-                console.log(`Confiming ${txns.length - totalProgress}/${
-                  txns.length
-                } transactions.\n${
-                  totalTxns - ret.length - thisRet.length
-                } total transactions remaining`)
-                },
-              recentBlockhash.lastValidBlockHeight,
-              // Hail mary, try with preflight enabled. Sometimes this causes
-              // errors that wouldn't otherwise happen
-              triesRemaining !== 1,
-            )
-            thisRet.push(...confirmedTxs)
-            if (confirmedTxs.length === signedTxs.length) {
-              break
-            }
-
-            const retSet = new Set(thisRet)
-
-            chunk = txsWithSigs
-              .filter(({ sig }) => !retSet.has(sig))
-              .map(({ transaction }) => transaction)
-
-            triesRemaining -= 1
-            if (triesRemaining <= 0) {
-              throw new Error(
-                `Failed to submit all txs after blockhashes expired, ${
-                  signedTxs.length - confirmedTxs.length
-                } remain`,
-              )
-            }
-          }
-          ret.push(...thisRet)
-        }
-      }
-
-      // Claims are done, now we need to update the UI
-      return ret
-    } catch (error) {
-      Logger.error(error)
-      throw error
-    }
+  if (!asset) {
+    throw new Error('No asset found')
   }
+
+  const recipientK = recipientKey(lazyDistributor, asset)
+
+  const recipientAcc = await lazyDistributorProgram.account.recipientV0.fetch(
+    recipientK[0]
+  )
+
+  if (!recipientAcc) {
+    throw new Error('Recipient account not found')
+  }
+
+  const rewards = await client.getCurrentRewards(
+    lazyDistributorProgram,
+    lazyDistributor,
+    asset
+  )
+
+  // Creating claim txn with helium mobile wallet as fee payer
+  const claimTxn = await client.formTransaction({
+    program: lazyDistributorProgram,
+    provider,
+    rewards,
+    asset: asset,
+    lazyDistributor: MOBILE_LAZY_KEY,
+    assetEndpoint: provider.connection.rpcEndpoint,
+    wallet: recipient,
+    payer: provider.wallet.publicKey,
+  })
+
+  const signedTxn = await provider.wallet.signTransaction(claimTxn)
+
+  const serializedTxn = signedTxn.serialize()
+
+  const sigs = await bulkSendRawTransactions(provider.connection, [
+    serializedTxn,
+  ])
+
+  return sigs
+}
 ```
