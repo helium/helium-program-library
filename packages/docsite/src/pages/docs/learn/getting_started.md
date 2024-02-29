@@ -172,12 +172,9 @@ export const claimAllRewards =
         })
         return acc
       }, 0)
-      dispatch(
-        solanaSlice.actions.setPaymentProgress({
-          percent: 0,
-          text: 'Preparing transactions...',
-        }),
-      )
+
+      console.log('Preparing transactions...')
+
       for (const lazyDistributor of lazyDistributors) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const mint = ldToMint[lazyDistributor.toBase58()]!
@@ -191,14 +188,11 @@ export const claimAllRewards =
           // Continually send in bulk while resetting blockhash until we send them all
           // eslint-disable-next-line no-constant-condition
           while (true) {
-            dispatch(
-              solanaSlice.actions.setPaymentProgress({
-                percent: ((ret.length + thisRet.length) * 100) / totalTxns,
-                text: `Preparing batch of ${chunk.length} transactions.\n${
+            console.log('percent => ', ((ret.length + thisRet.length) * 100) / totalTxns)
+            console.log(`Preparing batch of ${chunk.length} transactions.\n${
                   totalTxns - ret.length
-                } total transactions remaining.`,
-              }),
-            )
+                } total transactions remaining.`)
+
             const recentBlockhash =
               // eslint-disable-next-line no-await-in-loop
               await anchorProvider.connection.getLatestBlockhash('confirmed')
@@ -252,19 +246,14 @@ export const claimAllRewards =
             const confirmedTxs = await bulkSendRawTransactions(
               anchorProvider.connection,
               signedTxs.map((s) => s.serialize()),
-              ({ totalProgress }) =>
-                dispatch(
-                  solanaSlice.actions.setPaymentProgress({
-                    percent:
-                      ((totalProgress + ret.length + thisRet.length) * 100) /
-                      totalTxns,
-                    text: `Confiming ${txns.length - totalProgress}/${
-                      txns.length
-                    } transactions.\n${
-                      totalTxns - ret.length - thisRet.length
-                    } total transactions remaining`,
-                  }),
-                ),
+              ({ totalProgress }) => {
+                console.log('percent => ', ((totalProgress + ret.length + thisRet.length) * 100) / totalTxns)
+                console.log(`Confiming ${txns.length - totalProgress}/${
+                  txns.length
+                } transactions.\n${
+                  totalTxns - ret.length - thisRet.length
+                } total transactions remaining`)
+                },
               recentBlockhash.lastValidBlockHeight,
               // Hail mary, try with preflight enabled. Sometimes this causes
               // errors that wouldn't otherwise happen

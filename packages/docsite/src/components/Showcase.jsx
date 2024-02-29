@@ -11,17 +11,10 @@ export default function Showcase() {
         },
         {
             title: 'Helium Wallet App',
-            href: 'https://apps.apple.com/us/app/helium-hnt-wallet/id1609525848',
+            href: 'https://github.com/helium/wallet-app',
             imageUrl:
                 '/showcase/heliumWallet.png',
             category: 'Mobile App',
-        },
-        {
-            title: 'Helium Vote',
-            href: 'https://heliumvote.com/',
-            imageUrl:
-                '/showcase/heliumVote.png',
-            category: 'Web App',
         },
     ]
     return (
