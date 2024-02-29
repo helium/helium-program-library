@@ -224,7 +224,17 @@ const clearNavigation = () => {
 
 const generateAllIdlDocs = () => {
   // Get all idls from /target/idl folder
-  const idlFiles: string[] = fs.readdirSync("./target/idl");
+  const idlPreFiles: string[] = fs.readdirSync("./target/idl");
+  const programDirsInPrograms = fs.readdirSync("./programs");
+  console.log("programDirsInPrograms", programDirsInPrograms);
+  const idlFiles = idlPreFiles.filter((file) => {
+    // Remove no-emit from navigation.js
+    if (file === "no_emit.json") {
+      return false;
+    }
+    return programDirsInPrograms.includes(file.replace("_", "-").split(".")[0]);
+  });
+
   clearNavigation();
 
   idlFiles.forEach((fileName) => {

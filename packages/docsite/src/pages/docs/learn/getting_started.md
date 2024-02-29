@@ -26,9 +26,7 @@ The `lazy-distributor` contract is used to claim rewards for hotspots.
 ### First you need to get the compressed collectables by creator
 
 ```js async name=get-compressed-collectables
-import {
-  entityCreatorKey,
-} from '@helium/helium-entity-manager-sdk'
+import { entityCreatorKey } from '@helium/helium-entity-manager-sdk'
 import { daoKey } from '@helium/helium-sub-daos-sdk'
 import { HNT_MINT, searchAssets } from '@helium/spl-utils'
 import { AnchorProvider } from '@coral-xyz/anchor'
@@ -40,7 +38,7 @@ export const getCompressedCollectablesByCreator = async (
   pubKey: PublicKey,
   anchorProvider: AnchorProvider,
   page?: number,
-  limit?: number,
+  limit?: number
 ) => {
   const conn = anchorProvider.connection
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -131,7 +129,7 @@ import { init, keyToAssetForAsset, decodeEntityKey } from '@helium/helium-entity
 import { daoKey } from '@helium/helium-sub-daos-sdk'
 import { getPendingRewards, formBulkTransactions, getBulkRewards } from '@helium/distributor-oracle'
 
-export const claimAllRewards = 
+export const claimAllRewards =
   async (
     {
       account,
@@ -223,14 +221,6 @@ export const claimAllRewards =
               program,
               lazyDistributor,
               entityKeys,
-            )
-            dispatch(
-              solanaSlice.actions.setPaymentProgress({
-                percent: ((ret.length + thisRet.length) * 100) / totalTxns,
-                text: `Sending batch of ${chunk.length} transactions.\n${
-                  totalTxns - ret.length
-                } total transactions remaining.`,
-              }),
             )
 
             const txns = await formBulkTransactions({
