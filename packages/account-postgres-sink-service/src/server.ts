@@ -386,6 +386,7 @@ if (!HELIUS_AUTH_SECRET) {
       .join("&");
     applyParams([`${MODULE}=${accounts}`], substream.modules!.modules);
     
+    let cursor = lastCursor?.cursor;
     let running = true;
     while (running) {
       try {
@@ -394,8 +395,8 @@ if (!HELIUS_AUTH_SECRET) {
         const request = createRequest({
           substreamPackage: substream,
           outputModule: "map_filter_instructions",
-          startBlockNum: lastCursor ? undefined : currentBlock,
-          startCursor: lastCursor ? lastCursor.cursor : undefined,
+          startBlockNum: cursor ? undefined : currentBlock,
+          startCursor: cursor,
           productionMode: true,
         });
         console.log(
@@ -405,7 +406,6 @@ if (!HELIUS_AUTH_SECRET) {
         );
         for await (const response of streamBlocks(transport, request)) {
           const output = unpackMapOutput(response, registry);
-          let cursor;
           if (response.message.case === "blockScopedData") {
             cursor = response.message.value.cursor;
           }
