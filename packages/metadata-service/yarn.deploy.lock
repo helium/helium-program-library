@@ -305,6 +305,7 @@ __metadata:
     dotenv: ^16.3.1
     fastify: ^4.13.0
     git-format-staged: ^2.1.3
+    google-protobuf: ^3.21.2
     grpc-tools: ^1.12.4
     h3-js: ^4.1.0
     pg: ^8.11.3
@@ -1986,7 +1987,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"google-protobuf@npm:^3.15.5":
+"google-protobuf@npm:^3.15.5, google-protobuf@npm:^3.21.2":
   version: 3.21.2
   resolution: "google-protobuf@npm:3.21.2"
   checksum: 3caa2e1e2654714cc1a201ac5e5faabcaa48f5fba3d8ff9b64ca66fe19e4e0506b94053f32eddc77bf3a7a47ac1660315c6744185c1e2bb27654fd76fe91b988
