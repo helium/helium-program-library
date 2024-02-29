@@ -273,11 +273,21 @@ server.get<{ Params: { oui: string } }>(
   async (request, reply) => {
     try {
       const { oui } = request.params;
+      const ouiNum = parseInt(oui);
+
+      if (typeof ouiNum !== 'number' || isNaN(ouiNum)) {
+        const error = {
+          statusCode: 400,
+          error: "Bad Request",
+          message: "Invalid OUI ID"
+        }
+        return reply.code(400).send(error);
+      }
 
       const client = new orgClient(RPC_HOST, credentials.createSsl());
 
       const rpcReq = new org_get_req_v1();
-      rpcReq.setOui(parseInt(oui));
+      rpcReq.setOui(ouiNum);
 
       client.get(rpcReq, (err, resp) => {
         if (err) {
