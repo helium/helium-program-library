@@ -385,7 +385,7 @@ if (!HELIUS_AUTH_SECRET) {
       .map((config, idx) => `accounts[${idx}]=${config.programId}`)
       .join("&");
     applyParams([`${MODULE}=${accounts}`], substream.modules!.modules);
-    
+
     let cursor = lastCursor?.cursor;
     let running = true;
     while (running) {
@@ -410,40 +410,60 @@ if (!HELIUS_AUTH_SECRET) {
             cursor = response.message.value.cursor;
           }
           if (output !== undefined && !isEmptyMessage(output)) {
-            const slot: bigint = (output as any).slot;
-            if (slot % BigInt(100) == BigInt(0)) {
-              console.log("Slot", slot);
-              const diff = currentBlock - Number(slot)
-              if (diff > 0) {
-                console.log(`${(diff * 400) / 1000} Seconds behind`)
+            // Re attempt insertion if possible.
+            await withRetries(10, async () => {
+              const slot: bigint = (output as any).slot;
+              if (slot % BigInt(100) == BigInt(0)) {
+                console.log("Slot", slot);
+                const diff = currentBlock - Number(slot);
+                if (diff > 0) {
+                  console.log(`${(diff * 400) / 1000} Seconds behind`);
+                }
               }
-            }
-            await Promise.all(
-              (output as any).instructions.map((ix: any) =>
-                insertTransactionAccounts(
-                  ix.accounts.filter((acc: any) => acc.isWritable).map((a: any) => new PublicKey(a.pubkey))
+              await Promise.all(
+                (output as any).instructions.map((ix: any) =>
+                  insertTransactionAccounts(
+                    ix.accounts
+                      .filter((acc: any) => acc.isWritable)
+                      .map((a: any) => new PublicKey(a.pubkey))
+                  )
                 )
-              )
-            );
-            await Cursor.upsert({
-              cursor,
-            });
-            await Cursor.destroy({
-              where: {
-                cursor: {
-                  [Op.ne]: cursor,
+              );
+              await Cursor.upsert({
+                cursor,
+              });
+              await Cursor.destroy({
+                where: {
+                  cursor: {
+                    [Op.ne]: cursor,
+                  },
                 },
-              },
+              });
             });
           }
         }
       } catch (e: any) {
         if (e.message !== "UNRESOLVABLE_ERROR") {
           running = true;
+          console.error(e);
         } else {
-          throw e
+          throw e;
         }
       }
     }
   }
 })();
+
+async function withRetries<A>(
+  tries: number,
+  input: () => Promise<A>
+): Promise<A> {
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await input();
+    } catch (e) {
+      console.log(`Retrying ${i}...`, e);
+    }
+  }
+  throw new Error("Failed after retries");
+}

@@ -20,7 +20,8 @@ export {
   searchAssets,
   getAssetBatch,
   getAssetProofBatch,
-} from './mplAssetAPI';
+  searchAssetsWithPageInfo,
+} from "./mplAssetAPI";
 export { estimatePrioritizationFee, withPriorityFees } from "./priorityFees";
 
 export { proofArgsAndAccounts } from './proofArgsAndAccounts';
