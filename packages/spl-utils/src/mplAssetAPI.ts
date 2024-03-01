@@ -316,6 +316,13 @@ export type SearchAssetsOpts = {
 
 export async function searchAssets(
   url: string,
+  opts: SearchAssetsOpts
+): Promise<Asset[]> {
+  return (await searchAssetsWithPageInfo(url, opts)).items;
+}
+
+export async function searchAssetsWithPageInfo(
+  url: string,
   {
     creatorVerified = true,
     sortBy = { sortBy: "created", sortDirection: "asc" },
@@ -325,7 +332,12 @@ export async function searchAssets(
     tokenType,
     ...rest
   }: SearchAssetsOpts
-): Promise<Asset[]> {
+): Promise<{
+  page: number;
+  total: number;
+  limit: number;
+  items: Asset[];
+}> {
   const params = {
     page,
     limit,
@@ -353,7 +365,13 @@ export async function searchAssets(
       },
     });
 
-    return response.data.result?.items.map(toAsset);
+    const ret = response.data.result;
+    return {
+      items: ret.items?.map(toAsset),
+      limit: ret.limit,
+      total: ret.total,
+      page: ret.page,
+    };
   } catch (error) {
     console.error(error);
     throw error;
