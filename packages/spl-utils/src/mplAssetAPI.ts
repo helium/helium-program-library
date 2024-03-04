@@ -335,6 +335,7 @@ export async function searchAssetsWithPageInfo(
 ): Promise<{
   page: number;
   total: number;
+  grandTotal?: number;
   limit: number;
   items: Asset[];
 }> {
@@ -371,6 +372,7 @@ export async function searchAssetsWithPageInfo(
       limit: ret.limit,
       total: ret.total,
       page: ret.page,
+      grandTotal: ret.grand_total,
     };
   } catch (error) {
     console.error(error);
