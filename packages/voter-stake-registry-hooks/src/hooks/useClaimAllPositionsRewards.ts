@@ -27,7 +27,7 @@ import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta, SubDao } from "../sdk/types";
 import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
-import { PROGRAM_ID as VSR_PROGRAM_ID } from "@helium/voter-stake-registry-sdk";
+import { PROGRAM_ID as VSR_PROGRAM_ID, isClaimed } from "@helium/voter-stake-registry-sdk";
 
 const DAO = daoKey(HNT_MINT)[0];
 export const useClaimAllPositionsRewards = () => {
@@ -89,12 +89,13 @@ export const useClaimAllPositionsRewards = () => {
         for (const [idx, position] of positions.entries()) {
           const delegatedPosition = delegatedPositions[idx];
           multiDemArray[idx] = multiDemArray[idx] || [];
-          const { lastClaimedEpoch } = delegatedPosition.account;
+          const { lastClaimedEpoch, claimedEpochsBitmap } =
+            delegatedPosition.account;
           const epoch = lastClaimedEpoch.add(new BN(1));
           const epochsToClaim = Array.from(
             { length: currentEpoch.sub(epoch).toNumber() },
             (_v, k) => epoch.addn(k)
-          );
+          ).filter(epoch => !isClaimed({ epoch, lastClaimedEpoch, claimedEpochsBitmap }));
           const subDao = delegatedPosition.account.subDao;
           const subDaoStr = subDao.toBase58();
           const subDaoAcc = subDaos[subDaoStr];
