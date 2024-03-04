@@ -95,7 +95,14 @@ export const useClaimAllPositionsRewards = () => {
           const epochsToClaim = Array.from(
             { length: currentEpoch.sub(epoch).toNumber() },
             (_v, k) => epoch.addn(k)
-          ).filter(epoch => !isClaimed({ epoch, lastClaimedEpoch, claimedEpochsBitmap }));
+          ).filter(
+            (epoch) =>
+              !isClaimed({
+                epoch: epoch.toNumber(),
+                lastClaimedEpoch: lastClaimedEpoch.toNumber(),
+                claimedEpochsBitmap,
+              })
+          );
           const subDao = delegatedPosition.account.subDao;
           const subDaoStr = subDao.toBase58();
           const subDaoAcc = subDaos[subDaoStr];
