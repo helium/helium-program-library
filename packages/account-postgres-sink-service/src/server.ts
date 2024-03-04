@@ -447,7 +447,8 @@ if (!HELIUS_AUTH_SECRET) {
           running = true;
           console.error(e);
         } else {
-          throw e;
+          console.error(e);
+          process.exit(1);
         }
       }
     }
