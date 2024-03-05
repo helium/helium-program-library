@@ -89,8 +89,6 @@ export function handleAccountWebhook({
             },
             { transaction: t }
           );
-        } else {
-          console.log(`${new Date().toISOString()}: Observed no change on ${account.pubkey}`, sanitized, value.dataValues)
         }
       }
 
