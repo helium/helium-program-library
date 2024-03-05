@@ -1,7 +1,6 @@
 import { createGrpcTransport } from "@connectrpc/connect-node";
 import cors from "@fastify/cors";
-import { AccountFetchCache } from "@helium/account-fetch-cache";
-import { Connection, PublicKey, TransactionResponse } from "@solana/web3.js";
+import { AccountInfo, Connection, PublicKey, TransactionResponse } from "@solana/web3.js";
 import {
   applyParams,
   authIssue,
@@ -18,14 +17,13 @@ import Fastify, { FastifyInstance } from "fastify";
 import fastifyCron from "fastify-cron";
 import fs from "fs";
 import { ReasonPhrases, StatusCodes } from "http-status-codes";
+import { Op } from "sequelize";
 import {
-  FETCH_DELAY_SECONDS,
   HELIUS_AUTH_SECRET,
   PROGRAM_ACCOUNT_CONFIGS,
   RUN_JOBS_AT_STARTUP,
-  SOLANA_URL,
-  USE_SUBSTREAMS,
   SUBSTREAM,
+  USE_SUBSTREAMS
 } from "./env";
 import { initPlugins } from "./plugins";
 import { metrics } from "./plugins/metrics";
@@ -37,7 +35,6 @@ import { handleAccountWebhook } from "./utils/handleAccountWebhook";
 import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAccounts";
 import { provider } from "./utils/solana";
 import { truthy, upsertProgramAccounts } from "./utils/upsertProgramAccounts";
-import { Op } from "sequelize";
 const { BloomFilter } = require("bloom-filters");
 
 if (!HELIUS_AUTH_SECRET) {
@@ -183,26 +180,10 @@ if (!HELIUS_AUTH_SECRET) {
 
   // Assume 10 million accounts we might not want to watch (token accounts, etc)
   const nonWatchedAccountsFilter = BloomFilter.create(10000000, 0.05);
-  const cache = new AccountFetchCache({
-    connection: new Connection(SOLANA_URL),
-    commitment: "confirmed",
-    extendConnection: false,
-    enableLogging: true,
-    // One fetch every x second limit. When using substreams, we already batch accounts by block
-    // so adding a fetch delay will just cause us to fall behind
-    delay: USE_SUBSTREAMS ? 50 : FETCH_DELAY_SECONDS * 1000,
-  });
-  async function insertTransactionAccounts(writableAccountKeys: PublicKey[]) {
-    const accounts = await Promise.all(
-      writableAccountKeys
-        .filter((wa) => !nonWatchedAccountsFilter.has(wa.toBase58()))
-        .map((key) => cache.search(key))
-    );
-
+  async function insertTransactionAccounts(accounts: { pubkey: PublicKey, account: AccountInfo<Buffer> | null }[]) {
     if (configs) {
       let index = 0;
-      for (const account of accounts) {
-        const pubkey = writableAccountKeys[index];
+      for (const { account, pubkey } of accounts) {
         index++;
 
         // Account not found, delete it from any and all tables
@@ -228,10 +209,10 @@ if (!HELIUS_AUTH_SECRET) {
         }
 
         // If the owner isn't of a program we're watching, break
-        const owner = account.account.owner.toBase58();
+        const owner = account.owner.toBase58();
         const config = configs.find((x) => x.programId == owner);
         if (!config) {
-          if (owner) nonWatchedAccountsFilter.add(account.pubkey.toBase58());
+          if (owner) nonWatchedAccountsFilter.add(pubkey.toBase58());
           continue;
         }
 
@@ -241,8 +222,8 @@ if (!HELIUS_AUTH_SECRET) {
             programId: new PublicKey(config.programId),
             accounts: config.accounts,
             account: {
-              pubkey: account.pubkey.toBase58(),
-              data: [account.account.data, undefined],
+              pubkey: pubkey.toBase58(),
+              data: [account.data, undefined],
             },
             pluginsByAccountType: pluginsByAccountTypeByProgram[owner] || {},
           });
@@ -285,7 +266,12 @@ if (!HELIUS_AUTH_SECRET) {
             )
         )
         .map((k) => new PublicKey(k));
-      await insertTransactionAccounts(writableAccountKeys);
+      await insertTransactionAccounts(
+        await getMultipleAccounts({
+          connection: provider.connection,
+          keys: writableAccountKeys,
+        })
+      );
       res.code(StatusCodes.OK).send(ReasonPhrases.OK);
     } catch (err) {
       res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
@@ -420,15 +406,22 @@ if (!HELIUS_AUTH_SECRET) {
                   console.log(`${(diff * 400) / 1000} Seconds behind`);
                 }
               }
-              await Promise.all(
-                (output as any).instructions.map((ix: any) =>
-                  insertTransactionAccounts(
+              const allWritableAccounts = [
+                ...new Set(
+                  (output as any).instructions.flatMap((ix: any) =>
                     ix.accounts
                       .filter((acc: any) => acc.isWritable)
-                      .map((a: any) => new PublicKey(a.pubkey))
+                      .map((a: any) => a.pubkey)
                   )
-                )
-              );
+                ),
+              ];
+
+              await insertTransactionAccounts(await getMultipleAccounts({
+                connection: provider.connection,
+                keys: allWritableAccounts.map(a => new PublicKey(a as string)),
+                minContextSlot: Number(slot)
+              }))
+
               await Cursor.upsert({
                 cursor,
               });
@@ -463,8 +456,40 @@ async function withRetries<A>(
     try {
       return await input();
     } catch (e) {
-      console.log(`Retrying ${i}...`, e);
+      console.log(`${new Date().toISOString()}: Retrying ${i}...`, e);
+      await sleep(1000)
     }
   }
   throw new Error("Failed after retries");
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function getMultipleAccounts({
+  connection,
+  keys,
+  minContextSlot,
+}: {
+  connection: Connection;
+  keys: PublicKey[];
+  minContextSlot?: number;
+}): Promise<{ pubkey: PublicKey; account: AccountInfo<Buffer> | null }[]> {
+  const batchSize = 100;
+  const batches = Math.ceil(keys.length / batchSize);
+  const results: { pubkey: PublicKey; account: AccountInfo<Buffer> | null }[] =
+    [];
+
+  for (let i = 0; i < batches; i++) {
+    const batchKeys = keys.slice(i * batchSize, (i + 1) * batchSize);
+    const batchResults = await connection.getMultipleAccountsInfo(batchKeys, {
+      minContextSlot,
+    });
+    results.push(
+      ...batchResults.map((account, i) => ({ account, pubkey: batchKeys[i] }))
+    );
+  }
+
+  return results;
 }
