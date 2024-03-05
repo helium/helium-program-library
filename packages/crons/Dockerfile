@@ -7,9 +7,9 @@ COPY package.json ./
 
 COPY package.json ./
 COPY yarn.deploy.lock ./
-ENV YARN_LOCKFILE_FILENAME=yarn.deploy.lock
 
 RUN yarn set version 3.6.4
+ENV YARN_LOCKFILE_FILENAME=yarn.deploy.lock
 RUN yarn install
 
 COPY src src
