@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.6.30",
+  "version": "0.6.35",
   "description": "Mint metadata of hotspots",
   "repository": {
     "type": "git",
@@ -34,12 +34,14 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
     "@fastify/cors": "^8.1.1",
-    "@helium/account-fetch-cache": "^0.6.30",
+    "@grpc/grpc-js": "^1.10.1",
+    "@helium/account-fetch-cache": "^0.6.35",
     "@helium/address": "^4.10.2",
-    "@helium/helium-entity-manager-sdk": "^0.6.30",
-    "@helium/helium-sub-daos-sdk": "^0.6.30",
-    "@helium/idls": "^0.6.30",
-    "@helium/spl-utils": "^0.6.30",
+    "@helium/data-credits-sdk": "^0.6.35",
+    "@helium/helium-entity-manager-sdk": "^0.6.35",
+    "@helium/helium-sub-daos-sdk": "^0.6.35",
+    "@helium/idls": "^0.6.35",
+    "@helium/spl-utils": "^0.6.35",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.78.4",
@@ -50,6 +52,7 @@
     "bs58": "^4.0.1",
     "dotenv": "^16.3.1",
     "fastify": "^4.13.0",
+    "google-protobuf": "^3.21.2",
     "h3-js": "^4.1.0",
     "pg": "^8.11.3",
     "sequelize": "^6.33.0"
@@ -58,9 +61,11 @@
     "@types/bn.js": "^5.1.1",
     "@types/bs58": "^4.0.2",
     "git-format-staged": "^2.1.3",
+    "grpc-tools": "^1.12.4",
     "ts-loader": "^9.2.3",
     "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
+    "ts-protoc-gen": "^0.15.0",
     "typescript": "^5.2.2"
   },
   "keywords": [],

@@ -1,33 +1,40 @@
+import { createGrpcTransport } from "@connectrpc/connect-node";
+import cors from "@fastify/cors";
+import { AccountInfo, Connection, PublicKey, TransactionResponse } from "@solana/web3.js";
+import {
+  applyParams,
+  authIssue,
+  createAuthInterceptor,
+  createRegistry,
+  createRequest,
+  fetchSubstream,
+  isEmptyMessage,
+  streamBlocks,
+  unpackMapOutput,
+} from "@substreams/core";
+import { EventEmitter } from "events";
 import Fastify, { FastifyInstance } from "fastify";
 import fastifyCron from "fastify-cron";
-import cors from "@fastify/cors";
 import fs from "fs";
-import { StatusCodes, ReasonPhrases } from "http-status-codes";
+import { ReasonPhrases, StatusCodes } from "http-status-codes";
+import { Op } from "sequelize";
 import {
-  Connection,
-  PublicKey,
-  SystemProgram,
-  TransactionMessage,
-  TransactionResponse,
-} from "@solana/web3.js";
-import {
-  FETCH_DELAY_SECONDS,
   HELIUS_AUTH_SECRET,
   PROGRAM_ACCOUNT_CONFIGS,
   RUN_JOBS_AT_STARTUP,
-  SOLANA_URL,
+  SUBSTREAM,
+  USE_SUBSTREAMS
 } from "./env";
-import database from "./utils/database";
-import { defineAllIdlModels } from "./utils/defineIdlModels";
-import { createPgIndexes } from "./utils/createPgIndexes";
-import { truthy, upsertProgramAccounts } from "./utils/upsertProgramAccounts";
-import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAccounts";
-import { handleAccountWebhook } from "./utils/handleAccountWebhook";
+import { initPlugins } from "./plugins";
 import { metrics } from "./plugins/metrics";
 import { IConfig, IInitedPlugin } from "./types";
-import { EventEmitter } from "events";
-import { initPlugins } from "./plugins";
-import { AccountFetchCache } from "@helium/account-fetch-cache";
+import { createPgIndexes } from "./utils/createPgIndexes";
+import database, { Cursor } from "./utils/database";
+import { defineAllIdlModels } from "./utils/defineIdlModels";
+import { handleAccountWebhook } from "./utils/handleAccountWebhook";
+import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAccounts";
+import { provider } from "./utils/solana";
+import { truthy, upsertProgramAccounts } from "./utils/upsertProgramAccounts";
 const { BloomFilter } = require("bloom-filters");
 
 if (!HELIUS_AUTH_SECRET) {
@@ -173,14 +180,59 @@ if (!HELIUS_AUTH_SECRET) {
 
   // Assume 10 million accounts we might not want to watch (token accounts, etc)
   const nonWatchedAccountsFilter = BloomFilter.create(10000000, 0.05);
-  const cache = new AccountFetchCache({
-    connection: new Connection(SOLANA_URL),
-    commitment: "confirmed",
-    extendConnection: false,
-    enableLogging: true,
-    // One fetch every x second limit
-    delay: FETCH_DELAY_SECONDS * 1000,
-  });
+  async function insertTransactionAccounts(accounts: { pubkey: PublicKey, account: AccountInfo<Buffer> | null }[]) {
+    if (configs) {
+      let index = 0;
+      for (const { account, pubkey } of accounts) {
+        index++;
+
+        // Account not found, delete it from any and all tables
+        if (!account) {
+          const tables = configs.flatMap((config) =>
+            config.accounts.map((acc) => acc.table)
+          );
+          const transaction = await database.transaction();
+          for (const table of tables) {
+            await database.query(
+              `
+                  DELETE FROM ${table} WHERE address = ${database.escape(
+                pubkey.toBase58()
+              )}
+                `,
+              {
+                transaction,
+              }
+            );
+          }
+          await transaction.commit();
+          continue;
+        }
+
+        // If the owner isn't of a program we're watching, break
+        const owner = account.owner.toBase58();
+        const config = configs.find((x) => x.programId == owner);
+        if (!config) {
+          if (owner) nonWatchedAccountsFilter.add(pubkey.toBase58());
+          continue;
+        }
+
+        try {
+          await handleAccountWebhook({
+            fastify: server,
+            programId: new PublicKey(config.programId),
+            accounts: config.accounts,
+            account: {
+              pubkey: pubkey.toBase58(),
+              data: [account.data, undefined],
+            },
+            pluginsByAccountType: pluginsByAccountTypeByProgram[owner] || {},
+          });
+        } catch (err) {
+          throw err;
+        }
+      }
+    }
+  }
   server.post<{ Body: any[] }>("/transaction-webhook", async (req, res) => {
     if (req.headers.authorization != HELIUS_AUTH_SECRET) {
       res.code(StatusCodes.FORBIDDEN).send({
@@ -214,66 +266,12 @@ if (!HELIUS_AUTH_SECRET) {
             )
         )
         .map((k) => new PublicKey(k));
-      const accounts = await Promise.all(
-        writableAccountKeys.map((key) => cache.search(key))
+      await insertTransactionAccounts(
+        await getMultipleAccounts({
+          connection: provider.connection,
+          keys: writableAccountKeys,
+        })
       );
-
-      if (configs) {
-        let index = 0;
-        for (const account of accounts) {
-          const pubkey = writableAccountKeys[index];
-          index++;
-
-          // Account not found, delete it from any and all tables
-          if (!account) {
-            const tables = configs.flatMap((config) =>
-              config.accounts.map((acc) => acc.table)
-            );
-            const transaction = await database.transaction();
-            for (const table of tables) {
-              await database.query(
-                `
-                  DELETE FROM ${table} WHERE address = ${database.escape(
-                  pubkey.toBase58()
-                )}
-                `,
-                {
-                  transaction,
-                }
-              );
-            }
-            await transaction.commit();
-            continue;
-          }
-
-          // If the owner isn't of a program we're watching, break
-          const owner = account.account.owner.toBase58();
-          if (nonWatchedAccountsFilter.has(owner)) {
-            continue;
-          }
-
-          const config = configs.find((x) => x.programId == owner);
-          if (!config) {
-            if (owner) nonWatchedAccountsFilter.add(owner);
-            continue;
-          }
-
-          try {
-            await handleAccountWebhook({
-              fastify: server,
-              programId: new PublicKey(config.programId),
-              accounts: config.accounts,
-              account: {
-                pubkey: account.pubkey.toBase58(),
-                data: [account.account.data, undefined],
-              },
-              pluginsByAccountType: pluginsByAccountTypeByProgram[owner] || {},
-            });
-          } catch (err) {
-            throw err;
-          }
-        }
-      }
       res.code(StatusCodes.OK).send(ReasonPhrases.OK);
     } catch (err) {
       res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
@@ -347,4 +345,151 @@ if (!HELIUS_AUTH_SECRET) {
     console.error(err);
     process.exit(1);
   }
+
+  if (USE_SUBSTREAMS) {
+    await Cursor.sync();
+    const lastCursor = await Cursor.findOne({
+      order: [["createdAt", "DESC"]],
+    });
+    const MODULE = "map_filter_instructions";
+    const substream = await fetchSubstream(SUBSTREAM);
+    const registry = createRegistry(substream);
+    const { token } = await authIssue(
+      "server_e80b2b1b926856ef43c7f50310b85e6f"
+    );
+    const transport = createGrpcTransport({
+      baseUrl: "https://mainnet.sol.streamingfast.io",
+      httpVersion: "2",
+
+      interceptors: [createAuthInterceptor(token)],
+      useBinaryFormat: true,
+      jsonOptions: {
+        typeRegistry: registry,
+      },
+    });
+    const accounts = configs
+      .map((config, idx) => `accounts[${idx}]=${config.programId}`)
+      .join("&");
+    applyParams([`${MODULE}=${accounts}`], substream.modules!.modules);
+
+    let cursor = lastCursor?.cursor;
+    let running = true;
+    while (running) {
+      try {
+        running = false;
+        const currentBlock = await provider.connection.getSlot("finalized");
+        const request = createRequest({
+          substreamPackage: substream,
+          outputModule: "map_filter_instructions",
+          startBlockNum: cursor ? undefined : currentBlock,
+          startCursor: cursor,
+          productionMode: true,
+        });
+        console.log(
+          `streaming from ${
+            lastCursor ? `cursor ${lastCursor.cursor}` : `block ${currentBlock}`
+          }`
+        );
+        for await (const response of streamBlocks(transport, request)) {
+          const output = unpackMapOutput(response, registry);
+          if (response.message.case === "blockScopedData") {
+            cursor = response.message.value.cursor;
+          }
+          if (output !== undefined && !isEmptyMessage(output)) {
+            // Re attempt insertion if possible.
+            await withRetries(10, async () => {
+              const slot: bigint = (output as any).slot;
+              if (slot % BigInt(100) == BigInt(0)) {
+                console.log("Slot", slot);
+                const diff = currentBlock - Number(slot);
+                if (diff > 0) {
+                  console.log(`${(diff * 400) / 1000} Seconds behind`);
+                }
+              }
+              const allWritableAccounts = [
+                ...new Set(
+                  (output as any).instructions.flatMap((ix: any) =>
+                    ix.accounts
+                      .filter((acc: any) => acc.isWritable)
+                      .map((a: any) => a.pubkey)
+                  )
+                ),
+              ];
+
+              await insertTransactionAccounts(await getMultipleAccounts({
+                connection: provider.connection,
+                keys: allWritableAccounts.map(a => new PublicKey(a as string)),
+                minContextSlot: Number(slot)
+              }))
+
+              await Cursor.upsert({
+                cursor,
+              });
+              await Cursor.destroy({
+                where: {
+                  cursor: {
+                    [Op.ne]: cursor,
+                  },
+                },
+              });
+            });
+          }
+        }
+      } catch (e: any) {
+        if (e.message !== "UNRESOLVABLE_ERROR") {
+          running = true;
+          console.error(e);
+        } else {
+          console.error(e);
+          process.exit(1);
+        }
+      }
+    }
+  }
 })();
+
+async function withRetries<A>(
+  tries: number,
+  input: () => Promise<A>
+): Promise<A> {
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await input();
+    } catch (e) {
+      console.log(`${new Date().toISOString()}: Retrying ${i}...`, e);
+      await sleep(1000)
+    }
+  }
+  throw new Error("Failed after retries");
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function getMultipleAccounts({
+  connection,
+  keys,
+  minContextSlot,
+}: {
+  connection: Connection;
+  keys: PublicKey[];
+  minContextSlot?: number;
+}): Promise<{ pubkey: PublicKey; account: AccountInfo<Buffer> | null }[]> {
+  const batchSize = 100;
+  const batches = Math.ceil(keys.length / batchSize);
+  const results: { pubkey: PublicKey; account: AccountInfo<Buffer> | null }[] =
+    [];
+
+  for (let i = 0; i < batches; i++) {
+    const batchKeys = keys.slice(i * batchSize, (i + 1) * batchSize);
+    const batchResults = await connection.getMultipleAccountsInfo(batchKeys, {
+      minContextSlot,
+    });
+    results.push(
+      ...batchResults.map((account, i) => ({ account, pubkey: batchKeys[i] }))
+    );
+  }
+
+  return results;
+}
