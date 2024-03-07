@@ -26,7 +26,6 @@ export const useUndelegatePosition = () => {
       ) => Promise<void>;
     }) => {
       const isInvalid = !provider || !position.isDelegated;
-
       const idl = await Program.fetchIdl(programId, provider);
       const hsdProgram = await init(provider as any, programId, idl);
 
