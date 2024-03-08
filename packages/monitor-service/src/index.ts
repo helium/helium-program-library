@@ -37,7 +37,6 @@ import {
   monitorAccountCircuitBreaker,
   monitorMintCircuitBreaker,
 } from "./monitors/circuitBreaker";
-import { monitorPriceOracle } from "./monitors/priceOracle";
 import { monitorSupply } from "./monitors/supply";
 import { monitorVehnt } from "./monitors/vehnt";
 import { provider } from "./solana";
@@ -111,8 +110,6 @@ async function run() {
   const mobileMint = mobile.dntMint;
   const mobileTreasury = mobile.treasury;
   const mobileRewardsEscrow = mobile.rewardsEscrow;
-
-  await monitorPriceOracle(poProgram);
 
   await Recipient.sync();
   await monitorVehnt();
