@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.36](https://github.com/helium/helium-program-library/compare/v0.6.27...v0.6.36) (2024-03-08)
+
+
+### Features
+
+* **#559:** Use pyth oracle for mobile onboarding ([#566](https://github.com/helium/helium-program-library/issues/566)) ([1b751e9](https://github.com/helium/helium-program-library/commit/1b751e9a1aabbbe851ce828c4b2dfff46d18615a)), closes [#559](https://github.com/helium/helium-program-library/issues/559)
+* **#575:** Standardize all rewardable entities in url and creators ([#584](https://github.com/helium/helium-program-library/issues/584)) ([8560ad2](https://github.com/helium/helium-program-library/commit/8560ad26916fc5ac750599312138a8366947635f)), closes [#575](https://github.com/helium/helium-program-library/issues/575)
+* **#644:** Add helium/sus package to preview transactions ([09c4c70](https://github.com/helium/helium-program-library/commit/09c4c7031146b2871fe8b3607f9210f77e7851e1)), closes [#644](https://github.com/helium/helium-program-library/issues/644)
+
+
+
+
+
 ## [0.6.35](https://github.com/helium/helium-program-library/compare/v0.6.34...v0.6.35) (2024-03-04)
 
 **Note:** Version bump only for package helium-program-library
