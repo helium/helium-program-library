@@ -427,7 +427,7 @@ export async function sendAndConfirmWithRetry(
   console.log("txid", txid);
   const startTime = getUnixTime();
   (async () => {
-    while (!done && getUnixTime() - startTime < (timeout / 1000)) {
+    while (!done && getUnixTime() - startTime < timeout / 1000) {
       await connection.sendRawTransaction(txn, sendOptions);
       await sleep(500);
     }
@@ -518,7 +518,7 @@ export async function bulkSendTransactions(
   onProgress?: (status: Status) => void,
   triesRemaining: number = 10, // Number of blockhashes to try resending txs with before giving up
   extraSigners: Keypair[] = [],
-  maxSignatureBatch: number = TX_BATCH_SIZE,
+  maxSignatureBatch: number = TX_BATCH_SIZE
 ): Promise<string[]> {
   let ret: string[] = [];
 
@@ -536,20 +536,20 @@ export async function bulkSendTransactions(
           return tx;
         })
       );
-      const signedTxs = (await(provider as AnchorProvider)
-        .wallet.signAllTransactions(blockhashedTxs))
-        .map((tx) => {
-          extraSigners.forEach((signer: Keypair) => {
-            if (
-              tx.signatures.some((sig) =>
-                sig.publicKey.equals(signer.publicKey)
-              )
-            ) {
-              tx.partialSign(signer);
-            }
-          }, tx);
-          return tx;
-        });
+      const signedTxs = (
+        await (provider as AnchorProvider).wallet.signAllTransactions(
+          blockhashedTxs
+        )
+      ).map((tx) => {
+        extraSigners.forEach((signer: Keypair) => {
+          if (
+            tx.signatures.some((sig) => sig.publicKey.equals(signer.publicKey))
+          ) {
+            tx.partialSign(signer);
+          }
+        }, tx);
+        return tx;
+      });
 
       const txsWithSigs = signedTxs.map((tx, index) => {
         return {
