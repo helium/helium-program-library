@@ -1,6 +1,11 @@
 import { createGrpcTransport } from "@connectrpc/connect-node";
 import cors from "@fastify/cors";
-import { AccountInfo, Connection, PublicKey, TransactionResponse } from "@solana/web3.js";
+import {
+  AccountInfo,
+  Connection,
+  PublicKey,
+  TransactionResponse,
+} from "@solana/web3.js";
 import {
   applyParams,
   authIssue,
@@ -23,7 +28,7 @@ import {
   PROGRAM_ACCOUNT_CONFIGS,
   RUN_JOBS_AT_STARTUP,
   SUBSTREAM,
-  USE_SUBSTREAMS
+  USE_SUBSTREAMS,
 } from "./env";
 import { initPlugins } from "./plugins";
 import { metrics } from "./plugins/metrics";
@@ -180,7 +185,9 @@ if (!HELIUS_AUTH_SECRET) {
 
   // Assume 10 million accounts we might not want to watch (token accounts, etc)
   const nonWatchedAccountsFilter = BloomFilter.create(10000000, 0.05);
-  async function insertTransactionAccounts(accounts: { pubkey: PublicKey, account: AccountInfo<Buffer> | null }[]) {
+  async function insertTransactionAccounts(
+    accounts: { pubkey: PublicKey; account: AccountInfo<Buffer> | null }[]
+  ) {
     if (configs) {
       let index = 0;
       for (const { account, pubkey } of accounts) {
@@ -416,11 +423,15 @@ if (!HELIUS_AUTH_SECRET) {
                 ),
               ];
 
-              await insertTransactionAccounts(await getMultipleAccounts({
-                connection: provider.connection,
-                keys: allWritableAccounts.map(a => new PublicKey(a as string)),
-                minContextSlot: Number(slot)
-              }))
+              await insertTransactionAccounts(
+                await getMultipleAccounts({
+                  connection: provider.connection,
+                  keys: allWritableAccounts.map(
+                    (a) => new PublicKey(a as string)
+                  ),
+                  minContextSlot: Number(slot),
+                })
+              );
 
               await Cursor.upsert({
                 cursor,
@@ -436,7 +447,7 @@ if (!HELIUS_AUTH_SECRET) {
           }
         }
       } catch (e: any) {
-        if (e.message !== "UNRESOLVABLE_ERROR") {
+        if (e.toString().includes("ConnectError")) {
           running = true;
           console.error(e);
         } else {
@@ -457,14 +468,14 @@ async function withRetries<A>(
       return await input();
     } catch (e) {
       console.log(`${new Date().toISOString()}: Retrying ${i}...`, e);
-      await sleep(1000)
+      await sleep(1000);
     }
   }
   throw new Error("Failed after retries");
 }
 
 async function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function getMultipleAccounts({
