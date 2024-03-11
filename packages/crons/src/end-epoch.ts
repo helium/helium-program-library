@@ -24,14 +24,16 @@ import {
   HNT_MINT,
   IOT_MINT,
   MOBILE_MINT,
+  batchParallelInstructionsWithPriorityFee,
   chunks,
   createMintInstructions,
   sendAndConfirmWithRetry,
   sendInstructions,
   sendInstructionsWithPriorityFee,
+  truthy,
 } from "@helium/spl-utils";
 import { getAccount } from "@solana/spl-token";
-import { ComputeBudgetProgram as CBP, Keypair } from "@solana/web3.js";
+import { ComputeBudgetProgram as CBP, Connection, Keypair, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import BN from "bn.js";
 import bs58 from "bs58";
 
@@ -39,6 +41,14 @@ const FANOUT_NAME = "HST";
 const IOT_OPERATIONS_FUND = "iot_operations_fund";
 const NOT_EMITTED = "not_emitted";
 const MAX_CLAIM_AMOUNT = new BN("207020547945205");
+
+const BASE_PRIORITY_FEE = Number(process.env.BASE_PRIORITY_FEE || "1")
+
+async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
+  const clock = await connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+  const unixTime = clock!.data.readBigInt64LE(8 * 4);
+  return unixTime;
+}
 
 (async () => {
   try {
@@ -72,10 +82,17 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
       // Start one day back to ensure we at least close the epoch that the job is running in.
       new BN(unixNow - 24 * 60 * 60)
     );
+    const solanaTime = await getSolanaUnixTimestamp(provider.connection)
 
     mainLoop: while (targetTs.toNumber() < unixNow) {
       const epoch = currentEpoch(targetTs);
       console.log(epoch.toNumber(), targetTs.toNumber());
+      const driftFromSolana = targetTs.toNumber() - Number(solanaTime);
+      // If Solana is within 5 minutes of the epoch we're trying to end, wait.
+      // This can happen because of solana clock drift.
+      if (driftFromSolana > 0 && driftFromSolana < 60 * 5) {
+        await sleep(driftFromSolana * 1000);
+      }
       const [daoEpoch] = daoEpochInfoKey(dao, targetTs);
       const daoEpochInfo =
         await heliumSubDaosProgram.account.daoEpochInfoV0.fetchNullable(
@@ -92,14 +109,19 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
 
           if (!subDaoEpochInfo?.utilityScore) {
             try {
-              await sendInstructionsWithPriorityFee(provider, [
-                await heliumSubDaosProgram.methods
-                  .calculateUtilityScoreV0({ epoch })
-                  .accounts({ subDao: subDao.publicKey })
-                  .instruction(),
-              ], {
-                computeUnitLimit: 1000000
-              });
+              await sendInstructionsWithPriorityFee(
+                provider,
+                [
+                  await heliumSubDaosProgram.methods
+                    .calculateUtilityScoreV0({ epoch })
+                    .accounts({ subDao: subDao.publicKey })
+                    .instruction(),
+                ],
+                {
+                  computeUnitLimit: 1000000,
+                  basePriorityFee: BASE_PRIORITY_FEE,
+                }
+              );
             } catch (err: any) {
               const strErr = JSON.stringify(err);
 
@@ -133,12 +155,18 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
 
           if (!subDaoEpochInfo?.rewardsIssuedAt) {
             try {
-              await sendInstructionsWithPriorityFee(provider, [
-                await heliumSubDaosProgram.methods
-                  .issueRewardsV0({ epoch })
-                  .accounts({ subDao: subDao.publicKey })
-                  .instruction(),
-              ]);
+              await sendInstructionsWithPriorityFee(
+                provider,
+                [
+                  await heliumSubDaosProgram.methods
+                    .issueRewardsV0({ epoch })
+                    .accounts({ subDao: subDao.publicKey })
+                    .instruction(),
+                ],
+                {
+                  basePriorityFee: BASE_PRIORITY_FEE,
+                }
+              );
             } catch (err: any) {
               errors.push(
                 `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${err}`
@@ -150,12 +178,18 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
 
       if (!daoEpochInfo?.doneIssuingHstPool) {
         try {
-          await sendInstructionsWithPriorityFee(provider, [
-            await heliumSubDaosProgram.methods
-              .issueHstPoolV0({ epoch })
-              .accounts({ dao })
-              .instruction(),
-          ]);
+          await sendInstructionsWithPriorityFee(
+            provider,
+            [
+              await heliumSubDaosProgram.methods
+                .issueHstPoolV0({ epoch })
+                .accounts({ dao })
+                .instruction(),
+            ],
+            {
+              basePriorityFee: BASE_PRIORITY_FEE,
+            }
+          );
         } catch (err: any) {
           errors.push(`Failed to issue hst pool: ${err}`);
         }
@@ -171,39 +205,38 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
       (m) => m.account.fanout.equals(fanoutK)
     );
 
-    await Promise.all(
-      chunks(members, 100).map(async (chunk) => {
-        await Promise.all(
-          chunk.map(async (member) => {
-            const mint = member.account.mint;
-            const owners = await provider.connection.getTokenLargestAccounts(
-              mint
-            );
-            const owner = (
-              await getAccount(provider.connection, owners.value[0].address)
-            ).owner;
+    const instructions = (
+      await Promise.all(
+        members.map(async (member) => {
+          const mint = member.account.mint;
+          const owners = await provider.connection.getTokenLargestAccounts(
+            mint
+          );
+          const owner = (
+            await getAccount(provider.connection, owners.value[0].address)
+          ).owner;
 
-            try {
-              await sendInstructionsWithPriorityFee(provider, [
-                await hydraProgram.methods
-                  .distributeV0()
-                  .accounts({
-                    payer: provider.wallet.publicKey,
-                    fanout: fanoutK,
-                    owner,
-                    mint,
-                  })
-                  .instruction(),
-              ]);
-            } catch (err: any) {
-              errors.push(
-                `Failed to distribute hst for ${mint.toBase58()}: ${err}`
-              );
-            }
-          })
-        );
-      })
-    );
+          try {
+            return await hydraProgram.methods
+              .distributeV0()
+              .accounts({
+                payer: provider.wallet.publicKey,
+                fanout: fanoutK,
+                owner,
+                mint,
+              })
+              .instruction();
+          } catch (err: any) {
+            errors.push(
+              `Failed to distribute hst for ${mint.toBase58()}: ${err}`
+            );
+          }
+        })
+      )
+    ).filter(truthy);
+    await batchParallelInstructionsWithPriorityFee(provider, instructions, {
+      basePriorityFee: BASE_PRIORITY_FEE,
+    });
 
     // distribute iot operations fund
     const hemProgram = await initHem(provider);
@@ -221,7 +254,9 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
         mint: assetId,
       });
 
-      await sendInstructions(provider, [await method.instruction()]);
+      await sendInstructionsWithPriorityFee(provider, [await method.instruction()], {
+        basePriorityFee: BASE_PRIORITY_FEE
+      });
     }
 
     const rewards = await client.getCurrentRewards(
@@ -313,7 +348,9 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
                 lazyDistributor,
                 mint: assetId,
               });
-            await sendInstructions(provider, [await method.instruction()]);
+            await sendInstructionsWithPriorityFee(provider, [await method.instruction()], { 
+              basePriorityFee: BASE_PRIORITY_FEE
+            });
           }
 
           const rewards = await client.getCurrentRewards(
@@ -361,3 +398,8 @@ const MAX_CLAIM_AMOUNT = new BN("207020547945205");
     process.exit(1);
   }
 })();
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
