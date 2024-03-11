@@ -61,12 +61,14 @@ export async function sendInstructionsWithPriorityFee(
     commitment = "confirmed",
     idlErrors = new Map(),
     computeUnitLimit = 200000,
+    basePriorityFee = 1,
   }: {
     signers?: Signer[];
     payer?: PublicKey;
     commitment?: Commitment;
     idlErrors?: Map<number, string>;
     computeUnitLimit?: number;
+    basePriorityFee?: number;
   } = {}
 ): Promise<string> {
   return await sendInstructions(
@@ -76,7 +78,8 @@ export async function sendInstructionsWithPriorityFee(
       ComputeBudgetProgram.setComputeUnitPrice({
         microLamports: await estimatePrioritizationFee(
           provider.connection,
-          instructions
+          instructions,
+          basePriorityFee
         ),
       }),
       ...instructions,
