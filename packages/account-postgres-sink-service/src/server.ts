@@ -496,6 +496,7 @@ async function getMultipleAccounts({
     const batchKeys = keys.slice(i * batchSize, (i + 1) * batchSize);
     const batchResults = await connection.getMultipleAccountsInfo(batchKeys, {
       minContextSlot,
+      commitment: "finalized"
     });
     results.push(
       ...batchResults.map((account, i) => ({ account, pubkey: batchKeys[i] }))
