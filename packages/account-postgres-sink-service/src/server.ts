@@ -468,7 +468,7 @@ async function withRetries<A>(
       return await input();
     } catch (e) {
       console.log(`${new Date().toISOString()}: Retrying ${i}...`, e);
-      await sleep(1000);
+      await sleep(2000);
     }
   }
   throw new Error("Failed after retries");
@@ -496,7 +496,7 @@ async function getMultipleAccounts({
     const batchKeys = keys.slice(i * batchSize, (i + 1) * batchSize);
     const batchResults = await connection.getMultipleAccountsInfo(batchKeys, {
       minContextSlot,
-      commitment: "finalized"
+      commitment: "confirmed"
     });
     results.push(
       ...batchResults.map((account, i) => ({ account, pubkey: batchKeys[i] }))
