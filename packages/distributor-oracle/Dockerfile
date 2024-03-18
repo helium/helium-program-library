@@ -2,10 +2,12 @@ FROM node:18-alpine AS BUILD_IMAGE
 
 WORKDIR /usr/src/app
 
+RUN mkdir -p .yarn
+COPY .yarnrc.yml .yarnrc.yml
+COPY .yarn/releases .yarn/releases
 COPY package.json ./
 COPY yarn.deploy.lock ./
 
-RUN yarn set version 3.6.4
 ENV YARN_LOCKFILE_FILENAME=yarn.deploy.lock
 RUN yarn install
 
@@ -13,13 +15,13 @@ COPY src src
 COPY tsconfig.build.json tsconfig.json
 
 RUN yarn run build
-RUN npm prune --production
 
 FROM node:18-alpine
 
 WORKDIR /usr/src/app
 
 COPY --from=BUILD_IMAGE /usr/src/app/lib ./lib
+COPY --from=BUILD_IMAGE /usr/src/app/.yarn ./.yarn
 COPY --from=BUILD_IMAGE /usr/src/app/node_modules ./node_modules
 
 # This isn't actually used, service is read only. But anchor wants a wallet.
@@ -27,4 +29,4 @@ RUN echo "[124,96,181,146,132,165,175,182,60,194,167,230,29,91,110,109,226,38,41
 
 env ANCHOR_WALLET=/usr/src/app/id.json
 
-CMD ["node", "lib/src/server.js", "serve"]
+CMD ["yarn", "node", "lib/src/server.js", "serve"]

@@ -171,6 +171,7 @@ __metadata:
     "@solana/web3.js": ^1.78.4
     "@substreams/core": ^0.15.1
     "@types/bn.js": ^5.1.1
+    "@types/cron": ^2.4.0
     "@types/deep-equal": ^1.0.1
     "@types/lodash": ^4.14.195
     "@types/node": ^18.11.11
@@ -440,7 +441,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/cron@npm:^2.0.0":
+"@types/cron@npm:^2.0.0, @types/cron@npm:^2.4.0":
   version: 2.4.0
   resolution: "@types/cron@npm:2.4.0"
   dependencies:
