@@ -16,4 +16,4 @@ COPY tsconfig.build.json tsconfig.json
 
 RUN yarn run build
 
-CMD ["node", "lib/src/index.js"]
+CMD ["yarn", "node", "lib/src/index.js"]
