@@ -16,7 +16,7 @@
     "moduleResolution": "Node",
     "skipLibCheck": true,
     "baseUrl": ".",
-    "typeRoots": ["node_modules/@types"],
+    "types": ["node"],
     "strict": true,
     "noImplicitAny": false,
     "noEmitOnError": true,

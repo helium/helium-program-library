@@ -171,6 +171,7 @@ __metadata:
     "@solana/web3.js": ^1.78.4
     "@substreams/core": ^0.15.1
     "@types/bn.js": ^5.1.1
+    "@types/cron": ^2.4.0
     "@types/deep-equal": ^1.0.1
     "@types/lodash": ^4.14.195
     "@types/node": ^18.11.11
@@ -182,6 +183,7 @@ __metadata:
     bloom-filters: ^3.0.1
     bn.js: ^5.2.0
     bs58: ^4.0.1
+    cron: ^3.1.6
     deep-equal: ^2.2.2
     dotenv: ^16.3.1
     fastify: ^4.13.0
@@ -440,7 +442,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/cron@npm:^2.0.0":
+"@types/cron@npm:^2.0.0, @types/cron@npm:^2.4.0":
   version: 2.4.0
   resolution: "@types/cron@npm:2.4.0"
   dependencies:
@@ -1205,6 +1207,16 @@ __metadata:
     "@types/luxon": "npm:~3.3.0"
     luxon: "npm:~3.3.0"
   checksum: cb0ad49653b37ba125f8670ca92150ce515493512b1b8a5e08086d22bec9c54dc6d8926fcdb49ea5783f6699862ca5fdc532a440ce33c3228f9b3d565010db2f
+  languageName: node
+  linkType: hard
+
+"cron@npm:^3.1.6":
+  version: 3.1.6
+  resolution: "cron@npm:3.1.6"
+  dependencies:
+    "@types/luxon": ~3.3.0
+    luxon: ~3.4.0
+  checksum: e97bb6f85acf3195577c609f28bbac2e22812d8632802752a13591882deceeeeefd2c91c1293fb5102ef442f96ae17ca687854fd0b005149aae9a25834363e1d
   languageName: node
   linkType: hard
 
@@ -2455,6 +2467,13 @@ __metadata:
   version: 3.3.0
   resolution: "luxon@npm:3.3.0"
   checksum: 50cf17a0dc155c3dcacbeae8c0b7e80db425e0ba97b9cbdf12a7fc142d841ff1ab1560919f033af46240ed44e2f70c49f76e3422524c7fc8bb8d81ca47c66187
+  languageName: node
+  linkType: hard
+
+"luxon@npm:~3.4.0":
+  version: 3.4.4
+  resolution: "luxon@npm:3.4.4"
+  checksum: 36c1f99c4796ee4bfddf7dc94fa87815add43ebc44c8934c924946260a58512f0fd2743a629302885df7f35ccbd2d13f178c15df046d0e3b6eb71db178f1c60c
   languageName: node
   linkType: hard
 
