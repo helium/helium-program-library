@@ -265,21 +265,38 @@ export async function sus({
     acc[allAccounts[index].toBase58()] = account
     return acc
   }, {} as Record<string, AccountInfo<Buffer>>)
-  const { blockhash } = await connection?.getLatestBlockhash();
+  let { blockhash } = await connection?.getLatestBlockhash("finalized");
   const simulatedTxs: RpcResponseAndContext<SimulatedTransactionResponse>[] =
     [];
   // Linearly simulate txs so as not to hit rate limits
   for (const [index, transaction] of transactions.entries()) {
-    transaction.message.recentBlockhash = blockhash;
-    const simulatedTxn = await connection?.simulateTransaction(transaction, {
-      accounts: {
-        encoding: "base64",
-        addresses:
-          simulationAccountsByTx[index]?.map((account) => account.toBase58()) ||
-          [],
-      },
-    });
-    simulatedTxs.push(simulatedTxn);
+    let simulatedTxn: RpcResponseAndContext<SimulatedTransactionResponse> | null =
+      null;
+    let tries = 0;
+    // Retry until we stop getting blockhashNotFound
+    blockhashLoop: while (true) {
+      transaction.message.recentBlockhash = blockhash;
+      simulatedTxn = await connection.simulateTransaction(transaction, {
+        accounts: {
+          encoding: "base64",
+          addresses:
+            simulationAccountsByTx[index]?.map((account) =>
+              account.toBase58()
+            ) || [],
+        },
+      });
+      if (isBlockhashNotFound(simulatedTxn)) {
+        ({ blockhash } = await connection?.getLatestBlockhash("finalized"));
+        tries++
+        if (tries >= 5) {
+          simulatedTxs.push(simulatedTxn);
+          break blockhashLoop;
+        }
+      } else {
+        simulatedTxs.push(simulatedTxn);
+        break blockhashLoop;
+      }
+    }
   }
 
   const fullAccountsByTxn = simulationAccountsByTx.map(
@@ -608,6 +625,10 @@ export async function sus({
   }
 
   return results
+}
+
+function isBlockhashNotFound(simulatedTxn: RpcResponseAndContext<SimulatedTransactionResponse>): boolean {
+  return simulatedTxn?.value.err?.toString() === "BlockhashNotFound";
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
