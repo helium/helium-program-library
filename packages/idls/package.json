@@ -1,6 +1,6 @@
 {
   "name": "@helium/idls",
-  "version": "0.6.39",
+  "version": "0.6.40",
   "description": "Exported idls",
   "publishConfig": {
     "access": "public",
