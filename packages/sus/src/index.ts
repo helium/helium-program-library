@@ -472,7 +472,7 @@ export async function sus({
     const writableAccounts = writableAccountsByTx[index];
     const transaction = transactions[index];
 
-    const message = transaction.message.serialize().toString("base64");
+    const message = Buffer.from(transaction.message.serialize()).toString("base64");
     const explorerLink = `https://explorer.solana.com/tx/inspector?cluster=${cluster}&message=${encodeURIComponent(
       message
     )}`;
