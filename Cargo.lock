@@ -1360,7 +1360,9 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "data-credits",
  "default-env",
+ "pyth-sdk-solana",
  "shared-utils",
  "solana-security-txt",
 ]
