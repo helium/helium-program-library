@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 #[cfg(not(feature = "no-entrypoint"))]
 use {default_env::default_env, solana_security_txt::security_txt};
 
-declare_id!("fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6");
+declare_id!("dce4jeLBpfaFsNAKMAmVt5Py4E1R4mZcrVvMB5ejvGu");
 
 pub mod errors;
 pub mod instructions;
@@ -28,7 +28,7 @@ security_txt! {
 }
 
 #[program]
-pub mod dc_convesion_escrow {
+pub mod dc_conversion_escrow {
   use super::*;
 
   pub fn initialize_escrow_v0(

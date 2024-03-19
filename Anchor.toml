@@ -17,6 +17,7 @@ fanout = "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6"
 mobile_entity_manager = "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr"
 hexboosting = "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ"
 no_emit = "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv"
+dc_conversion_escrow = "dce4jeLBpfaFsNAKMAmVt5Py4E1R4mZcrVvMB5ejvGu"
 
 [workspace]
 members = [
@@ -34,6 +35,7 @@ members = [
   "programs/mobile-entity-manager",
   "programs/hexboosting",
   "programs/no-emit",
+  "programs/dc-conversion-escrow",
 ]
 
 [registry]

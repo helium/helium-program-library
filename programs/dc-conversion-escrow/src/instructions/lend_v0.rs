@@ -1,5 +1,4 @@
 use std::ops::Div;
-use std::str::FromStr;
 
 use crate::errors::ErrorCode;
 use crate::{escrow_seeds, ConversionEscrowV0};
@@ -8,9 +7,7 @@ use anchor_lang::solana_program::sysvar;
 use anchor_lang::solana_program::sysvar::instructions::{
   load_current_index_checked, load_instruction_at_checked,
 };
-use anchor_spl::mint;
-use anchor_spl::token::{mint_to, Mint, MintTo, Token, TokenAccount};
-use data_credits::accounts::MintDataCreditsV0;
+use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
 use data_credits::{DataCreditsV0, MintDataCreditsArgsV0, TESTING};
 use pyth_sdk_solana::load_price_feed_from_account_info;
 
@@ -25,16 +22,16 @@ pub struct LendV0<'info> {
     has_one = mint,
     has_one = oracle,
     has_one = escrow,
+    has_one = data_credits,
   )]
   pub conversion_escrow: Box<Account<'info, ConversionEscrowV0>>,
+  #[account(mut)]
   pub escrow: Account<'info, TokenAccount>,
   /// CHECK: Checked via pyth
   pub oracle: UncheckedAccount<'info>,
   pub mint: Box<Account<'info, Mint>>,
   #[account(
     has_one = hnt_price_oracle,
-    // Ensure we're working with the canonical helium data credits
-    constraint = data_credits.dc_mint == Pubkey::from_str("dcuc8Amr83Wz27ZkQ2K9NS6r8zRpf1J6cvArEBDZDmm").unwrap()
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
 
@@ -42,6 +39,7 @@ pub struct LendV0<'info> {
   pub hnt_price_oracle: AccountInfo<'info>,
 
   #[account(
+    mut,
     token::mint = mint
   )]
   pub destination: Box<Account<'info, TokenAccount>>,
@@ -137,7 +135,7 @@ pub fn handler(ctx: Context<LendV0>, args: LendArgsV0) -> Result<()> {
           );
 
           let mint_dc_args: MintDataCreditsArgsV0 =
-            MintDataCreditsArgsV0::deserialize(&mut ix.data.as_slice()).unwrap();
+            MintDataCreditsArgsV0::deserialize(&mut &ix.data[8..]).unwrap();
           let hnt_amount = mint_dc_args
             .hnt_amount
             .ok_or_else(|| error!(ErrorCode::HntAmountRequired))?;
@@ -164,13 +162,13 @@ pub fn handler(ctx: Context<LendV0>, args: LendArgsV0) -> Result<()> {
   }
 
   // Send the loan
-  mint_to(
+  transfer(
     CpiContext::new_with_signer(
       ctx.accounts.token_program.to_account_info(),
-      MintTo {
-        mint: ctx.accounts.mint.to_account_info(),
+      Transfer {
+        from: ctx.accounts.escrow.to_account_info(),
         to: ctx.accounts.destination.to_account_info(),
-        authority: ctx.accounts.escrow.to_account_info(),
+        authority: ctx.accounts.conversion_escrow.to_account_info(),
       },
       &[escrow_seeds!(ctx.accounts.conversion_escrow)],
     ),
