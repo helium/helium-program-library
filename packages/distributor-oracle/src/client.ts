@@ -39,7 +39,10 @@ import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manage
 const HNT = process.env.HNT_MINT
   ? new PublicKey(process.env.HNT_MINT)
   : HNT_MINT;
-const DAO = daoKey(HNT)[0];
+
+const RECIPIENT_EXISTS_CU = 200000;
+const MISSING_RECIPIENT_CU = 400000;
+
 
 export type Reward = {
   currentRewards: string;
@@ -301,13 +304,14 @@ export async function formBulkTransactions({
     false
   );
   // construct the set and distribute ixs
-  let setAndDistributeIxs = await Promise.all(
+  const setAndDistributeIxs = await Promise.all(
     compressionAssetAccs.map(async (assetAcc, idx) => {
       const keyToAssetK = keyToAssets[idx]?.pubkey;
       const keyToAsset = keyToAssets[idx]?.info;
       if (!keyToAsset || !keyToAssetK) {
         return [];
       }
+      const inits = ixsPerAsset[idx];
       const entityKey = decodeEntityKey(
         keyToAsset.entityKey,
         keyToAsset.keySerialization
@@ -354,32 +358,28 @@ export async function formBulkTransactions({
       ).instruction();
       return await withPriorityFees({
         connection: provider.connection,
-        instructions: [...setRewardIxs, distributeIx],
-        computeUnits: 300000,
+        instructions: [...inits, ...setRewardIxs, distributeIx],
+        // Require more compute if init recipient
+        computeUnits:
+          inits.length > 0 ? MISSING_RECIPIENT_CU : RECIPIENT_EXISTS_CU,
         basePriorityFee,
       });
     })
   );
 
-  for (let i = 0; i < setAndDistributeIxs.length; i++) {
-    if (setAndDistributeIxs[i].length == 0) {
-      continue;
-    }
-    ixsPerAsset[i].push(...setAndDistributeIxs[i]);
-  }
-  // filter arrays where init recipient is the only ix
-  ixsPerAsset = ixsPerAsset.filter((x) => x.length > 1);
-
   let blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
 
   // unsigned txs
-  let initialTxs = ixsPerAsset.map((ixs) => {
-    const tx = new Transaction();
-    tx.recentBlockhash = blockhash;
-    tx.feePayer = payer;
-    tx.add(...ixs);
-    return tx;
-  });
+  let initialTxs = setAndDistributeIxs
+    // filter arrays where init recipient is the only ix
+    .filter((ix) => ix.length > 1)
+    .map((ixs) => {
+      const tx = new Transaction();
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = payer;
+      tx.add(...ixs);
+      return tx;
+    });
 
   // @ts-ignore
   const oracleUrls = lazyDistributorAcc.oracles.map((x: any) => x.url);
@@ -479,7 +479,8 @@ export async function formTransaction({
     true
   );
 
-  if (!(await provider.connection.getAccountInfo(recipient))) {
+  const recipientExists = await provider.connection.getAccountInfo(recipient);
+  if (!recipientExists) {
     let initRecipientIx;
     if (assetAcc.compression.compressed) {
       initRecipientIx = await (
@@ -525,7 +526,7 @@ export async function formTransaction({
   tx.add(
     ...(await withPriorityFees({
       connection: provider.connection,
-      computeUnits: 300000,
+      computeUnits: recipientExists ? RECIPIENT_EXISTS_CU : MISSING_RECIPIENT_CU,
       instructions: ixs,
       basePriorityFee,
     }))
