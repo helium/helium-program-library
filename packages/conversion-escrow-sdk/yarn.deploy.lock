@@ -72,9 +72,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/dc-conversion-escrow-sdk@workspace:.":
+"@helium/conversion-escrow-sdk@workspace:.":
   version: 0.0.0-use.local
-  resolution: "@helium/dc-conversion-escrow-sdk@workspace:."
+  resolution: "@helium/conversion-escrow-sdk@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.6.41

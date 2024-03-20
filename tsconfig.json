@@ -11,7 +11,7 @@
       "path": "./packages/sus"
     },
     {
-      "path": "./packages/dc-conversion-escrow-sdk"
+      "path": "./packages/conversion-escrow-sdk"
     },
     {
       "path": "./packages/hexboosting-sdk"

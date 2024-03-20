@@ -1,8 +1,8 @@
-import { DcConversionEscrow } from "@helium/idls/lib/types/dc_conversion_escrow";
+import { ConversionEscrow } from "@helium/idls/lib/types/conversion_escrow";
 import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
-import { dcConversionEscrowResolvers } from "./resolvers";
+import { conversionEscrowResolvers } from "./resolvers";
 
 
 export * from "./constants";
@@ -12,18 +12,18 @@ export async function init(
   provider: AnchorProvider,
   programId: PublicKey = PROGRAM_ID,
   idl?: Idl | null
-): Promise<Program<DcConversionEscrow>> {
+): Promise<Program<ConversionEscrow>> {
   if (!idl) {
     idl = await Program.fetchIdl(programId, provider);
   }
 
-  const dcConversionEscrow = new Program<DcConversionEscrow>(
-    idl as DcConversionEscrow,
+  const conversionEscrow = new Program<ConversionEscrow>(
+    idl as ConversionEscrow,
     programId,
     provider,
     undefined,
-    () => dcConversionEscrowResolvers
-  ) as Program<DcConversionEscrow>;
+    () => conversionEscrowResolvers
+  ) as Program<ConversionEscrow>;
 
-  return dcConversionEscrow;
+  return conversionEscrow;
 }

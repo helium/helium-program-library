@@ -4,7 +4,7 @@ import {
   heliumCommonResolver
 } from "@helium/anchor-resolvers";
 
-export const dcConversionEscrowResolvers = combineResolvers(
+export const conversionEscrowResolvers = combineResolvers(
   heliumCommonResolver,
   ataResolver({
     instruction: "initializeEscrowV0",

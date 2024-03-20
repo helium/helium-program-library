@@ -23,7 +23,7 @@ import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { LazyDistributor } from "../../target/types/lazy_distributor";
 import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
-import { DcConversionEscrow } from "../../target/types/dc_conversion_escrow";
+import { ConversionEscrow } from "../../target/types/conversion_escrow";
 
 const ANCHOR_PATH = process.env.ANCHOR_PATH || 'anchor'
 
@@ -286,15 +286,15 @@ export async function ensureHSDIdl(hsdProgram: Program<HeliumSubDaos>) {
   }
 }
 
-export async function ensureDcEscrowIdl(dcEscrowProgram: Program<DcConversionEscrow>) {
+export async function ensureDcEscrowIdl(dcEscrowProgram: Program<ConversionEscrow>) {
   try {
     execSync(
-      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/dc_conversion_escrow.json ${dcEscrowProgram.programId}`,
+      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/conversion_escrow.json ${dcEscrowProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   } catch {
     execSync(
-      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/dc_conversion_escrow.json ${dcEscrowProgram.programId}`,
+      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/conversion_escrow.json ${dcEscrowProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   }

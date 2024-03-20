@@ -13,7 +13,7 @@ pub use state::*;
 
 #[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
-  name: "DC Conversion Escrow",
+  name: "Conversion Escrow",
   project_url: "http://helium.com",
   contacts: "email:hello@helium.foundation",
   policy: "https://github.com/helium/helium-program-library/tree/master/SECURITY.md",
@@ -21,14 +21,14 @@ security_txt! {
 
   // Optional Fields
   preferred_languages: "en",
-  source_code: "https://github.com/helium/helium-program-library/tree/master/programs/dc-conversion-escrow",
+  source_code: "https://github.com/helium/helium-program-library/tree/master/programs/conversion-escrow",
   source_revision: default_env!("GITHUB_SHA", ""),
   source_release: default_env!("GITHUB_REF_NAME", ""),
   auditors: "Sec3"
 }
 
 #[program]
-pub mod dc_conversion_escrow {
+pub mod conversion_escrow {
   use super::*;
 
   pub fn initialize_escrow_v0(
