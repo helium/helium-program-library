@@ -7,6 +7,7 @@ pub struct ConversionEscrowV0 {
   pub mint: Pubkey,
   pub oracle: Pubkey,
   pub owner: Pubkey,
+  pub update_authority: Pubkey,
   pub targets: Vec<ConversionTargetV0>,
   pub bump_seed: u8,
 }

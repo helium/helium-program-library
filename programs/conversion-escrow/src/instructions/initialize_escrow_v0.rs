@@ -28,6 +28,8 @@ pub struct InitializeEscrowV0<'info> {
   pub payer: Signer<'info>,
   /// CHECK: The owner of this account. Can fully withdraw
   pub owner: Signer<'info>,
+  /// CHECK: The update authority
+  pub update_authority: AccountInfo<'info>,
   #[account(
     init,
     payer = payer,
@@ -68,6 +70,7 @@ pub fn handler(ctx: Context<InitializeEscrowV0>, args: InitializeEscrowArgsV0) -
         })
         .collect(),
       owner: ctx.accounts.owner.key(),
+      update_authority: ctx.accounts.update_authority.key(),
       bump_seed: ctx.bumps["conversion_escrow"],
     });
 

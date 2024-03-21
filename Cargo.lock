@@ -3877,6 +3877,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "slashing-conversion-escrow"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "default-env",
+ "shared-utils",
+ "solana-security-txt",
+]
+
+[[package]]
 name = "smallvec"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
