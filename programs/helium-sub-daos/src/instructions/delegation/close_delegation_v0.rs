@@ -75,7 +75,7 @@ pub struct CloseDelegationV0<'info> {
       &current_epoch(
         // Avoid passing an extra account if the end is 0 (no genesis on this position).
         // Pass instead closing time epoch info, txn account deduplication will reduce the overall tx size
-        if position.genesis_end <= registrar.clock_unix_timestamp() {
+        if position.genesis_end == 0 {
           position.lockup.end_ts
         } else {
           position.genesis_end
