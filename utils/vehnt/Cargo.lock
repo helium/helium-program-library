@@ -426,9 +426,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.70"
+version = "1.0.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7de8ce5e0f9f8d88245311066a578d72b7af3e7088f32783804676302df237e4"
+checksum = "0952808a6c2afd1aa8947271f3a60f1a6763c7b912d210184c5149b5cf147247"
 
 [[package]]
 name = "ark-bn254"
@@ -1964,7 +1964,7 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2574,9 +2574,9 @@ dependencies = [
 
 [[package]]
 name = "mpl-token-metadata"
-version = "3.1.0"
+version = "3.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "177204bbe7486b22ac35af2c91a82630f830a6ddd3392651aefde1ef346aba3d"
+checksum = "ba8ee05284d79b367ae8966d558e1a305a781fc80c9df51f37775169117ba64f"
 dependencies = [
  "borsh 0.10.3",
  "num-derive 0.3.3",
@@ -3090,7 +3090,7 @@ dependencies = [
 
 [[package]]
 name = "proposal"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "anchor-gen",
  "anchor-lang",
@@ -4596,7 +4596,7 @@ dependencies = [
 [[package]]
 name = "spl-governance"
 version = "3.1.1"
-source = "git+https://github.com/solana-labs/solana-program-library.git#7492e38b8577eef4defb5d02caadf82162887c68"
+source = "git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e#0377e6452fef0c84148e2d4de6bef08dac7ca16e"
 dependencies = [
  "arrayref",
  "bincode",
@@ -4615,7 +4615,7 @@ dependencies = [
 [[package]]
 name = "spl-governance-addin-api"
 version = "0.1.3"
-source = "git+https://github.com/solana-labs/solana-program-library.git#7492e38b8577eef4defb5d02caadf82162887c68"
+source = "git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e#0377e6452fef0c84148e2d4de6bef08dac7ca16e"
 dependencies = [
  "borsh 0.10.3",
  "solana-program",
@@ -4625,7 +4625,7 @@ dependencies = [
 [[package]]
 name = "spl-governance-tools"
 version = "0.1.3"
-source = "git+https://github.com/solana-labs/solana-program-library.git#7492e38b8577eef4defb5d02caadf82162887c68"
+source = "git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e#0377e6452fef0c84148e2d4de6bef08dac7ca16e"
 dependencies = [
  "arrayref",
  "bincode",
@@ -4666,7 +4666,7 @@ dependencies = [
 [[package]]
 name = "spl-token"
 version = "4.0.0"
-source = "git+https://github.com/solana-labs/solana-program-library.git#7492e38b8577eef4defb5d02caadf82162887c68"
+source = "git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e#0377e6452fef0c84148e2d4de6bef08dac7ca16e"
 dependencies = [
  "arrayref",
  "bytemuck",
@@ -5283,7 +5283,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.2.1"
+version = "0.3.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

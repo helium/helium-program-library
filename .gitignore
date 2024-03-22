@@ -25,3 +25,4 @@ accounts
 !.yarn/plugins
 !.yarn/sdks
 !.yarn/versions
+!packages/docsite/src/data
