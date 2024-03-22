@@ -179,7 +179,9 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
 
   let genesis_end_is_closing = ctx.accounts.genesis_end_sub_dao_epoch_info.key()
     == ctx.accounts.closing_time_sub_dao_epoch_info.key();
-  if genesis_end_fall_rate_correction > 0 || genesis_end_vehnt_correction > 0 {
+  if position.genesis_end > curr_ts
+    && (genesis_end_fall_rate_correction > 0 || genesis_end_vehnt_correction > 0)
+  {
     // If the end account doesn't exist, init it. Otherwise just set the correcitons
     if !genesis_end_is_closing && ctx.accounts.genesis_end_sub_dao_epoch_info.data_len() == 0 {
       msg!("Genesis end doesn't exist, initting");
