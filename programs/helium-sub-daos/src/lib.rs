@@ -53,6 +53,13 @@ pub mod helium_sub_daos {
     update_sub_dao_v0::handler(ctx, args)
   }
 
+  pub fn temp_update_sub_dao_epoch_info(
+    ctx: Context<TempUpdateSubDaoEpochInfo>,
+    args: TempUpdateSubDaoEpochInfoArgs,
+  ) -> Result<()> {
+    temp_update_sub_dao_epoch_info::handler(ctx, args)
+  }
+
   pub fn update_sub_dao_vehnt_v0(
     ctx: Context<UpdateSubDaoVeHntV0>,
     args: UpdateSubDaoVeHntArgsV0,
