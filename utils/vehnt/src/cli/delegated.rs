@@ -12,7 +12,7 @@ use anchor_lang::AccountDeserialize;
 use solana_account_decoder::UiAccountEncoding;
 use solana_client::{
   nonblocking::rpc_client::RpcClient,
-  rpc_config::RpcProgramAccountsConfig,
+  rpc_config::{RpcProgramAccountsConfig, RpcSendTransactionConfig},
   rpc_filter::{Memcmp, RpcFilterType},
 };
 use solana_program::system_program;
@@ -374,13 +374,20 @@ impl Delegated {
                     blockhash,
                   );
                   let res = rpc_client
-                    .send_and_confirm_transaction_with_spinner_and_commitment(
+                    .send_and_confirm_transaction_with_spinner_and_config(
                       &transaction,
                       CommitmentConfig::confirmed(),
+                      RpcSendTransactionConfig {
+                        skip_preflight: true,
+                        ..RpcSendTransactionConfig::default()
+                      },
                     )
                     .await;
                   if res.is_ok() {
+                    println!("Success {}", res.unwrap());
                     break;
+                  } else {
+                    println!("Err {}", res.err().unwrap());
                   }
                 }
               }
