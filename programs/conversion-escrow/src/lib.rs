@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 #[cfg(not(feature = "no-entrypoint"))]
 use {default_env::default_env, solana_security_txt::security_txt};
 
-declare_id!("dce4jeLBpfaFsNAKMAmVt5Py4E1R4mZcrVvMB5ejvGu");
+declare_id!("cnvEguKeWyyWnKxoQ9HwrzEVfztqKjwNmerDvxdHK9w");
 
 pub mod errors;
 pub mod instructions;
@@ -41,5 +41,9 @@ pub mod conversion_escrow {
   /// Lends funds to the lendee, assuming they repay in enough data credits to `owner` DC account
   pub fn lend_v0(ctx: Context<LendV0>, args: LendArgsV0) -> Result<()> {
     instructions::lend_v0::handler(ctx, args)
+  }
+
+  pub fn check_repay_v0(ctx: Context<CheckRepayV0>) -> Result<()> {
+    instructions::check_repay_v0::handler(ctx)
   }
 }

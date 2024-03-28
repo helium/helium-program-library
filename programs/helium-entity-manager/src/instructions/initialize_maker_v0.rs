@@ -166,6 +166,7 @@ pub fn handler(ctx: Context<InitializeMakerV0>, args: InitializeMakerArgsV0) -> 
     bump_seed: ctx.bumps["maker"],
     collection_bump_seed: ctx.bumps["collection"],
     dao: ctx.accounts.dao.key(),
+    expected_onboard_amount: 0,
   });
 
   Ok(())

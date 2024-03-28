@@ -63,15 +63,17 @@ pub fn handler(ctx: Context<InitializeEscrowV0>, args: InitializeEscrowArgsV0) -
         .targets
         .iter()
         .map(|t| ConversionTargetV0 {
-          reserverd: [0; 8],
+          reserved: [0; 8],
           mint: t.mint,
           oracle: t.oracle,
-          slipage_bps: t.slippage_bps,
+          slippage_bps: t.slippage_bps,
         })
         .collect(),
       owner: ctx.accounts.owner.key(),
       update_authority: ctx.accounts.update_authority.key(),
       bump_seed: ctx.bumps["conversion_escrow"],
+      temp_repay_balance: 0,
+      temp_expected_repay: 0,
     });
 
   Ok(())

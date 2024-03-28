@@ -36,3 +36,5 @@ solana-security-txt = { workspace = true }
 default-env = { workspace = true }
 no-emit = { workspace = true }
 pyth-sdk-solana = { version = "0.8.0" }
+conversion-escrow = { path = "../conversion-escrow", features = ["cpi"] }
+circuit-breaker = { workspace = true }

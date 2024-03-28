@@ -10,8 +10,9 @@ pub enum ErrorCode {
   #[msg("Incorrect repayment destination")]
   IncorrectDestination,
   MissingRepay,
+  InsufficientRepayAmount,
   PythPriceNotFound,
   ArithmeticError,
-  IncorrectDc,
-  HntAmountRequired,
+  IncorrectRepaymentMint,
+  IncorrectRepaymentOwner,
 }

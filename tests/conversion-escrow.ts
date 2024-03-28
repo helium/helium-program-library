@@ -12,7 +12,7 @@ import { expect } from "chai";
 import { init } from "../packages/conversion-escrow-sdk/src";
 import { PROGRAM_ID } from "../packages/conversion-escrow-sdk/src/constants";
 import { ConversionEscrow } from "../target/types/conversion_escrow";
-import { ensureDcEscrowIdl } from "./utils/fixtures";
+import { ensureConversionEscrowIdl as ensureConversionEscrowIdl } from "./utils/fixtures";
 
 describe("conversion-escrow", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -51,7 +51,7 @@ describe("conversion-escrow", () => {
     let conversionEscrow: PublicKey | undefined;
 
     beforeEach(async () => {
-      await ensureDcEscrowIdl(program);
+      await ensureConversionEscrowIdl(program);
 
       ({
         pubkeys: { conversionEscrow },
@@ -71,6 +71,7 @@ describe("conversion-escrow", () => {
           owner: me,
           payer: me,
           mint: mobileMint,
+          updateAuthority: me
         })
         .rpcAndKeys({ skipPreflight: true }));
 
@@ -142,6 +143,13 @@ describe("conversion-escrow", () => {
           hntHolder.publicKey,
           BigInt(toBN(hntPerMobile * 5000, 8).toString())
         ),
+        await program.methods
+          .checkRepayV0()
+          .accounts({
+            conversionEscrow,
+            repayAccount: getAssociatedTokenAddressSync(hntMint, me),
+          })
+          .instruction(),
       ];
 
       await sendInstructions(provider, instructions, [hntHolder]);

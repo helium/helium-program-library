@@ -286,7 +286,7 @@ export async function ensureHSDIdl(hsdProgram: Program<HeliumSubDaos>) {
   }
 }
 
-export async function ensureDcEscrowIdl(dcEscrowProgram: Program<ConversionEscrow>) {
+export async function ensureConversionEscrowIdl(dcEscrowProgram: Program<ConversionEscrow>) {
   try {
     execSync(
       `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/conversion_escrow.json ${dcEscrowProgram.programId}`,

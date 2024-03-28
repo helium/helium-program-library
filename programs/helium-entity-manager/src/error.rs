@@ -56,4 +56,10 @@ pub enum ErrorCode {
 
   #[msg("Arithmetic error")]
   ArithmeticError,
+
+  #[msg("Cannot accept a maker loan without an onboard")]
+  MissingOnboard,
+
+  #[msg("Too much was borrowed from the maker for this txn")]
+  TooMuchBorrowed,
 }

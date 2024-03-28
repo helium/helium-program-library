@@ -9,6 +9,10 @@ pub struct ConversionEscrowV0 {
   pub owner: Pubkey,
   pub update_authority: Pubkey,
   pub targets: Vec<ConversionTargetV0>,
+  /// Temporarily records the balance of the repay account to check if it has been repaid
+  pub temp_repay_balance: u64,
+  /// Temporarily records the amount we expect to be repaid
+  pub temp_expected_repay: u64,
   pub bump_seed: u8,
 }
 
@@ -17,8 +21,8 @@ pub struct ConversionTargetV0 {
   pub mint: Pubkey,
   pub oracle: Pubkey,
   /// How much slippage to allow from the oracle price
-  pub slipage_bps: u16,
-  pub reserverd: [u64; 8],
+  pub slippage_bps: u16,
+  pub reserved: [u64; 8],
 }
 
 #[macro_export]

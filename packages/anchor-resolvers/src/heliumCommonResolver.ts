@@ -4,6 +4,10 @@ import { resolveIndividual } from "./individual";
 
 export const heliumCommonResolver = resolveIndividual(async ({ path }) => {
   switch (path[path.length - 1]) {
+    case "conversionEscrowProgram":
+      return new PublicKey("cnvEguKeWyyWnKxoQ9HwrzEVfztqKjwNmerDvxdHK9w");
+    case "circuitBreakerProgram":
+      return new PublicKey("circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g");
     case "dataCreditsProgram":
       return new PublicKey("credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT");
     case "tokenMetadataProgram":

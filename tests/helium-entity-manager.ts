@@ -3,25 +3,37 @@ import { Program } from "@coral-xyz/anchor";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
+import { init as initConversionEscrow } from "@helium/conversion-escrow-sdk";
 import { notEmittedKey, init as initBurn } from "@helium/no-emit-sdk";
 import {
   Asset,
   AssetProof,
+  HELIUM_COMMON_LUT,
+  HNT_PYTH_PRICE_FEED,
+  MOBILE_PYTH_PRICE_FEED,
+  USDC_PYTH_PRICE_FEED,
   createAtaAndMint,
   createMint,
   createMintInstructions,
   proofArgsAndAccounts,
   sendInstructions,
   toBN,
+  toVersionedTx,
 } from "@helium/spl-utils";
 import { AddGatewayV1 } from "@helium/transactions";
-import { getAssociatedTokenAddressSync, getAccount } from "@solana/spl-token";
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  createTransferInstruction,
+  getAssociatedTokenAddressSync,
+  getAccount,
+} from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
+  Connection,
 } from "@solana/web3.js";
 import chai from "chai";
 import {
@@ -47,6 +59,7 @@ import {
   initTestMaker,
   initTestRewardableEntityConfig,
   MAKER_STAKING_FEE,
+  ensureConversionEscrowIdl,
 } from "./utils/fixtures";
 // @ts-ignore
 import bs58 from "bs58";
@@ -65,7 +78,10 @@ import { BN } from "bn.js";
 import chaiAsPromised from "chai-as-promised";
 import { createMockCompression } from "./utils/compression";
 import { loadKeypair } from "./utils/solana";
-import { keyToAssetKey } from "@helium/helium-entity-manager-sdk";
+import { keyToAssetKey, payMobileVoucherDc, payMobileVoucherMobile } from "@helium/helium-entity-manager-sdk";
+import { program } from "@coral-xyz/anchor/dist/cjs/native/system";
+import { ConversionEscrow } from "../target/types/conversion_escrow";
+import { parsePriceData } from "@pythnetwork/client";
 
 chai.use(chaiAsPromised);
 
@@ -75,6 +91,7 @@ describe("helium-entity-manager", () => {
   let dcProgram: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
   let hemProgram: Program<HeliumEntityManager>;
+  let conversionEscrowProgram: Program<ConversionEscrow>;
   let noEmitProgram: Program<NoEmit>;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
@@ -83,9 +100,16 @@ describe("helium-entity-manager", () => {
   let dao: PublicKey;
   let subDao: PublicKey;
   let dcMint: PublicKey;
+  let hntMint: PublicKey;
+  let dntMint: PublicKey;
   let activeDeviceAuthority: Keypair;
 
   beforeEach(async () => {
+    conversionEscrowProgram = await initConversionEscrow(
+      provider,
+      anchor.workspace.ConversionEscrow.programId,
+      anchor.workspace.ConversionEscrow.idl
+    );
     dcProgram = await initDataCredits(
       provider,
       anchor.workspace.DataCredits.programId,
@@ -115,17 +139,22 @@ describe("helium-entity-manager", () => {
     );
     await ensureHEMIdl(hemProgram);
 
-    const dataCredits = await initTestDataCredits(dcProgram, provider);
+    const dataCredits = await initTestDataCredits(
+      dcProgram,
+      provider,
+      100000000000
+    );
     dcMint = dataCredits.dcMint;
-    ({ dao } = await initTestDao(
+    ({ dao, mint: hntMint } = await initTestDao(
       hsdProgram,
       provider,
       100,
       me,
-      dataCredits.dcMint
+      dataCredits.dcMint,
+      dataCredits.hntMint,
     ));
     activeDeviceAuthority = Keypair.generate();
-    ({ subDao } = await initTestSubdao({
+    ({ subDao, mint: dntMint } = await initTestSubdao({
       hsdProgram,
       provider,
       authority: me,
@@ -659,6 +688,263 @@ describe("helium-entity-manager", () => {
       );
       await provider.connection.confirmTransaction(sig);
     });
+
+    describe("with voucher", async () => {
+      let mobileHotspotVoucher: PublicKey | undefined;
+      let conversionEscrow: PublicKey | undefined;
+      let usdcMint: PublicKey;
+      const slippageBps = 5;
+
+      beforeEach(async () => {
+        await ensureConversionEscrowIdl(conversionEscrowProgram);
+        usdcMint = await createMint(provider, 6, me, me);
+
+        ({
+          pubkeys: { conversionEscrow },
+        } = await hemProgram.methods
+          .initializeMakerEscrowV0({
+            oracle: USDC_PYTH_PRICE_FEED,
+            // Slippage can be super low since price isn't changing.
+            targets: [
+              {
+                mint: dntMint,
+                slippageBps,
+                oracle: MOBILE_PYTH_PRICE_FEED,
+              },
+              {
+                mint: hntMint,
+                slippageBps,
+                oracle: HNT_PYTH_PRICE_FEED,
+              },
+            ],
+          })
+          .accounts({
+            maker,
+            payer: me,
+            mint: usdcMint,
+            updateAuthority: makerKeypair.publicKey,
+          })
+          .signers([makerKeypair])
+          .rpcAndKeys({ skipPreflight: true }));
+
+        // Populate the escrow
+        await createAtaAndMint(
+          provider,
+          usdcMint,
+          toBN(1000000, 6).toNumber(),
+          conversionEscrow
+        );
+
+        ({
+          pubkeys: { mobileHotspotVoucher },
+        } = await hemProgram.methods
+          .initializeMobileHotspotVoucherV0({
+            entityKey: Buffer.from(bs58.decode(ecc)),
+            keySerialization: { b58: {} },
+            deviceType: { wifiOutdoor: {} },
+          })
+          .accounts({
+            maker,
+            rewardableEntityConfig,
+            issuingAuthority: makerKeypair.publicKey,
+          })
+          .signers([makerKeypair])
+          .rpcAndKeys({ skipPreflight: true }));
+        await hemProgram.methods
+          .mobileVoucherVerifyOwnerV0()
+          .accounts({
+            verifiedOwner: me,
+            eccVerifier: eccVerifier.publicKey,
+            mobileHotspotVoucher,
+          })
+          .signers([eccVerifier])
+          .rpc({ skipPreflight: true });
+      });
+
+      it("allows paying mobile", async () => {
+        const makerDntAccount = getAssociatedTokenAddressSync(dntMint, maker, true);
+        const pythDataMobile = (await provider.connection.getAccountInfo(
+          MOBILE_PYTH_PRICE_FEED
+        ))!.data;
+        const priceMobile = parsePriceData(pythDataMobile);
+
+        const usdPerMobile =
+          priceMobile.emaPrice.value - priceMobile.emaConfidence!.value * 2;
+        const mobileAmount = toBN(20 / usdPerMobile, 6);
+        const myUsdcAccount = getAssociatedTokenAddressSync(usdcMint, me);
+        const instructions = [
+          createAssociatedTokenAccountIdempotentInstruction(
+            me,
+            myUsdcAccount,
+            me,
+            usdcMint
+          ),
+          await hemProgram.methods
+            .makerLendV0({
+              amount: toBN(20, 6),
+            })
+            .accounts({
+              maker,
+              targetOracle: MOBILE_PYTH_PRICE_FEED,
+              conversionEscrow,
+              destination: myUsdcAccount,
+              repayAccount: makerDntAccount,
+              usdcMint,
+            })
+            .instruction(),
+          // Repay
+          createAssociatedTokenAccountIdempotentInstruction(
+            me,
+            makerDntAccount,
+            maker,
+            dntMint
+          ),
+          createTransferInstruction(
+            getAssociatedTokenAddressSync(dntMint, me),
+            makerDntAccount,
+            me,
+            BigInt(mobileAmount.toString())
+          ),
+          await conversionEscrowProgram.methods
+            .checkRepayV0()
+            .accounts({
+              conversionEscrow,
+              repayAccount: makerDntAccount,
+            })
+            .instruction(),
+          await hemProgram.methods
+            .mobileVoucherPayMobileV0()
+            .accounts({
+              mobileHotspotVoucher,
+              dntPrice: MOBILE_PYTH_PRICE_FEED,
+            })
+            .instruction(),
+        ];
+        await sendInstructions(provider, instructions)
+        const voucher = await hemProgram.account.mobileHotspotVoucherV0.fetch(mobileHotspotVoucher!);
+        expect(voucher.paidMobile).to.be.true;
+      })
+
+      it("allows paying DC", async () => {
+        const makerHntAccount = getAssociatedTokenAddressSync(
+          hntMint,
+          maker,
+          true
+        );
+        const myUsdcAccount = getAssociatedTokenAddressSync(usdcMint, me);
+        const instructions = [
+          createAssociatedTokenAccountIdempotentInstruction(
+            me,
+            myUsdcAccount,
+            me,
+            usdcMint
+          ),
+          createAssociatedTokenAccountIdempotentInstruction(
+            me,
+            makerHntAccount,
+            maker,
+            hntMint
+          ),
+          await hemProgram.methods
+            .makerLendV0({
+              amount: toBN(10, 6),
+            })
+            .accounts({
+              maker,
+              targetOracle: HNT_PYTH_PRICE_FEED,
+              conversionEscrow,
+              destination: myUsdcAccount,
+              repayAccount: makerHntAccount,
+              usdcMint,
+            })
+            .instruction(),
+          // Repay in HNT
+          createTransferInstruction(
+            getAssociatedTokenAddressSync(hntMint, me),
+            makerHntAccount,
+            me,
+            BigInt(10000000000)
+          ),
+          await conversionEscrowProgram.methods
+            .checkRepayV0()
+            .accounts({
+              conversionEscrow,
+              repayAccount: makerHntAccount,
+            })
+            .instruction(),
+          await hemProgram.methods
+            .mobileVoucherPayDcV0()
+            .accounts({
+              mobileHotspotVoucher,
+            })
+            .instruction(),
+        ];
+        await sendInstructions(provider, instructions);
+        const voucher = await hemProgram.account.mobileHotspotVoucherV0.fetch(
+          mobileHotspotVoucher!
+        );
+        expect(voucher.paidDc).to.be.true;
+      });
+
+      it("fits a jupiter transaction in with flash lend mobile", async () => {
+        const { instructions, addressLookupTableAddresses } =
+          await payMobileVoucherMobile({
+            program: hemProgram,
+            ceProgram: conversionEscrowProgram,
+            mobileHotspotVoucher: mobileHotspotVoucher!,
+            verifiedOwner: me,
+            maker,
+            payer: me,
+          });
+        const tx = await toVersionedTx({
+          instructions: [
+            await hemProgram.methods
+              .mobileVoucherVerifyOwnerV0()
+              .accounts({
+                verifiedOwner: me,
+                eccVerifier: eccVerifier.publicKey,
+                mobileHotspotVoucher,
+              })
+              .instruction(),
+            ...instructions,
+          ],
+          addressLookupTableAddresses: [
+            ...addressLookupTableAddresses,
+            HELIUM_COMMON_LUT,
+          ],
+          connection: new Connection("https://api.mainnet-beta.solana.com"),
+          payer: me,
+        });
+        await tx.sign([eccVerifier]);
+        const signed = await provider.wallet.signTransaction(tx)
+        const serialized = signed.serialize();
+        expect(serialized.length).to.be.lessThan(1232);
+      })
+
+      it("fits a jupiter transaction in with flash lend dc", async () => {
+        const { instructions, addressLookupTableAddresses } =
+          await payMobileVoucherDc({
+            program: hemProgram,
+            ceProgram: conversionEscrowProgram,
+            mobileHotspotVoucher: mobileHotspotVoucher!,
+            verifiedOwner: me,
+            maker,
+            payer: me,
+          });
+        const tx = await toVersionedTx({
+          instructions,
+          addressLookupTableAddresses: [
+            ...addressLookupTableAddresses,
+            HELIUM_COMMON_LUT,
+          ],
+          connection: new Connection("https://api.mainnet-beta.solana.com"),
+          payer: me,
+        });
+        const signed = await provider.wallet.signTransaction(tx);
+        const serialized = signed.serialize();
+        expect(serialized.length).to.be.lessThan(1232);
+      });
+    })
 
     it("issues a mobile hotspot", async () => {
       await hemProgram.methods

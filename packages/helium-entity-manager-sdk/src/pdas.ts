@@ -145,6 +145,44 @@ export const keyToAssetKey = (
   return keyToAssetKeyRaw(dao, Buffer.from(hash, "hex"), programId);
 };
 
+export const mobileHotspotVoucherKeyRaw = (
+  rewardableEntityConfig: PublicKey,
+  hashedEntityKey: Buffer,
+  programId: PublicKey = PROGRAM_ID
+) => {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("mobile_hotspot_voucher", "utf-8"),
+      rewardableEntityConfig.toBuffer(),
+      hashedEntityKey,
+    ],
+    programId
+  );
+};
+
+export const mobileHotspotVoucherKey = (
+  rewardableEntityConfig: PublicKey,
+  entityKey: Buffer | string,
+  encoding: BufferEncoding | "b58" = "b58",
+  programId: PublicKey = PROGRAM_ID
+) => {
+  if (typeof entityKey === "string") {
+    if (encoding == "b58" || Address.isValid(entityKey)) {
+      entityKey = Buffer.from(bs58.decode(entityKey));
+    } else {
+      entityKey = Buffer.from(entityKey, encoding);
+    }
+  }
+  const hash = sha256(entityKey);
+
+  return mobileHotspotVoucherKeyRaw(
+    rewardableEntityConfig,
+    Buffer.from(hash, "hex"),
+    programId
+  );
+};
+
+
 export const iotInfoKey = (
   rewardableEntityConfig: PublicKey,
   entityKey: Buffer | string,

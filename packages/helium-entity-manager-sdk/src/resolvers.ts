@@ -10,7 +10,7 @@ import {
 } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { init } from "./init";
-import { iotInfoKey, keyToAssetKey, mobileInfoKey, programApprovalKey } from "./pdas";
+import { iotInfoKey, keyToAssetKey, mobileHotspotVoucherKey, mobileInfoKey, programApprovalKey } from "./pdas";
 import { notEmittedKey } from "@helium/no-emit-sdk";
 
 export const heliumEntityManagerResolvers = combineResolvers(
@@ -35,7 +35,10 @@ export const heliumEntityManagerResolvers = combineResolvers(
   }),
   resolveIndividual(async ({ path, provider }) => {
     if (path[path.length - 1] == "dntPrice") {
-      if (provider.connection.rpcEndpoint.includes("devnet") || provider.connection.rpcEndpoint.includes("test")) {
+      if (
+        provider.connection.rpcEndpoint.includes("devnet") ||
+        provider.connection.rpcEndpoint.includes("test")
+      ) {
         return new PublicKey("BmUdxoioVgoRTontomX8nBjWbnLevtxeuBYaLipP8GTQ");
       }
       return new PublicKey("JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5");
@@ -89,6 +92,17 @@ export const heliumEntityManagerResolvers = combineResolvers(
         await keyToAssetKey(
           accounts.dao as PublicKey,
           Buffer.from("not_emitted", "utf8")
+        )
+      )[0];
+    } else if (
+      path[path.length - 1] === "mobileHotspotVoucher" &&
+      accounts.rewardableEntityConfig
+    ) {
+      return (
+        await mobileHotspotVoucherKey(
+          accounts.rewardableEntityConfig as PublicKey,
+          args[args.length - 1].entityKey,
+          args[args.length - 1].keySerialization || "b58"
         )
       )[0];
     }
@@ -167,6 +181,12 @@ export const heliumEntityManagerResolvers = combineResolvers(
     owner: "hotspotOwner",
   }),
   ataResolver({
+    instruction: "mobileVoucherPayDcV0",
+    mint: "dcMint",
+    account: "dcBurner",
+    owner: "maker",
+  }),
+  ataResolver({
     account: "dcBurner",
     mint: "dcMint",
     owner: "dcFeePayer",
@@ -182,6 +202,24 @@ export const heliumEntityManagerResolvers = combineResolvers(
     mint: "dntMint",
     account: "dntBurner",
     owner: "payer",
+  }),
+  ataResolver({
+    instruction: "mobileVoucherPayMobileV0",
+    mint: "dntMint",
+    account: "dntBurner",
+    owner: "maker",
+  }),
+  ataResolver({
+    instruction: "initializeMakerEscrowV0",
+    mint: "mint",
+    account: "escrow",
+    owner: "conversionEscrow",
+  }),
+  ataResolver({
+    instruction: "mobileVoucherPayDcV0",
+    mint: "hntMint",
+    account: "burner",
+    owner: "maker",
   }),
   subDaoEpochInfoResolver
 );

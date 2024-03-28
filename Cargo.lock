@@ -1959,6 +1959,8 @@ dependencies = [
  "bs58 0.3.1",
  "bubblegum-cpi",
  "bytemuck",
+ "circuit-breaker",
+ "conversion-escrow",
  "data-credits",
  "default-env",
  "helium-sub-daos",

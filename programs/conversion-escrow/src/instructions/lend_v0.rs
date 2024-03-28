@@ -41,8 +41,8 @@ pub struct LendV0<'info> {
   )]
   pub destination: Box<Account<'info, TokenAccount>>,
   #[account(
-    constraint = conversion_escrow.targets.iter().find(|t| t.oracle == target_oracle.key()).unwrap().mint == repay_account.mint,
-    constraint = repay_account.owner == conversion_escrow.owner
+    constraint = conversion_escrow.targets.iter().find(|t| t.oracle == target_oracle.key()).unwrap().mint == repay_account.mint @ ErrorCode::IncorrectRepaymentMint,
+    constraint = repay_account.owner == conversion_escrow.owner @ ErrorCode::IncorrectRepaymentOwner
   )]
   pub repay_account: Box<Account<'info, TokenAccount>>,
   /// CHECK: check instructions account
@@ -126,30 +126,30 @@ pub fn handler(ctx: Context<LendV0>, args: LendArgsV0) -> Result<()> {
     .unwrap();
   let expected_repayment_amount_with_slippage = expected_repayment_amount
     - (expected_repayment_amount
-      .checked_mul(u64::from(target.slipage_bps))
+      .checked_mul(u64::from(target.slippage_bps))
       .unwrap()
       .checked_div(10000)
       .unwrap());
 
-  // make sure this isnt a cpi call
+  // Accounting for multiple flash loans in the same tx, just need to up the expected repay. Only set initial
+  // balance once.
+  if ctx.accounts.conversion_escrow.temp_repay_balance == 0 {
+    ctx.accounts.conversion_escrow.temp_repay_balance = ctx.accounts.repay_account.amount;
+  }
+  ctx.accounts.conversion_escrow.temp_expected_repay += expected_repayment_amount_with_slippage;
+
   let current_index = load_current_index_checked(&ixs)? as usize;
   // loop through instructions, looking for an equivalent mint dc to this borrow
   let mut index = current_index + 1; // jupiter swap
   loop {
     // get the next instruction, die if theres no more
     if let Ok(ix) = load_instruction_at_checked(index, &ixs) {
-      if ix.program_id == token::ID {
-        let transfer_data = match TokenInstruction::unpack(&ix.data)? {
-          TokenInstruction::Transfer { amount } => Some((amount, ix.accounts[1].pubkey)),
-          TokenInstruction::TransferChecked { amount, .. } => Some((amount, ix.accounts[2].pubkey)),
-          _ => None,
-        };
-
-        if let Some((amount, account)) = transfer_data {
-          if ctx.accounts.repay_account.key() == account {
-            require_gt!(amount, expected_repayment_amount_with_slippage);
-            break;
-          }
+      if ix.program_id == crate::id() {
+        if ix.data[0..8] == get_function_hash("global", "check_repay_v0")
+          && ix.accounts[0].pubkey == ctx.accounts.conversion_escrow.key()
+          && ix.accounts[1].pubkey == ctx.accounts.repay_account.key()
+        {
+          break;
         }
       }
     } else {
@@ -175,4 +175,12 @@ pub fn handler(ctx: Context<LendV0>, args: LendArgsV0) -> Result<()> {
   )?;
 
   Ok(())
+}
+
+pub fn get_function_hash(namespace: &str, name: &str) -> [u8; 8] {
+  let preimage = format!("{}:{}", namespace, name);
+  let mut sighash = [0u8; 8];
+  sighash
+    .copy_from_slice(&anchor_lang::solana_program::hash::hash(preimage.as_bytes()).to_bytes()[..8]);
+  sighash
 }
