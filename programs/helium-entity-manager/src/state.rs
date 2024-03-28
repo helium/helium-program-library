@@ -12,6 +12,32 @@ pub struct RewardableEntityConfigV0 {
   pub staking_requirement: u64,
 }
 
+#[account]
+#[derive(Default)]
+pub struct MobileHotspotVoucherV0 {
+  pub maker: Pubkey,
+  pub rewardable_entity_config: Pubkey,
+  pub entity_key: Vec<u8>,
+  pub bump_seed: u8,
+  pub key_serialization: KeySerialization,
+  pub device_type: MobileDeviceTypeV0,
+  pub paid_mobile: bool,
+  pub paid_dc: bool,
+  /// Maker key if not verified. Otherwise the verified owner of the hotspot
+  /// through the sig verifier.
+  pub verified_owner: Pubkey,
+}
+
+#[account]
+#[derive(Default)]
+pub struct IotHotspotVoucherV0 {
+  pub rewardable_entity_config: Pubkey,
+  pub entity_key: Vec<u8>,
+  pub bump_seed: u8,
+  pub key_serialization: KeySerialization,
+  pub paid_dc: bool,
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, PartialEq)]
 pub enum MobileDeviceTypeV0 {
   #[default]
@@ -144,6 +170,11 @@ pub struct MakerV0 {
   pub merkle_tree: Pubkey,
   pub collection_bump_seed: u8,
   pub dao: Pubkey,
+  // Outstanding loans in USDC. Used to check that the
+  // maker loan made is an appropriate amount during onboarding
+  // Given write locking on accounts, this should never be above what is actually
+  // used in the current tx
+  pub expected_onboard_amount: u64,
 }
 
 #[account]
@@ -242,6 +273,18 @@ pub const MOBILE_HOTSPOT_INFO_SIZE: usize = 8 +
     1 + // is active
     8 + // dc onboarding fee paid
     60; // pad
+
+#[macro_export]
+macro_rules! maker_seeds {
+  ( $maker:expr ) => {
+    &[
+      "maker".as_bytes(),
+      $maker.dao.as_ref(),
+      $maker.name.as_bytes(),
+      &[$maker.bump_seed],
+    ]
+  };
+}
 
 #[macro_export]
 macro_rules! data_only_config_seeds {

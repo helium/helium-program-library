@@ -180,4 +180,43 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     temp_standardize_entity::handler(ctx, args)
   }
+
+  pub fn maker_lend_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, MakerLendV0<'info>>,
+    args: MakerLendArgsV0,
+  ) -> Result<()> {
+    maker_lend_v0::handler(ctx, args)
+  }
+
+  pub fn mobile_voucher_pay_mobile_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, MobileVoucherPayMobileV0<'info>>,
+  ) -> Result<()> {
+    mobile_voucher_pay_mobile_v0::handler(ctx)
+  }
+
+  pub fn initialize_mobile_hotspot_voucher_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, InitializeMobileHotspotVoucherV0<'info>>,
+    args: InitializeMobileHotspotVoucherArgsV0,
+  ) -> Result<()> {
+    initialize_mobile_hotspot_voucher_v0::handler(ctx, args)
+  }
+
+  pub fn mobile_voucher_verify_owner_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, MobileVoucherVerifyOwnerV0<'info>>,
+  ) -> Result<()> {
+    mobile_voucher_verify_owner_v0::handler(ctx)
+  }
+
+  pub fn initialize_maker_escrow_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, InitializeMakerEscrowV0<'info>>,
+    args: InitializeMakerEscrowArgsV0,
+  ) -> Result<()> {
+    initialize_maker_escrow_v0::handler(ctx, args)
+  }
+
+  pub fn mobile_voucher_pay_dc_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, MobileVoucherPayDcV0<'info>>,
+  ) -> Result<()> {
+    mobile_voucher_pay_dc_v0::handler(ctx)
+  }
 }

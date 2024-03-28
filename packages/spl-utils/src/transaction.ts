@@ -1,5 +1,6 @@
 import { AnchorProvider, Program, Provider } from "@coral-xyz/anchor";
 import {
+  AddressLookupTableAccount,
   Commitment,
   ComputeBudgetProgram,
   Connection,
@@ -13,7 +14,9 @@ import {
   SimulatedTransactionResponse,
   Transaction,
   TransactionInstruction,
+  TransactionMessage,
   TransactionSignature,
+  VersionedTransaction,
   VersionedTransactionResponse,
 } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -39,6 +42,56 @@ async function promiseAllInOrder<T>(
 
   return ret;
 }
+
+
+export const getAddressLookupTableAccounts = async (
+  connection: Connection,
+  keys: PublicKey[]
+): Promise<AddressLookupTableAccount[]> => {
+  const addressLookupTableAccountInfos =
+    await connection.getMultipleAccountsInfo(
+      keys.map((key) => new PublicKey(key))
+    );
+
+  return addressLookupTableAccountInfos.reduce((acc, accountInfo, index) => {
+    const addressLookupTableAddress = keys[index];
+    if (accountInfo) {
+      const addressLookupTableAccount = new AddressLookupTableAccount({
+        key: addressLookupTableAddress,
+        state: AddressLookupTableAccount.deserialize(accountInfo.data),
+      });
+      acc.push(addressLookupTableAccount);
+    }
+
+    return acc;
+  }, new Array<AddressLookupTableAccount>());
+};
+
+export async function toVersionedTx({
+  instructions,
+  addressLookupTableAddresses,
+  payer,
+  connection,
+}: {
+  addressLookupTableAddresses: PublicKey[];
+  instructions: TransactionInstruction[];
+  payer: PublicKey;
+  connection: Connection;
+}): Promise<VersionedTransaction> {
+  const addressLookupTableAccounts: AddressLookupTableAccount[] = [];
+
+  addressLookupTableAccounts.push(
+    ...(await getAddressLookupTableAccounts(connection, addressLookupTableAddresses))
+  );
+
+  const blockhash = (await connection.getLatestBlockhash()).blockhash;
+  const messageV0 = new TransactionMessage({
+    payerKey: payer,
+    recentBlockhash: blockhash,
+    instructions
+  }).compileToV0Message(addressLookupTableAccounts);
+  return new VersionedTransaction(messageV0);
+};
 
 export interface InstructionResult<A> {
   instructions: TransactionInstruction[];

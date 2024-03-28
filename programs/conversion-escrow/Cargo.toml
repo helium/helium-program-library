@@ -1,0 +1,30 @@
+[package]
+name = "conversion-escrow"
+version = "0.0.1"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "conversion_escrow"
+
+[features]
+devnet = []
+no-genesis = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[profile.release]
+overflow-checks = true
+
+[dependencies]
+anchor-lang = { workspace = true }
+anchor-spl = { workspace = true }
+spl-token = "3.5.0"
+shared-utils = { workspace = true }
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }
+pyth-sdk-solana = { version = "0.8.0" }

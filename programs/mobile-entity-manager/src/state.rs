@@ -16,6 +16,23 @@ pub struct CarrierV0 {
   pub hexboost_authority: Pubkey,
 }
 
+pub struct HotspotConfigV0 {
+  pub sub_dao: Pubkey,
+  pub staking_requirement: u64,
+}
+
+pub struct HotspotVoucherV0 {
+  pub device_type: MobileDeviceTypeV0,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, PartialEq)]
+pub enum MobileDeviceTypeV0 {
+  #[default]
+  Cbrs,
+  WifiIndoor,
+  WifiOutdoor,
+}
+
 #[macro_export]
 macro_rules! carrier_seeds {
   ( $carrier:expr ) => {
