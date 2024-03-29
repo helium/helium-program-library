@@ -4,10 +4,10 @@ import {
   decodeEntityKey,
   init,
   init as initHem,
-  keyToAssetKey,
   keyToAssetForAsset,
+  keyToAssetKey,
 } from "@helium/helium-entity-manager-sdk";
-import { daoKey } from "@helium/helium-sub-daos-sdk";
+import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
 import {
@@ -19,22 +19,27 @@ import { init as initRewards } from "@helium/rewards-oracle-sdk";
 import {
   Asset,
   AssetProof,
+  HELIUM_COMMON_LUT,
+  HELIUM_COMMON_LUT_DEVNET,
   HNT_MINT,
+  batchInstructionsToTxsWithPriorityFee,
   getAsset,
-  getAssetProof,
   getAssetBatch,
+  getAssetProof,
   getAssetProofBatch,
+  populateMissingDraftInfo,
+  toVersionedTx,
   truthy,
-  withPriorityFees,
+  withPriorityFees
 } from "@helium/spl-utils";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
+  AddressLookupTableAccount,
   PublicKey,
-  Transaction,
   TransactionInstruction,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import axios from "axios";
-import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 
 const HNT = process.env.HNT_MINT
   ? new PublicKey(process.env.HNT_MINT)
@@ -42,7 +47,6 @@ const HNT = process.env.HNT_MINT
 
 const RECIPIENT_EXISTS_CU = 200000;
 const MISSING_RECIPIENT_CU = 400000;
-
 
 export type Reward = {
   currentRewards: string;
@@ -190,6 +194,7 @@ export async function formBulkTransactions({
   getAssetBatchFn = getAssetBatch,
   getAssetProofBatchFn = getAssetProofBatch,
   basePriorityFee,
+  isDevnet: isDevnetIn,
 }: {
   program: Program<LazyDistributor>;
   rewardsOracleProgram?: Program<RewardsOracle>;
@@ -213,11 +218,16 @@ export async function formBulkTransactions({
     url: string,
     assetIds: PublicKey[]
   ) => Promise<Record<string, AssetProof> | undefined>;
+  isDevnet?: boolean;
 }) {
   if (assets.length > 100) {
     throw new Error("Too many assets, max 100");
   }
   const provider = lazyDistributorProgram.provider as AnchorProvider;
+  const isDevnet =
+    isDevnetIn ||
+    provider.connection.rpcEndpoint.includes("test") ||
+    provider.connection.rpcEndpoint.includes("devnet");
 
   if (!rewardsOracleProgram) {
     rewardsOracleProgram = await initRewards(provider);
@@ -304,105 +314,99 @@ export async function formBulkTransactions({
     false
   );
   // construct the set and distribute ixs
-  const setAndDistributeIxs = await Promise.all(
-    compressionAssetAccs.map(async (assetAcc, idx) => {
-      const keyToAssetK = keyToAssets[idx]?.pubkey;
-      const keyToAsset = keyToAssets[idx]?.info;
-      if (!keyToAsset || !keyToAssetK) {
-        return [];
-      }
-      const inits = ixsPerAsset[idx];
-      const entityKey = decodeEntityKey(
-        keyToAsset.entityKey,
-        keyToAsset.keySerialization
-      )!;
-      const setRewardIxs = (
-        await Promise.all(
-          rewards.map(async (bulkRewards, oracleIdx) => {
-            if (!(entityKey in bulkRewards.currentRewards)) {
-              return null;
-            }
-            return await rewardsOracleProgram!.methods
-              .setCurrentRewardsWrapperV1({
-                currentRewards: new BN(bulkRewards.currentRewards[entityKey]),
-                oracleIndex: oracleIdx,
-              })
-              .accounts({
-                lazyDistributor,
-                recipient: recipientKeys[idx],
-                keyToAsset: keyToAssetK,
-                oracle: bulkRewards.oracleKey,
-              })
-              .instruction();
+  const setAndDistributeIxs = (
+    await Promise.all(
+      compressionAssetAccs.map(async (assetAcc, idx) => {
+        const keyToAssetK = keyToAssets[idx]?.pubkey;
+        const keyToAsset = keyToAssets[idx]?.info;
+        if (!keyToAsset || !keyToAssetK) {
+          return [];
+        }
+        const inits = ixsPerAsset[idx];
+        const entityKey = decodeEntityKey(
+          keyToAsset.entityKey,
+          keyToAsset.keySerialization
+        )!;
+        const setRewardIxs = (
+          await Promise.all(
+            rewards.map(async (bulkRewards, oracleIdx) => {
+              if (!(entityKey in bulkRewards.currentRewards)) {
+                return null;
+              }
+              return await rewardsOracleProgram!.methods
+                .setCurrentRewardsWrapperV1({
+                  currentRewards: new BN(bulkRewards.currentRewards[entityKey]),
+                  oracleIndex: oracleIdx,
+                })
+                .accounts({
+                  lazyDistributor,
+                  recipient: recipientKeys[idx],
+                  keyToAsset: keyToAssetK,
+                  oracle: bulkRewards.oracleKey,
+                })
+                .instruction();
+            })
+          )
+        ).filter(truthy);
+        if (setRewardIxs.length == 0) {
+          return [];
+        }
+        const distributeIx = await (
+          await distributeCompressionRewards({
+            program: lazyDistributorProgram,
+            assetId: assets![idx],
+            lazyDistributor,
+            rewardsMint: lazyDistributorAcc.rewardsMint!,
+            getAssetFn: () => Promise.resolve(assetAcc), // cache result so we don't hit again
+            getAssetProofFn: assetProofsById
+              ? () =>
+                  Promise.resolve(
+                    assetProofsById[compressionAssetAccs![idx].id.toBase58()]
+                  )
+              : undefined,
+            assetEndpoint,
           })
-        )
-      ).filter(truthy);
-      if (setRewardIxs.length == 0) {
+        ).instruction();
+        const ret = [...inits, ...setRewardIxs, distributeIx];
+        // filter arrays where init recipient is the only ix
+        if (ret.length > 1) {
+          return ret;
+        }
+
         return [];
-      }
-      const distributeIx = await (
-        await distributeCompressionRewards({
-          program: lazyDistributorProgram,
-          assetId: assets![idx],
-          lazyDistributor,
-          rewardsMint: lazyDistributorAcc.rewardsMint!,
-          getAssetFn: () => Promise.resolve(assetAcc), // cache result so we don't hit again
-          getAssetProofFn: assetProofsById
-            ? () =>
-                Promise.resolve(
-                  assetProofsById[compressionAssetAccs![idx].id.toBase58()]
-                )
-            : undefined,
-          assetEndpoint,
-        })
-      ).instruction();
-      return await withPriorityFees({
-        connection: provider.connection,
-        instructions: [...inits, ...setRewardIxs, distributeIx],
-        // Require more compute if init recipient
-        computeUnits:
-          inits.length > 0 ? MISSING_RECIPIENT_CU : RECIPIENT_EXISTS_CU,
-        basePriorityFee,
-      });
-    })
+      })
+    )
   );
 
-  let blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
-
   // unsigned txs
-  let initialTxs = setAndDistributeIxs
-    // filter arrays where init recipient is the only ix
-    .filter((ix) => ix.length > 1)
-    .map((ixs) => {
-      const tx = new Transaction();
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = payer;
-      tx.add(...ixs);
-      return tx;
+  const initialTxDrafts =
+    await batchInstructionsToTxsWithPriorityFee(provider, setAndDistributeIxs, {
+      basePriorityFee,
+      addressLookupTableAddresses: [
+        isDevnet ? HELIUM_COMMON_LUT_DEVNET : HELIUM_COMMON_LUT,
+      ],
     });
+  const initialTxs = initialTxDrafts.map(toVersionedTx);
 
   // @ts-ignore
   const oracleUrls = lazyDistributorAcc.oracles.map((x: any) => x.url);
 
   let serTxs = initialTxs.map((tx) => {
-    return tx.serialize({
-      requireAllSignatures: false,
-      verifySignatures: false,
-    });
+    return tx.serialize();
   });
   if (!skipOracleSign) {
     for (const oracle of oracleUrls) {
       const res = await axios.post(`${oracle}/bulk-sign`, {
-        transactions: serTxs.map((tx) => tx.toJSON().data),
+        transactions: serTxs.map((tx) => Buffer.from(tx).toJSON().data),
       });
       serTxs = res.data.transactions.map((x: any) => Buffer.from(x));
     }
   }
 
-  const finalTxs = serTxs.map((tx) => Transaction.from(tx));
+  const finalTxs = serTxs.map((tx) => VersionedTransaction.deserialize(tx));
   // Check instructions are the same
   finalTxs.forEach((finalTx, idx) => {
-    assertSameIxns(finalTx.instructions, initialTxs[idx].instructions);
+    assertSameTx(finalTx, initialTxs[idx], initialTxDrafts[0]?.addressLookupTables);
   });
 
   return finalTxs;
@@ -471,14 +475,13 @@ export async function formTransaction({
     ))!;
   const rewardsMint = lazyDistributorAcc.rewardsMint!;
 
-  let tx = new Transaction();
-
   const destinationAccount = await getAssociatedTokenAddress(
     rewardsMint,
     assetAcc.ownership.owner,
     true
   );
 
+  const instructions: TransactionInstruction[] = []
   const recipientExists = await provider.connection.getAccountInfo(recipient);
   if (!recipientExists) {
     let initRecipientIx;
@@ -505,7 +508,7 @@ export async function formTransaction({
         .instruction();
     }
 
-    tx.add(initRecipientIx);
+    instructions.push(initRecipientIx);
   }
 
   const ixPromises = rewards.map((x, idx) => {
@@ -523,7 +526,7 @@ export async function formTransaction({
       .instruction();
   });
   const ixs = await Promise.all(ixPromises);
-  tx.add(
+  instructions.push(
     ...(await withPriorityFees({
       connection: provider.connection,
       computeUnits: recipientExists ? RECIPIENT_EXISTS_CU : MISSING_RECIPIENT_CU,
@@ -531,12 +534,6 @@ export async function formTransaction({
       basePriorityFee,
     }))
   );
-
-  tx.recentBlockhash = (
-    await provider.connection.getLatestBlockhash()
-  ).blockhash;
-
-  tx.feePayer = payer ? payer : provider.wallet.publicKey;
 
   if (assetAcc.compression.compressed) {
     const distributeIx = await (
@@ -550,7 +547,7 @@ export async function formTransaction({
         payer,
       })
     ).instruction();
-    tx.add(distributeIx);
+    instructions.push(distributeIx);
   } else {
     const distributeIx = await lazyDistributorProgram.methods
       .distributeRewardsV0()
@@ -566,15 +563,18 @@ export async function formTransaction({
         },
       })
       .instruction();
-    tx.add(distributeIx);
+    instructions.push(distributeIx);
   }
+  const tx = toVersionedTx(
+    await populateMissingDraftInfo(provider.connection, {
+      instructions,
+      feePayer: payer ? payer : provider.wallet.publicKey,
+    })
+  );
   // @ts-ignore
   const oracleUrls = lazyDistributorAcc.oracles.map((x: any) => x.url);
 
-  let serTx = tx.serialize({
-    requireAllSignatures: false,
-    verifySignatures: false,
-  });
+  let serTx = tx.serialize();
   if (!skipOracleSign) {
     for (const oracle of oracleUrls) {
       const res = await axios.post(`${oracle}`, {
@@ -584,41 +584,62 @@ export async function formTransaction({
     }
   }
 
-  const finalTx = Transaction.from(serTx);
+  const finalTx = VersionedTransaction.deserialize(serTx);
   // Ensure the oracle didn't pull a fast one
-  assertSameIxns(finalTx.instructions, tx.instructions);
+  assertSameTx(finalTx, tx);
 
   return finalTx;
 }
 
-function assertSameIxns(
-  instructions: TransactionInstruction[],
-  instructions1: TransactionInstruction[]
+function assertSameTx(
+  tx: VersionedTransaction,
+  tx1: VersionedTransaction,
+  luts: AddressLookupTableAccount[] = []
 ) {
-  if (instructions.length !== instructions1.length) {
+  if (tx.message.compiledInstructions.length !== tx1.message.compiledInstructions.length) {
     throw new Error("Extra instructions added by oracle");
   }
 
-  instructions.forEach((instruction, idx) => {
-    const instruction1 = instructions1[idx];
+  tx.message.compiledInstructions.forEach((instruction, idx) => {
+    const instruction1 = tx1.message.compiledInstructions[idx];
     if (
-      instruction.programId.toBase58() !== instruction1.programId.toBase58()
+      instruction.programIdIndex !== instruction1.programIdIndex
     ) {
       throw new Error("Program id mismatch");
     }
-    if (!instruction.data.equals(instruction1.data)) {
+    if (!Buffer.from(instruction.data).equals(Buffer.from(instruction1.data))) {
       throw new Error("Instruction data mismatch");
     }
 
-    if (instruction.keys.length !== instruction1.keys.length) {
+    if (instruction.accountKeyIndexes.length !== instruction1.accountKeyIndexes.length) {
       throw new Error("Key length mismatch");
     }
 
-    instruction.keys.forEach((key, idx) => {
-      const key1 = instruction1.keys[idx];
-      if (key.pubkey.toBase58() !== key1.pubkey.toBase58()) {
+    instruction.accountKeyIndexes.forEach((key, idx) => {
+      const key1 = instruction1.accountKeyIndexes[idx];
+      if (key !== key1) {
         throw new Error("Key mismatch");
       }
     });
   });
+
+  const keys = tx.message
+    .getAccountKeys({ addressLookupTableAccounts: luts })
+    .keySegments()
+    .reduce((acc, cur) => acc.concat(cur), []);
+  const keys1 = tx1.message
+    .getAccountKeys({
+      addressLookupTableAccounts: luts,
+    })
+    .keySegments()
+    .reduce((acc, cur) => acc.concat(cur), []);;
+  if (keys1.length !== keys.length) {
+    throw new Error("Account keys do not match");
+  }
+
+  for (let i = 0; i < keys.length; i++) {
+    if (!keys[i].equals(keys1[i])) {
+      throw new Error("Account key mismatch");
+    }
+  }
 }

@@ -6,6 +6,7 @@ import {
   sendInstructions,
   sendInstructionsWithPriorityFee,
   toBN,
+  toVersionedTx,
 } from "@helium/spl-utils";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
@@ -149,25 +150,29 @@ export const useSplitPosition = () => {
           await onInstructions(instructions, [mintKeypair]);
         } else {
           const sigs = [mintKeypair];
-          const transactions = await batchInstructionsToTxsWithPriorityFee(
+          const drafts = await batchInstructionsToTxsWithPriorityFee(
             provider,
             instructions
           );
+          const transactions = drafts.map(toVersionedTx)
 
+          let i = 0;
           for (const tx of await provider.wallet.signAllTransactions(
             transactions
           )) {
+            const draft = drafts[i];
             sigs.forEach((sig) => {
               if (
-                tx.signatures.some((s) => s.publicKey.equals(sig.publicKey))
+                draft.signers?.some((s) => s.publicKey.equals(sig.publicKey))
               ) {
-                tx.partialSign(sig);
+                tx.sign([sig]);
               }
             });
 
+            i++
             await sendAndConfirmWithRetry(
               provider.connection,
-              tx.serialize(),
+              Buffer.from(tx.serialize()),
               {
                 skipPreflight: true,
               },

@@ -5,16 +5,15 @@ import {
   init as initLazy,
   lazyTransactionsKey,
 } from "@helium/lazy-transactions-sdk";
-import os from "os";
-import yargs from "yargs/yargs";
 import { bulkSendTransactions, chunks } from "@helium/spl-utils";
 import {
   Keypair,
   PublicKey,
   SystemProgram,
-  Transaction,
-  TransactionInstruction,
+  TransactionInstruction
 } from "@solana/web3.js";
+import os from "os";
+import yargs from "yargs/yargs";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -115,13 +114,14 @@ export async function run(args: any = process.argv) {
   }
 
   console.log(`${blocks.length} blocks to close`);
-  const txns = chunks(instructions, 10).map((chunk) => {
-    const tx = new Transaction({
-      feePayer: provider.wallet.publicKey,
-    });
-    tx.add(...chunk);
-    return tx;
-  });
+  const txns = await Promise.all(
+    chunks(instructions, 10).map(async (chunk) => {
+      return {
+        instructions: chunk,
+        feePayer: provider.wallet.publicKey,
+      };
+    })
+  );
 
   await bulkSendTransactions(provider, txns, (status) => {
     console.log(

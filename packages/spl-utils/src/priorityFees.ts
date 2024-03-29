@@ -1,10 +1,14 @@
 import {
+  AddressLookupTableAccount,
   ComputeBudgetProgram,
   Connection,
   PublicKey,
   RecentPrioritizationFees,
   TransactionInstruction,
+  VersionedTransaction,
 } from "@solana/web3.js";
+import { TransactionDraft, populateMissingDraftInfo } from "./draft";
+import { toVersionedTx } from "./transaction";
 
 const MAX_RECENT_PRIORITY_FEE_ACCOUNTS = 128;
 
@@ -86,18 +90,50 @@ export async function estimatePrioritizationFee(
   }
 }
 
+export const estimateComputeUnits = async (
+  connection: Connection,
+  tx: VersionedTransaction
+): Promise<number | undefined> => {
+  return (await connection.simulateTransaction(tx)).value.unitsConsumed;
+};
+
+
 export async function withPriorityFees({
   connection,
   computeUnits,
-  instructions,
-  basePriorityFee
+  instructions = [],
+  basePriorityFee,
+  computeScaleUp,
+  ...rest
 }: {
   connection: Connection;
-  computeUnits: number;
-  instructions: TransactionInstruction[];
+  computeUnits?: number;
   basePriorityFee?: number;
-}): Promise<TransactionInstruction[]> {
-  const estimate = await estimatePrioritizationFee(connection, instructions, basePriorityFee);
+  computeScaleUp?: number;
+} & Partial<TransactionDraft>): Promise<TransactionInstruction[]> {
+  if (!computeUnits && !rest.feePayer) {
+    throw new Error("Must provide feePayer if estimatingg compute units");
+  }
+
+  const estimate = await estimatePrioritizationFee(
+    connection,
+    instructions,
+    basePriorityFee
+  );
+  if (!computeUnits) {
+    const temp = {
+      instructions,
+      feePayer: rest.feePayer!,
+      ...rest,
+    };
+    const tx = await populateMissingDraftInfo(connection, temp);
+    const estimatedFee = await estimateComputeUnits(connection, toVersionedTx(tx));
+    if (estimatedFee) {
+      computeUnits = Math.ceil(estimatedFee * (computeScaleUp || 1.5));
+    } else {
+      computeUnits = 200000;
+    }
+  }
 
   return [
     ComputeBudgetProgram.setComputeUnitLimit({
