@@ -129,7 +129,7 @@ export async function withPriorityFees({
     const tx = await populateMissingDraftInfo(connection, temp);
     const estimatedFee = await estimateComputeUnits(connection, toVersionedTx(tx));
     if (estimatedFee) {
-      computeUnits = Math.ceil(estimatedFee * (computeScaleUp || 1.5));
+      computeUnits = Math.ceil(estimatedFee * (computeScaleUp || 1.1));
     } else {
       computeUnits = 200000;
     }
