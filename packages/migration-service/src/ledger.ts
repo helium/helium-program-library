@@ -5,6 +5,7 @@ import {
   getAssetProof,
   getAssetsByOwner,
   truthy,
+  toVersionedTx,
 } from "@helium/spl-utils";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import {
@@ -33,13 +34,14 @@ import {
   SystemProgram,
   Transaction,
   TransactionInstruction,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import { provider } from "./solana";
 
 export async function getMigrateTransactions(
   from: PublicKey,
   to: PublicKey
-): Promise<Transaction[]> {
+): Promise<VersionedTransaction[]> {
   const assetApiUrl =
     process.env.ASSET_API_URL || provider.connection.rpcEndpoint;
   const assets = await getAssetsByOwner(assetApiUrl, from.toBase58());
@@ -216,11 +218,11 @@ export async function getMigrateTransactions(
   ]);
 
   return await Promise.all(
-    transactions.map((tx) => {
-      // Do not remove this line. Fun fact, tx.signatures will be empty unless you do this once.
-      tx.serialize({ requireAllSignatures: false });
+    transactions.map(toVersionedTx).map((tx, i) => {
+      const draft = transactions[i];
+      tx.serialize();
       if (
-        tx.signatures.some((sig) =>
+        draft.signers?.some((sig) =>
           sig.publicKey.equals(provider.wallet.publicKey)
         )
       ) {

@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.7.0](https://github.com/helium/helium-program-library/compare/v0.6.42...v0.7.0) (2024-03-29)
+
+## Breaking
+
+  * Interfaces in spl-utils around transactions have changed to switch to `VersionedTransaction`. This allows for better transaction packing with loookup tables.
+
+
 ## [0.6.42](https://github.com/helium/helium-program-library/compare/v0.6.41...v0.6.42) (2024-03-19)
 
 **Note:** Version bump only for package helium-program-library

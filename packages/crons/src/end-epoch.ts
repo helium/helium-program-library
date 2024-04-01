@@ -295,7 +295,7 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
     try {
       await sendAndConfirmWithRetry(
         provider.connection,
-        signed.serialize(),
+        Buffer.from(signed.serialize()),
         { skipPreflight: true },
         "confirmed"
       );
@@ -369,7 +369,7 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
           const signed = await provider.wallet.signTransaction(tx);
           await sendAndConfirmWithRetry(
             provider.connection,
-            signed.serialize(),
+            Buffer.from(signed.serialize()),
             { skipPreflight: true },
             "confirmed"
           );

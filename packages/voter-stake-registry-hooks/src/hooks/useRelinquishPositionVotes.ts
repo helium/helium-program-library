@@ -105,14 +105,14 @@ export const useRelinquishPositionVotes = () => {
         if (onInstructions) {
           await onInstructions(instructions);
         } else {
-          await batchParallelInstructions(
+          await batchParallelInstructions({
             provider,
             instructions,
             onProgress,
-            10,
-            [],
+            triesRemaining: 10,
+            extraSigners: [],
             maxSignatureBatch
-          );
+          });
         }
       }
     }

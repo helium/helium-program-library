@@ -1,10 +1,12 @@
 import { AnchorProvider, Program, Provider } from "@coral-xyz/anchor";
 import {
+  AddressLookupTableAccount,
   Commitment,
   ComputeBudgetProgram,
   Connection,
   Finality,
   Keypair,
+  Message,
   PublicKey,
   RpcResponseAndContext,
   SendOptions,
@@ -13,12 +15,15 @@ import {
   SimulatedTransactionResponse,
   Transaction,
   TransactionInstruction,
+  TransactionMessage,
   TransactionSignature,
+  VersionedTransaction,
   VersionedTransactionResponse,
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
-import { estimatePrioritizationFee } from "./priorityFees";
+import { estimatePrioritizationFee, withPriorityFees } from "./priorityFees";
+import { TransactionDraft, populateMissingDraftInfo } from "./draft";
 
 export const chunks = <T>(array: T[], size: number): T[][] =>
   Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
@@ -38,6 +43,42 @@ async function promiseAllInOrder<T>(
   }
 
   return ret;
+}
+
+export const getAddressLookupTableAccounts = async (
+  connection: Connection,
+  keys: PublicKey[]
+): Promise<AddressLookupTableAccount[]> => {
+  if (keys.length == 0) {
+    return [];
+  }
+
+  const addressLookupTableAccountInfos =
+    await connection.getMultipleAccountsInfo(
+      keys.map((key) => new PublicKey(key))
+    );
+
+  return addressLookupTableAccountInfos.reduce((acc, accountInfo, index) => {
+    const addressLookupTableAddress = keys[index];
+    if (accountInfo) {
+      const addressLookupTableAccount = new AddressLookupTableAccount({
+        key: addressLookupTableAddress,
+        state: AddressLookupTableAccount.deserialize(accountInfo.data),
+      });
+      acc.push(addressLookupTableAccount);
+    }
+
+    return acc;
+  }, new Array<AddressLookupTableAccount>());
+};
+
+export function toVersionedTx(tx: TransactionDraft): VersionedTransaction {
+  const messageV0 = new TransactionMessage({
+    payerKey: tx.feePayer,
+    recentBlockhash: tx.recentBlockhash!,
+    instructions: tx.instructions,
+  }).compileToV0Message(tx.addressLookupTables!);
+  return new VersionedTransaction(messageV0);
 }
 
 export interface InstructionResult<A> {
@@ -517,7 +558,7 @@ export type Status = {
 const TX_BATCH_SIZE = 200;
 export async function bulkSendTransactions(
   provider: Provider,
-  txs: Transaction[],
+  txs: TransactionDraft[],
   onProgress?: (status: Status) => void,
   triesRemaining: number = 10, // Number of blockhashes to try resending txs with before giving up
   extraSigners: Keypair[] = [],
@@ -535,20 +576,28 @@ export async function bulkSendTransactions(
       );
       const blockhashedTxs = await Promise.all(
         chunk.map(async (tx) => {
-          tx.recentBlockhash = recentBlockhash.blockhash;
-          return tx;
+          await populateMissingDraftInfo(provider.connection, tx);
+          return toVersionedTx({
+            instructions: tx.instructions,
+            recentBlockhash: recentBlockhash.blockhash,
+            addressLookupTableAddresses: tx.addressLookupTableAddresses,
+            addressLookupTables: tx.addressLookupTables!,
+            feePayer: tx.feePayer,
+          });
         })
       );
       const signedTxs = (
         await (provider as AnchorProvider).wallet.signAllTransactions(
           blockhashedTxs
         )
-      ).map((tx) => {
+      ).map((tx, i) => {
         extraSigners.forEach((signer: Keypair) => {
           if (
-            tx.signatures.some((sig) => sig.publicKey.equals(signer.publicKey))
+            chunk[i].signers?.some((sig) =>
+              sig.publicKey.equals(signer.publicKey)
+            )
           ) {
-            tx.partialSign(signer);
+            tx.sign([signer]);
           }
         }, tx);
         return tx;
@@ -557,12 +606,12 @@ export async function bulkSendTransactions(
       const txsWithSigs = signedTxs.map((tx, index) => {
         return {
           transaction: chunk[index],
-          sig: bs58.encode(tx.signatures[0]!.signature!),
+          sig: bs58.encode(tx.signatures[0]),
         };
       });
       const confirmedTxs = await bulkSendRawTransactions(
         provider.connection,
-        signedTxs.map((s) => s.serialize()),
+        signedTxs.map((s) => Buffer.from(s.serialize())),
         ({ totalProgress, ...rest }) =>
           onProgress &&
           onProgress({
@@ -701,45 +750,54 @@ async function getAllTxns(
 }
 
 // Batch instructions parallel into as many txs as it takes
-export async function batchParallelInstructions(
-  provider: AnchorProvider,
-  instructions: TransactionInstruction[],
-  onProgress?: (status: Status) => void,
-  triesRemaining: number = 10, // Number of blockhashes to try resending txs with before giving up
-  extraSigners: Keypair[] = [],
-  maxSignatureBatch: number = TX_BATCH_SIZE
-): Promise<void> {
+export async function batchParallelInstructions({
+  provider,
+  instructions,
+  onProgress,
+  triesRemaining = 10,
+  extraSigners = [],
+  maxSignatureBatch = TX_BATCH_SIZE,
+  addressLookupTableAddresses = [],
+}: {
+  provider: AnchorProvider;
+  instructions: TransactionInstruction[];
+  onProgress?: (status: Status) => void;
+  triesRemaining?: number; // Number of blockhashes to try resending txs with before giving up
+  extraSigners?: Keypair[];
+  maxSignatureBatch?: number;
+  addressLookupTableAddresses?: PublicKey[];
+}): Promise<void> {
   let currentTxInstructions: TransactionInstruction[] = [];
   const blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
-  const transactions: Transaction[] = [];
+  const transactions: TransactionDraft[] = [];
+  const addressLookupTables = await getAddressLookupTableAccounts(
+    provider.connection,
+    addressLookupTableAddresses
+  );
 
   for (const instruction of instructions) {
     currentTxInstructions.push(instruction);
-    const tx = new Transaction({
+    const tx = await toVersionedTx({
       feePayer: provider.wallet.publicKey,
       recentBlockhash: blockhash,
+      instructions: currentTxInstructions,
+      addressLookupTableAddresses,
+      signers: extraSigners,
+      addressLookupTables,
     });
-    tx.add(...currentTxInstructions);
     try {
-      if (
-        tx.serialize({
-          requireAllSignatures: false,
-          verifySignatures: false,
-        }).length >=
-        1232 - (64 + 32) * tx.signatures.length
-      ) {
-        // yes it's ugly to throw and catch, but .serialize can _also_ throw this error
-        throw new Error("Transaction too large");
-      }
+      tx.serialize();
     } catch (e: any) {
-      if (e.toString().includes("Transaction too large")) {
+      if (e.toString().includes("encoding overruns Uint8Array")) {
         currentTxInstructions.pop();
-        const tx = new Transaction({
+        transactions.push({
           feePayer: provider.wallet.publicKey,
           recentBlockhash: blockhash,
+          instructions: currentTxInstructions,
+          addressLookupTableAddresses,
+          signers: extraSigners,
+          addressLookupTables,
         });
-        tx.add(...currentTxInstructions);
-        transactions.push(tx);
         currentTxInstructions = [instruction];
       } else {
         throw e;
@@ -748,12 +806,14 @@ export async function batchParallelInstructions(
   }
 
   if (currentTxInstructions.length > 0) {
-    const tx = new Transaction({
+    transactions.push({
       feePayer: provider.wallet.publicKey,
       recentBlockhash: blockhash,
+      instructions: currentTxInstructions,
+      addressLookupTableAddresses,
+      signers: extraSigners,
+      addressLookupTables,
     });
-    tx.add(...currentTxInstructions);
-    transactions.push(tx);
   }
 
   await bulkSendTransactions(
@@ -768,59 +828,75 @@ export async function batchParallelInstructions(
 
 export async function batchInstructionsToTxsWithPriorityFee(
   provider: AnchorProvider,
-  instructions: TransactionInstruction[],
+  // If passing an array of arrays, that indicates the instructions need to be run in the same tx,
+  // optionally with the ones around it.
+  instructions: TransactionInstruction[] | TransactionInstruction[][],
   {
-    computeUnitLimit = 1000000,
+    computeUnitLimit,
     basePriorityFee,
+    addressLookupTableAddresses,
+    computeScaleUp,
   }: {
+    // Manually specify limit instead of simulating
     computeUnitLimit?: number;
+    // Multiplier to increase compute to account for changes in runtime vs simulation
+    computeScaleUp?: number;
     basePriorityFee?: number;
+    addressLookupTableAddresses?: PublicKey[];
   } = {}
-): Promise<Transaction[]> {
+): Promise<TransactionDraft[]> {
   let currentTxInstructions: TransactionInstruction[] = [];
   const blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
-  const transactions: Transaction[] = [];
+  const transactions: TransactionDraft[] = [];
+  const addressLookupTables = await getAddressLookupTableAccounts(
+    provider.connection,
+    addressLookupTableAddresses || []
+  );
 
   for (const instruction of instructions) {
-    currentTxInstructions.push(instruction);
-    const tx = new Transaction({
+    const instrArr = Array.isArray(instruction) ? instruction : [instruction];
+    const prevLen = currentTxInstructions.length;
+    currentTxInstructions.push(...instrArr);
+    const tx = await toVersionedTx({
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: computeUnitLimit || 100000,
+        }),
+        ComputeBudgetProgram.setComputeUnitPrice({
+          // Placeholder, will be replaced with actual value
+          microLamports: 1,
+        }),
+        ...currentTxInstructions,
+      ],
+      addressLookupTableAddresses: addressLookupTableAddresses || [],
       feePayer: provider.wallet.publicKey,
       recentBlockhash: blockhash,
+      addressLookupTables,
     });
-    tx.add(...currentTxInstructions);
     try {
-      if (
-        tx.serialize({
-          requireAllSignatures: false,
-          verifySignatures: false,
-        }).length >=
-        1232 - (64 + 32) * tx.signatures.length - 60 // 60 to leave room for compute budget stuff
-      ) {
-        // yes it's ugly to throw and catch, but .serialize can _also_ throw this error
-        throw new Error("Transaction too large");
-      }
+      tx.serialize();
     } catch (e: any) {
-      if (e.toString().includes("Transaction too large")) {
-        currentTxInstructions.pop();
-        const tx = new Transaction({
-          feePayer: provider.wallet.publicKey,
-          recentBlockhash: blockhash,
-        });
-        tx.add(
-          ComputeBudgetProgram.setComputeUnitLimit({
-            units: computeUnitLimit,
-          }),
-          ComputeBudgetProgram.setComputeUnitPrice({
-            microLamports: await estimatePrioritizationFee(
-              provider.connection,
-              currentTxInstructions,
-              basePriorityFee
-            ),
-          }),
-          ...currentTxInstructions
-        );
-        transactions.push(tx);
-        currentTxInstructions = [instruction];
+      if (e.toString().includes("encoding overruns Uint8Array")) {
+        currentTxInstructions = currentTxInstructions.slice(0, prevLen);
+        if (currentTxInstructions.length > 2) {
+          transactions.push({
+            instructions: await withPriorityFees({
+              connection: provider.connection,
+              instructions: currentTxInstructions,
+              computeUnits: computeUnitLimit,
+              computeScaleUp,
+              basePriorityFee,
+              addressLookupTables,
+              feePayer: provider.wallet.publicKey,
+            }),
+            addressLookupTableAddresses: addressLookupTableAddresses || [],
+            feePayer: provider.wallet.publicKey,
+            recentBlockhash: blockhash,
+            addressLookupTables,
+          });
+        }
+
+        currentTxInstructions = instrArr;
       } else {
         throw e;
       }
@@ -828,24 +904,20 @@ export async function batchInstructionsToTxsWithPriorityFee(
   }
 
   if (currentTxInstructions.length > 0) {
-    const tx = new Transaction({
+    transactions.push({
+      instructions: await withPriorityFees({
+        connection: provider.connection,
+        instructions: currentTxInstructions,
+        computeUnits: computeUnitLimit,
+        computeScaleUp,
+        basePriorityFee,
+        feePayer: provider.wallet.publicKey,
+      }),
+      addressLookupTableAddresses: addressLookupTableAddresses || [],
       feePayer: provider.wallet.publicKey,
       recentBlockhash: blockhash,
+      addressLookupTables,
     });
-    tx.add(
-      ComputeBudgetProgram.setComputeUnitLimit({
-        units: computeUnitLimit,
-      }),
-      ComputeBudgetProgram.setComputeUnitPrice({
-        microLamports: await estimatePrioritizationFee(
-          provider.connection,
-          currentTxInstructions,
-          basePriorityFee
-        ),
-      }),
-      ...currentTxInstructions
-    );
-    transactions.push(tx);
   }
 
   return transactions;
@@ -853,18 +925,24 @@ export async function batchInstructionsToTxsWithPriorityFee(
 
 export async function batchParallelInstructionsWithPriorityFee(
   provider: AnchorProvider,
-  instructions: TransactionInstruction[],
+  // If passing an array of arrays, that indicates the instructions need to be run in the same tx,
+  // optionally with the ones around it.
+  instructions: TransactionInstruction[] | TransactionInstruction[][],
   {
     onProgress,
     triesRemaining = 10,
-    computeUnitLimit = 1000000,
+    computeUnitLimit,
+    computeScaleUp,
     basePriorityFee,
     extraSigners,
     maxSignatureBatch = TX_BATCH_SIZE,
   }: {
+    // Manually specify limit instead of simulating
+    computeUnitLimit?: number;
+    // Multiplier to increase compute to account for changes in runtime vs simulation
+    computeScaleUp?: number;
     onProgress?: (status: Status) => void;
     triesRemaining?: number; // Number of blockhashes to try resending txs with before giving up
-    computeUnitLimit?: number;
     basePriorityFee?: number;
     extraSigners?: Keypair[];
     maxSignatureBatch?: number;
@@ -876,6 +954,7 @@ export async function batchParallelInstructionsWithPriorityFee(
     {
       computeUnitLimit,
       basePriorityFee,
+      computeScaleUp,
     }
   );
 

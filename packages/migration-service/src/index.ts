@@ -252,7 +252,7 @@ server.post<{
 
   return (await getMigrateTransactions(from, to)).map(
     (tx) =>
-      Buffer.from(tx.serialize({ requireAllSignatures: false })).toJSON().data
+      Buffer.from(tx.serialize()).toJSON().data
   );
 });
 

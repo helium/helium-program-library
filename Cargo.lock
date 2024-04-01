@@ -1355,17 +1355,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2e66c9d817f1720209181c316d28635c050fa304f9c79e47a520882661b7308"
 
 [[package]]
-name = "dc-conversion-escrow"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "default-env",
- "shared-utils",
- "solana-security-txt",
-]
-
-[[package]]
 name = "default-env"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -151,14 +151,14 @@ export const useClaimAllPositionsRewards = () => {
         if (onInstructions) {
           await onInstructions(multiDemArray.flat());
         } else {
-          await batchParallelInstructions(
+          await batchParallelInstructions({
             provider,
-            multiDemArray.flat(),
+            instructions: multiDemArray.flat(),
             onProgress,
-            10,
-            [],
+            triesRemaining: 10,
+            extraSigners: [],
             maxSignatureBatch
-          );
+          });
         }
       }
     }

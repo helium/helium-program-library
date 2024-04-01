@@ -82,7 +82,7 @@ async function run() {
   const txs = await Promise.all(
     canopyChunks.map(async (leaves, index) => {
       const bytes = Buffer.concat(leaves);
-      const tx = await lazyTransactionsProgram.methods
+      const instruction = await lazyTransactionsProgram.methods
         .setCanopyV0({
           offset: 32 * chunkSize * index,
           bytes,
@@ -92,12 +92,13 @@ async function run() {
           canopy: lazyTransactionsAcc.canopy,
           authority: lazyTransactionsAcc.authority,
         })
-        .transaction();
+        .instruction();
 
-      // @ts-ignore
-      tx.feePayer = lazyTransactionsProgram.provider.wallet.publicKey;
-
-      return tx;
+      return {
+        // @ts-ignore
+        feePayer: program.provider.wallet.publicKey,
+        instructions: [instruction],
+      };
     })
   );
   let progress: cliProgress.SingleBar | undefined = undefined;
