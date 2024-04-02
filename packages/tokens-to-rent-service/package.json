@@ -39,7 +39,7 @@
     "@helium/spl-utils": "^0.7.1",
     "@jup-ag/api": "^6.0.6",
     "@solana/spl-token": "^0.3.8",
-    "@solana/web3.js": "^1.78.4",
+    "@solana/web3.js": "^1.78.8",
     "axios": "^1.3.6",
     "fastify": "^4.13.0",
     "typescript-collections": "^1.3.3",

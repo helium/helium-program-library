@@ -31,7 +31,7 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@solana/web3.js": "^1.78.4"
+    "@solana/web3.js": "^1.78.8"
   },
   "devDependencies": {
     "git-format-staged": "^2.1.3",
