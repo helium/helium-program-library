@@ -39,7 +39,7 @@
     "@fastify/cors": "^8.1.1",
     "@helium/account-fetch-cache": "^0.7.1",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
-    "@solana/web3.js": "^1.78.4",
+    "@solana/web3.js": "^1.78.8",
     "@substreams/core": "^0.15.1",
     "aws-sdk": "^2.1344.0",
     "axios": "^1.3.6",

@@ -112,7 +112,7 @@ export async function withPriorityFees({
   computeScaleUp?: number;
 } & Partial<TransactionDraft>): Promise<TransactionInstruction[]> {
   if (!computeUnits && !rest.feePayer) {
-    throw new Error("Must provide feePayer if estimatingg compute units");
+    throw new Error("Must provide feePayer if estimating compute units");
   }
 
   const estimate = await estimatePrioritizationFee(

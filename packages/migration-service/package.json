@@ -51,7 +51,7 @@
     "@project-serum/borsh": "^0.2.5",
     "@solana/buffer-layout": "^4.0.0",
     "@solana/spl-token": "^0.3.8",
-    "@solana/web3.js": "^1.78.4",
+    "@solana/web3.js": "^1.78.8",
     "@types/lowdb": "^1.0.11",
     "@types/pg-format": "^1.0.2",
     "@types/yargs": "^17.0.24",
