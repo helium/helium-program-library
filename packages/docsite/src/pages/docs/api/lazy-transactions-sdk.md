@@ -176,7 +176,3 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | --------- | --------------- |
 | root      | [object Object] |
 | authority | publicKey       |
-
-### Node
-
-[object Object]
