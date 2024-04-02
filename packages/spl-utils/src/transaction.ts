@@ -786,7 +786,9 @@ export async function batchParallelInstructions({
       addressLookupTables,
     });
     try {
-      tx.serialize();
+      if (tx.serialize().length + 64 * tx.signatures.length > 1232) {
+        throw new Error("encoding overruns Uint8Array");
+      }
     } catch (e: any) {
       if (e.toString().includes("encoding overruns Uint8Array")) {
         currentTxInstructions.pop();
@@ -874,11 +876,13 @@ export async function batchInstructionsToTxsWithPriorityFee(
       addressLookupTables,
     });
     try {
-      tx.serialize();
+      if ((tx.serialize().length + 64 * tx.signatures.length) > 1232) {
+        throw new Error("encoding overruns Uint8Array");
+      };
     } catch (e: any) {
       if (e.toString().includes("encoding overruns Uint8Array")) {
         currentTxInstructions = currentTxInstructions.slice(0, prevLen);
-        if (currentTxInstructions.length > 2) {
+        if (currentTxInstructions.length > 0) {
           transactions.push({
             instructions: await withPriorityFees({
               connection: provider.connection,
@@ -911,6 +915,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
         computeUnits: computeUnitLimit,
         computeScaleUp,
         basePriorityFee,
+        addressLookupTables,
         feePayer: provider.wallet.publicKey,
       }),
       addressLookupTableAddresses: addressLookupTableAddresses || [],
