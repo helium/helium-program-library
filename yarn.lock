@@ -666,6 +666,7 @@ __metadata:
     h3-js: ^4.1.0
     http-status-codes: ^2.2.0
     inflection: ^2.0.1
+    kafkajs: ^2.2.4
     lodash: ^4.17.21
     p-limit: 3.1.0
     pg: ^8.9.0
@@ -12198,6 +12199,13 @@ __metadata:
   version: 5.2.0
   resolution: "just-diff@npm:5.2.0"
   checksum: 5527fb6d28a446185250fba501ad857370c049bac7aa5a34c9ec82a45e1380af1a96137be7df2f87252d9f75ef67be41d4c0267d481ed0235b2ceb3ee1f5f75d
+  languageName: node
+  linkType: hard
+
+"kafkajs@npm:^2.2.4":
+  version: 2.2.4
+  resolution: "kafkajs@npm:2.2.4"
+  checksum: 83e9e8bc50a09b142f4ff79f6a2bd88ecc21b83bcefe6621ab1716118d624886befb7371731274f67812ce35dd50b53140ff3b49a06e5d9169fe6b164d72fea5
   languageName: node
   linkType: hard
 

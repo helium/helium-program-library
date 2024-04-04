@@ -21,4 +21,5 @@ export const FETCH_DELAY_SECONDS = Number(process.env.FETCH_DELAY_SECONDS || "10
 
 export const USE_SUBSTREAMS = process.env.USE_SUBSTREAMS === "true"
 
-export const SUBSTREAM = process.env.SUBSTREAM!
+export const SUBSTREAM = process.env.SUBSTREAM
+export const USE_KAFKA = process.env.USE_KAFKA === "true"

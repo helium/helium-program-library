@@ -25,6 +25,7 @@ import { ReasonPhrases, StatusCodes } from "http-status-codes";
 import { Op } from "sequelize";
 import {
   HELIUS_AUTH_SECRET,
+  USE_KAFKA,
   PROGRAM_ACCOUNT_CONFIGS,
   RUN_JOBS_AT_STARTUP,
   SUBSTREAM,
@@ -41,6 +42,7 @@ import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAcco
 import { provider } from "./utils/solana";
 import { truthy, upsertProgramAccounts } from "./utils/upsertProgramAccounts";
 const { BloomFilter } = require("bloom-filters");
+import { EachMessagePayload, Kafka, KafkaConfig } from "kafkajs";
 
 if (!HELIUS_AUTH_SECRET) {
   throw new Error("Helius auth secret not available");
@@ -353,13 +355,61 @@ if (!HELIUS_AUTH_SECRET) {
     process.exit(1);
   }
 
+  if (USE_KAFKA) {
+    const kafkaConfig: KafkaConfig = {
+      ssl: true,
+      clientId: "helium-reader",
+      sasl: {
+        mechanism: "scram-sha-512",
+        username: process.env.KAFKA_USER!,
+        password: process.env.KAFKA_PASSWORD!,
+      },
+      brokers: process.env.KAFKA_BROKERS!.split(","),
+    };
+    const kafka = new Kafka(kafkaConfig);
+    const consumer = kafka.consumer({ groupId: process.env.KAKFA_GROUP_ID! });
+
+    await consumer.connect();
+    await consumer.subscribe({
+      topic: process.env.KAFKA_TOPIC!,
+      fromBeginning: false,
+    });
+    await consumer.run({
+      eachMessage: async ({ message }: EachMessagePayload) => {
+        if (message.value) {
+          const {
+            data,
+            program: programId,
+            pubkey,
+            isDelete,
+          } = JSON.parse(message.value.toString());
+          const config = configs.find((x) => x.programId == programId);
+          if (config) {
+            await handleAccountWebhook({
+              fastify: server,
+              programId: new PublicKey(config.programId),
+              accounts: config.accounts,
+              isDelete,
+              account: {
+                pubkey: pubkey,
+                data: [data, "base64"],
+              },
+              pluginsByAccountType:
+                pluginsByAccountTypeByProgram[programId] || {},
+            });
+          }
+        }
+      },
+    });
+  }
+
   if (USE_SUBSTREAMS) {
     await Cursor.sync();
     const lastCursor = await Cursor.findOne({
       order: [["createdAt", "DESC"]],
     });
     const MODULE = "map_filter_instructions";
-    const substream = await fetchSubstream(SUBSTREAM);
+    const substream = await fetchSubstream(SUBSTREAM!);
     const registry = createRegistry(substream);
     const { token } = await authIssue(
       "server_e80b2b1b926856ef43c7f50310b85e6f"
@@ -496,7 +546,7 @@ async function getMultipleAccounts({
     const batchKeys = keys.slice(i * batchSize, (i + 1) * batchSize);
     const batchResults = await connection.getMultipleAccountsInfo(batchKeys, {
       minContextSlot,
-      commitment: "confirmed"
+      commitment: "confirmed",
     });
     results.push(
       ...batchResults.map((account, i) => ({ account, pubkey: batchKeys[i] }))
