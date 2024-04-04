@@ -56,7 +56,6 @@ export const useUndelegatePosition = () => {
               claimedEpochsBitmap,
             })
         );
-        console.log("EPPPOCK ", epochsToClaim)
 
         const instructions: TransactionInstruction[] = await Promise.all(
           epochsToClaim.map(
