@@ -362,11 +362,11 @@ if (!HELIUS_AUTH_SECRET) {
       sasl: {
         mechanism: "scram-sha-512",
         username: process.env.KAFKA_USER!,
-        password: process.env.KAFKA_PASSWORD!,
+        // Remove newlines from password
+        password: process.env.KAFKA_PASSWORD!.replace(/(\r\n|\n|\r)/gm, ""),
       },
       brokers: process.env.KAFKA_BROKERS!.split(","),
     };
-    console.log(kafkaConfig)
     const kafka = new Kafka(kafkaConfig);
     const consumer = kafka.consumer({ groupId: process.env.KAFKA_GROUP_ID! });
 
