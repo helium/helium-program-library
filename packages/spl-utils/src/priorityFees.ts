@@ -92,11 +92,21 @@ export async function estimatePrioritizationFee(
 
 export const estimateComputeUnits = async (
   connection: Connection,
-  tx: VersionedTransaction
+  tx: VersionedTransaction,
+  retries: number = 5
 ): Promise<number | undefined> => {
-  return (await connection.simulateTransaction(tx)).value.unitsConsumed;
+  const sim = (await connection.simulateTransaction(tx)).value;
+  if (sim.err && sim.err.toString().includes("BlockhashNotFound") && retries > 0) {
+    await sleep(500)
+    return estimateComputeUnits(connection, tx, retries - 1)
+  }
+
+  return sim.unitsConsumed
 };
 
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export async function withPriorityFees({
   connection,
