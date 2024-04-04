@@ -367,7 +367,7 @@ if (!HELIUS_AUTH_SECRET) {
       brokers: process.env.KAFKA_BROKERS!.split(","),
     };
     const kafka = new Kafka(kafkaConfig);
-    const consumer = kafka.consumer({ groupId: process.env.KAKFA_GROUP_ID! });
+    const consumer = kafka.consumer({ groupId: process.env.KAFKA_GROUP_ID! });
 
     await consumer.connect();
     await consumer.subscribe({
