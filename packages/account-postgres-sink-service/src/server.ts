@@ -366,6 +366,7 @@ if (!HELIUS_AUTH_SECRET) {
       },
       brokers: process.env.KAFKA_BROKERS!.split(","),
     };
+    console.log(kafkaConfig)
     const kafka = new Kafka(kafkaConfig);
     const consumer = kafka.consumer({ groupId: process.env.KAFKA_GROUP_ID! });
 
