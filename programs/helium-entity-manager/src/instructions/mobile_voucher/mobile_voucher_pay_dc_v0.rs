@@ -13,7 +13,11 @@ use data_credits::{
   program::DataCredits,
   BurnWithoutTrackingArgsV0, DataCreditsV0, MintDataCreditsArgsV0,
 };
-use helium_sub_daos::{DaoV0, SubDaoV0};
+use helium_sub_daos::{
+  cpi::{accounts::TrackDcOnboardingFeesV0, track_dc_onboarding_fees_v0},
+  program::HeliumSubDaos,
+  DaoV0, SubDaoV0, TrackDcOnboardingFeesArgsV0,
+};
 
 #[derive(Accounts)]
 pub struct MobileVoucherPayDcV0<'info> {
@@ -35,6 +39,7 @@ pub struct MobileVoucherPayDcV0<'info> {
   pub mobile_hotspot_voucher: Box<Account<'info, MobileHotspotVoucherV0>>,
   pub verified_owner: Signer<'info>,
   #[account(
+    mut,
     has_one = dao,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
@@ -86,6 +91,7 @@ pub struct MobileVoucherPayDcV0<'info> {
   pub data_credits_program: Program<'info, DataCredits>,
   pub system_program: Program<'info, System>,
   pub associated_token_program: Program<'info, AssociatedToken>,
+  pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
 }
 
 pub fn handler(ctx: Context<MobileVoucherPayDcV0>) -> Result<()> {
@@ -149,6 +155,26 @@ pub fn handler(ctx: Context<MobileVoucherPayDcV0>) -> Result<()> {
         &[maker_seeds!(ctx.accounts.maker)],
       ),
       BurnWithoutTrackingArgsV0 { amount: dc_fee },
+    )?;
+    track_dc_onboarding_fees_v0(
+      CpiContext::new_with_signer(
+        ctx.accounts.helium_sub_daos_program.to_account_info(),
+        TrackDcOnboardingFeesV0 {
+          hem_auth: ctx.accounts.rewardable_entity_config.to_account_info(),
+          sub_dao: ctx.accounts.sub_dao.to_account_info(),
+        },
+        &[&[
+          "rewardable_entity_config".as_bytes(),
+          ctx.accounts.sub_dao.key().as_ref(),
+          ctx.accounts.rewardable_entity_config.symbol.as_bytes(),
+          &[ctx.accounts.rewardable_entity_config.bump_seed],
+        ]],
+      ),
+      TrackDcOnboardingFeesArgsV0 {
+        amount: fees.dc_onboarding_fee,
+        add: true,
+        symbol: ctx.accounts.rewardable_entity_config.symbol.clone(),
+      },
     )?;
   }
 

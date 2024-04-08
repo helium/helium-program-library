@@ -219,4 +219,11 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     mobile_voucher_pay_dc_v0::handler(ctx)
   }
+
+  pub fn issue_mobile_hotspot_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, IssueMobileHotspotV0<'info>>,
+    args: IssueEntityArgsV0,
+  ) -> Result<()> {
+    issue_mobile_hotspot_v0::handler(ctx, args)
+  }
 }

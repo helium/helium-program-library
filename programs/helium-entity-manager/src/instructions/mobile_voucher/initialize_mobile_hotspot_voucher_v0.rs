@@ -54,6 +54,7 @@ pub fn handler(
     .accounts
     .mobile_hotspot_voucher
     .set_inner(MobileHotspotVoucherV0 {
+      refund: ctx.accounts.payer.key(),
       rewardable_entity_config: ctx.accounts.rewardable_entity_config.key(),
       entity_key: args.entity_key,
       bump_seed: ctx.bumps["mobile_hotspot_voucher"],

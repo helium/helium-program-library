@@ -12,6 +12,7 @@ import { PublicKey } from "@solana/web3.js";
 import { init } from "./init";
 import { iotInfoKey, keyToAssetKey, mobileHotspotVoucherKey, mobileInfoKey, programApprovalKey } from "./pdas";
 import { notEmittedKey } from "@helium/no-emit-sdk";
+import { Accounts } from "@coral-xyz/anchor";
 
 export const heliumEntityManagerResolvers = combineResolvers(
   heliumCommonResolver,
@@ -59,15 +60,16 @@ export const heliumEntityManagerResolvers = combineResolvers(
     }
   }),
   resolveIndividual(async ({ idlIx, path, args, accounts }) => {
+    const dao = accounts.dao || (accounts.issueEntityCommon as Accounts)?.dao
     if (
       path[path.length - 1] === "keyToAsset" &&
       args[args.length - 1] &&
       args[args.length - 1].entityKey &&
-      accounts.dao
+      dao
     ) {
       return (
         await keyToAssetKey(
-          accounts.dao as PublicKey,
+          dao as PublicKey,
           args[args.length - 1].entityKey,
           args[args.length - 1].encoding || "b58"
         )
@@ -107,10 +109,9 @@ export const heliumEntityManagerResolvers = combineResolvers(
       )[0];
     }
   }),
-  resolveIndividual(async ({ path, args, provider, accounts, idlIx }) => {
+  resolveIndividual(async ({ path, provider, accounts }) => {
     if (
       path[path.length - 1] === "iotInfo" &&
-      args[args.length - 1].index &&
       accounts.merkleTree &&
       accounts.keyToAsset
     ) {
@@ -137,21 +138,28 @@ export const heliumEntityManagerResolvers = combineResolvers(
     }
   }),
   resolveIndividual(async ({ path, args, provider, accounts }) => {
+    const merkleTree =
+      accounts.merkleTree || (accounts.issueEntityCommon as Accounts)?.merkleTree;
+    const keyToAsset = accounts.keyToAsset || (accounts.issueEntityCommon as Accounts)?.keyToAsset;
     if (
       path[path.length - 1] === "mobileInfo" &&
-      args[args.length - 1].index &&
-      accounts.merkleTree &&
+      merkleTree &&
+      keyToAsset &&
       accounts.rewardableEntityConfig
     ) {
-      // @ts-ignore
-      const program = await init(provider);
-      const keyToAssetAcc = await program.account.keyToAssetV0.fetch(
-        accounts.keyToAsset as PublicKey
-      );
+      let entityKey = args[0].entityKey;
+      if (!entityKey) {
+        // @ts-ignore
+        const program = await init(provider);
+        const keyToAssetAcc = await program.account.keyToAssetV0.fetch(
+          keyToAsset as PublicKey
+        );
+        entityKey = keyToAssetAcc.entityKey;
+      }
       return (
         await mobileInfoKey(
           accounts.rewardableEntityConfig as PublicKey,
-          keyToAssetAcc.entityKey
+          entityKey
         )
       )[0];
     }
@@ -223,3 +231,11 @@ export const heliumEntityManagerResolvers = combineResolvers(
   }),
   subDaoEpochInfoResolver
 );
+
+function getParent(accounts: any, path: string[]) {
+  let parent = accounts;
+  for (let i = 0; i < path.length - 1; i++) {
+    parent = parent[path[i]];
+  }
+  return parent;
+}

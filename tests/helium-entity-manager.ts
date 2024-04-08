@@ -78,7 +78,7 @@ import { BN } from "bn.js";
 import chaiAsPromised from "chai-as-promised";
 import { createMockCompression } from "./utils/compression";
 import { loadKeypair } from "./utils/solana";
-import { keyToAssetKey, payMobileVoucherDc, payMobileVoucherMobile } from "@helium/helium-entity-manager-sdk";
+import { keyToAssetKey, mobileInfoKey, payMobileVoucherDc, payMobileVoucherMobile } from "@helium/helium-entity-manager-sdk";
 import { program } from "@coral-xyz/anchor/dist/cjs/native/system";
 import { ConversionEscrow } from "../target/types/conversion_escrow";
 import { parsePriceData } from "@pythnetwork/client";
@@ -944,6 +944,155 @@ describe("helium-entity-manager", () => {
         const serialized = signed.serialize();
         expect(serialized.length).to.be.lessThan(1232);
       });
+
+      describe("when fully paid", () => {
+        
+        beforeEach(async () => {
+          const makerDntAccount = getAssociatedTokenAddressSync(
+            dntMint,
+            maker,
+            true
+          );
+          const pythDataMobile = (await provider.connection.getAccountInfo(
+            MOBILE_PYTH_PRICE_FEED
+          ))!.data;
+          const priceMobile = parsePriceData(pythDataMobile);
+
+          const usdPerMobile =
+            priceMobile.emaPrice.value - priceMobile.emaConfidence!.value * 2;
+          const mobileAmount = toBN(20 / usdPerMobile, 6);
+          const myUsdcAccount = getAssociatedTokenAddressSync(usdcMint, me);
+          const instructions0 = [
+            createAssociatedTokenAccountIdempotentInstruction(
+              me,
+              myUsdcAccount,
+              me,
+              usdcMint
+            ),
+            await hemProgram.methods
+              .makerLendV0({
+                amount: toBN(20, 6),
+              })
+              .accounts({
+                maker,
+                targetOracle: MOBILE_PYTH_PRICE_FEED,
+                conversionEscrow,
+                destination: myUsdcAccount,
+                repayAccount: makerDntAccount,
+                usdcMint,
+              })
+              .instruction(),
+            // Repay
+            createAssociatedTokenAccountIdempotentInstruction(
+              me,
+              makerDntAccount,
+              maker,
+              dntMint
+            ),
+            createTransferInstruction(
+              getAssociatedTokenAddressSync(dntMint, me),
+              makerDntAccount,
+              me,
+              BigInt(mobileAmount.toString())
+            ),
+            await conversionEscrowProgram.methods
+              .checkRepayV0()
+              .accounts({
+                conversionEscrow,
+                repayAccount: makerDntAccount,
+              })
+              .instruction(),
+            await hemProgram.methods
+              .mobileVoucherPayMobileV0()
+              .accounts({
+                mobileHotspotVoucher,
+                dntPrice: MOBILE_PYTH_PRICE_FEED,
+              })
+              .instruction(),
+          ];
+          await sendInstructions(provider, instructions0);
+          const makerHntAccount = getAssociatedTokenAddressSync(
+            hntMint,
+            maker,
+            true
+          );
+          const instructions = [
+            createAssociatedTokenAccountIdempotentInstruction(
+              me,
+              myUsdcAccount,
+              me,
+              usdcMint
+            ),
+            createAssociatedTokenAccountIdempotentInstruction(
+              me,
+              makerHntAccount,
+              maker,
+              hntMint
+            ),
+            await hemProgram.methods
+              .makerLendV0({
+                amount: toBN(10, 6),
+              })
+              .accounts({
+                maker,
+                targetOracle: HNT_PYTH_PRICE_FEED,
+                conversionEscrow,
+                destination: myUsdcAccount,
+                repayAccount: makerHntAccount,
+                usdcMint,
+              })
+              .instruction(),
+            // Repay in HNT
+            createTransferInstruction(
+              getAssociatedTokenAddressSync(hntMint, me),
+              makerHntAccount,
+              me,
+              BigInt(10000000000)
+            ),
+            await conversionEscrowProgram.methods
+              .checkRepayV0()
+              .accounts({
+                conversionEscrow,
+                repayAccount: makerHntAccount,
+              })
+              .instruction(),
+            await hemProgram.methods
+              .mobileVoucherPayDcV0()
+              .accounts({
+                mobileHotspotVoucher,
+              })
+              .instruction(),
+          ];
+          await sendInstructions(provider, instructions);
+        })
+
+        it("issues a mobile hotspot", async () => {
+          const method = await hemProgram.methods
+            .issueMobileHotspotV0({
+              entityKey: Buffer.from(bs58.decode(ecc)),
+            })
+            .accounts({
+              issueEntityCommon: {
+                maker,
+                recipient: me,
+                dao,
+              },
+              mobileInfo: mobileInfoKey(
+                rewardableEntityConfig,
+                Buffer.from(bs58.decode(ecc))
+              )[0],
+              voucher: mobileHotspotVoucher,
+            });
+          await method.rpc({ skipPreflight: true });
+          const { mobileInfo } = await method.pubkeys();
+
+          const mobileInfoAcc =
+            await hemProgram.account.mobileHotspotInfoV0.fetch(mobileInfo!);
+          expect(Boolean(mobileInfoAcc)).to.be.true;
+          const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
+          expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(1000000);
+        });
+      })
     })
 
     it("issues a mobile hotspot", async () => {

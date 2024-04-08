@@ -1,8 +1,8 @@
 use std::cmp::min;
-use std::str::FromStr;
+use std::collections::BTreeMap;
 
 use crate::{constants::ENTITY_METADATA_URL, error::ErrorCode};
-use crate::{key_to_asset_seeds, state::*, IssueEntityArgsV0};
+use crate::{key_to_asset_seeds, state::*};
 use account_compression_cpi::{program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
@@ -16,22 +16,15 @@ use bubblegum_cpi::{
 };
 use helium_sub_daos::DaoV0;
 
-pub const TESTING: bool = std::option_env!("TESTING").is_some();
-
-pub const ECC_VERIFIER: &str = if TESTING {
-  "eccCd1PHAPSTNLUtDzihhPmFPTqGPQn7kgLyjf6dYTS"
-} else {
-  "eccSAJM3tq7nQSpQTm8roxv4FPoipCkMsGizW2KBhqZ"
-};
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct IssueEntityArgsV0 {
+  pub entity_key: Vec<u8>,
+}
 
 #[derive(Accounts)]
-#[instruction(args: IssueEntityArgsV0)]
-pub struct IssueEntityV0<'info> {
+pub struct IssueEntityCommonV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  #[account(address = Pubkey::from_str(ECC_VERIFIER).unwrap())]
-  pub ecc_verifier: Signer<'info>,
-  pub issuing_authority: Signer<'info>,
   pub collection: Box<Account<'info, Mint>>,
   /// CHECK: Handled by cpi
   #[account(
@@ -50,7 +43,6 @@ pub struct IssueEntityV0<'info> {
   pub collection_master_edition: UncheckedAccount<'info>,
   #[account(
     mut,
-    has_one = issuing_authority,
     has_one = collection,
     has_one = merkle_tree,
     has_one = dao,
@@ -64,26 +56,12 @@ pub struct IssueEntityV0<'info> {
   pub entity_creator: UncheckedAccount<'info>,
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
-    init,
-    payer = payer,
-    space = 8 + std::mem::size_of::<KeyToAssetV0>() + 1 + args.entity_key.len(),
-    seeds = [
-      "key_to_asset".as_bytes(),
-      dao.key().as_ref(),
-      &hash(&args.entity_key[..]).to_bytes()
-    ],
-    bump
-  )]
-  pub key_to_asset: Box<Account<'info, KeyToAssetV0>>,
-  #[account(
       mut,
       seeds = [merkle_tree.key().as_ref()],
       seeds::program = bubblegum_program.key(),
       bump,
   )]
   pub tree_authority: Box<Account<'info, TreeConfig>>,
-  /// CHECK: Used in cpi
-  pub recipient: AccountInfo<'info>,
   /// CHECK: Used in cpi
   #[account(mut)]
   pub merkle_tree: AccountInfo<'info>,
@@ -94,6 +72,8 @@ pub struct IssueEntityV0<'info> {
   )]
   /// CHECK: Used in cpi
   pub bubblegum_signer: UncheckedAccount<'info>,
+  /// CHECK: Used as recipient wallet
+  pub recipient: AccountInfo<'info>,
 
   /// CHECK: Verified by constraint  
   #[account(address = mpl_token_metadata::ID)]
@@ -104,7 +84,7 @@ pub struct IssueEntityV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-impl<'info> IssueEntityV0<'info> {
+impl<'info> IssueEntityCommonV0<'info> {
   fn mint_to_collection_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintToCollectionV1<'info>> {
     let cpi_accounts = MintToCollectionV1 {
       tree_authority: self.tree_authority.to_account_info(),
@@ -126,85 +106,82 @@ impl<'info> IssueEntityV0<'info> {
     };
     CpiContext::new(self.bubblegum_program.to_account_info(), cpi_accounts)
   }
-}
 
-pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<()> {
-  let asset_id = get_asset_id(
-    &ctx.accounts.merkle_tree.key(),
-    ctx.accounts.tree_authority.num_minted,
-  );
-  ctx.accounts.key_to_asset.set_inner(KeyToAssetV0 {
-    asset: asset_id,
-    dao: ctx.accounts.dao.key(),
-    entity_key: args.entity_key.clone(),
-    bump_seed: ctx.bumps["key_to_asset"],
-    key_serialization: KeySerialization::B58,
-  });
+  pub fn issue_entity(
+    &mut self,
+    bumps: BTreeMap<String, u8>,
+    key_to_asset: &mut Account<'info, KeyToAssetV0>,
+    args: IssueEntityArgsV0,
+  ) -> Result<()> {
+    let asset_id = get_asset_id(&self.merkle_tree.key(), self.tree_authority.num_minted);
+    key_to_asset.set_inner(KeyToAssetV0 {
+      asset: asset_id,
+      dao: self.dao.key(),
+      entity_key: args.entity_key.clone(),
+      bump_seed: bumps["key_to_asset"],
+      key_serialization: KeySerialization::B58,
+    });
 
-  let key_str = bs58::encode(args.entity_key).into_string();
-  let animal_name: AnimalName = key_str
-    .parse()
-    .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
+    let key_str = bs58::encode(args.entity_key).into_string();
+    let animal_name: AnimalName = key_str
+      .parse()
+      .map_err(|_| error!(ErrorCode::InvalidEccCompact))?;
 
-  let maker_seeds: &[&[&[u8]]] = &[&[
-    b"maker",
-    ctx.accounts.maker.dao.as_ref(),
-    ctx.accounts.maker.name.as_bytes(),
-    &[ctx.accounts.maker.bump_seed],
-  ]];
+    let maker_seeds: &[&[&[u8]]] = &[&[
+      b"maker",
+      self.maker.dao.as_ref(),
+      self.maker.name.as_bytes(),
+      &[self.maker.bump_seed],
+    ]];
 
-  let name = animal_name.to_string();
-  let uri = format!(
-    "{}/v2/hotspot/{}",
-    ENTITY_METADATA_URL,
-    ctx.accounts.key_to_asset.key(),
-  );
-  let metadata = MetadataArgs {
-    name: name[..min(name.len(), 32)].to_owned(),
-    symbol: String::from("HOTSPOT"),
-    uri,
-    collection: Some(Collection {
-      key: ctx.accounts.collection.key(),
-      verified: false, // Verified in cpi
-    }),
-    primary_sale_happened: true,
-    is_mutable: true,
-    edition_nonce: None,
-    token_standard: Some(TokenStandard::NonFungible),
-    uses: None,
-    token_program_version: TokenProgramVersion::Original,
-    creators: vec![
-      Creator {
-        address: ctx.accounts.entity_creator.key(),
-        verified: true,
-        share: 100,
-      },
-      Creator {
-        address: ctx.accounts.key_to_asset.key(),
-        verified: true,
-        share: 0,
-      },
-    ],
-    seller_fee_basis_points: 0,
-  };
-  let entity_creator_seeds: &[&[&[u8]]] = &[&[
-    b"entity_creator",
-    ctx.accounts.dao.to_account_info().key.as_ref(),
-    &[ctx.bumps["entity_creator"]],
-  ]];
-  let mut creator = ctx.accounts.entity_creator.to_account_info();
-  creator.is_signer = true;
-  let mut key_to_asset_creator = ctx.accounts.key_to_asset.to_account_info();
-  key_to_asset_creator.is_signer = true;
-  let key_to_asset_signer: &[&[u8]] = key_to_asset_seeds!(ctx.accounts.key_to_asset);
-  mint_to_collection_v1(
-    ctx
-      .accounts
-      .mint_to_collection_ctx()
-      .with_remaining_accounts(vec![creator, key_to_asset_creator])
-      .with_signer(&[maker_seeds[0], entity_creator_seeds[0], key_to_asset_signer]),
-    metadata,
-  )?;
+    let name = animal_name.to_string();
+    let uri = format!("{}/v2/hotspot/{}", ENTITY_METADATA_URL, key_to_asset.key(),);
+    let metadata = MetadataArgs {
+      name: name[..min(name.len(), 32)].to_owned(),
+      symbol: String::from("HOTSPOT"),
+      uri,
+      collection: Some(Collection {
+        key: self.collection.key(),
+        verified: false, // Verified in cpi
+      }),
+      primary_sale_happened: true,
+      is_mutable: true,
+      edition_nonce: None,
+      token_standard: Some(TokenStandard::NonFungible),
+      uses: None,
+      token_program_version: TokenProgramVersion::Original,
+      creators: vec![
+        Creator {
+          address: self.entity_creator.key(),
+          verified: true,
+          share: 100,
+        },
+        Creator {
+          address: key_to_asset.key(),
+          verified: true,
+          share: 0,
+        },
+      ],
+      seller_fee_basis_points: 0,
+    };
+    let entity_creator_seeds: &[&[&[u8]]] = &[&[
+      b"entity_creator",
+      self.dao.to_account_info().key.as_ref(),
+      &[bumps["entity_creator"]],
+    ]];
+    let mut creator = self.entity_creator.to_account_info();
+    creator.is_signer = true;
+    let mut key_to_asset_creator = key_to_asset.to_account_info();
+    key_to_asset_creator.is_signer = true;
+    let key_to_asset_signer: &[&[u8]] = key_to_asset_seeds!(key_to_asset);
+    mint_to_collection_v1(
+      self
+        .mint_to_collection_ctx()
+        .with_remaining_accounts(vec![creator, key_to_asset_creator])
+        .with_signer(&[maker_seeds[0], entity_creator_seeds[0], key_to_asset_signer]),
+      metadata,
+    )?;
 
-  Ok(())
+    Ok(())
+  }
 }

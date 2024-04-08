@@ -18,7 +18,6 @@ pub struct MobileHotspotVoucherV0 {
   pub maker: Pubkey,
   pub rewardable_entity_config: Pubkey,
   pub entity_key: Vec<u8>,
-  pub bump_seed: u8,
   pub key_serialization: KeySerialization,
   pub device_type: MobileDeviceTypeV0,
   pub paid_mobile: bool,
@@ -26,6 +25,9 @@ pub struct MobileHotspotVoucherV0 {
   /// Maker key if not verified. Otherwise the verified owner of the hotspot
   /// through the sig verifier.
   pub verified_owner: Pubkey,
+  /// The wallet that paid the rent for this, will be refunded
+  pub refund: Pubkey,
+  pub bump_seed: u8,
 }
 
 #[account]

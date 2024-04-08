@@ -122,6 +122,22 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@helium/conversion-escrow-sdk@^0.6.42":
+  version: 0.0.0-use.local
+  resolution: "@helium/conversion-escrow-sdk@workspace:packages/conversion-escrow-sdk"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@helium/anchor-resolvers": ^0.6.42
+    "@helium/idls": ^0.6.42
+    bn.js: ^5.2.0
+    bs58: ^4.0.1
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
+
 "@helium/entity-invalidator@workspace:.":
   version: 0.0.0-use.local
   resolution: "@helium/entity-invalidator@workspace:."
@@ -160,6 +176,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/address": ^4.10.2
     "@helium/anchor-resolvers": ^0.6.42
+    "@helium/conversion-escrow-sdk": ^0.6.42
     "@helium/helium-sub-daos-sdk": ^0.6.42
     "@helium/idls": ^0.6.42
     "@helium/no-emit-sdk": ^0.6.42

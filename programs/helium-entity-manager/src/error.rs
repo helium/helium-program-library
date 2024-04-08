@@ -62,4 +62,7 @@ pub enum ErrorCode {
 
   #[msg("Too much was borrowed from the maker for this txn")]
   TooMuchBorrowed,
+
+  #[msg("Voucher was not paid for")]
+  VoucherNotPaid,
 }
