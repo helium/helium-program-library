@@ -7,6 +7,7 @@ import {
 } from "@helium/anchor-resolvers";
 import {
   getAssociatedTokenAddressSync,
+  NATIVE_MINT,
 } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { init } from "./init";
@@ -228,6 +229,16 @@ export const heliumEntityManagerResolvers = combineResolvers(
     mint: "hntMint",
     account: "burner",
     owner: "maker",
+  }),
+  resolveIndividual(async ({ path, accounts }) => {
+    if ((path[path.length - 1] === "makerWsol") && accounts.maker) {
+      return getAssociatedTokenAddressSync(
+        NATIVE_MINT,
+        accounts.maker as PublicKey,
+        true
+      );
+    }
+  
   }),
   subDaoEpochInfoResolver
 );

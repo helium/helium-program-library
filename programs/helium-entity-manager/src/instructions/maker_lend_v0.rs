@@ -25,7 +25,11 @@ pub struct MakerLendArgsV0 {
 
 #[derive(Accounts)]
 pub struct MakerLendV0<'info> {
-  #[account(mut)]
+  #[account(
+    mut,
+    // Ensure a loan isn't already in progress
+    constraint = maker.expected_onboard_amount == 0 @ ErrorCode::LoanInProgress,
+  )]
   pub maker: Box<Account<'info, MakerV0>>,
   #[account(
     constraint = TESTING || usdc_mint.key() == Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap()
@@ -98,7 +102,9 @@ pub fn handler(ctx: Context<MakerLendV0>, args: MakerLendArgsV0) -> Result<()> {
   let valid_instructions: Vec<[u8; 8]> = vec![
     get_function_hash("global", "mobile_voucher_pay_mobile_v0"),
     get_function_hash("global", "mobile_voucher_pay_dc_v0"),
+    get_function_hash("global", "mobile_voucher_verify_owner_v0"),
   ];
+
   loop {
     // get the next instruction, die if theres no more
     if let Ok(ix) = load_instruction_at_checked(index, &ixs) {

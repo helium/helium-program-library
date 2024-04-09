@@ -65,4 +65,6 @@ pub enum ErrorCode {
 
   #[msg("Voucher was not paid for")]
   VoucherNotPaid,
+  #[msg("Cannot do more than one maker lend at a time")]
+  LoanInProgress,
 }

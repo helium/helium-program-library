@@ -85,6 +85,10 @@ address = "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5" # Mobile price oracle
 [[test.validator.clone]]
 address = "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"
 
+# Sol pyth price
+[[test.validator.clone]]
+address = "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG"
+
 # Pyth usdc price oracle
 [[test.validator.clone]]
 address = "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD"

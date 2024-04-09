@@ -110,6 +110,7 @@ pub fn handler(ctx: Context<MobileVoucherPayMobileV0>) -> Result<()> {
     )?;
   }
 
+  ctx.accounts.maker.expected_onboard_amount = 0;
   ctx.accounts.mobile_hotspot_voucher.paid_mobile = true;
 
   Ok(())

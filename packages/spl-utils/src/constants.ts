@@ -14,6 +14,10 @@ export const HNT_PYTH_PRICE_FEED = new PublicKey(
   "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"
 );
 
+export const SOL_PYTH_PRICE_FEED = new PublicKey(
+  "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG"
+);
+
 export const MOBILE_PYTH_PRICE_FEED = new PublicKey(
   "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5"
 );
