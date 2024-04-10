@@ -20,6 +20,7 @@ import {
   VersionedTransaction,
   VersionedTransactionResponse,
 } from "@solana/web3.js";
+import { TransactionCompletionQueue } from "@helium/account-fetch-cache"
 import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
 import { estimatePrioritizationFee, withPriorityFees } from "./priorityFees";
@@ -318,8 +319,6 @@ function getUnixTime(): number {
   return new Date().valueOf() / 1000;
 }
 
-const SEND_TRANSACTION_INTERVAL = 10;
-
 export const awaitTransactionSignatureConfirmation = async (
   txid: TransactionSignature,
   timeout: number,
@@ -327,99 +326,10 @@ export const awaitTransactionSignatureConfirmation = async (
   commitment: Commitment = "recent",
   queryStatus = false
 ): Promise<SignatureStatus | null | void> => {
-  let done = false;
-  let status: SignatureStatus | null | void = {
-    slot: 0,
-    confirmations: 0,
-    err: null,
-  };
-  let subId = 0;
-  status = await new Promise(async (resolve, reject) => {
-    let t: NodeJS.Timeout;
-    function setDone() {
-      done = true;
-      clearTimeout(t);
-    }
-    t = setTimeout(() => {
-      if (done) {
-        return;
-      }
-      setDone();
-      console.log("Rejecting for timeout...");
-      reject({ timeout: true });
-    }, timeout);
-    try {
-      subId = connection.onSignature(
-        txid,
-        (result: any, context: any) => {
-          status = {
-            err: result.err,
-            slot: context.slot,
-            confirmations: 0,
-          };
-          setDone();
-          if (result.err) {
-            console.log("Rejected via websocket", result.err);
-            reject(status);
-          } else {
-            resolve(status);
-          }
-        },
-        commitment
-      );
-    } catch (e) {
-      console.error("WS error in setup", txid, e);
-      if (!queryStatus) {
-        reject(e);
-      }
-    }
-    while (!done && queryStatus) {
-      // eslint-disable-next-line no-loop-func
-      (async () => {
-        try {
-          const signatureStatuses = await connection.getSignatureStatuses([
-            txid,
-          ]);
-          status = signatureStatuses && signatureStatuses.value[0];
-          if (!done) {
-            if (!status) {
-            } else if (status.err) {
-              console.log("REST error for", txid, status);
-              setDone();
-              reject(status.err);
-            } else if (!status.confirmations && !status.confirmationStatus) {
-              console.log("REST no confirmations for", txid, status);
-            } else {
-              console.log("REST confirmation for", txid, status);
-              if (
-                !status.confirmationStatus ||
-                status.confirmationStatus == commitment
-              ) {
-                setDone();
-                resolve(status);
-              }
-            }
-          }
-        } catch (e) {
-          if (!done) {
-            console.log("REST connection error: txid", txid, e);
-          }
-        }
-      })();
-      await sleep(2000);
-    }
-  });
-
-  if (
-    //@ts-ignore
-    connection._signatureSubscriptions &&
-    //@ts-ignore
-    connection._signatureSubscriptions[subId]
-  ) {
-    connection.removeSignatureListener(subId);
-  }
-  done = true;
-  return status;
+  return new TransactionCompletionQueue({
+    connection,
+    log: true,
+  }).wait(commitment, txid, timeout);
 };
 
 async function simulateTransaction(
@@ -876,9 +786,9 @@ export async function batchInstructionsToTxsWithPriorityFee(
       addressLookupTables,
     });
     try {
-      if ((tx.serialize().length + 64 * tx.signatures.length) > 1232) {
+      if (tx.serialize().length + 64 * tx.signatures.length > 1232) {
         throw new Error("encoding overruns Uint8Array");
-      };
+      }
     } catch (e: any) {
       if (e.toString().includes("encoding overruns Uint8Array")) {
         currentTxInstructions = currentTxInstructions.slice(0, prevLen);

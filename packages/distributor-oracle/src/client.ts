@@ -134,7 +134,7 @@ export async function getPendingRewards(
       >("KeyToAssetV0", account.data),
     }),
     true,
-    forceRequery
+    false
   );
   keyToAssets.forEach((kta, index) => {
     if (!kta?.info) {
