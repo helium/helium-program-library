@@ -38,7 +38,10 @@ export class TransactionCompletionQueue {
     commitment: Commitment
   ): Promise<Record<string, SignatureStatus | null>> {
     // Requery every 2 seconds
-    if (this.lastQuery.valueOf() + 2000 < new Date().valueOf()) {
+    if (
+      !this.currentStatuses[commitment] ||
+      this.lastQuery.valueOf() + 2000 < new Date().valueOf()
+    ) {
       const txids = Object.keys(this.txPromises[commitment] || {});
       if (txids.length > 0) {
         const statuses = await getSignatureStatusesBatch(
@@ -69,9 +72,9 @@ export class TransactionCompletionQueue {
     if (!this.txPromises[commitment]) {
       this.txPromises[commitment] = {};
     }
-    const existing = this.txPromises[commitment][txid]
+    const existing = this.txPromises[commitment][txid];
     if (existing) {
-      return existing
+      return existing;
     }
 
     let done = false;
