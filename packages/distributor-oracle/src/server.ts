@@ -325,6 +325,7 @@ export class OracleServer {
   private async signTransaction(
     data: number[]
   ): Promise<{ success: boolean; message?: string; transaction?: Buffer }> {
+    console.log("data is", data)
     const conn = this.ldProgram.provider.connection;
     const tx = VersionedTransaction.deserialize(new Uint8Array(data));
     const LUTs = (

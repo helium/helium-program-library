@@ -388,6 +388,7 @@ describe("distributor-oracle", () => {
       dao
     );
     await oracleServer.start();
+
     await sendInstructions(provider, [
       SystemProgram.transfer({
         fromPubkey: me,
@@ -473,7 +474,7 @@ describe("distributor-oracle", () => {
     const signedTx = VersionedTransaction.deserialize(res.body.transactions[0].data);
     await sendAndConfirmWithRetry(
       provider.connection,
-      signedTx.serialize(),
+      Buffer.from(signedTx.serialize()),
       {
         skipPreflight: true,
       },
@@ -510,14 +511,13 @@ describe("distributor-oracle", () => {
     const res = await chai
       .request(oracleServer.server)
       .post("/")
-      .send({ transaction: serializedTx });
+      .send({ transaction: Buffer.from(serializedTx) });
 
-    console.log(res.body);
     assert.hasAllKeys(res.body, ["transaction", "success"]);
-    const signedTx = Transaction.from(res.body.transaction.data);
+    const signedTx = VersionedTransaction.deserialize(res.body.transaction.data);
     await sendAndConfirmWithRetry(
       provider.connection,
-      signedTx.serialize(),
+      Buffer.from(signedTx.serialize()),
       {
         skipPreflight: true,
       },
