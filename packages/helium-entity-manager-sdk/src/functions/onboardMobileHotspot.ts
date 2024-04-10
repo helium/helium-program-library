@@ -18,7 +18,9 @@ export async function onboardMobileHotspot({
   dao,
   payer,
   dcFeePayer,
-  deviceType = 'cbrs',
+  deviceType = "cbrs",
+  elevation,
+  azimuth,
   ...rest
 }: {
   program: Program<HeliumEntityManager>;
@@ -26,29 +28,25 @@ export async function onboardMobileHotspot({
   dcFeePayer?: PublicKey;
   assetId: PublicKey;
   location?: BN;
+  elevation?: number;
+  azimuth?: number;
   rewardableEntityConfig: PublicKey;
   maker: PublicKey;
   dao: PublicKey;
-  deviceType?: 'cbrs' | 'wifiIndoor' | 'wifiOutdoor'
+  deviceType?: "cbrs" | "wifiIndoor" | "wifiOutdoor";
 } & Omit<ProofArgsAndAccountsArgs, "connection">) {
-  const {
-    asset,
-    args,
-    accounts,
-    remainingAccounts,
-  } = await proofArgsAndAccounts({
-    connection: program.provider.connection,
-    assetId,
-    ...rest,
-  });
+  const { asset, args, accounts, remainingAccounts } =
+    await proofArgsAndAccounts({
+      connection: program.provider.connection,
+      assetId,
+      ...rest,
+    });
   const {
     ownership: { owner },
   } = asset;
 
   const keyToAssetKey = keyToAssetForAsset(asset, dao);
-  const keyToAsset = await program.account.keyToAssetV0.fetch(
-    keyToAssetKey
-  );
+  const keyToAsset = await program.account.keyToAssetV0.fetch(keyToAssetKey);
   const [info] = await mobileInfoKey(
     rewardableEntityConfig,
     keyToAsset.entityKey
@@ -60,8 +58,10 @@ export async function onboardMobileHotspot({
       ...args,
       location: typeof location == "undefined" ? null : location,
       deviceType: {
-        [deviceType]: {}
-      } as any
+        [deviceType]: {},
+      } as any,
+      elevation: typeof elevation == "undefined" ? null : elevation,
+      azimuth: typeof azimuth == "undefined" ? null : azimuth,
     })
     .accounts({
       // hotspot: assetId,
