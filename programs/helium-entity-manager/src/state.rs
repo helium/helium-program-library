@@ -232,6 +232,8 @@ pub struct MobileHotspotInfoV0 {
   pub is_active: bool,
   pub dc_onboarding_fee_paid: u64,
   pub device_type: MobileDeviceTypeV0,
+  pub elevation: Option<i32>,
+  pub azimuth: Option<u16>,
 }
 pub const MOBILE_HOTSPOT_INFO_SIZE: usize = 8 +
     32 + // asset
@@ -241,6 +243,8 @@ pub const MOBILE_HOTSPOT_INFO_SIZE: usize = 8 +
     2 + // num location asserts
     1 + // is active
     8 + // dc onboarding fee paid
+    4 + // elevation
+    2 + // azimuth
     60; // pad
 
 #[macro_export]
