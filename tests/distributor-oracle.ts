@@ -29,6 +29,7 @@ import {
   PublicKey,
   SystemProgram,
   Transaction,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import chai, { assert, expect } from "chai";
 import chaiHttp from "chai-http";
@@ -469,7 +470,7 @@ describe("distributor-oracle", () => {
 
     console.log(res.body);
     assert.hasAllKeys(res.body, ["transactions", "success"]);
-    const signedTx = Transaction.from(res.body.transactions[0].data);
+    const signedTx = VersionedTransaction.deserialize(res.body.transactions[0].data);
     await sendAndConfirmWithRetry(
       provider.connection,
       signedTx.serialize(),
@@ -511,9 +512,7 @@ describe("distributor-oracle", () => {
       .post("/")
       .send({ transaction: serializedTx });
 
-    if (res.body.error) {
-      console.log(res.body);
-    }
+    console.log(res.body);
     assert.hasAllKeys(res.body, ["transaction", "success"]);
     const signedTx = Transaction.from(res.body.transaction.data);
     await sendAndConfirmWithRetry(
