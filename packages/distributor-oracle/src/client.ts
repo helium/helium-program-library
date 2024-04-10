@@ -105,7 +105,8 @@ export async function getPendingRewards(
   lazyDistributor: PublicKey,
   dao: PublicKey,
   entityKeys: string[],
-  encoding: BufferEncoding | "b58" = "b58"
+  encoding: BufferEncoding | "b58" = "b58",
+  forceRequery = false
 ): Promise<Record<string, string>> {
   const oracleRewards = await getBulkRewards(
     program,
@@ -129,7 +130,7 @@ export async function getPendingRewards(
       >("KeyToAssetV0", account.data),
     }),
     true,
-    false
+    forceRequery
   );
   keyToAssets.forEach((kta, index) => {
     if (!kta?.info) {
@@ -149,7 +150,9 @@ export async function getPendingRewards(
       info: program.coder.accounts.decode<
         IdlAccounts<LazyDistributor>["recipientV0"]
       >("RecipientV0", account.data),
-    })
+    }),
+    false,
+    forceRequery
   );
   const withRecipients = recipients.map((recipient, index) => {
     return {
