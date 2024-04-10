@@ -640,6 +640,7 @@ export class OracleServer {
       res
         .status(400)
         .send({ error: result.message || "Error signing transaction" });
+      return
     }
 
     res.send({ success: true, transaction: result.transaction });
