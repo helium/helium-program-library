@@ -2,7 +2,7 @@ import { Commitment, Connection, SignatureStatus } from "@solana/web3.js";
 import { chunks } from "./getMultipleAccounts";
 import { sleep } from "./utils";
 
-const TIMEOUT = 3 * 60 * 1000; // 3 minutes
+const TIMEOUT = 2 * 60 * 1000; // 2 minutes
 
 // Ensure we don't go over the limit of 100 per check
 async function getSignatureStatusesBatch(
@@ -56,6 +56,8 @@ export class TransactionCompletionQueue {
           },
           {} as Record<string, SignatureStatus | null>
         );
+      } else {
+        this.currentStatuses[commitment] = {}
       }
       this.lastQuery = new Date();
     }
@@ -170,6 +172,6 @@ export class TransactionCompletionQueue {
         await sleep(2000);
       }
     });
-    return this.txPromises[txid];
+    return this.txPromises[commitment][txid];
   }
 }

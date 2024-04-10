@@ -460,10 +460,7 @@ describe('distributor-oracle', () => {
       skipOracleSign: true,
     });
     const tx = await provider.wallet.signTransaction(unsigned[0]);
-    const serializedTx = tx.serialize({
-      requireAllSignatures: false,
-      verifySignatures: false,
-    });
+    const serializedTx = tx.serialize();
 
     const res = await chai
       .request(oracleServer.server)
@@ -507,10 +504,7 @@ describe('distributor-oracle', () => {
       skipOracleSign: true,
     });
     const tx = await provider.wallet.signTransaction(unsigned);
-    const serializedTx = tx.serialize({
-      requireAllSignatures: false,
-      verifySignatures: false,
-    });
+    const serializedTx = tx.serialize();
 
     const res = await chai
       .request(oracleServer.server)
