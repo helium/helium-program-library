@@ -69,8 +69,9 @@ export class TransactionCompletionQueue {
     if (!this.txPromises[commitment]) {
       this.txPromises[commitment] = {};
     }
-    if (await this.txPromises[commitment][txid]) {
-      return this.txPromises[commitment][txid];
+    const existing = this.txPromises[commitment][txid]
+    if (existing) {
+      return existing
     }
 
     let done = false;
