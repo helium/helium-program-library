@@ -306,6 +306,9 @@ export class AccountFetchCache {
     }
     try {
       const keys = Array.from(currentBatch);
+      if (keys.length === 0) {
+        return { keys: [], array: [] };
+      }
       const { array } = await getMultipleAccounts(
         this.connection,
         keys,
