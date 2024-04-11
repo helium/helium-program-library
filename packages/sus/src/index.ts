@@ -465,6 +465,18 @@ export async function sus({
         });
       }
       if (
+        instructions.some(
+          (ix) => ix.parsed?.name === "updateDestinationV0"
+        )
+      ) {
+        warningsByTx[index].push({
+          severity: "warning",
+          shortMessage: "Rewards Destination Changed",
+          message:
+            "This transaction will change the destination wallet of your mining rewards",
+        });
+      }
+      if (
         (
           await Promise.all(
             instructions.map((ix) => isBurnHotspot(connection, ix, assets))

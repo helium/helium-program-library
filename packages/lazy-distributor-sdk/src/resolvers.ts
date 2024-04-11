@@ -48,6 +48,12 @@ export const lazyDistributorResolvers = combineResolvers(
     mint: 'common.rewardsMint',
     owner: 'common.owner',
   }),
+  ataResolver({
+    instruction: 'distributeCustomDestinationV0',
+    account: 'common.destinationAccount',
+    mint: 'common.rewardsMint',
+    owner: 'common.owner',
+  }),
   circuitBreakerResolvers,
   resolveIndividual(async ({ path, accounts, idlIx }) => {
     if (path[path.length - 1] === 'targetMetadata') {
@@ -100,6 +106,40 @@ export const lazyDistributorResolvers = combineResolvers(
     return {
       resolved,
       accounts,
+    };
+  },
+    async ({ accounts, provider, idlIx }) => {
+    let resolved = 0;
+    if (
+      idlIx.name === 'updateDestinationV0' &&
+      // @ts-ignore
+      (!accounts.recipientMintAccount ||
+        // @ts-ignore
+        !accounts.owner)
+    ) {
+      // @ts-ignore
+      const recipient = accounts.recipient as PublicKey;
+      const recipientAcc = await provider.connection.getAccountInfo(recipient);
+      const recipientMint = new PublicKey(
+        recipientAcc!.data.subarray(8 + 32, 8 + 32 + 32)
+      );
+      const recipientMintAccount = (
+        await provider.connection.getTokenLargestAccounts(recipientMint)
+      ).value[0].address;
+      const recipientMintTokenAccount = await getAccount(
+        provider.connection,
+        recipientMintAccount
+      );
+      // @ts-ignore
+      accounts.owner = recipientMintTokenAccount.owner;
+      // @ts-ignore
+      accounts.recipientMintAccount = recipientMintAccount;
+      resolved += 1;
+    }
+
+    return {
+      accounts,
+      resolved,
     };
   },
   async ({ accounts, provider, idlIx }) => {

@@ -77,4 +77,21 @@ pub mod lazy_distributor {
   ) -> Result<()> {
     update_lazy_distributor_v0::handler(ctx, args)
   }
+
+  pub fn update_compression_destination_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, UpdateCompressionDestinationV0<'info>>,
+    args: UpdateCompressionDestinationArgsV0,
+  ) -> Result<()> {
+    update_compression_destination_v0::handler(ctx, args)
+  }
+
+  pub fn update_destination_v0(ctx: Context<UpdateDestinationV0>) -> Result<()> {
+    update_destination_v0::handler(ctx)
+  }
+
+  pub fn distribute_custom_destination_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, DistributeCustomDestinationV0<'info>>,
+  ) -> Result<()> {
+    distribute_custom_destination_v0::handler(ctx)
+  }
 }

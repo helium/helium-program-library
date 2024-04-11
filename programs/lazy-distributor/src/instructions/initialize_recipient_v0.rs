@@ -39,6 +39,7 @@ pub fn handler(ctx: Context<InitializeRecipientV0>) -> Result<()> {
     current_rewards: vec![None; ctx.accounts.lazy_distributor.oracles.len()],
     lazy_distributor: ctx.accounts.lazy_distributor.key(),
     bump_seed: ctx.bumps["recipient"],
+    destination: Pubkey::default(),
   });
 
   Ok(())
