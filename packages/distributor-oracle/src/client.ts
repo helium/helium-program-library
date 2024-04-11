@@ -377,7 +377,8 @@ export async function formBulkTransactions({
                 true
               ),
             },
-          });
+          })
+          .instruction();
       } else {
         distributeIx = await (
           await distributeCompressionRewards({
