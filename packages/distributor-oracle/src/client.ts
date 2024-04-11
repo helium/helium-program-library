@@ -30,9 +30,12 @@ import {
   populateMissingDraftInfo,
   toVersionedTx,
   truthy,
-  withPriorityFees
+  withPriorityFees,
 } from "@helium/spl-utils";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import {
+  getAssociatedTokenAddress,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
 import {
   AddressLookupTableAccount,
   PublicKey,
@@ -317,44 +320,66 @@ export async function formBulkTransactions({
     false
   );
   // construct the set and distribute ixs
-  const setAndDistributeIxs = (
-    await Promise.all(
-      compressionAssetAccs.map(async (assetAcc, idx) => {
-        const keyToAssetK = keyToAssets[idx]?.pubkey;
-        const keyToAsset = keyToAssets[idx]?.info;
-        if (!keyToAsset || !keyToAssetK) {
-          return [];
-        }
-        const inits = ixsPerAsset[idx];
-        const entityKey = decodeEntityKey(
-          keyToAsset.entityKey,
-          keyToAsset.keySerialization
-        )!;
-        const setRewardIxs = (
-          await Promise.all(
-            rewards.map(async (bulkRewards, oracleIdx) => {
-              if (!(entityKey in bulkRewards.currentRewards)) {
-                return null;
-              }
-              return await rewardsOracleProgram!.methods
-                .setCurrentRewardsWrapperV1({
-                  currentRewards: new BN(bulkRewards.currentRewards[entityKey]),
-                  oracleIndex: oracleIdx,
-                })
-                .accounts({
-                  lazyDistributor,
-                  recipient: recipientKeys[idx],
-                  keyToAsset: keyToAssetK,
-                  oracle: bulkRewards.oracleKey,
-                })
-                .instruction();
-            })
-          )
-        ).filter(truthy);
-        if (setRewardIxs.length == 0) {
-          return [];
-        }
-        const distributeIx = await (
+  const setAndDistributeIxs = await Promise.all(
+    compressionAssetAccs.map(async (assetAcc, idx) => {
+      const keyToAssetK = keyToAssets[idx]?.pubkey;
+      const keyToAsset = keyToAssets[idx]?.info;
+      if (!keyToAsset || !keyToAssetK) {
+        return [];
+      }
+      const inits = ixsPerAsset[idx];
+      const entityKey = decodeEntityKey(
+        keyToAsset.entityKey,
+        keyToAsset.keySerialization
+      )!;
+      const setRewardIxs = (
+        await Promise.all(
+          rewards.map(async (bulkRewards, oracleIdx) => {
+            if (!(entityKey in bulkRewards.currentRewards)) {
+              return null;
+            }
+            return await rewardsOracleProgram!.methods
+              .setCurrentRewardsWrapperV1({
+                currentRewards: new BN(bulkRewards.currentRewards[entityKey]),
+                oracleIndex: oracleIdx,
+              })
+              .accounts({
+                lazyDistributor,
+                recipient: recipientKeys[idx],
+                keyToAsset: keyToAssetK,
+                oracle: bulkRewards.oracleKey,
+              })
+              .instruction();
+          })
+        )
+      ).filter(truthy);
+      if (setRewardIxs.length == 0) {
+        return [];
+      }
+      let distributeIx;
+      if (
+        recipientAccs[idx] &&
+        !recipientAccs[idx]?.destination.equals(PublicKey.default)
+      ) {
+        const destination = recipientAccs[idx]!.destination;
+        distributeIx = await lazyDistributorProgram.methods
+          .distributeCustomDestinationV0()
+          .accounts({
+            common: {
+              payer,
+              recipient: recipientKeys[idx],
+              lazyDistributor,
+              rewardsMint: lazyDistributorAcc.rewardsMint!,
+              owner: assetAcc.ownership.owner,
+              destinationAccount: getAssociatedTokenAddressSync(
+                lazyDistributorAcc.rewardsMint!,
+                destination,
+                true
+              ),
+            },
+          });
+      } else {
+        distributeIx = await (
           await distributeCompressionRewards({
             program: lazyDistributorProgram,
             assetId: assets![idx],
@@ -370,25 +395,28 @@ export async function formBulkTransactions({
             assetEndpoint,
           })
         ).instruction();
-        const ret = [...inits, ...setRewardIxs, distributeIx];
-        // filter arrays where init recipient is the only ix
-        if (ret.length > 1) {
-          return ret;
-        }
+      }
+      const ret = [...inits, ...setRewardIxs, distributeIx];
+      // filter arrays where init recipient is the only ix
+      if (ret.length > 1) {
+        return ret;
+      }
 
-        return [];
-      })
-    )
+      return [];
+    })
   );
 
   // unsigned txs
-  const initialTxDrafts =
-    await batchInstructionsToTxsWithPriorityFee(provider, setAndDistributeIxs, {
+  const initialTxDrafts = await batchInstructionsToTxsWithPriorityFee(
+    provider,
+    setAndDistributeIxs,
+    {
       basePriorityFee,
       addressLookupTableAddresses: [
         isDevnet ? HELIUM_COMMON_LUT_DEVNET : HELIUM_COMMON_LUT,
       ],
-    });
+    }
+  );
   const initialTxs = initialTxDrafts.map(toVersionedTx);
 
   // @ts-ignore
@@ -409,7 +437,11 @@ export async function formBulkTransactions({
   const finalTxs = serTxs.map((tx) => VersionedTransaction.deserialize(tx));
   // Check instructions are the same
   finalTxs.forEach((finalTx, idx) => {
-    assertSameTx(finalTx, initialTxs[idx], initialTxDrafts[0]?.addressLookupTables);
+    assertSameTx(
+      finalTx,
+      initialTxs[idx],
+      initialTxDrafts[0]?.addressLookupTables
+    );
   });
 
   return finalTxs;
@@ -484,9 +516,10 @@ export async function formTransaction({
     true
   );
 
-  const instructions: TransactionInstruction[] = []
-  const recipientExists = await provider.connection.getAccountInfo(recipient);
-  if (!recipientExists) {
+  const instructions: TransactionInstruction[] = [];
+  const recipientAcc =
+    await lazyDistributorProgram.account.recipientV0.fetchNullable(recipient);
+  if (!recipientAcc) {
     let initRecipientIx;
     if (assetAcc.compression.compressed) {
       initRecipientIx = await (
@@ -532,12 +565,35 @@ export async function formTransaction({
   instructions.push(
     ...(await withPriorityFees({
       connection: provider.connection,
-      computeUnits: recipientExists ? RECIPIENT_EXISTS_CU : MISSING_RECIPIENT_CU,
+      computeUnits: recipientAcc ? RECIPIENT_EXISTS_CU : MISSING_RECIPIENT_CU,
       instructions: ixs,
       basePriorityFee,
     }))
   );
 
+  if (recipientAcc && !recipientAcc.destination.equals(PublicKey.default)) {
+    const destination = recipientAcc.destination;
+    instructions.push(
+      await lazyDistributorProgram.methods
+        .distributeCustomDestinationV0()
+        .accounts({
+          // @ts-ignore
+          common: {
+            payer,
+            recipient,
+            lazyDistributor,
+            rewardsMint,
+            owner: destination,
+            destinationAccount: getAssociatedTokenAddressSync(
+              rewardsMint,
+              destination,
+              true
+            ),
+          },
+        })
+        .instruction()
+    );
+  }
   if (assetAcc.compression.compressed) {
     const distributeIx = await (
       await distributeCompressionRewards({
@@ -599,22 +655,26 @@ function assertSameTx(
   tx1: VersionedTransaction,
   luts: AddressLookupTableAccount[] = []
 ) {
-  if (tx.message.compiledInstructions.length !== tx1.message.compiledInstructions.length) {
+  if (
+    tx.message.compiledInstructions.length !==
+    tx1.message.compiledInstructions.length
+  ) {
     throw new Error("Extra instructions added by oracle");
   }
 
   tx.message.compiledInstructions.forEach((instruction, idx) => {
     const instruction1 = tx1.message.compiledInstructions[idx];
-    if (
-      instruction.programIdIndex !== instruction1.programIdIndex
-    ) {
+    if (instruction.programIdIndex !== instruction1.programIdIndex) {
       throw new Error("Program id mismatch");
     }
     if (!Buffer.from(instruction.data).equals(Buffer.from(instruction1.data))) {
       throw new Error("Instruction data mismatch");
     }
 
-    if (instruction.accountKeyIndexes.length !== instruction1.accountKeyIndexes.length) {
+    if (
+      instruction.accountKeyIndexes.length !==
+      instruction1.accountKeyIndexes.length
+    ) {
       throw new Error("Key length mismatch");
     }
 
@@ -635,7 +695,7 @@ function assertSameTx(
       addressLookupTableAccounts: luts,
     })
     .keySegments()
-    .reduce((acc, cur) => acc.concat(cur), []);;
+    .reduce((acc, cur) => acc.concat(cur), []);
   if (keys1.length !== keys.length) {
     throw new Error("Account keys do not match");
   }
