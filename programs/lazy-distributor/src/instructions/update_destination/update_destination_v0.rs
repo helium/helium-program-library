@@ -17,7 +17,7 @@ pub struct UpdateDestinationV0<'info> {
   pub recipient_mint_account: Box<Account<'info, TokenAccount>>,
 }
 
-pub fn handler<'info>(ctx: Context<UpdateDestinationV0>) -> Result<()> {
+pub fn handler(ctx: Context<UpdateDestinationV0>) -> Result<()> {
   ctx.accounts.recipient.destination = ctx.accounts.destination.key();
 
   Ok(())
