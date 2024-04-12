@@ -83,12 +83,13 @@ describe("lazy-distributor", () => {
     let mint: PublicKey;
     let lazyDistributor: PublicKey;
     let asset: PublicKey;
-    let merkle = Keypair.generate();
+    let merkle: Keypair;
     let merkleTree: MerkleTree;
     let creatorHash: Buffer;
     let dataHash: Buffer;
 
     beforeEach(async () => {
+      merkle = Keypair.generate();
       const { mintKey } = await createNft(provider, me);
       mint = mintKey;
 
