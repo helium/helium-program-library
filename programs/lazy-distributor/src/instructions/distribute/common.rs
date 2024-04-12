@@ -22,7 +22,7 @@ pub struct DistributeRewardsCommonV0<'info> {
   #[account(
     mut,
     has_one = lazy_distributor,
-    constraint = recipient.current_rewards.iter().flatten().count() >= ((lazy_distributor.oracles.len() + 1) / 2)
+    constraint = recipient.current_rewards.iter().flatten().count() >= ((lazy_distributor.oracles.len() + 1) / 2),
   )]
   pub recipient: Box<Account<'info, RecipientV0>>,
   pub rewards_mint: Box<Account<'info, Mint>>,
@@ -37,6 +37,7 @@ pub struct DistributeRewardsCommonV0<'info> {
   pub circuit_breaker: Box<Account<'info, AccountWindowedCircuitBreakerV0>>,
   /// TODO: Should this be permissioned? Should the owner have to sign to receive rewards?
   /// CHECK: Just required for ATA
+  #[account(mut)]
   pub owner: AccountInfo<'info>,
   #[account(
     init_if_needed,

@@ -29,4 +29,6 @@ pub struct RecipientV0 {
   pub current_config_version: u16,
   pub current_rewards: Vec<Option<u64>>, // One for each oracle, matching indexes in` LazyDistrubutorV0`
   pub bump_seed: u8,
+  /// Pubkey::Default if not being used.
+  pub destination: Pubkey,
 }

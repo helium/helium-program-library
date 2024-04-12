@@ -403,6 +403,7 @@ export class OracleServer {
         (decoded.name !== "setCurrentRewardsV0" &&
           decoded.name !== "distributeRewardsV0" &&
           decoded.name !== "distributeCompressionRewardsV0" &&
+          decoded.name !== "distributeCustomDestinationV0" &&
           decoded.name !== "initializeRecipientV0" &&
           decoded.name !== "initializeCompressionRecipientV0" &&
           decoded.name !== "setCurrentRewardsWrapperV0" &&
