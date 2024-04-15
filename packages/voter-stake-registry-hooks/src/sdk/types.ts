@@ -2,7 +2,6 @@ import { BN, IdlAccounts, IdlTypes } from '@coral-xyz/anchor'
 import { HeliumSubDaos } from '@helium/idls/lib/types/helium_sub_daos'
 import { VoterStakeRegistry as HeliumVoterStakeRegistry } from '@helium/idls/lib/types/voter_stake_registry'
 import { NftDelegation } from '@helium/modular-governance-idls/lib/types/nft_delegation'
-import { Sft } from '@metaplex-foundation/js'
 import { PublicKey } from '@solana/web3.js'
 
 export type VotingMintConfig = IdlTypes<HeliumVoterStakeRegistry>['VotingMintConfigV0']

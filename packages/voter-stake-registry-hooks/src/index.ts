@@ -24,7 +24,7 @@ export * from "./sdk/types";
 export { useVotingDelegatePositions } from "./hooks/useVotingDelegatePositions";
 export { useVotingUndelegatePositions } from "./hooks/useVotingUndelegatePositions";
 export { useVotingDelegatedTo } from "./hooks/useVotingDelegatedTo"
-export { getRegistrarKey, getPositionKeys } from "./utils/getPositionKeys";
+export { getPositionKeys } from "./utils/getPositionKeys";
 export { getSubDaos } from "./utils/getSubDaos";
 export { useVoteMarkers } from "./hooks/useVoteMarkers";
 export { useVote } from "./hooks/useVote";

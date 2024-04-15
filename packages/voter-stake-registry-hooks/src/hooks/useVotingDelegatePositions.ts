@@ -47,16 +47,18 @@ export const useVotingDelegatePositions = () => {
             })
             .prepare();
           // Don't delegate where there's already a delegation.
-          if ((await provider.connection.getAccountInfo(nextDelegation!))) {
-            throw new Error("Recipient wallet is already a proxy to this position")
+          if (await provider.connection.getAccountInfo(nextDelegation!)) {
+            throw new Error(
+              "Recipient wallet is already a proxy to this position"
+            );
           } else {
             instructions.push(instruction);
           }
         }
 
-        await batchParallelInstructions(provider, instructions);
+        await batchParallelInstructions({ provider, instructions });
         // Wait a couple seconds for changes to hit pg-sink
-        setTimeout(refetch, 2 * 1000)
+        setTimeout(refetch, 2 * 1000);
       }
     }
   );

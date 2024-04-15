@@ -77,7 +77,7 @@ address = "propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs" # Proposal
 address = "66t3XARU6Ja3zj91gDZ2KoNLJHEMTYPSKqJWYb6PJJBA" # Proposal IDL
 
 [[test.validator.clone]]
-address = "nde169MVKXLYbtDbrTF8wiJc8KYJRvLXKAzHApZ5vvD" # NFT Delegation
+address = "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p" # NFT Proxy
 
 [[test.validator.clone]]
 address = "5612ANVGVnwJRuvKJ1uSmky3A2mCfFDAi6DaK9xoZRp9" # NFT Delegation IDL

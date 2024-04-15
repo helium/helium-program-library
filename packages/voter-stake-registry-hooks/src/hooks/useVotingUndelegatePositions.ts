@@ -1,10 +1,6 @@
 import { Program } from "@coral-xyz/anchor";
 import { PROGRAM_ID, delegationKey, init } from "@helium/nft-delegation-sdk";
-import {
-  batchLinearInstructions,
-  sendInstructions,
-  truthy,
-} from "@helium/spl-utils";
+import { truthy, batchParallelInstructions } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
@@ -82,7 +78,7 @@ export const useVotingUndelegatePositions = () => {
             ).filter(truthy)
           );
         }
-        await batchLinearInstructions(provider, instructions);
+        await batchParallelInstructions({ provider, instructions });
         // Wait a couple seconds for changes to hit pg-sink
         setTimeout(refetch, 2 * 1000);
       }
