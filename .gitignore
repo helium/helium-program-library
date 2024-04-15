@@ -26,3 +26,4 @@ accounts
 !.yarn/sdks
 !.yarn/versions
 packages/helium-vote-service/helium-vote-proxies/
+!packages/docsite/src/data

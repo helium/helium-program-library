@@ -1,7 +1,14 @@
-use crate::{current_epoch, id, state::*, utils::*};
+use self::borsh::BorshSerialize;
+use crate::{
+  create_account::{create_and_serialize_account_signed, AccountMaxSize},
+  current_epoch,
+  error::ErrorCode,
+  id,
+  state::*,
+  utils::*,
+};
 use anchor_lang::{prelude::*, Discriminator};
 use anchor_spl::token::{Mint, TokenAccount};
-use spl_governance_tools::account::{create_and_serialize_account_signed, AccountMaxSize};
 
 use voter_stake_registry::{
   state::{LockupKind, PositionV0, Registrar},
@@ -46,6 +53,7 @@ pub struct DelegateV0<'info> {
     space = SubDaoEpochInfoV0::SIZE,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(registrar.clock_unix_timestamp()).to_le_bytes()],
     bump,
+    constraint = sub_dao_epoch_info.key() != closing_time_sub_dao_epoch_info.key() @ ErrorCode::NoDelegateEndingPosition
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   #[account(
@@ -93,7 +101,7 @@ pub struct SubDaoEpochInfoV0WithDescriminator {
   pub sub_dao_epoch_info: SubDaoEpochInfoV0,
 }
 
-impl crate::borsh::BorshSerialize for SubDaoEpochInfoV0WithDescriminator {
+impl BorshSerialize for SubDaoEpochInfoV0WithDescriminator {
   fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
     SubDaoEpochInfoV0::DISCRIMINATOR.serialize(writer)?;
     self.sub_dao_epoch_info.serialize(writer)
@@ -233,16 +241,26 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
           &mut parsed
         };
 
-      genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions =
-        genesis_end_sub_dao_epoch_info
-          .fall_rates_from_closing_positions
-          .checked_add(genesis_end_fall_rate_correction)
-          .unwrap();
+      // EDGE CASE: The genesis end could be this epoch. Do not override what was done with update_subdao_vehnt
+      if genesis_end_sub_dao_epoch_info.key() == ctx.accounts.sub_dao_epoch_info.key() {
+        genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions = ctx
+          .accounts
+          .sub_dao_epoch_info
+          .fall_rates_from_closing_positions;
+        genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions =
+          ctx.accounts.sub_dao_epoch_info.vehnt_in_closing_positions;
+      } else {
+        genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions =
+          genesis_end_sub_dao_epoch_info
+            .fall_rates_from_closing_positions
+            .checked_add(genesis_end_fall_rate_correction)
+            .unwrap();
 
-      genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = genesis_end_sub_dao_epoch_info
-        .vehnt_in_closing_positions
-        .checked_add(genesis_end_vehnt_correction)
-        .unwrap();
+        genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = genesis_end_sub_dao_epoch_info
+          .vehnt_in_closing_positions
+          .checked_add(genesis_end_vehnt_correction)
+          .unwrap();
+      }
 
       genesis_end_sub_dao_epoch_info.exit(&id())?;
     }

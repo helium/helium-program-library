@@ -5,6 +5,7 @@ import {
   createMintInstructions,
   sendInstructions,
   toBN,
+  withPriorityFees,
 } from "@helium/spl-utils";
 import {
   createCreateMetadataAccountV3Instruction,
@@ -55,7 +56,7 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
+import Squads, { getTxPDA } from "@sqds/sdk";
 import { BN } from "bn.js";
 import fs from "fs";
 import fetch from "node-fetch";
@@ -111,7 +112,6 @@ export async function createIdlUpgradeInstruction(
   });
 }
 
-
 export const getTimestampFromDays = (days: number) => days * SECONDS_PER_DAY;
 
 export const getUnixTimestamp = async (
@@ -128,7 +128,6 @@ export async function exists(
 ): Promise<boolean> {
   return Boolean(await connection.getAccountInfo(account));
 }
-
 
 async function withRetries<A>(
   tries: number,
@@ -706,7 +705,11 @@ export async function sendInstructionsOrSquads({
   if (!multisig) {
     return await sendInstructions(
       provider,
-      instructions,
+      await withPriorityFees({
+        connection: provider.connection,
+        computeUnits: 1000000,
+        instructions,
+      }),
       signers,
       payer,
       commitment,
@@ -738,7 +741,11 @@ export async function sendInstructionsOrSquads({
   if (squadsSignatures.length == 0) {
     return await sendInstructions(
       provider,
-      nonMissingSignerIxs,
+      await withPriorityFees({
+        connection: provider.connection,
+        computeUnits: 1000000,
+        instructions: nonMissingSignerIxs,
+      }),
       signers,
       payer,
       commitment,
@@ -750,24 +757,67 @@ export async function sendInstructionsOrSquads({
     throw new Error("Too many missing signatures");
   }
 
-  const tx = await squads.createTransaction(multisig, authorityIndex!);
-  for (const ix of instructions.filter(ix => !ix.programId.equals(ComputeBudgetProgram.programId))) {
-    await withRetries(3, async () => await squads.addInstruction(tx.publicKey, ix));
-  }
-
-  await withRetries(3, async () => await squads.activateTransaction(tx.publicKey));
-  await withRetries(3, async () => await squads.approveTransaction(tx.publicKey));
-  if (executeTransaction) {
-    const ix = await squads.buildExecuteTransaction(
-      tx.publicKey,
-      provider.wallet.publicKey
-    );
+  const txIndex = await squads.getNextTransactionIndex(multisig);
+  const ix = await squads.buildCreateTransaction(
+    multisig,
+    authorityIndex!,
+    txIndex
+  );
+  await sendInstructions(
+    provider,
+    await withPriorityFees({
+      connection: provider.connection,
+      instructions: [ix],
+      computeUnits: 200000,
+    })
+  );
+  const [txKey] = await getTxPDA(
+    multisig,
+    new BN(txIndex),
+    squads.multisigProgramId
+  );
+  let index = 1;
+  for (const ix of instructions.filter(
+    (ix) => !ix.programId.equals(ComputeBudgetProgram.programId)
+  )) {
     await sendInstructions(
       provider,
-      [ComputeBudgetProgram.setComputeUnitLimit({ units: 800000 }), ix],
-      signers
+      await withPriorityFees({
+        connection: provider.connection,
+        instructions: [
+          await squads.buildAddInstruction(
+            multisig,
+            txKey,
+            ix,
+            index
+          ),
+        ],
+        computeUnits: 200000,
+      })
     );
+    index++;
   }
+
+  const ixs: TransactionInstruction[] = []
+  ixs.push(await squads.buildActivateTransaction(multisig, txKey))
+  ixs.push(await squads.buildApproveTransaction(multisig, txKey))
+
+  if (executeTransaction) {
+    ixs.push(await squads.buildExecuteTransaction(
+      txKey,
+      provider.wallet.publicKey
+    ));
+  }
+
+  await sendInstructions(
+    provider,
+    await withPriorityFees({
+      connection: provider.connection,
+      computeUnits: 1000000,
+      instructions: ixs
+    }),
+    signers
+  )
 }
 
 export async function parseEmissionsSchedule(filepath: string) {
@@ -795,4 +845,3 @@ export async function parseEmissionsSchedule(filepath: string) {
 function sleep(arg0: number) {
   return new Promise((resolve) => setTimeout(resolve, arg0));
 }
-

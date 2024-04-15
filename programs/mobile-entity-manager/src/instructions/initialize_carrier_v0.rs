@@ -21,6 +21,7 @@ pub const CARRIER_STAKE_AMOUNT: u64 = 500_000_000_000_000;
 pub struct InitializeCarrierArgsV0 {
   pub update_authority: Pubkey,
   pub issuing_authority: Pubkey,
+  pub hexboost_authority: Pubkey,
   pub name: String,
   pub metadata_url: String,
 }
@@ -196,11 +197,12 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
     update_authority: args.update_authority,
     collection: ctx.accounts.collection.key(),
     merkle_tree: Pubkey::default(),
-    /// Initialized via set_carrier_tree
+    // Initialized via set_carrier_tree
     bump_seed: ctx.bumps["carrier"],
     collection_bump_seed: ctx.bumps["collection"],
     sub_dao: ctx.accounts.sub_dao.key(),
     escrow: ctx.accounts.escrow.key(),
+    hexboost_authority: args.hexboost_authority,
     approved: false,
   });
 

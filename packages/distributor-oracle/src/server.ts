@@ -1,5 +1,4 @@
 import dotenv from "dotenv";
-import bs58 from "bs58";
 dotenv.config();
 // @ts-ignore
 import {
@@ -9,7 +8,7 @@ import {
   getProvider,
   Instruction,
   Program,
-  setProvider
+  setProvider,
 } from "@coral-xyz/anchor";
 import {
   decodeEntityKey,
@@ -19,23 +18,38 @@ import {
   keyToAssetForAsset,
 } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
-import {
-  HeliumEntityManager,
-} from "@helium/idls/lib/types/helium_entity_manager";
+import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { init as initLazy, lazyDistributorKey, PROGRAM_ID as LD_PID } from "@helium/lazy-distributor-sdk";
-import { init as initRewards, PROGRAM_ID as RO_PID} from "@helium/rewards-oracle-sdk";
-import { Asset, getAsset, HNT_MINT, IOT_MINT } from "@helium/spl-utils";
+import {
+  init as initLazy,
+  lazyDistributorKey,
+  PROGRAM_ID as LD_PID,
+} from "@helium/lazy-distributor-sdk";
+import {
+  init as initRewards,
+  PROGRAM_ID as RO_PID,
+} from "@helium/rewards-oracle-sdk";
+import {
+  Asset,
+  getAsset,
+  HNT_MINT,
+  IOT_MINT,
+  toNumber,
+} from "@helium/spl-utils";
 import { AccountFetchCache } from "@helium/account-fetch-cache";
 import {
   Keypair,
   PublicKey,
   Transaction,
-  TransactionInstruction
+  TransactionInstruction,
+  ComputeBudgetProgram,
+  VersionedTransaction,
+  AddressLookupTableAccount,
+  MessageCompiledInstruction,
 } from "@solana/web3.js";
 import { Op } from "sequelize";
 import fs from "fs";
-import { Reward } from "./model";
+import { Reward, sequelize } from "./model";
 import Fastify, {
   FastifyInstance,
   FastifyRequest,
@@ -44,18 +58,24 @@ import Fastify, {
 import cors from "@fastify/cors";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
+import { register, totalRewardsGauge } from "./metrics";
 
-const HNT = process.env.HNT_MINT ? new PublicKey(process.env.HNT_MINT) : HNT_MINT;
+const HNT = process.env.HNT_MINT
+  ? new PublicKey(process.env.HNT_MINT)
+  : HNT_MINT;
+const DNT = process.env.DNT_MINT
+  ? new PublicKey(process.env.DNT_MINT)
+  : IOT_MINT;
 const DAO = daoKey(HNT)[0];
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
 export interface Database {
+  getTotalRewards(): Promise<string>;
   getCurrentRewardsByEntity: (entityKey: string) => Promise<string>;
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
   getBulkRewards: (entityKeys: string[]) => Promise<Record<string, string>>;
   getActiveDevices(): Promise<number>;
 }
-
 
 export class PgDatabase implements Database {
   constructor(
@@ -65,6 +85,17 @@ export class PgDatabase implements Database {
       asset: PublicKey
     ) => Promise<Asset | undefined> = getAsset
   ) {}
+
+  async getTotalRewards(): Promise<string> {
+    const totalRewards = (
+      await Reward.findAll({
+        attributes: [
+          [sequelize.fn("SUM", sequelize.col("rewards")), "rewards"],
+        ],
+      })
+    )[0].rewards;
+    return totalRewards;
+  }
 
   getActiveDevices(): Promise<number> {
     return Reward.count({
@@ -167,6 +198,21 @@ export class OracleServer {
     server.get("/health", async () => {
       return { ok: true };
     });
+    let lastCall = 0;
+    async function getTotalRewards() {
+      const currTs = new Date().valueOf();
+      // Only update once every 10m
+      if (currTs - lastCall > 10 * 60 * 1000) {
+        console.log("Updating total rewards");
+        const rewards = toNumber(new BN(await db.getTotalRewards()), 6);
+        totalRewardsGauge.labels(DNT.toBase58()).set(Number(rewards));
+        lastCall = currTs;
+      }
+    }
+    server.get("/metrics", async (request, reply) => {
+      await getTotalRewards();
+      return register.metrics();
+    });
 
     this.app = server;
     this.addRoutes();
@@ -187,10 +233,13 @@ export class OracleServer {
   private addRoutes() {
     this.app.get("/active-devices", this.getActiveDevicesHandler.bind(this));
     this.app.post("/bulk-rewards", this.getAllRewardsHandler.bind(this));
-    this.app.get<{ Querystring: { assetId?: string; entityKey?: string, keySerialization?: BufferEncoding | "b58" } }>(
-      "/",
-      this.getCurrentRewardsHandler.bind(this)
-    );
+    this.app.get<{
+      Querystring: {
+        assetId?: string;
+        entityKey?: string;
+        keySerialization?: BufferEncoding | "b58";
+      };
+    }>("/", this.getCurrentRewardsHandler.bind(this));
     this.app.post("/", this.signTransactionHandler.bind(this));
     this.app.post("/bulk-sign", this.signBulkTransactionsHandler.bind(this));
   }
@@ -232,8 +281,12 @@ export class OracleServer {
     }
 
     if (entityKey) {
-      const [key] = await keyToAssetKey(this.dao, entityKey as string, keySerialization);
-      console.log(key.toBase58())
+      const [key] = await keyToAssetKey(
+        this.dao,
+        entityKey as string,
+        keySerialization
+      );
+      console.log(key.toBase58());
       const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(key);
       assetId = keyToAsset.asset.toBase58();
     }
@@ -272,10 +325,25 @@ export class OracleServer {
   private async signTransaction(
     data: number[]
   ): Promise<{ success: boolean; message?: string; transaction?: Buffer }> {
-    const tx = Transaction.from(data);
+    console.log("data is", data)
+    const conn = this.ldProgram.provider.connection;
+    const tx = VersionedTransaction.deserialize(new Uint8Array(data));
+    const LUTs = (
+      await Promise.all(
+        tx.message.addressTableLookups.map((acc) =>
+          conn.getAddressLookupTable(acc.accountKey)
+        )
+      )
+    )
+      .map((lut) => lut.value)
+      .filter((val) => val !== null) as AddressLookupTableAccount[];
+    const allAccs = tx.message
+      .getAccountKeys({ addressLookupTableAccounts: LUTs })
+      .keySegments()
+      .reduce((acc, cur) => acc.concat(cur), []);
 
     // validate only interacts with LD and RO programs and only calls setCurrentRewards, distributeRewards
-    const setRewardIxs: TransactionInstruction[] = [];
+    const setRewardIxs: MessageCompiledInstruction[] = [];
     let recipientToLazyDistToMint: Record<
       string,
       Record<string, PublicKey>
@@ -308,28 +376,34 @@ export class OracleServer {
         (x) => x.name === "recipient"
       )!;
 
-    for (const ix of tx.instructions) {
-      if (!(ix.programId.equals(LD_PID) || ix.programId.equals(RO_PID))) {
+    for (const ix of tx.message.compiledInstructions) {
+      const programId = allAccs[ix.programIdIndex];
+      if (programId.equals(ComputeBudgetProgram.programId)) {
+        continue;
+      }
+      if (!(programId.equals(LD_PID) || programId.equals(RO_PID))) {
         return {
           success: false,
           message: "Invalid instructions in transaction",
         };
       }
+      const data = Buffer.from(ix.data);
       let decoded: Instruction | null;
-      if (ix.programId.equals(LD_PID)) {
+      if (programId.equals(LD_PID)) {
         decoded = (
           this.ldProgram.coder.instruction as BorshInstructionCoder
-        ).decode(ix.data);
+        ).decode(data);
       } else {
         decoded = (
           this.roProgram.coder.instruction as BorshInstructionCoder
-        ).decode(ix.data);
+        ).decode(data);
       }
       if (
         !decoded ||
         (decoded.name !== "setCurrentRewardsV0" &&
           decoded.name !== "distributeRewardsV0" &&
           decoded.name !== "distributeCompressionRewardsV0" &&
+          decoded.name !== "distributeCustomDestinationV0" &&
           decoded.name !== "initializeRecipientV0" &&
           decoded.name !== "initializeCompressionRecipientV0" &&
           decoded.name !== "setCurrentRewardsWrapperV0" &&
@@ -352,23 +426,23 @@ export class OracleServer {
 
       // Since recipient wont exist to fetch to get the mint id, grab it from the init recipient ix
       if (decoded.name === "initializeRecipientV0") {
-        const recipient = ix.keys[recipientIdxInitRecipient].pubkey.toBase58();
+        const recipient = allAccs[ix.accountKeyIndexes[recipientIdxInitRecipient]].toBase58();
         recipientToLazyDistToMint[recipient] ||= {};
         const lazyDist =
-          ix.keys[lazyDistributorIdxInitRecipient].pubkey.toBase58();
+          allAccs[ix.accountKeyIndexes[lazyDistributorIdxInitRecipient]].toBase58();
         recipientToLazyDistToMint[recipient][lazyDist] =
-          ix.keys[mintIdx].pubkey;
+          allAccs[ix.accountKeyIndexes[mintIdx]];
       }
 
       // Since recipient wont exist to fetch to get the asset id, grab it from the init recipient ix
       if (decoded.name === "initializeCompressionRecipientV0") {
         const recipient =
-          ix.keys[recipientIdxInitCompressionRecipient].pubkey.toBase58();
+          allAccs[ix.accountKeyIndexes[recipientIdxInitCompressionRecipient]].toBase58();
         recipientToLazyDistToMint[recipient] ||= {};
         const lazyDist =
-          ix.keys[lazyDistributorIdxInitCompressionRecipient].pubkey.toBase58();
+          allAccs[ix.accountKeyIndexes[lazyDistributorIdxInitCompressionRecipient]].toBase58();
         const merkleTree =
-          ix.keys[merkleTreeIdxInitCompressionRecipient].pubkey;
+          allAccs[ix.accountKeyIndexes[merkleTreeIdxInitCompressionRecipient]];
 
         const index = (decoded.data as any).args.index;
         recipientToLazyDistToMint[recipient][lazyDist] = await getLeafAssetId(
@@ -420,33 +494,38 @@ export class OracleServer {
       let entityKey: Buffer;
       let keyToAssetK: PublicKey | undefined = undefined;
       if (
-        ix.keys[wrapperOracleKeyIdx].pubkey.equals(this.oracle.publicKey) &&
-        ix.programId.equals(RO_PID)
+        allAccs[ix.accountKeyIndexes[wrapperOracleKeyIdx]].equals(this.oracle.publicKey) &&
+        allAccs[ix.programIdIndex].equals(RO_PID)
       ) {
         let decoded = (
           this.roProgram.coder.instruction as BorshInstructionCoder
-        ).decode(ix.data);
+        ).decode(Buffer.from(ix.data));
 
-        recipient = ix.keys[wrapperRecipientIdx].pubkey;
-        lazyDist = ix.keys[wrapperLazyDistIdx].pubkey;
-        keyToAssetK = ix.keys[wrapperKeyToAssetIdx].pubkey;
+        recipient = allAccs[ix.accountKeyIndexes[wrapperRecipientIdx]];
+        lazyDist = allAccs[ix.accountKeyIndexes[wrapperLazyDistIdx]];
+        keyToAssetK = allAccs[ix.accountKeyIndexes[wrapperKeyToAssetIdx]];
         //@ts-ignore
         proposedCurrentRewards = decoded.data.args.currentRewards;
-        entityKey = (await this.hemProgram.account.keyToAssetV0.fetch(keyToAssetK)).entityKey;
+        entityKey = (
+          await this.hemProgram.account.keyToAssetV0.fetch(keyToAssetK)
+        ).entityKey;
         // A sneaky RPC could return incorrect data. Verify that the entity key is correct for the key to asset
         if (!keyToAssetKey(this.dao, entityKey)[0].equals(keyToAssetK)) {
-          return { success: false, message: "RPC lied about the entity key for this asset." };
+          return {
+            success: false,
+            message: "RPC lied about the entity key for this asset.",
+          };
         }
       } else if (
-        ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey) &&
-        ix.programId.equals(LD_PID)
+        allAccs[ix.accountKeyIndexes[oracleKeyIdx]].equals(this.oracle.publicKey) &&
+        allAccs[ix.programIdIndex].equals(LD_PID)
       ) {
         let decoded = (
           this.ldProgram.coder.instruction as BorshInstructionCoder
-        ).decode(ix.data);
+        ).decode(Buffer.from(ix.data));
 
-        recipient = ix.keys[recipientIdx].pubkey;
-        lazyDist = ix.keys[lazyDistIdx].pubkey;
+        recipient = allAccs[ix.accountKeyIndexes[recipientIdx]];
+        lazyDist = allAccs[ix.accountKeyIndexes[lazyDistIdx]];
         //@ts-ignore
         proposedCurrentRewards = decoded.data.args.currentRewards;
       }
@@ -467,14 +546,13 @@ export class OracleServer {
         }
         mint = recipientAcc.asset;
       }
-      let keySerialization: any = { b58: {} }
+      let keySerialization: any = { b58: {} };
       if (keyToAssetK) {
         const keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
           keyToAssetK
         );
         keySerialization = keyToAsset.keySerialization;
       }
-      
 
       // @ts-ignore
       const currentRewards = entityKey
@@ -483,25 +561,33 @@ export class OracleServer {
           )
         : await this.db.getCurrentRewards(mint);
       if (proposedCurrentRewards.gt(new BN(currentRewards))) {
-        return { success: false, message: `Invalid amount, ${proposedCurrentRewards} is greater than actual rewards ${currentRewards}` };
+        return {
+          success: false,
+          message: `Invalid amount, ${proposedCurrentRewards} is greater than actual rewards ${currentRewards}`,
+        };
       }
     }
 
     // validate that this oracle is not the fee payer
-    if (tx.feePayer?.equals(this.oracle.publicKey)) {
+    if (allAccs[0]?.equals(this.oracle.publicKey)) {
       return {
         success: false,
         message: "Cannot set this oracle as the fee payer",
       };
     }
 
-    tx.partialSign(this.oracle);
+    try {
+      // It's valid to send txs that don't actually need to be signed by us. Happens sometimes with
+      // tx packing.
+      tx.sign([this.oracle]);
+    } catch (e: any) {
+      if (!e.message.toString().includes("Cannot sign with non signer key")) {
+        throw e
+      }
+    }
 
-    const serialized = tx.serialize({
-      requireAllSignatures: false,
-      verifySignatures: false,
-    });
-    return { success: true, transaction: serialized };
+    const serialized = tx.serialize();
+    return { success: true, transaction: Buffer.from(serialized) };
   }
 
   private async signBulkTransactionsHandler(
@@ -527,13 +613,11 @@ export class OracleServer {
 
     const errIdx = results.findIndex((x) => !x.success);
     if (errIdx > -1) {
-      res
-        .status(400)
-        .send({
-          error: results[errIdx].message
-            ? `${results[errIdx].message}\n\nTransaction index: ${errIdx}`
-            : `Error signing transaction index: ${errIdx}`,
-        });
+      res.status(400).send({
+        error: results[errIdx].message
+          ? `${results[errIdx].message}\n\nTransaction index: ${errIdx}`
+          : `Error signing transaction index: ${errIdx}`,
+      });
       return;
     }
 
@@ -558,6 +642,7 @@ export class OracleServer {
       res
         .status(400)
         .send({ error: result.message || "Error signing transaction" });
+      return
     }
 
     res.send({ success: true, transaction: result.transaction });
@@ -583,9 +668,7 @@ export class OracleServer {
     const ldProgram = await initLazy(provider);
     const roProgram = await initRewards(provider);
     const hemProgram = await initHeliumEntityManager(provider);
-    const DNT = process.env.DNT_MINT
-      ? new PublicKey(process.env.DNT_MINT)
-      : IOT_MINT;
+
     const LAZY_DISTRIBUTOR = lazyDistributorKey(DNT)[0];
     const server = new OracleServer(
       ldProgram,
@@ -593,7 +676,7 @@ export class OracleServer {
       hemProgram,
       oracleKeypair,
       new PgDatabase(hemProgram),
-      LAZY_DISTRIBUTOR,
+      LAZY_DISTRIBUTOR
     );
     // For performance
     new AccountFetchCache({

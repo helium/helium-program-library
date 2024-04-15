@@ -1,4 +1,5 @@
 import { Creator, Uses } from "@metaplex-foundation/mpl-bubblegum";
+import { collectInstructionDiscriminator } from "@metaplex-foundation/mpl-token-metadata";
 import { PublicKey } from "@solana/web3.js";
 import axios from "axios";
 // @ts-ignore
@@ -300,32 +301,64 @@ export async function getAssetsByOwner(
 export type SearchAssetsOpts = {
   sortBy?: { sortBy: "created"; sortDirection: "asc" | "desc" };
   page?: number;
+  limit?: number;
   collection?: string;
   ownerAddress: string;
-  creatorAddress: string;
+  creatorAddress?: string;
   creatorVerified?: boolean;
+  tokenType?:
+    | "all"
+    | "compressedNft"
+    | "regularNft"
+    | "nonFungible"
+    | "fungible";
 } & { [key: string]: unknown };
 
 export async function searchAssets(
+  url: string,
+  opts: SearchAssetsOpts
+): Promise<Asset[]> {
+  return (await searchAssetsWithPageInfo(url, opts)).items;
+}
+
+export async function searchAssetsWithPageInfo(
   url: string,
   {
     creatorVerified = true,
     sortBy = { sortBy: "created", sortDirection: "asc" },
     page = 1,
+    limit = 1000,
+    collection,
+    tokenType,
     ...rest
   }: SearchAssetsOpts
-): Promise<Asset[]> {
+): Promise<{
+  page: number;
+  total: number;
+  grandTotal?: number;
+  limit: number;
+  items: Asset[];
+}> {
+  const params = {
+    page,
+    limit,
+    sortBy:
+      tokenType && ["all", "fungible"].includes(tokenType) ? null : sortBy,
+    creatorVerified:
+      tokenType && ["all", "fungible"].includes(tokenType)
+        ? null
+        : creatorVerified,
+    tokenType,
+    ...(collection ? { grouping: ["collection", collection] } : {}),
+    ...rest,
+  };
+
   try {
     const response = await axios.post(url, {
       jsonrpc: "2.0",
       method: "searchAssets",
       id: "get-assets-op-1",
-      params: {
-        page,
-        creatorVerified,
-        sortBy,
-        ...rest,
-      },
+      params,
       headers: {
         "Cache-Control": "no-cache",
         Pragma: "no-cache",
@@ -333,7 +366,14 @@ export async function searchAssets(
       },
     });
 
-    return response.data.result?.items.map(toAsset);
+    const ret = response.data.result;
+    return {
+      items: ret.items?.map(toAsset),
+      limit: ret.limit,
+      total: ret.total,
+      page: ret.page,
+      grandTotal: ret.grand_total,
+    };
   } catch (error) {
     console.error(error);
     throw error;

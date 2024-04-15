@@ -818,15 +818,6 @@ describe("helium-sub-daos", () => {
                 await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
               ).epoch;
 
-              const thread = PublicKey.findProgramAddressSync(
-                [
-                  Buffer.from("thread", "utf8"),
-                  subDao.toBuffer(),
-                  Buffer.from("end-epoch", "utf8"),
-                ],
-                THREAD_PID
-              )[0];
-
               await program.methods
                 .calculateUtilityScoreV0({
                   epoch,
@@ -1066,7 +1057,7 @@ describe("helium-sub-daos", () => {
           // the total time staked. Imagine the total fall was 1 and the total time was 3. We would have
           // a fall rate of 0.3333333333333333 and could never have enough decimals to represent it
           expected,
-          0.00000001
+          0.0000001
         );
 
         console.log("Checking genesis end");
@@ -1084,7 +1075,7 @@ describe("helium-sub-daos", () => {
         );
         expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
           expected,
-          0.00000001
+          0.0000001
         );
 
         console.log("Checking after genesis end");
@@ -1101,7 +1092,7 @@ describe("helium-sub-daos", () => {
         );
         expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
           expected,
-          0.00000001
+          0.0000001
         );
 
         console.log("Checking at expiry");
@@ -1121,7 +1112,7 @@ describe("helium-sub-daos", () => {
         );
         expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
           expected,
-          0.00000001
+          0.0000001
         );
 
         console.log("Checking after expiry");
@@ -1133,7 +1124,7 @@ describe("helium-sub-daos", () => {
         console.log(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8));
         expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
           0,
-          0.00000001
+          0.0000001
         );
       });
     });

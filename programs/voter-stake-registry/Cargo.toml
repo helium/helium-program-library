@@ -1,6 +1,6 @@
 [package]
 name = "voter-stake-registry"
-version = "0.2.4"
+version = "0.3.1"
 description = "Heliums voter weight plugin for spl-governance"
 license = "GPL-3.0-or-later"
 homepage = "https://github.com/helium/helium-program-library"
@@ -30,13 +30,10 @@ bytemuck = "1.12.3"
 #          Recently the discriminator for new VoterWeightRecord accounts has changed, and upgrading
 #          this dependency here without also upgrading the spl-governance program instance beforehand
 #          would lead to VWR accounts that are unusable until the spl-governance program is upgraded.
-spl-governance = { git = "https://github.com/solana-labs/solana-program-library.git", version = "3.1.0", features = ["no-entrypoint"] }
-spl-governance-addin-api = { git = "https://github.com/solana-labs/solana-program-library.git", version = "0.1.3" }
 solana-program = "1.16.13"
 static_assertions = "1.1"
 mpl-token-metadata = { workspace = true }
 itertools = "0.10.2"
-spl-governance-tools = { git = "https://github.com/solana-labs/solana-program-library.git", version = "0.1.3" }
 proposal = { path = "../../utils/proposal" }
 nft-delegation = { path = "../../utils/nft-delegation" }
 shared-utils = { workspace = true }

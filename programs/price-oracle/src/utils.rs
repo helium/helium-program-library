@@ -1,7 +1,7 @@
 use crate::state::*;
 
 const SECONDS_PER_DAY: i64 = 24 * 60 * 60;
-pub fn calculate_current_price(oracles: &Vec<OracleV0>, curr_ts: i64) -> Option<u64> {
+pub fn calculate_current_price(oracles: &[OracleV0], curr_ts: i64) -> Option<u64> {
   let mut prices: Vec<u64> = oracles
     .iter()
     .filter(|oracle| {

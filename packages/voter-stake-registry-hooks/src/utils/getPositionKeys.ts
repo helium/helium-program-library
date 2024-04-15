@@ -1,15 +1,14 @@
 import { AnchorProvider } from "@coral-xyz/anchor";
+import { Asset, searchAssets } from "@helium/spl-utils";
 import {
   VoteService,
   getRegistrarKey,
   init as initVsr,
   positionKey,
 } from "@helium/voter-stake-registry-sdk";
-import { Metadata, Metaplex, Nft, Sft } from "@metaplex-foundation/js";
-import { Mint, getMint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import { Delegation, Registrar } from "../sdk/types";
 import { BN } from "bn.js";
+import { Delegation, Registrar } from "../sdk/types";
 
 export interface GetPositionsArgs {
   wallet: PublicKey;
@@ -23,7 +22,7 @@ export const getPositionKeys = async (
 ): Promise<{
   votingDelegatedPositionKeys: PublicKey[];
   positionKeys: PublicKey[];
-  nfts: (Metadata | Nft | Sft)[];
+  nfts: Asset[];
   delegations: Delegation[];
 }> => {
   const { mint, wallet, provider, voteService } = args;
@@ -31,30 +30,47 @@ export const getPositionKeys = async (
 
   const me = wallet;
 
-  const metaplex = new Metaplex(connection);
   const registrarPk = getRegistrarKey(mint);
   const program = await initVsr(provider as any);
   const registrar = (await program.account.registrar.fetch(
     registrarPk
   )) as Registrar;
+
   const myDelegations = await voteService.getDelegationsForWallet(me);
   const delegationPositions = myDelegations.map(
     (del) => positionKey(new PublicKey(del.asset))[0]
   );
-  const mintCfgs = registrar.votingMints;
-  const mints: Record<string, Mint> = {};
-  for (const mcfg of mintCfgs) {
-    const mint = await getMint(connection, mcfg.mint);
-    mints[mcfg.mint.toBase58()] = mint;
+  let page = 1;
+  const limit = 1000;
+  let allAssets: Asset[] = [];
+  while (true) {
+    const assets =
+      (await searchAssets(provider.connection.rpcEndpoint, {
+        page,
+        limit,
+        ownerAddress: wallet.toBase58(),
+        tokenType: "fungible",
+        collection: registrar.collection.toBase58(),
+      })) || [];
+
+    allAssets = allAssets.concat(assets);
+
+    if (assets.length < limit) {
+      break;
+    }
+
+    page++;
   }
 
-  const nfts = (await metaplex.nfts().findAllByOwner({ owner: wallet })).filter(
-    (nft) => nft.collection?.address.equals(registrar.collection)
-  );
-
-  const positionKeys = nfts.map(
-    (nft) => positionKey((nft as any).mintAddress)[0]
-  );
+  const positionKeys = allAssets
+    .filter((asset) =>
+      asset.grouping?.find(
+        (group) =>
+          group.group_key === "collection" &&
+          group.group_value.equals(registrar.collection)
+      )
+    )
+    .map((asset) => positionKey(asset.id)[0]);
 
   return {
     positionKeys,
@@ -70,6 +86,6 @@ export const getPositionKeys = async (
       bumpSeed: d.bumpSeed,
       expirationTime: new BN(d.expirationTime)
     })),
-    nfts,
+    nfts: allAssets,
   };
 };

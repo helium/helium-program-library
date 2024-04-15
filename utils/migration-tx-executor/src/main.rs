@@ -160,13 +160,13 @@ async fn run_transactions(
       }
 
       let result = send_and_confirm_messages_with_spinner(
-        rpc_client.clone(),
+        &rpc_client,
         &tpu_client,
         &response.transactions,
       );
       if result.is_ok() {
         offset += limit;
-        FAILED_TX.inc_by(result.unwrap().1.try_into().unwrap());
+        FAILED_TX.inc_by(result.unwrap().failure_count.try_into().unwrap());
       }
       NUM_SENT.inc_by(response.transactions.len() as u64);
     }
@@ -193,13 +193,13 @@ async fn run_transactions(
       }
 
       let result = send_and_confirm_messages_with_spinner(
-        rpc_client.clone(),
+        &rpc_client,
         &tpu_client,
         &response.transactions,
       );
       if result.is_ok() {
         offset += limit;
-        FAILED_TX.inc_by(result.unwrap().1.try_into().unwrap());
+        FAILED_TX.inc_by(result.unwrap().failure_count.try_into().unwrap());
       }
       NUM_SENT.inc_by(response.transactions.len() as u64);
     }
@@ -219,11 +219,11 @@ async fn run_transactions(
       .unwrap();
 
     let result = send_and_confirm_messages_with_spinner(
-      rpc_client.clone(),
+      &rpc_client,
       &tpu_client,
       &response.transactions,
     );
-    FAILED_TX.inc_by(result.unwrap().1.try_into().unwrap());
+    FAILED_TX.inc_by(result.unwrap().failure_count.try_into().unwrap());
     NUM_SENT.inc_by(response.transactions.len() as u64);
     
   } else {
@@ -251,13 +251,13 @@ async fn run_transactions(
         }
 
         let result = send_and_confirm_messages_with_spinner(
-          rpc_client.clone(),
+          &rpc_client,
           &tpu_client,
           &response.transactions,
         );
         if result.is_ok() {
           offset += limit;
-          FAILED_TX.inc_by(result.unwrap().1.try_into().unwrap());
+          FAILED_TX.inc_by(result.unwrap().failure_count.try_into().unwrap());
         }
         NUM_SENT.inc_by(response.transactions.len() as u64);
       }

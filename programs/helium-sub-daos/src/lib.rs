@@ -5,6 +5,7 @@ use {default_env::default_env, solana_security_txt::security_txt};
 declare_id!("hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR");
 
 pub mod circuit_breaker;
+pub mod create_account;
 pub mod error;
 pub mod instructions;
 pub mod state;
@@ -51,6 +52,13 @@ pub mod helium_sub_daos {
 
   pub fn update_sub_dao_v0(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result<()> {
     update_sub_dao_v0::handler(ctx, args)
+  }
+
+  pub fn temp_update_sub_dao_epoch_info(
+    ctx: Context<TempUpdateSubDaoEpochInfo>,
+    args: TempUpdateSubDaoEpochInfoArgs,
+  ) -> Result<()> {
+    temp_update_sub_dao_epoch_info::handler(ctx, args)
   }
 
   pub fn update_sub_dao_vehnt_v0(

@@ -14,6 +14,7 @@ interface HandleAccountWebhookArgs {
   programId: PublicKey;
   accounts: IAccountConfig[];
   account: any;
+  isDelete?: boolean;
   sequelize?: Sequelize;
   pluginsByAccountType: Record<string, IInitedPlugin[]>;
 }
@@ -29,6 +30,7 @@ export function handleAccountWebhook({
   account,
   sequelize = database,
   pluginsByAccountType,
+  isDelete = false
 }: HandleAccountWebhookArgs) {
   return limit(async () => {
     const idl = await cachedIdlFetch.fetchIdl({
@@ -75,20 +77,35 @@ export function handleAccountWebhook({
           }
         }
         const model = sequelize.models[accName];
-        const value = await model.findByPk(account.pubkey);
-        const changed =
-          !value ||
-          Object.entries(sanitized).some(([k, v]) => v?.toString() !== value.dataValues[k]?.toString());
-        if (changed) {
-          await model.upsert(
+        if (isDelete) {
+          await model.destroy(
             {
-              address: account.pubkey,
-              refreshed_at: now,
-              ...sanitized,
-            },
-            { transaction: t }
+              where: {
+                address: account.pubkey,
+              },
+              transaction: t,
+            }
           );
+        } else {
+          const value = await model.findByPk(account.pubkey);
+          const changed =
+            !value ||
+            Object.entries(sanitized).some(
+              ([k, v]) => v?.toString() !== value.dataValues[k]?.toString()
+            );
+
+          if (changed) {
+            await model.upsert(
+              {
+                address: account.pubkey,
+                refreshed_at: now,
+                ...sanitized,
+              },
+              { transaction: t }
+            );
+          }
         }
+        
       }
 
       await t.commit();

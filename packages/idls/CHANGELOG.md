@@ -3,6 +3,382 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.6](https://github.com/helium/helium-program-library/compare/v0.7.5...v0.7.6) (2024-04-10)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.7.5](https://github.com/helium/helium-program-library/compare/v0.7.4...v0.7.5) (2024-04-10)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.7.4](https://github.com/helium/helium-program-library/compare/v0.7.3...v0.7.4) (2024-04-10)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.7.3](https://github.com/helium/helium-program-library/compare/v0.7.2...v0.7.3) (2024-04-04)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.7.2](https://github.com/helium/helium-program-library/compare/v0.7.1...v0.7.2) (2024-04-04)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.7.1](https://github.com/helium/helium-program-library/compare/v0.7.0...v0.7.1) (2024-04-02)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+# [0.7.0](https://github.com/helium/helium-program-library/compare/v0.6.42...v0.7.0) (2024-03-29)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.42](https://github.com/helium/helium-program-library/compare/v0.6.41...v0.6.42) (2024-03-19)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.41](https://github.com/helium/helium-program-library/compare/v0.6.40...v0.6.41) (2024-03-18)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.40](https://github.com/helium/helium-program-library/compare/v0.6.39...v0.6.40) (2024-03-18)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.39](https://github.com/helium/helium-program-library/compare/v0.6.38...v0.6.39) (2024-03-13)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.38](https://github.com/helium/helium-program-library/compare/v0.6.37...v0.6.38) (2024-03-11)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.37](https://github.com/helium/helium-program-library/compare/v0.6.35...v0.6.37) (2024-03-11)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.36](https://github.com/helium/helium-program-library/compare/v0.6.27...v0.6.36) (2024-03-08)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.35](https://github.com/helium/helium-program-library/compare/v0.6.34...v0.6.35) (2024-03-04)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.34](https://github.com/helium/helium-program-library/compare/v0.6.33...v0.6.34) (2024-03-04)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.33](https://github.com/helium/helium-program-library/compare/v0.6.32...v0.6.33) (2024-03-01)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.32](https://github.com/helium/helium-program-library/compare/v0.6.31...v0.6.32) (2024-02-28)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.31](https://github.com/helium/helium-program-library/compare/v0.6.30...v0.6.31) (2024-02-28)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.30](https://github.com/helium/helium-program-library/compare/v0.6.29...v0.6.30) (2024-02-22)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.29](https://github.com/helium/helium-program-library/compare/v0.6.28...v0.6.29) (2024-02-06)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.28](https://github.com/helium/helium-program-library/compare/v0.6.27...v0.6.28) (2024-02-06)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.27](https://github.com/helium/helium-program-library/compare/v0.6.25...v0.6.27) (2024-02-01)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.26](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.26) (2024-01-31)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.25](https://github.com/helium/helium-program-library/compare/v0.6.24...v0.6.25) (2024-01-29)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.24](https://github.com/helium/helium-program-library/compare/v0.6.23...v0.6.24) (2024-01-29)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.23](https://github.com/helium/helium-program-library/compare/v0.6.20...v0.6.23) (2024-01-20)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.22](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.22) (2024-01-19)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.21](https://github.com/helium/helium-program-library/compare/v0.6.20...v0.6.21) (2024-01-19)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.20](https://github.com/helium/helium-program-library/compare/v0.6.19...v0.6.20) (2024-01-19)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.19](https://github.com/helium/helium-program-library/compare/v0.6.17...v0.6.19) (2024-01-19)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.18](https://github.com/helium/helium-program-library/compare/v0.6.17...v0.6.18) (2024-01-19)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.17](https://github.com/helium/helium-program-library/compare/v0.6.16...v0.6.17) (2024-01-19)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.16](https://github.com/helium/helium-program-library/compare/v0.6.15...v0.6.16) (2024-01-16)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.15](https://github.com/helium/helium-program-library/compare/v0.6.14...v0.6.15) (2024-01-12)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.14](https://github.com/helium/helium-program-library/compare/v0.6.13...v0.6.14) (2024-01-11)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.13](https://github.com/helium/helium-program-library/compare/v0.6.12...v0.6.13) (2024-01-05)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.12](https://github.com/helium/helium-program-library/compare/v0.6.11...v0.6.12) (2024-01-02)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.11](https://github.com/helium/helium-program-library/compare/v0.6.8...v0.6.11) (2023-12-27)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.10](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.10) (2023-12-22)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.9](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.9) (2023-12-21)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.8](https://github.com/helium/helium-program-library/compare/v0.6.7...v0.6.8) (2023-12-21)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.7](https://github.com/helium/helium-program-library/compare/v0.6.6...v0.6.7) (2023-12-19)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.6](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.6) (2023-12-13)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.5](https://github.com/helium/helium-program-library/compare/v0.6.2...v0.6.5) (2023-12-08)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.4](https://github.com/helium/helium-program-library/compare/v0.6.0...v0.6.4) (2023-12-06)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
+## [0.6.3](https://github.com/helium/helium-program-library/compare/v0.6.0...v0.6.3) (2023-12-01)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
 ## [0.6.2](https://github.com/helium/helium-program-library/compare/v0.6.1...v0.6.2) (2023-11-17)
 
 **Note:** Version bump only for package @helium/idls

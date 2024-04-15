@@ -1,14 +1,18 @@
 import {
   AccountInfo,
+  AddressLookupTableAccount,
   Commitment,
   Connection,
   PublicKey,
   SendOptions,
   Transaction,
   TransactionInstruction,
+  VersionedMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import { EventEmitter } from "./eventEmitter";
 import { getMultipleAccounts } from "./getMultipleAccounts";
+import { TransactionCompletionQueue } from "./transactionCompletionQueue";
 
 export const DEFAULT_CHUNK_SIZE = 99;
 export const DEFAULT_DELAY = 50;
@@ -59,7 +63,32 @@ function setSingleton(conn: Connection, cache: AccountFetchCache) {
   singletons[endp + commitment] = cache;
 }
 
+export interface AccountCache {
+  delete(key: string): void;
+  has(key: string): boolean;
+  get(key: string): ParsedAccountBase<unknown> | null | undefined;
+  set(key: string, value: ParsedAccountBase<unknown> | null): void;
+}
+
+export class MapAccountCache implements AccountCache {
+  cache = new Map<string, ParsedAccountBase<unknown> | null>() as AccountCache;
+
+  delete(key: string): void {
+    this.cache.delete(key);
+  }
+  has(key: string): boolean {
+    return this.cache.has(key);
+  }
+  get(key: string): ParsedAccountBase<unknown> | null | undefined {
+    return this.cache.get(key);
+  }
+  set(key: string, value: ParsedAccountBase<unknown> | null): void {
+    this.cache.set(key, value);
+  }
+}
+
 export class AccountFetchCache {
+  enableLogging: boolean;
   connection: Connection;
   chunkSize: number;
   delay: number;
@@ -68,7 +97,7 @@ export class AccountFetchCache {
   accountChangeListeners = new Map<string, number>();
   statics = new Set<string>();
   missingAccounts = new Map<string, AccountParser<unknown> | undefined>();
-  genericCache = new Map<string, ParsedAccountBase<unknown> | null>();
+  genericCache: AccountCache;
   keyToAccountParser = new Map<string, AccountParser<unknown> | undefined>();
   timeout: NodeJS.Timeout | null = null;
   currentBatch = new Set<string>();
@@ -99,6 +128,8 @@ export class AccountFetchCache {
     commitment,
     missingRefetchDelay = 10000,
     extendConnection = false,
+    cache,
+    enableLogging = false,
   }: {
     connection: Connection;
     chunkSize?: number;
@@ -107,7 +138,12 @@ export class AccountFetchCache {
     missingRefetchDelay?: number;
     /** Add functionatility to getAccountInfo that uses the cache */
     extendConnection?: boolean;
+    cache?: AccountCache;
+    enableLogging?: boolean;
   }) {
+    this.enableLogging = enableLogging;
+    this.genericCache = cache || new MapAccountCache();
+
     this.id = ++id;
     this.connection = connection;
     this.chunkSize = chunkSize;
@@ -145,16 +181,33 @@ export class AccountFetchCache {
         return self.oldGetAccountinfo!(publicKey, com);
       };
     }
+
+    const queue = new TransactionCompletionQueue({
+      connection,
+      log: this.enableLogging,
+    });
     connection.sendTransaction = async function overloadedSendTransaction(
       ...args: any[]
     ) {
       const result = await self.oldSendTransaction(...args);
 
-      this.confirmTransaction(result, "finalized")
-        .then(() => {
-          return self.requeryMissing(args[0].instructions);
+      // First try to requery when confirmed. Then mop up any that didn't change during confirmed.
+      queue
+        .wait("confirmed", result)
+        .then(async () => {
+          const instructions = args[0].instructions
+            ? args[0].instructions
+            : await getInstructions(connection, args[0]);
+          return self.requeryMissing(instructions);
+        })
+        .then(async (unchanged) => {
+          if (unchanged.length > 0) {
+            await queue.wait("finalized", result);
+            return self.requeryMissingByAccount(unchanged);
+          }
         })
         .catch(console.error);
+
       return result;
     };
 
@@ -165,11 +218,22 @@ export class AccountFetchCache {
       const result = await self.oldSendRawTransaction(rawTransaction, options);
 
       try {
-        const instructions = Transaction.from(rawTransaction).instructions;
+        const message = VersionedTransaction.deserialize(
+          new Uint8Array(rawTransaction)
+        ).message;
+        const instructions = await getInstructions(connection, message);
 
-        this.confirmTransaction(result, "finalized")
+        // First try to requery when confirmed. Then mop up any that didn't change during confirmed.
+        queue
+          .wait("confirmed", result)
           .then(() => {
             return self.requeryMissing(instructions);
+          })
+          .then(async (unchanged) => {
+            if (unchanged.length > 0) {
+              await queue.wait("finalized", result);
+              return self.requeryMissingByAccount(unchanged);
+            }
           })
           .catch(console.error);
       } catch (e: any) {
@@ -182,13 +246,25 @@ export class AccountFetchCache {
     setSingleton(connection, this);
   }
 
-  async requeryMissing(instructions: TransactionInstruction[]) {
-    const writeableAccounts = getWriteableAccounts(instructions).map((a) =>
-      a.toBase58()
+  // Requeries missin accounts and returns the ones that didn't change
+  async requeryMissing(
+    instructions: TransactionInstruction[]
+  ): Promise<PublicKey[]> {
+    const writeableAccounts = Array.from(
+      new Set(getWriteableAccounts(instructions).map((a) => a.toBase58()))
     );
+    return this.requeryMissingByAccount(
+      writeableAccounts.map((a) => new PublicKey(a))
+    );
+  }
+
+  async requeryMissingByAccount(accounts: PublicKey[]): Promise<PublicKey[]> {
+    const writeableAccounts = accounts.map((a) => a.toBase58());
+    const unchanged: PublicKey[] = [];
     await Promise.all(
       writeableAccounts.map(async (account) => {
         const parser = this.missingAccounts.get(account);
+        const prevAccount = this.genericCache.get(account);
         const [found, dispose] = await this.searchAndWatch(
           new PublicKey(account),
           parser,
@@ -196,11 +272,21 @@ export class AccountFetchCache {
           true
         );
         dispose();
+        const changed =
+          (prevAccount && !found) ||
+          (found && !prevAccount) ||
+          (prevAccount &&
+            !found?.account.data.equals(prevAccount.account.data));
+        if (!changed) {
+          unchanged.push(new PublicKey(account));
+        }
         if (found) {
           this.missingAccounts.delete(account);
         }
       })
     );
+
+    return unchanged;
   }
 
   async fetchMissing() {
@@ -234,8 +320,14 @@ export class AccountFetchCache {
   async fetchBatch() {
     const currentBatch = this.currentBatch;
     this.currentBatch = new Set(); // Erase current batch from state, so we can fetch multiple at a time
+    if (this.enableLogging) {
+      console.log(`Fetching batch of ${currentBatch.size} accounts`);
+    }
     try {
       const keys = Array.from(currentBatch);
+      if (keys.length === 0) {
+        return { keys: [], array: [] };
+      }
       const { array } = await getMultipleAccounts(
         this.connection,
         keys,
@@ -267,7 +359,7 @@ export class AccountFetchCache {
     } else {
       this.timeout = setTimeout(() => this.fetchBatch(), this.delay);
     }
-    return undefined
+    return undefined;
   }
 
   async addToBatch(id: PublicKey): Promise<AccountInfo<Buffer>> {
@@ -322,15 +414,22 @@ export class AccountFetchCache {
     const dispose = this.watch(id, parser, !!data);
     const cacheEntry = this.genericCache.get(address);
     if (!this.genericCache.has(address) || cacheEntry != data) {
-      this.updateCache<T>(address, data || null);
+      this.updateCacheAndRaiseUpdated<T>(address, data || null);
     }
 
     return [data, dispose];
   }
 
-  async updateCache<T>(id: string, data: ParsedAccountBase<T> | null) {
-    const isNew = !this.genericCache.has(id);
+  updateCache<T>(id: string, data: ParsedAccountBase<T> | null) {
     this.genericCache.set(id, data || null);
+  }
+
+  async updateCacheAndRaiseUpdated<T>(
+    id: string,
+    data: ParsedAccountBase<T> | null
+  ) {
+    const isNew = !this.genericCache.has(id);
+    this.updateCache(id, data);
 
     this.emitter.raiseCacheUpdated(id, isNew, this.keyToAccountParser.get(id));
   }
@@ -393,7 +492,7 @@ export class AccountFetchCache {
       // Never update the cache with an account that isn't being watched. This could cause
       // stale data to be returned.
       if (isStatic && result && result.info) {
-        this.updateCache(address, result);
+        this.updateCacheAndRaiseUpdated(address, result);
       }
 
       return result;
@@ -411,7 +510,7 @@ export class AccountFetchCache {
   ): Promise<(ParsedAccountBase<T> | undefined)[]> {
     // Store results of batch fetches in this map. If isStatic is false, genericCache will have none of the
     // results of our searches in the batch. So need to accumulate them here
-    const result: Record<string, ParsedAccountBase<T>> = {}
+    const result: Record<string, ParsedAccountBase<T>> = {};
     const searched = new Set(pubKeys.map((p) => p.toBase58()));
     for (const key of pubKeys) {
       this.registerParser(key, parser);
@@ -436,7 +535,7 @@ export class AccountFetchCache {
               const parsed = this.getParsed(key, item, parser) || null;
               // Cache these results if they aren't going to change
               if (isStatic) {
-                this.genericCache.set(key, parsed);
+                this.updateCache(key, parsed);
               }
               if (parsed) {
                 result[key] = parsed;
@@ -457,7 +556,7 @@ export class AccountFetchCache {
           const parsed = this.getParsed(key, item, parser) || null;
           // Cache these results if they aren't going to change
           if (isStatic) {
-            this.genericCache.set(key, parsed);
+            this.updateCache(key, parsed);
           }
           if (parsed) {
             result[key] = parsed;
@@ -468,9 +567,10 @@ export class AccountFetchCache {
 
     return pubKeys.map(
       (key) =>
-        result[key.toBase58()] || this.genericCache.get(key.toBase58()) as
+        result[key.toBase58()] ||
+        (this.genericCache.get(key.toBase58()) as
           | ParsedAccountBase<T>
-          | undefined
+          | undefined)
     );
   }
 
@@ -482,7 +582,7 @@ export class AccountFetchCache {
     try {
       const parsed = this.getParsed(key, account, parser);
       const address = key.toBase58();
-      this.updateCache(address, parsed || null);
+      this.updateCacheAndRaiseUpdated(address, parsed || null);
     } catch (e: any) {
       console.error("accountFetchCache", "Failed to update account", e);
     }
@@ -508,7 +608,9 @@ export class AccountFetchCache {
             address,
             this.connection.onAccountChange(
               id,
-              (account) => this.onAccountChange(id, undefined, account),
+              (account) => {
+                this.onAccountChange(id, undefined, account);
+              },
               this.commitment
             )
           );
@@ -657,7 +759,7 @@ export class AccountFetchCache {
         if (cached) {
           const parsed = parser(cached.pubkey, cached.account);
           if (parsed) {
-            this.genericCache.set(address, parsed);
+            this.updateCache(address, parsed);
           }
         }
       }
@@ -665,4 +767,32 @@ export class AccountFetchCache {
 
     return pubkey;
   }
+}
+
+async function getInstructions(
+  connection: Connection,
+  message: VersionedMessage
+): Promise<TransactionInstruction[]> {
+  const LUTs = (
+    await Promise.all(
+      message.addressTableLookups.map((acc) =>
+        connection.getAddressLookupTable(acc.accountKey)
+      )
+    )
+  )
+    .map((lut) => lut.value)
+    .filter((val) => val !== null) as AddressLookupTableAccount[];
+  const allAccs = message.getAccountKeys({ addressLookupTableAccounts: LUTs });
+
+  return message.compiledInstructions.map((ix) => {
+    return new TransactionInstruction({
+      programId: allAccs.get(ix.programIdIndex)!,
+      data: Buffer.from(ix.data),
+      keys: ix.accountKeyIndexes.map((key) => ({
+        pubkey: allAccs.get(key)!,
+        isSigner: message.isAccountSigner(key),
+        isWritable: message.isAccountWritable(key),
+      })),
+    });
+  });
 }

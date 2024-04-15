@@ -31,7 +31,6 @@ export async function initVsr(
   positionUpdateAuthority: PublicKey,
   genesisVotePowerMultiplierExpirationTs = 1,
   genesisVotePowerMultiplier = 0,
-  digitShift = 0
 ) {
   const programVersion = await getGovernanceProgramVersion(
     program.provider.connection,
@@ -72,7 +71,6 @@ export async function initVsr(
     await program.methods
       .configureVotingMintV0({
         idx: 0, // idx
-        digitShift: digitShift, // digit shift
         baselineVoteWeightScaledFactor: new BN(0 * 1e9),
         maxExtraLockupVoteWeightScaledFactor: new BN(100 * 1e9), // scaled factor
         genesisVotePowerMultiplier: genesisVotePowerMultiplier,

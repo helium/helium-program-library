@@ -15,5 +15,6 @@
     "skipLibCheck": true,
     "noEmit": false,
     "allowSyntheticDefaultImports": true,
+    "allowJs": true
   },
 }

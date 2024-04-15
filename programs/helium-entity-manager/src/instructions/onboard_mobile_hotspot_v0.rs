@@ -1,10 +1,12 @@
-use crate::error::ErrorCode;
 use crate::state::*;
+use crate::{error::ErrorCode, TESTING};
 use anchor_lang::{prelude::*, solana_program::hash::hash};
+use pyth_sdk_solana::load_price_feed_from_account_info;
+use std::str::FromStr;
 
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{Mint, Token},
+  token::{burn, Burn, Mint, Token},
 };
 use data_credits::{
   cpi::{
@@ -24,6 +26,11 @@ use account_compression_cpi::program::SplAccountCompression;
 use bubblegum_cpi::get_asset_id;
 use shared_utils::*;
 
+#[cfg(feature = "devnet")]
+const PRICE_ORACLE: &str = "BmUdxoioVgoRTontomX8nBjWbnLevtxeuBYaLipP8GTQ";
+#[cfg(not(feature = "devnet"))]
+const PRICE_ORACLE: &str = "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5";
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct OnboardMobileHotspotArgsV0 {
   pub data_hash: [u8; 32],
@@ -32,6 +39,8 @@ pub struct OnboardMobileHotspotArgsV0 {
   pub index: u32,
   pub location: Option<u64>,
   pub device_type: MobileDeviceTypeV0,
+  pub elevation: Option<i32>,
+  pub azimuth: Option<u16>,
 }
 
 #[derive(Accounts)]
@@ -61,6 +70,9 @@ pub struct OnboardMobileHotspotV0<'info> {
   /// CHECK: Only loaded if location is being asserted
   #[account(mut)]
   pub dc_burner: UncheckedAccount<'info>,
+  /// CHECK: Checked by spl token when the burn command is issued (which it may not be)
+  #[account(mut)]
+  pub dnt_burner: UncheckedAccount<'info>,
 
   #[account(
     has_one = sub_dao,
@@ -92,10 +104,18 @@ pub struct OnboardMobileHotspotV0<'info> {
   #[account(
     mut,
     has_one = dao,
+    has_one = dnt_mint,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,
+  #[account(mut)]
+  pub dnt_mint: Box<Account<'info, Mint>>,
+  /// CHECK: Checked by loading with pyth. Also double checked by the has_one on data credits instance.
+  #[account(
+    address = Pubkey::from_str(PRICE_ORACLE).unwrap()
+  )]
+  pub dnt_price: AccountInfo<'info>,
 
   #[account(
     seeds=[
@@ -132,16 +152,23 @@ impl<'info> OnboardMobileHotspotV0<'info> {
 
     CpiContext::new(self.data_credits_program.to_account_info(), cpi_accounts)
   }
+
+  pub fn mobile_burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Burn<'info>> {
+    let cpi_accounts = Burn {
+      mint: self.dnt_mint.to_account_info(),
+      from: self.dnt_burner.to_account_info(),
+      authority: self.payer.to_account_info(),
+    };
+
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+  }
 }
 
 pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, OnboardMobileHotspotV0<'info>>,
   args: OnboardMobileHotspotArgsV0,
 ) -> Result<()> {
-  let asset_id = get_asset_id(
-    &ctx.accounts.merkle_tree.key(),
-    u64::try_from(args.index).unwrap(),
-  );
+  let asset_id = get_asset_id(&ctx.accounts.merkle_tree.key(), u64::from(args.index));
 
   verify_compressed_nft(VerifyCompressedNftArgs {
     data_hash: args.data_hash,
@@ -173,6 +200,8 @@ pub fn handler<'info>(
     is_active: false,
     dc_onboarding_fee_paid: fees.dc_onboarding_fee,
     device_type: args.device_type,
+    elevation: args.elevation,
+    azimuth: args.azimuth,
   });
 
   if let Some(location) = args.location {
@@ -213,6 +242,41 @@ pub fn handler<'info>(
     ctx.accounts.burn_ctx(),
     BurnWithoutTrackingArgsV0 { amount: dc_fee },
   )?;
+
+  // Burn the mobile tokens
+  let dnt_fee = fees.mobile_onboarding_fee_usd;
+  let mobile_price_oracle =
+    load_price_feed_from_account_info(&ctx.accounts.dnt_price).map_err(|e| {
+      msg!("Pyth error {}", e);
+      error!(ErrorCode::PythError)
+    })?;
+
+  let current_time = Clock::get()?.unix_timestamp;
+  let mobile_price = mobile_price_oracle
+    .get_ema_price_no_older_than(current_time, if TESTING { 6000000 } else { 10 * 60 })
+    .ok_or_else(|| error!(ErrorCode::PythPriceNotFound))?;
+  // Remove the confidence from the price to use the most conservative price
+  // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
+  let mobile_price_with_conf = mobile_price
+    .price
+    .checked_sub(i64::try_from(mobile_price.conf.checked_mul(2).unwrap()).unwrap())
+    .unwrap();
+  // Exponent is a negative number, likely -8
+  // Since the price is multiplied by an extra 10^8, and we're dividing by that price, need to also multiply
+  // by the exponent
+  let exponent_dec = 10_u64
+    .checked_pow(u32::try_from(-mobile_price.expo).unwrap())
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
+
+  require_gt!(mobile_price_with_conf, 0);
+  let mobile_fee = dnt_fee
+    .checked_mul(exponent_dec)
+    .unwrap()
+    .checked_div(mobile_price_with_conf.try_into().unwrap())
+    .unwrap();
+  if mobile_fee > 0 {
+    burn(ctx.accounts.mobile_burn_ctx(), mobile_fee)?;
+  }
 
   Ok(())
 }

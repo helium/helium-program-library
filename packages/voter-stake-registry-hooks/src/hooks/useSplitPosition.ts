@@ -1,6 +1,13 @@
 import { Program } from "@coral-xyz/anchor";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
-import { chunks, sendMultipleInstructions, toBN } from "@helium/spl-utils";
+import {
+  batchInstructionsToTxsWithPriorityFee,
+  sendAndConfirmWithRetry,
+  sendInstructions,
+  sendInstructionsWithPriorityFee,
+  toBN,
+  toVersionedTx,
+} from "@helium/spl-utils";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
   MintLayout,
@@ -27,12 +34,18 @@ export const useSplitPosition = () => {
       lockupKind = { cliff: {} },
       lockupPeriodsInDays,
       programId = PROGRAM_ID,
+      onInstructions,
     }: {
       sourcePosition: PositionWithMeta;
       amount: number;
       lockupKind: any;
       lockupPeriodsInDays: number;
       programId?: PublicKey;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[],
+        signers: Keypair[]
+      ) => Promise<void>;
     }) => {
       const isInvalid = !provider || !provider.wallet;
 
@@ -133,13 +146,40 @@ export const useSplitPosition = () => {
           );
         }
 
-        // This is an arbitrary threshold and we assume that up to 2 instructions can be inserted as a single Tx
-        const ixsChunks = chunks(instructions, 2);
+        if (onInstructions) {
+          await onInstructions(instructions, [mintKeypair]);
+        } else {
+          const sigs = [mintKeypair];
+          const drafts = await batchInstructionsToTxsWithPriorityFee(
+            provider,
+            instructions
+          );
+          const transactions = drafts.map(toVersionedTx)
 
-        await sendMultipleInstructions(provider, ixsChunks, [
-          [mintKeypair],
-          ...ixsChunks.slice(1).map(() => []),
-        ]);
+          let i = 0;
+          for (const tx of await provider.wallet.signAllTransactions(
+            transactions
+          )) {
+            const draft = drafts[i];
+            sigs.forEach((sig) => {
+              if (
+                draft.signers?.some((s) => s.publicKey.equals(sig.publicKey))
+              ) {
+                tx.sign([sig]);
+              }
+            });
+
+            i++
+            await sendAndConfirmWithRetry(
+              provider.connection,
+              Buffer.from(tx.serialize()),
+              {
+                skipPreflight: true,
+              },
+              "confirmed"
+            );
+          }
+        }
       }
     }
   );

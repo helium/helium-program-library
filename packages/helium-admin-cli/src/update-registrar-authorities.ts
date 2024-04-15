@@ -22,6 +22,10 @@ export async function run(args: any = process.argv) {
       type: 'string',
       required: true,
     },
+    authority: {
+      type: 'string',
+      required: true
+    }
   });
 
   const argv = await yarg.argv;
@@ -35,10 +39,11 @@ export async function run(args: any = process.argv) {
   const registrarAcc = await vsrProgram.account.registrar.fetch(registrar);
   const instructions = [
     await vsrProgram.methods
-      .updateRegistrarAuthorityV0()
+      .updateRegistrarAuthorityV0({
+        authority: new PublicKey(argv.authority)
+      })
       .accounts({
         registrar,
-        realm: registrarAcc.realm,
         realmAuthority: registrarAcc.realmAuthority,
       })
       .instruction(),

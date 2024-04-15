@@ -140,11 +140,15 @@ jobs:
           - tests/distributor-oracle.ts
           - tests/helium-entity-manager.ts
           - tests/mobile-entity-manager.ts
+          - tests/helium-sub-daos.ts
+          - tests/hexboosting.ts
           - tests/lazy-distributor.ts
           - tests/lazy-transactions.ts
           - tests/treasury-management.ts
+          - tests/price-oracle.ts
           - tests/voter-stake-registry.ts
           - tests/fanout.ts
+          - tests/sus.ts
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/

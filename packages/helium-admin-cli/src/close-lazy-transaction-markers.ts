@@ -5,16 +5,15 @@ import {
   init as initLazy,
   lazyTransactionsKey,
 } from "@helium/lazy-transactions-sdk";
-import os from "os";
-import yargs from "yargs/yargs";
 import { bulkSendTransactions, chunks } from "@helium/spl-utils";
 import {
   Keypair,
   PublicKey,
   SystemProgram,
-  Transaction,
-  TransactionInstruction,
+  TransactionInstruction
 } from "@solana/web3.js";
+import os from "os";
+import yargs from "yargs/yargs";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -42,18 +41,6 @@ export async function run(args: any = process.argv) {
   const ltKey = lazyTransactionsKey(argv.name)[0];
   const lt = await lazyProgram.account.lazyTransactionsV0.fetch(ltKey);
 
-  const blocks = await lazyProgram.account.block.all();
-  const blocksByKey = new Set(blocks.map((b) => b.publicKey.toString()));
-  const allIndices = new Array(1 << lt.maxDepth)
-    .fill(0)
-    .map((_, i) => i)
-    .map((bi) => ({
-      index: bi,
-      block: blockKey(ltKey, bi)[0],
-    }));
-  const blockIndices = allIndices.filter((bi) =>
-    blocksByKey.has(bi.block.toBase58())
-  );
   if (lt.executedTransactions.equals(PublicKey.default)) {
     const executedTransactions = Keypair.generate();
     const executedTransactionsSize = 1 + getBitmapLen(lt.maxDepth);
@@ -78,12 +65,25 @@ export async function run(args: any = process.argv) {
       .accounts({
         lazyTransactions: ltKey,
         executedTransactions: executedTransactions.publicKey,
+        canopy: lt.canopy,
       })
       .signers([executedTransactions])
       .rpc({ skipPreflight: true });
 
     lt.executedTransactions = executedTransactions.publicKey;
   }
+  const blocks = await lazyProgram.account.block.all();
+  const blocksByKey = new Set(blocks.map((b) => b.publicKey.toString()));
+  const allIndices = new Array(1 << lt.maxDepth)
+    .fill(0)
+    .map((_, i) => i)
+    .map((bi) => ({
+      index: bi,
+      block: blockKey(ltKey, bi)[0],
+    }));
+  const blockIndices = allIndices.filter((bi) =>
+    blocksByKey.has(bi.block.toBase58())
+  );
 
   // Do in chunks so we don't create too many promises
   let instructions: TransactionInstruction[] = [];
@@ -114,13 +114,14 @@ export async function run(args: any = process.argv) {
   }
 
   console.log(`${blocks.length} blocks to close`);
-  const txns = chunks(instructions, 10).map((chunk) => {
-    const tx = new Transaction({
-      feePayer: provider.wallet.publicKey,
-    });
-    tx.add(...chunk);
-    return tx;
-  });
+  const txns = await Promise.all(
+    chunks(instructions, 10).map(async (chunk) => {
+      return {
+        instructions: chunk,
+        feePayer: provider.wallet.publicKey,
+      };
+    })
+  );
 
   await bulkSendTransactions(provider, txns, (status) => {
     console.log(

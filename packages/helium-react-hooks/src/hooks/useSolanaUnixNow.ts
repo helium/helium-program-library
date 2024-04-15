@@ -7,13 +7,13 @@ export const useSolanaUnixNow = (refreshInterval: number = 10000): number | unde
   const { connection } = useConnection();
   const connectionWithoutCache = useMemo(() => {
     if (connection) {
-      return new Connection(connection.rpcEndpoint)
+      return new Connection(connection.rpcEndpoint);
     }
-  }, [connection?.rpcEndpoint])
-  const [refresh, setRefresh] = useState(0);
-
+  }, [connection?.rpcEndpoint]);
+  const [startTsJs, setStartTsJs] = useState<number | null>(null)
+  const [ret, setRet] = useState<number | undefined>(undefined);
   const { result: unixTs } = useAsync(
-    async (connectionWithoutCache: Connection | undefined, _: number) => {
+    async (connectionWithoutCache: Connection | undefined) => {
       if (connectionWithoutCache) {
         const clock = await connectionWithoutCache.getAccountInfo(
           SYSVAR_CLOCK_PUBKEY
@@ -21,19 +21,25 @@ export const useSolanaUnixNow = (refreshInterval: number = 10000): number | unde
         return Number(clock!.data.readBigInt64LE(8 * 4));
       }
     },
-    [connectionWithoutCache, refresh]
+    [connectionWithoutCache]
   );
+  useEffect(() => {
+    setStartTsJs(new Date().valueOf() / 1000);
+    setRet(unixTs)
+  }, [unixTs]);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setRefresh((prev) => prev + 1);
+      if (startTsJs && unixTs) {
+        setRet(Math.ceil(unixTs + ((new Date().valueOf() / 1000) - startTsJs)));
+      }
     }, refreshInterval)
 
     return () => {
       clearInterval(interval);
     }
-  }, [])
+  }, [startTsJs, unixTs, refreshInterval, setRet])
 
 
-  return unixTs;
+  return ret;
 };

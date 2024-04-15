@@ -1,16 +1,15 @@
 import {
+  Status,
   batchParallelInstructions,
-  bulkSendTransactions,
-  chunks,
-  truthy,
+  truthy
 } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
-import { PublicKey } from "@metaplex-foundation/js";
-import { Transaction } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { useVoteMarkers } from "./useVoteMarkers";
+import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 
 export const useRelinquishVote = (proposal: PublicKey) => {
   const { positions, provider } = useHeliumVsrState();
@@ -38,7 +37,19 @@ export const useRelinquishVote = (proposal: PublicKey) => {
   );
 
   const { error, loading, execute } = useAsyncCallback(
-    async ({ choice }: { choice: number }) => {
+    async ({
+      choice,
+      onInstructions,
+      onProgress,
+      maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
+    }: {
+      choice: number; // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
+      onProgress?: (status: Status) => void;
+      maxSignatureBatch?: number;
+    }) => {
       const isInvalid = !provider || !positions || positions.length === 0;
 
       if (isInvalid) {
@@ -89,7 +100,18 @@ export const useRelinquishVote = (proposal: PublicKey) => {
           )
         ).filter(truthy);
 
-        await batchParallelInstructions(provider, instructions);
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await batchParallelInstructions({
+            provider,
+            instructions,
+            onProgress,
+            triesRemaining: 10,
+            extraSigners: [],
+            maxSignatureBatch
+          });
+        }
       }
     }
   );

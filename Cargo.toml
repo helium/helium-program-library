@@ -4,6 +4,7 @@ members = [
   "utils/proposal",
   "utils/nft-delegation",
 ]
+
 exclude = [
   "deps/metaplex-program-library/bubblegum/program",
   "deps/metaplex-program-library/token-metadata/program",
@@ -15,18 +16,22 @@ exclude = [
   "utils/generate-test-gateway-txn",
   "utils/active-hotspot-oracle",
   "utils/backfill-onboarding-fees",
+  "utils/standardize-hotspot-metadata",
 ]
 
 [workspace.dependencies]
 anchor-lang = { version = "0.28.0", features = ["init-if-needed"] }
 anchor-spl = { version = "0.28.0", features = ["mint", "token"] }
 mpl-token-metadata = { version = "3.2.0" }
-account-compression-cpi = { rev = "a2d12e4a157d91feb73aa40a97fe297fd477dd87", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
-bubblegum-cpi = { rev = "a2d12e4a157d91feb73aa40a97fe297fd477dd87", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
+account-compression-cpi = { rev = "a499196", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
+bubblegum-cpi = { rev = "a499196", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
 solana-security-txt = "1.1.1"
 default-env = "0.1.1"
 shared-utils = { path = "./utils/shared-utils" }
 circuit-breaker = { path = "./programs/circuit-breaker", features = ["cpi"] }
 helium-sub-daos = { path = "./programs/helium-sub-daos", features = ["cpi"] }
 helium-entity-manager = { path = "./programs/helium-entity-manager", features = ["cpi"] }
-rewards-burn = { path = "./programs/rewards-burn", features = ["cpi"] }
+lazy-distributor = { path = "./programs/lazy-distributor", features = ["cpi"] }
+mobile-entity-manager = { path = "./programs/mobile-entity-manager", features = ["cpi"] }
+price-oracle = { path = "./programs/price-oracle", features = ["cpi"] }
+no-emit = { path = "./programs/no-emit", features = ["cpi"] }

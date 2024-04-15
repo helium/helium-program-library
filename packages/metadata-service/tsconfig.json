@@ -17,6 +17,9 @@
       "path": "../account-fetch-cache"
     },
     {
+      "path": "../data-credits-sdk"
+    },
+    {
       "path": "./tsconfig.cjs.json"
     },
     {

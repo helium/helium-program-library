@@ -25,13 +25,19 @@ import { SHDW_DRIVE_URL } from "./constants";
 import { IotHotspotInfo, KeyToAsset, MobileHotspotInfo } from "./model";
 import { provider } from "./solana";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
+import { delegatedDataCreditsKey, escrowAccountKey } from '@helium/data-credits-sdk'
+import { subDaoKey } from '@helium/helium-sub-daos-sdk'
 import {
   AccountLayout,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { Op } from "sequelize";
+import { credentials } from "@grpc/grpc-js";
+import { orgClient } from "./proto/generated/iot_config_grpc_pb";
+import { org_get_req_v1, org_list_req_v1, org_v1 } from "./proto/generated/iot_config_pb";
 
+const RPC_HOST = process.env.RPC_HOST as string;
 const PAGE_SIZE = Number(process.env.PAGE_SIZE) || 10000;
 const MODEL_MAP: any = {
   "iot": [IotHotspotInfo, "iot_hotspot_info"],
@@ -131,8 +137,8 @@ async function getHotspotByKeyToAsset(request, reply) {
 
   const assetJson = generateAssetJson(record, keyStr!);
 
-  // Needed to make CloudFront to cache for longer than 1 day
-  reply.header("Cache-Control", "max-age=31536000");  // 1 year in seconds
+  // Needed to make Cloudflare to cache for longer than 1 day
+  reply.header("Cloudflare-CDN-Cache-Control", "max-age=31536000");  // 1 year in seconds
 
   return assetJson;
 };
@@ -168,6 +174,44 @@ function decodeCursor(cursor?: string) {
   return bufferObj.toString("utf8");
 };
 
+function createHeliumAddress(buf: Uint8Array): Address {
+  const payerKeyFirstByte = buf[0];
+  const payerWithoutFirstByte = buf.slice(1);
+
+  const solanaAddress = new PublicKey(payerWithoutFirstByte);
+  const heliumAddress = new Address(0, 0, payerKeyFirstByte, solanaAddress.toBytes());
+
+  return heliumAddress;
+}
+
+function processOrg(org: org_v1) {
+  const oui = org?.getOui();
+  const payerU8 = org?.getPayer_asU8() as Uint8Array;
+  const ownerU8 = org?.getOwner_asU8() as Uint8Array;
+  const delegateKeysU8Arr = org?.getDelegateKeysList_asU8() as Uint8Array[];
+  const locked = org?.getLocked();
+
+  const payerAddress = createHeliumAddress(payerU8);
+  const ownerAddress = createHeliumAddress(ownerU8);
+  const delegateKeysB58Arr = delegateKeysU8Arr.map((key) => {
+    const delegateAddress = createHeliumAddress(key);
+    return delegateAddress.b58;
+  })
+
+  const IOT_SUB_DAO_KEY = subDaoKey(IOT_MINT)[0];
+  const delegatedDataCredits = delegatedDataCreditsKey(IOT_SUB_DAO_KEY, payerAddress.b58)[0];
+  const escrowTokenAccount = escrowAccountKey(delegatedDataCredits)[0];
+
+  return {
+    oui,
+    owner: ownerAddress.b58,
+    payer: payerAddress.b58,
+    escrow: escrowTokenAccount.toBase58(),
+    delegate_keys: delegateKeysB58Arr,
+    locked,
+  }
+}
+
 const server: FastifyInstance = Fastify({
   logger: true,
 });
@@ -177,6 +221,112 @@ server.register(cors, {
 server.get("/health", async () => {
   return { ok: true };
 });
+
+server.get<{ Params: { oui: string } }>(
+  "/v2/oui/all",
+  async (request, reply) => {
+    try {
+      const client = new orgClient(RPC_HOST, credentials.createSsl());
+      const rpcReq = new org_list_req_v1();
+  
+      client.list(rpcReq, (err, resp) => {
+        if (err) {
+          const errMessage = {
+            statusCode: 500,
+            error: "Internal Server Error",
+            message: err.message ? err.message : "Error making RPC request"
+          }
+          reply.code(500).send(errMessage);
+        }
+        if (resp) {
+          try {
+            const orgList = resp.getOrgsList();
+            const orgListJson = orgList.map((org) => processOrg(org));
+    
+            reply.header("Cloudflare-CDN-Cache-Control", "max-age=3600"); // 1 hour
+            reply.send({ orgs: orgListJson });
+          } catch (error: any) {
+            const errorMessage = {
+              statusCode: 500,
+              error: "Internal Server Error",
+              message: error.message ? error.message : "Error processing RPC response"
+            }
+            reply.code(500).send(errorMessage);
+          }
+        }
+      });
+    } catch (error: any) {
+      const errorMessage = {
+        statusCode: 500,
+        error: "Internal Server Error",
+        message: error.message ? error.message : "Error creating RPC connection"
+      }
+      reply.code(500).send(errorMessage);
+    }
+
+    return reply;
+  }
+);
+
+server.get<{ Params: { oui: string } }>(
+  "/v2/oui/:oui",
+  async (request, reply) => {
+    try {
+      const { oui } = request.params;
+      const ouiNum = parseInt(oui);
+
+      if (typeof ouiNum !== 'number' || isNaN(ouiNum)) {
+        const error = {
+          statusCode: 400,
+          error: "Bad Request",
+          message: "Invalid OUI ID"
+        }
+        return reply.code(400).send(error);
+      }
+
+      const client = new orgClient(RPC_HOST, credentials.createSsl());
+
+      const rpcReq = new org_get_req_v1();
+      rpcReq.setOui(ouiNum);
+
+      client.get(rpcReq, (err, resp) => {
+        if (err) {
+          const errMessage = {
+            statusCode: 500,
+            error: "Internal Server Error",
+            message: err.message ? err.message : "Error making RPC request"
+          }
+          reply.code(500).send(errMessage);
+        };
+        if (resp) {
+          try {
+            const org = resp.getOrg() as org_v1;
+            const orgJson = processOrg(org);
+    
+            reply.header("Cloudflare-CDN-Cache-Control", "max-age=3600"); // 1 hour
+            reply.send(orgJson);
+          } catch (error: any) {
+            const errorMessage = {
+              statusCode: 500,
+              error: "Internal Server Error",
+              message: error.message ? error.message : "Error processing RPC response"
+            }
+            reply.code(500).send(errorMessage);
+          }
+        }
+      });
+    } catch (error: any) {
+      const errorMessage = {
+        statusCode: 500,
+        error: "Internal Server Error",
+        message: error.message ? error.message : "Error creating RPC connection"
+      }
+      reply.code(500).send(errorMessage);
+    }
+
+    return reply
+  }
+);
 
 server.get<{ Params: { wallet: string } }>(
   "/v2/wallet/:wallet",
@@ -238,7 +388,7 @@ server.get<{ Params: { wallet: string } }>(
       })
     );
 
-    reply.header("Cache-Control", "no-cache");
+    reply.header("Cloudflare-CDN-Cache-Control", "no-cache");
 
     return {
       hotspots_count: assetJsons.length,
@@ -277,7 +427,7 @@ server.get<{ Querystring: { subnetwork: string } }>(
       totalPages: Math.ceil(count / PAGE_SIZE),
     };
 
-    reply.header("Cache-Control", "no-cache");
+    reply.header("Cloudflare-CDN-Cache-Control", "no-cache");
 
     return result;
   }
@@ -360,17 +510,18 @@ server.get<{ Querystring: { subnetwork: string; cursor?: string; } }>(
     result.items = ktas.map((kta) => {
       return {
         key_to_asset_key: kta.address,
+        entity_key_str: decodeEntityKey(kta.entity_key, { [kta.key_serialization]: {} }),
+        is_active: kta[lastItemTable]?.is_active,
+        lat: kta[lastItemTable]?.lat,
+        long: kta[lastItemTable]?.long,
       };
     });
 
-    // If we're on the last page of results, tell Cloudfront not to cache
-    // so that origin requests are made and newly added hotspots can be 
-    // returned
     if (isLastPage) {
-      reply.header("Cache-Control", "no-cache");
+      reply.header("Cloudflare-CDN-Cache-Control", "no-cache");
     } else {
-      // Needed to make CloudFront to cache for longer than 1 day
-      reply.header("Cache-Control", "max-age=31536000");  // 1 year in seconds
+      reply.header("Cloudflare-CDN-Cache-Control", "max-age=86400");  // 1 day in seconds
+
     }
     
     return result;
@@ -423,8 +574,8 @@ server.get<{ Params: { eccCompact: string } }>(
 
     const assetJson = generateAssetJson(record, eccCompact);
 
-    // Needed to make CloudFront to cache for longer than 1 day
-    reply.header("Cache-Control", "max-age=31536000");  // 1 year in seconds
+    // Needed to make Cloudflare to cache for longer than 1 day
+    reply.header("Cloudflare-CDN-Cache-Control", "max-age=31536000");  // 1 year in seconds
 
     return assetJson;
   }

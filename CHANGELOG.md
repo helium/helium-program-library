@@ -3,6 +3,462 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.6](https://github.com/helium/helium-program-library/compare/v0.7.5...v0.7.6) (2024-04-10)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.7.5](https://github.com/helium/helium-program-library/compare/v0.7.4...v0.7.5) (2024-04-10)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.7.4](https://github.com/helium/helium-program-library/compare/v0.7.3...v0.7.4) (2024-04-10)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.7.3](https://github.com/helium/helium-program-library/compare/v0.7.2...v0.7.3) (2024-04-04)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.7.2](https://github.com/helium/helium-program-library/compare/v0.7.1...v0.7.2) (2024-04-04)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.7.1](https://github.com/helium/helium-program-library/compare/v0.7.0...v0.7.1) (2024-04-02)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+# [0.7.0](https://github.com/helium/helium-program-library/compare/v0.6.42...v0.7.0) (2024-03-29)
+
+## Breaking
+
+  * Interfaces in spl-utils around transactions have changed to switch to `VersionedTransaction`. This allows for better transaction packing with loookup tables.
+
+
+## [0.6.42](https://github.com/helium/helium-program-library/compare/v0.6.41...v0.6.42) (2024-03-19)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.41](https://github.com/helium/helium-program-library/compare/v0.6.40...v0.6.41) (2024-03-18)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.40](https://github.com/helium/helium-program-library/compare/v0.6.39...v0.6.40) (2024-03-18)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.39](https://github.com/helium/helium-program-library/compare/v0.6.38...v0.6.39) (2024-03-13)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.38](https://github.com/helium/helium-program-library/compare/v0.6.37...v0.6.38) (2024-03-11)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.37](https://github.com/helium/helium-program-library/compare/v0.6.35...v0.6.37) (2024-03-11)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.36](https://github.com/helium/helium-program-library/compare/v0.6.27...v0.6.36) (2024-03-08)
+
+
+### Features
+
+* **#559:** Use pyth oracle for mobile onboarding ([#566](https://github.com/helium/helium-program-library/issues/566)) ([1b751e9](https://github.com/helium/helium-program-library/commit/1b751e9a1aabbbe851ce828c4b2dfff46d18615a)), closes [#559](https://github.com/helium/helium-program-library/issues/559)
+* **#575:** Standardize all rewardable entities in url and creators ([#584](https://github.com/helium/helium-program-library/issues/584)) ([8560ad2](https://github.com/helium/helium-program-library/commit/8560ad26916fc5ac750599312138a8366947635f)), closes [#575](https://github.com/helium/helium-program-library/issues/575)
+* **#644:** Add helium/sus package to preview transactions ([09c4c70](https://github.com/helium/helium-program-library/commit/09c4c7031146b2871fe8b3607f9210f77e7851e1)), closes [#644](https://github.com/helium/helium-program-library/issues/644)
+
+
+
+
+
+## [0.6.35](https://github.com/helium/helium-program-library/compare/v0.6.34...v0.6.35) (2024-03-04)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.34](https://github.com/helium/helium-program-library/compare/v0.6.33...v0.6.34) (2024-03-04)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.33](https://github.com/helium/helium-program-library/compare/v0.6.32...v0.6.33) (2024-03-01)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.32](https://github.com/helium/helium-program-library/compare/v0.6.31...v0.6.32) (2024-02-28)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.31](https://github.com/helium/helium-program-library/compare/v0.6.30...v0.6.31) (2024-02-28)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.30](https://github.com/helium/helium-program-library/compare/v0.6.29...v0.6.30) (2024-02-22)
+
+
+### Features
+
+* **#575:** Standardize all rewardable entities in url and creators ([#584](https://github.com/helium/helium-program-library/issues/584)) ([8560ad2](https://github.com/helium/helium-program-library/commit/8560ad26916fc5ac750599312138a8366947635f)), closes [#575](https://github.com/helium/helium-program-library/issues/575)
+* **#644:** Add helium/sus package to preview transactions ([09c4c70](https://github.com/helium/helium-program-library/commit/09c4c7031146b2871fe8b3607f9210f77e7851e1)), closes [#644](https://github.com/helium/helium-program-library/issues/644)
+
+
+
+
+
+## [0.6.29](https://github.com/helium/helium-program-library/compare/v0.6.28...v0.6.29) (2024-02-06)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.28](https://github.com/helium/helium-program-library/compare/v0.6.27...v0.6.28) (2024-02-06)
+
+
+### Features
+
+* **#559:** Use pyth oracle for mobile onboarding ([#566](https://github.com/helium/helium-program-library/issues/566)) ([1b751e9](https://github.com/helium/helium-program-library/commit/1b751e9a1aabbbe851ce828c4b2dfff46d18615a)), closes [#559](https://github.com/helium/helium-program-library/issues/559)
+
+
+
+
+
+## [0.6.27](https://github.com/helium/helium-program-library/compare/v0.6.25...v0.6.27) (2024-02-01)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.26](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.26) (2024-01-31)
+
+
+### Bug Fixes
+
+* Do not require initialized token account if no mobile burn ([#542](https://github.com/helium/helium-program-library/issues/542)) ([a7334ed](https://github.com/helium/helium-program-library/commit/a7334ed0f916e8265a6f5955bd4fe837fc1dedb5))
+
+
+### Features
+
+* **#494:** Implement HIP-96 wifi onboarding fees ([#506](https://github.com/helium/helium-program-library/issues/506)) ([50471c3](https://github.com/helium/helium-program-library/commit/50471c33d06ba7f55e605ed7dbba02119af5e3cd)), closes [#494](https://github.com/helium/helium-program-library/issues/494)
+* **#495:** Add monitoring for claimable rewards and vehnt ([#507](https://github.com/helium/helium-program-library/issues/507)) ([efc6813](https://github.com/helium/helium-program-library/commit/efc6813839be4b323bea8110ad7762423dd13b82)), closes [#495](https://github.com/helium/helium-program-library/issues/495) [#495](https://github.com/helium/helium-program-library/issues/495)
+* **#504:** Parallelize claim delegation rewards  ([#509](https://github.com/helium/helium-program-library/issues/509)) ([01b5f3d](https://github.com/helium/helium-program-library/commit/01b5f3dbd35345302e5fc6a83667b5e5e017d4ec)), closes [#504](https://github.com/helium/helium-program-library/issues/504)
+* **#525:** Add prom metrics for price oracles, fix distributor oracle total rewards metric ([#528](https://github.com/helium/helium-program-library/issues/528)) ([13a5cb8](https://github.com/helium/helium-program-library/commit/13a5cb8d8936d1b5929379dafafd2907322dd473))
+* **#526:** Remove digit shift from VSR ([#527](https://github.com/helium/helium-program-library/issues/527)) ([651e629](https://github.com/helium/helium-program-library/commit/651e62905e53cbf67f4c4318ca683396b5511b14)), closes [#526](https://github.com/helium/helium-program-library/issues/526)
+* **#543:** Add transaction webhook capability to account-postgres-sink ([#544](https://github.com/helium/helium-program-library/issues/544)) ([a0d7bd9](https://github.com/helium/helium-program-library/commit/a0d7bd9cbf6e5a28c467d8df67c9702cef705dae)), closes [#543](https://github.com/helium/helium-program-library/issues/543)
+* Avoid purging prices when purging oracles ([#533](https://github.com/helium/helium-program-library/issues/533)) ([622ec12](https://github.com/helium/helium-program-library/commit/622ec12e18cde8b201018bb723c0d0df09cb4a33))
+
+
+
+
+
+## [0.6.25](https://github.com/helium/helium-program-library/compare/v0.6.24...v0.6.25) (2024-01-29)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.24](https://github.com/helium/helium-program-library/compare/v0.6.23...v0.6.24) (2024-01-29)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.23](https://github.com/helium/helium-program-library/compare/v0.6.20...v0.6.23) (2024-01-20)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.22](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.22) (2024-01-19)
+
+
+### Bug Fixes
+
+* Do not require initialized token account if no mobile burn ([#542](https://github.com/helium/helium-program-library/issues/542)) ([a7334ed](https://github.com/helium/helium-program-library/commit/a7334ed0f916e8265a6f5955bd4fe837fc1dedb5))
+
+
+### Features
+
+* **#494:** Implement HIP-96 wifi onboarding fees ([#506](https://github.com/helium/helium-program-library/issues/506)) ([50471c3](https://github.com/helium/helium-program-library/commit/50471c33d06ba7f55e605ed7dbba02119af5e3cd)), closes [#494](https://github.com/helium/helium-program-library/issues/494)
+* **#495:** Add monitoring for claimable rewards and vehnt ([#507](https://github.com/helium/helium-program-library/issues/507)) ([efc6813](https://github.com/helium/helium-program-library/commit/efc6813839be4b323bea8110ad7762423dd13b82)), closes [#495](https://github.com/helium/helium-program-library/issues/495) [#495](https://github.com/helium/helium-program-library/issues/495)
+* **#504:** Parallelize claim delegation rewards  ([#509](https://github.com/helium/helium-program-library/issues/509)) ([01b5f3d](https://github.com/helium/helium-program-library/commit/01b5f3dbd35345302e5fc6a83667b5e5e017d4ec)), closes [#504](https://github.com/helium/helium-program-library/issues/504)
+* **#525:** Add prom metrics for price oracles, fix distributor oracle total rewards metric ([#528](https://github.com/helium/helium-program-library/issues/528)) ([13a5cb8](https://github.com/helium/helium-program-library/commit/13a5cb8d8936d1b5929379dafafd2907322dd473))
+* **#526:** Remove digit shift from VSR ([#527](https://github.com/helium/helium-program-library/issues/527)) ([651e629](https://github.com/helium/helium-program-library/commit/651e62905e53cbf67f4c4318ca683396b5511b14)), closes [#526](https://github.com/helium/helium-program-library/issues/526)
+* **#543:** Add transaction webhook capability to account-postgres-sink ([#544](https://github.com/helium/helium-program-library/issues/544)) ([a0d7bd9](https://github.com/helium/helium-program-library/commit/a0d7bd9cbf6e5a28c467d8df67c9702cef705dae)), closes [#543](https://github.com/helium/helium-program-library/issues/543)
+* Avoid purging prices when purging oracles ([#533](https://github.com/helium/helium-program-library/issues/533)) ([622ec12](https://github.com/helium/helium-program-library/commit/622ec12e18cde8b201018bb723c0d0df09cb4a33))
+
+
+
+
+
+## [0.6.21](https://github.com/helium/helium-program-library/compare/v0.6.20...v0.6.21) (2024-01-19)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.20](https://github.com/helium/helium-program-library/compare/v0.6.19...v0.6.20) (2024-01-19)
+
+
+### Features
+
+* **#526:** Remove digit shift from VSR ([#527](https://github.com/helium/helium-program-library/issues/527)) ([651e629](https://github.com/helium/helium-program-library/commit/651e62905e53cbf67f4c4318ca683396b5511b14)), closes [#526](https://github.com/helium/helium-program-library/issues/526)
+
+
+
+
+
+## [0.6.19](https://github.com/helium/helium-program-library/compare/v0.6.17...v0.6.19) (2024-01-19)
+
+
+### Bug Fixes
+
+* Do not require initialized token account if no mobile burn ([#542](https://github.com/helium/helium-program-library/issues/542)) ([a7334ed](https://github.com/helium/helium-program-library/commit/a7334ed0f916e8265a6f5955bd4fe837fc1dedb5))
+
+
+
+
+
+## [0.6.18](https://github.com/helium/helium-program-library/compare/v0.6.17...v0.6.18) (2024-01-19)
+
+
+### Bug Fixes
+
+* Do not require initialized token account if no mobile burn ([#542](https://github.com/helium/helium-program-library/issues/542)) ([a7334ed](https://github.com/helium/helium-program-library/commit/a7334ed0f916e8265a6f5955bd4fe837fc1dedb5))
+
+
+
+
+
+## [0.6.17](https://github.com/helium/helium-program-library/compare/v0.6.16...v0.6.17) (2024-01-19)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.16](https://github.com/helium/helium-program-library/compare/v0.6.15...v0.6.16) (2024-01-16)
+
+
+### Features
+
+* **#543:** Add transaction webhook capability to account-postgres-sink ([#544](https://github.com/helium/helium-program-library/issues/544)) ([a0d7bd9](https://github.com/helium/helium-program-library/commit/a0d7bd9cbf6e5a28c467d8df67c9702cef705dae)), closes [#543](https://github.com/helium/helium-program-library/issues/543)
+
+
+
+
+
+## [0.6.15](https://github.com/helium/helium-program-library/compare/v0.6.14...v0.6.15) (2024-01-12)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.14](https://github.com/helium/helium-program-library/compare/v0.6.13...v0.6.14) (2024-01-11)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.13](https://github.com/helium/helium-program-library/compare/v0.6.12...v0.6.13) (2024-01-05)
+
+
+### Features
+
+* Avoid purging prices when purging oracles ([#533](https://github.com/helium/helium-program-library/issues/533)) ([622ec12](https://github.com/helium/helium-program-library/commit/622ec12e18cde8b201018bb723c0d0df09cb4a33))
+
+
+
+
+
+## [0.6.12](https://github.com/helium/helium-program-library/compare/v0.6.11...v0.6.12) (2024-01-02)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.11](https://github.com/helium/helium-program-library/compare/v0.6.8...v0.6.11) (2023-12-27)
+
+
+### Features
+
+* **#525:** Add prom metrics for price oracles, fix distributor oracle total rewards metric ([#528](https://github.com/helium/helium-program-library/issues/528)) ([13a5cb8](https://github.com/helium/helium-program-library/commit/13a5cb8d8936d1b5929379dafafd2907322dd473))
+
+
+
+
+
+## [0.6.10](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.10) (2023-12-22)
+
+
+### Features
+
+* **#494:** Implement HIP-96 wifi onboarding fees ([#506](https://github.com/helium/helium-program-library/issues/506)) ([50471c3](https://github.com/helium/helium-program-library/commit/50471c33d06ba7f55e605ed7dbba02119af5e3cd)), closes [#494](https://github.com/helium/helium-program-library/issues/494)
+* **#495:** Add monitoring for claimable rewards and vehnt ([#507](https://github.com/helium/helium-program-library/issues/507)) ([efc6813](https://github.com/helium/helium-program-library/commit/efc6813839be4b323bea8110ad7762423dd13b82)), closes [#495](https://github.com/helium/helium-program-library/issues/495) [#495](https://github.com/helium/helium-program-library/issues/495)
+* **#504:** Parallelize claim delegation rewards  ([#509](https://github.com/helium/helium-program-library/issues/509)) ([01b5f3d](https://github.com/helium/helium-program-library/commit/01b5f3dbd35345302e5fc6a83667b5e5e017d4ec)), closes [#504](https://github.com/helium/helium-program-library/issues/504)
+
+
+
+
+
+## [0.6.9](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.9) (2023-12-21)
+
+
+### Features
+
+* **#494:** Implement HIP-96 wifi onboarding fees ([#506](https://github.com/helium/helium-program-library/issues/506)) ([50471c3](https://github.com/helium/helium-program-library/commit/50471c33d06ba7f55e605ed7dbba02119af5e3cd)), closes [#494](https://github.com/helium/helium-program-library/issues/494)
+* **#495:** Add monitoring for claimable rewards and vehnt ([#507](https://github.com/helium/helium-program-library/issues/507)) ([efc6813](https://github.com/helium/helium-program-library/commit/efc6813839be4b323bea8110ad7762423dd13b82)), closes [#495](https://github.com/helium/helium-program-library/issues/495) [#495](https://github.com/helium/helium-program-library/issues/495)
+* **#504:** Parallelize claim delegation rewards  ([#509](https://github.com/helium/helium-program-library/issues/509)) ([01b5f3d](https://github.com/helium/helium-program-library/commit/01b5f3dbd35345302e5fc6a83667b5e5e017d4ec)), closes [#504](https://github.com/helium/helium-program-library/issues/504)
+
+
+
+
+
+## [0.6.8](https://github.com/helium/helium-program-library/compare/v0.6.7...v0.6.8) (2023-12-21)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.7](https://github.com/helium/helium-program-library/compare/v0.6.6...v0.6.7) (2023-12-19)
+
+
+### Features
+
+* **#494:** Implement HIP-96 wifi onboarding fees ([#506](https://github.com/helium/helium-program-library/issues/506)) ([50471c3](https://github.com/helium/helium-program-library/commit/50471c33d06ba7f55e605ed7dbba02119af5e3cd)), closes [#494](https://github.com/helium/helium-program-library/issues/494)
+* **#504:** Parallelize claim delegation rewards  ([#509](https://github.com/helium/helium-program-library/issues/509)) ([01b5f3d](https://github.com/helium/helium-program-library/commit/01b5f3dbd35345302e5fc6a83667b5e5e017d4ec)), closes [#504](https://github.com/helium/helium-program-library/issues/504)
+
+
+
+
+
+## [0.6.6](https://github.com/helium/helium-program-library/compare/v0.6.5...v0.6.6) (2023-12-13)
+
+
+### Features
+
+* **#495:** Add monitoring for claimable rewards and vehnt ([#507](https://github.com/helium/helium-program-library/issues/507)) ([efc6813](https://github.com/helium/helium-program-library/commit/efc6813839be4b323bea8110ad7762423dd13b82)), closes [#495](https://github.com/helium/helium-program-library/issues/495) [#495](https://github.com/helium/helium-program-library/issues/495)
+
+
+
+
+
+## [0.6.5](https://github.com/helium/helium-program-library/compare/v0.6.2...v0.6.5) (2023-12-08)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.6.4](https://github.com/helium/helium-program-library/compare/v0.6.0...v0.6.4) (2023-12-06)
+
+
+### Features
+
+* **#483:** Create a burn rewardable entity as a sink for unused service provider reward ([#487](https://github.com/helium/helium-program-library/issues/487)) ([2b8ff5b](https://github.com/helium/helium-program-library/commit/2b8ff5b885c6d2484f227033cfbe978daa404941)), closes [#483](https://github.com/helium/helium-program-library/issues/483) [#483](https://github.com/helium/helium-program-library/issues/483)
+
+
+
+
+
+## [0.6.3](https://github.com/helium/helium-program-library/compare/v0.6.0...v0.6.3) (2023-12-01)
+
+
+### Features
+
+* **#483:** Create a burn rewardable entity as a sink for unused service provider reward ([#487](https://github.com/helium/helium-program-library/issues/487)) ([2b8ff5b](https://github.com/helium/helium-program-library/commit/2b8ff5b885c6d2484f227033cfbe978daa404941)), closes [#483](https://github.com/helium/helium-program-library/issues/483) [#483](https://github.com/helium/helium-program-library/issues/483)
+
+
+
+
+
 ## [0.6.2](https://github.com/helium/helium-program-library/compare/v0.6.1...v0.6.2) (2023-11-17)
 
 

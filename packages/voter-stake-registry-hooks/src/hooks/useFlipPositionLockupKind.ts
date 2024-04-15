@@ -1,5 +1,4 @@
 import { BN, Program } from "@coral-xyz/anchor";
-import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
 import { sendInstructions } from "@helium/spl-utils";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
@@ -8,16 +7,24 @@ import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 
+function secsToDays(secs: number): number {
+  return secs / (60 * 60 * 24);
+}
+
 export const useFlipPositionLockupKind = () => {
-  const unixNow = useSolanaUnixNow();
-  const { provider } = useHeliumVsrState();
+  const { provider, unixNow } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,
       programId = PROGRAM_ID,
+      onInstructions,
     }: {
       position: PositionWithMeta;
       programId?: PublicKey;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
     }) => {
       const isInvalid =
         !provider ||
@@ -30,11 +37,7 @@ export const useFlipPositionLockupKind = () => {
       const idl = await Program.fetchIdl(programId, provider);
       const hsdProgram = await init(provider as any, programId, idl);
       const vsrProgram = await initVsr(provider as any);
-
-      const registrar = await vsrProgram.account.registrar.fetch(
-        position.registrar
-      );
-      const mint = registrar.votingMints[position.votingMintConfigIdx].mint;
+      const mint = position.votingMint.mint;
 
       if (loading) return;
 
@@ -72,7 +75,7 @@ export const useFlipPositionLockupKind = () => {
           );
         } else {
           instructions.push(
-            await hsdProgram.methods
+            await vsrProgram.methods
               .resetLockupV0({
                 kind,
                 periods: positionLockupPeriodInDays,
@@ -84,7 +87,11 @@ export const useFlipPositionLockupKind = () => {
           );
         }
 
-        await sendInstructions(provider, instructions);
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await sendInstructions(provider, instructions);
+        }
       }
     }
   );
@@ -95,7 +102,3 @@ export const useFlipPositionLockupKind = () => {
     flipPositionLockupKind: execute,
   };
 };
-
-function secsToDays(secs: number): number {
-  return Math.floor(secs / (60 * 60 * 24));
-}

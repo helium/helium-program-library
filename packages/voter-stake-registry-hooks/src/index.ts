@@ -21,9 +21,12 @@ export { useRegistrar } from "./hooks/useRegistrar";
 export { calcLockupMultiplier } from "./utils/calcLockupMultiplier";
 export { calcPositionVotingPower } from "./utils/calcPositionVotingPower";
 export * from "./sdk/types";
-export { useVoteMarkers } from "./hooks/useVoteMarkers";
-export { useVote } from "./hooks/useVote";
-export { useRelinquishVote } from "./hooks/useRelinquishVote";
 export { useVotingDelegatePositions } from "./hooks/useVotingDelegatePositions";
 export { useVotingUndelegatePositions } from "./hooks/useVotingUndelegatePositions";
 export { useVotingDelegatedTo } from "./hooks/useVotingDelegatedTo"
+export { getRegistrarKey, getPositionKeys } from "./utils/getPositionKeys";
+export { getSubDaos } from "./utils/getSubDaos";
+export { useVoteMarkers } from "./hooks/useVoteMarkers";
+export { useVote } from "./hooks/useVote";
+export { useRelinquishVote } from "./hooks/useRelinquishVote";
+export { useRelinquishPositionVotes } from "./hooks/useRelinquishPositionVotes";

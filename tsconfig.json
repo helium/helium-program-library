@@ -8,6 +8,12 @@
       "path": "./packages/fanout-sdk"
     },
     {
+      "path": "./packages/sus"
+    },
+    {
+      "path": "./packages/hexboosting-sdk"
+    },
+    {
       "path": "./packages/spl-utils"
     },
     {
@@ -78,10 +84,12 @@
     },
     {
       "path": "./packages/crons"
-    }, {
+    },
+    {
       "path": "./packages/entity-invalidator"
-    }, {
-      "path": "./packages/rewards-burn-sdk"
+    },
+    {
+      "path": "./packages/no-emit-sdk"
     }
   ]
 }

@@ -34,7 +34,6 @@ import {
 } from "@solana/spl-governance";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
-  ComputeBudgetProgram,
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
@@ -53,6 +52,7 @@ import {
   sendInstructionsOrSquads,
 } from "./utils";
 import { init } from "@helium/nft-delegation-sdk";
+import BN from "bn.js"
 
 const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
@@ -363,9 +363,6 @@ export async function run(args: any = process.argv) {
         .initializeRegistrarV0({
           positionUpdateAuthority: null,
         })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-        ])
         .accounts({
           realm,
           realmGoverningTokenMint: subdaoKeypair.publicKey,
@@ -378,7 +375,6 @@ export async function run(args: any = process.argv) {
       await heliumVsrProgram.methods
         .configureVotingMintV0({
           idx: 0, // idx
-          digitShift: -1, // digit shift
           baselineVoteWeightScaledFactor: new anchor.BN(BASELINE * 1e9),
           maxExtraLockupVoteWeightScaledFactor: new anchor.BN(SCALE * 1e9),
           genesisVotePowerMultiplier: 0,
@@ -403,17 +399,6 @@ export async function run(args: any = process.argv) {
 
     await sendInstructions(provider, instructions, []);
     instructions = [];
-
-    console.log("Creating max voter record");
-    instructions.push(
-      await heliumVsrProgram.methods
-        .updateMaxVoterWeightV0()
-        .accounts({
-          registrar,
-          realmGoverningTokenMint: subdaoKeypair.publicKey,
-        })
-        .instruction()
-    );
   }
 
   await sendInstructions(provider, instructions, []);
@@ -504,7 +489,6 @@ export async function run(args: any = process.argv) {
     await sendInstructionsOrSquads({
       provider,
       instructions: [
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         await initSubdaoMethod.instruction(),
       ],
       executeTransaction: true,
@@ -573,22 +557,28 @@ export async function run(args: any = process.argv) {
       };
     } else {
       settings = {
-        mobileConfigV1: {
+        mobileConfigV2: {
           feesByDevice: [
             {
               deviceType: { cbrs: {} },
               dcOnboardingFee: toBN(40, 5),
               locationStakingFee: toBN(10, 5),
+              mobileOnboardingFeeUsd: toBN(0, 6),
+              reserved: new Array(8).fill(new BN(0)),
             },
             {
               deviceType: { wifiIndoor: {} },
-              dcOnboardingFee: toBN(0, 5),
+              dcOnboardingFee: toBN(10, 5),
               locationStakingFee: toBN(0, 5),
+              mobileOnboardingFeeUsd: toBN(10, 6),
+              reserved: new Array(8).fill(new BN(0)),
             },
             {
               deviceType: { wifiOutdoor: {} },
-              dcOnboardingFee: toBN(0, 5),
+              dcOnboardingFee: toBN(10, 5),
               locationStakingFee: toBN(0, 5),
+              mobileOnboardingFeeUsd: toBN(20, 6),
+              reserved: new Array(8).fill(new BN(0)),
             },
           ],
         },

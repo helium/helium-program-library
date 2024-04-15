@@ -144,6 +144,7 @@ export async function run(args: any = process.argv) {
           name,
           issuingAuthority: issuingAuthority,
           updateAuthority: issuingAuthority,
+          hexboostAuthority: issuingAuthority,
           metadataUrl: argv.metadataUrl,
         })
         .preInstructions([

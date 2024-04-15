@@ -1,5 +1,4 @@
 import { BN } from "@coral-xyz/anchor";
-import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import { sendInstructions } from "@helium/spl-utils";
 import { TransactionInstruction } from "@solana/web3.js";
 import { useAsync, useAsyncCallback } from "react-async-hook";
@@ -8,14 +7,22 @@ import { HeliumVsrClient } from "../sdk/client";
 import { PositionWithMeta } from "../sdk/types";
 
 export const useClosePosition = () => {
-  const { provider } = useHeliumVsrState();
-  const unixNow = useSolanaUnixNow();
+  const { provider, unixNow } = useHeliumVsrState();
   const { result: client } = useAsync(
     (provider) => HeliumVsrClient.connect(provider),
     [provider]
   );
   const { error, loading, execute } = useAsyncCallback(
-    async ({ position }: { position: PositionWithMeta }) => {
+    async ({
+      position,
+      onInstructions,
+    }: {
+      position: PositionWithMeta;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
+    }) => {
       const lockup = position.lockup;
       const lockupKind = Object.keys(lockup.kind)[0];
       const isInvalid =
@@ -61,7 +68,11 @@ export const useClosePosition = () => {
             .instruction()
         );
 
-        await sendInstructions(provider, instructions);
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await sendInstructions(provider, instructions);
+        }
       }
     }
   );

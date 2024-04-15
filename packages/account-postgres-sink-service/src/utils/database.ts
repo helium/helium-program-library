@@ -1,4 +1,4 @@
-import { Sequelize } from "sequelize";
+import { Model, STRING, Sequelize } from "sequelize";
 import AWS from "aws-sdk";
 import * as pg from "pg";
 
@@ -49,5 +49,26 @@ export const database = new Sequelize({
     },
   },
 });
+
+export class Cursor extends Model {
+  declare cursor: string;
+}
+Cursor.init(
+  {
+    cursor: {
+      type: STRING,
+      primaryKey: true,
+    },
+  },
+  {
+    sequelize: database,
+    modelName: "cursor",
+    tableName: "cursors",
+    underscored: true,
+    timestamps: true,
+  }
+
+);
+
 
 export default database;

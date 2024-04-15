@@ -5,6 +5,7 @@ export * from './executeRemoteTxn';
 export * from './utils';
 export * from './token';
 export * from './constants';
+export * from "./draft";
 
 export type {
   AssetProof,
@@ -20,7 +21,9 @@ export {
   searchAssets,
   getAssetBatch,
   getAssetProofBatch,
-} from './mplAssetAPI';
+  searchAssetsWithPageInfo,
+} from "./mplAssetAPI";
+export { estimatePrioritizationFee, withPriorityFees } from "./priorityFees";
 
 export { proofArgsAndAccounts } from './proofArgsAndAccounts';
 export type { ProofArgsAndAccountsArgs } from './proofArgsAndAccounts';

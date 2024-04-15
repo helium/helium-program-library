@@ -99,7 +99,6 @@ export async function run(args: any = process.argv) {
       await hvsrProgram.methods
         .configureVotingMintV0({
           idx: 0,
-          digitShift: 0,
           baselineVoteWeightScaledFactor: new anchor.BN(0 * 1e9),
           maxExtraLockupVoteWeightScaledFactor: new anchor.BN(100 * 1e9),
           lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
@@ -132,7 +131,6 @@ export async function run(args: any = process.argv) {
       await hvsrProgram.methods
         .configureVotingMintV0({
           idx: 0,
-          digitShift: -1,
           baselineVoteWeightScaledFactor: new anchor.BN(0 * 1e9),
           maxExtraLockupVoteWeightScaledFactor: new anchor.BN(100 * 1e9),
           lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),

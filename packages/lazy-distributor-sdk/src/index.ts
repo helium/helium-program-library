@@ -4,6 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { lazyDistributorResolvers } from "./resolvers";
 
+export { updateCompressionDestination } from "./functions/updateCompressionDestination";
 export { distributeCompressionRewards } from "./functions/distributeCompressionRewards";
 export { initializeCompressionRecipient } from "./functions/initializeCompressionRecipient";
 

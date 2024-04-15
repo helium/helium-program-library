@@ -37,5 +37,10 @@ export type LockupKind = IdlTypes<HeliumVoterStakeRegistry>['LockupKind']
 export type SubDao = IdlAccounts<HeliumSubDaos>['subDaoV0']
 export interface SubDaoWithMeta extends Omit<SubDao, 'dntMint'> {
   pubkey: PublicKey
-  dntMetadata: Sft
+  dntMetadata: {
+    name: string;
+    symbol: string;
+    uri: string;
+    json: any;
+  }
 }

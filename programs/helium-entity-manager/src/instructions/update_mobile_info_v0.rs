@@ -25,6 +25,8 @@ pub struct UpdateMobileInfoArgsV0 {
   pub creator_hash: [u8; 32],
   pub root: [u8; 32],
   pub index: u32,
+  pub elevation: Option<i32>,
+  pub azimuth: Option<u16>,
 }
 
 #[derive(Accounts)]
@@ -34,7 +36,7 @@ pub struct UpdateMobileInfoV0<'info> {
   pub dc_fee_payer: Signer<'info>,
   #[account(
     mut,
-    constraint = mobile_info.asset == get_asset_id(&merkle_tree.key(), u64::try_from(args.index).unwrap())
+    constraint = mobile_info.asset == get_asset_id(&merkle_tree.key(), u64::from(args.index))
   )]
   pub mobile_info: Box<Account<'info, MobileHotspotInfoV0>>,
   #[account(mut)]
@@ -150,6 +152,14 @@ pub fn handler<'info>(
       )?;
       ctx.accounts.mobile_info.location = Some(new_location);
     }
+  }
+
+  if args.elevation.is_some() {
+    ctx.accounts.mobile_info.elevation = args.elevation;
+  }
+
+  if args.azimuth.is_some() {
+    ctx.accounts.mobile_info.azimuth = args.azimuth;
   }
 
   Ok(())

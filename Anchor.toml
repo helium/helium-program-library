@@ -15,7 +15,8 @@ rewards_oracle = "rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF"
 voter_stake_registry = "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8"
 fanout = "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6"
 mobile_entity_manager = "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr"
-rewards_burn = "burnhwK2QgaJnK93i82g8dH1zDjbpwxMukyVit9xYXo"
+hexboosting = "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ"
+no_emit = "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv"
 
 [workspace]
 members = [
@@ -31,7 +32,8 @@ members = [
   "programs/voter-stake-registry",
   "programs/fanout",
   "programs/mobile-entity-manager",
-  "programs/rewards-burn",
+  "programs/hexboosting",
+  "programs/no-emit",
 ]
 
 [registry]
@@ -79,6 +81,9 @@ address = "nde169MVKXLYbtDbrTF8wiJc8KYJRvLXKAzHApZ5vvD" # NFT Delegation
 
 [[test.validator.clone]]
 address = "5612ANVGVnwJRuvKJ1uSmky3A2mCfFDAi6DaK9xoZRp9" # NFT Delegation IDL
+
+[[test.validator.clone]]
+address = "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5" # Mobile price oracle
 
 # Pyth price oracle
 [[test.validator.clone]]

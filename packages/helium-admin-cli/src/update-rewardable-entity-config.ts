@@ -116,22 +116,28 @@ export async function run(args: any = process.argv) {
     };
   } else {
     settings = {
-      mobileConfigV1: {
+      mobileConfigV2: {
         feesByDevice: [
           {
             deviceType: { cbrs: {} },
-            dcOnboardingFee: new BN(argv.cbrsDcOnboardingFee!),
-            locationStakingFee: new BN(argv.cbrsDcLocationStakingFee!),
+            dcOnboardingFee: toBN(40, 5),
+            locationStakingFee: toBN(10, 5),
+            mobileOnboardingFeeUsd: toBN(0, 6),
+            reserved: new Array(8).fill(new BN(0)),
           },
           {
             deviceType: { wifiIndoor: {} },
-            dcOnboardingFee: new BN(argv.wifiDcOnboardingFee!),
-            locationStakingFee: new BN(argv.wifiDcLocationStakingFee!),
+            dcOnboardingFee: toBN(10, 5),
+            locationStakingFee: toBN(0, 5),
+            mobileOnboardingFeeUsd: toBN(10, 6),
+            reserved: new Array(8).fill(new BN(0)),
           },
           {
             deviceType: { wifiOutdoor: {} },
-            dcOnboardingFee: new BN(argv.wifiDcOnboardingFee!),
-            locationStakingFee: new BN(argv.wifiDcLocationStakingFee!),
+            dcOnboardingFee: toBN(10, 5),
+            locationStakingFee: toBN(0, 5),
+            mobileOnboardingFeeUsd: toBN(20, 6),
+            reserved: new Array(8).fill(new BN(0)),
           },
         ],
       },

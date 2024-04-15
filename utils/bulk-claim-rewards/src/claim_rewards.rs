@@ -11,7 +11,7 @@ use helium_entity_manager::{KeyToAssetV0, ID as HEM_PID};
 use hpl_utils::{dao::Dao, send_and_confirm_messages_with_spinner};
 use lazy_distributor::{
   accounts::{
-    DistributeCompressionRewardsV0, DistributeRewardsCommonV0, InitializeCompressionRecipientV0,
+    DistributeCompressionRewardsV0, DistributeCustomDestinationV0, DistributeRewardsCommonV0, InitializeCompressionRecipientV0,
   },
   DistributeCompressionRewardsArgsV0, InitializeCompressionRecipientArgsV0, LazyDistributorV0,
   RecipientV0, ID as LD_PID,
@@ -504,7 +504,7 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
     if serialized_txs.len() > 0 {
       println!("Sending init recipient transactions");
       send_and_confirm_messages_with_spinner(
-        lazy_distributor_program.rpc().into(),
+        &lazy_distributor_program.rpc(),
         &tpu_client,
         &serialized_txs,
       )
@@ -588,7 +588,7 @@ pub async fn claim_rewards(args: ClaimRewardsArgs<'_>) -> Result<(), anyhow::Err
 
     // submit the batch of txs
     send_and_confirm_messages_with_spinner(
-      lazy_distributor_program.rpc().into(),
+      &lazy_distributor_program.rpc(),
       &tpu_client,
       &deserialized_txs,
     )
@@ -727,38 +727,73 @@ fn process_hotspot<C: Deref<Target = impl Signer> + Clone>(
 
     ixs.push(set_reward_ix.clone());
   }
-
-  let distribute_accounts = construct_distribute_rewards_accounts(
-    lazy_distributor_program,
-    rewards_mint,
-    hotspot_owner,
-    hotspot.id,
-    hotspot.merkle_tree,
-    lazy_distributor,
-    ld_acc.clone(),
-  )
-  .map_err(|e| anyhow!("Failed to construct distribute rewards accounts: {e}"))?;
-
-  let mut distribute_rewards_ixs = lazy_distributor_program
-    .request()
-    .args(
-      lazy_distributor::instruction::DistributeCompressionRewardsV0 {
-        args: DistributeCompressionRewardsArgsV0 {
-          data_hash: hotspot.data_hash,
-          creator_hash: hotspot.creator_hash,
-          root: root.clone(),
-          index: hotspot.leaf_id.try_into().unwrap(),
-        },
-      },
+  let maybe_recip = hotspot.recipient_acc.unwrap_or(None);
+  let maybe_dest = maybe_recip.map(|r| r.destination);
+  if let Some(dest) = maybe_dest {
+    let distribute_accounts = construct_distribute_custom_destination_accounts(
+      lazy_distributor_program,
+      rewards_mint,
+      dest,
+      hotspot.id,
+      lazy_distributor,
+      ld_acc.clone(),
     )
-    .accounts(distribute_accounts)
-    .instructions()
-    .map_err(|e| anyhow!("Failed to construct set reward instruction: {e}"))?;
+    .map_err(|e| anyhow!("Failed to construct distribute rewards accounts: {e}"))?;
 
-  distribute_rewards_ixs[0]
-    .accounts
-    .extend_from_slice(&proof.as_slice()[0..3]);
-  ixs.push(distribute_rewards_ixs[0].clone());
+    let mut distribute_rewards_ixs = lazy_distributor_program
+      .request()
+      .args(
+        lazy_distributor::instruction::DistributeCompressionRewardsV0 {
+          args: DistributeCompressionRewardsArgsV0 {
+            data_hash: hotspot.data_hash,
+            creator_hash: hotspot.creator_hash,
+            root: root.clone(),
+            index: hotspot.leaf_id.try_into().unwrap(),
+          },
+        },
+      )
+      .accounts(distribute_accounts)
+      .instructions()
+      .map_err(|e| anyhow!("Failed to construct set reward instruction: {e}"))?;
+
+    distribute_rewards_ixs[0]
+      .accounts
+      .extend_from_slice(&proof.as_slice()[0..3]);
+    ixs.push(distribute_rewards_ixs[0].clone());
+  } else {
+    let distribute_accounts = construct_distribute_rewards_accounts(
+      lazy_distributor_program,
+      rewards_mint,
+      hotspot_owner,
+      hotspot.id,
+      hotspot.merkle_tree,
+      lazy_distributor,
+      ld_acc.clone(),
+    )
+    .map_err(|e| anyhow!("Failed to construct distribute rewards accounts: {e}"))?;
+
+    let mut distribute_rewards_ixs = lazy_distributor_program
+      .request()
+      .args(
+        lazy_distributor::instruction::DistributeCompressionRewardsV0 {
+          args: DistributeCompressionRewardsArgsV0 {
+            data_hash: hotspot.data_hash,
+            creator_hash: hotspot.creator_hash,
+            root: root.clone(),
+            index: hotspot.leaf_id.try_into().unwrap(),
+          },
+        },
+      )
+      .accounts(distribute_accounts)
+      .instructions()
+      .map_err(|e| anyhow!("Failed to construct set reward instruction: {e}"))?;
+
+    distribute_rewards_ixs[0]
+      .accounts
+      .extend_from_slice(&proof.as_slice()[0..3]);
+    ixs.push(distribute_rewards_ixs[0].clone());
+  }
+
   let mut tx = Transaction::new_with_payer(&ixs, Some(&payer.pubkey()));
 
   tx.try_partial_sign(&[payer], blockhash)
@@ -924,6 +959,49 @@ fn construct_distribute_rewards_accounts<C: Deref<Target = impl Signer> + Clone>
     merkle_tree,
     compression_program,
     token_program: anchor_spl::token::ID,
+  })
+}
+
+fn construct_distribute_custom_destination_accounts<C: Deref<Target = impl Signer> + Clone>(
+  lazy_distributor_program: &Program<C>,
+  rewards_mint: Pubkey,
+  destination: Pubkey,
+  asset_id: Pubkey,
+  lazy_distributor: Pubkey,
+  ld_acc: LazyDistributorV0,
+) -> Result<DistributeCustomDestinationV0, anyhow::Error> {
+  let (recipient, _rcp_bump) = Pubkey::find_program_address(
+    &[
+      "recipient".as_bytes(),
+      lazy_distributor.as_ref(),
+      asset_id.as_ref(),
+    ],
+    &LD_PID,
+  );
+
+  let (circuit_breaker, _cb_bump) = Pubkey::find_program_address(
+    &[
+      "account_windowed_breaker".as_bytes(),
+      ld_acc.rewards_escrow.as_ref(),
+    ],
+    &CB_PID,
+  );
+
+  Ok(DistributeCustomDestinationV0 {
+    common: DistributeRewardsCommonV0 {
+      payer: lazy_distributor_program.payer(),
+      lazy_distributor,
+      recipient,
+      rewards_mint,
+      rewards_escrow: ld_acc.rewards_escrow,
+      circuit_breaker,
+      owner: destination,
+      destination_account: get_associated_token_address(&destination, &rewards_mint),
+      associated_token_program: spl_associated_token_account::id(),
+      circuit_breaker_program: CB_PID,
+      system_program: system_program::id(),
+      token_program: anchor_spl::token::ID,
+    },
   })
 }
 

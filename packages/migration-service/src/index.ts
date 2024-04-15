@@ -24,7 +24,7 @@ import { LAZY_TRANSACTIONS_NAME } from "./env";
 import { getMigrateTransactions } from "./ledger";
 import { provider, wallet } from "./solana";
 import { decompress, decompressSigners, shouldThrottle } from "./utils";
-import { truthy } from "@helium/spl-utils";
+import { estimatePrioritizationFee, truthy } from "@helium/spl-utils";
 
 export const chunks = <T>(array: T[], size: number): T[][] =>
   Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
@@ -150,7 +150,7 @@ async function getTransactions(
           },
           idx
         ) => {
-          const hasRun = isExecuted(executed, idx);
+          const hasRun = isExecuted(executed, id);
           const compiledTx = decompress(compiled);
           const block = blockKey(lazyTransactions, id)[0];
           const signers = decompressSigners(signersRaw);
@@ -189,6 +189,12 @@ async function getTransactions(
                 instructions: [
                   ComputeBudgetProgram.setComputeUnitLimit({
                     units: compute,
+                  }),
+                  ComputeBudgetProgram.setComputeUnitPrice({
+                    microLamports: await estimatePrioritizationFee(
+                      provider.connection,
+                      [ix]
+                    ),
                   }),
                   ix,
                 ],
@@ -246,7 +252,7 @@ server.post<{
 
   return (await getMigrateTransactions(from, to)).map(
     (tx) =>
-      Buffer.from(tx.serialize({ requireAllSignatures: false })).toJSON().data
+      Buffer.from(tx.serialize()).toJSON().data
   );
 });
 

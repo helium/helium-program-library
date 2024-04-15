@@ -118,12 +118,10 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   // check epoch that's being claimed is over
   let epoch = current_epoch(registrar.clock_unix_timestamp());
   if !TESTING {
-    require_gt!(epoch, args.epoch, ErrorCode::EpochNotOver,);
-    require_eq!(
-      args.epoch,
-      delegated_position.last_claimed_epoch + 1,
-      ErrorCode::InvalidClaimEpoch
-    )
+    require_gt!(epoch, args.epoch, ErrorCode::EpochNotOver);
+    if delegated_position.is_claimed(args.epoch)? {
+      return Err(error!(ErrorCode::InvalidClaimEpoch));
+    }
   }
 
   let delegated_vehnt_at_epoch = position.voting_power(
@@ -140,7 +138,7 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   // calculate the position's share of that epoch's rewards
   // rewards = staking_rewards_issued * staked_vehnt_at_epoch / total_vehnt
   let rewards = u64::try_from(
-    (delegated_vehnt_at_epoch as u128)
+    delegated_vehnt_at_epoch
       .checked_mul(ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued as u128)
       .unwrap()
       .checked_div(ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start as u128)
@@ -148,7 +146,7 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   )
   .unwrap();
 
-  delegated_position.last_claimed_epoch += 1;
+  delegated_position.set_claimed(args.epoch)?;
 
   let amount_left = ctx.accounts.delegator_pool.amount;
   transfer_v0(

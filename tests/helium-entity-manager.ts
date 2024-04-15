@@ -3,7 +3,7 @@ import { Program } from "@coral-xyz/anchor";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
-import { burnKey, init as initBurn } from "@helium/rewards-burn-sdk";
+import { notEmittedKey, init as initBurn } from "@helium/no-emit-sdk";
 import {
   Asset,
   AssetProof,
@@ -35,7 +35,7 @@ import {
 } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
-import { RewardsBurn } from "../target/types/rewards_burn";
+import { NoEmit } from "../target/types/no_emit";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import {
@@ -75,7 +75,7 @@ describe("helium-entity-manager", () => {
   let dcProgram: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
   let hemProgram: Program<HeliumEntityManager>;
-  let burnProram: Program<RewardsBurn>;
+  let noEmitProgram: Program<NoEmit>;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -94,10 +94,10 @@ describe("helium-entity-manager", () => {
 
     await ensureDCIdl(dcProgram);
 
-    burnProram = await initBurn(
+    noEmitProgram = await initBurn(
       provider,
-      anchor.workspace.RewardsBurn.programId,
-      anchor.workspace.RewardsBurn.idl,
+      anchor.workspace.NoEmit.programId,
+      anchor.workspace.NoEmit.idl,
     )
 
     hsdProgram = await initHeliumSubDaos(
@@ -131,7 +131,8 @@ describe("helium-entity-manager", () => {
       authority: me,
       dao,
       activeDeviceAuthority: activeDeviceAuthority.publicKey,
-      numTokens: MAKER_STAKING_FEE.mul(new BN(2)),
+      // Add some padding for onboards
+      numTokens: MAKER_STAKING_FEE.mul(new BN(2)).add(new BN(10000000000)),
     }));
   });
 
@@ -156,29 +157,29 @@ describe("helium-entity-manager", () => {
   it("issues burn entity, and allows burn", async () => {
     const mint = Keypair.generate();
     await hemProgram.methods
-      .issueBurnEntityV0()
+      .issueNotEmittedEntityV0()
       .preInstructions(await createMintInstructions(provider, 0, me, me, mint))
       .accounts({
         dao,
-        mint: mint.publicKey
+        mint: mint.publicKey,
       })
       .signers([mint])
       .rpc({ skipPreflight: true });
 
-    const addr = getAssociatedTokenAddressSync(mint.publicKey, burnKey()[0], true);
+    const addr = getAssociatedTokenAddressSync(mint.publicKey, notEmittedKey()[0], true);
     const balance = await provider.connection.getTokenAccountBalance(addr);
     expect(balance.value.uiAmount).to.eq(1);
 
     const tokenMint = await createMint(provider, 2, me, me)
-    const burnAta = await createAtaAndMint(provider, tokenMint, new BN(1000), burnKey()[0])
-    await burnProram.methods.burnV0()
+    const burnAta = await createAtaAndMint(provider, tokenMint, new BN(1000), notEmittedKey()[0])
+    await noEmitProgram.methods.noEmitV0()
     .accounts({
       mint: tokenMint
     })
     .rpc({ skipPreflight: true })
 
-    const postBalance = (await getAccount(provider.connection, burnAta)).amount
-    expect(postBalance).to.eq(BigInt(0))
+    const postBalance = (await getAccount(provider.connection, burnAta)).amount;
+    expect(postBalance).to.eq(BigInt(0));
   });
 
   it("initializes a rewardable entity config", async () => {
@@ -548,22 +549,28 @@ describe("helium-entity-manager", () => {
         hemProgram,
         subDao,
         {
-          mobileConfigV1: {
+          mobileConfigV2: {
             feesByDevice: [
               {
                 deviceType: { cbrs: {} },
                 dcOnboardingFee: toBN(0, 5),
                 locationStakingFee: toBN(10, 5),
+                mobileOnboardingFeeUsd: toBN(0, 6),
+                reserved: new Array(8).fill(new BN(0)),
               },
               {
                 deviceType: { wifiIndoor: {} },
-                dcOnboardingFee: toBN(0, 5),
+                dcOnboardingFee: toBN(10, 5),
                 locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(10, 6),
+                reserved: new Array(8).fill(new BN(0)),
               },
               {
                 deviceType: { wifiOutdoor: {} },
-                dcOnboardingFee: toBN(0, 5),
+                dcOnboardingFee: toBN(10, 5),
                 locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(20, 6),
+                reserved: new Array(8).fill(new BN(0)),
               },
             ],
           },
@@ -680,6 +687,7 @@ describe("helium-entity-manager", () => {
           rewardableEntityConfig,
           getAssetFn,
           getAssetProofFn,
+          deviceType: "wifiIndoor",
         })
       ).signers([makerKeypair, hotspotOwner]);
 
@@ -691,9 +699,7 @@ describe("helium-entity-manager", () => {
       );
       expect(Boolean(mobileInfoAcc)).to.be.true;
       const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
-      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(
-        0
-      );
+      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(1000000);
     });
 
     describe("with hotspot", () => {
@@ -783,49 +789,58 @@ describe("helium-entity-manager", () => {
         await hemProgram.methods
           .updateRewardableEntityConfigV0({
             settings: {
-              mobileConfigV1: {
+              mobileConfigV2: {
                 feesByDevice: [
                   {
                     deviceType: { cbrs: {} },
                     dcOnboardingFee: toBN(40, 5),
                     locationStakingFee: toBN(10, 5),
+                    mobileOnboardingFeeUsd: toBN(0, 6),
+                    reserved: new Array(8).fill(new BN(0)),
                   },
                   {
                     deviceType: { wifiIndoor: {} },
-                    dcOnboardingFee: toBN(0, 5),
+                    dcOnboardingFee: toBN(10, 5),
                     locationStakingFee: toBN(0, 5),
+                    mobileOnboardingFeeUsd: toBN(10, 6),
+                    reserved: new Array(8).fill(new BN(0)),
                   },
                   {
                     deviceType: { wifiOutdoor: {} },
-                    dcOnboardingFee: toBN(0, 5),
+                    dcOnboardingFee: toBN(10, 5),
                     locationStakingFee: toBN(0, 5),
+                    mobileOnboardingFeeUsd: toBN(20, 6),
+                    reserved: new Array(8).fill(new BN(0)),
                   },
                 ],
               },
             },
             newAuthority: null,
-            stakingRequirement: MAKER_STAKING_FEE
+            stakingRequirement: MAKER_STAKING_FEE,
           })
           .accounts({ rewardableEntityConfig })
           .rpc({ skipPreflight: true });
 
-        const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
+        await method.rpc({ skipPreflight: true });
+
         const postBalance = await provider.connection.getTokenAccountBalance(
           ata
         );
         expect(postBalance.value.uiAmount).to.be.eq(
-          preBalance.value.uiAmount! - subDaoAcc.onboardingDcFee.toNumber()
+          preBalance.value.uiAmount! - toBN(40, 5).toNumber()
         );
         const infoAcc = await hemProgram.account.mobileHotspotInfoV0.fetch(
           infoKey!
         );
         expect(infoAcc.dcOnboardingFeePaid.toNumber()).to.eq(
-          subDaoAcc.onboardingDcFee.toNumber()
+          toBN(40, 5).toNumber()
         );
       });
 
       it("changes the metadata", async () => {
         const location = new BN(1000);
+        const elevation = 10;
+        const azimuth = 5;
 
         const method = (
           await updateMobileMetadata({
@@ -833,6 +848,8 @@ describe("helium-entity-manager", () => {
             assetId: hotspot,
             rewardableEntityConfig,
             location,
+            elevation,
+            azimuth,
             getAssetFn,
             getAssetProofFn,
           })
@@ -845,6 +862,8 @@ describe("helium-entity-manager", () => {
           info!
         );
         expect(storageAcc.location?.toNumber()).to.eq(location.toNumber());
+        expect(storageAcc.elevation).to.eq(elevation);
+        expect(storageAcc.azimuth).to.eq(azimuth);
       });
 
       it("oracle can update active status", async () => {
@@ -983,7 +1002,7 @@ describe("helium-entity-manager", () => {
         .updateRewardableEntityConfigV0({
           newAuthority: PublicKey.default,
           settings: null,
-          stakingRequirement: null
+          stakingRequirement: null,
         })
         .accounts({
           rewardableEntityConfig,

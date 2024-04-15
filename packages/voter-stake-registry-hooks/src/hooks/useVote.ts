@@ -1,10 +1,11 @@
 import { useProposal } from "@helium/modular-governance-hooks";
 import {
+  Status,
   batchParallelInstructions,
   truthy
 } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
-import { PublicKey } from "@metaplex-foundation/js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
@@ -58,7 +59,19 @@ export const useVote = (proposalKey: PublicKey) => {
     [markers]
   );
   const { error, loading, execute } = useAsyncCallback(
-    async ({ choice }: { choice: number }) => {
+    async ({
+      choice,
+      onInstructions,
+      onProgress,
+      maxSignatureBatch
+    }: {
+      choice: number; // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
+      onProgress?: (status: Status) => void;
+      maxSignatureBatch?: number;
+    }) => {
       const isInvalid = !provider || !positions || positions.length === 0;
 
       if (isInvalid) {
@@ -115,7 +128,18 @@ export const useVote = (proposalKey: PublicKey) => {
           )
         ).filter(truthy);
 
-        await batchParallelInstructions(provider, instructions);
+        if (onInstructions) {
+          await onInstructions(instructions);
+        } else {
+          await batchParallelInstructions({
+            provider,
+            instructions,
+            onProgress,
+            triesRemaining: 10,
+            extraSigners: [],
+            maxSignatureBatch
+          });
+        }
       }
     }
   );

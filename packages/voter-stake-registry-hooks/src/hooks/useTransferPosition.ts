@@ -16,11 +16,16 @@ export const useTransferPosition = () => {
       amount,
       targetPosition,
       programId = PROGRAM_ID,
+      onInstructions,
     }: {
       sourcePosition: PositionWithMeta;
       amount: number;
       targetPosition: PositionWithMeta;
       programId?: PublicKey;
+      // Instead of sending the transaction, let the caller decide
+      onInstructions?: (
+        instructions: TransactionInstruction[]
+      ) => Promise<void>;
     }) => {
       const isInvalid =
         !provider ||
@@ -30,12 +35,7 @@ export const useTransferPosition = () => {
       const idl = await Program.fetchIdl(programId, provider);
       const hsdProgram = await init(provider as any, programId, idl);
       const vsrProgram = await initVsr(provider as any);
-
-      const registrar = await vsrProgram.account.registrar.fetch(
-        sourcePosition.registrar
-      );
-      const mint =
-        registrar.votingMints[sourcePosition.votingMintConfigIdx].mint;
+      const mint = sourcePosition.votingMint.mint;
 
       if (loading) return;
 
@@ -90,7 +90,11 @@ export const useTransferPosition = () => {
           );
         }
 
-        await sendInstructions(provider, instructions);
+        if (onInstructions) {
+          await onInstructions(instructions)
+        } else {
+          await sendInstructions(provider, instructions);
+        }
       }
     }
   );

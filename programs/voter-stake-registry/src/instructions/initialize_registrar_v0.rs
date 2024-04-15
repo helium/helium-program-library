@@ -1,4 +1,3 @@
-use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -12,7 +11,6 @@ use shared_utils::create_metadata_accounts_v3;
 use shared_utils::token_metadata::{
   create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
 };
-use spl_governance::state::realm;
 use std::mem::size_of;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Default, Clone)]
@@ -199,20 +197,6 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
       .map(|k| k.key())
       .unwrap_or_default(),
   });
-
-  // Verify that "realm_authority" is the expected authority on "realm"
-  // and that the mint matches one of the realm mints too.
-  let realm = realm::get_realm_data_for_governing_token_mint(
-    &ctx.accounts.governance_program_id.key(),
-    &ctx.accounts.realm.to_account_info(),
-    &ctx.accounts.realm_governing_token_mint.key(),
-  )?;
-
-  require_keys_eq!(
-    realm.authority.unwrap(),
-    ctx.accounts.realm_authority.key(),
-    VsrError::InvalidRealmAuthority
-  );
 
   Ok(())
 }

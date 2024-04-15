@@ -77,7 +77,7 @@ export const initTestDataCredits = async (
 
   const dcKey = (await initDataCredits.pubkeys()).dataCredits!;
 
-  await initDataCredits.rpc();
+  await initDataCredits.rpc({ skipPreflight: true });
 
   return { dcKey, hntMint, hntBal, dcMint, dcBal };
 };
@@ -213,15 +213,17 @@ export const initTestMaker = async (
   };
 };
 
+const ANCHOR_PATH = process.env.ANCHOR_PATH || "anchor";
+
 export async function ensureDCIdl(dcProgram: Program<DataCredits>) {
   try {
     execSync(
-      `anchor idl init --filepath ${__dirname}/../../target/idl/data_credits.json ${dcProgram.programId}`,
+      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/data_credits.json ${dcProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   } catch {
     execSync(
-      `anchor idl upgrade --filepath ${__dirname}/../../target/idl/data_credits.json ${dcProgram.programId}`,
+      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/data_credits.json ${dcProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   }
@@ -230,12 +232,12 @@ export async function ensureDCIdl(dcProgram: Program<DataCredits>) {
 export async function ensureMemIdl(memProgram: Program<MobileEntityManager>) {
   try {
     execSync(
-      `anchor idl init --filepath ${__dirname}/../../target/idl/mobile_entity_manager.json ${memProgram.programId}`,
+      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/mobile_entity_manager.json ${memProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   } catch {
     execSync(
-      `anchor idl upgrade --filepath ${__dirname}/../../target/idl/mobile_entity_manager.json ${memProgram.programId}`,
+      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/mobile_entity_manager.json ${memProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   }
@@ -244,12 +246,12 @@ export async function ensureMemIdl(memProgram: Program<MobileEntityManager>) {
 export async function ensureLDIdl(ldProgram: Program<LazyDistributor>) {
   try {
     execSync(
-      `anchor idl init --filepath ${__dirname}/../../target/idl/lazy_distributor.json ${ldProgram.programId}`,
+      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/lazy_distributor.json ${ldProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   } catch {
     execSync(
-      `anchor idl upgrade --filepath ${__dirname}/../../target/idl/lazy_distributor.json ${ldProgram.programId}`,
+      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/lazy_distributor.json ${ldProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   }
@@ -258,12 +260,12 @@ export async function ensureLDIdl(ldProgram: Program<LazyDistributor>) {
 export async function ensureHEMIdl(hemProgram: Program<HeliumEntityManager>) {
   try {
     execSync(
-      `anchor idl init --filepath ${__dirname}/../../target/idl/helium_entity_manager.json ${hemProgram.programId}`,
+      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/helium_entity_manager.json ${hemProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   } catch {
     execSync(
-      `anchor idl upgrade --filepath ${__dirname}/../../target/idl/helium_entity_manager.json ${hemProgram.programId}`,
+      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/helium_entity_manager.json ${hemProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   }
@@ -272,12 +274,12 @@ export async function ensureHEMIdl(hemProgram: Program<HeliumEntityManager>) {
 export async function ensureHSDIdl(hsdProgram: Program<HeliumSubDaos>) {
   try {
     execSync(
-      `anchor idl init --filepath ${__dirname}/../../target/idl/helium_sub_daos.json ${hsdProgram.programId}`,
+      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/helium_sub_daos.json ${hsdProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   } catch {
     execSync(
-      `anchor idl upgrade --filepath ${__dirname}/../../target/idl/helium_sub_daos.json ${hsdProgram.programId}`,
+      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/helium_sub_daos.json ${hsdProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   }
@@ -286,12 +288,12 @@ export async function ensureHSDIdl(hsdProgram: Program<HeliumSubDaos>) {
 export async function ensureVSRIdl(vsrProgram: Program<VoterStakeRegistry>) {
   try {
     execSync(
-      `anchor idl init --filepath ${__dirname}/../../target/idl/voter_stake_registry.json ${vsrProgram.programId}`,
+      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/voter_stake_registry.json ${vsrProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   } catch {
     execSync(
-      `anchor idl upgrade --filepath ${__dirname}/../../target/idl/voter_stake_registry.json ${vsrProgram.programId}`,
+      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/voter_stake_registry.json ${vsrProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   }

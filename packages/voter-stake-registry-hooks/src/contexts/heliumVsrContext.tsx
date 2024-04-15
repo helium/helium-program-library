@@ -45,6 +45,8 @@ export interface HeliumVsrState {
   provider?: AnchorProvider;
   votingPower?: BN;
   registrar?: Registrar & { pubkey?: PublicKey };
+  unixNow?: number;
+
   refetch: () => void;
   voteService?: VoteService;
 }
@@ -293,6 +295,7 @@ export const HeliumVsrStateProvider: React.FC<{
       votingPower,
       registrar,
       voteService,
+      now,
     ]
   );
   return (

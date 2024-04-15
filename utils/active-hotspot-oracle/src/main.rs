@@ -10,10 +10,12 @@ use deltalake::{datafusion::prelude::SessionContext, DeltaTableBuilder};
 use helium_entity_manager::KeyToAssetV0;
 use helium_entity_manager::{accounts::SetEntityActiveV0, SetEntityActiveArgsV0};
 use helium_entity_manager::{
-  accounts::TempPayMobileOnboardingFeeV0, IotHotspotInfoV0, MobileHotspotInfoV0, MobileDeviceTypeV0
+  accounts::TempPayMobileOnboardingFeeV0, IotHotspotInfoV0, MobileDeviceTypeV0, MobileHotspotInfoV0,
 };
+use hpl_utils::construct_and_send_txs;
 use hpl_utils::dao::Dao;
 use hpl_utils::token::Token;
+use hpl_utils::SendResult;
 use hpl_utils::{dao::SubDao, send_and_confirm_messages_with_spinner};
 use s3::{bucket::Bucket, creds::Credentials, region::Region};
 use serde::{Deserialize, Serialize};
@@ -22,6 +24,7 @@ use solana_connection_cache::connection_cache::{
   ConnectionManager, ConnectionPool, NewConnectionConfig,
 };
 use solana_sdk::commitment_config::CommitmentConfig;
+use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::signature::Keypair;
 use solana_sdk::signer::Signer;
 use solana_sdk::transaction::Transaction;
@@ -175,7 +178,9 @@ async fn main() -> Result<()> {
       .collect::<HashMap<Pubkey, KeyToAssetV0>>();
     last_active_pub_keys = match args.sub_dao {
       SubDao::Iot => {
-        let infos = helium_entity_program.accounts::<IotHotspotInfoV0>(vec![]).await?;
+        let infos = helium_entity_program
+          .accounts::<IotHotspotInfoV0>(vec![])
+          .await?;
         infos
           .iter()
           .filter(|i| i.1.is_active)
@@ -183,7 +188,9 @@ async fn main() -> Result<()> {
           .collect::<HashSet<_>>()
       }
       SubDao::Mobile => {
-        let infos = helium_entity_program.accounts::<MobileHotspotInfoV0>(vec![]).await?;
+        let infos = helium_entity_program
+          .accounts::<MobileHotspotInfoV0>(vec![])
+          .await?;
         infos
           .iter()
           .filter(|i| i.1.is_active)
@@ -252,7 +259,7 @@ async fn main() -> Result<()> {
 
     count += pub_keys.len();
     for pk in pub_keys {
-      let pub_key = pk.unwrap_or("").clone().to_string();
+      let pub_key = pk.unwrap_or("").to_string();
       active_pub_keys.insert(pub_key);
     }
   }
@@ -292,7 +299,7 @@ async fn main() -> Result<()> {
   // send transactions
   println!("Sending mark active transactions");
   construct_and_send_txs(
-    &helium_entity_program,
+    &helium_entity_program.rpc(),
     &tpu_client,
     mark_active_ixs,
     &kp,
@@ -301,7 +308,7 @@ async fn main() -> Result<()> {
 
   println!("Sending mark inactive transactions");
   construct_and_send_txs(
-    &helium_entity_program,
+    &helium_entity_program.rpc(),
     &tpu_client,
     mark_inactive_ixs,
     &kp,
@@ -346,103 +353,6 @@ fn check_validity<C: Deref<Target = impl Signer> + Clone>(
 
   println!("Scanned {} entities", entity_keys.len());
   println!("Found {} invalid iot infos", invalid_infos.len());
-  Ok(())
-}
-
-const MAX_TX_LEN: usize = 1232;
-
-fn construct_and_send_txs<
-  P: ConnectionPool<NewConnectionConfig = C>,
-  M: ConnectionManager<ConnectionPool = P, NewConnectionConfig = C>,
-  C: NewConnectionConfig,
-  A: Deref<Target = impl Signer> + Clone,
->(
-  helium_entity_program: &Program<A>,
-  tpu_client: &TpuClient<P, M, C>,
-  ixs: Vec<Instruction>,
-  payer: &Keypair,
-  dry_run: bool,
-) -> Result<()> {
-  // send transactions in batches so blockhash doesn't expire
-  let transaction_batch_size = 100;
-  println!("Ixs to execute: {}", ixs.len());
-
-  let mut instructions = Vec::new();
-  let mut txs = Vec::new();
-  let mut blockhash = helium_entity_program.rpc().get_latest_blockhash()?;
-  // Pack as many ixs as possible into a tx, then send batches of 100
-  for ix in ixs {
-    instructions.push(ix.clone());
-    let mut tx = Transaction::new_with_payer(&instructions, Some(&helium_entity_program.payer()));
-    tx.try_sign(&[payer], blockhash)
-      .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
-    let tx_len = bincode::serialize(&tx).unwrap().len();
-
-    if tx_len > MAX_TX_LEN || tx.message.account_keys.len() > 64 {
-      // clear instructions except for last one
-      instructions.pop();
-      let mut tx = Transaction::new_with_payer(&instructions, Some(&helium_entity_program.payer()));
-      tx.try_sign(&[payer], blockhash)
-        .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
-      txs.push(tx);
-      // clear instructions except for last one
-      instructions = vec![ix.clone()];
-    }
-
-    if dry_run {
-      continue;
-    }
-
-    // send batch of txns
-    if txs.len() >= transaction_batch_size {
-      let (_, failed_tx_count) = send_and_confirm_messages_with_spinner(
-        helium_entity_program.rpc().into(),
-        &tpu_client,
-        &txs
-          .iter()
-          .map(|tx| {
-            bincode::serialize(&tx.clone()).map_err(|e| anyhow!("Failed to serialize tx: {e}"))
-          })
-          .collect::<Result<Vec<_>, anyhow::Error>>()
-          .context("Failed to serialize txs")?,
-      )
-      .context("Failed sending transactions")?;
-
-      if failed_tx_count > 0 {
-        return Err(anyhow!("{} transactions failed", failed_tx_count));
-      }
-
-      txs = Vec::new();
-      blockhash = helium_entity_program.rpc().get_latest_blockhash()?;
-    }
-  }
-
-  // Send last group of txns
-  if instructions.len() > 0 {
-    let mut tx = Transaction::new_with_payer(&instructions, Some(&helium_entity_program.payer()));
-    tx.try_sign(&[payer], blockhash)
-      .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
-    txs.push(tx)
-  }
-  if txs.len() > 0 {
-    let (_, failed_tx_count) = send_and_confirm_messages_with_spinner(
-      helium_entity_program.rpc().into(),
-      &tpu_client,
-      &txs
-        .iter()
-        .map(|tx| {
-          bincode::serialize(&tx.clone()).map_err(|e| anyhow!("Failed to serialize tx: {e}"))
-        })
-        .collect::<Result<Vec<_>, anyhow::Error>>()
-        .context("Failed to serialize txs")?,
-    )
-    .context("Failed sending transactions")?;
-
-    if failed_tx_count > 0 {
-      return Err(anyhow!("{} transactions failed", failed_tx_count));
-    }
-  }
-
   Ok(())
 }
 
