@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.7](https://github.com/helium/helium-program-libary/compare/v0.7.6...v0.7.7) (2024-04-15)
+
+
+### Features
+
+* **#629:** Add configurable destination for lazy distributor ([#630](https://github.com/helium/helium-program-libary/issues/630)) ([c64972f](https://github.com/helium/helium-program-libary/commit/c64972fd7d228ee5cdb6b64904bfad3ace64d433)), closes [#629](https://github.com/helium/helium-program-libary/issues/629)
+
+
+
+
+
 ## [0.7.6](https://github.com/helium/helium-program-libary/compare/v0.7.5...v0.7.6) (2024-04-10)
 
 **Note:** Version bump only for package @helium/distributor-oracle
