@@ -41,7 +41,7 @@ import { SPL_GOVERNANCE_PID } from "./utils/vsr";
 import {
   PROGRAM_ID as DEL_PID,
   init as initNftProxy,
-  delegationKey,
+  proxyKey,
 } from "@helium/nft-proxy-sdk";
 import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import { ensureVSRIdl } from "./utils/fixtures";
@@ -468,7 +468,7 @@ describe("voter-stake-registry", () => {
       beforeEach(async () => {
         ({ position, mint } = await createAndDeposit(10000, 200));
         await proxyProgram.methods
-          .delegateV0({
+          .assignProxyV0({
             expirationTime: new anchor.BN(new Date().valueOf() / 1000 + 10000),
           })
           .accounts({
@@ -586,24 +586,24 @@ describe("voter-stake-registry", () => {
       });
 
       it("allows the original owner to undelegate", async () => {
-        const toUndelegate = delegationKey(proxyConfig!, mint, delegatee.publicKey)[0];
-        const myDelegation = delegationKey(proxyConfig!, mint, PublicKey.default)[0];
+        const toUnProxy = proxyKey(proxyConfig!, mint, delegatee.publicKey)[0];
+        const myProxy = proxyKey(proxyConfig!, mint, PublicKey.default)[0];
         await proxyProgram.methods
-          .undelegateV0()
+          .unassignProxyV0()
           .accounts({
-            delegation: toUndelegate,
-            prevDelegation: myDelegation,
-            currentDelegation: myDelegation,
+            proxy: toUnProxy,
+            prevProxy: myProxy,
+            currentProxy: myProxy,
           })
           .rpc({ skipPreflight: true });
 
         expect(
           (
-            await proxyProgram.account.proxyV0.fetch(myDelegation)
+            await proxyProgram.account.proxyV0.fetch(myProxy)
           ).nextOwner.toBase58()
         ).to.eq(PublicKey.default.toBase58());
         expect(
-          await proxyProgram.account.proxyV0.fetchNullable(toUndelegate)
+          await proxyProgram.account.proxyV0.fetchNullable(toUnProxy)
         ).to.be.null;
       });
     });

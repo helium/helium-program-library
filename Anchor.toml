@@ -80,7 +80,7 @@ address = "66t3XARU6Ja3zj91gDZ2KoNLJHEMTYPSKqJWYb6PJJBA" # Proposal IDL
 address = "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p" # NFT Proxy
 
 [[test.validator.clone]]
-address = "5612ANVGVnwJRuvKJ1uSmky3A2mCfFDAi6DaK9xoZRp9" # NFT Delegation IDL
+address = "CNjepJnCPddZwd8xGS3M2QpZuCbfVRNvi3jfBehKHKHw" # NFT Proxy IDL
 
 [[test.validator.clone]]
 address = "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5" # Mobile price oracle

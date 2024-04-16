@@ -9,7 +9,7 @@
       ]
     },
     {
-      "programId": "nde169MVKXLYbtDbrTF8wiJc8KYJRvLXKAzHApZ5vvD",
+      "programId": "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p",
       "accounts": [
         { "type": "DelegationV0", "table": "delegations", "schema": "public" }
       ]
