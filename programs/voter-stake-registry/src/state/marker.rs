@@ -14,7 +14,7 @@ pub struct VoteMarkerV0 {
   pub relinquished: bool,
   // Keep track of which delegation index voted on this marker,
   // earlier delegators can override
-  pub delegation_index: u16,
+  pub proxy_index: u16,
   // Ensure the refund goes to whoever paid to create the marker when closing
   pub rent_refund: Pubkey,
 }

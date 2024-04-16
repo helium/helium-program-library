@@ -2,7 +2,7 @@ import yargs from "yargs/yargs";
 import { exists, loadKeypair, sendInstructionsOrSquads } from "./utils";
 import os from "os";
 import * as anchor from "@coral-xyz/anchor";
-import { init } from "@helium/nft-delegation-sdk";
+import { init } from "@helium/nft-proxy-sdk";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import fs from "fs";
 import { sendInstructions } from "@helium/spl-utils";
@@ -70,12 +70,12 @@ export async function run(args: any = process.argv) {
   );
 
   const {
-    pubkeys: { delegationConfig },
+    pubkeys: { proxyConfig },
     instruction,
   } = await delProgram.methods
-    .initializeDelegationConfigV0({
+    .initializeProxyConfigV0({
       // Set max time to 2 years, though seasons should take precedent
-      maxDelegationTime: new anchor.BN(24 * 60 * 60 * 365 * 2),
+      maxProxyTime: new anchor.BN(24 * 60 * 60 * 365 * 2),
       seasons,
       name: "Helium",
     })
@@ -84,7 +84,7 @@ export async function run(args: any = process.argv) {
     })
     .prepare();
 
-  if (!(await exists(provider.connection, delegationConfig!))) {
+  if (!(await exists(provider.connection, proxyConfig!))) {
     console.log("Creating delegation config");
     await sendInstructions(provider, [instruction]);
   }
@@ -96,7 +96,7 @@ export async function run(args: any = process.argv) {
       await vsrProgram.methods
         .updateRegistrarV0()
         .accounts({
-          delegationConfig,
+          proxyConfig,
           registrar,
           realmAuthority: authority,
         })

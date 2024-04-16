@@ -27,9 +27,9 @@ export const useRelinquishVote = (proposal: PublicKey) => {
         const position = positions?.[index];
         const earlierDelegateVoted =
           position &&
-          position.votingDelegation &&
+          position.proxy &&
           m.info &&
-          position.votingDelegation.index > m.info.delegationIndex;
+          position.proxy.index > m.info.proxyIndex;
         return !earlierDelegateVoted && m.info?.choices.includes(choice);
       });
     },
@@ -65,17 +65,17 @@ export const useRelinquishVote = (proposal: PublicKey) => {
               const alreadyVotedThisChoice = marker?.choices.includes(choice);
 
               if (marker && alreadyVotedThisChoice) {
-                if (position.isVotingDelegatedToMe) {
+                if (position.isProxiedToMe) {
                   if (
-                    marker.delegationIndex <
-                    (position.votingDelegation?.index || 0)
+                    marker.proxyIndex <
+                    (position.proxy?.index || 0)
                   ) {
                     // Do not vote with a position that has been delegated to us, but voting overidden
                     return;
                   }
 
                   return await vsrProgram.methods
-                    .delegatedRelinquishVoteV0({
+                    .proxiedRelinquishVoteV0({
                       choice,
                     })
                     .accounts({

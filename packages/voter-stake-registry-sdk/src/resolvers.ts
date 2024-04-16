@@ -9,14 +9,14 @@ import { getAccount } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { init } from ".";
 import { voterWeightRecordKey } from "./pdas";
-import { delegationKey, nftDelegationResolvers } from "@helium/nft-delegation-sdk";
+import { proxyKey, nftProxyResolvers } from "@helium/nft-proxy-sdk";
 
 export * from "./constants";
 export * from "./pdas";
 export * from "./resolvers";
 
 export const vsrResolvers = combineResolvers(
-  nftDelegationResolvers,
+  nftProxyResolvers,
   heliumCommonResolver,
   ataResolver({
     instruction: "initializeRegistrarV0",
@@ -113,7 +113,7 @@ export const vsrResolvers = combineResolvers(
       // @ts-ignore
       return provider.wallet.publicKey;
     } else if (
-      path[path.length - 1] == "delegation" &&
+      path[path.length - 1] == "proxy" &&
       accounts.registrar &&
       accounts.owner &&
       accounts.mint
@@ -122,8 +122,8 @@ export const vsrResolvers = combineResolvers(
       const registrar = await program.account.registrar.fetch(
         accounts.registrar as PublicKey
       );
-      return delegationKey(
-        registrar.delegationConfig,
+      return proxyKey(
+        registrar.proxyConfig,
         accounts.mint as PublicKey,
         accounts.owner as PublicKey
       )[0];

@@ -56,7 +56,7 @@ import {
   parseEmissionsSchedule,
   sendInstructionsOrSquads,
 } from "./utils";
-import { init } from "@helium/nft-delegation-sdk";
+import { init } from "@helium/nft-proxy-sdk";
 
 const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
@@ -278,12 +278,12 @@ export async function run(args: any = process.argv) {
 
   const delProgram = await init(provider);
   const {
-    pubkeys: { delegationConfig },
+    pubkeys: { proxyConfig },
     instruction,
   } = await delProgram.methods
-    .initializeDelegationConfigV0({
+    .initializeProxyConfigV0({
       // Set max time to 2 years, though seasons should take precedent
-      maxDelegationTime: new anchor.BN(24 * 60 * 60 * 365 * 2),
+      maxProxyTime: new anchor.BN(24 * 60 * 60 * 365 * 2),
       seasons,
       name: "Helium",
     })
@@ -292,7 +292,7 @@ export async function run(args: any = process.argv) {
     })
     .prepare();
 
-  if (!(await exists(provider.connection, delegationConfig!))) {
+  if (!(await exists(provider.connection, proxyConfig!))) {
     console.log("Creating delegation config");
     await sendInstructions(provider, [instruction]);
   }
@@ -349,7 +349,7 @@ export async function run(args: any = process.argv) {
         .accounts({
           realm,
           realmGoverningTokenMint: hntKeypair.publicKey,
-          delegationConfig,
+          proxyConfig,
         })
         .instruction()
     );

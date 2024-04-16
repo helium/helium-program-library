@@ -1,0 +1,355 @@
+{
+  "version": "0.0.1",
+  "name": "nft_proxy",
+  "instructions": [
+    {
+      "name": "initializeProxyConfigV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "proxyConfig",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "proxy_config"
+              },
+              {
+                "kind": "arg",
+                "type": {
+                  "defined": "InitializeProxyConfigArgsV0"
+                },
+                "path": "args.name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializeProxyConfigArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "assignProxyV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "asset",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "approver",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "or in the case of a primary proxy (first in the line), Pubkey::default"
+          ]
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "proxyConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "currentProxy",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "proxy"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "ProxyConfigV0",
+                "path": "proxy_config"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "asset"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "nextProxy",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "proxy"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "ProxyConfigV0",
+                "path": "proxy_config"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "asset"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "recipient"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "AssignProxyArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "unassignProxyV0",
+      "accounts": [
+        {
+          "name": "rentRefund",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asset",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "approver",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "or in the case of a primary proxy (first in the line), Pubkey::default"
+          ]
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "currentProxy",
+          "isMut": false,
+          "isSigner": false,
+          "relations": ["owner", "asset"]
+        },
+        {
+          "name": "prevProxy",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "proxy",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["rent_refund"]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ProxyConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "maxProxyTime",
+            "type": "i64"
+          },
+          {
+            "name": "seasons",
+            "type": {
+              "vec": "i64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProxyV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "proxyConfig",
+            "type": "publicKey"
+          },
+          {
+            "name": "asset",
+            "type": "publicKey"
+          },
+          {
+            "name": "index",
+            "type": "u16"
+          },
+          {
+            "name": "nextOwner",
+            "type": "publicKey"
+          },
+          {
+            "name": "rentRefund",
+            "type": "publicKey"
+          },
+          {
+            "name": "expirationTime",
+            "type": "i64"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "AssignProxyArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "expirationTime",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeProxyConfigArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "maxProxyTime",
+            "type": "i64"
+          },
+          {
+            "name": "seasons",
+            "type": {
+              "vec": "i64"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ExpirationExceedsMax",
+      "msg": "The specified expiration time exceeds the maximum allowed for this proxy configuration"
+    },
+    {
+      "code": 6001,
+      "name": "ExpirationExceedsSeasonMax",
+      "msg": "The specified expiration time exceeds the maximum allowed for this season"
+    },
+    {
+      "code": 6002,
+      "name": "ExpirationPast",
+      "msg": "The specified expiration time has already passed"
+    },
+    {
+      "code": 6003,
+      "name": "ExpirationExceedsPreceedingProxy",
+      "msg": "The specified expiration time exceeds the expiration of the existing delegatio"
+    }
+  ]
+}

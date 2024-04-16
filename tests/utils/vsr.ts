@@ -61,7 +61,7 @@ export async function initVsr(
     .accounts({
       realm: realmPk,
       realmGoverningTokenMint: hntMint,
-      delegationConfig: null
+      proxyConfig: null
     });
   instructions.push(await createRegistrar.instruction());
   const registrar = (await createRegistrar.pubkeys()).registrar as PublicKey;

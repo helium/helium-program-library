@@ -15,11 +15,11 @@ __metadata:
   linkType: hard
 
 "@babel/runtime@npm:^7.23.4":
-  version: 7.24.1
-  resolution: "@babel/runtime@npm:7.24.1"
+  version: 7.24.4
+  resolution: "@babel/runtime@npm:7.24.4"
   dependencies:
     regenerator-runtime: ^0.14.0
-  checksum: 5c8f3b912ba949865f03b3cf8395c60e1f4ebd1033fbd835bdfe81b6cac8a87d85bc3c7aded5fcdf07be044c9ab8c818f467abe0deca50020c72496782639572
+  checksum: 2f27d4c0ffac7ae7999ac0385e1106f2a06992a8bdcbf3da06adcac7413863cd08c198c2e4e970041bbea849e17f02e1df18875539b6afba76c781b6b59a07c3
   languageName: node
   linkType: hard
 
@@ -112,18 +112,18 @@ __metadata:
   linkType: hard
 
 "@grpc/grpc-js@npm:^1.10.1":
-  version: 1.10.1
-  resolution: "@grpc/grpc-js@npm:1.10.1"
+  version: 1.10.6
+  resolution: "@grpc/grpc-js@npm:1.10.6"
   dependencies:
-    "@grpc/proto-loader": ^0.7.8
-    "@types/node": ">=12.12.47"
-  checksum: 5842c1c3ffcb630a1ee45998733861a16f8f6db4fe78f317f6be25ddf581040dc38e8c09aed7073dfae1a7099a3c83658ca8f3db77c0bc3b0e40625618245bd0
+    "@grpc/proto-loader": ^0.7.10
+    "@js-sdsl/ordered-map": ^4.4.2
+  checksum: 343d70ee435d6b4b82c72160d31a4749ac2621938f58328dd71df3013377665128c890df60e057fde381b12b83d34f802d586f7feb61d079793d89adfc0f40e8
   languageName: node
   linkType: hard
 
-"@grpc/proto-loader@npm:^0.7.8":
-  version: 0.7.10
-  resolution: "@grpc/proto-loader@npm:0.7.10"
+"@grpc/proto-loader@npm:^0.7.10":
+  version: 0.7.12
+  resolution: "@grpc/proto-loader@npm:0.7.12"
   dependencies:
     lodash.camelcase: ^4.3.0
     long: ^5.0.0
@@ -131,7 +131,7 @@ __metadata:
     yargs: ^17.7.2
   bin:
     proto-loader-gen-types: build/bin/proto-loader-gen-types.js
-  checksum: 4987e23b57942c2363b6a6a106e63efae636666cefa348778dfafef2ff72da7343c8587667521cb1d52482827bcd001dd535bdc27065110af56d9c7c176334c9
+  checksum: 5132b683b3f809417f46b421231ffa083d6300406d1276a12fc619d771b4f8e0e8ad5a935e0b381caaa9a57ef47630191dd2310b739d1be5aa90cc87b97fce0f
   languageName: node
   linkType: hard
 
@@ -339,7 +339,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/modular-governance-idls@npm:^0.0.8-next.12+f1b0c8c":
+"@helium/modular-governance-idls@npm:^0.0.8-next.16+ace2c47":
   version: 0.0.8
   resolution: "@helium/modular-governance-idls@npm:0.0.8"
   dependencies:
@@ -349,15 +349,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/nft-delegation-sdk@npm:0.0.8-next.12+f1b0c8c":
-  version: 0.0.8-next.12
-  resolution: "@helium/nft-delegation-sdk@npm:0.0.8-next.12"
+"@helium/nft-proxy-sdk@npm:0.0.8-next.16+ace2c47":
+  version: 0.0.8-next.16
+  resolution: "@helium/nft-proxy-sdk@npm:0.0.8-next.16"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.2.17
-    "@helium/modular-governance-idls": ^0.0.8-next.12+f1b0c8c
+    "@helium/modular-governance-idls": ^0.0.8-next.16+ace2c47
     "@solana/spl-token": ^0.3.8
-  checksum: 0c9b8fc24044f30b0e794db24b211c4b888670dcc6f988fc2144d5bc5d653f9f76f9b9b3f6be3091c3b730b7a83df7d1a8ab25211cac02da0e8b6528bef11c2b
+  checksum: 8fc7d62a301c7e8e94bbe431a937f49de91012182481698287afb5e964537f33f0d12f08a779fa022d64847d763e17204c82a26f48a20c191aa2aec2e068d115
   languageName: node
   linkType: hard
 
@@ -423,7 +423,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.7.6
     "@helium/idls": ^0.7.6
-    "@helium/nft-delegation-sdk": 0.0.8-next.12+f1b0c8c
+    "@helium/nft-proxy-sdk": 0.0.8-next.16+ace2c47
     "@helium/spl-utils": ^0.7.6
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
@@ -471,6 +471,13 @@ __metadata:
     "@jridgewell/resolve-uri": "npm:^3.0.3"
     "@jridgewell/sourcemap-codec": "npm:^1.4.10"
   checksum: d89597752fd88d3f3480845691a05a44bd21faac18e2185b6f436c3b0fd0c5a859fbbd9aaa92050c4052caf325ad3e10e2e1d1b64327517471b7d51babc0ddef
+  languageName: node
+  linkType: hard
+
+"@js-sdsl/ordered-map@npm:^4.4.2":
+  version: 4.4.2
+  resolution: "@js-sdsl/ordered-map@npm:4.4.2"
+  checksum: a927ae4ff8565ecb75355cc6886a4f8fadbf2af1268143c96c0cce3ba01261d241c3f4ba77f21f3f017a00f91dfe9e0673e95f830255945c80a0e96c6d30508a
   languageName: node
   linkType: hard
 
@@ -733,8 +740,8 @@ __metadata:
   linkType: hard
 
 "@solana/web3.js@npm:^1.78.8":
-  version: 1.91.3
-  resolution: "@solana/web3.js@npm:1.91.3"
+  version: 1.91.4
+  resolution: "@solana/web3.js@npm:1.91.4"
   dependencies:
     "@babel/runtime": ^7.23.4
     "@noble/curves": ^1.2.0
@@ -751,7 +758,7 @@ __metadata:
     node-fetch: ^2.7.0
     rpc-websockets: ^7.5.1
     superstruct: ^0.14.2
-  checksum: 5b251915057368d0615d6a6f0de7b4d4129c3d0643599551c0a342125601418634851b633a47d19da481973406f0f2928fa4bf1a2c57fb19914e69fd5b81c302
+  checksum: 9f6ac2f64ac05043cb367c09d5b4f4b859060618dbffc7a27da35fccdac0be9bd84b83899c9547efedc061fa7e20af283a9bacff01972bd047089809facfbdfe
   languageName: node
   linkType: hard
 
@@ -844,15 +851,6 @@ __metadata:
   version: 20.5.7
   resolution: "@types/node@npm:20.5.7"
   checksum: fc284c8e16ddc04569730d58e87eae349eb1c3dd9020cb79a1862d9d9add6f04e7367a236f3252db8db2572f90278e250f4cd43d27d264972b54394eaba1ed76
-  languageName: node
-  linkType: hard
-
-"@types/node@npm:>=12.12.47":
-  version: 20.11.21
-  resolution: "@types/node@npm:20.11.21"
-  dependencies:
-    undici-types: ~5.26.4
-  checksum: 6d32edc3ba61236d879ebb6aa8905602310a2dc6469113ed6e282d63c03b4b800bd17a10ae780e4ac2a92f1ad99ad44fe8aa14cac67f86389cb141a2477a2fee
   languageName: node
   linkType: hard
 
@@ -3944,13 +3942,6 @@ __metadata:
     tsc: bin/tsc
     tsserver: bin/tsserver
   checksum: 0f4da2f15e6f1245e49db15801dbee52f2bbfb267e1c39225afdab5afee1a72839cd86000e65ee9d7e4dfaff12239d28beaf5ee431357fcced15fb08583d72ca
-  languageName: node
-  linkType: hard
-
-"undici-types@npm:~5.26.4":
-  version: 5.26.5
-  resolution: "undici-types@npm:5.26.5"
-  checksum: 3192ef6f3fd5df652f2dc1cd782b49d6ff14dc98e5dced492aa8a8c65425227da5da6aafe22523c67f035a272c599bb89cfe803c1db6311e44bed3042fc25487
   languageName: node
   linkType: hard
 

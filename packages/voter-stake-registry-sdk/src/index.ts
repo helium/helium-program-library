@@ -10,7 +10,7 @@ export * from "./resolvers";
 export { VoteService } from "./voteService";
 export type {
   ProposalWithVotes,
-  Delegation,
+  Proxy as Delegation,
   Proxy,
   EnhancedProxy,
   EnhancedProxyData,

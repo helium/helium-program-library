@@ -40,10 +40,10 @@ import { random } from "./utils/string";
 import { SPL_GOVERNANCE_PID } from "./utils/vsr";
 import {
   PROGRAM_ID as DEL_PID,
-  init as initNftDelegation,
+  init as initNftProxy,
   delegationKey,
-} from "@helium/nft-delegation-sdk";
-import { NftDelegation } from "@helium/modular-governance-idls/lib/types/nft_delegation";
+} from "@helium/nft-proxy-sdk";
+import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import { ensureVSRIdl } from "./utils/fixtures";
 
 chai.use(chaiAsPromised);
@@ -61,13 +61,13 @@ describe("voter-stake-registry", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
   let program: Program<VoterStakeRegistry>;
-  let delegateProgram: Program<NftDelegation>;
+  let proxyProgram: Program<NftProxy>;
   let proposalProgram: Program<Proposal>;
   let registrar: PublicKey;
   let collection: PublicKey;
   let hntMint: PublicKey;
   let realm: PublicKey;
-  let delegationConfig: PublicKey | undefined;
+  let proxyConfig: PublicKey | undefined;
   let programVersion: number;
   let oneWeekFromNow: number;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
@@ -82,7 +82,7 @@ describe("voter-stake-registry", () => {
     ensureVSRIdl(program);
     // @ts-ignore
     proposalProgram = await initProposal(provider as any);
-    delegateProgram = await initNftDelegation(provider, DEL_PID);
+    proxyProgram = await initNftProxy(provider, DEL_PID);
     hntMint = await createMint(provider, 8, me, me);
     await createAtaAndMint(provider, hntMint, toBN(223_000_000, 8));
 
@@ -126,10 +126,10 @@ describe("voter-stake-registry", () => {
     );
 
     ({
-      pubkeys: { delegationConfig },
-    } = await delegateProgram.methods
-      .initializeDelegationConfigV0({
-        maxDelegationTime: new anchor.BN(1000000000000),
+      pubkeys: { proxyConfig },
+    } = await proxyProgram.methods
+      .initializeProxyConfigV0({
+        maxProxyTime: new anchor.BN(1000000000000),
         name: random(10),
         seasons: [new anchor.BN(new Date().valueOf() / 1000 + 100000)],
       })
@@ -148,7 +148,7 @@ describe("voter-stake-registry", () => {
       .accounts({
         realm: realm,
         realmGoverningTokenMint: hntMint,
-        delegationConfig,
+        proxyConfig,
       })
       .prepare();
     registrar = rkey!;
@@ -460,19 +460,19 @@ describe("voter-stake-registry", () => {
       });
     });
 
-    describe("with delegation", async () => {
+    describe("with proxy", async () => {
       let delegatee = Keypair.generate();
       let position: PublicKey;
       let mint: PublicKey;
 
       beforeEach(async () => {
         ({ position, mint } = await createAndDeposit(10000, 200));
-        await delegateProgram.methods
+        await proxyProgram.methods
           .delegateV0({
             expirationTime: new anchor.BN(new Date().valueOf() / 1000 + 10000),
           })
           .accounts({
-            delegationConfig,
+            proxyConfig,
             asset: mint,
             recipient: delegatee.publicKey,
           })
@@ -483,7 +483,7 @@ describe("voter-stake-registry", () => {
         const {
           pubkeys: { marker },
         } = await program.methods
-          .delegatedVoteV0({
+          .proxiedVoteV0({
             choice: 0,
           })
           .accounts({
@@ -503,7 +503,7 @@ describe("voter-stake-registry", () => {
         expect(markerA?.choices).to.deep.eq([0]);
 
         await program.methods
-          .delegatedRelinquishVoteV0({
+          .proxiedRelinquishVoteV0({
             choice: 0,
           })
           .accounts({
@@ -523,11 +523,11 @@ describe("voter-stake-registry", () => {
         expect(markerA).to.be.null;
       });
 
-      it("allows earlier delegates to change the vote", async () => {
+      it("allows earlier proxies to change the vote", async () => {
         const {
           pubkeys: { marker },
         } = await program.methods
-          .delegatedVoteV0({
+          .proxiedVoteV0({
             choice: 0,
           })
           .accounts({
@@ -545,7 +545,7 @@ describe("voter-stake-registry", () => {
           marker! as PublicKey
         );
         expect(markerA?.choices).to.deep.eq([0]);
-        expect(markerA?.delegationIndex).to.eq(1);
+        expect(markerA?.proxyIndex).to.eq(1);
 
         await program.methods
           .relinquishVoteV1({
@@ -582,13 +582,13 @@ describe("voter-stake-registry", () => {
           marker! as PublicKey
         );
         expect(markerA?.choices).to.deep.eq([1]);
-        expect(markerA?.delegationIndex).to.eq(0);
+        expect(markerA?.proxyIndex).to.eq(0);
       });
 
       it("allows the original owner to undelegate", async () => {
-        const toUndelegate = delegationKey(delegationConfig!, mint, delegatee.publicKey)[0];
-        const myDelegation = delegationKey(delegationConfig!, mint, PublicKey.default)[0];
-        await delegateProgram.methods
+        const toUndelegate = delegationKey(proxyConfig!, mint, delegatee.publicKey)[0];
+        const myDelegation = delegationKey(proxyConfig!, mint, PublicKey.default)[0];
+        await proxyProgram.methods
           .undelegateV0()
           .accounts({
             delegation: toUndelegate,
@@ -599,11 +599,11 @@ describe("voter-stake-registry", () => {
 
         expect(
           (
-            await delegateProgram.account.delegationV0.fetch(myDelegation)
+            await proxyProgram.account.proxyV0.fetch(myDelegation)
           ).nextOwner.toBase58()
         ).to.eq(PublicKey.default.toBase58());
         expect(
-          await delegateProgram.account.delegationV0.fetchNullable(toUndelegate)
+          await proxyProgram.account.proxyV0.fetchNullable(toUndelegate)
         ).to.be.null;
       });
     });

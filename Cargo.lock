@@ -2568,7 +2568,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nft-delegation"
+name = "nft-proxy"
 version = "0.0.2"
 dependencies = [
  "anchor-gen",
@@ -5681,7 +5681,7 @@ dependencies = [
  "itertools",
  "log",
  "mpl-token-metadata",
- "nft-delegation",
+ "nft-proxy",
  "proposal",
  "serde",
  "shared-utils",

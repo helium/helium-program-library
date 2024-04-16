@@ -1,22 +1,22 @@
 import { Program } from "@coral-xyz/anchor";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
-import { NftDelegation } from "@helium/modular-governance-idls/lib/types/nft_delegation";
+import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import { PublicKey } from "@solana/web3.js";
 import axios, { AxiosInstance } from "axios";
 
-export type Delegation = {
+export type Proxy = {
   owner: string;
   nextOwner: string;
   index: number;
   address: string;
   asset: string;
-  delegationConfig: string;
+  proxyConfig: string;
   bumpSeed: number;
   rentRefund: string;
   expirationTime: string;
 };
 
-export type Proxy = {
+export type ProxyDef = {
   name: string;
   image: string;
   wallet: string;
@@ -62,7 +62,7 @@ export type ProposalWithVotes = Proposal & {
 export class VoteService {
   private client: AxiosInstance | undefined;
   private program: Program<VoterStakeRegistry> | undefined;
-  private nftDelegationProgram: Program<NftDelegation> | undefined;
+  private nftProxyProgram: Program<NftProxy> | undefined;
   private registrar: PublicKey;
 
   // Wrapper arÍound vsr bulk operations that either uses
@@ -71,18 +71,18 @@ export class VoteService {
     baseURL,
     program,
     registrar,
-    nftDelegationProgram,
+    nftProxyProgram,
   }: {
     registrar: PublicKey;
     baseURL?: string;
     program?: Program<VoterStakeRegistry>;
-    nftDelegationProgram?: Program<NftDelegation>;
+    nftProxyProgram?: Program<NftProxy>;
   }) {
     if (baseURL) {
       this.client = axios.create({ baseURL: baseURL });
     }
     this.program = program;
-    this.nftDelegationProgram = nftDelegationProgram;
+    this.nftProxyProgram = nftProxyProgram;
     this.registrar = registrar;
   }
 
@@ -116,28 +116,28 @@ export class VoteService {
     }
   }
 
-  async getDelegationsForWallet(
+  async getProxiesForWallet(
     wallet: PublicKey,
-    minDelegationIndex: number = 0
-  ): Promise<Delegation[]> {
+    minProxyIndex: number = 0
+  ): Promise<Proxy[]> {
     if (this.client) {
       return (
-        await this.client.get(`/delegations`, {
+        await this.client.get(`/proxies`, {
           params: {
             limit: 10000,
             owner: wallet.toBase58(),
-            minIndex: minDelegationIndex,
+            minIndex: minProxyIndex,
           },
         })
       ).data;
     }
 
-    if (this.nftDelegationProgram && this.program) {
+    if (this.nftProxyProgram && this.program) {
       const registrar = await this.program.account.registrar.fetch(
         this.registrar
       );
       return (
-        await this.nftDelegationProgram.account.delegationV0.all([
+        await this.nftProxyProgram.account.proxyV0.all([
           {
             memcmp: {
               offset: 8,
@@ -147,7 +147,7 @@ export class VoteService {
           {
             memcmp: {
               offset: 8 + 32,
-              bytes: registrar.delegationConfig.toBase58(),
+              bytes: registrar.proxyConfig.toBase58(),
             },
           },
         ])
@@ -159,39 +159,39 @@ export class VoteService {
           index: a.account.index,
           address: a.publicKey.toBase58(),
           asset: a.account.asset.toBase58(),
-          delegationConfig: a.account.delegationConfig.toBase58(),
+          proxyConfig: a.account.proxyConfig.toBase58(),
           rentRefund: a.account.rentRefund.toBase58(),
           bumpSeed: a.account.bumpSeed,
           expirationTime: a.account.expirationTime.toString(),
         }));
     } else {
-      throw new Error("No nft delegation program or api url");
+      throw new Error("No nft proxy program or api url");
     }
   }
 
-  async getPositionDelegations(
+  async getPositionProxies(
     position: PublicKey,
     minIndex: number
-  ): Promise<Delegation[]> {
+  ): Promise<Proxy[]> {
     if (this.client) {
       return (
-        await this.client.get(`/delegations`, {
+        await this.client.get(`/proxys`, {
           params: { limit: 10000, position, minIndex },
         })
       ).data;
     }
 
-    if (this.nftDelegationProgram && this.program) {
+    if (this.nftProxyProgram && this.program) {
       const registrar = await this.program.account.registrar.fetch(
         this.registrar
       );
       const positionAcc = await this.program.account.positionV0.fetch(position);
       return (
-        await this.nftDelegationProgram.account.delegationV0.all([
+        await this.nftProxyProgram.account.proxyV0.all([
           {
             memcmp: {
               offset: 8 + 32,
-              bytes: registrar.delegationConfig.toBase58(),
+              bytes: registrar.proxyConfig.toBase58(),
             },
           },
           {
@@ -210,13 +210,13 @@ export class VoteService {
           index: a.account.index,
           address: a.publicKey.toBase58(),
           asset: a.account.asset.toBase58(),
-          delegationConfig: a.account.delegationConfig.toBase58(),
+          proxyConfig: a.account.proxyConfig.toBase58(),
           rentRefund: a.account.rentRefund.toBase58(),
           bumpSeed: a.account.bumpSeed,
           expirationTime: a.account.expirationTime.toString(),
         }));
     } else {
-      throw new Error("No nft delegation program or api url");
+      throw new Error("No nft proxy program or api url");
     }
   }
 

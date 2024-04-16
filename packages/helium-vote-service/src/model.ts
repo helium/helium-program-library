@@ -104,7 +104,7 @@ export class VoteMarker extends Model {
   declare mint: string;
   declare choices: number[];
   declare weight: string;
-  declare delegationIndex: number;
+  declare proxyIndex: number;
 
   declare created_at: Date;
 }
@@ -120,7 +120,7 @@ VoteMarker.init(
     mint: DataTypes.STRING,
     choices: DataTypes.JSONB,
     weight: DataTypes.DECIMAL(38, 0).UNSIGNED,
-    delegationIndex: DataTypes.INTEGER,
+    proxyIndex: DataTypes.INTEGER,
   },
   {
     sequelize,
@@ -290,7 +290,7 @@ export class Delegation extends Model {
   declare nextOwner: string;
   declare index: number;
   declare asset: string;
-  declare delegationConfig: string
+  declare proxyConfig: string
   declare rentRefund: string;
   declare bumpSeed: number;
 }
@@ -304,7 +304,7 @@ Delegation.init(
     nextOwner: DataTypes.STRING,
     index: DataTypes.INTEGER,
     asset: DataTypes.STRING,
-    delegationConfig: DataTypes.STRING,
+    proxyConfig: DataTypes.STRING,
     rentRefund: DataTypes.STRING,
     bumpSeed: DataTypes.INTEGER,
     expirationTime: DataTypes.DECIMAL.UNSIGNED

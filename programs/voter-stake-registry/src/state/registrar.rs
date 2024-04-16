@@ -22,7 +22,7 @@ pub struct Registrar {
   // Empty bytes for future upgrades.
   pub reserved1: [u8; 4],
   pub reserved2: [u64; 3], // split because `Default` does not support [u8; 60]
-  pub delegation_config: Pubkey,
+  pub proxy_config: Pubkey,
   pub voting_mints: Vec<VotingMintConfigV0>,
 }
 

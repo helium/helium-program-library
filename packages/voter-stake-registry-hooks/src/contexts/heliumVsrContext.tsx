@@ -5,7 +5,6 @@ import {
   delegatedPositionKey,
 } from "@helium/helium-sub-daos-sdk";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
-import { delegationKey } from "@helium/nft-delegation-sdk";
 import { truthy } from "@helium/spl-utils";
 import { Connection, PublicKey } from "@solana/web3.js";
 import React, {
@@ -18,11 +17,11 @@ import React, {
 } from "react";
 import { useAsync } from "react-async-hook";
 import { useDelegatedPositions } from "../hooks/useDelegatedPositions";
-import { useDelegations } from "../hooks/useDelegations";
+import { useProxies } from "../hooks/useProxies";
 import { usePositions } from "../hooks/usePositions";
 import { useRegistrar } from "../hooks/useRegistrar";
-import { init as initNftDelegation } from "@helium/nft-delegation-sdk";
-import { DelegationV0, PositionWithMeta } from "../sdk/types";
+import { init as initNftProxy } from "@helium/nft-proxy-sdk";
+import { ProxyV0, PositionWithMeta } from "../sdk/types";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 import {
   GetPositionsArgs as GetPosArgs,
@@ -38,7 +37,7 @@ type Registrar = IdlAccounts<VoterStakeRegistry>["registrar"];
 
 export interface HeliumVsrState {
   amountLocked?: BN;
-  amountVotingDelegationLocked?: BN;
+  amountProxyLocked?: BN;
   loading: boolean;
   mint?: PublicKey;
   positions?: PositionWithMeta[];
@@ -110,11 +109,11 @@ export const HeliumVsrStateProvider: React.FC<{
         });
       } else {
         const program = await init(provider as any);
-        const nftDelegationProgram = await initNftDelegation(provider as any);
+        const nftProxyProgram = await initNftProxy(provider as any);
         new VoteService({
           registrar: registrarKey,
           program,
-          nftDelegationProgram,
+          nftProxyProgram,
         });
       }
     }
@@ -149,13 +148,13 @@ export const HeliumVsrStateProvider: React.FC<{
   const { accounts: delegatedAccounts, loading: loadingDel } =
     useDelegatedPositions(delegatedPositionKeys);
 
-  const votingDelegationAccounts = result?.delegations;
-  const votingDelegationAccountsByAsset = useMemo(() => {
-    return votingDelegationAccounts?.reduce((acc, del) => {
+  const proxyAccounts = result?.proxies;
+  const proxyAccountsByAsset = useMemo(() => {
+    return proxyAccounts?.reduce((acc, del) => {
       acc[del.asset.toBase58()] = del;
       return acc
-    }, {} as Record<string, DelegationV0>)
-  }, [votingDelegationAccounts])
+    }, {} as Record<string, ProxyV0>)
+  }, [proxyAccounts])
   const myOwnedPositionsEndIdx = result?.positionKeys?.length;
   // Assume that my positions are a small amount, so we don't need to say they're static
   const { accounts: myPositions, loading: loadingMyPositions } = usePositions(
@@ -163,7 +162,7 @@ export const HeliumVsrStateProvider: React.FC<{
   );
   // Delegated positions may be a lot, set to static
   const { accounts: delegatedPositions, loading: loadingDelPositions } =
-    usePositions(result?.votingDelegatedPositionKeys, true);
+    usePositions(result?.proxiedPositionKeys, true);
   const positions = useMemo(
     () => [...(myPositions || []), ...(delegatedPositions || [])],
     [myPositions, delegatedPositions]
@@ -174,18 +173,18 @@ export const HeliumVsrStateProvider: React.FC<{
     amountLocked,
     votingPower,
     positionsWithMeta,
-    amountVotingDelegationLocked,
+    amountProxyLocked,
   } = useMemo(() => {
     if (positions && registrar && delegatedAccounts && now) {
       let amountLocked = new BN(0);
-      let amountVotingDelegationLocked = new BN(0);
+      let amountProxyLocked = new BN(0);
       let votingPower = new BN(0);
       const mintCfgs = registrar?.votingMints;
       const positionsWithMeta = positions
         .map((position, idx) => {
           if (position && position.info) {
             const isDelegated = !!delegatedAccounts?.[idx]?.info;
-            const delegation = votingDelegationAccountsByAsset?.[position.info.mint.toBase58()];
+            const proxy = proxyAccountsByAsset?.[position.info.mint.toBase58()];
             const delegatedSubDao = isDelegated
               ? delegatedAccounts[idx]?.info?.subDao
               : null;
@@ -201,9 +200,9 @@ export const HeliumVsrStateProvider: React.FC<{
               unixNow: new BN(now),
             });
 
-            const isVotingDelegatedToMe = idx >= (myOwnedPositionsEndIdx || 0);
-            if (isVotingDelegatedToMe) {
-              amountVotingDelegationLocked = amountVotingDelegationLocked.add(
+            const isProxiedToMe = idx >= (myOwnedPositionsEndIdx || 0);
+            if (isProxiedToMe) {
+              amountProxyLocked = amountProxyLocked.add(
                 position.info.amountDepositedNative
               );
             } else {
@@ -223,8 +222,8 @@ export const HeliumVsrStateProvider: React.FC<{
               hasGenesisMultiplier: position.info.genesisEnd.gt(new BN(now)),
               votingPower: posVotingPower,
               votingMint: mintCfgs[position.info.votingMintConfigIdx],
-              isVotingDelegatedToMe,
-              votingDelegation: delegation,
+              isProxiedToMe,
+              proxy,
             } as PositionWithMeta;
           }
         })
@@ -234,7 +233,7 @@ export const HeliumVsrStateProvider: React.FC<{
         positionsWithMeta,
         amountLocked,
         votingPower,
-        amountVotingDelegationLocked,
+        amountProxyLocked,
       };
     }
 
@@ -244,7 +243,7 @@ export const HeliumVsrStateProvider: React.FC<{
     positions,
     registrar,
     delegatedAccounts,
-    votingDelegationAccounts,
+    proxyAccounts,
   ]);
 
   const sortedPositions = useMemo(
@@ -267,7 +266,7 @@ export const HeliumVsrStateProvider: React.FC<{
       loading: loading || loadingPositions || loadingDel,
       error,
       amountLocked,
-      amountVotingDelegationLocked,
+      amountProxyLocked,
       mint,
       positions: sortedPositions,
       provider,
@@ -287,7 +286,7 @@ export const HeliumVsrStateProvider: React.FC<{
       loading,
       error,
       amountLocked,
-      amountVotingDelegationLocked,
+      amountProxyLocked,
       mint,
       sortedPositions,
       provider,

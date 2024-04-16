@@ -8,7 +8,7 @@ import {
 } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
-import { Delegation, Registrar } from "../sdk/types";
+import { Proxy, Registrar } from "../sdk/types";
 
 export interface GetPositionsArgs {
   wallet: PublicKey;
@@ -20,10 +20,10 @@ export interface GetPositionsArgs {
 export const getPositionKeys = async (
   args: GetPositionsArgs
 ): Promise<{
-  votingDelegatedPositionKeys: PublicKey[];
+  proxiedPositionKeys: PublicKey[];
   positionKeys: PublicKey[];
   nfts: Asset[];
-  delegations: Delegation[];
+  proxies: Proxy[];
 }> => {
   const { mint, wallet, provider, voteService } = args;
   const connection = provider.connection;
@@ -36,8 +36,8 @@ export const getPositionKeys = async (
     registrarPk
   )) as Registrar;
 
-  const myDelegations = await voteService.getDelegationsForWallet(me);
-  const delegationPositions = myDelegations.map(
+  const myProxies = await voteService.getProxiesForWallet(me);
+  const delegationPositions = myProxies.map(
     (del) => positionKey(new PublicKey(del.asset))[0]
   );
   let page = 1;
@@ -74,14 +74,14 @@ export const getPositionKeys = async (
 
   return {
     positionKeys,
-    votingDelegatedPositionKeys: delegationPositions,
-    delegations: myDelegations.map((d) => ({
+    proxiedPositionKeys: delegationPositions,
+    proxies: myProxies.map((d) => ({
       owner: new PublicKey(d.owner),
       nextOwner: new PublicKey(d.nextOwner),
       address: new PublicKey(d.address),
       asset: new PublicKey(d.asset),
       rentRefund: new PublicKey(d.rentRefund),
-      delegationConfig: new PublicKey(d.delegationConfig),
+      proxyConfig: new PublicKey(d.proxyConfig),
       index: d.index,
       bumpSeed: d.bumpSeed,
       expirationTime: new BN(d.expirationTime)

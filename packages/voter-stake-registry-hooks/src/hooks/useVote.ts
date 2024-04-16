@@ -41,9 +41,9 @@ export const useVote = (proposalKey: PublicKey) => {
         const position = positions?.[index];
         const earlierDelegateVoted =
           position &&
-          position.votingDelegation &&
+          position.proxy &&
           m.info &&
-          position.votingDelegation.index > m.info.delegationIndex;
+          position.proxy.index > m.info.proxyIndex;
         const noMarker = !m?.info;
         const maxChoicesReached =
           (m?.info?.choices.length || 0) >= (proposal?.maxChoicesPerVoter || 0);
@@ -89,11 +89,11 @@ export const useVote = (proposalKey: PublicKey) => {
                 (marker?.choices.length || 0) >=
                 (proposal?.maxChoicesPerVoter || 0);
               if (!marker || (!alreadyVotedThisChoice && !maxChoicesReached)) {
-                if (position.isVotingDelegatedToMe) {
+                if (position.isProxiedToMe) {
                   if (
                     marker &&
-                    (marker.delegationIndex <
-                      (position.votingDelegation?.index || 0) ||
+                    (marker.proxyIndex <
+                      (position.proxy?.index || 0) ||
                       marker.choices.includes(choice))
                   ) {
                     // Do not vote with a position that has been delegated to us, but voting overidden
@@ -102,7 +102,7 @@ export const useVote = (proposalKey: PublicKey) => {
                   }
 
                   return await vsrProgram.methods
-                    .delegatedVoteV0({
+                    .proxiedVoteV0({
                       choice,
                     })
                     .accounts({

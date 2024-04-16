@@ -7,7 +7,7 @@ import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 import { getRegistrarKey } from "@helium/voter-stake-registry-sdk";
 import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 
-export function useVotingDelegatedTo(wallet?: PublicKey): {
+export function useProxiedTo(wallet?: PublicKey): {
   positions?: PositionWithMeta[];
   votingPower?: BN;
 } {
@@ -18,8 +18,8 @@ export function useVotingDelegatedTo(wallet?: PublicKey): {
     if (wallet) {
       return positions?.filter(
         (position) =>
-          position.votingDelegation &&
-          position.votingDelegation.nextOwner.equals(wallet)
+          position.proxy &&
+          position.proxy.nextOwner.equals(wallet)
       );
     }
   }, [positions]);

@@ -1,6 +1,6 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
-use nft_delegation::DelegationConfigV0;
+use nft_proxy::ProxyConfigV0;
 
 #[derive(Accounts)]
 #[instruction()]
@@ -12,13 +12,13 @@ pub struct UpdateRegistrarV0<'info> {
   pub registrar: Box<Account<'info, Registrar>>,
   /// CHECK: checked as signer
   pub realm_authority: Signer<'info>,
-  pub delegation_config: Option<Account<'info, DelegationConfigV0>>,
+  pub proxy_config: Option<Account<'info, ProxyConfigV0>>,
 }
 
 pub fn handler(ctx: Context<UpdateRegistrarV0>) -> Result<()> {
-  ctx.accounts.registrar.delegation_config = ctx
+  ctx.accounts.registrar.proxy_config = ctx
     .accounts
-    .delegation_config
+    .proxy_config
     .clone()
     .map(|k| k.key())
     .unwrap_or_default();
