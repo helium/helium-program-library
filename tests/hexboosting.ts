@@ -253,6 +253,7 @@ describe("hexboosting", () => {
         .boostV0({
           location: new BN(1),
           version: 0,
+          deviceTypes: [{ wifiIndoor: {} }],
           amounts: [
             {
               period: 0,
@@ -293,7 +294,6 @@ describe("hexboosting", () => {
         )
       ).amount;
 
-      console.log(pythPrice);
       const expected = Number(
         BigInt(toBN((6 * 0.005) / pythPrice, 6).toNumber())
       );
@@ -304,6 +304,7 @@ describe("hexboosting", () => {
 
       const hex = await program.account.boostedHexV0.fetch(boostedHex!);
 
+      expect(Object.keys(hex.deviceTypes[0])[0]).to.eq("wifiIndoor");
       expect(hex.location.toNumber()).to.eq(1);
       expect(hex.startTs.toNumber()).to.eq(0);
       expect(hex.boostsByPeriod.toJSON().data).to.deep.eq([1, 1, 1, 1, 1, 1]);
@@ -315,6 +316,7 @@ describe("hexboosting", () => {
           .boostV0({
             location: new BN(1),
             version: 0,
+            deviceTypes: [{ wifiIndoor: {} }],
             amounts: [
               {
                 period: 0,
@@ -362,6 +364,7 @@ describe("hexboosting", () => {
           .boostV0({
             location: new BN(1),
             version: 1,
+            deviceTypes: [{ wifiIndoor: {} }],
             amounts: [
               {
                 period: 2,
@@ -407,7 +410,7 @@ describe("hexboosting", () => {
       });
 
       it("allows starting a boost", async () => {
-        const boostedHex = boostedHexKey(boostConfigKey(mint)[0], new BN(1))[0];
+        const boostedHex = boostedHexKey(boostConfigKey(mint)[0], carrier, new BN(1))[0];
         await program.methods
           .startBoostV0({
             startTs: new BN(1),
@@ -429,6 +432,7 @@ describe("hexboosting", () => {
         beforeEach(async () => {
           const boostedHex = boostedHexKey(
             boostConfigKey(mint)[0],
+            carrier,
             new BN(1)
           )[0];
           await program.methods
@@ -444,6 +448,7 @@ describe("hexboosting", () => {
         it("allows closing the boost when it's done", async () => {
           const boostedHex = boostedHexKey(
             boostConfigKey(mint)[0],
+            carrier,
             new BN(1)
           )[0];
           // Wait 7 seconds so it is fully expired

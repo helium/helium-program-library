@@ -1,4 +1,4 @@
-use crate::error::ErrorCode;
+use crate::{error::ErrorCode, DeviceTypeV0};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
@@ -20,6 +20,7 @@ pub struct BoostArgsV0 {
   // invalid
   pub version: u32,
   pub amounts: Vec<BoostAmountV0>,
+  pub device_types: Vec<DeviceTypeV0>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -69,7 +70,7 @@ pub struct BoostV0<'info> {
     init_if_needed,
     payer = payer,
     space = get_space(boosted_hex),
-    seeds = [b"boosted_hex", boost_config.key().as_ref(), &args.location.to_le_bytes()],
+    seeds = [b"boosted_hex", boost_config.key().as_ref(), carrier.key().as_ref(), &args.location.to_le_bytes()],
     bump,
     constraint = boosted_hex.version == args.version @ ErrorCode::InvalidVersion,
   )]
@@ -87,6 +88,7 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
   ctx.accounts.boosted_hex.location = args.location;
   ctx.accounts.boosted_hex.bump_seed = ctx.bumps["boosted_hex"];
   ctx.accounts.boosted_hex.version += 1;
+  ctx.accounts.boosted_hex.device_types = args.device_types;
 
   // Insert the new periods
   let max_period = args

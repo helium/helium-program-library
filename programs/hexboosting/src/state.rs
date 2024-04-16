@@ -20,6 +20,14 @@ pub struct BoostConfigV0 {
   pub start_authority: Pubkey,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, PartialEq)]
+pub enum DeviceTypeV0 {
+  #[default]
+  Cbrs,
+  WifiIndoor,
+  WifiOutdoor,
+}
+
 #[account]
 pub struct BoostedHexV0 {
   pub boost_config: Pubkey,
@@ -34,6 +42,7 @@ pub struct BoostedHexV0 {
   pub boosts_by_period: Vec<u8>,
   // Track changes to the boosted hex so client can pass what version it made a change to
   pub version: u32,
+  pub device_types: Vec<DeviceTypeV0>,
 }
 
 impl BoostedHexV0 {
