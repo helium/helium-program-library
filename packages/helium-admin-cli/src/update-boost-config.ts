@@ -50,11 +50,11 @@ export async function run(args: any = process.argv) {
     },
     minimumPeriods: {
       type: "number",
-      describe: "The new minimum number of periods"
+      describe: "The new minimum number of periods",
     },
     boostPrice: {
       type: "string",
-      describe: "The boost price in bones"
+      describe: "The boost price in bones",
     },
     dntMint: {
       type: "string",

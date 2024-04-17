@@ -21,13 +21,11 @@ import {
 } from "@solana/web3.js";
 import { BN } from "bn.js";
 import { expect } from "chai";
-import {
-  init as initHeliumEntityManager
-} from "../packages/helium-entity-manager-sdk/src";
+import { init as initHeliumEntityManager } from "../packages/helium-entity-manager-sdk/src";
 import {
   boostConfigKey,
   boostedHexKey,
-  init
+  init,
 } from "../packages/hexboosting-sdk";
 import { init as initMobileEntityManager } from "../packages/mobile-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
@@ -39,7 +37,7 @@ import {
   ensureHEMIdl,
   ensureHSDIdl,
   ensureMemIdl,
-  initTestDataCredits
+  initTestDataCredits,
 } from "./utils/fixtures";
 import { random } from "./utils/string";
 
@@ -253,7 +251,7 @@ describe("hexboosting", () => {
         .boostV0({
           location: new BN(1),
           version: 0,
-          deviceTypes: [{ wifiIndoor: {} }],
+          deviceType: { wifiIndoor: {} },
           amounts: [
             {
               period: 0,
@@ -304,7 +302,7 @@ describe("hexboosting", () => {
 
       const hex = await program.account.boostedHexV0.fetch(boostedHex!);
 
-      expect(Object.keys(hex.deviceTypes[0])[0]).to.eq("wifiIndoor");
+      expect(Object.keys(hex.deviceType)[0]).to.eq("wifiIndoor");
       expect(hex.location.toNumber()).to.eq(1);
       expect(hex.startTs.toNumber()).to.eq(0);
       expect(hex.boostsByPeriod.toJSON().data).to.deep.eq([1, 1, 1, 1, 1, 1]);
@@ -316,7 +314,7 @@ describe("hexboosting", () => {
           .boostV0({
             location: new BN(1),
             version: 0,
-            deviceTypes: [{ wifiIndoor: {} }],
+            deviceType: { wifiIndoor: {} },
             amounts: [
               {
                 period: 0,
@@ -364,7 +362,7 @@ describe("hexboosting", () => {
           .boostV0({
             location: new BN(1),
             version: 1,
-            deviceTypes: [{ wifiIndoor: {} }],
+            deviceType: { wifiIndoor: {} },
             amounts: [
               {
                 period: 2,
@@ -399,18 +397,16 @@ describe("hexboosting", () => {
         const hex = await program.account.boostedHexV0.fetch(boostedHex!);
 
         expect(hex.boostsByPeriod.toJSON().data).to.deep.eq([
-          1,
-          1,
-          2,
-          1,
-          1,
-          1,
-          2,
+          1, 1, 2, 1, 1, 1, 2,
         ]);
       });
 
       it("allows starting a boost", async () => {
-        const boostedHex = boostedHexKey(boostConfigKey(mint)[0], carrier, new BN(1))[0];
+        const boostedHex = boostedHexKey(
+          boostConfigKey(mint)[0],
+          { wifiIndoor: {} },
+          new BN(1)
+        )[0];
         await program.methods
           .startBoostV0({
             startTs: new BN(1),
@@ -432,7 +428,7 @@ describe("hexboosting", () => {
         beforeEach(async () => {
           const boostedHex = boostedHexKey(
             boostConfigKey(mint)[0],
-            carrier,
+            { wifiIndoor: {} },
             new BN(1)
           )[0];
           await program.methods
@@ -448,7 +444,7 @@ describe("hexboosting", () => {
         it("allows closing the boost when it's done", async () => {
           const boostedHex = boostedHexKey(
             boostConfigKey(mint)[0],
-            carrier,
+            { wifiIndoor: {} },
             new BN(1)
           )[0];
           // Wait 7 seconds so it is fully expired

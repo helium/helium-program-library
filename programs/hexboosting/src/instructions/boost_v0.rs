@@ -20,7 +20,7 @@ pub struct BoostArgsV0 {
   // invalid
   pub version: u32,
   pub amounts: Vec<BoostAmountV0>,
-  pub device_types: Vec<DeviceTypeV0>,
+  pub device_type: DeviceTypeV0,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -70,7 +70,7 @@ pub struct BoostV0<'info> {
     init_if_needed,
     payer = payer,
     space = get_space(boosted_hex),
-    seeds = [b"boosted_hex", boost_config.key().as_ref(), carrier.key().as_ref(), &args.location.to_le_bytes()],
+    seeds = [b"boosted_hex", boost_config.key().as_ref(), &[(args.device_type as u8)], &args.location.to_le_bytes()],
     bump,
     constraint = boosted_hex.version == args.version @ ErrorCode::InvalidVersion,
   )]
@@ -88,7 +88,7 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
   ctx.accounts.boosted_hex.location = args.location;
   ctx.accounts.boosted_hex.bump_seed = ctx.bumps["boosted_hex"];
   ctx.accounts.boosted_hex.version += 1;
-  ctx.accounts.boosted_hex.device_types = args.device_types;
+  ctx.accounts.boosted_hex.device_type = args.device_type;
 
   // Insert the new periods
   let max_period = args
@@ -104,6 +104,7 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
       .boosts_by_period
       .resize(max_period + 1, 0);
   }
+
   let now = Clock::get()?.unix_timestamp;
 
   for amount in args.amounts.clone() {
@@ -165,8 +166,8 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
   let total_fee: u64 = args
     .amounts
     .iter()
-    .map(|amount| amount.amount as u64 * ctx.accounts.boost_config.boost_price)
-    .sum();
+    .map(|amount| (amount.amount as u64 * ctx.accounts.boost_config.boost_price))
+    .sum::<u64>();
   let mobile_price_oracle =
     load_price_feed_from_account_info(&ctx.accounts.price_oracle).map_err(|e| {
       msg!("Pyth error {}", e);
