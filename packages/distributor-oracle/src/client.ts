@@ -359,8 +359,8 @@ export async function formBulkTransactions({
       let distributeIx;
       if (
         recipientAccs[idx] &&
-        recipientAccs[idx].destination &&
-        !recipientAccs[idx].destination.equals(PublicKey.default)
+        recipientAccs[idx]?.destination &&
+        !recipientAccs[idx]?.destination.equals(PublicKey.default)
       ) {
         const destination = recipientAccs[idx]!.destination;
         distributeIx = await lazyDistributorProgram.methods
@@ -575,8 +575,8 @@ export async function formTransaction({
 
   if (
     recipientAcc &&
-    recipientAcc.destination &&
-    !recipientAcc.destination.equals(PublicKey.default)
+    recipientAcc?.destination &&
+    !recipientAcc?.destination.equals(PublicKey.default)
   ) {
     const destination = recipientAcc.destination;
     instructions.push(
