@@ -125,18 +125,25 @@ describe("voter-stake-registry", () => {
       me
     );
 
+    console.log("heheh");
     ({
       pubkeys: { proxyConfig },
     } = await proxyProgram.methods
       .initializeProxyConfigV0({
         maxProxyTime: new anchor.BN(1000000000000),
         name: random(10),
-        seasons: [new anchor.BN(new Date().valueOf() / 1000 + 100000)],
+        seasons: [
+          {
+            start: new anchor.BN(0),
+            end: new anchor.BN(new Date().valueOf() / 1000 + 100000),
+          },
+        ],
       })
       .accounts({
         authority: me,
       })
       .rpcAndKeys());
+      console.log("hohoho")
 
     const {
       instruction: createRegistrar,
@@ -602,9 +609,8 @@ describe("voter-stake-registry", () => {
             await proxyProgram.account.proxyV0.fetch(myProxy)
           ).nextOwner.toBase58()
         ).to.eq(PublicKey.default.toBase58());
-        expect(
-          await proxyProgram.account.proxyV0.fetchNullable(toUnProxy)
-        ).to.be.null;
+        expect(await proxyProgram.account.proxyV0.fetchNullable(toUnProxy)).to
+          .be.null;
       });
     });
 

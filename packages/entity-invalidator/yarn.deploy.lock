@@ -242,7 +242,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/modular-governance-idls@npm:^0.0.8-next.16+ace2c47":
+"@helium/modular-governance-idls@npm:^0.0.8-next.17+7ff2115":
   version: 0.0.8
   resolution: "@helium/modular-governance-idls@npm:0.0.8"
   dependencies:
@@ -252,15 +252,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/nft-proxy-sdk@npm:0.0.8-next.16+ace2c47":
-  version: 0.0.8-next.16
-  resolution: "@helium/nft-proxy-sdk@npm:0.0.8-next.16"
+"@helium/nft-proxy-sdk@npm:0.0.8-next.17+7ff2115":
+  version: 0.0.8-next.17
+  resolution: "@helium/nft-proxy-sdk@npm:0.0.8-next.17"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.2.17
-    "@helium/modular-governance-idls": ^0.0.8-next.16+ace2c47
+    "@helium/modular-governance-idls": ^0.0.8-next.17+7ff2115
     "@solana/spl-token": ^0.3.8
-  checksum: 8fc7d62a301c7e8e94bbe431a937f49de91012182481698287afb5e964537f33f0d12f08a779fa022d64847d763e17204c82a26f48a20c191aa2aec2e068d115
+  checksum: 2199e8a88d03de7683d85976f8f57c14266b4cb7190ab06e75403e97b3a17144a619249ba4bf7e62d404861103fccf6fe08dd4d2571cec0b8104c8f472f62047
   languageName: node
   linkType: hard
 
@@ -326,7 +326,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.7.6
     "@helium/idls": ^0.7.6
-    "@helium/nft-proxy-sdk": 0.0.8-next.16+ace2c47
+    "@helium/nft-proxy-sdk": 0.0.8-next.17+7ff2115
     "@helium/spl-utils": ^0.7.6
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
@@ -544,8 +544,8 @@ __metadata:
   linkType: hard
 
 "@solana/web3.js@npm:^1.78.8":
-  version: 1.91.4
-  resolution: "@solana/web3.js@npm:1.91.4"
+  version: 1.91.6
+  resolution: "@solana/web3.js@npm:1.91.6"
   dependencies:
     "@babel/runtime": ^7.23.4
     "@noble/curves": ^1.2.0
@@ -562,7 +562,7 @@ __metadata:
     node-fetch: ^2.7.0
     rpc-websockets: ^7.5.1
     superstruct: ^0.14.2
-  checksum: 9f6ac2f64ac05043cb367c09d5b4f4b859060618dbffc7a27da35fccdac0be9bd84b83899c9547efedc061fa7e20af283a9bacff01972bd047089809facfbdfe
+  checksum: 95509d651c41abc71ea5732618b9aca3ff0baac7817549e913ade9eb9567e077472c2319cb422675dbeab13a22b26d036d2ce5b621b8786cb38dce076c188ab1
   languageName: node
   linkType: hard
 
