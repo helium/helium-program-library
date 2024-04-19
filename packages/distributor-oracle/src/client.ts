@@ -518,7 +518,7 @@ export async function formTransaction({
     true
   );
 
-  const instructions: TransactionInstruction[] = [];
+  let instructions: TransactionInstruction[] = [];
   const recipientAcc =
     await lazyDistributorProgram.account.recipientV0.fetchNullable(recipient);
   if (!recipientAcc) {
@@ -564,14 +564,7 @@ export async function formTransaction({
       .instruction();
   });
   const ixs = await Promise.all(ixPromises);
-  instructions.push(
-    ...(await withPriorityFees({
-      connection: provider.connection,
-      computeUnits: recipientAcc ? RECIPIENT_EXISTS_CU : MISSING_RECIPIENT_CU,
-      instructions: ixs,
-      basePriorityFee,
-    }))
-  );
+  instructions.push(...ixs);
 
   if (
     recipientAcc &&
@@ -630,12 +623,20 @@ export async function formTransaction({
       .instruction();
     instructions.push(distributeIx);
   }
-  const tx = toVersionedTx(
-    await populateMissingDraftInfo(provider.connection, {
-      instructions,
-      feePayer: payer ? payer : provider.wallet.publicKey,
-    })
-  );
+
+  const fullDraft = await populateMissingDraftInfo(provider.connection, {
+    instructions,
+    feePayer: payer ? payer : provider.wallet.publicKey,
+  });
+  instructions = await withPriorityFees({
+    connection: provider.connection,
+    basePriorityFee,
+    ...fullDraft,
+  });
+  const tx = toVersionedTx({
+    ...fullDraft,
+    instructions,
+  });
   // @ts-ignore
   const oracleUrls = lazyDistributorAcc.oracles.map((x: any) => x.url);
 
@@ -643,7 +644,7 @@ export async function formTransaction({
   if (!skipOracleSign) {
     for (const oracle of oracleUrls) {
       const res = await axios.post(`${oracle}`, {
-        transaction: serTx,
+        transaction: Buffer.from(serTx).toJSON(),
       });
       serTx = Buffer.from(res.data.transaction);
     }
