@@ -71,6 +71,7 @@ pub fn handler<'info>(
     lazy_distributor: ctx.accounts.lazy_distributor.key(),
     bump_seed: ctx.bumps["recipient"],
     destination: Pubkey::default(),
+    reserved: 0,
   });
 
   Ok(())
