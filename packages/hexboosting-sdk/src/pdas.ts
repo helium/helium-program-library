@@ -2,12 +2,12 @@ import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import BN from "bn.js";
 
-const deviceTypeValues = {
-  cbrsIndoor: 0,
-  cbrsOutdoor: 1,
-  wifiIndoor: 2,
-  wifiOutdoor: 3,
-};
+enum DeviceType {
+  cbrsIndoor,
+  cbrsOutdoor,
+  wifiIndoor,
+  wifiOutdoor,
+}
 
 export function boostedHexKey(
   boostConfig: PublicKey,
@@ -18,7 +18,7 @@ export function boostedHexKey(
   const locBuffer = Buffer.alloc(8);
   locBuffer.writeBigUint64LE(BigInt(location.toString()));
   const deviceTypeName = Object.keys(deviceType)[0];
-  let deviceTypeValue = deviceTypeValues[deviceTypeName];
+  let deviceTypeValue = DeviceType[deviceTypeName];
   return PublicKey.findProgramAddressSync(
     [
       Buffer.from("boosted_hex", "utf-8"),
