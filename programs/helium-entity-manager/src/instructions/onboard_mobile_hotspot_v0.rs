@@ -29,7 +29,7 @@ use shared_utils::*;
 #[cfg(feature = "devnet")]
 const PRICE_ORACLE: &str = "BmUdxoioVgoRTontomX8nBjWbnLevtxeuBYaLipP8GTQ";
 #[cfg(not(feature = "devnet"))]
-const PRICE_ORACLE: &str = "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5";
+const PRICE_ORACLE: &str = "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct OnboardMobileHotspotArgsV0 {

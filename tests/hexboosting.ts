@@ -52,7 +52,7 @@ describe("hexboosting", () => {
   let periodLength = 60 * 60 * 24 * 30; // roughly one month
 
   const priceOracle: PublicKey = new PublicKey(
-    "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5"
+    "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx"
   );
 
   let hemProgram: Program<HeliumEntityManager>;

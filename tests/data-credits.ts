@@ -131,7 +131,7 @@ describe("data-credits", () => {
         dcMint,
         payer: me,
         hntPriceOracle: new PublicKey(
-          "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"
+          "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
         ),
       });
     dcKey = (await method.pubkeys()).dataCredits!;
@@ -218,7 +218,7 @@ describe("data-credits", () => {
       const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
       const hntBal = await provider.connection.getTokenAccountBalance(hntAta);
       const pythData = (await provider.connection.getAccountInfo(
-        new PublicKey("7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm")
+        new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33")
       ))!.data;
       const price = parsePriceData(pythData);
       console.log(price);
@@ -254,7 +254,7 @@ describe("data-credits", () => {
         await getAssociatedTokenAddress(hntMint, me)
       );
       const pythData = (await provider.connection.getAccountInfo(
-        new PublicKey("7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm")
+        new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33")
       ))!.data;
       const price = parsePriceData(pythData);
       const approxEndBal =

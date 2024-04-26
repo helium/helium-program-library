@@ -38,7 +38,7 @@ export const heliumEntityManagerResolvers = combineResolvers(
       if (provider.connection.rpcEndpoint.includes("devnet") || provider.connection.rpcEndpoint.includes("test")) {
         return new PublicKey("BmUdxoioVgoRTontomX8nBjWbnLevtxeuBYaLipP8GTQ");
       }
-      return new PublicKey("JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5");
+      return new PublicKey("DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx");
     }
   }),
   resolveIndividual(async ({ path, args, accounts, provider }) => {
