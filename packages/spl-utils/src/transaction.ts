@@ -20,7 +20,7 @@ import {
   VersionedTransaction,
   VersionedTransactionResponse,
 } from "@solana/web3.js";
-import { TransactionCompletionQueue } from "@helium/account-fetch-cache"
+import { TransactionCompletionQueue } from "@helium/account-fetch-cache";
 import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
 import { estimatePrioritizationFee, withPriorityFees } from "./priorityFees";
@@ -748,6 +748,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     basePriorityFee,
     addressLookupTableAddresses,
     computeScaleUp,
+    extraSigners = [],
   }: {
     // Manually specify limit instead of simulating
     computeUnitLimit?: number;
@@ -755,6 +756,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     computeScaleUp?: number;
     basePriorityFee?: number;
     addressLookupTableAddresses?: PublicKey[];
+    extraSigners?: Signer[];
   } = {}
 ): Promise<TransactionDraft[]> {
   let currentTxInstructions: TransactionInstruction[] = [];
@@ -807,6 +809,11 @@ export async function batchInstructionsToTxsWithPriorityFee(
             feePayer: provider.wallet.publicKey,
             recentBlockhash: blockhash,
             addressLookupTables,
+            signers: extraSigners.filter((s) =>
+              currentTxInstructions.some((ix) =>
+                ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
+              )
+            ),
           });
         }
 
@@ -832,6 +839,11 @@ export async function batchInstructionsToTxsWithPriorityFee(
       feePayer: provider.wallet.publicKey,
       recentBlockhash: blockhash,
       addressLookupTables,
+      signers: extraSigners.filter((s) =>
+        currentTxInstructions.some((ix) =>
+          ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
+        )
+      ),
     });
   }
 
