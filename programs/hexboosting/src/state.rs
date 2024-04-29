@@ -43,10 +43,24 @@ pub struct BoostedHexV0 {
   pub boosts_by_period: Vec<u8>,
   // Track changes to the boosted hex so client can pass what version it made a change to
   pub version: u32,
-  pub device_type: DeviceTypeV0,
 }
 
-impl BoostedHexV0 {
+#[account]
+pub struct BoostedHexV1 {
+  pub device_type: DeviceTypeV0,
+  pub boost_config: Pubkey,
+  // Track changes to the boosted hex so client can pass what version it made a change to
+  pub version: u32,
+  pub location: u64,
+  // 0 if the boosting has not yet started. Avoding using an option here to keep serialization length
+  // consistent
+  pub start_ts: i64,
+  pub bump_seed: u8,
+  /// Each entry represents the boost multiplier for a given period
+  pub boosts_by_period: Vec<u8>,
+}
+
+impl BoostedHexV1 {
   pub fn is_expired(&self, boost_config: &BoostConfigV0) -> bool {
     if self.start_ts == 0 {
       false

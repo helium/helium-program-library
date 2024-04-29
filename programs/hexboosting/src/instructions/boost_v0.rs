@@ -8,7 +8,7 @@ use mobile_entity_manager::CarrierV0;
 use pyth_sdk_solana::load_price_feed_from_account_info;
 use shared_utils::resize_to_fit;
 
-use crate::{BoostConfigV0, BoostedHexV0};
+use crate::{BoostConfigV0, BoostedHexV1};
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
 
@@ -31,7 +31,7 @@ pub struct BoostAmountV0 {
 
 fn get_space(boosted_hex: &AccountInfo) -> usize {
   if boosted_hex.data_len() == 0 {
-    8 + 60 + std::mem::size_of::<BoostedHexV0>()
+    8 + 60 + std::mem::size_of::<BoostedHexV1>()
   } else {
     boosted_hex.data_len()
   }
@@ -74,7 +74,7 @@ pub struct BoostV0<'info> {
     bump,
     constraint = boosted_hex.version == args.version @ ErrorCode::InvalidVersion,
   )]
-  pub boosted_hex: Box<Account<'info, BoostedHexV0>>,
+  pub boosted_hex: Box<Account<'info, BoostedHexV1>>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub associated_token_program: Program<'info, AssociatedToken>,
