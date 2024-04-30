@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.7.11",
+  "version": "0.7.12",
   "description": "React hooks for helium",
   "repository": {
     "type": "git",
@@ -32,8 +32,8 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
-    "@helium/account-fetch-cache": "^0.7.11",
-    "@helium/account-fetch-cache-hooks": "^0.7.11",
+    "@helium/account-fetch-cache": "^0.7.12",
+    "@helium/account-fetch-cache-hooks": "^0.7.12",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.78.8",
     "bs58": "^4.0.1",
