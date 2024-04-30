@@ -82,7 +82,7 @@ impl<'info> TransferV0<'info> {
 ///
 /// The primary usecases are:
 /// - consolidating multiple small deposit entries into a single big one for cleanup
-/// - transfering a small part of a big "constant" lockup position into a "cliff"
+/// - transferring a small part of a big "constant" lockup position into a "cliff"
 ///   locked position to start the unlocking process (reset_lockup could only
 ///   change the whole position to "cliff")
 pub fn handler(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {

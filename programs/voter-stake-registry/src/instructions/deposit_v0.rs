@@ -53,7 +53,7 @@ pub struct DepositArgsV0 {
 
 /// Adds tokens to a deposit entry.
 ///
-/// Tokens will be transfered from deposit_token to vault using the deposit_authority.
+/// Tokens will be transferred from deposit_token to vault using the deposit_authority.
 ///
 /// The deposit entry must have been initialized with create_deposit_entry.
 ///

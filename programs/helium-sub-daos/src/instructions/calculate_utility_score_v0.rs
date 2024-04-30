@@ -63,7 +63,7 @@ pub fn handler(
   let end_of_epoch_ts = i64::try_from(args.epoch + 1).unwrap() * EPOCH_LENGTH;
   let curr_epoch = current_epoch(Clock::get()?.unix_timestamp);
 
-  // Set total rewards, accounting for net emmissions by counting
+  // Set total rewards, accounting for net emissions by counting
   // burned hnt since last supply setting.
   let curr_supply = ctx.accounts.hnt_mint.supply;
   let mut prev_supply = curr_supply;

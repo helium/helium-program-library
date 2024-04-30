@@ -30,7 +30,7 @@ pub struct PositionV0 {
 }
 
 impl PositionV0 {
-  // # Voting Power Caclulation
+  // # Voting Power Calculation
   //
   // Returns the voting power for the position, giving locked tokens boosted
   // voting power that scales linearly with the lockup time.

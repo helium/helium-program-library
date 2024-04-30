@@ -349,7 +349,7 @@ describe("voter-stake-registry", () => {
             Math.min((SECS_PER_DAY * (200 - 60)) / MAX_LOCKUP, 1) * SCALE),
       },
       {
-        name: "constant 1 positon (outside of genesis)",
+        name: "constant 1 position (outside of genesis)",
         delay: 0, // days
         fastForward: 201, // days
         positions: [
