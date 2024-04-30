@@ -135,22 +135,22 @@ helium-admin create-subdao -u $SOLANA_URL \
                            --crank $ORACLE_CRANK \
                            --switchboardNetwork $NETWORK
 
-helium-admin create-maker -u $SOLANA_URL \
-                          --wallet $ANCHOR_WALLET \
-                          --symbol IOT \
-                          --subdaoMint $(solana address -k keypairs/iot.json) \
-                          --fromFile makers.json \
-                          --multisig $MULTISIG \
-                          --merkleBasePath keypairs \
-                          --executeTransaction
-helium-admin create-maker -u $SOLANA_URL \
-                          --wallet $ANCHOR_WALLET \
-                          --symbol MOBILE \
-                          --subdaoMint $(solana address -k keypairs/mobile.json) \
-                          --fromFile makers-mobile.json \
-                          --multisig $MULTISIG \
-                          --merkleBasePath keypairs \
-                          --executeTransaction
+helium-admin create-and-approve-makers -u $SOLANA_URL \
+                                       --wallet $ANCHOR_WALLET \
+                                       --symbol IOT \
+                                       --subdaoMint $(solana address -k keypairs/iot.json) \
+                                       --fromFile makers.json \
+                                       --multisig $MULTISIG \
+                                       --merkleBasePath keypairs \
+                                       --executeTransaction
+helium-admin create-and-approve-makers -u $SOLANA_URL \
+                                       --wallet $ANCHOR_WALLET \
+                                       --symbol MOBILE \
+                                       --subdaoMint $(solana address -k keypairs/mobile.json) \
+                                       --fromFile makers-mobile.json \
+                                       --multisig $MULTISIG \
+                                       --merkleBasePath keypairs \
+                                       --executeTransaction
 
 node --expose-gc --max_old_space_size=15000 packages/migration-service/lib/cjs/gen-transactions.js \
                                 --wallet $ANCHOR_WALLET \
