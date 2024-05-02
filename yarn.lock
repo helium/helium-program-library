@@ -637,15 +637,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@npm:^0.6.42":
-  version: 0.6.42
-  resolution: "@helium/account-fetch-cache@npm:0.6.42"
-  dependencies:
-    "@solana/web3.js": ^1.78.4
-  checksum: 76547e0d844a901dac8aee14a87e407cb8c9f615cd48d682dbaf9f6cca7c399a215af72803b15e5a41eafe8aac9eac749b7fb73b1c8652e5e681b4e1bfee0903
-  languageName: node
-  linkType: hard
-
 "@helium/account-postgres-sink-service@workspace:packages/account-postgres-sink-service":
   version: 0.0.0-use.local
   resolution: "@helium/account-postgres-sink-service@workspace:packages/account-postgres-sink-service"
@@ -758,18 +749,6 @@ __metadata:
   peerDependencies:
     "@coral-xyz/anchor": ^0.28.0
   checksum: b20f52072bb8e1cb097e951c98a66149989035a58d3f4de1998c3043a1e04e36b6dee2e0760b99d0fbd5fa4e47f499972ad17f6560e1f3c7424e96a1e35343a9
-  languageName: node
-  linkType: hard
-
-"@helium/anchor-resolvers@npm:^0.6.42":
-  version: 0.6.42
-  resolution: "@helium/anchor-resolvers@npm:0.6.42"
-  dependencies:
-    "@solana/spl-token": ^0.3.8
-    "@solana/web3.js": ^1.78.4
-  peerDependencies:
-    "@coral-xyz/anchor": ^0.28.0
-  checksum: 25ceab8b1cb6a68fd95c5bf2d57f7a5faf5b473504d1e056588f0f6f8cf21401bb9edd84fb5df6d360af6198f1395d02f1a2e40b57f8da164677e8fb741d110a
   languageName: node
   linkType: hard
 
@@ -1151,8 +1130,8 @@ __metadata:
     "@fastify/cors": ^8.1.1
     "@fastify/static": ^6
     "@helium/organization-sdk": ^0.0.5
-    "@helium/spl-utils": ^0.6.2
-    "@helium/voter-stake-registry-sdk": ^0.6.2
+    "@helium/spl-utils": ^0.7.6
+    "@helium/voter-stake-registry-sdk": ^0.7.6
     "@types/bn.js": ^5.1.1
     dotenv: ^16.0.3
     fastify: ^4.13.0
@@ -1221,19 +1200,6 @@ __metadata:
     borsh: ^0.7.0
     bs58: ^4.0.1
   checksum: 66a021a9953cf0a96f0eaf8932a2006286c266cc323f171eedf2bc18a94d55ad035cc7da9e21c99dc70fc77b1681630382a55999a2f40228f33611d7621a0c7c
-  languageName: node
-  linkType: hard
-
-"@helium/idls@npm:^0.6.42":
-  version: 0.6.42
-  resolution: "@helium/idls@npm:0.6.42"
-  dependencies:
-    "@coral-xyz/anchor": ^0.28.0
-    "@solana/web3.js": ^1.78.4
-    bn.js: ^5.2.0
-    borsh: ^0.7.0
-    bs58: ^4.0.1
-  checksum: 7285ccb1b171c2490f5d4071ff21d37c2ecccbd02d0499c007ee32b185c628b85c642cfcc3a020fe899434cbefcf45dbfacb69b9d6024c3be10576d43e9c2039
   languageName: node
   linkType: hard
 
@@ -1633,26 +1599,6 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/spl-utils@npm:^0.6.2":
-  version: 0.6.42
-  resolution: "@helium/spl-utils@npm:0.6.42"
-  dependencies:
-    "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.6.42
-    "@helium/address": ^4.10.2
-    "@helium/anchor-resolvers": ^0.6.42
-    "@metaplex-foundation/mpl-token-metadata": ^2.10.0
-    "@solana/spl-account-compression": ^0.1.7
-    "@solana/spl-token": ^0.3.8
-    "@solana/web3.js": ^1.78.4
-    axios: ^1.5.0
-    bn.js: ^5.2.0
-    borsh: ^0.7.0
-    bs58: ^4.0.1
-  checksum: 2b1bf38d34b4fe645fdf9b84efcd6ff06ba7bc2ba396fd3338258406809220e4a03073bd0e6ea370c8b6c1b085734b9c11c35258c2c5672951f01342c344d140
-  languageName: node
-  linkType: hard
-
 "@helium/state-controller-sdk@npm:0.0.8-next.17+7ff2115":
   version: 0.0.8-next.17
   resolution: "@helium/state-controller-sdk@npm:0.0.8-next.17"
@@ -1784,21 +1730,6 @@ __metadata:
     typescript: ^5.2.2
   languageName: unknown
   linkType: soft
-
-"@helium/voter-stake-registry-sdk@npm:^0.6.2":
-  version: 0.6.42
-  resolution: "@helium/voter-stake-registry-sdk@npm:0.6.42"
-  dependencies:
-    "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.6.42
-    "@helium/idls": ^0.6.42
-    "@metaplex-foundation/mpl-token-metadata": ^2.10.0
-    "@solana/spl-token": ^0.3.8
-    bn.js: ^5.2.0
-    bs58: ^4.0.1
-  checksum: 64985aa25b29e05e24b624793bd2a925181228aa87a9f913215dfe380e42f3798e91d2353bba2c45df1a7953e40ed4c7c81574508cca84765306ba7f390a6b4f
-  languageName: node
-  linkType: hard
 
 "@helium/vsr-metadata-service@workspace:packages/vsr-metadata-service":
   version: 0.0.0-use.local

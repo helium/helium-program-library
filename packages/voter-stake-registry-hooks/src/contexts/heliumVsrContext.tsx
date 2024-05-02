@@ -99,14 +99,19 @@ export const HeliumVsrStateProvider: React.FC<{
     () => mint && getRegistrarKey(mint),
     [mint?.toBase58()]
   );
+  const urlVoteService = useMemo(() => {
+    return heliumVoteUri && registrarKey
+      ? new VoteService({
+          baseURL: heliumVoteUri,
+          registrar: registrarKey,
+        })
+      : undefined;
+  }, [heliumVoteUri, registrarKey]);
   // Allow vote service either from native rpc or from api
   const { result: voteService } = useAsync(async () => {
     if (registrarKey) {
-      if (heliumVoteUri) {
-        return new VoteService({
-          baseURL: heliumVoteUri,
-          registrar: registrarKey,
-        });
+      if (urlVoteService) {
+        return urlVoteService;
       } else {
         const program = await init(provider as any);
         const nftProxyProgram = await initNftProxy(provider as any);
@@ -117,7 +122,7 @@ export const HeliumVsrStateProvider: React.FC<{
         });
       }
     }
-  }, [provider, registrarKey]);
+  }, [provider, registrarKey, urlVoteService]);
   const args = useMemo(
     () =>
       wallet &&
@@ -152,9 +157,9 @@ export const HeliumVsrStateProvider: React.FC<{
   const proxyAccountsByAsset = useMemo(() => {
     return proxyAccounts?.reduce((acc, del) => {
       acc[del.asset.toBase58()] = del;
-      return acc
-    }, {} as Record<string, ProxyV0>)
-  }, [proxyAccounts])
+      return acc;
+    }, {} as Record<string, ProxyV0>);
+  }, [proxyAccounts]);
   const myOwnedPositionsEndIdx = result?.positionKeys?.length;
   // Assume that my positions are a small amount, so we don't need to say they're static
   const { accounts: myPositions, loading: loadingMyPositions } = usePositions(
@@ -169,82 +174,79 @@ export const HeliumVsrStateProvider: React.FC<{
   );
   const now = useSolanaUnixNow(60 * 5 * 1000);
 
-  const {
-    amountLocked,
-    votingPower,
-    positionsWithMeta,
-    amountProxyLocked,
-  } = useMemo(() => {
-    if (positions && registrar && delegatedAccounts && now) {
-      let amountLocked = new BN(0);
-      let amountProxyLocked = new BN(0);
-      let votingPower = new BN(0);
-      const mintCfgs = registrar?.votingMints;
-      const positionsWithMeta = positions
-        .map((position, idx) => {
-          if (position && position.info) {
-            const isDelegated = !!delegatedAccounts?.[idx]?.info;
-            const proxy = proxyAccountsByAsset?.[position.info.mint.toBase58()];
-            const delegatedSubDao = isDelegated
-              ? delegatedAccounts[idx]?.info?.subDao
-              : null;
-            const hasRewards = isDelegated
-              ? delegatedAccounts[idx]!.info!.lastClaimedEpoch.add(
-                  new BN(1)
-                ).lt(new BN(now).div(new BN(EPOCH_LENGTH)))
-              : false;
+  const { amountLocked, votingPower, positionsWithMeta, amountProxyLocked } =
+    useMemo(() => {
+      if (positions && registrar && delegatedAccounts && now) {
+        let amountLocked = new BN(0);
+        let amountProxyLocked = new BN(0);
+        let votingPower = new BN(0);
+        const mintCfgs = registrar?.votingMints;
+        const positionsWithMeta = positions
+          .map((position, idx) => {
+            if (position && position.info) {
+              const isDelegated = !!delegatedAccounts?.[idx]?.info;
+              const proxy =
+                proxyAccountsByAsset?.[position.info.mint.toBase58()];
+              const delegatedSubDao = isDelegated
+                ? delegatedAccounts[idx]?.info?.subDao
+                : null;
+              const hasRewards = isDelegated
+                ? delegatedAccounts[idx]!.info!.lastClaimedEpoch.add(
+                    new BN(1)
+                  ).lt(new BN(now).div(new BN(EPOCH_LENGTH)))
+                : false;
 
-            const posVotingPower = calcPositionVotingPower({
-              position: position?.info || null,
-              registrar,
-              unixNow: new BN(now),
-            });
+              const posVotingPower = calcPositionVotingPower({
+                position: position?.info || null,
+                registrar,
+                unixNow: new BN(now),
+              });
 
-            const isProxiedToMe = idx >= (myOwnedPositionsEndIdx || 0);
-            if (isProxiedToMe) {
-              amountProxyLocked = amountProxyLocked.add(
-                position.info.amountDepositedNative
-              );
-            } else {
-              amountLocked = amountLocked.add(
-                position.info.amountDepositedNative
-              );
+              const isProxiedToMe = idx >= (myOwnedPositionsEndIdx || 0);
+              if (isProxiedToMe) {
+                amountProxyLocked = amountProxyLocked.add(
+                  position.info.amountDepositedNative
+                );
+              } else {
+                amountLocked = amountLocked.add(
+                  position.info.amountDepositedNative
+                );
+              }
+
+              votingPower = votingPower.add(posVotingPower);
+
+              return {
+                ...position.info,
+                pubkey: position?.publicKey,
+                isDelegated,
+                delegatedSubDao,
+                hasRewards,
+                hasGenesisMultiplier: position.info.genesisEnd.gt(new BN(now)),
+                votingPower: posVotingPower,
+                votingMint: mintCfgs[position.info.votingMintConfigIdx],
+                isProxiedToMe,
+                proxy,
+              } as PositionWithMeta;
             }
+          })
+          .filter(truthy);
 
-            votingPower = votingPower.add(posVotingPower);
+        return {
+          positionsWithMeta,
+          amountLocked,
+          votingPower,
+          amountProxyLocked,
+        };
+      }
 
-            return {
-              ...position.info,
-              pubkey: position?.publicKey,
-              isDelegated,
-              delegatedSubDao,
-              hasRewards,
-              hasGenesisMultiplier: position.info.genesisEnd.gt(new BN(now)),
-              votingPower: posVotingPower,
-              votingMint: mintCfgs[position.info.votingMintConfigIdx],
-              isProxiedToMe,
-              proxy,
-            } as PositionWithMeta;
-          }
-        })
-        .filter(truthy);
-
-      return {
-        positionsWithMeta,
-        amountLocked,
-        votingPower,
-        amountProxyLocked,
-      };
-    }
-
-    return {};
-  }, [
-    myOwnedPositionsEndIdx,
-    positions,
-    registrar,
-    delegatedAccounts,
-    proxyAccounts,
-  ]);
+      return {};
+    }, [
+      myOwnedPositionsEndIdx,
+      positions,
+      registrar,
+      delegatedAccounts,
+      proxyAccounts,
+    ]);
 
   const sortedPositions = useMemo(
     () =>

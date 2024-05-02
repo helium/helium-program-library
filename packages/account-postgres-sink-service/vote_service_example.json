@@ -11,7 +11,7 @@
     {
       "programId": "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p",
       "accounts": [
-        { "type": "DelegationV0", "table": "delegations", "schema": "public" }
+        { "type": "ProxyV0", "table": "proxy_assignments", "schema": "public" }
       ]
     },
     {

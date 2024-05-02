@@ -1,6 +1,11 @@
 import { Program } from "@coral-xyz/anchor";
 import { PROGRAM_ID, proxyKey, init } from "@helium/nft-proxy-sdk";
-import { truthy, batchParallelInstructions, Status } from "@helium/spl-utils";
+import {
+  truthy,
+  batchParallelInstructions,
+  Status,
+  batchParallelInstructionsWithPriorityFee,
+} from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
@@ -42,19 +47,16 @@ export const useUnassignProxies = () => {
             position.mint,
             provider.wallet.publicKey
           )[0];
-          let proxy =
-            await nftProxyProgram.account.proxyV0.fetchNullable(
-              currentProxy
-            );
+          let proxy = await nftProxyProgram.account.proxyV0.fetchNullable(
+            currentProxy
+          );
           if (!proxy) {
             currentProxy = proxyKey(
               registrar.proxyConfig,
               position.mint,
               PublicKey.default
             )[0];
-            proxy = await nftProxyProgram.account.proxyV0.fetch(
-              currentProxy
-            );
+            proxy = await nftProxyProgram.account.proxyV0.fetch(currentProxy);
           }
           const toUndelegate = await voteService.getProxiesForWallet(
             position.pubkey,
@@ -91,14 +93,16 @@ export const useUnassignProxies = () => {
         if (onInstructions) {
           await onInstructions(instructions);
         } else {
-          await batchParallelInstructions({
+          await batchParallelInstructionsWithPriorityFee(
             provider,
             instructions,
-            onProgress,
-            triesRemaining: 10,
-            extraSigners: [],
-            maxSignatureBatch,
-          });
+            {
+              onProgress,
+              triesRemaining: 10,
+              extraSigners: [],
+              maxSignatureBatch,
+            }
+          );
         }
         // Wait a couple seconds for changes to hit pg-sink
         setTimeout(refetch, 2 * 1000);

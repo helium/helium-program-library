@@ -83,6 +83,18 @@ address = "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p" # NFT Proxy
 address = "CNjepJnCPddZwd8xGS3M2QpZuCbfVRNvi3jfBehKHKHw" # NFT Proxy IDL
 
 [[test.validator.clone]]
+address = "orgdXvHVLkWgBYerptASkAwkZAE563CJUu717dMNx5f" # Org program
+
+[[test.validator.clone]]
+address = "CjVhwk3gdDXB8iUZCUP9M6QaRvoBGkM7FX9qAf6Qm4sG" # Org program IDL
+
+[[test.validator.clone]]
+address = "stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM" # State controller program
+
+[[test.validator.clone]]
+address = "GPQNABq6s63uqzHRwZN9e2GcxtzG4yLP5AnJer7DkB9E" # State controller IDL
+
+[[test.validator.clone]]
 address = "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5" # Mobile price oracle
 
 # Pyth price oracle

@@ -4,7 +4,7 @@ import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import { PublicKey } from "@solana/web3.js";
 import axios, { AxiosInstance } from "axios";
 
-export type Proxy = {
+export type ProxyAssignment = {
   owner: string;
   nextOwner: string;
   index: number;
@@ -16,7 +16,7 @@ export type Proxy = {
   expirationTime: string;
 };
 
-export type ProxyDef = {
+export type Proxy = {
   name: string;
   image: string;
   wallet: string;
@@ -28,6 +28,9 @@ export type EnhancedProxyData = {
   numDelegations: string;
   delegatedVeTokens: string;
   percent: string;
+  numProposalsVoted: string;
+  numProxies: string;
+  lastVotedAt: Date | null;
 };
 
 export type EnhancedProxy = Proxy & EnhancedProxyData;
@@ -63,7 +66,7 @@ export class VoteService {
   private client: AxiosInstance | undefined;
   private program: Program<VoterStakeRegistry> | undefined;
   private nftProxyProgram: Program<NftProxy> | undefined;
-  private registrar: PublicKey;
+  registrar: PublicKey;
 
   // Wrapper arÍound vsr bulk operations that either uses
   // an API or gPA calls
@@ -84,13 +87,12 @@ export class VoteService {
     this.program = program;
     this.nftProxyProgram = nftProxyProgram;
     this.registrar = registrar;
+
+    this.mapRoutes = this.mapRoutes.bind(this)
   }
 
-  getAssetUrl(baseUrl: string) {
-    return baseUrl.replace(
-      "./",
-      `${this.client!.getUri()}/helium-vote-proxies/`
-    );
+  assetUrl(url: string) {
+    return url.replace("\.\/", `${this.client!.getUri()}/helium-vote-proxies/`);
   }
 
   async getVotesForWallet({
@@ -105,7 +107,7 @@ export class VoteService {
     if (this.client) {
       return (
         await this.client.get(
-          `/registrars/${this.registrar.toBase58()}/votes/${wallet.toBase58()}`,
+          `/v1/registrars/${this.registrar.toBase58()}/votes/${wallet.toBase58()}`,
           {
             params: { limit, page },
           }
@@ -119,10 +121,10 @@ export class VoteService {
   async getProxiesForWallet(
     wallet: PublicKey,
     minProxyIndex: number = 0
-  ): Promise<Proxy[]> {
+  ): Promise<ProxyAssignment[]> {
     if (this.client) {
       return (
-        await this.client.get(`/proxies`, {
+        await this.client.get(`/v1/proxy-assignments`, {
           params: {
             limit: 10000,
             owner: wallet.toBase58(),
@@ -172,10 +174,10 @@ export class VoteService {
   async getPositionProxies(
     position: PublicKey,
     minIndex: number
-  ): Promise<Proxy[]> {
+  ): Promise<ProxyAssignment[]> {
     if (this.client) {
       return (
-        await this.client.get(`/proxys`, {
+        await this.client.get(`/v1/proxy-assignments`, {
           params: { limit: 10000, position, minIndex },
         })
       ).data;
@@ -231,12 +233,12 @@ export class VoteService {
       throw new Error("This operation is not supported without an API");
     }
     const response = await this.client.get(
-      `/registrars/${this.registrar.toBase58()}/proxies`,
+      `/v1/registrars/${this.registrar.toBase58()}/proxies`,
       {
         params: { page, limit },
       }
     );
-    return response.data;
+    return response.data.map(this.mapRoutes);
   }
 
   async getProxy(wallet: string): Promise<EnhancedProxy> {
@@ -244,9 +246,9 @@ export class VoteService {
       throw new Error("This operation is not supported without an API");
     }
     const response = await this.client.get(
-      `/registrars/${this.registrar.toBase58()}/proxies/${wallet}`
+      `/v1/registrars/${this.registrar.toBase58()}/proxies/${wallet}`
     );
-    return response.data;
+    return this.mapRoutes(response.data);
   }
 
   async searchProxies({ query }: { query: string }): Promise<Proxy[]> {
@@ -255,11 +257,19 @@ export class VoteService {
     }
 
     const response = await this.client.get(
-      `/registrar/${this.registrar.toBase58()}/proxies/search`,
+      `/v1/registrars/${this.registrar.toBase58()}/proxies/search`,
       {
         params: { query },
       }
     );
-    return response.data;
+    return response.data.map(this.mapRoutes);
+  }
+
+  mapRoutes<T extends Proxy>(data: T): T {
+    return {
+      ...data,
+      image: this.assetUrl(data.image),
+      detail: this.assetUrl(data.detail),
+    };
   }
 }

@@ -284,7 +284,7 @@ ProxyRegistrar.init(
   }
 );
 
-export class Delegation extends Model {
+export class ProxyAssignment extends Model {
   declare address: string;
   declare owner: string;
   declare nextOwner: string;
@@ -294,7 +294,7 @@ export class Delegation extends Model {
   declare rentRefund: string;
   declare bumpSeed: number;
 }
-Delegation.init(
+ProxyAssignment.init(
   {
     address: {
       type: DataTypes.STRING,
@@ -311,8 +311,8 @@ Delegation.init(
   },
   {
     sequelize,
-    modelName: "delegation",
-    tableName: "delegations",
+    modelName: "proxy_assignment",
+    tableName: "proxy_assignments",
     underscored: true,
     timestamps: false,
   }
@@ -320,9 +320,9 @@ Delegation.init(
 
 
 export function setRelations() {
-  Delegation.belongsTo(Position, { foreignKey: "asset", targetKey: "asset" });
-  Position.hasMany(Delegation, { foreignKey: "asset", sourceKey: "asset" });
-  Proxy.hasMany(Delegation, { foreignKey: "owner", sourceKey: "wallet" });
+  ProxyAssignment.belongsTo(Position, { foreignKey: "asset", targetKey: "asset" });
+  Position.hasMany(ProxyAssignment, { foreignKey: "asset", sourceKey: "asset" });
+  Proxy.hasMany(ProxyAssignment, { foreignKey: "owner", sourceKey: "wallet" });
   ProxyRegistrar.hasMany(Proxy, { foreignKey: "wallet", sourceKey: "wallet" });
   Proxy.hasMany(ProxyRegistrar, { foreignKey: "wallet", sourceKey: "wallet" });
 }

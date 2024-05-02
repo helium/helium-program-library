@@ -3,15 +3,15 @@ import { PROGRAM_ID, init } from "@helium/nft-proxy-sdk";
 import {
   Status,
   batchParallelInstructions,
-  sendInstructions,
+  batchParallelInstructionsWithPriorityFee,
 } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import BN from "bn.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
-import BN from "bn.js";
 
-export const useVotingDelegatePositions = () => {
+export const useAssignProxies = () => {
   const { provider, registrar, refetch } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
@@ -71,14 +71,16 @@ export const useVotingDelegatePositions = () => {
         if (onInstructions) {
           await onInstructions(instructions);
         } else {
-          await batchParallelInstructions({
+          await batchParallelInstructionsWithPriorityFee(
             provider,
             instructions,
-            onProgress,
-            triesRemaining: 10,
-            extraSigners: [],
-            maxSignatureBatch,
-          });
+            {
+              onProgress,
+              triesRemaining: 10,
+              extraSigners: [],
+              maxSignatureBatch,
+            }
+          );
         }
 
         // Wait a couple seconds for changes to hit pg-sink
@@ -90,6 +92,6 @@ export const useVotingDelegatePositions = () => {
   return {
     error,
     loading,
-    proxiedPositions: execute,
+    assignProxies: execute,
   };
 };
