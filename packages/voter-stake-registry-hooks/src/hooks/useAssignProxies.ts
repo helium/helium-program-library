@@ -1,9 +1,10 @@
 import { Program } from "@coral-xyz/anchor";
-import { PROGRAM_ID, init } from "@helium/nft-proxy-sdk";
+import { PROGRAM_ID, init, proxyKey } from "@helium/nft-proxy-sdk";
 import {
   Status,
   batchParallelInstructions,
   batchParallelInstructionsWithPriorityFee,
+  truthy,
 } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
@@ -12,7 +13,7 @@ import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 
 export const useAssignProxies = () => {
-  const { provider, registrar, refetch } = useHeliumVsrState();
+  const { provider, registrar, refetch, voteService } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       positions,
@@ -40,11 +41,59 @@ export const useAssignProxies = () => {
 
       if (loading) return;
 
-      if (isInvalid || !nftProxyProgram || !registrar) {
+      if (isInvalid || !nftProxyProgram || !registrar || !voteService) {
         throw new Error("Unable to voting delegate, Invalid params");
       } else {
         const instructions: TransactionInstruction[] = [];
         for (const position of positions) {
+          let currentProxy = proxyKey(
+            registrar.proxyConfig,
+            position.mint,
+            provider.wallet.publicKey
+          )[0];
+          let proxy = await nftProxyProgram.account.proxyV0.fetchNullable(
+            currentProxy
+          );
+          if (!proxy) {
+            currentProxy = proxyKey(
+              registrar.proxyConfig,
+              position.mint,
+              PublicKey.default
+            )[0];
+            proxy = await nftProxyProgram.account.proxyV0.fetch(currentProxy);
+          }
+          if (proxy && !proxy.nextOwner?.equals(PublicKey.default)) {
+            const toUndelegate =
+              await voteService.getProxyAssignmentsForPosition(
+                position.pubkey,
+                proxy.index
+              );
+            const ixs = (
+              await Promise.all(
+                toUndelegate.map((proxy, index) => {
+                  // Can't undelegate the 1st one (Pubkey.default)
+                  if (index == toUndelegate.length - 1) {
+                    return Promise.resolve(undefined);
+                  }
+
+                  const prevProxy = new PublicKey(
+                    toUndelegate[index + 1].address
+                  );
+                  return nftProxyProgram.methods
+                    .unassignProxyV0()
+                    .accounts({
+                      asset: position.mint,
+                      prevProxy,
+                      currentProxy,
+                      proxy: new PublicKey(proxy.address),
+                    })
+                    .instruction();
+                })
+              )
+            ).filter(truthy);
+
+            instructions.push(...ixs);
+          }
           const {
             instruction,
             pubkeys: { nextProxy },

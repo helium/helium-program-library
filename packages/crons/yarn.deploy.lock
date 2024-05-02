@@ -204,11 +204,11 @@ __metadata:
     "@helium/organization-sdk": ^0.0.8
     "@helium/price-oracle-sdk": ^0.7.12
     "@helium/proposal-sdk": ^0.0.8
-    "@helium/rewards-oracle-sdk": ^0.7.6
-    "@helium/spl-utils": ^0.7.6
+    "@helium/rewards-oracle-sdk": ^0.7.12
+    "@helium/spl-utils": ^0.7.12
     "@helium/state-controller-sdk": 0.0.8-next.17+7ff2115
-    "@helium/treasury-management-sdk": ^0.7.6
-    "@helium/voter-stake-registry-sdk": ^0.7.6
+    "@helium/treasury-management-sdk": ^0.7.12
+    "@helium/voter-stake-registry-sdk": ^0.7.12
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.78.8
     "@types/bn.js": ^5.1.0
@@ -407,7 +407,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/no-emit-sdk@^0.7.6":
+"@helium/no-emit-sdk@^0.7.12":
   version: 0.0.0-use.local
   resolution: "@helium/no-emit-sdk@workspace:packages/no-emit-sdk"
   dependencies:
@@ -532,10 +532,10 @@ __metadata:
   resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.7.6
-    "@helium/idls": ^0.7.6
+    "@helium/anchor-resolvers": ^0.7.12
+    "@helium/idls": ^0.7.12
     "@helium/nft-proxy-sdk": 0.0.8-next.17+7ff2115
-    "@helium/spl-utils": ^0.7.6
+    "@helium/spl-utils": ^0.7.12
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     bn.js: ^5.2.0

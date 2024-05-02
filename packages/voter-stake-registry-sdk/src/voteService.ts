@@ -88,11 +88,11 @@ export class VoteService {
     this.nftProxyProgram = nftProxyProgram;
     this.registrar = registrar;
 
-    this.mapRoutes = this.mapRoutes.bind(this)
+    this.mapRoutes = this.mapRoutes.bind(this);
   }
 
   assetUrl(url: string) {
-    return url.replace("\.\/", `${this.client!.getUri()}/helium-vote-proxies/`);
+    return url.replace("./", `${this.client!.getUri()}/helium-vote-proxies/`);
   }
 
   async getVotesForWallet({
@@ -118,7 +118,62 @@ export class VoteService {
     }
   }
 
-  async getProxiesForWallet(
+  async getProxyAssignmentsForPosition(
+    position: PublicKey,
+    minProxyIndex: number = 0
+  ): Promise<ProxyAssignment[]> {
+    if (this.client) {
+      return (
+        await this.client.get(`/v1/proxy-assignments`, {
+          params: {
+            limit: 10000,
+            asset: position.toBase58(),
+            minIndex: minProxyIndex,
+          },
+        })
+      ).data;
+    }
+
+    if (this.nftProxyProgram && this.program) {
+      const registrar = await this.program.account.registrar.fetch(
+        this.registrar
+      );
+      const positionAcc = await this.program.account.positionV0.fetch(position)
+
+      return (
+        await this.nftProxyProgram.account.proxyV0.all([
+          {
+            memcmp: {
+              offset: 8 + 32 + 32,
+              bytes: positionAcc.mint.toBase58(),
+            },
+          },
+          {
+            memcmp: {
+              offset: 8 + 32,
+              bytes: registrar.proxyConfig.toBase58(),
+            },
+          },
+        ])
+      )
+        .sort((a, b) => b.account.index - a.account.index)
+        .map((a) => ({
+          owner: a.account.owner.toBase58(),
+          nextOwner: a.account.nextOwner.toBase58(),
+          index: a.account.index,
+          address: a.publicKey.toBase58(),
+          asset: a.account.asset.toBase58(),
+          proxyConfig: a.account.proxyConfig.toBase58(),
+          rentRefund: a.account.rentRefund.toBase58(),
+          bumpSeed: a.account.bumpSeed,
+          expirationTime: a.account.expirationTime.toString(),
+        }));
+    } else {
+      throw new Error("No nft proxy program or api url");
+    }
+  }
+
+  async getProxyAssignmentsForWallet(
     wallet: PublicKey,
     minProxyIndex: number = 0
   ): Promise<ProxyAssignment[]> {

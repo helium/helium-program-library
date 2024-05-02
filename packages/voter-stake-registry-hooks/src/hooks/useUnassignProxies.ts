@@ -58,7 +58,7 @@ export const useUnassignProxies = () => {
             )[0];
             proxy = await nftProxyProgram.account.proxyV0.fetch(currentProxy);
           }
-          const toUndelegate = await voteService.getProxiesForWallet(
+          const toUndelegate = await voteService.getProxyAssignmentsForPosition(
             position.pubkey,
             proxy.index
           );

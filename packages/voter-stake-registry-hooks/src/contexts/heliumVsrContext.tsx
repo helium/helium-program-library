@@ -155,8 +155,8 @@ export const HeliumVsrStateProvider: React.FC<{
 
   const proxyAccounts = result?.proxies;
   const proxyAccountsByAsset = useMemo(() => {
-    return proxyAccounts?.reduce((acc, del) => {
-      acc[del.asset.toBase58()] = del;
+    return proxyAccounts?.reduce((acc, prox) => {
+      acc[prox.asset.toBase58()] = prox;
       return acc;
     }, {} as Record<string, ProxyV0>);
   }, [proxyAccounts]);
@@ -165,12 +165,12 @@ export const HeliumVsrStateProvider: React.FC<{
   const { accounts: myPositions, loading: loadingMyPositions } = usePositions(
     result?.positionKeys
   );
-  // Delegated positions may be a lot, set to static
-  const { accounts: delegatedPositions, loading: loadingDelPositions } =
+  // Proxied positions may be a lot, set to static
+  const { accounts: proxiedPositions, loading: loadingDelPositions } =
     usePositions(result?.proxiedPositionKeys, true);
   const positions = useMemo(
-    () => [...(myPositions || []), ...(delegatedPositions || [])],
-    [myPositions, delegatedPositions]
+    () => [...(myPositions || []), ...(proxiedPositions || [])],
+    [myPositions, proxiedPositions]
   );
   const now = useSolanaUnixNow(60 * 5 * 1000);
 

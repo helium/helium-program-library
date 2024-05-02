@@ -381,8 +381,8 @@ __metadata:
     "@helium/helium-sub-daos-sdk": ^0.7.12
     "@helium/modular-governance-hooks": ^0.0.8
     "@helium/modular-governance-idls": 0.0.8-next.17+7ff2115
-    "@helium/spl-utils": ^0.7.6
-    "@helium/voter-stake-registry-sdk": ^0.7.6
+    "@helium/spl-utils": ^0.7.12
+    "@helium/voter-stake-registry-sdk": ^0.7.12
     "@solana/wallet-adapter-base": ^0.9.22
     "@solana/wallet-adapter-react": ^0.15.32
     "@solana/web3.js": ^1.78.8
@@ -403,10 +403,10 @@ __metadata:
   resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.7.6
-    "@helium/idls": ^0.7.6
+    "@helium/anchor-resolvers": ^0.7.12
+    "@helium/idls": ^0.7.12
     "@helium/nft-proxy-sdk": 0.0.8-next.17+7ff2115
-    "@helium/spl-utils": ^0.7.6
+    "@helium/spl-utils": ^0.7.12
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     bn.js: ^5.2.0

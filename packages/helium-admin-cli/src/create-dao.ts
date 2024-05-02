@@ -176,9 +176,9 @@ export async function run(args: any = process.argv) {
       describe: "Path to the merkle keypair",
       default: `${__dirname}/../../keypairs/data-only-merkle.json`,
     },
-    delegationSeasonsFile: {
+    proxySeasonsFile: {
       type: "string",
-      default: `${__dirname}/../../delegation-seasons.json`,
+      default: `${__dirname}/../../proxy-seasons.json`,
     },
   });
 
@@ -211,12 +211,15 @@ export async function run(args: any = process.argv) {
 
   console.log("DAO", dao.toString());
 
-  const delegationSeasonsFile = fs.readFileSync(
-    argv.delegationSeasonsFile,
+  const proxySeasonsFile = fs.readFileSync(
+    argv.proxySeasonsFile,
     "utf8"
   );
-  const seasons = JSON.parse(delegationSeasonsFile).map(
-    (s) => new anchor.BN(Math.floor(Date.parse(s) / 1000))
+  const seasons = JSON.parse(proxySeasonsFile).map(
+    (s) => ({
+      start: new anchor.BN(Math.floor(Date.parse(s.start) / 1000)),
+      end: new anchor.BN(Math.floor(Date.parse(s.end) / 1000)),
+    })
   );
 
   const conn = provider.connection;
