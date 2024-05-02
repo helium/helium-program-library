@@ -3,6 +3,54 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.12](https://github.com/helium/helium-program-libary/compare/v0.7.11...v0.7.12) (2024-04-30)
+
+**Note:** Version bump only for package @helium/helium-admin-cli
+
+
+
+
+
+## [0.7.11](https://github.com/helium/helium-program-libary/compare/v0.7.10...v0.7.11) (2024-04-29)
+
+**Note:** Version bump only for package @helium/helium-admin-cli
+
+
+
+
+
+## [0.7.10](https://github.com/helium/helium-program-libary/compare/v0.7.9...v0.7.10) (2024-04-19)
+
+**Note:** Version bump only for package @helium/helium-admin-cli
+
+
+
+
+
+## [0.7.9](https://github.com/helium/helium-program-libary/compare/v0.7.8...v0.7.9) (2024-04-18)
+
+**Note:** Version bump only for package @helium/helium-admin-cli
+
+
+
+
+
+## [0.7.8](https://github.com/helium/helium-program-libary/compare/v0.7.7...v0.7.8) (2024-04-18)
+
+**Note:** Version bump only for package @helium/helium-admin-cli
+
+
+
+
+
+## [0.7.7](https://github.com/helium/helium-program-libary/compare/v0.7.6...v0.7.7) (2024-04-15)
+
+**Note:** Version bump only for package @helium/helium-admin-cli
+
+
+
+
+
 ## [0.7.6](https://github.com/helium/helium-program-libary/compare/v0.7.5...v0.7.6) (2024-04-10)
 
 **Note:** Version bump only for package @helium/helium-admin-cli
