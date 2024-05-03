@@ -1,10 +1,9 @@
 import { Program } from "@coral-xyz/anchor";
-import { PROGRAM_ID, init, proxyKey } from "@helium/nft-proxy-sdk";
+import { PROGRAM_ID, init, proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import {
   Status,
-  batchParallelInstructions,
   batchParallelInstructionsWithPriorityFee,
-  truthy,
+  truthy
 } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
@@ -24,6 +23,7 @@ export const useAssignProxies = () => {
       onProgress,
       maxSignatureBatch,
     }: {
+
       positions: PositionWithMeta[];
       recipient: PublicKey;
       programId?: PublicKey;
@@ -46,27 +46,27 @@ export const useAssignProxies = () => {
       } else {
         const instructions: TransactionInstruction[] = [];
         for (const position of positions) {
-          let currentProxy = proxyKey(
+          let currentProxyAssignment = proxyAssignmentKey(
             registrar.proxyConfig,
             position.mint,
             provider.wallet.publicKey
           )[0];
-          let proxy = await nftProxyProgram.account.proxyV0.fetchNullable(
-            currentProxy
+          let proxyAssignment = await nftProxyProgram.account.proxyAssignmentV0.fetchNullable(
+            currentProxyAssignment
           );
-          if (!proxy) {
-            currentProxy = proxyKey(
+          if (!proxyAssignment) {
+            currentProxyAssignment = proxyAssignmentKey(
               registrar.proxyConfig,
               position.mint,
               PublicKey.default
             )[0];
-            proxy = await nftProxyProgram.account.proxyV0.fetch(currentProxy);
+            proxyAssignment = await nftProxyProgram.account.proxyAssignmentV0.fetchNullable(currentProxyAssignment);
           }
-          if (proxy && !proxy.nextOwner?.equals(PublicKey.default)) {
+          if (proxyAssignment && !proxyAssignment.nextVoter?.equals(PublicKey.default)) {
             const toUndelegate =
               await voteService.getProxyAssignmentsForPosition(
                 position.pubkey,
-                proxy.index
+                proxyAssignment.index
               );
             const ixs = (
               await Promise.all(
@@ -76,16 +76,16 @@ export const useAssignProxies = () => {
                     return Promise.resolve(undefined);
                   }
 
-                  const prevProxy = new PublicKey(
+                  const prevProxyAssignment = new PublicKey(
                     toUndelegate[index + 1].address
                   );
                   return nftProxyProgram.methods
                     .unassignProxyV0()
                     .accounts({
                       asset: position.mint,
-                      prevProxy,
-                      currentProxy,
-                      proxy: new PublicKey(proxy.address),
+                      prevProxyAssignment,
+                      currentProxyAssignment,
+                      proxyAssignment: new PublicKey(proxy.address),
                     })
                     .instruction();
                 })
@@ -96,7 +96,7 @@ export const useAssignProxies = () => {
           }
           const {
             instruction,
-            pubkeys: { nextProxy },
+            pubkeys: { nextProxyAssignment },
           } = await nftProxyProgram.methods
             .assignProxyV0({
               expirationTime,
@@ -108,7 +108,7 @@ export const useAssignProxies = () => {
             })
             .prepare();
           // Don't delegate where there's already a proxy.
-          if (await provider.connection.getAccountInfo(nextProxy!)) {
+          if (await provider.connection.getAccountInfo(nextProxyAssignment!)) {
             throw new Error(
               "Recipient wallet is already a proxy to this position"
             );

@@ -43,23 +43,23 @@ server.get<{
   Querystring: {
     page: number;
     limit: number;
-    owner: string;
-    nextOwner: string;
+    voter: string;
+    nextVoter: string;
     minIndex: number;
     position: string;
   };
 }>("/v1/proxy-assignments", async (request, reply) => {
   const {
     position,
-    owner,
-    nextOwner,
+    voter: voter,
+    nextVoter,
     page = 1,
     limit = 1000,
     minIndex,
   } = request.query;
   const where: any = {};
-  if (owner) where.owner = owner;
-  if (nextOwner) where.nextOwner = nextOwner;
+  if (voter) where.voter = voter;
+  if (nextVoter) where.nextVoter = nextVoter;
   if (typeof minIndex !== "undefined") {
     where.index = {
       [Op.gte]: minIndex,
@@ -105,7 +105,7 @@ WITH
     FROM
       positions_with_vetokens p
     JOIN proxy_assignments d on d.asset = p.asset
-        AND d.next_owner = '11111111111111111111111111111111'
+        AND d.next_voter = '11111111111111111111111111111111'
     WHERE registrar = ${escapedRegistrar}
   ),
   total_vetokens as (
@@ -123,13 +123,13 @@ WITH
       proxies.wallet as wallet,
       description,
       detail,
-      count(p.owner) as "numAssignments",
+      count(p.voter) as "numAssignments",
       floor(sum(p.ve_tokens)) as "delegatedVeTokens",
       100 * sum(p.ve_tokens) / (select total_vetokens from total_vetokens) as "percent"
     FROM
       proxies
     JOIN proxy_registrars pr ON pr.wallet = proxies.wallet 
-    LEFT OUTER JOIN positions_with_proxy_assignments p ON p.owner = proxies.wallet
+    LEFT OUTER JOIN positions_with_proxy_assignments p ON p.voter = proxies.wallet
     WHERE pr.registrar = ${escapedRegistrar}
     GROUP BY
       name,
@@ -168,7 +168,7 @@ WITH
     FROM
       positions_with_vetokens p
     JOIN proxy_assignments d on d.asset = p.asset
-        AND d.next_owner = '11111111111111111111111111111111'
+        AND d.next_voter = '11111111111111111111111111111111'
     WHERE registrar = ${escapedRegistrar}
   ),
   total_vetokens as (
@@ -186,13 +186,13 @@ WITH
       proxies.wallet as wallet,
       description,
       detail,
-      count(p.owner) as "numAssignments",
+      count(p.voter) as "numAssignments",
       floor(sum(p.ve_tokens)) as "delegatedVeTokens",
       100 * sum(p.ve_tokens) / (select total_vetokens from total_vetokens) as "percent"
     FROM
       proxies
     JOIN proxy_registrars pr ON pr.wallet = proxies.wallet 
-    LEFT OUTER JOIN positions_with_proxy_assignments p ON p.owner = proxies.wallet
+    LEFT OUTER JOIN positions_with_proxy_assignments p ON p.voter = proxies.wallet
     WHERE pr.registrar = ${escapedRegistrar} AND proxies.wallet = ${escapedWallet}
     GROUP BY
       name,

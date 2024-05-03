@@ -107,7 +107,7 @@ export const useVote = (proposalKey: PublicKey) => {
                     })
                     .accounts({
                       proposal: proposalKey,
-                      owner: provider.wallet.publicKey,
+                      voter: provider.wallet.publicKey,
                       position: position.pubkey,
                       registrar: registrar?.pubkey,
                     })
@@ -137,7 +137,7 @@ export const useVote = (proposalKey: PublicKey) => {
             onProgress,
             triesRemaining: 10,
             extraSigners: [],
-            maxSignatureBatch
+            maxSignatureBatch,
           });
         }
       }

@@ -2,13 +2,13 @@ import { useAnchorAccounts } from "@helium/helium-react-hooks";
 import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import { PublicKey } from "@solana/web3.js";
 
-export const useProxies = (
+export const useProxyAssignments = (
   delegationKeys: PublicKey[] | undefined,
   isStatic: boolean = false
 ) => {
-  return useAnchorAccounts<NftProxy, "proxyV0">(
+  return useAnchorAccounts<NftProxy, "proxyAssignmentV0">(
     delegationKeys,
-    "proxyV0",
+    "proxyAssignmentV0",
     isStatic
   );
 };

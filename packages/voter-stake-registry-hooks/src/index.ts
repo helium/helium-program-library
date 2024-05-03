@@ -23,7 +23,7 @@ export { calcPositionVotingPower } from "./utils/calcPositionVotingPower";
 export * from "./sdk/types";
 export { useAssignProxies } from "./hooks/useAssignProxies";
 export { useUnassignProxies } from "./hooks/useUnassignProxies";
-export { useProxies } from "./hooks/useProxies"
+export { useProxyAssignments } from "./hooks/useProxies"
 export { useProxiedTo } from "./hooks/useProxiedTo";
 export { getPositionKeys } from "./utils/getPositionKeys";
 export { getSubDaos } from "./utils/getSubDaos";

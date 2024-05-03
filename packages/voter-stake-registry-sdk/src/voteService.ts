@@ -5,8 +5,8 @@ import { PublicKey } from "@solana/web3.js";
 import axios, { AxiosInstance } from "axios";
 
 export type ProxyAssignment = {
-  owner: string;
-  nextOwner: string;
+  voter: string;
+  nextVoter: string;
   index: number;
   address: string;
   asset: string;
@@ -146,7 +146,7 @@ export class VoteService {
       const positionAcc = await this.program.account.positionV0.fetch(position)
 
       return (
-        await this.nftProxyProgram.account.proxyV0.all([
+        await this.nftProxyProgram.account.proxyAssignmentV0.all([
           {
             memcmp: {
               offset: 8 + 32 + 32,
@@ -163,8 +163,8 @@ export class VoteService {
       )
         .sort((a, b) => b.account.index - a.account.index)
         .map((a) => ({
-          owner: a.account.owner.toBase58(),
-          nextOwner: a.account.nextOwner.toBase58(),
+          voter: a.account.voter.toBase58(),
+          nextVoter: a.account.nextVoter.toBase58(),
           index: a.account.index,
           address: a.publicKey.toBase58(),
           asset: a.account.asset.toBase58(),
@@ -187,7 +187,7 @@ export class VoteService {
         await this.client.get(`/v1/proxy-assignments`, {
           params: {
             limit: 10000,
-            owner: wallet.toBase58(),
+            voter: wallet.toBase58(),
             minIndex: minProxyIndex,
           },
         })
@@ -199,7 +199,7 @@ export class VoteService {
         this.registrar
       );
       return (
-        await this.nftProxyProgram.account.proxyV0.all([
+        await this.nftProxyProgram.account.proxyAssignmentV0.all([
           {
             memcmp: {
               offset: 8,
@@ -216,8 +216,8 @@ export class VoteService {
       )
         .sort((a, b) => b.account.index - a.account.index)
         .map((a) => ({
-          owner: a.account.owner.toBase58(),
-          nextOwner: a.account.nextOwner.toBase58(),
+          voter: a.account.voter.toBase58(),
+          nextVoter: a.account.nextVoter.toBase58(),
           index: a.account.index,
           address: a.publicKey.toBase58(),
           asset: a.account.asset.toBase58(),
@@ -249,7 +249,7 @@ export class VoteService {
       );
       const positionAcc = await this.program.account.positionV0.fetch(position);
       return (
-        await this.nftProxyProgram.account.proxyV0.all([
+        await this.nftProxyProgram.account.proxyAssignmentV0.all([
           {
             memcmp: {
               offset: 8 + 32,
@@ -267,8 +267,8 @@ export class VoteService {
         .filter((a) => a.account.index >= minIndex)
         .sort((a, b) => b.account.index - a.account.index)
         .map((a) => ({
-          owner: a.account.owner.toBase58(),
-          nextOwner: a.account.nextOwner.toBase58(),
+          voter: a.account.voter.toBase58(),
+          nextVoter: a.account.nextVoter.toBase58(),
           index: a.account.index,
           address: a.publicKey.toBase58(),
           asset: a.account.asset.toBase58(),

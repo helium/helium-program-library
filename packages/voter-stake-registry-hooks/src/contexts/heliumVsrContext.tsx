@@ -17,11 +17,11 @@ import React, {
 } from "react";
 import { useAsync } from "react-async-hook";
 import { useDelegatedPositions } from "../hooks/useDelegatedPositions";
-import { useProxies } from "../hooks/useProxies";
+import { useProxyAssignments } from "../hooks/useProxies";
 import { usePositions } from "../hooks/usePositions";
 import { useRegistrar } from "../hooks/useRegistrar";
 import { init as initNftProxy } from "@helium/nft-proxy-sdk";
-import { ProxyV0, PositionWithMeta } from "../sdk/types";
+import { ProxyAssignmentV0, PositionWithMeta } from "../sdk/types";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 import {
   GetPositionsArgs as GetPosArgs,
@@ -158,7 +158,7 @@ export const HeliumVsrStateProvider: React.FC<{
     return proxyAccounts?.reduce((acc, prox) => {
       acc[prox.asset.toBase58()] = prox;
       return acc;
-    }, {} as Record<string, ProxyV0>);
+    }, {} as Record<string, ProxyAssignmentV0>);
   }, [proxyAccounts]);
   const myOwnedPositionsEndIdx = result?.positionKeys?.length;
   // Assume that my positions are a small amount, so we don't need to say they're static

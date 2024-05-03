@@ -80,7 +80,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
                     })
                     .accounts({
                       proposal,
-                      owner: provider.wallet.publicKey,
+                      voter: provider.wallet.publicKey,
                       position: position.pubkey,
                     })
                     .instruction();

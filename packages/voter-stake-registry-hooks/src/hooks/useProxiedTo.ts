@@ -18,7 +18,7 @@ export function useProxiedTo(wallet?: PublicKey): {
       return positions?.filter(
         (position) =>
           position.proxy &&
-          position.proxy.nextOwner.equals(wallet)
+          position.proxy.nextVoter.equals(wallet)
       );
     }
   }, [positions]);

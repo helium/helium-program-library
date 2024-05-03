@@ -70,7 +70,7 @@
           "isSigner": true
         },
         {
-          "name": "owner",
+          "name": "voter",
           "isMut": false,
           "isSigner": false,
           "docs": [
@@ -88,7 +88,7 @@
           "isSigner": false
         },
         {
-          "name": "currentProxy",
+          "name": "currentProxyAssignment",
           "isMut": true,
           "isSigner": false,
           "pda": {
@@ -96,7 +96,7 @@
               {
                 "kind": "const",
                 "type": "string",
-                "value": "proxy"
+                "value": "proxy_assignment"
               },
               {
                 "kind": "account",
@@ -113,7 +113,7 @@
               {
                 "kind": "account",
                 "type": "publicKey",
-                "path": "owner"
+                "path": "voter"
               }
             ]
           }
@@ -124,7 +124,7 @@
           "isSigner": false
         },
         {
-          "name": "nextProxy",
+          "name": "nextProxyAssignment",
           "isMut": true,
           "isSigner": false,
           "pda": {
@@ -132,7 +132,7 @@
               {
                 "kind": "const",
                 "type": "string",
-                "value": "proxy"
+                "value": "proxy_assignment"
               },
               {
                 "kind": "account",
@@ -188,7 +188,7 @@
           "isSigner": true
         },
         {
-          "name": "owner",
+          "name": "voter",
           "isMut": false,
           "isSigner": false,
           "docs": [
@@ -201,18 +201,18 @@
           "isSigner": false
         },
         {
-          "name": "currentProxy",
+          "name": "currentProxyAssignment",
           "isMut": false,
           "isSigner": false,
-          "relations": ["owner", "asset"]
+          "relations": ["voter", "asset"]
         },
         {
-          "name": "prevProxy",
+          "name": "prevProxyAssignment",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "proxy",
+          "name": "proxyAssignment",
           "isMut": true,
           "isSigner": false,
           "relations": ["rent_refund"]
@@ -247,19 +247,21 @@
           {
             "name": "seasons",
             "type": {
-              "vec": "i64"
+              "vec": {
+                "defined": "SeasonV0"
+              }
             }
           }
         ]
       }
     },
     {
-      "name": "ProxyV0",
+      "name": "ProxyAssignmentV0",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "owner",
+            "name": "voter",
             "type": "publicKey"
           },
           {
@@ -275,7 +277,7 @@
             "type": "u16"
           },
           {
-            "name": "nextOwner",
+            "name": "nextVoter",
             "type": "publicKey"
           },
           {
@@ -323,8 +325,26 @@
           {
             "name": "seasons",
             "type": {
-              "vec": "i64"
+              "vec": {
+                "defined": "SeasonV0"
+              }
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SeasonV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "start",
+            "type": "i64"
+          },
+          {
+            "name": "end",
+            "type": "i64"
           }
         ]
       }
@@ -351,5 +371,8 @@
       "name": "ExpirationExceedsPreceedingProxy",
       "msg": "The specified expiration time exceeds the expiration of the existing delegatio"
     }
-  ]
+  ],
+  "metadata": {
+    "address": "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p"
+  }
 }

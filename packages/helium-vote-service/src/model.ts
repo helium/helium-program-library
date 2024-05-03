@@ -286,8 +286,8 @@ ProxyRegistrar.init(
 
 export class ProxyAssignment extends Model {
   declare address: string;
-  declare owner: string;
-  declare nextOwner: string;
+  declare voter: string;
+  declare nextVoter: string;
   declare index: number;
   declare asset: string;
   declare proxyConfig: string
@@ -300,8 +300,8 @@ ProxyAssignment.init(
       type: DataTypes.STRING,
       primaryKey: true
     },
-    owner: DataTypes.STRING,
-    nextOwner: DataTypes.STRING,
+    voter: DataTypes.STRING,
+    nextVoter: DataTypes.STRING,
     index: DataTypes.INTEGER,
     asset: DataTypes.STRING,
     proxyConfig: DataTypes.STRING,
@@ -322,7 +322,7 @@ ProxyAssignment.init(
 export function setRelations() {
   ProxyAssignment.belongsTo(Position, { foreignKey: "asset", targetKey: "asset" });
   Position.hasMany(ProxyAssignment, { foreignKey: "asset", sourceKey: "asset" });
-  Proxy.hasMany(ProxyAssignment, { foreignKey: "owner", sourceKey: "wallet" });
+  Proxy.hasMany(ProxyAssignment, { foreignKey: "voter", sourceKey: "wallet" });
   ProxyRegistrar.hasMany(Proxy, { foreignKey: "wallet", sourceKey: "wallet" });
   Proxy.hasMany(ProxyRegistrar, { foreignKey: "wallet", sourceKey: "wallet" });
 }

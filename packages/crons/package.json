@@ -46,7 +46,7 @@
     "@helium/proposal-sdk": "^0.0.8",
     "@helium/rewards-oracle-sdk": "^0.7.12",
     "@helium/spl-utils": "^0.7.12",
-    "@helium/state-controller-sdk": "0.0.8-next.17+7ff2115",
+    "@helium/state-controller-sdk": "0.0.8-next.19+4fa4c6b",
     "@helium/treasury-management-sdk": "^0.7.12",
     "@helium/voter-stake-registry-sdk": "^0.7.12",
     "@solana/spl-token": "^0.3.8",

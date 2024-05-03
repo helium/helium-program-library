@@ -9,7 +9,7 @@ import { getAccount } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { init } from ".";
 import { voterWeightRecordKey } from "./pdas";
-import { proxyKey, nftProxyResolvers } from "@helium/nft-proxy-sdk";
+import { proxyAssignmentKey, nftProxyResolvers } from "@helium/nft-proxy-sdk";
 
 export * from "./constants";
 export * from "./pdas";
@@ -113,19 +113,19 @@ export const vsrResolvers = combineResolvers(
       // @ts-ignore
       return provider.wallet.publicKey;
     } else if (
-      path[path.length - 1] == "proxy" &&
+      path[path.length - 1] == "proxyAssignment" &&
       accounts.registrar &&
-      accounts.owner &&
+      accounts.voter &&
       accounts.mint
     ) {
       const program = await init(provider as any, programId);
       const registrar = await program.account.registrar.fetch(
         accounts.registrar as PublicKey
       );
-      return proxyKey(
+      return proxyAssignmentKey(
         registrar.proxyConfig,
         accounts.mint as PublicKey,
-        accounts.owner as PublicKey
+        accounts.voter as PublicKey
       )[0];
     }
 

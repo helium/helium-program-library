@@ -117,8 +117,8 @@ export const getPositionKeys = async (
     positionKeys,
     proxiedPositionKeys: delegationPositions,
     proxies: myProxies.map((d) => ({
-      owner: new PublicKey(d.owner),
-      nextOwner: new PublicKey(d.nextOwner),
+      voter: new PublicKey(d.voter),
+      nextVoter: new PublicKey(d.nextVoter),
       address: new PublicKey(d.address),
       asset: new PublicKey(d.asset),
       rentRefund: new PublicKey(d.rentRefund),

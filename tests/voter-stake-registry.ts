@@ -41,7 +41,7 @@ import { SPL_GOVERNANCE_PID } from "./utils/vsr";
 import {
   PROGRAM_ID as DEL_PID,
   init as initNftProxy,
-  proxyKey,
+  proxyAssignmentKey,
 } from "@helium/nft-proxy-sdk";
 import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import { ensureVSRIdl } from "./utils/fixtures";
@@ -497,7 +497,7 @@ describe("voter-stake-registry", () => {
             mint,
             proposal,
             position,
-            owner: delegatee.publicKey,
+            voter: delegatee.publicKey,
           })
           .signers([delegatee])
           .rpcAndKeys({ skipPreflight: true });
@@ -517,7 +517,7 @@ describe("voter-stake-registry", () => {
             mint,
             proposal,
             position,
-            owner: delegatee.publicKey,
+            voter: delegatee.publicKey,
           })
           .signers([delegatee])
           .rpc({ skipPreflight: true });
@@ -541,7 +541,7 @@ describe("voter-stake-registry", () => {
             mint,
             proposal,
             position,
-            owner: delegatee.publicKey,
+            voter: delegatee.publicKey,
           })
           .signers([delegatee])
           .rpcAndKeys({ skipPreflight: true });
@@ -593,23 +593,23 @@ describe("voter-stake-registry", () => {
       });
 
       it("allows the original owner to undelegate", async () => {
-        const toUnProxy = proxyKey(proxyConfig!, mint, delegatee.publicKey)[0];
-        const myProxy = proxyKey(proxyConfig!, mint, PublicKey.default)[0];
+        const toUnProxy = proxyAssignmentKey(proxyConfig!, mint, delegatee.publicKey)[0];
+        const myProxy = proxyAssignmentKey(proxyConfig!, mint, PublicKey.default)[0];
         await proxyProgram.methods
           .unassignProxyV0()
           .accounts({
-            proxy: toUnProxy,
-            prevProxy: myProxy,
-            currentProxy: myProxy,
+            proxyAssignment: toUnProxy,
+            prevProxyAssignment: myProxy,
+            currentProxyAssignment: myProxy,
           })
           .rpc({ skipPreflight: true });
 
         expect(
           (
-            await proxyProgram.account.proxyV0.fetch(myProxy)
-          ).nextOwner.toBase58()
+            await proxyProgram.account.proxyAssignmentV0.fetch(myProxy)
+          ).nextVoter.toBase58()
         ).to.eq(PublicKey.default.toBase58());
-        expect(await proxyProgram.account.proxyV0.fetchNullable(toUnProxy)).to
+        expect(await proxyProgram.account.proxyAssignmentV0.fetchNullable(toUnProxy)).to
           .be.null;
       });
     });

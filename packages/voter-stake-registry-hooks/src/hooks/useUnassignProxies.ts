@@ -1,5 +1,5 @@
 import { Program } from "@coral-xyz/anchor";
-import { PROGRAM_ID, proxyKey, init } from "@helium/nft-proxy-sdk";
+import { PROGRAM_ID, proxyAssignmentKey, init } from "@helium/nft-proxy-sdk";
 import {
   truthy,
   batchParallelInstructions,
@@ -42,21 +42,23 @@ export const useUnassignProxies = () => {
       } else {
         const instructions: TransactionInstruction[] = [];
         for (const position of positions) {
-          let currentProxy = proxyKey(
+          let currentProxyAssignment = proxyAssignmentKey(
             registrar.proxyConfig,
             position.mint,
             provider.wallet.publicKey
           )[0];
-          let proxy = await nftProxyProgram.account.proxyV0.fetchNullable(
-            currentProxy
+          let proxy = await nftProxyProgram.account.proxyAssignmentV0.fetchNullable(
+            currentProxyAssignment
           );
           if (!proxy) {
-            currentProxy = proxyKey(
+            currentProxyAssignment = proxyAssignmentKey(
               registrar.proxyConfig,
               position.mint,
               PublicKey.default
             )[0];
-            proxy = await nftProxyProgram.account.proxyV0.fetch(currentProxy);
+            proxy = await nftProxyProgram.account.proxyAssignmentV0.fetch(
+              currentProxyAssignment
+            );
           }
           const toUndelegate = await voteService.getProxyAssignmentsForPosition(
             position.pubkey,
@@ -72,16 +74,16 @@ export const useUnassignProxies = () => {
                     return Promise.resolve(undefined);
                   }
 
-                  const prevProxy = new PublicKey(
+                  const prevProxyAssignment = new PublicKey(
                     toUndelegate[index + 1].address
                   );
                   return nftProxyProgram.methods
                     .unassignProxyV0()
                     .accounts({
                       asset: position.mint,
-                      prevProxy,
-                      currentProxy,
-                      proxy: new PublicKey(proxy.address),
+                      prevProxyAssignment,
+                      currentProxyAssignment,
+                      proxyAssignment: new PublicKey(proxy.address),
                     })
                     .instruction();
                 })

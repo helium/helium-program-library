@@ -1,7 +1,7 @@
 use crate::{error::VsrError, RelinquishVoteArgsV1};
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
-use nft_proxy::ProxyV0;
+use nft_proxy::ProxyAssignmentV0;
 use proposal::{ProposalConfigV0, ProposalV0};
 
 use crate::{registrar_seeds, state::*};
@@ -21,15 +21,15 @@ pub struct ProxiedRelinquishVoteV0<'info> {
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
   pub registrar: Box<Account<'info, Registrar>>,
-  pub owner: Signer<'info>,
+  pub voter: Signer<'info>,
   #[account(
-    has_one = owner,
-    constraint = proxy.proxy_config == registrar.proxy_config,
-    constraint = proxy.expiration_time > Clock::get().unwrap().unix_timestamp,
+    has_one = voter,
+    constraint = proxy_assignment.proxy_config == registrar.proxy_config,
+    constraint = proxy_assignment.expiration_time > Clock::get().unwrap().unix_timestamp,
     // only the current or earlier delegates can change vote.
-    constraint = proxy.index <= marker.proxy_index
+    constraint = proxy_assignment.index <= marker.proxy_index
   )]
-  pub proxy: Box<Account<'info, ProxyV0>>,
+  pub proxy_assignment: Box<Account<'info, ProxyAssignmentV0>>,
   #[account(
     mut,
     has_one = mint,
@@ -64,9 +64,9 @@ pub struct ProxiedRelinquishVoteV0<'info> {
 
 pub fn handler(ctx: Context<ProxiedRelinquishVoteV0>, args: RelinquishVoteArgsV1) -> Result<()> {
   let marker = &mut ctx.accounts.marker;
-  marker.proxy_index = ctx.accounts.proxy.index;
+  marker.proxy_index = ctx.accounts.proxy_assignment.index;
   marker.proposal = ctx.accounts.proposal.key();
-  marker.voter = ctx.accounts.owner.key();
+  marker.voter = ctx.accounts.voter.key();
   ctx.accounts.position.num_active_votes -= 1;
 
   require!(
@@ -85,7 +85,7 @@ pub fn handler(ctx: Context<ProxiedRelinquishVoteV0>, args: RelinquishVoteArgsV1
     CpiContext::new_with_signer(
       ctx.accounts.proposal_program.to_account_info(),
       proposal::cpi::accounts::VoteV0 {
-        voter: ctx.accounts.owner.to_account_info(),
+        voter: ctx.accounts.voter.to_account_info(),
         vote_controller: ctx.accounts.registrar.to_account_info(),
         state_controller: ctx.accounts.state_controller.to_account_info(),
         proposal_config: ctx.accounts.proposal_config.to_account_info(),

@@ -14,12 +14,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/runtime@npm:^7.23.4":
-  version: 7.24.4
-  resolution: "@babel/runtime@npm:7.24.4"
+"@babel/runtime@npm:^7.24.5":
+  version: 7.24.5
+  resolution: "@babel/runtime@npm:7.24.5"
   dependencies:
     regenerator-runtime: ^0.14.0
-  checksum: 2f27d4c0ffac7ae7999ac0385e1106f2a06992a8bdcbf3da06adcac7413863cd08c198c2e4e970041bbea849e17f02e1df18875539b6afba76c781b6b59a07c3
+  checksum: 755383192f3ac32ba4c62bd4f1ae92aed5b82d2c6665f39eb28fa94546777cf5c63493ea92dd03f1c2e621b17e860f190c056684b7f234270fdc91e29beda063
   languageName: node
   linkType: hard
 
@@ -299,7 +299,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/modular-governance-idls@npm:^0.0.8-next.17+7ff2115":
+"@helium/modular-governance-idls@npm:^0.0.8-next.19+4fa4c6b":
   version: 0.0.8
   resolution: "@helium/modular-governance-idls@npm:0.0.8"
   dependencies:
@@ -350,15 +350,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/nft-proxy-sdk@npm:0.0.8-next.17+7ff2115":
-  version: 0.0.8-next.17
-  resolution: "@helium/nft-proxy-sdk@npm:0.0.8-next.17"
+"@helium/nft-proxy-sdk@npm:0.0.8-next.19+4fa4c6b":
+  version: 0.0.8-next.19
+  resolution: "@helium/nft-proxy-sdk@npm:0.0.8-next.19"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.2.17
-    "@helium/modular-governance-idls": ^0.0.8-next.17+7ff2115
+    "@helium/modular-governance-idls": ^0.0.8-next.19+4fa4c6b
     "@solana/spl-token": ^0.3.8
-  checksum: 2199e8a88d03de7683d85976f8f57c14266b4cb7190ab06e75403e97b3a17144a619249ba4bf7e62d404861103fccf6fe08dd4d2571cec0b8104c8f472f62047
+  checksum: f5c6d9348cfebb8dd2d8fd997c365b5656afa7a6683592e1ed6b0bf04f73f231265a770c96022c930d32c686f57dbf56a0b7790c9d025413c80de30f07f1e587
   languageName: node
   linkType: hard
 
@@ -439,7 +439,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.7.12
     "@helium/idls": ^0.7.12
-    "@helium/nft-proxy-sdk": 0.0.8-next.17+7ff2115
+    "@helium/nft-proxy-sdk": 0.0.8-next.19+4fa4c6b
     "@helium/spl-utils": ^0.7.12
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
@@ -560,7 +560,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@noble/curves@npm:^1.2.0":
+"@noble/curves@npm:^1.4.0":
   version: 1.4.0
   resolution: "@noble/curves@npm:1.4.0"
   dependencies:
@@ -576,7 +576,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@noble/hashes@npm:1.4.0, @noble/hashes@npm:^1.3.3":
+"@noble/hashes@npm:1.4.0, @noble/hashes@npm:^1.4.0":
   version: 1.4.0
   resolution: "@noble/hashes@npm:1.4.0"
   checksum: 8ba816ae26c90764b8c42493eea383716396096c5f7ba6bea559993194f49d80a73c081f315f4c367e51bd2d5891700bcdfa816b421d24ab45b41cb03e4f3342
@@ -687,12 +687,12 @@ __metadata:
   linkType: hard
 
 "@solana/web3.js@npm:^1.78.8":
-  version: 1.91.6
-  resolution: "@solana/web3.js@npm:1.91.6"
+  version: 1.91.8
+  resolution: "@solana/web3.js@npm:1.91.8"
   dependencies:
-    "@babel/runtime": ^7.23.4
-    "@noble/curves": ^1.2.0
-    "@noble/hashes": ^1.3.3
+    "@babel/runtime": ^7.24.5
+    "@noble/curves": ^1.4.0
+    "@noble/hashes": ^1.4.0
     "@solana/buffer-layout": ^4.0.1
     agentkeepalive: ^4.5.0
     bigint-buffer: ^1.1.5
@@ -703,9 +703,9 @@ __metadata:
     fast-stable-stringify: ^1.0.0
     jayson: ^4.1.0
     node-fetch: ^2.7.0
-    rpc-websockets: ^7.5.1
+    rpc-websockets: ^7.11.0
     superstruct: ^0.14.2
-  checksum: 95509d651c41abc71ea5732618b9aca3ff0baac7817549e913ade9eb9567e077472c2319cb422675dbeab13a22b26d036d2ce5b621b8786cb38dce076c188ab1
+  checksum: ffc3c31a58fbf401b12c90d87615e5e611ba878c976092bc0a8bd2b96accf14c9898883c5dcdba8cc3a98c3e410f3261c06b5c7a42936c23dcbc69d084d3ad1d
   languageName: node
   linkType: hard
 
@@ -3183,6 +3183,24 @@ __metadata:
   bin:
     rimraf: bin.js
   checksum: 87f4164e396f0171b0a3386cc1877a817f572148ee13a7e113b238e48e8a9f2f31d009a92ec38a591ff1567d9662c6b67fd8818a2dbbaed74bc26a87a2a4a9a0
+  languageName: node
+  linkType: hard
+
+"rpc-websockets@npm:^7.11.0":
+  version: 7.11.0
+  resolution: "rpc-websockets@npm:7.11.0"
+  dependencies:
+    bufferutil: ^4.0.1
+    eventemitter3: ^4.0.7
+    utf-8-validate: ^5.0.2
+    uuid: ^8.3.2
+    ws: ^8.5.0
+  dependenciesMeta:
+    bufferutil:
+      optional: true
+    utf-8-validate:
+      optional: true
+  checksum: bf8b760e661a1ac4a26d4d139cf98978d14b79dd6463d7acfd8a300355db4be57675f8e2cf5e2feada8cd9cc2ab063914f3b63fce442540a66141dff69e74f60
   languageName: node
   linkType: hard
 
