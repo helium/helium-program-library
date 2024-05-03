@@ -29,9 +29,14 @@ export type EnhancedProxyData = {
   delegatedVeTokens: string;
   percent: string;
   numProposalsVoted: string;
-  numProxies: string;
+  numAssignments: string;
   lastVotedAt: Date | null;
 };
+
+export type WithRank = {
+  numProxies: string;
+  rank: string;
+}
 
 export type EnhancedProxy = Proxy & EnhancedProxyData;
 
@@ -296,7 +301,7 @@ export class VoteService {
     return response.data.map(this.mapRoutes);
   }
 
-  async getProxy(wallet: string): Promise<EnhancedProxy> {
+  async getProxy(wallet: string): Promise<EnhancedProxy & WithRank> {
     if (!this.client) {
       throw new Error("This operation is not supported without an API");
     }

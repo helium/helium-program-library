@@ -123,7 +123,7 @@ WITH
       proxies.wallet as wallet,
       description,
       detail,
-      count(p.owner) as "numProxies",
+      count(p.owner) as "numAssignments",
       floor(sum(p.ve_tokens)) as "delegatedVeTokens",
       100 * sum(p.ve_tokens) / (select total_vetokens from total_vetokens) as "percent"
     FROM
@@ -144,7 +144,7 @@ SELECT
   MAX(vm.created_at) as "lastVotedAt"
 FROM proxies_with_assignments pa
 LEFT OUTER JOIN vote_markers vm ON vm.voter = pa.wallet
-GROUP BY pa.name, pa.image, pa.wallet, pa.description, pa.detail, pa."numProxies", pa."delegatedVeTokens", pa.percent
+GROUP BY pa.name, pa.image, pa.wallet, pa.description, pa.detail, pa."numAssignments", pa."delegatedVeTokens", pa.percent
 ORDER BY "delegatedVeTokens" DESC
 OFFSET ${offset}
 LIMIT ${limit};
@@ -186,7 +186,7 @@ WITH
       proxies.wallet as wallet,
       description,
       detail,
-      count(p.owner) as "numProxies",
+      count(p.owner) as "numAssignments",
       floor(sum(p.ve_tokens)) as "delegatedVeTokens",
       100 * sum(p.ve_tokens) / (select total_vetokens from total_vetokens) as "percent"
     FROM
@@ -200,10 +200,17 @@ WITH
       proxies.wallet,
       description,
       detail
+  ),
+  proxies_with_rank AS(
+      SELECT
+        pa.*,
+        COUNT(*) OVER () as "numProxies",
+        RANK() OVER (ORDER BY "delegatedVeTokens" DESC) as rank
+      FROM proxies_with_assignments pa
   )
 SELECT
   *
-FROM proxies_with_assignments
+FROM proxies_with_rank
 LIMIT 1
       `);
   return proxies[0][0];

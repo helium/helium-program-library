@@ -13,6 +13,7 @@ export type {
   ProxyAssignment as Delegation,
   ProxyAssignment as Proxy,
   EnhancedProxy as EnhancedProxy,
+  WithRank,
   EnhancedProxyData,
 } from "./voteService";
 
