@@ -118,7 +118,7 @@ export const useClaimAllPositionsRewards = () => {
           const subDaoStr = subDao.toBase58();
           const subDaoAcc = subDaos[subDaoStr];
 
-          // Chunk size is 128 because we want each chunk to correspond to the 128 bits in bitmap (0-indexed)
+          // Chunk size is 128 because we want each chunk to correspond to the 128 bits in bitmap
           for (const chunk of chunks(epochsToClaim, 128)) {
             bucketedEpochsByPosition[position.pubkey.toBase58()].push(
               await Promise.all(
