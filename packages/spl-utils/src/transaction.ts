@@ -738,6 +738,36 @@ export async function batchParallelInstructions({
   );
 }
 
+export async function batchSequentialParallelInstructions({
+  provider,
+  instructions,
+  onProgress,
+  triesRemaining = 10,
+  extraSigners = [],
+  maxSignatureBatch = TX_BATCH_SIZE,
+  addressLookupTableAddresses = [],
+}: {
+  provider: AnchorProvider;
+  instructions: TransactionInstruction[][];
+  onProgress?: (status: Status) => void;
+  triesRemaining?: number; // Number of blockhashes to try resending txs with before giving up
+  extraSigners?: Keypair[];
+  maxSignatureBatch?: number;
+  addressLookupTableAddresses?: PublicKey[];
+}): Promise<void> {
+  for (const instruction of instructions) {
+    await batchParallelInstructions({
+      provider,
+      instructions: instruction,
+      onProgress,
+      triesRemaining,
+      extraSigners,
+      maxSignatureBatch,
+      addressLookupTableAddresses,
+    });
+  }
+}
+
 export async function batchInstructionsToTxsWithPriorityFee(
   provider: AnchorProvider,
   // If passing an array of arrays, that indicates the instructions need to be run in the same tx,

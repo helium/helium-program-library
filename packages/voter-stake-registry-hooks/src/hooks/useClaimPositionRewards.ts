@@ -5,7 +5,11 @@ import {
   delegatedPositionKey,
   init,
 } from "@helium/helium-sub-daos-sdk";
-import { Status, batchParallelInstructions } from "@helium/spl-utils";
+import {
+  Status,
+  batchSequentialParallelInstructions,
+  chunks,
+} from "@helium/spl-utils";
 import { isClaimed } from "@helium/voter-stake-registry-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
@@ -61,31 +65,40 @@ export const useClaimPositionRewards = () => {
             })
         );
 
-        const instructions: TransactionInstruction[] = await Promise.all(
-          epochsToClaim.map(
-            async (epoch) =>
-              await hsdProgram.methods
-                .claimRewardsV0({
-                  epoch,
-                })
-                .accounts({
-                  position: position.pubkey,
-                  subDao: delegatedPosAcc.subDao,
-                })
-                .instruction()
-          )
-        );
+        const instructions: TransactionInstruction[][] = [];
+
+        // Chunk size is 128 because we want each chunk to correspond to the 128 bits in bitmap
+        for (const chunk of chunks(epochsToClaim, 128)) {
+          instructions.push(
+            await Promise.all(
+              chunk.map(
+                async (epoch) =>
+                  await hsdProgram.methods
+                    .claimRewardsV0({
+                      epoch,
+                    })
+                    .accounts({
+                      position: position.pubkey,
+                      subDao: delegatedPosAcc.subDao,
+                    })
+                    .instruction()
+              )
+            )
+          );
+        }
 
         if (onInstructions) {
-          await onInstructions(instructions);
+          for (const ixs of instructions) {
+            await onInstructions(ixs);
+          }
         } else {
-          await batchParallelInstructions({
+          await batchSequentialParallelInstructions({
             provider,
-            instructions,
+            instructions: instructions,
             onProgress,
             triesRemaining: 10,
             extraSigners: [],
-            maxSignatureBatch
+            maxSignatureBatch,
           });
         }
       }

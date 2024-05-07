@@ -1,5 +1,9 @@
 import { BN, Program } from "@coral-xyz/anchor";
 import {
+  PROGRAM_ID as CIRCUIT_BREAKER_PROGRAM_ID,
+  accountWindowedBreakerKey,
+} from "@helium/circuit-breaker-sdk";
+import {
   EPOCH_LENGTH,
   PROGRAM_ID,
   daoKey,
@@ -8,19 +12,19 @@ import {
   subDaoEpochInfoKey,
 } from "@helium/helium-sub-daos-sdk";
 import {
-  PROGRAM_ID as CIRCUIT_BREAKER_PROGRAM_ID,
-  accountWindowedBreakerKey,
-} from "@helium/circuit-breaker-sdk";
-import {
-  batchParallelInstructions,
-  chunks,
   HNT_MINT,
   Status,
+  batchSequentialParallelInstructions,
+  chunks,
 } from "@helium/spl-utils";
 import {
-  getAssociatedTokenAddressSync,
-  TOKEN_PROGRAM_ID,
+  PROGRAM_ID as VSR_PROGRAM_ID,
+  isClaimed,
+} from "@helium/voter-stake-registry-sdk";
+import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import {
   PublicKey,
@@ -28,15 +32,12 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
+import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta, SubDao } from "../sdk/types";
-import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
-import {
-  PROGRAM_ID as VSR_PROGRAM_ID,
-  isClaimed,
-} from "@helium/voter-stake-registry-sdk";
 
 const DAO = daoKey(HNT_MINT)[0];
+
 export const useClaimAllPositionsRewards = () => {
   const { provider, unixNow } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
@@ -181,9 +182,9 @@ export const useClaimAllPositionsRewards = () => {
             await onInstructions(ixs);
           }
         } else {
-          await batchParallelInstructions({
+          await batchSequentialParallelInstructions({
             provider,
-            instructions: multiDemArray.flat(),
+            instructions: multiDemArray,
             onProgress,
             triesRemaining: 10,
             extraSigners: [],
