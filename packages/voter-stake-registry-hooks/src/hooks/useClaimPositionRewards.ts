@@ -94,7 +94,7 @@ export const useClaimPositionRewards = () => {
         } else {
           await batchSequentialParallelInstructions({
             provider,
-            instructions: instructions,
+            instructions,
             onProgress,
             triesRemaining: 10,
             extraSigners: [],
