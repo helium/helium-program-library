@@ -171,6 +171,7 @@ export async function sendInstructions(
       tx.serialize(),
       {
         skipPreflight: true,
+        maxRetries: 0,
       },
       commitment
     );
@@ -569,7 +570,8 @@ export async function bulkSendRawTransactions(
   txs: Buffer[],
   onProgress?: (status: Status) => void,
   lastValidBlockHeight?: number,
-  skipPreflight: boolean = true
+  skipPreflight: boolean = true,
+  maxRetries: number = 0
 ): Promise<string[]> {
   const txBatchSize = TX_BATCH_SIZE;
   let totalProgress = 0;
@@ -603,6 +605,7 @@ export async function bulkSendRawTransactions(
         for (const tx of chunk) {
           const txid = await connection.sendRawTransaction(tx, {
             skipPreflight,
+            maxRetries,
           });
           txids.push(txid);
         }
