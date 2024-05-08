@@ -171,6 +171,7 @@ export async function sendInstructions(
       tx.serialize(),
       {
         skipPreflight: true,
+        maxRetries: 0,
       },
       commitment
     );
@@ -603,6 +604,7 @@ export async function bulkSendRawTransactions(
         for (const tx of chunk) {
           const txid = await connection.sendRawTransaction(tx, {
             skipPreflight,
+            maxRetries: 0,
           });
           txids.push(txid);
         }
