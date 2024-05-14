@@ -46,6 +46,10 @@ export const useClaimPositionRewards = () => {
       if (isInvalid || !hsdProgram) {
         throw new Error("Unable to Claim Rewards, Invalid params");
       } else {
+        const { lockup } = position;
+        const lockupKind = Object.keys(lockup.kind)[0] as string;
+        const isConstant = lockupKind === "constant";
+        const isDecayed = !isConstant && lockup.endTs.lte(new BN(unixNow));
         const currentEpoch = new BN(unixNow).div(new BN(EPOCH_LENGTH));
         const delegatedPosKey = delegatedPositionKey(position.pubkey)[0];
         const delegatedPosAcc =
@@ -54,7 +58,11 @@ export const useClaimPositionRewards = () => {
         const { lastClaimedEpoch, claimedEpochsBitmap } = delegatedPosAcc;
         const epoch = lastClaimedEpoch.add(new BN(1));
         const epochsToClaim = Array.from(
-          { length: currentEpoch.sub(epoch).toNumber() },
+          {
+            length: !isDecayed
+              ? currentEpoch.sub(epoch).toNumber()
+              : lockup.endTs.sub(epoch).toNumber(),
+          },
           (_v, k) => epoch.addn(k)
         ).filter(
           (epoch) =>
