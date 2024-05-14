@@ -102,6 +102,7 @@ export const useClaimAllPositionsRewards = () => {
           const lockupKind = Object.keys(lockup.kind)[0] as string;
           const isConstant = lockupKind === "constant";
           const isDecayed = !isConstant && lockup.endTs.lte(new BN(unixNow));
+          const decayedEpoch = lockup.endTs.div(new BN(EPOCH_LENGTH));
           const delegatedPosition = delegatedPositions[idx];
           bucketedEpochsByPosition[position.pubkey.toBase58()] =
             bucketedEpochsByPosition[position.pubkey.toBase58()] || [];
@@ -112,7 +113,7 @@ export const useClaimAllPositionsRewards = () => {
             {
               length: !isDecayed
                 ? currentEpoch.sub(epoch).toNumber()
-                : lockup.endTs.sub(epoch).toNumber(),
+                : decayedEpoch.sub(epoch).toNumber(),
             },
             (_v, k) => epoch.addn(k)
           ).filter(
