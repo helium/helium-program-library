@@ -80,7 +80,8 @@ export async function run(args: any = process.argv) {
       .accounts({
         maker,
         authority,
-        rewardableEntityConfig: entityConfigKey
+        rewardableEntityConfig: entityConfigKey,
+        payer: authority
       })
       .instruction()
   );
