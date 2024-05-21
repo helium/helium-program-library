@@ -27,7 +27,7 @@ pub struct InitializeCompressionRecipientV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 8 + 60 + std::mem::size_of::<RecipientV0>(),
+    space = 8 + 60 + std::mem::size_of::<RecipientV0>() + 8 * lazy_distributor.oracles.len(),
     seeds = [
       "recipient".as_bytes(), 
       lazy_distributor.key().as_ref(),

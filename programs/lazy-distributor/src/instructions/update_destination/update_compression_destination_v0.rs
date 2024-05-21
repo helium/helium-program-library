@@ -1,6 +1,8 @@
+use crate::error::ErrorCode;
 use crate::state::*;
 use account_compression_cpi::program::SplAccountCompression;
 use anchor_lang::prelude::*;
+use bubblegum_cpi::get_asset_id;
 use shared_utils::{verify_compressed_nft, VerifyCompressedNftArgs};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -28,6 +30,11 @@ pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, UpdateCompressionDestinationV0<'info>>,
   args: UpdateCompressionDestinationArgsV0,
 ) -> Result<()> {
+  require_eq!(
+    ctx.accounts.recipient.asset,
+    get_asset_id(&ctx.accounts.merkle_tree.key(), args.index.into()),
+    ErrorCode::InvalidAsset
+  );
   verify_compressed_nft(VerifyCompressedNftArgs {
     data_hash: args.data_hash,
     creator_hash: args.creator_hash,
