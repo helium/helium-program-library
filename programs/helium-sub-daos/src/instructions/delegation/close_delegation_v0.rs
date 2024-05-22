@@ -116,9 +116,16 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   msg!("Vehnt calculations: {:?}", vehnt_info);
 
   // don't allow unstake without claiming available rewards
+  // make sure to account for when the position ends
   // unless we're testing, in which case we don't care
   let curr_epoch = current_epoch(curr_ts);
-  assert!((ctx.accounts.delegated_position.last_claimed_epoch >= curr_epoch - 1) || TESTING);
+  let to_claim_to_epoch =
+    if position.lockup.end_ts < curr_ts && position.lockup.kind == LockupKind::Cliff {
+      current_epoch(position.lockup.end_ts)
+    } else {
+      curr_epoch - 1
+    };
+  assert!((ctx.accounts.delegated_position.last_claimed_epoch >= to_claim_to_epoch) || TESTING);
 
   let delegated_position = &mut ctx.accounts.delegated_position;
   let sub_dao = &mut ctx.accounts.sub_dao;

@@ -98,6 +98,11 @@ export const useClaimAllPositionsRewards = () => {
         }, {} as Record<string, SubDao>);
 
         for (const [idx, position] of positions.entries()) {
+          const { lockup } = position;
+          const lockupKind = Object.keys(lockup.kind)[0] as string;
+          const isConstant = lockupKind === "constant";
+          const isDecayed = !isConstant && lockup.endTs.lte(new BN(unixNow));
+          const decayedEpoch = lockup.endTs.div(new BN(EPOCH_LENGTH));
           const delegatedPosition = delegatedPositions[idx];
           bucketedEpochsByPosition[position.pubkey.toBase58()] =
             bucketedEpochsByPosition[position.pubkey.toBase58()] || [];
@@ -105,7 +110,11 @@ export const useClaimAllPositionsRewards = () => {
             delegatedPosition.account;
           const epoch = lastClaimedEpoch.add(new BN(1));
           const epochsToClaim = Array.from(
-            { length: currentEpoch.sub(epoch).toNumber() },
+            {
+              length: !isDecayed
+                ? currentEpoch.sub(epoch).toNumber()
+                : decayedEpoch.sub(epoch).toNumber(),
+            },
             (_v, k) => epoch.addn(k)
           ).filter(
             (epoch) =>
