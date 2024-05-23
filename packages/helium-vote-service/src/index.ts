@@ -224,7 +224,10 @@ server.get<{ Params: { registrar: string }; Querystring: { query: string } }>(
     const proxies = await Proxy.findAll({
       attributes: ["name", "description", "image", "wallet", "detail"],
       where: {
-        [Op.or]: [{ name: { [Op.iLike]: `%${query}%` } }],
+        [Op.or]: [
+          { name: { [Op.iLike]: `%${query}%` } },
+          { wallet: { [Op.like]: `${query}%` } },
+        ],
       },
       include: [
         {
