@@ -168,10 +168,17 @@ export const HeliumVsrStateProvider: React.FC<{
   // Proxied positions may be a lot, set to static
   const { accounts: proxiedPositions, loading: loadingDelPositions } =
     usePositions(result?.proxiedPositionKeys, true);
-  const positions = useMemo(
-    () => [...(myPositions || []), ...(proxiedPositions || [])],
-    [myPositions, proxiedPositions]
-  );
+  const positions = useMemo(() => {
+    const uniquePositions = new Map();
+    [...(myPositions || []), ...(proxiedPositions || [])].forEach(
+      (position) => {
+        if (position) {
+          uniquePositions.set(position.publicKey.toBase58(), position);
+        }
+      }
+    );
+    return Array.from(uniquePositions.values());
+  }, [myPositions, proxiedPositions]);
   const now = useSolanaUnixNow(60 * 5 * 1000);
 
   const { amountLocked, votingPower, positionsWithMeta, amountProxyLocked } =

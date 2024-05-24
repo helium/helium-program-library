@@ -16,6 +16,7 @@ export type {
   WithRank,
   EnhancedProxyData,
 } from "./voteService";
+export { getPositionKeysForOwner } from "./helpers";
 
 export function getRegistrarKey(mint: PublicKey) {
   return registrarKey(

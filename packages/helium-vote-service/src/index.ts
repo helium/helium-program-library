@@ -1,12 +1,23 @@
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import { organizationKey } from "@helium/organization-sdk";
-import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import {
+  Asset,
+  HNT_MINT,
+  IOT_MINT,
+  MOBILE_MINT,
+  searchAssets,
+} from "@helium/spl-utils";
+import {
+  getPositionKeysForOwner,
+  registrarCollectionKey,
+} from "@helium/voter-stake-registry-sdk";
 import Fastify, { FastifyInstance } from "fastify";
 import fs from "fs";
 import { camelCase, isPlainObject, mapKeys } from "lodash";
 import path from "path";
 import { Op } from "sequelize";
+import { SOLANA_URL } from "./env";
 import {
   Position,
   Proxy,
@@ -17,6 +28,7 @@ import {
   setRelations,
 } from "./model";
 import { cloneRepo, readProxiesAndUpsert } from "./repo";
+import { Connection, PublicKey } from "@solana/web3.js";
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -47,6 +59,7 @@ server.get<{
     nextVoter: string;
     minIndex: number;
     position: string;
+    votingMint: string;
   };
 }>("/v1/proxy-assignments", async (request, reply) => {
   const {
@@ -56,9 +69,42 @@ server.get<{
     page = 1,
     limit = 1000,
     minIndex,
+    votingMint,
   } = request.query;
   const where: any = {};
-  if (voter) where.voter = voter;
+  if (voter) {
+    const registrar = (
+      (
+        await sequelize.query(
+          `SELECT address FROM registrars WHERE  voting_mints[1]->>'mint' = ${sequelize.escape(
+            votingMint
+          )}`
+        )
+      )[0][0] as any
+    ).address;
+    const collection = registrarCollectionKey(new PublicKey(registrar))[0];
+    const { assets } = await getPositionKeysForOwner({
+      connection: new Connection(SOLANA_URL),
+      owner: new PublicKey(voter),
+      collection,
+    });
+
+    where[Op.or] = [
+      {
+        voter,
+      },
+      {
+        [Op.and]: [
+          {
+            asset: {
+              [Op.in]: assets.map((a) => a.toBase58()),
+            },
+            voter: PublicKey.default.toBase58(),
+          },
+        ],
+      },
+    ];
+  }
   if (nextVoter) where.nextVoter = nextVoter;
   if (typeof minIndex !== "undefined") {
     where.index = {

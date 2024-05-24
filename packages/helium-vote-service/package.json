@@ -40,7 +40,8 @@
     "dotenv": "^16.0.3",
     "fastify": "^4.13.0",
     "sequelize": "^6.28.0",
-    "simple-git": "^3.21.0"
+    "simple-git": "^3.21.0",
+    "@solana/web3.js": "^1.78.8"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.1",

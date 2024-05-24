@@ -180,6 +180,7 @@ export class VoteService {
 
   async getProxyAssignmentsForWallet(
     wallet: PublicKey,
+    votingMint: PublicKey,
     minProxyIndex: number = 0
   ): Promise<ProxyAssignment[]> {
     if (this.client) {
@@ -189,6 +190,7 @@ export class VoteService {
             limit: 10000,
             voter: wallet.toBase58(),
             minIndex: minProxyIndex,
+            votingMint,
           },
         })
       ).data;
