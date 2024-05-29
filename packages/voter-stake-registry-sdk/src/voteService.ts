@@ -287,9 +287,11 @@ export class VoteService {
   async getProxies({
     page,
     limit,
+    query
   }: {
     page: number;
     limit: number;
+    query?: string;
   }): Promise<EnhancedProxy[]> {
     if (!this.client) {
       throw new Error("This operation is not supported without an API");
@@ -297,7 +299,7 @@ export class VoteService {
     const response = await this.client.get(
       `/v1/registrars/${this.registrar.toBase58()}/proxies`,
       {
-        params: { page, limit },
+        params: { page, limit, query },
       }
     );
     return response.data.map(this.mapRoutes);

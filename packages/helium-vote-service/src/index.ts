@@ -136,7 +136,12 @@ server.get<{
 
 server.get<{
   Params: { registrar: string };
-  Querystring: { registrar: string; page: number; limit: number };
+  Querystring: {
+    registrar: string;
+    page: number;
+    limit: number;
+    query: string;
+  };
 }>("/v1/registrars/:registrar/proxies", async (request, reply) => {
   const limit = Number(request.query.limit || 1000); // default limit
   const offset = Number((request.query.page || 1) - 1) * limit;
@@ -177,6 +182,15 @@ WITH
     JOIN proxy_registrars pr ON pr.wallet = proxies.wallet 
     LEFT OUTER JOIN positions_with_proxy_assignments p ON p.voter = proxies.wallet
     WHERE pr.registrar = ${escapedRegistrar}
+          ${
+            request.query.query
+              ? `AND (proxies.name ILIKE ${sequelize.escape(
+                  `%${request.query.query}%`
+                )} OR proxies.wallet ILIKE ${sequelize.escape(
+                  `%${request.query.query}%`
+                )})`
+              : ""
+          }
     GROUP BY
       name,
       image,
@@ -186,7 +200,7 @@ WITH
   )
 SELECT
   pa.*,
-  COUNT(vm.voter) as "numProposalsVoted",
+  COUNT(distinct vm.proposal) as "numProposalsVoted",
   MAX(vm.created_at) as "lastVotedAt"
 FROM proxies_with_assignments pa
 LEFT OUTER JOIN vote_markers vm ON vm.voter = pa.wallet
@@ -253,10 +267,26 @@ WITH
         COUNT(*) OVER () as "numProxies",
         RANK() OVER (ORDER BY "delegatedVeTokens" DESC) as rank
       FROM proxies_with_assignments pa
+  ),
+  proxies_with_votes AS (
+    SELECT
+      name,
+      image,
+      wallet,
+      description,
+      detail,
+      "numAssignments",
+      "delegatedVeTokens",
+      "percent",
+      count(distinct vm.proposal) as "numProposalsVoted"
+    FROM
+      proxies_with_rank proxies
+    LEFT OUTER JOIN vote_markers vm ON vm.voter = proxies.wallet AND vm.registrar = ${escapedRegistrar}
+    GROUP BY name, image, wallet, description, detail, "numAssignments", "delegatedVeTokens", "percent"
   )
 SELECT
   *
-FROM proxies_with_rank
+FROM proxies_with_votes
 LIMIT 1
       `);
   return proxies[0][0];
@@ -328,11 +358,9 @@ SELECT
     'choice', vms.choice,
     'choiceName', p.choices[vms.choice + 1]->>'name'
   )) as votes
-FROM exploded_choice_vote_markers vms
-JOIN proposals p ON vms.proposal = p.address
-WHERE p.namespace = ${sequelize.escape(
-    ORG_IDS[mint]
-  )} AND vms.registrar = ${registrar} AND vms.voter = ${wallet}
+FROM proposals p
+LEFT OUTER JOIN exploded_choice_vote_markers vms ON vms.proposal = p.address AND vms.registrar = ${registrar} AND vms.voter = ${wallet}
+WHERE p.namespace = ${sequelize.escape(ORG_IDS[mint])}
 GROUP BY p.address
 OFFSET ${offset}
 LIMIT ${limit};
