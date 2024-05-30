@@ -20,7 +20,7 @@ import {
   VersionedTransaction,
   VersionedTransactionResponse,
 } from "@solana/web3.js";
-import { TransactionCompletionQueue } from "@helium/account-fetch-cache"
+import { TransactionCompletionQueue } from "@helium/account-fetch-cache";
 import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
 import { estimatePrioritizationFee, withPriorityFees } from "./priorityFees";
@@ -171,6 +171,7 @@ export async function sendInstructions(
       tx.serialize(),
       {
         skipPreflight: true,
+        maxRetries: 0,
       },
       commitment
     );
@@ -569,7 +570,8 @@ export async function bulkSendRawTransactions(
   txs: Buffer[],
   onProgress?: (status: Status) => void,
   lastValidBlockHeight?: number,
-  skipPreflight: boolean = true
+  skipPreflight: boolean = true,
+  maxRetries: number = 0
 ): Promise<string[]> {
   const txBatchSize = TX_BATCH_SIZE;
   let totalProgress = 0;
@@ -603,6 +605,7 @@ export async function bulkSendRawTransactions(
         for (const tx of chunk) {
           const txid = await connection.sendRawTransaction(tx, {
             skipPreflight,
+            maxRetries,
           });
           txids.push(txid);
         }
@@ -738,6 +741,36 @@ export async function batchParallelInstructions({
   );
 }
 
+export async function batchSequentialParallelInstructions({
+  provider,
+  instructions,
+  onProgress,
+  triesRemaining = 10,
+  extraSigners = [],
+  maxSignatureBatch = TX_BATCH_SIZE,
+  addressLookupTableAddresses = [],
+}: {
+  provider: AnchorProvider;
+  instructions: TransactionInstruction[][];
+  onProgress?: (status: Status) => void;
+  triesRemaining?: number; // Number of blockhashes to try resending txs with before giving up
+  extraSigners?: Keypair[];
+  maxSignatureBatch?: number;
+  addressLookupTableAddresses?: PublicKey[];
+}): Promise<void> {
+  for (const instruction of instructions) {
+    await batchParallelInstructions({
+      provider,
+      instructions: instruction,
+      onProgress,
+      triesRemaining,
+      extraSigners,
+      maxSignatureBatch,
+      addressLookupTableAddresses,
+    });
+  }
+}
+
 export async function batchInstructionsToTxsWithPriorityFee(
   provider: AnchorProvider,
   // If passing an array of arrays, that indicates the instructions need to be run in the same tx,
@@ -748,6 +781,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     basePriorityFee,
     addressLookupTableAddresses,
     computeScaleUp,
+    extraSigners = [],
   }: {
     // Manually specify limit instead of simulating
     computeUnitLimit?: number;
@@ -755,6 +789,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     computeScaleUp?: number;
     basePriorityFee?: number;
     addressLookupTableAddresses?: PublicKey[];
+    extraSigners?: Signer[];
   } = {}
 ): Promise<TransactionDraft[]> {
   let currentTxInstructions: TransactionInstruction[] = [];
@@ -807,6 +842,11 @@ export async function batchInstructionsToTxsWithPriorityFee(
             feePayer: provider.wallet.publicKey,
             recentBlockhash: blockhash,
             addressLookupTables,
+            signers: extraSigners.filter((s) =>
+              currentTxInstructions.some((ix) =>
+                ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
+              )
+            ),
           });
         }
 
@@ -832,6 +872,11 @@ export async function batchInstructionsToTxsWithPriorityFee(
       feePayer: provider.wallet.publicKey,
       recentBlockhash: blockhash,
       addressLookupTables,
+      signers: extraSigners.filter((s) =>
+        currentTxInstructions.some((ix) =>
+          ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
+        )
+      ),
     });
   }
 
