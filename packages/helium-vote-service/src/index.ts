@@ -217,7 +217,6 @@ server.get<{
 }>("/v1/registrars/:registrar/proxies/:wallet", async (request, reply) => {
   const registrar = request.params.registrar;
   const escapedRegistrar = sequelize.escape(registrar);
-  const wallet = request.params.wallet;
   const escapedWallet = sequelize.escape(request.params.wallet);
 
   const proxies = await sequelize.query(`
@@ -278,11 +277,14 @@ WITH
       "numAssignments",
       "delegatedVeTokens",
       "percent",
-      count(distinct vm.proposal) as "numProposalsVoted"
+      "numProxies",
+      rank,
+      count(distinct vm.proposal) as "numProposalsVoted",
+      MAX(vm.created_at) as "lastVotedAt"
     FROM
       proxies_with_rank proxies
     LEFT OUTER JOIN vote_markers vm ON vm.voter = proxies.wallet AND vm.registrar = ${escapedRegistrar}
-    GROUP BY name, image, wallet, description, detail, "numAssignments", "delegatedVeTokens", "percent"
+    GROUP BY "numProxies", rank, name, image, wallet, description, detail, "numAssignments", "delegatedVeTokens", "percent"
   )
 SELECT
   *
@@ -290,6 +292,18 @@ FROM proxies_with_votes
 LIMIT 1
       `);
   return proxies[0][0];
+});
+
+server.get<{
+  Params: { wallet: string };
+}>("/v1/proxies/:wallet/registrars", async (request, reply) => {
+  const wallet = request.params.wallet;
+  const registrars = await ProxyRegistrar.findAll({
+    where: {
+      wallet,
+    },
+  });
+  return registrars.map(r => r.registrar);
 });
 
 server.get<{ Params: { registrar: string }; Querystring: { query: string } }>(

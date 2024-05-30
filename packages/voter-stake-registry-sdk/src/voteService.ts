@@ -123,6 +123,16 @@ export class VoteService {
     }
   }
 
+  async getRegistrarsForProxy(wallet: PublicKey): Promise<string[]> {
+    if (this.client) {
+      return (
+        await this.client.get(`/v1/proxies/${wallet.toBase58()}/registrars`)
+      ).data;
+    } else {
+      throw new Error("This is not supported without an indexer");
+    }
+  }
+
   async getProxyAssignmentsForPosition(
     position: PublicKey,
     minProxyIndex: number = 0
