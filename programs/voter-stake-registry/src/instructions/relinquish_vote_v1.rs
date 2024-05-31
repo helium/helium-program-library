@@ -18,6 +18,7 @@ pub struct RelinquishVoteV1<'info> {
     bump = marker.bump_seed,
     has_one = registrar,
     has_one = mint,
+    has_one = rent_refund,
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
   pub registrar: Box<Account<'info, Registrar>>,
@@ -58,6 +59,9 @@ pub struct RelinquishVoteV1<'info> {
   )]
   pub proposal_program: AccountInfo<'info>,
   pub system_program: Program<'info, System>,
+  /// CHECK: has one on the marker gets this
+  #[account(mut)]
+  pub rent_refund: AccountInfo<'info>,
 }
 
 pub fn handler(ctx: Context<RelinquishVoteV1>, args: RelinquishVoteArgsV1) -> Result<()> {
@@ -97,6 +101,10 @@ pub fn handler(ctx: Context<RelinquishVoteV1>, args: RelinquishVoteArgsV1) -> Re
       weight: marker.weight,
     },
   )?;
+
+  if marker.choices.is_empty() {
+    marker.close(ctx.accounts.rent_refund.to_account_info())?;
+  }
 
   Ok(())
 }

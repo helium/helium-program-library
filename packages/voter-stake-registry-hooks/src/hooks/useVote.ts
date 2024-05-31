@@ -23,16 +23,40 @@ export const useVote = (proposalKey: PublicKey) => {
   const { accounts: markers } = useVoteMarkers(voteMarkerKeys);
   const voteWeights: BN[] | undefined = useMemo(() => {
     if (proposal && markers) {
-      return markers.reduce((acc, marker) => {
+      return markers.reduce((acc, marker, idx) => {
+        const position = positions?.[idx];
         marker.info?.choices.forEach((choice) => {
-          acc[choice] = (acc[choice] || new BN(0)).add(
-            marker.info?.weight || new BN(0)
-          );
+          // Only count my own and down the line vote weights
+          if ((marker?.info?.proxyIndex || 0) >= (position?.proxy?.index || 0)) {
+            acc[choice] = (acc[choice] || new BN(0)).add(
+              marker.info?.weight || new BN(0)
+            );
+          }
         });
         return acc;
       }, new Array(proposal?.choices.length));
     }
-  }, [proposal, markers]);
+  }, [proposal, markers, positions]);
+  const voters: (PublicKey)[][] | undefined = useMemo(() => {
+    if (proposal && markers) {
+      const nonUniqueResult = markers.reduce((acc, marker, idx) => {
+        const position = positions?.[idx]
+        marker.info?.choices.forEach((choice) => {
+          acc[choice] ||= [];
+          if (
+            marker.info?.voter &&
+            marker.info.proxyIndex > (position?.proxy?.index || 0)
+          ) {
+            acc[choice].push(marker.info.voter);
+          }
+
+          return acc;
+        });
+        return acc;
+      }, new Array(proposal?.choices.length));
+      return nonUniqueResult.map((voters) => Array.from(new Set(voters)));
+    }
+  }, [markers, positions]);
   const canVote = useCallback(
     (choice: number) => {
       if (!markers) return false;
@@ -151,5 +175,6 @@ export const useVote = (proposalKey: PublicKey) => {
     markers,
     voteWeights,
     canVote,
+    voters,
   };
 };

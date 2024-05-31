@@ -142,7 +142,7 @@ export class VoteService {
         await this.client.get(`/v1/proxy-assignments`, {
           params: {
             limit: 10000,
-            asset: position.toBase58(),
+            position: position.toBase58(),
             minIndex: minProxyIndex,
           },
         })
