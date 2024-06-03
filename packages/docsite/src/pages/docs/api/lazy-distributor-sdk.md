@@ -203,6 +203,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | currentConfigVersion | u16             |
 | currentRewards       | [object Object] |
 | bumpSeed             | u8              |
+| reserved             | u64             |
 | destination          | publicKey       |
 
 ## Types
