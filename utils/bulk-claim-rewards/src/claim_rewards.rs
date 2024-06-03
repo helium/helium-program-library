@@ -957,7 +957,6 @@ fn construct_distribute_rewards_accounts<C: Deref<Target = impl Signer> + Clone>
     },
     merkle_tree,
     compression_program,
-    token_program: anchor_spl::token::ID,
   })
 }
 
@@ -999,7 +998,6 @@ fn construct_distribute_custom_destination_accounts<C: Deref<Target = impl Signe
       associated_token_program: spl_associated_token_account::id(),
       circuit_breaker_program: CB_PID,
       system_program: system_program::id(),
-      token_program: anchor_spl::token::ID,
     },
   })
 }
