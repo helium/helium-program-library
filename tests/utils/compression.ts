@@ -94,7 +94,7 @@ export async function createCompressionNft({
     creators: [],
     editionNonce: 0,
     tokenProgramVersion: TokenProgramVersion.Original,
-    tokenStandard: TokenStandard.Fungible,
+    tokenStandard: TokenStandard.NonFungible,
     uses: null,
     collection: null,
     primarySaleHappened: false,
@@ -126,7 +126,7 @@ export async function createCompressionNft({
     await bubblegum.methods
       .mintToCollectionV1({
         ...metadata,
-        tokenStandard: { fungible: {} },
+        tokenStandard: { nonFungible: {} },
         tokenProgramVersion: { original: {} },
       })
       .accounts({
@@ -144,7 +144,7 @@ export async function createCompressionNft({
     await bubblegum.methods
       .mintV1({
         ...metadata,
-        tokenStandard: { fungible: {} },
+        tokenStandard: { nonFungible: {} },
         tokenProgramVersion: { original: {} },
       })
       .accounts({

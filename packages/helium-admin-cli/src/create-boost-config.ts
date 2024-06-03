@@ -104,7 +104,7 @@ export async function run(args: any = process.argv) {
         rentReclaimAuthority: new PublicKey(argv.rentReclaimAuthority),
         authority: subDaoAuth,
         subDao,
-        startAuthority: new PublicKey(argv.startAuthority)
+        startAuthority: new PublicKey(argv.startAuthority),
       })
       .instruction(),
   ];
