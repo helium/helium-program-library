@@ -301,7 +301,7 @@ describe("hexboosting", () => {
         expected
       );
 
-      const hex = await program.account.boostedHexV0.fetch(boostedHex!);
+      const hex = await program.account.boostedHexV1.fetch(boostedHex!);
 
       expect(Object.keys(hex.deviceType)[0]).to.eq("wifiIndoor");
       expect(hex.location.toNumber()).to.eq(1);
@@ -395,7 +395,7 @@ describe("hexboosting", () => {
           Number(expected)
         );
 
-        const hex = await program.account.boostedHexV0.fetch(boostedHex!);
+        const hex = await program.account.boostedHexV1.fetch(boostedHex!);
 
         expect(hex.boostsByPeriod.toJSON().data).to.deep.eq([
           1, 1, 2, 1, 1, 1, 2,
@@ -416,7 +416,7 @@ describe("hexboosting", () => {
             boostedHex,
           })
           .rpc({ skipPreflight: true });
-        const acc = await program.account.boostedHexV0.fetch(boostedHex!);
+        const acc = await program.account.boostedHexV1.fetch(boostedHex!);
         expect(acc.startTs.toNumber()).to.not.eq(0);
       });
 
