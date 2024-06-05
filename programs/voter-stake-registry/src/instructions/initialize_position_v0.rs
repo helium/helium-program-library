@@ -31,7 +31,6 @@ pub struct InitializePositionArgsV0 {
 #[derive(Accounts)]
 pub struct InitializePositionV0<'info> {
   #[account(
-    mut,
     has_one = collection
   )]
   pub registrar: Box<Account<'info, Registrar>>,

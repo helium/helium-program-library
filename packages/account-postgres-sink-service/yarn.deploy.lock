@@ -23,6 +23,43 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@babel/runtime@npm:^7.23.4":
+  version: 7.24.1
+  resolution: "@babel/runtime@npm:7.24.1"
+  dependencies:
+    regenerator-runtime: ^0.14.0
+  checksum: 5c8f3b912ba949865f03b3cf8395c60e1f4ebd1033fbd835bdfe81b6cac8a87d85bc3c7aded5fcdf07be044c9ab8c818f467abe0deca50020c72496782639572
+  languageName: node
+  linkType: hard
+
+"@bufbuild/protobuf@npm:^1.7.2":
+  version: 1.7.2
+  resolution: "@bufbuild/protobuf@npm:1.7.2"
+  checksum: f91e2574c97a64cceba04f7e697279fee621eb76cf5d049047184e3d08bd2c52d4a7e9afbe8560cfd49948bd61a24dc9013d6ca56fc10302e948de09afd7acff
+  languageName: node
+  linkType: hard
+
+"@connectrpc/connect-node@npm:^1.3.0":
+  version: 1.3.0
+  resolution: "@connectrpc/connect-node@npm:1.3.0"
+  dependencies:
+    undici: ^5.28.2
+  peerDependencies:
+    "@bufbuild/protobuf": ^1.4.2
+    "@connectrpc/connect": 1.3.0
+  checksum: 4e53cc5057b9a2fbd533e2209833881a0e27dc9079c3f56566eedf5667978436d9aaf1bb6d0509874d627dbd4491413eff8e5bad06c50ff049eed824a5a2e1e3
+  languageName: node
+  linkType: hard
+
+"@connectrpc/connect@npm:^1.3.0":
+  version: 1.3.0
+  resolution: "@connectrpc/connect@npm:1.3.0"
+  peerDependencies:
+    "@bufbuild/protobuf": ^1.4.2
+  checksum: a68bfffedd817a7db3563c00e5efc5eb510cc00a93c722d81fa1f52b71a96300d7175b0c0710a9d2ef2e8aaabee36921c90470a80343e7a9fbccffd3cc83f868
+  languageName: node
+  linkType: hard
+
 "@coral-xyz/anchor@npm:^0.28.0":
   version: 0.28.0
   resolution: "@coral-xyz/anchor@npm:0.28.0"
@@ -78,6 +115,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@fastify/busboy@npm:^2.0.0":
+  version: 2.1.0
+  resolution: "@fastify/busboy@npm:2.1.0"
+  checksum: 3233abd10f73e50668cb4bb278a79b7b3fadd30215ac6458299b0e5a09a29c3586ec07597aae6bd93f5cbedfcef43a8aeea51829cd28fc13850cdbcd324c28d5
+  languageName: node
+  linkType: hard
+
 "@fastify/cors@npm:^8.1.1":
   version: 8.3.0
   resolution: "@fastify/cors@npm:8.3.0"
@@ -111,11 +155,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@^0.6.29":
+"@helium/account-fetch-cache@^0.7.17":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
-    "@solana/web3.js": ^1.78.4
+    "@solana/web3.js": ^1.78.8
     git-format-staged: ^2.1.3
     ts-loader: ^9.2.3
     typescript: ^5.2.2
@@ -126,12 +170,17 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/account-postgres-sink-service@workspace:."
   dependencies:
+    "@bufbuild/protobuf": ^1.7.2
+    "@connectrpc/connect": ^1.3.0
+    "@connectrpc/connect-node": ^1.3.0
     "@coral-xyz/anchor": ^0.28.0
     "@fastify/cors": ^8.1.1
-    "@helium/account-fetch-cache": ^0.6.29
+    "@helium/account-fetch-cache": ^0.7.17
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
-    "@solana/web3.js": ^1.78.4
+    "@solana/web3.js": ^1.78.8
+    "@substreams/core": ^0.15.1
     "@types/bn.js": ^5.1.1
+    "@types/cron": ^2.4.0
     "@types/deep-equal": ^1.0.1
     "@types/lodash": ^4.14.195
     "@types/node": ^18.11.11
@@ -143,6 +192,7 @@ __metadata:
     bloom-filters: ^3.0.1
     bn.js: ^5.2.0
     bs58: ^4.0.1
+    cron: ^3.1.6
     deep-equal: ^2.2.2
     dotenv: ^16.3.1
     fastify: ^4.13.0
@@ -153,6 +203,7 @@ __metadata:
     h3-js: ^4.1.0
     http-status-codes: ^2.2.0
     inflection: ^2.0.1
+    kafkajs: ^2.2.4
     lodash: ^4.17.21
     p-limit: 3.1.0
     pg: ^8.9.0
@@ -258,10 +309,26 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@noble/curves@npm:^1.2.0":
+  version: 1.4.0
+  resolution: "@noble/curves@npm:1.4.0"
+  dependencies:
+    "@noble/hashes": 1.4.0
+  checksum: 0014ff561d16e98da4a57e2310a4015e4bdab3b1e1eafcd18d3f9b955c29c3501452ca5d702fddf8ca92d570bbeadfbe53fe16ebbd81a319c414f739154bb26b
+  languageName: node
+  linkType: hard
+
 "@noble/hashes@npm:1.3.2, @noble/hashes@npm:^1.3.1":
   version: 1.3.2
   resolution: "@noble/hashes@npm:1.3.2"
   checksum: fe23536b436539d13f90e4b9be843cc63b1b17666a07634a2b1259dded6f490be3d050249e6af98076ea8f2ea0d56f578773c2197f2aa0eeaa5fba5bc18ba474
+  languageName: node
+  linkType: hard
+
+"@noble/hashes@npm:1.4.0, @noble/hashes@npm:^1.3.3":
+  version: 1.4.0
+  resolution: "@noble/hashes@npm:1.4.0"
+  checksum: 8ba816ae26c90764b8c42493eea383716396096c5f7ba6bea559993194f49d80a73c081f315f4c367e51bd2d5891700bcdfa816b421d24ab45b41cb03e4f3342
   languageName: node
   linkType: hard
 
@@ -293,7 +360,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/buffer-layout@npm:^4.0.0":
+"@solana/buffer-layout@npm:^4.0.0, @solana/buffer-layout@npm:^4.0.1":
   version: 4.0.1
   resolution: "@solana/buffer-layout@npm:4.0.1"
   dependencies:
@@ -315,7 +382,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/web3.js@npm:^1.32.0, @solana/web3.js@npm:^1.56.2, @solana/web3.js@npm:^1.66.2, @solana/web3.js@npm:^1.68.0, @solana/web3.js@npm:^1.78.4":
+"@solana/web3.js@npm:^1.32.0, @solana/web3.js@npm:^1.56.2, @solana/web3.js@npm:^1.66.2, @solana/web3.js@npm:^1.68.0":
   version: 1.78.4
   resolution: "@solana/web3.js@npm:1.78.4"
   dependencies:
@@ -335,6 +402,39 @@ __metadata:
     rpc-websockets: "npm:^7.5.1"
     superstruct: "npm:^0.14.2"
   checksum: e1c44c6cbec87cdfd4d6d23b4241b746e14ed3a9ca73d596693758d91ac825cecf579345da3b0b7bb5e54b6794791bc0eac02cadf11f1ec79e859b6536f26f11
+  languageName: node
+  linkType: hard
+
+"@solana/web3.js@npm:^1.78.8":
+  version: 1.91.3
+  resolution: "@solana/web3.js@npm:1.91.3"
+  dependencies:
+    "@babel/runtime": ^7.23.4
+    "@noble/curves": ^1.2.0
+    "@noble/hashes": ^1.3.3
+    "@solana/buffer-layout": ^4.0.1
+    agentkeepalive: ^4.5.0
+    bigint-buffer: ^1.1.5
+    bn.js: ^5.2.1
+    borsh: ^0.7.0
+    bs58: ^4.0.1
+    buffer: 6.0.3
+    fast-stable-stringify: ^1.0.0
+    jayson: ^4.1.0
+    node-fetch: ^2.7.0
+    rpc-websockets: ^7.5.1
+    superstruct: ^0.14.2
+  checksum: 5b251915057368d0615d6a6f0de7b4d4129c3d0643599551c0a342125601418634851b633a47d19da481973406f0f2928fa4bf1a2c57fb19914e69fd5b81c302
+  languageName: node
+  linkType: hard
+
+"@substreams/core@npm:^0.15.1":
+  version: 0.15.1
+  resolution: "@substreams/core@npm:0.15.1"
+  peerDependencies:
+    "@bufbuild/protobuf": ^1.7.2
+    "@connectrpc/connect": ^1.3.0
+  checksum: e8eefd77a66ea09e10cf1f788d11a7af31af04cecad1a18c64cf489aca878264bb80e09e14667d04e8fca4ccb5213515d6f702a3aac814d009985e5348fb496b
   languageName: node
   linkType: hard
 
@@ -391,7 +491,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/cron@npm:^2.0.0":
+"@types/cron@npm:^2.0.0, @types/cron@npm:^2.4.0":
   version: 2.4.0
   resolution: "@types/cron@npm:2.4.0"
   dependencies:
@@ -575,7 +675,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"agentkeepalive@npm:^4.2.1, agentkeepalive@npm:^4.3.0":
+"agentkeepalive@npm:^4.2.1, agentkeepalive@npm:^4.3.0, agentkeepalive@npm:^4.5.0":
   version: 4.5.0
   resolution: "agentkeepalive@npm:4.5.0"
   dependencies:
@@ -1156,6 +1256,16 @@ __metadata:
     "@types/luxon": "npm:~3.3.0"
     luxon: "npm:~3.3.0"
   checksum: cb0ad49653b37ba125f8670ca92150ce515493512b1b8a5e08086d22bec9c54dc6d8926fcdb49ea5783f6699862ca5fdc532a440ce33c3228f9b3d565010db2f
+  languageName: node
+  linkType: hard
+
+"cron@npm:^3.1.6":
+  version: 3.1.6
+  resolution: "cron@npm:3.1.6"
+  dependencies:
+    "@types/luxon": ~3.3.0
+    luxon: ~3.4.0
+  checksum: e97bb6f85acf3195577c609f28bbac2e22812d8632802752a13591882deceeeeefd2c91c1293fb5102ef442f96ae17ca687854fd0b005149aae9a25834363e1d
   languageName: node
   linkType: hard
 
@@ -2331,6 +2441,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"kafkajs@npm:^2.2.4":
+  version: 2.2.4
+  resolution: "kafkajs@npm:2.2.4"
+  checksum: 83e9e8bc50a09b142f4ff79f6a2bd88ecc21b83bcefe6621ab1716118d624886befb7371731274f67812ce35dd50b53140ff3b49a06e5d9169fe6b164d72fea5
+  languageName: node
+  linkType: hard
+
 "light-my-request@npm:^5.9.1":
   version: 5.10.0
   resolution: "light-my-request@npm:5.10.0"
@@ -2406,6 +2523,13 @@ __metadata:
   version: 3.3.0
   resolution: "luxon@npm:3.3.0"
   checksum: 50cf17a0dc155c3dcacbeae8c0b7e80db425e0ba97b9cbdf12a7fc142d841ff1ab1560919f033af46240ed44e2f70c49f76e3422524c7fc8bb8d81ca47c66187
+  languageName: node
+  linkType: hard
+
+"luxon@npm:~3.4.0":
+  version: 3.4.4
+  resolution: "luxon@npm:3.4.4"
+  checksum: 36c1f99c4796ee4bfddf7dc94fa87815add43ebc44c8934c924946260a58512f0fd2743a629302885df7f35ccbd2d13f178c15df046d0e3b6eb71db178f1c60c
   languageName: node
   linkType: hard
 
@@ -2639,7 +2763,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"node-fetch@npm:^2.6.12":
+"node-fetch@npm:^2.6.12, node-fetch@npm:^2.7.0":
   version: 2.7.0
   resolution: "node-fetch@npm:2.7.0"
   dependencies:
@@ -3891,6 +4015,15 @@ __metadata:
     tsc: bin/tsc
     tsserver: bin/tsserver
   checksum: 0f4da2f15e6f1245e49db15801dbee52f2bbfb267e1c39225afdab5afee1a72839cd86000e65ee9d7e4dfaff12239d28beaf5ee431357fcced15fb08583d72ca
+  languageName: node
+  linkType: hard
+
+"undici@npm:^5.28.2":
+  version: 5.28.3
+  resolution: "undici@npm:5.28.3"
+  dependencies:
+    "@fastify/busboy": ^2.0.0
+  checksum: fa1e65aff896c5e2ee23637b632e306f9e3a2b32a3dc0b23ea71e5555ad350bcc25713aea894b3dccc0b7dc2c5e92a5a58435ebc2033b731a5524506f573dfd2
   languageName: node
   linkType: hard
 

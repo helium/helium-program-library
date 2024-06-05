@@ -7,6 +7,10 @@ import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 
+function secsToDays(secs: number): number {
+  return secs / (60 * 60 * 24);
+}
+
 export const useFlipPositionLockupKind = () => {
   const { provider, unixNow } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
@@ -98,7 +102,3 @@ export const useFlipPositionLockupKind = () => {
     flipPositionLockupKind: execute,
   };
 };
-
-function secsToDays(secs: number): number {
-  return secs / (60 * 60 * 24);
-}

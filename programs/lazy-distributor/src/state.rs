@@ -29,4 +29,9 @@ pub struct RecipientV0 {
   pub current_config_version: u16,
   pub current_rewards: Vec<Option<u64>>, // One for each oracle, matching indexes in` LazyDistrubutorV0`
   pub bump_seed: u8,
+  // Reserved bytes to push destination out of the blast radius of current_rewards being
+  // Vec<None> and serializing with extra bytes left over at the end.
+  pub reserved: u64,
+  /// Pubkey::Default if not being used.
+  pub destination: Pubkey,
 }

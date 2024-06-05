@@ -40,6 +40,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | subDao               | immut      | no     |      |
 | authority            | immut      | yes    |      |
 | rentReclaimAuthority | immut      | no     |      |
+| startAuthority       | immut      | no     |      |
 | priceOracle          | immut      | no     |      |
 | dntMint              | immut      | no     |      |
 | boostConfig          | mut        | no     |      |
@@ -55,18 +56,17 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 #### Accounts
 
-| Name              | Mutability | Signer | Docs |
-| ----------------- | ---------- | ------ | ---- |
-| startAuthority    | immut      | yes    |      |
-| boostConfig       | immut      | no     |      |
-| carrier           | immut      | no     |      |
-| hexboostAuthority | immut      | yes    |      |
-| boostedHex        | mut        | no     |      |
+| Name           | Mutability | Signer | Docs |
+| -------------- | ---------- | ------ | ---- |
+| startAuthority | immut      | yes    |      |
+| boostConfig    | immut      | no     |      |
+| boostedHex     | mut        | no     |      |
 
 #### Args
 
-| Name | Type | Docs |
-| ---- | ---- | ---- |
+| Name | Type             | Docs |
+| ---- | ---------------- | ---- |
+| args | StartBoostArgsV0 |      |
 
 ### closeBoostV0
 
@@ -83,6 +83,22 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
+### updateBoostConfigV0
+
+#### Accounts
+
+| Name        | Mutability | Signer | Docs |
+| ----------- | ---------- | ------ | ---- |
+| subDao      | immut      | no     |      |
+| authority   | immut      | yes    |      |
+| boostConfig | mut        | no     |      |
+
+#### Args
+
+| Name | Type                    | Docs |
+| ---- | ----------------------- | ---- |
+| args | UpdateBoostConfigArgsV0 |      |
+
 ## Accounts
 
 ### BoostConfigV0
@@ -97,6 +113,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | periodLength         | u32       |
 | minimumPeriods       | u16       |
 | bumpSeed             | u8        |
+| startAuthority       | publicKey |
 
 ### BoostedHexV0
 
@@ -108,16 +125,30 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | reserved       | [object Object] |
 | bumpSeed       | u8              |
 | boostsByPeriod | bytes           |
+| version        | u32             |
+
+### BoostedHexV1
+
+| Field          | Type         |
+| -------------- | ------------ |
+| deviceType     | DeviceTypeV0 |
+| boostConfig    | publicKey    |
+| version        | u32          |
+| location       | u64          |
+| startTs        | i64          |
+| bumpSeed       | u8           |
+| boostsByPeriod | bytes        |
 
 ## Types
 
 ### BoostArgsV0
 
-| Field    | Type          |
-| -------- | ------------- |
-| location | u64           |
-| startTs  | i64           |
-| amounts  | BoostAmountV0 |
+| Field      | Type          |
+| ---------- | ------------- |
+| location   | u64           |
+| version    | u32           |
+| amounts    | BoostAmountV0 |
+| deviceType | DeviceTypeV0  |
 
 ### BoostAmountV0
 
@@ -133,3 +164,28 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | boostPrice     | u64  |
 | periodLength   | u32  |
 | minimumPeriods | u16  |
+
+### StartBoostArgsV0
+
+| Field   | Type |
+| ------- | ---- |
+| startTs | i64  |
+
+### UpdateBoostConfigArgsV0
+
+| Field                | Type      |
+| -------------------- | --------- |
+| startAuthority       | publicKey |
+| rentReclaimAuthority | publicKey |
+| boostPrice           | u64       |
+| minimumPeriods       | u16       |
+| priceOracle          | publicKey |
+
+### DeviceTypeV0
+
+| Variant     | Fields |
+| ----------- | ------ |
+| CbrsIndoor  |        |
+| CbrsOutdoor |        |
+| WifiIndoor  |        |
+| WifiOutdoor |        |

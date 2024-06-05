@@ -1,7 +1,14 @@
-use crate::{current_epoch, error::ErrorCode, id, state::*, utils::*};
+use self::borsh::BorshSerialize;
+use crate::{
+  create_account::{create_and_serialize_account_signed, AccountMaxSize},
+  current_epoch,
+  error::ErrorCode,
+  id,
+  state::*,
+  utils::*,
+};
 use anchor_lang::{prelude::*, Discriminator};
 use anchor_spl::token::{Mint, TokenAccount};
-use spl_governance_tools::account::{create_and_serialize_account_signed, AccountMaxSize};
 
 use voter_stake_registry::{
   state::{LockupKind, PositionV0, Registrar},
@@ -94,7 +101,7 @@ pub struct SubDaoEpochInfoV0WithDescriminator {
   pub sub_dao_epoch_info: SubDaoEpochInfoV0,
 }
 
-impl crate::borsh::BorshSerialize for SubDaoEpochInfoV0WithDescriminator {
+impl BorshSerialize for SubDaoEpochInfoV0WithDescriminator {
   fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
     SubDaoEpochInfoV0::DISCRIMINATOR.serialize(writer)?;
     self.sub_dao_epoch_info.serialize(writer)

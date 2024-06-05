@@ -163,7 +163,11 @@ pub fn handler(ctx: Context<IssueDataOnlyEntityV0>, args: IssueDataOnlyEntityArg
   let metadata = MetadataArgs {
     name: name[..min(name.len(), 32)].to_owned(),
     symbol: String::from("HOTSPOT"),
-    uri: format!("{}/{}", ENTITY_METADATA_URL, key_str),
+    uri: format!(
+      "{}/v2/hotspot/{}",
+      ENTITY_METADATA_URL,
+      ctx.accounts.key_to_asset.key()
+    ),
     collection: Some(Collection {
       key: ctx.accounts.collection.key(),
       verified: false, // Verified in cpi

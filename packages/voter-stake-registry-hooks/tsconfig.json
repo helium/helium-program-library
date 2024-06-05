@@ -14,6 +14,9 @@
       "path": "../voter-stake-registry-sdk"
     },
     {
+      "path": "../circuit-breaker-sdk"
+    },
+    {
       "path": "../helium-sub-daos-sdk"
     },
     {

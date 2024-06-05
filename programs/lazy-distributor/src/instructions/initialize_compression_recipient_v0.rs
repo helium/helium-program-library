@@ -27,7 +27,7 @@ pub struct InitializeCompressionRecipientV0<'info> {
   #[account(
     init,
     payer = payer,
-    space = 8 + 60 + std::mem::size_of::<RecipientV0>(),
+    space = 8 + 60 + std::mem::size_of::<RecipientV0>() + 8 * lazy_distributor.oracles.len(),
     seeds = [
       "recipient".as_bytes(), 
       lazy_distributor.key().as_ref(),
@@ -70,6 +70,8 @@ pub fn handler<'info>(
     current_rewards: vec![None; ctx.accounts.lazy_distributor.oracles.len()],
     lazy_distributor: ctx.accounts.lazy_distributor.key(),
     bump_seed: ctx.bumps["recipient"],
+    destination: Pubkey::default(),
+    reserved: 0,
   });
 
   Ok(())

@@ -104,7 +104,7 @@ export async function run(args: any = process.argv) {
   const signed = await provider.wallet.signTransaction(tx);
   await sendAndConfirmWithRetry(
     provider.connection,
-    signed.serialize(),
+    Buffer.from(signed.serialize()),
     { skipPreflight: true },
     'confirmed'
   );

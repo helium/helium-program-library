@@ -12,6 +12,7 @@ use helium_entity_manager::{accounts::SetEntityActiveV0, SetEntityActiveArgsV0};
 use helium_entity_manager::{
   accounts::TempPayMobileOnboardingFeeV0, IotHotspotInfoV0, MobileDeviceTypeV0, MobileHotspotInfoV0,
 };
+use hpl_utils::construct_and_send_txs;
 use hpl_utils::dao::Dao;
 use hpl_utils::token::Token;
 use hpl_utils::SendResult;
@@ -298,7 +299,7 @@ async fn main() -> Result<()> {
   // send transactions
   println!("Sending mark active transactions");
   construct_and_send_txs(
-    &helium_entity_program,
+    &helium_entity_program.rpc(),
     &tpu_client,
     mark_active_ixs,
     &kp,
@@ -307,7 +308,7 @@ async fn main() -> Result<()> {
 
   println!("Sending mark inactive transactions");
   construct_and_send_txs(
-    &helium_entity_program,
+    &helium_entity_program.rpc(),
     &tpu_client,
     mark_inactive_ixs,
     &kp,
@@ -352,136 +353,6 @@ fn check_validity<C: Deref<Target = impl Signer> + Clone>(
 
   println!("Scanned {} entities", entity_keys.len());
   println!("Found {} invalid iot infos", invalid_infos.len());
-  Ok(())
-}
-
-const MAX_TX_LEN: usize = 1232;
-const MAX_BLOCKHASH_RETRIES: usize = 10;
-
-fn construct_and_send_txs<
-  P: ConnectionPool<NewConnectionConfig = C>,
-  M: ConnectionManager<ConnectionPool = P, NewConnectionConfig = C>,
-  C: NewConnectionConfig,
-  A: Deref<Target = impl Signer> + Clone,
->(
-  helium_entity_program: &Program<A>,
-  tpu_client: &TpuClient<P, M, C>,
-  ixs: Vec<Instruction>,
-  payer: &Keypair,
-  dry_run: bool,
-) -> Result<()> {
-  if ixs.is_empty() {
-    return Ok(());
-  }
-  // send transactions in batches so blockhash doesn't expire
-  let transaction_batch_size = 100;
-  println!("Ixs to execute: {}", ixs.len());
-  let priority_fee_lamports: u32 = env::var("PRIORITY_FEE_LAMPORTS")
-    .context("Failed to get env var PRIORITY_FEE_LAMPORTS")
-    .and_then(|v| {
-      v.parse::<u32>()
-        .map_err(|e| anyhow!("Failed to parse PRIORITY_FEE_LAMPORTS: {}", e))
-    })
-    .unwrap_or(1);
-  let mut instructions = vec![
-    ComputeBudgetInstruction::set_compute_unit_limit(600000),
-    ComputeBudgetInstruction::set_compute_unit_price(
-      (f64::from(priority_fee_lamports) / (600000_f64 * 0.000001_f64)).ceil() as u64,
-    ),
-  ];
-  let mut ix_groups = Vec::new();
-  let blockhash = helium_entity_program.rpc().get_latest_blockhash()?;
-  // Pack as many ixs as possible into a tx, then send batches of 100
-  for ix in ixs {
-    instructions.push(ix.clone());
-    let mut tx = Transaction::new_with_payer(&instructions, Some(&helium_entity_program.payer()));
-    tx.try_sign(&[payer], blockhash)
-      .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
-    let tx_len = bincode::serialize(&tx).unwrap().len();
-
-    if tx_len > MAX_TX_LEN || tx.message.account_keys.len() > 64 {
-      // clear instructions except for last one
-      instructions.pop();
-      ix_groups.push(instructions);
-
-      // clear instructions except for last one
-      instructions = vec![
-        ComputeBudgetInstruction::set_compute_unit_limit(600000),
-        ComputeBudgetInstruction::set_compute_unit_price(
-          (f64::from(priority_fee_lamports) / (600000_f64 * 0.000001_f64)).ceil() as u64,
-        ),
-        ix.clone(),
-      ];
-    }
-  }
-
-  // Send last group of txns
-  if instructions.len() > 0 {
-    ix_groups.push(instructions);
-  }
-
-  if !dry_run {
-    for tx_ix_group in ix_groups.chunks(transaction_batch_size) {
-      let mut retries = 0;
-      let confirmed_indexes: Vec<usize> = vec![];
-      let mut group_to_send = tx_ix_group.to_vec();
-
-      // Continually retry forming instruction groups into transactions and sending them until all are confirmed,
-      // or blockhashes have expired too many times.
-      while retries < MAX_BLOCKHASH_RETRIES {
-        let blockhash = helium_entity_program.rpc().get_latest_blockhash()?;
-        let txs: Vec<Transaction> = group_to_send
-          .iter()
-          .map(|group| {
-            let mut tx = Transaction::new_with_payer(group, Some(&helium_entity_program.payer()));
-            tx.try_sign(&[payer], blockhash)
-              .map_err(|e| anyhow!("Error while signing tx: {e}"))?;
-            Ok(tx)
-          })
-          .collect::<Result<Vec<_>, anyhow::Error>>()?;
-
-        let SendResult {
-          failure_count,
-          confirmed_signatures,
-          ..
-        } = send_and_confirm_messages_with_spinner(
-          helium_entity_program.rpc().into(),
-          &tpu_client,
-          &txs
-            .iter()
-            .map(|tx| {
-              bincode::serialize(&tx.clone()).map_err(|e| anyhow!("Failed to serialize tx: {e}"))
-            })
-            .collect::<Result<Vec<_>, anyhow::Error>>()
-            .context("Failed to serialize txs")?,
-        )
-        .context("Failed sending transactions")?;
-
-        if failure_count > 0 {
-          return Err(anyhow!("{} transactions failed", failure_count));
-        }
-
-        group_to_send = group_to_send
-          .into_iter()
-          .enumerate()
-          .filter_map(|(i, group)| {
-            if confirmed_signatures.get(i).is_some() {
-              Some(group)
-            } else {
-              None
-            }
-          })
-          .collect();
-
-        if confirmed_indexes.is_empty() {
-          break;
-        }
-
-        retries += 1;
-      }
-    }
-  }
-
   Ok(())
 }
 

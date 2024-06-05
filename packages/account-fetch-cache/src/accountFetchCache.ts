@@ -1,14 +1,18 @@
 import {
   AccountInfo,
+  AddressLookupTableAccount,
   Commitment,
   Connection,
   PublicKey,
   SendOptions,
   Transaction,
   TransactionInstruction,
+  VersionedMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import { EventEmitter } from "./eventEmitter";
 import { getMultipleAccounts } from "./getMultipleAccounts";
+import { TransactionCompletionQueue } from "./transactionCompletionQueue";
 
 export const DEFAULT_CHUNK_SIZE = 99;
 export const DEFAULT_DELAY = 50;
@@ -177,18 +181,28 @@ export class AccountFetchCache {
         return self.oldGetAccountinfo!(publicKey, com);
       };
     }
+
+    const queue = new TransactionCompletionQueue({
+      connection,
+      log: this.enableLogging,
+    });
     connection.sendTransaction = async function overloadedSendTransaction(
       ...args: any[]
     ) {
       const result = await self.oldSendTransaction(...args);
+
       // First try to requery when confirmed. Then mop up any that didn't change during confirmed.
-      this.confirmTransaction(result, "confirmed")
-        .then(() => {
-          return self.requeryMissing(args[0].instructions);
+      queue
+        .wait("confirmed", result)
+        .then(async () => {
+          const instructions = args[0].instructions
+            ? args[0].instructions
+            : await getInstructions(connection, args[0]);
+          return self.requeryMissing(instructions);
         })
         .then(async (unchanged) => {
           if (unchanged.length > 0) {
-            await this.confirmTransaction(result, "finalized");
+            await queue.wait("finalized", result);
             return self.requeryMissingByAccount(unchanged);
           }
         })
@@ -204,16 +218,20 @@ export class AccountFetchCache {
       const result = await self.oldSendRawTransaction(rawTransaction, options);
 
       try {
-        const instructions = Transaction.from(rawTransaction).instructions;
+        const message = VersionedTransaction.deserialize(
+          new Uint8Array(rawTransaction)
+        ).message;
+        const instructions = await getInstructions(connection, message);
 
         // First try to requery when confirmed. Then mop up any that didn't change during confirmed.
-        this.confirmTransaction(result, "confirmed")
+        queue
+          .wait("confirmed", result)
           .then(() => {
             return self.requeryMissing(instructions);
           })
-          .then(async unchanged => {
+          .then(async (unchanged) => {
             if (unchanged.length > 0) {
-              await this.confirmTransaction(result, "finalized");
+              await queue.wait("finalized", result);
               return self.requeryMissingByAccount(unchanged);
             }
           })
@@ -235,13 +253,13 @@ export class AccountFetchCache {
     const writeableAccounts = Array.from(
       new Set(getWriteableAccounts(instructions).map((a) => a.toBase58()))
     );
-    return this.requeryMissingByAccount(writeableAccounts.map(a => new PublicKey(a)));
+    return this.requeryMissingByAccount(
+      writeableAccounts.map((a) => new PublicKey(a))
+    );
   }
 
-  async requeryMissingByAccount(
-    accounts: PublicKey[]
-  ): Promise<PublicKey[]> {
-    const writeableAccounts = accounts.map(a => a.toBase58())
+  async requeryMissingByAccount(accounts: PublicKey[]): Promise<PublicKey[]> {
+    const writeableAccounts = accounts.map((a) => a.toBase58());
     const unchanged: PublicKey[] = [];
     await Promise.all(
       writeableAccounts.map(async (account) => {
@@ -257,7 +275,8 @@ export class AccountFetchCache {
         const changed =
           (prevAccount && !found) ||
           (found && !prevAccount) ||
-          (prevAccount && !found?.account.data.equals(prevAccount.account.data));
+          (prevAccount &&
+            !found?.account.data.equals(prevAccount.account.data));
         if (!changed) {
           unchanged.push(new PublicKey(account));
         }
@@ -306,6 +325,9 @@ export class AccountFetchCache {
     }
     try {
       const keys = Array.from(currentBatch);
+      if (keys.length === 0) {
+        return { keys: [], array: [] };
+      }
       const { array } = await getMultipleAccounts(
         this.connection,
         keys,
@@ -745,4 +767,32 @@ export class AccountFetchCache {
 
     return pubkey;
   }
+}
+
+async function getInstructions(
+  connection: Connection,
+  message: VersionedMessage
+): Promise<TransactionInstruction[]> {
+  const LUTs = (
+    await Promise.all(
+      message.addressTableLookups.map((acc) =>
+        connection.getAddressLookupTable(acc.accountKey)
+      )
+    )
+  )
+    .map((lut) => lut.value)
+    .filter((val) => val !== null) as AddressLookupTableAccount[];
+  const allAccs = message.getAccountKeys({ addressLookupTableAccounts: LUTs });
+
+  return message.compiledInstructions.map((ix) => {
+    return new TransactionInstruction({
+      programId: allAccs.get(ix.programIdIndex)!,
+      data: Buffer.from(ix.data),
+      keys: ix.accountKeyIndexes.map((key) => ({
+        pubkey: allAccs.get(key)!,
+        isSigner: message.isAccountSigner(key),
+        isWritable: message.isAccountWritable(key),
+      })),
+    });
+  });
 }

@@ -160,7 +160,7 @@ async fn run_transactions(
       }
 
       let result = send_and_confirm_messages_with_spinner(
-        rpc_client.clone(),
+        &rpc_client,
         &tpu_client,
         &response.transactions,
       );
@@ -193,7 +193,7 @@ async fn run_transactions(
       }
 
       let result = send_and_confirm_messages_with_spinner(
-        rpc_client.clone(),
+        &rpc_client,
         &tpu_client,
         &response.transactions,
       );
@@ -219,7 +219,7 @@ async fn run_transactions(
       .unwrap();
 
     let result = send_and_confirm_messages_with_spinner(
-      rpc_client.clone(),
+      &rpc_client,
       &tpu_client,
       &response.transactions,
     );
@@ -251,7 +251,7 @@ async fn run_transactions(
         }
 
         let result = send_and_confirm_messages_with_spinner(
-          rpc_client.clone(),
+          &rpc_client,
           &tpu_client,
           &response.transactions,
         );

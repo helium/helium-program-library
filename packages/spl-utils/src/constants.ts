@@ -14,3 +14,11 @@ export const IOT_MINT = new PublicKey("iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9f
 export const HNT_PYTH_PRICE_FEED = new PublicKey(
   "6Eg8YdfFJQF2HHonzPUBSCCmyUEhrStg9VBLK957sBe6"
 );
+
+export const HELIUM_COMMON_LUT_DEVNET = new PublicKey(
+  "FnqYkQ6ZKnVKdkvYCGsEeiP5qgGqVbcFUkGduy2ta4gA"
+);
+
+export const HELIUM_COMMON_LUT = new PublicKey(
+  "43eY9L2spbM2b1MPDFFBStUiFGt29ziZ1nc1xbpzsfVt"
+);

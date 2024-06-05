@@ -139,6 +139,7 @@ const start = async () => {
 
     const address = server.server.address();
     const port = typeof address === "string" ? address : address?.port;
+    await Reward.sync();
     console.log(`Running on 0.0.0.0:${port}`);
   } catch (err) {
     console.error(err);

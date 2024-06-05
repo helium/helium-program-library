@@ -94,7 +94,7 @@ export async function createCompressionNft({
     creators: [],
     editionNonce: 0,
     tokenProgramVersion: TokenProgramVersion.Original,
-    tokenStandard: TokenStandard.Fungible,
+    tokenStandard: TokenStandard.NonFungible,
     uses: null,
     collection: null,
     primarySaleHappened: false,
@@ -126,7 +126,7 @@ export async function createCompressionNft({
     await bubblegum.methods
       .mintToCollectionV1({
         ...metadata,
-        tokenStandard: { fungible: {} },
+        tokenStandard: { nonFungible: {} },
         tokenProgramVersion: { original: {} },
       })
       .accounts({
@@ -144,7 +144,7 @@ export async function createCompressionNft({
     await bubblegum.methods
       .mintV1({
         ...metadata,
-        tokenStandard: { fungible: {} },
+        tokenStandard: { nonFungible: {} },
         tokenProgramVersion: { original: {} },
       })
       .accounts({
@@ -197,7 +197,7 @@ export async function createMockCompression({
   merkle: PublicKey,
   hotspotOwner: Keypair,
 }) {
-
+  const kta = keyToAssetKey(dao, ecc, "b58")[0];
   const creators = [
     {
       address: entityCreatorKey(dao)[0],
@@ -205,7 +205,7 @@ export async function createMockCompression({
       share: 100,
     },
     {
-      address: keyToAssetKey(dao, ecc, "b58")[0],
+      address: kta,
       verified: true,
       share: 0,
     },
@@ -213,7 +213,7 @@ export async function createMockCompression({
   let metadata: any = {
     name: animalHash(ecc).replace(/\s/g, "-").toLowerCase().slice(0, 32),
     symbol: "HOTSPOT",
-    uri: `https://entities.nft.helium.io/${ecc}`,
+    uri: `https://entities.nft.helium.io/v2/hotspot/${kta.toBase58()}`,
     collection: {
       key: collection,
       verified: true,
@@ -283,5 +283,6 @@ export async function createMockCompression({
     getAssetFn,
     getAssetProofFn,
     hotspot,
+    metadata,
   }
 }

@@ -111,6 +111,12 @@ export function useAccounts<T>(
     }
   }, [accounts, eagerResult])
 
+  useEffect(() => {
+    if (!keys) {
+      setAccounts([]);
+    }
+  }, [keys]);
+
   const prevKeys = usePrevious(keys);
   const { result, loading, error, status } = useAsync(
     async (

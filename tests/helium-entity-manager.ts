@@ -839,6 +839,8 @@ describe("helium-entity-manager", () => {
 
       it("changes the metadata", async () => {
         const location = new BN(1000);
+        const elevation = 10;
+        const azimuth = 5;
 
         const method = (
           await updateMobileMetadata({
@@ -846,6 +848,8 @@ describe("helium-entity-manager", () => {
             assetId: hotspot,
             rewardableEntityConfig,
             location,
+            elevation,
+            azimuth,
             getAssetFn,
             getAssetProofFn,
           })
@@ -858,6 +862,8 @@ describe("helium-entity-manager", () => {
           info!
         );
         expect(storageAcc.location?.toNumber()).to.eq(location.toNumber());
+        expect(storageAcc.elevation).to.eq(elevation);
+        expect(storageAcc.azimuth).to.eq(azimuth);
       });
 
       it("oracle can update active status", async () => {

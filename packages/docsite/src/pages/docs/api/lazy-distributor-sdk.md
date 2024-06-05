@@ -108,7 +108,6 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | common             | immut      | no     |      |
 | merkleTree         | immut      | no     |      |
 | compressionProgram | immut      | no     |      |
-| tokenProgram       | immut      | no     |      |
 
 #### Args
 
@@ -131,6 +130,53 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type                        | Docs |
 | ---- | --------------------------- | ---- |
 | args | UpdateLazyDistributorArgsV0 |      |
+
+### updateCompressionDestinationV0
+
+#### Accounts
+
+| Name               | Mutability | Signer | Docs |
+| ------------------ | ---------- | ------ | ---- |
+| recipient          | mut        | no     |      |
+| owner              | immut      | yes    |      |
+| destination        | immut      | no     |      |
+| merkleTree         | immut      | no     |      |
+| compressionProgram | immut      | no     |      |
+
+#### Args
+
+| Name | Type                               | Docs |
+| ---- | ---------------------------------- | ---- |
+| args | UpdateCompressionDestinationArgsV0 |      |
+
+### updateDestinationV0
+
+#### Accounts
+
+| Name                 | Mutability | Signer | Docs |
+| -------------------- | ---------- | ------ | ---- |
+| recipient            | mut        | no     |      |
+| owner                | immut      | yes    |      |
+| destination          | immut      | no     |      |
+| recipientMintAccount | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
+### distributeCustomDestinationV0
+
+#### Accounts
+
+| Name   | Mutability | Signer | Docs |
+| ------ | ---------- | ------ | ---- |
+| common | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
 
 ## Accounts
 
@@ -156,6 +202,8 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | currentConfigVersion | u16             |
 | currentRewards       | [object Object] |
 | bumpSeed             | u8              |
+| reserved             | u64             |
+| destination          | publicKey       |
 
 ## Types
 
@@ -200,6 +248,15 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | -------------- | ---- |
 | oracleIndex    | u16  |
 | currentRewards | u64  |
+
+### UpdateCompressionDestinationArgsV0
+
+| Field       | Type            |
+| ----------- | --------------- |
+| dataHash    | [object Object] |
+| creatorHash | [object Object] |
+| root        | [object Object] |
+| index       | u32             |
 
 ### UpdateLazyDistributorArgsV0
 

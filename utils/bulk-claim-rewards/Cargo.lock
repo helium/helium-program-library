@@ -15,7 +15,7 @@ dependencies = [
 [[package]]
 name = "account-compression-cpi"
 version = "0.1.2"
-source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=a2d12e4a157d91feb73aa40a97fe297fd477dd87#a2d12e4a157d91feb73aa40a97fe297fd477dd87"
+source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=a499196#a499196fd0f57227dce46c59d6f5a92d0a46ea84"
 dependencies = [
  "anchor-gen",
  "anchor-lang",
@@ -966,7 +966,7 @@ dependencies = [
 [[package]]
 name = "bubblegum-cpi"
 version = "0.9.2"
-source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=a2d12e4a157d91feb73aa40a97fe297fd477dd87#a2d12e4a157d91feb73aa40a97fe297fd477dd87"
+source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=a499196#a499196fd0f57227dce46c59d6f5a92d0a46ea84"
 dependencies = [
  "anchor-gen",
  "anchor-lang",
@@ -1585,7 +1585,7 @@ dependencies = [
 
 [[package]]
 name = "data-credits"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2264,7 +2264,7 @@ dependencies = [
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.2.1"
+version = "0.2.5"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -2278,13 +2278,14 @@ dependencies = [
  "helium-sub-daos",
  "mpl-token-metadata",
  "no-emit",
+ "pyth-sdk-solana",
  "shared-utils",
  "solana-security-txt",
 ]
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.1.0"
+version = "0.1.6"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2293,7 +2294,6 @@ dependencies = [
  "mpl-token-metadata",
  "shared-utils",
  "solana-security-txt",
- "spl-governance-tools",
  "time 0.3.20",
  "treasury-management",
  "voter-stake-registry",
@@ -2711,7 +2711,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-transactions"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3008,6 +3008,18 @@ dependencies = [
  "libc",
  "memoffset 0.7.1",
  "pin-utils",
+]
+
+[[package]]
+name = "no-emit"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "default-env",
+ "helium-sub-daos",
+ "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]
@@ -3838,18 +3850,6 @@ dependencies = [
  "web-sys",
  "webpki-roots 0.25.2",
  "winreg",
-]
-
-[[package]]
-name = "no-emit"
-version = "0.0.1"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "default-env",
- "helium-sub-daos",
- "shared-utils",
- "solana-security-txt",
 ]
 
 [[package]]
@@ -5238,7 +5238,7 @@ dependencies = [
  "num-derive 0.4.0",
  "num-traits",
  "solana-program",
- "spl-token 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spl-token 4.0.0",
  "spl-token-2022 0.8.0",
  "thiserror",
 ]
@@ -5286,52 +5286,6 @@ dependencies = [
  "quote 1.0.33",
  "solana-program",
  "syn 2.0.37",
- "thiserror",
-]
-
-[[package]]
-name = "spl-governance"
-version = "3.1.1"
-source = "git+https://github.com/solana-labs/solana-program-library.git#7492e38b8577eef4defb5d02caadf82162887c68"
-dependencies = [
- "arrayref",
- "bincode",
- "borsh 0.10.3",
- "num-derive 0.4.0",
- "num-traits",
- "serde",
- "serde_derive",
- "solana-program",
- "spl-governance-addin-api",
- "spl-governance-tools",
- "spl-token 4.0.0 (git+https://github.com/solana-labs/solana-program-library.git)",
- "thiserror",
-]
-
-[[package]]
-name = "spl-governance-addin-api"
-version = "0.1.3"
-source = "git+https://github.com/solana-labs/solana-program-library.git#7492e38b8577eef4defb5d02caadf82162887c68"
-dependencies = [
- "borsh 0.10.3",
- "solana-program",
- "spl-governance-tools",
-]
-
-[[package]]
-name = "spl-governance-tools"
-version = "0.1.3"
-source = "git+https://github.com/solana-labs/solana-program-library.git#7492e38b8577eef4defb5d02caadf82162887c68"
-dependencies = [
- "arrayref",
- "bincode",
- "borsh 0.10.3",
- "num-derive 0.4.0",
- "num-traits",
- "serde",
- "serde_derive",
- "solana-program",
- "spl-token 4.0.0 (git+https://github.com/solana-labs/solana-program-library.git)",
  "thiserror",
 ]
 
@@ -5436,20 +5390,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "spl-token"
-version = "4.0.0"
-source = "git+https://github.com/solana-labs/solana-program-library.git#7492e38b8577eef4defb5d02caadf82162887c68"
-dependencies = [
- "arrayref",
- "bytemuck",
- "num-derive 0.4.0",
- "num-traits",
- "num_enum 0.7.0",
- "solana-program",
- "thiserror",
-]
-
-[[package]]
 name = "spl-token-2022"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5482,7 +5422,7 @@ dependencies = [
  "solana-zk-token-sdk",
  "spl-memo 4.0.0",
  "spl-pod",
- "spl-token 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spl-token 4.0.0",
  "spl-token-metadata-interface",
  "spl-transfer-hook-interface",
  "spl-type-length-value",
@@ -6135,7 +6075,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.2.4"
+version = "0.3.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -6147,9 +6087,6 @@ dependencies = [
  "shared-utils",
  "solana-program",
  "solana-security-txt",
- "spl-governance",
- "spl-governance-addin-api",
- "spl-governance-tools",
  "static_assertions",
 ]
 

@@ -114,7 +114,7 @@ async fn main() -> Result<()> {
       .context("Failed to serialize txs")?;
 
     let SendResult { failure_count, .. } = send_and_confirm_messages_with_spinner(
-      helium_entity_program.rpc().into(),
+      &helium_entity_program.rpc(),
       &tpu_client,
       &serialized_txs,
     )

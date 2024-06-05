@@ -152,9 +152,6 @@ pub fn handler(ctx: Context<ConfigureVotingMintV0>, args: ConfigureVotingMintArg
     }),
   }
 
-  // Check for overflow in vote weight
-  registrar.max_vote_weight(ctx.remaining_accounts)?;
-
   resize_to_fit(
     &ctx.accounts.payer.to_account_info(),
     &ctx.accounts.system_program.to_account_info(),
