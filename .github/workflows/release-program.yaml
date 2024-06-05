@@ -68,7 +68,7 @@ jobs:
       - uses: ./.github/actions/buffer-deploy/
         id: buffer-deploy
         with:
-          network: https://api.mainnet-beta.solana.com
+          network: ${{ secrets.SOLANA_DEPLOY_URL }}
           program: ${{ env.PROGRAM_NAME }}
           keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
           program-id: ${{ env.PROGRAM_ID }}
