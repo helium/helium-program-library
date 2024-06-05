@@ -592,8 +592,7 @@ export async function formTransaction({
         })
         .instruction()
     );
-  }
-  if (assetAcc.compression.compressed) {
+  } else if (assetAcc.compression.compressed) {
     const distributeIx = await (
       await distributeCompressionRewards({
         program: lazyDistributorProgram,
