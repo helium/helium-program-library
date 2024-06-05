@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.7.16](https://github.com/helium/helium-program-library/compare/v0.7.12...v0.7.16) (2024-06-05)
+
+**Note:** Version bump only for package @helium/xnft-hotspot
+
+
+
+
+
 ## [0.7.15](https://github.com/helium/helium-program-library/compare/v0.7.12...v0.7.15) (2024-06-05)
 
 **Note:** Version bump only for package @helium/xnft-hotspot
