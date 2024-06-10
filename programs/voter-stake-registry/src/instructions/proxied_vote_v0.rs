@@ -95,10 +95,10 @@ pub fn handler(ctx: Context<ProxiedVoteV0>, args: VoteArgsV0) -> Result<()> {
   let weight = if marker.weight > 0 {
     marker.weight
   } else {
-    u128::from(ctx.accounts.position.voting_power(
+    ctx.accounts.position.voting_power(
       voting_mint_config,
       ctx.accounts.registrar.clock_unix_timestamp(),
-    )?)
+    )?
   };
   marker.weight = weight;
 
