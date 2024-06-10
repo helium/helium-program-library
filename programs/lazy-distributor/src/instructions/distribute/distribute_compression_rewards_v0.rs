@@ -2,7 +2,6 @@ use super::common::*;
 use crate::error::ErrorCode;
 use account_compression_cpi::program::SplAccountCompression;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Token;
 use bubblegum_cpi::get_asset_id;
 use shared_utils::*;
 
@@ -20,7 +19,6 @@ pub struct DistributeCompressionRewardsV0<'info> {
   /// CHECK: The merkle tree
   pub merkle_tree: UncheckedAccount<'info>,
   pub compression_program: Program<'info, SplAccountCompression>,
-  pub token_program: Program<'info, Token>,
 }
 
 pub fn handler<'info>(

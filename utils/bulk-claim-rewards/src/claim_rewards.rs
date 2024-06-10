@@ -958,7 +958,6 @@ fn construct_distribute_rewards_accounts<C: Deref<Target = impl Signer> + Clone>
     },
     merkle_tree,
     compression_program,
-    token_program: anchor_spl::token::ID,
   })
 }
 

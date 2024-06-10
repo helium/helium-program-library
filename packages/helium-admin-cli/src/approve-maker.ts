@@ -1,15 +1,16 @@
 import * as anchor from "@coral-xyz/anchor";
-import { boostConfigKey, init as initHex } from "@helium/hexboosting-sdk";
-import { MOBILE_MINT } from "@helium/spl-utils";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import {
+  rewardableEntityConfigKey,
+  makerKey,
+  init as initHem,
+} from "@helium/helium-entity-manager-sdk";
+import { subDaoKey, daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
+import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
 import { loadKeypair, sendInstructionsOrSquads } from "./utils";
-import {
-  init as initHsd,
-  subDaoKey,
-} from "@helium/helium-sub-daos-sdk";
+import { HNT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -22,6 +23,23 @@ export async function run(args: any = process.argv) {
       alias: "u",
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
+    },
+    dntMint: {
+      type: "string",
+      describe: "DNT mint of the subdao to approve on",
+      default: MOBILE_MINT.toBase58(),
+    },
+    name: {
+      alias: "n",
+      type: "string",
+      required: true,
+      describe: "Name of the maker to approve, case sensitive",
+    },
+    symbol: {
+      alias: "s",
+      type: "string",
+      required: true,
+      describe: "The symbol of the entity config",
     },
     executeTransaction: {
       type: "boolean",
@@ -36,31 +54,6 @@ export async function run(args: any = process.argv) {
       describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
-    startAuthority: {
-      type: "string",
-      describe: "The new start authority to set",
-    },
-    rentReclaimAuthority: {
-      type: "string",
-      describe: "The rent reclaim authority to set",
-    },
-    priceOracle: {
-      type: "string",
-      describe: "The new price oracle to set",
-    },
-    minimumPeriods: {
-      type: "number",
-      describe: "The new minimum number of periods",
-    },
-    boostPrice: {
-      type: "string",
-      describe: "The boost price in bones",
-    },
-    dntMint: {
-      type: "string",
-      describe: "DNT mint of the boost config",
-      default: MOBILE_MINT.toBase58(),
-    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -68,31 +61,27 @@ export async function run(args: any = process.argv) {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
-  const program = await initHex(provider);
+  const program = await initHem(provider);
   const hsdProgram = await initHsd(provider);
 
   const instructions: TransactionInstruction[] = [];
 
   const dntMint = new PublicKey(argv.dntMint);
-  const subDaoK = subDaoKey(dntMint)[0]
-  const subDao = await hsdProgram.account.subDaoV0.fetch(subDaoK)
+  const subDao = subDaoKey(dntMint)[0];
+  const authority = (await hsdProgram.account.subDaoV0.fetch(subDao)).authority;
+  const maker = makerKey(daoKey(HNT_MINT)[0], argv.name)[0];
+  const entityConfigKey = (
+    await rewardableEntityConfigKey(subDao, argv.symbol.toUpperCase())
+  )[0];
 
   instructions.push(
     await program.methods
-      .updateBoostConfigV0({
-        startAuthority: argv.startAuthority
-          ? new PublicKey(argv.startAuthority)
-          : null,
-        rentReclaimAuthority: argv.rentReclaimAuthority
-          ? new PublicKey(argv.rentReclaimAuthority)
-          : null,
-        priceOracle: argv.priceOracle ? new PublicKey(argv.priceOracle) : null,
-        minimumPeriods: argv.minimumPeriods || null,
-        boostPrice: argv.boostPrice ? new anchor.BN(argv.boostPrice) : null,
-      })
+      .approveMakerV0()
       .accounts({
-        boostConfig: boostConfigKey(dntMint)[0],
-        authority: subDao.authority,
+        maker,
+        authority,
+        rewardableEntityConfig: entityConfigKey,
+        payer: authority
       })
       .instruction()
   );

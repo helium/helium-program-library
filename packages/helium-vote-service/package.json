@@ -37,11 +37,11 @@
     "@helium/organization-sdk": "^0.0.5",
     "@helium/spl-utils": "^0.7.6",
     "@helium/voter-stake-registry-sdk": "^0.7.6",
+    "@solana/web3.js": "^1.78.8",
     "dotenv": "^16.0.3",
     "fastify": "^4.13.0",
     "sequelize": "^6.28.0",
-    "simple-git": "^3.21.0",
-    "@solana/web3.js": "^1.78.8"
+    "simple-git": "^3.21.0"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.1",

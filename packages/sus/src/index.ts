@@ -466,7 +466,9 @@ export async function sus({
       }
       if (
         instructions.some(
-          (ix) => ix.parsed?.name === "updateDestinationV0"
+          (ix) =>
+            ix.parsed?.name === "updateDestinationV0" ||
+            ix.parsed?.name === "updateCompressionDestinationV0"
         )
       ) {
         warningsByTx[index].push({

@@ -73,9 +73,10 @@ pub struct CloseDelegationV0<'info> {
       "sub_dao_epoch_info".as_bytes(), 
       sub_dao.key().as_ref(),
       &current_epoch(
-        // Avoid passing an extra account if the end is 0 (no genesis on this position).
-        // Pass instead closing time epoch info, txn account deduplication will reduce the overall tx size
-        if position.genesis_end == 0 {
+        // If the genesis piece is no longer in effect (has been purged), 
+        // no need to pass an extra account here. Just pass the closing time sdei and
+        // do not change it.
+        if position.genesis_end <= registrar.clock_unix_timestamp() {
           position.lockup.end_ts
         } else {
           position.genesis_end
@@ -116,9 +117,16 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   msg!("Vehnt calculations: {:?}", vehnt_info);
 
   // don't allow unstake without claiming available rewards
+  // make sure to account for when the position ends
   // unless we're testing, in which case we don't care
   let curr_epoch = current_epoch(curr_ts);
-  assert!((ctx.accounts.delegated_position.last_claimed_epoch >= curr_epoch - 1) || TESTING);
+  let to_claim_to_epoch =
+    if position.lockup.end_ts < curr_ts && position.lockup.kind == LockupKind::Cliff {
+      current_epoch(position.lockup.end_ts)
+    } else {
+      curr_epoch - 1
+    };
+  assert!((ctx.accounts.delegated_position.last_claimed_epoch >= to_claim_to_epoch) || TESTING);
 
   let delegated_position = &mut ctx.accounts.delegated_position;
   let sub_dao = &mut ctx.accounts.sub_dao;
@@ -166,7 +174,9 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
 
   // Once start ts passes, everything gets purged. We only
   // need this correction when the epoch has not passed
-  if ctx.accounts.genesis_end_sub_dao_epoch_info.start_ts() > curr_ts {
+  if position.genesis_end > curr_ts
+    && ctx.accounts.genesis_end_sub_dao_epoch_info.start_ts() > curr_ts
+  {
     genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions =
       genesis_end_sub_dao_epoch_info
         .fall_rates_from_closing_positions

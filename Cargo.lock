@@ -1958,7 +1958,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1999,7 +1999,7 @@ dependencies = [
 
 [[package]]
 name = "hexboosting"
-version = "0.0.5"
+version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2294,7 +2294,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-distributor"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -5669,7 +5669,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
