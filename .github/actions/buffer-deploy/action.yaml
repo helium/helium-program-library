@@ -56,7 +56,7 @@ runs:
         timeout_minutes: 30
         max_attempts: 10
         shell: bash
-        command: solana program write-buffer --max-sign-attempts 50 --with-compute-unit-price 1000000 --use-rpc --buffer ./keyp -k ./deploy-keypair.json ./target/deploy/$PROGRAM.so -u $NETWORK > ./buffer.out
+        command: solana program write-buffer --max-sign-attempts 50 --with-compute-unit-price 100000 --use-rpc --buffer ./keyp -k ./deploy-keypair.json ./target/deploy/$PROGRAM.so -u $NETWORK > ./buffer.out
       env:
         NETWORK: ${{ inputs.network }}
         PROGRAM: ${{ inputs.program }}
