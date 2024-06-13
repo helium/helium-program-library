@@ -35,9 +35,9 @@ export async function run(args: any = process.argv) {
       describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
-    delegationSeasonsFile: {
+    proxySeasonsFile: {
       type: "string",
-      default: `${__dirname}/../../delegation-seasons.json`,
+      default: `${__dirname}/../../proxy-seasons.json`,
     },
   });
 
@@ -61,11 +61,11 @@ export async function run(args: any = process.argv) {
   const vsrProgram = await initVsr(provider);
   const registrar = new PublicKey(argv.registrar);
 
-  const delegationSeasonsFile = fs.readFileSync(
-    argv.delegationSeasonsFile,
+  const proxySeasonsFile = fs.readFileSync(
+    argv.proxySeasonsFile,
     "utf8"
   );
-  const seasons = JSON.parse(delegationSeasonsFile).map(
+  const seasons = JSON.parse(proxySeasonsFile).map(
     (s) => new anchor.BN(Math.floor(Date.parse(s) / 1000))
   );
 
