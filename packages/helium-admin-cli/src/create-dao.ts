@@ -288,7 +288,7 @@ export async function run(args: any = process.argv) {
       // Set max time to 2 years, though seasons should take precedent
       maxProxyTime: new anchor.BN(24 * 60 * 60 * 365 * 2),
       seasons,
-      name: "Helium",
+      name: "Helium V1",
     })
     .accounts({
       authority,

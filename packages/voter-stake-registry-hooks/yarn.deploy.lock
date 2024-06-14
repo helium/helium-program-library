@@ -386,6 +386,7 @@ __metadata:
     "@solana/wallet-adapter-base": ^0.9.22
     "@solana/wallet-adapter-react": ^0.15.32
     "@solana/web3.js": ^1.78.8
+    "@tanstack/react-query": ^5.45.0
     axios: ^1.3.6
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -780,6 +781,24 @@ __metadata:
     rpc-websockets: ^7.5.1
     superstruct: ^0.14.2
   checksum: 5b251915057368d0615d6a6f0de7b4d4129c3d0643599551c0a342125601418634851b633a47d19da481973406f0f2928fa4bf1a2c57fb19914e69fd5b81c302
+  languageName: node
+  linkType: hard
+
+"@tanstack/query-core@npm:5.45.0":
+  version: 5.45.0
+  resolution: "@tanstack/query-core@npm:5.45.0"
+  checksum: a3c13d90cfa12955d22fa754ebfddbea70081fc0128111083269bdd78ed0d25678f050007b753164a929a00fdef9ee5ebba945deb8e360120ae3cbae06e655a5
+  languageName: node
+  linkType: hard
+
+"@tanstack/react-query@npm:^5.45.0":
+  version: 5.45.0
+  resolution: "@tanstack/react-query@npm:5.45.0"
+  dependencies:
+    "@tanstack/query-core": 5.45.0
+  peerDependencies:
+    react: ^18.0.0
+  checksum: 3f2896e132e2fc4f5a2b77e015719cd8f74a3b5ce958d3d2ffc83cc9bd8a1a265ed54835a8751daf00b85af7bf15f8ad1a9fe123dafdfdfe3e81f17e585d0e95
   languageName: node
   linkType: hard
 

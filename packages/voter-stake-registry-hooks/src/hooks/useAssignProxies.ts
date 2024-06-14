@@ -3,18 +3,22 @@ import { PROGRAM_ID, init, proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import {
   Status,
   batchParallelInstructionsWithPriorityFee,
-  truthy
+  truthy,
 } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
-import { PositionWithMeta } from "../sdk/types";
+import { PositionWithMeta, ProxyAssignmentV0 } from "../sdk/types";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ProxyAssignment } from "@helium/voter-stake-registry-sdk";
 
 export const useAssignProxies = () => {
-  const { provider, registrar, refetch, voteService } = useHeliumVsrState();
-  const { error, loading, execute } = useAsyncCallback(
-    async ({
+  const { provider, registrar, mint, voteService } =
+    useHeliumVsrState();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
       positions,
       recipient,
       programId = PROGRAM_ID,
@@ -23,7 +27,6 @@ export const useAssignProxies = () => {
       onProgress,
       maxSignatureBatch,
     }: {
-
       positions: PositionWithMeta[];
       recipient: PublicKey;
       programId?: PublicKey;
@@ -39,7 +42,7 @@ export const useAssignProxies = () => {
       const idl = await Program.fetchIdl(programId, provider);
       const nftProxyProgram = await init(provider as any, programId, idl);
 
-      if (loading) return;
+      let resultingAssignments: ProxyAssignment[] = [];
 
       if (isInvalid || !nftProxyProgram || !registrar || !voteService) {
         throw new Error("Unable to voting delegate, Invalid params");
@@ -51,18 +54,25 @@ export const useAssignProxies = () => {
             position.mint,
             provider.wallet.publicKey
           )[0];
-          let proxyAssignment = await nftProxyProgram.account.proxyAssignmentV0.fetchNullable(
-            currentProxyAssignment
-          );
+          let proxyAssignment =
+            await nftProxyProgram.account.proxyAssignmentV0.fetchNullable(
+              currentProxyAssignment
+            );
           if (!proxyAssignment) {
             currentProxyAssignment = proxyAssignmentKey(
               registrar.proxyConfig,
               position.mint,
               PublicKey.default
             )[0];
-            proxyAssignment = await nftProxyProgram.account.proxyAssignmentV0.fetchNullable(currentProxyAssignment);
+            proxyAssignment =
+              await nftProxyProgram.account.proxyAssignmentV0.fetchNullable(
+                currentProxyAssignment
+              );
           }
-          if (proxyAssignment && !proxyAssignment.nextVoter?.equals(PublicKey.default)) {
+          if (
+            proxyAssignment &&
+            !proxyAssignment.nextVoter?.equals(PublicKey.default)
+          ) {
             const toUndelegate =
               await voteService.getProxyAssignmentsForPosition(
                 position.pubkey,
@@ -94,6 +104,20 @@ export const useAssignProxies = () => {
 
             instructions.push(...ixs);
           }
+
+          resultingAssignments.push({
+            address: currentProxyAssignment.toBase58(),
+            asset: position.mint.toBase58(),
+            nextVoter: recipient.toBase58(),
+            voter: position.isProxiedToMe
+              ? provider.wallet.publicKey.toBase58()
+              : PublicKey.default.toBase58(),
+            proxyConfig: registrar.proxyConfig.toBase58(),
+            index: 0,
+            expirationTime: expirationTime.toString(),
+            rentRefund: recipient.toBase58(),
+            bumpSeed: 0,
+          });
           const {
             instruction,
             pubkeys: { nextProxyAssignment },
@@ -132,15 +156,24 @@ export const useAssignProxies = () => {
           );
         }
 
-        // Wait a couple seconds for changes to hit pg-sink
-        setTimeout(refetch, 2 * 1000);
+        queryClient.setQueryData<ProxyAssignment[]>(
+          [
+            "proxyAssignmentsForWallet",
+            {
+              registrar: voteService.registrar.toBase58(),
+              wallet: provider.wallet.publicKey.toBase58(),
+              mint: mint?.toBase58(),
+            },
+          ],
+          (old) => {
+            const changed = new Set(resultingAssignments.map((r) => r.address));
+            return [
+              ...(old || []).filter((todo) => !changed.has(todo.address)),
+              ...resultingAssignments,
+            ];
+          }
+        );
       }
-    }
-  );
-
-  return {
-    error,
-    loading,
-    assignProxies: execute,
-  };
+    },
+  });
 };

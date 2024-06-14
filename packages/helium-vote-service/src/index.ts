@@ -50,6 +50,17 @@ server.get("/v1/sync", async () => {
   await readProxiesAndUpsert();
 });
 
+const registrarsByMint = {
+  [HNT_MINT.toBase58()]: new PublicKey(
+    "BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz"
+  ),
+  [IOT_MINT.toBase58()]: new PublicKey(
+    "7ZZopN1mx6ECcb3YCG8dbxeLpA44xq4gzA1ETEiaLoeL"
+  ),
+  [MOBILE_MINT.toBase58()]: new PublicKey(
+    "C4DWaps9bLiqy4e81wJ7VTQ6QR7C4MWvwsei3ZjsaDuW"
+  ),
+};
 server.get<{
   Params: { position: string };
   Querystring: {
@@ -61,7 +72,7 @@ server.get<{
     position: string;
     votingMint: string;
   };
-}>("/v1/proxy-assignments", async (request, reply) => {
+}>("/v1/proxy-assignments", async (request) => {
   const {
     position,
     voter: voter,
@@ -73,15 +84,7 @@ server.get<{
   } = request.query;
   const where: any = {};
   if (voter) {
-    const registrar = (
-      (
-        await sequelize.query(
-          `SELECT address FROM registrars WHERE  voting_mints[1]->>'mint' = ${sequelize.escape(
-            votingMint
-          )}`
-        )
-      )[0][0] as any
-    ).address;
+    const registrar = registrarsByMint[votingMint];
     const collection = registrarCollectionKey(new PublicKey(registrar))[0];
     const { assets } = await getPositionKeysForOwner({
       connection: new Connection(SOLANA_URL),
@@ -303,37 +306,8 @@ server.get<{
       wallet,
     },
   });
-  return registrars.map(r => r.registrar);
+  return registrars.map((r) => r.registrar);
 });
-
-server.get<{ Params: { registrar: string }; Querystring: { query: string } }>(
-  "/v1/registrars/:registrar/proxies/search",
-  async (request, reply) => {
-    const query = request.query.query;
-    const registrar = request.params.registrar;
-    const proxies = await Proxy.findAll({
-      attributes: ["name", "description", "image", "wallet", "detail"],
-      where: {
-        [Op.or]: [
-          { name: { [Op.iLike]: `%${query}%` } },
-          { wallet: { [Op.like]: `${query}%` } },
-        ],
-      },
-      include: [
-        {
-          model: ProxyRegistrar,
-          where: {
-            registrar,
-          },
-          required: true,
-          attributes: [],
-        },
-      ],
-      limit: 10,
-    });
-    return proxies;
-  }
-);
 
 const ORG_IDS = {
   [HNT_MINT.toBase58()]: organizationKey("Helium")[0].toBase58(),

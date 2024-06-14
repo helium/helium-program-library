@@ -61,13 +61,11 @@ export async function run(args: any = process.argv) {
   const vsrProgram = await initVsr(provider);
   const registrar = new PublicKey(argv.registrar);
 
-  const proxySeasonsFile = fs.readFileSync(
-    argv.proxySeasonsFile,
-    "utf8"
-  );
-  const seasons = JSON.parse(proxySeasonsFile).map(
-    (s) => new anchor.BN(Math.floor(Date.parse(s) / 1000))
-  );
+  const proxySeasonsFile = fs.readFileSync(argv.proxySeasonsFile, "utf8");
+  const seasons = JSON.parse(proxySeasonsFile).map((s) => ({
+    start: new anchor.BN(Math.floor(Date.parse(s.start) / 1000)),
+    end: new anchor.BN(Math.floor(Date.parse(s.end) / 1000)),
+  }));
 
   const {
     pubkeys: { proxyConfig },
@@ -77,7 +75,7 @@ export async function run(args: any = process.argv) {
       // Set max time to 2 years, though seasons should take precedent
       maxProxyTime: new anchor.BN(24 * 60 * 60 * 365 * 2),
       seasons,
-      name: "Helium",
+      name: "Helium V1",
     })
     .accounts({
       authority,

@@ -325,20 +325,6 @@ export class VoteService {
     return this.mapRoutes(response.data);
   }
 
-  async searchProxies({ query }: { query: string }): Promise<Proxy[]> {
-    if (!this.client) {
-      throw new Error("This operation is not supported without an API");
-    }
-
-    const response = await this.client.get(
-      `/v1/registrars/${this.registrar.toBase58()}/proxies/search`,
-      {
-        params: { query },
-      }
-    );
-    return response.data.map(this.mapRoutes);
-  }
-
   mapRoutes<T extends Proxy>(data: T): T {
     return {
       ...data,

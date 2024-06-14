@@ -5,33 +5,28 @@ import {
   delegatedPositionKey,
 } from "@helium/helium-sub-daos-sdk";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
-import { truthy } from "@helium/spl-utils";
-import { Connection, PublicKey } from "@solana/web3.js";
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import { useAsync } from "react-async-hook";
-import { useDelegatedPositions } from "../hooks/useDelegatedPositions";
-import { useProxyAssignments } from "../hooks/useProxies";
-import { usePositions } from "../hooks/usePositions";
-import { useRegistrar } from "../hooks/useRegistrar";
 import { init as initNftProxy } from "@helium/nft-proxy-sdk";
-import { ProxyAssignmentV0, PositionWithMeta } from "../sdk/types";
-import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
-import {
-  GetPositionsArgs as GetPosArgs,
-  getPositionKeys,
-} from "../utils/getPositionKeys";
+import { truthy } from "@helium/spl-utils";
 import {
   VoteService,
   getRegistrarKey,
   init,
 } from "@helium/voter-stake-registry-sdk";
+import { Connection, PublicKey } from "@solana/web3.js";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState
+} from "react";
+import { useAsync } from "react-async-hook";
+import { useDelegatedPositions } from "../hooks/useDelegatedPositions";
+import { usePositionKeysAndProxies } from "../hooks/usePositionKeysAndProxies";
+import { usePositions } from "../hooks/usePositions";
+import { useRegistrar } from "../hooks/useRegistrar";
+import { PositionWithMeta, ProxyAssignmentV0 } from "../sdk/types";
+import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 
 type Registrar = IdlAccounts<VoterStakeRegistry>["registrar"];
 
@@ -123,51 +118,39 @@ export const HeliumVsrStateProvider: React.FC<{
       }
     }
   }, [provider, registrarKey, urlVoteService]);
-  const args = useMemo(
-    () =>
-      wallet &&
-      mint &&
-      connection &&
-      voteService &&
-      ({
-        wallet: provider?.publicKey,
-        mint,
-        provider,
-        callIndex,
-        voteService,
-      } as GetPosArgs),
-    [mint, provider, callIndex, voteService]
-  );
   const { info: registrar } = useRegistrar(registrarKey);
-  const { result, loading, error } = useAsync(
-    async (args: GetPosArgs | undefined) => {
-      if (args) {
-        return await getPositionKeys(args);
-      }
-    },
-    [args]
-  );
+  const {
+    positionKeys,
+    proxiedPositionKeys,
+    proxies: proxyAccounts,
+    isLoading,
+    error,
+  } = usePositionKeysAndProxies({
+    wallet: me,
+    provider,
+    voteService,
+    mint,
+  });
+
   const delegatedPositionKeys = useMemo(() => {
-    return result?.positionKeys.map((pk) => delegatedPositionKey(pk)[0]);
-  }, [result?.positionKeys]);
+    return positionKeys?.map((pk) => delegatedPositionKey(pk)[0]);
+  }, [positionKeys]);
   const { accounts: delegatedAccounts, loading: loadingDel } =
     useDelegatedPositions(delegatedPositionKeys);
 
-  const proxyAccounts = result?.proxies;
   const proxyAccountsByAsset = useMemo(() => {
     return proxyAccounts?.reduce((acc, prox) => {
       acc[prox.asset.toBase58()] = prox;
       return acc;
     }, {} as Record<string, ProxyAssignmentV0>);
   }, [proxyAccounts]);
-  const myOwnedPositionsEndIdx = result?.positionKeys?.length;
+  const myOwnedPositionsEndIdx = positionKeys?.length;
   // Assume that my positions are a small amount, so we don't need to say they're static
-  const { accounts: myPositions, loading: loadingMyPositions } = usePositions(
-    result?.positionKeys
-  );
+  const { accounts: myPositions, loading: loadingMyPositions } =
+    usePositions(positionKeys);
   // Proxied positions may be a lot, set to static
   const { accounts: proxiedPositions, loading: loadingDelPositions } =
-    usePositions(result?.proxiedPositionKeys, true);
+    usePositions(proxiedPositionKeys, true);
   const positions = useMemo(() => {
     const uniquePositions = new Map();
     [...(myPositions || []), ...(proxiedPositions || [])].forEach(
@@ -272,7 +255,7 @@ export const HeliumVsrStateProvider: React.FC<{
   const loadingPositions = loadingMyPositions || loadingDelPositions;
   const ret = useMemo(
     () => ({
-      loading: loading || loadingPositions || loadingDel,
+      loading: isLoading || loadingPositions || loadingDel,
       error,
       amountLocked,
       amountProxyLocked,
@@ -292,7 +275,7 @@ export const HeliumVsrStateProvider: React.FC<{
     [
       loadingPositions,
       loadingDel,
-      loading,
+      isLoading,
       error,
       amountLocked,
       amountProxyLocked,
