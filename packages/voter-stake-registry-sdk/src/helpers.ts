@@ -1,6 +1,6 @@
 import { Asset, searchAssets, truthy } from "@helium/spl-utils";
 import { AccountInfo, PublicKey, Connection } from "@solana/web3.js";
-import { positionKey } from "./pdas";
+import { positionKey, registrarCollectionKey } from "./pdas";
 import { TOKEN_PROGRAM_ID, unpackAccount } from "@solana/spl-token";
 import {
   PROGRAM_ID as MPL_PID,
@@ -10,14 +10,15 @@ import {
 export async function getPositionKeysForOwner({
   connection,
   owner,
-  collection,
+  registrar,
 }: {
   connection: Connection;
   owner: PublicKey;
-  collection: PublicKey;
+  registrar: PublicKey;
 }): Promise<{ positions: PublicKey[]; assets: PublicKey[] }> {
   let positions: PublicKey[] = [];
   let assets: PublicKey[] = [];
+  const collection = registrarCollectionKey(registrar)[0];
 
   try {
     let page = 1;

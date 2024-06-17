@@ -25,7 +25,6 @@ export type Proxy = {
 };
 
 export type EnhancedProxyData = {
-  numDelegations: string;
   delegatedVeTokens: string;
   percent: string;
   numProposalsVoted: string;
@@ -36,7 +35,7 @@ export type EnhancedProxyData = {
 export type WithRank = {
   numProxies: string;
   rank: string;
-}
+};
 
 export type EnhancedProxy = Proxy & EnhancedProxyData;
 
@@ -72,6 +71,18 @@ export class VoteService {
   private program: Program<VoterStakeRegistry> | undefined;
   private nftProxyProgram: Program<NftProxy> | undefined;
   registrar: PublicKey;
+
+  get config() {
+    return {
+      registrar: this.registrar.toBase58(),
+      baseUrl: this.client?.getUri(),
+      rpcEndpoint: this.provider?.connection.rpcEndpoint,
+    };
+  }
+
+  get provider() {
+    return this.nftProxyProgram?.provider;
+  }
 
   // Wrapper arÍound vsr bulk operations that either uses
   // an API or gPA calls
@@ -139,13 +150,16 @@ export class VoteService {
   ): Promise<ProxyAssignment[]> {
     if (this.client) {
       return (
-        await this.client.get(`/v1/proxy-assignments`, {
-          params: {
-            limit: 10000,
-            position: position.toBase58(),
-            minIndex: minProxyIndex,
-          },
-        })
+        await this.client.get(
+          `/v1/registrars/${this.registrar.toBase58()}/proxy-assignments`,
+          {
+            params: {
+              limit: 10000,
+              position: position.toBase58(),
+              minIndex: minProxyIndex,
+            },
+          }
+        )
       ).data;
     }
 
@@ -153,7 +167,7 @@ export class VoteService {
       const registrar = await this.program.account.registrar.fetch(
         this.registrar
       );
-      const positionAcc = await this.program.account.positionV0.fetch(position)
+      const positionAcc = await this.program.account.positionV0.fetch(position);
 
       return (
         await this.nftProxyProgram.account.proxyAssignmentV0.all([
@@ -190,19 +204,20 @@ export class VoteService {
 
   async getProxyAssignmentsForWallet(
     wallet: PublicKey,
-    votingMint: PublicKey,
     minProxyIndex: number = 0
   ): Promise<ProxyAssignment[]> {
     if (this.client) {
       return (
-        await this.client.get(`/v1/proxy-assignments`, {
-          params: {
-            limit: 10000,
-            voter: wallet.toBase58(),
-            minIndex: minProxyIndex,
-            votingMint,
-          },
-        })
+        await this.client.get(
+          `/v1/registrars/${this.registrar.toBase58()}/proxy-assignments`,
+          {
+            params: {
+              limit: 10000,
+              voter: wallet.toBase58(),
+              minIndex: minProxyIndex,
+            },
+          }
+        )
       ).data;
     }
 
@@ -297,7 +312,7 @@ export class VoteService {
   async getProxies({
     page,
     limit,
-    query
+    query,
   }: {
     page: number;
     limit: number;
@@ -315,12 +330,12 @@ export class VoteService {
     return response.data.map(this.mapRoutes);
   }
 
-  async getProxy(wallet: string): Promise<EnhancedProxy & WithRank> {
+  async getProxy(wallet: PublicKey): Promise<EnhancedProxy & WithRank> {
     if (!this.client) {
       throw new Error("This operation is not supported without an API");
     }
     const response = await this.client.get(
-      `/v1/registrars/${this.registrar.toBase58()}/proxies/${wallet}`
+      `/v1/registrars/${this.registrar.toBase58()}/proxies/${wallet.toBase58()}`
     );
     return this.mapRoutes(response.data);
   }

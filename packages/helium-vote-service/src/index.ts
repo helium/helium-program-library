@@ -62,7 +62,7 @@ const registrarsByMint = {
   ),
 };
 server.get<{
-  Params: { position: string };
+  Params: { registrar: string };
   Querystring: {
     page: number;
     limit: number;
@@ -70,77 +70,76 @@ server.get<{
     nextVoter: string;
     minIndex: number;
     position: string;
-    votingMint: string;
   };
-}>("/v1/proxy-assignments", async (request) => {
-  const {
-    position,
-    voter: voter,
-    nextVoter,
-    page = 1,
-    limit = 1000,
-    minIndex,
-    votingMint,
-  } = request.query;
-  const where: any = {};
-  if (voter) {
-    const registrar = registrarsByMint[votingMint];
-    const collection = registrarCollectionKey(new PublicKey(registrar))[0];
-    const { assets } = await getPositionKeysForOwner({
-      connection: new Connection(SOLANA_URL),
-      owner: new PublicKey(voter),
-      collection,
+}>(
+  "/v1/registrars/:registrar/proxy-assignments",
+  async (request) => {
+    const {
+      position,
+      voter: voter,
+      nextVoter,
+      page = 1,
+      limit = 1000,
+      minIndex,
+    } = request.query;
+    const where: any = {};
+    if (voter) {
+      const registrar = request.params.registrar
+      const { assets } = await getPositionKeysForOwner({
+        connection: new Connection(SOLANA_URL),
+        owner: new PublicKey(voter),
+        registrar: new PublicKey(registrar),
+      });
+
+      where[Op.or] = [
+        {
+          voter,
+        },
+        {
+          [Op.and]: [
+            {
+              asset: {
+                [Op.in]: assets.map((a) => a.toBase58()),
+              },
+              voter: PublicKey.default.toBase58(),
+            },
+          ],
+        },
+      ];
+    }
+    if (nextVoter) where.nextVoter = nextVoter;
+    if (typeof minIndex !== "undefined") {
+      where.index = {
+        [Op.gte]: minIndex,
+      };
+    }
+
+    const offset = (page - 1) * limit;
+
+    return ProxyAssignment.findAll({
+      where,
+      offset,
+      limit,
+      include: position
+        ? [
+            {
+              model: Position,
+              where: {
+                address: position,
+              },
+              attributes: [],
+              required: true,
+            },
+          ]
+        : undefined,
+      order: [["index", "DESC"]],
     });
-
-    where[Op.or] = [
-      {
-        voter,
-      },
-      {
-        [Op.and]: [
-          {
-            asset: {
-              [Op.in]: assets.map((a) => a.toBase58()),
-            },
-            voter: PublicKey.default.toBase58(),
-          },
-        ],
-      },
-    ];
   }
-  if (nextVoter) where.nextVoter = nextVoter;
-  if (typeof minIndex !== "undefined") {
-    where.index = {
-      [Op.gte]: minIndex,
-    };
-  }
-
-  const offset = (page - 1) * limit;
-
-  return ProxyAssignment.findAll({
-    where,
-    offset,
-    limit,
-    include: position
-      ? [
-          {
-            model: Position,
-            where: {
-              address: position,
-            },
-            attributes: [],
-            required: true,
-          },
-        ]
-      : undefined,
-    order: [["index", "DESC"]],
-  });
-});
+);
 
 server.get<{
   Params: { registrar: string };
   Querystring: {
-    registrar: string;
     page: number;
     limit: number;
     query: string;

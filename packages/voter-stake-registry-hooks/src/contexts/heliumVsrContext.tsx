@@ -103,14 +103,12 @@ export const HeliumVsrStateProvider: React.FC<{
       : undefined;
   }, [heliumVoteUri, registrarKey]);
   // Allow vote service either from native rpc or from api
-  const { result: voteService } = useAsync(async () => {
+  const { result: programVoteService } = useAsync(async () => {
     if (registrarKey) {
-      if (urlVoteService) {
-        return urlVoteService;
-      } else {
+      if (!urlVoteService) {
         const program = await init(provider as any);
         const nftProxyProgram = await initNftProxy(provider as any);
-        new VoteService({
+        return new VoteService({
           registrar: registrarKey,
           program,
           nftProxyProgram,
@@ -118,6 +116,10 @@ export const HeliumVsrStateProvider: React.FC<{
       }
     }
   }, [provider, registrarKey, urlVoteService]);
+  const voteService = useMemo(
+    () => urlVoteService ?? programVoteService,
+    [urlVoteService, programVoteService]
+  );
   const { info: registrar } = useRegistrar(registrarKey);
   const {
     positionKeys,
@@ -129,7 +131,6 @@ export const HeliumVsrStateProvider: React.FC<{
     wallet: me,
     provider,
     voteService,
-    mint,
   });
 
   const delegatedPositionKeys = useMemo(() => {

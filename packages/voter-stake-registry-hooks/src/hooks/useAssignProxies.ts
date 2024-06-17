@@ -12,10 +12,10 @@ import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta, ProxyAssignmentV0 } from "../sdk/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ProxyAssignment } from "@helium/voter-stake-registry-sdk";
+import { INDEXER_WAIT } from "../constants";
 
 export const useAssignProxies = () => {
-  const { provider, registrar, mint, voteService } =
-    useHeliumVsrState();
+  const { provider, registrar, mint, voteService } = useHeliumVsrState();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -43,6 +43,7 @@ export const useAssignProxies = () => {
       const nftProxyProgram = await init(provider as any, programId, idl);
 
       let resultingAssignments: ProxyAssignment[] = [];
+      let undelegated: ProxyAssignment[] = [];
 
       if (isInvalid || !nftProxyProgram || !registrar || !voteService) {
         throw new Error("Unable to voting delegate, Invalid params");
@@ -89,6 +90,7 @@ export const useAssignProxies = () => {
                   const prevProxyAssignment = new PublicKey(
                     toUndelegate[index + 1].address
                   );
+                  undelegated.push(...toUndelegate);
                   return nftProxyProgram.methods
                     .unassignProxyV0()
                     .accounts({
@@ -105,19 +107,6 @@ export const useAssignProxies = () => {
             instructions.push(...ixs);
           }
 
-          resultingAssignments.push({
-            address: currentProxyAssignment.toBase58(),
-            asset: position.mint.toBase58(),
-            nextVoter: recipient.toBase58(),
-            voter: position.isProxiedToMe
-              ? provider.wallet.publicKey.toBase58()
-              : PublicKey.default.toBase58(),
-            proxyConfig: registrar.proxyConfig.toBase58(),
-            index: 0,
-            expirationTime: expirationTime.toString(),
-            rentRefund: recipient.toBase58(),
-            bumpSeed: 0,
-          });
           const {
             instruction,
             pubkeys: { nextProxyAssignment },
@@ -131,6 +120,19 @@ export const useAssignProxies = () => {
               proxyConfig: registrar.proxyConfig,
             })
             .prepare();
+          resultingAssignments.push({
+            address: nextProxyAssignment!.toBase58(),
+            asset: position.mint.toBase58(),
+            nextVoter: recipient.toBase58(),
+            voter: position.isProxiedToMe
+              ? provider.wallet.publicKey.toBase58()
+              : PublicKey.default.toBase58(),
+            proxyConfig: registrar.proxyConfig.toBase58(),
+            index: 0,
+            expirationTime: expirationTime.toString(),
+            rentRefund: recipient.toBase58(),
+            bumpSeed: 0,
+          });
           // Don't delegate where there's already a proxy.
           if (await provider.connection.getAccountInfo(nextProxyAssignment!)) {
             throw new Error(
@@ -166,13 +168,29 @@ export const useAssignProxies = () => {
             },
           ],
           (old) => {
-            const changed = new Set(resultingAssignments.map((r) => r.address));
+            const changed = new Set(
+              [...resultingAssignments, ...undelegated].map((r) => r.address)
+            );
             return [
               ...(old || []).filter((todo) => !changed.has(todo.address)),
               ...resultingAssignments,
             ];
           }
         );
+
+        // Give some time for indexers
+        setTimeout(async () => {
+          try {
+            await queryClient.invalidateQueries({
+              queryKey: ["proxies"],
+            });
+            await queryClient.invalidateQueries({
+              queryKey: ["proxy"],
+            });
+          } catch (e: any) {
+            console.error("Exception invalidating queries", e);
+          }
+        }, INDEXER_WAIT);
       }
     },
   });

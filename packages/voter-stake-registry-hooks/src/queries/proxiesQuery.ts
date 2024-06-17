@@ -1,20 +1,21 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { useHeliumVsrState } from "../contexts/heliumVsrContext";
+import { VoteService } from "@helium/voter-stake-registry-sdk";
+import { infiniteQueryOptions } from "@tanstack/react-query";
 
-export function useVoters({
+export function proxiesQuery({
   search,
   amountPerPage = 20,
+  voteService,
 }: {
   search: string;
   amountPerPage: number;
+  voteService?: VoteService;
 }) {
-  const { voteService } = useHeliumVsrState();
-  return useInfiniteQuery({
+  return infiniteQueryOptions({
     enabled: !!voteService,
     queryKey: [
-      "voters",
+      "proxies",
       {
-        registrar: voteService?.registrar.toBase58(),
+        ...voteService?.config,
         amountPerPage,
         search,
       },

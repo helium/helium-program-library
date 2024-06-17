@@ -3,7 +3,7 @@ import { AnchorProvider, BN, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { registrarKey, vsrResolvers } from "./resolvers";
 import { PROGRAM_ID } from "./constants";
-import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import { HNT_MINT, IOT_MINT, MOBILE_MINT, realmNames } from "@helium/spl-utils";
 export * from "./constants";
 export * from "./pdas";
 export * from "./resolvers";
@@ -29,12 +29,6 @@ export function getRegistrarKey(mint: PublicKey) {
     mint
   )[0];
 }
-
-const realmNames: Record<string, string> = {
-  [HNT_MINT.toBase58()]: "Helium",
-  [MOBILE_MINT.toBase58()]: "Helium MOBILE",
-  [IOT_MINT.toBase58()]: "Helium IOT",
-};
 
 export const init = async (
   provider: AnchorProvider,

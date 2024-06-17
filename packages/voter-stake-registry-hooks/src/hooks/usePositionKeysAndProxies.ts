@@ -1,74 +1,52 @@
 import { AnchorProvider, BN } from "@coral-xyz/anchor";
-import {
-  VoteService,
-  getPositionKeysForOwner,
-  getRegistrarKey,
-  positionKey,
-} from "@helium/voter-stake-registry-sdk";
+import { VoteService, positionKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useRegistrar } from "./useRegistrar";
+import { positionKeysForWalletQuery } from "../queries/positionKeysForWalletQuery";
+import { proxyAssignmentsForWalletQuery } from "../queries/proxyAssignmentsForWalletQuery";
 
 export interface GetPositionKeysAndProxiesArgs {
   wallet?: PublicKey;
-  mint?: PublicKey;
   provider?: AnchorProvider;
   voteService?: VoteService;
 }
 
 export function usePositionKeysAndProxies({
   wallet,
-  mint,
   provider,
   voteService,
 }: GetPositionKeysAndProxiesArgs) {
-  const registrarKey = useMemo(
-    () => mint && getRegistrarKey(mint),
-    [mint?.toBase58()]
-  );
-  const { info: registrar } = useRegistrar(registrarKey);
   const {
     data: myProxies,
     error: myProxyError,
     isLoading: myProxyLoading,
-  } = useQuery({
-    queryKey: [
-      "proxyAssignmentsForWallet",
-      {
-        registrar: voteService?.registrar.toBase58(),
-        wallet: wallet?.toBase58(),
-        mint: mint?.toBase58(),
-      },
-    ],
-    queryFn: () => voteService!.getProxyAssignmentsForWallet(wallet!, mint!),
-    enabled: !!wallet && !!mint && !!voteService,
-  });
+  } = useQuery(
+    proxyAssignmentsForWalletQuery({
+      wallet,
+      voteService,
+    })
+  );
   const proxyPositions = useMemo(
     () => myProxies?.map((del) => positionKey(new PublicKey(del.asset))[0]),
     [myProxies]
+  );
+  const registrar = useMemo(
+    () =>
+      voteService ? new PublicKey(voteService?.config.registrar) : undefined,
+    [voteService]
   );
   const {
     data: positionKeys,
     error,
     isLoading,
-  } = useQuery({
-    queryKey: [
-      "positionKeys",
-      {
-        wallet,
-        collection: registrar?.collection,
-        rpcEndpoint: provider?.connection.rpcEndpoint,
-      },
-    ],
-    queryFn: () =>
-      getPositionKeysForOwner({
-        connection: provider!.connection,
-        owner: wallet!,
-        collection: registrar?.collection!,
-      }),
-    enabled: !!wallet && !!registrar?.collection && !!provider,
-  });
+  } = useQuery(
+    positionKeysForWalletQuery({
+      wallet,
+      registrar: registrar!,
+      connection: provider?.connection,
+    })
+  );
 
   return {
     error: error || myProxyError,

@@ -24,3 +24,16 @@ export const HELIUM_COMMON_LUT_DEVNET = new PublicKey(
 export const HELIUM_COMMON_LUT = new PublicKey(
   "43eY9L2spbM2b1MPDFFBStUiFGt29ziZ1nc1xbpzsfVt"
 );
+
+export type Network = "hnt" | "mobile" | "iot";
+export const networksToMint: { [Network: string]: PublicKey } = {
+  hnt: HNT_MINT,
+  mobile: MOBILE_MINT,
+  iot: IOT_MINT,
+};
+
+export const realmNames: Record<string, string> = {
+  [HNT_MINT.toBase58()]: "Helium",
+  [MOBILE_MINT.toBase58()]: "Helium MOBILE",
+  [IOT_MINT.toBase58()]: "Helium IOT",
+};

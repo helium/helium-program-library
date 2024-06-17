@@ -1,21 +1,27 @@
 import { Program } from "@coral-xyz/anchor";
-import { PROGRAM_ID, proxyAssignmentKey, init } from "@helium/nft-proxy-sdk";
+import { PROGRAM_ID, init, proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import {
-  truthy,
-  batchParallelInstructions,
   Status,
   batchParallelInstructionsWithPriorityFee,
+  truthy
 } from "@helium/spl-utils";
+import {
+  ProxyAssignment
+} from "@helium/voter-stake-registry-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
-import { useAsyncCallback } from "react-async-hook";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  INDEXER_WAIT,
+  MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
+} from "../constants";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
-import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 
 export const useUnassignProxies = () => {
-  const { provider, registrar, voteService, refetch } = useHeliumVsrState();
-  const { error, loading, execute } = useAsyncCallback(
-    async ({
+  const { provider, registrar, voteService, mint } = useHeliumVsrState();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
       positions,
       programId = PROGRAM_ID,
       onProgress,
@@ -35,21 +41,21 @@ export const useUnassignProxies = () => {
       const idl = await Program.fetchIdl(programId, provider);
       const nftProxyProgram = await init(provider as any, programId, idl);
 
-      if (loading) return;
-
       if (isInvalid || !nftProxyProgram || !registrar || !voteService) {
         throw new Error("Unable to unassign proxy, Invalid params");
       } else {
         const instructions: TransactionInstruction[] = [];
+        let undelegated: ProxyAssignment[] = [];
         for (const position of positions) {
           let currentProxyAssignment = proxyAssignmentKey(
             registrar.proxyConfig,
             position.mint,
             provider.wallet.publicKey
           )[0];
-          let proxy = await nftProxyProgram.account.proxyAssignmentV0.fetchNullable(
-            currentProxyAssignment
-          );
+          let proxy =
+            await nftProxyProgram.account.proxyAssignmentV0.fetchNullable(
+              currentProxyAssignment
+            );
           if (!proxy) {
             currentProxyAssignment = proxyAssignmentKey(
               registrar.proxyConfig,
@@ -64,6 +70,7 @@ export const useUnassignProxies = () => {
             position.pubkey,
             proxy.index
           );
+          undelegated.push(...toUndelegate);
 
           instructions.push(
             ...(
@@ -106,15 +113,38 @@ export const useUnassignProxies = () => {
             }
           );
         }
-        // Wait a couple seconds for changes to hit pg-sink
-        setTimeout(refetch, 2 * 1000);
-      }
-    }
-  );
 
-  return {
-    error,
-    loading,
-    unassignProxies: execute,
-  };
+        queryClient.setQueryData<ProxyAssignment[]>(
+          [
+            "proxyAssignmentsForWallet",
+            {
+              registrar: voteService.registrar.toBase58(),
+              wallet: provider.wallet.publicKey.toBase58(),
+              mint: mint?.toBase58(),
+            },
+          ],
+          (old) => {
+            const changed = new Set(undelegated.map((r) => r.address));
+            return [
+              ...(old || []).filter((todo) => !changed.has(todo.address)),
+            ];
+          }
+        );
+
+        // Give some time for indexers
+        setTimeout(async () => {
+          try {
+            await queryClient.invalidateQueries({
+              queryKey: ["proxies"],
+            });
+            await queryClient.invalidateQueries({
+              queryKey: ["proxy"],
+            });
+          } catch (e: any) {
+            console.error("Exception invalidating queries", e);
+          }
+        }, INDEXER_WAIT);
+      }
+    },
+  });
 };
