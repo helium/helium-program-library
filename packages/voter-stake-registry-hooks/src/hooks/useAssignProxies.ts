@@ -133,14 +133,8 @@ export const useAssignProxies = () => {
             rentRefund: recipient.toBase58(),
             bumpSeed: 0,
           });
-          // Don't delegate where there's already a proxy.
-          if (await provider.connection.getAccountInfo(nextProxyAssignment!)) {
-            throw new Error(
-              "Recipient wallet is already a proxy to this position"
-            );
-          } else {
-            instructions.push(instruction);
-          }
+
+          instructions.push(instruction);
         }
 
         if (onInstructions) {
@@ -162,9 +156,8 @@ export const useAssignProxies = () => {
           [
             "proxyAssignmentsForWallet",
             {
-              registrar: voteService.registrar.toBase58(),
+              ...voteService.config,
               wallet: provider.wallet.publicKey.toBase58(),
-              mint: mint?.toBase58(),
             },
           ],
           (old) => {

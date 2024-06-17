@@ -251,10 +251,10 @@ WITH
       floor(sum(p.ve_tokens)) as "delegatedVeTokens",
       100 * sum(p.ve_tokens) / (select total_vetokens from total_vetokens) as "percent"
     FROM
-      proxies
-    JOIN proxy_registrars pr ON pr.wallet = proxies.wallet 
-    LEFT OUTER JOIN positions_with_proxy_assignments p ON p.voter = proxies.wallet
-    WHERE pr.registrar = ${escapedRegistrar} AND proxies.wallet = ${escapedWallet}
+      positions_with_proxy_assignments p
+    LEFT OUTER JOIN proxy_registrars pr ON p.voter = pr.wallet AND p.registrar = pr.registrar
+    LEFT OUTER JOIN proxies ON pr.wallet = proxies.wallet 
+    WHERE p.registrar = ${escapedRegistrar} AND p.voter = ${escapedWallet}
     GROUP BY
       name,
       image,
@@ -293,6 +293,75 @@ SELECT
 FROM proxies_with_votes
 LIMIT 1
       `);
+      
+  `
+  WITH 
+  positions_with_proxy_assignments AS (
+    SELECT
+      *
+    FROM
+      positions_with_vetokens p
+    JOIN proxy_assignments d on d.asset = p.asset
+        AND d.next_voter = '11111111111111111111111111111111'
+    WHERE registrar = 'BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz'
+  ),
+  total_vetokens as (
+    SELECT
+      SUM(ve_tokens) total_vetokens
+    FROM
+      positions_with_vetokens
+    WHERE
+      registrar = 'BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz'
+  ),
+  proxies_with_assignments AS (
+    SELECT
+      name,
+      image,
+      proxies.wallet as wallet,
+      description,
+      detail,
+      count(p.voter) as "numAssignments",
+      floor(sum(p.ve_tokens)) as "delegatedVeTokens",
+      100 * sum(p.ve_tokens) / (select total_vetokens from total_vetokens) as "percent"
+    FROM
+      positions_with_proxy_assignments p
+    LEFT OUTER JOIN proxy_registrars pr ON p.voter = pr.wallet AND p.registrar = pr.registrar
+    LEFT OUTER JOIN proxies ON pr.wallet = proxies.wallet 
+    WHERE p.registrar = 'BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz'
+    GROUP BY
+      name,
+      image,
+      proxies.wallet,
+      description,
+      detail
+  ),
+  proxies_with_rank AS(
+      SELECT
+        pa.*,
+        COUNT(*) OVER () as "numProxies",
+        RANK() OVER (ORDER BY "delegatedVeTokens" DESC) as rank
+      FROM proxies_with_assignments pa
+  ),
+  proxies_with_votes AS (
+    SELECT
+      name,
+      image,
+      wallet,
+      description,
+      detail,
+      "numAssignments",
+      "delegatedVeTokens",
+      "percent",
+      "numProxies",
+      rank,
+      count(distinct vm.proposal) as "numProposalsVoted",
+      MAX(vm.created_at) as "lastVotedAt"
+    FROM
+      proxies_with_rank proxies
+    LEFT OUTER JOIN vote_markers vm ON vm.voter = proxies.wallet AND vm.registrar = 'BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz'
+    GROUP BY "numProxies", rank, name, image, wallet, description, detail, "numAssignments", "delegatedVeTokens", "percent"
+  )
+  `;
   return proxies[0][0];
 });
 

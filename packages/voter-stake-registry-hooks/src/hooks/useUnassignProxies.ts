@@ -118,9 +118,8 @@ export const useUnassignProxies = () => {
           [
             "proxyAssignmentsForWallet",
             {
-              registrar: voteService.registrar.toBase58(),
+              ...voteService.config,
               wallet: provider.wallet.publicKey.toBase58(),
-              mint: mint?.toBase58(),
             },
           ],
           (old) => {
