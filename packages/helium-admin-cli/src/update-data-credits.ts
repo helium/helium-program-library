@@ -9,6 +9,7 @@ import {
   sendInstructionsOrCreateProposal,
   sendInstructionsOrSquads,
 } from './utils';
+import { HNT_FEED_ID } from '@helium/spl-utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -71,6 +72,7 @@ export async function run(args: any = process.argv) {
         hntPriceOracle: argv.hntPriceOracle
           ? new PublicKey(argv.hntPriceOracle)
           : null,
+        feedId: HNT_FEED_ID
       })
       .accounts({
         dataCredits,

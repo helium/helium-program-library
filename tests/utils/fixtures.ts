@@ -7,7 +7,7 @@ import {
   createAtaAndTransfer,
   createMint,
   sendMultipleInstructions,
-  toBN,
+  toBN
 } from "@helium/spl-utils";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,

@@ -40,7 +40,10 @@ import {
   initTestDataCredits,
 } from "./utils/fixtures";
 import { random } from "./utils/string";
-
+import {
+  PythSolanaReceiverProgram,
+  pythSolanaReceiverIdl,
+} from "@pythnetwork/pyth-solana-receiver";
 
 describe("hexboosting", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -57,7 +60,7 @@ describe("hexboosting", () => {
   let hemProgram: Program<HeliumEntityManager>;
   let hsdProgram: Program<HeliumSubDaos>;
   let dcProgram: Program<DataCredits>;
-  let poProgram: Program<PriceOracle>;
+  let pythProgram: Program<PythSolanaReceiverProgram>;
   let memProgram: Program<MobileEntityManager>;
   let carrier: PublicKey;
   let merkle: Keypair;
@@ -70,10 +73,9 @@ describe("hexboosting", () => {
       anchor.workspace.Hexboosting.programId,
       anchor.workspace.Hexboosting.idl
     );
-    poProgram = await initPo(
-      provider,
-      anchor.workspace.PriceOracle.programId,
-      anchor.workspace.PriceOracle.idl
+    pythProgram = new Program(
+      pythSolanaReceiverIdl,
+      new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ")
     );
     dcProgram = await initDataCredits(
       provider,
@@ -205,10 +207,13 @@ describe("hexboosting", () => {
           rentReclaimAuthority: me,
         })
         .rpcAndKeys({ skipPreflight: true });
-      const pythData = (await provider.connection.getAccountInfo(priceOracle))!
-        .data;
-      const price = parsePriceData(pythData);
-      pythPrice = price.emaPrice.value - price.emaConfidence!.value * 2;
+      const price = await pythProgram.account.priceUpdateV2.fetch(
+        new PublicKey("DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx")
+      );
+      pythPrice = price.priceMessage.emaPrice.sub(
+        price.priceMessage.emaConf.mul(new BN(2))
+      ).toNumber() * 10 ** price.priceMessage.exponent;
+      console.log(pythPrice);
     });
 
     it("allows updating boost config", async () => {
