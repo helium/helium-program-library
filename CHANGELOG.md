@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.8.0](https://github.com/helium/helium-program-library/compare/v0.7.17...v0.8.0) (2024-06-18)
+
+**Note:** Version bump only for package helium-program-library
+
+## Breaking
+
+  * Switch to Pyth V2 sponsored price feeds.
+     * This breaks @helium/currency-utils
+     * This changes accounts not resolved automatically for onboarding mobile hotspots
+
+
+
 ## [0.7.17](https://github.com/helium/helium-program-library/compare/v0.7.16...v0.7.17) (2024-06-05)
 
 **Note:** Version bump only for package helium-program-library

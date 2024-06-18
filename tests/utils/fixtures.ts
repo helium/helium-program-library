@@ -7,7 +7,7 @@ import {
   createAtaAndTransfer,
   createMint,
   sendMultipleInstructions,
-  toBN,
+  toBN
 } from "@helium/spl-utils";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
@@ -71,7 +71,7 @@ export const initTestDataCredits = async (
       hntMint,
       dcMint,
       hntPriceOracle: new PublicKey(
-        "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"
+        "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
       ),
     });
 

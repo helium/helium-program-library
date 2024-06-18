@@ -95,11 +95,11 @@ address = "stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM" # State controller progr
 address = "GPQNABq6s63uqzHRwZN9e2GcxtzG4yLP5AnJer7DkB9E" # State controller IDL
 
 [[test.validator.clone]]
-address = "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5" # Mobile price oracle
+address = "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx" # Mobile price oracle
 
 # Pyth price oracle
 [[test.validator.clone]]
-address = "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"
+address = "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
 
 # Squads multisig program
 [[test.validator.clone]]

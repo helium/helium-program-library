@@ -1,8 +1,7 @@
 use crate::state::*;
 use crate::{error::ErrorCode, TESTING};
 use anchor_lang::{prelude::*, solana_program::hash::hash};
-use pyth_sdk_solana::load_price_feed_from_account_info;
-use std::str::FromStr;
+use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
 use anchor_spl::{
   associated_token::AssociatedToken,
@@ -25,11 +24,6 @@ use helium_sub_daos::{
 use account_compression_cpi::program::SplAccountCompression;
 use bubblegum_cpi::get_asset_id;
 use shared_utils::*;
-
-#[cfg(feature = "devnet")]
-const PRICE_ORACLE: &str = "BmUdxoioVgoRTontomX8nBjWbnLevtxeuBYaLipP8GTQ";
-#[cfg(not(feature = "devnet"))]
-const PRICE_ORACLE: &str = "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct OnboardMobileHotspotArgsV0 {
@@ -111,11 +105,7 @@ pub struct OnboardMobileHotspotV0<'info> {
   pub dc_mint: Box<Account<'info, Mint>>,
   #[account(mut)]
   pub dnt_mint: Box<Account<'info, Mint>>,
-  /// CHECK: Checked by loading with pyth. Also double checked by the has_one on data credits instance.
-  #[account(
-    address = Pubkey::from_str(PRICE_ORACLE).unwrap()
-  )]
-  pub dnt_price: AccountInfo<'info>,
+  pub dnt_price: Account<'info, PriceUpdateV2>,
 
   #[account(
     seeds=[
@@ -245,27 +235,29 @@ pub fn handler<'info>(
 
   // Burn the mobile tokens
   let dnt_fee = fees.mobile_onboarding_fee_usd;
-  let mobile_price_oracle =
-    load_price_feed_from_account_info(&ctx.accounts.dnt_price).map_err(|e| {
-      msg!("Pyth error {}", e);
-      error!(ErrorCode::PythError)
-    })?;
-
+  let mobile_price_oracle = &ctx.accounts.dnt_price;
+  let message = mobile_price_oracle.price_message;
   let current_time = Clock::get()?.unix_timestamp;
-  let mobile_price = mobile_price_oracle
-    .get_ema_price_no_older_than(current_time, if TESTING { 6000000 } else { 10 * 60 })
-    .ok_or_else(|| error!(ErrorCode::PythPriceNotFound))?;
+  require_gte!(
+    message
+      .publish_time
+      .saturating_add(if TESTING { 6000000 } else { 10 * 60 }.into()),
+    current_time,
+    ErrorCode::PythPriceNotFound
+  );
+  let mobile_price = message.ema_price;
+  require_gt!(mobile_price, 0);
+
   // Remove the confidence from the price to use the most conservative price
   // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
   let mobile_price_with_conf = mobile_price
-    .price
-    .checked_sub(i64::try_from(mobile_price.conf.checked_mul(2).unwrap()).unwrap())
+    .checked_sub(i64::try_from(message.ema_conf.checked_mul(2).unwrap()).unwrap())
     .unwrap();
   // Exponent is a negative number, likely -8
   // Since the price is multiplied by an extra 10^8, and we're dividing by that price, need to also multiply
   // by the exponent
   let exponent_dec = 10_u64
-    .checked_pow(u32::try_from(-mobile_price.expo).unwrap())
+    .checked_pow(u32::try_from(-message.exponent).unwrap())
     .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
 
   require_gt!(mobile_price_with_conf, 0);
