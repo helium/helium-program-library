@@ -1,5 +1,5 @@
 import { networksToMint } from "@helium/spl-utils";
-import { VoteService, getRegistrarKey } from "@helium/voter-stake-registry-sdk";
+import { PartialEnhancedProxy, VoteService, getRegistrarKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@solana/web3.js";
 import { queryOptions } from "@tanstack/react-query";
 
@@ -38,11 +38,12 @@ export function proxyQuery({
         const res = await fetch(proxy.detail);
         detail = await res.text();
       }
+
       return {
         ...proxy,
         detail: detail ?? proxy.detail,
         networks,
-      };
+      } as PartialEnhancedProxy;
     },
   });
 }

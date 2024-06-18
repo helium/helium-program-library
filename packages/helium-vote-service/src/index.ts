@@ -244,7 +244,7 @@ WITH
     SELECT
       name,
       image,
-      proxies.wallet as wallet,
+      p.voter as wallet,
       description,
       detail,
       count(p.voter) as "numAssignments",
@@ -258,7 +258,7 @@ WITH
     GROUP BY
       name,
       image,
-      proxies.wallet,
+      p.voter,
       description,
       detail
   ),

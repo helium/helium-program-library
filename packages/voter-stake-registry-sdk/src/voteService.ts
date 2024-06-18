@@ -38,6 +38,10 @@ export type WithRank = {
 };
 
 export type EnhancedProxy = Proxy & EnhancedProxyData;
+export type PartialEnhancedProxy = Partial<Proxy> & {
+  wallet: string;
+} & EnhancedProxyData &
+  WithRank;
 
 export type Proposal = {
   address: string;
@@ -330,7 +334,9 @@ export class VoteService {
     return response.data.map(this.mapRoutes);
   }
 
-  async getProxy(wallet: PublicKey): Promise<EnhancedProxy & WithRank> {
+  async getProxy(
+    wallet: PublicKey
+  ): Promise<PartialEnhancedProxy> {
     if (!this.client) {
       throw new Error("This operation is not supported without an API");
     }
@@ -343,8 +349,8 @@ export class VoteService {
   mapRoutes<T extends Proxy>(data: T): T {
     return {
       ...data,
-      image: this.assetUrl(data.image),
-      detail: this.assetUrl(data.detail),
+      image: data.image && this.assetUrl(data.image),
+      detail: data.detail && this.assetUrl(data.detail),
     };
   }
 }
