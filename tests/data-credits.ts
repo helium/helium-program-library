@@ -281,8 +281,8 @@ describe("data-credits", () => {
       const hntAmount =
         (Math.floor(dcAmount * 10 ** (hntDecimals - 5)) / hntEmaPrice) *
         10 ** -hntDecimals;
-      console.log(dcAmount, hntAmount, hntEmaPrice);
-      const approxEndBal = startHntBal - hntAmount;
+
+        const approxEndBal = startHntBal - hntAmount;
       expect(hntBal.value.uiAmount).to.be.within(
         approxEndBal * 0.999,
         approxEndBal * 1.001

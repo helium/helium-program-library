@@ -4,10 +4,11 @@ import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { Hexboosting } from "@helium/idls/lib/types/hexboosting";
 import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
-import { PriceOracle } from "@helium/idls/lib/types/price_oracle";
-import { init as initPo } from "@helium/price-oracle-sdk";
 import { toBN } from "@helium/spl-utils";
-import { parsePriceData } from "@pythnetwork/client";
+import {
+  PythSolanaReceiverProgram,
+  pythSolanaReceiverIdl,
+} from "@pythnetwork/pyth-solana-receiver";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   getConcurrentMerkleTreeAccountSize,
@@ -40,10 +41,6 @@ import {
   initTestDataCredits,
 } from "./utils/fixtures";
 import { random } from "./utils/string";
-import {
-  PythSolanaReceiverProgram,
-  pythSolanaReceiverIdl,
-} from "@pythnetwork/pyth-solana-receiver";
 
 describe("hexboosting", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
