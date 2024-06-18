@@ -77,9 +77,9 @@ export async function run(args: any = process.argv) {
     // Lazy dist mobile
     "GZtTp3AUo2AHdQe9BCJ6gXR9KqfruRvHnZ4QiJUALMcz",
     // Hnt pyth
-    "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm",
+    "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33",
     // Mobile pyth
-    "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5",
+    "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx",
     // Usdc pyth
     "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD",
     // Hnt

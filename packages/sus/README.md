@@ -227,7 +227,7 @@ Parsing results in the following data:
         },
         {
           name: 'Hnt Price Oracle',
-          pubkey: [PublicKey [PublicKey(6Eg8YdfFJQF2HHonzPUBSCCmyUEhrStg9VBLK957sBe6)]],
+          pubkey: [PublicKey [PublicKey(4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33)]],
           isSigner: false,
           isWritable: false
         },

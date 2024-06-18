@@ -12,7 +12,7 @@ export const IOT_MINT = new PublicKey("iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9f
 
 // TODO: Replace with actual HNT feed
 export const HNT_PYTH_PRICE_FEED = new PublicKey(
-  "6Eg8YdfFJQF2HHonzPUBSCCmyUEhrStg9VBLK957sBe6"
+  "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
 );
 
 export const HELIUM_COMMON_LUT_DEVNET = new PublicKey(

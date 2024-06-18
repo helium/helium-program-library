@@ -33,7 +33,7 @@ export function usePrevious<T>(state: T): T | undefined {
 
 export const AccountProvider: FC<IAccountProviderProps> = ({
   children,
-  commitment = "confirmed",
+  commitment = "confirmed" as Commitment,
   extendConnection = true,
   connection,
 }) => {
