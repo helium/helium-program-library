@@ -377,7 +377,7 @@ export async function run(args: any = process.argv) {
         config: {
           windowSizeSeconds: new anchor.BN(60 * 60),
           thresholdType: ThresholdType.Absolute as never,
-          threshold: new anchor.BN('1000000000000'),
+          threshold: new anchor.BN("1000000000000"),
         },
       })
       .accounts({

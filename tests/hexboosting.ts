@@ -4,10 +4,11 @@ import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { Hexboosting } from "@helium/idls/lib/types/hexboosting";
 import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
-import { PriceOracle } from "@helium/idls/lib/types/price_oracle";
-import { init as initPo } from "@helium/price-oracle-sdk";
 import { toBN } from "@helium/spl-utils";
-import { parsePriceData } from "@pythnetwork/client";
+import {
+  PythSolanaReceiverProgram,
+  pythSolanaReceiverIdl,
+} from "@pythnetwork/pyth-solana-receiver";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   getConcurrentMerkleTreeAccountSize,
@@ -41,7 +42,6 @@ import {
 } from "./utils/fixtures";
 import { random } from "./utils/string";
 
-
 describe("hexboosting", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
@@ -51,13 +51,13 @@ describe("hexboosting", () => {
   let periodLength = 60 * 60 * 24 * 30; // roughly one month
 
   const priceOracle: PublicKey = new PublicKey(
-    "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5"
+    "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx"
   );
 
   let hemProgram: Program<HeliumEntityManager>;
   let hsdProgram: Program<HeliumSubDaos>;
   let dcProgram: Program<DataCredits>;
-  let poProgram: Program<PriceOracle>;
+  let pythProgram: Program<PythSolanaReceiverProgram>;
   let memProgram: Program<MobileEntityManager>;
   let carrier: PublicKey;
   let merkle: Keypair;
@@ -70,10 +70,9 @@ describe("hexboosting", () => {
       anchor.workspace.Hexboosting.programId,
       anchor.workspace.Hexboosting.idl
     );
-    poProgram = await initPo(
-      provider,
-      anchor.workspace.PriceOracle.programId,
-      anchor.workspace.PriceOracle.idl
+    pythProgram = new Program(
+      pythSolanaReceiverIdl,
+      new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ")
     );
     dcProgram = await initDataCredits(
       provider,
@@ -205,10 +204,13 @@ describe("hexboosting", () => {
           rentReclaimAuthority: me,
         })
         .rpcAndKeys({ skipPreflight: true });
-      const pythData = (await provider.connection.getAccountInfo(priceOracle))!
-        .data;
-      const price = parsePriceData(pythData);
-      pythPrice = price.emaPrice.value - price.emaConfidence!.value * 2;
+      const price = await pythProgram.account.priceUpdateV2.fetch(
+        new PublicKey("DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx")
+      );
+      pythPrice = price.priceMessage.emaPrice.sub(
+        price.priceMessage.emaConf.mul(new BN(2))
+      ).toNumber() * 10 ** price.priceMessage.exponent;
+      console.log(pythPrice);
     });
 
     it("allows updating boost config", async () => {

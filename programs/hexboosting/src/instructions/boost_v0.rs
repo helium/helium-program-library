@@ -5,7 +5,7 @@ use anchor_spl::{
   token::{burn, Burn, Mint, Token, TokenAccount},
 };
 use mobile_entity_manager::CarrierV0;
-use pyth_sdk_solana::load_price_feed_from_account_info;
+use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 use shared_utils::resize_to_fit;
 
 use crate::{BoostConfigV0, BoostedHexV1};
@@ -56,8 +56,7 @@ pub struct BoostV0<'info> {
   )]
   pub carrier: Box<Account<'info, CarrierV0>>,
   pub hexboost_authority: Signer<'info>,
-  /// CHECK: Pyth price oracle
-  pub price_oracle: AccountInfo<'info>,
+  pub price_oracle: Account<'info, PriceUpdateV2>,
   #[account(mut)]
   pub payment_mint: Box<Account<'info, Mint>>,
   #[account(
@@ -168,26 +167,29 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
     .iter()
     .map(|amount| (amount.amount as u64 * ctx.accounts.boost_config.boost_price))
     .sum::<u64>();
-  let mobile_price_oracle =
-    load_price_feed_from_account_info(&ctx.accounts.price_oracle).map_err(|e| {
-      msg!("Pyth error {}", e);
-      error!(ErrorCode::PythError)
-    })?;
+  let mobile_price_oracle = &ctx.accounts.price_oracle;
+  let message = mobile_price_oracle.price_message;
+  let mobile_price = message.ema_price;
+  require_gt!(mobile_price, 0);
   let current_time = Clock::get()?.unix_timestamp;
-  let mobile_price = mobile_price_oracle
-    .get_ema_price_no_older_than(current_time, if TESTING { 6000000 } else { 10 * 60 })
-    .ok_or_else(|| error!(ErrorCode::PythPriceNotFound))?;
+  require_gte!(
+    message
+      .publish_time
+      .saturating_add(if TESTING { 6000000 } else { 10 * 60 }.into()),
+    current_time,
+    ErrorCode::PythPriceNotFound
+  );
+
   // Remove the confidence from the price to use the most conservative price
   // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
   let mobile_price_with_conf = mobile_price
-    .price
-    .checked_sub(i64::try_from(mobile_price.conf.checked_mul(2).unwrap()).unwrap())
+    .checked_sub(i64::try_from(message.ema_conf.checked_mul(2).unwrap()).unwrap())
     .unwrap();
   // Exponent is a negative number, likely -8
   // Since the price is multiplied by an extra 10^8, and we're dividing by that price, need to also multiply
   // by the exponent
   let exponent_dec = 10_u64
-    .checked_pow(u32::try_from(-mobile_price.expo).unwrap())
+    .checked_pow(u32::try_from(-message.exponent).unwrap())
     .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
 
   let dnt_fee = total_fee
