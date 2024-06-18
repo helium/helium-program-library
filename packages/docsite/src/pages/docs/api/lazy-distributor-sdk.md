@@ -108,7 +108,6 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | common             | immut      | no     |      |
 | merkleTree         | immut      | no     |      |
 | compressionProgram | immut      | no     |      |
-| tokenProgram       | immut      | no     |      |
 
 #### Args
 
