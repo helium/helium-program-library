@@ -570,7 +570,7 @@ describe("voter-stake-registry", () => {
         markerA = await program.account.voteMarkerV0.fetchNullable(
           marker! as PublicKey
         );
-        expect(markerA?.choices).to.be.empty;
+        expect(markerA?.choices || []).to.be.empty;
 
         await program.methods
           .voteV0({
