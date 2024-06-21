@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.8.0",
+  "version": "0.8.2",
   "description": "Interface to the voter-stake-registry smart contract",
   "repository": {
     "type": "git",
@@ -32,10 +32,10 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
-    "@helium/anchor-resolvers": "^0.8.0",
-    "@helium/idls": "^0.8.0",
+    "@helium/anchor-resolvers": "^0.8.2",
+    "@helium/idls": "^0.8.2",
     "@helium/nft-proxy-sdk": "0.0.8-next.19+4fa4c6b",
-    "@helium/spl-utils": "^0.8.0",
+    "@helium/spl-utils": "^0.8.2",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-token": "^0.3.8",
     "bn.js": "^5.2.0",

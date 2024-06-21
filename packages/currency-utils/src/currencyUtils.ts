@@ -44,7 +44,7 @@ export const getOraclePrice = async ({
   );
 
   const data = await pythProgram.account.priceUpdateV2.fetch(
-    new PublicKey("DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx")
+    new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33")
   );
 
   return data;
