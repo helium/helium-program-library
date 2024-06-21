@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{BoostConfigV0, BoostedHexV1};
+use crate::{BoostConfigV0, BoostedHexV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct StartBoostArgsV0 {
@@ -18,7 +18,7 @@ pub struct StartBoostV0<'info> {
     mut,
     has_one = boost_config,
   )]
-  pub boosted_hex: Box<Account<'info, BoostedHexV1>>,
+  pub boosted_hex: Box<Account<'info, BoostedHexV0>>,
 }
 
 pub fn handler(ctx: Context<StartBoostV0>, args: StartBoostArgsV0) -> Result<()> {

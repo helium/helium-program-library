@@ -33,7 +33,6 @@ use solana_sdk::signature::Keypair;
 use solana_sdk::{signer::Signer, transaction::Transaction};
 use spl_associated_token_account::get_associated_token_address;
 use std::ops::Deref;
-use std::rc::Rc;
 use std::str::FromStr;
 use tokio::runtime::Runtime;
 
