@@ -39,6 +39,7 @@ import {
   SOLANA_URL,
   YELLOWSTONE_TOKEN,
   YELLOWSTONE_URL,
+  REFRESH_PASSWORD,
 } from "./env";
 import { initPlugins } from "./plugins";
 import { metrics } from "./plugins/metrics";
@@ -129,7 +130,13 @@ if (!HELIUS_AUTH_SECRET) {
   });
 
   server.get("/refresh-accounts", async (req, res) => {
-    const programId = (req.query as any).program;
+    const { program: programId, password } = req.query as any;
+    if (password !== REFRESH_PASSWORD) {
+      res.code(StatusCodes.FORBIDDEN).send({
+        message: "Invalid password",
+      });
+      return;
+    }
     let prevRefreshing = refreshing;
     eventHandler.emit("refresh-accounts", programId);
     if (prevRefreshing) {

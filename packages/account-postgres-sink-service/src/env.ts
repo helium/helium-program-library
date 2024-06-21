@@ -11,6 +11,8 @@ export const SOLANA_URL = process.env.SOLANA_URL || 'http://127.0.0.1:8899';
 export const YELLOWSTONE_URL = process.env.YELLOWSTONE_URL || 'http://127.0.0.1:8899';
 export const YELLOWSTONE_TOKEN = process.env.YELLOWSTONE_TOKEN!;
 
+export const REFRESH_PASSWORD = process.env.REFRESH_PASSWORD;
+
 export const PROGRAM_ACCOUNT_CONFIGS =
   process.env.PROGRAM_ACCOUNT_CONFIGS ||
   `${__dirname}/../program_account_configs_example.json`;
