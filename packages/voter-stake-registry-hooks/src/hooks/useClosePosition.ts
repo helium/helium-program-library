@@ -6,6 +6,8 @@ import { useAsync, useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { HeliumVsrClient } from "../sdk/client";
 import { PositionWithMeta } from "../sdk/types";
+import { useQueryClient } from "@tanstack/react-query";
+import { INDEXER_WAIT } from "../constants";
 
 export const useClosePosition = () => {
   const { provider, unixNow } = useHeliumVsrState();
@@ -13,6 +15,7 @@ export const useClosePosition = () => {
     (provider) => HeliumVsrClient.connect(provider),
     [provider]
   );
+  const queryClient = useQueryClient();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,
@@ -87,6 +90,17 @@ export const useClosePosition = () => {
         } else {
           await sendInstructions(provider, instructions);
         }
+
+        // Give some time for indexers
+        setTimeout(async () => {
+          try {
+            await queryClient.invalidateQueries({
+              queryKey: ["positionKeys"],
+            });
+          } catch (e: any) {
+            console.error("Exception invalidating queries", e);
+          }
+        }, INDEXER_WAIT);
       }
     }
   );

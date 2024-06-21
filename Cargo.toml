@@ -2,6 +2,7 @@
 members = [
   "programs/*",
   "utils/proposal",
+  "utils/nft-proxy",
 ]
 
 exclude = [

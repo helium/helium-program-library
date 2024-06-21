@@ -1,9 +1,5 @@
 import { useProposal } from "@helium/modular-governance-hooks";
-import {
-  Status,
-  batchParallelInstructions,
-  truthy
-} from "@helium/spl-utils";
+import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
@@ -14,7 +10,7 @@ import { useVoteMarkers } from "./useVoteMarkers";
 
 export const useVote = (proposalKey: PublicKey) => {
   const { info: proposal } = useProposal(proposalKey);
-  const { positions, provider } = useHeliumVsrState();
+  const { positions, provider, registrar } = useHeliumVsrState();
   const voteMarkerKeys = useMemo(() => {
     return positions
       ? positions.map((p) => voteMarkerKey(p.mint, proposalKey)[0])
@@ -23,27 +19,66 @@ export const useVote = (proposalKey: PublicKey) => {
   const { accounts: markers } = useVoteMarkers(voteMarkerKeys);
   const voteWeights: BN[] | undefined = useMemo(() => {
     if (proposal && markers) {
-      return markers.reduce((acc, marker) => {
+      return markers.reduce((acc, marker, idx) => {
+        const position = positions?.[idx];
         marker.info?.choices.forEach((choice) => {
-          acc[choice] = (acc[choice] || new BN(0)).add(
-            marker.info?.weight || new BN(0)
-          );
+          // Only count my own and down the line vote weights
+          if (
+            (marker?.info?.proxyIndex || 0) >= (position?.proxy?.index || 0)
+          ) {
+            acc[choice] = (acc[choice] || new BN(0)).add(
+              marker.info?.weight || new BN(0)
+            );
+          }
         });
         return acc;
       }, new Array(proposal?.choices.length));
     }
-  }, [proposal, markers]);
+  }, [proposal, markers, positions]);
+  const voters: PublicKey[][] | undefined = useMemo(() => {
+    if (proposal && markers) {
+      const nonUniqueResult = markers.reduce((acc, marker, idx) => {
+        const position = positions?.[idx];
+        marker.info?.choices.forEach((choice) => {
+          acc[choice] ||= [];
+          if (
+            marker.info?.voter &&
+            marker.info.proxyIndex > (position?.proxy?.index || 0)
+          ) {
+            acc[choice].push(marker.info.voter);
+          }
+
+          return acc;
+        });
+        return acc;
+      }, new Array(proposal?.choices.length));
+      return nonUniqueResult.map((voters) =>
+        Array.from(new Set(voters.map((v) => v.toBase58()))).map(
+          (v: any) => new PublicKey(v)
+        )
+      );
+    }
+  }, [markers, positions]);
   const canVote = useCallback(
     (choice: number) => {
       if (!markers) return false;
 
-      return markers.some((m) => {
+      return markers.some((m, index) => {
+        const position = positions?.[index];
+        const earlierDelegateVoted =
+          position &&
+          position.proxy &&
+          m.info &&
+          position.proxy.index > m.info.proxyIndex;
         const noMarker = !m?.info;
         const maxChoicesReached =
           (m?.info?.choices.length || 0) >= (proposal?.maxChoicesPerVoter || 0);
         const alreadyVotedThisChoice = m.info?.choices.includes(choice);
         const canVote =
-          noMarker || (!maxChoicesReached && !alreadyVotedThisChoice);
+          noMarker ||
+          (!maxChoicesReached &&
+            !alreadyVotedThisChoice &&
+            !earlierDelegateVoted);
         return canVote;
       });
     },
@@ -54,7 +89,7 @@ export const useVote = (proposalKey: PublicKey) => {
       choice,
       onInstructions,
       onProgress,
-      maxSignatureBatch
+      maxSignatureBatch,
     }: {
       choice: number; // Instead of sending the transaction, let the caller decide
       onInstructions?: (
@@ -80,6 +115,29 @@ export const useVote = (proposalKey: PublicKey) => {
                 (marker?.choices.length || 0) >=
                 (proposal?.maxChoicesPerVoter || 0);
               if (!marker || (!alreadyVotedThisChoice && !maxChoicesReached)) {
+                if (position.isProxiedToMe) {
+                  if (
+                    marker &&
+                    (marker.proxyIndex < (position.proxy?.index || 0) ||
+                      marker.choices.includes(choice))
+                  ) {
+                    // Do not vote with a position that has been delegated to us, but voting overidden
+                    // Also ignore voting for the same choice twice
+                    return;
+                  }
+
+                  return await vsrProgram.methods
+                    .proxiedVoteV0({
+                      choice,
+                    })
+                    .accounts({
+                      proposal: proposalKey,
+                      voter: provider.wallet.publicKey,
+                      position: position.pubkey,
+                      registrar: registrar?.pubkey,
+                    })
+                    .instruction();
+                }
                 return await vsrProgram.methods
                   .voteV0({
                     choice,
@@ -104,7 +162,7 @@ export const useVote = (proposalKey: PublicKey) => {
             onProgress,
             triesRemaining: 10,
             extraSigners: [],
-            maxSignatureBatch
+            maxSignatureBatch,
           });
         }
       }
@@ -118,5 +176,6 @@ export const useVote = (proposalKey: PublicKey) => {
     markers,
     voteWeights,
     canVote,
+    voters,
   };
 };

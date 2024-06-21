@@ -23,7 +23,15 @@ export const useRelinquishVote = (proposal: PublicKey) => {
     (choice: number) => {
       if (!markers) return false;
 
-      return markers.some((m) => m.info?.choices.includes(choice));
+      return markers.some((m, index) => {
+        const position = positions?.[index];
+        const earlierDelegateVoted =
+          position &&
+          position.proxy &&
+          m.info &&
+          position.proxy.index > m.info.proxyIndex;
+        return !earlierDelegateVoted && m.info?.choices.includes(choice);
+      });
     },
     [markers]
   );
@@ -57,6 +65,26 @@ export const useRelinquishVote = (proposal: PublicKey) => {
               const alreadyVotedThisChoice = marker?.choices.includes(choice);
 
               if (marker && alreadyVotedThisChoice) {
+                if (position.isProxiedToMe) {
+                  if (
+                    marker.proxyIndex <
+                    (position.proxy?.index || 0)
+                  ) {
+                    // Do not vote with a position that has been delegated to us, but voting overidden
+                    return;
+                  }
+
+                  return await vsrProgram.methods
+                    .proxiedRelinquishVoteV0({
+                      choice,
+                    })
+                    .accounts({
+                      proposal,
+                      voter: provider.wallet.publicKey,
+                      position: position.pubkey,
+                    })
+                    .instruction();
+                }
                 return await vsrProgram.methods
                   .relinquishVoteV1({
                     choice,
@@ -65,7 +93,6 @@ export const useRelinquishVote = (proposal: PublicKey) => {
                     proposal,
                     voter: provider.wallet.publicKey,
                     position: position.pubkey,
-                    refund: provider.wallet.publicKey,
                   })
                   .instruction();
               }

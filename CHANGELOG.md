@@ -27,7 +27,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
   * Switch to Pyth V2 sponsored price feeds.
      * This breaks @helium/currency-utils
-     * This changes accounts not resolved automatically for onboarding mobile hotspots.
+     * This changes accounts not resolved automatically for onboarding mobile hotspots
 
 
 

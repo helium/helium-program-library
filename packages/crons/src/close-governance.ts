@@ -103,6 +103,7 @@ import pLimit from "p-limit";
               position: positionKey(marker.account.mint)[0],
               proposal: marker.account.proposal,
               systemProgram: SystemProgram.programId,
+              rentRefund: marker.account.rentRefund,
             })
             .instruction();
         })

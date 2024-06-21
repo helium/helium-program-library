@@ -1,5 +1,6 @@
 {
   "web": {
+    "helium-vote-service": "./packages/helium-vote-service",
     "solana-monitor": "./packages/monitor-service",
     "ecc-verifier": "./utils/ecc-sig-verifier",
     "entity-metadata-service": "./packages/metadata-service",

@@ -6,6 +6,7 @@ use anchor_spl::{
 };
 use mpl_token_metadata::types::CollectionDetails;
 use mpl_token_metadata::types::DataV2;
+use nft_proxy::ProxyConfigV0;
 use shared_utils::create_metadata_accounts_v3;
 use shared_utils::token_metadata::{
   create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
@@ -85,6 +86,7 @@ pub struct InitializeRegistrarV0<'info> {
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
+  pub proxy_config: Option<Account<'info, ProxyConfigV0>>,
 }
 
 impl<'info> InitializeRegistrarV0<'info> {
@@ -186,8 +188,14 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
     bump_seed: ctx.bumps["registrar"],
     collection_bump_seed: ctx.bumps["collection"],
     reserved1: [0; 4],
-    reserved2: [0; 7],
+    reserved2: [0; 3],
     voting_mints: Vec::new(),
+    proxy_config: ctx
+      .accounts
+      .proxy_config
+      .clone()
+      .map(|k| k.key())
+      .unwrap_or_default(),
   });
 
   Ok(())

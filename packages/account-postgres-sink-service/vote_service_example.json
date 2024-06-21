@@ -1,0 +1,35 @@
+{
+  "configs": [
+    {
+      "programId": "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8",
+      "accounts": [
+        { "type": "PositionV0", "table": "positions", "schema": "public" },
+        { "type": "Registrar", "table": "registrars", "schema": "public" },
+        { "type": "VoteMarkerV0", "table": "vote_markers", "schema": "public" }
+      ]
+    },
+    {
+      "programId": "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p",
+      "accounts": [
+        { "type": "ProxyAssignmentV0", "table": "proxy_assignments", "schema": "public" }
+      ]
+    },
+    {
+      "programId": "propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs",
+      "accounts": [
+        { "type": "ProposalV0", "table": "proposals", "schema": "public" }
+      ]
+    },
+    {
+      "programId": "orgdXvHVLkWgBYerptASkAwkZAE563CJUu717dMNx5f",
+      "accounts": [
+        {
+          "type": "OrganizationV0",
+          "table": "organizations",
+          "schema": "public"
+        }
+      ]
+    }
+  ],
+  "indexConfigs": []
+}

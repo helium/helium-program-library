@@ -58,6 +58,11 @@ export async function getAsset(
         Expires: "0",
       },
     });
+
+    if (response.data && response.data.error) {
+      throw new Error(response.data.error.message);
+    }
+
     const result = response.data.result;
     if (result) {
       return toAsset(result);
@@ -84,6 +89,11 @@ export async function getAssetBatch(
         Expires: "0",
       },
     });
+
+    if (response.data && response.data.error) {
+      throw new Error(response.data.error.message);
+    }
+
     const result = response.data.result;
     if (result) {
       return result.map(toAsset);
@@ -125,6 +135,10 @@ export async function getAssets(
       },
       data: JSON.stringify(batch),
     });
+
+    if (response.data && response.data.error) {
+      throw new Error(response.data.error.message);
+    }
 
     const result = response.data
       ? response.data.map((res: any) => res?.result || undefined)
@@ -205,6 +219,11 @@ export async function getAssetProof(
         Expires: "0",
       },
     });
+
+    if (response.data && response.data.error) {
+      throw new Error(response.data.error.message);
+    }
+
     const result = response.data.result;
     if (result) {
       return {
@@ -237,6 +256,11 @@ export async function getAssetProofBatch(
         Expires: "0",
       },
     });
+
+    if (response.data && response.data.error) {
+      throw new Error(response.data.error.message);
+    }
+
     const result = response.data.result;
     if (result) {
       return Object.entries(result as Record<string, any>).reduce(
@@ -290,6 +314,10 @@ export async function getAssetsByOwner(
         Expires: "0",
       },
     });
+
+    if (response.data && response.data.error) {
+      throw new Error(response.data.error.message);
+    }
 
     return response.data.result?.items.map(toAsset);
   } catch (error) {
@@ -365,6 +393,10 @@ export async function searchAssetsWithPageInfo(
         Expires: "0",
       },
     });
+
+    if (response.data && response.data.error) {
+      throw new Error(response.data.error.message);
+    }
 
     const ret = response.data.result;
     return {
