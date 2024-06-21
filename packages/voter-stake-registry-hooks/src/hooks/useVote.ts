@@ -1,9 +1,5 @@
 import { useProposal } from "@helium/modular-governance-hooks";
-import {
-  Status,
-  batchParallelInstructions,
-  truthy
-} from "@helium/spl-utils";
+import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
@@ -27,7 +23,9 @@ export const useVote = (proposalKey: PublicKey) => {
         const position = positions?.[idx];
         marker.info?.choices.forEach((choice) => {
           // Only count my own and down the line vote weights
-          if ((marker?.info?.proxyIndex || 0) >= (position?.proxy?.index || 0)) {
+          if (
+            (marker?.info?.proxyIndex || 0) >= (position?.proxy?.index || 0)
+          ) {
             acc[choice] = (acc[choice] || new BN(0)).add(
               marker.info?.weight || new BN(0)
             );
@@ -37,10 +35,10 @@ export const useVote = (proposalKey: PublicKey) => {
       }, new Array(proposal?.choices.length));
     }
   }, [proposal, markers, positions]);
-  const voters: (PublicKey)[][] | undefined = useMemo(() => {
+  const voters: PublicKey[][] | undefined = useMemo(() => {
     if (proposal && markers) {
       const nonUniqueResult = markers.reduce((acc, marker, idx) => {
-        const position = positions?.[idx]
+        const position = positions?.[idx];
         marker.info?.choices.forEach((choice) => {
           acc[choice] ||= [];
           if (
@@ -54,7 +52,11 @@ export const useVote = (proposalKey: PublicKey) => {
         });
         return acc;
       }, new Array(proposal?.choices.length));
-      return nonUniqueResult.map((voters) => Array.from(new Set(voters)));
+      return nonUniqueResult.map((voters) =>
+        Array.from(new Set(voters.map((v) => v.toBase58()))).map(
+          (v: any) => new PublicKey(v)
+        )
+      );
     }
   }, [markers, positions]);
   const canVote = useCallback(
@@ -87,7 +89,7 @@ export const useVote = (proposalKey: PublicKey) => {
       choice,
       onInstructions,
       onProgress,
-      maxSignatureBatch
+      maxSignatureBatch,
     }: {
       choice: number; // Instead of sending the transaction, let the caller decide
       onInstructions?: (
@@ -116,8 +118,7 @@ export const useVote = (proposalKey: PublicKey) => {
                 if (position.isProxiedToMe) {
                   if (
                     marker &&
-                    (marker.proxyIndex <
-                      (position.proxy?.index || 0) ||
+                    (marker.proxyIndex < (position.proxy?.index || 0) ||
                       marker.choices.includes(choice))
                   ) {
                     // Do not vote with a position that has been delegated to us, but voting overidden

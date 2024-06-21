@@ -233,7 +233,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/no-emit-sdk@^0.8.0":
+"@helium/no-emit-sdk@^0.8.2":
   version: 0.0.0-use.local
   resolution: "@helium/no-emit-sdk@workspace:packages/no-emit-sdk"
   dependencies:
@@ -293,10 +293,10 @@ __metadata:
   resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.8.0
-    "@helium/idls": ^0.8.0
+    "@helium/anchor-resolvers": ^0.8.2
+    "@helium/idls": ^0.8.2
     "@helium/nft-proxy-sdk": 0.0.8-next.19+4fa4c6b
-    "@helium/spl-utils": ^0.8.0
+    "@helium/spl-utils": ^0.8.2
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     bn.js: ^5.2.0
