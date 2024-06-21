@@ -17,6 +17,11 @@ import {
   streamBlocks,
   unpackMapOutput,
 } from "@substreams/core";
+import Client, {
+  CommitmentLevel,
+  SubscribeRequest,
+  SubscribeRequestFilterAccountsFilter,
+} from "@triton-one/yellowstone-grpc";
 import { EventEmitter } from "events";
 import Fastify, { FastifyInstance } from "fastify";
 import fastifyCron from "fastify-cron";
@@ -30,6 +35,10 @@ import {
   RUN_JOBS_AT_STARTUP,
   SUBSTREAM,
   USE_SUBSTREAMS,
+  USE_YELLOWSTONE,
+  SOLANA_URL,
+  YELLOWSTONE_TOKEN,
+  YELLOWSTONE_URL,
 } from "./env";
 import { initPlugins } from "./plugins";
 import { metrics } from "./plugins/metrics";
@@ -507,6 +516,90 @@ if (!HELIUS_AUTH_SECRET) {
         }
       }
     }
+  }
+
+  if (USE_YELLOWSTONE) {
+    const client = new Client(YELLOWSTONE_URL, YELLOWSTONE_TOKEN, {
+      "grpc.max_receive_message_length": 64 * 1024 * 1024, // 64MiB
+    });
+
+    const stream = await client.subscribe();
+
+    // Create `error` / `end` handler
+    const streamClosed = new Promise<void>((resolve, reject) => {
+      stream.on("error", (error) => {
+        reject(error);
+        stream.end();
+      });
+      stream.on("end", () => {
+        resolve();
+      });
+      stream.on("close", () => {
+        resolve();
+      });
+    });
+
+    // Handle updates
+    stream.on("data", async (data) => {
+      const account = data?.account?.account;
+      if (account) {
+        if (configs) {
+          const owner = new PublicKey(account.owner).toBase58();
+          const config = configs.find((x) => x.programId === owner);
+
+          if (config) {
+            try {
+              await handleAccountWebhook({
+                fastify: server,
+                programId: new PublicKey(config.programId),
+                accounts: config.accounts,
+                account: {
+                  ...account,
+                  pubkey: new PublicKey(account.pubkey).toBase58(),
+                  data: [account.data],
+                },
+                pluginsByAccountType:
+                  pluginsByAccountTypeByProgram[owner] || {},
+              });
+            } catch (err) {
+              console.error(err);
+            }
+          }
+        }
+      }
+    });
+
+    const request: SubscribeRequest = {
+      accounts: {
+        client: {
+          owner: configs.map((c) => c.programId),
+          account: [],
+          filters: [],
+        },
+      },
+      slots: {},
+      transactions: {},
+      entry: {},
+      blocks: {},
+      blocksMeta: {},
+      accountsDataSlice: [],
+      ping: undefined,
+    };
+
+    await new Promise<void>((resolve, reject) => {
+      stream.write(request, (err: any) => {
+        if (err === null || err === undefined) {
+          resolve();
+        } else {
+          reject(err);
+        }
+      });
+    }).catch((reason) => {
+      console.error(reason);
+      throw reason;
+    });
+
+    await streamClosed;
   }
 })();
 
