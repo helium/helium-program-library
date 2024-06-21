@@ -27,7 +27,9 @@ pub struct ProxiedRelinquishVoteV0<'info> {
     constraint = proxy_assignment.proxy_config == registrar.proxy_config,
     constraint = proxy_assignment.expiration_time > Clock::get().unwrap().unix_timestamp,
     // only the current or earlier delegates can change vote.
-    constraint = proxy_assignment.index <= marker.proxy_index
+    constraint = proxy_assignment.index <= marker.proxy_index,
+    // Ensure this is actually for the position
+    constraint = proxy_assignment.asset == position.mint,
   )]
   pub proxy_assignment: Box<Account<'info, ProxyAssignmentV0>>,
   #[account(

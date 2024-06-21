@@ -32,7 +32,9 @@ pub struct ProxiedVoteV0<'info> {
     constraint = proxy_assignment.proxy_config == registrar.proxy_config,
     constraint = proxy_assignment.expiration_time > Clock::get().unwrap().unix_timestamp,
     // only the current or earlier proxies can change vote. Or if proposal not set, this was an `init` for the marker
-    constraint = proxy_assignment.index <= marker.proxy_index || marker.proposal == Pubkey::default()
+    constraint = proxy_assignment.index <= marker.proxy_index || marker.proposal == Pubkey::default(),
+    // Ensure this is actually for the position
+    constraint = proxy_assignment.asset == position.mint,
   )]
   pub proxy_assignment: Box<Account<'info, ProxyAssignmentV0>>,
   #[account(
