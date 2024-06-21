@@ -527,7 +527,7 @@ describe("voter-stake-registry", () => {
         markerA = await program.account.voteMarkerV0.fetchNullable(
           marker! as PublicKey
         );
-        expect(markerA).to.be.null;
+        expect(markerA?.choices).to.be.empty;
       });
 
       it("allows earlier proxies to change the vote", async () => {

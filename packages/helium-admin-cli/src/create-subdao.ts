@@ -191,7 +191,7 @@ export async function run(args: any = process.argv) {
     },
     delegationSeasonsFile: {
       type: "string",
-      default: `${__dirname}/../../delegation-seasons.json`,
+      default: `${__dirname}/../../proxy-seasons.json`,
     },
   });
   const argv = await yarg.argv;
