@@ -21,6 +21,8 @@ import {
   init as initHsd,
   subDaoEpochInfoKey,
 } from "@helium/helium-sub-daos-sdk";
+import { useQueryClient } from "@tanstack/react-query";
+import { INDEXER_WAIT } from "../constants";
 
 const SECS_PER_DAY = 86400;
 export const useCreatePosition = () => {
@@ -29,6 +31,7 @@ export const useCreatePosition = () => {
     (provider) => HeliumVsrClient.connect(provider),
     [provider]
   );
+  const queryClient = useQueryClient();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       amount,
@@ -156,6 +159,17 @@ export const useCreatePosition = () => {
             await sendInstructions(provider, delegateInstructions);
           }
         }
+
+        // Give some time for indexers
+        setTimeout(async () => {
+          try {
+            await queryClient.invalidateQueries({
+              queryKey: ["positionKeys"],
+            });
+          } catch (e: any) {
+            console.error("Exception invalidating queries", e);
+          }
+        }, INDEXER_WAIT);
       }
     }
   );

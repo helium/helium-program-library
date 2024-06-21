@@ -418,6 +418,7 @@ FROM proposals p
 LEFT OUTER JOIN exploded_choice_vote_markers vms ON vms.proposal = p.address AND vms.registrar = ${registrar} AND vms.voter = ${wallet}
 WHERE p.namespace = ${sequelize.escape(ORG_IDS[mint])}
 GROUP BY p.address
+ORDER BY created_at DESC
 OFFSET ${offset}
 LIMIT ${limit};
     `);

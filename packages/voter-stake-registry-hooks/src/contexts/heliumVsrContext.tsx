@@ -59,7 +59,7 @@ const defaultState: HeliumVsrState = {
 
 const HeliumVsrStateContext = createContext<HeliumVsrState>(defaultState);
 
-export const useHeliumVsrState = () => {
+export const useHeliumVsrState: () => HeliumVsrState = () => {
   const context = useContext(HeliumVsrStateContext);
   if (context === undefined) {
     throw new Error(
