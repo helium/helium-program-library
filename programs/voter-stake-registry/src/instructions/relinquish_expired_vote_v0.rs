@@ -6,11 +6,15 @@ use crate::state::*;
 // Allow anyone to permissionlessly close expired votes and refund to user
 #[derive(Accounts)]
 pub struct RelinquishExpiredVoteV0<'info> {
+  /// CHECK: Destination for refunded rent
+  #[account(mut)]
+  pub rent_refund: AccountInfo<'info>,
   #[account(
     mut,
     seeds = [b"marker", marker.mint.as_ref(), proposal.key().as_ref()],
     bump = marker.bump_seed,
     has_one = proposal,
+    has_one = rent_refund
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
   #[account(
