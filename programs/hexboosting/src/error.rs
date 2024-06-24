@@ -20,4 +20,6 @@ pub enum ErrorCode {
   BoostPeriodOver,
   #[msg("Cannot leave a gap in boost periods")]
   NoEmptyPeriods,
+  #[msg("Pyth price is stale")]
+  PythPriceFeedStale,
 }

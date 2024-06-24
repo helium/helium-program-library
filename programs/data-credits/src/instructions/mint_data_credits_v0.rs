@@ -12,6 +12,7 @@ use circuit_breaker::{
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
+use pyth_solana_receiver_sdk::price_update::VerificationLevel;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MintDataCreditsArgsV0 {
@@ -37,6 +38,9 @@ pub struct MintDataCreditsV0<'info> {
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
 
   /// CHECK: Checked by loading with pyth. Also double checked by the has_one on data credits instance.
+  #[account(
+    constraint = hnt_price_oracle.verification_level == VerificationLevel::Full @ DataCreditsErrors::PythPriceFeedStale,
+  )]
   pub hnt_price_oracle: Account<'info, PriceUpdateV2>,
 
   // hnt tokens from this account are burned
