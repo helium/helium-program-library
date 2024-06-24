@@ -1,14 +1,14 @@
-use crate::{error::ErrorCode, DeviceTypeV0};
+use crate::error::ErrorCode;
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{burn, Burn, Mint, Token, TokenAccount},
 };
 use mobile_entity_manager::CarrierV0;
-use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
+use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 use shared_utils::resize_to_fit;
 
-use crate::{BoostConfigV0, BoostedHexV1};
+use crate::{BoostConfigV0, BoostedHexV0};
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
 
@@ -20,7 +20,6 @@ pub struct BoostArgsV0 {
   // invalid
   pub version: u32,
   pub amounts: Vec<BoostAmountV0>,
-  pub device_type: DeviceTypeV0,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -31,7 +30,7 @@ pub struct BoostAmountV0 {
 
 fn get_space(boosted_hex: &AccountInfo) -> usize {
   if boosted_hex.data_len() == 0 {
-    8 + 60 + std::mem::size_of::<BoostedHexV1>()
+    8 + 60 + std::mem::size_of::<BoostedHexV0>()
   } else {
     boosted_hex.data_len()
   }
@@ -56,6 +55,9 @@ pub struct BoostV0<'info> {
   )]
   pub carrier: Box<Account<'info, CarrierV0>>,
   pub hexboost_authority: Signer<'info>,
+  #[account(
+    constraint = price_oracle.verification_level == VerificationLevel::Full @ ErrorCode::PythPriceFeedStale,
+  )]
   pub price_oracle: Account<'info, PriceUpdateV2>,
   #[account(mut)]
   pub payment_mint: Box<Account<'info, Mint>>,
@@ -69,11 +71,11 @@ pub struct BoostV0<'info> {
     init_if_needed,
     payer = payer,
     space = get_space(boosted_hex),
-    seeds = [b"boosted_hex", boost_config.key().as_ref(), &[(args.device_type as u8)], &args.location.to_le_bytes()],
+    seeds = [b"boosted_hex", boost_config.key().as_ref(), &args.location.to_le_bytes()],
     bump,
     constraint = boosted_hex.version == args.version @ ErrorCode::InvalidVersion,
   )]
-  pub boosted_hex: Box<Account<'info, BoostedHexV1>>,
+  pub boosted_hex: Box<Account<'info, BoostedHexV0>>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub associated_token_program: Program<'info, AssociatedToken>,
@@ -87,7 +89,6 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
   ctx.accounts.boosted_hex.location = args.location;
   ctx.accounts.boosted_hex.bump_seed = ctx.bumps["boosted_hex"];
   ctx.accounts.boosted_hex.version += 1;
-  ctx.accounts.boosted_hex.device_type = args.device_type;
 
   // Insert the new periods
   let max_period = args
@@ -103,7 +104,6 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
       .boosts_by_period
       .resize(max_period + 1, 0);
   }
-
   let now = Clock::get()?.unix_timestamp;
 
   for amount in args.amounts.clone() {

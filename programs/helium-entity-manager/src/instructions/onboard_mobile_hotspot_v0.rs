@@ -1,7 +1,9 @@
+use std::str::FromStr;
+
 use crate::state::*;
 use crate::{error::ErrorCode, TESTING};
 use anchor_lang::{prelude::*, solana_program::hash::hash};
-use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
+use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 
 use anchor_spl::{
   associated_token::AssociatedToken,
@@ -105,6 +107,10 @@ pub struct OnboardMobileHotspotV0<'info> {
   pub dc_mint: Box<Account<'info, Mint>>,
   #[account(mut)]
   pub dnt_mint: Box<Account<'info, Mint>>,
+  #[account(
+    address = Pubkey::from_str("DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx").unwrap(),
+    constraint = dnt_price.verification_level == VerificationLevel::Full @ ErrorCode::PythPriceFeedStale,
+  )]
   pub dnt_price: Account<'info, PriceUpdateV2>,
 
   #[account(
