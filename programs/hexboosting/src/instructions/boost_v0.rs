@@ -5,7 +5,7 @@ use anchor_spl::{
   token::{burn, Burn, Mint, Token, TokenAccount},
 };
 use mobile_entity_manager::CarrierV0;
-use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
+use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 use shared_utils::resize_to_fit;
 
 use crate::{BoostConfigV0, BoostedHexV0};
@@ -55,6 +55,9 @@ pub struct BoostV0<'info> {
   )]
   pub carrier: Box<Account<'info, CarrierV0>>,
   pub hexboost_authority: Signer<'info>,
+  #[account(
+    constraint = price_oracle.verification_level == VerificationLevel::Full @ ErrorCode::PythPriceFeedStale,
+  )]
   pub price_oracle: Account<'info, PriceUpdateV2>,
   #[account(mut)]
   pub payment_mint: Box<Account<'info, Mint>>,
