@@ -35,7 +35,8 @@
     "@helium/anchor-resolvers": "^0.8.0",
     "@helium/circuit-breaker-sdk": "^0.8.0",
     "bn.js": "^5.2.0",
-    "bs58": "^4.0.1"
+    "bs58": "^4.0.1",
+    "@metaplex-foundation/mpl-bubblegum": "^0.7.0"
   },
   "devDependencies": {
     "git-format-staged": "^2.1.3",
