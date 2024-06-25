@@ -67,7 +67,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@^0.8.3":
+"@helium/anchor-resolvers@^0.8.4":
   version: 0.0.0-use.local
   resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
   dependencies:
@@ -81,7 +81,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/idls@^0.8.3":
+"@helium/idls@^0.8.4":
   version: 0.0.0-use.local
   resolution: "@helium/idls@workspace:packages/idls"
   dependencies:
@@ -100,8 +100,8 @@ __metadata:
   resolution: "@helium/voter-stake-registry-sdk@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.8.3
-    "@helium/idls": ^0.8.3
+    "@helium/anchor-resolvers": ^0.8.4
+    "@helium/idls": ^0.8.4
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     bn.js: ^5.2.0
