@@ -727,7 +727,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/currency-utils@workspace:packages/currency-utils"
   dependencies:
-    "@pythnetwork/pyth-solana-receiver": ^0.8.0
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.78.8
   languageName: unknown
