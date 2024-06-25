@@ -1,11 +1,10 @@
 import { Connection, PublicKey, Cluster } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync, getAccount } from "@solana/spl-token";
 import {
-  PythSolanaReceiverProgram,
-  pythSolanaReceiverIdl,
-} from "@pythnetwork/pyth-solana-receiver";
+  PythSolanaReceiver,
+  IDL as pythSolanaReceiverIdl,
+} from "./pyth";
 import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
-import { token } from "@coral-xyz/anchor/dist/cjs/utils";
 
 export const getBalance = async ({
   pubKey,
@@ -35,7 +34,7 @@ export const getOraclePrice = async ({
   cluster: Cluster;
   connection: Connection;
 }) => {
-  const pythProgram: Program<PythSolanaReceiverProgram> = new Program(
+  const pythProgram: Program<PythSolanaReceiver> = new Program(
     pythSolanaReceiverIdl,
     new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"),
     new AnchorProvider(connection, {} as Wallet, {
