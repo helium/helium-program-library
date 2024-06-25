@@ -67,7 +67,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/idls@^0.8.4":
+"@helium/idls@^0.8.5":
   version: 0.0.0-use.local
   resolution: "@helium/idls@workspace:packages/idls"
   dependencies:
@@ -86,7 +86,7 @@ __metadata:
   resolution: "@helium/price-oracle-sdk@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/idls": ^0.8.4
+    "@helium/idls": ^0.8.5
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
