@@ -39,7 +39,7 @@ runs:
         path: |
           ~/.cargo/bin/solana-verify
         key: cargo-${{ runner.os }}-solana-verify
-    - run: cargo install solana-verify
+    - run: cargo install solana-verify --locked
       if: steps.cache-solana-verify.outputs.cache-hit != 'true'
       shell: bash
     - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/solana-verify build --library-name $PROGRAM ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}

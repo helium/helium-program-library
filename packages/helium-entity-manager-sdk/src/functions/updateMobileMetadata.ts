@@ -16,8 +16,6 @@ export async function updateMobileMetadata({
   dcFeePayer,
   payer,
   dao = HELIUM_DAO,
-  elevation,
-  azimuth,
   ...rest
 }: {
   program: Program<HeliumEntityManager>;
@@ -26,8 +24,6 @@ export async function updateMobileMetadata({
   location: BN | null;
   assetId: PublicKey;
   rewardableEntityConfig: PublicKey;
-  elevation?: number;
-  azimuth?: number;
   dao?: PublicKey
 } & Omit<ProofArgsAndAccountsArgs, "connection">) {
   const {
@@ -57,8 +53,6 @@ export async function updateMobileMetadata({
   return program.methods
     .updateMobileInfoV0({
       location,
-      elevation: typeof elevation == "undefined" ? null : elevation,
-      azimuth: typeof azimuth == "undefined" ? null : azimuth,
       ...args,
     })
     .accounts({

@@ -35,8 +35,6 @@ pub struct OnboardMobileHotspotArgsV0 {
   pub index: u32,
   pub location: Option<u64>,
   pub device_type: MobileDeviceTypeV0,
-  pub elevation: Option<i32>,
-  pub azimuth: Option<u16>,
 }
 
 #[derive(Accounts)]
@@ -196,8 +194,6 @@ pub fn handler<'info>(
     is_active: false,
     dc_onboarding_fee_paid: fees.dc_onboarding_fee,
     device_type: args.device_type,
-    elevation: args.elevation,
-    azimuth: args.azimuth,
   });
 
   if let Some(location) = args.location {
