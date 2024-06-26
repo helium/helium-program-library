@@ -232,7 +232,22 @@ pub struct MobileHotspotInfoV0 {
   pub is_active: bool,
   pub dc_onboarding_fee_paid: u64,
   pub device_type: MobileDeviceTypeV0,
+  pub deployment_info: Option<MobileDeploymentInfoV0>,
 }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub enum MobileDeploymentInfoV0 {
+  WifiInfoV0 { antenna: u32, height: i32 },
+  CbrsInfoV0 { radio_infos: Vec<RadioInfoV0> },
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct RadioInfoV0 {
+  pub radio_id: String,
+  pub elevation: i32,
+  pub azimuth: u16,
+}
+
 pub const MOBILE_HOTSPOT_INFO_SIZE: usize = 8 +
     32 + // asset
     1 + // bump
