@@ -25,8 +25,6 @@ pub struct UpdateMobileInfoArgsV0 {
   pub creator_hash: [u8; 32],
   pub root: [u8; 32],
   pub index: u32,
-  pub elevation: Option<i32>,
-  pub azimuth: Option<u16>,
 }
 
 #[derive(Accounts)]
@@ -152,14 +150,6 @@ pub fn handler<'info>(
       )?;
       ctx.accounts.mobile_info.location = Some(new_location);
     }
-  }
-
-  if args.elevation.is_some() {
-    ctx.accounts.mobile_info.elevation = args.elevation;
-  }
-
-  if args.azimuth.is_some() {
-    ctx.accounts.mobile_info.azimuth = args.azimuth;
   }
 
   Ok(())
