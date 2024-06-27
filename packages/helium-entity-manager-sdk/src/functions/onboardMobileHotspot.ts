@@ -8,6 +8,7 @@ import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import { keyToAssetForAsset } from "../helpers";
 import { mobileInfoKey } from "../pdas";
+import { MobileDeploymentInfoV0 } from "..";
 
 export async function onboardMobileHotspot({
   program,
@@ -19,6 +20,7 @@ export async function onboardMobileHotspot({
   payer,
   dcFeePayer,
   deviceType = "cbrs",
+  deploymentInfo,
   ...rest
 }: {
   program: Program<HeliumEntityManager>;
@@ -27,6 +29,7 @@ export async function onboardMobileHotspot({
   assetId: PublicKey;
   location?: BN;
   rewardableEntityConfig: PublicKey;
+  deploymentInfo?: MobileDeploymentInfoV0 | null;
   maker: PublicKey;
   dao: PublicKey;
   deviceType?: "cbrs" | "wifiIndoor" | "wifiOutdoor";
@@ -56,6 +59,7 @@ export async function onboardMobileHotspot({
       deviceType: {
         [deviceType]: {},
       } as any,
+      deploymentInfo: deploymentInfo as any,
     })
     .accounts({
       // hotspot: assetId,

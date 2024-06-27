@@ -97,8 +97,8 @@ describe("helium-entity-manager", () => {
     noEmitProgram = await initBurn(
       provider,
       anchor.workspace.NoEmit.programId,
-      anchor.workspace.NoEmit.idl,
-    )
+      anchor.workspace.NoEmit.idl
+    );
 
     hsdProgram = await initHeliumSubDaos(
       provider,
@@ -166,17 +166,27 @@ describe("helium-entity-manager", () => {
       .signers([mint])
       .rpc({ skipPreflight: true });
 
-    const addr = getAssociatedTokenAddressSync(mint.publicKey, notEmittedKey()[0], true);
+    const addr = getAssociatedTokenAddressSync(
+      mint.publicKey,
+      notEmittedKey()[0],
+      true
+    );
     const balance = await provider.connection.getTokenAccountBalance(addr);
     expect(balance.value.uiAmount).to.eq(1);
 
-    const tokenMint = await createMint(provider, 2, me, me)
-    const burnAta = await createAtaAndMint(provider, tokenMint, new BN(1000), notEmittedKey()[0])
-    await noEmitProgram.methods.noEmitV0()
-    .accounts({
-      mint: tokenMint
-    })
-    .rpc({ skipPreflight: true })
+    const tokenMint = await createMint(provider, 2, me, me);
+    const burnAta = await createAtaAndMint(
+      provider,
+      tokenMint,
+      new BN(1000),
+      notEmittedKey()[0]
+    );
+    await noEmitProgram.methods
+      .noEmitV0()
+      .accounts({
+        mint: tokenMint,
+      })
+      .rpc({ skipPreflight: true });
 
     const postBalance = (await getAccount(provider.connection, burnAta)).amount;
     expect(postBalance).to.eq(BigInt(0));
@@ -688,6 +698,7 @@ describe("helium-entity-manager", () => {
           getAssetFn,
           getAssetProofFn,
           deviceType: "wifiIndoor",
+          deploymentInfo: null,
         })
       ).signers([makerKeypair, hotspotOwner]);
 
@@ -748,6 +759,7 @@ describe("helium-entity-manager", () => {
             getAssetFn,
             getAssetProofFn,
             location: new BN(100),
+            deploymentInfo: null,
           })
         ).signers([makerKeypair, hotspotOwner]);
 
@@ -839,6 +851,13 @@ describe("helium-entity-manager", () => {
 
       it("changes the metadata", async () => {
         const location = new BN(1000);
+        const wifiInfo = {
+          antenna: 1,
+          elevation: 2,
+          azimuth: 3,
+          mechanicalDownTilt: 4,
+          electricalDownTilt: 5,
+        };
 
         const method = (
           await updateMobileMetadata({
@@ -848,6 +867,9 @@ describe("helium-entity-manager", () => {
             location,
             getAssetFn,
             getAssetProofFn,
+            deploymentInfo: {
+              wifiInfoV0: wifiInfo,
+            },
           })
         ).signers([hotspotOwner]);
 
@@ -858,6 +880,7 @@ describe("helium-entity-manager", () => {
           info!
         );
         expect(storageAcc.location?.toNumber()).to.eq(location.toNumber());
+        expect(storageAcc.deploymentInfo?.wifiInfoV0).to.deep.equal(wifiInfo);
       });
 
       it("oracle can update active status", async () => {
