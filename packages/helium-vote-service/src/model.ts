@@ -31,7 +31,7 @@ export const sequelize = new Sequelize({
           username: process.env.PGUSER,
         });
         password = await new Promise((resolve, reject) =>
-          signer.getAuthToken({}, (err, token) => {
+          signer.getAuthToken({}, (err: any, token: any) => {
             if (err) {
               return reject(err);
             }

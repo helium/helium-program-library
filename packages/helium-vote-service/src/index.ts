@@ -71,71 +71,68 @@ server.get<{
     minIndex: number;
     position: string;
   };
-}>(
-  "/v1/registrars/:registrar/proxy-assignments",
-  async (request) => {
-    const {
-      position,
-      voter: voter,
-      nextVoter,
-      page = 1,
-      limit = 1000,
-      minIndex,
-    } = request.query;
-    const where: any = {};
-    if (voter) {
-      const registrar = request.params.registrar
-      const { assets } = await getPositionKeysForOwner({
-        connection: new Connection(SOLANA_URL),
-        owner: new PublicKey(voter),
-        registrar: new PublicKey(registrar),
-      });
-
-      where[Op.or] = [
-        {
-          voter,
-        },
-        {
-          [Op.and]: [
-            {
-              asset: {
-                [Op.in]: assets.map((a) => a.toBase58()),
-              },
-              voter: PublicKey.default.toBase58(),
-            },
-          ],
-        },
-      ];
-    }
-    if (nextVoter) where.nextVoter = nextVoter;
-    if (typeof minIndex !== "undefined") {
-      where.index = {
-        [Op.gte]: minIndex,
-      };
-    }
-
-    const offset = (page - 1) * limit;
-
-    return ProxyAssignment.findAll({
-      where,
-      offset,
-      limit,
-      include: position
-        ? [
-            {
-              model: Position,
-              where: {
-                address: position,
-              },
-              attributes: [],
-              required: true,
-            },
-          ]
-        : undefined,
-      order: [["index", "DESC"]],
+}>("/v1/registrars/:registrar/proxy-assignments", async (request) => {
+  const {
+    position,
+    voter: voter,
+    nextVoter,
+    page = 1,
+    limit = 1000,
+    minIndex,
+  } = request.query;
+  const where: any = {};
+  if (voter) {
+    const registrar = request.params.registrar;
+    const { assets } = await getPositionKeysForOwner({
+      connection: new Connection(SOLANA_URL),
+      owner: new PublicKey(voter),
+      registrar: new PublicKey(registrar),
     });
+
+    where[Op.or] = [
+      {
+        voter,
+      },
+      {
+        [Op.and]: [
+          {
+            asset: {
+              [Op.in]: assets.map((a) => a.toBase58()),
+            },
+            voter: PublicKey.default.toBase58(),
+          },
+        ],
+      },
+    ];
   }
-);
+  if (nextVoter) where.nextVoter = nextVoter;
+  if (typeof minIndex !== "undefined") {
+    where.index = {
+      [Op.gte]: minIndex,
+    };
+  }
+
+  const offset = (page - 1) * limit;
+
+  return ProxyAssignment.findAll({
+    where,
+    offset,
+    limit,
+    include: position
+      ? [
+          {
+            model: Position,
+            where: {
+              address: position,
+            },
+            attributes: [],
+            required: true,
+          },
+        ]
+      : undefined,
+    order: [["index", "DESC"]],
+  });
+});
 
 server.get<{
   Params: { registrar: string };
@@ -293,7 +290,7 @@ SELECT
 FROM proxies_with_votes
 LIMIT 1
       `);
-      
+
   `
   WITH 
   positions_with_proxy_assignments AS (
@@ -425,7 +422,7 @@ LIMIT ${limit};
   return result[0].map(deepCamelCaseKeys);
 });
 
-function deepCamelCaseKeys(obj) {
+function deepCamelCaseKeys(obj: any): any {
   if (Array.isArray(obj)) {
     return obj.map(deepCamelCaseKeys);
   } else if (isPlainObject(obj)) {

@@ -45,7 +45,7 @@ export const readProxiesAndUpsert = async () => {
       await Proxy.create(proxy);
     }
     for (const network of proxy.networks) {
-      const registrar = networksToRegistrars[network];
+      const registrar = networksToRegistrars[network as keyof typeof networksToRegistrars];
       if (registrar) {
         const proxyRegistrar = {
           registrar,
