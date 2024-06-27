@@ -241,7 +241,7 @@ pub enum MobileDeploymentInfoV0 {
     antenna: u32,
     // the height of the hotspot above ground level in whole meters
     elevation: i32,
-    // integer representation of a 2-point precision decima
+    // integer representation of a 2-point precision decimal
     azimuth: u16,
     // integer representation of a 2-point precision decimal
     mechanical_down_tilt: u16,
