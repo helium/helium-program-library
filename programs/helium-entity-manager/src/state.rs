@@ -237,15 +237,28 @@ pub struct MobileHotspotInfoV0 {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub enum MobileDeploymentInfoV0 {
-  WifiInfoV0 { antenna: u32, height: i32 },
-  CbrsInfoV0 { radio_infos: Vec<RadioInfoV0> },
+  WifiInfoV0 {
+    antenna: u32,
+    // the height of the hotspot above ground level in whole meters
+    elevation: i32,
+    // integer representation of a 2-point precision decima
+    azimuth: u16,
+    // integer representation of a 2-point precision decimal
+    mechanical_down_tilt: u16,
+    // integer representation of a 2-point precision decimal
+    electrical_down_tilt: u16,
+  },
+  CbrsInfoV0 {
+    radio_infos: Vec<RadioInfoV0>,
+  },
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct RadioInfoV0 {
+  // CBSD_ID or radio
   pub radio_id: String,
+  // The asserted elevation of the gateway above ground level in whole meters
   pub elevation: i32,
-  pub azimuth: u16,
 }
 
 pub const MOBILE_HOTSPOT_INFO_SIZE: usize = 8 +
