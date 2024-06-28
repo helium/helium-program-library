@@ -453,7 +453,10 @@ const start = async () => {
 
     await ProxyRegistrar.sync({ alter: true });
     await Proxy.sync({ alter: true });
+    await cloneRepo();
+    await readProxiesAndUpsert();
     setRelations();
+    
     // Read SQL file
     const sqlFilePath = path.join(
       __dirname,
