@@ -458,7 +458,7 @@ const start = async () => {
     // Read SQL file
     const sqlFilePath = path.join(
       __dirname,
-      "..",
+      process.env.NODE_ENV === "production" ? "../.." : "..",
       "positions_with_vetokens.sql"
     );
     const sqlQuery = fs.readFileSync(sqlFilePath, "utf8");

@@ -20,6 +20,8 @@ FROM node:18-alpine
 
 WORKDIR /usr/src/app
 
+ENV NODE_ENV=production
+
 RUN apk add --no-cache git 
 
 COPY --from=BUILD_IMAGE /usr/src/app/lib ./lib
