@@ -63,5 +63,3 @@ export const readProxiesAndUpsert = async () => {
     delete proxy.networks;
   }
 };
-
-cloneRepo().then(readProxiesAndUpsert);
