@@ -140,7 +140,7 @@ jobs:
         id: buffer-deploy
         with:
           devnet: true
-          network: devnet
+          network: ${{ secrets.DEVNET_SOLANA_DEPLOY_URL }}
           program: ${{ env.PROGRAM_NAME }}
           keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
           program-id: ${{ env.PROGRAM_ID }}
