@@ -207,11 +207,9 @@ describe("hexboosting", () => {
       const price = await pythProgram.account.priceUpdateV2.fetch(
         new PublicKey("DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx")
       );
-      pythPrice =
-        price.priceMessage.emaPrice
-          .sub(price.priceMessage.emaConf.mul(new BN(2)))
-          .toNumber() *
-        10 ** price.priceMessage.exponent;
+      pythPrice = price.priceMessage.emaPrice.sub(
+        price.priceMessage.emaConf.mul(new BN(2))
+      ).toNumber() * 10 ** price.priceMessage.exponent;
       console.log(pythPrice);
     });
 
@@ -256,6 +254,7 @@ describe("hexboosting", () => {
         .boostV0({
           location: new BN(1),
           version: 0,
+          deviceType: { wifiIndoor: {} },
           amounts: [
             {
               period: 0,
@@ -304,8 +303,9 @@ describe("hexboosting", () => {
         expected
       );
 
-      const hex = await program.account.boostedHexV0.fetch(boostedHex!);
+      const hex = await program.account.boostedHexV1.fetch(boostedHex!);
 
+      expect(Object.keys(hex.deviceType)[0]).to.eq("wifiIndoor");
       expect(hex.location.toNumber()).to.eq(1);
       expect(hex.startTs.toNumber()).to.eq(0);
       expect(hex.boostsByPeriod.toJSON().data).to.deep.eq([1, 1, 1, 1, 1, 1]);
@@ -317,6 +317,7 @@ describe("hexboosting", () => {
           .boostV0({
             location: new BN(1),
             version: 0,
+            deviceType: { wifiIndoor: {} },
             amounts: [
               {
                 period: 0,
@@ -364,6 +365,7 @@ describe("hexboosting", () => {
           .boostV0({
             location: new BN(1),
             version: 1,
+            deviceType: { wifiIndoor: {} },
             amounts: [
               {
                 period: 2,
@@ -395,7 +397,7 @@ describe("hexboosting", () => {
           Number(expected)
         );
 
-        const hex = await program.account.boostedHexV0.fetch(boostedHex!);
+        const hex = await program.account.boostedHexV1.fetch(boostedHex!);
 
         expect(hex.boostsByPeriod.toJSON().data).to.deep.eq([
           1, 1, 2, 1, 1, 1, 2,
@@ -403,16 +405,20 @@ describe("hexboosting", () => {
       });
 
       it("allows starting a boost", async () => {
-        const boostedHex = boostedHexKey(boostConfigKey(mint)[0], new BN(1))[0];
+        const boostedHex = boostedHexKey(
+          boostConfigKey(mint)[0],
+          { wifiIndoor: {} },
+          new BN(1)
+        )[0];
         await program.methods
-          .startBoostV0({
+          .startBoostV1({
             startTs: new BN(1),
           })
           .accounts({
             boostedHex,
           })
           .rpc({ skipPreflight: true });
-        const acc = await program.account.boostedHexV0.fetch(boostedHex!);
+        const acc = await program.account.boostedHexV1.fetch(boostedHex!);
         expect(acc.startTs.toNumber()).to.not.eq(0);
       });
 
@@ -425,10 +431,11 @@ describe("hexboosting", () => {
         beforeEach(async () => {
           const boostedHex = boostedHexKey(
             boostConfigKey(mint)[0],
+            { wifiIndoor: {} },
             new BN(1)
           )[0];
           await program.methods
-            .startBoostV0({
+            .startBoostV1({
               startTs: new BN(1),
             })
             .accounts({
@@ -440,6 +447,7 @@ describe("hexboosting", () => {
         it("allows closing the boost when it's done", async () => {
           const boostedHex = boostedHexKey(
             boostConfigKey(mint)[0],
+            { wifiIndoor: {} },
             new BN(1)
           )[0];
           // Wait 7 seconds so it is fully expired
