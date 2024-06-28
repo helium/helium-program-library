@@ -20,6 +20,8 @@ FROM node:18-alpine
 
 WORKDIR /usr/src/app
 
+RUN apk add --no-cache git 
+
 COPY --from=BUILD_IMAGE /usr/src/app/lib ./lib
 COPY --from=BUILD_IMAGE /usr/src/app/.yarn ./.yarn
 COPY --from=BUILD_IMAGE /usr/src/app/node_modules ./node_modules
