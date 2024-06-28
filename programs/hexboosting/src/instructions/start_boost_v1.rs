@@ -1,11 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{BoostConfigV0, BoostedHexV1};
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct StartBoostArgsV0 {
-  pub start_ts: i64,
-}
+use crate::{BoostConfigV0, BoostedHexV1, StartBoostArgsV0};
 
 #[derive(Accounts)]
 pub struct StartBoostV1<'info> {
