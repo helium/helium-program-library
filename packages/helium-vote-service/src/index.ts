@@ -442,6 +442,8 @@ function deepCamelCaseKeys(obj: any): any {
 
 const start = async () => {
   try {
+    await ProxyRegistrar.sync({ alter: true });
+    await Proxy.sync({ alter: true });
     const port = process.env.PORT ? Number(process.env.PORT) : 8081;
     await server.listen({
       port,
@@ -451,10 +453,6 @@ const start = async () => {
     server.server.address();
     console.log(`Started server on 0.0.0.0:${port}`);
 
-    await ProxyRegistrar.sync({ alter: true });
-    await Proxy.sync({ alter: true });
-    await cloneRepo();
-    await readProxiesAndUpsert();
     setRelations();
     
     // Read SQL file
@@ -467,6 +465,8 @@ const start = async () => {
 
     // Execute SQL query
     await sequelize.query(sqlQuery);
+    await cloneRepo();
+    await readProxiesAndUpsert();
     console.log("Created models");
   } catch (err) {
     server.log.error(err);
