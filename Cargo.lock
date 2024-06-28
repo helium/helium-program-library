@@ -1336,7 +1336,7 @@ dependencies = [
 
 [[package]]
 name = "data-credits"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1940,7 +1940,7 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -2002,7 +2002,7 @@ dependencies = [
 
 [[package]]
 name = "hexboosting"
-version = "0.1.0"
+version = "0.0.6"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

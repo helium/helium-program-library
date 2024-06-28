@@ -19,8 +19,6 @@ export async function onboardMobileHotspot({
   payer,
   dcFeePayer,
   deviceType = "cbrs",
-  elevation,
-  azimuth,
   ...rest
 }: {
   program: Program<HeliumEntityManager>;
@@ -28,8 +26,6 @@ export async function onboardMobileHotspot({
   dcFeePayer?: PublicKey;
   assetId: PublicKey;
   location?: BN;
-  elevation?: number;
-  azimuth?: number;
   rewardableEntityConfig: PublicKey;
   maker: PublicKey;
   dao: PublicKey;
@@ -60,8 +56,6 @@ export async function onboardMobileHotspot({
       deviceType: {
         [deviceType]: {},
       } as any,
-      elevation: typeof elevation == "undefined" ? null : elevation,
-      azimuth: typeof azimuth == "undefined" ? null : azimuth,
     })
     .accounts({
       // hotspot: assetId,
