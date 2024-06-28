@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{BoostConfigV0, BoostedHexV0};
+use crate::{BoostConfigV0, BoostedHexV1};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct StartBoostArgsV0 {
@@ -8,7 +8,7 @@ pub struct StartBoostArgsV0 {
 }
 
 #[derive(Accounts)]
-pub struct StartBoostV0<'info> {
+pub struct StartBoostV1<'info> {
   pub start_authority: Signer<'info>,
   #[account(
     has_one = start_authority
@@ -18,10 +18,10 @@ pub struct StartBoostV0<'info> {
     mut,
     has_one = boost_config,
   )]
-  pub boosted_hex: Box<Account<'info, BoostedHexV0>>,
+  pub boosted_hex: Box<Account<'info, BoostedHexV1>>,
 }
 
-pub fn handler(ctx: Context<StartBoostV0>, args: StartBoostArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<StartBoostV1>, args: StartBoostArgsV0) -> Result<()> {
   require_eq!(ctx.accounts.boosted_hex.start_ts, 0);
   require_gt!(args.start_ts, 0);
 
