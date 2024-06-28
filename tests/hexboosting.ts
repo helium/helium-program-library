@@ -411,7 +411,7 @@ describe("hexboosting", () => {
           new BN(1)
         )[0];
         await program.methods
-          .startBoostV0({
+          .startBoostV1({
             startTs: new BN(1),
           })
           .accounts({
@@ -435,7 +435,7 @@ describe("hexboosting", () => {
             new BN(1)
           )[0];
           await program.methods
-            .startBoostV0({
+            .startBoostV1({
               startTs: new BN(1),
             })
             .accounts({
