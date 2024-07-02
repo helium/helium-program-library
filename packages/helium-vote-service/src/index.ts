@@ -38,7 +38,12 @@ server.register(cors, {
 });
 
 server.register(fastifyStatic, {
-  root: path.join(__dirname, "../helium-vote-proxies"),
+  root: path.join(
+    __dirname,
+    process.env.NODE_ENV === "production"
+      ? "../../helium-vote-proxies"
+      : "../helium-vote-proxies"
+  ),
   prefix: "/helium-vote-proxies/",
 });
 
@@ -454,7 +459,7 @@ const start = async () => {
     console.log(`Started server on 0.0.0.0:${port}`);
 
     setRelations();
-    
+
     // Read SQL file
     const sqlFilePath = path.join(
       __dirname,
