@@ -255,11 +255,9 @@ WITH
     FROM
       (SELECT DISTINCT voter as wallet FROM positions_with_proxy_assignments
        UNION
-       SELECT wallet FROM proxies) AS all_wallets
-    LEFT OUTER JOIN proxy_registrars pr ON all_wallets.wallet = pr.wallet AND pr.registrar = ${escapedRegistrar}
-    LEFT OUTER JOIN positions_with_proxy_assignments p ON p.voter = all_wallets.wallet AND p.registrar = pr.registrar
+       SELECT proxies.wallet FROM proxies JOIN proxy_registrars pr ON pr.wallet = proxies.wallet WHERE pr.registrar = ${escapedRegistrar}) AS all_wallets
+    LEFT OUTER JOIN positions_with_proxy_assignments p ON p.voter = all_wallets.wallet
     LEFT OUTER JOIN proxies ON all_wallets.wallet = proxies.wallet
-    WHERE p.registrar = ${escapedRegistrar} AND p.voter = ${escapedWallet}
     GROUP BY
       name,
       image,
@@ -296,6 +294,7 @@ WITH
 SELECT
   *
 FROM proxies_with_votes
+WHERE wallet = ${escapedWallet}
 LIMIT 1
       `);
   return proxies[0][0];

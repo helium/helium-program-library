@@ -54,7 +54,6 @@ export const readProxiesAndUpsert = async () => {
         const existing = await ProxyRegistrar.findOne({
           where: proxyRegistrar,
         });
-        console.log(registrar);
         if (!existing) {
           await ProxyRegistrar.create(proxyRegistrar);
         }
