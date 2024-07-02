@@ -102,5 +102,9 @@ pub fn handler(ctx: Context<RelinquishVoteV1>, args: RelinquishVoteArgsV1) -> Re
     },
   )?;
 
+  if marker.choices.len() == 0 {
+    marker.weight = 0;
+  }
+
   Ok(())
 }
