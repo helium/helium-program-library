@@ -8,8 +8,14 @@ import { PublicKey } from '@solana/web3.js';
 import { circuitBreakerResolvers } from '@helium/circuit-breaker-sdk';
 import { recipientKey } from './pdas';
 import { Accounts } from '@coral-xyz/anchor';
-import { getLeafAssetId } from '@metaplex-foundation/mpl-bubblegum';
-import { BN, red } from 'bn.js';
+import BN from 'bn.js';
+
+const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY')
+
+async function getLeafAssetId(tree: PublicKey, leafIndex: BN) {
+    const [assetId] = await PublicKey.findProgramAddress([Buffer.from('asset', 'utf8'), tree.toBuffer(), Uint8Array.from(leafIndex.toArray('le', 8))], BUBBLEGUM_PROGRAM_ID);
+    return assetId;
+}
 
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'

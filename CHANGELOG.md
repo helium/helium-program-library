@@ -3,6 +3,41 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.8.6](https://github.com/helium/helium-program-library/compare/v0.8.5...v0.8.6) (2024-06-25)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.8.5](https://github.com/helium/helium-program-library/compare/v0.8.4...v0.8.5) (2024-06-25)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.8.4](https://github.com/helium/helium-program-library/compare/v0.8.3...v0.8.4) (2024-06-25)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.8.3](https://github.com/helium/helium-program-library/compare/v0.8.2...v0.8.3) (2024-06-24)
+
+
+### Reverts
+
+* Revert "Feat/632 hip 109 (#634)" ([ca0139e](https://github.com/helium/helium-program-library/commit/ca0139e10d16d39fe425d5fa6ad3dcb6225c61df)), closes [#634](https://github.com/helium/helium-program-library/issues/634)
+
+
+
+
+
 ## [0.8.2](https://github.com/helium/helium-program-library/compare/v0.8.1...v0.8.2) (2024-06-18)
 
 **Note:** Version bump only for package helium-program-library
