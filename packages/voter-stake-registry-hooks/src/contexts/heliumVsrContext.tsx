@@ -53,6 +53,7 @@ const defaultState: HeliumVsrState = {
   provider: undefined,
   votingPower: new BN(0),
   voteService: undefined,
+  registrar: undefined,
 
   refetch: () => {},
 };
