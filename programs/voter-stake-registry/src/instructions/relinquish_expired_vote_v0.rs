@@ -14,7 +14,8 @@ pub struct RelinquishExpiredVoteV0<'info> {
     seeds = [b"marker", marker.mint.as_ref(), proposal.key().as_ref()],
     bump = marker.bump_seed,
     has_one = proposal,
-    has_one = rent_refund
+    has_one = rent_refund,
+    close = rent_refund
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
   #[account(
@@ -30,8 +31,10 @@ pub struct RelinquishExpiredVoteV0<'info> {
 }
 
 pub fn handler(ctx: Context<RelinquishExpiredVoteV0>) -> Result<()> {
-  ctx.accounts.position.num_active_votes -= ctx.accounts.marker.choices.len() as u16;
-  ctx.accounts.marker.relinquished = true;
+  // Allow closing old markers that just had the relinquished boolean.
+  if !ctx.accounts.marker._deprecated_relinquished {
+    ctx.accounts.position.num_active_votes -= ctx.accounts.marker.choices.len() as u16;
+  }
 
   Ok(())
 }

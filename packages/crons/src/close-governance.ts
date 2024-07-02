@@ -89,7 +89,6 @@ import pLimit from "p-limit";
 
     const markers = (await vsrProgram.account.voteMarkerV0.all()).filter(
       (m) =>
-        !m.account.relinquished &&
         closedProposals.has(m.account.proposal.toBase58())
     );
     const limit = pLimit(100);

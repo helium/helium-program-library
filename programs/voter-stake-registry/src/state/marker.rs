@@ -10,8 +10,9 @@ pub struct VoteMarkerV0 {
   pub choices: Vec<u16>,
   pub weight: u128,
   pub bump_seed: u8,
-  /// Whether this vote has been cleared on the position after proposal expireds
-  pub relinquished: bool,
+  /// Whether this vote has been cleared on the position after proposal expired
+  /// DEPRECATED. New votes will have markers closed after the vote completes.
+  pub _deprecated_relinquished: bool,
   // Keep track of which delegation index voted on this marker,
   // earlier delegators can override
   pub proxy_index: u16,
