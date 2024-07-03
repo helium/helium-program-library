@@ -200,8 +200,8 @@ __metadata:
     "@fastify/cors": ^8.1.1
     "@fastify/static": ^6
     "@helium/organization-sdk": ^0.0.5
-    "@helium/spl-utils": ^0.9.0-alpha.1
-    "@helium/voter-stake-registry-sdk": ^0.9.0-alpha.1
+    "@helium/spl-utils": ^0.9.0-alpha.2
+    "@helium/voter-stake-registry-sdk": ^0.9.0-alpha.2
     "@solana/web3.js": ^1.78.8
     "@types/bn.js": ^5.1.1
     "@types/lodash": ^4.17.6
@@ -289,7 +289,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/spl-utils@^0.9.0-alpha.1":
+"@helium/spl-utils@^0.9.0-alpha.2":
   version: 0.0.0-use.local
   resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
@@ -311,7 +311,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/voter-stake-registry-sdk@^0.9.0-alpha.1":
+"@helium/voter-stake-registry-sdk@^0.9.0-alpha.2":
   version: 0.0.0-use.local
   resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:
@@ -319,7 +319,7 @@ __metadata:
     "@helium/anchor-resolvers": ^0.9.0-alpha.1
     "@helium/idls": ^0.9.0-alpha.1
     "@helium/nft-proxy-sdk": 0.0.8-next.19+4fa4c6b
-    "@helium/spl-utils": ^0.9.0-alpha.1
+    "@helium/spl-utils": ^0.9.0-alpha.2
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     bn.js: ^5.2.0

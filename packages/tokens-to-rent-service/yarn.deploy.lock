@@ -147,7 +147,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/spl-utils@^0.9.0-alpha.1":
+"@helium/spl-utils@^0.9.0-alpha.2":
   version: 0.0.0-use.local
   resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
@@ -177,7 +177,7 @@ __metadata:
     "@fastify/cors": ^8.1.1
     "@helium/account-fetch-cache": ^0.9.0-alpha.1
     "@helium/address": ^4.10.2
-    "@helium/spl-utils": ^0.9.0-alpha.1
+    "@helium/spl-utils": ^0.9.0-alpha.2
     "@jup-ag/api": ^6.0.6
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.78.8

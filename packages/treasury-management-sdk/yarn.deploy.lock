@@ -81,7 +81,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/circuit-breaker-sdk@^0.9.0-alpha.1":
+"@helium/circuit-breaker-sdk@^0.9.0-alpha.2":
   version: 0.0.0-use.local
   resolution: "@helium/circuit-breaker-sdk@workspace:packages/circuit-breaker-sdk"
   dependencies:
@@ -117,7 +117,7 @@ __metadata:
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.9.0-alpha.1
-    "@helium/circuit-breaker-sdk": ^0.9.0-alpha.1
+    "@helium/circuit-breaker-sdk": ^0.9.0-alpha.2
     "@helium/idls": ^0.9.0-alpha.1
     bn.js: ^5.2.0
     bs58: ^4.0.1
