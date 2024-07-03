@@ -43,7 +43,7 @@ export function proxyQuery({
         ...proxy,
         detail: detail ?? proxy.detail,
         networks,
-      } as PartialEnhancedProxy;
+      } as PartialEnhancedProxy & { networks: string[] };
     },
   });
 }
