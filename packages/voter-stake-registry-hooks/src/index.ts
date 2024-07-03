@@ -20,7 +20,7 @@ export { usePositions } from "./hooks/usePositions";
 export { useRegistrar } from "./hooks/useRegistrar";
 export { calcLockupMultiplier } from "./utils/calcLockupMultiplier";
 export { calcPositionVotingPower } from "./utils/calcPositionVotingPower";
-export { usePositionKeysAndProxies as usePositionKeys } from "./hooks/usePositionKeysAndProxies";
+export { usePositionKeysAndProxies } from "./hooks/usePositionKeysAndProxies";
 export * from "./sdk/types";
 export { useAssignProxies } from "./hooks/useAssignProxies";
 export { useUnassignProxies } from "./hooks/useUnassignProxies";
