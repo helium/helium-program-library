@@ -25,7 +25,7 @@ export type Proxy = {
 };
 
 export type EnhancedProxyData = {
-  delegatedVeTokens: string;
+  proxiedVeTokens: string;
   percent: string;
   numProposalsVoted: string;
   numAssignments: string;

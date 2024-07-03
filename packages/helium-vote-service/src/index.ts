@@ -179,7 +179,7 @@ WITH
       description,
       detail,
       count(p.voter) as "numAssignments",
-      floor(sum(p.ve_tokens)) as "delegatedVeTokens",
+      floor(sum(p.ve_tokens)) as "proxiedVeTokens",
       100 * sum(p.ve_tokens) / (select total_vetokens from total_vetokens) as "percent"
     FROM
       proxies
@@ -208,8 +208,8 @@ SELECT
   MAX(vm.created_at) as "lastVotedAt"
 FROM proxies_with_assignments pa
 LEFT OUTER JOIN vote_markers vm ON vm.voter = pa.wallet
-GROUP BY pa.name, pa.image, pa.wallet, pa.description, pa.detail, pa."numAssignments", pa."delegatedVeTokens", pa.percent
-ORDER BY "delegatedVeTokens" DESC
+GROUP BY pa.name, pa.image, pa.wallet, pa.description, pa.detail, pa."numAssignments", pa."proxiedVeTokens", pa.percent
+ORDER BY "proxiedVeTokens" DESC
 OFFSET ${offset}
 LIMIT ${limit};
       `);
@@ -250,7 +250,7 @@ WITH
       description,
       detail,
       count(p.voter) as "numAssignments",
-      floor(sum(p.ve_tokens)) as "delegatedVeTokens",
+      floor(sum(p.ve_tokens)) as "proxiedVeTokens",
       100 * sum(p.ve_tokens) / (select total_vetokens from total_vetokens) as "percent"
     FROM
       (SELECT DISTINCT voter as wallet FROM positions_with_proxy_assignments
@@ -269,7 +269,7 @@ WITH
       SELECT
         pa.*,
         COUNT(*) OVER () as "numProxies",
-        RANK() OVER (ORDER BY "delegatedVeTokens" DESC) as rank
+        RANK() OVER (ORDER BY "proxiedVeTokens" DESC) as rank
       FROM proxies_with_assignments pa
   ),
   proxies_with_votes AS (
@@ -280,7 +280,7 @@ WITH
       description,
       detail,
       "numAssignments",
-      "delegatedVeTokens",
+      "proxiedVeTokens",
       "percent",
       "numProxies",
       rank,
@@ -289,7 +289,7 @@ WITH
     FROM
       proxies_with_rank proxies
     LEFT OUTER JOIN vote_markers vm ON vm.voter = proxies.wallet AND vm.registrar = ${escapedRegistrar}
-    GROUP BY "numProxies", rank, name, image, wallet, description, detail, "numAssignments", "delegatedVeTokens", "percent"
+    GROUP BY "numProxies", rank, name, image, wallet, description, detail, "numAssignments", "proxiedVeTokens", "percent"
   )
 SELECT
   *
