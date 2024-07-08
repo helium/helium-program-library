@@ -1,12 +1,13 @@
 import { useProposal } from "@helium/modular-governance-hooks";
 import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { PublicKey, SYSVAR_CLOCK_PUBKEY, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { useVoteMarkers } from "./useVoteMarkers";
+import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 
 export const useVote = (proposalKey: PublicKey) => {
   const { info: proposal } = useProposal(proposalKey);
@@ -105,51 +106,83 @@ export const useVote = (proposalKey: PublicKey) => {
           "Unable to vote without positions. Please stake tokens first."
         );
       } else {
+        const clock = await provider.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+        const unixNow = new BN(clock!.data.readBigInt64LE(8 * 4).toString());
         const vsrProgram = await init(provider);
         const instructions = (
           await Promise.all(
-            positions.map(async (position, index) => {
-              const marker = markers?.[index]?.info;
-              const alreadyVotedThisChoice = marker?.choices.includes(choice);
-              const maxChoicesReached =
-                (marker?.choices.length || 0) >=
-                (proposal?.maxChoicesPerVoter || 0);
-              if (!marker || (!alreadyVotedThisChoice && !maxChoicesReached)) {
-                if (position.isProxiedToMe) {
-                  if (
-                    marker &&
-                    (marker.proxyIndex < (position.proxy?.index || 0) ||
-                      marker.choices.includes(choice))
-                  ) {
-                    // Do not vote with a position that has been delegated to us, but voting overidden
-                    // Also ignore voting for the same choice twice
-                    return;
-                  }
+            // vote with bigger positions first.
+            positions
+              .sort((a, b) => {
+                return -calcPositionVotingPower({
+                  position: a,
+                  registrar: registrar || null,
+                  unixNow,
+                }).cmp(
+                  calcPositionVotingPower({
+                    position: b,
+                    registrar: registrar || null,
+                    unixNow,
+                  })
+                );
+              })
+              .map(async (position, index) => {
+                const marker = markers?.[index]?.info;
+                const alreadyVotedThisChoice = marker?.choices.includes(choice);
+                const maxChoicesReached =
+                  (marker?.choices.length || 0) >=
+                  (proposal?.maxChoicesPerVoter || 0);
 
+                // Ignore positions that have 0 voting power and haven't already voted
+                if (
+                  !marker &&
+                  calcPositionVotingPower({
+                    position,
+                    registrar: registrar || null,
+                    unixNow,
+                  }).isZero()
+                ) {
+                  return;
+                }
+                if (
+                  !marker ||
+                  (!alreadyVotedThisChoice && !maxChoicesReached)
+                ) {
+                  if (position.isProxiedToMe) {
+                    if (
+                      marker &&
+                      (marker.proxyIndex < (position.proxy?.index || 0) ||
+                        marker.choices.includes(choice))
+                    ) {
+                      // Do not vote with a position that has been delegated to us, but voting overidden
+                      // Also ignore voting for the same choice twice
+                      return;
+                    }
+
+                    return await vsrProgram.methods
+                      .proxiedVoteV0({
+                        choice,
+                      })
+                      .accounts({
+                        proposal: proposalKey,
+                        voter: provider.wallet.publicKey,
+                        position: position.pubkey,
+                        registrar: registrar?.pubkey,
+                      })
+                      .instruction();
+                  }
                   return await vsrProgram.methods
-                    .proxiedVoteV0({
+                    .voteV0({
                       choice,
                     })
                     .accounts({
                       proposal: proposalKey,
                       voter: provider.wallet.publicKey,
                       position: position.pubkey,
-                      registrar: registrar?.pubkey,
                     })
                     .instruction();
                 }
-                return await vsrProgram.methods
-                  .voteV0({
-                    choice,
-                  })
-                  .accounts({
-                    proposal: proposalKey,
-                    voter: provider.wallet.publicKey,
-                    position: position.pubkey,
-                  })
-                  .instruction();
-              }
-            })
+              })
           )
         ).filter(truthy);
 
