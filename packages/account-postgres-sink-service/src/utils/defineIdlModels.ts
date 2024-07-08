@@ -92,7 +92,7 @@ export const defineIdlModels = async ({
           updatedAt: false,
           schema: underscore(accConfig.schema || "public"),
           tableName: underscore(accConfig.table || acc.name),
-          createdAt: !schema.createdAt && !schema.created_at,
+          createdAt: !schema[acc.name].createdAt && !schema[acc.name].created_at,
         }
       );
 
