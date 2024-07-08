@@ -1,13 +1,18 @@
 import { useProposal } from "@helium/modular-governance-hooks";
 import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
-import { PublicKey, SYSVAR_CLOCK_PUBKEY, TransactionInstruction } from "@solana/web3.js";
+import {
+  PublicKey,
+  SYSVAR_CLOCK_PUBKEY,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import BN from "bn.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { useVoteMarkers } from "./useVoteMarkers";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
+import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 
 export const useVote = (proposalKey: PublicKey) => {
   const { info: proposal } = useProposal(proposalKey);
@@ -106,7 +111,9 @@ export const useVote = (proposalKey: PublicKey) => {
           "Unable to vote without positions. Please stake tokens first."
         );
       } else {
-        const clock = await provider.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+        const clock = await provider.connection.getAccountInfo(
+          SYSVAR_CLOCK_PUBKEY
+        );
         const unixNow = new BN(clock!.data.readBigInt64LE(8 * 4).toString());
         const vsrProgram = await init(provider);
         const instructions = (
@@ -159,7 +166,7 @@ export const useVote = (proposalKey: PublicKey) => {
                       return;
                     }
 
-                    return await vsrProgram.methods
+                    const { pubkeys, instruction } = await vsrProgram.methods
                       .proxiedVoteV0({
                         choice,
                       })
@@ -168,8 +175,24 @@ export const useVote = (proposalKey: PublicKey) => {
                         voter: provider.wallet.publicKey,
                         position: position.pubkey,
                         registrar: registrar?.pubkey,
+                        marker: voteMarkerKey(
+                          position.mint,
+                          proposalKey
+                        )[0],
+                        proxyAssignment: proxyAssignmentKey(
+                          registrar!.proxyConfig,
+                          position.mint,
+                          provider.wallet.publicKey
+                        )[0],
                       })
-                      .instruction();
+                      .prepare();
+                    console.log(
+                      JSON.stringify(Object.entries(pubkeys).map(([key, value]) => [
+                        key,
+                        value.toBase58(),
+                      ]))
+                    );
+                    return instruction;
                   }
                   return await vsrProgram.methods
                     .voteV0({

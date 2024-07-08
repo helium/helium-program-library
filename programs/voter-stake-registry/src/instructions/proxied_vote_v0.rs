@@ -14,7 +14,7 @@ pub struct ProxiedVoteV0<'info> {
     init_if_needed,
     payer = payer,
     space = 8 + 32 + std::mem::size_of::<VoteMarkerV0>() + 1 + 2 * proposal.choices.len(),
-    seeds = [b"marker", mint.key().as_ref(), proposal.key().as_ref()],
+    seeds = [b"marker", position.mint.key().as_ref(), proposal.key().as_ref()],
     bump
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
@@ -23,11 +23,9 @@ pub struct ProxiedVoteV0<'info> {
   pub voter: Signer<'info>,
   #[account(
     mut,
-    has_one = mint,
     has_one = registrar
   )]
   pub position: Box<Account<'info, PositionV0>>,
-  pub mint: Box<Account<'info, Mint>>,
   #[account(
     has_one = voter,
     constraint = proxy_assignment.proxy_config == registrar.proxy_config,
@@ -83,7 +81,7 @@ pub fn handler(ctx: Context<ProxiedVoteV0>, args: VoteArgsV0) -> Result<()> {
   marker.proposal = ctx.accounts.proposal.key();
   marker.bump_seed = ctx.bumps["marker"];
   marker.voter = ctx.accounts.voter.key();
-  marker.mint = ctx.accounts.mint.key();
+  marker.mint = ctx.accounts.position.mint;
   marker.registrar = ctx.accounts.registrar.key();
   marker.proxy_index = ctx.accounts.proxy_assignment.index;
 

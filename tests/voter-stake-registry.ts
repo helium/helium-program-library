@@ -492,7 +492,6 @@ describe("voter-stake-registry", () => {
             choice: 0,
           })
           .accounts({
-            mint,
             proposal,
             position,
             voter: delegatee.publicKey,
@@ -547,7 +546,6 @@ describe("voter-stake-registry", () => {
             choice: 0,
           })
           .accounts({
-            mint,
             proposal,
             position,
             voter: delegatee.publicKey,
@@ -574,7 +572,6 @@ describe("voter-stake-registry", () => {
             choice: 0,
           })
           .accounts({
-            mint,
             proposal,
             position,
             voter: delegatee.publicKey,
