@@ -182,7 +182,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/helium-react-hooks@^0.9.0-alpha.2":
+"@helium/helium-react-hooks@^0.9.0-alpha.3":
   version: 0.0.0-use.local
   resolution: "@helium/helium-react-hooks@workspace:packages/helium-react-hooks"
   dependencies:
@@ -225,15 +225,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/helium-sub-daos-sdk@^0.9.0-alpha.2":
+"@helium/helium-sub-daos-sdk@^0.9.0-alpha.3":
   version: 0.0.0-use.local
   resolution: "@helium/helium-sub-daos-sdk@workspace:packages/helium-sub-daos-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.9.0-alpha.1
     "@helium/circuit-breaker-sdk": ^0.9.0-alpha.2
-    "@helium/treasury-management-sdk": ^0.9.0-alpha.2
-    "@helium/voter-stake-registry-sdk": ^0.9.0-alpha.2
+    "@helium/treasury-management-sdk": ^0.9.0-alpha.3
+    "@helium/voter-stake-registry-sdk": ^0.9.0-alpha.3
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -352,7 +352,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/treasury-management-sdk@^0.9.0-alpha.2":
+"@helium/treasury-management-sdk@^0.9.0-alpha.3":
   version: 0.0.0-use.local
   resolution: "@helium/treasury-management-sdk@workspace:packages/treasury-management-sdk"
   dependencies:
@@ -377,12 +377,12 @@ __metadata:
     "@helium/account-fetch-cache": ^0.9.0-alpha.1
     "@helium/account-fetch-cache-hooks": ^0.9.0-alpha.2
     "@helium/circuit-breaker-sdk": ^0.9.0-alpha.2
-    "@helium/helium-react-hooks": ^0.9.0-alpha.2
-    "@helium/helium-sub-daos-sdk": ^0.9.0-alpha.2
+    "@helium/helium-react-hooks": ^0.9.0-alpha.3
+    "@helium/helium-sub-daos-sdk": ^0.9.0-alpha.3
     "@helium/modular-governance-hooks": ^0.0.8
     "@helium/modular-governance-idls": 0.0.8-next.19+4fa4c6b
     "@helium/spl-utils": ^0.9.0-alpha.2
-    "@helium/voter-stake-registry-sdk": ^0.9.0-alpha.2
+    "@helium/voter-stake-registry-sdk": ^0.9.0-alpha.3
     "@solana/wallet-adapter-base": ^0.9.22
     "@solana/wallet-adapter-react": ^0.15.32
     "@solana/web3.js": ^1.78.8
@@ -399,7 +399,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/voter-stake-registry-sdk@^0.9.0-alpha.2":
+"@helium/voter-stake-registry-sdk@^0.9.0-alpha.3":
   version: 0.0.0-use.local
   resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:

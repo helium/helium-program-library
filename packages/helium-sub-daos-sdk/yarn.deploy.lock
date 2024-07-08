@@ -138,8 +138,8 @@ __metadata:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.9.0-alpha.1
     "@helium/circuit-breaker-sdk": ^0.9.0-alpha.2
-    "@helium/treasury-management-sdk": ^0.9.0-alpha.2
-    "@helium/voter-stake-registry-sdk": ^0.9.0-alpha.2
+    "@helium/treasury-management-sdk": ^0.9.0-alpha.3
+    "@helium/voter-stake-registry-sdk": ^0.9.0-alpha.3
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -207,7 +207,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/treasury-management-sdk@^0.9.0-alpha.2":
+"@helium/treasury-management-sdk@^0.9.0-alpha.3":
   version: 0.0.0-use.local
   resolution: "@helium/treasury-management-sdk@workspace:packages/treasury-management-sdk"
   dependencies:
@@ -224,7 +224,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/voter-stake-registry-sdk@^0.9.0-alpha.2":
+"@helium/voter-stake-registry-sdk@^0.9.0-alpha.3":
   version: 0.0.0-use.local
   resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:

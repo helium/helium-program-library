@@ -217,7 +217,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/voter-stake-registry-sdk@^0.9.0-alpha.2":
+"@helium/voter-stake-registry-sdk@^0.9.0-alpha.3":
   version: 0.0.0-use.local
   resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:
@@ -246,7 +246,7 @@ __metadata:
     "@helium/account-fetch-cache": ^0.9.0-alpha.1
     "@helium/address": ^4.10.2
     "@helium/spl-utils": ^0.9.0-alpha.2
-    "@helium/voter-stake-registry-sdk": ^0.9.0-alpha.2
+    "@helium/voter-stake-registry-sdk": ^0.9.0-alpha.3
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
