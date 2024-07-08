@@ -25,7 +25,7 @@ import {
   getAssociatedTokenAddress,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
 import chai, { expect } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import {
@@ -125,7 +125,6 @@ describe("voter-stake-registry", () => {
       me
     );
 
-    console.log("heheh");
     ({
       pubkeys: { proxyConfig },
     } = await proxyProgram.methods
@@ -143,7 +142,6 @@ describe("voter-stake-registry", () => {
         authority: me,
       })
       .rpcAndKeys());
-      console.log("hohoho")
 
     const {
       instruction: createRegistrar,
@@ -528,6 +526,44 @@ describe("voter-stake-registry", () => {
           marker! as PublicKey
         );
         expect(markerA?.choices).to.be.empty;
+      });
+
+      it("allows pays the rent for the marker from registrar if possible", async () => {
+        await sendInstructions(
+          provider,
+          [
+            SystemProgram.transfer({
+              fromPubkey: me,
+              toPubkey: registrar,
+              lamports: LAMPORTS_PER_SOL,
+            })
+          ]
+        )
+        const registrarBalance = await provider.connection.getBalance(registrar)
+        const {
+          pubkeys: { marker },
+        } = await program.methods
+          .proxiedVoteV0({
+            choice: 0,
+          })
+          .accounts({
+            mint,
+            proposal,
+            position,
+            voter: delegatee.publicKey,
+          })
+          .signers([delegatee])
+          .rpcAndKeys({ skipPreflight: true });
+
+        let acct = await proposalProgram.account.proposalV0.fetch(proposal!);
+        expect(acct.choices[0].weight.toNumber()).to.be.gt(0);
+        let markerA = await program.account.voteMarkerV0.fetchNullable(
+          marker! as PublicKey
+        );
+        expect(markerA?.rentRefund?.toBase58()).to.eq(registrar.toBase58());
+        const registrarBalance2 = await provider.connection.getBalance(registrar);
+        const spentLamports = (await provider.connection.getAccountInfo(marker! as PublicKey))?.lamports || 0;
+        expect(registrarBalance2).to.eq(registrarBalance - spentLamports);
       });
 
       it("allows earlier proxies to change the vote", async () => {
