@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.9.0-alpha.2",
+  "version": "0.9.0-alpha.3",
   "description": "Faucet for devnet Helium tokens",
   "repository": {
     "type": "git",

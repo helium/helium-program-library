@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.9.0-alpha.2",
+  "version": "0.9.0-alpha.3",
   "description": "Interface to the helium-entity-manager smart contract",
   "repository": {
     "type": "git",
@@ -34,7 +34,7 @@
     "@coral-xyz/anchor": "^0.28.0",
     "@helium/address": "^4.10.2",
     "@helium/anchor-resolvers": "^0.9.0-alpha.1",
-    "@helium/helium-sub-daos-sdk": "^0.9.0-alpha.2",
+    "@helium/helium-sub-daos-sdk": "^0.9.0-alpha.3",
     "@helium/idls": "^0.9.0-alpha.1",
     "@helium/no-emit-sdk": "^0.9.0-alpha.1",
     "@helium/spl-utils": "^0.9.0-alpha.2",

@@ -1,6 +1,6 @@
 {
   "name": "@helium/hotspot-utils",
-  "version": "0.9.0-alpha.2",
+  "version": "0.9.0-alpha.3",
   "description": "Utils for Hotspot interaction",
   "homepage": "https://github.com/helium/helium-program-library#readme",
   "publishConfig": {
@@ -29,8 +29,8 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
-    "@helium/helium-entity-manager-sdk": "^0.9.0-alpha.2",
-    "@helium/helium-sub-daos-sdk": "^0.9.0-alpha.2",
+    "@helium/helium-entity-manager-sdk": "^0.9.0-alpha.3",
+    "@helium/helium-sub-daos-sdk": "^0.9.0-alpha.3",
     "@helium/idls": "^0.9.0-alpha.1",
     "@helium/spl-utils": "^0.9.0-alpha.2",
     "@solana/web3.js": "^1.78.8",
