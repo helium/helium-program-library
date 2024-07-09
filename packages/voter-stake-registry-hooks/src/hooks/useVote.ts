@@ -166,7 +166,7 @@ export const useVote = (proposalKey: PublicKey) => {
                       return;
                     }
 
-                    const { pubkeys, instruction } = await vsrProgram.methods
+                    return await vsrProgram.methods
                       .proxiedVoteV0({
                         choice,
                       })
@@ -185,14 +185,7 @@ export const useVote = (proposalKey: PublicKey) => {
                           provider.wallet.publicKey
                         )[0],
                       })
-                      .prepare();
-                    console.log(
-                      JSON.stringify(Object.entries(pubkeys).map(([key, value]) => [
-                        key,
-                        value.toBase58(),
-                      ]))
-                    );
-                    return instruction;
+                      .instruction();
                   }
                   return await vsrProgram.methods
                     .voteV0({
