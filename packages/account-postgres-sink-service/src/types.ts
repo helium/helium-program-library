@@ -1,7 +1,7 @@
 import { Transaction } from "sequelize";
 
-type Plugins = 'ExtractHexLocation';
-type Crons = 'refresh-accounts' | 'integrity-check';
+type Plugins = "ExtractHexLocation";
+type Crons = "refresh-accounts" | "integrity-check";
 
 export interface IPluginConfig {
   type: Plugins;
@@ -14,6 +14,7 @@ export interface IAccountConfig {
   schema: string;
   batchSize: number;
   plugins?: IPluginConfig[];
+  delete?: string; // String of instructionName.field to trigger deletes
 }
 
 export interface IConfig {

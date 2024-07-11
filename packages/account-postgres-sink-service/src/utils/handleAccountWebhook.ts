@@ -30,7 +30,7 @@ export function handleAccountWebhook({
   account,
   sequelize = database,
   pluginsByAccountType,
-  isDelete = false
+  isDelete = false,
 }: HandleAccountWebhookArgs) {
   return limit(async () => {
     const idl = await cachedIdlFetch.fetchIdl({
@@ -39,7 +39,7 @@ export function handleAccountWebhook({
     });
 
     if (!idl) {
-      throw new Error(`unable to fetch idl for ${programId}`);
+      throw new Error(`unable to fetch idl for ${programId.toBase58()}`);
     }
 
     if (
@@ -78,14 +78,12 @@ export function handleAccountWebhook({
         }
         const model = sequelize.models[accName];
         if (isDelete) {
-          await model.destroy(
-            {
-              where: {
-                address: account.pubkey,
-              },
-              transaction: t,
-            }
-          );
+          await model.destroy({
+            where: {
+              address: account.pubkey,
+            },
+            transaction: t,
+          });
         } else {
           const value = await model.findByPk(account.pubkey);
           const changed =
@@ -105,7 +103,6 @@ export function handleAccountWebhook({
             );
           }
         }
-        
       }
 
       await t.commit();

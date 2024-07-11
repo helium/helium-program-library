@@ -18,28 +18,30 @@ import {
   unpackMapOutput,
 } from "@substreams/core";
 import Client, {
-  CommitmentLevel,
   SubscribeRequest,
-  SubscribeRequestFilterAccountsFilter,
+  SubscribeUpdate,
+  SubscribeUpdateAccount,
+  SubscribeUpdateTransaction,
 } from "@triton-one/yellowstone-grpc";
+import { BloomFilter } from "bloom-filters";
 import { EventEmitter } from "events";
 import Fastify, { FastifyInstance } from "fastify";
 import fastifyCron from "fastify-cron";
 import fs from "fs";
 import { ReasonPhrases, StatusCodes } from "http-status-codes";
+import { EachMessagePayload, Kafka, KafkaConfig } from "kafkajs";
 import { Op } from "sequelize";
 import {
   HELIUS_AUTH_SECRET,
-  USE_KAFKA,
   PROGRAM_ACCOUNT_CONFIGS,
+  REFRESH_PASSWORD,
   RUN_JOBS_AT_STARTUP,
   SUBSTREAM,
+  USE_KAFKA,
   USE_SUBSTREAMS,
   USE_YELLOWSTONE,
-  SOLANA_URL,
   YELLOWSTONE_TOKEN,
   YELLOWSTONE_URL,
-  REFRESH_PASSWORD,
 } from "./env";
 import { initPlugins } from "./plugins";
 import { metrics } from "./plugins/metrics";
@@ -51,8 +53,9 @@ import { handleAccountWebhook } from "./utils/handleAccountWebhook";
 import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAccounts";
 import { provider } from "./utils/solana";
 import { truthy, upsertProgramAccounts } from "./utils/upsertProgramAccounts";
-const { BloomFilter } = require("bloom-filters");
-import { EachMessagePayload, Kafka, KafkaConfig } from "kafkajs";
+import cachedIdlFetch from "./utils/cachedIdlFetch";
+import { BorshInstructionCoder } from "@coral-xyz/anchor";
+import { getWritableAccountKeys } from "./utils/getWritableAccountKeys";
 
 if (!HELIUS_AUTH_SECRET) {
   throw new Error("Helius auth secret not available");
@@ -274,23 +277,13 @@ if (!HELIUS_AUTH_SECRET) {
 
     try {
       const transactions = req.body as TransactionResponse[];
-      const writableAccountKeys = transactions
-        .flatMap((tx) =>
-          tx.transaction.message.accountKeys
-            .slice(
-              0,
-              tx.transaction.message.accountKeys.length -
-                tx.transaction.message.header.numReadonlyUnsignedAccounts
-            )
-            .filter(
-              (_, index) =>
-                index <
-                  tx.transaction.message.header.numRequiredSignatures -
-                    tx.transaction.message.header.numReadonlySignedAccounts ||
-                index >= tx.transaction.message.header.numRequiredSignatures
-            )
+      const writableAccountKeys = transactions.flatMap((tx) =>
+        getWritableAccountKeys(
+          tx.transaction.message.accountKeys,
+          tx.transaction.message.header
         )
-        .map((k) => new PublicKey(k));
+      );
+
       await insertTransactionAccounts(
         await getMultipleAccounts({
           connection: provider.connection,
@@ -532,11 +525,12 @@ if (!HELIUS_AUTH_SECRET) {
     if (USE_YELLOWSTONE) {
       const client = new Client(YELLOWSTONE_URL, YELLOWSTONE_TOKEN, {
         "grpc.max_receive_message_length": 2065853043,
+        "grpc.": "true",
       });
 
       const stream = await client.subscribe();
 
-      console.log("Connected")
+      console.log("Connected");
 
       // Create `error` / `end` handler
       const streamClosed = new Promise<void>((resolve, reject) => {
@@ -553,10 +547,82 @@ if (!HELIUS_AUTH_SECRET) {
       });
 
       // Handle updates
-      stream.on("data", async (data) => {
-        const account = data?.account?.account;
-        if (account) {
-          if (configs) {
+      stream.on("data", async (data: SubscribeUpdate) => {
+        // only used for deletes currently
+        if (data.transaction) {
+          const transaction = (data.transaction as SubscribeUpdateTransaction)
+            ?.transaction?.transaction;
+
+          if (transaction?.message && configs) {
+            const message = transaction.message;
+            const { accountKeys, header, instructions } = message;
+
+            for (const ix of instructions) {
+              const pIdIdx = ix.programIdIndex;
+              const owner = new PublicKey(accountKeys[pIdIdx]).toBase58();
+              const config = configs.find((x) => x.programId === owner);
+
+              if (config) {
+                try {
+                  await (async () => {
+                    const idl = await cachedIdlFetch.fetchIdl({
+                      programId: owner,
+                      provider,
+                    });
+
+                    if (!idl) {
+                      throw new Error(`unable to fetch idl for ${owner}`);
+                    }
+
+                    if (
+                      !config.accounts.every(({ type }) =>
+                        idl.accounts!.some(({ name }) => name === type)
+                      )
+                    ) {
+                      throw new Error("idl does not have every account type");
+                    }
+
+                    const coder = new BorshInstructionCoder(idl);
+                    const parsed = coder.decode(Buffer.from(ix.data), "base58");
+                    const writableAccounts = getWritableAccountKeys(
+                      accountKeys,
+                      header!
+                    );
+
+                    console.log({
+                      accounts: ix.accounts,
+                      accountKeys,
+                      writableAccounts,
+                    });
+
+                    const ixAccounts = Array.from(ix.accounts)
+                      .map((idx) => accountKeys[idx])
+                      .filter(truthy)
+                      .map((key) => ({
+                        pubkey: new PublicKey(key),
+                        isSigner: false,
+                        isWritable: false,
+                      }));
+
+                    if (parsed) {
+                      const formatted = coder.format(parsed, ixAccounts);
+
+                      if (formatted) {
+                        console.log(formatted.accounts);
+                      }
+                    }
+                  })();
+                } catch (err) {
+                  console.error(err);
+                }
+              }
+            }
+          }
+        }
+
+        if (data.account) {
+          const account = (data.account as SubscribeUpdateAccount)?.account;
+          if (account && configs) {
             const owner = new PublicKey(account.owner).toBase58();
             const config = configs.find((x) => x.programId === owner);
 
@@ -591,7 +657,15 @@ if (!HELIUS_AUTH_SECRET) {
           },
         },
         slots: {},
-        transactions: {},
+        transactions: {
+          client: {
+            vote: false,
+            failed: false,
+            accountInclude: configs.map((c) => c.programId),
+            accountExclude: [],
+            accountRequired: [],
+          },
+        },
         entry: {},
         blocks: {},
         blocksMeta: {},
