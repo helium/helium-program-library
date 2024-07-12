@@ -21,7 +21,6 @@ import Client, {
   SubscribeRequest,
   SubscribeUpdate,
   SubscribeUpdateAccount,
-  SubscribeUpdateTransaction,
 } from "@triton-one/yellowstone-grpc";
 import { BloomFilter } from "bloom-filters";
 import { EventEmitter } from "events";
@@ -46,16 +45,17 @@ import {
 import { initPlugins } from "./plugins";
 import { metrics } from "./plugins/metrics";
 import { IConfig, IInitedPlugin } from "./types";
+import { convertYellowstoneTransaction } from "./utils/convertYellowstoneTransaction";
 import { createPgIndexes } from "./utils/createPgIndexes";
 import database, { Cursor } from "./utils/database";
 import { defineAllIdlModels } from "./utils/defineIdlModels";
+import { getWritableAccountKeys } from "./utils/getWritableAccountKeys";
 import { handleAccountWebhook } from "./utils/handleAccountWebhook";
+import { handleTransactionWebhoook } from "./utils/handleTransactionWebhook";
 import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAccounts";
 import { provider } from "./utils/solana";
-import { truthy, upsertProgramAccounts } from "./utils/upsertProgramAccounts";
-import cachedIdlFetch from "./utils/cachedIdlFetch";
-import { BorshInstructionCoder } from "@coral-xyz/anchor";
-import { getWritableAccountKeys } from "./utils/getWritableAccountKeys";
+import { truthy } from "./utils/truthy";
+import { upsertProgramAccounts } from "./utils/upsertProgramAccounts";
 
 if (!HELIUS_AUTH_SECRET) {
   throw new Error("Helius auth secret not available");
@@ -548,74 +548,20 @@ if (!HELIUS_AUTH_SECRET) {
 
       // Handle updates
       stream.on("data", async (data: SubscribeUpdate) => {
-        // only used for deletes currently
         if (data.transaction) {
-          const transaction = (data.transaction as SubscribeUpdateTransaction)
-            ?.transaction?.transaction;
+          const transaction = await convertYellowstoneTransaction(
+            data.transaction.transaction
+          );
 
-          if (transaction?.message && configs) {
-            const message = transaction.message;
-            const { accountKeys, header, instructions } = message;
-
-            for (const ix of instructions) {
-              const pIdIdx = ix.programIdIndex;
-              const owner = new PublicKey(accountKeys[pIdIdx]).toBase58();
-              const config = configs.find((x) => x.programId === owner);
-
-              if (config) {
-                try {
-                  await (async () => {
-                    const idl = await cachedIdlFetch.fetchIdl({
-                      programId: owner,
-                      provider,
-                    });
-
-                    if (!idl) {
-                      throw new Error(`unable to fetch idl for ${owner}`);
-                    }
-
-                    if (
-                      !config.accounts.every(({ type }) =>
-                        idl.accounts!.some(({ name }) => name === type)
-                      )
-                    ) {
-                      throw new Error("idl does not have every account type");
-                    }
-
-                    const coder = new BorshInstructionCoder(idl);
-                    const parsed = coder.decode(Buffer.from(ix.data), "base58");
-                    const writableAccounts = getWritableAccountKeys(
-                      accountKeys,
-                      header!
-                    );
-
-                    console.log({
-                      accounts: ix.accounts,
-                      accountKeys,
-                      writableAccounts,
-                    });
-
-                    const ixAccounts = Array.from(ix.accounts)
-                      .map((idx) => accountKeys[idx])
-                      .filter(truthy)
-                      .map((key) => ({
-                        pubkey: new PublicKey(key),
-                        isSigner: false,
-                        isWritable: false,
-                      }));
-
-                    if (parsed) {
-                      const formatted = coder.format(parsed, ixAccounts);
-
-                      if (formatted) {
-                        console.log(formatted.accounts);
-                      }
-                    }
-                  })();
-                } catch (err) {
-                  console.error(err);
-                }
-              }
+          if (transaction) {
+            try {
+              await handleTransactionWebhoook({
+                fastify: server,
+                configs,
+                transaction,
+              });
+            } catch (err) {
+              console.error(err);
             }
           }
         }

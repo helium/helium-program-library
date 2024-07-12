@@ -1,13 +1,13 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
+import { FastifyInstance } from "fastify";
+import pLimit from "p-limit";
 import { Sequelize } from "sequelize";
-import { provider } from "./solana";
+import { IAccountConfig, IInitedPlugin } from "../types";
+import cachedIdlFetch from "./cachedIdlFetch";
 import database from "./database";
 import { sanitizeAccount } from "./sanitizeAccount";
-import cachedIdlFetch from "./cachedIdlFetch";
-import { FastifyInstance } from "fastify";
-import { IAccountConfig, IInitedPlugin } from "../types";
-import pLimit from "p-limit";
+import { provider } from "./solana";
 
 interface HandleAccountWebhookArgs {
   fastify: FastifyInstance;
@@ -23,6 +23,7 @@ interface HandleAccountWebhookArgs {
 const limit = pLimit(
   (process.env.PG_POOL_SIZE ? Number(process.env.PG_POOL_SIZE) : 5) - 1
 );
+
 export function handleAccountWebhook({
   fastify,
   programId,

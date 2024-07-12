@@ -8,13 +8,20 @@ export interface IPluginConfig {
   config: any;
 }
 
+export type IxSideEffectAction = "delete";
+export interface IIxSideEffect {
+  ix: string;
+  acc: string;
+  action: IxSideEffectAction;
+}
+
 export interface IAccountConfig {
   type: string;
   table: string;
   schema: string;
   batchSize: number;
   plugins?: IPluginConfig[];
-  delete?: string; // String of instructionName.field to trigger deletes
+  ix_side_effects?: IIxSideEffect[];
 }
 
 export interface IConfig {

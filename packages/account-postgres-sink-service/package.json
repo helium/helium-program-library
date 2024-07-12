@@ -57,7 +57,7 @@
     "fastify-plugin": "^4.5.1",
     "h3-js": "^4.1.0",
     "http-status-codes": "^2.2.0",
-    "inflection": "^2.0.1",
+    "inflection": "^3.0.0",
     "kafkajs": "^2.2.4",
     "lodash": "^4.17.21",
     "p-limit": "3.1.0",
