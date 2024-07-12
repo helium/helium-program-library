@@ -2,16 +2,14 @@ import * as anchor from "@coral-xyz/anchor";
 import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
 import { Op, Sequelize } from "sequelize";
 import { SOLANA_URL } from "../env";
+import { initPlugins } from "../plugins";
 import { IAccountConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
 import { chunks } from "./chunks";
 import database from "./database";
 import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
-import { initPlugins } from "../plugins";
-
-export type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
-export const truthy = <T>(value: T): value is Truthy<T> => !!value;
+import { truthy } from "./truthy";
 
 interface UpsertProgramAccountsArgs {
   programId: PublicKey;

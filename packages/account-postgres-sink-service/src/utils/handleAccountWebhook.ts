@@ -1,13 +1,13 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
+import { FastifyInstance } from "fastify";
+import pLimit from "p-limit";
 import { Sequelize } from "sequelize";
-import { provider } from "./solana";
+import { IAccountConfig, IInitedPlugin } from "../types";
+import cachedIdlFetch from "./cachedIdlFetch";
 import database from "./database";
 import { sanitizeAccount } from "./sanitizeAccount";
-import cachedIdlFetch from "./cachedIdlFetch";
-import { FastifyInstance } from "fastify";
-import { IAccountConfig, IInitedPlugin } from "../types";
-import pLimit from "p-limit";
+import { provider } from "./solana";
 
 interface HandleAccountWebhookArgs {
   fastify: FastifyInstance;
@@ -23,6 +23,7 @@ interface HandleAccountWebhookArgs {
 const limit = pLimit(
   (process.env.PG_POOL_SIZE ? Number(process.env.PG_POOL_SIZE) : 5) - 1
 );
+
 export function handleAccountWebhook({
   fastify,
   programId,
@@ -30,7 +31,7 @@ export function handleAccountWebhook({
   account,
   sequelize = database,
   pluginsByAccountType,
-  isDelete = false
+  isDelete = false,
 }: HandleAccountWebhookArgs) {
   return limit(async () => {
     const idl = await cachedIdlFetch.fetchIdl({
@@ -39,7 +40,7 @@ export function handleAccountWebhook({
     });
 
     if (!idl) {
-      throw new Error(`unable to fetch idl for ${programId}`);
+      throw new Error(`unable to fetch idl for ${programId.toBase58()}`);
     }
 
     if (
@@ -78,14 +79,12 @@ export function handleAccountWebhook({
         }
         const model = sequelize.models[accName];
         if (isDelete) {
-          await model.destroy(
-            {
-              where: {
-                address: account.pubkey,
-              },
-              transaction: t,
-            }
-          );
+          await model.destroy({
+            where: {
+              address: account.pubkey,
+            },
+            transaction: t,
+          });
         } else {
           const value = await model.findByPk(account.pubkey);
           const changed =
@@ -105,7 +104,6 @@ export function handleAccountWebhook({
             );
           }
         }
-        
       }
 
       await t.commit();

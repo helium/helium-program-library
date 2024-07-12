@@ -3,3 +3,4 @@ dist/
 tmp/
 ./node_modules
 .env
+program_account_configs.json
