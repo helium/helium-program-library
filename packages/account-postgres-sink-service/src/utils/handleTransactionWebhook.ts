@@ -122,7 +122,6 @@ export const handleTransactionWebhoook = async ({
                     )?.pubkey;
 
                     if (pKey) {
-                      console.log("Deleting", model.name, pKey.toBase58());
                       await model.destroy({
                         where: {
                           address: pKey.toBase58(),
