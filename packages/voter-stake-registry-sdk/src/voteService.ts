@@ -3,6 +3,7 @@ import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry"
 import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import { PublicKey } from "@solana/web3.js";
 import axios, { AxiosInstance } from "axios";
+import BN from "bn.js";
 
 export type ProxyAssignment = {
   voter: string;
@@ -14,6 +15,7 @@ export type ProxyAssignment = {
   bumpSeed: number;
   rentRefund: string;
   expirationTime: string;
+  isExpired: boolean;
 };
 
 export type Proxy = {
@@ -164,7 +166,11 @@ export class VoteService {
             },
           }
         )
-      ).data;
+      ).data.map((p) => ({
+        ...p,
+        isExpired:
+          p.expirationTime && p.expirationTime < new BN(new Date().valueOf() / 1000),
+      }));
     }
 
     if (this.nftProxyProgram && this.program) {
@@ -200,6 +206,9 @@ export class VoteService {
           rentRefund: a.account.rentRefund.toBase58(),
           bumpSeed: a.account.bumpSeed,
           expirationTime: a.account.expirationTime.toString(),
+          isExpired:
+            a.account.expirationTime &&
+            a.account.expirationTime < new BN(new Date().valueOf() / 1000),
         }));
     } else {
       throw new Error("No nft proxy program or api url");
@@ -222,7 +231,11 @@ export class VoteService {
             },
           }
         )
-      ).data;
+      ).data.map((p) => ({
+        ...p,
+        isExpired:
+          p.expirationTime && p.expirationTime < new BN(new Date().valueOf() / 1000),
+      }));
     }
 
     if (this.nftProxyProgram && this.program) {
@@ -256,6 +269,9 @@ export class VoteService {
           rentRefund: a.account.rentRefund.toBase58(),
           bumpSeed: a.account.bumpSeed,
           expirationTime: a.account.expirationTime.toString(),
+          isExpired:
+            a.account.expirationTime &&
+            a.account.expirationTime < new BN(new Date().valueOf() / 1000),
         }));
     } else {
       throw new Error("No nft proxy program or api url");
@@ -307,6 +323,9 @@ export class VoteService {
           rentRefund: a.account.rentRefund.toBase58(),
           bumpSeed: a.account.bumpSeed,
           expirationTime: a.account.expirationTime.toString(),
+          isExpired:
+            a.account.expirationTime &&
+            a.account.expirationTime < new BN(new Date().valueOf() / 1000),
         }));
     } else {
       throw new Error("No nft proxy program or api url");

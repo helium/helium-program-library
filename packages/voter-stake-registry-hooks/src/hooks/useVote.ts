@@ -13,20 +13,37 @@ import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { useVoteMarkers } from "./useVoteMarkers";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
+import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 
 export const useVote = (proposalKey: PublicKey) => {
   const { info: proposal } = useProposal(proposalKey);
   const { positions, provider, registrar } = useHeliumVsrState();
+  const unixNow = useSolanaUnixNow()
+  const sortedPositions = useMemo(() => {
+    return unixNow && positions?.sort((a, b) => {
+      return -calcPositionVotingPower({
+        position: a,
+        registrar: registrar || null,
+        unixNow: new BN(unixNow),
+      }).cmp(
+        calcPositionVotingPower({
+          position: b,
+          registrar: registrar || null,
+          unixNow: new BN(unixNow),
+        })
+      );
+    });
+  }, [positions, unixNow]);
   const voteMarkerKeys = useMemo(() => {
-    return positions
-      ? positions.map((p) => voteMarkerKey(p.mint, proposalKey)[0])
+    return sortedPositions
+      ? sortedPositions.map((p) => voteMarkerKey(p.mint, proposalKey)[0])
       : [];
-  }, [positions]);
+  }, [sortedPositions]);
   const { accounts: markers } = useVoteMarkers(voteMarkerKeys);
   const voteWeights: BN[] | undefined = useMemo(() => {
     if (proposal && markers) {
       return markers.reduce((acc, marker, idx) => {
-        const position = positions?.[idx];
+        const position = sortedPositions?.[idx];
         marker.info?.choices.forEach((choice) => {
           // Only count my own and down the line vote weights
           if (
@@ -40,11 +57,11 @@ export const useVote = (proposalKey: PublicKey) => {
         return acc;
       }, new Array(proposal?.choices.length));
     }
-  }, [proposal, markers, positions]);
+  }, [proposal, markers, sortedPositions]);
   const voters: PublicKey[][] | undefined = useMemo(() => {
     if (proposal && markers) {
       const nonUniqueResult = markers.reduce((acc, marker, idx) => {
-        const position = positions?.[idx];
+        const position = sortedPositions?.[idx];
         marker.info?.choices.forEach((choice) => {
           acc[choice] ||= [];
           if (
@@ -64,13 +81,13 @@ export const useVote = (proposalKey: PublicKey) => {
         )
       );
     }
-  }, [markers, positions]);
+  }, [markers, sortedPositions]);
   const canVote = useCallback(
     (choice: number) => {
       if (!markers) return false;
 
       return markers.some((m, index) => {
-        const position = positions?.[index];
+        const position = sortedPositions?.[index];
         const earlierDelegateVoted =
           position &&
           position.proxy &&
@@ -80,11 +97,13 @@ export const useVote = (proposalKey: PublicKey) => {
         const maxChoicesReached =
           (m?.info?.choices.length || 0) >= (proposal?.maxChoicesPerVoter || 0);
         const alreadyVotedThisChoice = m.info?.choices.includes(choice);
+        const proxyExpired = position?.proxy?.isExpired;
         const canVote =
-          noMarker ||
-          (!maxChoicesReached &&
-            !alreadyVotedThisChoice &&
-            !earlierDelegateVoted);
+          !proxyExpired &&
+          (noMarker ||
+            (!maxChoicesReached &&
+              !alreadyVotedThisChoice &&
+              !earlierDelegateVoted));
         return canVote;
       });
     },
@@ -104,7 +123,8 @@ export const useVote = (proposalKey: PublicKey) => {
       onProgress?: (status: Status) => void;
       maxSignatureBatch?: number;
     }) => {
-      const isInvalid = !provider || !positions || positions.length === 0;
+      const isInvalid =
+        !provider || !sortedPositions || sortedPositions.length === 0;
 
       if (isInvalid) {
         throw new Error(
@@ -114,25 +134,11 @@ export const useVote = (proposalKey: PublicKey) => {
         const clock = await provider.connection.getAccountInfo(
           SYSVAR_CLOCK_PUBKEY
         );
-        const unixNow = new BN(clock!.data.readBigInt64LE(8 * 4).toString());
         const vsrProgram = await init(provider);
         const instructions = (
           await Promise.all(
             // vote with bigger positions first.
-            positions
-              .sort((a, b) => {
-                return -calcPositionVotingPower({
-                  position: a,
-                  registrar: registrar || null,
-                  unixNow,
-                }).cmp(
-                  calcPositionVotingPower({
-                    position: b,
-                    registrar: registrar || null,
-                    unixNow,
-                  })
-                );
-              })
+            sortedPositions
               .map(async (position, index) => {
                 const marker = markers?.[index]?.info;
                 const alreadyVotedThisChoice = marker?.choices.includes(choice);
@@ -140,14 +146,17 @@ export const useVote = (proposalKey: PublicKey) => {
                   (marker?.choices.length || 0) >=
                   (proposal?.maxChoicesPerVoter || 0);
 
+                const proxyExpired = position?.proxy?.isExpired;
+
                 // Ignore positions that have 0 voting power and haven't already voted
                 if (
-                  !marker &&
-                  calcPositionVotingPower({
-                    position,
-                    registrar: registrar || null,
-                    unixNow,
-                  }).isZero()
+                  proxyExpired ||
+                  (!marker && unixNow &&
+                    calcPositionVotingPower({
+                      position,
+                      registrar: registrar || null,
+                      unixNow: new BN(unixNow),
+                    }).isZero())
                 ) {
                   return;
                 }

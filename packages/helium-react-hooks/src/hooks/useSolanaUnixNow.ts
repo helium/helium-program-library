@@ -3,6 +3,8 @@ import { Connection, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { useAsync } from "react-async-hook";
 import { useConnection } from "@solana/wallet-adapter-react";
 
+let globalUnixTimePromise: Promise<number> | undefined;
+
 export const useSolanaUnixNow = (refreshInterval: number = 10000): number | undefined => {
   const { connection } = useConnection();
   const connectionWithoutCache = useMemo(() => {
@@ -13,13 +15,21 @@ export const useSolanaUnixNow = (refreshInterval: number = 10000): number | unde
   const [startTsJs, setStartTsJs] = useState<number | null>(null)
   const [ret, setRet] = useState<number | undefined>(undefined);
   const { result: unixTs } = useAsync(
-    async (connectionWithoutCache: Connection | undefined) => {
+    (connectionWithoutCache: Connection | undefined) => {
       if (connectionWithoutCache) {
-        const clock = await connectionWithoutCache.getAccountInfo(
-          SYSVAR_CLOCK_PUBKEY
-        );
-        return Number(clock!.data.readBigInt64LE(8 * 4));
+        if (globalUnixTimePromise) {
+          return globalUnixTimePromise
+        }
+
+        globalUnixTimePromise = new Promise(async (resolve) => {
+          const clock = await connectionWithoutCache.getAccountInfo(
+            SYSVAR_CLOCK_PUBKEY
+          );
+          resolve(Number(clock!.data.readBigInt64LE(8 * 4)));
+        });
+        return globalUnixTimePromise;
       }
+      return Promise.resolve(undefined)
     },
     [connectionWithoutCache]
   );
@@ -31,7 +41,11 @@ export const useSolanaUnixNow = (refreshInterval: number = 10000): number | unde
   useEffect(() => {
     const interval = setInterval(() => {
       if (startTsJs && unixTs) {
-        setRet(Math.ceil(unixTs + ((new Date().valueOf() / 1000) - startTsJs)));
+        const nextVal = Math.ceil(
+          unixTs + (new Date().valueOf() / 1000 - startTsJs)
+        );
+        setRet(nextVal);
+        globalUnixTimePromise = Promise.resolve(nextVal);
       }
     }, refreshInterval)
 

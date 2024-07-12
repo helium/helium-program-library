@@ -8,6 +8,7 @@ import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry"
 import { init as initNftProxy } from "@helium/nft-proxy-sdk";
 import { truthy } from "@helium/spl-utils";
 import {
+  ProxyAssignment,
   VoteService,
   getRegistrarKey,
   init,
@@ -144,7 +145,7 @@ export const HeliumVsrStateProvider: React.FC<{
     return proxyAccounts?.reduce((acc, prox) => {
       acc[prox.asset.toBase58()] = prox;
       return acc;
-    }, {} as Record<string, ProxyAssignmentV0>);
+    }, {} as Record<string, ProxyAssignmentV0 & { isExpired: boolean }>);
   }, [proxyAccounts]);
   const myOwnedPositionsEndIdx = positionKeys?.length;
   // Assume that my positions are a small amount, so we don't need to say they're static

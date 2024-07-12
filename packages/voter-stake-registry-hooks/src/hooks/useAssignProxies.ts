@@ -132,6 +132,7 @@ export const useAssignProxies = () => {
             expirationTime: expirationTime.toString(),
             rentRefund: recipient.toBase58(),
             bumpSeed: 0,
+            isExpired: false,
           });
 
           instructions.push(instruction);
