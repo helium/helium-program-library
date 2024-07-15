@@ -111,6 +111,9 @@ server.get<{
     ];
   }
   if (nextVoter) where.nextVoter = nextVoter;
+  where.expirationTime = {
+    [Op.gt]: new Date().valueOf() / 1000,
+  };
   if (typeof minIndex !== "undefined") {
     where.index = {
       [Op.gte]: minIndex,
