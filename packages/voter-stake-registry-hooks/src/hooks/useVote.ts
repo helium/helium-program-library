@@ -97,13 +97,14 @@ export const useVote = (proposalKey: PublicKey) => {
         const maxChoicesReached =
           (m?.info?.choices.length || 0) >= (proposal?.maxChoicesPerVoter || 0);
         const alreadyVotedThisChoice = m.info?.choices.includes(choice);
-        const proxyExpired = position?.proxy?.isExpired;
-        const canVote =
-          !proxyExpired &&
+        const proxyExpired =
+          position?.proxy?.expirationTime &&
+          new BN(position.proxy.expirationTime).lt(new BN(Date.now() / 1000));
+        const canVote = !proxyExpired && 
           (noMarker ||
-            (!maxChoicesReached &&
-              !alreadyVotedThisChoice &&
-              !earlierDelegateVoted));
+          (!maxChoicesReached &&
+            !alreadyVotedThisChoice &&
+            !earlierDelegateVoted));
         return canVote;
       });
     },
@@ -146,7 +147,10 @@ export const useVote = (proposalKey: PublicKey) => {
                   (marker?.choices.length || 0) >=
                   (proposal?.maxChoicesPerVoter || 0);
 
-                const proxyExpired = position?.proxy?.isExpired;
+                const proxyExpired =
+                  position?.proxy?.expirationTime &&
+                  unixNow &&
+                  new BN(position.proxy.expirationTime).lt(new BN(unixNow));
 
                 // Ignore positions that have 0 voting power and haven't already voted
                 if (

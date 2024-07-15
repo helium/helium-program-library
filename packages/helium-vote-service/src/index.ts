@@ -161,6 +161,7 @@ WITH
       positions_with_vetokens p
     JOIN proxy_assignments d on d.asset = p.asset
         AND d.next_voter = '11111111111111111111111111111111'
+        AND d.expiration_time > EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)
     WHERE registrar = ${escapedRegistrar}
   ),
   total_vetokens as (
@@ -232,6 +233,7 @@ WITH
       positions_with_vetokens p
     JOIN proxy_assignments d on d.asset = p.asset
         AND d.next_voter = '11111111111111111111111111111111'
+        AND d.expiration_time > EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)
     WHERE registrar = ${escapedRegistrar}
   ),
   total_vetokens as (

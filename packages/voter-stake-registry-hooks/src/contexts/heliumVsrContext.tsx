@@ -145,7 +145,7 @@ export const HeliumVsrStateProvider: React.FC<{
     return proxyAccounts?.reduce((acc, prox) => {
       acc[prox.asset.toBase58()] = prox;
       return acc;
-    }, {} as Record<string, ProxyAssignmentV0 & { isExpired: boolean }>);
+    }, {} as Record<string, ProxyAssignmentV0>);
   }, [proxyAccounts]);
   const myOwnedPositionsEndIdx = positionKeys?.length;
   // Assume that my positions are a small amount, so we don't need to say they're static

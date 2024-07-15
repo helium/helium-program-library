@@ -64,7 +64,6 @@ export function usePositionKeysAndProxies({
       index: d.index,
       bumpSeed: d.bumpSeed,
       expirationTime: new BN(d.expirationTime),
-      isExpired: d.isExpired,
     })),
   };
 }
