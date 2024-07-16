@@ -3,6 +3,7 @@ import {
   AddressLookupTableAccount,
   Commitment,
   Connection,
+  GetMultipleAccountsConfig,
   PublicKey,
   SendOptions,
   Transaction,
@@ -113,6 +114,10 @@ export class AccountFetchCache {
     publicKey: PublicKey,
     com?: Commitment
   ) => Promise<AccountInfo<Buffer> | null>;
+  oldGetMultipleAccountsInfo?: (
+    publicKeys: PublicKey[],
+    com?: Commitment | GetMultipleAccountsConfig
+  ) => Promise<(AccountInfo<Buffer> | null)[]>;
   oldSendTransaction: (...args: any[]) => Promise<string>;
   oldSendRawTransaction: (
     rawTransaction: Buffer | Uint8Array | Array<number>,
@@ -164,6 +169,8 @@ export class AccountFetchCache {
       // @ts-ignore
       connection._accountFetchWrapped = true;
       this.oldGetAccountinfo = connection.getAccountInfo.bind(connection);
+      this.oldGetMultipleAccountsInfo =
+        connection.getMultipleAccountsInfo.bind(connection);
 
       connection.getAccountInfo = async (
         publicKey: PublicKey,
@@ -179,6 +186,26 @@ export class AccountFetchCache {
         }
 
         return self.oldGetAccountinfo!(publicKey, com);
+      };
+
+      connection.getMultipleAccountsInfo = async (
+        publicKeys: PublicKey[],
+        com?: Commitment
+      ): Promise<(AccountInfo<Buffer> | null)[]> => {
+        if (
+          (com || connection.commitment) == commitment ||
+          typeof (com || connection.commitment) == "undefined"
+        ) {
+          const res = await Promise.all(
+            publicKeys.map((k) => this.searchAndWatch(k))
+          );
+          setTimeout(() => {
+            res.map(([_, dispose]) => dispose());
+          }, 30 * 1000); // cache for 30s
+          return res.map(([r]) => r?.account || null);
+        }
+
+        return self.oldGetMultipleAccountsInfo!(publicKeys, com);
       };
     }
 
@@ -773,15 +800,10 @@ async function getInstructions(
   connection: Connection,
   message: VersionedMessage
 ): Promise<TransactionInstruction[]> {
-  const LUTs = (
-    await Promise.all(
-      message.addressTableLookups.map((acc) =>
-        connection.getAddressLookupTable(acc.accountKey)
-      )
-    )
-  )
-    .map((lut) => lut.value)
-    .filter((val) => val !== null) as AddressLookupTableAccount[];
+  const LUTs = await getAddressLookupTableAccounts(
+    connection,
+    message.addressTableLookups.map((lut) => lut.accountKey)
+  );
   const allAccs = message.getAccountKeys({ addressLookupTableAccounts: LUTs });
 
   return message.compiledInstructions.map((ix) => {
@@ -796,3 +818,30 @@ async function getInstructions(
     });
   });
 }
+
+const getAddressLookupTableAccounts = async (
+  connection: Connection,
+  keys: PublicKey[]
+): Promise<AddressLookupTableAccount[]> => {
+  if (keys.length == 0) {
+    return [];
+  }
+
+  const addressLookupTableAccountInfos =
+    await connection.getMultipleAccountsInfo(
+      keys.map((key) => new PublicKey(key))
+    );
+
+  return addressLookupTableAccountInfos.reduce((acc, accountInfo, index) => {
+    const addressLookupTableAddress = keys[index];
+    if (accountInfo) {
+      const addressLookupTableAccount = new AddressLookupTableAccount({
+        key: addressLookupTableAddress,
+        state: AddressLookupTableAccount.deserialize(accountInfo.data),
+      });
+      acc.push(addressLookupTableAccount);
+    }
+
+    return acc;
+  }, new Array<AddressLookupTableAccount>());
+};

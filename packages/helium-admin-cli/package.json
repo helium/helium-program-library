@@ -49,7 +49,7 @@
     "@helium/helium-sub-daos-sdk": "^0.9.0-alpha.3",
     "@helium/lazy-distributor-sdk": "^0.9.0-alpha.3",
     "@helium/mobile-entity-manager-sdk": "^0.9.0-alpha.3",
-    "@helium/nft-proxy-sdk": "0.0.8-next.19+4fa4c6b",
+    "@helium/nft-proxy-sdk": "0.0.8-next.22+7098baa",
     "@helium/price-oracle-sdk": "^0.9.0-alpha.2",
     "@helium/spl-utils": "^0.9.0-alpha.2",
     "@helium/treasury-management-sdk": "^0.9.0-alpha.3",

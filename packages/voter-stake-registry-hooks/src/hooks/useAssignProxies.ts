@@ -5,9 +5,9 @@ import {
   batchParallelInstructionsWithPriorityFee,
   truthy,
 } from "@helium/spl-utils";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token"
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
-import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta, ProxyAssignmentV0 } from "../sdk/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -50,30 +50,19 @@ export const useAssignProxies = () => {
       } else {
         const instructions: TransactionInstruction[] = [];
         for (const position of positions) {
-          let currentProxyAssignment = proxyAssignmentKey(
+          let currentProxyAssignment = position.proxy?.address;
+          const proxyAssignment = position.proxy;
+          const ownedAssetProxyAssignmentAddress = proxyAssignmentKey(
             registrar.proxyConfig,
             position.mint,
-            provider.wallet.publicKey
+            PublicKey.default
           )[0];
-          let proxyAssignment =
-            await nftProxyProgram.account.proxyAssignmentV0.fetchNullable(
-              currentProxyAssignment
-            );
           if (!proxyAssignment) {
-            currentProxyAssignment = proxyAssignmentKey(
-              registrar.proxyConfig,
-              position.mint,
-              PublicKey.default
-            )[0];
-            proxyAssignment =
-              await nftProxyProgram.account.proxyAssignmentV0.fetchNullable(
-                currentProxyAssignment
-              );
+            currentProxyAssignment = ownedAssetProxyAssignmentAddress;
           }
           if (
             proxyAssignment &&
-            !proxyAssignment.nextVoter?.equals(PublicKey.default)
-          ) {
+            !proxyAssignment.nextVoter?.equals(PublicKey.default)          ) {
             const toUndelegate =
               await voteService.getProxyAssignmentsForPosition(
                 position.pubkey,
@@ -98,6 +87,20 @@ export const useAssignProxies = () => {
                       prevProxyAssignment,
                       currentProxyAssignment,
                       proxyAssignment: new PublicKey(proxy.address),
+                      voter: currentProxyAssignment?.equals(
+                        ownedAssetProxyAssignmentAddress
+                      )
+                        ? PublicKey.default
+                        : provider.wallet.publicKey,
+                      approver: provider.wallet.publicKey,
+                      tokenAccount: currentProxyAssignment?.equals(
+                        ownedAssetProxyAssignmentAddress
+                      )
+                        ? getAssociatedTokenAddressSync(
+                            position.mint,
+                            provider.wallet.publicKey
+                          )
+                        : PROGRAM_ID,
                     })
                     .instruction();
                 })
@@ -118,6 +121,20 @@ export const useAssignProxies = () => {
               asset: position.mint,
               recipient,
               proxyConfig: registrar.proxyConfig,
+              voter: currentProxyAssignment?.equals(
+                ownedAssetProxyAssignmentAddress
+              )
+                ? PublicKey.default
+                : provider.wallet.publicKey,
+              approver: provider.wallet.publicKey,
+              tokenAccount: currentProxyAssignment?.equals(
+                ownedAssetProxyAssignmentAddress
+              )
+                ? getAssociatedTokenAddressSync(
+                    position.mint,
+                    provider.wallet.publicKey
+                  )
+                : PROGRAM_ID,
             })
             .prepare();
           resultingAssignments.push({

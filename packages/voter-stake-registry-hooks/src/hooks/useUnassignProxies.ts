@@ -16,6 +16,7 @@ import {
 } from "../constants";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 export const useUnassignProxies = () => {
   const { provider, registrar, voteService, mint } = useHeliumVsrState();
@@ -47,29 +48,17 @@ export const useUnassignProxies = () => {
         const instructions: TransactionInstruction[] = [];
         let undelegated: ProxyAssignment[] = [];
         for (const position of positions) {
-          let currentProxyAssignment = proxyAssignmentKey(
-            registrar.proxyConfig,
-            position.mint,
-            provider.wallet.publicKey
-          )[0];
-          let proxy =
-            await nftProxyProgram.account.proxyAssignmentV0.fetchNullable(
-              currentProxyAssignment
-            );
-          if (!proxy) {
-            currentProxyAssignment = proxyAssignmentKey(
-              registrar.proxyConfig,
-              position.mint,
-              PublicKey.default
-            )[0];
-            proxy = await nftProxyProgram.account.proxyAssignmentV0.fetch(
-              currentProxyAssignment
-            );
-          }
+          const currentProxyAssignment = position.proxy?.address;
+          const proxy = position.proxy!
           const toUndelegate = await voteService.getProxyAssignmentsForPosition(
             position.pubkey,
             proxy.index
           );
+          const ownedAssetProxyAssignmentAddress = proxyAssignmentKey(
+            registrar.proxyConfig,
+            position.mint,
+            PublicKey.default
+          )[0];
           undelegated.push(...toUndelegate);
 
           instructions.push(
@@ -91,6 +80,14 @@ export const useUnassignProxies = () => {
                       prevProxyAssignment,
                       currentProxyAssignment,
                       proxyAssignment: new PublicKey(proxy.address),
+                      tokenAccount: currentProxyAssignment?.equals(
+                        ownedAssetProxyAssignmentAddress
+                      )
+                        ? getAssociatedTokenAddressSync(
+                            position.mint,
+                            provider.wallet.publicKey
+                          )
+                        : PROGRAM_ID,
                     })
                     .instruction();
                 })
