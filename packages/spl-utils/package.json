@@ -1,6 +1,6 @@
 {
   "name": "@helium/spl-utils",
-  "version": "0.9.0-alpha.4",
+  "version": "0.9.0-alpha.5",
   "description": "Utils shared across spl suite",
   "publishConfig": {
     "access": "public",
