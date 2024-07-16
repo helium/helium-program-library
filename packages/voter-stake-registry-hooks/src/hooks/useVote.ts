@@ -14,25 +14,29 @@ import { useVoteMarkers } from "./useVoteMarkers";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import { useSolanaUnixNow } from "@helium/helium-react-hooks";
+import { PositionWithMeta } from "../sdk/types";
 
 export const useVote = (proposalKey: PublicKey) => {
   const { info: proposal } = useProposal(proposalKey);
   const { positions, provider, registrar } = useHeliumVsrState();
-  const unixNow = useSolanaUnixNow()
+  const unixNow = useSolanaUnixNow();
   const sortedPositions = useMemo(() => {
-    return unixNow && positions?.sort((a, b) => {
-      return -calcPositionVotingPower({
-        position: a,
-        registrar: registrar || null,
-        unixNow: new BN(unixNow),
-      }).cmp(
-        calcPositionVotingPower({
-          position: b,
+    return (
+      unixNow &&
+      positions?.sort((a, b) => {
+        return -calcPositionVotingPower({
+          position: a,
           registrar: registrar || null,
           unixNow: new BN(unixNow),
-        })
-      );
-    });
+        }).cmp(
+          calcPositionVotingPower({
+            position: b,
+            registrar: registrar || null,
+            unixNow: new BN(unixNow),
+          })
+        );
+      })
+    );
   }, [positions, unixNow]);
   const voteMarkerKeys = useMemo(() => {
     return sortedPositions
@@ -82,33 +86,50 @@ export const useVote = (proposalKey: PublicKey) => {
       );
     }
   }, [markers, sortedPositions]);
-  const canVote = useCallback(
-    (choice: number) => {
-      if (!markers) return false;
+  const canPositionVote = useCallback(
+    (index: number, choice: number) => {
+      const position = sortedPositions?.[index];
+      const marker = markers?.[index];
 
-      return markers.some((m, index) => {
-        const position = sortedPositions?.[index];
-        const earlierDelegateVoted =
-          position &&
-          position.proxy &&
-          m.info &&
-          position.proxy.index > m.info.proxyIndex;
-        const noMarker = !m?.info;
-        const maxChoicesReached =
-          (m?.info?.choices.length || 0) >= (proposal?.maxChoicesPerVoter || 0);
-        const alreadyVotedThisChoice = m.info?.choices.includes(choice);
-        const proxyExpired =
-          position?.proxy?.expirationTime &&
-          new BN(position.proxy.expirationTime).lt(new BN(Date.now() / 1000));
-        const canVote = !proxyExpired && 
-          (noMarker ||
+      const earlierDelegateVoted =
+        position &&
+        position.proxy &&
+        marker?.info &&
+        position.proxy.index > marker.info.proxyIndex;
+      const noMarker = !marker?.info;
+      const maxChoicesReached =
+        (marker?.info?.choices.length || 0) >=
+        (proposal?.maxChoicesPerVoter || 0);
+      const alreadyVotedThisChoice = marker?.info?.choices.includes(choice);
+      const now = unixNow && new BN(unixNow);
+      const proxyExpired =
+        position?.proxy?.expirationTime &&
+        now &&
+        new BN(position.proxy.expirationTime).lt(now);
+      const votingPowerIsZero =
+        now &&
+        calcPositionVotingPower({
+          position,
+          registrar: registrar || null,
+          unixNow: now,
+        }).isZero();
+      const canVote =
+        !proxyExpired &&
+        !votingPowerIsZero &&
+        (noMarker ||
           (!maxChoicesReached &&
             !alreadyVotedThisChoice &&
             !earlierDelegateVoted));
-        return canVote;
-      });
+      return canVote;
     },
-    [markers]
+    [registrar, unixNow]
+  );
+  const canVote = useCallback(
+    (choice: number) => {
+      if (!markers) return false;
+      return markers.some((_, index) => canPositionVote(index, choice));
+    },
+    [markers, canPositionVote]
   );
   const { error, loading, execute } = useAsyncCallback(
     async ({
@@ -132,86 +153,56 @@ export const useVote = (proposalKey: PublicKey) => {
           "Unable to vote without positions. Please stake tokens first."
         );
       } else {
-        const clock = await provider.connection.getAccountInfo(
-          SYSVAR_CLOCK_PUBKEY
-        );
         const vsrProgram = await init(provider);
         const instructions = (
           await Promise.all(
             // vote with bigger positions first.
-            sortedPositions
-              .map(async (position, index) => {
-                const marker = markers?.[index]?.info;
-                const alreadyVotedThisChoice = marker?.choices.includes(choice);
-                const maxChoicesReached =
-                  (marker?.choices.length || 0) >=
-                  (proposal?.maxChoicesPerVoter || 0);
-
-                const proxyExpired =
-                  position?.proxy?.expirationTime &&
-                  unixNow &&
-                  new BN(position.proxy.expirationTime).lt(new BN(unixNow));
-
-                // Ignore positions that have 0 voting power and haven't already voted
-                if (
-                  proxyExpired ||
-                  (!marker && unixNow &&
-                    calcPositionVotingPower({
-                      position,
-                      registrar: registrar || null,
-                      unixNow: new BN(unixNow),
-                    }).isZero())
-                ) {
-                  return;
-                }
-                if (
-                  !marker ||
-                  (!alreadyVotedThisChoice && !maxChoicesReached)
-                ) {
-                  if (position.isProxiedToMe) {
-                    if (
-                      marker &&
-                      (marker.proxyIndex < (position.proxy?.index || 0) ||
-                        marker.choices.includes(choice))
-                    ) {
-                      // Do not vote with a position that has been delegated to us, but voting overidden
-                      // Also ignore voting for the same choice twice
-                      return;
-                    }
-
-                    return await vsrProgram.methods
-                      .proxiedVoteV0({
-                        choice,
-                      })
-                      .accounts({
-                        proposal: proposalKey,
-                        voter: provider.wallet.publicKey,
-                        position: position.pubkey,
-                        registrar: registrar?.pubkey,
-                        marker: voteMarkerKey(
-                          position.mint,
-                          proposalKey
-                        )[0],
-                        proxyAssignment: proxyAssignmentKey(
-                          registrar!.proxyConfig,
-                          position.mint,
-                          provider.wallet.publicKey
-                        )[0],
-                      })
-                      .instruction();
+            sortedPositions.map(async (position, index) => {
+              const marker = markers?.[index]?.info;
+              const canVote = canPositionVote(index, choice);
+              if (canVote) {
+                if (position.isProxiedToMe) {
+                  if (
+                    marker &&
+                    (marker.proxyIndex < (position.proxy?.index || 0) ||
+                      marker.choices.includes(choice))
+                  ) {
+                    // Do not vote with a position that has been delegated to us, but voting overidden
+                    // Also ignore voting for the same choice twice
+                    return;
                   }
+
                   return await vsrProgram.methods
-                    .voteV0({
+                    .proxiedVoteV0({
                       choice,
                     })
                     .accounts({
                       proposal: proposalKey,
                       voter: provider.wallet.publicKey,
                       position: position.pubkey,
+                      registrar: registrar?.pubkey,
+                      marker: voteMarkerKey(position.mint, proposalKey)[0],
+                      proxyAssignment: proxyAssignmentKey(
+                        registrar!.proxyConfig,
+                        position.mint,
+                        provider.wallet.publicKey
+                      )[0],
                     })
                     .instruction();
                 }
-              })
+                return await vsrProgram.methods
+                  .voteV0({
+                    choice,
+                  })
+                  .accounts({
+                    proposal: proposalKey,
+                    voter: provider.wallet.publicKey,
+                    position: position.pubkey,
+                    marker: voteMarkerKey(position.mint, proposalKey)[0],
+                  })
+                  .instruction();
+              }
+            })
           )
         ).filter(truthy);
 
