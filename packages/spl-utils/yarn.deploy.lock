@@ -58,7 +58,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@^0.9.0-alpha.1":
+"@helium/account-fetch-cache@^0.9.0-alpha.4":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -99,7 +99,7 @@ __metadata:
   resolution: "@helium/spl-utils@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.9.0-alpha.1
+    "@helium/account-fetch-cache": ^0.9.0-alpha.4
     "@helium/address": ^4.10.2
     "@helium/anchor-resolvers": ^0.9.0-alpha.1
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
