@@ -68,6 +68,22 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | ---------------- | ---- |
 | args | StartBoostArgsV0 |      |
 
+### startBoostV1
+
+#### Accounts
+
+| Name           | Mutability | Signer | Docs |
+| -------------- | ---------- | ------ | ---- |
+| startAuthority | immut      | yes    |      |
+| boostConfig    | immut      | no     |      |
+| boostedHex     | mut        | no     |      |
+
+#### Args
+
+| Name | Type             | Docs |
+| ---- | ---------------- | ---- |
+| args | StartBoostArgsV0 |      |
+
 ### closeBoostV0
 
 #### Accounts
@@ -127,15 +143,28 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | boostsByPeriod | bytes           |
 | version        | u32             |
 
+### BoostedHexV1
+
+| Field          | Type         |
+| -------------- | ------------ |
+| deviceType     | DeviceTypeV0 |
+| boostConfig    | publicKey    |
+| version        | u32          |
+| location       | u64          |
+| startTs        | i64          |
+| bumpSeed       | u8           |
+| boostsByPeriod | bytes        |
+
 ## Types
 
 ### BoostArgsV0
 
-| Field    | Type          |
-| -------- | ------------- |
-| location | u64           |
-| version  | u32           |
-| amounts  | BoostAmountV0 |
+| Field      | Type          |
+| ---------- | ------------- |
+| location   | u64           |
+| version    | u32           |
+| amounts    | BoostAmountV0 |
+| deviceType | DeviceTypeV0  |
 
 ### BoostAmountV0
 
@@ -167,3 +196,12 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | boostPrice           | u64       |
 | minimumPeriods       | u16       |
 | priceOracle          | publicKey |
+
+### DeviceTypeV0
+
+| Variant     | Fields |
+| ----------- | ------ |
+| CbrsIndoor  |        |
+| CbrsOutdoor |        |
+| WifiIndoor  |        |
+| WifiOutdoor |        |
