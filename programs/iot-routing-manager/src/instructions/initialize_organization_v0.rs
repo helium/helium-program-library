@@ -1,4 +1,4 @@
-use crate::{carrier_seeds, state::*};
+use crate::{net_id_seeds, routing_manager_seeds, state::*};
 use account_compression_cpi::{program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
@@ -9,17 +9,25 @@ use helium_entity_manager::program::HeliumEntityManager;
 use helium_entity_manager::{
   cpi::accounts::IssueProgramEntityV0, cpi::issue_program_entity_v0, ProgramApprovalV0,
 };
-use helium_entity_manager::{IssueProgramEntityArgsV0, KeySerialization};
+use helium_entity_manager::{IssueProgramEntityArgsV0, KeySerialization, SharedMerkleV0};
 use helium_sub_daos::{DaoV0, SubDaoV0};
 
+#[cfg(feature = "devnet")]
+pub const ENTITY_METADATA_URL: &str = "https://entities.nft.test-helium.com";
+
+#[cfg(not(feature = "devnet"))]
+pub const ENTITY_METADATA_URL: &str = "https://entities.nft.helium.io";
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct IssueCarrierNftArgsV0 {
-  pub metadata_url: Option<String>,
+pub struct InitializeOrganizationArgsV0 {
+  pub oui: u64,
+  // Default escrow key is OUI_<oui>. For legacy OUIs, this can be overridden
+  pub escrow_key_override: Option<String>,
 }
 
 #[derive(Accounts)]
-#[instruction(args: IssueCarrierNftArgsV0)]
-pub struct IssueCarrierNftV0<'info> {
+#[instruction(args: InitializeOrganizationArgsV0)]
+pub struct InitializeOrganizationV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
@@ -30,12 +38,25 @@ pub struct IssueCarrierNftV0<'info> {
   pub program_approval: Box<Account<'info, ProgramApprovalV0>>,
   #[account(
     has_one = collection,
-    has_one = merkle_tree,
-    has_one = issuing_authority,
     has_one = sub_dao
   )]
-  pub carrier: Box<Account<'info, CarrierV0>>,
-  pub issuing_authority: Signer<'info>,
+  pub routing_manager: Box<Account<'info, IotRoutingManagerV0>>,
+  #[account(
+    has_one = authority,
+    has_one = routing_manager,
+  )]
+  pub net_id: Box<Account<'info, NetIdV0>>,
+  pub oui_authority: Signer<'info>,
+  /// CHECK: The new authority for this OUI
+  pub authority: AccountInfo<'info>,
+  #[account(
+    init,
+    payer = payer,
+    seeds = ["organization".as_bytes(), routing_manager.key().as_ref(), &args.oui.to_le_bytes()[..]],
+    space = 8 + std::mem::size_of::<OrganizationV0>() + args.escrow_key_override.map(|k| k.len()).unwrap_or(8) + 60,
+    bump
+  )]
+  pub organization: Box<Account<'info, OrganizationV0>>,
   pub collection: Box<Account<'info, Mint>>,
   /// CHECK: Handled by cpi
   #[account(
@@ -69,7 +90,7 @@ pub struct IssueCarrierNftV0<'info> {
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
-      &hash(carrier.name.as_bytes()).to_bytes()
+      &hash(format!("OUI_{}", args.oui).as_bytes()).to_bytes()
     ],
     seeds::program = helium_entity_manager_program.key(),
     bump
@@ -95,6 +116,14 @@ pub struct IssueCarrierNftV0<'info> {
   )]
   /// CHECK: Used in cpi
   pub bubblegum_signer: UncheckedAccount<'info>,
+  #[account(
+    mut,
+    seeds = ["shared_merkle".as_bytes(), &[3]],
+    seeds::program = helium_entity_manager_program.key(),
+    bump = shared_merkle.bump_seed,
+    has_one = merkle_tree
+  )]
+  pub shared_merkle: Box<Account<'info, SharedMerkleV0>>,
 
   /// CHECK: Verified by constraint
   #[account(address = mpl_token_metadata::ID)]
@@ -106,17 +135,40 @@ pub struct IssueCarrierNftV0<'info> {
   pub helium_entity_manager_program: Program<'info, HeliumEntityManager>,
 }
 
-pub fn handler(ctx: Context<IssueCarrierNftV0>, args: IssueCarrierNftArgsV0) -> Result<()> {
-  let seeds: &[&[&[u8]]] = &[carrier_seeds!(ctx.accounts.carrier)];
+pub fn handler(
+  ctx: Context<InitializeOrganizationV0>,
+  args: InitializeOrganizationArgsV0,
+) -> Result<()> {
+  let seeds: &[&[&[u8]]] = &[
+    routing_manager_seeds!(ctx.accounts.routing_manager),
+    net_id_seeds!(ctx.accounts.net_id),
+  ];
+  let key = format!("OUI_{}", args.oui);
+  let escrow_key = args.escrow_key_override.unwrap_or(key.clone());
+
+  ctx.accounts.organization.set_inner(OrganizationV0 {
+    oui: args.oui,
+    routing_manager: ctx.accounts.routing_manager.key(),
+    authority: ctx.accounts.authority.key(),
+    escrow_key,
+    bump_seed: ctx.bumps["organization"],
+    net_id: ctx.accounts.net_id.key(),
+  });
+
+  let uri = format!(
+    "{}/v2/oui/{}",
+    ENTITY_METADATA_URL,
+    ctx.accounts.key_to_asset.key(),
+  );
 
   issue_program_entity_v0(
     CpiContext::new_with_signer(
       ctx.accounts.helium_entity_manager_program.to_account_info(),
       IssueProgramEntityV0 {
         payer: ctx.accounts.payer.to_account_info(),
-        program_approver: ctx.accounts.carrier.to_account_info(),
+        program_approver: ctx.accounts.net_id.to_account_info(),
         program_approval: ctx.accounts.program_approval.to_account_info(),
-        collection_authority: ctx.accounts.carrier.to_account_info(),
+        collection_authority: ctx.accounts.routing_manager.to_account_info(),
         collection: ctx.accounts.collection.to_account_info(),
         collection_metadata: ctx.accounts.collection_metadata.to_account_info(),
         collection_master_edition: ctx.accounts.collection_master_edition.to_account_info(),
@@ -132,17 +184,17 @@ pub fn handler(ctx: Context<IssueCarrierNftV0>, args: IssueCarrierNftArgsV0) -> 
         bubblegum_program: ctx.accounts.bubblegum_program.to_account_info(),
         compression_program: ctx.accounts.compression_program.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
-        shared_merkle: None,
+        shared_merkle: Some(ctx.accounts.shared_merkle.to_account_info()),
       },
       seeds,
     ),
     IssueProgramEntityArgsV0 {
-      entity_key: ctx.accounts.carrier.name.as_bytes().to_vec(),
-      name: ctx.accounts.carrier.name.clone(),
-      symbol: String::from("CARRIER"),
-      approver_seeds: seeds[0].iter().map(|s| s.to_vec()).collect(),
+      entity_key: key.as_bytes().to_vec(),
+      name: key,
+      symbol: String::from("OUI"),
+      approver_seeds: seeds[1].iter().map(|s| s.to_vec()).collect(),
       key_serialization: KeySerialization::UTF8,
-      metadata_url: args.metadata_url,
+      metadata_url: Some(uri),
     },
   )?;
 

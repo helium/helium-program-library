@@ -2239,6 +2239,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "iot-routing-manager"
+version = "0.1.2"
+dependencies = [
+ "account-compression-cpi",
+ "anchor-lang",
+ "anchor-spl",
+ "angry-purple-tiger",
+ "bs58 0.3.1",
+ "bubblegum-cpi",
+ "bytemuck",
+ "default-env",
+ "helium-entity-manager",
+ "helium-sub-daos",
+ "mpl-token-metadata",
+ "shared-utils",
+ "solana-security-txt",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

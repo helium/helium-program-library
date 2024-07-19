@@ -1,0 +1,37 @@
+[package]
+name = "iot-routing-manager"
+version = "0.1.2"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "iot_routing_manager"
+
+[features]
+devnet = []
+no-genesis = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[profile.release]
+overflow-checks = true
+
+[dependencies]
+bs58 = "0.3.1"
+anchor-lang = { workspace = true }
+anchor-spl = { workspace = true }
+bytemuck = "1.12.3"
+angry-purple-tiger = "0.1.0"
+mpl-token-metadata = { workspace = true }
+bubblegum-cpi = { workspace = true }
+account-compression-cpi = { workspace = true }
+shared-utils = { workspace = true }
+helium-entity-manager = { workspace = true }
+helium-sub-daos = { workspace = true }
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }
+

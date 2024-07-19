@@ -331,3 +331,23 @@ macro_rules! key_to_asset_seeds {
     ]
   };
 }
+
+#[account]
+#[derive(Default, InitSpace)]
+pub struct SharedMerkleV0 {
+  pub proof_size: u8,
+  pub price_per_mint: u64,
+  pub merkle_tree: Pubkey,
+  pub bump_seed: u8,
+}
+
+#[macro_export]
+macro_rules! shared_merkle_seeds {
+  ( $merkle:expr ) => {
+    &[
+      b"shared_merkle".as_ref(),
+      &$merkle.proof_size.to_le_bytes()[..],
+      &[$merkle.bump_seed],
+    ]
+  };
+}

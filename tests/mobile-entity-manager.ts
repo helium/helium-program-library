@@ -20,6 +20,7 @@ import {
   ensureDCIdl,
   ensureHSDIdl,
   initTestDataCredits,
+  initSharedMerkle,
 } from './utils/fixtures';
 const { expect } = chai;
 import chaiAsPromised from 'chai-as-promised';
