@@ -26,6 +26,22 @@ export function organizationKey(
   );
 }
 
+export function devaddrConstraintKey(
+  organization: PublicKey,
+  startAddr: BN,
+  programId: PublicKey = PROGRAM_ID
+): [PublicKey, number] {
+  const startAddrBuffer = Buffer.alloc(8);
+  startAddrBuffer.writeBigUint64LE(BigInt(startAddr.toString()));
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("devaddr_constraint", "utf-8"),
+      organization.toBuffer(),
+      startAddrBuffer,
+    ],
+    programId
+  );
+}
 
 export function netIdKey(
   routingManager: PublicKey,

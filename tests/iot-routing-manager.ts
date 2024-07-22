@@ -215,6 +215,45 @@ describe("iot-routing-manager", () => {
         expect(organizationAcc.netId.toBase58()).to.eq(netId.toBase58());
         expect(organizationAcc.routingManager.toBase58()).to.eq(routingManager.toBase58());
       })
+
+      describe("with an organization", () => {
+        let organization: PublicKey;
+        beforeEach(async () => {
+          const {
+            pubkeys: { organization: organizationK },
+          } = await irmProgram.methods
+            .initializeOrganizationV0({
+              oui: new anchor.BN(2),
+              escrowKeyOverride: null,
+            })
+            .preInstructions([
+              ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+            ])
+            .accounts({
+              authority: me,
+              netId,
+            })
+            .rpcAndKeys({ skipPreflight: true });
+          organization = organizationK!;
+        })
+
+        it("should initialize a devaddr constraint", async () => {
+          const {
+            pubkeys: { devaddrConstraint },
+          } = await irmProgram.methods
+            .initializeDevaddrConstraintV0({
+              startAddr: null,
+              numBlocks: 2,
+            })
+            .accounts({
+              organization,
+            })
+            .rpcAndKeys({ skipPreflight: true });
+          const devaddr = await irmProgram.account.devAddrConstraintV0.fetch(devaddrConstraint!);
+          expect(devaddr.startAddr.toNumber()).to.eq(0);
+          expect(devaddr.endAddr.toNumber()).to.eq(16);
+        });
+      })
     })
   });
 });

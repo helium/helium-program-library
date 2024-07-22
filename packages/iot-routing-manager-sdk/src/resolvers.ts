@@ -1,4 +1,4 @@
-import { Accounts } from "@coral-xyz/anchor";
+import { Accounts, BorshAccountsCoder, Program, Provider } from "@coral-xyz/anchor";
 import { heliumCommonResolver } from "@helium/anchor-resolvers";
 import {
   ataResolver,
@@ -6,9 +6,10 @@ import {
   resolveIndividual,
 } from "@helium/anchor-resolvers";
 import { PublicKey } from "@solana/web3.js";
-import { netIdKey, organizationKey } from "./pdas";
+import { devaddrConstraintKey, netIdKey, organizationKey } from "./pdas";
 import { PROGRAM_ID } from "./constants";
 import { heliumEntityManagerResolvers, keyToAssetKey, programApprovalKey, sharedMerkleKey } from "@helium/helium-entity-manager-sdk";
+import { IDL } from "@helium/idls/lib/types/iot_routing_manager";
 
 export const lazyDistributorResolvers = combineResolvers(
   heliumCommonResolver,
@@ -19,7 +20,7 @@ export const lazyDistributorResolvers = combineResolvers(
     mint: "collection",
     owner: "routingManager",
   }),
-  resolveIndividual(async ({ args, path, accounts }) => {
+  resolveIndividual(async ({ args, path, accounts, provider }) => {
     if (
       args[0] &&
       args[0].netId &&
@@ -37,6 +38,8 @@ export const lazyDistributorResolvers = combineResolvers(
         accounts.routingManager as PublicKey,
         args[0].oui
       )[0];
+    } else if (path[path.length - 1] === "devaddrConstraint" && accounts.organization && accounts.netId) {
+      return devaddrConstraintKey(accounts.organization as PublicKey, (args[0] && args[0].startAddr) ?? (await getNetId(provider, accounts.netId as PublicKey)).currentAddrOffset)[0];
     } else if (path[path.length - 1] == "programApproval" && accounts.dao) {
       return programApprovalKey(accounts.dao as PublicKey, PROGRAM_ID)[0];
     } else if (
@@ -58,3 +61,12 @@ export const lazyDistributorResolvers = combineResolvers(
   })
 );
 
+async function getNetId(provider: Provider, netId: PublicKey) {
+  const idl = await Program.fetchIdl(PROGRAM_ID, provider);
+  const netIdAccount = await provider.connection.getAccountInfo(netId);
+  if (!netIdAccount) {
+    throw new Error("NetId account not found");
+  }
+  const coder = new BorshAccountsCoder(idl!)
+  return coder.decode("NetIdV0", netIdAccount.data)
+}
