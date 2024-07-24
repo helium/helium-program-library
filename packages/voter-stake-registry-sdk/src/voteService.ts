@@ -49,16 +49,16 @@ export type Proposal = {
   namespace: string;
   owner: string;
   state: object;
-  created_at: number;
-  proposal_config: string;
-  max_choices_per_voter: number;
+  createdAt: number;
+  proposalConfig: string;
+  maxChoicesPerVoter: number;
   seed: Buffer;
   name: string;
   uri: string;
   tags: string[];
   choices: { name: string; weight: string; uri: string }[];
-  bump_seed: number;
-  refreshed_at: Date;
+  bumpSeed: number;
+  refreshedAt: Date;
 };
 
 export type ProposalWithVotes = Proposal & {
