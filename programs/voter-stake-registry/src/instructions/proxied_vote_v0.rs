@@ -1,6 +1,5 @@
 use crate::{error::VsrError, VoteArgsV0};
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
 use nft_proxy::ProxyAssignmentV0;
 
 use crate::{registrar_seeds, state::*};
