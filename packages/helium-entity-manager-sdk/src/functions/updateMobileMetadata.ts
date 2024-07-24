@@ -7,6 +7,7 @@ import {
   ProofArgsAndAccountsArgs,
 } from "@helium/spl-utils";
 import { HELIUM_DAO, keyToAssetForAsset } from "../helpers";
+import { MobileDeploymentInfoV0 } from "..";
 
 export async function updateMobileMetadata({
   program,
@@ -16,6 +17,7 @@ export async function updateMobileMetadata({
   dcFeePayer,
   payer,
   dao = HELIUM_DAO,
+  deploymentInfo,
   ...rest
 }: {
   program: Program<HeliumEntityManager>;
@@ -24,35 +26,31 @@ export async function updateMobileMetadata({
   location: BN | null;
   assetId: PublicKey;
   rewardableEntityConfig: PublicKey;
-  dao?: PublicKey
+  deploymentInfo?: MobileDeploymentInfoV0 | null;
+  dao?: PublicKey;
 } & Omit<ProofArgsAndAccountsArgs, "connection">) {
-  const {
-    asset,
-    args,
-    accounts,
-    remainingAccounts,
-  } = await proofArgsAndAccounts({
-    connection: program.provider.connection,
-    assetId,
-    ...rest,
-  });
+  const { asset, args, accounts, remainingAccounts } =
+    await proofArgsAndAccounts({
+      connection: program.provider.connection,
+      assetId,
+      ...rest,
+    });
 
   const {
     ownership: { owner },
   } = asset;
 
   const keyToAssetKey = keyToAssetForAsset(asset, dao);
-  const keyToAsset = await program.account.keyToAssetV0.fetch(
-    keyToAssetKey
-  );
+  const keyToAsset = await program.account.keyToAssetV0.fetch(keyToAssetKey);
   const [info] = await mobileInfoKey(
     rewardableEntityConfig,
-    keyToAsset.entityKey,
+    keyToAsset.entityKey
   );
 
   return program.methods
     .updateMobileInfoV0({
       location,
+      deploymentInfo: deploymentInfo as any,
       ...args,
     })
     .accounts({
