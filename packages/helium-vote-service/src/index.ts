@@ -283,7 +283,7 @@ WITH
       SELECT
         pa.*,
         COUNT(*) OVER () as "numProxies",
-        RANK() OVER (ORDER BY "proxiedVeTokens" DESC) as rank
+        RANK() OVER (ORDER BY "proxiedVeTokens" DESC NULLS LAST) as rank
       FROM proxies_with_assignments pa
   ),
   proxies_with_votes AS (
