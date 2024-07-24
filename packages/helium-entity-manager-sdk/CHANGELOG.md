@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.9.0-alpha.7](https://github.com/helium/helium-program-libary/compare/v0.9.0-alpha.6...v0.9.0-alpha.7) (2024-07-24)
+
+
+
+## [0.8.7](https://github.com/helium/helium-program-libary/compare/v0.9.0-alpha.5...v0.8.7) (2024-07-17)
+
+**Note:** Version bump only for package @helium/helium-entity-manager-sdk
+
+
+
+
+
 # [0.9.0-alpha.6](https://github.com/helium/helium-program-libary/compare/v0.9.0-alpha.5...v0.9.0-alpha.6) (2024-07-24)
 
 **Note:** Version bump only for package @helium/helium-entity-manager-sdk
