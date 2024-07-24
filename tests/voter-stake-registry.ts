@@ -469,10 +469,11 @@ describe("voter-stake-registry", () => {
       let delegatee = Keypair.generate();
       let position: PublicKey;
       let mint: PublicKey;
+      let proxyAssignment: PublicKey;
 
       beforeEach(async () => {
-        ({ position, mint } = await createAndDeposit(10000, 200));
-        await proxyProgram.methods
+        ({ position, mint, } = await createAndDeposit(10000, 200));
+        const { pubkeys: { nextProxyAssignment: proxyAssignmentK } } = await proxyProgram.methods
           .assignProxyV0({
             expirationTime: new anchor.BN(new Date().valueOf() / 1000 + 10000),
           })
@@ -481,7 +482,9 @@ describe("voter-stake-registry", () => {
             asset: mint,
             recipient: delegatee.publicKey,
           })
-          .rpc({ skipPreflight: true });
+          .rpcAndKeys({ skipPreflight: true });
+
+        proxyAssignment = proxyAssignmentK!
       });
 
       it("allows voting on and relinquishing votes on the proposal", async () => {
@@ -495,6 +498,7 @@ describe("voter-stake-registry", () => {
             proposal,
             position,
             voter: delegatee.publicKey,
+            proxyAssignment,
           })
           .signers([delegatee])
           .rpcAndKeys({ skipPreflight: true });
@@ -515,6 +519,7 @@ describe("voter-stake-registry", () => {
             proposal,
             position,
             voter: delegatee.publicKey,
+            proxyAssignment,
           })
           .signers([delegatee])
           .rpc({ skipPreflight: true });
@@ -549,6 +554,7 @@ describe("voter-stake-registry", () => {
             proposal,
             position,
             voter: delegatee.publicKey,
+            proxyAssignment,
           })
           .signers([delegatee])
           .rpcAndKeys({ skipPreflight: true });
@@ -575,6 +581,7 @@ describe("voter-stake-registry", () => {
             proposal,
             position,
             voter: delegatee.publicKey,
+            proxyAssignment,
           })
           .signers([delegatee])
           .rpcAndKeys({ skipPreflight: true });
