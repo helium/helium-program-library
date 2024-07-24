@@ -86,8 +86,8 @@ server.get<{
     minIndex,
   } = request.query;
   const where: any = {};
+  const registrar = request.params.registrar;
   if (voter) {
-    const registrar = request.params.registrar;
     const { assets } = await getPositionKeysForOwner({
       connection: new Connection(SOLANA_URL),
       owner: new PublicKey(voter),
@@ -137,7 +137,16 @@ server.get<{
             required: true,
           },
         ]
-      : undefined,
+      : [
+          {
+            model: Position,
+            where: {
+              registrar: registrar,
+            },
+            attributes: [],
+            required: true,
+          },
+        ],
     order: [["index", "DESC"]],
   });
 });
@@ -213,7 +222,7 @@ SELECT
 FROM proxies_with_assignments pa
 LEFT OUTER JOIN vote_markers vm ON vm.voter = pa.wallet
 GROUP BY pa.name, pa.image, pa.wallet, pa.description, pa.detail, pa."numAssignments", pa."proxiedVeTokens", pa.percent
-ORDER BY "proxiedVeTokens" DESC
+ORDER BY "proxiedVeTokens" DESC NULLS LAST
 OFFSET ${offset}
 LIMIT ${limit};
       `);

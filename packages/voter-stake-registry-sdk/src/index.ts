@@ -1,22 +1,18 @@
-import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { AnchorProvider, BN, Idl, Program } from "@coral-xyz/anchor";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { realmNames } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
-import { registrarKey, vsrResolvers } from "./resolvers";
 import { PROGRAM_ID } from "./constants";
-import { HNT_MINT, IOT_MINT, MOBILE_MINT, realmNames } from "@helium/spl-utils";
+import { registrarKey, vsrResolvers } from "./resolvers";
 export * from "./constants";
+export { getPositionKeysForOwner } from "./helpers";
 export * from "./pdas";
 export * from "./resolvers";
 export { VoteService } from "./voteService";
 export type {
-  ProposalWithVotes,
-  ProxyAssignment,
-  EnhancedProxy,
-  PartialEnhancedProxy,
-  WithRank,
-  EnhancedProxyData,
+  EnhancedProxy, EnhancedProxyData, PartialEnhancedProxy, ProposalWithVotes,
+  ProxyAssignment, WithRank
 } from "./voteService";
-export { getPositionKeysForOwner } from "./helpers";
 
 export function getRegistrarKey(mint: PublicKey) {
   return registrarKey(

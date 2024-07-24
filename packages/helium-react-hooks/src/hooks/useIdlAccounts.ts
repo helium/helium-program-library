@@ -35,5 +35,6 @@ export function useIdlAccounts<IDL extends Idl, A extends keyof AllAccountsMap<I
         };
       }
     }, [idl, type]);
+
   return useAccounts(keys, parser, isStatic);
 }

@@ -2,7 +2,7 @@ import { AnchorProvider, BN } from "@coral-xyz/anchor";
 import { VoteService, positionKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { positionKeysForWalletQuery } from "../queries/positionKeysForWalletQuery";
 import { proxyAssignmentsForWalletQuery } from "../queries/proxyAssignmentsForWalletQuery";
 
