@@ -72,4 +72,11 @@ pub mod iot_routing_manager {
   pub fn approve_organization_v0(ctx: Context<ApproveOrganizationV0>) -> Result<()> {
     approve_organization_v0::handler(ctx)
   }
+
+  pub fn update_organization_v0(
+    ctx: Context<UpdateOrganizationV0>,
+    args: UpdateOrganizationArgsV0,
+  ) -> Result<()> {
+    update_organization_v0::handler(ctx, args)
+  }
 }

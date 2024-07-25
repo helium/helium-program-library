@@ -2255,6 +2255,7 @@ dependencies = [
  "mpl-token-metadata",
  "pyth-solana-receiver-sdk",
  "shared-utils",
+ "solana-program",
  "solana-security-txt",
 ]
 
