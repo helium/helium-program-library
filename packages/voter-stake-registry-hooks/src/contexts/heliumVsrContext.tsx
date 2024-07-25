@@ -274,6 +274,7 @@ export const HeliumVsrStateProvider: React.FC<{
           }
         : undefined,
       voteService,
+      unixNow: now,
     }),
     [
       loadingPositions,
