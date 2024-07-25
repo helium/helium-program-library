@@ -1,5 +1,5 @@
 use crate::error::ErrorCode;
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::pubkey};
 use anchor_spl::token::{burn, Burn, Mint, Token, TokenAccount};
 use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 
@@ -16,6 +16,7 @@ pub struct InitializeDevaddrConstraintArgsV0 {
   pub start_addr: Option<u64>,
 }
 
+pub const ADMIN_KEY: Pubkey = pubkey!("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW");
 #[derive(Accounts)]
 #[instruction(args: InitializeDevaddrConstraintArgsV0)]
 pub struct InitializeDevaddrConstraintV0<'info> {
@@ -114,7 +115,8 @@ pub fn handler(
         .unwrap(),
     )
     .unwrap();
-  if iot_fee > 0 {
+  // TEMP: Admin doesn't have to burn, that way we can backfill
+  if iot_fee > 0 && ctx.accounts.payer.key() != ADMIN_KEY {
     burn(
       CpiContext::new(
         ctx.accounts.token_program.to_account_info(),

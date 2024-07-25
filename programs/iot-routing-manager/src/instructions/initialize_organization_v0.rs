@@ -1,5 +1,5 @@
 use crate::error::ErrorCode;
-use crate::{net_id_seeds, routing_manager_seeds, state::*, TESTING};
+use crate::{net_id_seeds, routing_manager_seeds, state::*, ADMIN_KEY, TESTING};
 use account_compression_cpi::{program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
@@ -247,7 +247,7 @@ pub fn handler(
     .unwrap()
     .checked_div(iot_price_with_conf.try_into().unwrap())
     .unwrap();
-  if iot_fee > 0 {
+  if iot_fee > 0 && ctx.accounts.payer.key() != ADMIN_KEY {
     burn(
       CpiContext::new(
         ctx.accounts.token_program.to_account_info(),
