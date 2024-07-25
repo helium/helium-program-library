@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.9.0-alpha.7",
+  "version": "0.9.0-alpha.8",
   "description": "Interface to the rewards oracle smart contract",
   "repository": {
     "type": "git",
@@ -32,8 +32,8 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
-    "@helium/anchor-resolvers": "^0.9.0-alpha.7",
-    "@helium/idls": "^0.9.0-alpha.7",
+    "@helium/anchor-resolvers": "^0.9.0-alpha.8",
+    "@helium/idls": "^0.9.0-alpha.8",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },
