@@ -2253,6 +2253,7 @@ dependencies = [
  "helium-entity-manager",
  "helium-sub-daos",
  "mpl-token-metadata",
+ "pyth-solana-receiver-sdk",
  "shared-utils",
  "solana-security-txt",
 ]

@@ -20,6 +20,11 @@ export const lazyDistributorResolvers = combineResolvers(
     mint: "collection",
     owner: "routingManager",
   }),
+  ataResolver({
+    account: "payerIotAccount",
+    mint: "iotMint",
+    owner: "payer",
+  }),
   resolveIndividual(async ({ args, path, accounts, provider }) => {
     if (
       args[0] &&
@@ -38,8 +43,17 @@ export const lazyDistributorResolvers = combineResolvers(
         accounts.routingManager as PublicKey,
         args[0].oui
       )[0];
-    } else if (path[path.length - 1] === "devaddrConstraint" && accounts.organization && accounts.netId) {
-      return devaddrConstraintKey(accounts.organization as PublicKey, (args[0] && args[0].startAddr) ?? (await getNetId(provider, accounts.netId as PublicKey)).currentAddrOffset)[0];
+    } else if (
+      path[path.length - 1] === "devaddrConstraint" &&
+      accounts.organization &&
+      accounts.netId
+    ) {
+      return devaddrConstraintKey(
+        accounts.organization as PublicKey,
+        (args[0] && args[0].startAddr) ??
+          (await getNetId(provider, accounts.netId as PublicKey))
+            .currentAddrOffset
+      )[0];
     } else if (path[path.length - 1] == "programApproval" && accounts.dao) {
       return programApprovalKey(accounts.dao as PublicKey, PROGRAM_ID)[0];
     } else if (
@@ -56,7 +70,7 @@ export const lazyDistributorResolvers = combineResolvers(
         )
       )[0];
     } else if (path[path.length - 1] === "sharedMerkle") {
-      return sharedMerkleKey(3)[0]
+      return sharedMerkleKey(3)[0];
     }
   })
 );

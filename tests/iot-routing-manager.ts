@@ -32,6 +32,7 @@ import {
   getConcurrentMerkleTreeAccountSize,
 } from "@solana/spl-account-compression";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
+import { IOT_PRICE_FEED } from "@helium/spl-utils";
 
 chai.use(chaiAsPromised);
 
@@ -47,6 +48,7 @@ describe("iot-routing-manager", () => {
   const me = provider.wallet.publicKey;
   let dao: PublicKey;
   let subDao: PublicKey;
+  let iotMint: PublicKey | undefined;
   let dcMint: PublicKey;
   let programApproval: PublicKey;
 
@@ -91,7 +93,7 @@ describe("iot-routing-manager", () => {
       me,
       dataCredits.dcMint
     ));
-    ({ subDao } = await initTestSubdao({
+    ({ subDao, mint: iotMint } = await initTestSubdao({
       hsdProgram,
       provider,
       authority: me,
@@ -117,6 +119,8 @@ describe("iot-routing-manager", () => {
     } = await irmProgram.methods
       .initializeRoutingManagerV0({
         metadataUrl: "https://some/url",
+        devaddrPriceUsd: new anchor.BN(100_000000),
+        ouiPriceUsd: new anchor.BN(100_000000),
       })
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
@@ -124,7 +128,9 @@ describe("iot-routing-manager", () => {
       .accounts({
         updateAuthority: me,
         netIdAuthority: me,
+        dntMint: iotMint,
         subDao,
+        iotPriceOracle: IOT_PRICE_FEED,
       })
       .rpcAndKeys({ skipPreflight: true });
 
@@ -136,13 +142,15 @@ describe("iot-routing-manager", () => {
 
   describe("with a routing manager", async () => {
     let routingManager: PublicKey;
-    let merkle: Keypair;
+
     beforeEach(async () => {
       const {
         pubkeys: { routingManager: routingManagerK },
       } = await irmProgram.methods
         .initializeRoutingManagerV0({
           metadataUrl: "https://some/url",
+          devaddrPriceUsd: new anchor.BN(100_000000),
+          ouiPriceUsd: new anchor.BN(100_000000),
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
@@ -151,6 +159,7 @@ describe("iot-routing-manager", () => {
           updateAuthority: me,
           netIdAuthority: me,
           subDao,
+          iotPriceOracle: IOT_PRICE_FEED,
         })
         .rpcAndKeys({ skipPreflight: true });
       routingManager = routingManagerK!
@@ -234,8 +243,16 @@ describe("iot-routing-manager", () => {
               netId,
             })
             .rpcAndKeys({ skipPreflight: true });
+
           organization = organizationK!;
-        })
+
+          await irmProgram.methods
+            .approveOrganizationV0()
+            .accounts({
+              organization,
+            })
+            .rpc({ skipPreflight: true });
+        });
 
         it("should initialize a devaddr constraint", async () => {
           const {

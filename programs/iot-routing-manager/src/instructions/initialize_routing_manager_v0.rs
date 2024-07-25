@@ -7,6 +7,7 @@ use anchor_spl::{
 };
 use helium_sub_daos::SubDaoV0;
 use mpl_token_metadata::types::{CollectionDetails, DataV2};
+use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 use shared_utils::create_metadata_accounts_v3;
 use shared_utils::token_metadata::{
   create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
@@ -19,6 +20,8 @@ pub const CARRIER_STAKE_AMOUNT: u64 = 500_000_000_000_000;
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeRoutingManagerArgsV0 {
   pub metadata_url: String,
+  pub devaddr_price_usd: u64,
+  pub oui_price_usd: u64,
 }
 
 #[derive(Accounts)]
@@ -40,9 +43,12 @@ pub struct InitializeRoutingManagerV0<'info> {
   )]
   pub routing_manager: Box<Account<'info, IotRoutingManagerV0>>,
   #[account(
-    has_one = authority
+    has_one = authority,
+    has_one = dnt_mint,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
+  pub dnt_mint: Box<Account<'info, Mint>>,
+  pub iot_price_oracle: Box<Account<'info, PriceUpdateV2>>,
   #[account(
     init,
     payer = payer,
@@ -111,7 +117,11 @@ pub fn handler(
     collection: ctx.accounts.collection.key(),
     // Initialized via set_carrier_tree
     bump_seed: ctx.bumps["routing_manager"],
+    iot_mint: ctx.accounts.dnt_mint.key(),
+    iot_price_oracle: ctx.accounts.iot_price_oracle.key(),
     sub_dao: ctx.accounts.sub_dao.key(),
+    devaddr_price_usd: args.devaddr_price_usd,
+    oui_price_usd: args.oui_price_usd,
   });
 
   let signer_seeds: &[&[&[u8]]] = &[routing_manager_seeds!(ctx.accounts.routing_manager)];

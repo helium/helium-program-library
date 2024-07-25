@@ -1,8 +1,9 @@
-use crate::{net_id_seeds, routing_manager_seeds, state::*};
+use crate::error::ErrorCode;
+use crate::{net_id_seeds, routing_manager_seeds, state::*, TESTING};
 use account_compression_cpi::{program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
-use anchor_spl::token::Mint;
+use anchor_spl::token::{burn, Burn, Mint, Token, TokenAccount};
 use bubblegum_cpi::program::Bubblegum;
 use bubblegum_cpi::TreeConfig;
 use helium_entity_manager::program::HeliumEntityManager;
@@ -11,6 +12,7 @@ use helium_entity_manager::{
 };
 use helium_entity_manager::{IssueProgramEntityArgsV0, KeySerialization, SharedMerkleV0};
 use helium_sub_daos::{DaoV0, SubDaoV0};
+use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 
 #[cfg(feature = "devnet")]
 pub const ENTITY_METADATA_URL: &str = "https://entities.nft.test-helium.com";
@@ -38,15 +40,27 @@ pub struct InitializeOrganizationV0<'info> {
   pub program_approval: Box<Account<'info, ProgramApprovalV0>>,
   #[account(
     has_one = collection,
-    has_one = sub_dao
+    has_one = sub_dao,
+    has_one = iot_mint,
+    has_one = iot_price_oracle,
   )]
   pub routing_manager: Box<Account<'info, IotRoutingManagerV0>>,
   #[account(
-    has_one = authority,
     has_one = routing_manager,
   )]
   pub net_id: Box<Account<'info, NetIdV0>>,
-  pub oui_authority: Signer<'info>,
+  #[account(mut)]
+  pub iot_mint: Box<Account<'info, Mint>>,
+  #[account(
+    mut,
+    associated_token::mint = iot_mint,
+    associated_token::authority = payer,
+  )]
+  pub payer_iot_account: Box<Account<'info, TokenAccount>>,
+  #[account(
+    constraint = iot_price_oracle.verification_level == VerificationLevel::Full @ ErrorCode::PythPriceFeedStale,
+  )]
+  pub iot_price_oracle: Box<Account<'info, PriceUpdateV2>>,
   /// CHECK: The new authority for this OUI
   pub authority: AccountInfo<'info>,
   #[account(
@@ -133,6 +147,7 @@ pub struct InitializeOrganizationV0<'info> {
   pub compression_program: Program<'info, SplAccountCompression>,
   pub system_program: Program<'info, System>,
   pub helium_entity_manager_program: Program<'info, HeliumEntityManager>,
+  pub token_program: Program<'info, Token>,
 }
 
 pub fn handler(
@@ -153,6 +168,7 @@ pub fn handler(
     escrow_key,
     bump_seed: ctx.bumps["organization"],
     net_id: ctx.accounts.net_id.key(),
+    approved: false,
   });
 
   let uri = format!(
@@ -197,6 +213,53 @@ pub fn handler(
       metadata_url: Some(uri),
     },
   )?;
+
+  let message = ctx.accounts.iot_price_oracle.price_message;
+  let current_time = Clock::get()?.unix_timestamp;
+  require_gte!(
+    message
+      .publish_time
+      .saturating_add(if TESTING { 6000000 } else { 10 * 60 }.into()),
+    current_time,
+    ErrorCode::PythPriceNotFound
+  );
+  let iot_price = message.ema_price;
+  require_gt!(iot_price, 0);
+
+  // Remove the confidence from the price to use the most conservative price
+  // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
+  let iot_price_with_conf = iot_price
+    .checked_sub(i64::try_from(message.ema_conf.checked_mul(2).unwrap()).unwrap())
+    .unwrap();
+  // Exponent is a negative number, likely -8
+  // Since the price is multiplied by an extra 10^8, and we're dividing by that price, need to also multiply
+  // by the exponent
+  let exponent_dec = 10_u64
+    .checked_pow(u32::try_from(-message.exponent).unwrap())
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
+
+  require_gt!(iot_price_with_conf, 0);
+  let iot_fee = ctx
+    .accounts
+    .routing_manager
+    .oui_price_usd
+    .checked_mul(exponent_dec)
+    .unwrap()
+    .checked_div(iot_price_with_conf.try_into().unwrap())
+    .unwrap();
+  if iot_fee > 0 {
+    burn(
+      CpiContext::new(
+        ctx.accounts.token_program.to_account_info(),
+        Burn {
+          mint: ctx.accounts.iot_mint.to_account_info(),
+          from: ctx.accounts.payer_iot_account.to_account_info(),
+          authority: ctx.accounts.payer.to_account_info(),
+        },
+      ),
+      iot_fee,
+    )?;
+  }
 
   Ok(())
 }

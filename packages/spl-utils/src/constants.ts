@@ -22,3 +22,11 @@ export const HELIUM_COMMON_LUT_DEVNET = new PublicKey(
 export const HELIUM_COMMON_LUT = new PublicKey(
   "43eY9L2spbM2b1MPDFFBStUiFGt29ziZ1nc1xbpzsfVt"
 );
+
+export const MOBILE_PRICE_FEED = new PublicKey(
+  "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx"
+);
+
+export const IOT_PRICE_FEED = new PublicKey(
+  "8UYEn5Weq7toHwgcmctvcAxaNJo3SJxXEayM57rpoXr9"
+);

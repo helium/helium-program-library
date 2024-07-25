@@ -4,9 +4,14 @@ use anchor_lang::prelude::*;
 #[derive(Default, InitSpace)]
 pub struct IotRoutingManagerV0 {
   pub sub_dao: Pubkey,
+  pub iot_mint: Pubkey,
+  pub iot_price_oracle: Pubkey,
   pub update_authority: Pubkey,
   pub net_id_authority: Pubkey,
   pub collection: Pubkey, // The metaplex collection to be issued for Rewardable Entities
+  // with 6 decimals of precision
+  pub devaddr_price_usd: u64,
+  pub oui_price_usd: u64,
   pub bump_seed: u8,
 }
 
@@ -29,6 +34,7 @@ pub struct OrganizationV0 {
   pub authority: Pubkey,
   pub oui: u64,
   pub escrow_key: String,
+  pub approved: bool,
   pub bump_seed: u8,
 }
 
@@ -78,8 +84,8 @@ pub struct DevAddrConstraintV0 {
 }
 
 #[account]
-#[derive(Default)]
-pub struct OranizationDelegateV0 {
+#[derive(Default, InitSpace)]
+pub struct OrganizationDelegateV0 {
   pub organization: Pubkey,
   pub delegate: Pubkey,
   pub bump_seed: u8,

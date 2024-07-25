@@ -34,4 +34,4 @@ helium-entity-manager = { workspace = true }
 helium-sub-daos = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }
-
+pyth-solana-receiver-sdk = "0.3.0"

@@ -58,4 +58,18 @@ pub mod iot_routing_manager {
   ) -> Result<()> {
     initialize_routing_manager_v0::handler(ctx, args)
   }
+
+  pub fn initialize_organization_delegate_v0(
+    ctx: Context<InitializeOrganizationDelegateV0>,
+  ) -> Result<()> {
+    initialize_organization_delegate_v0::handler(ctx)
+  }
+
+  pub fn remove_organization_delegate_v0(ctx: Context<RemoveOrganizationDelegateV0>) -> Result<()> {
+    remove_organization_delegate_v0::handler(ctx)
+  }
+
+  pub fn approve_organization_v0(ctx: Context<ApproveOrganizationV0>) -> Result<()> {
+    approve_organization_v0::handler(ctx)
+  }
 }

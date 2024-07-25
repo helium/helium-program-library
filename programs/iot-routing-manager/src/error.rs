@@ -8,4 +8,12 @@ pub enum ErrorCode {
   InvalidStringLength,
   #[msg("Cannot swap tree until it is close to full")]
   TreeNotFull,
+  #[msg("Arithmetic error")]
+  ArithmeticError,
+  #[msg("Pyth price is not available")]
+  PythPriceNotFound,
+  #[msg("Pyth price is stale")]
+  PythPriceFeedStale,
+  #[msg("Organization is not approved")]
+  OrganizationNotApproved,
 }

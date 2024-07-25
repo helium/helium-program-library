@@ -8,6 +8,9 @@
       "path": "../anchor-resolvers"
     },
     {
+      "path": "../helium-entity-manager-sdk"
+    },
+    {
       "path": "../circuit-breaker-sdk"
     },
     {
