@@ -12,6 +12,8 @@ import { PublicKey } from "@solana/web3.js";
 import { inflate } from "pako";
 import { useMemo, useState } from "react";
 
+const parserCache = new Map<string, TypedAccountParser<any>>();
+
 export function useIdl<IDL extends Idl>(
   programId: PublicKey | undefined
 ): UseAccountState<IDL> & { error: Error | undefined } {
@@ -30,19 +32,30 @@ export function useIdl<IDL extends Idl>(
   }, [programId?.toBase58()]);
   const cache = useAccountFetchCache();
   const idlParser: TypedAccountParser<IDL> = useMemo(() => {
-    return (_, data) => {
-      try {
-        const idlData = decodeIdlAccount(Buffer.from(data.data.subarray(8)));
-        const inflatedIdl = inflate(idlData.data);
-        return JSON.parse(utf8.decode(inflatedIdl));
-      } catch (e: any) {
-        if (cache.enableLogging) {
-          console.error(e);
-        }
-        setIdlError(e);
+    if (programId) {
+      // Default to using the cached parser if it exists, this makes
+      // for fewer rerenders in useAccounts.
+      if (!parserCache[programId.toBase58()]) {
+        parserCache[programId.toBase58()] = (_, data) => {
+          try {
+            const idlData = decodeIdlAccount(
+              Buffer.from(data.data.subarray(8))
+            );
+            const inflatedIdl = inflate(idlData.data);
+            return JSON.parse(utf8.decode(inflatedIdl));
+          } catch (e: any) {
+            if (cache.enableLogging) {
+              console.error(e);
+            }
+            setIdlError(e);
+          }
+        };
       }
-    };
-  }, []);
+
+      return parserCache[programId.toBase58()];
+    }
+    return undefined;
+  }, [programId]);
 
   const result = useAccount(idlKey, idlParser);
   return {

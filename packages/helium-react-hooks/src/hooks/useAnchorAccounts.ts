@@ -16,20 +16,25 @@ export function useAnchorAccounts<
   keys: PublicKey[] | undefined,
   type: A,
   // Perf optimization - set if the account will never change, to lower websocket usage.
-  isStatic: boolean = false
+  isStatic: boolean = false,
+  programId?: PublicKey
 ): UseAccountsState<IdlAccounts<IDL>[A]> & {
   error?: Error;
 } {
-  const { accounts: rawAccounts } = useAccounts(keys);
+  const rawAccountKeys = useMemo(
+    () => (programId ? [] : keys),
+    [programId, keys]
+  );
+  const { accounts: rawAccounts } = useAccounts(rawAccountKeys);
   const owner = useMemo(() => {
-    return rawAccounts?.find((a) => a.account)?.account?.owner;
-  }, [rawAccounts]);
-  const { info: idl, error, loading } = useIdl<IDL>(owner);
+    return programId ?? rawAccounts?.find((a) => a.account)?.account?.owner;
+  }, [rawAccounts, programId]);
+  const { account: idlAccount, info: idl, error, loading } = useIdl<IDL>(owner);
   useEffect(() => {
-    if (!loading && owner && !idl) {
-      console.warn(`Idl not found for ${owner.toBase58()}`);
+    if (!loading && owner && !idl && !idlAccount) {
+      console.warn(`Idl not found for ${owner.toBase58()}`, error);
     }
-  }, [idl, loading, owner]);
+  }, [idl, loading, owner, error, idlAccount]);
 
   const { error: useAccErr, ...result } = useIdlAccounts<IDL, A>(
     keys,

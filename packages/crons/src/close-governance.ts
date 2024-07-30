@@ -12,7 +12,7 @@ import {
 } from "@helium/spl-utils";
 import { init as initState } from "@helium/state-controller-sdk";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
-import { SystemProgram, Transaction } from "@solana/web3.js";
+import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import pLimit from "p-limit";
 
 (async () => {
@@ -89,24 +89,28 @@ import pLimit from "p-limit";
 
     const markers = (await vsrProgram.account.voteMarkerV0.all()).filter(
       (m) =>
-        !m.account.relinquished &&
         closedProposals.has(m.account.proposal.toBase58())
     );
     const limit = pLimit(100);
     const relinquishIxns = await Promise.all(
-      markers.map((marker) =>
-        limit(async () => {
-          return await vsrProgram.methods
-            .relinquishExpiredVoteV0()
-            .accountsStrict({
-              marker: marker.publicKey,
-              position: positionKey(marker.account.mint)[0],
-              proposal: marker.account.proposal,
-              systemProgram: SystemProgram.programId,
-            })
-            .instruction();
-        })
-      )
+      markers
+        .filter(
+          (marker) => !marker.account.rentRefund.equals(PublicKey.default)
+        )
+        .map((marker) =>
+          limit(async () => {
+            return await vsrProgram.methods
+              .relinquishExpiredVoteV0()
+              .accountsStrict({
+                marker: marker.publicKey,
+                position: positionKey(marker.account.mint)[0],
+                proposal: marker.account.proposal,
+                systemProgram: SystemProgram.programId,
+                rentRefund: marker.account.rentRefund,
+              })
+              .instruction();
+          })
+        )
     );
     await batchParallelInstructionsWithPriorityFee(provider, relinquishIxns);
 

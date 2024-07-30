@@ -2577,6 +2577,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nft-proxy"
+version = "0.0.2"
+dependencies = [
+ "anchor-gen",
+ "anchor-lang",
+]
+
+[[package]]
 name = "nix"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5659,6 +5667,7 @@ dependencies = [
  "itertools",
  "log",
  "mpl-token-metadata",
+ "nft-proxy",
  "proposal",
  "serde",
  "shared-utils",

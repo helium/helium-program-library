@@ -29,25 +29,37 @@ const getMultipleAccountsCore = async (
   throw new Error();
 };
 
+
+const MAX_CHUNK_SIZE = 99; // Define the maximum chunk size
+
 export const getMultipleAccounts = async (
   connection: any,
   keys: string[],
   commitment: string
-): Promise<{ keys: string[]; array: AccountInfo<Buffer>[] }> => {
-  const result = await getMultipleAccountsCore(connection, keys, commitment);
+): Promise<{ keys: string[]; array: (AccountInfo<Buffer> | undefined)[] }> => {
+  const array: (AccountInfo<Buffer> | undefined)[] = []; // Initialize an empty array to hold results
 
-  const array = result.array.map((acc) => {
-    if (!acc) {
-      return undefined;
-    }
+  // Loop through keys in chunks of MAX_CHUNK_SIZE
+  for (let i = 0; i < keys.length; i += MAX_CHUNK_SIZE) {
+    const chunk = keys.slice(i, i + MAX_CHUNK_SIZE); // Get the current chunk
+    const result = await getMultipleAccountsCore(connection, chunk, commitment); // Call the core function with the chunk
 
-    const { data, ...rest } = acc;
-    const obj = {
-      ...rest,
-      owner: rest.owner && new PublicKey(rest.owner),
-      data: Buffer.from(data[0], "base64"),
-    } as AccountInfo<Buffer>;
-    return obj;
-  }) as AccountInfo<Buffer>[];
-  return { keys, array };
+    // Process the result and add to the array
+    const processedArray = result.array.map((acc) => {
+      if (!acc) {
+        return undefined;
+      }
+
+      const { data, ...rest } = acc;
+      const obj = {
+        ...rest,
+        owner: rest.owner && new PublicKey(rest.owner),
+        data: Buffer.from(data[0], "base64"),
+      } as AccountInfo<Buffer>;
+      return obj;
+    });
+    array.push(...processedArray); // Merge processed results into the main array
+  }
+
+  return { keys, array }; // Return the final result
 };

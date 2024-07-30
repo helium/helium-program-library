@@ -1,11 +1,18 @@
 import { Transaction } from "sequelize";
 
-type Plugins = 'ExtractHexLocation';
-type Crons = 'refresh-accounts' | 'integrity-check';
+type Plugins = "ExtractHexLocation";
+type Crons = "refresh-accounts" | "integrity-check";
 
 export interface IPluginConfig {
   type: Plugins;
   config: any;
+}
+
+export type IxSideEffectAction = "delete";
+export interface IIxSideEffect {
+  ix: string;
+  acc: string;
+  action: IxSideEffectAction;
 }
 
 export interface IAccountConfig {
@@ -14,6 +21,7 @@ export interface IAccountConfig {
   schema: string;
   batchSize: number;
   plugins?: IPluginConfig[];
+  ix_side_effects?: IIxSideEffect[];
 }
 
 export interface IConfig {

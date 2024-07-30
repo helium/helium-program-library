@@ -12,7 +12,7 @@ import database from "./database";
 import { getBlockTimeWithRetry } from "./getBlockTimeWithRetry";
 import { getTransactionSignaturesUptoBlockTime } from "./getTransactionSignaturesUpToBlock";
 import { sanitizeAccount } from "./sanitizeAccount";
-import { truthy } from "./upsertProgramAccounts";
+import { truthy } from "./truthy";
 
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;

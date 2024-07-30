@@ -1,0 +1,20 @@
+[package]
+name = "nft-proxy"
+version = "0.0.2"
+description = "Nft proxy cpi wrapper"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "nft_proxy"
+
+[features]
+default = ["cpi"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+
+[dependencies]
+anchor-gen = { git = "https://github.com/ChewingGlass/anchor-gen.git" }
+anchor-lang = { workspace = true }

@@ -1,17 +1,15 @@
-import * as anchor from '@coral-xyz/anchor';
-import { GetProgramAccountsFilter, PublicKey } from '@solana/web3.js';
-import { Op, Sequelize } from 'sequelize';
-import { SOLANA_URL } from '../env';
-import { IAccountConfig } from '../types';
-import cachedIdlFetch from './cachedIdlFetch';
-import { chunks } from './chunks';
-import database from './database';
-import { defineIdlModels } from './defineIdlModels';
-import { sanitizeAccount } from './sanitizeAccount';
-import { initPlugins } from '../plugins';
-
-export type Truthy<T> = T extends false | '' | 0 | null | undefined ? never : T; // from lodash
-export const truthy = <T>(value: T): value is Truthy<T> => !!value;
+import * as anchor from "@coral-xyz/anchor";
+import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
+import { Op, Sequelize } from "sequelize";
+import { SOLANA_URL } from "../env";
+import { initPlugins } from "../plugins";
+import { IAccountConfig } from "../types";
+import cachedIdlFetch from "./cachedIdlFetch";
+import { chunks } from "./chunks";
+import database from "./database";
+import { defineIdlModels } from "./defineIdlModels";
+import { sanitizeAccount } from "./sanitizeAccount";
+import { truthy } from "./truthy";
 
 interface UpsertProgramAccountsArgs {
   programId: PublicKey;
@@ -43,7 +41,7 @@ export const upsertProgramAccounts = async ({
       idl.accounts!.some(({ name }) => name === type)
     )
   ) {
-    throw new Error('idl does not have every account type');
+    throw new Error("idl does not have every account type");
   }
 
   const program = new anchor.Program(idl, programId, provider);
@@ -144,8 +142,8 @@ export const upsertProgramAccounts = async ({
           await model.bulkCreate(values, {
             transaction: t,
             updateOnDuplicate: [
-              'address',
-              'refreshed_at',
+              "address",
+              "refreshed_at",
               ...updateOnDuplicateFields,
             ],
           });
@@ -154,7 +152,7 @@ export const upsertProgramAccounts = async ({
         await t.commit();
       } catch (err) {
         await t.rollback();
-        console.error('While inserting, err', err);
+        console.error("While inserting, err", err);
         throw err;
       }
 
