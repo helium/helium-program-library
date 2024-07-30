@@ -1,11 +1,10 @@
 import { Connection, PublicKey, Cluster } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync, getAccount } from "@solana/spl-token";
 import {
-  PythSolanaReceiverProgram,
-  pythSolanaReceiverIdl,
-} from "@pythnetwork/pyth-solana-receiver";
-import { Program } from "@coral-xyz/anchor";
-import { token } from "@coral-xyz/anchor/dist/cjs/utils";
+  PythSolanaReceiver,
+  IDL as pythSolanaReceiverIdl,
+} from "./pyth";
+import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
 
 export const getBalance = async ({
   pubKey,
@@ -35,14 +34,17 @@ export const getOraclePrice = async ({
   cluster: Cluster;
   connection: Connection;
 }) => {
-  const pythProgram: Program<PythSolanaReceiverProgram> = new Program(
+  const pythProgram: Program<PythSolanaReceiver> = new Program(
     pythSolanaReceiverIdl,
-    new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ")
+    new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"),
+    new AnchorProvider(connection, {} as Wallet, {
+      skipPreflight: true,
+    })
   );
 
   const data = await pythProgram.account.priceUpdateV2.fetch(
-    new PublicKey("DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx")
+    new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33")
   );
 
-  return data
+  return data;
 };

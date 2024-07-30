@@ -68,6 +68,22 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | ---------------- | ---- |
 | args | StartBoostArgsV0 |      |
 
+### startBoostV1
+
+#### Accounts
+
+| Name           | Mutability | Signer | Docs |
+| -------------- | ---------- | ------ | ---- |
+| startAuthority | immut      | yes    |      |
+| boostConfig    | immut      | no     |      |
+| boostedHex     | mut        | no     |      |
+
+#### Args
+
+| Name | Type             | Docs |
+| ---- | ---------------- | ---- |
+| args | StartBoostArgsV0 |      |
+
 ### closeBoostV0
 
 #### Accounts

@@ -35,6 +35,7 @@ pub struct OnboardMobileHotspotArgsV0 {
   pub index: u32,
   pub location: Option<u64>,
   pub device_type: MobileDeviceTypeV0,
+  pub deployment_info: Option<MobileDeploymentInfoV0>,
 }
 
 #[derive(Accounts)]
@@ -194,6 +195,7 @@ pub fn handler<'info>(
     is_active: false,
     dc_onboarding_fee_paid: fees.dc_onboarding_fee,
     device_type: args.device_type,
+    deployment_info: args.deployment_info,
   });
 
   if let Some(location) = args.location {
@@ -271,6 +273,12 @@ pub fn handler<'info>(
   if mobile_fee > 0 {
     burn(ctx.accounts.mobile_burn_ctx(), mobile_fee)?;
   }
+
+  resize_to_fit(
+    &ctx.accounts.payer,
+    &ctx.accounts.system_program.to_account_info(),
+    &ctx.accounts.mobile_info,
+  )?;
 
   Ok(())
 }

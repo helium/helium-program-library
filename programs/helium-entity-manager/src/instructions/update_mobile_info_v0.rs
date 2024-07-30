@@ -25,6 +25,7 @@ pub struct UpdateMobileInfoArgsV0 {
   pub creator_hash: [u8; 32],
   pub root: [u8; 32],
   pub index: u32,
+  pub deployment_info: Option<MobileDeploymentInfoV0>,
 }
 
 #[derive(Accounts)]
@@ -151,6 +152,16 @@ pub fn handler<'info>(
       ctx.accounts.mobile_info.location = Some(new_location);
     }
   }
+
+  if let Some(deployment_info) = args.deployment_info {
+    ctx.accounts.mobile_info.deployment_info = Some(deployment_info);
+  }
+
+  resize_to_fit(
+    &ctx.accounts.payer,
+    &ctx.accounts.system_program.to_account_info(),
+    &ctx.accounts.mobile_info,
+  )?;
 
   Ok(())
 }

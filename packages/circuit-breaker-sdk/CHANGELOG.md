@@ -3,6 +3,70 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.8.8](https://github.com/helium/helium-program-libary/compare/v0.8.7...v0.8.8) (2024-07-29)
+
+**Note:** Version bump only for package @helium/circuit-breaker-sdk
+
+
+
+
+
+## [0.8.7](https://github.com/helium/helium-program-libary/compare/v0.8.6...v0.8.7) (2024-07-17)
+
+**Note:** Version bump only for package @helium/circuit-breaker-sdk
+
+
+
+
+
+## [0.8.6](https://github.com/helium/helium-program-libary/compare/v0.8.5...v0.8.6) (2024-06-25)
+
+**Note:** Version bump only for package @helium/circuit-breaker-sdk
+
+
+
+
+
+## [0.8.5](https://github.com/helium/helium-program-libary/compare/v0.8.4...v0.8.5) (2024-06-25)
+
+**Note:** Version bump only for package @helium/circuit-breaker-sdk
+
+
+
+
+
+## [0.8.4](https://github.com/helium/helium-program-libary/compare/v0.8.3...v0.8.4) (2024-06-25)
+
+**Note:** Version bump only for package @helium/circuit-breaker-sdk
+
+
+
+
+
+## [0.8.3](https://github.com/helium/helium-program-libary/compare/v0.8.2...v0.8.3) (2024-06-24)
+
+**Note:** Version bump only for package @helium/circuit-breaker-sdk
+
+
+
+
+
+## [0.8.2](https://github.com/helium/helium-program-libary/compare/v0.8.1...v0.8.2) (2024-06-18)
+
+**Note:** Version bump only for package @helium/circuit-breaker-sdk
+
+
+
+
+
+## [0.8.1](https://github.com/helium/helium-program-libary/compare/v0.7.17...v0.8.1) (2024-06-18)
+
+**Note:** Version bump only for package @helium/circuit-breaker-sdk
+
+
+
+
+
 # [0.8.0](https://github.com/helium/helium-program-libary/compare/v0.7.17...v0.8.0) (2024-06-18)
 
 **Note:** Version bump only for package @helium/circuit-breaker-sdk
