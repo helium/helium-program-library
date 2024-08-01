@@ -8,7 +8,7 @@ import {
   useAccountFetchCache,
 } from "@helium/account-fetch-cache-hooks";
 import { sha256 } from "@noble/hashes/sha256";
-import { PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { inflate } from "pako";
 import { useMemo, useState } from "react";
 
@@ -33,10 +33,11 @@ export function useIdl<IDL extends Idl>(
   const cache = useAccountFetchCache();
   const idlParser: TypedAccountParser<IDL> = useMemo(() => {
     if (programId) {
+      const cacheK = cacheKey(programId, cache.connection)
       // Default to using the cached parser if it exists, this makes
       // for fewer rerenders in useAccounts.
-      if (!parserCache[programId.toBase58()]) {
-        parserCache[programId.toBase58()] = (_, data) => {
+      if (!parserCache[cacheK]) {
+        parserCache[cacheK] = (_, data) => {
           try {
             const idlData = decodeIdlAccount(
               Buffer.from(data.data.subarray(8))
@@ -52,10 +53,10 @@ export function useIdl<IDL extends Idl>(
         };
       }
 
-      return parserCache[programId.toBase58()];
+      return parserCache[cacheK];
     }
     return undefined;
-  }, [programId]);
+  }, [programId, cache]);
 
   const result = useAccount(idlKey, idlParser);
   return {
@@ -63,4 +64,8 @@ export function useIdl<IDL extends Idl>(
     loading: result.loading,
     error: idlError,
   };
+}
+
+function cacheKey(programId: PublicKey, connection: Connection) {
+  return `${programId.toBase58()}-${connection.rpcEndpoint}`
 }
