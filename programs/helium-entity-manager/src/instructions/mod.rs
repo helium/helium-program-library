@@ -16,7 +16,6 @@ pub mod revoke_program_v0;
 pub mod set_entity_active_v0;
 pub mod set_maker_tree_v0;
 pub mod temp_pay_mobile_onboarding_fee_v0;
-mod temp_repair_mobile_hotspot_Info;
 pub mod temp_repair_mobile_hotspot_info;
 pub mod temp_standardize_entity;
 pub mod update_data_only_tree_v0;
