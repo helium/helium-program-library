@@ -1,3 +1,4 @@
+pub mod admin_set_dc_onboarding_fees_paid;
 pub mod calculate_utility_score_v0;
 pub mod delegation;
 pub mod initialize_dao_v0;
@@ -11,6 +12,7 @@ pub mod update_dao_v0;
 pub mod update_sub_dao_v0;
 pub mod update_sub_dao_vehnt_v0;
 
+pub use admin_set_dc_onboarding_fees_paid::*;
 pub use calculate_utility_score_v0::*;
 pub use delegation::*;
 pub use initialize_dao_v0::*;
