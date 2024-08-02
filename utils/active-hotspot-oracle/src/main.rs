@@ -297,15 +297,6 @@ async fn main() -> Result<()> {
   )?;
 
   // send transactions
-  println!("Sending mark active transactions");
-  construct_and_send_txs(
-    &helium_entity_program.rpc(),
-    &tpu_client,
-    mark_active_ixs,
-    &kp,
-    args.dry_run,
-  )?;
-
   println!("Sending mark inactive transactions");
   construct_and_send_txs(
     &helium_entity_program.rpc(),
@@ -313,6 +304,17 @@ async fn main() -> Result<()> {
     mark_inactive_ixs,
     &kp,
     args.dry_run,
+    280000
+  )?;
+
+  println!("Sending mark active transactions");
+  construct_and_send_txs(
+    &helium_entity_program.rpc(),
+    &tpu_client,
+    mark_active_ixs,
+    &kp,
+    args.dry_run,
+    280000
   )?;
 
   // write to new checkpoint file and upload to s3

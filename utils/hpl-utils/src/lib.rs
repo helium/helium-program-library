@@ -212,6 +212,7 @@ pub fn construct_and_send_txs<
   ixs: Vec<Instruction>,
   payer: &Keypair,
   dry_run: bool,
+  compute_units: u64,
 ) -> Result<(), anyhow::Error> {
   if ixs.is_empty() {
     return Ok(());
@@ -227,9 +228,9 @@ pub fn construct_and_send_txs<
     })
     .unwrap_or(1);
   let mut instructions = vec![
-    ComputeBudgetInstruction::set_compute_unit_limit(600000),
+    ComputeBudgetInstruction::set_compute_unit_limit(compute_units),
     ComputeBudgetInstruction::set_compute_unit_price(
-      (f64::from(priority_fee_lamports) / (600000_f64 * 0.000001_f64)).ceil() as u64,
+      (f64::from(priority_fee_lamports) / (compute_units as f64 * 0.000001_f64)).ceil() as u64,
     ),
   ];
   let mut ix_groups = Vec::new();
@@ -249,9 +250,9 @@ pub fn construct_and_send_txs<
 
       // clear instructions except for last one
       instructions = vec![
-        ComputeBudgetInstruction::set_compute_unit_limit(600000),
+        ComputeBudgetInstruction::set_compute_unit_limit(compute_units),
         ComputeBudgetInstruction::set_compute_unit_price(
-          (f64::from(priority_fee_lamports) / (600000_f64 * 0.000001_f64)).ceil() as u64,
+          (f64::from(priority_fee_lamports) / (compute_units as f64 * 0.000001_f64)).ceil() as u64,
         ),
         ix.clone(),
       ];
