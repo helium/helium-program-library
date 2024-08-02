@@ -3,7 +3,7 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 use std::str::FromStr;
 
-use anchor_lang::{prelude::*, AnchorDeserialize, AnchorSerialize, Discriminator};
+use anchor_lang::{AnchorDeserialize, AnchorSerialize};
 
 #[account]
 pub struct OldMobileHotspotInfo {
