@@ -180,10 +180,4 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     temp_standardize_entity::handler(ctx, args)
   }
-
-  pub fn temp_repair_mobile_hotspot_info<'info>(
-    ctx: Context<'_, '_, '_, 'info, TempRepairMobileHotspotInfo<'info>>,
-  ) -> Result<()> {
-    temp_repair_mobile_hotspot_info::handler(ctx)
-  }
 }
