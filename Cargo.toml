@@ -35,4 +35,3 @@ lazy-distributor = { path = "./programs/lazy-distributor", features = ["cpi"] }
 mobile-entity-manager = { path = "./programs/mobile-entity-manager", features = ["cpi"] }
 price-oracle = { path = "./programs/price-oracle", features = ["cpi"] }
 no-emit = { path = "./programs/no-emit", features = ["cpi"] }
-time = "0.3.36"
