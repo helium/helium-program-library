@@ -84,7 +84,8 @@ pub fn send_and_confirm_messages_with_spinner<
     // Periodically re-send all pending transactions
     if Instant::now().duration_since(last_resend) > TRANSACTION_RESEND_INTERVAL {
       for (index, (_i, transaction, deser)) in pending_transactions.values().enumerate() {
-        if !tpu_client.send_wire_transaction(transaction.clone()) {
+        // Disabling TPU client because it doesn't work with SWQoS
+        // if !tpu_client.send_wire_transaction(transaction.clone()) {
           if let Err(err) = rpc_client.send_transaction_with_config(
             deser,
             RpcSendTransactionConfig {
@@ -99,7 +100,7 @@ pub fn send_and_confirm_messages_with_spinner<
               deser.signatures[0], err
             ));
           }
-        }
+        // }
         set_message_for_confirmed_transactions(
           &progress_bar,
           confirmed_transactions,
