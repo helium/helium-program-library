@@ -907,6 +907,7 @@ __metadata:
     "@helium/fanout-sdk": ^0.8.7
     "@helium/helium-entity-manager-sdk": ^0.8.7
     "@helium/helium-sub-daos-sdk": ^0.8.7
+    "@helium/iot-routing-manager-sdk": ^0.8.7
     "@helium/lazy-distributor-sdk": ^0.8.7
     "@helium/mobile-entity-manager-sdk": ^0.8.7
     "@helium/price-oracle-sdk": ^0.8.7
@@ -1073,7 +1074,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/iot-routing-manager-sdk@workspace:packages/iot-routing-manager-sdk":
+"@helium/iot-routing-manager-sdk@^0.8.7, @helium/iot-routing-manager-sdk@workspace:packages/iot-routing-manager-sdk":
   version: 0.0.0-use.local
   resolution: "@helium/iot-routing-manager-sdk@workspace:packages/iot-routing-manager-sdk"
   dependencies:

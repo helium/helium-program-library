@@ -47,6 +47,7 @@
     "@helium/fanout-sdk": "^0.8.7",
     "@helium/helium-entity-manager-sdk": "^0.8.7",
     "@helium/helium-sub-daos-sdk": "^0.8.7",
+    "@helium/iot-routing-manager-sdk": "^0.8.7",
     "@helium/lazy-distributor-sdk": "^0.8.7",
     "@helium/mobile-entity-manager-sdk": "^0.8.7",
     "@helium/price-oracle-sdk": "^0.8.7",

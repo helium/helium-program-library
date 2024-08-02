@@ -79,4 +79,10 @@ pub mod iot_routing_manager {
   ) -> Result<()> {
     update_organization_v0::handler(ctx, args)
   }
+
+  pub fn temp_backfill_organization_delegate(
+    ctx: Context<TempBackfillOrganizationDelegate>,
+  ) -> Result<()> {
+    temp_backfill_organization_delegate::handler(ctx)
+  }
 }
