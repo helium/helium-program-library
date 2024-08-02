@@ -12,7 +12,7 @@ pub struct RewardableEntityConfigV0 {
   pub staking_requirement: u64,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, PartialEq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, PartialEq, Debug)]
 pub enum MobileDeviceTypeV0 {
   #[default]
   Cbrs,
