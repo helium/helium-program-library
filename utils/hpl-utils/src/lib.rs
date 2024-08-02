@@ -212,7 +212,7 @@ pub fn construct_and_send_txs<
   ixs: Vec<Instruction>,
   payer: &Keypair,
   dry_run: bool,
-  compute_units: u64,
+  compute_units: u32,
 ) -> Result<(), anyhow::Error> {
   if ixs.is_empty() {
     return Ok(());
