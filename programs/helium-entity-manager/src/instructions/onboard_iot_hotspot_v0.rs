@@ -161,23 +161,6 @@ pub fn handler<'info>(
     is_active: false,
     dc_onboarding_fee_paid: dc_fee,
   });
-  track_dc_onboarding_fees_v0(
-    CpiContext::new_with_signer(
-      ctx.accounts.helium_sub_daos_program.to_account_info(),
-      TrackDcOnboardingFeesV0 {
-        hem_auth: ctx.accounts.rewardable_entity_config.to_account_info(),
-        sub_dao: ctx.accounts.sub_dao.to_account_info(),
-      },
-      &[rewardable_entity_config_seeds!(
-        ctx.accounts.rewardable_entity_config
-      )],
-    ),
-    TrackDcOnboardingFeesArgsV0 {
-      amount: dc_fee,
-      add: true,
-      symbol: ctx.accounts.rewardable_entity_config.symbol.clone(),
-    },
-  )?;
 
   if let (
     Some(location),
