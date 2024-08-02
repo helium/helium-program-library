@@ -62,7 +62,8 @@ export const useAssignProxies = () => {
           }
           if (
             proxyAssignment &&
-            !proxyAssignment.nextVoter?.equals(PublicKey.default)          ) {
+            !proxyAssignment.nextVoter?.equals(PublicKey.default)
+          ) {
             const toUndelegate =
               await voteService.getProxyAssignmentsForPosition(
                 position.pubkey,
