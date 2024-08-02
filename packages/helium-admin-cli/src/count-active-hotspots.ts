@@ -2,10 +2,8 @@ import * as anchor from "@coral-xyz/anchor";
 import {
   init as initHem
 } from "@helium/helium-entity-manager-sdk";
-import { PublicKey } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import fs from "fs";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -29,17 +27,8 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const hemProgram = await initHem(provider);
 
-  // const hotspots = await hemProgram.account.iotHotspotInfoV0.all()
-  // console.log("IOT", hotspots.filter((h) => h.account.isActive).length);
+  const hotspots = await hemProgram.account.iotHotspotInfoV0.all()
+  console.log("IOT", hotspots.filter((h) => h.account.isActive).length);
   const mobileHotspots = await hemProgram.account.mobileHotspotInfoV0.all();
-  console.log("MOBILE", mobileHotspots.filter((h) => !h.account).length);
-    const inactiveHotspots = mobileHotspots
-      .filter((h) => !h.account)
-      .map((h) => h.publicKey.toBase58());
-
-    // Write inactive hotspots to a JSON file
-    fs.writeFileSync(
-      "broken_hotspots.json",
-      JSON.stringify(inactiveHotspots, null, 2)
-    );
+  console.log("MOBILE", mobileHotspots.filter((h) => h.account.isActive).length);
 }
