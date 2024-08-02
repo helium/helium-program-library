@@ -199,7 +199,7 @@ fn set_message_for_confirmed_transactions(
 }
 
 const MAX_TX_LEN: usize = 1232;
-const MAX_BLOCKHASH_RETRIES: usize = 10;
+const MAX_BLOCKHASH_RETRIES: usize = 50;
 
 pub fn construct_and_send_txs<
   P: ConnectionPool<NewConnectionConfig = C>,
@@ -320,6 +320,10 @@ pub fn construct_and_send_txs<
         }
 
         retries += 1;
+      }
+
+      if retries >= MAX_BLOCKHASH_RETRIES {
+        return Err(anyhow!("Failed to send transactions"));
       }
     }
   }

@@ -30,3 +30,4 @@ git = "https://github.com/helium/ledger-rs"
 branch = "lthiery/tcp-transport"
 default-features = false
 features = ["transport-hid", "transport-tcp"]
+time = "0.3.36"
