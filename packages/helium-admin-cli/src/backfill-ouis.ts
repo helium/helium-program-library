@@ -379,5 +379,5 @@ export async function run(args: any = process.argv) {
   ).filter(truthy);
 
   console.log(`Initializing (${devaddrIxs.length}) devaddrConstraints`);
-  //await batchParallelInstructionsWithPriorityFee(provider, devaddrIxs);
+  await batchParallelInstructionsWithPriorityFee(provider, devaddrIxs);
 }
