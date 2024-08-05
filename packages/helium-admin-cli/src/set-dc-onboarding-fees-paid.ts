@@ -59,6 +59,7 @@ export async function run(args: any = process.argv) {
 
   const dntMint = new PublicKey(argv.dntMint);
   const subDaoK = subDaoKey(dntMint)[0];
+  const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDaoK);
 
   instructions.push(
     await hsdProgram.methods
@@ -67,6 +68,7 @@ export async function run(args: any = process.argv) {
       })
       .accounts({
         subDao: subDaoK,
+        authority: subDaoAcc.authority,
       })
       .instruction()
   );
