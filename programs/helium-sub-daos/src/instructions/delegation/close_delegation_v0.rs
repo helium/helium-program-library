@@ -122,7 +122,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   let curr_epoch = current_epoch(curr_ts);
   let to_claim_to_epoch =
     if position.lockup.end_ts < curr_ts && position.lockup.kind == LockupKind::Cliff {
-      current_epoch(position.lockup.end_ts)
+      current_epoch(position.lockup.end_ts) - 1
     } else {
       curr_epoch - 1
     };
