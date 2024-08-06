@@ -1,5 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
-import { AccountFetchCache, chunks } from "@helium/account-fetch-cache";
+import { AccountFetchCache } from "@helium/account-fetch-cache";
+import { init as initNftProxy } from "@helium/nft-proxy-sdk";
 import {
   init as initOrg,
   organizationKey,
@@ -7,13 +8,27 @@ import {
 } from "@helium/organization-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";
 import {
-  bulkSendTransactions,
   batchParallelInstructionsWithPriorityFee,
+  batchSequentialParallelInstructions,
+  truthy,
 } from "@helium/spl-utils";
 import { init as initState } from "@helium/state-controller-sdk";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
-import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import {
+  PublicKey,
+  SYSVAR_CLOCK_PUBKEY,
+  SystemProgram,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import pLimit from "p-limit";
+
+async function getSolanaUnixTimestamp(
+  provider: anchor.AnchorProvider
+): Promise<bigint> {
+  const clock = await provider.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+  const unixTime = clock!.data.readBigInt64LE(8 * 4);
+  return unixTime;
+}
 
 (async () => {
   try {
@@ -35,6 +50,8 @@ import pLimit from "p-limit";
     const stateProgram = await initState(provider);
     const proposalProgram = await initProposal(provider);
     const vsrProgram = await initVsr(provider);
+    const proxyProgram = await initNftProxy(provider);
+    const solanaTime = await getSolanaUnixTimestamp(provider);
     let closedProposals = new Set();
     for (const orgName of ["Helium", "Helium MOBILE", "Helium IOT"]) {
       console.log(`Checking for expired proposals in ${orgName}`);
@@ -81,15 +98,11 @@ import pLimit from "p-limit";
           closedProposals.add(proposal.pubkey.toBase58());
         }
       }
-      await batchParallelInstructionsWithPriorityFee(
-        provider,
-        resolveIxs
-      );
+      await batchParallelInstructionsWithPriorityFee(provider, resolveIxs);
     }
 
-    const markers = (await vsrProgram.account.voteMarkerV0.all()).filter(
-      (m) =>
-        closedProposals.has(m.account.proposal.toBase58())
+    const markers = (await vsrProgram.account.voteMarkerV0.all()).filter((m) =>
+      closedProposals.has(m.account.proposal.toBase58())
     );
     const limit = pLimit(100);
     const relinquishIxns = await Promise.all(
@@ -113,6 +126,61 @@ import pLimit from "p-limit";
         )
     );
     await batchParallelInstructionsWithPriorityFee(provider, relinquishIxns);
+
+    const proxyAssignments = await proxyProgram.account.proxyAssignmentV0.all();
+    const expiredProxyAssignments = proxyAssignments.filter((pa) => {
+      const { account } = pa;
+      return account.expirationTime.lt(new anchor.BN(Number(solanaTime)));
+    });
+
+    const proxyAssignmentsByAsset: {
+      [key: string]: (typeof proxyAssignments)[0][];
+    } = expiredProxyAssignments.reduce(
+      (acc, assignment) => ({
+        ...acc,
+        [assignment.account.asset.toBase58()]: [
+          ...(acc[assignment.account.asset.toBase58()] || []),
+          assignment,
+        ],
+      }),
+      {}
+    );
+
+    const multiDemArray: TransactionInstruction[][] = Object.entries(
+      proxyAssignmentsByAsset
+    ).map(async ([_, value], idx) => {
+      const sorted = value.sort((a, b) =>
+        a.account.index < b.account.index ? 1 : -1
+      );
+
+      return (
+        await Promise.all(
+          sorted.map((proxy, index) => {
+            // Can't undelegate the 1st one (Pubkey.default)
+            if (index === sorted.length - 1) {
+              return Promise.resolve(undefined);
+            }
+
+            const prevProxyAssignment = new PublicKey(
+              sorted[index + 1].publicKey
+            );
+
+            return proxyProgram.methods
+              .unassignExpiredProxyV0()
+              .accounts({
+                prevProxyAssignment,
+                proxyAssignment: new PublicKey(proxy.publicKey),
+              })
+              .instruction();
+          })
+        )
+      ).filter(truthy);
+    });
+
+    await batchSequentialParallelInstructions({
+      provider,
+      instructions: multiDemArray,
+    });
 
     process.exit(0);
   } catch (err) {
