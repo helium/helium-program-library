@@ -43,8 +43,9 @@ async function getSolanaUnixTimestamp(
     anchor.setProvider(anchor.AnchorProvider.local(process.env.SOLANA_URL));
 
     const provider = anchor.getProvider() as anchor.AnchorProvider;
+    const conn = provider.connection;
     new AccountFetchCache({
-      connection: provider.connection,
+      connection: conn,
       commitment: "confirmed",
       extendConnection: true,
     });
@@ -181,16 +182,24 @@ async function getSolanaUnixTimestamp(
       })
     );
 
-    for (const tx of await batchInstructionsToTxsWithPriorityFee(
+    const txs = await batchInstructionsToTxsWithPriorityFee(
       provider,
       multiDimArray.flat()
-    )) {
-      const fullDraft = await populateMissingDraftInfo(provider.connection, tx);
-      const versionedTx = toVersionedTx(fullDraft);
-      const signed = await provider.wallet.signTransaction(versionedTx);
+    );
+
+    const signedTxs = await Promise.all(
+      txs.map(async (tx) => {
+        const fullDraft = await populateMissingDraftInfo(conn, tx);
+        const versionedTx = toVersionedTx(fullDraft);
+        const signed = await provider.wallet.signTransaction(versionedTx);
+        return signed;
+      })
+    );
+
+    for (const tx of signedTxs) {
       await sendAndConfirmWithRetry(
-        provider.connection,
-        Buffer.from(signed.serialize()),
+        conn,
+        Buffer.from(tx.serialize()),
         { skipPreflight: true },
         "confirmed"
       );
