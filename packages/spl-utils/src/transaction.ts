@@ -748,7 +748,6 @@ export async function batchSequentialParallelInstructions({
   triesRemaining = 10,
   extraSigners = [],
   maxSignatureBatch = TX_BATCH_SIZE,
-  addressLookupTableAddresses = [],
 }: {
   provider: AnchorProvider;
   instructions: TransactionInstruction[][];
@@ -759,14 +758,11 @@ export async function batchSequentialParallelInstructions({
   addressLookupTableAddresses?: PublicKey[];
 }): Promise<void> {
   for (const instruction of instructions) {
-    await batchParallelInstructions({
-      provider,
-      instructions: instruction,
+    await batchParallelInstructionsWithPriorityFee(provider, instruction, {
       onProgress,
       triesRemaining,
       extraSigners,
       maxSignatureBatch,
-      addressLookupTableAddresses,
     });
   }
 }

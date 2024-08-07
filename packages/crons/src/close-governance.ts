@@ -30,6 +30,43 @@ async function getSolanaUnixTimestamp(
   return unixTime;
 }
 
+const flattenAndLimitSubArrays = <T>(
+  multiDimArray: T[][],
+  maxItems: number
+): T[][] => {
+  const result: T[][] = [];
+  let currentBucket: T[] = [];
+
+  for (const subArray of multiDimArray) {
+    // If the current sub-array itself is larger than maxItems, we need to split it
+    if (subArray.length > maxItems) {
+      if (currentBucket.length > 0) {
+        result.push(currentBucket);
+        currentBucket = [];
+      }
+      for (let i = 0; i < subArray.length; i += maxItems) {
+        result.push(subArray.slice(i, i + maxItems));
+      }
+      continue;
+    }
+
+    // Check if adding the current sub-array would exceed maxItems in the current bucket
+    if (currentBucket.length + subArray.length > maxItems) {
+      result.push(currentBucket);
+      currentBucket = [];
+    }
+
+    currentBucket.push(...subArray);
+  }
+
+  // Add the last bucket if it has any items
+  if (currentBucket.length > 0) {
+    result.push(currentBucket);
+  }
+
+  return result;
+};
+
 (async () => {
   try {
     if (!process.env.ANCHOR_WALLET)
@@ -146,40 +183,44 @@ async function getSolanaUnixTimestamp(
       {}
     );
 
-    const multiDemArray: TransactionInstruction[][] = Object.entries(
-      proxyAssignmentsByAsset
-    ).map(async ([_, value], idx) => {
-      const sorted = value.sort((a, b) =>
-        a.account.index < b.account.index ? 1 : -1
-      );
+    const multiDimArray: TransactionInstruction[][] = await Promise.all(
+      Object.entries(proxyAssignmentsByAsset).map(async ([_, proxies], idx) => {
+        const sortedProxies = proxies.sort((a, b) =>
+          a.account.index < b.account.index ? 1 : -1
+        );
 
-      return (
-        await Promise.all(
-          sorted.map((proxy, index) => {
-            // Can't undelegate the 1st one (Pubkey.default)
-            if (index === sorted.length - 1) {
-              return Promise.resolve(undefined);
-            }
+        return (
+          await Promise.all(
+            sortedProxies.map(async (proxy, index) => {
+              if (index === sortedProxies.length - 1) {
+                return proxyProgram.methods
+                  .closeExpiredProxyV0()
+                  .accounts({
+                    proxyAssignment: new PublicKey(proxy.publicKey),
+                  })
+                  .instruction();
+              }
 
-            const prevProxyAssignment = new PublicKey(
-              sorted[index + 1].publicKey
-            );
+              const prevProxyAssignment = new PublicKey(
+                sortedProxies[index + 1].publicKey
+              );
 
-            return proxyProgram.methods
-              .unassignExpiredProxyV0()
-              .accounts({
-                prevProxyAssignment,
-                proxyAssignment: new PublicKey(proxy.publicKey),
-              })
-              .instruction();
-          })
-        )
-      ).filter(truthy);
-    });
+              return proxyProgram.methods
+                .unassignExpiredProxyV0()
+                .accounts({
+                  prevProxyAssignment,
+                  proxyAssignment: new PublicKey(proxy.publicKey),
+                })
+                .instruction();
+            })
+          )
+        ).filter(truthy);
+      })
+    );
 
     await batchSequentialParallelInstructions({
       provider,
-      instructions: multiDemArray,
+      instructions: flattenAndLimitSubArrays(multiDimArray, 15),
     });
 
     process.exit(0);
