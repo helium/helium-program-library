@@ -8,6 +8,7 @@ import {
 } from "@helium/organization-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";
 import {
+  batchInstructionsToTxsWithPriorityFee,
   batchParallelInstructionsWithPriorityFee,
   batchSequentialParallelInstructions,
   truthy,
@@ -21,7 +22,6 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import pLimit from "p-limit";
-import { flattenAndLimitSubArrays } from "./utils";
 
 async function getSolanaUnixTimestamp(
   provider: anchor.AnchorProvider
@@ -182,11 +182,15 @@ async function getSolanaUnixTimestamp(
       })
     );
 
+    const txs = await batchInstructionsToTxsWithPriorityFee(
+      provider,
+      multiDimArray
+    );
+
     await batchSequentialParallelInstructions({
       provider,
-      instructions: flattenAndLimitSubArrays(multiDimArray, 15),
+      instructions: txs.map((tx) => tx.instructions),
     });
-
     process.exit(0);
   } catch (err) {
     console.log(err);
