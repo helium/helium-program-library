@@ -10,7 +10,9 @@ import { init as initProposal } from "@helium/proposal-sdk";
 import {
   batchInstructionsToTxsWithPriorityFee,
   batchParallelInstructionsWithPriorityFee,
-  batchSequentialParallelInstructions,
+  populateMissingDraftInfo,
+  sendAndConfirmWithRetry,
+  toVersionedTx,
   truthy,
 } from "@helium/spl-utils";
 import { init as initState } from "@helium/state-controller-sdk";
@@ -182,15 +184,21 @@ async function getSolanaUnixTimestamp(
       })
     );
 
-    const txs = await batchInstructionsToTxsWithPriorityFee(
+    for (const tx of await batchInstructionsToTxsWithPriorityFee(
       provider,
-      multiDimArray
-    );
+      multiDimArray.flat()
+    )) {
+      const fullDraft = await populateMissingDraftInfo(provider.connection, tx);
+      const versionedTx = toVersionedTx(fullDraft);
+      const signed = await provider.wallet.signTransaction(versionedTx);
+      await sendAndConfirmWithRetry(
+        provider.connection,
+        Buffer.from(signed.serialize()),
+        { skipPreflight: true },
+        "confirmed"
+      );
+    }
 
-    await batchSequentialParallelInstructions({
-      provider,
-      instructions: txs.map((tx) => tx.instructions),
-    });
     process.exit(0);
   } catch (err) {
     console.log(err);
