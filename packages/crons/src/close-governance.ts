@@ -187,19 +187,13 @@ async function getSolanaUnixTimestamp(
       multiDimArray.flat()
     );
 
-    const signedTxs = await Promise.all(
-      txs.map(async (tx) => {
-        const fullDraft = await populateMissingDraftInfo(conn, tx);
-        const versionedTx = toVersionedTx(fullDraft);
-        const signed = await provider.wallet.signTransaction(versionedTx);
-        return signed;
-      })
-    );
-
-    for (const tx of signedTxs) {
+    for (const tx of txs) {
+      const fullDraft = await populateMissingDraftInfo(conn, tx);
+      const versionedTx = toVersionedTx(fullDraft);
+      const signed = await provider.wallet.signTransaction(versionedTx);
       await sendAndConfirmWithRetry(
         conn,
-        Buffer.from(tx.serialize()),
+        Buffer.from(signed.serialize()),
         { skipPreflight: true },
         "confirmed"
       );
