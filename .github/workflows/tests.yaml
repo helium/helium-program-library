@@ -101,6 +101,7 @@ jobs:
           - packages/tokens-to-rent-service
           - packages/rewards-oracle-faucet-service
           - packages/vsr-metadata-service
+          - packages/crons
     steps:
       - uses: actions/checkout@v3
       - run: cd $DOCKER_PATH && docker build .
