@@ -59,31 +59,29 @@ export async function run(args: any = process.argv) {
   }
 
   const accounts = [
-    // Mobile sponsored price oracle
-    "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx",
-    // HNT sponsored price oracle
-    "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33",
+    // HNT Proposal Config
+    "22SWTDZVj1L81SXfwbEeUmdZBFj23MFmER3Gv8BmxbBS",
+    // HNT state controller
+    "7Vrme34DXPH8ow4HEAatZKwZF9AR5vq8MZhA3CanMEbr",
+    // IOT proposal config
+    "7cvYwyj6k4NEPNoaCTUufDdGJqqB6ZBRf4t3TrSSUGrc",
+    // IOT State controller
+    "3eEnmZBiJems6ipPtdQS2UkJYfPqzvnDzhWQuTTN2ou5",
     // IOT Registrar
     "7ZZopN1mx6ECcb3YCG8dbxeLpA44xq4gzA1ETEiaLoeL",
-    // IOT Proposal Config
-    "7cvYwyj6k4NEPNoaCTUufDdGJqqB6ZBRf4t3TrSSUGrc",
     // State controller program
     "stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM",
-    // Proposal program
-    "propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs",
-    // MOBILE Registrar
-    "C4DWaps9bLiqy4e81wJ7VTQ6QR7C4MWvwsei3ZjsaDuW",
-    // MOBILE Proposal Config
+    // Mobile proposal config
     "5c9JxRCj4CwhZwaUyjvpb4JJbKW7xpvEFq3Rb2upkytc",
+    // Mobile registrar
+    "C4DWaps9bLiqy4e81wJ7VTQ6QR7C4MWvwsei3ZjsaDuW",
+    // Mobile state controller
+    "r11HAkEaPqkFHwDVewcmWSfRrMaLYcBLGquC2RBn3Xp",
   ].map((a) => {
     return new PublicKey(a);
   });
 
-  const slot = await provider.connection.getSlot();
   const lookupTableAddress = new PublicKey(argv.lookupTable);
-  const lookupTableInst = AddressLookupTableAccount.deserialize(
-    (await provider.connection.getAccountInfo(lookupTableAddress))!.data
-  );
   for (const addresses of chunks(accounts, 20)) {
     await sendInstructionsOrSquads({
       provider,

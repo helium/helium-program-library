@@ -29,9 +29,7 @@ export const useFlipPositionLockupKind = () => {
       const isInvalid =
         !provider ||
         !provider.wallet ||
-        !unixNow ||
-        position.numActiveVotes > 0;
-
+        !unixNow;
       const lockupKind = Object.keys(position.lockup.kind)[0] as string;
       const isConstant = lockupKind === "constant";
       const idl = await Program.fetchIdl(programId, provider);

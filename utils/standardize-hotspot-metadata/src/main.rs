@@ -323,6 +323,7 @@ async fn main() -> Result<()> {
       instructions,
       &kp,
       false,
+      600000
     ) {
       println!("Failed to send txs: {:?}", r);
     };

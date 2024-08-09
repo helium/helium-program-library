@@ -101,6 +101,11 @@ export const estimateComputeUnits = async (
     return estimateComputeUnits(connection, tx, retries - 1)
   }
 
+  // Default to 200k compute if it failed
+  if (sim.err) {
+    return Math.max(sim.unitsConsumed || 0, 200000)
+  }
+
   return sim.unitsConsumed
 };
 

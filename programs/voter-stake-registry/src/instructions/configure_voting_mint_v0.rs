@@ -85,7 +85,7 @@ pub struct ConfigureVotingMintArgsV0 {
 /// unit of vote weight. If the supplies were significantly lower, you could use
 ///    * A with digit_shift=3, baseline_vote_weight_scaled_factor=2e9, max_extra_lockup_vote_weight_scaled_factor=0
 ///    * B with digit_shift=0, baseline_vote_weight_scaled_factor=1e9, max_extra_lockup_vote_weight_scaled_factor=1e9
-/// to not lose precision on B tokens.
+///      to not lose precision on B tokens.
 ///
 pub fn handler(ctx: Context<ConfigureVotingMintV0>, args: ConfigureVotingMintArgsV0) -> Result<()> {
   let ConfigureVotingMintArgsV0 {
