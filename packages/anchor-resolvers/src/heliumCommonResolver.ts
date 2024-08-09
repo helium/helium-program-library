@@ -28,6 +28,8 @@ export const heliumCommonResolver = resolveIndividual(async ({ path }) => {
       return new PublicKey("1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w");
     case "noEmitProgram":
       return new PublicKey("noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv");
+    case "heliumEntityManagerProgram":
+      return new PublicKey("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8");
     default:
       return;
   }
