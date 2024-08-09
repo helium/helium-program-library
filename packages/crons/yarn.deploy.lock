@@ -206,7 +206,7 @@ __metadata:
     "@helium/proposal-sdk": ^0.0.8
     "@helium/rewards-oracle-sdk": ^0.9.2
     "@helium/spl-utils": ^0.9.2
-    "@helium/state-controller-sdk": 0.0.8-next.22+7098baa
+    "@helium/state-controller-sdk": 0.0.8-next.39+d213e1d
     "@helium/treasury-management-sdk": ^0.9.2
     "@helium/voter-stake-registry-sdk": ^0.9.2
     "@solana/spl-token": ^0.3.8
@@ -385,7 +385,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/modular-governance-idls@npm:^0.0.8, @helium/modular-governance-idls@npm:^0.0.8-next.22+7098baa":
+"@helium/modular-governance-idls@npm:^0.0.8, @helium/modular-governance-idls@npm:^0.0.8-next.39+d213e1d":
   version: 0.0.8
   resolution: "@helium/modular-governance-idls@npm:0.0.8"
   dependencies:
@@ -395,15 +395,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/nft-proxy-sdk@npm:0.0.8-next.22+7098baa":
-  version: 0.0.8-next.19
-  resolution: "@helium/nft-proxy-sdk@npm:0.0.8-next.19"
+"@helium/nft-proxy-sdk@npm:0.0.8-next.39+d213e1d":
+  version: 0.0.8-next.39
+  resolution: "@helium/nft-proxy-sdk@npm:0.0.8-next.39"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.2.17
-    "@helium/modular-governance-idls": ^0.0.8-next.22+7098baa
+    "@helium/modular-governance-idls": ^0.0.8-next.39+d213e1d
     "@solana/spl-token": ^0.3.8
-  checksum: f5c6d9348cfebb8dd2d8fd997c365b5656afa7a6683592e1ed6b0bf04f73f231265a770c96022c930d32c686f57dbf56a0b7790c9d025413c80de30f07f1e587
+  checksum: bdb16423da6a52581317e191f61db35ae2d4642620ba8c99bc5a454bae052ce89fcd0bb0a45c3625c2d7ab8497e62fbfb5e31b704840ab7a5b177b93f3e6356c
   languageName: node
   linkType: hard
 
@@ -499,14 +499,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/state-controller-sdk@npm:0.0.8-next.22+7098baa":
-  version: 0.0.8-next.19
-  resolution: "@helium/state-controller-sdk@npm:0.0.8-next.19"
+"@helium/state-controller-sdk@npm:0.0.8-next.39+d213e1d":
+  version: 0.0.8-next.39
+  resolution: "@helium/state-controller-sdk@npm:0.0.8-next.39"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.5.0
-    "@helium/modular-governance-idls": ^0.0.8-next.22+7098baa
-  checksum: 51ac8d1151e7b02843e4ad437d7a20af03678198e67971698870ad1399f83ee976245df915998e9411310dc31d55f26ea7bc25f7235f20a20d573e0ff560a964
+    "@helium/modular-governance-idls": ^0.0.8-next.39+d213e1d
+  checksum: 76f09b7f934035351d96025195af61ea618a733f289513d72a4c0f659925b6da64add870e0681e4916f4b7038dcde5f825587eb6eedc327329e04cfe76f17f82
   languageName: node
   linkType: hard
 
@@ -534,7 +534,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.9.2
     "@helium/idls": ^0.9.2
-    "@helium/nft-proxy-sdk": 0.0.8-next.22+7098baa
+    "@helium/nft-proxy-sdk": 0.0.8-next.39+d213e1d
     "@helium/spl-utils": ^0.9.2
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
