@@ -34,7 +34,7 @@
     "@coral-xyz/anchor": "^0.28.0",
     "@helium/anchor-resolvers": "^0.9.4",
     "@helium/idls": "^0.9.4",
-    "@helium/nft-proxy-sdk": "0.0.8-next.39+d213e1d",
+    "@helium/nft-proxy-sdk": "^0.0.12",
     "@helium/spl-utils": "^0.9.4",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-token": "^0.3.8",
