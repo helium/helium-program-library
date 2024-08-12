@@ -146,7 +146,9 @@ async function getSolanaUnixTimestamp(
           assignment,
         ],
       }),
-      {}
+      {} as {
+        [key: string]: (typeof proxyAssignments)[0][];
+      }
     );
 
     const multiDimArray: TransactionInstruction[][] = await Promise.all(

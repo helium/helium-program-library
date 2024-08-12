@@ -1,21 +1,27 @@
 {
   "compilerOptions": {
-    "lib": ["ES2021"],
-    "target": "ESNext",
+    "target": "ES2016",
     "module": "CommonJS",
-    "moduleResolution": "Node",
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "noImplicitAny": false,
-    "noEmitOnError": true,
-    "resolveJsonModule": true,
-    "strict": true,
-    "stripInternal": true,
-    "skipLibCheck": true,
-    "noEmit": false,
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
     "allowSyntheticDefaultImports": true,
-    "allowJs": true,
-    "outDir": "lib/src"
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "composite": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": false,
+    "moduleResolution": "Node",
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "typeRoots": ["node_modules/@types"],
+    "strict": true,
+    "paths": {
+      "@/*": ["*"]
+    },
+    "outDir": "lib",
   },
-  "include": ["src"]
+  "include": ["src"],
 }
