@@ -194,7 +194,8 @@ export const integrityCheckProgramAccounts = async ({
     for (const correction of corrections) {
       // @ts-ignore
       fastify.customMetrics.integrityCheckCounter.inc();
-      console.log(`IntegrityCheckCorrection:`, correction);
+      console.log("IntegrityCheckCorrection:");
+      console.dir(correction, { depth: null });
     }
   } catch (err) {
     await t.rollback();
