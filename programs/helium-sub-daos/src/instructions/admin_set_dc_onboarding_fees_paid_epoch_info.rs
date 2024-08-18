@@ -18,6 +18,7 @@ pub struct AdminSetDcOnboardingFeesPaidEpochInfo<'info> {
   )]
   pub sub_dao: Account<'info, SubDaoV0>,
   #[account(
+    mut,
     has_one = sub_dao
   )]
   pub sub_dao_epoch_info: Account<'info, SubDaoEpochInfoV0>,
