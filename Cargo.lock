@@ -1961,7 +1961,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
