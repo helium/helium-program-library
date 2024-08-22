@@ -14,6 +14,8 @@ pub struct CarrierV0 {
   pub collection_bump_seed: u8,
   pub bump_seed: u8,
   pub hexboost_authority: Pubkey,
+  // The percentage of the SP rewards that are allocated to the incentive fund, in basis points
+  pub incentive_escrow_fund_bps: u16,
 }
 
 #[macro_export]

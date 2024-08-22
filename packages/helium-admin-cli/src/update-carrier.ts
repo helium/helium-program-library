@@ -56,6 +56,10 @@ export async function run(args: any = process.argv) {
       describe: "DNT mint of the subdao to approve on",
       default: MOBILE_MINT.toBase58(),
     },
+    incentiveEscrowFundBps: {
+      type: "number",
+      describe: "The new incentive escrow fund bps to set",
+    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -85,6 +89,7 @@ export async function run(args: any = process.argv) {
         updateAuthority: argv.updateAuthority
           ? new PublicKey(argv.updateAuthority)
           : null,
+        incentiveEscrowFundBps: typeof argv.incentiveEscrowFundBps === "number" ? argv.incentiveEscrowFundBps : null,
       })
       .accounts({
         carrier,
