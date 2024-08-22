@@ -81,6 +81,11 @@ export async function run(args: any = process.argv) {
       describe: "Base path for merkle keypair",
       default: path.join(__dirname, "..", "..", "keypairs"),
     },
+    incentiveEscrowFundBps: {
+      type: "number",
+      describe: "The percentage of the SP rewards that are allocated to the incentive fund, in basis points",
+      required: true,
+    },
   });
 
   const argv = await yarg.argv;
@@ -146,6 +151,7 @@ export async function run(args: any = process.argv) {
           updateAuthority: issuingAuthority,
           hexboostAuthority: issuingAuthority,
           metadataUrl: argv.metadataUrl,
+          incentiveEscrowFundBps: argv.incentiveEscrowFundBps,
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),

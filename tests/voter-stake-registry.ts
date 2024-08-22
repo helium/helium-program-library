@@ -296,18 +296,20 @@ describe("voter-stake-registry", () => {
     let name: string;
     beforeEach(async () => {
       name = random();
-      ({
-        pubkeys: { proposalConfig },
+      const {
+        pubkeys: { proposalConfig: proposalConfigK },
       } = await proposalProgram.methods
         .initializeProposalConfigV0({
           name,
           voteController: registrar,
           stateController: me,
           onVoteHook: PublicKey.default,
+          authority: me,
         })
-        .rpcAndKeys());
-      ({
-        pubkeys: { proposal },
+        .rpcAndKeys();
+      proposalConfig = proposalConfigK as PublicKey;
+      const {
+        pubkeys: { proposal: proposalK },
       } = await proposalProgram.methods
         .initializeProposalV0({
           seed: Buffer.from(name, "utf-8"),
@@ -327,7 +329,8 @@ describe("voter-stake-registry", () => {
           tags: ["test", "tags"],
         })
         .accounts({ proposalConfig })
-        .rpcAndKeys());
+        .rpcAndKeys();
+      proposal = proposalK as PublicKey;
 
       await proposalProgram.methods
         .updateStateV0({
