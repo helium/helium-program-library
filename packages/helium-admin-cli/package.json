@@ -50,7 +50,7 @@
     "@helium/iot-routing-manager-sdk": "^0.9.2",
     "@helium/lazy-distributor-sdk": "^0.9.2",
     "@helium/mobile-entity-manager-sdk": "^0.9.2",
-    "@helium/nft-proxy-sdk": "0.0.12",
+    "@helium/nft-proxy-sdk": "^0.0.12",
     "@helium/price-oracle-sdk": "^0.9.2",
     "@helium/spl-utils": "^0.9.2",
     "@helium/treasury-management-sdk": "^0.9.2",
