@@ -318,8 +318,8 @@ export async function run(args: any = process.argv) {
 
         const delegateSolAddr = toSolana(orgDelegate.delegate_pubkey);
         if (!delegateSolAddr) {
-          throw new Error(
-            `Delegate doesn't have a sol address ${orgDelegate.delegate_pubkey}`
+          console.log(
+            `Delegate doesn't have a sol address, skipping delegate: ${orgDelegate.delegate_pubkey} oui: ${orgDelegate.oui}`
           );
         }
 
