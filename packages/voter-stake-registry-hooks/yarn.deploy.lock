@@ -276,12 +276,12 @@ __metadata:
   linkType: hard
 
 "@helium/modular-governance-idls@npm:0.0.8-next.22+7098baa":
-  version: 0.0.8-next.19
-  resolution: "@helium/modular-governance-idls@npm:0.0.8-next.19"
+  version: 0.0.8-next.22
+  resolution: "@helium/modular-governance-idls@npm:0.0.8-next.22"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@solana/web3.js": ^1.78.4
-  checksum: 109d5ceca42944851485274cb231d4a01c075eea6ce67ab0128a751ec112018ec5d681f7c4a79633d49b1b3da3b1312a7b6a79ddd9d8dbe7f2fba1f333a56002
+  checksum: 2e3f7e9577dd759e36c3c0b6d3f1ad7824b285b536c1a6bca6186fe7b997a1c8ada786ecbc7d7c8de9e7caa1f21f34f0308702fbd5bcf033b3b095294ce10587
   languageName: node
   linkType: hard
 
@@ -296,14 +296,14 @@ __metadata:
   linkType: hard
 
 "@helium/nft-proxy-sdk@npm:0.0.8-next.22+7098baa":
-  version: 0.0.8-next.19
-  resolution: "@helium/nft-proxy-sdk@npm:0.0.8-next.19"
+  version: 0.0.8-next.22
+  resolution: "@helium/nft-proxy-sdk@npm:0.0.8-next.22"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.2.17
     "@helium/modular-governance-idls": ^0.0.8-next.22+7098baa
     "@solana/spl-token": ^0.3.8
-  checksum: f5c6d9348cfebb8dd2d8fd997c365b5656afa7a6683592e1ed6b0bf04f73f231265a770c96022c930d32c686f57dbf56a0b7790c9d025413c80de30f07f1e587
+  checksum: 136d2e636da28fbb90335d42b995ed090f51a80236873f803fbe170de8493f353e5015508decf9685849d9c998b351fdadace6ffbd68361e2a81d8dce3392a97
   languageName: node
   linkType: hard
 
@@ -784,21 +784,21 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tanstack/query-core@npm:5.45.0":
-  version: 5.45.0
-  resolution: "@tanstack/query-core@npm:5.45.0"
-  checksum: a3c13d90cfa12955d22fa754ebfddbea70081fc0128111083269bdd78ed0d25678f050007b753164a929a00fdef9ee5ebba945deb8e360120ae3cbae06e655a5
+"@tanstack/query-core@npm:5.52.0":
+  version: 5.52.0
+  resolution: "@tanstack/query-core@npm:5.52.0"
+  checksum: 1e142995fa9b0eec88009dd1083cd226eaec9125dc668b6485699639f45edb1386e4acd634e0eddc33d3a29e0c9636302824c42ac8c4106935d776fdc41d2638
   languageName: node
   linkType: hard
 
 "@tanstack/react-query@npm:^5.45.0":
-  version: 5.45.0
-  resolution: "@tanstack/react-query@npm:5.45.0"
+  version: 5.52.1
+  resolution: "@tanstack/react-query@npm:5.52.1"
   dependencies:
-    "@tanstack/query-core": 5.45.0
+    "@tanstack/query-core": 5.52.0
   peerDependencies:
-    react: ^18.0.0
-  checksum: 3f2896e132e2fc4f5a2b77e015719cd8f74a3b5ce958d3d2ffc83cc9bd8a1a265ed54835a8751daf00b85af7bf15f8ad1a9fe123dafdfdfe3e81f17e585d0e95
+    react: ^18 || ^19
+  checksum: f46bf1f85cc03b8329aee5d8a5a96b4e30dc88aff04d5256ebd0efefe1f507720b42a4be4a9bee340d3ade6cf0ae7b59187de90d87ea973c0f67e3764f76260c
   languageName: node
   linkType: hard
 
