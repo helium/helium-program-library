@@ -84,7 +84,8 @@ pub fn send_and_confirm_messages_with_spinner<
     // Periodically re-send all pending transactions
     if Instant::now().duration_since(last_resend) > TRANSACTION_RESEND_INTERVAL {
       for (index, (_i, transaction, deser)) in pending_transactions.values().enumerate() {
-        if !tpu_client.send_wire_transaction(transaction.clone()) {
+        // Disabling TPU client because it doesn't work with SWQoS
+        // if !tpu_client.send_wire_transaction(transaction.clone()) {
           if let Err(err) = rpc_client.send_transaction_with_config(
             deser,
             RpcSendTransactionConfig {
@@ -99,7 +100,7 @@ pub fn send_and_confirm_messages_with_spinner<
               deser.signatures[0], err
             ));
           }
-        }
+        // }
         set_message_for_confirmed_transactions(
           &progress_bar,
           confirmed_transactions,
@@ -199,7 +200,7 @@ fn set_message_for_confirmed_transactions(
 }
 
 const MAX_TX_LEN: usize = 1232;
-const MAX_BLOCKHASH_RETRIES: usize = 10;
+const MAX_BLOCKHASH_RETRIES: usize = 50;
 
 pub fn construct_and_send_txs<
   P: ConnectionPool<NewConnectionConfig = C>,
@@ -211,6 +212,7 @@ pub fn construct_and_send_txs<
   ixs: Vec<Instruction>,
   payer: &Keypair,
   dry_run: bool,
+  compute_units: u32,
 ) -> Result<(), anyhow::Error> {
   if ixs.is_empty() {
     return Ok(());
@@ -226,9 +228,9 @@ pub fn construct_and_send_txs<
     })
     .unwrap_or(1);
   let mut instructions = vec![
-    ComputeBudgetInstruction::set_compute_unit_limit(600000),
+    ComputeBudgetInstruction::set_compute_unit_limit(compute_units),
     ComputeBudgetInstruction::set_compute_unit_price(
-      (f64::from(priority_fee_lamports) / (600000_f64 * 0.000001_f64)).ceil() as u64,
+      (f64::from(priority_fee_lamports) / (compute_units as f64 * 0.000001_f64)).ceil() as u64,
     ),
   ];
   let mut ix_groups = Vec::new();
@@ -248,9 +250,9 @@ pub fn construct_and_send_txs<
 
       // clear instructions except for last one
       instructions = vec![
-        ComputeBudgetInstruction::set_compute_unit_limit(600000),
+        ComputeBudgetInstruction::set_compute_unit_limit(compute_units),
         ComputeBudgetInstruction::set_compute_unit_price(
-          (f64::from(priority_fee_lamports) / (600000_f64 * 0.000001_f64)).ceil() as u64,
+          (f64::from(priority_fee_lamports) / (compute_units as f64 * 0.000001_f64)).ceil() as u64,
         ),
         ix.clone(),
       ];
@@ -320,6 +322,10 @@ pub fn construct_and_send_txs<
         }
 
         retries += 1;
+      }
+
+      if retries >= MAX_BLOCKHASH_RETRIES {
+        return Err(anyhow!("Failed to send transactions"));
       }
     }
   }

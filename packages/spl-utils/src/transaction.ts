@@ -782,6 +782,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     addressLookupTableAddresses,
     computeScaleUp,
     extraSigners = [],
+    useFirstEstimateForAll = false,
   }: {
     // Manually specify limit instead of simulating
     computeUnitLimit?: number;
@@ -790,6 +791,9 @@ export async function batchInstructionsToTxsWithPriorityFee(
     basePriorityFee?: number;
     addressLookupTableAddresses?: PublicKey[];
     extraSigners?: Signer[];
+    // Instead of populating priority fee and compute per tx, just use the same prio fee and compute
+    // for all txs. Only use this if all instructions are roughly the same.
+    useFirstEstimateForAll?: boolean;
   } = {}
 ): Promise<TransactionDraft[]> {
   let currentTxInstructions: TransactionInstruction[] = [];
@@ -800,6 +804,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     addressLookupTableAddresses || []
   );
 
+  let firstTxComputeAndPrio: TransactionInstruction[] | null = null;
   for (const instruction of instructions) {
     const instrArr = Array.isArray(instruction) ? instruction : [instruction];
     const prevLen = currentTxInstructions.length;
@@ -828,8 +833,15 @@ export async function batchInstructionsToTxsWithPriorityFee(
       if (e.toString().includes("encoding overruns Uint8Array")) {
         currentTxInstructions = currentTxInstructions.slice(0, prevLen);
         if (currentTxInstructions.length > 0) {
-          transactions.push({
-            instructions: await withPriorityFees({
+          // If we've already estimated the compute and priority fee for the first tx, we can use that for
+          // all txs. Otherwise, we estimate it for each tx individually.
+          // Only do this optimization if `useFirstEstimateForAll` is set. This is necessary for
+          // large sets of txs to avoid spamming the rpc.
+          let ixs: TransactionInstruction[] = [];
+          if (firstTxComputeAndPrio) {
+            ixs = [...firstTxComputeAndPrio, ...currentTxInstructions];
+          } else {
+            ixs = await withPriorityFees({
               connection: provider.connection,
               instructions: currentTxInstructions,
               computeUnits: computeUnitLimit,
@@ -837,7 +849,14 @@ export async function batchInstructionsToTxsWithPriorityFee(
               basePriorityFee,
               addressLookupTables,
               feePayer: provider.wallet.publicKey,
-            }),
+            });
+            if (useFirstEstimateForAll) {
+              firstTxComputeAndPrio = ixs.slice(0, 2);
+            }
+          }
+
+          transactions.push({
+            instructions: ixs,
             addressLookupTableAddresses: addressLookupTableAddresses || [],
             feePayer: provider.wallet.publicKey,
             recentBlockhash: blockhash,

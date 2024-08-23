@@ -35,6 +35,7 @@ static_assertions = "1.1"
 mpl-token-metadata = { workspace = true }
 itertools = "0.10.2"
 proposal = { path = "../../utils/proposal" }
+nft-proxy = { path = "../../utils/nft-proxy" }
 shared-utils = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }

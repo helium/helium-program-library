@@ -8,12 +8,15 @@ import { AnchorProvider } from "@coral-xyz/anchor";
 import { getAccount } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { init } from ".";
-import { voterWeightRecordKey } from "./pdas";
+import { voteMarkerKey, voterWeightRecordKey } from "./pdas";
+import { proxyAssignmentKey, nftProxyResolvers } from "@helium/nft-proxy-sdk";
+
 export * from "./constants";
 export * from "./pdas";
 export * from "./resolvers";
 
 export const vsrResolvers = combineResolvers(
+  nftProxyResolvers,
   heliumCommonResolver,
   ataResolver({
     instruction: "initializeRegistrarV0",
@@ -103,13 +106,39 @@ export const vsrResolvers = combineResolvers(
     mint: "mint",
     owner: "voter",
   }),
-  resolveIndividual(async ({ accounts, path, provider }) => {
-    if (path[path.length - 1] === "proposalProgram")  {
+  resolveIndividual(async ({ accounts, path, provider, programId, idlIx }) => {
+    if (path[path.length - 1] === "proposalProgram") {
       return new PublicKey("propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs");
     } else if (path[path.length - 1] === "recipient") {
       // @ts-ignore
       return provider.wallet.publicKey;
+    } else if (
+      path[path.length - 1] == "marker" &&
+      idlIx.name === "proxiedVoteV0" &&
+      accounts.position
+    ) {
+      const program = await init(provider as any, programId);
+      const position = await program.account.positionV0.fetch(
+        accounts.position as PublicKey
+      );
+      return voteMarkerKey(position.mint, accounts.proposal as PublicKey)[0];
+    } else if (
+      path[path.length - 1] == "proxyAssignment" &&
+      accounts.registrar &&
+      accounts.voter &&
+      accounts.mint
+    ) {
+      const program = await init(provider as any, programId);
+      const registrar = await program.account.registrar.fetch(
+        accounts.registrar as PublicKey
+      );
+      return proxyAssignmentKey(
+        registrar.proxyConfig,
+        accounts.mint as PublicKey,
+        accounts.voter as PublicKey
+      )[0];
     }
+
     if (path[path.length - 1] === "solDestination") {
       // @ts-ignore
       return provider.wallet.publicKey;

@@ -1,6 +1,6 @@
 use crate::{position_seeds, state::*};
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Burn, Mint, ThawAccount, Token, TokenAccount};
+use anchor_spl::token::{self, Burn, CloseAccount, Mint, ThawAccount, Token, TokenAccount};
 use shared_utils::token_metadata::Metadata;
 
 #[derive(Accounts)]
@@ -62,5 +62,15 @@ pub fn handler(ctx: Context<ClosePositionV0>) -> Result<()> {
     ),
     1,
   )?;
+
+  token::close_account(CpiContext::new(
+    ctx.accounts.token_program.to_account_info(),
+    CloseAccount {
+      account: ctx.accounts.position_token_account.to_account_info(),
+      destination: ctx.accounts.sol_destination.to_account_info(),
+      authority: ctx.accounts.position_authority.to_account_info(),
+    },
+  ))?;
+
   Ok(())
 }

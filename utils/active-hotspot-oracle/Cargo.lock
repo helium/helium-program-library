@@ -15,7 +15,7 @@ dependencies = [
 [[package]]
 name = "account-compression-cpi"
 version = "0.1.2"
-source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=a2d12e4a157d91feb73aa40a97fe297fd477dd87#a2d12e4a157d91feb73aa40a97fe297fd477dd87"
+source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=a499196#a499196fd0f57227dce46c59d6f5a92d0a46ea84"
 dependencies = [
  "anchor-gen",
  "anchor-lang",
@@ -49,7 +49,7 @@ dependencies = [
  "solana-connection-cache",
  "solana-sdk",
  "spl-associated-token-account 2.2.0",
- "spl-token 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spl-token 4.0.0",
  "tokio",
  "warp",
 ]
@@ -161,7 +161,7 @@ checksum = "faa5be5b72abea167f87c868379ba3c2be356bfca9e6f474fd055fa0f7eeb4f2"
 dependencies = [
  "anchor-syn 0.28.0",
  "anyhow",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "regex",
  "syn 1.0.109",
@@ -176,7 +176,7 @@ dependencies = [
  "anchor-syn 0.28.0",
  "anyhow",
  "bs58 0.5.0",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "rustversion",
  "syn 1.0.109",
@@ -189,7 +189,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59948e7f9ef8144c2aefb3f32a40c5fce2798baeec765ba038389e82301017ef"
 dependencies = [
  "anchor-syn 0.28.0",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "syn 1.0.109",
 ]
 
@@ -200,7 +200,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc753c9d1c7981cb8948cf7e162fb0f64558999c0413058e2d43df1df5448086"
 dependencies = [
  "anchor-syn 0.28.0",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -213,7 +213,7 @@ checksum = "f38b4e172ba1b52078f53fdc9f11e3dc0668ad27997838a0aad2d148afac8c97"
 dependencies = [
  "anchor-syn 0.28.0",
  "anyhow",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -226,7 +226,7 @@ checksum = "4eebd21543606ab61e2d83d9da37d24d3886a49f390f9c43a1964735e8c0f0d5"
 dependencies = [
  "anchor-syn 0.28.0",
  "anyhow",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -258,7 +258,7 @@ checksum = "ec4720d899b3686396cced9508f23dab420f1308344456ec78ef76f98fda42af"
 dependencies = [
  "anchor-syn 0.28.0",
  "anyhow",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -269,7 +269,7 @@ version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f495e85480bd96ddeb77b71d499247c7d4e8b501e75ecb234e9ef7ae7bd6552a"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -310,7 +310,7 @@ dependencies = [
  "anchor-syn 0.24.2",
  "darling 0.14.4",
  "heck 0.4.1",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "serde_json",
  "syn 1.0.109",
@@ -362,7 +362,7 @@ dependencies = [
  "anyhow",
  "bs58 0.3.1",
  "heck 0.3.3",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "proc-macro2-diagnostics",
  "quote 1.0.33",
  "serde",
@@ -381,7 +381,7 @@ dependencies = [
  "anyhow",
  "bs58 0.5.0",
  "heck 0.3.3",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "serde",
  "serde_json",
@@ -543,7 +543,7 @@ checksum = "7abe79b0e4288889c4574159ab790824d0033b9fdcb2a112a3182fac2e514565"
 dependencies = [
  "num-bigint 0.4.4",
  "num-traits",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -579,7 +579,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae3281bc6d0fd7e549af32b52511e1302185bd688fd3359fa36423346ff682ea"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -850,7 +850,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "726535892e8eae7e70657b4c8ea93d26b8553afb1ce617caee529ef96d7dee6c"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
  "synstructure",
@@ -862,7 +862,7 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2777730b2039ac0f95f093556e61b6d26cebed5393ca6f152717777cec3a42ed"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -931,7 +931,7 @@ version = "0.1.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc00ceb34980c03614e35a3a4e218276a0a824e911d07651cd0d858a51e8c0f0"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -1435,7 +1435,7 @@ dependencies = [
  "borsh-derive-internal 0.9.3",
  "borsh-schema-derive-internal 0.9.3",
  "proc-macro-crate 0.1.5",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "syn 1.0.109",
 ]
 
@@ -1448,7 +1448,7 @@ dependencies = [
  "borsh-derive-internal 0.10.3",
  "borsh-schema-derive-internal 0.10.3",
  "proc-macro-crate 0.1.5",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "syn 1.0.109",
 ]
 
@@ -1458,7 +1458,7 @@ version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5449c28a7b352f2d1e592a8a28bf139bc71afb0764a14f3c02500935d8c44065"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -1469,7 +1469,7 @@ version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "afb438156919598d2c7bad7e1c0adf3d26ed3840dbc010db1a882a65583ca2fb"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -1480,7 +1480,7 @@ version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdbd5696d8bfa21d53d9fe39a714a18538bad11492a42d066dbbc395fb1951c0"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -1491,7 +1491,7 @@ version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "634205cc43f74a1b9046ef87c4540ebda95696ec0f315024860cad7c5b0f5ccd"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -1541,7 +1541,7 @@ dependencies = [
 [[package]]
 name = "bubblegum-cpi"
 version = "0.9.2"
-source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=a2d12e4a157d91feb73aa40a97fe297fd477dd87#a2d12e4a157d91feb73aa40a97fe297fd477dd87"
+source = "git+https://github.com/helium/account-compression-anchor-gen.git?rev=a499196#a499196fd0f57227dce46c59d6f5a92d0a46ea84"
 dependencies = [
  "anchor-gen",
  "anchor-lang",
@@ -1579,7 +1579,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "965ab7eb5f8f97d2a083c799f3a1b994fc397b2fe2da5d1da1626ce15a39f2b1"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -1702,7 +1702,7 @@ dependencies = [
 [[package]]
 name = "circuit-breaker"
 version = "0.1.0"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#4a067988b33c0607a37963f9607a205a73fbd0dd"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1771,7 +1771,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0862016ff20d69b84ef8247369fabf5c008a7417002411897d40ee1f4532b873"
 dependencies = [
  "heck 0.4.1",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -2091,7 +2091,7 @@ checksum = "109c1ca6e6b7f82cc233a97004ea8ed7ca123a9af07a8230878fcfda9b158bf0"
 dependencies = [
  "fnv",
  "ident_case",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "strsim 0.10.0",
  "syn 1.0.109",
@@ -2105,7 +2105,7 @@ checksum = "177e3443818124b357d8e76f53be906d60937f0d3a90773a664fa63fa253e621"
 dependencies = [
  "fnv",
  "ident_case",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "strsim 0.10.0",
  "syn 2.0.37",
@@ -2148,8 +2148,8 @@ dependencies = [
 
 [[package]]
 name = "data-credits"
-version = "0.2.1"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
+version = "0.2.2"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#4a067988b33c0607a37963f9607a205a73fbd0dd"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2157,7 +2157,7 @@ dependencies = [
  "default-env",
  "helium-sub-daos",
  "lazy-transactions",
- "pyth-sdk-solana",
+ "pyth-solana-receiver-sdk",
  "solana-security-txt",
 ]
 
@@ -2443,10 +2443,11 @@ dependencies = [
 
 [[package]]
 name = "deranged"
-version = "0.3.8"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2696e8a945f658fd14dc3b87242e6b80cd0f36ff04ea560fa39082368847946"
+checksum = "b42b6fa04a440b495c8b04d0e71b707c585f83cb9cb28cf8cd0d976c315e31b4"
 dependencies = [
+ "powerfmt",
  "serde",
 ]
 
@@ -2462,7 +2463,7 @@ version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -2546,7 +2547,7 @@ version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "487585f4d0c6655fe74905e2504d8ad6908e4db67f744eb140876906c2f3175d"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -2585,12 +2586,6 @@ name = "doc-comment"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
-
-[[package]]
-name = "dyn-clone"
-version = "1.0.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23d2f3407d9a573d666de4b5bdf10569d73ca9478087346697dcbae6244bfbcd"
 
 [[package]]
 name = "dynamodb_lock"
@@ -2685,7 +2680,7 @@ version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eecf8589574ce9b895052fa12d69af7a233f99e6107f5cb8dd1044f2a17bfdcb"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -2735,6 +2730,15 @@ name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
+
+[[package]]
+name = "fast-math"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2465292146cdfc2011350fe3b1c616ac83cf0faeedb33463ba1c332ed8948d66"
+dependencies = [
+ "ieee754",
+]
 
 [[package]]
 name = "fastrand"
@@ -2867,7 +2871,7 @@ version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89ca545a94061b6365f2c7355b4b32bd20df3ff95f02da9329b34ccc3bd6ee72"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -3085,8 +3089,8 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.2.4"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
+version = "0.2.7"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#4a067988b33c0607a37963f9607a205a73fbd0dd"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -3100,15 +3104,15 @@ dependencies = [
  "helium-sub-daos",
  "mpl-token-metadata",
  "no-emit",
- "pyth-sdk-solana",
+ "pyth-solana-receiver-sdk",
  "shared-utils",
  "solana-security-txt",
 ]
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.1.4"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
+version = "0.1.6"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#4a067988b33c0607a37963f9607a205a73fbd0dd"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3117,7 +3121,6 @@ dependencies = [
  "mpl-token-metadata",
  "shared-utils",
  "solana-security-txt",
- "spl-governance-tools",
  "time",
  "treasury-management",
  "voter-stake-registry",
@@ -3196,7 +3199,7 @@ dependencies = [
 [[package]]
 name = "hpl-utils"
 version = "0.1.0"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#4a067988b33c0607a37963f9607a205a73fbd0dd"
 dependencies = [
  "anyhow",
  "bincode",
@@ -3214,6 +3217,7 @@ dependencies = [
  "solana-sdk",
  "spl-associated-token-account 2.2.0",
  "thiserror",
+ "time",
  "warp",
 ]
 
@@ -3380,6 +3384,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ieee754"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9007da9cacbd3e6343da136e98b0d2df013f553d35bdec8b518f07bea768e19c"
+
+[[package]]
 name = "im"
 version = "15.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3509,7 +3519,7 @@ dependencies = [
 [[package]]
 name = "lazy-transactions"
 version = "0.2.0"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#4a067988b33c0607a37963f9607a205a73fbd0dd"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3715,7 +3725,7 @@ version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f1b8c13cb1f814b634a96b2c725449fe7ed464a7b8781de8688be5ffbd3f305"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -3893,6 +3903,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nft-proxy"
+version = "0.0.2"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#4a067988b33c0607a37963f9607a205a73fbd0dd"
+dependencies = [
+ "anchor-gen",
+ "anchor-lang",
+]
+
+[[package]]
 name = "nix"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3908,7 +3927,7 @@ dependencies = [
 [[package]]
 name = "no-emit"
 version = "0.0.1"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#4a067988b33c0607a37963f9607a205a73fbd0dd"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3998,12 +4017,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-conv"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51d515d32fb182ee37cda2ccdcb92950d6a3c2893aa280e540671c2cd0f3b1d9"
+
+[[package]]
 name = "num-derive"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "876a53fff98e03a936a674b29568b0e605f06b29372c2489ff4de23f1949743d"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -4014,7 +4039,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e6a0fd4f737c707bd9086cc16c925f294943eb62eb71499e9fd4cf71f8b9f4e"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -4118,7 +4143,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcbff9bc912032c62bf65ef1d5aea88983b420f4f839db1e9b0c281a25c9c799"
 dependencies = [
  "proc-macro-crate 1.3.1",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -4130,7 +4155,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96667db765a921f7b295ffee8b60472b686a51d4f21c2ee4ffdb94c7013b65a6"
 dependencies = [
  "proc-macro-crate 1.3.1",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -4142,7 +4167,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56ea360eafe1022f7cc56cd7b869ed57330fb2453d0c7831d99b74c65d2f5597"
 dependencies = [
  "proc-macro-crate 1.3.1",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -4234,7 +4259,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a948666b637a0f465e8564c73e89d4dde00d72d4d473cc972f390fc3dcee7d9c"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -4465,7 +4490,7 @@ version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4359fd9c9171ec6e8c62926d6faaf553a8dc3f64e1507e76da7911b4f6a04405"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -4524,6 +4549,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "31114a898e107c51bb1609ffaf55a0e011cf6a4d7f1170d0015a165082c0338b"
 
 [[package]]
+name = "powerfmt"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4565,9 +4596,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.67"
+version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d433d9f1a3e8c1263d9456598b16fec66f4acc9a74dacffd35c7bb09b3a1328"
+checksum = "e835ff2298f5721608eb1a980ecaee1aef2c132bf95ecc026a11b7bf3c01c02e"
 dependencies = [
  "unicode-ident",
 ]
@@ -4578,7 +4609,7 @@ version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4bf29726d67464d49fa6224a1d07936a8c08bb3fba727c7493f6cf1616fdaada"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
  "version_check",
@@ -4588,7 +4619,7 @@ dependencies = [
 [[package]]
 name = "proposal"
 version = "0.1.0"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#4a067988b33c0607a37963f9607a205a73fbd0dd"
 dependencies = [
  "anchor-gen",
  "anchor-lang",
@@ -4612,38 +4643,41 @@ checksum = "e5d2d8d10f3c6ded6da8b05b5fb3b8a5082514344d56c9f871412d29b4e075b4"
 dependencies = [
  "anyhow",
  "itertools",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
 
 [[package]]
-name = "pyth-sdk"
-version = "0.8.0"
+name = "pyth-solana-receiver-sdk"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e7aeef4d5f0a9c98ff5af2ddd84a8b89919c512188305b497a9eb9afa97a949"
+checksum = "1b7854c4176470c8d86de301dc5b57ac84227dabb9527328b585fc332962d60b"
 dependencies = [
- "borsh 0.10.3",
- "borsh-derive 0.10.3",
- "getrandom 0.2.10",
+ "anchor-lang",
  "hex",
- "schemars",
- "serde",
+ "pythnet-sdk",
+ "solana-program",
 ]
 
 [[package]]
-name = "pyth-sdk-solana"
-version = "0.8.0"
+name = "pythnet-sdk"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afa571ea6ea51102b8fc03303d0e6fea4f788f77bb4e0d65ae2d3c5e384e3187"
+checksum = "b4f81d23a693463366640d1ba14c612841b5b07adc56ee20bbf9acaca2ad86b5"
 dependencies = [
+ "anchor-lang",
+ "bincode",
  "borsh 0.10.3",
- "borsh-derive 0.10.3",
  "bytemuck",
- "num-derive 0.3.3",
- "num-traits",
- "pyth-sdk",
+ "byteorder",
+ "fast-math",
+ "hex",
+ "proc-macro2 1.0.79",
+ "rustc_version",
  "serde",
+ "sha3 0.10.8",
+ "slow_primes",
  "solana-program",
  "thiserror",
 ]
@@ -4742,7 +4776,7 @@ version = "1.0.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5267fca4496028628a95160fc423a33e8b2e6af8a5302579e322e4b520293cae"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
 ]
 
 [[package]]
@@ -5308,30 +5342,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "schemars"
-version = "0.8.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f7b0ce13155372a76ee2e1c5ffba1fe61ede73fbea5630d61eee6fac4929c0c"
-dependencies = [
- "dyn-clone",
- "schemars_derive",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "schemars_derive"
-version = "0.8.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e85e2a16b12bdb763244c69ab79363d71db2b4b918a2def53f80b02e0574b13c"
-dependencies = [
- "proc-macro2 1.0.67",
- "quote 1.0.33",
- "serde_derive_internals",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5358,7 +5368,7 @@ version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1db149f81d46d2deba7cd3c50772474707729550221e69588478ebf9ada425ae"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -5442,20 +5452,9 @@ version = "1.0.188"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4eca7ac642d82aa35b60049a6eccb4be6be75e599bd2e9adb5f875a737654af2"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
-]
-
-[[package]]
-name = "serde_derive_internals"
-version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85bf8229e7920a9f636479437026331ce11aa132b4dde37d121944a44d6e5f3c"
-dependencies = [
- "proc-macro2 1.0.67",
- "quote 1.0.33",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -5498,7 +5497,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "881b6f881b17d13214e5d494c939ebab463d01264ce1811e9d4ac3a882e7695f"
 dependencies = [
  "darling 0.20.3",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -5574,7 +5573,7 @@ dependencies = [
 [[package]]
 name = "shared-utils"
 version = "0.0.1"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#4a067988b33c0607a37963f9607a205a73fbd0dd"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -5637,6 +5636,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "slow_primes"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58267dd2fbaa6dceecba9e3e106d2d90a2b02497c0e8b01b8759beccf5113938"
+dependencies = [
+ "num 0.4.1",
+]
+
+[[package]]
 name = "smallvec"
 version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5670,7 +5678,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "990079665f075b699031e9c08fd3ab99be5029b96f3b78dc0709e8f77e4efebf"
 dependencies = [
  "heck 0.4.1",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -5871,7 +5879,7 @@ version = "1.16.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4dabde7fbd88a68eb083ae9d6d5f6855b7ba1bfc45d200c786b1b448ac49da5f"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "rustc_version",
  "syn 2.0.37",
@@ -6247,7 +6255,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "760fdfd4b7edb02fd9173a6dcec899ffae06ac21b66b65f8c7c5f3d17b12fa64"
 dependencies = [
  "bs58 0.4.0",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "rustversion",
  "syn 2.0.37",
@@ -6508,7 +6516,7 @@ dependencies = [
  "num-derive 0.4.0",
  "num-traits",
  "solana-program",
- "spl-token 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spl-token 4.0.0",
  "spl-token-2022 0.9.0",
  "thiserror",
 ]
@@ -6552,56 +6560,10 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21968d7da2f0a624c509f24580c3fee70b364a6886d90709e679e64f572eca2f"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "solana-program",
  "syn 2.0.37",
- "thiserror",
-]
-
-[[package]]
-name = "spl-governance"
-version = "3.1.1"
-source = "git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e#0377e6452fef0c84148e2d4de6bef08dac7ca16e"
-dependencies = [
- "arrayref",
- "bincode",
- "borsh 0.10.3",
- "num-derive 0.4.0",
- "num-traits",
- "serde",
- "serde_derive",
- "solana-program",
- "spl-governance-addin-api",
- "spl-governance-tools",
- "spl-token 4.0.0 (git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e)",
- "thiserror",
-]
-
-[[package]]
-name = "spl-governance-addin-api"
-version = "0.1.3"
-source = "git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e#0377e6452fef0c84148e2d4de6bef08dac7ca16e"
-dependencies = [
- "borsh 0.10.3",
- "solana-program",
- "spl-governance-tools",
-]
-
-[[package]]
-name = "spl-governance-tools"
-version = "0.1.3"
-source = "git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e#0377e6452fef0c84148e2d4de6bef08dac7ca16e"
-dependencies = [
- "arrayref",
- "bincode",
- "borsh 0.10.3",
- "num-derive 0.4.0",
- "num-traits",
- "serde",
- "serde_derive",
- "solana-program",
- "spl-token 4.0.0 (git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e)",
  "thiserror",
 ]
 
@@ -6655,7 +6617,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6709c5f41fefb730f2bd8464da741079cf0efd1d0f522e041224b98d431b9b3"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "solana-program",
  "syn 2.0.37",
@@ -6706,20 +6668,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "spl-token"
-version = "4.0.0"
-source = "git+https://github.com/solana-labs/solana-program-library.git?rev=0377e6452fef0c84148e2d4de6bef08dac7ca16e#0377e6452fef0c84148e2d4de6bef08dac7ca16e"
-dependencies = [
- "arrayref",
- "bytemuck",
- "num-derive 0.4.0",
- "num-traits",
- "num_enum 0.7.0",
- "solana-program",
- "thiserror",
-]
-
-[[package]]
 name = "spl-token-2022"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6752,7 +6700,7 @@ dependencies = [
  "solana-zk-token-sdk",
  "spl-memo 4.0.0",
  "spl-pod",
- "spl-token 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spl-token 4.0.0",
  "spl-token-metadata-interface",
  "spl-transfer-hook-interface",
  "spl-type-length-value",
@@ -6818,7 +6766,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55fe75cb4a364c7f7ae06c7dbbc8d84bddd85d6cdf9975963c3935bc1991761e"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
 ]
@@ -6854,7 +6802,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e385be0d24f186b4ce2f9982191e7101bb737312ad61c1f2f984f34bcf85d59"
 dependencies = [
  "heck 0.4.1",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "rustversion",
  "syn 1.0.109",
@@ -6883,7 +6831,7 @@ version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "unicode-ident",
 ]
@@ -6894,7 +6842,7 @@ version = "2.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7303ef2c05cd654186cb250d29049a24840ca25d2747c25c0381c8d9e2f582e8"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "unicode-ident",
 ]
@@ -6905,7 +6853,7 @@ version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f36bdaa60a83aca3921b5259d5400cbf5e90fc51931376a9bd4a0eb79aa7210f"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 1.0.109",
  "unicode-xid 0.2.4",
@@ -6963,7 +6911,7 @@ version = "1.0.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10712f02019e9288794769fba95cd6847df9874d49d871d062172f9dd41bc4cc"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -6981,12 +6929,14 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.29"
+version = "0.3.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "426f806f4089c493dcac0d24c29c01e2c38baf8e30f1b716ee37e83d200b18fe"
+checksum = "5dfd88e563464686c916c7e46e623e520ddc6d79fa6641390f2e3fa86e83e885"
 dependencies = [
  "deranged",
  "itoa",
+ "num-conv",
+ "powerfmt",
  "serde",
  "time-core",
  "time-macros",
@@ -7000,10 +6950,11 @@ checksum = "ef927ca75afb808a4d64dd374f00a2adf8d0fcff8e7b184af886c3c87ec4a3f3"
 
 [[package]]
 name = "time-macros"
-version = "0.2.15"
+version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ad70d68dba9e1f8aceda7aa6711965dfec1cac869f311a51bd08b3a2ccbce20"
+checksum = "3f252a68540fde3a3877aeea552b832b40ab9a69e318efd078774a01ddee1ccf"
 dependencies = [
+ "num-conv",
  "time-core",
 ]
 
@@ -7075,7 +7026,7 @@ version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "630bdcf245f78637c13ec01ffae6187cca34625e8c63150d424b59e55af2675e"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -7248,7 +7199,7 @@ version = "0.1.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f4f31f56159e98206da9efd823404b79b6ef3143b4a7ab76e67b1751b25a4ab"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -7265,7 +7216,7 @@ dependencies = [
 [[package]]
 name = "treasury-management"
 version = "0.2.0"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#4a067988b33c0607a37963f9607a205a73fbd0dd"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -7504,8 +7455,8 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.3.0"
-source = "git+https://github.com/helium/helium-program-library?branch=develop#5a409103df49b7592282a1aa1716ee5ae1fb46cd"
+version = "0.3.2"
+source = "git+https://github.com/helium/helium-program-library?branch=develop#4a067988b33c0607a37963f9607a205a73fbd0dd"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -7513,13 +7464,11 @@ dependencies = [
  "default-env",
  "itertools",
  "mpl-token-metadata",
+ "nft-proxy",
  "proposal",
  "shared-utils",
  "solana-program",
  "solana-security-txt",
- "spl-governance",
- "spl-governance-addin-api",
- "spl-governance-tools",
  "static_assertions",
 ]
 
@@ -7610,7 +7559,7 @@ dependencies = [
  "bumpalo",
  "log",
  "once_cell",
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
  "wasm-bindgen-shared",
@@ -7644,7 +7593,7 @@ version = "0.2.87"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54681b18a46765f095758388f2d0cf16eb8d4169b639ab575a8f5693af210c7b"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
  "wasm-bindgen-backend",
@@ -7990,7 +7939,7 @@ version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce36e65b0d2999d2aafac989fb249189a141aee1f53c612c1f37d72631959f69"
 dependencies = [
- "proc-macro2 1.0.67",
+ "proc-macro2 1.0.79",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
