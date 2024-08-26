@@ -144,8 +144,6 @@ if (!HELIUS_AUTH_SECRET) {
 
     try {
       if (!programId) throw new Error("program not provided");
-      console.log(`Integrity checking program: ${programId}`);
-
       if (configs) {
         const config = configs.find((c) => c.programId === programId);
         if (!config)
