@@ -1,7 +1,9 @@
-import { IPluginConfig } from '../types';
-import { ExtractHexLocationPlugin } from './extractHexLocation';
+import { IConfig, IInitedPlugin, IPluginConfig } from "../types";
+import { truthy } from "../utils/truthy";
+import { ExtractHexLocationPlugin } from "./extractHexLocation";
 
 export const Plugins = [ExtractHexLocationPlugin];
+
 export const initPlugins = async (pluginConfigs: IPluginConfig[] = []) =>
   (
     await Promise.all(
@@ -11,3 +13,31 @@ export const initPlugins = async (pluginConfigs: IPluginConfig[] = []) =>
       })
     )
   ).filter(Boolean);
+
+export const getPluginsByAccountTypeByProgram = async (
+  configs: IConfig[]
+): Promise<Record<string, Record<string, IInitedPlugin[]>>> => {
+  const result = await Promise.all(
+    configs.map(async (config) => {
+      return {
+        programId: config.programId,
+        pluginsByAccountType: (
+          await Promise.all(
+            config.accounts.map(async (acc) => {
+              const plugins = await initPlugins(acc.plugins);
+              return { type: acc.type, plugins };
+            })
+          )
+        ).reduce((acc, { type, plugins }) => {
+          acc[type] = plugins.filter(truthy);
+          return acc;
+        }, {} as Record<string, IInitedPlugin[]>),
+      };
+    })
+  );
+
+  return result.reduce((acc, { programId, pluginsByAccountType }) => {
+    acc[programId] = pluginsByAccountType;
+    return acc;
+  }, {} as Record<string, Record<string, IInitedPlugin[]>>);
+};

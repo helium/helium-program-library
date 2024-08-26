@@ -4,7 +4,7 @@ import retry from "async-retry";
 import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
-import { Sequelize } from "sequelize";
+import { Sequelize, Transaction } from "sequelize";
 import { SOLANA_URL } from "../env";
 import { initPlugins } from "../plugins";
 import { IAccountConfig, IInitedPlugin } from "../types";
@@ -28,6 +28,7 @@ export const integrityCheckProgramAccounts = async ({
   accounts,
   sequelize = database,
 }: IntegrityCheckProgramAccountsArgs) => {
+  console.log(`Integrity checking program: ${programId}`);
   anchor.setProvider(
     anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
   );
@@ -49,7 +50,9 @@ export const integrityCheckProgramAccounts = async ({
   }
 
   const performIntegrityCheck = async () => {
-    const t = await sequelize.transaction();
+    const t = await sequelize.transaction({
+      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+    });
     const now = new Date().toISOString();
     const txIdsByAccountId: { [key: string]: string[] } = {};
     const corrections: {
@@ -202,7 +205,7 @@ export const integrityCheckProgramAccounts = async ({
     } catch (err) {
       await t.rollback();
       console.error("While inserting, err", err);
-      throw err;
+      throw err; // Rethrow the error to be caught by the retry mechanism
     }
   };
 
