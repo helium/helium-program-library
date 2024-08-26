@@ -24,6 +24,7 @@ pub struct InitializeCarrierArgsV0 {
   pub hexboost_authority: Pubkey,
   pub name: String,
   pub metadata_url: String,
+  pub incentive_escrow_fund_bps: u16,
 }
 
 #[derive(Accounts)]
@@ -125,6 +126,11 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
     args.metadata_url.len() <= 200,
     ErrorCode::InvalidStringLength
   );
+  require_gte!(
+    10000, // 10,000 basis points is 100 percent
+    args.incentive_escrow_fund_bps,
+    ErrorCode::InvalidIncentiveEscrowFundBps
+  );
 
   let signer_seeds: &[&[&[u8]]] = &[&[
     b"carrier",
@@ -204,6 +210,7 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
     escrow: ctx.accounts.escrow.key(),
     hexboost_authority: args.hexboost_authority,
     approved: false,
+    incentive_escrow_fund_bps: args.incentive_escrow_fund_bps,
   });
 
   Ok(())

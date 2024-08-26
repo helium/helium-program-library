@@ -8,4 +8,6 @@ pub enum ErrorCode {
   InvalidStringLength,
   #[msg("Cannot swap tree until it is close to full")]
   TreeNotFull,
+  #[msg("Incentive escrow fund bps cannot be greater than 100%")]
+  InvalidIncentiveEscrowFundBps,
 }

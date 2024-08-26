@@ -179,7 +179,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@^0.9.2":
+"@helium/account-fetch-cache@^0.9.4":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -199,11 +199,12 @@ __metadata:
     "@connectrpc/connect-node": ^1.3.0
     "@coral-xyz/anchor": ^0.28.0
     "@fastify/cors": ^8.1.1
-    "@helium/account-fetch-cache": ^0.9.2
+    "@helium/account-fetch-cache": ^0.9.4
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/web3.js": ^1.78.8
     "@substreams/core": ^0.15.1
     "@triton-one/yellowstone-grpc": ^0.4.0
+    "@types/async-retry": ^1.4.8
     "@types/bn.js": ^5.1.1
     "@types/cron": ^2.4.0
     "@types/deep-equal": ^1.0.1
@@ -211,6 +212,7 @@ __metadata:
     "@types/node": ^18.11.11
     "@types/pg": ^8.6.6
     "@types/yargs": ^17.0.24
+    async-retry: ^1.3.3
     aws-sdk: ^2.1344.0
     axios: ^1.3.6
     axios-retry: ^3.8.0
@@ -587,6 +589,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/async-retry@npm:^1.4.8":
+  version: 1.4.8
+  resolution: "@types/async-retry@npm:1.4.8"
+  dependencies:
+    "@types/retry": "*"
+  checksum: 5d4b0b786e2506ab690c311d55a8000c3675cf1036290ad3b83af11ad791c62c9e16e7ff5a6dac3fae557404127451e72c297d711701015b027227586368eaf5
+  languageName: node
+  linkType: hard
+
 "@types/bn.js@npm:^5.1.1":
   version: 5.1.1
   resolution: "@types/bn.js@npm:5.1.1"
@@ -680,6 +691,13 @@ __metadata:
     pg-protocol: "npm:*"
     pg-types: "npm:^4.0.1"
   checksum: 49da89f64cec1bd12a3fbc0c72b17d685c2fee579726a529f62fcab395dbc5696d80455073409947a577164b3c53a90181a331e4a5d9357679f724d4ce37f4b9
+  languageName: node
+  linkType: hard
+
+"@types/retry@npm:*":
+  version: 0.12.5
+  resolution: "@types/retry@npm:0.12.5"
+  checksum: 3fb6bf91835ca0eb2987567d6977585235a7567f8aeb38b34a8bb7bbee57ac050ed6f04b9998cda29701b8c893f5dfe315869bc54ac17e536c9235637fe351a2
   languageName: node
   linkType: hard
 
@@ -919,6 +937,15 @@ __metadata:
     call-bind: "npm:^1.0.2"
     is-array-buffer: "npm:^3.0.1"
   checksum: 044e101ce150f4804ad19c51d6c4d4cfa505c5b2577bd179256e4aa3f3f6a0a5e9874c78cd428ee566ac574c8a04d7ce21af9fe52e844abfdccb82b33035a7c3
+  languageName: node
+  linkType: hard
+
+"async-retry@npm:^1.3.3":
+  version: 1.3.3
+  resolution: "async-retry@npm:1.3.3"
+  dependencies:
+    retry: 0.13.1
+  checksum: 38a7152ff7265a9321ea214b9c69e8224ab1febbdec98efbbde6e562f17ff68405569b796b1c5271f354aef8783665d29953f051f68c1fc45306e61aec82fdc4
   languageName: node
   linkType: hard
 
@@ -3520,6 +3547,13 @@ __metadata:
   version: 7.0.4
   resolution: "retry-as-promised@npm:7.0.4"
   checksum: 2b0dcddb06649d42b1384ec1f933c7cb4461939c28004460b0c4be0c8ae16cabaed2411aa5d46e734a320f33f4a1d480078a19b97c743c754bd32e896b3f8ea2
+  languageName: node
+  linkType: hard
+
+"retry@npm:0.13.1":
+  version: 0.13.1
+  resolution: "retry@npm:0.13.1"
+  checksum: 47c4d5be674f7c13eee4cfe927345023972197dbbdfba5d3af7e461d13b44de1bfd663bfc80d2f601f8ef3fc8164c16dd99655a221921954a65d044a2fc1233b
   languageName: node
   linkType: hard
 

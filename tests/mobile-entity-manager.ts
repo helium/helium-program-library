@@ -116,7 +116,8 @@ describe('mobile-entity-manager', () => {
         issuingAuthority: me,
         updateAuthority: me,
         hexboostAuthority: me,
-        metadataUrl: 'https://some/url',
+        metadataUrl: "https://some/url",
+        incentiveEscrowFundBps: 100,
       })
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
@@ -128,6 +129,7 @@ describe('mobile-entity-manager', () => {
 
     const carrierAcc = await memProgram.account.carrierV0.fetch(carrier!);
 
+    expect(carrierAcc.incentiveEscrowFundBps).to.eq(100);
     expect(carrierAcc.issuingAuthority.toBase58()).to.eq(me.toBase58());
     expect(carrierAcc.updateAuthority.toBase58()).to.eq(me.toBase58());
     expect(carrierAcc.name).to.eq(name);
@@ -150,7 +152,8 @@ describe('mobile-entity-manager', () => {
           issuingAuthority: me,
           updateAuthority: me,
           hexboostAuthority: me,
-          metadataUrl: 'https://some/url',
+          metadataUrl: "https://some/url",
+          incentiveEscrowFundBps: 100,
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
