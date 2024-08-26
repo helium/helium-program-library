@@ -139,11 +139,6 @@ export const setupYellowstone = async (
         console.log("Yellowstone stream closed");
         throw new Error("Stream closed");
       });
-
-      // Wait for the stream to close
-      await new Promise((resolve) => {
-        stream.on("close", resolve);
-      });
     },
     {
       retries: 10,
