@@ -137,7 +137,7 @@ pub fn handler(
       routing_manager: ctx.accounts.net_id.routing_manager,
       net_id: ctx.accounts.net_id.key(),
       organization: ctx.accounts.organization.key(),
-      start_addr: start_addr,
+      start_addr,
       end_addr,
       bump_seed: ctx.bumps["devaddr_constraint"],
     });
