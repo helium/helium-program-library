@@ -4,7 +4,6 @@ import Client, {
   SubscribeUpdate,
   SubscribeUpdateAccount,
 } from "@triton-one/yellowstone-grpc";
-import retry from "async-retry";
 import { FastifyInstance } from "fastify";
 import { YELLOWSTONE_TOKEN, YELLOWSTONE_URL } from "../env";
 import { getPluginsByAccountTypeByProgram } from "../plugins";
@@ -12,6 +11,9 @@ import { IConfig } from "../types";
 import { convertYellowstoneTransaction } from "../utils/convertYellowstoneTransaction";
 import { handleAccountWebhook } from "../utils/handleAccountWebhook";
 import { handleTransactionWebhoook } from "../utils/handleTransactionWebhook";
+
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_DELAY = 5000; // 5 seconds
 
 export const setupYellowstone = async (
   server: FastifyInstance,
@@ -21,17 +23,25 @@ export const setupYellowstone = async (
     configs
   );
 
-  await retry(
-    async () => {
-      const client = new Client(YELLOWSTONE_URL, YELLOWSTONE_TOKEN, {
-        "grpc.max_receive_message_length": 2065853043,
-        "grpc.keepalive_time_ms": 10000,
-        "grpc.keepalive_timeout_ms": 5000,
-        "grpc.keepalive_permit_without_calls": 1,
-      });
+  const connect = async (attemptCount = 0) => {
+    if (attemptCount >= MAX_RECONNECT_ATTEMPTS) {
+      console.error(
+        `Yellowstone failed to connect after ${MAX_RECONNECT_ATTEMPTS} attempts.`
+      );
+      process.exit(1);
+    }
 
+    const client = new Client(YELLOWSTONE_URL, YELLOWSTONE_TOKEN, {
+      "grpc.max_receive_message_length": 2065853043,
+      "grpc.keepalive_time_ms": 10000,
+      "grpc.keepalive_timeout_ms": 5000,
+      "grpc.keepalive_permit_without_calls": 1,
+    });
+
+    try {
       const stream = await client.subscribe();
       console.log("Connected to Yellowstone");
+      attemptCount = 0;
 
       stream.on("data", async (data: SubscribeUpdate) => {
         try {
@@ -109,48 +119,39 @@ export const setupYellowstone = async (
         ping: undefined,
       };
 
-      try {
-        await new Promise<void>((resolve, reject) => {
-          stream.write(request, (err: any) => {
-            if (err === null || err === undefined) {
-              resolve();
-            } else {
-              reject(err);
-            }
-          });
-        });
-      } catch (err: unknown) {
-        console.error(`Failed to write initial request: ${err}`);
-        throw err;
-      }
+      stream.write(request, (err: any) => {
+        if (err) {
+          console.error(`Failed to write initial request: ${err}`);
+          stream.end();
+        }
+      });
 
-      stream.on("error", (error) => {
-        console.error("Yellowstone stream error:", error);
+      stream.on("error", (err) => {
+        console.error("Yellowstone stream error:", err);
         stream.end();
-        throw error;
       });
 
       stream.on("end", () => {
         console.log("Yellowstone stream ended");
-        throw new Error("Stream ended");
+        handleReconnect(attemptCount + 1);
       });
 
       stream.on("close", () => {
         console.log("Yellowstone stream closed");
-        throw new Error("Stream closed");
+        handleReconnect(attemptCount + 1);
       });
-    },
-    {
-      retries: 10,
-      factor: 2,
-      minTimeout: 1000,
-      maxTimeout: 60000,
-      onRetry: (error, attempt) => {
-        console.log(
-          `Yellowstone retry attempt ${attempt} due to error:`,
-          error
-        );
-      },
+    } catch (err) {
+      console.log("Yellowstone connection error:", err);
+      handleReconnect(attemptCount + 1);
     }
-  );
+  };
+
+  const handleReconnect = async (nextAttempt: number) => {
+    console.log(
+      `Attempting to reconnect (attempt ${nextAttempt} of ${MAX_RECONNECT_ATTEMPTS})...`
+    );
+    setTimeout(() => connect(nextAttempt), RECONNECT_DELAY);
+  };
+
+  await connect();
 };
