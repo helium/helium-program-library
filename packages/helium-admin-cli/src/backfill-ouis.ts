@@ -78,9 +78,6 @@ export async function run(args: any = process.argv) {
       describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
-    executeTransaction: {
-      type: "boolean",
-    },
     url: {
       alias: "u",
       default: "http://127.0.0.1:8899",
@@ -303,6 +300,21 @@ export async function run(args: any = process.argv) {
   await batchParallelInstructionsWithPriorityFee(provider, orgIxs, {
     computeUnitLimit: 500000,
   });
+
+  const orgApprovalIxs = (
+    await Promise.all(
+      orgs.map(async (org) => {
+        const [orgK] = organizationKey(routingManager, new anchor.BN(org.oui));
+        return await irm.methods
+          .approveOrganizationV0()
+          .accounts({ organization: orgK })
+          .instruction();
+      })
+    )
+  ).filter(truthy);
+
+  console.log(`Approving (${orgApprovalIxs.length}) organizations`);
+  await batchParallelInstructionsWithPriorityFee(provider, orgApprovalIxs);
 
   const orgDelegateIxs = (
     await Promise.all(
