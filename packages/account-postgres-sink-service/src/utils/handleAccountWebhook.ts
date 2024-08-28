@@ -88,7 +88,7 @@ export function handleAccountWebhook({
         }
       }
 
-      if (isDelete && existing) {
+      if (isDelete) {
         await model.destroy({
           where: {
             address: account.pubkey,
