@@ -19,6 +19,7 @@ export const setupYellowstone = async (
   server: FastifyInstance,
   configs: IConfig[]
 ) => {
+  let isReconnecting = false;
   const pluginsByAccountTypeByProgram = await getPluginsByAccountTypeByProgram(
     configs
   );
@@ -42,6 +43,7 @@ export const setupYellowstone = async (
       const stream = await client.subscribe();
       console.log("Connected to Yellowstone");
       attemptCount = 0;
+      isReconnecting = false;
 
       stream.on("data", async (data: SubscribeUpdate) => {
         try {
@@ -133,16 +135,25 @@ export const setupYellowstone = async (
 
       stream.on("end", () => {
         console.log("Yellowstone stream ended");
-        handleReconnect(attemptCount + 1);
+        if (!isReconnecting) {
+          isReconnecting = true;
+          handleReconnect(attemptCount + 1);
+        }
       });
 
       stream.on("close", () => {
         console.log("Yellowstone stream closed");
-        handleReconnect(attemptCount + 1);
+        if (!isReconnecting) {
+          isReconnecting = true;
+          handleReconnect(attemptCount + 1);
+        }
       });
     } catch (err) {
       console.log("Yellowstone connection error:", err);
-      handleReconnect(attemptCount + 1);
+      if (!isReconnecting) {
+        isReconnecting = true;
+        handleReconnect(attemptCount + 1);
+      }
     }
   };
 

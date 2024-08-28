@@ -148,6 +148,7 @@ export const integrityCheckProgramAccounts = async ({
                 )
               );
             })?.type;
+
             if (!accName) {
               continue;
             }
