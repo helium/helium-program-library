@@ -69,6 +69,7 @@ export function handleAccountWebhook({
       })?.type;
 
       if (!accName) {
+        await t.rollback();
         return;
       }
 
