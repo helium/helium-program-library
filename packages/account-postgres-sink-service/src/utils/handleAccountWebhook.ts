@@ -23,7 +23,7 @@ interface HandleAccountWebhookArgs {
 
 // Ensure we never have more txns open than the pool size - 1
 const limit = pLimit(
-  (process.env.PG_POOL_SIZE ? Number(process.env.PG_POOL_SIZE) : 5) - 1
+  (process.env.PG_POOL_SIZE ? Number(process.env.PG_POOL_SIZE) : 10) - 1
 );
 
 export function handleAccountWebhook({
