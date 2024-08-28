@@ -1,6 +1,8 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
+import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
+import _omit from "lodash/omit";
 import pLimit from "p-limit";
 import { Sequelize } from "sequelize";
 import { IAccountConfig, IInitedPlugin } from "../types";
@@ -66,43 +68,50 @@ export function handleAccountWebhook({
         );
       })?.type;
 
-      if (accName) {
-        const decodedAcc = program.coder.accounts.decode(
-          accName!,
-          data as Buffer
-        );
-        let sanitized = sanitizeAccount(decodedAcc);
-        for (const plugin of pluginsByAccountType[accName]) {
-          if (plugin?.processAccount) {
-            sanitized = await plugin.processAccount(sanitized, t);
-          }
-        }
-        const model = sequelize.models[accName];
-        if (isDelete) {
-          await model.destroy({
-            where: {
-              address: account.pubkey,
-            },
-            transaction: t,
-          });
-        } else {
-          const value = await model.findByPk(account.pubkey);
-          const changed =
-            !value ||
-            Object.entries(sanitized).some(
-              ([k, v]) => v?.toString() !== value.dataValues[k]?.toString()
-            );
+      if (!accName) {
+        return;
+      }
 
-          if (changed) {
-            await model.upsert(
-              {
-                address: account.pubkey,
-                refreshed_at: now,
-                ...sanitized,
-              },
-              { transaction: t }
-            );
-          }
+      const decodedAcc = program.coder.accounts.decode(
+        accName!,
+        data as Buffer
+      );
+
+      const omitKeys = ["refreshed_at", "createdAt"];
+      const model = sequelize.models[accName];
+      const existing = await model.findByPk(account.pubkey);
+      let sanitized = sanitizeAccount(decodedAcc);
+
+      for (const plugin of pluginsByAccountType[accName]) {
+        if (plugin?.processAccount) {
+          sanitized = await plugin.processAccount(sanitized, t);
+        }
+      }
+
+      if (isDelete && existing) {
+        await model.destroy({
+          where: {
+            address: account.pubkey,
+          },
+          transaction: t,
+        });
+      } else {
+        const isEqual =
+          existing &&
+          deepEqual(
+            _omit(sanitized, omitKeys),
+            _omit(existing.dataValues, omitKeys)
+          );
+
+        if (!isEqual) {
+          await model.upsert(
+            {
+              address: account.pubkey,
+              refreshed_at: now,
+              ...sanitized,
+            },
+            { transaction: t }
+          );
         }
       }
 
