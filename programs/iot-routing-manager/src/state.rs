@@ -35,6 +35,7 @@ pub struct OrganizationV0 {
   pub oui: u64,
   pub escrow_key: String,
   pub approved: bool,
+  pub locked: bool,
   pub bump_seed: u8,
 }
 

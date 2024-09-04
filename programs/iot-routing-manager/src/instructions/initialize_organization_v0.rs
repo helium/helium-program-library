@@ -169,6 +169,7 @@ pub fn handler(
     bump_seed: ctx.bumps["organization"],
     net_id: ctx.accounts.net_id.key(),
     approved: false,
+    locked: false,
   });
 
   let uri = format!(
