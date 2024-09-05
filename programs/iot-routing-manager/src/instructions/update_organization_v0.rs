@@ -6,7 +6,6 @@ use crate::OrganizationV0;
 pub struct UpdateOrganizationArgsV0 {
   new_authority: Option<Pubkey>,
   escrow_key: Option<String>,
-  locked: Option<bool>,
 }
 
 #[derive(Accounts)]
@@ -25,9 +24,6 @@ pub fn handler(ctx: Context<UpdateOrganizationV0>, args: UpdateOrganizationArgsV
   }
   if let Some(escrow_key) = args.escrow_key {
     ctx.accounts.organization.escrow_key = escrow_key;
-  }
-  if let Some(locked) = args.locked {
-    ctx.accounts.organization.locked = locked;
   }
   Ok(())
 }
