@@ -1,4 +1,4 @@
-use crate::{rewardable_entity_config_seeds, state::*};
+use crate::state::*;
 use account_compression_cpi::program::SplAccountCompression;
 use anchor_lang::{prelude::*, solana_program::hash::hash};
 use anchor_spl::{
@@ -14,11 +14,7 @@ use data_credits::{
   program::DataCredits,
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
-use helium_sub_daos::{
-  cpi::{accounts::TrackDcOnboardingFeesV0, track_dc_onboarding_fees_v0},
-  program::HeliumSubDaos,
-  DaoV0, SubDaoV0, TrackDcOnboardingFeesArgsV0,
-};
+use helium_sub_daos::{program::HeliumSubDaos, DaoV0, SubDaoV0};
 use shared_utils::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
