@@ -113,4 +113,18 @@ pub mod helium_sub_daos {
   ) -> Result<()> {
     track_dc_onboarding_fees_v0::handler(ctx, args)
   }
+
+  pub fn admin_set_dc_onboarding_fees_paid(
+    ctx: Context<AdminSetDcOnboardingFeesPaid>,
+    args: AdminSetDcOnboardingFeesPaidArgs,
+  ) -> Result<()> {
+    admin_set_dc_onboarding_fees_paid::handler(ctx, args)
+  }
+
+  pub fn admin_set_dc_onboarding_fees_paid_epoch_info(
+    ctx: Context<AdminSetDcOnboardingFeesPaidEpochInfo>,
+    args: AdminSetDcOnboardingFeesPaidEpochInfoArgs,
+  ) -> Result<()> {
+    admin_set_dc_onboarding_fees_paid_epoch_info::handler(ctx, args)
+  }
 }

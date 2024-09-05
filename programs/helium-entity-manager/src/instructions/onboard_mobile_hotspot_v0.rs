@@ -210,27 +210,6 @@ pub fn handler<'info>(
       .unwrap();
   }
 
-  track_dc_onboarding_fees_v0(
-    CpiContext::new_with_signer(
-      ctx.accounts.helium_sub_daos_program.to_account_info(),
-      TrackDcOnboardingFeesV0 {
-        hem_auth: ctx.accounts.rewardable_entity_config.to_account_info(),
-        sub_dao: ctx.accounts.sub_dao.to_account_info(),
-      },
-      &[&[
-        "rewardable_entity_config".as_bytes(),
-        ctx.accounts.sub_dao.key().as_ref(),
-        ctx.accounts.rewardable_entity_config.symbol.as_bytes(),
-        &[ctx.accounts.rewardable_entity_config.bump_seed],
-      ]],
-    ),
-    TrackDcOnboardingFeesArgsV0 {
-      amount: fees.dc_onboarding_fee,
-      add: true,
-      symbol: ctx.accounts.rewardable_entity_config.symbol.clone(),
-    },
-  )?;
-
   // burn the dc tokens
   burn_without_tracking_v0(
     ctx.accounts.burn_ctx(),
