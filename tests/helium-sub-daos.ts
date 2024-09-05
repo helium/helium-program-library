@@ -512,7 +512,19 @@ describe("helium-sub-daos", () => {
             })
           ).signers([makerKeypair, hotspotOwner]);
 
-          await method.rpc({ skipPreflight: true });
+          const { pubkeys: { iotInfo: infoKey }} = await method.rpcAndKeys({ skipPreflight: true });
+
+          await hemProgram.methods
+          .setEntityActiveV0({
+            isActive: true,
+            entityKey: Buffer.from(bs58.decode(ecc)),
+          })
+          .accounts({
+            activeDeviceAuthority: me,
+            rewardableEntityConfig,
+            info: infoKey! as PublicKey,
+          })
+          .rpc({ skipPreflight: true });
 
           const { subDaoEpochInfo } = await burnDc(1600000);
           const epoch = (
