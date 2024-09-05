@@ -285,7 +285,6 @@ export async function run(args: any = process.argv) {
             .initializeOrganizationV0({
               oui: new anchor.BN(org.oui),
               escrowKeyOverride: org.payer_pubkey,
-              locked: org.locked,
             })
             .accounts({
               authority: ownerSolAddr,
