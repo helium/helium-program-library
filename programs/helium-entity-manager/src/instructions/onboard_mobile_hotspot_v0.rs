@@ -17,11 +17,7 @@ use data_credits::{
   program::DataCredits,
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
-use helium_sub_daos::{
-  cpi::{accounts::TrackDcOnboardingFeesV0, track_dc_onboarding_fees_v0},
-  program::HeliumSubDaos,
-  DaoV0, SubDaoV0, TrackDcOnboardingFeesArgsV0,
-};
+use helium_sub_daos::{program::HeliumSubDaos, DaoV0, SubDaoV0};
 
 use account_compression_cpi::program::SplAccountCompression;
 use bubblegum_cpi::get_asset_id;

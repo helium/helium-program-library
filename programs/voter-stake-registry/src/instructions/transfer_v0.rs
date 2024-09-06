@@ -39,6 +39,7 @@ pub struct TransferV0<'info> {
   #[account(
     mut,
     has_one = registrar,
+    constraint = target_position.num_active_votes == 0 @ VsrError::ActiveVotesExist,
   )]
   pub target_position: Box<Account<'info, PositionV0>>,
   pub deposit_mint: Box<Account<'info, Mint>>,

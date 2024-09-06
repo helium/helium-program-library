@@ -96,27 +96,6 @@ export function useAccounts<T>(
     });
   }, [cache, keys, parsedAccountBaseParser]);
 
-  const [accounts, setAccounts] = useState<
-    {
-      account?: AccountInfo<Buffer>;
-      info?: T;
-      publicKey: PublicKey;
-    }[]
-  >(eagerResult || []);
-
-  // Sometimes eager result never gets set because cache or keys is undefined
-  useEffect(() => {
-    if (eagerResult && accounts.length != keys?.length && (eagerResult?.length || 0) == keys?.length) {
-      setAccounts(eagerResult);
-    }
-  }, [accounts, eagerResult])
-
-  useEffect(() => {
-    if (!keys) {
-      setAccounts([]);
-    }
-  }, [keys]);
-
   const prevKeys = usePrevious(keys);
   const { result, loading, error, status } = useAsync(
     async (
@@ -125,65 +104,84 @@ export function useAccounts<T>(
         | ((pubkey: PublicKey, data: AccountInfo<Buffer>) => ParsedAccountBase)
         | undefined
     ) => {
-      return (
-        keys &&
-        (await Promise.all(
-          keys.map(async (key) => {
-            // Important: MUST searchAndWatch here to guarentee caching.
-            // account fetch cache will not cache things unles it is watching them,
-            // or it could offer stale data
-            const [acc, dispose] = await cache.searchAndWatch(
-              key,
-              parsedAccountBaseParser,
-              isStatic
-            );
+      const { accounts: accs, disposers } = keys
+        ? await cache.searchMultipleAndWatch(
+            keys,
+            parsedAccountBaseParser,
+            isStatic
+          )
+        : { accounts: [], disposers: [] };
 
-            // Watch the account for at least 30 seconds
-            setTimeout(dispose, 1000 * 30);
+      // Watch the account(s) for at least 30 seconds
+      setTimeout(() => {
+        disposers.map((d) => d());
+      }, 1000 * 30);
+      return accs.map((acc, index) => {
+        const key = keys && keys[index];
 
-            // The cache caches the parser, so we need to check if the parser is different
-            let info = acc?.info;
-            if (
-              cache.keyToAccountParser[key.toBase58()] !=
-                parsedAccountBaseParser &&
-              parsedAccountBaseParser &&
-              acc?.account
-            ) {
-              info = parsedAccountBaseParser(key, acc?.account).info;
-            }
-            if (acc) {
-              return {
-                info,
-                account: acc.account,
-                publicKey: acc.pubkey,
-                parser: parsedAccountBaseParser,
-              };
-            } else {
-              return {
-                publicKey: key,
-              };
-            }
-          })
-        ))
-      );
+        // The cache caches the parser, so we need to check if the parser is different
+        let info = acc?.info;
+        if (
+          key &&
+          cache.keyToAccountParser[key.toBase58()] != parsedAccountBaseParser &&
+          parsedAccountBaseParser &&
+          acc?.account
+        ) {
+          info = parsedAccountBaseParser(key, acc?.account).info;
+        }
+        if (acc) {
+          return {
+            info,
+            account: acc.account,
+            publicKey: acc.pubkey,
+            parser: parsedAccountBaseParser,
+          };
+        } else {
+          return {
+            publicKey: key,
+          };
+        }
+      });
     },
     [keys, parsedAccountBaseParser]
   );
 
+  const accounts = useMemo(() => {
+    if (keys) {
+      if (
+        result &&
+        result.length !== 0 &&
+        (!eagerResult ||
+          result.length !== eagerResult.length ||
+          result.some((item, index) => {
+            const eager = eagerResult[index];
+            return (
+              (!item.account && eager.account) ||
+              (!eager.account && item.account) ||
+              (item.account &&
+                eager.account &&
+                !item.account.data.equals(eager.account.data))
+            );
+          }))
+      ) {
+        return result;
+      }
+      return eagerResult;
+    }
+
+    return [];
+  }, [eagerResult, result]);
+
+  useEffect(() => {
+    if (error) {
+      console.error(error);
+    }
+  }, [error]);
+
   // Start watchers
   useEffect(() => {
-    if (
-      result &&
-      (!eagerResult ||
-        result.length !== eagerResult.length ||
-        result.some(
-          (item, index) =>
-            item.account !== eagerResult[index]?.account ||
-            item.info !== eagerResult[index]?.info
-        ))
-    ) {
-      setAccounts(result);
-      const disposers = result.map((account) => {
+    if (accounts) {
+      const disposers = accounts.map((account) => {
         return cache.watch(
           account.publicKey,
           account.parser,
@@ -195,23 +193,43 @@ export function useAccounts<T>(
         disposers?.forEach((disposer) => disposer());
       };
     }
-  }, [result]);
+  }, [accounts]);
+
+  const [watchedAccounts, setWatchedAccounts] = useState<
+    {
+      account?: AccountInfo<Buffer>;
+      info?: T;
+      publicKey: PublicKey;
+    }[]
+  >(accounts || []);
 
   useEffect(() => {
-    const keySet = new Set(keys ? keys.map((k) => k.toBase58()) : []);
+    if (watchedAccounts != accounts) {
+      setWatchedAccounts(accounts);
+    }
+  }, [accounts]);
+
+  useEffect(() => {
+    const accountsByKey = accounts.reduce((acc, account, index) => {
+      acc[account.publicKey.toBase58()] = {
+        index,
+        account: account.account,
+        info: account.info,
+      };
+      return acc;
+    }, {} as Record<string, { index: number; account: AccountInfo<Buffer>; info: T }>);
 
     const disposeEmitter = cache.emitter.onCache(async (e) => {
       const event = e;
-      if (keySet.has(event.id)) {
-        const index = accounts.findIndex(
-          (acc) => acc.publicKey.toBase58() === event.id
-        );
+      if (accountsByKey[event.id]) {
+        const current = accountsByKey[event.id].account;
         const acc = await cache.get(event.id);
-        if (acc) {
+        if (acc && (!current || !acc.account?.data.equals(current.data))) {
           const parsed = parser && parser(acc.pubkey, acc?.account);
-          const newParsed = accounts[index]
-            ? mergePublicKeys(accounts[index].info, parsed)
+          const newParsed = accountsByKey[event.id]
+            ? mergePublicKeys(accountsByKey[event.id].info, parsed)
             : parsed;
+          const index = accountsByKey[event.id].index;
           const newAccounts = [
             ...accounts.slice(0, index),
             {
@@ -222,7 +240,7 @@ export function useAccounts<T>(
             },
             ...accounts.slice(index + 1),
           ];
-          setAccounts(newAccounts);
+          setWatchedAccounts(newAccounts);
         }
       }
     });
@@ -234,7 +252,7 @@ export function useAccounts<T>(
   return {
     status,
     loading: loading || prevKeys !== keys,
-    accounts,
+    accounts: watchedAccounts,
     error,
   };
 }

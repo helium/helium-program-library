@@ -107,6 +107,23 @@
       ]
     },
     {
+      "programId": "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p",
+      "accounts": [
+        {
+          "type": "ProxyAssignmentV0",
+          "table": "proxy_assignments",
+          "schema": "public",
+          "ix_side_effects": [
+            {
+              "ix": "unassign_proxy_v0",
+              "acc": "proxy_assignment",
+              "action": "delete"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "programId": "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w",
       "accounts": [
         {

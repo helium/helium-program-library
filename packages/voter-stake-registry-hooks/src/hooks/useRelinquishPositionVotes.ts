@@ -93,7 +93,6 @@ export const useRelinquishPositionVotes = () => {
                         proposal: marker.proposal,
                         voter: provider.wallet.publicKey,
                         position: position.pubkey,
-                        refund: provider.wallet.publicKey,
                       })
                       .instruction();
                   })

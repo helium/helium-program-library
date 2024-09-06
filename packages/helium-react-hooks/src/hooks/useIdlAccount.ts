@@ -6,6 +6,10 @@ import { PublicKey } from "@solana/web3.js";
 import { useMemo } from "react";
 import { capitalizeFirstChar } from "./useIdlAccounts";
 
+// Cache parsers per key/type combination to avoid re-creating them on re-render.
+// This makes it so we get fewer rerenders using effectively the same parser
+const parserCache = new Map<string, TypedAccountParser<any>>();
+
 export function useIdlAccount<IDL extends Idl, A extends keyof AllAccountsMap<IDL>>(
   key: PublicKey | undefined,
   idl: IDL | undefined,
@@ -16,20 +20,24 @@ export function useIdlAccount<IDL extends Idl, A extends keyof AllAccountsMap<ID
   const parser: TypedAccountParser<
     IdlAccounts<IDL>[A]
   > | undefined = useMemo(() => {
-    if (idl) {
-      const coder = new BorshAccountsCoder(idl);
-      const tpe = capitalizeFirstChar(type);
-      return (pubkey, data) => {
-        try {
-          if (data.data.length === 0) return;
-          const decoded = coder.decode(tpe, data.data);
-          decoded.pubkey = pubkey;
-          return decoded;
-        } catch (e: any) {
-          console.error(e);
-        }
-      };
+    const cacheKey = `${key?.toBase58()}-${type}`;
+    if (!parserCache[cacheKey]) {
+      if (idl) {
+        const coder = new BorshAccountsCoder(idl);
+        const tpe = capitalizeFirstChar(type);
+        parserCache[cacheKey] = (pubkey, data) => {
+          try {
+            if (data.data.length === 0) return;
+            const decoded = coder.decode(tpe, data.data);
+            decoded.pubkey = pubkey;
+            return decoded;
+          } catch (e: any) {
+            console.error(e);
+          }
+        };
+      }
     }
+    return parserCache[cacheKey];
   }, [idl, type]);
   return useAccount(key, parser, isStatic);
 }

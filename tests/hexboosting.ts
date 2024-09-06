@@ -126,6 +126,7 @@ describe("hexboosting", () => {
         updateAuthority: me,
         hexboostAuthority: me,
         metadataUrl: "https://some/url",
+        incentiveEscrowFundBps: 100,
       })
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),

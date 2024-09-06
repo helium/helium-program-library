@@ -175,7 +175,7 @@ export const useClaimAllPositionsRewards = () => {
           }
         }
 
-        const multiDemArray = Object.entries(bucketedEpochsByPosition).reduce(
+        const multiDimArray = Object.entries(bucketedEpochsByPosition).reduce(
           (acc, [_, instructions]) => {
             instructions.map((ixs, idx) => {
               acc[idx] = acc[idx] || [];
@@ -187,13 +187,13 @@ export const useClaimAllPositionsRewards = () => {
         );
 
         if (onInstructions) {
-          for (const ixs of multiDemArray) {
+          for (const ixs of multiDimArray) {
             await onInstructions(ixs);
           }
         } else {
           await batchSequentialParallelInstructions({
             provider,
-            instructions: multiDemArray,
+            instructions: multiDimArray,
             onProgress,
             triesRemaining: 10,
             extraSigners: [],

@@ -1,13 +1,15 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
+import deepEqual from "deep-equal";
+import { FastifyInstance } from "fastify";
+import _omit from "lodash/omit";
+import pLimit from "p-limit";
 import { Sequelize } from "sequelize";
-import { provider } from "./solana";
+import { IAccountConfig, IInitedPlugin } from "../types";
+import cachedIdlFetch from "./cachedIdlFetch";
 import database from "./database";
 import { sanitizeAccount } from "./sanitizeAccount";
-import cachedIdlFetch from "./cachedIdlFetch";
-import { FastifyInstance } from "fastify";
-import { IAccountConfig, IInitedPlugin } from "../types";
-import pLimit from "p-limit";
+import { provider } from "./solana";
 
 interface HandleAccountWebhookArgs {
   fastify: FastifyInstance;
@@ -21,8 +23,9 @@ interface HandleAccountWebhookArgs {
 
 // Ensure we never have more txns open than the pool size - 1
 const limit = pLimit(
-  (process.env.PG_POOL_SIZE ? Number(process.env.PG_POOL_SIZE) : 5) - 1
+  (process.env.PG_POOL_SIZE ? Number(process.env.PG_POOL_SIZE) : 10) - 1
 );
+
 export function handleAccountWebhook({
   fastify,
   programId,
@@ -30,7 +33,7 @@ export function handleAccountWebhook({
   account,
   sequelize = database,
   pluginsByAccountType,
-  isDelete = false
+  isDelete = false,
 }: HandleAccountWebhookArgs) {
   return limit(async () => {
     const idl = await cachedIdlFetch.fetchIdl({
@@ -39,7 +42,7 @@ export function handleAccountWebhook({
     });
 
     if (!idl) {
-      throw new Error(`unable to fetch idl for ${programId}`);
+      throw new Error(`unable to fetch idl for ${programId.toBase58()}`);
     }
 
     if (
@@ -65,47 +68,52 @@ export function handleAccountWebhook({
         );
       })?.type;
 
-      if (accName) {
-        const decodedAcc = program.coder.accounts.decode(
-          accName!,
-          data as Buffer
-        );
-        let sanitized = sanitizeAccount(decodedAcc);
-        for (const plugin of pluginsByAccountType[accName]) {
-          if (plugin?.processAccount) {
-            sanitized = await plugin.processAccount(sanitized, t);
-          }
-        }
-        const model = sequelize.models[accName];
-        if (isDelete) {
-          await model.destroy(
-            {
-              where: {
-                address: account.pubkey,
-              },
-              transaction: t,
-            }
-          );
-        } else {
-          const value = await model.findByPk(account.pubkey);
-          const changed =
-            !value ||
-            Object.entries(sanitized).some(
-              ([k, v]) => v?.toString() !== value.dataValues[k]?.toString()
-            );
+      if (!accName) {
+        await t.rollback();
+        return;
+      }
 
-          if (changed) {
-            await model.upsert(
-              {
-                address: account.pubkey,
-                refreshed_at: now,
-                ...sanitized,
-              },
-              { transaction: t }
-            );
-          }
+      const decodedAcc = program.coder.accounts.decode(
+        accName!,
+        data as Buffer
+      );
+
+      const omitKeys = ["refreshed_at", "createdAt"];
+      const model = sequelize.models[accName];
+      const existing = await model.findByPk(account.pubkey);
+      let sanitized = sanitizeAccount(decodedAcc);
+
+      for (const plugin of pluginsByAccountType[accName]) {
+        if (plugin?.processAccount) {
+          sanitized = await plugin.processAccount(sanitized, t);
         }
-        
+      }
+
+      if (isDelete) {
+        await model.destroy({
+          where: {
+            address: account.pubkey,
+          },
+          transaction: t,
+        });
+      } else {
+        const isEqual =
+          existing &&
+          deepEqual(
+            _omit(sanitized, omitKeys),
+            _omit(existing.dataValues, omitKeys)
+          );
+
+        if (!isEqual) {
+          await model.upsert(
+            {
+              address: account.pubkey,
+              refreshed_at: now,
+              ...sanitized,
+            },
+            { transaction: t }
+          );
+        }
       }
 
       await t.commit();

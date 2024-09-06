@@ -380,6 +380,19 @@ describe("helium-entity-manager", () => {
       const { iotInfo } = await onboardMethod.pubkeys();
       await onboardMethod.rpc();
 
+      await hemProgram.methods
+        .setEntityActiveV0({
+          isActive: false,
+          entityKey: Buffer.from(bs58.decode(ecc)),
+        })
+        .accounts({
+          activeDeviceAuthority: activeDeviceAuthority.publicKey,
+          rewardableEntityConfig,
+          info: iotInfo!,
+        })
+        .signers([activeDeviceAuthority])
+        .rpc({ skipPreflight: true });
+
       const iotInfoAccount = await hemProgram.account.iotHotspotInfoV0.fetch(
         iotInfo!
       );
@@ -705,6 +718,20 @@ describe("helium-entity-manager", () => {
       await method.rpc({ skipPreflight: true });
       const { mobileInfo } = await method.pubkeys();
 
+
+      await hemProgram.methods
+        .setEntityActiveV0({
+          isActive: false,
+          entityKey: Buffer.from(bs58.decode(ecc)),
+        })
+        .accounts({
+          activeDeviceAuthority: activeDeviceAuthority.publicKey,
+          rewardableEntityConfig,
+          info: mobileInfo! as PublicKey,
+        })
+        .signers([activeDeviceAuthority])
+        .rpc({ skipPreflight: true });
+
       const mobileInfoAcc = await hemProgram.account.mobileHotspotInfoV0.fetch(
         mobileInfo!
       );
@@ -1005,7 +1032,7 @@ describe("helium-entity-manager", () => {
       expect(Boolean(iotInfoAccount)).to.be.true;
       const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
       expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(
-        subDaoAcc.onboardingDcFee.toNumber()
+        0
       );
     });
 
@@ -1097,7 +1124,7 @@ describe("helium-entity-manager", () => {
         );
         expect(infoAcc.isActive).to.be.false;
         const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
-        expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(5000000);
+        expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(0);
       });
 
       it("changes the metadata", async () => {

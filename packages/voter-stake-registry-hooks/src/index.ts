@@ -20,10 +20,21 @@ export { usePositions } from "./hooks/usePositions";
 export { useRegistrar } from "./hooks/useRegistrar";
 export { calcLockupMultiplier } from "./utils/calcLockupMultiplier";
 export { calcPositionVotingPower } from "./utils/calcPositionVotingPower";
+export { usePositionKeysAndProxies } from "./hooks/usePositionKeysAndProxies";
 export * from "./sdk/types";
-export { getRegistrarKey, getPositionKeys } from "./utils/getPositionKeys";
+export { useAssignProxies } from "./hooks/useAssignProxies";
+export { useUnassignProxies } from "./hooks/useUnassignProxies";
+export { useProxyAssignments } from "./hooks/useProxyAssignments"
+export { useProxiedTo } from "./hooks/useProxiedTo";
+export { votesForWalletQuery } from "./queries/votesForWalletQuery";
 export { getSubDaos } from "./utils/getSubDaos";
 export { useVoteMarkers } from "./hooks/useVoteMarkers";
 export { useVote } from "./hooks/useVote";
 export { useRelinquishVote } from "./hooks/useRelinquishVote";
 export { useRelinquishPositionVotes } from "./hooks/useRelinquishPositionVotes";
+export { useKnownProxy } from "./hooks/useKnownProxy";
+
+export { proxyAssignmentsForWalletQuery } from "./queries/proxyAssignmentsForWalletQuery";
+export { positionKeysForWalletQuery } from "./queries/positionKeysForWalletQuery";
+export { proxiesQuery } from "./queries/proxiesQuery";
+export { proxyQuery } from "./queries/proxyQuery";

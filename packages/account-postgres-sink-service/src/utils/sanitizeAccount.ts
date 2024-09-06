@@ -1,4 +1,3 @@
-import { PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
 
 const sanitizeValue = (value: any): any => {
