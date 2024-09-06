@@ -1,4 +1,4 @@
-import * as anchor from '@coral-xyz/anchor';
+import * as anchor from "@coral-xyz/anchor";
 
 const cachedIdlFetch = (() => {
   let cache: { programId: string; idl: anchor.Idl }[] = [];
@@ -22,12 +22,17 @@ const cachedIdlFetch = (() => {
       // move to front of cache
       cache.splice(0, 0, cache.splice(foundIdx, 1)[0]);
     } else {
-      idl = await anchor.Program.fetchIdl(programId, provider);
+      try {
+        idl = await anchor.Program.fetchIdl(programId, provider);
 
-      if (idl) {
-        cache.unshift({ programId, idl });
-        // prune cache to 10 items;
-        cache = cache.slice(0, 10);
+        if (idl) {
+          cache.unshift({ programId, idl });
+          // prune cache to 10 items;
+          cache = cache.slice(0, 10);
+        }
+      } catch (e) {
+        console.error(e);
+        idl = null;
       }
     }
 

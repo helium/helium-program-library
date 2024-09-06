@@ -16,13 +16,14 @@ import {
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { execSync } from "child_process";
 import { ThresholdType } from "../../packages/circuit-breaker-sdk/src";
-import { makerKey } from "../../packages/helium-entity-manager-sdk/src";
+import { makerKey, sharedMerkleKey } from "../../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../../target/types/data_credits";
 import { HeliumEntityManager } from "../../target/types/helium_entity_manager";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { LazyDistributor } from "../../target/types/lazy_distributor";
 import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
+import { IotRoutingManager } from "../../target/types/iot_routing_manager";
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =
@@ -113,6 +114,37 @@ export const initTestRewardableEntityConfig = async (
   return {
     rewardableEntityConfig: rewardableEntityConfig!,
   };
+};
+
+export const initSharedMerkle = async (program: Program<HeliumEntityManager>) => {
+  const sharedMerkle = sharedMerkleKey(3)[0];
+  const exists = !!(await program.provider.connection.getAccountInfo(sharedMerkle));
+  if (exists) {
+    return sharedMerkle;
+  }
+  const merkle = Keypair.generate();
+  const space = getConcurrentMerkleTreeAccountSize(20, 64, 17);
+  const createMerkle = SystemProgram.createAccount({
+    fromPubkey: (program.provider as anchor.AnchorProvider).wallet.publicKey,
+    newAccountPubkey: merkle.publicKey,
+    lamports: await (program.provider as anchor.AnchorProvider).connection.getMinimumBalanceForRentExemption(
+      space
+    ),
+    space: space,
+    programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  });
+  await program.methods
+    .initializeSharedMerkleV0({
+      proofSize: 3,
+    })
+    .preInstructions([createMerkle])
+    .signers([merkle])
+    .accounts({
+      merkleTree: merkle.publicKey,
+    })
+    .rpc({ skipPreflight: true });
+
+  return sharedMerkle
 };
 
 export const initTestMaker = async (
@@ -238,6 +270,20 @@ export async function ensureMemIdl(memProgram: Program<MobileEntityManager>) {
   } catch {
     execSync(
       `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/mobile_entity_manager.json ${memProgram.programId}`,
+      { stdio: "inherit", shell: "/bin/bash" }
+    );
+  }
+}
+
+export async function ensureIrmIdl(irmProgram: Program<IotRoutingManager>) {
+  try {
+    execSync(
+      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/iot_routing_manager.json ${irmProgram.programId}`,
+      { stdio: "inherit", shell: "/bin/bash" }
+    );
+  } catch {
+    execSync(
+      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/iot_routing_manager.json ${irmProgram.programId}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   }
