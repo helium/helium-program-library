@@ -180,5 +180,11 @@ export const heliumEntityManagerResolvers = combineResolvers(
     account: "dntBurner",
     owner: "payer",
   }),
+  ataResolver({
+    instruction: "onboardDataOnlyMobileHotspotV0",
+    mint: "dntMint",
+    account: "dntBurner",
+    owner: "payer",
+  }),
   subDaoEpochInfoResolver
 );
