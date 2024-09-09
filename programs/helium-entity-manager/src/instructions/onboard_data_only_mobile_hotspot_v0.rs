@@ -1,0 +1,243 @@
+use std::str::FromStr;
+
+use crate::state::*;
+use crate::{error::ErrorCode, TESTING};
+use anchor_lang::{prelude::*, solana_program::hash::hash};
+use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
+
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token::{burn, Burn, Mint, Token},
+};
+use data_credits::{
+  cpi::{
+    accounts::{BurnCommonV0, BurnWithoutTrackingV0},
+    burn_without_tracking_v0,
+  },
+  program::DataCredits,
+  BurnWithoutTrackingArgsV0, DataCreditsV0,
+};
+use helium_sub_daos::{program::HeliumSubDaos, DaoV0, SubDaoV0};
+
+use account_compression_cpi::program::SplAccountCompression;
+use bubblegum_cpi::get_asset_id;
+use shared_utils::*;
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct OnboardDataOnlyMobileHotspotArgsV0 {
+  pub data_hash: [u8; 32],
+  pub creator_hash: [u8; 32],
+  pub root: [u8; 32],
+  pub index: u32,
+  pub location: Option<u64>,
+}
+
+#[derive(Accounts)]
+#[instruction(args: OnboardDataOnlyMobileHotspotArgsV0)]
+pub struct OnboardDataOnlyMobileHotspotV0<'info> {
+  #[account(mut)]
+  pub payer: Signer<'info>,
+  #[account(mut)]
+  pub dc_fee_payer: Signer<'info>,
+  #[account(
+    init,
+    payer = payer,
+    space = MOBILE_HOTSPOT_INFO_SIZE,
+    seeds = [
+      b"mobile_info", 
+      rewardable_entity_config.key().as_ref(),
+      &hash(&key_to_asset.entity_key[..]).to_bytes()
+    ],
+    bump,
+  )]
+  pub mobile_info: Box<Account<'info, MobileHotspotInfoV0>>,
+  #[account(mut)]
+  pub hotspot_owner: Signer<'info>,
+  /// CHECK: The merkle tree
+  pub merkle_tree: UncheckedAccount<'info>,
+  /// CHECK: Only loaded if location is being asserted
+  #[account(mut)]
+  pub dc_burner: UncheckedAccount<'info>,
+  /// CHECK: Checked by spl token when the burn command is issued (which it may not be)
+  #[account(mut)]
+  pub dnt_burner: UncheckedAccount<'info>,
+
+  #[account(
+    has_one = sub_dao,
+    constraint = rewardable_entity_config.settings.is_mobile()
+  )]
+  pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
+  #[account(
+    has_one = dc_mint,
+  )]
+  pub dao: Box<Account<'info, DaoV0>>,
+  #[account(
+    has_one = dao,
+    constraint = get_asset_id(&merkle_tree.key(), args.index.into()) == key_to_asset.asset,
+  )]
+  pub key_to_asset: Box<Account<'info, KeyToAssetV0>>,
+  #[account(
+    mut,
+    has_one = dao,
+    has_one = dnt_mint,
+  )]
+  pub sub_dao: Box<Account<'info, SubDaoV0>>,
+  #[account(mut)]
+  pub dc_mint: Box<Account<'info, Mint>>,
+  #[account(mut)]
+  pub dnt_mint: Box<Account<'info, Mint>>,
+  #[account(
+    address = Pubkey::from_str("DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx").unwrap(),
+    constraint = dnt_price.verification_level == VerificationLevel::Full @ ErrorCode::PythPriceFeedStale,
+  )]
+  pub dnt_price: Account<'info, PriceUpdateV2>,
+
+  #[account(
+    seeds=[
+      "dc".as_bytes(),
+      dc_mint.key().as_ref()
+    ],
+    seeds::program = data_credits_program.key(),
+    bump = dc.data_credits_bump,
+    has_one = dc_mint
+  )]
+  pub dc: Account<'info, DataCreditsV0>,
+
+  pub compression_program: Program<'info, SplAccountCompression>,
+  pub data_credits_program: Program<'info, DataCredits>,
+  pub token_program: Program<'info, Token>,
+  pub associated_token_program: Program<'info, AssociatedToken>,
+  pub system_program: Program<'info, System>,
+  pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
+}
+
+impl<'info> OnboardDataOnlyMobileHotspotV0<'info> {
+  pub fn burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, BurnWithoutTrackingV0<'info>> {
+    let cpi_accounts = BurnWithoutTrackingV0 {
+      burn_accounts: BurnCommonV0 {
+        data_credits: self.dc.to_account_info(),
+        burner: self.dc_burner.to_account_info(),
+        owner: self.dc_fee_payer.to_account_info(),
+        dc_mint: self.dc_mint.to_account_info(),
+        token_program: self.token_program.to_account_info(),
+        associated_token_program: self.associated_token_program.to_account_info(),
+        system_program: self.system_program.to_account_info(),
+      },
+    };
+
+    CpiContext::new(self.data_credits_program.to_account_info(), cpi_accounts)
+  }
+
+  pub fn mobile_burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Burn<'info>> {
+    let cpi_accounts = Burn {
+      mint: self.dnt_mint.to_account_info(),
+      from: self.dnt_burner.to_account_info(),
+      authority: self.payer.to_account_info(),
+    };
+
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+  }
+}
+
+pub fn handler<'info>(
+  ctx: Context<'_, '_, '_, 'info, OnboardDataOnlyMobileHotspotV0<'info>>,
+  args: OnboardDataOnlyMobileHotspotArgsV0,
+) -> Result<()> {
+  let asset_id = get_asset_id(&ctx.accounts.merkle_tree.key(), u64::from(args.index));
+
+  verify_compressed_nft(VerifyCompressedNftArgs {
+    data_hash: args.data_hash,
+    creator_hash: args.creator_hash,
+    root: args.root,
+    index: args.index,
+    compression_program: ctx.accounts.compression_program.to_account_info(),
+    merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
+    owner: ctx.accounts.hotspot_owner.key(),
+    delegate: ctx.accounts.hotspot_owner.key(),
+    proof_accounts: ctx.remaining_accounts.to_vec(),
+  })?;
+
+  let fees = ctx
+    .accounts
+    .rewardable_entity_config
+    .settings
+    .mobile_device_fees(MobileDeviceTypeV0::WifiDataOnly)
+    .ok_or(error!(ErrorCode::InvalidDeviceType))?;
+  let mut dc_fee = fees.dc_onboarding_fee;
+  let location_fee = fees.location_staking_fee;
+
+  ctx.accounts.mobile_info.set_inner(MobileHotspotInfoV0 {
+    asset: asset_id,
+    bump_seed: ctx.bumps["mobile_info"],
+    location: None,
+    is_full_hotspot: true,
+    num_location_asserts: 0,
+    is_active: false,
+    dc_onboarding_fee_paid: fees.dc_onboarding_fee,
+    device_type: MobileDeviceTypeV0::WifiDataOnly,
+    deployment_info: None,
+  });
+
+  if let Some(location) = args.location {
+    dc_fee = location_fee.checked_add(dc_fee).unwrap();
+
+    ctx.accounts.mobile_info.location = Some(location);
+    ctx.accounts.mobile_info.num_location_asserts = ctx
+      .accounts
+      .mobile_info
+      .num_location_asserts
+      .checked_add(1)
+      .unwrap();
+  }
+
+  // burn the dc tokens
+  burn_without_tracking_v0(
+    ctx.accounts.burn_ctx(),
+    BurnWithoutTrackingArgsV0 { amount: dc_fee },
+  )?;
+
+  // Burn the mobile tokens
+  let dnt_fee = fees.mobile_onboarding_fee_usd;
+  let mobile_price_oracle = &ctx.accounts.dnt_price;
+  let message = mobile_price_oracle.price_message;
+  let current_time = Clock::get()?.unix_timestamp;
+  require_gte!(
+    message
+      .publish_time
+      .saturating_add(if TESTING { 6000000 } else { 10 * 60 }.into()),
+    current_time,
+    ErrorCode::PythPriceNotFound
+  );
+  let mobile_price = message.ema_price;
+  require_gt!(mobile_price, 0);
+
+  // Remove the confidence from the price to use the most conservative price
+  // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
+  let mobile_price_with_conf = mobile_price
+    .checked_sub(i64::try_from(message.ema_conf.checked_mul(2).unwrap()).unwrap())
+    .unwrap();
+  // Exponent is a negative number, likely -8
+  // Since the price is multiplied by an extra 10^8, and we're dividing by that price, need to also multiply
+  // by the exponent
+  let exponent_dec = 10_u64
+    .checked_pow(u32::try_from(-message.exponent).unwrap())
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
+
+  require_gt!(mobile_price_with_conf, 0);
+  let mobile_fee = dnt_fee
+    .checked_mul(exponent_dec)
+    .unwrap()
+    .checked_div(mobile_price_with_conf.try_into().unwrap())
+    .unwrap();
+  if mobile_fee > 0 {
+    burn(ctx.accounts.mobile_burn_ctx(), mobile_fee)?;
+  }
+
+  resize_to_fit(
+    &ctx.accounts.payer,
+    &ctx.accounts.system_program.to_account_info(),
+    &ctx.accounts.mobile_info,
+  )?;
+
+  Ok(())
+}
