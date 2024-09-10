@@ -229,6 +229,7 @@ export const HeliumVsrStateProvider: React.FC<{
           amountLocked,
           votingPower,
           amountProxyLocked,
+          proxyAccountsByAsset,
         };
       }
 
@@ -240,7 +241,7 @@ export const HeliumVsrStateProvider: React.FC<{
       delegatedAccounts,
       proxyAccounts,
     ]);
-
+    
   const sortedPositions = useMemo(
     () =>
       positionsWithMeta?.sort((a, b) => {

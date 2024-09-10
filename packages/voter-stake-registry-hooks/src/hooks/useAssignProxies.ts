@@ -139,7 +139,7 @@ export const useAssignProxies = () => {
             })
             .prepare();
           resultingAssignments.push({
-            address: nextProxyAssignment!.toBase58(),
+            address: currentProxyAssignment!.toBase58(),
             asset: position.mint.toBase58(),
             nextVoter: recipient.toBase58(),
             voter: position.isProxiedToMe
@@ -147,9 +147,11 @@ export const useAssignProxies = () => {
               : PublicKey.default.toBase58(),
             proxyConfig: registrar.proxyConfig.toBase58(),
             index: 0,
-            expirationTime: expirationTime.toString(),
-            rentRefund: recipient.toBase58(),
-            bumpSeed: 0,
+            expirationTime:
+              proxyAssignment?.expirationTime?.toString() || expirationTime.toString(),
+            rentRefund:
+              proxyAssignment?.rentRefund?.toBase58() || recipient.toBase58(),
+            bumpSeed: proxyAssignment?.bumpSeed || 0,
           });
 
           instructions.push(instruction);
