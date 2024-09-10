@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.5](https://github.com/helium/helium-program-libary/compare/v0.9.2...v0.9.5) (2024-09-10)
+
+
+### Reverts
+
+* Revert "Add temp endpoint to fix mobile hotspots (#683)" (#685) ([3f5a4be](https://github.com/helium/helium-program-libary/commit/3f5a4be5fc7da0dcbcd10c0ade199831fc538a9b)), closes [#683](https://github.com/helium/helium-program-libary/issues/683) [#685](https://github.com/helium/helium-program-libary/issues/685) [#683](https://github.com/helium/helium-program-libary/issues/683)
+
+
+
+
+
 ## [0.9.4](https://github.com/helium/helium-program-libary/compare/v0.9.0-alpha.9...v0.9.4) (2024-08-09)
 
 **Note:** Version bump only for package @helium/helium-admin-cli
