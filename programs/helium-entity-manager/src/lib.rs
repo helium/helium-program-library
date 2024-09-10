@@ -180,4 +180,11 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     temp_standardize_entity::handler(ctx, args)
   }
+
+  pub fn onboard_data_only_mobile_hotspot_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, OnboardDataOnlyMobileHotspotV0<'info>>,
+    args: OnboardDataOnlyMobileHotspotArgsV0,
+  ) -> Result<()> {
+    onboard_data_only_mobile_hotspot_v0::handler(ctx, args)
+  }
 }

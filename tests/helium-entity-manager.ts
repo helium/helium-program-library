@@ -65,7 +65,7 @@ import { BN } from "bn.js";
 import chaiAsPromised from "chai-as-promised";
 import { createMockCompression } from "./utils/compression";
 import { loadKeypair } from "./utils/solana";
-import { keyToAssetKey } from "@helium/helium-entity-manager-sdk";
+import { keyToAssetKey, mobileInfoKey } from "@helium/helium-entity-manager-sdk";
 
 chai.use(chaiAsPromised);
 
@@ -330,7 +330,7 @@ describe("helium-entity-manager", () => {
         .accounts({ dcMint })
         .rpc({ skipPreflight: true });
     });
-    it("issues and onboards a data only hotspot", async () => {
+    it("issues and onboards an iot data only hotspot", async () => {
       let hotspotOwner = Keypair.generate();
       const issueMethod = hemProgram.methods
         .issueDataOnlyEntityV0({
@@ -382,7 +382,7 @@ describe("helium-entity-manager", () => {
 
       await hemProgram.methods
         .setEntityActiveV0({
-          isActive: false,
+          isActive: true,
           entityKey: Buffer.from(bs58.decode(ecc)),
         })
         .accounts({
@@ -406,6 +406,120 @@ describe("helium-entity-manager", () => {
       const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
       expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(
         subDaoAcc.onboardingDataOnlyDcFee.toNumber()
+      );
+    });
+
+    it("issues and onboards a mobile data only hotspot", async () => {
+      let hotspotOwner = Keypair.generate();
+      const issueMethod = hemProgram.methods
+        .issueDataOnlyEntityV0({
+          entityKey: Buffer.from(bs58.decode(ecc)),
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+        ])
+        .accounts({
+          recipient: hotspotOwner.publicKey,
+          dao,
+          eccVerifier: eccVerifier.publicKey,
+        })
+        .signers([eccVerifier]);
+
+      const { keyToAsset } = await issueMethod.pubkeys();
+      await issueMethod.rpc({ skipPreflight: true });
+
+      const ktaAcc = await hemProgram.account.keyToAssetV0.fetch(keyToAsset!);
+      expect(Boolean(ktaAcc)).to.be.true;
+      expect(ktaAcc.asset.toString()).to.eq(hotspot.toString());
+      expect(ktaAcc.dao.toString()).to.eq(dao.toString());
+
+      ({ rewardableEntityConfig } = await initTestRewardableEntityConfig(
+        hemProgram,
+        subDao,
+        {
+          mobileConfigV2: {
+            feesByDevice: [
+              {
+                deviceType: { cbrs: {} },
+                dcOnboardingFee: toBN(0, 5),
+                locationStakingFee: toBN(10, 5),
+                mobileOnboardingFeeUsd: toBN(0, 6),
+                reserved: new Array(8).fill(new BN(0)),
+              },
+              {
+                deviceType: { wifiIndoor: {} },
+                dcOnboardingFee: toBN(10, 5),
+                locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(10, 6),
+                reserved: new Array(8).fill(new BN(0)),
+              },
+              {
+                deviceType: { wifiOutdoor: {} },
+                dcOnboardingFee: toBN(10, 5),
+                locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(20, 6),
+                reserved: new Array(8).fill(new BN(0)),
+              },
+              {
+                deviceType: { wifiDataOnly: {} },
+                dcOnboardingFee: toBN(1, 5),
+                locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(1, 6),
+                reserved: new Array(8).fill(new BN(0)),
+              },
+            ],
+          },
+        }
+      ));
+
+
+      const { args } = await proofArgsAndAccounts({
+        connection: hemProgram.provider.connection,
+        assetId: hotspot,
+        getAssetFn,
+        getAssetProofFn,
+      });
+      const onboardMethod = hemProgram.methods
+        .onboardDataOnlyMobileHotspotV0({
+          ...args,
+          location: null,
+        })
+        .accounts({
+          rewardableEntityConfig,
+          hotspotOwner: hotspotOwner.publicKey,
+          keyToAsset,
+          mobileInfo: mobileInfoKey(rewardableEntityConfig, ecc)[0],
+          subDao,
+        })
+        .signers([hotspotOwner]);
+
+      const { mobileInfo } = await onboardMethod.pubkeys();
+      await onboardMethod.rpc();
+
+      await hemProgram.methods
+        .setEntityActiveV0({
+          isActive: true,
+          entityKey: Buffer.from(bs58.decode(ecc)),
+        })
+        .accounts({
+          activeDeviceAuthority: activeDeviceAuthority.publicKey,
+          rewardableEntityConfig,
+          info: mobileInfo!,
+        })
+        .signers([activeDeviceAuthority])
+        .rpc({ skipPreflight: true });
+
+      const mobileInfoAccount = await hemProgram.account.mobileHotspotInfoV0.fetch(
+        mobileInfo!
+      );
+      expect(Boolean(mobileInfoAccount)).to.be.true;
+      expect(mobileInfoAccount.asset.toString()).to.eq(hotspot.toString());
+      expect(mobileInfoAccount.location).to.be.null;
+      expect(Object.keys(mobileInfoAccount.deviceType)[0]).to.eq("wifiDataOnly");
+
+      const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
+      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(
+        100000
       );
     });
 
@@ -595,6 +709,13 @@ describe("helium-entity-manager", () => {
                 mobileOnboardingFeeUsd: toBN(20, 6),
                 reserved: new Array(8).fill(new BN(0)),
               },
+              {
+                deviceType: { wifiDataOnly: {} },
+                dcOnboardingFee: toBN(1, 5),
+                locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(1, 6),
+                reserved: new Array(8).fill(new BN(0)),
+              },
             ],
           },
         }
@@ -721,7 +842,7 @@ describe("helium-entity-manager", () => {
 
       await hemProgram.methods
         .setEntityActiveV0({
-          isActive: false,
+          isActive: true,
           entityKey: Buffer.from(bs58.decode(ecc)),
         })
         .accounts({
@@ -849,6 +970,13 @@ describe("helium-entity-manager", () => {
                     dcOnboardingFee: toBN(10, 5),
                     locationStakingFee: toBN(0, 5),
                     mobileOnboardingFeeUsd: toBN(20, 6),
+                    reserved: new Array(8).fill(new BN(0)),
+                  },
+                  {
+                    deviceType: { wifiDataOnly: {} },
+                    dcOnboardingFee: toBN(1, 5),
+                    locationStakingFee: toBN(0, 5),
+                    mobileOnboardingFeeUsd: toBN(1, 6),
                     reserved: new Array(8).fill(new BN(0)),
                   },
                 ],

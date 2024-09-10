@@ -66,7 +66,6 @@ pub struct OnboardDataOnlyIotHotspotV0<'info> {
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
 
   #[account(
-    mut,
     seeds = ["data_only_config".as_bytes(), dao.key().as_ref()],
     bump,
     has_one = merkle_tree,

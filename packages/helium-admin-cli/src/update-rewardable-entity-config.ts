@@ -139,6 +139,13 @@ export async function run(args: any = process.argv) {
             mobileOnboardingFeeUsd: toBN(20, 6),
             reserved: new Array(8).fill(new BN(0)),
           },
+          {
+            deviceType: { wifiDataOnly: {} },
+            dcOnboardingFee: toBN(1, 5),
+            locationStakingFee: toBN(0, 5),
+            mobileOnboardingFeeUsd: toBN(1, 6),
+            reserved: new Array(8).fill(new BN(0)),
+          },
         ],
       },
     };

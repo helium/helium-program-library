@@ -18,6 +18,7 @@ pub enum MobileDeviceTypeV0 {
   Cbrs,
   WifiIndoor,
   WifiOutdoor,
+  WifiDataOnly,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
