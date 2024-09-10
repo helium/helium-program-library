@@ -498,7 +498,7 @@ describe("helium-entity-manager", () => {
 
       await hemProgram.methods
         .setEntityActiveV0({
-          isActive: false,
+          isActive: true,
           entityKey: Buffer.from(bs58.decode(ecc)),
         })
         .accounts({
