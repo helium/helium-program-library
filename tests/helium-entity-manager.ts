@@ -433,6 +433,46 @@ describe("helium-entity-manager", () => {
       expect(ktaAcc.asset.toString()).to.eq(hotspot.toString());
       expect(ktaAcc.dao.toString()).to.eq(dao.toString());
 
+      ({ rewardableEntityConfig } = await initTestRewardableEntityConfig(
+        hemProgram,
+        subDao,
+        {
+          mobileConfigV2: {
+            feesByDevice: [
+              {
+                deviceType: { cbrs: {} },
+                dcOnboardingFee: toBN(0, 5),
+                locationStakingFee: toBN(10, 5),
+                mobileOnboardingFeeUsd: toBN(0, 6),
+                reserved: new Array(8).fill(new BN(0)),
+              },
+              {
+                deviceType: { wifiIndoor: {} },
+                dcOnboardingFee: toBN(10, 5),
+                locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(10, 6),
+                reserved: new Array(8).fill(new BN(0)),
+              },
+              {
+                deviceType: { wifiOutdoor: {} },
+                dcOnboardingFee: toBN(10, 5),
+                locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(20, 6),
+                reserved: new Array(8).fill(new BN(0)),
+              },
+              {
+                deviceType: { wifiDataOnly: {} },
+                dcOnboardingFee: toBN(1, 5),
+                locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(1, 6),
+                reserved: new Array(8).fill(new BN(0)),
+              },
+            ],
+          },
+        }
+      ));
+
+
       const { args } = await proofArgsAndAccounts({
         connection: hemProgram.provider.connection,
         assetId: hotspot,
