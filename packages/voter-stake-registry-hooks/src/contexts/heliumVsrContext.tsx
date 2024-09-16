@@ -8,19 +8,12 @@ import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry"
 import { init as initNftProxy } from "@helium/nft-proxy-sdk";
 import { truthy } from "@helium/spl-utils";
 import {
-  ProxyAssignment,
   VoteService,
   getRegistrarKey,
   init,
 } from "@helium/voter-stake-registry-sdk";
 import { Connection, PublicKey } from "@solana/web3.js";
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState
-} from "react";
+import React, { createContext, useContext, useMemo } from "react";
 import { useAsync } from "react-async-hook";
 import { useDelegatedPositions } from "../hooks/useDelegatedPositions";
 import { usePositionKeysAndProxies } from "../hooks/usePositionKeysAndProxies";
@@ -78,6 +71,9 @@ export const HeliumVsrStateProvider: React.FC<{
   children: React.ReactNode;
   heliumVoteUri?: string;
 }> = ({ heliumVoteUri, wallet, mint, connection, children }) => {
+  const me = useMemo(() => wallet?.publicKey, [wallet?.publicKey?.toBase58()]);
+  const now = useSolanaUnixNow(60 * 5 * 1000);
+
   const provider = useMemo(() => {
     if (connection && wallet) {
       return new AnchorProvider(connection, wallet, {
@@ -87,15 +83,14 @@ export const HeliumVsrStateProvider: React.FC<{
       });
     }
   }, [connection?.rpcEndpoint, wallet?.publicKey?.toBase58()]);
-  const me = useMemo(() => wallet?.publicKey, [wallet?.publicKey?.toBase58()]);
 
-  /// Allow refetching all NFTs by incrementing call index
-  const [callIndex, setCallIndex] = useState(0);
-  const refetch = useCallback(() => setCallIndex((i) => i + 1), [setCallIndex]);
   const registrarKey = useMemo(
     () => mint && getRegistrarKey(mint),
     [mint?.toBase58()]
   );
+
+  const { info: registrar } = useRegistrar(registrarKey);
+
   const urlVoteService = useMemo(() => {
     return heliumVoteUri && registrarKey
       ? new VoteService({
@@ -104,6 +99,7 @@ export const HeliumVsrStateProvider: React.FC<{
         })
       : undefined;
   }, [heliumVoteUri, registrarKey]);
+
   // Allow vote service either from native rpc or from api
   const { result: programVoteService } = useAsync(async () => {
     if (registrarKey) {
@@ -118,17 +114,19 @@ export const HeliumVsrStateProvider: React.FC<{
       }
     }
   }, [provider, registrarKey, urlVoteService]);
+
   const voteService = useMemo(
     () => urlVoteService ?? programVoteService,
     [urlVoteService, programVoteService]
   );
-  const { info: registrar } = useRegistrar(registrarKey);
+
   const {
     positionKeys,
     proxiedPositionKeys,
     proxies: proxyAccounts,
     isLoading,
     error,
+    refetch,
   } = usePositionKeysAndProxies({
     wallet: me,
     provider,
@@ -138,6 +136,7 @@ export const HeliumVsrStateProvider: React.FC<{
   const delegatedPositionKeys = useMemo(() => {
     return positionKeys?.map((pk) => delegatedPositionKey(pk)[0]);
   }, [positionKeys]);
+
   const { accounts: delegatedAccounts, loading: loadingDel } =
     useDelegatedPositions(delegatedPositionKeys);
 
@@ -147,13 +146,17 @@ export const HeliumVsrStateProvider: React.FC<{
       return acc;
     }, {} as Record<string, ProxyAssignmentV0>);
   }, [proxyAccounts]);
+
   const myOwnedPositionsEndIdx = positionKeys?.length;
+
   // Assume that my positions are a small amount, so we don't need to say they're static
   const { accounts: myPositions, loading: loadingMyPositions } =
     usePositions(positionKeys);
+
   // Proxied positions may be a lot, set to static
   const { accounts: proxiedPositions, loading: loadingDelPositions } =
     usePositions(proxiedPositionKeys, true);
+
   const positions = useMemo(() => {
     const uniquePositions = new Map();
     [...(myPositions || []), ...(proxiedPositions || [])].forEach(
@@ -165,7 +168,6 @@ export const HeliumVsrStateProvider: React.FC<{
     );
     return Array.from(uniquePositions.values());
   }, [myPositions, proxiedPositions]);
-  const now = useSolanaUnixNow(60 * 5 * 1000);
 
   const { amountLocked, votingPower, positionsWithMeta, amountProxyLocked } =
     useMemo(() => {
@@ -241,7 +243,7 @@ export const HeliumVsrStateProvider: React.FC<{
       delegatedAccounts,
       proxyAccounts,
     ]);
-    
+
   const sortedPositions = useMemo(
     () =>
       positionsWithMeta?.sort((a, b) => {
