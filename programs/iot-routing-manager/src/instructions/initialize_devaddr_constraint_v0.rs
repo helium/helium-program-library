@@ -24,6 +24,7 @@ pub struct InitializeDevaddrConstraintV0<'info> {
   pub payer: Signer<'info>,
   pub authority: Signer<'info>,
   #[account(
+    mut,
     has_one = authority,
   )]
   pub net_id: Box<Account<'info, NetIdV0>>,
