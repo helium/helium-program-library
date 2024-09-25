@@ -1,4 +1,4 @@
-import { AnchorProvider, Program, Provider } from "@coral-xyz/anchor";
+import anchor, { AnchorProvider, Program, Provider } from "@coral-xyz/anchor";
 import {
   AddressLookupTableAccount,
   Commitment,
@@ -6,7 +6,6 @@ import {
   Connection,
   Finality,
   Keypair,
-  Message,
   PublicKey,
   RpcResponseAndContext,
   SendOptions,
@@ -14,6 +13,7 @@ import {
   Signer,
   SimulatedTransactionResponse,
   Transaction,
+  TransactionConfirmationStatus,
   TransactionInstruction,
   TransactionMessage,
   TransactionSignature,
@@ -941,4 +941,40 @@ export async function batchParallelInstructionsWithPriorityFee(
     extraSigners,
     maxSignatureBatch
   );
+}
+
+export async function confirmTransaction(
+  provider: AnchorProvider,
+  signature: string,
+  confirmationStatus: TransactionConfirmationStatus = "finalized",
+  timeout: number = 15000,
+  pollingInterval: number = 500
+): Promise<anchor.web3.RpcResponseAndContext<anchor.web3.SignatureResult>> {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    const statuses = await provider.connection.getSignatureStatuses([
+      signature,
+    ]);
+
+    const status = statuses.value?.[0];
+
+    if (status?.confirmationStatus === confirmationStatus) {
+      return {
+        context: {
+          slot: status.slot || 0,
+        },
+        value: status,
+      };
+    }
+
+    if (status?.err) {
+      throw new Error("Transaction failed");
+    }
+
+    // Wait for the polling interval before checking again
+    await new Promise((resolve) => setTimeout(resolve, pollingInterval));
+  }
+
+  throw new Error("Transaction confirmation timed out");
 }

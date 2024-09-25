@@ -45,6 +45,7 @@
     "@helium/helium-sub-daos-sdk": "^0.9.6",
     "@helium/lazy-distributor-sdk": "^0.9.6",
     "@helium/lazy-transactions-sdk": "^0.9.6",
+    "@helium/spl-utils": "^0.9.6",
     "@helium/treasury-management-sdk": "^0.9.6",
     "@helium/voter-stake-registry-sdk": "^0.9.6",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",

@@ -1,6 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { idlAddress } from "@coral-xyz/anchor/dist/cjs/idl";
 import {
+  confirmTransaction,
   createAtaAndMintInstructions,
   createMintInstructions,
   sendInstructions,
@@ -8,15 +9,12 @@ import {
   withPriorityFees,
 } from "@helium/spl-utils";
 import {
-  createCreateMetadataAccountV3Instruction,
   PROGRAM_ID as METADATA_PROGRAM_ID,
+  createCreateMetadataAccountV3Instruction,
 } from "@metaplex-foundation/mpl-token-metadata";
 import {
   AccountMetaData,
   BPF_UPGRADE_LOADER_ID,
-  getGovernanceProgramVersion,
-  getProposalTransactionAddress,
-  getTokenOwnerRecordAddress,
   Governance,
   GovernanceAccountParser,
   InstructionData,
@@ -24,6 +22,10 @@ import {
   Realm,
   Vote,
   VoteType,
+  YesNoVote,
+  getGovernanceProgramVersion,
+  getProposalTransactionAddress,
+  getTokenOwnerRecordAddress,
   withAddSignatory,
   withCastVote,
   withCreateProposal,
@@ -34,7 +36,6 @@ import {
   withRelinquishVote,
   withSignOffProposal,
   withWithdrawGoverningTokens,
-  YesNoVote,
 } from "@solana/spl-governance";
 import {
   AuthorityType,
@@ -49,9 +50,9 @@ import {
   Connection,
   Keypair,
   PublicKey,
-  Signer,
   SYSVAR_CLOCK_PUBKEY,
   SYSVAR_RENT_PUBKEY,
+  Signer,
   TransactionInstruction,
   TransactionMessage,
   VersionedTransaction,
@@ -489,7 +490,7 @@ export async function sendInstructionsOrCreateProposal({
           console.log("Created lookup table since ix too big", lut.toBase58());
           await tx.sign([walletSigner!]);
           const sent = await provider.connection.sendTransaction(tx);
-          await provider.connection.confirmTransaction(sent, "confirmed");
+          await confirmTransaction(provider, sent, "confirmed");
           console.log(`Added tx ${idx}`, sent);
 
           await AddressLookupTableProgram.closeLookupTable({
@@ -785,12 +786,7 @@ export async function sendInstructionsOrSquads({
       await withPriorityFees({
         connection: provider.connection,
         instructions: [
-          await squads.buildAddInstruction(
-            multisig,
-            txKey,
-            ix,
-            index
-          ),
+          await squads.buildAddInstruction(multisig, txKey, ix, index),
         ],
         computeUnits: 200000,
       })
@@ -798,15 +794,14 @@ export async function sendInstructionsOrSquads({
     index++;
   }
 
-  const ixs: TransactionInstruction[] = []
-  ixs.push(await squads.buildActivateTransaction(multisig, txKey))
-  ixs.push(await squads.buildApproveTransaction(multisig, txKey))
+  const ixs: TransactionInstruction[] = [];
+  ixs.push(await squads.buildActivateTransaction(multisig, txKey));
+  ixs.push(await squads.buildApproveTransaction(multisig, txKey));
 
   if (executeTransaction) {
-    ixs.push(await squads.buildExecuteTransaction(
-      txKey,
-      provider.wallet.publicKey
-    ));
+    ixs.push(
+      await squads.buildExecuteTransaction(txKey, provider.wallet.publicKey)
+    );
   }
 
   await sendInstructions(
@@ -814,10 +809,10 @@ export async function sendInstructionsOrSquads({
     await withPriorityFees({
       connection: provider.connection,
       computeUnits: 1000000,
-      instructions: ixs
+      instructions: ixs,
     }),
     signers
-  )
+  );
 }
 
 export async function parseEmissionsSchedule(filepath: string) {

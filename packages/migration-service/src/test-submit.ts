@@ -1,4 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
+import { confirmTransaction } from "@helium/spl-utils";
 import axios from "axios";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -22,8 +23,8 @@ const yarg = yargs(hideBin(process.argv)).options({
   },
   targetWallet: {
     alias: "t",
-    type: "string"
-  }
+    type: "string",
+  },
 });
 
 async function run() {
@@ -33,25 +34,36 @@ async function run() {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
-  const txs = (await axios.get(`${argv.migrateUrl}/migrate/${argv.targetWallet}`)).data.transactions;
-  const txids = await Promise.all(txs.map(async tx => await provider.connection.sendRawTransaction(
-    Buffer.from(tx),
-    {
-      skipPreflight: true
-    }
-  )));
+  const txs = (
+    await axios.get(`${argv.migrateUrl}/migrate/${argv.targetWallet}`)
+  ).data.transactions;
+  const txids = await Promise.all(
+    txs.map(
+      async (tx) =>
+        await provider.connection.sendRawTransaction(Buffer.from(tx), {
+          skipPreflight: true,
+        })
+    )
+  );
   console.log("Sending", txids);
-  const success = await Promise.all(txids.map(async txid => {
-    const tx = await provider.connection.confirmTransaction(txid, "processed");
-    if(tx.value.err) {
-      const tx = await provider.connection.getTransaction(txid);
-      console.error(txid, tx!.meta!.logMessages?.join("\n"));
-    }
-    return !tx.value.err
-  }));
+  const success = await Promise.all(
+    txids.map(async (txid) => {
+      const tx = await confirmTransaction(provider, txid, "processed");
+      if (tx.value.err) {
+        const tx = await provider.connection.getTransaction(txid);
+        console.error(txid, tx!.meta!.logMessages?.join("\n"));
+      }
+      return !tx.value.err;
+    })
+  );
 
-
-  console.log("done", success.filter(s => !s).length, "failed", success.filter(s => s).length, "succeeded");
+  console.log(
+    "done",
+    success.filter((s) => !s).length,
+    "failed",
+    success.filter((s) => s).length,
+    "succeeded"
+  );
 }
 
 run()
