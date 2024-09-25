@@ -12,6 +12,7 @@ import {
   createMintInstructions,
   proofArgsAndAccounts,
   sendInstructions,
+  confirmTransaction,
   toBN,
 } from "@helium/spl-utils";
 import { AddGatewayV1 } from "@helium/transactions";
@@ -783,7 +784,7 @@ describe("helium-entity-manager", () => {
         .signers([makerKeypair])
         .transaction();
       tx.recentBlockhash = (
-        await provider.connection.getRecentBlockhash()
+        await provider.connection.getLatestBlockhash()
       ).blockhash;
       tx.feePayer = provider.wallet.publicKey;
       tx.partialSign(makerKeypair);
@@ -803,7 +804,8 @@ describe("helium-entity-manager", () => {
       const sig = await provider.connection.sendRawTransaction(
         Buffer.from(transaction, "hex")
       );
-      await provider.connection.confirmTransaction(sig);
+
+      await confirmTransaction(provider, sig);
     });
 
     it("issues a mobile hotspot", async () => {
