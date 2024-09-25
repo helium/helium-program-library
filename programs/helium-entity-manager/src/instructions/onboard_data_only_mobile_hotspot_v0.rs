@@ -44,7 +44,7 @@ pub struct OnboardDataOnlyMobileHotspotV0<'info> {
     payer = payer,
     space = MOBILE_HOTSPOT_INFO_SIZE,
     seeds = [
-      b"mobile_info", 
+      b"mobile_info",
       rewardable_entity_config.key().as_ref(),
       &hash(&key_to_asset.entity_key[..]).to_bytes()
     ],
@@ -178,7 +178,7 @@ pub fn handler<'info>(
     asset: asset_id,
     bump_seed: ctx.bumps["mobile_info"],
     location: None,
-    is_full_hotspot: true,
+    is_full_hotspot: false,
     num_location_asserts: 0,
     is_active: false,
     dc_onboarding_fee_paid: fees.dc_onboarding_fee,
