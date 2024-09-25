@@ -65,7 +65,10 @@ import { BN } from "bn.js";
 import chaiAsPromised from "chai-as-promised";
 import { createMockCompression } from "./utils/compression";
 import { loadKeypair } from "./utils/solana";
-import { keyToAssetKey, mobileInfoKey } from "@helium/helium-entity-manager-sdk";
+import {
+  keyToAssetKey,
+  mobileInfoKey,
+} from "@helium/helium-entity-manager-sdk";
 
 chai.use(chaiAsPromised);
 
@@ -472,7 +475,6 @@ describe("helium-entity-manager", () => {
         }
       ));
 
-
       const { args } = await proofArgsAndAccounts({
         connection: hemProgram.provider.connection,
         assetId: hotspot,
@@ -509,18 +511,18 @@ describe("helium-entity-manager", () => {
         .signers([activeDeviceAuthority])
         .rpc({ skipPreflight: true });
 
-      const mobileInfoAccount = await hemProgram.account.mobileHotspotInfoV0.fetch(
-        mobileInfo!
-      );
+      const mobileInfoAccount =
+        await hemProgram.account.mobileHotspotInfoV0.fetch(mobileInfo!);
       expect(Boolean(mobileInfoAccount)).to.be.true;
       expect(mobileInfoAccount.asset.toString()).to.eq(hotspot.toString());
       expect(mobileInfoAccount.location).to.be.null;
-      expect(Object.keys(mobileInfoAccount.deviceType)[0]).to.eq("wifiDataOnly");
+      expect(mobileInfoAccount.isFullHotspot).to.be.false;
+      expect(Object.keys(mobileInfoAccount.deviceType)[0]).to.eq(
+        "wifiDataOnly"
+      );
 
       const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
-      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(
-        100000
-      );
+      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(100000);
     });
 
     it("can swap tree when it's full", async () => {
@@ -838,7 +840,6 @@ describe("helium-entity-manager", () => {
 
       await method.rpc({ skipPreflight: true });
       const { mobileInfo } = await method.pubkeys();
-
 
       await hemProgram.methods
         .setEntityActiveV0({
@@ -1159,9 +1160,7 @@ describe("helium-entity-manager", () => {
       );
       expect(Boolean(iotInfoAccount)).to.be.true;
       const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
-      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(
-        0
-      );
+      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(0);
     });
 
     it("updates entity config", async () => {
