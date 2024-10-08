@@ -1,7 +1,9 @@
+use std::cmp::min;
+
+use anchor_lang::prelude::*;
+
 use super::{Lockup, LockupKind, VotingMintConfigV0};
 use crate::error::*;
-use anchor_lang::prelude::*;
-use std::cmp::min;
 
 pub const PRECISION_FACTOR: u128 = 1_000_000_000_000;
 

@@ -1,6 +1,6 @@
-use crate::error::*;
-use crate::state::voting_mint_config::VotingMintConfigV0;
 use anchor_lang::prelude::*;
+
+use crate::{error::*, state::voting_mint_config::VotingMintConfigV0};
 
 // Instance of a voting rights distributor.
 #[account]
@@ -24,6 +24,7 @@ pub struct Registrar {
   pub reserved2: [u64; 3], // split because `Default` does not support [u8; 60]
   pub proxy_config: Pubkey,
   pub voting_mints: Vec<VotingMintConfigV0>,
+  pub recent_proposals: [Pubkey; 4],
 }
 
 impl Registrar {

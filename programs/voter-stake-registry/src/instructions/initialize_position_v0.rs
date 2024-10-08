@@ -1,20 +1,20 @@
-use crate::error::VsrError;
-use crate::position_seeds;
-use crate::registrar_seeds;
-use crate::state::*;
+use std::{convert::TryFrom, mem::size_of};
+
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token;
-use anchor_spl::token::FreezeAccount;
-use anchor_spl::token::{Mint, MintTo, Token, TokenAccount};
-use mpl_token_metadata::types::Collection;
-use mpl_token_metadata::types::DataV2;
-use shared_utils::create_metadata_accounts_v3;
-use shared_utils::token_metadata::{
-  verify_sized_collection_item, CreateMetadataAccountsV3, Metadata, VerifyCollectionItem,
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token,
+  token::{FreezeAccount, Mint, MintTo, Token, TokenAccount},
 };
-use std::convert::TryFrom;
-use std::mem::size_of;
+use mpl_token_metadata::types::{Collection, DataV2};
+use shared_utils::{
+  create_metadata_accounts_v3,
+  token_metadata::{
+    verify_sized_collection_item, CreateMetadataAccountsV3, Metadata, VerifyCollectionItem,
+  },
+};
+
+use crate::{error::VsrError, position_seeds, registrar_seeds, state::*};
 
 #[cfg(feature = "devnet")]
 const URL: &str = "https://positions.nft.test-helium.com";
