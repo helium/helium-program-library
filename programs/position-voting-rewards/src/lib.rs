@@ -4,8 +4,6 @@ use {default_env::default_env, solana_security_txt::security_txt};
 
 declare_id!("pvr1pJdeAcW6tzFyPRSmkL5Xwysi1Tq79f7KF2XB4zM");
 
-use anchor_spl::token::{Mint, Token, TokenAccount};
-
 #[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
   name: "Position Voting Rewards",
@@ -28,8 +26,37 @@ pub mod instructions;
 pub mod state;
 pub mod util;
 
+use instructions::*;
+
 #[program]
 pub mod position_voting_rewards {
-
   use super::*;
+
+  pub fn initialize_vetoken_tracker_v0(ctx: Context<InitializeVeTokenTrackerV0>) -> Result<()> {
+    initialize_vetoken_tracker_v0::handler(ctx)
+  }
+
+  pub fn enroll_v0(ctx: Context<EnrollV0>) -> Result<()> {
+    enroll_v0::handler(ctx)
+  }
+
+  pub fn claim_rewards_v0(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result<()> {
+    claim_rewards_v0::handler(ctx, args)
+  }
+
+  pub fn reset_lockup_v0(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<()> {
+    reset_lockup_v0::handler(ctx, args)
+  }
+
+  pub fn transfer_v0(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
+    transfer_v0::handler(ctx, args)
+  }
+
+  pub fn unenroll_v0(ctx: Context<UnenrollV0>) -> Result<()> {
+    unenroll_v0::handler(ctx)
+  }
+
+  pub fn track_vote_v0(ctx: Context<TrackVoteV0>) -> Result<()> {
+    track_vote_v0::handler(ctx)
+  }
 }

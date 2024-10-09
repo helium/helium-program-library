@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use anchor_lang::prelude::*;
 
 use crate::{
@@ -15,13 +13,19 @@ pub struct EnrolledPositionV0 {
   pub position: Pubkey,
   pub start_ts: i64,
   pub is_rewards_enrolled: bool,
-  pub recent_proposals: [Pubkey; 4],
   pub last_claimed_epoch: u64, // the latest epoch not included claimed_epochs_bitmap
   // A bitmap of epochs past last_claimed_epoch (exclusive) that have been claimed.
   // This bitmap gets rotated as last_claimed_epoch increases.
   // This allows for claiming ~128 epochs worth of rewards in parallel.
   pub claimed_epochs_bitmap: u128,
   pub bump_seed: u8,
+  pub recent_proposals: Vec<RecentProposal>,
+}
+
+#[derive(Default, Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct RecentProposal {
+  pub proposal: Pubkey,
+  pub ts: i64,
 }
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
@@ -59,62 +63,27 @@ impl EnrolledPositionV0 {
   }
 
   // Add a proposal to the recent proposals list
-  pub fn add_recent_proposal(&mut self, proposal_key: Pubkey, valid_proposals: &[Pubkey]) {
-    self.clean_recent_proposals(valid_proposals);
+  pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
+    let new_proposal = RecentProposal { proposal, ts };
 
-    let recent_proposals = &mut self.recent_proposals;
-    if !recent_proposals.contains(&proposal_key) && valid_proposals.contains(&proposal_key) {
-      if let Some(index) = recent_proposals
-        .iter()
-        .position(|&x| x == Pubkey::default())
-      {
-        recent_proposals[index] = proposal_key;
-      } else {
-        // Shift array to the left
-        for i in 0..recent_proposals.len() - 1 {
-          recent_proposals[i] = recent_proposals[i + 1];
-        }
-        recent_proposals[recent_proposals.len() - 1] = proposal_key;
-      }
-    }
-  }
-
-  // Remove a proposal from the recent proposals list
-  pub fn remove_recent_proposal(&mut self, proposal_key: Pubkey, valid_proposals: &[Pubkey]) {
-    self.clean_recent_proposals(valid_proposals);
-
-    let recent_proposals = &mut self.recent_proposals;
-    if let Some(index) = recent_proposals.iter().position(|&x| x == proposal_key) {
-      // Shift elements to the left, overwriting the removed proposal
-      for i in index..recent_proposals.len() - 1 {
-        recent_proposals[i] = recent_proposals[i + 1];
-      }
-      // Set the last element to Pubkey::default()
-      recent_proposals[recent_proposals.len() - 1] = Pubkey::default();
-    }
-  }
-
-  // Remove all proposals that are not in the valid_proposals list
-  fn clean_recent_proposals(&mut self, valid_proposals: &[Pubkey]) {
-    for proposal in self.recent_proposals.iter_mut() {
-      if *proposal != Pubkey::default() && !valid_proposals.contains(proposal) {
-        *proposal = Pubkey::default();
-      }
-    }
-    self.compact_recent_proposals();
-  }
-
-  // Remove all Pubkey defaults and place them at the end of the array
-  fn compact_recent_proposals(&mut self) {
-    let non_default = self
+    // Find the insertion point to maintain descending order by timestamp
+    let insert_index = self
       .recent_proposals
       .iter()
-      .filter(|&&pubkey| pubkey != Pubkey::default())
-      .cloned()
-      .collect::<Vec<_>>();
+      .position(|p| p.ts <= ts)
+      .unwrap_or(self.recent_proposals.len());
 
-    self.recent_proposals.fill(Pubkey::default());
-    self.recent_proposals[..non_default.len()].copy_from_slice(&non_default);
+    // Insert the new proposal
+    self.recent_proposals.insert(insert_index, new_proposal);
+  }
+
+  pub fn remove_recent_proposal(&mut self, proposal: Pubkey) {
+    self.recent_proposals.retain(|p| p.proposal != proposal);
+  }
+
+  // Remove proposals older than the given timestamp
+  pub fn remove_proposals_older_than(&mut self, ts: i64) {
+    self.recent_proposals.retain(|p| p.ts >= ts);
   }
 }
 
@@ -125,6 +94,7 @@ pub struct VsrEpochInfoV0 {
   pub vetoken_tracker: Pubkey,
   pub registrar: Pubkey,
   pub initialized: bool,
+  pub recent_proposals: [Pubkey; 4],
   pub vetokens_at_epoch_start: u128,
   /// The number of enrollment rewards issued this epoch, so that enrollies can claim their share of the rewards
   pub rewards_amount: u64,
@@ -165,14 +135,27 @@ impl VsrEpochInfoV0 {
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct VeTokenTrackerV0 {
   pub registrar: Pubkey,
   pub rewards_mint: Pubkey,
+  pub rewards_authority: Pubkey,
   pub vetoken_last_calculated_ts: i64,
   pub vetoken_fall_rate: u128, // the vetoken amount that the position decays by per second, with 12 decimals of extra precision
   pub total_vetokens: u128, // the total amount of vetoken staked to this subdao, with 12 decimals of extra precision
   pub recent_proposals: [Pubkey; 4],
   pub bump_seed: u8,
+}
+
+#[macro_export]
+macro_rules! vetoken_tracker_seeds {
+  ( $vt:expr ) => {
+    &[
+      b"vetoken_tracker".as_ref(),
+      $vt.registrar.as_ref(),
+      &[$vt.bump_seed],
+    ]
+  };
 }
 
 impl VeTokenTrackerV0 {

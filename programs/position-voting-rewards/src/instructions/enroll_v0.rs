@@ -204,6 +204,7 @@ pub fn handler(ctx: Context<EnrollV0>) -> Result<()> {
             initialized: false,
             registrar: ctx.accounts.registrar.key(),
             rewards_amount: 0,
+            recent_proposals: [Pubkey::default(); 4],
           },
         },
         &[
