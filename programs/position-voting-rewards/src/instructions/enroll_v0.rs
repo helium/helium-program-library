@@ -1,6 +1,9 @@
+use std::array;
+
 use anchor_lang::{prelude::*, Discriminator};
 use anchor_spl::token::{Mint, TokenAccount};
 use voter_stake_registry::{
+  cpi::{accounts::FreezePositionV0, freeze_position_v0},
   state::{LockupKind, PositionV0, Registrar},
   VoterStakeRegistry,
 };
@@ -10,8 +13,9 @@ use crate::{
   create_account::{create_and_serialize_account_signed, AccountMaxSize},
   error::ErrorCode,
   id,
-  state::{EnrolledPositionV0, VeTokenTrackerV0, VsrEpochInfoV0},
-  util::*,
+  state::{EnrolledPositionV0, RecentProposal, VeTokenTrackerV0, VsrEpochInfoV0},
+  util::{calculate_vetoken_info, current_epoch, VetokenInfo},
+  vetoken_tracker_seeds,
 };
 
 #[derive(Accounts)]
@@ -41,7 +45,7 @@ pub struct EnrollV0<'info> {
     mut,
     has_one = registrar,
   )]
-  pub vetoken_tracker: Account<'info, VeTokenTrackerV0>,
+  pub vetoken_tracker: Box<Account<'info, VeTokenTrackerV0>>,
   #[account(
     init_if_needed,
     payer = payer,
@@ -204,7 +208,7 @@ pub fn handler(ctx: Context<EnrollV0>) -> Result<()> {
             initialized: false,
             registrar: ctx.accounts.registrar.key(),
             rewards_amount: 0,
-            recent_proposals: [Pubkey::default(); 4],
+            recent_proposals: array::from_fn(|_| RecentProposal::default()),
           },
         },
         &[
@@ -259,7 +263,16 @@ pub fn handler(ctx: Context<EnrollV0>) -> Result<()> {
 
   ctx.accounts.vsr_epoch_info.vetoken_tracker = ctx.accounts.vetoken_tracker.key();
   ctx.accounts.vsr_epoch_info.bump_seed = *ctx.bumps.get("vsr_epoch_info").unwrap();
-  ctx.accounts.vsr_epoch_info.initialized = true;
+
+  freeze_position_v0(CpiContext::new_with_signer(
+    ctx.accounts.vsr_program.to_account_info(),
+    FreezePositionV0 {
+      authority: ctx.accounts.position_authority.to_account_info(),
+      registrar: ctx.accounts.registrar.to_account_info(),
+      position: ctx.accounts.position.to_account_info(),
+    },
+    &[vetoken_tracker_seeds!(ctx.accounts.vetoken_tracker)],
+  ))?;
 
   Ok(())
 }

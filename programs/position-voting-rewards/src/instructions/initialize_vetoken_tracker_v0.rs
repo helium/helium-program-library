@@ -1,8 +1,10 @@
+use std::array;
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use voter_stake_registry::state::Registrar;
 
-use crate::state::VeTokenTrackerV0;
+use crate::state::{RecentProposal, VeTokenTrackerV0};
 
 #[derive(Accounts)]
 pub struct InitializeVeTokenTrackerV0<'info> {
@@ -35,7 +37,7 @@ pub fn handler(ctx: Context<InitializeVeTokenTrackerV0>) -> Result<()> {
     vetoken_last_calculated_ts: ctx.accounts.registrar.clock_unix_timestamp(),
     vetoken_fall_rate: 0,
     total_vetokens: 0,
-    recent_proposals: [Pubkey::default(); 4],
+    recent_proposals: array::from_fn(|_| RecentProposal::default()),
     bump_seed: ctx.bumps["vetoken_tracker"],
   });
   Ok(())

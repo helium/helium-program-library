@@ -15,4 +15,6 @@ pub enum ErrorCode {
   NoEnrollEndingPosition,
   #[msg("Cannot change position while enrolled")]
   PositionChangeWhileEnrolled,
+  #[msg("Marker has incorrect registrar")]
+  InvalidMarker,
 }

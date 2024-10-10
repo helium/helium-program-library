@@ -1,11 +1,15 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::Mint;
 use proposal::ProposalV0;
 use voter_stake_registry::{
   state::{PositionV0, VoteMarkerV0},
   VoterStakeRegistry,
 };
 
-use crate::state::{EnrolledPositionV0, VeTokenTrackerV0};
+use crate::{
+  error::ErrorCode,
+  state::{EnrolledPositionV0, VeTokenTrackerV0},
+};
 
 #[derive(Accounts)]
 pub struct TrackVoteV0<'info> {
@@ -14,19 +18,22 @@ pub struct TrackVoteV0<'info> {
   pub proposal: Account<'info, ProposalV0>,
   #[account(
     mut,
-    has_one = registrar
+    has_one = registrar,
+    has_one = mint
   )]
   pub position: Box<Account<'info, PositionV0>>,
+  pub mint: Box<Account<'info, Mint>>,
   /// CHECK: Checked by seeds
   #[account(
-    seeds = [b"marker", position.mint.as_ref(), proposal.key().as_ref()],
-    bump ,
+    seeds = [b"marker", mint.key().as_ref(), proposal.key().as_ref()],
+    bump,
     seeds::program = vsr_program
   )]
-  pub marker: AccountInfo<'info>,
+  pub marker: UncheckedAccount<'info>,
   #[account(mut, has_one = registrar)]
-  pub ve_token_tracker: Account<'info, VeTokenTrackerV0>,
-  pub enrolled_position: Account<'info, EnrolledPositionV0>,
+  pub vetoken_tracker: Box<Account<'info, VeTokenTrackerV0>>,
+  #[account(mut, has_one = vetoken_tracker)]
+  pub enrolled_position: Box<Account<'info, EnrolledPositionV0>>,
   pub vsr_program: Program<'info, VoterStakeRegistry>,
 }
 
@@ -36,6 +43,11 @@ pub fn handler(ctx: Context<TrackVoteV0>) -> Result<()> {
   let mut voted = has_data;
   if has_data {
     let marker = VoteMarkerV0::try_from_slice(&data)?;
+    require_eq!(
+      marker.registrar,
+      ctx.accounts.registrar.key(),
+      ErrorCode::InvalidMarker
+    );
     voted = !marker.choices.is_empty();
   }
   if voted {

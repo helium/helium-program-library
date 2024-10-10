@@ -19,6 +19,7 @@ use crate::state::*;
 #[derive(AnchorSerialize, AnchorDeserialize, Default, Clone)]
 pub struct InitializeRegistrarArgsV0 {
   pub position_update_authority: Option<Pubkey>,
+  pub position_freeze_authorities: Vec<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -193,6 +194,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
     reserved1: [0; 4],
     reserved2: [0; 3],
     recent_proposals: [Pubkey::default(); 4],
+    position_freeze_authorities: args.position_freeze_authorities,
     voting_mints: Vec::new(),
     proxy_config: ctx
       .accounts

@@ -22,7 +22,7 @@ pub struct EnrolledPositionV0 {
   pub recent_proposals: Vec<RecentProposal>,
 }
 
-#[derive(Default, Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(InitSpace, Default, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct RecentProposal {
   pub proposal: Pubkey,
   pub ts: i64,
@@ -94,7 +94,7 @@ pub struct VsrEpochInfoV0 {
   pub vetoken_tracker: Pubkey,
   pub registrar: Pubkey,
   pub initialized: bool,
-  pub recent_proposals: [Pubkey; 4],
+  pub recent_proposals: [RecentProposal; 4],
   pub vetokens_at_epoch_start: u128,
   /// The number of enrollment rewards issued this epoch, so that enrollies can claim their share of the rewards
   pub rewards_amount: u64,
@@ -143,7 +143,7 @@ pub struct VeTokenTrackerV0 {
   pub vetoken_last_calculated_ts: i64,
   pub vetoken_fall_rate: u128, // the vetoken amount that the position decays by per second, with 12 decimals of extra precision
   pub total_vetokens: u128, // the total amount of vetoken staked to this subdao, with 12 decimals of extra precision
-  pub recent_proposals: [Pubkey; 4],
+  pub recent_proposals: [RecentProposal; 4],
   pub bump_seed: u8,
 }
 
@@ -210,6 +210,7 @@ impl VeTokenTrackerV0 {
       msg!("Setting vetoken_at_epoch_start to {}", self.total_vetokens,);
       curr_epoch_info.vetokens_at_epoch_start =
         apply_fall_rate_factor(self.total_vetokens).unwrap();
+      curr_epoch_info.initialized = true;
     }
     // Step 2. Update fall rate according to this epoch's closed position corrections
     if curr_epoch_info.fall_rates_from_closing_positions > 0

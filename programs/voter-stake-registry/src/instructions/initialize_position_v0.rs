@@ -168,6 +168,7 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
   };
 
   ctx.accounts.position.set_inner(PositionV0 {
+    freeze_bitmap: 0,
     registrar: ctx.accounts.registrar.key(),
     mint: ctx.accounts.mint.key(),
     bump_seed: ctx.bumps["position"],

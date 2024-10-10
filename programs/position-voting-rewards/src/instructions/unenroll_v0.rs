@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use voter_stake_registry::{
+  cpi::{accounts::ThawPositionV0, thaw_position_v0},
   state::{LockupKind, PositionV0, Registrar},
   VoterStakeRegistry,
 };
@@ -9,6 +10,7 @@ use crate::{
   id,
   state::*,
   util::{calculate_vetoken_info, current_epoch, VetokenInfo},
+  vetoken_tracker_seeds,
 };
 
 #[derive(Accounts)]
@@ -223,7 +225,6 @@ pub fn handler(ctx: Context<UnenrollV0>) -> Result<()> {
 
   ctx.accounts.vsr_epoch_info.vetoken_tracker = ctx.accounts.vetoken_tracker.key();
   ctx.accounts.vsr_epoch_info.bump_seed = *ctx.bumps.get("vsr_epoch_info").unwrap();
-  ctx.accounts.vsr_epoch_info.initialized = true;
 
   // EDGE CASE: When the closing time epoch infos are the same as the current epoch info,
   // update_subdao_vetokens will have already removed the fall rates and vetokens from the sub dao.
@@ -264,5 +265,14 @@ pub fn handler(ctx: Context<UnenrollV0>) -> Result<()> {
       .enrolled_position
       .close(ctx.accounts.position_authority.to_account_info())?;
   }
+  thaw_position_v0(CpiContext::new_with_signer(
+    ctx.accounts.vsr_program.to_account_info(),
+    ThawPositionV0 {
+      authority: ctx.accounts.position_authority.to_account_info(),
+      registrar: ctx.accounts.registrar.to_account_info(),
+      position: ctx.accounts.position.to_account_info(),
+    },
+    &[vetoken_tracker_seeds!(ctx.accounts.vetoken_tracker)],
+  ))?;
   Ok(())
 }

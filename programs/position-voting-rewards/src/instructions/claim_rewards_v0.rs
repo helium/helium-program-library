@@ -1,7 +1,9 @@
+use std::collections::HashSet;
+
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{transfer, Mint, Token, TokenAccount, Transfer},
+  token::{burn, transfer, Burn, Mint, Token, TokenAccount, Transfer},
 };
 use voter_stake_registry::{
   state::{PositionV0, Registrar},
@@ -47,6 +49,7 @@ pub struct ClaimRewardsV0<'info> {
     bump,
   )]
   pub enrolled_position: Account<'info, EnrolledPositionV0>,
+  #[account(mut)]
   pub rewards_mint: Box<Account<'info, Mint>>,
 
   #[account(
@@ -81,6 +84,16 @@ impl<'info> ClaimRewardsV0<'info> {
       from: self.rewards_pool.to_account_info(),
       to: self.enrolled_ata.to_account_info(),
       authority: self.vsr_epoch_info.to_account_info(),
+    };
+
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+  }
+
+  fn burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Burn<'info>> {
+    let cpi_accounts = Burn {
+      from: self.rewards_pool.to_account_info(),
+      authority: self.vsr_epoch_info.to_account_info(),
+      mint: self.rewards_mint.to_account_info(),
     };
 
     CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
@@ -128,14 +141,63 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   enrolled_position.set_claimed(args.epoch)?;
 
   let amount_left = ctx.accounts.rewards_pool.amount;
-  transfer(
-    ctx
-      .accounts
-      .transfer_ctx()
-      .with_signer(&[vsr_epoch_info_seeds!(ctx.accounts.vsr_epoch_info)]),
-    // Due to rounding down of vetokens fall rates it's possible the vetokens on the dao does not exactly match the
-    // vetokens remaining. It could be off by a little bit of dust.
-    std::cmp::min(rewards, amount_left),
-  )?;
+  let amount = std::cmp::min(rewards, amount_left);
+  let first_ts = ctx
+    .accounts
+    .vsr_epoch_info
+    .recent_proposals
+    .first()
+    .unwrap()
+    .ts;
+  let last_ts = ctx
+    .accounts
+    .vsr_epoch_info
+    .recent_proposals
+    .last()
+    .unwrap()
+    .ts;
+  ctx
+    .accounts
+    .enrolled_position
+    .remove_proposals_older_than(first_ts - 1);
+  let proposal_set = ctx
+    .accounts
+    .enrolled_position
+    .recent_proposals
+    .iter()
+    .filter(|p| p.ts <= last_ts)
+    .map(|rp| rp.proposal)
+    .collect::<HashSet<_>>();
+
+  // Check eligibility based on recent proposals
+  let eligible_count = ctx
+    .accounts
+    .vsr_epoch_info
+    .recent_proposals
+    .iter()
+    .filter(|&proposal| proposal_set.contains(&proposal.proposal))
+    .count();
+  if eligible_count >= 2 {
+    msg!("Position is eligible, transferring");
+    transfer(
+      ctx
+        .accounts
+        .transfer_ctx()
+        .with_signer(&[vsr_epoch_info_seeds!(ctx.accounts.vsr_epoch_info)]),
+      // Due to rounding down of vetokens fall rates it's possible the vetokens on the dao does not exactly match the
+      // vetokens remaining. It could be off by a little bit of dust.
+      amount,
+    )?;
+  } else {
+    msg!("Position is not eligible, burning");
+    burn(
+      ctx
+        .accounts
+        .burn_ctx()
+        .with_signer(&[vsr_epoch_info_seeds!(ctx.accounts.vsr_epoch_info)]),
+      amount,
+    )?;
+  }
+
   Ok(())
 }

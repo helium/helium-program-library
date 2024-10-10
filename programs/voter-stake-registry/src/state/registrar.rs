@@ -25,6 +25,7 @@ pub struct Registrar {
   pub proxy_config: Pubkey,
   pub voting_mints: Vec<VotingMintConfigV0>,
   pub recent_proposals: [Pubkey; 4],
+  pub position_freeze_authorities: Vec<Pubkey>,
 }
 
 impl Registrar {

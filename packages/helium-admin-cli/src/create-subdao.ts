@@ -362,6 +362,7 @@ export async function run(args: any = process.argv) {
       await heliumVsrProgram.methods
         .initializeRegistrarV0({
           positionUpdateAuthority: null,
+          positionFreezeAuthorities: [],
         })
         .accounts({
           realm,

@@ -44,12 +44,11 @@ pub mod position_voting_rewards {
     claim_rewards_v0::handler(ctx, args)
   }
 
-  pub fn reset_lockup_v0(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<()> {
-    reset_lockup_v0::handler(ctx, args)
-  }
-
-  pub fn transfer_v0(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
-    transfer_v0::handler(ctx, args)
+  pub fn reward_for_epoch_v0(
+    ctx: Context<RewardForEpochV0>,
+    args: RewardForEpochArgsV0,
+  ) -> Result<()> {
+    reward_for_epoch_v0::handler(ctx, args)
   }
 
   pub fn unenroll_v0(ctx: Context<UnenrollV0>) -> Result<()> {
