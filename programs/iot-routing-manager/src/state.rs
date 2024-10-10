@@ -74,7 +74,7 @@ macro_rules! net_id_seeds {
 
 #[account]
 #[derive(Default, InitSpace)]
-pub struct DevAddrConstraintV0 {
+pub struct DevaddrConstraintV0 {
   pub routing_manager: Pubkey,
   pub net_id: Pubkey,
   pub organization: Pubkey,

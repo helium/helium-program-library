@@ -38,6 +38,10 @@ pub mod iot_routing_manager {
     initialize_devaddr_constraint_v0::handler(ctx, args)
   }
 
+  pub fn remove_devaddr_constraint_v0(ctx: Context<RemoveDevaddrConstraintV0>) -> Result<()> {
+    remove_devaddr_constraint_v0::handler(ctx)
+  }
+
   pub fn initialize_net_id_v0(
     ctx: Context<InitializeNetIdV0>,
     args: InitializeNetIdArgsV0,

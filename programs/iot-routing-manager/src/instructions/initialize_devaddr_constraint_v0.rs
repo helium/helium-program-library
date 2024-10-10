@@ -3,7 +3,7 @@ use anchor_lang::{prelude::*, solana_program::pubkey};
 use anchor_spl::token::{burn, Burn, Mint, Token, TokenAccount};
 use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 
-use crate::{DevAddrConstraintV0, IotRoutingManagerV0, NetIdV0, OrganizationV0};
+use crate::{DevaddrConstraintV0, IotRoutingManagerV0, NetIdV0, OrganizationV0};
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
 
@@ -56,9 +56,9 @@ pub struct InitializeDevaddrConstraintV0<'info> {
     payer = payer,
     seeds = [b"devaddr_constraint", organization.key().as_ref(), &args.start_addr.unwrap_or(net_id.current_addr_offset).to_le_bytes()[..]],
     bump,
-    space = 8 + DevAddrConstraintV0::INIT_SPACE + 60
+    space = 8 + DevaddrConstraintV0::INIT_SPACE + 60
   )]
-  pub devaddr_constraint: Box<Account<'info, DevAddrConstraintV0>>,
+  pub devaddr_constraint: Box<Account<'info, DevaddrConstraintV0>>,
   pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
 }
@@ -134,7 +134,7 @@ pub fn handler(
   ctx
     .accounts
     .devaddr_constraint
-    .set_inner(DevAddrConstraintV0 {
+    .set_inner(DevaddrConstraintV0 {
       routing_manager: ctx.accounts.net_id.routing_manager,
       net_id: ctx.accounts.net_id.key(),
       organization: ctx.accounts.organization.key(),
