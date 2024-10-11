@@ -1,7 +1,12 @@
-use std::{cmp::Ordering, convert::TryInto};
+use std::{
+  cmp::{min, Ordering},
+  convert::TryInto,
+};
 
 use anchor_lang::prelude::*;
 use voter_stake_registry::state::{LockupKind, PositionV0, VotingMintConfigV0};
+
+use crate::error::ErrorCode;
 
 pub const EPOCH_LENGTH: i64 = 24 * 60 * 60;
 
@@ -41,7 +46,7 @@ pub fn calculate_vetoken_info(
   position: &PositionV0,
   voting_mint_config: &VotingMintConfigV0,
 ) -> Result<VetokenInfo> {
-  let vetokens_at_curr_ts = position.voting_power(voting_mint_config, curr_ts)?;
+  let vetokens_at_curr_ts = position.voting_power_precise(voting_mint_config, curr_ts)?;
 
   let has_genesis = position.genesis_end > curr_ts;
   let seconds_to_genesis = if has_genesis {
@@ -72,19 +77,19 @@ pub fn calculate_vetoken_info(
     position.lockup.seconds_left(curr_ts)
   };
   // One second before genesis end, the last moment we have the multiplier
-  let vetokens_at_genesis_end = position.voting_power(
+  let vetokens_at_genesis_end = position.voting_power_precise(
     voting_mint_config,
     curr_ts
       .checked_add(i64::try_from(seconds_to_genesis).unwrap())
       .unwrap(),
   )?;
   let vetokens_at_genesis_end_exact = if has_genesis {
-    position.voting_power(voting_mint_config, position.genesis_end)?
+    position.voting_power_precise(voting_mint_config, position.genesis_end)?
   } else {
-    position.voting_power(voting_mint_config, curr_ts)?
+    position.voting_power_precise(voting_mint_config, curr_ts)?
   };
   let vetokens_at_position_end =
-    position.voting_power(voting_mint_config, position.lockup.end_ts)?;
+    position.voting_power_precise(voting_mint_config, position.lockup.end_ts)?;
 
   let pre_genesis_end_fall_rate = calculate_fall_rate(
     vetokens_at_curr_ts,
@@ -173,6 +178,104 @@ pub fn calculate_vetoken_info(
     end_fall_rate_correction,
     end_vetoken_correction: end_vetokens_correction,
   })
+}
+
+pub trait PrecisePosition {
+  fn voting_power_precise(
+    &self,
+    voting_mint_config: &VotingMintConfigV0,
+    curr_ts: i64,
+  ) -> Result<u128>;
+  fn voting_power_precise_locked_precise(
+    &self,
+    curr_ts: i64,
+    max_locked_vote_weight: u128,
+    lockup_saturation_secs: u64,
+  ) -> Result<u128>;
+
+  fn voting_power_precise_cliff_precise(
+    &self,
+    curr_ts: i64,
+    max_locked_vote_weight: u128,
+    lockup_saturation_secs: u64,
+  ) -> Result<u128>;
+}
+
+impl PrecisePosition for PositionV0 {
+  fn voting_power_precise(
+    &self,
+    voting_mint_config: &VotingMintConfigV0,
+    curr_ts: i64,
+  ) -> Result<u128> {
+    let baseline_vote_weight = (voting_mint_config
+      .baseline_vote_weight(self.amount_deposited_native)?)
+    .checked_mul(FALL_RATE_FACTOR)
+    .unwrap();
+    let max_locked_vote_weight =
+      voting_mint_config.max_extra_lockup_vote_weight(self.amount_deposited_native)?;
+    let genesis_multiplier =
+      if curr_ts < self.genesis_end && voting_mint_config.genesis_vote_power_multiplier > 0 {
+        voting_mint_config.genesis_vote_power_multiplier
+      } else {
+        1
+      };
+
+    let locked_vote_weight = self.voting_power_precise_locked_precise(
+      curr_ts,
+      max_locked_vote_weight,
+      voting_mint_config.lockup_saturation_secs,
+    )?;
+
+    locked_vote_weight
+      .checked_add(baseline_vote_weight)
+      .unwrap()
+      .checked_mul(genesis_multiplier as u128)
+      .ok_or(error!(ErrorCode::ArithmeticError))
+  }
+
+  /// Vote power contribution from locked funds only.
+  fn voting_power_precise_locked_precise(
+    &self,
+    curr_ts: i64,
+    max_locked_vote_weight: u128,
+    lockup_saturation_secs: u64,
+  ) -> Result<u128> {
+    if self.lockup.expired(curr_ts) || (max_locked_vote_weight == 0) {
+      return Ok(0);
+    }
+
+    match self.lockup.kind {
+      LockupKind::None => Ok(0),
+      LockupKind::Cliff => self.voting_power_precise_cliff_precise(
+        curr_ts,
+        max_locked_vote_weight,
+        lockup_saturation_secs,
+      ),
+      LockupKind::Constant => self.voting_power_precise_cliff_precise(
+        curr_ts,
+        max_locked_vote_weight,
+        lockup_saturation_secs,
+      ),
+    }
+  }
+
+  fn voting_power_precise_cliff_precise(
+    &self,
+    curr_ts: i64,
+    max_locked_vote_weight: u128,
+    lockup_saturation_secs: u64,
+  ) -> Result<u128> {
+    let remaining = min(self.lockup.seconds_left(curr_ts), lockup_saturation_secs);
+    Ok(
+      (max_locked_vote_weight)
+        .checked_mul(remaining as u128)
+        .unwrap()
+        .checked_mul(FALL_RATE_FACTOR)
+        .unwrap()
+        .checked_div(lockup_saturation_secs as u128)
+        .unwrap(),
+    )
+  }
 }
 
 // Use bankers rounding

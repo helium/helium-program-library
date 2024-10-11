@@ -5,7 +5,8 @@ use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateRegistrarArgsV0 {
-  pub position_freeze_authorities: Option<Vec<Pubkey>>,
+  pub position_freeze_authorities: Vec<Pubkey>,
+  pub position_update_authority: Option<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -29,9 +30,8 @@ pub fn handler(ctx: Context<UpdateRegistrarV0>, args: UpdateRegistrarArgsV0) -> 
     .map(|k| k.key())
     .unwrap_or_default();
 
-  if let Some(authorities) = args.position_freeze_authorities {
-    ctx.accounts.registrar.position_freeze_authorities = authorities;
-  }
+  ctx.accounts.registrar.position_freeze_authorities = args.position_freeze_authorities;
+  ctx.accounts.registrar.position_update_authority = args.position_update_authority;
 
   Ok(())
 }

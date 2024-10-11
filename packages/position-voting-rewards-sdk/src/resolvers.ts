@@ -34,12 +34,12 @@ export const vsrEpochInfoResolver = resolveIndividual(
       const unixTime =
         Number(clock!.data.readBigInt64LE(8 * 4)) +
         (registrar?.timeOffset.toNumber() || 0);
-      const vsrTracker = get(accounts, [
+      const vetokenTracker = get(accounts, [
         ...path.slice(0, path.length - 1),
-        "vsr_tracker",
+        "vetokenTracker",
       ]) as PublicKey;
-      if (vsrTracker) {
-        const [key] = await vsrEpochInfoKey(vsrTracker, unixTime, PROGRAM_ID);
+      if (vetokenTracker) {
+        const [key] = await vsrEpochInfoKey(vetokenTracker, unixTime, PROGRAM_ID);
 
         return key;
       }
@@ -52,9 +52,9 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
     if (path[path.length - 1] === "closingTimeVsrEpochInfo") {
       const program = await init(provider as AnchorProvider, VSR_PROGRAM_ID);
 
-      const vsrTracker = get(accounts, [
+      const vetokenTracker = get(accounts, [
         ...path.slice(0, path.length - 1),
-        "vsr_tracker",
+        "vetokenTracker",
       ]) as PublicKey;
       const position = get(accounts, [
         ...path.slice(0, path.length - 1),
@@ -64,7 +64,7 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
         position && (await program.account.positionV0.fetch(position));
       if (positionAcc) {
         const [key] = await vsrEpochInfoKey(
-          vsrTracker,
+          vetokenTracker,
           positionAcc.lockup.endTs
         );
 
@@ -85,9 +85,9 @@ export const genesisEndEpochInfoResolver = resolveIndividual(
     if (path[path.length - 1] === "genesisEndVsrEpochInfo") {
       const program = await init(provider as AnchorProvider, VSR_PROGRAM_ID);
 
-      const vsrTracker = get(accounts, [
+      const vetokenTracker = get(accounts, [
         ...path.slice(0, path.length - 1),
-        "vsr_tracker",
+        "vetokenTracker",
       ]) as PublicKey;
       const position = get(accounts, [
         ...path.slice(0, path.length - 1),
@@ -109,7 +109,7 @@ export const genesisEndEpochInfoResolver = resolveIndividual(
           positionAcc.genesisEnd.toNumber() < currTs
             ? positionAcc.lockup.endTs.toNumber()
             : positionAcc.genesisEnd;
-        const [key] = await vsrEpochInfoKey(vsrTracker, ts);
+        const [key] = await vsrEpochInfoKey(vetokenTracker, ts);
 
         return key;
       }

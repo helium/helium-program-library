@@ -18,6 +18,7 @@ pub struct UnenrollV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
+    mut,
     seeds = [b"position".as_ref(), mint.key().as_ref()],
     seeds::program = vsr_program.key(),
     bump = position.bump_seed,

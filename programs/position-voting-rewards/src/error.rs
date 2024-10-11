@@ -17,4 +17,5 @@ pub enum ErrorCode {
   PositionChangeWhileEnrolled,
   #[msg("Marker has incorrect registrar")]
   InvalidMarker,
+  ArithmeticError,
 }

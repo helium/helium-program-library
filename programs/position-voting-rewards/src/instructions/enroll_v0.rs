@@ -23,6 +23,7 @@ pub struct EnrollV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
+    mut,
     seeds = [b"position".as_ref(), mint.key().as_ref()],
     seeds::program = vsr_program.key(),
     bump = position.bump_seed,
@@ -86,7 +87,7 @@ pub struct EnrollV0<'info> {
   #[account(
     init,
     space = 60 + 8 + std::mem::size_of::<EnrolledPositionV0>(),
-    payer = position_authority,
+    payer = payer,
     seeds = ["enrolled_position".as_bytes(), position.key().as_ref()],
     bump,
   )]
@@ -267,7 +268,7 @@ pub fn handler(ctx: Context<EnrollV0>) -> Result<()> {
   freeze_position_v0(CpiContext::new_with_signer(
     ctx.accounts.vsr_program.to_account_info(),
     FreezePositionV0 {
-      authority: ctx.accounts.position_authority.to_account_info(),
+      authority: ctx.accounts.vetoken_tracker.to_account_info(),
       registrar: ctx.accounts.registrar.to_account_info(),
       position: ctx.accounts.position.to_account_info(),
     },
