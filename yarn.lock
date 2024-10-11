@@ -679,6 +679,7 @@ __metadata:
     "@helium/nft-proxy-sdk": ^0.0.12
     "@helium/no-emit-sdk": ^0.9.7
     "@helium/organization-sdk": ^0.0.12
+    "@helium/position-voting-rewards-sdk": ^0.9.7
     "@helium/price-oracle-sdk": ^0.9.7
     "@helium/proposal-sdk": ^0.0.12
     "@helium/rewards-oracle-sdk": ^0.9.7
@@ -912,6 +913,7 @@ __metadata:
     "@helium/lazy-distributor-sdk": ^0.9.7
     "@helium/mobile-entity-manager-sdk": ^0.9.7
     "@helium/nft-proxy-sdk": ^0.0.12
+    "@helium/position-voting-rewards-sdk": ^0.9.7
     "@helium/price-oracle-sdk": ^0.9.7
     "@helium/spl-utils": ^0.9.7
     "@helium/treasury-management-sdk": ^0.9.7
@@ -1362,7 +1364,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/position-voting-rewards-sdk@workspace:packages/position-voting-rewards-sdk":
+"@helium/position-voting-rewards-sdk@^0.9.7, @helium/position-voting-rewards-sdk@workspace:packages/position-voting-rewards-sdk":
   version: 0.0.0-use.local
   resolution: "@helium/position-voting-rewards-sdk@workspace:packages/position-voting-rewards-sdk"
   dependencies:
