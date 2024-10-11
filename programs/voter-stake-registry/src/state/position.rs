@@ -2,7 +2,7 @@ use std::cmp::min;
 
 use anchor_lang::prelude::*;
 
-use super::{registrar, Lockup, LockupKind, Registrar, VotingMintConfigV0};
+use super::{Lockup, LockupKind, Registrar, VotingMintConfigV0};
 use crate::error::*;
 
 pub const PRECISION_FACTOR: u128 = 1_000_000_000_000;

@@ -23,19 +23,18 @@ pub struct RewardForEpochV0<'info> {
   #[account(
     has_one = rewards_authority,
     has_one = rewards_mint,
+    has_one = registrar,
   )]
-  pub vetoken_tracker: Account<'info, VeTokenTrackerV0>,
-  pub registrar: Account<'info, Registrar>,
+  pub vetoken_tracker: Box<Account<'info, VeTokenTrackerV0>>,
+  pub registrar: Box<Account<'info, Registrar>>,
   #[account(
     init_if_needed,
     payer = rent_payer,
     space = 60 + VsrEpochInfoV0::INIT_SPACE,
     seeds = ["vsr_epoch_info".as_bytes(), vetoken_tracker.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
-    has_one = vetoken_tracker,
-    has_one = registrar,
   )]
-  pub vsr_epoch_info: Account<'info, VsrEpochInfoV0>,
+  pub vsr_epoch_info: Box<Account<'info, VsrEpochInfoV0>>,
   pub rewards_mint: Box<Account<'info, Mint>>,
   #[account(
     init_if_needed,

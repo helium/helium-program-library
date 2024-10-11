@@ -2,21 +2,19 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use voter_stake_registry::{
   cpi::{accounts::ThawPositionV0, thaw_position_v0},
-  state::{LockupKind, PositionV0, Registrar},
+  state::*,
   VoterStakeRegistry,
 };
 
-use crate::{
-  id,
-  state::*,
-  util::{calculate_vetoken_info, current_epoch, VetokenInfo},
-  vetoken_tracker_seeds,
-};
+use crate::{id, state::*, util::*, vetoken_tracker_seeds};
 
 #[derive(Accounts)]
 pub struct UnenrollV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
+  /// CHECK: Doesn't need to be checked, just who gets the rent.
+  #[account(mut)]
+  pub rent_refund: AccountInfo<'info>,
   #[account(
     mut,
     seeds = [b"position".as_ref(), mint.key().as_ref()],
@@ -44,6 +42,7 @@ pub struct UnenrollV0<'info> {
 
   #[account(
     mut,
+    close = rent_refund,
     has_one = vetoken_tracker,
     seeds = ["enrolled_position".as_bytes(), position.key().as_ref()],
     bump = enrolled_position.bump_seed,
@@ -96,7 +95,7 @@ pub fn handler(ctx: Context<UnenrollV0>) -> Result<()> {
   let registrar = &ctx.accounts.registrar;
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
-  let vetokens_at_curr_ts = position.voting_power(voting_mint_config, curr_ts)?;
+  let vetokens_at_curr_ts = position.voting_power_precise(voting_mint_config, curr_ts)?;
   let vetokens_info = calculate_vetoken_info(
     ctx.accounts.enrolled_position.start_ts,
     position,
@@ -257,19 +256,10 @@ pub fn handler(ctx: Context<UnenrollV0>) -> Result<()> {
       .fall_rates_from_closing_positions = 0;
   }
 
-  // If the lockup is expired or no tokens staked, close the enrollment.
-  if ctx.accounts.position.lockup.expired(curr_ts)
-    || ctx.accounts.position.amount_deposited_native == 0
-  {
-    ctx
-      .accounts
-      .enrolled_position
-      .close(ctx.accounts.position_authority.to_account_info())?;
-  }
   thaw_position_v0(CpiContext::new_with_signer(
     ctx.accounts.vsr_program.to_account_info(),
     ThawPositionV0 {
-      authority: ctx.accounts.position_authority.to_account_info(),
+      authority: ctx.accounts.vetoken_tracker.to_account_info(),
       registrar: ctx.accounts.registrar.to_account_info(),
       position: ctx.accounts.position.to_account_info(),
     },

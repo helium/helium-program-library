@@ -138,5 +138,11 @@ export const positionVotingRewardsResolvers = combineResolvers(
     mint: "rewardsMint",
     owner: "vsrEpochInfo",
   }),
+  ataResolver({
+    instruction: "rewardForEpochV0",
+    account: "payerAta",
+    mint: "rewardsMint",
+    owner: "rewardsPayer",
+  }),
   vsrResolvers
 );

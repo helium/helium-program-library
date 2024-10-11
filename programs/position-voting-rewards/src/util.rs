@@ -129,12 +129,12 @@ pub fn calculate_vetoken_info(
       // will not include the genesis. When this happens, we'll miss a vetokens correction
       if genesis_end_epoch_start_ts == position.genesis_end {
         genesis_end_vetokens_correction = position
-          .voting_power(voting_mint_config, genesis_end_epoch_start_ts - 1)?
+          .voting_power_precise(voting_mint_config, genesis_end_epoch_start_ts - 1)?
           .checked_sub(vetokens_at_genesis_end_exact)
           .unwrap();
       } else {
         genesis_end_vetokens_correction = position
-          .voting_power(voting_mint_config, genesis_end_epoch_start_ts)?
+          .voting_power_precise(voting_mint_config, genesis_end_epoch_start_ts)?
           .checked_sub(vetokens_at_genesis_end_exact)
           .unwrap()
           // Correction factor
@@ -162,7 +162,7 @@ pub fn calculate_vetoken_info(
     let end_epoch_start_ts =
       i64::try_from(current_epoch(position.lockup.end_ts)).unwrap() * EPOCH_LENGTH;
     let vetokens_at_closing_epoch_start =
-      position.voting_power(voting_mint_config, end_epoch_start_ts)?;
+      position.voting_power_precise(voting_mint_config, end_epoch_start_ts)?;
 
     end_vetokens_correction = vetokens_at_closing_epoch_start;
     end_fall_rate_correction = post_genesis_end_fall_rate;

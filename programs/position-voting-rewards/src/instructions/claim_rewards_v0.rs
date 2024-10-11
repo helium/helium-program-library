@@ -133,7 +133,7 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     enrolled_vetokens_at_epoch
       .checked_mul(ctx.accounts.vsr_epoch_info.rewards_amount as u128)
       .unwrap()
-      .checked_div(ctx.accounts.vsr_epoch_info.vetokens_at_epoch_start as u128)
+      .checked_div(ctx.accounts.vsr_epoch_info.vetokens_at_epoch_start)
       .unwrap(),
   )
   .unwrap();

@@ -263,7 +263,7 @@ describe("position-voting-rewards", () => {
               .signers([positionAuthorityKp])
               .rpc()
           ).to.eventually.be.rejectedWith(
-            "AnchorError caused by account: source_enrolled_position. Error Code: PositionChangeWhileDelegated. Error Number: 6014. Error Message: Cannot change a position while it is enrolled."
+            "AnchorError caused by account: source_position. Error Code: PositionFrozen. Error Number: 6060. Error Message: PositionFrozen."
           );
         });
 
@@ -281,7 +281,7 @@ describe("position-voting-rewards", () => {
               .signers([positionAuthorityKp])
               .rpc()
           ).to.eventually.be.rejectedWith(
-            "AnchorError caused by account: enrolled_position. Error Code: PositionChangeWhileDelegated. Error Number: 6014. Error Message: Cannot change a position while it is enrolled."
+            "AnchorError caused by account: position. Error Code: PositionFrozen. Error Number: 6060. Error Message: PositionFrozen."
           );
         });
 
@@ -293,6 +293,7 @@ describe("position-voting-rewards", () => {
               position,
               vetokenTracker,
               positionAuthority: positionAuthorityKp.publicKey,
+              rentRefund: me,
             })
             .signers([positionAuthorityKp]);
 
@@ -363,6 +364,7 @@ describe("position-voting-rewards", () => {
                 position: basePosition,
                 vetokenTracker,
                 positionAuthority: positionAuthorityKp.publicKey,
+                rentRefund: me,
               })
               .signers([positionAuthorityKp]);
 
@@ -428,10 +430,10 @@ describe("position-voting-rewards", () => {
                 amount: toBN(REWARDS, 8),
               })
               .accounts({
-                vsrEpochInfo,
-              })
-              .accounts({
                 vetokenTracker,
+                registrar,
+                vsrEpochInfo,
+                rewardsPayer: me,
               })
               .rpc({ skipPreflight: true });
 
@@ -445,16 +447,13 @@ describe("position-voting-rewards", () => {
                 positionAuthority: positionAuthorityKp.publicKey,
               })
               .signers([positionAuthorityKp]);
-            const { enrolledAta } = await method.pubkeys();
+            const { rewardsPool } = await method.pubkeys();
             await method.rpc({ skipPreflight: true });
 
             const postAtaBalance = AccountLayout.decode(
-              (await provider.connection.getAccountInfo(enrolledAta!))?.data!
+              (await provider.connection.getAccountInfo(rewardsPool!))?.data!
             ).amount;
-            expect(Number(postAtaBalance)).to.be.within(
-              (REWARDS * 8) / 100 - 5,
-              (REWARDS * 8) / 100
-            );
+            expect(Number(postAtaBalance)).to.be.within(0, 5000);
           });
         });
       });
