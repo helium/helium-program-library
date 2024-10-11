@@ -267,6 +267,7 @@ describe("helium-sub-daos", () => {
         .initializeVetokenTrackerV0()
         .accounts({
           registrar: subDaoRegistrar,
+          proposalNamespace: me,
           rewardsMint: dntMint,
           payer: me,
           rewardsAuthority: subDao,

@@ -14,6 +14,9 @@ import chaiAsPromised from "chai-as-promised";
 import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 import { getUnixTimestamp } from "./utils/solana";
 import { AccountLayout } from "@solana/spl-token";
+import { Proposal } from "@helium/modular-governance-idls/lib/types/proposal";
+import { init as initProposal } from "@helium/proposal-sdk";
+import { random } from "./utils/string";
 
 chai.use(chaiAsPromised);
 
@@ -37,6 +40,7 @@ describe("position-voting-rewards", () => {
     }
   );
 
+  let proposalProgram: Program<Proposal>;
   let vsrProgram: Program<VoterStakeRegistry>;
   let registrar: PublicKey;
   let genesisVotePowerMultiplierExpirationTs = 1;
@@ -51,6 +55,7 @@ describe("position-voting-rewards", () => {
     hntMint = await createMint(provider, 8, me, me);
     await createAtaAndMint(provider, hntMint, toBN(REWARDS, 8), me);
     await createAtaAndMint(provider, hntMint, toBN(REWARDS, 8), positionAuthorityKp.publicKey);
+    proposalProgram = await initProposal(provider);
     vsrProgram = await vsrInit(
       provider,
       anchor.workspace.VoterStakeRegistry.programId,
@@ -147,6 +152,7 @@ describe("position-voting-rewards", () => {
           rewardsMint: hntMint,
           payer: me,
           rewardsAuthority: me,
+          proposalNamespace: me,
         }).rpcAndKeys({ skipPreflight: true });
         vetokenTracker = tracker! as PublicKey;
 
@@ -454,6 +460,115 @@ describe("position-voting-rewards", () => {
               (await provider.connection.getAccountInfo(rewardsPool!))?.data!
             ).amount;
             expect(Number(postAtaBalance)).to.be.within(0, 5000);
+          });
+
+          it("claim rewards after voting on two proposals", async () => {
+            // Create and vote on two proposals
+            const {
+              pubkeys: { proposalConfig },
+            } = await proposalProgram.methods
+              .initializeProposalConfigV0({
+                name: random(10),
+                voteController: registrar,
+                stateController: me,
+                onVoteHook: PublicKey.default,
+                authority: me,
+              })
+              .rpcAndKeys({ skipPreflight: true });
+            for (let i = 0; i < 2; i++) {
+              const proposalName = `Proposal ${random(10)}`;
+              const {
+                pubkeys: { proposal },
+              } = await proposalProgram.methods
+                .initializeProposalV0({
+                  seed: Buffer.from(proposalName, "utf-8"),
+                  maxChoicesPerVoter: 1,
+                  name: proposalName,
+                  uri: "https://example.com",
+                  choices: [
+                    { name: "Yes", uri: null },
+                    { name: "No", uri: null },
+                  ],
+                  tags: ["test"],
+                })
+                .accounts({ proposalConfig })
+                .rpcAndKeys({ skipPreflight: true });
+
+              await proposalProgram.methods
+                .updateStateV0({
+                  newState: {
+                    voting: {
+                      startTs: new anchor.BN(new Date().valueOf() / 1000),
+                    } as any,
+                  },
+                })
+                .accounts({ proposal })
+                .rpc({ skipPreflight: true });
+
+              const {
+                pubkeys: { marker },
+              } = await vsrProgram.methods
+                .voteV0({
+                  choice: 0,
+                })
+                .accounts({
+                  position,
+                  proposal: proposal as PublicKey,
+                  voter: positionAuthorityKp.publicKey,
+                })
+                .signers([positionAuthorityKp])
+                .rpcAndKeys({ skipPreflight: true });
+
+                await program.methods
+                  .trackVoteV0()
+                  .accounts({
+                    marker: marker as PublicKey,
+                    vetokenTracker,
+                    proposal: proposal as PublicKey,
+                    position,
+                  })
+                  .rpc({ skipPreflight: true });
+            }
+
+            // Issue rewards
+            await program.methods
+              .rewardForEpochV0({
+                epoch,
+                amount: toBN(REWARDS, 8),
+              })
+              .accounts({
+                vetokenTracker,
+                registrar,
+                vsrEpochInfo,
+                rewardsPayer: me,
+              })
+              .rpc({ skipPreflight: true });
+
+
+            // Claim rewards
+            const method = program.methods
+              .claimRewardsV0({
+                epoch,
+              })
+              .accounts({
+                position,
+                vetokenTracker,
+                positionAuthority: positionAuthorityKp.publicKey,
+              })
+              .signers([positionAuthorityKp]);
+            const { enrolledAta } = await method.pubkeys();
+            const preAtaBalance = AccountLayout.decode(
+              (await provider.connection.getAccountInfo(enrolledAta!))?.data!
+            ).amount;
+            await method.rpc({ skipPreflight: true });
+
+            const postAtaBalance = AccountLayout.decode(
+              (await provider.connection.getAccountInfo(enrolledAta!))?.data!
+            ).amount;
+            expect(Number(preAtaBalance) - Number(postAtaBalance)).to.be.within(
+              REWARDS - 5000,
+              REWARDS
+            );
           });
         });
       });

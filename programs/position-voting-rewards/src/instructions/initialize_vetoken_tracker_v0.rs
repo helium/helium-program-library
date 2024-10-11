@@ -18,6 +18,8 @@ pub struct InitializeVeTokenTrackerV0<'info> {
     bump,
   )]
   pub vetoken_tracker: Account<'info, VeTokenTrackerV0>,
+  /// CHECK: Check not needed
+  pub proposal_namespace: UncheckedAccount<'info>,
   #[account(
     has_one = realm_authority,
   )]
@@ -31,6 +33,7 @@ pub struct InitializeVeTokenTrackerV0<'info> {
 
 pub fn handler(ctx: Context<InitializeVeTokenTrackerV0>) -> Result<()> {
   ctx.accounts.vetoken_tracker.set_inner(VeTokenTrackerV0 {
+    proposal_namespace: ctx.accounts.proposal_namespace.key(),
     registrar: ctx.accounts.registrar.key(),
     rewards_authority: ctx.accounts.rewards_authority.key(),
     rewards_mint: ctx.accounts.rewards_mint.key(),

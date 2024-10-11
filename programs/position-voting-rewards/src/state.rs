@@ -138,6 +138,8 @@ impl VsrEpochInfoV0 {
 #[derive(InitSpace)]
 pub struct VeTokenTrackerV0 {
   pub registrar: Pubkey,
+  /// The org to track proposals from
+  pub proposal_namespace: Pubkey,
   pub rewards_mint: Pubkey,
   pub rewards_authority: Pubkey,
   pub vetoken_last_calculated_ts: i64,

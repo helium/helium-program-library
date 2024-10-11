@@ -189,7 +189,7 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
       amount,
     )?;
   } else {
-    msg!("Position is not eligible, burning");
+    msg!("Position is not eligible, burning. Position proposals {:?}, recent proposals {:?}");
     burn(
       ctx
         .accounts
