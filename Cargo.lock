@@ -1971,6 +1971,7 @@ dependencies = [
  "circuit-breaker",
  "default-env",
  "mpl-token-metadata",
+ "position-voting-rewards",
  "rust_decimal",
  "shared-utils",
  "solana-security-txt",
