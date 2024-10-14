@@ -146,14 +146,14 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     .accounts
     .vsr_epoch_info
     .recent_proposals
-    .first()
+    .last()
     .unwrap()
     .ts;
   let last_ts = ctx
     .accounts
     .vsr_epoch_info
     .recent_proposals
-    .last()
+    .first()
     .unwrap()
     .ts;
   ctx
@@ -177,6 +177,7 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     .iter()
     .filter(|&proposal| proposal_set.contains(&proposal.proposal))
     .count();
+
   if eligible_count >= 2 {
     msg!("Position is eligible, transferring");
     transfer(
@@ -189,7 +190,11 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
       amount,
     )?;
   } else {
-    msg!("Position is not eligible, burning. Position proposals {:?}, recent proposals {:?}");
+    msg!(
+      "Position is not eligible, burning. Position proposals {:?}, recent proposals {:?}",
+      ctx.accounts.enrolled_position.recent_proposals,
+      ctx.accounts.vsr_epoch_info.recent_proposals
+    );
     burn(
       ctx
         .accounts

@@ -237,6 +237,7 @@ describe("position-voting-rewards", () => {
 
       describe("with enrolled vehnt", () => {
         beforeEach(async () => {
+          
           await program.methods
             .enrollV0()
             .accounts({
@@ -519,7 +520,7 @@ describe("position-voting-rewards", () => {
                 .signers([positionAuthorityKp])
                 .rpcAndKeys({ skipPreflight: true });
 
-                await program.methods
+                console.log("track", await program.methods
                   .trackVoteV0()
                   .accounts({
                     marker: marker as PublicKey,
@@ -527,7 +528,7 @@ describe("position-voting-rewards", () => {
                     proposal: proposal as PublicKey,
                     position,
                   })
-                  .rpc({ skipPreflight: true });
+                  .rpc({ skipPreflight: true }));
             }
 
             // Issue rewards
@@ -565,10 +566,9 @@ describe("position-voting-rewards", () => {
             const postAtaBalance = AccountLayout.decode(
               (await provider.connection.getAccountInfo(enrolledAta!))?.data!
             ).amount;
-            expect(Number(preAtaBalance) - Number(postAtaBalance)).to.be.within(
-              REWARDS - 5000,
-              REWARDS
-            );
+            expect(
+              Number(postAtaBalance) - Number(preAtaBalance)
+            ).to.be.within(toBN(REWARDS, 8).toNumber() - 5000, toBN(REWARDS, 8).toNumber());
           });
         });
       });

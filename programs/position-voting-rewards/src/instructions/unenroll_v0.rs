@@ -224,6 +224,7 @@ pub fn handler(ctx: Context<UnenrollV0>) -> Result<()> {
   }
 
   ctx.accounts.vsr_epoch_info.vetoken_tracker = ctx.accounts.vetoken_tracker.key();
+  ctx.accounts.vsr_epoch_info.registrar = ctx.accounts.registrar.key();
   ctx.accounts.vsr_epoch_info.bump_seed = *ctx.bumps.get("vsr_epoch_info").unwrap();
 
   // EDGE CASE: When the closing time epoch infos are the same as the current epoch info,

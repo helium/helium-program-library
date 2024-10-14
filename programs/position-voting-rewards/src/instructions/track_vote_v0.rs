@@ -8,18 +8,23 @@ use voter_stake_registry::{
 
 use crate::{
   error::ErrorCode,
-  state::{EnrolledPositionV0, VeTokenTrackerV0},
+  state::{EnrolledPositionV0, VeTokenTrackerV0, VsrEpochInfoV0},
+  util::current_epoch,
 };
 
 #[derive(Accounts)]
 pub struct TrackVoteV0<'info> {
+  #[account(mut)]
+  pub payer: Signer<'info>,
   #[account(
     constraint = proposal.namespace == vetoken_tracker.proposal_namespace
   )]
   pub proposal: Account<'info, ProposalV0>,
+  pub registrar: Box<Account<'info, Registrar>>,
   #[account(
     mut,
     has_one = mint,
+    has_one = registrar,
     constraint = position.registrar == vetoken_tracker.registrar
   )]
   pub position: Box<Account<'info, PositionV0>>,
@@ -39,11 +44,34 @@ pub struct TrackVoteV0<'info> {
     bump = enrolled_position.bump_seed,
   )]
   pub enrolled_position: Box<Account<'info, EnrolledPositionV0>>,
-  /// TODO: Add vsr epoch info here and update the recent proposals
+  #[account(
+    init_if_needed,
+    payer = payer,
+    space = 60 + VsrEpochInfoV0::INIT_SPACE,
+    seeds = ["vsr_epoch_info".as_bytes(), vetoken_tracker.key().as_ref(), &current_epoch(registrar.clock_unix_timestamp()).to_le_bytes()],
+    bump,
+  )]
+  pub vsr_epoch_info: Account<'info, VsrEpochInfoV0>,
   pub vsr_program: Program<'info, VoterStakeRegistry>,
+  pub system_program: Program<'info, System>,
 }
 
 pub fn handler(ctx: Context<TrackVoteV0>) -> Result<()> {
+  ctx.accounts.vsr_epoch_info.epoch = current_epoch(ctx.accounts.registrar.clock_unix_timestamp());
+  ctx.accounts.vsr_epoch_info.vetoken_tracker = ctx.accounts.vetoken_tracker.key();
+  ctx.accounts.vsr_epoch_info.registrar = ctx.accounts.registrar.key();
+  ctx.accounts.vsr_epoch_info.bump_seed = *ctx.bumps.get("vsr_epoch_info").unwrap();
+
+  ctx.accounts.vetoken_tracker.add_recent_proposal(
+    ctx.accounts.proposal.key(),
+    ctx.accounts.proposal.created_at,
+  );
+  ctx.accounts.vsr_epoch_info.recent_proposals =
+    ctx.accounts.vetoken_tracker.recent_proposals.clone();
+  ctx.accounts.vetoken_tracker.update_vetokens(
+    &mut ctx.accounts.vsr_epoch_info,
+    ctx.accounts.registrar.clock_unix_timestamp(),
+  )?;
   let data = ctx.accounts.marker.data.try_borrow().unwrap();
   let has_data = !data.is_empty();
   drop(data);
@@ -61,6 +89,10 @@ pub fn handler(ctx: Context<TrackVoteV0>) -> Result<()> {
     ctx.accounts.enrolled_position.add_recent_proposal(
       ctx.accounts.proposal.key(),
       ctx.accounts.proposal.created_at,
+    );
+    msg!(
+      "Proposals are now {:?}",
+      ctx.accounts.enrolled_position.recent_proposals
     );
   } else {
     ctx

@@ -180,6 +180,7 @@ pub fn handler(ctx: Context<EnrollV0>) -> Result<()> {
     .checked_add(end_vetoken_correction)
     .unwrap();
   ctx.accounts.closing_time_vsr_epoch_info.vetoken_tracker = vetoken_tracker.key();
+  ctx.accounts.closing_time_vsr_epoch_info.registrar = ctx.accounts.registrar.key();
   ctx.accounts.closing_time_vsr_epoch_info.epoch = current_epoch(position.lockup.end_ts);
   ctx.accounts.closing_time_vsr_epoch_info.bump_seed = ctx.bumps["closing_time_vsr_epoch_info"];
 
@@ -264,6 +265,7 @@ pub fn handler(ctx: Context<EnrollV0>) -> Result<()> {
 
   ctx.accounts.vsr_epoch_info.vetoken_tracker = ctx.accounts.vetoken_tracker.key();
   ctx.accounts.vsr_epoch_info.bump_seed = *ctx.bumps.get("vsr_epoch_info").unwrap();
+  ctx.accounts.vsr_epoch_info.registrar = ctx.accounts.registrar.key();
 
   freeze_position_v0(CpiContext::new_with_signer(
     ctx.accounts.vsr_program.to_account_info(),

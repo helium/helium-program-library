@@ -193,7 +193,6 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
     collection_bump_seed: ctx.bumps["collection"],
     reserved1: [0; 4],
     reserved2: [0; 3],
-    recent_proposals: [Pubkey::default(); 4],
     position_freeze_authorities: args.position_freeze_authorities,
     voting_mints: Vec::new(),
     proxy_config: ctx

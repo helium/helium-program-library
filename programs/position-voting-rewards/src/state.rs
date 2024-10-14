@@ -22,7 +22,7 @@ pub struct EnrolledPositionV0 {
   pub recent_proposals: Vec<RecentProposal>,
 }
 
-#[derive(InitSpace, Default, Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(Debug, InitSpace, Default, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct RecentProposal {
   pub proposal: Pubkey,
   pub ts: i64,
@@ -161,6 +161,33 @@ macro_rules! vetoken_tracker_seeds {
 }
 
 impl VeTokenTrackerV0 {
+  pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
+    let new_proposal = RecentProposal { proposal, ts };
+
+    // Find the insertion point to maintain descending order by timestamp
+    let insert_index = self
+      .recent_proposals
+      .iter()
+      .position(|p| p.ts <= ts)
+      .unwrap_or(self.recent_proposals.len());
+
+    let cloned_proposals = self.recent_proposals.clone();
+
+    // Shift elements to make room for the new proposal
+    if insert_index < self.recent_proposals.len() {
+      for i in (insert_index + 1..self.recent_proposals.len()).rev() {
+        self.recent_proposals[i] = cloned_proposals[i - 1].clone();
+      }
+      self.recent_proposals[insert_index] = new_proposal;
+    } else if ts > self.recent_proposals[self.recent_proposals.len() - 1].ts {
+      // If the new proposal is more recent than the oldest one, replace the oldest
+      self.recent_proposals[self.recent_proposals.len() - 1] = new_proposal;
+    }
+
+    // Re-sort the array to ensure it's in descending order by timestamp
+    self.recent_proposals.sort_by(|a, b| b.ts.cmp(&a.ts));
+  }
+
   pub fn update_vetokens(
     &mut self,
     curr_epoch_info: &mut VsrEpochInfoV0,
