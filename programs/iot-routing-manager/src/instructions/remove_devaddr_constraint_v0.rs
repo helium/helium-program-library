@@ -8,7 +8,9 @@ pub struct RemoveDevaddrConstraintV0<'info> {
   #[account(mut)]
   pub rent_refund: AccountInfo<'info>,
   pub authority: Signer<'info>,
-  #[account(has_one = authority)]
+  #[account(
+    has_one = authority
+  )]
   pub net_id: Box<Account<'info, NetIdV0>>,
   #[account(
     mut,
