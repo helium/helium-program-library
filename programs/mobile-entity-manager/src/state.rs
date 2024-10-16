@@ -29,3 +29,14 @@ macro_rules! carrier_seeds {
     ]
   };
 }
+
+#[account]
+#[derive(Default, InitSpace)]
+pub struct IncentiveEscrowProgramV0 {
+  pub carrier: Pubkey,
+  pub start_ts: i64,
+  pub stop_ts: i64,
+  // Shares are summed as a total of all incentive escrow funds under a carrier
+  pub shares: u32,
+  pub bump_seed: u8,
+}

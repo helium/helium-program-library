@@ -1,5 +1,5 @@
 import * as anchor from '@coral-xyz/anchor';
-import { Program } from '@coral-xyz/anchor';
+import { BN, Program } from '@coral-xyz/anchor';
 import { init as initDataCredits } from '@helium/data-credits-sdk';
 import { init as initHeliumSubDaos } from '@helium/helium-sub-daos-sdk';
 import {
@@ -10,7 +10,7 @@ import {
 } from '@solana/web3.js';
 import chai from 'chai';
 import { init as initMobileEntityManager } from '../packages/mobile-entity-manager-sdk/src';
-import { init as initHeliumEntityManager } from '../packages/helium-entity-manager-sdk/src';
+import { init as initHeliumEntityManager, keyToAssetKey } from '../packages/helium-entity-manager-sdk/src';
 import { DataCredits } from '../target/types/data_credits';
 import { HeliumSubDaos } from '../target/types/helium_sub_daos';
 import { MobileEntityManager } from '../target/types/mobile_entity_manager';
@@ -143,6 +143,7 @@ describe('mobile-entity-manager', () => {
     let merkle: Keypair;
     beforeEach(async () => {
       const name = random();
+      console.log("carrier name", name)
       const {
         pubkeys: { carrier: carrierK },
       } = await memProgram.methods
@@ -235,6 +236,49 @@ describe('mobile-entity-manager', () => {
           ])
           .accounts({ carrier, recipient: me })
           .rpc({ skipPreflight: true });
+      });
+
+      it("allows the carrier to initialize and update incentive programs", async () => {
+        const name = random();
+        const { pubkeys: { incentiveEscrowProgram } } = await memProgram.methods
+          .initializeIncentiveProgramV0({
+            metadataUrl: null,
+            name,
+            startTs: new BN(5),
+            stopTs: new BN(10),
+            shares: 100,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+          ])
+          .accounts({
+            carrier,
+            recipient: me,
+            keyToAsset: keyToAssetKey(dao, name, "utf-8")[0],
+          })
+          .rpcAndKeys({ skipPreflight: true });
+          const incentiveEscrowProgramAcc =
+            await memProgram.account.incentiveEscrowProgramV0.fetch(
+              incentiveEscrowProgram!
+            );
+          expect(incentiveEscrowProgramAcc.carrier.toBase58()).to.eq(carrier.toBase58());
+          expect(incentiveEscrowProgramAcc.startTs.toNumber()).to.eq(5);
+          expect(incentiveEscrowProgramAcc.stopTs.toNumber()).to.eq(10);
+          expect(incentiveEscrowProgramAcc.shares).to.eq(100);
+
+          await memProgram.methods.updateIncentiveProgramV0({
+            startTs: new BN(10),
+            stopTs: new BN(15),
+            shares: 200,
+          }).accounts({ incentiveEscrowProgram }).rpc({ skipPreflight: true });
+          const incentiveEscrowProgramAcc2 =
+            await memProgram.account.incentiveEscrowProgramV0.fetch(
+              incentiveEscrowProgram!
+            );
+          
+          expect(incentiveEscrowProgramAcc2.startTs.toNumber()).to.eq(10);
+          expect(incentiveEscrowProgramAcc2.stopTs.toNumber()).to.eq(15);
+          expect(incentiveEscrowProgramAcc2.shares).to.eq(200);
       });
 
       it("can swap tree when it's full", async () => {
