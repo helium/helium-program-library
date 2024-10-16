@@ -1,16 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
-import {
-  init as initHem,
-  keyToAssetKey,
-} from "@helium/helium-entity-manager-sdk";
-import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { carrierKey, incentiveProgramKey, init as initMem } from "@helium/mobile-entity-manager-sdk";
-import { HNT_MINT, MOBILE_MINT } from "@helium/spl-utils";
-import { ComputeBudgetProgram, PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { MOBILE_MINT } from "@helium/spl-utils";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
 import { sendInstructionsOrSquads } from "./utils";
-import Squads from "@sqds/sdk";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
