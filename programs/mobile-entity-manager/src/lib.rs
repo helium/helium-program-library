@@ -70,4 +70,18 @@ pub mod mobile_entity_manager {
   pub fn update_carrier_v0(ctx: Context<UpdateCarrierV0>, args: UpdateCarrierArgsV0) -> Result<()> {
     update_carrier_v0::handler(ctx, args)
   }
+
+  pub fn initialize_incentive_program_v0(
+    ctx: Context<InitializeIncentiveProgramV0>,
+    args: InitializeIncentiveProgramArgsV0,
+  ) -> Result<()> {
+    initialize_incentive_program_v0::handler(ctx, args)
+  }
+
+  pub fn update_incentive_program_v0(
+    ctx: Context<UpdateIncentiveProgramV0>,
+    args: UpdateIncentiveProgramV0Args,
+  ) -> Result<()> {
+    update_incentive_program_v0::handler(ctx, args)
+  }
 }
