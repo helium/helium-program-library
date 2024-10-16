@@ -25,6 +25,7 @@ pub struct InitializeIncentiveProgramArgsV0 {
 pub struct InitializeIncentiveProgramV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
+  pub issuing_authority: Signer<'info>,
   #[account(
     seeds = ["program_approval".as_bytes(), dao.key().as_ref(), crate::id().as_ref()],
     seeds::program = helium_entity_manager_program.key(),
@@ -39,7 +40,6 @@ pub struct InitializeIncentiveProgramV0<'info> {
     constraint = carrier.approved @ ErrorCode::CarrierNotApproved
   )]
   pub carrier: Box<Account<'info, CarrierV0>>,
-  pub issuing_authority: Signer<'info>,
   pub collection: Box<Account<'info, Mint>>,
   /// CHECK: Handled by cpi
   #[account(
