@@ -143,7 +143,6 @@ describe('mobile-entity-manager', () => {
     let merkle: Keypair;
     beforeEach(async () => {
       const name = random();
-      console.log("carrier name", name)
       const {
         pubkeys: { carrier: carrierK },
       } = await memProgram.methods
