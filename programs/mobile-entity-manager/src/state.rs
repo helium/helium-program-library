@@ -31,7 +31,7 @@ macro_rules! carrier_seeds {
 }
 
 #[account]
-#[derive(Default, InitSpace)]
+#[derive(Default)]
 pub struct IncentiveEscrowProgramV0 {
   pub carrier: Pubkey,
   pub start_ts: i64,
@@ -39,4 +39,5 @@ pub struct IncentiveEscrowProgramV0 {
   // Shares are summed as a total of all incentive escrow funds under a carrier
   pub shares: u32,
   pub bump_seed: u8,
+  pub name: String,
 }

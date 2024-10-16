@@ -85,7 +85,7 @@ pub struct InitializeIncentiveProgramV0<'info> {
     payer = payer,
     seeds = ["incentive_escrow_program".as_bytes(), carrier.key().as_ref(), &hash(args.name.as_bytes()).to_bytes()],
     bump,
-    space = 60 + IncentiveEscrowProgramV0::INIT_SPACE,
+    space = 8 + 60 + std::mem::size_of::<IncentiveEscrowProgramV0>() + args.name.len(),
   )]
   pub incentive_escrow_program: Box<Account<'info, IncentiveEscrowProgramV0>>,
   #[account(
@@ -152,7 +152,7 @@ pub fn handler(
     ),
     IssueProgramEntityArgsV0 {
       entity_key: args.name.as_bytes().to_vec(),
-      name: args.name,
+      name: args.name.clone(),
       symbol: String::from("INCENTIVE"),
       approver_seeds: seeds[0].iter().map(|s| s.to_vec()).collect(),
       key_serialization: KeySerialization::UTF8,
@@ -168,6 +168,7 @@ pub fn handler(
       stop_ts: args.stop_ts,
       shares: args.shares,
       carrier: ctx.accounts.carrier.key(),
+      name: args.name,
       bump_seed: ctx.bumps["incentive_escrow_program"],
     });
 
