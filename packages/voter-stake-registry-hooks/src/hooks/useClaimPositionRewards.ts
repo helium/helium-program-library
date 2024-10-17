@@ -36,7 +36,7 @@ export const useClaimPositionRewards = () => {
       ) => Promise<void>;
       maxSignatureBatch?: number;
     }) => {
-      const isInvalid = !unixNow || !provider || !position.hasRewards;
+      const isInvalid = !unixNow || !provider || !position.hasDelegationRewards;
 
       const idl = await Program.fetchIdl(programId, provider);
       const hsdProgram = await init(provider as any, programId, idl);

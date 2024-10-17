@@ -2,12 +2,12 @@ import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID, currentEpoch } from "./constants";
 import BN from "bn.js";
 
-export const vsrTrackerKey = (
+export const vetokenTrackerKey = (
   registrar: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
-    [Buffer.from("vsr_tracker", "utf-8"), registrar.toBuffer()],
+    [Buffer.from("vetoken_tracker", "utf-8"), registrar.toBuffer()],
     programId
   );
 

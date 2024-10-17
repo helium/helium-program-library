@@ -58,7 +58,7 @@ export const useClaimAllPositionsRewards = () => {
       maxSignatureBatch?: number;
     }) => {
       const isInvalid =
-        !unixNow || !provider || !positions.every((pos) => pos.hasRewards);
+        !unixNow || !provider || !positions.every((pos) => pos.hasDelegationRewards);
 
       const idl = await Program.fetchIdl(programId, provider);
       const hsdProgram = await init(provider as any, programId, idl);
