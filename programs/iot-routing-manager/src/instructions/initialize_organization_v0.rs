@@ -20,14 +20,7 @@ pub const ENTITY_METADATA_URL: &str = "https://entities.nft.test-helium.com";
 #[cfg(not(feature = "devnet"))]
 pub const ENTITY_METADATA_URL: &str = "https://entities.nft.helium.io";
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct InitializeOrganizationArgsV0 {
-  // Default escrow key is OUI_<oui>. For legacy OUIs, this can be overridden
-  pub escrow_key_override: Option<String>,
-}
-
 #[derive(Accounts)]
-#[instruction(args: InitializeOrganizationArgsV0)]
 pub struct InitializeOrganizationV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
@@ -67,7 +60,7 @@ pub struct InitializeOrganizationV0<'info> {
     init,
     payer = payer,
     seeds = ["organization".as_bytes(), routing_manager.key().as_ref(), &routing_manager.next_oui_id.to_le_bytes()[..]],
-    space = 8 + std::mem::size_of::<OrganizationV0>() + args.escrow_key_override.map(|k| k.len()).unwrap_or(8) + 60,
+    space = 8 + std::mem::size_of::<OrganizationV0>() + 8 + 60,
     bump
   )]
   pub organization: Box<Account<'info, OrganizationV0>>,
@@ -150,16 +143,13 @@ pub struct InitializeOrganizationV0<'info> {
   pub token_program: Program<'info, Token>,
 }
 
-pub fn handler(
-  ctx: Context<InitializeOrganizationV0>,
-  args: InitializeOrganizationArgsV0,
-) -> Result<()> {
+pub fn handler(ctx: Context<InitializeOrganizationV0>) -> Result<()> {
   let seeds: &[&[&[u8]]] = &[
     routing_manager_seeds!(ctx.accounts.routing_manager),
     net_id_seeds!(ctx.accounts.net_id),
   ];
   let key = format!("OUI_{}", ctx.accounts.routing_manager.next_oui_id);
-  let escrow_key = args.escrow_key_override.unwrap_or(key.clone());
+  let escrow_key = key.clone();
 
   ctx.accounts.organization.set_inner(OrganizationV0 {
     oui: ctx.accounts.routing_manager.next_oui_id,

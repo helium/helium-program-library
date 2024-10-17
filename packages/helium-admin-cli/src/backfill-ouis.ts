@@ -282,7 +282,7 @@ export async function run(args: any = process.argv) {
 
         if (!(await exists(conn, orgK))) {
           return await irm.methods
-            .initializeOrganizationV0({
+            .tempBackfillOrganization({
               oui: new anchor.BN(org.oui),
               escrowKeyOverride: org.payer_pubkey,
             })

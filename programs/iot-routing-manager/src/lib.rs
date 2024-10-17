@@ -49,11 +49,8 @@ pub mod iot_routing_manager {
     initialize_net_id_v0::handler(ctx, args)
   }
 
-  pub fn initialize_organization_v0(
-    ctx: Context<InitializeOrganizationV0>,
-    args: InitializeOrganizationArgsV0,
-  ) -> Result<()> {
-    initialize_organization_v0::handler(ctx, args)
+  pub fn initialize_organization_v0(ctx: Context<InitializeOrganizationV0>) -> Result<()> {
+    initialize_organization_v0::handler(ctx)
   }
 
   pub fn initialize_routing_manager_v0(
@@ -82,6 +79,13 @@ pub mod iot_routing_manager {
     args: UpdateOrganizationArgsV0,
   ) -> Result<()> {
     update_organization_v0::handler(ctx, args)
+  }
+
+  pub fn temp_backfill_organization(
+    ctx: Context<TempBackfillOrganization>,
+    args: TempBackfillOrganizationArgs,
+  ) -> Result<()> {
+    temp_backfill_organization::handler(ctx, args)
   }
 
   pub fn temp_backfill_organization_delegate(

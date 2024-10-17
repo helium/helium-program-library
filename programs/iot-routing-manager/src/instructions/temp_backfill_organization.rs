@@ -22,15 +22,15 @@ pub const ENTITY_METADATA_URL: &str = "https://entities.nft.test-helium.com";
 pub const ENTITY_METADATA_URL: &str = "https://entities.nft.helium.io";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct InitializeOrganizationArgsV0 {
+pub struct TempBackfillOrganizationArgs {
   pub oui: u64,
   // Default escrow key is OUI_<oui>. For legacy OUIs, this can be overridden
   pub escrow_key_override: Option<String>,
 }
 
 #[derive(Accounts)]
-#[instruction(args: InitializeOrganizationArgsV0)]
-pub struct InitializeOrganizationV0<'info> {
+#[instruction(args: TempBackfillOrganizationArgs)]
+pub struct TempBackfillOrganization<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
@@ -153,8 +153,8 @@ pub struct InitializeOrganizationV0<'info> {
 }
 
 pub fn handler(
-  ctx: Context<InitializeOrganizationV0>,
-  args: InitializeOrganizationArgsV0,
+  ctx: Context<TempBackfillOrganization>,
+  args: TempBackfillOrganizationArgs,
 ) -> Result<()> {
   let seeds: &[&[&[u8]]] = &[
     routing_manager_seeds!(ctx.accounts.routing_manager),
