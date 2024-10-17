@@ -43,6 +43,7 @@
     "@helium/nft-proxy-sdk": "^0.0.12",
     "@helium/no-emit-sdk": "^0.9.7",
     "@helium/organization-sdk": "^0.0.12",
+    "@helium/position-voting-rewards-sdk": "^0.9.7",
     "@helium/price-oracle-sdk": "^0.9.7",
     "@helium/proposal-sdk": "^0.0.12",
     "@helium/rewards-oracle-sdk": "^0.9.7",

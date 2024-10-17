@@ -69,12 +69,15 @@ import {
   keyToAssetKey,
   mobileInfoKey,
 } from "@helium/helium-entity-manager-sdk";
+import { VoterStakeRegistry } from "../target/types/voter_stake_registry";
+import { init as initVsr } from "../packages/voter-stake-registry-sdk/src";
 
 chai.use(chaiAsPromised);
 
 describe("helium-entity-manager", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
+  let vsrProgram: Program<VoterStakeRegistry>;
   let dcProgram: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
   let hemProgram: Program<HeliumEntityManager>;
@@ -101,6 +104,12 @@ describe("helium-entity-manager", () => {
       provider,
       anchor.workspace.NoEmit.programId,
       anchor.workspace.NoEmit.idl
+    );
+
+    vsrProgram = await initVsr(
+      provider,
+      anchor.workspace.VoterStakeRegistry.programId,
+      anchor.workspace.VoterStakeRegistry.idl
     );
 
     hsdProgram = await initHeliumSubDaos(
@@ -130,6 +139,7 @@ describe("helium-entity-manager", () => {
     activeDeviceAuthority = Keypair.generate();
     ({ subDao } = await initTestSubdao({
       hsdProgram,
+      vsrProgram,
       provider,
       authority: me,
       dao,
@@ -884,6 +894,8 @@ describe("helium-entity-manager", () => {
 
         await hsdProgram.methods
           .updateSubDaoV0({
+            vetokenTracker: null,
+            votingRewardsPercent: null,
             authority: null,
             dcBurnAuthority: null,
             emissionSchedule: null,

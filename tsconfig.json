@@ -32,6 +32,9 @@
       "path": "./packages/voter-stake-registry-hooks"
     },
     {
+      "path": "./packages/position-voting-rewards-sdk"
+    },
+    {
       "path": "./packages/distributor-oracle"
     },
     {

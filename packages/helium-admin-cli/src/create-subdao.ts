@@ -362,6 +362,7 @@ export async function run(args: any = process.argv) {
       await heliumVsrProgram.methods
         .initializeRegistrarV0({
           positionUpdateAuthority: null,
+          positionFreezeAuthorities: [],
         })
         .accounts({
           realm,
@@ -512,6 +513,8 @@ export async function run(args: any = process.argv) {
       instructions: [
         await heliumSubDaosProgram.methods
           .updateSubDaoV0({
+            vetokenTracker: null,
+            votingRewardsPercent: null,
             authority,
             emissionSchedule,
             dcBurnAuthority: null,

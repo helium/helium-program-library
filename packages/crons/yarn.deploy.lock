@@ -203,6 +203,7 @@ __metadata:
     "@helium/nft-proxy-sdk": ^0.0.12
     "@helium/no-emit-sdk": ^0.9.7
     "@helium/organization-sdk": ^0.0.12
+    "@helium/position-voting-rewards-sdk": ^0.9.7
     "@helium/price-oracle-sdk": ^0.9.7
     "@helium/proposal-sdk": ^0.0.12
     "@helium/rewards-oracle-sdk": ^0.9.7
@@ -445,6 +446,24 @@ __metadata:
   checksum: 16425b4634ce474fb5902cd25883e213854d67291ce31dbf4fe58fbdf7695583405129b6faeafd6b96c861be208643a204d40f6e30d3aa05da8068eb98df07ca
   languageName: node
   linkType: hard
+
+"@helium/position-voting-rewards-sdk@^0.9.7":
+  version: 0.0.0-use.local
+  resolution: "@helium/position-voting-rewards-sdk@workspace:packages/position-voting-rewards-sdk"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@helium/anchor-resolvers": ^0.9.7
+    "@helium/idls": ^0.9.7
+    "@helium/spl-utils": ^0.9.7
+    "@solana/spl-token": ^0.3.8
+    bn.js: ^5.2.0
+    bs58: ^4.0.1
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@helium/price-oracle-sdk@^0.9.7":
   version: 0.0.0-use.local

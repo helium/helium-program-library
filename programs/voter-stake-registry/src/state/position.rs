@@ -1,7 +1,9 @@
-use super::{Lockup, LockupKind, VotingMintConfigV0};
-use crate::error::*;
-use anchor_lang::prelude::*;
 use std::cmp::min;
+
+use anchor_lang::prelude::*;
+
+use super::{Lockup, LockupKind, Registrar, VotingMintConfigV0};
+use crate::error::*;
 
 pub const PRECISION_FACTOR: u128 = 1_000_000_000_000;
 
@@ -27,9 +29,34 @@ pub struct PositionV0 {
   pub genesis_end: i64,
   pub bump_seed: u8,
   pub vote_controller: Pubkey,
+  pub freeze_bitmap: u8,
 }
 
 impl PositionV0 {
+  pub fn is_frozen(&self) -> bool {
+    self.freeze_bitmap > 0
+  }
+
+  pub fn freeze(&mut self, registrar: &Registrar, authority: &Pubkey) -> Result<()> {
+    let idx = registrar
+      .position_freeze_authorities
+      .iter()
+      .position(|x| x == authority)
+      .ok_or(VsrError::UnauthorizedFreezeAuthority)?;
+    self.freeze_bitmap |= 1 << idx;
+    Ok(())
+  }
+
+  pub fn thaw(&mut self, registrar: &Registrar, authority: &Pubkey) -> Result<()> {
+    let idx = registrar
+      .position_freeze_authorities
+      .iter()
+      .position(|x| x == authority)
+      .ok_or(VsrError::UnauthorizedFreezeAuthority)?;
+    self.freeze_bitmap &= !(1 << idx);
+    Ok(())
+  }
+
   // # Voting Power Caclulation
   //
   // Returns the voting power for the position, giving locked tokens boosted

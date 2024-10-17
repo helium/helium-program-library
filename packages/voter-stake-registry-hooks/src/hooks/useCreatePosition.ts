@@ -53,7 +53,7 @@ export const useCreatePosition = () => {
       ) => Promise<void>;
     }) => {
       const isInvalid = !provider || !client;
-      const registrar = getRegistrarKey(mint);
+      const registrar = subDao?.registrar || getRegistrarKey(mint);
 
       if (isInvalid) {
         throw new Error("Unable to Create Position, Invalid params");

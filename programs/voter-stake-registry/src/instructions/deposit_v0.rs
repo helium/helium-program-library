@@ -1,8 +1,7 @@
-use crate::error::VsrError;
-use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
-use anchor_spl::token::{self, Token, TokenAccount};
+use anchor_spl::token::{self, Mint, Token, TokenAccount};
+
+use crate::{error::VsrError, state::*};
 
 #[derive(Accounts)]
 pub struct DepositV0<'info> {
@@ -10,7 +9,7 @@ pub struct DepositV0<'info> {
 
   #[account(
     mut,
-    has_one = registrar
+    has_one = registrar,
   )]
   pub position: Box<Account<'info, PositionV0>>,
 
