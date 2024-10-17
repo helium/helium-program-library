@@ -13,6 +13,7 @@ use helium_entity_manager::{
 use helium_entity_manager::{IssueProgramEntityArgsV0, KeySerialization, SharedMerkleV0};
 use helium_sub_daos::{DaoV0, SubDaoV0};
 use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
+use std::cmp::max;
 
 #[cfg(feature = "devnet")]
 pub const ENTITY_METADATA_URL: &str = "https://entities.nft.test-helium.com";
@@ -22,6 +23,7 @@ pub const ENTITY_METADATA_URL: &str = "https://entities.nft.helium.io";
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeOrganizationArgsV0 {
+  pub oui: u64,
   // Default escrow key is OUI_<oui>. For legacy OUIs, this can be overridden
   pub escrow_key_override: Option<String>,
 }
@@ -66,7 +68,7 @@ pub struct InitializeOrganizationV0<'info> {
   #[account(
     init,
     payer = payer,
-    seeds = ["organization".as_bytes(), routing_manager.key().as_ref(), &routing_manager.next_oui_id.to_le_bytes()[..]],
+    seeds = ["organization".as_bytes(), routing_manager.key().as_ref(), &args.oui.to_le_bytes()],
     space = 8 + std::mem::size_of::<OrganizationV0>() + args.escrow_key_override.map(|k| k.len()).unwrap_or(8) + 60,
     bump
   )]
@@ -104,7 +106,7 @@ pub struct InitializeOrganizationV0<'info> {
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
-      &hash(format!("OUI_{}", &routing_manager.next_oui_id).as_bytes()).to_bytes()
+      &hash(format!("OUI_{}", args.oui).as_bytes()).to_bytes()
     ],
     seeds::program = helium_entity_manager_program.key(),
     bump
@@ -158,11 +160,11 @@ pub fn handler(
     routing_manager_seeds!(ctx.accounts.routing_manager),
     net_id_seeds!(ctx.accounts.net_id),
   ];
-  let key = format!("OUI_{}", ctx.accounts.routing_manager.next_oui_id);
+  let key = format!("OUI_{}", args.oui);
   let escrow_key = args.escrow_key_override.unwrap_or(key.clone());
 
   ctx.accounts.organization.set_inner(OrganizationV0 {
-    oui: ctx.accounts.routing_manager.next_oui_id,
+    oui: args.oui,
     routing_manager: ctx.accounts.routing_manager.key(),
     authority: ctx.accounts.authority.key(),
     escrow_key,
@@ -261,6 +263,8 @@ pub fn handler(
     )?;
   }
 
-  ctx.accounts.routing_manager.next_oui_id += 1;
+  ctx.accounts.routing_manager.next_oui_id =
+    max(ctx.accounts.routing_manager.next_oui_id, args.oui);
+
   Ok(())
 }

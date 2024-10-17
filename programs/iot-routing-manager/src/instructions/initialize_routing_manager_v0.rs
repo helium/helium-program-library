@@ -122,6 +122,7 @@ pub fn handler(
     sub_dao: ctx.accounts.sub_dao.key(),
     devaddr_price_usd: args.devaddr_price_usd,
     oui_price_usd: args.oui_price_usd,
+    next_oui_id: 1,
   });
 
   let signer_seeds: &[&[&[u8]]] = &[routing_manager_seeds!(ctx.accounts.routing_manager)];

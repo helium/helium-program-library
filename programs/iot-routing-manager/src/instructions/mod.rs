@@ -6,6 +6,7 @@ pub mod initialize_organization_v0;
 pub mod initialize_routing_manager_v0;
 pub mod remove_devaddr_constraint_v0;
 pub mod remove_organization_delegate_v0;
+pub mod temp_backfill_organization;
 pub mod temp_backfill_organization_delegate;
 pub mod update_organization_v0;
 
@@ -17,5 +18,6 @@ pub use initialize_organization_v0::*;
 pub use initialize_routing_manager_v0::*;
 pub use remove_devaddr_constraint_v0::*;
 pub use remove_organization_delegate_v0::*;
+pub use temp_backfill_organization::*;
 pub use temp_backfill_organization_delegate::*;
 pub use update_organization_v0::*;

@@ -12,6 +12,7 @@ pub struct IotRoutingManagerV0 {
   // with 6 decimals of precision
   pub devaddr_price_usd: u64,
   pub oui_price_usd: u64,
+  pub next_oui_id: u64,
   pub bump_seed: u8,
 }
 
