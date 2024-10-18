@@ -107,24 +107,6 @@ describe("voter-stake-registry", () => {
       new anchor.BN(1)
     );
 
-    await withSetRealmConfig(
-      instructions,
-      SPL_GOVERNANCE_PID,
-      programVersion,
-      realm,
-      me,
-      undefined,
-      MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION,
-      new anchor.BN(1),
-      new GoverningTokenConfigAccountArgs({
-        voterWeightAddin: program.programId,
-        maxVoterWeightAddin: undefined,
-        tokenType: GoverningTokenType.Liquid,
-      }),
-      undefined,
-      me
-    );
-
     ({
       pubkeys: { proxyConfig },
     } = await proxyProgram.methods
@@ -141,7 +123,7 @@ describe("voter-stake-registry", () => {
       .accounts({
         authority: me,
       })
-      .rpcAndKeys());
+      .rpcAndKeys({ skipPreflight: true }));
 
     const {
       instruction: createRegistrar,
@@ -149,6 +131,7 @@ describe("voter-stake-registry", () => {
     } = await program.methods
       .initializeRegistrarV0({
         positionUpdateAuthority: null,
+        positionFreezeAuthorities: [],
       })
       .accounts({
         realm: realm,
@@ -306,7 +289,7 @@ describe("voter-stake-registry", () => {
           onVoteHook: PublicKey.default,
           authority: me,
         })
-        .rpcAndKeys();
+        .rpcAndKeys({ skipPreflight: true });
       proposalConfig = proposalConfigK as PublicKey;
       const {
         pubkeys: { proposal: proposalK },
@@ -329,7 +312,7 @@ describe("voter-stake-registry", () => {
           tags: ["test", "tags"],
         })
         .accounts({ proposalConfig })
-        .rpcAndKeys();
+        .rpcAndKeys({ skipPreflight: true });
       proposal = proposalK as PublicKey;
 
       await proposalProgram.methods
@@ -750,7 +733,7 @@ describe("voter-stake-registry", () => {
               targetPosition: newPos,
               depositMint: hntMint,
             })
-            .rpc()
+            .rpc({ skipPreflight: true })
         ).to.eventually.be.rejectedWith(
           "AnchorError caused by account: source_position. Error Code: ActiveVotesExist. Error Number: 6055. Error Message: Cannot change a position while active votes exist."
         );

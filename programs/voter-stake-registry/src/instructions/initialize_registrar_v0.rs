@@ -1,21 +1,25 @@
-use crate::state::*;
+use std::mem::size_of;
+
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use mpl_token_metadata::types::CollectionDetails;
-use mpl_token_metadata::types::DataV2;
+use mpl_token_metadata::types::{CollectionDetails, DataV2};
 use nft_proxy::ProxyConfigV0;
-use shared_utils::create_metadata_accounts_v3;
-use shared_utils::token_metadata::{
-  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
+use shared_utils::{
+  create_metadata_accounts_v3,
+  token_metadata::{
+    create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
+  },
 };
-use std::mem::size_of;
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Default, Clone)]
 pub struct InitializeRegistrarArgsV0 {
   pub position_update_authority: Option<Pubkey>,
+  pub position_freeze_authorities: Vec<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -189,6 +193,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
     collection_bump_seed: ctx.bumps["collection"],
     reserved1: [0; 4],
     reserved2: [0; 3],
+    position_freeze_authorities: args.position_freeze_authorities,
     voting_mints: Vec::new(),
     proxy_config: ctx
       .accounts

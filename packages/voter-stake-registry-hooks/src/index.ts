@@ -12,10 +12,15 @@ export { useDelegatePosition } from "./hooks/useDelegatePosition";
 export { useSplitPosition } from "./hooks/useSplitPosition";
 export { useExtendPosition } from "./hooks/useExtendPosition";
 export { useFlipPositionLockupKind } from "./hooks/useFlipPositionLockupKind";
+export { useRegistrarForMint } from "./hooks/useRegistrarForMint"
 export { useSubDaos } from "./hooks/useSubDaos";
+export { useSubDao } from "./hooks/useSubDao";
+export { useDao } from "./hooks/useDao";
 export { useTransferPosition } from "./hooks/useTransferPosition";
 export { useUndelegatePosition } from "./hooks/useUndelegatePosition";
 export { useDelegatedPositions } from "./hooks/useDelegatedPositions";
+export { useEnrolledPositions } from "./hooks/useEnrolledPositions";
+export { useEnrolledPosition } from "./hooks/useEnrolledPosition";
 export { usePositions } from "./hooks/usePositions";
 export { useRegistrar } from "./hooks/useRegistrar";
 export { calcLockupMultiplier } from "./utils/calcLockupMultiplier";

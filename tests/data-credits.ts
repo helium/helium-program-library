@@ -209,6 +209,7 @@ describe("data-credits", () => {
 
       ({ subDao } = await initTestSubdao({
         hsdProgram,
+        vsrProgram,
         provider,
         authority: me,
         dao,
@@ -337,6 +338,7 @@ describe("data-credits", () => {
     it("redelegates delegated data credits", async () => {
       const { subDao: destinationSubDao } = await initTestSubdao({
         hsdProgram,
+        vsrProgram,
         provider,
         authority: me,
         dao,

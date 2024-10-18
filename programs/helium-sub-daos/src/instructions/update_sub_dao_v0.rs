@@ -1,6 +1,7 @@
-use crate::state::*;
 use anchor_lang::prelude::*;
 use shared_utils::resize_to_fit;
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateSubDaoArgsV0 {
@@ -12,6 +13,8 @@ pub struct UpdateSubDaoArgsV0 {
   pub delegator_rewards_percent: Option<u64>,
   pub onboarding_data_only_dc_fee: Option<u64>,
   pub active_device_authority: Option<Pubkey>,
+  pub voting_rewards_percent: Option<u64>,
+  pub vetoken_tracker: Option<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -63,6 +66,15 @@ pub fn handler(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result
 
   if let Some(active_device_authority) = args.active_device_authority {
     ctx.accounts.sub_dao.active_device_authority = active_device_authority;
+  }
+
+  if let Some(voting_rewards_percent) = args.voting_rewards_percent {
+    require_gte!(max_percent, voting_rewards_percent);
+    ctx.accounts.sub_dao.voting_rewards_percent = voting_rewards_percent;
+  }
+
+  if let Some(vetoken_tracker) = args.vetoken_tracker {
+    ctx.accounts.sub_dao.vetoken_tracker = vetoken_tracker;
   }
 
   resize_to_fit(
