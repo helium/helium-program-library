@@ -1,5 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import Client, {
+  CommitmentLevel,
   SubscribeRequest,
   SubscribeUpdate,
   SubscribeUpdateAccount,
@@ -119,6 +120,7 @@ export const setupYellowstone = async (
         blocksMeta: {},
         accountsDataSlice: [],
         ping: undefined,
+        commitment: CommitmentLevel.CONFIRMED
       };
 
       stream.write(request, (err: any) => {
