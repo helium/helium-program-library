@@ -89,7 +89,8 @@ export const useClosePosition = () => {
               .unenrollV0()
               .accounts({
                 position: position.pubkey,
-                vetokenTracker
+                vetokenTracker,
+                rentRefund: provider.wallet.publicKey,
               })
               .instruction()
           );

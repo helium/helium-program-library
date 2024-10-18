@@ -2,31 +2,27 @@ import { AnchorProvider, BN, IdlAccounts, Wallet } from "@coral-xyz/anchor";
 import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import {
   EPOCH_LENGTH,
-  daoKey,
-  delegatedPositionKey,
-  subDaoKey,
+  delegatedPositionKey
 } from "@helium/helium-sub-daos-sdk";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { init as initNftProxy } from "@helium/nft-proxy-sdk";
+import { enrolledPositionKey } from "@helium/position-voting-rewards-sdk";
 import { truthy } from "@helium/spl-utils";
 import {
   VoteService,
-  getRegistrarKey,
-  init,
+  init
 } from "@helium/voter-stake-registry-sdk";
 import { Connection, PublicKey } from "@solana/web3.js";
 import React, { createContext, useContext, useMemo } from "react";
 import { useAsync } from "react-async-hook";
 import { useDelegatedPositions } from "../hooks/useDelegatedPositions";
+import { useEnrolledPositions } from "../hooks/useEnrolledPositions";
 import { usePositionKeysAndProxies } from "../hooks/usePositionKeysAndProxies";
 import { usePositions } from "../hooks/usePositions";
 import { useRegistrar } from "../hooks/useRegistrar";
+import { useRegistrarForMint } from "../hooks/useRegistrarForMint";
 import { PositionWithMeta, ProxyAssignmentV0 } from "../sdk/types";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
-import { enrolledPositionKey } from "@helium/position-voting-rewards-sdk";
-import { useEnrolledPositions } from "../hooks/useEnrolledPositions";
-import { useSubDao } from "../hooks/useSubDao";
-import { useDao } from "../hooks/useDao";
 
 type Registrar = IdlAccounts<VoterStakeRegistry>["registrar"];
 
@@ -90,23 +86,7 @@ export const HeliumVsrStateProvider: React.FC<{
     }
   }, [connection?.rpcEndpoint, wallet?.publicKey?.toBase58()]);
 
-  const daoK = useMemo(() => {
-    if (mint) {
-      return daoKey(mint);
-    }
-  }, [mint?.toBase58()]);
-  const subDaoK = useMemo(() => {
-    if (mint) {
-      return subDaoKey(mint)[0];
-    }
-  }, [mint?.toBase58()]);
-  const { info: subDao } = useSubDao(subDaoK);
-  const { info: dao } = useDao(subDaoK);
-
-  const registrarKey = useMemo(
-    () => subDao && subDao.registrar || dao && dao.registrar,
-    [subDao?.registrar, dao?.registrar]
-  );
+  const { registrarKey } = useRegistrarForMint(mint)
 
   const { info: registrar } = useRegistrar(registrarKey);
 
@@ -198,7 +178,13 @@ export const HeliumVsrStateProvider: React.FC<{
 
   const { amountLocked, votingPower, positionsWithMeta, amountProxyLocked } =
     useMemo(() => {
-      if (positions && registrar && delegatedAccounts && enrolledAccounts && now) {
+      if (
+        positions &&
+        registrar &&
+        delegatedAccounts &&
+        enrolledAccounts &&
+        now
+      ) {
         let amountLocked = new BN(0);
         let amountProxyLocked = new BN(0);
         let votingPower = new BN(0);
@@ -223,10 +209,10 @@ export const HeliumVsrStateProvider: React.FC<{
                 : false;
 
               const enrollmentRewards = isEnrolled
-                ? enrollment!.lastClaimedEpoch.add(
-                    new BN(1)
-                  ).lt(new BN(now).div(new BN(EPOCH_LENGTH)))
-                  : false;
+                ? enrollment!.lastClaimedEpoch
+                    .add(new BN(1))
+                    .lt(new BN(now).div(new BN(EPOCH_LENGTH)))
+                : false;
 
               const posVotingPower = calcPositionVotingPower({
                 position: position?.info || null,
@@ -253,6 +239,7 @@ export const HeliumVsrStateProvider: React.FC<{
                 isDelegated,
                 isEnrolled,
                 delegatedSubDao,
+                hasRewards: delegationRewards || enrollmentRewards,
                 hasDelegationRewards: delegationRewards,
                 hasEnrollmentRewards: enrollmentRewards,
                 hasGenesisMultiplier: position.info.genesisEnd.gt(new BN(now)),
@@ -281,6 +268,7 @@ export const HeliumVsrStateProvider: React.FC<{
       registrar,
       delegatedAccounts,
       proxyAccounts,
+      enrolledAccounts,
     ]);
 
   const sortedPositions = useMemo(

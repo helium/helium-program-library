@@ -54,6 +54,7 @@ export const useExtendPosition = () => {
               .accounts({
                 position: position.pubkey,
                 vetokenTracker,
+                rentRefund: provider.wallet.publicKey,
               })
               .instruction()
           );

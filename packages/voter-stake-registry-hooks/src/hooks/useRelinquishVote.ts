@@ -152,6 +152,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
                       .accounts({
                         marker: markerK,
                         position: position.pubkey,
+                        proposal
                       })
                       .instruction()
                   );

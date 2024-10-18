@@ -18,8 +18,10 @@ import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { HeliumVsrClient } from "../sdk/client";
 import { SubDaoWithMeta } from "../sdk/types";
 import {
+  daoKey,
   init as initHsd,
   subDaoEpochInfoKey,
+  subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
 import { useQueryClient } from "@tanstack/react-query";
 import { INDEXER_WAIT } from "../constants";
@@ -53,12 +55,16 @@ export const useCreatePosition = () => {
       ) => Promise<void>;
     }) => {
       const isInvalid = !provider || !client;
-      const registrar = subDao?.registrar || getRegistrarKey(mint);
 
       if (isInvalid) {
         throw new Error("Unable to Create Position, Invalid params");
       } else {
         const hsdProgram = await initHsd(provider);
+        const [daoK] = daoKey(mint);
+        const [subDaoK] = subDaoKey(mint);
+        const myDao = await hsdProgram.account.daoV0.fetchNullable(daoK);
+        const mySubDao = await hsdProgram.account.subDaoV0.fetchNullable(subDaoK);
+        const registrar = (mySubDao?.registrar || myDao?.registrar)!;
         const mintKeypair = Keypair.generate();
         const position = positionKey(mintKeypair.publicKey)[0];
         const instructions: TransactionInstruction[] = [];

@@ -1,5 +1,6 @@
 import { BN, IdlAccounts, IdlTypes } from '@coral-xyz/anchor'
 import { HeliumSubDaos } from '@helium/idls/lib/types/helium_sub_daos'
+import { PositionVotingRewards } from '@helium/idls/lib/types/position_voting_rewards'
 import { VoterStakeRegistry as HeliumVoterStakeRegistry } from '@helium/idls/lib/types/voter_stake_registry'
 import { NftProxy } from '@helium/modular-governance-idls/lib/types/nft_proxy'
 import { PublicKey } from '@solana/web3.js'
@@ -25,6 +26,7 @@ export interface PositionWithMeta extends Position {
   // This position could by someone elses position, but was delegated to me
   isProxiedToMe: boolean;
   delegatedSubDao: PublicKey | null;
+  hasRewards: boolean;
   hasDelegationRewards: boolean;
   hasEnrollmentRewards: boolean;
   hasGenesisMultiplier: boolean;
@@ -45,3 +47,5 @@ export interface SubDaoWithMeta extends Omit<SubDao, 'dntMint'> {
     json: any;
   }
 }
+
+export type VeTokenTracker = IdlAccounts<PositionVotingRewards>["veTokenTrackerV0"];

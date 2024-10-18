@@ -63,6 +63,7 @@ export const useTransferPosition = () => {
               .accounts({
                 position: sourcePosition.pubkey,
                 vetokenTracker,
+                rentRefund: provider.wallet.publicKey,
               })
               .instruction()
           );
