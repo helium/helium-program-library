@@ -17,6 +17,7 @@ pub struct SetCurrentRewardsWrapperArgsV1 {
 #[instruction(args: SetCurrentRewardsWrapperArgsV1)]
 pub struct SetCurrentRewardsWrapperV1<'info> {
   // the oracle EOA that gets wrapped
+  #[account(mut)]
   pub oracle: Signer<'info>,
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
   #[account(
