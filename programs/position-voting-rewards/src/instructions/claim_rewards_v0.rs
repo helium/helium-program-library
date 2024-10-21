@@ -178,7 +178,17 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     .filter(|&proposal| proposal_set.contains(&proposal.proposal))
     .count();
 
-  if eligible_count >= 2 {
+  let not_two_proposals = ctx.accounts.vsr_epoch_info.recent_proposals.len() < 2
+    || ctx
+      .accounts
+      .vsr_epoch_info
+      .recent_proposals
+      .iter()
+      .filter(|p| p.proposal == Pubkey::default())
+      .count()
+      < 2;
+
+  if not_two_proposals || eligible_count >= 2 {
     msg!("Position is eligible, transferring");
     transfer(
       ctx
