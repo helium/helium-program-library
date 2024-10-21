@@ -145,7 +145,7 @@ describe("helium-entity-manager", () => {
       dao,
       activeDeviceAuthority: activeDeviceAuthority.publicKey,
       // Add some padding for onboards
-      numTokens: MAKER_STAKING_FEE.mul(new BN(2)).add(new BN(10000000000)),
+      numTokens: MAKER_STAKING_FEE.mul(new BN(2)).add(new BN(100000000000)),
     }));
   });
 
