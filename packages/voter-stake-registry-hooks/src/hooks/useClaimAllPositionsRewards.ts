@@ -243,8 +243,6 @@ export const useClaimAllPositionsRewards = () => {
                 })
             );
 
-            console.log("epochsToClaim", epochsToClaim)
-
             const vetokenTracker = enrolledPosition.account.vetokenTracker;
             const vetokenTrackerStr = vetokenTracker.toBase58();
             const vetokenTrackerAcc = vetokenTrackers[vetokenTrackerStr];
@@ -257,7 +255,8 @@ export const useClaimAllPositionsRewards = () => {
               )[0];
               const rewardsPool = getAssociatedTokenAddressSync(
                 vetokenTrackerAcc.rewardsMint,
-                vsrEpochInfo
+                vsrEpochInfo,
+                true
               );
               bucketedEpochsByPosition[position.pubkey.toBase58()].push(
                 await Promise.all(
