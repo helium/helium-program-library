@@ -217,7 +217,7 @@ export async function run(args: any = process.argv) {
   }
 
   if (!(await exists(conn, routingManager))) {
-    console.log(`Initializing routingManager`);
+    console.log(`Initializing routingManager ${routingManager.toBase58()}`);
     await sendInstructionsWithPriorityFee(
       provider,
       [
