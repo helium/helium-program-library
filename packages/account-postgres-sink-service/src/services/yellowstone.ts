@@ -11,7 +11,7 @@ import { getPluginsByAccountTypeByProgram } from "../plugins";
 import { IConfig } from "../types";
 import { convertYellowstoneTransaction } from "../utils/convertYellowstoneTransaction";
 import { handleAccountWebhook } from "../utils/handleAccountWebhook";
-import { handleTransactionWebhoook } from "../utils/handleTransactionWebhook";
+import { handleTransactionWebhook } from "../utils/handleTransactionWebhook";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 5000; // 5 seconds
@@ -55,7 +55,7 @@ export const setupYellowstone = async (
 
             if (transaction) {
               try {
-                await handleTransactionWebhoook({
+                await handleTransactionWebhook({
                   fastify: server,
                   configs,
                   transaction,
@@ -120,7 +120,7 @@ export const setupYellowstone = async (
         blocksMeta: {},
         accountsDataSlice: [],
         ping: undefined,
-        commitment: CommitmentLevel.CONFIRMED
+        commitment: CommitmentLevel.CONFIRMED,
       };
 
       stream.write(request, (err: any) => {
