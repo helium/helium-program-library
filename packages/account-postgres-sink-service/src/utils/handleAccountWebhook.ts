@@ -21,12 +21,8 @@ interface HandleAccountWebhookArgs {
   pluginsByAccountType: Record<string, IInitedPlugin[]>;
 }
 
-// Ensure we never have more txns open than the pool size - 1
-const limit = pLimit(
-  (process.env.PG_POOL_SIZE ? Number(process.env.PG_POOL_SIZE) : 10) - 1
-);
-
-export function handleAccountWebhook({
+const limit = pLimit(Number(process.env.PG_POOL_SIZE) || 20);
+export const handleAccountWebhook = async ({
   fastify,
   programId,
   accounts,
@@ -34,7 +30,7 @@ export function handleAccountWebhook({
   sequelize = database,
   pluginsByAccountType,
   isDelete = false,
-}: HandleAccountWebhookArgs) {
+}: HandleAccountWebhookArgs) => {
   return limit(async () => {
     const idl = await cachedIdlFetch.fetchIdl({
       programId: programId.toBase58(),
@@ -125,4 +121,4 @@ export function handleAccountWebhook({
       throw err;
     }
   });
-}
+};
