@@ -16,7 +16,7 @@ import retry from "async-retry";
 import { BloomFilter } from "bloom-filters";
 import { EventEmitter } from "events";
 import Fastify, { FastifyInstance } from "fastify";
-import fastifyCron from "fastify-cron";
+import fastifyCron, { Params as CronConfig } from "fastify-cron";
 import fs from "fs";
 import { ReasonPhrases, StatusCodes } from "http-status-codes";
 import { EachMessagePayload, Kafka, KafkaConfig } from "kafkajs";
@@ -25,7 +25,6 @@ import {
   HELIUS_AUTH_SECRET,
   PROGRAM_ACCOUNT_CONFIGS,
   REFRESH_PASSWORD,
-  RUN_JOBS_AT_STARTUP,
   SUBSTREAM,
   USE_KAFKA,
   USE_SUBSTREAMS,
@@ -66,18 +65,19 @@ if (!HELIUS_AUTH_SECRET) {
   const customJobs = configs
     .filter((x) => !!x.crons)
     .flatMap(({ programId, crons = [] }) =>
-      crons.map(({ schedule, type }) => ({
-        cronTime: schedule,
-        runOnInit: false,
-        onTick: async (server: any) => {
-          try {
-            console.log(`Running custom job: ${type}`);
-            await server.inject(`/${type}?program=${programId}`);
-          } catch (err) {
-            console.error(err);
-          }
-        },
-      }))
+      crons.map(
+        ({ schedule, type }): CronConfig => ({
+          cronTime: schedule,
+          onTick: async (server: any) => {
+            try {
+              console.log(`Running custom job: ${type}`);
+              await server.inject(`/${type}?program=${programId}`);
+            } catch (err) {
+              console.error(err);
+            }
+          },
+        })
+      )
     );
 
   const server: FastifyInstance = Fastify({ logger: false });
@@ -105,6 +105,7 @@ if (!HELIUS_AUTH_SECRET) {
                     programId: new PublicKey(config.programId),
                     accounts: config.accounts,
                   });
+                  console.log(`Accounts refreshed for program: ${programId}`);
                 } catch (err) {
                   throw err;
                 }
@@ -321,13 +322,14 @@ if (!HELIUS_AUTH_SECRET) {
       port: Number(process.env.PORT || "3000"),
       host: "0.0.0.0",
     });
+
+    if (customJobs.length > 0) {
+      server.cron.startAllJobs();
+    }
+
     const address = server.server.address();
     const port = typeof address === "string" ? address : address?.port;
     console.log(`Running on 0.0.0.0:${port}`);
-    // By default, jobs are not running at startup
-    if (RUN_JOBS_AT_STARTUP) {
-      server.cron.startAllJobs();
-    }
   } catch (err) {
     console.error(err);
     process.exit(1);

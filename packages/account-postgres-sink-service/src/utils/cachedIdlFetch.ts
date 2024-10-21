@@ -1,7 +1,7 @@
-import * as anchor from '@coral-xyz/anchor';
+import * as anchor from "@coral-xyz/anchor";
 
 const cachedIdlFetch = (() => {
-  let cache: { programId: string; idl: anchor.Idl }[] = [];
+  let cache: Map<string, anchor.Idl> = new Map();
 
   const fetchIdl = async ({
     programId,
@@ -13,21 +13,22 @@ const cachedIdlFetch = (() => {
     provider: anchor.AnchorProvider;
   }): Promise<anchor.Idl | null> => {
     let idl: anchor.Idl | null;
-    const foundIdx = cache.findIndex(
-      (cacheItem) => cacheItem.programId === programId
-    );
 
-    if (!skipCache && foundIdx > -1) {
-      idl = cache[foundIdx].idl;
-      // move to front of cache
-      cache.splice(0, 0, cache.splice(foundIdx, 1)[0]);
+    if (!skipCache && cache.has(programId)) {
+      idl = cache.get(programId)!;
+      // Move the accessed item to the end to represent recent use
+      cache.delete(programId);
+      cache.set(programId, idl);
     } else {
       idl = await anchor.Program.fetchIdl(programId, provider);
 
       if (idl) {
-        cache.unshift({ programId, idl });
-        // prune cache to 10 items;
-        cache = cache.slice(0, 10);
+        cache.set(programId, idl);
+        // Prune cache to 10 items
+        if (cache.size > 10) {
+          const firstKey = cache.keys().next().value;
+          cache.delete(firstKey);
+        }
       }
     }
 

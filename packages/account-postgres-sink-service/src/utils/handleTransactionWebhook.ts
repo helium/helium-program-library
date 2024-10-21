@@ -20,12 +20,8 @@ interface HandleTransactionWebhookArgs {
   sequelize?: Sequelize;
 }
 
-// Ensure we never have more txns open than the pool size - 1
-const limit = pLimit(
-  (process.env.PG_POOL_SIZE ? Number(process.env.PG_POOL_SIZE) : 5) - 1
-);
-
-export const handleTransactionWebhoook = async ({
+const limit = pLimit(Number(process.env.PG_POOL_SIZE) || 20);
+export const handleTransactionWebhook = async ({
   fastify,
   configs,
   transaction,
