@@ -1,13 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
 import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
-import pLimit from "p-limit";
 import { Op, Sequelize } from "sequelize";
 import { SOLANA_URL } from "../env";
 import { initPlugins } from "../plugins";
 import { IAccountConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
 import { chunks } from "./chunks";
-import database from "./database";
+import database, { limit } from "./database";
 import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
@@ -87,7 +86,6 @@ export const upsertProgramAccounts = async ({
         // @ts-ignore
         const respChunks = chunks(resp, batchSize);
         const now = new Date().toISOString();
-        const limit = pLimit(Number(process.env.PG_POOL_SIZE) || 20);
 
         try {
           const processingPromises = respChunks.map((c) =>
