@@ -733,7 +733,7 @@ describe("voter-stake-registry", () => {
               targetPosition: newPos,
               depositMint: hntMint,
             })
-            .rpc({ skipPreflight: true })
+            .rpc()
         ).to.eventually.be.rejectedWith(
           "AnchorError caused by account: source_position. Error Code: ActiveVotesExist. Error Number: 6055. Error Message: Cannot change a position while active votes exist."
         );
