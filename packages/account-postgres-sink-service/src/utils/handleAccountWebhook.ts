@@ -9,7 +9,6 @@ import cachedIdlFetch from "./cachedIdlFetch";
 import database, { limit } from "./database";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { provider } from "./solana";
-import { PG_POOL_SIZE } from "../env";
 
 interface HandleAccountWebhookArgs {
   fastify: FastifyInstance;

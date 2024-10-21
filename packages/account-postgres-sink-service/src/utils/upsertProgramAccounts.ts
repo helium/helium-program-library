@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
 import { Op, Sequelize } from "sequelize";
-import { PG_POOL_SIZE, SOLANA_URL } from "../env";
+import { SOLANA_URL } from "../env";
 import { initPlugins } from "../plugins";
 import { IAccountConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";

@@ -11,7 +11,6 @@ import { IConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
 import database, { limit } from "./database";
 import { provider } from "./solana";
-import { PG_POOL_SIZE } from "../env";
 
 interface HandleTransactionWebhookArgs {
   fastify: FastifyInstance;
