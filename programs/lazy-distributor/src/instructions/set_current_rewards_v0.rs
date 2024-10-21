@@ -21,7 +21,6 @@ pub struct SetCurrentRewardsV0<'info> {
   )]
   pub recipient: Box<Account<'info, RecipientV0>>,
   #[account(
-    mut,
     constraint = args.oracle_index < lazy_distributor.oracles.len() as u16 @ ErrorCode::InvalidOracleIndex,
     constraint = oracle.key() == lazy_distributor.oracles[usize::from(args.oracle_index)].oracle
   )]
