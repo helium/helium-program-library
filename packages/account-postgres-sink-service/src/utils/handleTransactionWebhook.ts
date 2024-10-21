@@ -6,12 +6,12 @@ import {
 } from "@solana/web3.js";
 import { FastifyInstance } from "fastify";
 import { camelize, humanize, titleize } from "inflection";
-import pLimit from "p-limit";
 import { Sequelize } from "sequelize";
 import { IConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
-import database from "./database";
+import database, { limit } from "./database";
 import { provider } from "./solana";
+import { PG_POOL_SIZE } from "../env";
 
 interface HandleTransactionWebhookArgs {
   fastify: FastifyInstance;
@@ -20,7 +20,6 @@ interface HandleTransactionWebhookArgs {
   sequelize?: Sequelize;
 }
 
-const limit = pLimit(Number(process.env.PG_POOL_SIZE) || 20);
 export const handleTransactionWebhook = async ({
   fastify,
   configs,

@@ -1,9 +1,12 @@
 import { Model, STRING, Sequelize } from "sequelize";
 import AWS from "aws-sdk";
 import * as pg from "pg";
+import { PG_POOL_SIZE } from "../env";
+import pLimit from "p-limit";
 
 const host = process.env.PGHOST || "localhost";
 const port = Number(process.env.PGPORT) || 5432;
+export const limit = pLimit(PG_POOL_SIZE - 1);
 export const database = new Sequelize({
   host: host,
   dialect: "postgres",
@@ -13,10 +16,18 @@ export const database = new Sequelize({
   username: process.env.PGUSER,
   database: process.env.PGDATABASE,
   pool: {
-    max: Number(process.env.PG_POOL_SIZE) || 20,
+    max: PG_POOL_SIZE,
     min: 5,
     acquire: 60000,
     idle: 10000,
+    validate: (client: any) => {
+      try {
+        client.query("SELECT 1");
+        return true;
+      } catch (err) {
+        return false;
+      }
+    },
   },
   hooks: {
     beforeConnect: async (config: any) => {
