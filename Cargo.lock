@@ -1964,7 +1964,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -5673,7 +5673,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
