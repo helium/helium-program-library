@@ -1,5 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
+import retry from "async-retry";
 import { Op, Sequelize, Transaction } from "sequelize";
 import { SOLANA_URL } from "../env";
 import { initPlugins } from "../plugins";
@@ -62,6 +63,7 @@ export const upsertProgramAccounts = async ({
   const processProgramAccounts = async (
     connection: anchor.web3.Connection,
     programId: anchor.web3.PublicKey,
+    accountType: string,
     filters: anchor.web3.GetProgramAccountsFilter[],
     batchSize: number,
     processChunk: (
@@ -72,10 +74,25 @@ export const upsertProgramAccounts = async ({
     const startTime = Date.now();
     let processedCount = 0;
 
-    const accounts = await connection.getProgramAccounts(programId, {
-      filters,
-      commitment: connection.commitment,
-    });
+    const accounts = await retry(
+      async () => {
+        return await connection.getProgramAccounts(programId, {
+          filters,
+          commitment: connection.commitment,
+        });
+      },
+      {
+        retries: 5,
+        factor: 2,
+        minTimeout: 1000,
+        maxTimeout: 60000,
+        onRetry: (err, attempt) => {
+          console.warn(
+            `Retrying getProgramAccounts for ${accountType}, attempt #${attempt}: Retrying due to ${err.message}`
+          );
+        },
+      }
+    );
 
     for (const chunk of chunks(accounts, batchSize)) {
       try {
@@ -85,7 +102,7 @@ export const upsertProgramAccounts = async ({
         await processChunk(chunk, t);
         await t.commit();
         processedCount += chunk.length;
-        console.log(`Processed ${processedCount} accounts`);
+        console.log(`Processed ${processedCount} ${accountType} accounts`);
       } catch (err) {
         console.error(`Error processing chunk:`, err);
         throw err;
@@ -94,7 +111,7 @@ export const upsertProgramAccounts = async ({
 
     const duration = (Date.now() - startTime) / 1000;
     console.log(
-      `Finished processing ${processedCount} accounts in ${duration} seconds`
+      `Finished processing ${accountType} accounts in ${duration} seconds`
     );
   };
 
@@ -119,6 +136,7 @@ export const upsertProgramAccounts = async ({
       await processProgramAccounts(
         connection,
         programId,
+        type,
         coderFilters,
         batchSize,
         async (chunk, transaction) => {
