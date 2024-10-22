@@ -189,7 +189,6 @@ export const upsertProgramAccounts = async ({
       });
     } catch (err) {
       console.error(`Error processing account type ${type}:`, err);
-      throw err;
     }
   }
 };
