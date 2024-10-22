@@ -3,11 +3,10 @@ import { PublicKey } from "@solana/web3.js";
 import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
-import pLimit from "p-limit";
 import { Sequelize } from "sequelize";
 import { IAccountConfig, IInitedPlugin } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
-import database from "./database";
+import database, { limit } from "./database";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { provider } from "./solana";
 
@@ -21,12 +20,7 @@ interface HandleAccountWebhookArgs {
   pluginsByAccountType: Record<string, IInitedPlugin[]>;
 }
 
-// Ensure we never have more txns open than the pool size - 1
-const limit = pLimit(
-  (process.env.PG_POOL_SIZE ? Number(process.env.PG_POOL_SIZE) : 10) - 1
-);
-
-export function handleAccountWebhook({
+export const handleAccountWebhook = async ({
   fastify,
   programId,
   accounts,
@@ -34,7 +28,7 @@ export function handleAccountWebhook({
   sequelize = database,
   pluginsByAccountType,
   isDelete = false,
-}: HandleAccountWebhookArgs) {
+}: HandleAccountWebhookArgs) => {
   return limit(async () => {
     const idl = await cachedIdlFetch.fetchIdl({
       programId: programId.toBase58(),
@@ -125,4 +119,4 @@ export function handleAccountWebhook({
       throw err;
     }
   });
-}
+};

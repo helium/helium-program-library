@@ -26,7 +26,7 @@ export async function estimatePrioritizationFee(
   ixs: TransactionInstruction[],
   basePriorityFee?: number
 ): Promise<number> {
-  const accounts = ixs.map((x) => x.keys.map((k) => k.pubkey)).flat();
+  const accounts = ixs.map((x) => x.keys.filter(k => k.isWritable).map((k) => k.pubkey)).flat();
   const uniqueAccounts = [...new Set(accounts.map((x) => x.toBase58()))]
     .map((a) => new PublicKey(a))
     .slice(0, MAX_RECENT_PRIORITY_FEE_ACCOUNTS);

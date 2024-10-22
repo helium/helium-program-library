@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 use helium_entity_manager::state::*;
-use lazy_distributor::program::LazyDistributor;
-use lazy_distributor::state::*;
 use lazy_distributor::{
   cpi::{accounts::SetCurrentRewardsV0, set_current_rewards_v0},
+  program::LazyDistributor,
+  state::*,
   SetCurrentRewardsArgsV0,
 };
 
@@ -16,8 +16,8 @@ pub struct SetCurrentRewardsWrapperArgsV1 {
 #[derive(Accounts)]
 #[instruction(args: SetCurrentRewardsWrapperArgsV1)]
 pub struct SetCurrentRewardsWrapperV1<'info> {
-  #[account(mut)]
   // the oracle EOA that gets wrapped
+  #[account(mut)]
   pub oracle: Signer<'info>,
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
   #[account(

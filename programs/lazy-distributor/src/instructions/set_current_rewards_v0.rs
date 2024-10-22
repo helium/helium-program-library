@@ -1,7 +1,7 @@
-use crate::error::ErrorCode;
-use crate::state::*;
 use anchor_lang::prelude::*;
 use shared_utils::resize_to_fit;
+
+use crate::{error::ErrorCode, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct SetCurrentRewardsArgsV0 {

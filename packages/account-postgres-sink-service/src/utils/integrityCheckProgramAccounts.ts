@@ -1,9 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import retry from "async-retry";
+import retry, { Options as RetryOptions } from "async-retry";
 import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
+import pLimit from "p-limit";
 import { Sequelize, Transaction } from "sequelize";
 import { SOLANA_URL } from "../env";
 import { initPlugins } from "../plugins";
@@ -21,6 +22,13 @@ interface IntegrityCheckProgramAccountsArgs {
   accounts: IAccountConfig[];
   sequelize?: Sequelize;
 }
+
+const retryOptions: RetryOptions = {
+  retries: 5,
+  factor: 2,
+  minTimeout: 1000,
+  maxTimeout: 60000,
+};
 
 export const integrityCheckProgramAccounts = async ({
   fastify,
@@ -87,10 +95,14 @@ export const integrityCheckProgramAccounts = async ({
             }),
             100
           ).map((chunk) =>
-            connection.getParsedTransactions(chunk, {
-              commitment: "confirmed",
-              maxSupportedTransactionVersion: 0,
-            })
+            retry(
+              () =>
+                connection.getParsedTransactions(chunk, {
+                  commitment: "confirmed",
+                  maxSupportedTransactionVersion: 0,
+                }),
+              retryOptions
+            )
           )
         )
       ).flat();
@@ -110,12 +122,17 @@ export const integrityCheckProgramAccounts = async ({
 
       const accountInfosWithPk = (
         await Promise.all(
-          chunks([...uniqueWritableAccounts.values()], 100).map(
-            async (chunk) =>
-              await connection.getMultipleAccountsInfo(
-                chunk.map((c) => new PublicKey(c)),
-                "confirmed"
+          chunks([...uniqueWritableAccounts.values()], 100).map((chunk) =>
+            pLimit(100)(() =>
+              retry(
+                () =>
+                  connection.getMultipleAccountsInfo(
+                    chunk.map((c) => new PublicKey(c)),
+                    "confirmed"
+                  ),
+                retryOptions
               )
+            )
           )
         )
       )
@@ -197,32 +214,37 @@ export const integrityCheckProgramAccounts = async ({
       );
 
       await t.commit();
-      for (const correction of corrections) {
-        // @ts-ignore
-        fastify.customMetrics.integrityCheckCounter.inc();
-        console.log("IntegrityCheckCorrection:");
-        console.dir(correction, { depth: null });
+
+      if (corrections.length > 0) {
+        console.log(`Integrity check corrections for: ${programId}`);
+        for (const correction of corrections) {
+          // @ts-ignore
+          fastify.customMetrics.integrityCheckCounter.inc();
+          console.dir(correction, { depth: null });
+        }
       }
     } catch (err) {
       await t.rollback();
-      console.error("While inserting, err", err);
+      console.error(
+        `Integrity check error while inserting for ${programId}:`,
+        err
+      );
       throw err; // Rethrow the error to be caught by the retry mechanism
     }
   };
 
   try {
     await retry(performIntegrityCheck, {
-      retries: 5,
-      factor: 2,
-      minTimeout: 1000,
-      maxTimeout: 60000,
+      ...retryOptions,
       onRetry: (error, attempt) => {
-        console.warn(`Attempt ${attempt}: Retrying due to ${error.message}`);
+        console.warn(
+          `Integrity check ${programId} attempt ${attempt}: Retrying due to ${error.message}`
+        );
       },
     });
   } catch (err) {
     console.error(
-      "Failed to perform integrity check after multiple attempts:",
+      `Failed to perform integrity check for ${programId} after multiple attempts:`,
       err
     );
     throw err;
