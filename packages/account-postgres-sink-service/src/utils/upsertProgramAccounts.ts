@@ -121,7 +121,7 @@ export const upsertProgramAccounts = async ({
         programId,
         coderFilters,
         batchSize,
-        async (chunk) => {
+        async (chunk, transaction) => {
           const accs = chunk
             .map(({ pubkey, account }) => {
               try {
@@ -170,6 +170,7 @@ export const upsertProgramAccounts = async ({
           );
 
           await model.bulkCreate(values, {
+            transaction,
             updateOnDuplicate: [
               "address",
               "refreshed_at",
