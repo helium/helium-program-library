@@ -1,12 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
 import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
-import { Op, Sequelize } from "sequelize";
+import { Op, Sequelize, Transaction } from "sequelize";
 import { SOLANA_URL } from "../env";
 import { initPlugins } from "../plugins";
 import { IAccountConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
 import { chunks } from "./chunks";
-import database, { limit } from "./database";
+import database from "./database";
 import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
@@ -26,6 +26,7 @@ export const upsertProgramAccounts = async ({
     anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
   );
   const provider = anchor.getProvider() as anchor.AnchorProvider;
+  const connection = provider.connection;
   const idl = await cachedIdlFetch.fetchIdl({
     skipCache: true,
     programId: programId.toBase58(),
@@ -55,122 +56,140 @@ export const upsertProgramAccounts = async ({
     });
   } catch (e) {
     console.log(e);
+    throw e;
   }
 
-  await Promise.all(
-    accounts.map(async ({ type, batchSize = 2500, ...rest }) => {
+  const processProgramAccounts = async (
+    connection: anchor.web3.Connection,
+    programId: anchor.web3.PublicKey,
+    filters: anchor.web3.GetProgramAccountsFilter[],
+    batchSize: number,
+    processChunk: (
+      chunk: anchor.web3.GetProgramAccountsResponse,
+      transaction: Transaction
+    ) => Promise<void>
+  ) => {
+    const startTime = Date.now();
+    let processedCount = 0;
+
+    const accounts = await connection.getProgramAccounts(programId, {
+      filters,
+      commitment: connection.commitment,
+    });
+
+    for (const chunk of chunks(accounts, batchSize)) {
       try {
-        const filter: {
-          offset?: number;
-          bytes?: string;
-          dataSize?: number;
-        } = program.coder.accounts.memcmp(type, undefined);
-        const coderFilters: GetProgramAccountsFilter[] = [];
-        const plugins = await initPlugins(rest.plugins);
-        if (filter?.offset != undefined && filter?.bytes != undefined) {
-          coderFilters.push({
-            memcmp: { offset: filter.offset, bytes: filter.bytes },
-          });
-        }
-
-        if (filter?.dataSize != undefined) {
-          coderFilters.push({ dataSize: filter.dataSize });
-        }
-
-        let resp = await provider.connection.getProgramAccounts(programId, {
-          commitment: provider.connection.commitment,
-          filters: [...coderFilters],
+        const t = await sequelize.transaction({
+          isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
         });
-        const model = sequelize.models[type];
-        const t = await sequelize.transaction();
-        // @ts-ignore
-        const respChunks = chunks(resp, batchSize);
-        const now = new Date().toISOString();
+        await processChunk(chunk, t);
+        await t.commit();
+        processedCount += chunk.length;
+        console.log(`Processed ${processedCount} accounts`);
+      } catch (err) {
+        console.error(`Error processing chunk:`, err);
+        throw err;
+      }
+    }
 
-        try {
-          const processingPromises = respChunks.map((c) =>
-            limit(async () => {
-              const accs = c
-                .map(({ pubkey, account }) => {
-                  // ignore accounts we cant decode
-                  try {
-                    const decodedAcc = program.coder.accounts.decode(
-                      type,
-                      account.data
-                    );
+    const duration = (Date.now() - startTime) / 1000;
+    console.log(
+      `Finished processing ${processedCount} accounts in ${duration} seconds`
+    );
+  };
 
-                    return {
-                      publicKey: pubkey,
-                      account: decodedAcc,
-                    };
-                  } catch (_e) {
-                    console.error(`Decode error ${pubkey.toBase58()}`, _e);
-                    return null;
-                  }
-                })
-                .filter(truthy);
+  for (const { type, batchSize = 50000, ...rest } of accounts) {
+    try {
+      const model = sequelize.models[type];
+      const plugins = await initPlugins(rest.plugins);
+      const filter = program.coder.accounts.memcmp(type, undefined);
+      const coderFilters: GetProgramAccountsFilter[] = [];
 
-              const updateOnDuplicateFields: string[] = [
-                ...Object.keys(accs[0].account),
-                ...[
-                  ...new Set(
-                    plugins
-                      .map((plugin) => plugin?.updateOnDuplicateFields || [])
-                      .flat()
-                  ),
-                ],
-              ];
+      if (filter?.offset != undefined && filter?.bytes != undefined) {
+        coderFilters.push({
+          memcmp: { offset: filter.offset, bytes: filter.bytes },
+        });
+      }
 
-              const values = await Promise.all(
-                accs.map(async ({ publicKey, account }) => {
-                  let sanitizedAccount = sanitizeAccount(account);
+      if (filter?.dataSize != undefined) {
+        coderFilters.push({ dataSize: filter.dataSize });
+      }
 
-                  for (const plugin of plugins) {
-                    if (plugin?.processAccount) {
-                      sanitizedAccount = await plugin.processAccount(
-                        sanitizedAccount
-                      );
-                    }
-                  }
+      const now = new Date().toISOString();
+      await processProgramAccounts(
+        connection,
+        programId,
+        coderFilters,
+        batchSize,
+        async (chunk, transaction) => {
+          const accs = chunk
+            .map(({ pubkey, account }) => {
+              try {
+                const decodedAcc = program.coder.accounts.decode(
+                  type,
+                  account.data
+                );
+                return {
+                  publicKey: pubkey,
+                  account: decodedAcc,
+                };
+              } catch (_e) {
+                console.error(`Decode error ${pubkey.toBase58()}`, _e);
+                return null;
+              }
+            })
+            .filter(truthy);
 
-                  return {
-                    address: publicKey.toBase58(),
-                    refreshed_at: now,
-                    ...sanitizedAccount,
-                  };
-                })
-              );
+          const updateOnDuplicateFields: string[] = [
+            ...Object.keys(accs[0].account),
+            ...new Set(
+              plugins
+                .map((plugin) => plugin?.updateOnDuplicateFields || [])
+                .flat()
+            ),
+          ];
 
-              await model.bulkCreate(values, {
-                transaction: t,
-                updateOnDuplicate: [
-                  "address",
-                  "refreshed_at",
-                  ...updateOnDuplicateFields,
-                ],
-              });
+          const values = await Promise.all(
+            accs.map(async ({ publicKey, account }) => {
+              let sanitizedAccount = sanitizeAccount(account);
+
+              for (const plugin of plugins) {
+                if (plugin?.processAccount) {
+                  sanitizedAccount = await plugin.processAccount(
+                    sanitizedAccount
+                  );
+                }
+              }
+
+              return {
+                address: publicKey.toBase58(),
+                refreshed_at: now,
+                ...sanitizedAccount,
+              };
             })
           );
 
-          await Promise.all(processingPromises);
-          await t.commit();
-        } catch (err) {
-          await t.rollback();
-          console.error("While inserting, err", err);
-          throw err;
+          await model.bulkCreate(values, {
+            transaction,
+            updateOnDuplicate: [
+              "address",
+              "refreshed_at",
+              ...updateOnDuplicateFields,
+            ],
+          });
         }
+      );
 
-        await model.destroy({
-          where: {
-            refreshed_at: {
-              [Op.lt]: now,
-            },
+      await model.destroy({
+        where: {
+          refreshed_at: {
+            [Op.lt]: now,
           },
-        });
-      } catch (err) {
-        console.error(`Error processing account type ${type}:`, err);
-        throw err;
-      }
-    })
-  );
+        },
+      });
+    } catch (err) {
+      console.error(`Error processing account type ${type}:`, err);
+      throw err;
+    }
+  }
 };
