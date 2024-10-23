@@ -3,11 +3,10 @@ import { PublicKey } from "@solana/web3.js";
 import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
-import pLimit from "p-limit";
 import { Sequelize } from "sequelize";
 import { IAccountConfig, IInitedPlugin } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
-import database from "./database";
+import database, { limit } from "./database";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { provider } from "./solana";
 
@@ -21,7 +20,6 @@ interface HandleAccountWebhookArgs {
   pluginsByAccountType: Record<string, IInitedPlugin[]>;
 }
 
-const limit = pLimit(Number(process.env.PG_POOL_SIZE) || 20);
 export const handleAccountWebhook = async ({
   fastify,
   programId,

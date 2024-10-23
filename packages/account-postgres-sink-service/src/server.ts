@@ -29,6 +29,7 @@ import {
   USE_KAFKA,
   USE_SUBSTREAMS,
   USE_YELLOWSTONE,
+  PG_POOL_SIZE,
 } from "./env";
 import { getPluginsByAccountTypeByProgram } from "./plugins";
 import { metrics } from "./plugins/metrics";
@@ -46,6 +47,10 @@ import { upsertProgramAccounts } from "./utils/upsertProgramAccounts";
 
 if (!HELIUS_AUTH_SECRET) {
   throw new Error("Helius auth secret not available");
+}
+
+if (PG_POOL_SIZE < 5) {
+  throw new Error("PG Pool size must be minimum of 5");
 }
 
 (async () => {
