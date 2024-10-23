@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.8](https://github.com/helium/helium-program-libary/compare/v0.9.7...v0.9.8) (2024-10-23)
+
+**Note:** Version bump only for package @helium/helium-react-hooks
+
+
+
+
+
 ## [0.9.7](https://github.com/helium/helium-program-libary/compare/v0.9.5...v0.9.7) (2024-10-04)
 
 **Note:** Version bump only for package @helium/helium-react-hooks
