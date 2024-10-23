@@ -21,7 +21,7 @@ export const setupYellowstone = async (
   configs: IConfig[]
 ) => {
   if (!YELLOWSTONE_TOKEN) {
-    throw new Error("Yellowstone token not available");
+    throw new Error("YELLOWSTONE_TOKEN undefined");
   }
 
   let isReconnecting = false;
