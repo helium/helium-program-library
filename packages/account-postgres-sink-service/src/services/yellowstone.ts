@@ -20,6 +20,10 @@ export const setupYellowstone = async (
   server: FastifyInstance,
   configs: IConfig[]
 ) => {
+  if (!YELLOWSTONE_TOKEN) {
+    throw new Error("YELLOWSTONE_TOKEN undefined");
+  }
+
   let isReconnecting = false;
   const pluginsByAccountTypeByProgram = await getPluginsByAccountTypeByProgram(
     configs
