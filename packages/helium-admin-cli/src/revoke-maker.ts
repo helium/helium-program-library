@@ -62,7 +62,8 @@ export async function run(args: any = process.argv) {
   const instructions: TransactionInstruction[] = [];
 
   const maker = makerKey(daoKey(HNT_MINT)[0], argv.name)[0];
-  const makerAcc = await program.account.makerV0.fetch(maker);
+  // Ensure the maker exists
+  await program.account.makerV0.fetch(maker);
   const rewardableEntityConfigK = rewardableEntityConfigKey(
     subDaoKey(new PublicKey(argv.dntMint))[0],
     argv.symbol
