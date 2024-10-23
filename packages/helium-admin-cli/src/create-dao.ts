@@ -348,6 +348,7 @@ export async function run(args: any = process.argv) {
       await heliumVsrProgram.methods
         .initializeRegistrarV0({
           positionUpdateAuthority: (await daoKey(hntKeypair.publicKey))[0],
+          positionFreezeAuthorities: [],
         })
         .accounts({
           realm,

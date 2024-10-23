@@ -41,6 +41,8 @@ import {
   initTestDataCredits,
 } from "./utils/fixtures";
 import { random } from "./utils/string";
+import { VoterStakeRegistry } from "../target/types/voter_stake_registry";
+import { init as initVsr } from "../packages/voter-stake-registry-sdk/src";
 
 describe("hexboosting", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -54,6 +56,7 @@ describe("hexboosting", () => {
     "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx"
   );
 
+  let vsrProgram: Program<VoterStakeRegistry>;
   let hemProgram: Program<HeliumEntityManager>;
   let hsdProgram: Program<HeliumSubDaos>;
   let dcProgram: Program<DataCredits>;
@@ -73,6 +76,11 @@ describe("hexboosting", () => {
     pythProgram = new Program(
       pythSolanaReceiverIdl,
       new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ")
+    );
+    vsrProgram = await initVsr(
+      provider,
+      anchor.workspace.VoterStakeRegistry.programId,
+      anchor.workspace.VoterStakeRegistry.idl
     );
     dcProgram = await initDataCredits(
       provider,
@@ -112,6 +120,7 @@ describe("hexboosting", () => {
     ({ subDao, mint } = await initTestSubdao({
       hsdProgram,
       provider,
+      vsrProgram,
       authority: me,
       dao,
       numTokens: new anchor.BN("1000000000000000"),

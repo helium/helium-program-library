@@ -326,6 +326,8 @@ __metadata:
     "@helium/lazy-distributor-sdk": ^0.9.7
     "@helium/mobile-entity-manager-sdk": ^0.9.7
     "@helium/nft-proxy-sdk": ^0.0.12
+    "@helium/organization-sdk": ^0.0.13
+    "@helium/position-voting-rewards-sdk": ^0.9.7
     "@helium/price-oracle-sdk": ^0.9.7
     "@helium/spl-utils": ^0.9.7
     "@helium/treasury-management-sdk": ^0.9.7
@@ -460,6 +462,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@helium/modular-governance-idls@npm:^0.0.13":
+  version: 0.0.13
+  resolution: "@helium/modular-governance-idls@npm:0.0.13"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@solana/web3.js": ^1.78.4
+  checksum: d210bdbaf3d56c88e96a1cbb4066277629a34da33aff7f49323a376a3df68a9f1a8382edb02a97c61e2336aaec32a8eb0f11699ea1e3e7a07c542d4d3b5edd8f
+  languageName: node
+  linkType: hard
+
 "@helium/nft-proxy-sdk@npm:^0.0.12":
   version: 0.0.12
   resolution: "@helium/nft-proxy-sdk@npm:0.0.12"
@@ -488,6 +500,36 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@helium/organization-sdk@npm:^0.0.13":
+  version: 0.0.13
+  resolution: "@helium/organization-sdk@npm:0.0.13"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@helium/anchor-resolvers": ^0.5.0
+    "@helium/modular-governance-idls": ^0.0.13
+    "@helium/proposal-sdk": ^0.0.13
+  checksum: 771d9b5d768d64276ca5b78911fc265434aee98c7b5d3da535fa6a55e24aa77523177e2d24112c0e83f9b0017d5a67c4d5d0f5315c13979ecc5ddf42662055a4
+  languageName: node
+  linkType: hard
+
+"@helium/position-voting-rewards-sdk@^0.9.7":
+  version: 0.0.0-use.local
+  resolution: "@helium/position-voting-rewards-sdk@workspace:packages/position-voting-rewards-sdk"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@helium/anchor-resolvers": ^0.9.7
+    "@helium/idls": ^0.9.7
+    "@helium/spl-utils": ^0.9.7
+    "@solana/spl-token": ^0.3.8
+    bn.js: ^5.2.0
+    bs58: ^4.0.1
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
+
 "@helium/price-oracle-sdk@^0.9.7":
   version: 0.0.0-use.local
   resolution: "@helium/price-oracle-sdk@workspace:packages/price-oracle-sdk"
@@ -502,6 +544,17 @@ __metadata:
     typescript: ^5.2.2
   languageName: unknown
   linkType: soft
+
+"@helium/proposal-sdk@npm:^0.0.13":
+  version: 0.0.13
+  resolution: "@helium/proposal-sdk@npm:0.0.13"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@helium/anchor-resolvers": ^0.5.0
+    "@helium/modular-governance-idls": ^0.0.13
+  checksum: 70b8c02906f0361b1c32308b09492fb5c6b847aceee922c6b1a5b2bfca8eb2f425fa42782a51cb993157b338f7422229c1694a48e6fdfe41040e2ad5b646bff6
+  languageName: node
+  linkType: hard
 
 "@helium/rewards-oracle-sdk@^0.9.7":
   version: 0.0.0-use.local

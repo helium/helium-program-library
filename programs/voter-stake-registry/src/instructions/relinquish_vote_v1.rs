@@ -1,9 +1,8 @@
-use crate::error::VsrError;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use proposal::{ProposalConfigV0, ProposalV0};
 
-use crate::{registrar_seeds, state::*};
+use crate::{error::VsrError, registrar_seeds, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct RelinquishVoteArgsV1 {

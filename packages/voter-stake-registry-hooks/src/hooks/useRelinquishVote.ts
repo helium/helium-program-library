@@ -10,6 +10,10 @@ import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 import BN from "bn.js";
 import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
+import {
+  init as initPVR,
+  vetokenTrackerKey,
+} from "@helium/position-voting-rewards-sdk";
 
 export const useRelinquishVote = (proposal: PublicKey) => {
   const { positions, provider, registrar } = useHeliumVsrState();
@@ -85,6 +89,11 @@ export const useRelinquishVote = (proposal: PublicKey) => {
         );
       } else {
         const vsrProgram = await init(provider);
+        const pvrProgram = await initPVR(provider);
+        const vetokenTrackerK = vetokenTrackerKey(registrar!.pubkey!)[0];
+        const vetokenTracker = await pvrProgram.account.veTokenTrackerV0.fetchNullable(
+          vetokenTrackerK
+        );
         const instructions = (
           await Promise.all(
             sortedPositions.map(async (position, index) => {
@@ -95,43 +104,65 @@ export const useRelinquishVote = (proposal: PublicKey) => {
               const marker = markers?.[index]?.info;
 
               if (marker && canRelinquishVote) {
+                const instructions: TransactionInstruction[] = [];
+                const markerK = voteMarkerKey(position.mint, proposal)[0];
                 if (position.isProxiedToMe) {
                   if (marker.proxyIndex < (position.proxy?.index || 0)) {
                     // Do not vote with a position that has been delegated to us, but voting overidden
                     return;
                   }
 
-                  return await vsrProgram.methods
-                    .proxiedRelinquishVoteV0({
-                      choice,
-                    })
-                    .accounts({
-                      proposal,
-                      voter: provider.wallet.publicKey,
-                      position: position.pubkey,
-                      marker: voteMarkerKey(position.mint, proposal)[0],
-                      proxyAssignment: proxyAssignmentKey(
-                        registrar!.proxyConfig,
-                        position.mint,
-                        provider.wallet.publicKey,
-                      )[0],
-                    })
-                    .instruction();
+                  instructions.push(
+                    await vsrProgram.methods
+                      .proxiedRelinquishVoteV0({
+                        choice,
+                      })
+                      .accounts({
+                        proposal,
+                        voter: provider.wallet.publicKey,
+                        position: position.pubkey,
+                        marker: markerK,
+                        proxyAssignment: proxyAssignmentKey(
+                          registrar!.proxyConfig,
+                          position.mint,
+                          provider.wallet.publicKey
+                        )[0],
+                      })
+                      .instruction()
+                  );
+                } else {
+                  instructions.push(
+                    await vsrProgram.methods
+                      .relinquishVoteV1({
+                        choice,
+                      })
+                      .accounts({
+                        proposal,
+                        voter: provider.wallet.publicKey,
+                        position: position.pubkey,
+                      })
+                      .instruction()
+                  );
                 }
-                return await vsrProgram.methods
-                  .relinquishVoteV1({
-                    choice,
-                  })
-                  .accounts({
-                    proposal,
-                    voter: provider.wallet.publicKey,
-                    position: position.pubkey,
-                  })
-                  .instruction();
+
+                if (vetokenTracker && position.isEnrolled) {
+                  instructions.push(
+                    await pvrProgram.methods
+                      .trackVoteV0()
+                      .accounts({
+                        marker: markerK,
+                        position: position.pubkey,
+                        proposal
+                      })
+                      .instruction()
+                  );
+                }
+
+                return instructions;
               }
             })
           )
-        ).filter(truthy);
+        ).filter(truthy).flat();
 
         if (onInstructions) {
           await onInstructions(instructions);

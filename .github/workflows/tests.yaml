@@ -152,6 +152,7 @@ jobs:
           - tests/voter-stake-registry.ts
           - tests/fanout.ts
           - tests/sus.ts
+          - tests/position-voting-rewards.ts
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/
