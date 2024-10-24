@@ -10,7 +10,10 @@ import {
 } from "@solana/web3.js";
 import chai from "chai";
 import { init as initIotRoutingManager } from "../packages/iot-routing-manager-sdk/src";
-import { init as initHeliumEntityManager, sharedMerkleKey } from "../packages/helium-entity-manager-sdk/src";
+import {
+  init as initHeliumEntityManager,
+  sharedMerkleKey,
+} from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { IotRoutingManager } from "../target/types/iot_routing_manager";
@@ -83,7 +86,6 @@ describe("iot-routing-manager", () => {
     );
     ensureIrmIdl(irmProgram);
 
-
     const dataCredits = await initTestDataCredits(dcProgram, provider);
     dcMint = dataCredits.dcMint;
     ({ dao } = await initTestDao(
@@ -134,7 +136,8 @@ describe("iot-routing-manager", () => {
       })
       .rpcAndKeys({ skipPreflight: true });
 
-    const routingManagerAcc = await irmProgram.account.iotRoutingManagerV0.fetch(routingManager!);
+    const routingManagerAcc =
+      await irmProgram.account.iotRoutingManagerV0.fetch(routingManager!);
 
     expect(routingManagerAcc.updateAuthority.toBase58()).to.eq(me.toBase58());
     expect(routingManagerAcc.netIdAuthority.toBase58()).to.eq(me.toBase58());
@@ -162,7 +165,7 @@ describe("iot-routing-manager", () => {
           iotPriceOracle: IOT_PRICE_FEED,
         })
         .rpcAndKeys({ skipPreflight: true });
-      routingManager = routingManagerK!
+      routingManager = routingManagerK!;
     });
 
     it("should initialize a net id", async () => {
@@ -181,7 +184,7 @@ describe("iot-routing-manager", () => {
       const netIdAcc = await irmProgram.account.netIdV0.fetch(netId!);
       expect(netIdAcc.authority.toBase58()).to.eq(me.toBase58());
       expect(netIdAcc.id.toNumber()).to.eq(1);
-    })
+    });
 
     describe("with net id", async () => {
       let netId: PublicKey;
@@ -200,30 +203,31 @@ describe("iot-routing-manager", () => {
         netId = netIdK!;
       });
 
-      it ("should initialize an organization", async () => {
+      it("should initialize an organization", async () => {
         const {
           pubkeys: { organization },
         } = await irmProgram.methods
-          .initializeOrganizationV0({
-            oui: new anchor.BN(2),
-            escrowKeyOverride: null,
-          })
-          .preInstructions(
-            [ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 })]
-          )
+          .initializeOrganizationV0()
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+          ])
           .accounts({
             authority: me,
             netId,
           })
           .rpcAndKeys({ skipPreflight: true });
 
-        const organizationAcc = await irmProgram.account.organizationV0.fetch(organization!);
+        const organizationAcc = await irmProgram.account.organizationV0.fetch(
+          organization!
+        );
         expect(organizationAcc.authority.toBase58()).to.eq(me.toBase58());
-        expect(organizationAcc.oui.toNumber()).to.eq(2);
-        expect(organizationAcc.escrowKey.toString()).to.eq("OUI_2");
+        expect(organizationAcc.oui.toNumber()).to.eq(1);
+        expect(organizationAcc.escrowKey.toString()).to.eq("OUI_1");
         expect(organizationAcc.netId.toBase58()).to.eq(netId.toBase58());
-        expect(organizationAcc.routingManager.toBase58()).to.eq(routingManager.toBase58());
-      })
+        expect(organizationAcc.routingManager.toBase58()).to.eq(
+          routingManager.toBase58()
+        );
+      });
 
       describe("with an organization", () => {
         let organization: PublicKey;
@@ -231,10 +235,7 @@ describe("iot-routing-manager", () => {
           const {
             pubkeys: { organization: organizationK },
           } = await irmProgram.methods
-            .initializeOrganizationV0({
-              oui: new anchor.BN(2),
-              escrowKeyOverride: null,
-            })
+            .initializeOrganizationV0()
             .preInstructions([
               ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
             ])
@@ -266,11 +267,13 @@ describe("iot-routing-manager", () => {
               organization,
             })
             .rpcAndKeys({ skipPreflight: true });
-          const devaddr = await irmProgram.account.devAddrConstraintV0.fetch(devaddrConstraint!);
+          const devaddr = await irmProgram.account.devaddrConstraintV0.fetch(
+            devaddrConstraint!
+          );
           expect(devaddr.startAddr.toNumber()).to.eq(0);
           expect(devaddr.endAddr.toNumber()).to.eq(16);
         });
-      })
-    })
+      });
+    });
   });
 });

@@ -264,7 +264,7 @@ pub fn handler(
   }
 
   ctx.accounts.routing_manager.next_oui_id =
-    max(ctx.accounts.routing_manager.next_oui_id, args.oui);
+    max(ctx.accounts.routing_manager.next_oui_id, args.oui + 1);
 
   Ok(())
 }
