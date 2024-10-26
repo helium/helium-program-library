@@ -55,7 +55,7 @@ macro_rules! organization_seeds {
 #[derive(Default, InitSpace)]
 pub struct NetIdV0 {
   pub routing_manager: Pubkey,
-  pub id: u64,
+  pub id: u32,
   pub authority: Pubkey,
   pub current_addr_offset: u64,
   pub bump_seed: u8,

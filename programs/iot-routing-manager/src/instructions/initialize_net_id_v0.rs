@@ -4,7 +4,7 @@ use crate::{IotRoutingManagerV0, NetIdV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeNetIdArgsV0 {
-  pub net_id: u64,
+  pub net_id: u32,
 }
 
 #[derive(Accounts)]

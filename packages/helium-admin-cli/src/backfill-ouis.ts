@@ -250,7 +250,7 @@ export async function run(args: any = process.argv) {
         if (!(await exists(conn, netIdK))) {
           return await irm.methods
             .initializeNetIdV0({
-              netId: new anchor.BN(netId),
+              netId,
             })
             .accounts({
               authority: wallet.publicKey,
