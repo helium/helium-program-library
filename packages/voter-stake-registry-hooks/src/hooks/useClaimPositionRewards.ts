@@ -117,7 +117,6 @@ export const useClaimPositionRewards = () => {
         if (enrolledPosAcc) {
           const { lastClaimedEpoch, claimedEpochsBitmap } = enrolledPosAcc;
           const epoch = lastClaimedEpoch.add(new BN(1));
-          const epoch = lastClaimedEpoch.add(new BN(1));
           const epochsCount = isDecayed
             ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
             : currentEpoch.sub(epoch).toNumber();
