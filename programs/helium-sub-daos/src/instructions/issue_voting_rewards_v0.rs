@@ -87,9 +87,9 @@ pub fn handler(ctx: Context<IssueVotingRewardsV0>, args: IssueVotingRewardsArgsV
     return Err(error!(ErrorCode::EpochNotOver));
   }
 
-  let data: &mut [u8] = &mut ctx.accounts.vsr_epoch_info.try_borrow_mut_data()?;
+  let data = ctx.accounts.vsr_epoch_info.try_borrow_data()?;
   if !data.is_empty() {
-    let vsr_epoch_info: VsrEpochInfoV0 = anchor_lang::AnchorDeserialize::deserialize(&mut &*data)?;
+    let vsr_epoch_info = VsrEpochInfoV0::deserialize(&mut &data[8..])?;
     if vsr_epoch_info.rewards_issued_at.is_some() {
       return Err(error!(ErrorCode::RewardsAlreadyIssued));
     }
