@@ -35,6 +35,7 @@ pub struct IssueVotingRewardsV0<'info> {
   #[account(mut)]
   pub rent_payer: Signer<'info>,
   #[account(
+    mut,
     has_one = rewards_mint,
     has_one = registrar,
   )]
