@@ -67,9 +67,7 @@ export const useClaimAllPositionsRewards = () => {
       maxSignatureBatch?: number;
     }) => {
       const isInvalid =
-        !unixNow ||
-        !provider ||
-        !positions.every((pos) => pos.hasRewards);
+        !unixNow || !provider || !positions.every((pos) => pos.hasRewards);
 
       const idl = await Program.fetchIdl(programId, provider);
       const pvrIdl = await Program.fetchIdl(pvrProgramId, provider);
@@ -91,7 +89,8 @@ export const useClaimAllPositionsRewards = () => {
             const key = delegatedPositionKey(p.pubkey)[0];
             return {
               key,
-              account: await hsdProgram.account.delegatedPositionV0.fetchNullable(key),
+              account:
+                await hsdProgram.account.delegatedPositionV0.fetchNullable(key),
             };
           })
         );
@@ -156,12 +155,12 @@ export const useClaimAllPositionsRewards = () => {
             const { lastClaimedEpoch, claimedEpochsBitmap } =
               delegatedPosition.account;
             const epoch = lastClaimedEpoch.add(new BN(1));
+            const epochsCount = isDecayed
+              ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
+              : currentEpoch.sub(epoch).toNumber();
+
             const epochsToClaim = Array.from(
-              {
-                length: !isDecayed
-                  ? currentEpoch.sub(epoch).toNumber()
-                  : decayedEpoch.sub(epoch).toNumber(),
-              },
+              { length: epochsCount > 0 ? epochsCount : 0 },
               (_v, k) => epoch.addn(k)
             ).filter(
               (epoch) =>
@@ -227,12 +226,12 @@ export const useClaimAllPositionsRewards = () => {
             const { lastClaimedEpoch, claimedEpochsBitmap } =
               enrolledPosition.account;
             const epoch = lastClaimedEpoch.add(new BN(1));
+            const epochsCount = isDecayed
+              ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
+              : currentEpoch.sub(epoch).toNumber();
+
             const epochsToClaim = Array.from(
-              {
-                length: !isDecayed
-                  ? currentEpoch.sub(epoch).toNumber()
-                  : decayedEpoch.sub(epoch).toNumber(),
-              },
+              { length: epochsCount > 0 ? epochsCount : 0 },
               (_v, k) => epoch.addn(k)
             ).filter(
               (epoch) =>
@@ -274,7 +273,8 @@ export const useClaimAllPositionsRewards = () => {
                         ),
                         positionAuthority: provider.wallet.publicKey,
                         registrar: position.registrar,
-                        vetokenTracker: enrolledPosition.account!.vetokenTracker,
+                        vetokenTracker:
+                          enrolledPosition.account!.vetokenTracker,
                         enrolledPosition: enrolledPosition.key,
                         rewardsMint: vetokenTrackerAcc.rewardsMint,
                         vsrEpochInfo,
