@@ -215,7 +215,7 @@ impl VeTokenTrackerV0 {
     );
 
     // If last calculated was more than an epoch ago
-    // let epoch_start = curr_epoch_info.start_ts();
+    let epoch_start = curr_epoch_info.start_ts();
     // if epoch_start
     //   .checked_sub(self.vetoken_last_calculated_ts)
     //   .unwrap()
