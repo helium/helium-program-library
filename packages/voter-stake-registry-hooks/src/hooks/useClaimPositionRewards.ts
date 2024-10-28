@@ -63,19 +63,21 @@ export const useClaimPositionRewards = () => {
         const currentEpoch = new BN(unixNow).div(new BN(EPOCH_LENGTH));
         const delegatedPosKey = delegatedPositionKey(position.pubkey)[0];
         const delegatedPosAcc =
-          await hsdProgram.account.delegatedPositionV0.fetchNullable(delegatedPosKey);
+          await hsdProgram.account.delegatedPositionV0.fetchNullable(
+            delegatedPosKey
+          );
 
         const instructions: TransactionInstruction[][] = [];
 
         if (delegatedPosAcc) {
           const { lastClaimedEpoch, claimedEpochsBitmap } = delegatedPosAcc;
           const epoch = lastClaimedEpoch.add(new BN(1));
+          const epochsCount = isDecayed
+            ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
+            : currentEpoch.sub(epoch).toNumber();
+
           const epochsToClaim = Array.from(
-            {
-              length: !isDecayed
-                ? currentEpoch.sub(epoch).toNumber()
-                : decayedEpoch.sub(epoch).toNumber(),
-            },
+            { length: epochsCount > 0 ? epochsCount : 0 },
             (_v, k) => epoch.addn(k)
           ).filter(
             (epoch) =>
@@ -108,17 +110,19 @@ export const useClaimPositionRewards = () => {
 
         const enrolledPosKey = enrolledPositionKey(position.pubkey)[0];
         const enrolledPosAcc =
-          await pvrProgram.account.enrolledPositionV0.fetchNullable(enrolledPosKey);
+          await pvrProgram.account.enrolledPositionV0.fetchNullable(
+            enrolledPosKey
+          );
 
         if (enrolledPosAcc) {
           const { lastClaimedEpoch, claimedEpochsBitmap } = enrolledPosAcc;
           const epoch = lastClaimedEpoch.add(new BN(1));
+          const epochsCount = isDecayed
+            ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
+            : currentEpoch.sub(epoch).toNumber();
+
           const epochsToClaim = Array.from(
-            {
-              length: !isDecayed
-                ? currentEpoch.sub(epoch).toNumber()
-                : decayedEpoch.sub(epoch).toNumber(),
-            },
+            { length: epochsCount > 0 ? epochsCount : 0 },
             (_v, k) => epoch.addn(k)
           ).filter(
             (epoch) =>
