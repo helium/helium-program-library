@@ -197,6 +197,8 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
           );
           const vsrEpochInfo =
             await pvrProgram.account.vsrEpochInfoV0.fetchNullable(vsrEpoch);
+          const vetokenTracker = await pvrProgram.account.veTokenTrackerV0.fetch(subDao.account.vetokenTracker);
+          console.log("ve", vetokenTracker.vetokenLastCalculatedTs.toNumber(), targetTs.toNumber());
           if (!vsrEpochInfo || !vsrEpochInfo.rewardsIssuedAt) {
             try {
               await sendInstructionsWithPriorityFee(

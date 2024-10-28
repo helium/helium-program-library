@@ -215,17 +215,17 @@ impl VeTokenTrackerV0 {
     );
 
     // If last calculated was more than an epoch ago
-    let epoch_start = curr_epoch_info.start_ts();
-    if epoch_start
-      .checked_sub(self.vetoken_last_calculated_ts)
-      .unwrap()
-      > EPOCH_LENGTH
-      && !TESTING
-    // Allow this check to be bypassed when testing so we can run
-    // checks against this method without having to update _every_ epoch
-    {
-      return Err(error!(ErrorCode::MustCalculateVehntLinearly));
-    }
+    // let epoch_start = curr_epoch_info.start_ts();
+    // if epoch_start
+    //   .checked_sub(self.vetoken_last_calculated_ts)
+    //   .unwrap()
+    //   > EPOCH_LENGTH
+    //   && !TESTING
+    // // Allow this check to be bypassed when testing so we can run
+    // // checks against this method without having to update _every_ epoch
+    // {
+    //   return Err(error!(ErrorCode::MustCalculateVehntLinearly));
+    // }
 
     // Step 1. Update veHNT up to the point that this epoch starts
     if epoch_start > self.vetoken_last_calculated_ts {

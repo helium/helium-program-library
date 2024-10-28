@@ -21,6 +21,7 @@ pub struct RewardForEpochV0<'info> {
   #[account(mut)]
   pub rent_payer: Signer<'info>,
   #[account(
+    mut,
     has_one = rewards_authority,
     has_one = rewards_mint,
     has_one = registrar,
