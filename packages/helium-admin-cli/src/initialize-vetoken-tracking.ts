@@ -81,19 +81,19 @@ export async function run(args: any = process.argv) {
       percent: delegatorRewardsPercent(12.5),
     },
     {
-      numVetokens: new BN(35_000_000_000_000000),
+      numVetokens: new BN("35000000000000000"),
       percent: delegatorRewardsPercent(25),
     },
     {
-      numVetokens: new BN(50_000_000_000_000000),
+      numVetokens: new BN("50000000000000000"),
       percent: delegatorRewardsPercent(50),
     },
     {
-      numVetokens: new BN(75_000_000_000_000000),
+      numVetokens: new BN("75000000000000000"),
       percent: delegatorRewardsPercent(75),
     },
     {
-      numVetokens: new BN(100_000_000_000_000000),
+      numVetokens: new BN("100000000000000000"),
       percent: delegatorRewardsPercent(100),
     },
   ];

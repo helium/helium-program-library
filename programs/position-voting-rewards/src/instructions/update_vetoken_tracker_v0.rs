@@ -12,7 +12,7 @@ pub struct UpdateVeTokenTrackerArgsV0 {
 pub struct UpdateVeTokenTrackerV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  #[account(has_one = registrar)]
+  #[account(mut, has_one = registrar)]
   pub vetoken_tracker: Account<'info, VeTokenTrackerV0>,
   #[account(
     has_one = realm_authority
