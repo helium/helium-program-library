@@ -20,7 +20,7 @@ export function useAnchorAccount<IDL extends Idl, A extends keyof AllAccountsMap
     if (!loading && rawAccount && !idl && !idlAccount) {
       console.warn(`Idl not found for ${rawAccount.owner.toBase58()}`, error);
     }
-  }, [idl, loading, rawAccount, idlAccount]);
+  }, [idl, loading, rawAccount, idlAccount, error]);
 
   return {
     ...useIdlAccount(key, idl, type, isStatic),
