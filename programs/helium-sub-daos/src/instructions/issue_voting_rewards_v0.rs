@@ -35,6 +35,7 @@ pub struct IssueVotingRewardsV0<'info> {
   #[account(mut)]
   pub rent_payer: Signer<'info>,
   #[account(
+    mut,
     has_one = rewards_mint,
     has_one = registrar,
   )]
@@ -89,7 +90,7 @@ pub fn handler(ctx: Context<IssueVotingRewardsV0>, args: IssueVotingRewardsArgsV
 
   let data = ctx.accounts.vsr_epoch_info.try_borrow_data()?;
   if !data.is_empty() {
-    let vsr_epoch_info = VsrEpochInfoV0::try_from_slice(&data)?;
+    let vsr_epoch_info = VsrEpochInfoV0::deserialize(&mut &data[8..])?;
     if vsr_epoch_info.rewards_issued_at.is_some() {
       return Err(error!(ErrorCode::RewardsAlreadyIssued));
     }

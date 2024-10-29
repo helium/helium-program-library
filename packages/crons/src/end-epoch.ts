@@ -78,12 +78,20 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
         },
       },
     ]);
+    const vetokenTrackers = subDaos.map(subDao => subDao.account.vetokenTracker).filter(tracker => !tracker.equals(PublicKey.default));
+    const vetokenTrackerAccounts = await Promise.all(vetokenTrackers.map(tracker => pvrProgram.account.veTokenTrackerV0.fetch(tracker)));
+    const targetTsVetokenTrackers = vetokenTrackerAccounts.reduce(
+      (acc, tracker) => BN.min(acc, tracker.vetokenLastCalculatedTs),
+      // Start one day back to ensure we at least close the epoch that the job is running in.
+      new BN(unixNow - 24 * 60 * 60)
+    );
 
-    let targetTs = subDaos.reduce(
+    let targetTsSubdao = subDaos.reduce(
       (acc, subDao) => BN.min(acc, subDao.account.vehntLastCalculatedTs),
       // Start one day back to ensure we at least close the epoch that the job is running in.
       new BN(unixNow - 24 * 60 * 60)
     );
+    let targetTs = BN.min(targetTsSubdao, targetTsVetokenTrackers);
     const solanaTime = await getSolanaUnixTimestamp(provider.connection)
 
     mainLoop: while (targetTs.toNumber() < unixNow) {
@@ -147,8 +155,9 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
         }
       }
 
-      if (!daoEpochInfo?.doneIssuingRewards) {
-        for (const subDao of subDaos) {
+      
+      for (const subDao of subDaos) {
+        if (!daoEpochInfo?.doneIssuingRewards) {
           const [subDaoEpoch] = subDaoEpochInfoKey(subDao.publicKey, targetTs);
           const subDaoEpochInfo =
             await heliumSubDaosProgram.account.subDaoEpochInfoV0.fetchNullable(
@@ -175,15 +184,20 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
               );
             }
           }
+        }
 
-          const hasVeTokenTracker = !subDao.account.vetokenTracker.equals(PublicKey.default);
-          if (hasVeTokenTracker) {
-            const [vsrEpoch] = vsrEpochInfoKey(subDao.account.vetokenTracker, targetTs);
-            const vsrEpochInfo =
-              await pvrProgram.account.vsrEpochInfoV0.fetchNullable(
-                vsrEpoch
-              );
-            if (!vsrEpochInfo || !vsrEpochInfo.rewardsIssuedAt) {
+        const hasVeTokenTracker = !subDao.account.vetokenTracker.equals(
+          PublicKey.default
+        );
+
+        if (hasVeTokenTracker) {
+          const [vsrEpoch] = vsrEpochInfoKey(
+            subDao.account.vetokenTracker,
+            targetTs
+          );
+          const vsrEpochInfo =
+            await pvrProgram.account.vsrEpochInfoV0.fetchNullable(vsrEpoch);
+          if (!vsrEpochInfo || !vsrEpochInfo.rewardsIssuedAt) {
             try {
               await sendInstructionsWithPriorityFee(
                 provider,
@@ -203,8 +217,7 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
             } catch (err: any) {
               errors.push(
                 `Failed to issue voting rewards for ${subDao.account.dntMint.toBase58()}: ${err}`
-                );
-              }
+              );
             }
           }
         }

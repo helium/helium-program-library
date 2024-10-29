@@ -4,7 +4,12 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use voter_stake_registry::state::Registrar;
 
-use crate::state::{RecentProposal, VeTokenTrackerV0};
+use crate::state::{RecentProposal, VeTokenTrackerV0, VotingRewardsTierV0};
+
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct InitializeVeTokenTrackerArgsV0 {
+  pub voting_rewards_tiers: Vec<VotingRewardsTierV0>,
+}
 
 #[derive(Accounts)]
 pub struct InitializeVeTokenTrackerV0<'info> {
@@ -31,7 +36,10 @@ pub struct InitializeVeTokenTrackerV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<InitializeVeTokenTrackerV0>) -> Result<()> {
+pub fn handler(
+  ctx: Context<InitializeVeTokenTrackerV0>,
+  args: InitializeVeTokenTrackerArgsV0,
+) -> Result<()> {
   ctx.accounts.vetoken_tracker.set_inner(VeTokenTrackerV0 {
     proposal_namespace: ctx.accounts.proposal_namespace.key(),
     registrar: ctx.accounts.registrar.key(),
@@ -42,6 +50,7 @@ pub fn handler(ctx: Context<InitializeVeTokenTrackerV0>) -> Result<()> {
     total_vetokens: 0,
     recent_proposals: array::from_fn(|_| RecentProposal::default()),
     bump_seed: ctx.bumps["vetoken_tracker"],
+    voting_rewards_tiers: args.voting_rewards_tiers,
   });
   Ok(())
 }

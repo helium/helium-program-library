@@ -248,19 +248,19 @@ export const useClaimAllPositionsRewards = () => {
 
             // Chunk size is 128 because we want each chunk to correspond to the 128 bits in bitmap
             for (const chunk of chunks(epochsToClaim, 128)) {
-              const vsrEpochInfo = vsrEpochInfoKey(
-                vetokenTracker,
-                epoch.mul(new BN(EPOCH_LENGTH))
-              )[0];
-              const rewardsPool = getAssociatedTokenAddressSync(
-                vetokenTrackerAcc.rewardsMint,
-                vsrEpochInfo,
-                true
-              );
               bucketedEpochsByPosition[position.pubkey.toBase58()].push(
                 await Promise.all(
-                  chunk.map((epoch) =>
-                    pvrProgram.methods
+                  chunk.map((epoch) => {
+                    const vsrEpochInfo = vsrEpochInfoKey(
+                      vetokenTracker,
+                      epoch.mul(new BN(EPOCH_LENGTH))
+                    )[0];
+                    const rewardsPool = getAssociatedTokenAddressSync(
+                      vetokenTrackerAcc.rewardsMint,
+                      vsrEpochInfo,
+                      true
+                    );
+                    return pvrProgram.methods
                       .claimRewardsV0({
                         epoch,
                       })
@@ -288,8 +288,8 @@ export const useClaimAllPositionsRewards = () => {
                         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                         tokenProgram: TOKEN_PROGRAM_ID,
                       })
-                      .instruction()
-                  )
+                      .instruction();
+                  })
                 )
               );
             }
