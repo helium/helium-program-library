@@ -2,16 +2,13 @@ import { AnchorProvider, BN, IdlAccounts, Wallet } from "@coral-xyz/anchor";
 import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import {
   EPOCH_LENGTH,
-  delegatedPositionKey
+  delegatedPositionKey,
 } from "@helium/helium-sub-daos-sdk";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { init as initNftProxy } from "@helium/nft-proxy-sdk";
 import { enrolledPositionKey } from "@helium/position-voting-rewards-sdk";
 import { truthy } from "@helium/spl-utils";
-import {
-  VoteService,
-  init
-} from "@helium/voter-stake-registry-sdk";
+import { VoteService, init } from "@helium/voter-stake-registry-sdk";
 import { Connection, PublicKey } from "@solana/web3.js";
 import React, { createContext, useContext, useMemo } from "react";
 import { useAsync } from "react-async-hook";
@@ -86,7 +83,7 @@ export const HeliumVsrStateProvider: React.FC<{
     }
   }, [connection?.rpcEndpoint, wallet?.publicKey?.toBase58()]);
 
-  const { registrarKey } = useRegistrarForMint(mint)
+  const { registrarKey } = useRegistrarForMint(mint);
 
   const { info: registrar } = useRegistrar(registrarKey);
 
@@ -140,7 +137,6 @@ export const HeliumVsrStateProvider: React.FC<{
     return positionKeys?.map((pk) => enrolledPositionKey(pk)[0]);
   }, [positionKeys]);
 
-
   const { accounts: delegatedAccounts, loading: loadingDel } =
     useDelegatedPositions(delegatedPositionKeys);
 
@@ -192,27 +188,46 @@ export const HeliumVsrStateProvider: React.FC<{
         const positionsWithMeta = positions
           .map((position, idx) => {
             if (position && position.info) {
+              const { lockup } = position.info;
+              const lockupKind = Object.keys(lockup.kind)[0] as string;
+              const isConstant = lockupKind === "constant";
+              const isDecayed = !isConstant && lockup.endTs.lte(new BN(now));
+              const decayedEpoch = lockup.endTs.div(new BN(EPOCH_LENGTH));
+              const currentEpoch = new BN(now).div(new BN(EPOCH_LENGTH));
               const isDelegated = !!delegatedAccounts?.[idx]?.info;
               const isEnrolled = !!enrolledAccounts?.[idx]?.info;
+              let delegationRewards = false;
+              let enrollmentRewards = false;
               const proxy =
                 proxyAccountsByAsset?.[position.info.mint.toBase58()];
+
               const delegatedSubDao = isDelegated
                 ? delegatedAccounts[idx]?.info?.subDao
                 : null;
+
               const enrollment = isEnrolled
                 ? enrolledAccounts[idx]?.info
                 : null;
-              const delegationRewards = isDelegated
-                ? delegatedAccounts[idx]!.info!.lastClaimedEpoch.add(
-                    new BN(1)
-                  ).lt(new BN(now).div(new BN(EPOCH_LENGTH)))
-                : false;
 
-              const enrollmentRewards = isEnrolled
-                ? enrollment!.lastClaimedEpoch
-                    .add(new BN(1))
-                    .lt(new BN(now).div(new BN(EPOCH_LENGTH)))
-                : false;
+              if (isDelegated) {
+                const epoch = delegatedAccounts[
+                  idx
+                ]!.info!.lastClaimedEpoch.add(new BN(1));
+                const epochsCount = isDecayed
+                  ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
+                  : currentEpoch.sub(epoch).toNumber();
+
+                delegationRewards = epochsCount > 0;
+              }
+
+              if (isEnrolled) {
+                const epoch = enrollment!.lastClaimedEpoch.add(new BN(1));
+                const epochsCount = isDecayed
+                  ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
+                  : currentEpoch.sub(epoch).toNumber();
+
+                enrollmentRewards = epochsCount > 0;
+              }
 
               const posVotingPower = calcPositionVotingPower({
                 position: position?.info || null,
