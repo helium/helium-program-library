@@ -131,20 +131,20 @@ export const formPositionClaims = async ({
     }, {} as Record<string, VeTokenTracker>);
 
     for (const [idx, position] of positions.entries()) {
-      const delegatedPosition = delegatedPositions[idx];
       bucketedEpochsByPosition[position.pubkey.toBase58()] =
         bucketedEpochsByPosition[position.pubkey.toBase58()] || [];
+
+      const delegatedPosition = delegatedPositions[idx];
+      const { lockup } = position;
+      const lockupKind = Object.keys(lockup.kind)[0] as string;
+      const isConstant = lockupKind === "constant";
+      const isDecayed = !isConstant && lockup.endTs.lte(new BN(unixNow));
+      const decayedEpoch = lockup.endTs.div(new BN(EPOCH_LENGTH));
 
       if (delegatedPosition?.account) {
         const subDao = delegatedPosition.account.subDao;
         const subDaoStr = subDao.toBase58();
         const subDaoAcc = subDaos[subDaoStr];
-
-        const { lockup } = position;
-        const lockupKind = Object.keys(lockup.kind)[0] as string;
-        const isConstant = lockupKind === "constant";
-        const isDecayed = !isConstant && lockup.endTs.lte(new BN(unixNow));
-        const decayedEpoch = lockup.endTs.div(new BN(EPOCH_LENGTH));
 
         const { lastClaimedEpoch, claimedEpochsBitmap } =
           delegatedPosition.account;
@@ -217,7 +217,9 @@ export const formPositionClaims = async ({
         const { lastClaimedEpoch, claimedEpochsBitmap } =
           enrolledPosition.account;
         const epoch = lastClaimedEpoch.add(new BN(1));
-        const epochsCount = currentEpoch.sub(epoch).toNumber();
+        const epochsCount = isDecayed
+          ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
+          : currentEpoch.sub(epoch).toNumber();
 
         const epochsToClaim = Array.from(
           { length: epochsCount > 0 ? epochsCount : 0 },

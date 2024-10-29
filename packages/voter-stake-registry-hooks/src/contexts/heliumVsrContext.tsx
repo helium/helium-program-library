@@ -222,7 +222,11 @@ export const HeliumVsrStateProvider: React.FC<{
 
               if (isEnrolled) {
                 const epoch = enrollment!.lastClaimedEpoch.add(new BN(1));
-                enrollmentRewards = currentEpoch.sub(epoch).toNumber() > 0;
+                const epochsCount = isDecayed
+                  ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
+                  : currentEpoch.sub(epoch).toNumber();
+
+                enrollmentRewards = epochsCount > 0;
               }
 
               const posVotingPower = calcPositionVotingPower({
