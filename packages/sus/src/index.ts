@@ -261,10 +261,13 @@ export async function sus({
     connection,
     keys: allAccounts,
   });
-  const fetchedAccountsByAddr = fetchedAccounts.reduce((acc, account, index) => {
-    acc[allAccounts[index].toBase58()] = account
-    return acc
-  }, {} as Record<string, AccountInfo<Buffer>>)
+  const fetchedAccountsByAddr = fetchedAccounts.reduce(
+    (acc, account, index) => {
+      acc[allAccounts[index].toBase58()] = account;
+      return acc;
+    },
+    {} as Record<string, AccountInfo<Buffer>>
+  );
   let { blockhash } = await connection?.getLatestBlockhash("finalized");
   const simulatedTxs: RpcResponseAndContext<SimulatedTransactionResponse>[] =
     [];
@@ -287,7 +290,7 @@ export async function sus({
       });
       if (isBlockhashNotFound(simulatedTxn)) {
         ({ blockhash } = await connection?.getLatestBlockhash("finalized"));
-        tries++
+        tries++;
         if (tries >= 5) {
           simulatedTxs.push(simulatedTxn);
           break blockhashLoop;
@@ -420,15 +423,22 @@ export async function sus({
         }
 
         // Catch malicious sol ownwer change
-        const sysProg = new PublicKey("11111111111111111111111111111111")
-        const postOwner = acc.post.account?.owner || sysProg
-        const preOwner = acc.pre.account?.owner || sysProg
-        const accountOwnerChanged = !preOwner.equals(postOwner)
-        if (acc.name === "Native SOL Account" && acc.owner && acc.owner.equals(wallet) && accountOwnerChanged) {
+        const sysProg = new PublicKey("11111111111111111111111111111111");
+        const postOwner = acc.post.account?.owner || sysProg;
+        const preOwner = acc.pre.account?.owner || sysProg;
+        const accountOwnerChanged = !preOwner.equals(postOwner);
+        if (
+          acc.name === "Native SOL Account" &&
+          acc.owner &&
+          acc.owner.equals(wallet) &&
+          accountOwnerChanged
+        ) {
           warningsByTx[index].push({
             severity: "critical",
             shortMessage: "Owner Changed",
-            message: `The owner of ${acc.name} changed to ${acc.post.parsed?.owner?.toBase58()}. This gives that wallet full custody of these tokens.`,
+            message: `The owner of ${
+              acc.name
+            } changed to ${acc.post.parsed?.owner?.toBase58()}. This gives that wallet full custody of these tokens.`,
             account: acc.address,
           });
         }
@@ -465,6 +475,20 @@ export async function sus({
         });
       }
       if (
+        instructions.some(
+          (ix) =>
+            ix.parsed?.name === "updateDestinationV0" ||
+            ix.parsed?.name === "updateCompressionDestinationV0"
+        )
+      ) {
+        warningsByTx[index].push({
+          severity: "warning",
+          shortMessage: "Rewards Destination Changed",
+          message:
+            "This transaction will change the destination wallet of your mining rewards",
+        });
+      }
+      if (
         (
           await Promise.all(
             instructions.map((ix) => isBurnHotspot(connection, ix, assets))
@@ -489,7 +513,9 @@ export async function sus({
     const writableAccounts = writableAccountsByTx[index];
     const transaction = transactions[index];
 
-    const message = Buffer.from(transaction.message.serialize()).toString("base64");
+    const message = Buffer.from(transaction.message.serialize()).toString(
+      "base64"
+    );
     const explorerLink = `https://explorer.solana.com/tx/inspector?cluster=${cluster}&message=${encodeURIComponent(
       message
     )}`;
@@ -583,7 +609,13 @@ export async function sus({
         .filter(truthy);
 
       // Don't count new mints being created, as this might flag on candymachine txs
-      if (balanceChanges.filter((b) => b.owner.equals(wallet) && fetchedAccountsByAddr[b.address.toBase58()]).length >= 3) {
+      if (
+        balanceChanges.filter(
+          (b) =>
+            b.owner.equals(wallet) &&
+            fetchedAccountsByAddr[b.address.toBase58()]
+        ).length >= 3
+      ) {
         warnings.push({
           severity: "warning",
           shortMessage: "3+ Token Accounts",
@@ -624,10 +656,12 @@ export async function sus({
     results.push(result);
   }
 
-  return results
+  return results;
 }
 
-function isBlockhashNotFound(simulatedTxn: RpcResponseAndContext<SimulatedTransactionResponse>): boolean {
+function isBlockhashNotFound(
+  simulatedTxn: RpcResponseAndContext<SimulatedTransactionResponse>
+): boolean {
   return simulatedTxn?.value.err?.toString() === "BlockhashNotFound";
 }
 
@@ -785,13 +819,10 @@ export function getDetailedWritableAccountsWithoutTM({
         if (owner) {
           const idl = idls[owner.toBase58()];
           if (idl) {
-            const decodedPre = decodeIdlStruct(idl, pre)
-            const decodedPost = decodeIdlStruct(
-              idl,
-              postAccount
-            )
-            preParsed = decodedPre?.parsed
-            postParsed = decodedPost?.parsed
+            const decodedPre = decodeIdlStruct(idl, pre);
+            const decodedPost = decodeIdlStruct(idl, postAccount);
+            preParsed = decodedPre?.parsed;
+            postParsed = decodedPost?.parsed;
             type =
               (decodedPre?.type !== "Unknown" && decodedPre?.type) ||
               (decodedPost?.type !== "Unknown" && decodedPost?.type) ||
@@ -956,7 +987,7 @@ export async function fetchMetadatas(
       // Ignore, not a valid mint
     }
 
-    return null
+    return null;
   });
 }
 
@@ -979,9 +1010,9 @@ async function isBurnHotspot(
     if (tree) {
       const index = ix.parsed?.data?.index;
       const assetId = await getLeafAssetId(tree, new BN(index));
-      let asset
+      let asset;
       if (assets) {
-        asset = assets.find(a => a.id === assetId.toBase58())
+        asset = assets.find((a) => a.id === assetId.toBase58());
       } else {
         const assetResponse = await axios.post(connection.rpcEndpoint, {
           jsonrpc: "2.0",
@@ -996,7 +1027,7 @@ async function isBurnHotspot(
             Expires: "0",
           },
         });
-        asset = assetResponse.data.result
+        asset = assetResponse.data.result;
       }
       return (
         asset &&

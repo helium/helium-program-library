@@ -1,6 +1,6 @@
 [package]
 name = "hexboosting"
-version = "0.0.3"
+version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -27,6 +27,6 @@ shared-utils = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }
 helium-sub-daos = { workspace = true }
-pyth-sdk-solana = { version = "0.8.0" }
+pyth-solana-receiver-sdk = "0.3.0"
 mobile-entity-manager = { workspace = true }
 bytemuck = "1.14.0"

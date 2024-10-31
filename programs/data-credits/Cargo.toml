@@ -1,6 +1,6 @@
 [package]
 name = "data-credits"
-version = "0.2.1"
+version = "0.2.2"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -25,7 +25,7 @@ anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 helium-sub-daos = { workspace = true }
 circuit-breaker = { workspace = true }
-pyth-sdk-solana = { version = "0.8.0" }
+pyth-solana-receiver-sdk = "0.3.0"
 lazy-transactions = { path = "../lazy-transactions", features = ["cpi"] }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }

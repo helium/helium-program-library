@@ -21,6 +21,10 @@ import {
   toBN,
   toVersionedTx,
 } from "@helium/spl-utils";
+import {
+  PythSolanaReceiverProgram,
+  pythSolanaReceiverIdl,
+} from "@pythnetwork/pyth-solana-receiver";
 import { AddGatewayV1 } from "@helium/transactions";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
@@ -80,16 +84,24 @@ import { BN } from "bn.js";
 import chaiAsPromised from "chai-as-promised";
 import { createMockCompression } from "./utils/compression";
 import { loadKeypair } from "./utils/solana";
-import { keyToAssetKey, mobileInfoKey, payMobileVoucherDc, payMobileVoucherMobile } from "@helium/helium-entity-manager-sdk";
-import { program } from "@coral-xyz/anchor/dist/cjs/native/system";
 import { ConversionEscrow } from "../target/types/conversion_escrow";
-import { parsePriceData } from "@pythnetwork/client";
+import {
+  keyToAssetKey,
+  mobileInfoKey,
+  payMobileVoucherDc,
+  payMobileVoucherMobile,
+} from "@helium/helium-entity-manager-sdk";
+import { VoterStakeRegistry } from "../target/types/voter_stake_registry";
+import { init as initVsr } from "../packages/voter-stake-registry-sdk/src";
+import { populateMissingDraftInfo } from "@helium/spl-utils";
 
 chai.use(chaiAsPromised);
 
 describe("helium-entity-manager", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
+  let vsrProgram: Program<VoterStakeRegistry>;
+  let pythProgram: Program<PythSolanaReceiverProgram>;
   let dcProgram: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
   let hemProgram: Program<HeliumEntityManager>;
@@ -107,6 +119,10 @@ describe("helium-entity-manager", () => {
   let activeDeviceAuthority: Keypair;
 
   beforeEach(async () => {
+    pythProgram = new Program(
+      pythSolanaReceiverIdl,
+      new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ")
+    );
     conversionEscrowProgram = await initConversionEscrow(
       provider,
       anchor.workspace.ConversionEscrow.programId,
@@ -123,8 +139,14 @@ describe("helium-entity-manager", () => {
     noEmitProgram = await initBurn(
       provider,
       anchor.workspace.NoEmit.programId,
-      anchor.workspace.NoEmit.idl,
-    )
+      anchor.workspace.NoEmit.idl
+    );
+
+    vsrProgram = await initVsr(
+      provider,
+      anchor.workspace.VoterStakeRegistry.programId,
+      anchor.workspace.VoterStakeRegistry.idl
+    );
 
     hsdProgram = await initHeliumSubDaos(
       provider,
@@ -153,17 +175,18 @@ describe("helium-entity-manager", () => {
       100,
       me,
       dataCredits.dcMint,
-      dataCredits.hntMint,
+      dataCredits.hntMint
     ));
     activeDeviceAuthority = Keypair.generate();
     ({ subDao, mint: dntMint } = await initTestSubdao({
       hsdProgram,
+      vsrProgram,
       provider,
       authority: me,
       dao,
       activeDeviceAuthority: activeDeviceAuthority.publicKey,
       // Add some padding for onboards
-      numTokens: MAKER_STAKING_FEE.mul(new BN(2)).add(new BN(10000000000)),
+      numTokens: MAKER_STAKING_FEE.mul(new BN(2)).add(new BN(100000000000)),
     }));
   });
 
@@ -197,17 +220,27 @@ describe("helium-entity-manager", () => {
       .signers([mint])
       .rpc({ skipPreflight: true });
 
-    const addr = getAssociatedTokenAddressSync(mint.publicKey, notEmittedKey()[0], true);
+    const addr = getAssociatedTokenAddressSync(
+      mint.publicKey,
+      notEmittedKey()[0],
+      true
+    );
     const balance = await provider.connection.getTokenAccountBalance(addr);
     expect(balance.value.uiAmount).to.eq(1);
 
-    const tokenMint = await createMint(provider, 2, me, me)
-    const burnAta = await createAtaAndMint(provider, tokenMint, new BN(1000), notEmittedKey()[0])
-    await noEmitProgram.methods.noEmitV0()
-    .accounts({
-      mint: tokenMint
-    })
-    .rpc({ skipPreflight: true })
+    const tokenMint = await createMint(provider, 2, me, me);
+    const burnAta = await createAtaAndMint(
+      provider,
+      tokenMint,
+      new BN(1000),
+      notEmittedKey()[0]
+    );
+    await noEmitProgram.methods
+      .noEmitV0()
+      .accounts({
+        mint: tokenMint,
+      })
+      .rpc({ skipPreflight: true });
 
     const postBalance = (await getAccount(provider.connection, burnAta)).amount;
     expect(postBalance).to.eq(BigInt(0));
@@ -351,7 +384,7 @@ describe("helium-entity-manager", () => {
         .accounts({ dcMint })
         .rpc({ skipPreflight: true });
     });
-    it("issues and onboards a data only hotspot", async () => {
+    it("issues and onboards an iot data only hotspot", async () => {
       let hotspotOwner = Keypair.generate();
       const issueMethod = hemProgram.methods
         .issueDataOnlyEntityV0({
@@ -401,6 +434,19 @@ describe("helium-entity-manager", () => {
       const { iotInfo } = await onboardMethod.pubkeys();
       await onboardMethod.rpc();
 
+      await hemProgram.methods
+        .setEntityActiveV0({
+          isActive: true,
+          entityKey: Buffer.from(bs58.decode(ecc)),
+        })
+        .accounts({
+          activeDeviceAuthority: activeDeviceAuthority.publicKey,
+          rewardableEntityConfig,
+          info: iotInfo!,
+        })
+        .signers([activeDeviceAuthority])
+        .rpc({ skipPreflight: true });
+
       const iotInfoAccount = await hemProgram.account.iotHotspotInfoV0.fetch(
         iotInfo!
       );
@@ -415,6 +461,119 @@ describe("helium-entity-manager", () => {
       expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(
         subDaoAcc.onboardingDataOnlyDcFee.toNumber()
       );
+    });
+
+    it("issues and onboards a mobile data only hotspot", async () => {
+      let hotspotOwner = Keypair.generate();
+      const issueMethod = hemProgram.methods
+        .issueDataOnlyEntityV0({
+          entityKey: Buffer.from(bs58.decode(ecc)),
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+        ])
+        .accounts({
+          recipient: hotspotOwner.publicKey,
+          dao,
+          eccVerifier: eccVerifier.publicKey,
+        })
+        .signers([eccVerifier]);
+
+      const { keyToAsset } = await issueMethod.pubkeys();
+      await issueMethod.rpc({ skipPreflight: true });
+
+      const ktaAcc = await hemProgram.account.keyToAssetV0.fetch(keyToAsset!);
+      expect(Boolean(ktaAcc)).to.be.true;
+      expect(ktaAcc.asset.toString()).to.eq(hotspot.toString());
+      expect(ktaAcc.dao.toString()).to.eq(dao.toString());
+
+      ({ rewardableEntityConfig } = await initTestRewardableEntityConfig(
+        hemProgram,
+        subDao,
+        {
+          mobileConfigV2: {
+            feesByDevice: [
+              {
+                deviceType: { cbrs: {} },
+                dcOnboardingFee: toBN(0, 5),
+                locationStakingFee: toBN(10, 5),
+                mobileOnboardingFeeUsd: toBN(0, 6),
+                reserved: new Array(8).fill(new BN(0)),
+              },
+              {
+                deviceType: { wifiIndoor: {} },
+                dcOnboardingFee: toBN(10, 5),
+                locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(10, 6),
+                reserved: new Array(8).fill(new BN(0)),
+              },
+              {
+                deviceType: { wifiOutdoor: {} },
+                dcOnboardingFee: toBN(10, 5),
+                locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(20, 6),
+                reserved: new Array(8).fill(new BN(0)),
+              },
+              {
+                deviceType: { wifiDataOnly: {} },
+                dcOnboardingFee: toBN(1, 5),
+                locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(1, 6),
+                reserved: new Array(8).fill(new BN(0)),
+              },
+            ],
+          },
+        }
+      ));
+
+      const { args } = await proofArgsAndAccounts({
+        connection: hemProgram.provider.connection,
+        assetId: hotspot,
+        getAssetFn,
+        getAssetProofFn,
+      });
+      const onboardMethod = hemProgram.methods
+        .onboardDataOnlyMobileHotspotV0({
+          ...args,
+          location: null,
+        })
+        .accounts({
+          rewardableEntityConfig,
+          hotspotOwner: hotspotOwner.publicKey,
+          keyToAsset,
+          mobileInfo: mobileInfoKey(rewardableEntityConfig, ecc)[0],
+          subDao,
+        })
+        .signers([hotspotOwner]);
+
+      const { mobileInfo } = await onboardMethod.pubkeys();
+      await onboardMethod.rpc();
+
+      await hemProgram.methods
+        .setEntityActiveV0({
+          isActive: true,
+          entityKey: Buffer.from(bs58.decode(ecc)),
+        })
+        .accounts({
+          activeDeviceAuthority: activeDeviceAuthority.publicKey,
+          rewardableEntityConfig,
+          info: mobileInfo!,
+        })
+        .signers([activeDeviceAuthority])
+        .rpc({ skipPreflight: true });
+
+      const mobileInfoAccount =
+        await hemProgram.account.mobileHotspotInfoV0.fetch(mobileInfo!);
+      expect(Boolean(mobileInfoAccount)).to.be.true;
+      expect(mobileInfoAccount.asset.toString()).to.eq(hotspot.toString());
+      expect(mobileInfoAccount.location).to.be.null;
+      expect(mobileInfoAccount.isFullHotspot).to.be.false;
+      expect(Object.keys(mobileInfoAccount.deviceType)[0]).to.eq(
+        "wifiDataOnly"
+      );
+
+      const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
+      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(100000);
     });
 
     it("can swap tree when it's full", async () => {
@@ -603,6 +762,13 @@ describe("helium-entity-manager", () => {
                 mobileOnboardingFeeUsd: toBN(20, 6),
                 reserved: new Array(8).fill(new BN(0)),
               },
+              {
+                deviceType: { wifiDataOnly: {} },
+                dcOnboardingFee: toBN(1, 5),
+                locationStakingFee: toBN(0, 5),
+                mobileOnboardingFeeUsd: toBN(1, 6),
+                reserved: new Array(8).fill(new BN(0)),
+              },
             ],
           },
         }
@@ -722,7 +888,7 @@ describe("helium-entity-manager", () => {
                 mint: NATIVE_MINT,
                 slippageBps,
                 oracle: SOL_PYTH_PRICE_FEED,
-              }
+              },
             ],
           })
           .accounts({
@@ -757,11 +923,10 @@ describe("helium-entity-manager", () => {
           })
           .signers([makerKeypair])
           .rpcAndKeys({ skipPreflight: true }));
-        
       });
 
       it("allows verifying owner while topping off sol", async () => {
-        const owner = Keypair.generate()
+        const owner = Keypair.generate();
         const makerWsol = getAssociatedTokenAddressSync(
           NATIVE_MINT,
           maker,
@@ -820,9 +985,13 @@ describe("helium-entity-manager", () => {
         const voucher = await hemProgram.account.mobileHotspotVoucherV0.fetch(
           mobileHotspotVoucher!
         );
-        expect(voucher.verifiedOwner.toBase58()).to.eq(owner.publicKey.toBase58());
-        const lamps = (await provider.connection.getAccountInfo(owner.publicKey))?.lamports
-        expect(lamps).to.be.gt(0.02 * LAMPORTS_PER_SOL)
+        expect(voucher.verifiedOwner.toBase58()).to.eq(
+          owner.publicKey.toBase58()
+        );
+        const lamps = (
+          await provider.connection.getAccountInfo(owner.publicKey)
+        )?.lamports;
+        expect(lamps).to.be.gt(0.02 * LAMPORTS_PER_SOL);
       });
       describe("with verified owner", async () => {
         beforeEach(async () => {
@@ -835,20 +1004,23 @@ describe("helium-entity-manager", () => {
             })
             .signers([eccVerifier])
             .rpc({ skipPreflight: true });
-        })
+        });
         it("allows paying mobile", async () => {
           const makerDntAccount = getAssociatedTokenAddressSync(
             dntMint,
             maker,
             true
           );
-          const pythDataMobile = (await provider.connection.getAccountInfo(
+          const pythDataMobile = await pythProgram.account.priceUpdateV2.fetch(
             MOBILE_PYTH_PRICE_FEED
-          ))!.data;
-          const priceMobile = parsePriceData(pythDataMobile);
-
+          );
           const usdPerMobile =
-            priceMobile.emaPrice.value - priceMobile.emaConfidence!.value * 2;
+            pythDataMobile.priceMessage.emaPrice
+              .sub(pythDataMobile.priceMessage.emaConf.mul(new anchor.BN(2)))
+              .toNumber() *
+            10 ** pythDataMobile.priceMessage.exponent *
+            10 ** 6;
+
           const mobileAmount = toBN(20 / usdPerMobile, 6);
           const myUsdcAccount = getAssociatedTokenAddressSync(usdcMint, me);
           const instructions = [
@@ -977,25 +1149,26 @@ describe("helium-entity-manager", () => {
               maker,
               payer: me,
             });
-          const tx = await toVersionedTx({
-            instructions: [
-              await hemProgram.methods
-                .mobileVoucherVerifyOwnerV0()
-                .accounts({
-                  verifiedOwner: me,
-                  eccVerifier: eccVerifier.publicKey,
-                  mobileHotspotVoucher,
-                })
-                .instruction(),
-              ...instructions,
-            ],
-            addressLookupTableAddresses: [
-              ...addressLookupTableAddresses,
-              HELIUM_COMMON_LUT,
-            ],
-            connection: new Connection("https://api.mainnet-beta.solana.com"),
-            payer: me,
-          });
+          const tx = await toVersionedTx(
+            await populateMissingDraftInfo(provider.connection, {
+              instructions: [
+                await hemProgram.methods
+                  .mobileVoucherVerifyOwnerV0()
+                  .accounts({
+                    verifiedOwner: me,
+                    eccVerifier: eccVerifier.publicKey,
+                    mobileHotspotVoucher,
+                  })
+                  .instruction(),
+                ...instructions,
+              ],
+              addressLookupTableAddresses: [
+                ...addressLookupTableAddresses,
+                HELIUM_COMMON_LUT,
+              ],
+              feePayer: me,
+            })
+          );
           await tx.sign([eccVerifier]);
           const signed = await provider.wallet.signTransaction(tx);
           const serialized = signed.serialize();
@@ -1012,15 +1185,16 @@ describe("helium-entity-manager", () => {
               maker,
               payer: me,
             });
-          const tx = await toVersionedTx({
-            instructions,
-            addressLookupTableAddresses: [
-              ...addressLookupTableAddresses,
-              HELIUM_COMMON_LUT,
-            ],
-            connection: new Connection("https://api.mainnet-beta.solana.com"),
-            payer: me,
-          });
+          const tx = await toVersionedTx(
+            await populateMissingDraftInfo(provider.connection, {
+              instructions,
+              addressLookupTableAddresses: [
+                ...addressLookupTableAddresses,
+                HELIUM_COMMON_LUT,
+              ],
+              feePayer: me,
+            })
+          );
           const signed = await provider.wallet.signTransaction(tx);
           const serialized = signed.serialize();
           expect(serialized.length).to.be.lessThan(1232);
@@ -1033,13 +1207,15 @@ describe("helium-entity-manager", () => {
               maker,
               true
             );
-            const pythDataMobile = (await provider.connection.getAccountInfo(
+            const pythDataMobile = await pythProgram.account.priceUpdateV2.fetch(
               MOBILE_PYTH_PRICE_FEED
-            ))!.data;
-            const priceMobile = parsePriceData(pythDataMobile);
-
+            );
             const usdPerMobile =
-              priceMobile.emaPrice.value - priceMobile.emaConfidence!.value * 2;
+              pythDataMobile.priceMessage.emaPrice
+                .sub(pythDataMobile.priceMessage.emaConf.mul(new anchor.BN(2)))
+                .toNumber() *
+              10 ** pythDataMobile.priceMessage.exponent *
+              10 ** 6;
             const mobileAmount = toBN(20 / usdPerMobile, 6);
             const myUsdcAccount = getAssociatedTokenAddressSync(usdcMint, me);
             const instructions0 = [
@@ -1173,8 +1349,8 @@ describe("helium-entity-manager", () => {
             expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(1000000);
           });
         });
-      })
-    })
+      });
+    });
 
     it("issues a mobile hotspot", async () => {
       await hemProgram.methods
@@ -1204,11 +1380,25 @@ describe("helium-entity-manager", () => {
           getAssetFn,
           getAssetProofFn,
           deviceType: "wifiIndoor",
+          deploymentInfo: null,
         })
       ).signers([makerKeypair, hotspotOwner]);
 
       await method.rpc({ skipPreflight: true });
       const { mobileInfo } = await method.pubkeys();
+
+      await hemProgram.methods
+        .setEntityActiveV0({
+          isActive: true,
+          entityKey: Buffer.from(bs58.decode(ecc)),
+        })
+        .accounts({
+          activeDeviceAuthority: activeDeviceAuthority.publicKey,
+          rewardableEntityConfig,
+          info: mobileInfo! as PublicKey,
+        })
+        .signers([activeDeviceAuthority])
+        .rpc({ skipPreflight: true });
 
       const mobileInfoAcc = await hemProgram.account.mobileHotspotInfoV0.fetch(
         mobileInfo!
@@ -1240,6 +1430,8 @@ describe("helium-entity-manager", () => {
 
         await hsdProgram.methods
           .updateSubDaoV0({
+            vetokenTracker: null,
+            votingRewardsPercent: null,
             authority: null,
             dcBurnAuthority: null,
             emissionSchedule: null,
@@ -1264,6 +1456,7 @@ describe("helium-entity-manager", () => {
             getAssetFn,
             getAssetProofFn,
             location: new BN(100),
+            deploymentInfo: null,
           })
         ).signers([makerKeypair, hotspotOwner]);
 
@@ -1328,6 +1521,13 @@ describe("helium-entity-manager", () => {
                     mobileOnboardingFeeUsd: toBN(20, 6),
                     reserved: new Array(8).fill(new BN(0)),
                   },
+                  {
+                    deviceType: { wifiDataOnly: {} },
+                    dcOnboardingFee: toBN(1, 5),
+                    locationStakingFee: toBN(0, 5),
+                    mobileOnboardingFeeUsd: toBN(1, 6),
+                    reserved: new Array(8).fill(new BN(0)),
+                  },
                 ],
               },
             },
@@ -1355,6 +1555,13 @@ describe("helium-entity-manager", () => {
 
       it("changes the metadata", async () => {
         const location = new BN(1000);
+        const wifiInfo = {
+          antenna: 1,
+          elevation: 2,
+          azimuth: 3,
+          mechanicalDownTilt: 4,
+          electricalDownTilt: 5,
+        };
 
         const method = (
           await updateMobileMetadata({
@@ -1364,6 +1571,9 @@ describe("helium-entity-manager", () => {
             location,
             getAssetFn,
             getAssetProofFn,
+            deploymentInfo: {
+              wifiInfoV0: wifiInfo,
+            },
           })
         ).signers([hotspotOwner]);
 
@@ -1374,6 +1584,7 @@ describe("helium-entity-manager", () => {
           info!
         );
         expect(storageAcc.location?.toNumber()).to.eq(location.toNumber());
+        expect(storageAcc.deploymentInfo?.wifiInfoV0).to.deep.equal(wifiInfo);
       });
 
       it("oracle can update active status", async () => {
@@ -1497,9 +1708,7 @@ describe("helium-entity-manager", () => {
       );
       expect(Boolean(iotInfoAccount)).to.be.true;
       const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
-      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(
-        subDaoAcc.onboardingDcFee.toNumber()
-      );
+      expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(0);
     });
 
     it("updates entity config", async () => {
@@ -1590,7 +1799,7 @@ describe("helium-entity-manager", () => {
         );
         expect(infoAcc.isActive).to.be.false;
         const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
-        expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(5000000);
+        expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(0);
       });
 
       it("changes the metadata", async () => {

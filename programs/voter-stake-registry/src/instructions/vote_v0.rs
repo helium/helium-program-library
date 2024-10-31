@@ -1,9 +1,8 @@
-use crate::error::VsrError;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
-
-use crate::{registrar_seeds, state::*};
 use proposal::{ProposalConfigV0, ProposalV0};
+
+use crate::{error::VsrError, registrar_seeds, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct VoteArgsV0 {
@@ -64,11 +63,15 @@ pub struct VoteV0<'info> {
 
 pub fn handler(ctx: Context<VoteV0>, args: VoteArgsV0) -> Result<()> {
   let marker = &mut ctx.accounts.marker;
+  if marker.rent_refund == Pubkey::default() {
+    marker.rent_refund = ctx.accounts.payer.key();
+  }
   marker.proposal = ctx.accounts.proposal.key();
   marker.bump_seed = ctx.bumps["marker"];
   marker.voter = ctx.accounts.voter.key();
   marker.mint = ctx.accounts.mint.key();
   marker.registrar = ctx.accounts.registrar.key();
+  marker.proxy_index = 0;
 
   // Don't allow voting for the same choice twice.
   require!(

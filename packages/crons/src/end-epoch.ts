@@ -33,7 +33,8 @@ import {
   truthy,
 } from "@helium/spl-utils";
 import { getAccount } from "@solana/spl-token";
-import { ComputeBudgetProgram as CBP, Connection, Keypair, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
+import { init as initPVR, vsrEpochInfoKey } from "@helium/position-voting-rewards-sdk";
+import { ComputeBudgetProgram as CBP, Connection, Keypair, PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import BN from "bn.js";
 import bs58 from "bs58";
 
@@ -63,6 +64,7 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
     const errors: string[] = [];
     const provider = anchor.getProvider() as anchor.AnchorProvider;
     const heliumSubDaosProgram = await initDao(provider);
+    const pvrProgram = await initPVR(provider);
     const hntMint = HNT_MINT;
     const iotMint = IOT_MINT;
     const unixNow = new Date().valueOf() / 1000;
@@ -76,12 +78,20 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
         },
       },
     ]);
+    const vetokenTrackers = subDaos.map(subDao => subDao.account.vetokenTracker).filter(tracker => !tracker.equals(PublicKey.default));
+    const vetokenTrackerAccounts = await Promise.all(vetokenTrackers.map(tracker => pvrProgram.account.veTokenTrackerV0.fetch(tracker)));
+    const targetTsVetokenTrackers = vetokenTrackerAccounts.reduce(
+      (acc, tracker) => BN.min(acc, tracker.vetokenLastCalculatedTs),
+      // Start one day back to ensure we at least close the epoch that the job is running in.
+      new BN(unixNow - 24 * 60 * 60)
+    );
 
-    let targetTs = subDaos.reduce(
+    let targetTsSubdao = subDaos.reduce(
       (acc, subDao) => BN.min(acc, subDao.account.vehntLastCalculatedTs),
       // Start one day back to ensure we at least close the epoch that the job is running in.
       new BN(unixNow - 24 * 60 * 60)
     );
+    let targetTs = BN.min(targetTsSubdao, targetTsVetokenTrackers);
     const solanaTime = await getSolanaUnixTimestamp(provider.connection)
 
     mainLoop: while (targetTs.toNumber() < unixNow) {
@@ -145,8 +155,9 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
         }
       }
 
-      if (!daoEpochInfo?.doneIssuingRewards) {
-        for (const subDao of subDaos) {
+      
+      for (const subDao of subDaos) {
+        if (!daoEpochInfo?.doneIssuingRewards) {
           const [subDaoEpoch] = subDaoEpochInfoKey(subDao.publicKey, targetTs);
           const subDaoEpochInfo =
             await heliumSubDaosProgram.account.subDaoEpochInfoV0.fetchNullable(
@@ -170,6 +181,42 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
             } catch (err: any) {
               errors.push(
                 `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${err}`
+              );
+            }
+          }
+        }
+
+        const hasVeTokenTracker = !subDao.account.vetokenTracker.equals(
+          PublicKey.default
+        );
+
+        if (hasVeTokenTracker) {
+          const [vsrEpoch] = vsrEpochInfoKey(
+            subDao.account.vetokenTracker,
+            targetTs
+          );
+          const vsrEpochInfo =
+            await pvrProgram.account.vsrEpochInfoV0.fetchNullable(vsrEpoch);
+          if (!vsrEpochInfo || !vsrEpochInfo.rewardsIssuedAt) {
+            try {
+              await sendInstructionsWithPriorityFee(
+                provider,
+                [
+                  await heliumSubDaosProgram.methods
+                    .issueVotingRewardsV0({ epoch })
+                    .accounts({
+                      subDao: subDao.publicKey,
+                      vsrEpochInfo: vsrEpoch,
+                    })
+                    .instruction(),
+                ],
+                {
+                  basePriorityFee: BASE_PRIORITY_FEE,
+                }
+              );
+            } catch (err: any) {
+              errors.push(
+                `Failed to issue voting rewards for ${subDao.account.dntMint.toBase58()}: ${err}`
               );
             }
           }
@@ -295,7 +342,7 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
     try {
       await sendAndConfirmWithRetry(
         provider.connection,
-        signed.serialize(),
+        Buffer.from(signed.serialize()),
         { skipPreflight: true },
         "confirmed"
       );
@@ -369,7 +416,7 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
           const signed = await provider.wallet.signTransaction(tx);
           await sendAndConfirmWithRetry(
             provider.connection,
-            signed.serialize(),
+            Buffer.from(signed.serialize()),
             { skipPreflight: true },
             "confirmed"
           );

@@ -1,6 +1,8 @@
 import { PublicKey } from "@solana/web3.js";
 
-export const DC_MINT = new PublicKey("dcuc8Amr83Wz27ZkQ2K9NS6r8zRpf1J6cvArEBDZDmm");
+export const DC_MINT = new PublicKey(
+  "dcuc8Amr83Wz27ZkQ2K9NS6r8zRpf1J6cvArEBDZDmm"
+);
 
 export const HNT_MINT = new PublicKey("hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux");
 
@@ -11,19 +13,19 @@ export const MOBILE_MINT = new PublicKey(
 export const IOT_MINT = new PublicKey("iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9fns");
 
 export const HNT_PYTH_PRICE_FEED = new PublicKey(
-  "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"
+  "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
 );
 
 export const SOL_PYTH_PRICE_FEED = new PublicKey(
-  "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG"
+  "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE"
 );
 
 export const MOBILE_PYTH_PRICE_FEED = new PublicKey(
-  "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5"
+  "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx"
 );
 
 export const USDC_PYTH_PRICE_FEED = new PublicKey(
-  "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD"
+  "Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX"
 );
 
 export const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
@@ -33,5 +35,18 @@ export const HELIUM_COMMON_LUT_DEVNET = new PublicKey(
 );
 
 export const HELIUM_COMMON_LUT = new PublicKey(
-  "43eY9L2spbM2b1MPDFFBStUiFGt29ziZ1nc1xbpzsfVt"
+  "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
 );
+
+export type Network = "hnt" | "mobile" | "iot";
+export const networksToMint: { [Network: string]: PublicKey } = {
+  hnt: HNT_MINT,
+  mobile: MOBILE_MINT,
+  iot: IOT_MINT,
+};
+
+export const realmNames: Record<string, string> = {
+  [HNT_MINT.toBase58()]: "Helium",
+  [MOBILE_MINT.toBase58()]: "Helium MOBILE",
+  [IOT_MINT.toBase58()]: "Helium IOT",
+};

@@ -113,4 +113,30 @@ pub mod voter_stake_registry {
   pub fn relinquish_expired_vote_v0(ctx: Context<RelinquishExpiredVoteV0>) -> Result<()> {
     instructions::relinquish_expired_vote_v0::handler(ctx)
   }
+
+  pub fn proxied_relinquish_vote_v0(
+    ctx: Context<ProxiedRelinquishVoteV0>,
+    args: RelinquishVoteArgsV1,
+  ) -> Result<()> {
+    instructions::proxied_relinquish_vote_v0::handler(ctx, args)
+  }
+
+  pub fn proxied_vote_v0(ctx: Context<ProxiedVoteV0>, args: VoteArgsV0) -> Result<()> {
+    instructions::proxied_vote_v0::handler(ctx, args)
+  }
+
+  pub fn update_registrar_v0(
+    ctx: Context<UpdateRegistrarV0>,
+    args: UpdateRegistrarArgsV0,
+  ) -> Result<()> {
+    instructions::update_registrar_v0::handler(ctx, args)
+  }
+
+  pub fn freeze_position_v0(ctx: Context<FreezePositionV0>) -> Result<()> {
+    instructions::freeze_position_v0::handler(ctx)
+  }
+
+  pub fn thaw_position_v0(ctx: Context<ThawPositionV0>) -> Result<()> {
+    instructions::thaw_position_v0::handler(ctx)
+  }
 }

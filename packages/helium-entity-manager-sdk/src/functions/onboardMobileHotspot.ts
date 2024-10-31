@@ -8,6 +8,7 @@ import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import { keyToAssetForAsset } from "../helpers";
 import { mobileInfoKey } from "../pdas";
+import { MobileDeploymentInfoV0 } from "..";
 
 export async function onboardMobileHotspot({
   program,
@@ -18,7 +19,8 @@ export async function onboardMobileHotspot({
   dao,
   payer,
   dcFeePayer,
-  deviceType = 'cbrs',
+  deviceType = "cbrs",
+  deploymentInfo,
   ...rest
 }: {
   program: Program<HeliumEntityManager>;
@@ -27,28 +29,23 @@ export async function onboardMobileHotspot({
   assetId: PublicKey;
   location?: BN;
   rewardableEntityConfig: PublicKey;
+  deploymentInfo?: MobileDeploymentInfoV0 | null;
   maker: PublicKey;
   dao: PublicKey;
-  deviceType?: 'cbrs' | 'wifiIndoor' | 'wifiOutdoor'
+  deviceType?: "cbrs" | "wifiIndoor" | "wifiOutdoor";
 } & Omit<ProofArgsAndAccountsArgs, "connection">) {
-  const {
-    asset,
-    args,
-    accounts,
-    remainingAccounts,
-  } = await proofArgsAndAccounts({
-    connection: program.provider.connection,
-    assetId,
-    ...rest,
-  });
+  const { asset, args, accounts, remainingAccounts } =
+    await proofArgsAndAccounts({
+      connection: program.provider.connection,
+      assetId,
+      ...rest,
+    });
   const {
     ownership: { owner },
   } = asset;
 
   const keyToAssetKey = keyToAssetForAsset(asset, dao);
-  const keyToAsset = await program.account.keyToAssetV0.fetch(
-    keyToAssetKey
-  );
+  const keyToAsset = await program.account.keyToAssetV0.fetch(keyToAssetKey);
   const [info] = await mobileInfoKey(
     rewardableEntityConfig,
     keyToAsset.entityKey
@@ -60,8 +57,9 @@ export async function onboardMobileHotspot({
       ...args,
       location: typeof location == "undefined" ? null : location,
       deviceType: {
-        [deviceType]: {}
-      } as any
+        [deviceType]: {},
+      } as any,
+      deploymentInfo: deploymentInfo as any,
     })
     .accounts({
       // hotspot: assetId,

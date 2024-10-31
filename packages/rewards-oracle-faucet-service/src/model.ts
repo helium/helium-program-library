@@ -1,7 +1,8 @@
-import {Sequelize, STRING, INTEGER, Model, INET, BIGINT} from 'sequelize';
 import AWS from "aws-sdk";
+import dotenv from "dotenv";
 import * as pg from "pg";
-import { BOOLEAN } from 'sequelize';
+import { BIGINT, Model, STRING, Sequelize } from 'sequelize';
+dotenv.config();
 
 const host = process.env.PGHOST || "localhost";
 const port = Number(process.env.PGPORT) || 5432;
@@ -63,6 +64,9 @@ Reward.init(
     },
     rewards: {
       type: BIGINT,
+    },
+    rewardType: {
+      type: STRING,
     },
     lastReward: {
       type: "TIMESTAMP",

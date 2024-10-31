@@ -11,7 +11,8 @@ use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
-use pyth_sdk_solana::load_price_feed_from_account_info;
+use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
+use pyth_solana_receiver_sdk::price_update::VerificationLevel;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MintDataCreditsArgsV0 {
@@ -37,7 +38,10 @@ pub struct MintDataCreditsV0<'info> {
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
 
   /// CHECK: Checked by loading with pyth. Also double checked by the has_one on data credits instance.
-  pub hnt_price_oracle: AccountInfo<'info>,
+  #[account(
+    constraint = hnt_price_oracle.verification_level == VerificationLevel::Full @ DataCreditsErrors::PythPriceFeedStale,
+  )]
+  pub hnt_price_oracle: Account<'info, PriceUpdateV2>,
 
   // hnt tokens from this account are burned
   #[account(
@@ -130,24 +134,24 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
     token::thaw_account(ctx.accounts.thaw_ctx().with_signer(signer_seeds))?;
   }
 
-  let hnt_price_oracle = load_price_feed_from_account_info(&ctx.accounts.hnt_price_oracle)
-    .map_err(|e| {
-      msg!("Pyth error {}", e);
-      error!(DataCreditsErrors::PythError)
-    })?;
+  let hnt_price_oracle = &ctx.accounts.hnt_price_oracle;
+  let message = hnt_price_oracle.price_message;
 
   let current_time = Clock::get()?.unix_timestamp;
-  let hnt_price = hnt_price_oracle
-    .get_ema_price_no_older_than(current_time, if TESTING { 6000000 } else { 10 * 60 })
-    .ok_or_else(|| error!(DataCreditsErrors::PythPriceNotFound))?;
-
-  require_gt!(hnt_price.price, 0);
+  require_gte!(
+    message
+      .publish_time
+      .saturating_add(if TESTING { 6000000 } else { 10 * 60 }.into()),
+    current_time,
+    DataCreditsErrors::PythPriceNotFound
+  );
+  let hnt_price = message.ema_price;
+  require_gt!(hnt_price, 0);
 
   // Remove the confidence from the price to use the most conservative price
   // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
   let hnt_price_with_conf = hnt_price
-    .price
-    .checked_sub(i64::try_from(hnt_price.conf.checked_mul(2).unwrap()).unwrap())
+    .checked_sub(i64::try_from(message.ema_conf.checked_mul(2).unwrap()).unwrap())
     .unwrap();
 
   // dc_exponent = 5 since $1 = 10^5 DC
@@ -156,7 +160,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
   // dc = price * hnt_amount * 10^(expo - hnt_decimals + dc_exponent)
   // dc = price * hnt_amount / 10^(hnt_decimals - expo - dc_exponent)
   // hnt_amount = dc * 10^(hnt_decimals - expo - dc_exponent) / price
-  let exponent = i32::from(ctx.accounts.hnt_mint.decimals) - hnt_price.expo - 5;
+  let exponent = i32::from(ctx.accounts.hnt_mint.decimals) - message.exponent - 5;
   let decimals_factor = 10_u128
     .checked_pow(u32::try_from(exponent).unwrap())
     .ok_or_else(|| error!(DataCreditsErrors::ArithmeticError))?;
@@ -199,7 +203,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
   msg!(
     "HNT Price is {} * 10^{}, issuing {} data credits",
     hnt_price_with_conf,
-    hnt_price.expo,
+    message.exponent,
     dc_amount
   );
 

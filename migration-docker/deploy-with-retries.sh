@@ -14,7 +14,7 @@ CURRENT_RETRY=0
 # Deploy the program with the buffer signer keypair
 while [[ $CURRENT_RETRY -lt $MAX_RETRIES ]]; do
   echo "Deploying program (retry $((CURRENT_RETRY+1)))..."
-  solana program deploy $PROGRAM_SOURCE_FILE --buffer buffer.json -u $SOLANA_URL --program-id $KEYPAIR
+  solana program deploy $PROGRAM_SOURCE_FILE --with-compute-unit-price 2 --buffer buffer.json -u $SOLANA_URL --program-id $KEYPAIR
 
   # Check if the deploy command succeeded
   if [[ $? -eq 0 ]]; then

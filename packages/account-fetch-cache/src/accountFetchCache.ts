@@ -1,14 +1,18 @@
 import {
   AccountInfo,
+  AddressLookupTableAccount,
   Commitment,
   Connection,
+  GetMultipleAccountsConfig,
   PublicKey,
   SendOptions,
-  Transaction,
   TransactionInstruction,
+  VersionedMessage,
+  VersionedTransaction
 } from "@solana/web3.js";
 import { EventEmitter } from "./eventEmitter";
 import { getMultipleAccounts } from "./getMultipleAccounts";
+import { TransactionCompletionQueue } from "./transactionCompletionQueue";
 
 export const DEFAULT_CHUNK_SIZE = 99;
 export const DEFAULT_DELAY = 50;
@@ -83,10 +87,52 @@ export class MapAccountCache implements AccountCache {
   }
 }
 
+// Keeps track of a promise representing a batch of accounts to fetch.
+// When the promise resolves, it returns a map of pubkey to account info.
+class Batcher {
+  inFlight = false
+  currentBatch = new Set<string>();
+  result: Promise<Record<string, AccountInfo<Buffer>>> | null;
+  currentBatchResultResolve: (res: Record<string, AccountInfo<Buffer>>) => void = () => {};
+  currentBatchResultReject: (e: any) => void = () => {};
+
+  constructor() {
+    this.result = new Promise((resolve, reject) => {
+      this.currentBatchResultReject = reject
+      this.currentBatchResultResolve = resolve
+    })
+    this.resolve = this.resolve.bind(this);
+    this.reject = this.resolve.bind(this);
+  }
+
+  start() {
+    this.inFlight = true
+  }
+
+  resolve(res: Record<string, AccountInfo<Buffer>>) {
+    this.currentBatchResultResolve(res)
+  }
+
+  reject(e: any) {
+    this.currentBatchResultReject(e)
+  }
+
+  get keys() {
+    return Array.from(this.currentBatch)
+  }
+
+  add(...keys: string[]) {
+    if (keys.length === 1) {
+      this.currentBatch.add(keys[0])
+    } else {
+      this.currentBatch = new Set([...this.currentBatch, ...keys])
+    }
+  }
+}
+
 export class AccountFetchCache {
   enableLogging: boolean;
   connection: Connection;
-  chunkSize: number;
   delay: number;
   commitment: Commitment;
   accountWatchersCount = new Map<string, number>();
@@ -96,19 +142,22 @@ export class AccountFetchCache {
   genericCache: AccountCache;
   keyToAccountParser = new Map<string, AccountParser<unknown> | undefined>();
   timeout: NodeJS.Timeout | null = null;
-  currentBatch = new Set<string>();
-  pendingCallbacks = new Map<
-    string,
-    (info: AccountInfo<Buffer> | null, err: Error | null) => void
-  >();
-  pendingCalls = new Map<string, Promise<ParsedAccountBase<unknown>>>();
   emitter = new EventEmitter();
+  // As account requests come in, they get pushed to the list of batches
+  // When the batcher is full, it gets flushed to the network. Then a new one is added.
+  // There can be multiple in flight batches at the same time.
+  activeBatches = [new Batcher()]
+  
   id: number; // For debugging, to see which cache is being used
 
   oldGetAccountinfo?: (
     publicKey: PublicKey,
     com?: Commitment
   ) => Promise<AccountInfo<Buffer> | null>;
+  oldGetMultipleAccountsInfo?: (
+    publicKeys: PublicKey[],
+    com?: Commitment | GetMultipleAccountsConfig
+  ) => Promise<(AccountInfo<Buffer> | null)[]>;
   oldSendTransaction: (...args: any[]) => Promise<string>;
   oldSendRawTransaction: (
     rawTransaction: Buffer | Uint8Array | Array<number>,
@@ -119,7 +168,6 @@ export class AccountFetchCache {
 
   constructor({
     connection,
-    chunkSize = DEFAULT_CHUNK_SIZE,
     delay = DEFAULT_DELAY,
     commitment,
     missingRefetchDelay = 10000,
@@ -128,7 +176,6 @@ export class AccountFetchCache {
     enableLogging = false,
   }: {
     connection: Connection;
-    chunkSize?: number;
     delay?: number;
     commitment: Commitment;
     missingRefetchDelay?: number;
@@ -142,7 +189,6 @@ export class AccountFetchCache {
 
     this.id = ++id;
     this.connection = connection;
-    this.chunkSize = chunkSize;
     this.delay = delay;
     this.commitment = commitment;
     this.missingInterval = setInterval(
@@ -160,6 +206,8 @@ export class AccountFetchCache {
       // @ts-ignore
       connection._accountFetchWrapped = true;
       this.oldGetAccountinfo = connection.getAccountInfo.bind(connection);
+      this.oldGetMultipleAccountsInfo =
+        connection.getMultipleAccountsInfo.bind(connection);
 
       connection.getAccountInfo = async (
         publicKey: PublicKey,
@@ -176,19 +224,49 @@ export class AccountFetchCache {
 
         return self.oldGetAccountinfo!(publicKey, com);
       };
+
+      connection.getMultipleAccountsInfo = async (
+        publicKeys: PublicKey[],
+        com?: Commitment
+      ): Promise<(AccountInfo<Buffer> | null)[]> => {
+        if (
+          (com || connection.commitment) == commitment ||
+          typeof (com || connection.commitment) == "undefined"
+        ) {
+          const res = await Promise.all(
+            publicKeys.map((k) => this.searchAndWatch(k))
+          );
+          setTimeout(() => {
+            res.map(([_, dispose]) => dispose());
+          }, 30 * 1000); // cache for 30s
+          return res.map(([r]) => r?.account || null);
+        }
+
+        return self.oldGetMultipleAccountsInfo!(publicKeys, com);
+      };
     }
+
+    const queue = new TransactionCompletionQueue({
+      connection,
+      log: this.enableLogging,
+    });
     connection.sendTransaction = async function overloadedSendTransaction(
       ...args: any[]
     ) {
       const result = await self.oldSendTransaction(...args);
+
       // First try to requery when confirmed. Then mop up any that didn't change during confirmed.
-      this.confirmTransaction(result, "confirmed")
-        .then(() => {
-          return self.requeryMissing(args[0].instructions);
+      queue
+        .wait("confirmed", result)
+        .then(async () => {
+          const instructions = args[0].instructions
+            ? args[0].instructions
+            : await getInstructions(connection, args[0]);
+          return self.requeryMissing(instructions);
         })
         .then(async (unchanged) => {
           if (unchanged.length > 0) {
-            await this.confirmTransaction(result, "finalized");
+            await queue.wait("finalized", result);
             return self.requeryMissingByAccount(unchanged);
           }
         })
@@ -204,16 +282,20 @@ export class AccountFetchCache {
       const result = await self.oldSendRawTransaction(rawTransaction, options);
 
       try {
-        const instructions = Transaction.from(rawTransaction).instructions;
+        const message = VersionedTransaction.deserialize(
+          new Uint8Array(rawTransaction)
+        ).message;
+        const instructions = await getInstructions(connection, message);
 
         // First try to requery when confirmed. Then mop up any that didn't change during confirmed.
-        this.confirmTransaction(result, "confirmed")
+        queue
+          .wait("confirmed", result)
           .then(() => {
             return self.requeryMissing(instructions);
           })
-          .then(async unchanged => {
+          .then(async (unchanged) => {
             if (unchanged.length > 0) {
-              await this.confirmTransaction(result, "finalized");
+              await queue.wait("finalized", result);
               return self.requeryMissingByAccount(unchanged);
             }
           })
@@ -235,13 +317,13 @@ export class AccountFetchCache {
     const writeableAccounts = Array.from(
       new Set(getWriteableAccounts(instructions).map((a) => a.toBase58()))
     );
-    return this.requeryMissingByAccount(writeableAccounts.map(a => new PublicKey(a)));
+    return this.requeryMissingByAccount(
+      writeableAccounts.map((a) => new PublicKey(a))
+    );
   }
 
-  async requeryMissingByAccount(
-    accounts: PublicKey[]
-  ): Promise<PublicKey[]> {
-    const writeableAccounts = accounts.map(a => a.toBase58())
+  async requeryMissingByAccount(accounts: PublicKey[]): Promise<PublicKey[]> {
+    const writeableAccounts = accounts.map((a) => a.toBase58());
     const unchanged: PublicKey[] = [];
     await Promise.all(
       writeableAccounts.map(async (account) => {
@@ -257,7 +339,8 @@ export class AccountFetchCache {
         const changed =
           (prevAccount && !found) ||
           (found && !prevAccount) ||
-          (prevAccount && !found?.account.data.equals(prevAccount.account.data));
+          (prevAccount &&
+            !found?.account.data.equals(prevAccount.account.data));
         if (!changed) {
           unchanged.push(new PublicKey(account));
         }
@@ -296,78 +379,95 @@ export class AccountFetchCache {
     this.connection.sendTransaction = this.oldSendTransaction;
     this.connection.sendRawTransaction = this.oldSendRawTransaction;
     clearInterval(this.missingInterval);
+    this.activeBatches.forEach((batcher) =>
+      batcher.reject(new Error("AccountFetchCache closed"))
+    );
   }
 
   async fetchBatch() {
-    const currentBatch = this.currentBatch;
-    this.currentBatch = new Set(); // Erase current batch from state, so we can fetch multiple at a time
-    if (this.enableLogging) {
-      console.log(`Fetching batch of ${currentBatch.size} accounts`);
-    }
-    try {
-      const keys = Array.from(currentBatch);
-      const { array } = await getMultipleAccounts(
-        this.connection,
-        keys,
-        this.commitment
-      );
-      keys.forEach((key, index) => {
-        const callback = this.pendingCallbacks.get(key);
-        callback && callback(array[index], null);
-      });
-
-      return { keys, array };
-    } catch (e: any) {
-      currentBatch.forEach((key) => {
-        const callback = this.pendingCallbacks.get(key);
-        callback && callback(null, e);
-      });
-      throw e;
-    }
-  }
-
-  addToBatchIgnoreResult(id: PublicKey) {
-    const idStr = id.toBase58();
-
-    this.currentBatch.add(idStr);
-
-    this.timeout != null && clearTimeout(this.timeout);
-    if (this.currentBatch.size > DEFAULT_CHUNK_SIZE) {
-      return this.fetchBatch();
-    } else {
-      this.timeout = setTimeout(() => this.fetchBatch(), this.delay);
-    }
-    return undefined;
-  }
-
-  async addToBatch(id: PublicKey): Promise<AccountInfo<Buffer>> {
-    const idStr = id.toBase58();
-
-    this.currentBatch.add(idStr);
-
-    this.timeout != null && clearTimeout(this.timeout);
-    if (this.currentBatch.size > DEFAULT_CHUNK_SIZE) {
-      this.fetchBatch();
-    } else {
-      this.timeout = setTimeout(() => this.fetchBatch(), this.delay);
-    }
-
-    const promise = new Promise<AccountInfo<Buffer>>((resolve, reject) => {
-      this.pendingCallbacks.set(idStr, (info, err) => {
-        this.pendingCallbacks.delete(idStr);
-        if (err) {
-          return reject(err);
+    const batcher = this.activeBatches[this.activeBatches.length - 1];
+    this.activeBatches.push(new Batcher());
+    if (batcher) {
+      batcher.start();
+      const resolve = batcher?.resolve;
+      const reject = batcher?.reject;
+      const currentBatch = batcher?.keys;
+      if (currentBatch?.length > 0) {
+        try {
+          if (this.enableLogging) {
+            console.log(`Fetching batch of ${currentBatch.length} accounts`);
+          }
+          const keys = Array.from(currentBatch);
+          const res = await getMultipleAccounts(
+            this.connection,
+            keys,
+            this.commitment
+          );
+          const grouped = res.keys.reduce((acc, key, index) => {
+            const account = res.array[index];
+            if (account) {
+              acc[key] = account;
+            }
+            return acc;
+          }, {} as Record<string, AccountInfo<Buffer>>);
+          resolve && resolve(grouped);
+        } catch (e: any) {
+          reject && reject(e);
+        } finally {
+          this.activeBatches = this.activeBatches.filter(q => q != batcher)
         }
-        resolve(info!);
-      });
-    });
+      }
+    }
+  }
 
-    return promise;
+  addToBatch(id: PublicKey) {
+    const idStr = id.toBase58();
+
+    const batcher = this.activeBatches[this.activeBatches.length - 1];
+    batcher.add(idStr);
+
+    this.debounceFetchBatch();
+    return batcher
+  }
+
+  debounceFetchBatch() {
+    this.timeout != null && clearTimeout(this.timeout);
+    this.timeout = setTimeout(() => this.fetchBatch(), this.delay);
   }
 
   async flush() {
     this.timeout && clearTimeout(this.timeout);
     await this.fetchBatch();
+  }
+
+  async searchMultipleAndWatch<T>(
+    pubKeys: PublicKey[],
+    parser?: AccountParser<T> | undefined,
+    isStatic: Boolean = false, // optimization, set if the data will never change
+    forceRequery = false
+  ): Promise<{
+    accounts: (ParsedAccountBase<T> | undefined)[];
+    disposers: (() => void)[];
+  }> {
+    const data = await this.searchMultiple(
+      pubKeys,
+      parser,
+      isStatic,
+      forceRequery
+    );
+    const disposers = data.map((account) => {
+      if (account) {
+        const address = account.pubkey.toBase58();
+        const cacheEntry = this.genericCache.get(address);
+        if (!this.genericCache.has(address) || cacheEntry != account) {
+          this.updateCache<T>(address, account || null);
+        }
+        return this.watch(account.pubkey, parser, !!account.account);
+      } else {
+        return () => {};
+      }
+    });
+    return { accounts: data, disposers };
   }
 
   async searchAndWatch<T>(
@@ -392,7 +492,13 @@ export class AccountFetchCache {
     const dispose = this.watch(id, parser, !!data);
     const cacheEntry = this.genericCache.get(address);
     if (!this.genericCache.has(address) || cacheEntry != data) {
-      this.updateCacheAndRaiseUpdated<T>(address, data || null);
+      // Should only need to notify if we forced a requery. Otherwise,
+      // if the thing wasn't in the cache we're returning to the caller who queried it
+      if (forceRequery) {
+        this.updateCacheAndRaiseUpdated<T>(address, data || null);
+      } else {
+        this.updateCache<T>(address, data || null);
+      }
     }
 
     return [data, dispose];
@@ -440,6 +546,10 @@ export class AccountFetchCache {
       this.statics.delete(address); // If trying to use this as not static, need to rm it from the statics list.
     }
 
+    if (forceRequery) {
+      this.addToBatch(id);
+    }
+
     if (!forceRequery && this.genericCache.has(address)) {
       const result = this.genericCache.get(address);
       return result == null
@@ -447,109 +557,118 @@ export class AccountFetchCache {
         : (result as ParsedAccountBase<T> | undefined);
     }
 
-    const existingQuery = this.pendingCalls.get(address) as Promise<
-      ParsedAccountBase<T>
-    >;
-    if (!forceRequery && existingQuery) {
-      return existingQuery;
+    let results = await this.awaitAllInFlight();
+    let data = results?.[address];
+
+    if (!data) {
+      const batcher = this.addToBatch(id);
+      results = (await batcher.result)!;
+      data = results?.[address];
     }
-    const query = this.addToBatch(id).then((data) => {
-      this.pendingCalls.delete(address);
-      if (!data) {
-        return undefined;
+
+    if (!data) {
+      return undefined;
+    }
+
+    const result = this.getParsed(id, data, parser) || {
+      pubkey: id,
+      account: data,
+      info: undefined,
+    };
+
+    // Only set the cache for defined static accounts. Static accounts can change if they go from nonexistant to existant.
+    // Rely on searchAndWatch to set the generic cache for everything else.
+    // Never update the cache with an account that isn't being watched. This could cause
+    // stale data to be returned.
+    if (isStatic && result && result.info) {
+      this.updateCacheAndRaiseUpdated(address, result);
+    }
+
+    return result;
+  }
+
+  async awaitAllInFlight() {
+    let results = {}
+    for (const batch of this.activeBatches) {
+      if (batch.inFlight) {
+        results = {
+          ...(await batch.result),
+          ...results,
+        };
+        this.activeBatches = this.activeBatches.filter(b => b != batch)
       }
+    }
 
-      const result = this.getParsed(id, data, parser) || {
-        pubkey: id,
-        account: data,
-        info: undefined,
-      };
-
-      // Only set the cache for defined static accounts. Static accounts can change if they go from nonexistant to existant.
-      // Rely on searchAndWatch to set the generic cache for everything else.
-      // Never update the cache with an account that isn't being watched. This could cause
-      // stale data to be returned.
-      if (isStatic && result && result.info) {
-        this.updateCacheAndRaiseUpdated(address, result);
-      }
-
-      return result;
-    });
-    this.pendingCalls.set(address, query as any);
-
-    return query;
+    return results
   }
 
   async searchMultiple<T>(
     pubKeys: PublicKey[],
     parser?: AccountParser<T> | undefined,
-    isStatic: Boolean = false, // optimization, set if the data will never change
+    isStatic: Boolean = false,
     forceRequery = false
   ): Promise<(ParsedAccountBase<T> | undefined)[]> {
-    // Store results of batch fetches in this map. If isStatic is false, genericCache will have none of the
-    // results of our searches in the batch. So need to accumulate them here
-    const result: Record<string, ParsedAccountBase<T>> = {};
-    const searched = new Set(pubKeys.map((p) => p.toBase58()));
-    for (const key of pubKeys) {
-      this.registerParser(key, parser);
+    const result: (ParsedAccountBase<T> | undefined)[] = new Array(
+      pubKeys.length
+    );
+    const keysToFetch: PublicKey[] = [];
+    const indexMap: Record<string, number> = {};
+
+    const inflightResults = await this.awaitAllInFlight()
+
+    // First pass: check cache and prepare keys to fetch
+    pubKeys.forEach((key, index) => {
       const address = key.toBase58();
+      this.registerParser(key, parser);
+
       if (isStatic) {
         this.statics.add(address);
       } else if (this.statics.has(address)) {
-        this.statics.delete(address); // If trying to use this as not static, need to rm it from the statics list.
+        this.statics.delete(address);
       }
 
-      if (forceRequery || !this.genericCache.has(address)) {
-        const { keys, array } = (await this.addToBatchIgnoreResult(key)) || {
-          keys: [],
-          array: [],
-        };
-
-        keys.forEach((key, index) => {
-          this.statics.add(key);
-          if (searched.has(key)) {
-            const item = array[index];
-            if (item) {
-              const parsed = this.getParsed(key, item, parser) || null;
-              // Cache these results if they aren't going to change
-              if (isStatic) {
-                this.updateCache(key, parsed);
-              }
-              if (parsed) {
-                result[key] = parsed;
-              }
-            }
-          }
-        });
-      }
-    }
-
-    // Force a batch fetch to resolve all accounts
-    const { keys, array } = await this.fetchBatch();
-    keys.forEach((key, index) => {
-      this.statics.add(key);
-      if (searched.has(key)) {
-        const item = array[index];
-        if (item) {
-          const parsed = this.getParsed(key, item, parser) || null;
-          // Cache these results if they aren't going to change
-          if (isStatic) {
-            this.updateCache(key, parsed);
-          }
-          if (parsed) {
-            result[key] = parsed;
-          }
-        }
+      if (!forceRequery && this.genericCache.has(address)) {
+        result[index] = this.genericCache.get(address) as
+          | ParsedAccountBase<T>
+          | undefined;
+      } else if (inflightResults[address]) {
+        result[index] = inflightResults[address]
+      } else {
+        keysToFetch.push(key);
+        indexMap[address] = index;
       }
     });
 
-    return pubKeys.map(
-      (key) =>
-        result[key.toBase58()] ||
-        (this.genericCache.get(key.toBase58()) as
-          | ParsedAccountBase<T>
-          | undefined)
-    );
+    // Fetch missing accounts in batches
+    if (keysToFetch.length > 0) {
+      const batcher = this.activeBatches[this.activeBatches.length - 1]
+      batcher.add(...keysToFetch.map((k) => k.toBase58()));
+      this.debounceFetchBatch();
+      const accounts = await batcher.result;
+      keysToFetch.forEach((key) => {
+        const address = key.toBase58();
+        const index = indexMap[address];
+        const account = accounts?.[address];
+
+        if (account) {
+          const parsed = this.getParsed(address, account, parser) || {
+            pubkey: new PublicKey(address),
+            account,
+            info: undefined,
+          };
+
+          result[index] = parsed;
+
+          if (isStatic && parsed.info) {
+            this.updateCache(address, parsed);
+          }
+        } else {
+          result[index] = undefined;
+        }
+      });
+    }
+
+    return result;
   }
 
   onAccountChange<T>(
@@ -746,3 +865,53 @@ export class AccountFetchCache {
     return pubkey;
   }
 }
+
+async function getInstructions(
+  connection: Connection,
+  message: VersionedMessage
+): Promise<TransactionInstruction[]> {
+  const LUTs = await getAddressLookupTableAccounts(
+    connection,
+    message.addressTableLookups.map((lut) => lut.accountKey)
+  );
+  const allAccs = message.getAccountKeys({ addressLookupTableAccounts: LUTs });
+
+  return message.compiledInstructions.map((ix) => {
+    return new TransactionInstruction({
+      programId: allAccs.get(ix.programIdIndex)!,
+      data: Buffer.from(ix.data),
+      keys: ix.accountKeyIndexes.map((key) => ({
+        pubkey: allAccs.get(key)!,
+        isSigner: message.isAccountSigner(key),
+        isWritable: message.isAccountWritable(key),
+      })),
+    });
+  });
+}
+
+const getAddressLookupTableAccounts = async (
+  connection: Connection,
+  keys: PublicKey[]
+): Promise<AddressLookupTableAccount[]> => {
+  if (keys.length == 0) {
+    return [];
+  }
+
+  const addressLookupTableAccountInfos =
+    await connection.getMultipleAccountsInfo(
+      keys.map((key) => new PublicKey(key))
+    );
+
+  return addressLookupTableAccountInfos.reduce((acc, accountInfo, index) => {
+    const addressLookupTableAddress = keys[index];
+    if (accountInfo) {
+      const addressLookupTableAccount = new AddressLookupTableAccount({
+        key: addressLookupTableAddress,
+        state: AddressLookupTableAccount.deserialize(accountInfo.data),
+      });
+      acc.push(addressLookupTableAccount);
+    }
+
+    return acc;
+  }, new Array<AddressLookupTableAccount>());
+};

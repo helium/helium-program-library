@@ -18,6 +18,7 @@ mobile_entity_manager = "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr"
 hexboosting = "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ"
 no_emit = "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv"
 conversion_escrow = "cnvEguKeWyyWnKxoQ9HwrzEVfztqKjwNmerDvxdHK9w"
+position_voting_rewards = "pvr1pJdeAcW6tzFyPRSmkL5Xwysi1Tq79f7KF2XB4zM"
 
 [workspace]
 members = [
@@ -36,6 +37,7 @@ members = [
   "programs/hexboosting",
   "programs/no-emit",
   "programs/conversion-escrow",
+  "programs/position-voting-rewards",
 ]
 
 [registry]
@@ -79,19 +81,37 @@ address = "propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs" # Proposal
 address = "66t3XARU6Ja3zj91gDZ2KoNLJHEMTYPSKqJWYb6PJJBA" # Proposal IDL
 
 [[test.validator.clone]]
-address = "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5" # Mobile price oracle
+address = "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p" # NFT Proxy
+
+[[test.validator.clone]]
+address = "CNjepJnCPddZwd8xGS3M2QpZuCbfVRNvi3jfBehKHKHw" # NFT Proxy IDL
+
+[[test.validator.clone]]
+address = "orgdXvHVLkWgBYerptASkAwkZAE563CJUu717dMNx5f" # Org program
+
+[[test.validator.clone]]
+address = "CjVhwk3gdDXB8iUZCUP9M6QaRvoBGkM7FX9qAf6Qm4sG" # Org program IDL
+
+[[test.validator.clone]]
+address = "stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM" # State controller program
+
+[[test.validator.clone]]
+address = "GPQNABq6s63uqzHRwZN9e2GcxtzG4yLP5AnJer7DkB9E" # State controller IDL
+
+[[test.validator.clone]]
+address = "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx" # Mobile price oracle
 
 # Pyth price oracle
 [[test.validator.clone]]
-address = "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"
+address = "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
 
 # Sol pyth price
 [[test.validator.clone]]
-address = "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG"
+address = "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE"
 
 # Pyth usdc price oracle
 [[test.validator.clone]]
-address = "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD"
+address = "Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX"
 
 # Squads multisig program
 [[test.validator.clone]]

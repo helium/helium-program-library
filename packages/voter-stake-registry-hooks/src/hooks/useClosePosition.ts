@@ -1,10 +1,17 @@
 import { BN } from "@coral-xyz/anchor";
 import { sendInstructions } from "@helium/spl-utils";
+import { getAssociatedTokenAddressSync, createAssociatedTokenAccountIdempotentInstruction } from '@solana/spl-token'
 import { TransactionInstruction } from "@solana/web3.js";
 import { useAsync, useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { HeliumVsrClient } from "../sdk/client";
 import { PositionWithMeta } from "../sdk/types";
+import { useQueryClient } from "@tanstack/react-query";
+import { INDEXER_WAIT } from "../constants";
+import {
+  init as initPvr,
+  vetokenTrackerKey,
+} from "@helium/position-voting-rewards-sdk";
 
 export const useClosePosition = () => {
   const { provider, unixNow } = useHeliumVsrState();
@@ -12,6 +19,7 @@ export const useClosePosition = () => {
     (provider) => HeliumVsrClient.connect(provider),
     [provider]
   );
+  const queryClient = useQueryClient();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,
@@ -60,6 +68,35 @@ export const useClosePosition = () => {
         );
 
         instructions.push(
+          createAssociatedTokenAccountIdempotentInstruction(
+            provider.wallet.publicKey,
+            getAssociatedTokenAddressSync(
+              position.votingMint.mint,
+              provider.wallet.publicKey,
+              true
+            ),
+            provider.wallet.publicKey,
+            position.votingMint.mint
+          )
+        );
+
+        if (position.isEnrolled) {
+          const pvrProgram = await initPvr(provider as any);
+          const [vetokenTracker] = vetokenTrackerKey(position.registrar);
+
+          instructions.push(
+            await pvrProgram.methods
+              .unenrollV0()
+              .accounts({
+                position: position.pubkey,
+                vetokenTracker,
+                rentRefund: provider.wallet.publicKey,
+              })
+              .instruction()
+          );
+        }
+
+        instructions.push(
           await client.program.methods
             .closePositionV0()
             .accounts({
@@ -73,6 +110,17 @@ export const useClosePosition = () => {
         } else {
           await sendInstructions(provider, instructions);
         }
+
+        // Give some time for indexers
+        setTimeout(async () => {
+          try {
+            await queryClient.invalidateQueries({
+              queryKey: ["positionKeys"],
+            });
+          } catch (e: any) {
+            console.error("Exception invalidating queries", e);
+          }
+        }, INDEXER_WAIT);
       }
     }
   );

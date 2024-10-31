@@ -1,18 +1,16 @@
 use std::str::FromStr;
 
-use crate::{error::ErrorCode, maker_seeds, state::*, TESTING};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{burn, Burn, Mint, Token, TokenAccount},
 };
 use helium_sub_daos::SubDaoV0;
-use pyth_sdk_solana::load_price_feed_from_account_info;
+use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
-#[cfg(feature = "devnet")]
-const PRICE_ORACLE: &str = "BmUdxoioVgoRTontomX8nBjWbnLevtxeuBYaLipP8GTQ";
-#[cfg(not(feature = "devnet"))]
-const PRICE_ORACLE: &str = "JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5";
+use crate::{error::ErrorCode, maker_seeds, state::*, TESTING};
+
+const PRICE_ORACLE: &str = "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx";
 
 #[derive(Accounts)]
 pub struct MobileVoucherPayMobileV0<'info> {
@@ -37,7 +35,7 @@ pub struct MobileVoucherPayMobileV0<'info> {
   #[account(
     address = Pubkey::from_str(PRICE_ORACLE).unwrap()
   )]
-  pub dnt_price: AccountInfo<'info>,
+  pub dnt_price: Box<Account<'info, PriceUpdateV2>>,
   #[account(
     has_one = dnt_mint,
   )]
@@ -66,26 +64,36 @@ pub fn handler(ctx: Context<MobileVoucherPayMobileV0>) -> Result<()> {
     ErrorCode::TooMuchBorrowed
   );
 
-  let mobile_price_oracle =
-    load_price_feed_from_account_info(&ctx.accounts.dnt_price).map_err(|e| {
-      msg!("Pyth error {}", e);
-      error!(ErrorCode::PythError)
-    })?;
+  let mobile_price_oracle = &mut ctx.accounts.dnt_price;
   let current_time = Clock::get()?.unix_timestamp;
-  let mobile_price = mobile_price_oracle
-    .get_ema_price_no_older_than(current_time, if TESTING { 6000000 } else { 10 * 60 })
-    .ok_or_else(|| error!(ErrorCode::PythPriceNotFound))?;
+  require_gte!(
+    mobile_price_oracle
+      .price_message
+      .publish_time
+      .saturating_add(if TESTING { 6000000 } else { 10 * 60 }.into()),
+    current_time,
+    ErrorCode::PythPriceFeedStale
+  );
+  let mobile_price = mobile_price_oracle.price_message.ema_price;
   // Remove the confidence from the price to use the most conservative price
   // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
   let mobile_price_with_conf = mobile_price
-    .price
-    .checked_sub(i64::try_from(mobile_price.conf.checked_mul(2).unwrap()).unwrap())
+    .checked_sub(
+      i64::try_from(
+        mobile_price_oracle
+          .price_message
+          .ema_conf
+          .checked_mul(2)
+          .unwrap(),
+      )
+      .unwrap(),
+    )
     .unwrap();
   // Exponent is a negative number, likely -8
   // Since the price is multiplied by an extra 10^8, and we're dividing by that price, need to also multiply
   // by the exponent
   let exponent_dec = 10_u64
-    .checked_pow(u32::try_from(-mobile_price.expo).unwrap())
+    .checked_pow(u32::try_from(-mobile_price_oracle.price_message.exponent).unwrap())
     .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
 
   require_gt!(mobile_price_with_conf, 0);

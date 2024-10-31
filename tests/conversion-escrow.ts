@@ -1,7 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { createAtaAndMint, createMint, sendInstructions, toBN, toNumber } from "@helium/spl-utils";
-import { parsePriceData } from "@pythnetwork/client";
+import {
+  PythSolanaReceiverProgram,
+  pythSolanaReceiverIdl,
+} from "@pythnetwork/pyth-solana-receiver";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   createTransferInstruction,
@@ -17,9 +20,14 @@ import { ensureConversionEscrowIdl as ensureConversionEscrowIdl } from "./utils/
 describe("conversion-escrow", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
-  const mobileOracle = new PublicKey("JBaTytFv1CmGNkyNiLu16jFMXNZ49BGfy4bYAYZdkxg5")
-  const hntOracle = new PublicKey("7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm")
+  const mobileOracle = new PublicKey(
+    "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx"
+  );
+  const hntOracle = new PublicKey(
+    "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
+  );
   let program: Program<ConversionEscrow>;
+  let pythProgram: Program<PythSolanaReceiverProgram>;
   let mobileMint: PublicKey;
   let hntMint: PublicKey;
   let startHntBal = 10000;
@@ -31,6 +39,10 @@ describe("conversion-escrow", () => {
   const hntHolder = Keypair.generate();
 
   beforeEach(async () => {
+    pythProgram = new Program(
+      pythSolanaReceiverIdl,
+      new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ")
+    );
     program = await init(
       provider,
       PROGRAM_ID,
@@ -87,20 +99,27 @@ describe("conversion-escrow", () => {
     it("lends MOBILE in exchange for HNT", async () => {
       // Lend enough MOBILE to `hntHolder` to get 40000 DC. HNT holder
       // will then burn enough HNT to get that DC into `owner`
-      const pythDataMobile = (await provider.connection.getAccountInfo(
+      console.log("fetching mobile price")
+      const priceMobile = await pythProgram.account.priceUpdateV2.fetch(
         mobileOracle
-      ))!.data;
-      const priceMobile = parsePriceData(pythDataMobile);
+      );
 
       const mobileFloorValue =
-        priceMobile.emaPrice.value - priceMobile.emaConfidence!.value * 2;
+        priceMobile.priceMessage.emaPrice
+          .sub(priceMobile.priceMessage.emaConf.mul(new anchor.BN(2)))
+          .toNumber() *
+        10 ** priceMobile.priceMessage.exponent *
+        10 ** 6;
 
-      const pythData = (await provider.connection.getAccountInfo(hntOracle))!
-        .data;
-      const priceHnt = parsePriceData(pythData);
+      console.log("fetching hnt price");
+      const priceHnt = await pythProgram.account.priceUpdateV2.fetch(hntOracle);
 
       const hntFloorValue =
-        priceHnt.emaPrice.value - priceHnt.emaConfidence!.value * 2;
+        priceHnt.priceMessage.emaPrice
+            .sub(priceMobile.priceMessage.emaConf.mul(new anchor.BN(2)))
+          .toNumber() *
+        10 ** priceHnt.priceMessage.exponent *
+        10 ** 8;
       const hntPerMobile = mobileFloorValue / hntFloorValue
 
       const hntHolderMobileAta = getAssociatedTokenAddressSync(

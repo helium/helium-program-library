@@ -1,13 +1,16 @@
-use crate::errors::ErrorCode;
-use crate::{escrow_seeds, ConversionEscrowV0};
-use anchor_lang::prelude::*;
-use anchor_lang::solana_program::sysvar;
-use anchor_lang::solana_program::sysvar::instructions::{
-  load_current_index_checked, load_instruction_at_checked,
+use std::cmp::Ordering;
+
+use anchor_lang::{
+  prelude::*,
+  solana_program::{
+    sysvar,
+    sysvar::instructions::{load_current_index_checked, load_instruction_at_checked},
+  },
 };
-use anchor_spl::token::{self, transfer, Mint, Token, TokenAccount, Transfer};
-use pyth_sdk_solana::load_price_feed_from_account_info;
-use spl_token::instruction::TokenInstruction;
+use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
+use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
+
+use crate::{errors::ErrorCode, escrow_seeds, ConversionEscrowV0};
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
 
@@ -22,17 +25,19 @@ pub struct LendV0<'info> {
     has_one = mint,
     has_one = oracle,
     has_one = escrow,
+    has_one = owner,
   )]
   pub conversion_escrow: Box<Account<'info, ConversionEscrowV0>>,
+  pub owner: Signer<'info>,
   #[account(mut)]
   pub escrow: Account<'info, TokenAccount>,
   /// CHECK: Checked via pyth
-  pub oracle: UncheckedAccount<'info>,
+  pub oracle: Account<'info, PriceUpdateV2>,
   /// CHECK: Checked via pyth
   #[account(
     constraint = conversion_escrow.targets.iter().any(|t| t.oracle == target_oracle.key())
   )]
-  pub target_oracle: UncheckedAccount<'info>,
+  pub target_oracle: Account<'info, PriceUpdateV2>,
   pub mint: Box<Account<'info, Mint>>,
 
   #[account(
@@ -54,41 +59,46 @@ pub struct LendV0<'info> {
 pub fn handler(ctx: Context<LendV0>, args: LendArgsV0) -> Result<()> {
   let ixs = ctx.accounts.instructions.to_account_info();
 
-  let price_feed = load_price_feed_from_account_info(&ctx.accounts.oracle).map_err(|e| {
-    msg!("Pyth error {}", e);
-    error!(ErrorCode::PythError)
-  })?;
+  let price_feed = &mut ctx.accounts.oracle;
+  let message = price_feed.price_message;
 
   let current_time = Clock::get()?.unix_timestamp;
-  let source_price = price_feed
-    .get_ema_price_no_older_than(current_time, if TESTING { 6000000 } else { 10 * 60 })
-    .ok_or_else(|| error!(ErrorCode::PythPriceNotFound))?;
+  require_gte!(
+    message
+      .publish_time
+      .saturating_add(if TESTING { 6000000 } else { 10 * 60 }.into()),
+    current_time,
+    ErrorCode::PythPriceNotFound
+  );
+  let source_price = message.ema_price;
   // Remove the confidence from the price to use the most conservative price
   // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
-  let source_price_with_conf = u64::try_from(source_price.price)
+  let source_price_with_conf = u64::try_from(source_price)
     .unwrap()
-    .checked_sub(source_price.conf.checked_mul(2).unwrap())
+    .checked_sub(message.ema_conf.checked_mul(2).unwrap())
     .unwrap();
 
   require_gt!(source_price_with_conf, 0);
 
-  let target_price_oracle = load_price_feed_from_account_info(&ctx.accounts.target_oracle)
-    .map_err(|e| {
-      msg!("Pyth error {}", e);
-      error!(ErrorCode::PythError)
-    })?;
+  let target_price_oracle = &mut ctx.accounts.target_oracle;
+  let target_message = target_price_oracle.price_message;
 
-  let target_price = target_price_oracle
-    .get_ema_price_no_older_than(current_time, if TESTING { 6000000 } else { 10 * 60 })
-    .ok_or_else(|| error!(ErrorCode::PythPriceNotFound))?;
+  let target_price = target_message.ema_price;
+  require_gte!(
+    target_message
+      .publish_time
+      .saturating_add(if TESTING { 6000000 } else { 10 * 60 }.into()),
+    current_time,
+    ErrorCode::PythPriceNotFound
+  );
 
-  require_gt!(target_price.price, 0);
+  require_gt!(target_price, 0);
 
   // Remove the confidence from the price to use the most conservative price
   // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
-  let target_price_with_conf = u64::try_from(target_price.price)
+  let target_price_with_conf = u64::try_from(target_price)
     .unwrap()
-    .checked_sub(target_price.conf.checked_mul(2).unwrap())
+    .checked_sub(target_message.ema_conf.checked_mul(2).unwrap())
     .unwrap();
 
   // USD/Sorce divided by USD/Target gets us Target/Source, in other words how much target
@@ -96,26 +106,21 @@ pub fn handler(ctx: Context<LendV0>, args: LendArgsV0) -> Result<()> {
   let target_per_source = source_price_with_conf
     .checked_div(target_price_with_conf)
     .unwrap();
-  let expo_diff = source_price.expo - target_price.expo;
-  let expected_repayment_amount = if expo_diff > 0 {
-    // Target has more decimals than source, need to multiply
-    args
+  let expo_diff = message.exponent - target_message.exponent;
+  let expected_repayment_amount = match expo_diff.cmp(&0) {
+    Ordering::Greater => args
       .amount
       .checked_mul(10_u64.pow(u32::try_from(expo_diff.abs()).unwrap()))
       .unwrap()
       .checked_mul(target_per_source)
-      .unwrap()
-  } else if expo_diff < 0 {
-    // Target has less decimals than source, need to divide
-    args
+      .unwrap(),
+    Ordering::Less => args
       .amount
       .checked_mul(target_per_source)
       .unwrap()
       .checked_div(10_u64.pow(u32::try_from(expo_diff.abs()).unwrap()))
-      .unwrap()
-  } else {
-    // Same decimals
-    args.amount.checked_mul(target_per_source).unwrap()
+      .unwrap(),
+    Ordering::Equal => args.amount.checked_mul(target_per_source).unwrap(),
   };
   let target = ctx
     .accounts
@@ -139,25 +144,24 @@ pub fn handler(ctx: Context<LendV0>, args: LendArgsV0) -> Result<()> {
   ctx.accounts.conversion_escrow.temp_expected_repay += expected_repayment_amount_with_slippage;
 
   let current_index = load_current_index_checked(&ixs)? as usize;
-  // loop through instructions, looking for an equivalent mint dc to this borrow
-  let mut index = current_index + 1; // jupiter swap
-  loop {
-    // get the next instruction, die if theres no more
-    if let Ok(ix) = load_instruction_at_checked(index, &ixs) {
-      if ix.program_id == crate::id() {
-        if ix.data[0..8] == get_function_hash("global", "check_repay_v0")
+  // Search for the repayment instruction that should follow this lend instruction
+  let repay_function_hash = get_function_hash("global", "check_repay_v0");
+
+  // Start checking from the next instruction (skipping the current lend instruction)
+  for index in (current_index + 1).. {
+    match load_instruction_at_checked(index, &ixs) {
+      Ok(ix) => {
+        // Check if this is our repayment instruction
+        if ix.program_id == crate::id()
+          && ix.data[0..8] == repay_function_hash
           && ix.accounts[0].pubkey == ctx.accounts.conversion_escrow.key()
           && ix.accounts[1].pubkey == ctx.accounts.repay_account.key()
         {
           break;
         }
       }
-    } else {
-      // no more instructions, so we're missing a repay
-      return Err(ErrorCode::MissingRepay.into());
+      Err(_) => return Err(ErrorCode::MissingRepay.into()),
     }
-
-    index += 1
   }
 
   // Send the loan

@@ -2,7 +2,6 @@ use super::common::*;
 use crate::error::ErrorCode;
 use account_compression_cpi::program::SplAccountCompression;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Token;
 use bubblegum_cpi::get_asset_id;
 use shared_utils::*;
 
@@ -17,16 +16,21 @@ pub struct DistributeCompressionRewardsArgsV0 {
 #[derive(Accounts)]
 pub struct DistributeCompressionRewardsV0<'info> {
   pub common: DistributeRewardsCommonV0<'info>,
-  /// CHECK: THe merkle tree
+  /// CHECK: The merkle tree
   pub merkle_tree: UncheckedAccount<'info>,
   pub compression_program: Program<'info, SplAccountCompression>,
-  pub token_program: Program<'info, Token>,
 }
 
 pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, DistributeCompressionRewardsV0<'info>>,
   args: DistributeCompressionRewardsArgsV0,
 ) -> Result<()> {
+  require_eq!(
+    ctx.accounts.common.recipient.destination,
+    Pubkey::default(),
+    ErrorCode::CustomDestination
+  );
+
   verify_compressed_nft(VerifyCompressedNftArgs {
     data_hash: args.data_hash,
     creator_hash: args.creator_hash,

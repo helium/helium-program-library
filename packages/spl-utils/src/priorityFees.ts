@@ -1,10 +1,14 @@
 import {
+  AddressLookupTableAccount,
   ComputeBudgetProgram,
   Connection,
   PublicKey,
   RecentPrioritizationFees,
   TransactionInstruction,
+  VersionedTransaction,
 } from "@solana/web3.js";
+import { TransactionDraft, populateMissingDraftInfo } from "./draft";
+import { toVersionedTx } from "./transaction";
 
 const MAX_RECENT_PRIORITY_FEE_ACCOUNTS = 128;
 
@@ -22,7 +26,7 @@ export async function estimatePrioritizationFee(
   ixs: TransactionInstruction[],
   basePriorityFee?: number
 ): Promise<number> {
-  const accounts = ixs.map((x) => x.keys.map((k) => k.pubkey)).flat();
+  const accounts = ixs.map((x) => x.keys.filter(k => k.isWritable).map((k) => k.pubkey)).flat();
   const uniqueAccounts = [...new Set(accounts.map((x) => x.toBase58()))]
     .map((a) => new PublicKey(a))
     .slice(0, MAX_RECENT_PRIORITY_FEE_ACCOUNTS);
@@ -86,18 +90,65 @@ export async function estimatePrioritizationFee(
   }
 }
 
+export const estimateComputeUnits = async (
+  connection: Connection,
+  tx: VersionedTransaction,
+  retries: number = 5
+): Promise<number | undefined> => {
+  const sim = (await connection.simulateTransaction(tx)).value;
+  if (sim.err && sim.err.toString().includes("BlockhashNotFound") && retries > 0) {
+    await sleep(500)
+    return estimateComputeUnits(connection, tx, retries - 1)
+  }
+
+  // Default to 200k compute if it failed
+  if (sim.err) {
+    return Math.max(sim.unitsConsumed || 0, 200000)
+  }
+
+  return sim.unitsConsumed
+};
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function withPriorityFees({
   connection,
   computeUnits,
-  instructions,
-  basePriorityFee
+  instructions = [],
+  basePriorityFee,
+  computeScaleUp,
+  ...rest
 }: {
   connection: Connection;
-  computeUnits: number;
-  instructions: TransactionInstruction[];
+  computeUnits?: number;
   basePriorityFee?: number;
-}): Promise<TransactionInstruction[]> {
-  const estimate = await estimatePrioritizationFee(connection, instructions, basePriorityFee);
+  computeScaleUp?: number;
+} & Partial<TransactionDraft>): Promise<TransactionInstruction[]> {
+  if (!computeUnits && !rest.feePayer) {
+    throw new Error("Must provide feePayer if estimating compute units");
+  }
+
+  const estimate = await estimatePrioritizationFee(
+    connection,
+    instructions,
+    basePriorityFee
+  );
+  if (!computeUnits) {
+    const temp = {
+      instructions,
+      feePayer: rest.feePayer!,
+      ...rest,
+    };
+    const tx = await populateMissingDraftInfo(connection, temp);
+    const estimatedFee = await estimateComputeUnits(connection, toVersionedTx(tx));
+    if (estimatedFee) {
+      computeUnits = Math.ceil(estimatedFee * (computeScaleUp || 1.1));
+    } else {
+      computeUnits = 200000;
+    }
+  }
 
   return [
     ComputeBudgetProgram.setComputeUnitLimit({

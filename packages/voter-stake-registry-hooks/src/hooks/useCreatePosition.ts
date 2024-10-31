@@ -1,6 +1,6 @@
 import { BN } from "@coral-xyz/anchor";
 import { sendInstructions } from "@helium/spl-utils";
-import { positionKey } from "@helium/voter-stake-registry-sdk";
+import { getRegistrarKey, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
   MintLayout,
   TOKEN_PROGRAM_ID,
@@ -16,12 +16,15 @@ import {
 import { useAsync, useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { HeliumVsrClient } from "../sdk/client";
-import { getRegistrarKey } from "../utils/getPositionKeys";
 import { SubDaoWithMeta } from "../sdk/types";
 import {
+  daoKey,
   init as initHsd,
   subDaoEpochInfoKey,
+  subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
+import { useQueryClient } from "@tanstack/react-query";
+import { INDEXER_WAIT } from "../constants";
 
 const SECS_PER_DAY = 86400;
 export const useCreatePosition = () => {
@@ -30,6 +33,7 @@ export const useCreatePosition = () => {
     (provider) => HeliumVsrClient.connect(provider),
     [provider]
   );
+  const queryClient = useQueryClient();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       amount,
@@ -51,12 +55,16 @@ export const useCreatePosition = () => {
       ) => Promise<void>;
     }) => {
       const isInvalid = !provider || !client;
-      const registrar = getRegistrarKey(mint);
 
       if (isInvalid) {
         throw new Error("Unable to Create Position, Invalid params");
       } else {
         const hsdProgram = await initHsd(provider);
+        const [daoK] = daoKey(mint);
+        const [subDaoK] = subDaoKey(mint);
+        const myDao = await hsdProgram.account.daoV0.fetchNullable(daoK);
+        const mySubDao = await hsdProgram.account.subDaoV0.fetchNullable(subDaoK);
+        const registrar = (mySubDao?.registrar || myDao?.registrar)!;
         const mintKeypair = Keypair.generate();
         const position = positionKey(mintKeypair.publicKey)[0];
         const instructions: TransactionInstruction[] = [];
@@ -157,6 +165,17 @@ export const useCreatePosition = () => {
             await sendInstructions(provider, delegateInstructions);
           }
         }
+
+        // Give some time for indexers
+        setTimeout(async () => {
+          try {
+            await queryClient.invalidateQueries({
+              queryKey: ["positionKeys"],
+            });
+          } catch (e: any) {
+            console.error("Exception invalidating queries", e);
+          }
+        }, INDEXER_WAIT);
       }
     }
   );

@@ -14,6 +14,8 @@ pub struct CarrierV0 {
   pub collection_bump_seed: u8,
   pub bump_seed: u8,
   pub hexboost_authority: Pubkey,
+  // The percentage of the SP rewards that are allocated to the incentive fund, in basis points
+  pub incentive_escrow_fund_bps: u16,
 }
 
 pub struct HotspotConfigV0 {
@@ -43,4 +45,16 @@ macro_rules! carrier_seeds {
       &[$carrier.bump_seed],
     ]
   };
+}
+
+#[account]
+#[derive(Default)]
+pub struct IncentiveEscrowProgramV0 {
+  pub carrier: Pubkey,
+  pub start_ts: i64,
+  pub stop_ts: i64,
+  // Shares are summed as a total of all incentive escrow funds under a carrier
+  pub shares: u32,
+  pub bump_seed: u8,
+  pub name: String,
 }

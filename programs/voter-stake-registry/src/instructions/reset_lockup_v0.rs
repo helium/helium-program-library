@@ -1,8 +1,7 @@
-use crate::error::*;
-use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token::{Mint, TokenAccount};
+
+use crate::{error::*, state::*};
 
 #[derive(Accounts)]
 pub struct ResetLockupV0<'info> {
@@ -19,7 +18,8 @@ pub struct ResetLockupV0<'info> {
     seeds = [b"position".as_ref(), mint.key().as_ref()],
     bump = position.bump_seed,
     has_one = registrar,
-    has_one = mint
+    has_one = mint,
+    constraint = !position.is_frozen() @ VsrError::PositionFrozen
   )]
   pub position: Box<Account<'info, PositionV0>>,
   pub mint: Box<Account<'info, Mint>>,

@@ -16,7 +16,7 @@ clockwork localnet \
   --url https://api.mainnet-beta.solana.com \
   --clone hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S \
   --clone ENmcpFCpxN1CqyUjuog9yyUVfdXBKF3LVCwLr7grJZpk \
-  --clone 7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm \
+  --clone 4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33 \
   --clone SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f \
   --clone E3cqnoFvTeKKNsGmC8YitpMjo2E39hwfoyt2Aiem7dCb \
   --clone GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR \

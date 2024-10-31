@@ -1,8 +1,4 @@
-import {
-  Status,
-  batchParallelInstructions,
-  truthy
-} from "@helium/spl-utils";
+import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useCallback, useMemo } from "react";
@@ -10,22 +6,64 @@ import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { useVoteMarkers } from "./useVoteMarkers";
 import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
+import { useSolanaUnixNow } from "@helium/helium-react-hooks";
+import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
+import BN from "bn.js";
+import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
+import {
+  init as initPVR,
+  vetokenTrackerKey,
+} from "@helium/position-voting-rewards-sdk";
 
 export const useRelinquishVote = (proposal: PublicKey) => {
-  const { positions, provider } = useHeliumVsrState();
+  const { positions, provider, registrar } = useHeliumVsrState();
+  const unixNow = useSolanaUnixNow();
+  const sortedPositions = useMemo(() => {
+    return (
+      unixNow &&
+      positions?.sort((a, b) => {
+        return -calcPositionVotingPower({
+          position: a,
+          registrar: registrar || null,
+          unixNow: new BN(unixNow),
+        }).cmp(
+          calcPositionVotingPower({
+            position: b,
+            registrar: registrar || null,
+            unixNow: new BN(unixNow),
+          })
+        );
+      })
+    );
+  }, [positions, unixNow]);
   const voteMarkerKeys = useMemo(() => {
-    return positions
-      ? positions.map((p) => voteMarkerKey(p.mint, proposal)[0])
+    return sortedPositions
+      ? sortedPositions.map((p) => voteMarkerKey(p.mint, proposal)[0])
       : [];
-  }, [positions]);
+  }, [sortedPositions]);
   const { accounts: markers } = useVoteMarkers(voteMarkerKeys);
+  const canPositionRelinquishVote = useCallback(
+    (index: number, choice: number) => {
+      const position = sortedPositions?.[index];
+      const marker = markers?.[index]?.info;
+      const earlierDelegateVoted =
+        position &&
+        position.proxy &&
+        marker &&
+        position.proxy.index > marker.proxyIndex;
+      return !earlierDelegateVoted && marker?.choices.includes(choice);
+    },
+    [markers]
+  );
   const canRelinquishVote = useCallback(
     (choice: number) => {
       if (!markers) return false;
 
-      return markers.some((m) => m.info?.choices.includes(choice));
+      return markers.some((_, index) =>
+        canPositionRelinquishVote(index, choice)
+      );
     },
-    [markers]
+    [markers, canPositionRelinquishVote]
   );
 
   const { error, loading, execute } = useAsyncCallback(
@@ -42,7 +80,8 @@ export const useRelinquishVote = (proposal: PublicKey) => {
       onProgress?: (status: Status) => void;
       maxSignatureBatch?: number;
     }) => {
-      const isInvalid = !provider || !positions || positions.length === 0;
+      const isInvalid =
+        !provider || !sortedPositions || sortedPositions.length === 0;
 
       if (isInvalid) {
         throw new Error(
@@ -50,40 +89,92 @@ export const useRelinquishVote = (proposal: PublicKey) => {
         );
       } else {
         const vsrProgram = await init(provider);
+        const pvrProgram = await initPVR(provider);
+        const vetokenTrackerK = vetokenTrackerKey(registrar!.pubkey!)[0];
+        const vetokenTracker = await pvrProgram.account.veTokenTrackerV0.fetchNullable(
+          vetokenTrackerK
+        );
         const instructions = (
           await Promise.all(
-            positions.map(async (position, index) => {
+            sortedPositions.map(async (position, index) => {
+              const canRelinquishVote = canPositionRelinquishVote(
+                index,
+                choice
+              );
               const marker = markers?.[index]?.info;
-              const alreadyVotedThisChoice = marker?.choices.includes(choice);
 
-              if (marker && alreadyVotedThisChoice) {
-                return await vsrProgram.methods
-                  .relinquishVoteV1({
-                    choice,
-                  })
-                  .accounts({
-                    proposal,
-                    voter: provider.wallet.publicKey,
-                    position: position.pubkey,
-                    refund: provider.wallet.publicKey,
-                  })
-                  .instruction();
+              if (marker && canRelinquishVote) {
+                const instructions: TransactionInstruction[] = [];
+                const markerK = voteMarkerKey(position.mint, proposal)[0];
+                if (position.isProxiedToMe) {
+                  if (marker.proxyIndex < (position.proxy?.index || 0)) {
+                    // Do not vote with a position that has been delegated to us, but voting overidden
+                    return;
+                  }
+
+                  instructions.push(
+                    await vsrProgram.methods
+                      .proxiedRelinquishVoteV0({
+                        choice,
+                      })
+                      .accounts({
+                        proposal,
+                        voter: provider.wallet.publicKey,
+                        position: position.pubkey,
+                        marker: markerK,
+                        proxyAssignment: proxyAssignmentKey(
+                          registrar!.proxyConfig,
+                          position.mint,
+                          provider.wallet.publicKey
+                        )[0],
+                      })
+                      .instruction()
+                  );
+                } else {
+                  instructions.push(
+                    await vsrProgram.methods
+                      .relinquishVoteV1({
+                        choice,
+                      })
+                      .accounts({
+                        proposal,
+                        voter: provider.wallet.publicKey,
+                        position: position.pubkey,
+                      })
+                      .instruction()
+                  );
+                }
+
+                if (vetokenTracker && position.isEnrolled) {
+                  instructions.push(
+                    await pvrProgram.methods
+                      .trackVoteV0()
+                      .accounts({
+                        marker: markerK,
+                        position: position.pubkey,
+                        proposal
+                      })
+                      .instruction()
+                  );
+                }
+
+                return instructions;
               }
             })
           )
-        ).filter(truthy);
+        ).filter(truthy).flat();
 
         if (onInstructions) {
           await onInstructions(instructions);
         } else {
-          await batchParallelInstructions(
+          await batchParallelInstructions({
             provider,
             instructions,
             onProgress,
-            10,
-            [],
-            maxSignatureBatch
-          );
+            triesRemaining: 10,
+            extraSigners: [],
+            maxSignatureBatch,
+          });
         }
       }
     }

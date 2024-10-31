@@ -43,6 +43,9 @@ import {
   Transaction,
   TransactionInstruction,
   ComputeBudgetProgram,
+  VersionedTransaction,
+  AddressLookupTableAccount,
+  MessageCompiledInstruction,
 } from "@solana/web3.js";
 import { Op } from "sequelize";
 import fs from "fs";
@@ -322,10 +325,25 @@ export class OracleServer {
   private async signTransaction(
     data: number[]
   ): Promise<{ success: boolean; message?: string; transaction?: Buffer }> {
-    const tx = Transaction.from(data);
+    console.log("data is", data)
+    const conn = this.ldProgram.provider.connection;
+    const tx = VersionedTransaction.deserialize(new Uint8Array(data));
+    const LUTs = (
+      await Promise.all(
+        tx.message.addressTableLookups.map((acc) =>
+          conn.getAddressLookupTable(acc.accountKey)
+        )
+      )
+    )
+      .map((lut) => lut.value)
+      .filter((val) => val !== null) as AddressLookupTableAccount[];
+    const allAccs = tx.message
+      .getAccountKeys({ addressLookupTableAccounts: LUTs })
+      .keySegments()
+      .reduce((acc, cur) => acc.concat(cur), []);
 
     // validate only interacts with LD and RO programs and only calls setCurrentRewards, distributeRewards
-    const setRewardIxs: TransactionInstruction[] = [];
+    const setRewardIxs: MessageCompiledInstruction[] = [];
     let recipientToLazyDistToMint: Record<
       string,
       Record<string, PublicKey>
@@ -358,31 +376,34 @@ export class OracleServer {
         (x) => x.name === "recipient"
       )!;
 
-    for (const ix of tx.instructions) {
-      if (ix.programId.equals(ComputeBudgetProgram.programId)) {
+    for (const ix of tx.message.compiledInstructions) {
+      const programId = allAccs[ix.programIdIndex];
+      if (programId.equals(ComputeBudgetProgram.programId)) {
         continue;
       }
-      if (!(ix.programId.equals(LD_PID) || ix.programId.equals(RO_PID))) {
+      if (!(programId.equals(LD_PID) || programId.equals(RO_PID))) {
         return {
           success: false,
           message: "Invalid instructions in transaction",
         };
       }
+      const data = Buffer.from(ix.data);
       let decoded: Instruction | null;
-      if (ix.programId.equals(LD_PID)) {
+      if (programId.equals(LD_PID)) {
         decoded = (
           this.ldProgram.coder.instruction as BorshInstructionCoder
-        ).decode(ix.data);
+        ).decode(data);
       } else {
         decoded = (
           this.roProgram.coder.instruction as BorshInstructionCoder
-        ).decode(ix.data);
+        ).decode(data);
       }
       if (
         !decoded ||
         (decoded.name !== "setCurrentRewardsV0" &&
           decoded.name !== "distributeRewardsV0" &&
           decoded.name !== "distributeCompressionRewardsV0" &&
+          decoded.name !== "distributeCustomDestinationV0" &&
           decoded.name !== "initializeRecipientV0" &&
           decoded.name !== "initializeCompressionRecipientV0" &&
           decoded.name !== "setCurrentRewardsWrapperV0" &&
@@ -405,23 +426,23 @@ export class OracleServer {
 
       // Since recipient wont exist to fetch to get the mint id, grab it from the init recipient ix
       if (decoded.name === "initializeRecipientV0") {
-        const recipient = ix.keys[recipientIdxInitRecipient].pubkey.toBase58();
+        const recipient = allAccs[ix.accountKeyIndexes[recipientIdxInitRecipient]].toBase58();
         recipientToLazyDistToMint[recipient] ||= {};
         const lazyDist =
-          ix.keys[lazyDistributorIdxInitRecipient].pubkey.toBase58();
+          allAccs[ix.accountKeyIndexes[lazyDistributorIdxInitRecipient]].toBase58();
         recipientToLazyDistToMint[recipient][lazyDist] =
-          ix.keys[mintIdx].pubkey;
+          allAccs[ix.accountKeyIndexes[mintIdx]];
       }
 
       // Since recipient wont exist to fetch to get the asset id, grab it from the init recipient ix
       if (decoded.name === "initializeCompressionRecipientV0") {
         const recipient =
-          ix.keys[recipientIdxInitCompressionRecipient].pubkey.toBase58();
+          allAccs[ix.accountKeyIndexes[recipientIdxInitCompressionRecipient]].toBase58();
         recipientToLazyDistToMint[recipient] ||= {};
         const lazyDist =
-          ix.keys[lazyDistributorIdxInitCompressionRecipient].pubkey.toBase58();
+          allAccs[ix.accountKeyIndexes[lazyDistributorIdxInitCompressionRecipient]].toBase58();
         const merkleTree =
-          ix.keys[merkleTreeIdxInitCompressionRecipient].pubkey;
+          allAccs[ix.accountKeyIndexes[merkleTreeIdxInitCompressionRecipient]];
 
         const index = (decoded.data as any).args.index;
         recipientToLazyDistToMint[recipient][lazyDist] = await getLeafAssetId(
@@ -473,16 +494,16 @@ export class OracleServer {
       let entityKey: Buffer;
       let keyToAssetK: PublicKey | undefined = undefined;
       if (
-        ix.keys[wrapperOracleKeyIdx].pubkey.equals(this.oracle.publicKey) &&
-        ix.programId.equals(RO_PID)
+        allAccs[ix.accountKeyIndexes[wrapperOracleKeyIdx]].equals(this.oracle.publicKey) &&
+        allAccs[ix.programIdIndex].equals(RO_PID)
       ) {
         let decoded = (
           this.roProgram.coder.instruction as BorshInstructionCoder
-        ).decode(ix.data);
+        ).decode(Buffer.from(ix.data));
 
-        recipient = ix.keys[wrapperRecipientIdx].pubkey;
-        lazyDist = ix.keys[wrapperLazyDistIdx].pubkey;
-        keyToAssetK = ix.keys[wrapperKeyToAssetIdx].pubkey;
+        recipient = allAccs[ix.accountKeyIndexes[wrapperRecipientIdx]];
+        lazyDist = allAccs[ix.accountKeyIndexes[wrapperLazyDistIdx]];
+        keyToAssetK = allAccs[ix.accountKeyIndexes[wrapperKeyToAssetIdx]];
         //@ts-ignore
         proposedCurrentRewards = decoded.data.args.currentRewards;
         entityKey = (
@@ -496,15 +517,15 @@ export class OracleServer {
           };
         }
       } else if (
-        ix.keys[oracleKeyIdx].pubkey.equals(this.oracle.publicKey) &&
-        ix.programId.equals(LD_PID)
+        allAccs[ix.accountKeyIndexes[oracleKeyIdx]].equals(this.oracle.publicKey) &&
+        allAccs[ix.programIdIndex].equals(LD_PID)
       ) {
         let decoded = (
           this.ldProgram.coder.instruction as BorshInstructionCoder
-        ).decode(ix.data);
+        ).decode(Buffer.from(ix.data));
 
-        recipient = ix.keys[recipientIdx].pubkey;
-        lazyDist = ix.keys[lazyDistIdx].pubkey;
+        recipient = allAccs[ix.accountKeyIndexes[recipientIdx]];
+        lazyDist = allAccs[ix.accountKeyIndexes[lazyDistIdx]];
         //@ts-ignore
         proposedCurrentRewards = decoded.data.args.currentRewards;
       }
@@ -548,20 +569,25 @@ export class OracleServer {
     }
 
     // validate that this oracle is not the fee payer
-    if (tx.feePayer?.equals(this.oracle.publicKey)) {
+    if (allAccs[0]?.equals(this.oracle.publicKey)) {
       return {
         success: false,
         message: "Cannot set this oracle as the fee payer",
       };
     }
 
-    tx.partialSign(this.oracle);
+    try {
+      // It's valid to send txs that don't actually need to be signed by us. Happens sometimes with
+      // tx packing.
+      tx.sign([this.oracle]);
+    } catch (e: any) {
+      if (!e.message.toString().includes("Cannot sign with non signer key")) {
+        throw e
+      }
+    }
 
-    const serialized = tx.serialize({
-      requireAllSignatures: false,
-      verifySignatures: false,
-    });
-    return { success: true, transaction: serialized };
+    const serialized = tx.serialize();
+    return { success: true, transaction: Buffer.from(serialized) };
   }
 
   private async signBulkTransactionsHandler(
@@ -616,6 +642,7 @@ export class OracleServer {
       res
         .status(400)
         .send({ error: result.message || "Error signing transaction" });
+      return
     }
 
     res.send({ success: true, transaction: result.transaction });

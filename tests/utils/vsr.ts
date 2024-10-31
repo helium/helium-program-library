@@ -57,10 +57,12 @@ export async function initVsr(
   const createRegistrar = program.methods
     .initializeRegistrarV0({
       positionUpdateAuthority,
+      positionFreezeAuthorities: []
     })
     .accounts({
       realm: realmPk,
       realmGoverningTokenMint: hntMint,
+      proxyConfig: null
     });
   instructions.push(await createRegistrar.instruction());
   const registrar = (await createRegistrar.pubkeys()).registrar as PublicKey;

@@ -250,7 +250,7 @@ export async function fillCanopy({
   const txs = await Promise.all(
     canopyChunks.map(async (leaves, index) => {
       const bytes = Buffer.concat(leaves.map((leaf) => leaf.node));
-      const tx = await program.methods
+      const instruction = await program.methods
         .setCanopyV0({
           offset: 32 * chunkSize * index,
           bytes,
@@ -260,12 +260,13 @@ export async function fillCanopy({
           canopy: lazyTransactionsAcc.canopy,
           authority: lazyTransactionsAcc.authority,
         })
-        .transaction();
+        .instruction();
 
-      // @ts-ignore
-      tx.feePayer = program.provider.wallet.publicKey;
-
-      return tx;
+      return {
+        // @ts-ignore
+        feePayer: program.provider.wallet.publicKey,
+        instructions: [instruction],
+      };
     })
   );
 

@@ -15,12 +15,12 @@ export function useAnchorAccount<IDL extends Idl, A extends keyof AllAccountsMap
   error?: Error;
 } {
   const { account: rawAccount } = useAccount(key);
-  const { info: idl, error, loading } = useIdl<IDL>(rawAccount?.owner);
+  const { account: idlAccount, info: idl, error, loading } = useIdl<IDL>(rawAccount?.owner);
   useEffect(() => {
-    if (!loading && rawAccount && !idl) {
-      console.warn(`Idl not found for ${rawAccount.owner.toBase58()}`);
+    if (!loading && rawAccount && !idl && !idlAccount) {
+      console.warn(`Idl not found for ${rawAccount.owner.toBase58()}`, error);
     }
-  }, [idl, loading, rawAccount]);
+  }, [idl, loading, rawAccount, idlAccount, error]);
 
   return {
     ...useIdlAccount(key, idl, type, isStatic),

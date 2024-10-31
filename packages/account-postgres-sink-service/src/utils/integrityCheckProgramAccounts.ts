@@ -1,9 +1,11 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
+import retry, { Options as RetryOptions } from "async-retry";
 import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
-import { Sequelize } from "sequelize";
+import pLimit from "p-limit";
+import { Sequelize, Transaction } from "sequelize";
 import { SOLANA_URL } from "../env";
 import { initPlugins } from "../plugins";
 import { IAccountConfig, IInitedPlugin } from "../types";
@@ -12,7 +14,7 @@ import database from "./database";
 import { getBlockTimeWithRetry } from "./getBlockTimeWithRetry";
 import { getTransactionSignaturesUptoBlockTime } from "./getTransactionSignaturesUpToBlock";
 import { sanitizeAccount } from "./sanitizeAccount";
-import { truthy } from "./upsertProgramAccounts";
+import { truthy } from "./truthy";
 
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;
@@ -21,12 +23,20 @@ interface IntegrityCheckProgramAccountsArgs {
   sequelize?: Sequelize;
 }
 
+const retryOptions: RetryOptions = {
+  retries: 5,
+  factor: 2,
+  minTimeout: 1000,
+  maxTimeout: 60000,
+};
+
 export const integrityCheckProgramAccounts = async ({
   fastify,
   programId,
   accounts,
   sequelize = database,
 }: IntegrityCheckProgramAccountsArgs) => {
+  console.log(`Integrity checking program: ${programId}`);
   anchor.setProvider(
     anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
   );
@@ -47,158 +57,196 @@ export const integrityCheckProgramAccounts = async ({
     throw new Error("idl does not have every account type");
   }
 
-  const t = await sequelize.transaction();
-  const now = new Date().toISOString();
-  const txIdsByAccountId: { [key: string]: string[] } = {};
-  const corrections: {
-    type: string;
-    accountId: string;
-    txSignatures: string[];
-    currentValues: null | { [key: string]: any };
-    newValues: { [key: string]: any };
-  }[] = [];
-
-  try {
-    const program = new anchor.Program(idl, programId, provider);
-    const currentSlot = await connection.getSlot();
-    const twentyFourHoursAgoSlot =
-      currentSlot - Math.floor((24 * 60 * 60 * 1000) / 400); // (assuming a slot duration of 400ms)
-    const blockTime24HoursAgo = await getBlockTimeWithRetry({
-      slot: twentyFourHoursAgoSlot,
-      provider,
+  const performIntegrityCheck = async () => {
+    const t = await sequelize.transaction({
+      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
     });
+    const now = new Date().toISOString();
+    const txIdsByAccountId: { [key: string]: string[] } = {};
+    const corrections: {
+      type: string;
+      accountId: string;
+      txSignatures: string[];
+      currentValues: null | { [key: string]: any };
+      newValues: { [key: string]: any };
+    }[] = [];
 
-    if (!blockTime24HoursAgo) {
-      throw new Error("Unable to get blocktime from 24 hours ago");
-    }
+    try {
+      const program = new anchor.Program(idl, programId, provider);
+      const currentSlot = await connection.getSlot();
+      const twentyFourHoursAgoSlot =
+        currentSlot - Math.floor((24 * 60 * 60 * 1000) / 400); // (assuming a slot duration of 400ms)
+      const blockTime24HoursAgo = await getBlockTimeWithRetry({
+        slot: twentyFourHoursAgoSlot,
+        provider,
+      });
 
-    const parsedTransactions = (
-      await Promise.all(
-        chunks(
-          await getTransactionSignaturesUptoBlockTime({
-            programId,
-            blockTime: blockTime24HoursAgo,
-            provider,
-          }),
-          100
-        ).map((chunk) =>
-          connection.getParsedTransactions(chunk, {
-            commitment: "confirmed",
-            maxSupportedTransactionVersion: 0,
+      if (!blockTime24HoursAgo) {
+        throw new Error("Unable to get blocktime from 24 hours ago");
+      }
+
+      const parsedTransactions = (
+        await Promise.all(
+          chunks(
+            await getTransactionSignaturesUptoBlockTime({
+              programId,
+              blockTime: blockTime24HoursAgo,
+              provider,
+            }),
+            100
+          ).map((chunk) =>
+            retry(
+              () =>
+                connection.getParsedTransactions(chunk, {
+                  commitment: "confirmed",
+                  maxSupportedTransactionVersion: 0,
+                }),
+              retryOptions
+            )
+          )
+        )
+      ).flat();
+
+      const uniqueWritableAccounts = new Set<string>();
+      for (const parsed of parsedTransactions) {
+        parsed?.transaction.message.accountKeys
+          .filter((acc) => acc.writable)
+          .map((acc) => {
+            uniqueWritableAccounts.add(acc.pubkey.toBase58());
+            txIdsByAccountId[acc.pubkey.toBase58()] = [
+              ...parsed.transaction.signatures,
+              ...(txIdsByAccountId[acc.pubkey.toBase58()] || []),
+            ];
+          });
+      }
+
+      const accountInfosWithPk = (
+        await Promise.all(
+          chunks([...uniqueWritableAccounts.values()], 100).map((chunk) =>
+            pLimit(100)(() =>
+              retry(
+                () =>
+                  connection.getMultipleAccountsInfo(
+                    chunk.map((c) => new PublicKey(c)),
+                    "confirmed"
+                  ),
+                retryOptions
+              )
+            )
+          )
+        )
+      )
+        .flat()
+        .map((accountInfo, idx) => ({
+          pubkey: [...uniqueWritableAccounts.values()][idx],
+          ...accountInfo,
+        }));
+
+      const pluginsByAccountType = (
+        await Promise.all(
+          accounts.map(async (acc) => {
+            const plugins = await initPlugins(acc.plugins);
+            return { type: acc.type, plugins };
           })
         )
-      )
-    ).flat();
+      ).reduce((acc, { type, plugins }) => {
+        acc[type] = plugins.filter(truthy);
+        return acc;
+      }, {} as Record<string, IInitedPlugin[]>);
 
-    const uniqueWritableAccounts = new Set<string>();
-    for (const parsed of parsedTransactions) {
-      parsed?.transaction.message.accountKeys
-        .filter((acc) => acc.writable)
-        .map((acc) => {
-          uniqueWritableAccounts.add(acc.pubkey.toBase58());
-          txIdsByAccountId[acc.pubkey.toBase58()] = [
-            ...parsed.transaction.signatures,
-            ...(txIdsByAccountId[acc.pubkey.toBase58()] || []),
-          ];
-        });
-    }
-
-    const accountInfosWithPk = (
       await Promise.all(
-        chunks([...uniqueWritableAccounts.values()], 100).map(
-          async (chunk) =>
-            await connection.getMultipleAccountsInfo(
-              chunk.map((c) => new PublicKey(c)),
-              "confirmed"
-            )
-        )
-      )
-    )
-      .flat()
-      .map((accountInfo, idx) => ({
-        pubkey: [...uniqueWritableAccounts.values()][idx],
-        ...accountInfo,
-      }));
+        chunks(accountInfosWithPk, 1000).map(async (chunk) => {
+          for (const c of chunk) {
+            const accName = accounts.find(({ type }) => {
+              return (
+                c.data &&
+                anchor.BorshAccountsCoder.accountDiscriminator(type).equals(
+                  c.data.subarray(0, 8)
+                )
+              );
+            })?.type;
 
-    const pluginsByAccountType = (
-      await Promise.all(
-        accounts.map(async (acc) => {
-          const plugins = await initPlugins(acc.plugins);
-          return { type: acc.type, plugins };
-        })
-      )
-    ).reduce((acc, { type, plugins }) => {
-      acc[type] = plugins.filter(truthy);
-      return acc;
-    }, {} as Record<string, IInitedPlugin[]>);
+            if (!accName) {
+              continue;
+            }
 
-    await Promise.all(
-      chunks(accountInfosWithPk, 1000).map(async (chunk) => {
-        for (const c of chunk) {
-          const accName = accounts.find(({ type }) => {
-            return (
-              c.data &&
-              anchor.BorshAccountsCoder.accountDiscriminator(type).equals(
-                c.data.subarray(0, 8)
-              )
+            const decodedAcc = program.coder.accounts.decode(
+              accName!,
+              c.data as Buffer
             );
-          })?.type;
-          if (!accName) {
-            continue;
-          }
 
-          const decodedAcc = program.coder.accounts.decode(
-            accName!,
-            c.data as Buffer
-          );
+            if (accName) {
+              const omitKeys = ["refreshed_at", "createdAt"];
+              const model = sequelize.models[accName];
+              const existing = await model.findByPk(c.pubkey);
+              let sanitized = {
+                refreshed_at: now,
+                address: c.pubkey,
+                ...sanitizeAccount(decodedAcc),
+              };
 
-          if (accName) {
-            const omitKeys = ["refreshed_at", "createdAt"];
-            const model = sequelize.models[accName];
-            const existing = await model.findByPk(c.pubkey);
-            let sanitized = {
-              refreshed_at: now,
-              address: c.pubkey,
-              ...sanitizeAccount(decodedAcc),
-            };
+              for (const plugin of pluginsByAccountType[accName]) {
+                if (plugin?.processAccount) {
+                  sanitized = await plugin.processAccount(sanitized);
+                }
+              }
 
-            for (const plugin of pluginsByAccountType[accName]) {
-              if (plugin?.processAccount) {
-                sanitized = await plugin.processAccount(sanitized);
+              const isEqual =
+                existing &&
+                deepEqual(
+                  _omit(sanitized, omitKeys),
+                  _omit(existing.dataValues, omitKeys)
+                );
+
+              if (!isEqual) {
+                corrections.push({
+                  type: accName,
+                  accountId: c.pubkey,
+                  txSignatures: txIdsByAccountId[c.pubkey],
+                  currentValues: existing ? existing.dataValues : null,
+                  newValues: sanitized,
+                });
+                await model.upsert({ ...sanitized }, { transaction: t });
               }
             }
-
-            const isEqual =
-              existing &&
-              deepEqual(
-                _omit(sanitized, omitKeys),
-                _omit(existing.dataValues, omitKeys)
-              );
-
-            if (!isEqual) {
-              corrections.push({
-                type: accName,
-                accountId: c.pubkey,
-                txSignatures: txIdsByAccountId[c.pubkey],
-                currentValues: existing ? existing.dataValues : null,
-                newValues: sanitized,
-              });
-              await model.upsert({ ...sanitized }, { transaction: t });
-            }
           }
-        }
-      })
-    );
+        })
+      );
 
-    await t.commit();
-    for (const correction of corrections) {
-      // @ts-ignore
-      fastify.customMetrics.integrityCheckCounter.inc();
-      console.log(`IntegrityCheckCorrection:`, correction);
+      await t.commit();
+
+      if (corrections.length > 0) {
+        console.log(`Integrity check corrections for: ${programId}`);
+        for (const correction of corrections) {
+          // @ts-ignore
+          fastify.customMetrics.integrityCheckCounter.inc();
+          console.dir(correction, { depth: null });
+        }
+      }
+    } catch (err) {
+      await t.rollback();
+      console.error(
+        `Integrity check error while inserting for ${programId}:`,
+        err
+      );
+      throw err; // Rethrow the error to be caught by the retry mechanism
     }
+  };
+
+  try {
+    await retry(performIntegrityCheck, {
+      ...retryOptions,
+      onRetry: (error, attempt) => {
+        console.warn(
+          `Integrity check ${programId} attempt ${attempt}: Retrying due to ${error.message}`
+        );
+      },
+    });
   } catch (err) {
-    await t.rollback();
-    console.error("While inserting, err", err);
+    console.error(
+      `Failed to perform integrity check for ${programId} after multiple attempts:`,
+      err
+    );
     throw err;
   }
 };

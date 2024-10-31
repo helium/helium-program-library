@@ -2,8 +2,6 @@
 /// but only if they are doing a valid onboarding command later on.
 use std::str::FromStr;
 
-use crate::{error::ErrorCode, maker_seeds};
-use crate::{state::*, TESTING};
 use anchor_lang::{
   prelude::*,
   solana_program::sysvar::{
@@ -17,6 +15,8 @@ use conversion_escrow::{
   program::ConversionEscrow,
   ConversionEscrowV0, LendArgsV0,
 };
+
+use crate::{error::ErrorCode, maker_seeds, state::*, TESTING};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MakerLendArgsV0 {
@@ -78,6 +78,7 @@ pub fn handler(ctx: Context<MakerLendV0>, args: MakerLendArgsV0) -> Result<()> {
     CpiContext::new_with_signer(
       ctx.accounts.conversion_escrow_program.to_account_info(),
       LendV0 {
+        owner: ctx.accounts.maker.to_account_info(),
         conversion_escrow: ctx.accounts.conversion_escrow.to_account_info(),
         escrow: ctx.accounts.escrow.to_account_info(),
         mint: ctx.accounts.usdc_mint.to_account_info(),

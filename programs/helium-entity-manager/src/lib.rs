@@ -10,7 +10,6 @@ pub mod instructions;
 pub mod state;
 
 pub use instructions::*;
-
 pub use state::*;
 
 #[cfg(not(feature = "no-entrypoint"))]
@@ -225,5 +224,12 @@ pub mod helium_entity_manager {
     args: IssueEntityArgsV0,
   ) -> Result<()> {
     issue_mobile_hotspot_v0::handler(ctx, args)
+  }
+
+  pub fn onboard_data_only_mobile_hotspot_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, OnboardDataOnlyMobileHotspotV0<'info>>,
+    args: OnboardDataOnlyMobileHotspotArgsV0,
+  ) -> Result<()> {
+    onboard_data_only_mobile_hotspot_v0::handler(ctx, args)
   }
 }

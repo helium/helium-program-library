@@ -1,5 +1,5 @@
 import * as anchor from '@coral-xyz/anchor';
-import { Program } from '@coral-xyz/anchor';
+import { BN, Program } from '@coral-xyz/anchor';
 import { init as initDataCredits } from '@helium/data-credits-sdk';
 import { init as initHeliumSubDaos } from '@helium/helium-sub-daos-sdk';
 import {
@@ -10,7 +10,7 @@ import {
 } from '@solana/web3.js';
 import chai from 'chai';
 import { init as initMobileEntityManager } from '../packages/mobile-entity-manager-sdk/src';
-import { init as initHeliumEntityManager } from '../packages/helium-entity-manager-sdk/src';
+import { init as initHeliumEntityManager, keyToAssetKey } from '../packages/helium-entity-manager-sdk/src';
 import { DataCredits } from '../target/types/data_credits';
 import { HeliumSubDaos } from '../target/types/helium_sub_daos';
 import { MobileEntityManager } from '../target/types/mobile_entity_manager';
@@ -29,13 +29,16 @@ import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   getConcurrentMerkleTreeAccountSize,
 } from '@solana/spl-account-compression';
+import { VoterStakeRegistry } from '../target/types/voter_stake_registry';
 import { HeliumEntityManager } from '../target/types/helium_entity_manager';
+import { init as initVsr } from '../packages/voter-stake-registry-sdk/src';
 
 chai.use(chaiAsPromised);
 
 describe('mobile-entity-manager', () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
+  let vsrProgram: Program<VoterStakeRegistry>;
   let dcProgram: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
   let hemProgram: Program<HeliumEntityManager>;
@@ -53,6 +56,12 @@ describe('mobile-entity-manager', () => {
       provider,
       anchor.workspace.DataCredits.programId,
       anchor.workspace.DataCredits.idl
+    );
+
+    vsrProgram = await initVsr(
+      provider,
+      anchor.workspace.VoterStakeRegistry.programId,
+      anchor.workspace.VoterStakeRegistry.idl
     );
 
     ensureDCIdl(dcProgram);
@@ -89,6 +98,7 @@ describe('mobile-entity-manager', () => {
     ));
     ({ subDao } = await initTestSubdao({
       hsdProgram,
+      vsrProgram,
       provider,
       authority: me,
       dao,
@@ -115,7 +125,8 @@ describe('mobile-entity-manager', () => {
         issuingAuthority: me,
         updateAuthority: me,
         hexboostAuthority: me,
-        metadataUrl: 'https://some/url',
+        metadataUrl: "https://some/url",
+        incentiveEscrowFundBps: 100,
       })
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
@@ -127,6 +138,7 @@ describe('mobile-entity-manager', () => {
 
     const carrierAcc = await memProgram.account.carrierV0.fetch(carrier!);
 
+    expect(carrierAcc.incentiveEscrowFundBps).to.eq(100);
     expect(carrierAcc.issuingAuthority.toBase58()).to.eq(me.toBase58());
     expect(carrierAcc.updateAuthority.toBase58()).to.eq(me.toBase58());
     expect(carrierAcc.name).to.eq(name);
@@ -149,7 +161,8 @@ describe('mobile-entity-manager', () => {
           issuingAuthority: me,
           updateAuthority: me,
           hexboostAuthority: me,
-          metadataUrl: 'https://some/url',
+          metadataUrl: "https://some/url",
+          incentiveEscrowFundBps: 100,
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
@@ -232,6 +245,49 @@ describe('mobile-entity-manager', () => {
           ])
           .accounts({ carrier, recipient: me })
           .rpc({ skipPreflight: true });
+      });
+
+      it("allows the carrier to initialize and update incentive programs", async () => {
+        const name = random();
+        const { pubkeys: { incentiveEscrowProgram } } = await memProgram.methods
+          .initializeIncentiveProgramV0({
+            metadataUrl: null,
+            name,
+            startTs: new BN(5),
+            stopTs: new BN(10),
+            shares: 100,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+          ])
+          .accounts({
+            carrier,
+            recipient: me,
+            keyToAsset: keyToAssetKey(dao, name, "utf-8")[0],
+          })
+          .rpcAndKeys({ skipPreflight: true });
+          const incentiveEscrowProgramAcc =
+            await memProgram.account.incentiveEscrowProgramV0.fetch(
+              incentiveEscrowProgram!
+            );
+          expect(incentiveEscrowProgramAcc.carrier.toBase58()).to.eq(carrier.toBase58());
+          expect(incentiveEscrowProgramAcc.startTs.toNumber()).to.eq(5);
+          expect(incentiveEscrowProgramAcc.stopTs.toNumber()).to.eq(10);
+          expect(incentiveEscrowProgramAcc.shares).to.eq(100);
+
+          await memProgram.methods.updateIncentiveProgramV0({
+            startTs: new BN(10),
+            stopTs: new BN(15),
+            shares: 200,
+          }).accounts({ incentiveEscrowProgram }).rpc({ skipPreflight: true });
+          const incentiveEscrowProgramAcc2 =
+            await memProgram.account.incentiveEscrowProgramV0.fetch(
+              incentiveEscrowProgram!
+            );
+          
+          expect(incentiveEscrowProgramAcc2.startTs.toNumber()).to.eq(10);
+          expect(incentiveEscrowProgramAcc2.stopTs.toNumber()).to.eq(15);
+          expect(incentiveEscrowProgramAcc2.shares).to.eq(200);
       });
 
       it("can swap tree when it's full", async () => {

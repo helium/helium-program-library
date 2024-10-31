@@ -54,6 +54,13 @@ pub mod helium_sub_daos {
     update_sub_dao_v0::handler(ctx, args)
   }
 
+  pub fn temp_update_sub_dao_epoch_info(
+    ctx: Context<TempUpdateSubDaoEpochInfo>,
+    args: TempUpdateSubDaoEpochInfoArgs,
+  ) -> Result<()> {
+    temp_update_sub_dao_epoch_info::handler(ctx, args)
+  }
+
   pub fn update_sub_dao_vehnt_v0(
     ctx: Context<UpdateSubDaoVeHntV0>,
     args: UpdateSubDaoVeHntArgsV0,
@@ -105,5 +112,26 @@ pub mod helium_sub_daos {
     args: TrackDcOnboardingFeesArgsV0,
   ) -> Result<()> {
     track_dc_onboarding_fees_v0::handler(ctx, args)
+  }
+
+  pub fn admin_set_dc_onboarding_fees_paid(
+    ctx: Context<AdminSetDcOnboardingFeesPaid>,
+    args: AdminSetDcOnboardingFeesPaidArgs,
+  ) -> Result<()> {
+    admin_set_dc_onboarding_fees_paid::handler(ctx, args)
+  }
+
+  pub fn admin_set_dc_onboarding_fees_paid_epoch_info(
+    ctx: Context<AdminSetDcOnboardingFeesPaidEpochInfo>,
+    args: AdminSetDcOnboardingFeesPaidEpochInfoArgs,
+  ) -> Result<()> {
+    admin_set_dc_onboarding_fees_paid_epoch_info::handler(ctx, args)
+  }
+
+  pub fn issue_voting_rewards_v0(
+    ctx: Context<IssueVotingRewardsV0>,
+    args: IssueVotingRewardsArgsV0,
+  ) -> Result<()> {
+    issue_voting_rewards_v0::handler(ctx, args)
   }
 }

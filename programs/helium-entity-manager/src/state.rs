@@ -46,6 +46,7 @@ pub enum MobileDeviceTypeV0 {
   Cbrs,
   WifiIndoor,
   WifiOutdoor,
+  WifiDataOnly,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
@@ -265,7 +266,35 @@ pub struct MobileHotspotInfoV0 {
   pub is_active: bool,
   pub dc_onboarding_fee_paid: u64,
   pub device_type: MobileDeviceTypeV0,
+  pub deployment_info: Option<MobileDeploymentInfoV0>,
 }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub enum MobileDeploymentInfoV0 {
+  WifiInfoV0 {
+    antenna: u32,
+    // the height of the hotspot above ground level in whole meters
+    elevation: i32,
+    // integer representation of a 2-point precision decimal
+    azimuth: u16,
+    // integer representation of a 2-point precision decimal
+    mechanical_down_tilt: u16,
+    // integer representation of a 2-point precision decimal
+    electrical_down_tilt: u16,
+  },
+  CbrsInfoV0 {
+    radio_infos: Vec<RadioInfoV0>,
+  },
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct RadioInfoV0 {
+  // CBSD_ID or radio
+  pub radio_id: String,
+  // The asserted elevation of the gateway above ground level in whole meters
+  pub elevation: i32,
+}
+
 pub const MOBILE_HOTSPOT_INFO_SIZE: usize = 8 +
     32 + // asset
     1 + // bump
@@ -274,6 +303,8 @@ pub const MOBILE_HOTSPOT_INFO_SIZE: usize = 8 +
     2 + // num location asserts
     1 + // is active
     8 + // dc onboarding fee paid
+    4 + // elevation
+    2 + // azimuth
     60; // pad
 
 #[macro_export]

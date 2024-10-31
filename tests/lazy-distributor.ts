@@ -2,20 +2,26 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
-  Asset, createAtaAndMint, createMint, createNft, sendInstructions
+  Asset,
+  createAtaAndMint,
+  createMint,
+  createNft,
+  sendInstructions,
 } from "@helium/spl-utils";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { assert, expect } from "chai";
 import {
   distributeCompressionRewards,
   init,
-  initializeCompressionRecipient
+  initializeCompressionRecipient,
+  updateCompressionDestination,
 } from "../packages/lazy-distributor-sdk/src";
 import { PROGRAM_ID } from "../packages/lazy-distributor-sdk/src/constants";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { createCompressionNft } from "./utils/compression";
 import { ensureLDIdl } from "./utils/fixtures";
-import { MerkleTree } from "@solana/spl-account-compression";
+import { MerkleTree, MerkleTreeProof } from "@solana/spl-account-compression";
 
 describe("lazy-distributor", () => {
   // Configure the client to use the local cluster.
@@ -53,7 +59,7 @@ describe("lazy-distributor", () => {
           thresholdType: ThresholdType.Absolute as never,
           threshold: new anchor.BN(1000000000),
         },
-        approver: null
+        approver: null,
       })
       .accounts({
         rewardsMint,
@@ -77,20 +83,22 @@ describe("lazy-distributor", () => {
     let mint: PublicKey;
     let lazyDistributor: PublicKey;
     let asset: PublicKey;
-    let merkle = Keypair.generate();
+    let merkle: Keypair;
     let merkleTree: MerkleTree;
     let creatorHash: Buffer;
     let dataHash: Buffer;
 
     beforeEach(async () => {
+      merkle = Keypair.generate();
       const { mintKey } = await createNft(provider, me);
       mint = mintKey;
 
-      ({ asset, merkleTree, creatorHash, dataHash } = await createCompressionNft({
-        provider,
-        recipient: me,
-        merkle,
-      }));
+      ({ asset, merkleTree, creatorHash, dataHash } =
+        await createCompressionNft({
+          provider,
+          recipient: me,
+          merkle,
+        }));
 
       const method = await program.methods
         .initializeLazyDistributorV0({
@@ -154,7 +162,7 @@ describe("lazy-distributor", () => {
             compression: {
               leafId: 0,
               dataHash,
-              creatorHash
+              creatorHash,
             },
           } as Asset;
         },
@@ -248,7 +256,11 @@ describe("lazy-distributor", () => {
           .rpc({ skipPreflight: true });
 
         const proof = merkleTree.getProof(0);
-        const getAssetFn = async () => ({ ownership: { owner: me }, compression: { leafId: 0, creatorHash, dataHash } } as Asset);
+        const getAssetFn = async () =>
+          ({
+            ownership: { owner: me },
+            compression: { leafId: 0, creatorHash, dataHash },
+          } as Asset);
         const getAssetProofFn = async () => {
           return {
             root: new PublicKey(proof.root),
@@ -299,6 +311,102 @@ describe("lazy-distributor", () => {
           destination
         );
         expect(balance2.value.uiAmount).to.eq(5);
+      });
+
+      describe("with custom destination", () => {
+        const destinationWallet = Keypair.generate();
+        let proof: MerkleTreeProof;
+        let getAssetFn: any;
+        let getAssetProofFn: any;
+        beforeEach(async () => {
+          proof = merkleTree.getProof(0);
+          getAssetFn = async () =>
+            ({
+              ownership: { owner: me },
+              compression: { leafId: 0, creatorHash, dataHash },
+            } as Asset);
+          getAssetProofFn = async () => {
+            return {
+              root: new PublicKey(proof.root),
+              proof: proof.proof.map((p) => new PublicKey(p)),
+              nodeIndex: 0,
+              leaf: new PublicKey(proof.leaf),
+              treeId: merkle.publicKey,
+            };
+          };
+          (
+            await updateCompressionDestination({
+              program,
+              assetId: asset,
+              lazyDistributor,
+              destination: destinationWallet.publicKey,
+              getAssetFn,
+              getAssetProofFn,
+            })
+          ).rpc({ skipPreflight: true });
+        });
+
+        it("allows distributing current rewards", async () => {
+          await program.methods
+            .setCurrentRewardsV0({
+              currentRewards: new anchor.BN("5000000"),
+              oracleIndex: 0,
+            })
+            .accounts({
+              lazyDistributor,
+              recipient,
+            })
+            .rpc({ skipPreflight: true });
+
+          const method = await program.methods
+            .distributeCustomDestinationV0()
+            .accounts({
+              common: {
+                recipient,
+                lazyDistributor,
+                rewardsMint,
+                owner: destinationWallet.publicKey,
+              },
+            });
+
+          await method.rpc({ skipPreflight: true });
+          const destination = getAssociatedTokenAddressSync(
+            rewardsMint,
+            destinationWallet.publicKey
+          );
+
+          const balance = await provider.connection.getTokenAccountBalance(
+            destination
+          );
+          expect(balance.value.uiAmount).to.eq(5);
+
+          // Make sure dist again doesn't increase balance
+          await program.methods
+            .setCurrentRewardsV0({
+              currentRewards: new anchor.BN("5000000"),
+              oracleIndex: 0,
+            })
+            .accounts({
+              lazyDistributor,
+              recipient,
+            })
+            .rpc({ skipPreflight: true });
+          await program.methods
+            .distributeCustomDestinationV0()
+            .accounts({
+              common: {
+                recipient,
+                lazyDistributor,
+                rewardsMint,
+                owner: destinationWallet.publicKey,
+              },
+            })
+            .rpc({ skipPreflight: true });
+          const balance2 = await provider.connection.getTokenAccountBalance(
+            destination
+          );
+          expect(balance2.value.uiAmount).to.eq(5);
+        });
       });
     });
 
@@ -378,28 +486,105 @@ describe("lazy-distributor", () => {
         );
         expect(balance2.value.uiAmount).to.eq(5);
       });
+
+      describe("with custom destination", () => {
+        const destinationWallet = Keypair.generate();
+        beforeEach(async () => {
+          await program.methods
+            .updateDestinationV0()
+            .accounts({
+              recipient,
+              destination: destinationWallet.publicKey,
+            })
+            .rpc({ skipPreflight: true });
+        });
+
+        it("allows distributing current rewards", async () => {
+          await program.methods
+            .setCurrentRewardsV0({
+              currentRewards: new anchor.BN("5000000"),
+              oracleIndex: 0,
+            })
+            .accounts({
+              lazyDistributor,
+              recipient,
+            })
+            .rpc({ skipPreflight: true });
+          const method = await program.methods
+            .distributeCustomDestinationV0()
+            .accounts({
+              common: {
+                recipient,
+                lazyDistributor,
+                rewardsMint,
+                owner: destinationWallet.publicKey,
+              },
+            });
+          await method.rpc({ skipPreflight: true });
+          // @ts-ignore
+          const destination = getAssociatedTokenAddressSync(
+            rewardsMint,
+            destinationWallet.publicKey
+          );
+
+          const balance = await provider.connection.getTokenAccountBalance(
+            destination
+          );
+          expect(balance.value.uiAmount).to.eq(5);
+
+          // ensure dist same amount does nothing
+          await program.methods
+            .setCurrentRewardsV0({
+              currentRewards: new anchor.BN("5000000"),
+              oracleIndex: 0,
+            })
+            .accounts({
+              lazyDistributor,
+              recipient,
+            })
+            .rpc({ skipPreflight: true });
+          await program.methods
+            .distributeCustomDestinationV0()
+            .accounts({
+              common: {
+                recipient,
+                lazyDistributor,
+                rewardsMint,
+                owner: destinationWallet.publicKey,
+              },
+            })
+            .rpc({ skipPreflight: true });
+          const balance2 = await provider.connection.getTokenAccountBalance(
+            destination
+          );
+          expect(balance2.value.uiAmount).to.eq(5);
+        });
+      });
     });
 
-    it("updates lazy distributor", async() => {
-      await program.methods.updateLazyDistributorV0({
-        authority: PublicKey.default,
-        oracles: [
-          {
-            oracle: PublicKey.default,
-            url: "https://some-other-url",
-          }
-        ],
-        approver: null,
-      }).accounts({
-        rewardsMint
-      }).rpc()
+    it("updates lazy distributor", async () => {
+      await program.methods
+        .updateLazyDistributorV0({
+          authority: PublicKey.default,
+          oracles: [
+            {
+              oracle: PublicKey.default,
+              url: "https://some-other-url",
+            },
+          ],
+          approver: null,
+        })
+        .accounts({
+          rewardsMint,
+        })
+        .rpc();
 
       const ld = await program.account.lazyDistributorV0.fetch(lazyDistributor);
       assert.isTrue(PublicKey.default.equals(ld.authority));
       assert.isTrue(ld.oracles.length == 1);
       assert.equal(ld.oracles[0].url, "https://some-other-url");
       assert.isTrue(PublicKey.default.equals(ld.oracles[0].oracle));
-    })
+    });
   });
 
   describe("multiple oracles", () => {

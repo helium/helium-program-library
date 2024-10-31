@@ -16,4 +16,7 @@ pub enum ErrorCode {
 
   #[msg("Approver signature required")]
   InvalidApproverSignature,
+
+  #[msg("This recipient uses a custom destination. Use distribute_custom_destination_v0")]
+  CustomDestination,
 }

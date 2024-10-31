@@ -58,19 +58,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@^0.6.42":
-  version: 0.0.0-use.local
-  resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
+"@helium/anchor-resolvers@npm:^0.6.42":
+  version: 0.6.42
+  resolution: "@helium/anchor-resolvers@npm:0.6.42"
   dependencies:
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.78.4
-    git-format-staged: ^2.1.3
-    ts-loader: ^9.2.3
-    typescript: ^5.2.2
   peerDependencies:
     "@coral-xyz/anchor": ^0.28.0
-  languageName: unknown
-  linkType: soft
+  checksum: 25ceab8b1cb6a68fd95c5bf2d57f7a5faf5b473504d1e056588f0f6f8cf21401bb9edd84fb5df6d360af6198f1395d02f1a2e40b57f8da164677e8fb741d110a
+  languageName: node
+  linkType: hard
 
 "@helium/conversion-escrow-sdk@workspace:.":
   version: 0.0.0-use.local
@@ -88,19 +86,18 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/idls@^0.6.42":
-  version: 0.0.0-use.local
-  resolution: "@helium/idls@workspace:packages/idls"
+"@helium/idls@npm:^0.6.42":
+  version: 0.6.42
+  resolution: "@helium/idls@npm:0.6.42"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@solana/web3.js": ^1.78.4
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-    ts-loader: ^9.2.3
-    typescript: ^5.2.2
-  languageName: unknown
-  linkType: soft
+  checksum: 7285ccb1b171c2490f5d4071ff21d37c2ecccbd02d0499c007ee32b185c628b85c642cfcc3a020fe899434cbefcf45dbfacb69b9d6024c3be10576d43e9c2039
+  languageName: node
+  linkType: hard
 
 "@isaacs/cliui@npm:^8.0.2":
   version: 8.0.2

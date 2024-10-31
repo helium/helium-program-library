@@ -3,10 +3,14 @@ import { Program } from "@coral-xyz/anchor";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { createAtaAndMint, createMint } from "@helium/spl-utils";
-import { parsePriceData } from "@pythnetwork/client";
 import {
-  createAssociatedTokenAccountIdempotentInstruction, getAccount,
-  getAssociatedTokenAddress
+  PythSolanaReceiverProgram,
+  pythSolanaReceiverIdl,
+} from "@pythnetwork/pyth-solana-receiver";
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  getAccount,
+  getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import * as web3 from "@solana/web3.js";
 import { PublicKey } from "@solana/web3.js";
@@ -18,7 +22,7 @@ import {
   dataCreditsKey,
   delegatedDataCreditsKey,
   escrowAccountKey,
-  init
+  init,
 } from "../packages/data-credits-sdk/src";
 import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
 import * as hsd from "../packages/helium-sub-daos-sdk/src";
@@ -73,10 +77,10 @@ describe("data-credits", () => {
   let program: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
   let vsrProgram: Program<VoterStakeRegistry>;
+  let pythProgram: Program<PythSolanaReceiverProgram>;
   let dcKey: PublicKey;
   let hntMint: PublicKey;
   let dcMint: PublicKey;
-  let priceOracle: PublicKey;
   let startHntBal = 10000;
   let startDcBal = 2;
   let hntDecimals = 8;
@@ -85,6 +89,10 @@ describe("data-credits", () => {
   const me = provider.wallet.publicKey;
 
   beforeEach(async () => {
+    pythProgram = new Program(
+      pythSolanaReceiverIdl,
+      new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ")
+    );
     program = await init(
       provider,
       PROGRAM_ID,
@@ -131,7 +139,7 @@ describe("data-credits", () => {
         dcMint,
         payer: me,
         hntPriceOracle: new PublicKey(
-          "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm"
+          "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
         ),
       });
     dcKey = (await method.pubkeys()).dataCredits!;
@@ -199,7 +207,13 @@ describe("data-credits", () => {
         await method.rpc({ skipPreflight: true });
       }
 
-      ({ subDao } = await initTestSubdao({hsdProgram, provider, authority: me, dao}));
+      ({ subDao } = await initTestSubdao({
+        hsdProgram,
+        vsrProgram,
+        provider,
+        authority: me,
+        dao,
+      }));
     });
 
     it("mints some data credits with hnt amount", async () => {
@@ -217,16 +231,19 @@ describe("data-credits", () => {
       assert(dcAtaAcc.isFrozen);
       const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
       const hntBal = await provider.connection.getTokenAccountBalance(hntAta);
-      const pythData = (await provider.connection.getAccountInfo(
-        new PublicKey("7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm")
-      ))!.data;
-      const price = parsePriceData(pythData);
+      const price = await pythProgram.account.priceUpdateV2.fetch(
+        new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33")
+      );
       console.log(price);
 
       const approxEndBal =
         startDcBal +
         Math.floor(
-          (price.emaPrice.value - price.emaConfidence!.value * 2) * 10 ** 5
+          price.priceMessage.emaPrice
+            .sub(price.priceMessage.emaConf.mul(new BN(2)))
+            .toNumber() *
+            10 ** price.priceMessage.exponent *
+            10 ** 5
         );
       expect(dcBal.value.uiAmount).to.be.within(
         approxEndBal - 1,
@@ -236,7 +253,7 @@ describe("data-credits", () => {
     });
 
     it("mints some data credits with dc amount", async () => {
-      let dcAmount = 1428 * 10**5
+      let dcAmount = 1428 * 10 ** 5;
       await program.methods
         .mintDataCreditsV0({
           hntAmount: null,
@@ -253,19 +270,24 @@ describe("data-credits", () => {
       const hntBal = await provider.connection.getTokenAccountBalance(
         await getAssociatedTokenAddress(hntMint, me)
       );
-      const pythData = (await provider.connection.getAccountInfo(
-        new PublicKey("7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm")
-      ))!.data;
-      const price = parsePriceData(pythData);
-      const approxEndBal =
-        startHntBal -
-        (Math.floor(dcAmount * 10 ** 11) /
-          Number(
-            price.emaPrice.valueComponent -
-              price.emaConfidence.valueComponent * BigInt(2)
-          )) *
-          10 ** -hntDecimals;
-      expect(hntBal.value.uiAmount).to.be.within(approxEndBal * 0.999, approxEndBal * 1.001);
+
+      const price = await pythProgram.account.priceUpdateV2.fetch(
+        new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33")
+      );
+      const hntEmaPrice =
+        price.priceMessage.emaPrice
+          .sub(price.priceMessage.emaConf.mul(new BN(2)))
+          .toNumber() *
+        10 ** price.priceMessage.exponent;
+      const hntAmount =
+        (Math.floor(dcAmount * 10 ** (hntDecimals - 5)) / hntEmaPrice) *
+        10 ** -hntDecimals;
+
+        const approxEndBal = startHntBal - hntAmount;
+      expect(hntBal.value.uiAmount).to.be.within(
+        approxEndBal * 0.999,
+        approxEndBal * 1.001
+      );
       expect(dcBal.value.uiAmount).to.eq(startDcBal + dcAmount);
     });
 
@@ -300,7 +322,7 @@ describe("data-credits", () => {
       await program.methods
         .updateDataCreditsV0({
           newAuthority: PublicKey.default,
-          hntPriceOracle: null
+          hntPriceOracle: null,
         })
         .accounts({
           dcMint,
@@ -313,9 +335,14 @@ describe("data-credits", () => {
       assert.isTrue(PublicKey.default.equals(dcAcc.authority));
     });
 
-
-    it("redelegates delegated data credits", async() => {
-      const { subDao: destinationSubDao } = await initTestSubdao({hsdProgram, provider, authority: me, dao});
+    it("redelegates delegated data credits", async () => {
+      const { subDao: destinationSubDao } = await initTestSubdao({
+        hsdProgram,
+        vsrProgram,
+        provider,
+        authority: me,
+        dao,
+      });
 
       const amount = 2;
       const routerKey = (await HeliumKeypair.makeRandom()).address.b58;
@@ -327,31 +354,43 @@ describe("data-credits", () => {
         .accounts({
           subDao,
         });
-      const sourceDelegatedDataCredits = (await methodA.pubkeys()).delegatedDataCredits!;
+      const sourceDelegatedDataCredits = (await methodA.pubkeys())
+        .delegatedDataCredits!;
       await methodA.rpc({ skipPreflight: true });
 
-     
-      const destinationDelegatedDataCredits = delegatedDataCreditsKey(destinationSubDao, routerKey)[0];
-
-      await program.methods.changeDelegatedSubDaoV0({
-        amount: toBN(amount, 0),
-        routerKey,
-      }).accounts({
-        delegatedDataCredits: sourceDelegatedDataCredits,
-        destinationDelegatedDataCredits,
-        subDao,
+      const destinationDelegatedDataCredits = delegatedDataCreditsKey(
         destinationSubDao,
-        authority: me,
-      }).rpc({ skipPreflight: true });
+        routerKey
+      )[0];
+
+      await program.methods
+        .changeDelegatedSubDaoV0({
+          amount: toBN(amount, 0),
+          routerKey,
+        })
+        .accounts({
+          delegatedDataCredits: sourceDelegatedDataCredits,
+          destinationDelegatedDataCredits,
+          subDao,
+          destinationSubDao,
+          authority: me,
+        })
+        .rpc({ skipPreflight: true });
 
       const sourceEscrow = escrowAccountKey(sourceDelegatedDataCredits)[0];
-      const destinationEscrow = escrowAccountKey(destinationDelegatedDataCredits)[0];
+      const destinationEscrow = escrowAccountKey(
+        destinationDelegatedDataCredits
+      )[0];
 
-      const sourceBal = await provider.connection.getTokenAccountBalance(sourceEscrow);
-      const destinationBal = await provider.connection.getTokenAccountBalance(destinationEscrow);
+      const sourceBal = await provider.connection.getTokenAccountBalance(
+        sourceEscrow
+      );
+      const destinationBal = await provider.connection.getTokenAccountBalance(
+        destinationEscrow
+      );
 
       expect(sourceBal.value.uiAmount).to.eq(0);
       expect(destinationBal.value.uiAmount).to.eq(amount);
-    })
+    });
   });
 });

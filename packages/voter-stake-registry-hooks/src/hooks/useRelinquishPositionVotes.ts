@@ -93,7 +93,6 @@ export const useRelinquishPositionVotes = () => {
                         proposal: marker.proposal,
                         voter: provider.wallet.publicKey,
                         position: position.pubkey,
-                        refund: provider.wallet.publicKey,
                       })
                       .instruction();
                   })
@@ -105,14 +104,14 @@ export const useRelinquishPositionVotes = () => {
         if (onInstructions) {
           await onInstructions(instructions);
         } else {
-          await batchParallelInstructions(
+          await batchParallelInstructions({
             provider,
             instructions,
             onProgress,
-            10,
-            [],
+            triesRemaining: 10,
+            extraSigners: [],
             maxSignatureBatch
-          );
+          });
         }
       }
     }

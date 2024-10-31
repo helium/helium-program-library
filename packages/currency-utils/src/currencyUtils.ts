@@ -1,9 +1,10 @@
 import { Connection, PublicKey, Cluster } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync, getAccount } from "@solana/spl-token";
 import {
-  getPythProgramKeyForCluster,
-  PythHttpClient,
-} from "@pythnetwork/client";
+  PythSolanaReceiver,
+  IDL as pythSolanaReceiverIdl,
+} from "./pyth";
+import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
 
 export const getBalance = async ({
   pubKey,
@@ -33,15 +34,17 @@ export const getOraclePrice = async ({
   cluster: Cluster;
   connection: Connection;
 }) => {
-  const pythPublicKey = getPythProgramKeyForCluster(cluster);
-  const pythClient = new PythHttpClient(connection, pythPublicKey);
-  const data = await pythClient.getData();
+  const pythProgram: Program<PythSolanaReceiver> = new Program(
+    pythSolanaReceiverIdl,
+    new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"),
+    new AnchorProvider(connection, {} as Wallet, {
+      skipPreflight: true,
+    })
+  );
 
-  let symbol = "";
-  switch (tokenType) {
-    case "HNT":
-      symbol = "Crypto.HNT/USD";
-  }
+  const data = await pythProgram.account.priceUpdateV2.fetch(
+    new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33")
+  );
 
-  return data.productPrice.get(symbol);
+  return data;
 };
