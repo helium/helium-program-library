@@ -97,7 +97,7 @@ export const integrityCheckProgramAccounts = async ({
             retry(
               () =>
                 connection.getParsedTransactions(chunk, {
-                  commitment: "confirmed",
+                  commitment: "finalized",
                   maxSupportedTransactionVersion: 0,
                 }),
               retryOptions
