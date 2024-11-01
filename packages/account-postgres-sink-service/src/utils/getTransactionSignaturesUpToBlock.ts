@@ -1,5 +1,5 @@
-import * as anchor from '@coral-xyz/anchor';
-import { PublicKey, TransactionSignature } from '@solana/web3.js';
+import * as anchor from "@coral-xyz/anchor";
+import { PublicKey, TransactionSignature } from "@solana/web3.js";
 
 interface GetTransactionSignaturesUptoBlockTimeArgs {
   programId: PublicKey;
@@ -26,7 +26,7 @@ export const getTransactionSignaturesUptoBlockTime = async ({
       {
         before: beforeSignature,
       },
-      'confirmed'
+      "finalized"
     );
 
     if (
@@ -54,7 +54,7 @@ export const getTransactionSignaturesUptoBlockTime = async ({
       provider,
     });
   } catch (err) {
-    console.error('Error fetching transaction signatures:', err);
+    console.error("Error fetching transaction signatures:", err);
     return [];
   }
 };
