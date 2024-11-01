@@ -61,7 +61,6 @@ export const integrityCheckProgramAccounts = async ({
     const t = await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
     });
-    const now = new Date().toISOString();
     const txIdsByAccountId: { [key: string]: string[] } = {};
     const corrections: {
       type: string;
@@ -178,9 +177,12 @@ export const integrityCheckProgramAccounts = async ({
             if (accName) {
               const omitKeys = ["refreshed_at", "createdAt"];
               const model = sequelize.models[accName];
-              const existing = await model.findByPk(c.pubkey);
+              const existing = await model.findByPk(c.pubkey, {
+                transaction: t,
+              });
+
               let sanitized = {
-                refreshed_at: now,
+                refreshed_at: new Date().toISOString(),
                 address: c.pubkey,
                 ...sanitizeAccount(decodedAcc),
               };
@@ -191,14 +193,12 @@ export const integrityCheckProgramAccounts = async ({
                 }
               }
 
-              const isEqual =
-                existing &&
-                deepEqual(
-                  _omit(sanitized, omitKeys),
-                  _omit(existing.dataValues, omitKeys)
-                );
+              const shouldUpdate = !deepEqual(
+                _omit(sanitized, omitKeys),
+                _omit(existing?.dataValues, omitKeys)
+              );
 
-              if (!isEqual) {
+              if (shouldUpdate) {
                 corrections.push({
                   type: accName,
                   accountId: c.pubkey,
