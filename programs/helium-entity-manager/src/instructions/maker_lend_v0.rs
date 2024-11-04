@@ -49,6 +49,7 @@ pub struct MakerLendV0<'info> {
   #[account(mut)]
   pub repay_account: AccountInfo<'info>,
   #[account(
+    mut,
     seeds = [b"conversion_escrow", usdc_mint.key().as_ref(), maker.key().as_ref()],
     seeds::program = conversion_escrow_program,
     bump = conversion_escrow.bump_seed,

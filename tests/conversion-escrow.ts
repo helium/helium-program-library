@@ -119,7 +119,7 @@ describe("conversion-escrow", () => {
             .sub(priceMobile.priceMessage.emaConf.mul(new anchor.BN(2)))
           .toNumber() *
         10 ** priceHnt.priceMessage.exponent *
-        10 ** 8;
+        10 ** 6;
       const hntPerMobile = mobileFloorValue / hntFloorValue
 
       const hntHolderMobileAta = getAssociatedTokenAddressSync(
@@ -130,6 +130,7 @@ describe("conversion-escrow", () => {
         hntMint,
         hntHolder.publicKey
       );
+      console.log("mobile per hnt", 1 / hntPerMobile, mobileFloorValue, hntFloorValue);
       const mobileAmount = new anchor.BN(5000)
       const instructions = [
         createAssociatedTokenAccountIdempotentInstruction(

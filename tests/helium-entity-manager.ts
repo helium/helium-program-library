@@ -10,9 +10,11 @@ import {
   AssetProof,
   HELIUM_COMMON_LUT,
   HNT_PYTH_PRICE_FEED,
+  LUT_ACCOUNTS,
   MOBILE_PYTH_PRICE_FEED,
   SOL_PYTH_PRICE_FEED,
   USDC_PYTH_PRICE_FEED,
+  chunks,
   createAtaAndMint,
   createMint,
   createMintInstructions,
@@ -20,6 +22,8 @@ import {
   sendInstructions,
   toBN,
   toVersionedTx,
+  truthy,
+  withPriorityFees,
 } from "@helium/spl-utils";
 import {
   PythSolanaReceiverProgram,
@@ -40,6 +44,7 @@ import {
   PublicKey,
   SystemProgram,
   Connection,
+  AddressLookupTableProgram,
 } from "@solana/web3.js";
 import chai from "chai";
 import {
@@ -927,11 +932,6 @@ describe("helium-entity-manager", () => {
 
       it("allows verifying owner while topping off sol", async () => {
         const owner = Keypair.generate();
-        const makerWsol = getAssociatedTokenAddressSync(
-          NATIVE_MINT,
-          maker,
-          true
-        );
         const myUsdcAccount = getAssociatedTokenAddressSync(usdcMint, me);
         const instructions = [
           createAssociatedTokenAccountIdempotentInstruction(
@@ -939,12 +939,6 @@ describe("helium-entity-manager", () => {
             myUsdcAccount,
             me,
             usdcMint
-          ),
-          createAssociatedTokenAccountIdempotentInstruction(
-            me,
-            makerWsol,
-            maker,
-            NATIVE_MINT
           ),
           await hemProgram.methods
             .makerLendV0({
@@ -955,21 +949,21 @@ describe("helium-entity-manager", () => {
               targetOracle: SOL_PYTH_PRICE_FEED,
               conversionEscrow,
               destination: myUsdcAccount,
-              repayAccount: makerWsol,
+              repayAccount: maker,
               usdcMint,
             })
             .instruction(),
           // Repay
           SystemProgram.transfer({
             fromPubkey: me,
-            toPubkey: makerWsol,
+            toPubkey: maker,
             lamports: 0.02 * LAMPORTS_PER_SOL,
           }),
           await conversionEscrowProgram.methods
             .checkRepayV0()
             .accounts({
               conversionEscrow,
-              repayAccount: makerWsol,
+              repayAccount: maker,
             })
             .instruction(),
           await hemProgram.methods
@@ -994,6 +988,7 @@ describe("helium-entity-manager", () => {
         expect(lamps).to.be.gt(0.02 * LAMPORTS_PER_SOL);
       });
       describe("with verified owner", async () => {
+        let lut: PublicKey;
         beforeEach(async () => {
           await hemProgram.methods
             .mobileVoucherVerifyOwnerV0()
@@ -1004,6 +999,31 @@ describe("helium-entity-manager", () => {
             })
             .signers([eccVerifier])
             .rpc({ skipPreflight: true });
+
+            const slot = await provider.connection.getSlot();
+            const [lookupTableInst, lookupTableAddress] =
+              AddressLookupTableProgram.createLookupTable({
+                authority: me,
+                payer: me,
+                recentSlot: slot,
+              });
+            let isFirst = true;
+            for (const addresses of chunks([...LUT_ACCOUNTS, usdcMint, rewardableEntityConfig, dntMint, eccVerifier.publicKey], 20)) {
+              await sendInstructions(
+                provider,
+                [
+                  isFirst ? lookupTableInst : undefined,
+                  AddressLookupTableProgram.extendLookupTable({
+                    payer: me,
+                    authority: me,
+                    lookupTable: lookupTableAddress,
+                    addresses,
+                  }),
+                ].filter(truthy)
+              );
+              isFirst = false;
+            }
+          lut = lookupTableAddress;
         });
         it("allows paying mobile", async () => {
           const makerDntAccount = getAssociatedTokenAddressSync(
@@ -1018,8 +1038,7 @@ describe("helium-entity-manager", () => {
             pythDataMobile.priceMessage.emaPrice
               .sub(pythDataMobile.priceMessage.emaConf.mul(new anchor.BN(2)))
               .toNumber() *
-            10 ** pythDataMobile.priceMessage.exponent *
-            10 ** 6;
+            10 ** pythDataMobile.priceMessage.exponent;
 
           const mobileAmount = toBN(20 / usdPerMobile, 6);
           const myUsdcAccount = getAssociatedTokenAddressSync(usdcMint, me);
@@ -1150,27 +1169,18 @@ describe("helium-entity-manager", () => {
               payer: me,
             });
           const tx = await toVersionedTx(
-            await populateMissingDraftInfo(provider.connection, {
-              instructions: [
-                await hemProgram.methods
-                  .mobileVoucherVerifyOwnerV0()
-                  .accounts({
-                    verifiedOwner: me,
-                    eccVerifier: eccVerifier.publicKey,
-                    mobileHotspotVoucher,
-                  })
-                  .instruction(),
-                ...instructions,
-              ],
+            {
+              instructions,
               addressLookupTableAddresses: [
                 ...addressLookupTableAddresses,
-                HELIUM_COMMON_LUT,
+                lut,
               ],
               feePayer: me,
-            })
+              recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash,
+            }
           );
-          await tx.sign([eccVerifier]);
           const signed = await provider.wallet.signTransaction(tx);
+          console.log("signed", signed)
           const serialized = signed.serialize();
           expect(serialized.length).to.be.lessThan(1232);
         });
@@ -1191,6 +1201,7 @@ describe("helium-entity-manager", () => {
               addressLookupTableAddresses: [
                 ...addressLookupTableAddresses,
                 HELIUM_COMMON_LUT,
+                lut,
               ],
               feePayer: me,
             })
@@ -1214,8 +1225,7 @@ describe("helium-entity-manager", () => {
               pythDataMobile.priceMessage.emaPrice
                 .sub(pythDataMobile.priceMessage.emaConf.mul(new anchor.BN(2)))
                 .toNumber() *
-              10 ** pythDataMobile.priceMessage.exponent *
-              10 ** 6;
+              10 ** pythDataMobile.priceMessage.exponent;
             const mobileAmount = toBN(20 / usdPerMobile, 6);
             const myUsdcAccount = getAssociatedTokenAddressSync(usdcMint, me);
             const instructions0 = [

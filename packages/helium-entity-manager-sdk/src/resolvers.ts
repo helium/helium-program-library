@@ -224,15 +224,6 @@ export const heliumEntityManagerResolvers = combineResolvers(
     account: "burner",
     owner: "maker",
   }),
-  resolveIndividual(async ({ path, accounts }) => {
-    if ((path[path.length - 1] === "makerWsol") && accounts.maker) {
-      return getAssociatedTokenAddressSync(
-        NATIVE_MINT,
-        accounts.maker as PublicKey,
-        true
-      );
-    }
-  }),
   ataResolver({
     instruction: "onboardDataOnlyMobileHotspotV0",
     mint: "dntMint",

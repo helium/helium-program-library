@@ -384,15 +384,17 @@ export class OracleServer {
       if (!(programId.equals(LD_PID) || programId.equals(RO_PID))) {
         return {
           success: false,
-          message: "Invalid instructions in transaction",
+          message: `Invalid instructions in transaction: ${programId.toBase58()}`,
         };
       }
       const data = Buffer.from(ix.data);
       let decoded: Instruction | null;
       if (programId.equals(LD_PID)) {
+        console.log("decoding LD", data)
         decoded = (
           this.ldProgram.coder.instruction as BorshInstructionCoder
         ).decode(data);
+        console.log("decoded LD", decoded)
       } else {
         decoded = (
           this.roProgram.coder.instruction as BorshInstructionCoder
@@ -411,7 +413,7 @@ export class OracleServer {
       ) {
         return {
           success: false,
-          message: "Invalid instructions in transaction",
+          message: `Invalid instructions in transaction: name: ${decoded} ${programId.toBase58()}`,
         };
       }
 

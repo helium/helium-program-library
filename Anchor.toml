@@ -105,6 +105,10 @@ address = "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx" # Mobile price oracle
 [[test.validator.clone]]
 address = "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
 
+# Helium Common LUT
+[[test.validator.clone]]
+address = "43eY9L2spbM2b1MPDFFBStUiFGt29ziZ1nc1xbpzsfVt"
+
 # Sol pyth price
 [[test.validator.clone]]
 address = "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE"

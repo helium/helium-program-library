@@ -22,6 +22,7 @@ pub struct LendArgsV0 {
 #[derive(Accounts)]
 pub struct LendV0<'info> {
   #[account(
+    mut,
     has_one = mint,
     has_one = oracle,
     has_one = escrow,
