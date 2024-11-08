@@ -38,7 +38,9 @@ export async function mintTo(
     )
   );
   try {
-    await provider.sendAndConfirm(mintTx);
+    await provider.sendAndConfirm(mintTx, [], {
+      skipPreflight: true,
+    });
   } catch (e: any) {
     console.log("Error", e, e.logs);
     if (e.logs) {

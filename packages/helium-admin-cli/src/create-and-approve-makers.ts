@@ -217,6 +217,7 @@ export async function run(args: any = process.argv) {
           metadataUrl: 'todo',
           issuingAuthority: makerAuthority,
           updateAuthority,
+          topupAmounts: [],
         })
         .accounts({
           maker,

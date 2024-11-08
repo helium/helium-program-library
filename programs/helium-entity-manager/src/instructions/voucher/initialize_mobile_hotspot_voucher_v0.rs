@@ -1,6 +1,6 @@
+use anchor_lang::{prelude::*, solana_program::hash::hash};
+
 use crate::state::*;
-use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeMobileHotspotVoucherArgsV0 {
@@ -60,10 +60,9 @@ pub fn handler(
       bump_seed: ctx.bumps["mobile_hotspot_voucher"],
       key_serialization: args.key_serialization,
       device_type: args.device_type,
-      paid_mobile: false,
-      paid_dc: false,
+      paid: false,
+      dc_paid: 0,
       maker: ctx.accounts.maker.key(),
-      verified_owner: ctx.accounts.issuing_authority.key(),
     });
   Ok(())
 }

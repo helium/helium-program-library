@@ -123,7 +123,12 @@ export const initTestMaker = async (
   program: Program<HeliumEntityManager>,
   provider: anchor.AnchorProvider,
   rewardableEntityConfig: PublicKey,
-  dao: PublicKey
+  dao: PublicKey,
+  topupAmounts: {
+    mint: PublicKey;
+    threshold: anchor.BN;
+    sourceAmount: anchor.BN;
+  }[] = []
 ): Promise<{
   authority: PublicKey;
   makerKeypair: Keypair;
@@ -157,6 +162,7 @@ export const initTestMaker = async (
       issuingAuthority: makerKeypair.publicKey,
       name,
       metadataUrl: DEFAULT_METADATA_URL,
+      topupAmounts,
     })
     .accounts({
       dao,

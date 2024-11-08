@@ -141,6 +141,7 @@ export async function run(args: any = process.argv) {
         issuingAuthority,
         // Temp, since we need to set maker tree
         updateAuthority: provider.wallet.publicKey,
+        topupAmounts: [],
       })
       .accounts({
         maker,

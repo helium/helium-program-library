@@ -20,24 +20,11 @@ pub struct MobileHotspotVoucherV0 {
   pub entity_key: Vec<u8>,
   pub key_serialization: KeySerialization,
   pub device_type: MobileDeviceTypeV0,
-  pub paid_mobile: bool,
-  pub paid_dc: bool,
-  /// Maker key if not verified. Otherwise the verified owner of the hotspot
-  /// through the sig verifier.
-  pub verified_owner: Pubkey,
+  pub paid: bool,
+  pub dc_paid: u64,
   /// The wallet that paid the rent for this, will be refunded
   pub refund: Pubkey,
   pub bump_seed: u8,
-}
-
-#[account]
-#[derive(Default)]
-pub struct IotHotspotVoucherV0 {
-  pub rewardable_entity_config: Pubkey,
-  pub entity_key: Vec<u8>,
-  pub bump_seed: u8,
-  pub key_serialization: KeySerialization,
-  pub paid_dc: bool,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, PartialEq)]
@@ -173,11 +160,14 @@ pub struct MakerV0 {
   pub merkle_tree: Pubkey,
   pub collection_bump_seed: u8,
   pub dao: Pubkey,
-  // Outstanding loans in USDC. Used to check that the
-  // maker loan made is an appropriate amount during onboarding
-  // Given write locking on accounts, this should never be above what is actually
-  // used in the current tx
-  pub expected_onboard_amount: u64,
+  pub topup_amounts: Vec<TopupAmountV0>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct TopupAmountV0 {
+  pub mint: Pubkey,
+  pub threshold: u64,
+  pub source_amount: u64,
 }
 
 #[account]
