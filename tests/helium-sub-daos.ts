@@ -265,7 +265,10 @@ describe("helium-sub-daos", () => {
         pubkeys: { vetokenTracker: tracker },
       } = await rewardsProgram.methods
         .initializeVetokenTrackerV0({
-          votingRewardsTiers: [],
+          votingRewardsTiers: [{
+            numVetokens: new BN(0),
+            percent: delegatorRewardsPercent(100),
+          }],
         })
         .accounts({
           registrar: subDaoRegistrar,
@@ -900,7 +903,6 @@ describe("helium-sub-daos", () => {
             });
 
             it("issues hnt rewards to subdaos, dnt to rewards escrow, and hst to hst pool", async () => {
-              const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
               const preBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
               ).amount;
@@ -931,15 +933,6 @@ describe("helium-sub-daos", () => {
 
               const vsrEpochInfoAcc = await rewardsProgram.account.vsrEpochInfoV0.fetch(vsrEpochInfo!);
 
-              await program.methods
-                .issueHstPoolV0({
-                  epoch,
-                })
-                .accounts({
-                  dao,
-                })
-                .rpc({ skipPreflight: true });
-
               const postBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
               ).amount;
@@ -953,7 +946,7 @@ describe("helium-sub-daos", () => {
                 ((1 - 0.32) * EPOCH_REWARDS).toString()
               );
               expect((postHstBalance - preHstBalance).toString()).to.eq(
-                (0.32 * EPOCH_REWARDS).toString()
+                "0"
               );
               expect((postMobileBalance - preMobileBalance).toString()).to.eq(
                 ((SUB_DAO_EPOCH_REWARDS / 100) * 92).toString()

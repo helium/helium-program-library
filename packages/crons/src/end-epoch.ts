@@ -223,25 +223,6 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
         }
       }
 
-      if (!daoEpochInfo?.doneIssuingHstPool) {
-        try {
-          await sendInstructionsWithPriorityFee(
-            provider,
-            [
-              await heliumSubDaosProgram.methods
-                .issueHstPoolV0({ epoch })
-                .accounts({ dao })
-                .instruction(),
-            ],
-            {
-              basePriorityFee: BASE_PRIORITY_FEE,
-            }
-          );
-        } catch (err: any) {
-          errors.push(`Failed to issue hst pool: ${err}`);
-        }
-      }
-
       targetTs = targetTs.add(new BN(EPOCH_LENGTH));
     }
 

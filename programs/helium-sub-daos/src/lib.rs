@@ -99,9 +99,9 @@ pub mod helium_sub_daos {
     transfer_v0::handler(ctx, args)
   }
 
-  pub fn issue_hst_pool_v0(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result<()> {
-    issue_hst_pool_v0::handler(ctx, args)
-  }
+  //   pub fn issue_hst_pool_v0(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result<()> {
+  //     issue_hst_pool_v0::handler(ctx, args)
+  //   }
 
   pub fn reset_lockup_v0(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<()> {
     reset_lockup_v0::handler(ctx, args)

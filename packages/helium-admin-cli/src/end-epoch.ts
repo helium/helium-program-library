@@ -137,19 +137,6 @@ export async function run(args: any = process.argv) {
       }
     }
 
-    try {
-      if (!daoEpochInfo?.doneIssuingHstPool) {
-        await sendInstructionsWithPriorityFee(provider, [
-          await heliumSubDaosProgram.methods
-            .issueHstPoolV0({ epoch })
-            .accounts({ dao })
-            .instruction(),
-        ]);
-      }
-    } catch (e: any) {
-      console.log(`Failed to issue hst pool: ${e.message}`);
-    }
-
     targetTs = targetTs.add(new BN(EPOCH_LENGTH));
   }
 }

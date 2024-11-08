@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use circuit_breaker::{
@@ -151,16 +153,22 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .unwrap()
     .checked_div(100)
     .unwrap();
+  let hst_emissions = total_emissions.checked_sub(emissions).unwrap();
   let total_rewards = PreciseNumber::new(emissions.into()).or_arith_error()?;
   let rewards_prec = percent_share.checked_mul(&total_rewards).or_arith_error()?;
-  let rewards_amount: u64 = rewards_prec
+  let mut rewards_amount: u64 = rewards_prec
     .floor() // Ensure we never overspend the defined rewards
     .or_arith_error()?
     .to_imprecise()
     .ok_or_else(|| error!(ErrorCode::ArithmeticError))?
     .try_into()
     .unwrap();
-
+  if ctx.accounts.dnt_mint.key()
+    == Pubkey::from_str("mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6").unwrap()
+  {
+    rewards_amount += hst_emissions;
+    ctx.accounts.dao_epoch_info.done_issuing_hst_pool = true;
+  }
   let total_emissions = ctx
     .accounts
     .sub_dao

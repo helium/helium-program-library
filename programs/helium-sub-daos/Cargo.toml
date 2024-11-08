@@ -1,6 +1,6 @@
 [package]
 name = "helium-sub-daos"
-version = "0.1.10"
+version = "0.1.11"
 description = "Created with Anchor"
 edition = "2021"
 
