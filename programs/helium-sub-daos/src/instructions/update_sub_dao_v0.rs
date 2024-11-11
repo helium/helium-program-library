@@ -15,6 +15,7 @@ pub struct UpdateSubDaoArgsV0 {
   pub active_device_authority: Option<Pubkey>,
   pub voting_rewards_percent: Option<u64>,
   pub vetoken_tracker: Option<Pubkey>,
+  pub rewards_escrow: Option<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -75,6 +76,10 @@ pub fn handler(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result
 
   if let Some(vetoken_tracker) = args.vetoken_tracker {
     ctx.accounts.sub_dao.vetoken_tracker = vetoken_tracker;
+  }
+
+  if let Some(rewards_escrow) = args.rewards_escrow {
+    ctx.accounts.sub_dao.rewards_escrow = rewards_escrow;
   }
 
   resize_to_fit(
