@@ -270,72 +270,78 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
     const hemProgram = await initHem(provider);
     const lazyProgram = await initLazy(provider);
     const rewardsOracleProgram = await initRewards(provider);
-    const [lazyDistributor] = lazyDistributorKey(iotMint);
-    const [keyToAsset] = keyToAssetKey(dao, IOT_OPERATIONS_FUND, "utf8");
-    const assetId = (await hemProgram.account.keyToAssetV0.fetch(keyToAsset))
-      .asset;
+    for (const token of [IOT_MINT, HNT_MINT]) {
+      const [lazyDistributor] = lazyDistributorKey(token);
+      const [keyToAsset] = keyToAssetKey(dao, IOT_OPERATIONS_FUND, "utf8");
+      const assetId = (await hemProgram.account.keyToAssetV0.fetch(keyToAsset))
+        .asset;
 
-    const [recipient] = recipientKey(lazyDistributor, assetId);
-    if (!(await provider.connection.getAccountInfo(recipient))) {
-      const method = lazyProgram.methods.initializeRecipientV0().accounts({
+      const [recipient] = recipientKey(lazyDistributor, assetId);
+      if (!(await provider.connection.getAccountInfo(recipient))) {
+        const method = lazyProgram.methods.initializeRecipientV0().accounts({
+          lazyDistributor,
+          mint: assetId,
+        });
+
+        await sendInstructionsWithPriorityFee(
+          provider,
+          [await method.instruction()],
+          {
+            basePriorityFee: BASE_PRIORITY_FEE,
+          }
+        );
+      }
+
+      const rewards = await client.getCurrentRewards(
+        lazyProgram,
         lazyDistributor,
-        mint: assetId,
-      });
-
-      await sendInstructionsWithPriorityFee(provider, [await method.instruction()], {
-        basePriorityFee: BASE_PRIORITY_FEE
-      });
-    }
-
-    const rewards = await client.getCurrentRewards(
-      lazyProgram,
-      lazyDistributor,
-      assetId
-    );
-
-    const pending = await client.getPendingRewards(
-      lazyProgram,
-      lazyDistributor,
-      daoKey(HNT_MINT)[0],
-      [IOT_OPERATIONS_FUND],
-      "utf8"
-    );
-
-    // Avoid claiming too much and tripping the breaker
-    if (new BN(pending[IOT_OPERATIONS_FUND]).gt(MAX_CLAIM_AMOUNT)) {
-      rewards[0].currentRewards = new BN(rewards[0].currentRewards)
-        .sub(new BN(pending[IOT_OPERATIONS_FUND]))
-        .add(MAX_CLAIM_AMOUNT)
-        .toString();
-    }
-
-    const tx = await client.formTransaction({
-      program: lazyProgram,
-      rewardsOracleProgram: rewardsOracleProgram,
-      provider,
-      rewards,
-      asset: assetId,
-      lazyDistributor,
-    });
-
-    const signed = await provider.wallet.signTransaction(tx);
-
-    try {
-      await sendAndConfirmWithRetry(
-        provider.connection,
-        Buffer.from(signed.serialize()),
-        { skipPreflight: true },
-        "confirmed"
+        assetId
       );
-    } catch (err: any) {
-      errors.push(`Failed to distribute iot op funds: ${err}`);
+
+      const pending = await client.getPendingRewards(
+        lazyProgram,
+        lazyDistributor,
+        daoKey(HNT_MINT)[0],
+        [IOT_OPERATIONS_FUND],
+        "utf8"
+      );
+
+      // Avoid claiming too much and tripping the breaker
+      if (new BN(pending[IOT_OPERATIONS_FUND]).gt(MAX_CLAIM_AMOUNT)) {
+        rewards[0].currentRewards = new BN(rewards[0].currentRewards)
+          .sub(new BN(pending[IOT_OPERATIONS_FUND]))
+          .add(MAX_CLAIM_AMOUNT)
+          .toString();
+      }
+
+      const tx = await client.formTransaction({
+        program: lazyProgram,
+        rewardsOracleProgram: rewardsOracleProgram,
+        provider,
+        rewards,
+        asset: assetId,
+        lazyDistributor,
+      });
+
+      const signed = await provider.wallet.signTransaction(tx);
+
+      try {
+        await sendAndConfirmWithRetry(
+          provider.connection,
+          Buffer.from(signed.serialize()),
+          { skipPreflight: true },
+          "confirmed"
+        );
+      } catch (err: any) {
+        errors.push(`Failed to distribute iot op funds: ${err}`);
+      }
     }
 
     // Only do this if that feature has been deployed
     if (hemProgram.methods.issueNotEmittedEntityV0) {
       console.log("Issuing no_emit");
       const noEmitProgram = await initBurn(provider);
-      const tokens = [MOBILE_MINT, IOT_MINT];
+      const tokens = [MOBILE_MINT, IOT_MINT, HNT_MINT];
       for (const token of tokens) {
         const [lazyDistributor] = lazyDistributorKey(token);
         const notEmittedEntityKta = keyToAssetKey(dao, NOT_EMITTED, "utf-8")[0];

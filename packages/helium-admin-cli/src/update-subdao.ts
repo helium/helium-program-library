@@ -205,6 +205,7 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await program.methods
       .updateSubDaoV0({
+        rewardsEscrow: null,
         vetokenTracker: null,
         votingRewardsPercent: null,
         authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,

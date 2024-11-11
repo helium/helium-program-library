@@ -894,6 +894,7 @@ describe("helium-entity-manager", () => {
 
         await hsdProgram.methods
           .updateSubDaoV0({
+            rewardsEscrow: null,
             vetokenTracker: null,
             votingRewardsPercent: null,
             authority: null,

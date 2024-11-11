@@ -281,6 +281,7 @@ describe("helium-sub-daos", () => {
       vetokenTracker = tracker!;
       await program.methods
         .updateSubDaoV0({
+          rewardsEscrow: null,
           vetokenTracker,
           votingRewardsPercent: delegatorRewardsPercent(2),
           authority: null,
@@ -323,6 +324,7 @@ describe("helium-sub-daos", () => {
       const newAuth = Keypair.generate().publicKey;
       await program.methods
         .updateSubDaoV0({
+          rewardsEscrow: null,
           vetokenTracker: null,
           votingRewardsPercent: null,
           authority: newAuth,
