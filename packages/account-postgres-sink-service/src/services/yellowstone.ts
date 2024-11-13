@@ -12,7 +12,6 @@ import { IConfig } from "../types";
 import { convertYellowstoneTransaction } from "../utils/convertYellowstoneTransaction";
 import { handleAccountWebhook } from "../utils/handleAccountWebhook";
 import { handleTransactionWebhook } from "../utils/handleTransactionWebhook";
-import { limit } from "../utils/database";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 5000; // 5 seconds
