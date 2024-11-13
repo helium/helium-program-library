@@ -1,42 +1,40 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
+import { init as initConversionEscrow } from "@helium/conversion-escrow-sdk";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
-import { init as initConversionEscrow } from "@helium/conversion-escrow-sdk";
-import { notEmittedKey, init as initBurn } from "@helium/no-emit-sdk";
+import { init as initBurn, notEmittedKey } from "@helium/no-emit-sdk";
 import {
   Asset,
   AssetProof,
   HELIUM_COMMON_LUT,
   HNT_PYTH_PRICE_FEED,
-  LUT_ACCOUNTS,
   MOBILE_PYTH_PRICE_FEED,
   SOL_PYTH_PRICE_FEED,
   USDC_PYTH_PRICE_FEED,
-  chunks,
+  batchInstructionsToTxsWithPriorityFee,
   createAtaAndMint,
   createMint,
   createMintInstructions,
-  mintTo,
+  populateMissingDraftInfo,
   proofArgsAndAccounts,
+  sendAndConfirmWithRetry,
   sendInstructions,
   toBN,
   toVersionedTx,
-  truthy,
-  withPriorityFees,
 } from "@helium/spl-utils";
+import { AddGatewayV1 } from "@helium/transactions";
 import {
   PythSolanaReceiverProgram,
   pythSolanaReceiverIdl,
 } from "@pythnetwork/pyth-solana-receiver";
-import { AddGatewayV1 } from "@helium/transactions";
 import {
-  createAssociatedTokenAccountIdempotentInstruction,
-  createTransferInstruction,
-  getAssociatedTokenAddressSync,
-  getAccount,
   NATIVE_MINT,
+  createTransferInstruction,
+  getAccount,
+  getAssociatedTokenAddressSync,
+  createAssociatedTokenAccountIdempotentInstruction,
 } from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
@@ -44,8 +42,6 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
-  Connection,
-  AddressLookupTableProgram,
 } from "@solana/web3.js";
 import chai from "chai";
 import {
@@ -59,19 +55,19 @@ import {
 } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
-import { NoEmit } from "../target/types/no_emit";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
+import { NoEmit } from "../target/types/no_emit";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import {
   DC_FEE,
+  MAKER_STAKING_FEE,
+  ensureConversionEscrowIdl,
   ensureDCIdl,
-  ensureHSDIdl,
   ensureHEMIdl,
+  ensureHSDIdl,
   initTestDataCredits,
   initTestMaker,
   initTestRewardableEntityConfig,
-  MAKER_STAKING_FEE,
-  ensureConversionEscrowIdl,
 } from "./utils/fixtures";
 // @ts-ignore
 import bs58 from "bs58";
@@ -82,22 +78,22 @@ import { helium } from "@helium/proto";
 import axios from "axios";
 
 import {
+  keyToAssetKey,
+  mobileInfoKey,
+  topUpMaker,
+} from "@helium/helium-entity-manager-sdk";
+import {
   MerkleTree,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   getConcurrentMerkleTreeAccountSize,
 } from "@solana/spl-account-compression";
 import { BN } from "bn.js";
 import chaiAsPromised from "chai-as-promised";
+import { init as initVsr } from "../packages/voter-stake-registry-sdk/src";
+import { ConversionEscrow } from "../target/types/conversion_escrow";
+import { VoterStakeRegistry } from "../target/types/voter_stake_registry";
 import { createMockCompression } from "./utils/compression";
 import { loadKeypair } from "./utils/solana";
-import { ConversionEscrow } from "../target/types/conversion_escrow";
-import {
-  keyToAssetKey,
-  mobileInfoKey,
-  topUpMaker,
-} from "@helium/helium-entity-manager-sdk";
-import { VoterStakeRegistry } from "../target/types/voter_stake_registry";
-import { init as initVsr } from "../packages/voter-stake-registry-sdk/src";
 
 chai.use(chaiAsPromised);
 
@@ -806,7 +802,13 @@ describe("helium-entity-manager", () => {
         topupAmounts
       );
 
-      await initTestMaker(hemProgram, provider, rewardableEntityConfig, dao, topupAmounts);
+      await initTestMaker(
+        hemProgram,
+        provider,
+        rewardableEntityConfig,
+        dao,
+        topupAmounts
+      );
 
       await dcProgram.methods
         .mintDataCreditsV0({
@@ -1002,7 +1004,7 @@ describe("helium-entity-manager", () => {
             .sub(priceMobile.priceMessage.emaConf.mul(new anchor.BN(2)))
             .toNumber() *
           10 ** priceMobile.priceMessage.exponent;
-          console.log("mobileFloor", mobileFloorValue)
+        console.log("mobileFloor", mobileFloorValue);
         const { instruction, pubkeys } = await hemProgram.methods
           .makerLendV0()
           .accounts({
@@ -1031,15 +1033,14 @@ describe("helium-entity-manager", () => {
             })
             .instruction(),
         ];
-        
-        console.log("sending");
+
         await sendInstructions(provider, ixs);
-        console.log("sent");
 
         const postBalance = await provider.connection.getTokenAccountBalance(
           myAcc
         );
-        console.log(postBalance.value.uiAmount,
+        console.log(
+          postBalance.value.uiAmount,
           preBalance.value.uiAmount! + 10 * (1 + slippageBps / 10000)
         );
         expect(postBalance.value.uiAmount).to.be.eq(
@@ -1048,32 +1049,95 @@ describe("helium-entity-manager", () => {
         );
       });
 
-        // it("issues a mobile hotspot", async () => {
-        //   const method = await hemProgram.methods
-        //     .onboardMobileHotspotV1({
-        //       entityKey: Buffer.from(bs58.decode(ecc)),
-        //     })
-        //     .accounts({
-        //       issueEntityCommon: {
-        //         maker,
-        //         recipient: me,
-        //         dao,
-        //       },
-        //       mobileInfo: mobileInfoKey(
-        //         rewardableEntityConfig,
-        //         Buffer.from(bs58.decode(ecc))
-        //       )[0],
-        //       voucher: mobileHotspotVoucher,
-        //     });
-        //   await method.rpc({ skipPreflight: true });
-        //   const { mobileInfo } = await method.pubkeys();
+      it("issues a mobile hotspot", async () => {
+        await hemProgram.methods
+          .issueEntityV1({
+            entityKey: Buffer.from(bs58.decode(ecc)),
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+          ])
+          .accounts({
+            maker,
+            recipient: hotspotOwner.publicKey,
+            mobileVoucher: mobileHotspotVoucher!,
+            dao,
+            eccVerifier: eccVerifier.publicKey,
+          })
+          .signers([eccVerifier])
+          .rpc({ skipPreflight: true });
 
-        //   const mobileInfoAcc =
-        //     await hemProgram.account.mobileHotspotInfoV0.fetch(mobileInfo!);
-        //   expect(Boolean(mobileInfoAcc)).to.be.true;
-        //   const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
-        //   expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(1000000);
-        // });
+        const method = await onboardMobileHotspot({
+          program: hemProgram,
+          assetId: hotspot,
+          maker,
+          dao,
+          rewardableEntityConfig,
+          getAssetFn,
+          getAssetProofFn,
+          deviceType: "wifiIndoor",
+          deploymentInfo: null,
+        });
+        const txs = await batchInstructionsToTxsWithPriorityFee(
+          provider,
+          [
+            createAssociatedTokenAccountIdempotentInstruction(
+              me,
+              getAssociatedTokenAddressSync(dntMint, maker, true),
+              maker,
+              dntMint
+            ),
+            createTransferInstruction(
+              getAssociatedTokenAddressSync(dntMint, me),
+              getAssociatedTokenAddressSync(dntMint, maker, true),
+              me,
+              toBN(1000, 8).toNumber()
+            ),
+            createAssociatedTokenAccountIdempotentInstruction(
+              me,
+              getAssociatedTokenAddressSync(hntMint, maker, true),
+              maker,
+              hntMint
+            ),
+            createTransferInstruction(
+              getAssociatedTokenAddressSync(hntMint, me),
+              getAssociatedTokenAddressSync(hntMint, maker, true),
+              me,
+              toBN(1000, 6).toNumber()
+            ),
+            ...(await method.transaction()).instructions,
+          ],
+          {
+            addressLookupTableAddresses: [HELIUM_COMMON_LUT],
+            computeScaleUp: 2,
+          }
+        );
+        for (const draft of txs) {
+          const tx = toVersionedTx(draft);
+          try {
+            tx.sign([hotspotOwner]);
+          } catch (e) {
+            // ignore, one of these txs doesn't need hotspot owner to sign
+          }
+          await provider.wallet.signTransaction(tx);
+          await sendAndConfirmWithRetry(
+            provider.connection,
+            Buffer.from(tx.serialize()),
+            {
+              skipPreflight: true,
+            },
+            "confirmed"
+          );
+        }
+
+        const { mobileInfo } = await method.pubkeys();
+
+        const mobileInfoAcc =
+          await hemProgram.account.mobileHotspotInfoV0.fetch(mobileInfo!);
+        expect(Boolean(mobileInfoAcc)).to.be.true;
+        const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(subDao);
+        expect(subDaoAcc.dcOnboardingFeesPaid.toNumber()).to.be.eq(1000000);
+      });
     });
 
     it("issues a mobile hotspot", async () => {
@@ -1370,7 +1434,13 @@ describe("helium-entity-manager", () => {
         dao
       );
 
-      await initTestMaker(hemProgram, provider, rewardableEntityConfig, dao, topupAmounts);
+      await initTestMaker(
+        hemProgram,
+        provider,
+        rewardableEntityConfig,
+        dao,
+        topupAmounts
+      );
 
       await dcProgram.methods
         .mintDataCreditsV0({

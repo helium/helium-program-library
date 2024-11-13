@@ -211,4 +211,18 @@ pub mod helium_entity_manager {
   ) -> Result<()> {
     onboard_data_only_mobile_hotspot_v0::handler(ctx, args)
   }
+
+  pub fn pay_mobile_voucher_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, PayMobileVoucherV0<'info>>,
+    args: PayMobileVoucherArgsV0,
+  ) -> Result<()> {
+    pay_mobile_voucher_v0::handler(ctx, args)
+  }
+
+  pub fn issue_entity_v1<'info>(
+    ctx: Context<'_, '_, '_, 'info, IssueEntityV1<'info>>,
+    args: IssueEntityArgsV0,
+  ) -> Result<()> {
+    issue_entity_v1::handler(ctx, args)
+  }
 }

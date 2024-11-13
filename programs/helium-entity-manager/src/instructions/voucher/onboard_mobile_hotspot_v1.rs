@@ -5,8 +5,8 @@ use helium_sub_daos::DaoV0;
 use shared_utils::{verify_compressed_nft, VerifyCompressedNftArgs};
 
 use crate::{
-  error::ErrorCode, KeyToAssetV0, MakerApprovalV0, MakerV0, MobileHotspotInfoV0,
-  MobileHotspotVoucherV0, RewardableEntityConfigV0, MOBILE_HOTSPOT_INFO_SIZE,
+  error::ErrorCode, KeyToAssetV0, MakerApprovalV0, MakerV0, MobileDeploymentInfoV0,
+  MobileHotspotInfoV0, MobileHotspotVoucherV0, RewardableEntityConfigV0, MOBILE_HOTSPOT_INFO_SIZE,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -15,6 +15,7 @@ pub struct OnboardMobileHotspotArgsV1 {
   pub creator_hash: [u8; 32],
   pub root: [u8; 32],
   pub index: u32,
+  pub deployment_info: Option<MobileDeploymentInfoV0>,
 }
 
 #[derive(Accounts)]
@@ -102,7 +103,7 @@ pub fn handler<'info>(
     is_active: false,
     dc_onboarding_fee_paid: ctx.accounts.mobile_voucher.dc_paid,
     device_type: ctx.accounts.mobile_voucher.device_type,
-    deployment_info: None,
+    deployment_info: args.deployment_info,
   });
 
   Ok(())

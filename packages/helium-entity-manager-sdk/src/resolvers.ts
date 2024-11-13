@@ -55,7 +55,7 @@ export const heliumEntityManagerResolvers = combineResolvers(
     }
   }),
   resolveIndividual(async ({ idlIx, path, args, accounts }) => {
-    const dao = accounts.dao || (accounts.issueEntityCommon as Accounts)?.dao
+    const dao = accounts.dao || (accounts.issueEntityCommon as Accounts)?.dao;
     if (
       path[path.length - 1] === "keyToAsset" &&
       args[args.length - 1] &&
@@ -134,8 +134,11 @@ export const heliumEntityManagerResolvers = combineResolvers(
   }),
   resolveIndividual(async ({ path, args, provider, accounts }) => {
     const merkleTree =
-      accounts.merkleTree || (accounts.issueEntityCommon as Accounts)?.merkleTree;
-    const keyToAsset = accounts.keyToAsset || (accounts.issueEntityCommon as Accounts)?.keyToAsset;
+      accounts.merkleTree ||
+      (accounts.issueEntityCommon as Accounts)?.merkleTree;
+    const keyToAsset =
+      accounts.keyToAsset ||
+      (accounts.issueEntityCommon as Accounts)?.keyToAsset;
     if (
       path[path.length - 1] === "mobileInfo" &&
       merkleTree &&
@@ -219,9 +222,21 @@ export const heliumEntityManagerResolvers = combineResolvers(
     owner: "conversionEscrow",
   }),
   ataResolver({
-    instruction: "mobileVoucherPayDcV0",
+    instruction: "payMobileVoucherV0",
     mint: "hntMint",
-    account: "burner",
+    account: "hntBurner",
+    owner: "maker",
+  }),
+  ataResolver({
+    instruction: "payMobileVoucherV0",
+    mint: "dcMint",
+    account: "dcBurner",
+    owner: "maker",
+  }),
+  ataResolver({
+    instruction: "payMobileVoucherV0",
+    mint: "dntMint",
+    account: "dntBurner",
     owner: "maker",
   }),
   ataResolver({

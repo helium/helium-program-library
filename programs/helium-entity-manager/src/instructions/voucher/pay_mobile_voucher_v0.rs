@@ -1,10 +1,12 @@
 use std::str::FromStr;
 
+use account_compression_cpi::program::SplAccountCompression;
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{burn, Burn, Mint, Token, TokenAccount},
 };
+use bubblegum_cpi::get_asset_id;
 use circuit_breaker::{CircuitBreaker, MintWindowedCircuitBreakerV0};
 use data_credits::{
   cpi::{
@@ -20,17 +22,29 @@ use helium_sub_daos::{
   DaoV0, SubDaoV0, TrackDcOnboardingFeesArgsV0,
 };
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
+use shared_utils::{verify_compressed_nft, VerifyCompressedNftArgs};
 
 use crate::{error::ErrorCode, maker_seeds, state::*, TESTING};
 
 const PRICE_ORACLE: &str = "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx";
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct PayMobileVoucherArgsV0 {
+  pub data_hash: [u8; 32],
+  pub creator_hash: [u8; 32],
+  pub root: [u8; 32],
+  pub index: u32,
+}
+
 #[derive(Accounts)]
+#[instruction(args: PayMobileVoucherArgsV0)]
 pub struct PayMobileVoucherV0<'info> {
   #[account(mut)]
   pub maker: Box<Account<'info, MakerV0>>,
   #[account(mut)]
   pub payer: Signer<'info>,
+  #[account(mut)]
+  pub hotspot_owner: Signer<'info>,
   #[account(
     has_one = sub_dao,
     constraint = rewardable_entity_config.settings.is_mobile(),
@@ -41,7 +55,7 @@ pub struct PayMobileVoucherV0<'info> {
     has_one = rewardable_entity_config,
     has_one = maker,
   )]
-  pub mobile_hotspot_voucher: Box<Account<'info, MobileHotspotVoucherV0>>,
+  pub mobile_voucher: Box<Account<'info, MobileHotspotVoucherV0>>,
   #[account(
     mut,
     has_one = dao,
@@ -105,25 +119,48 @@ pub struct PayMobileVoucherV0<'info> {
     bump = circuit_breaker.bump_seed
   )]
   pub circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
+  #[account(
+    has_one = dao,
+    constraint = get_asset_id(&merkle_tree.key(), args.index.into()) == key_to_asset.asset,
+  )]
+  pub key_to_asset: Box<Account<'info, KeyToAssetV0>>,
+  /// CHECK: The merkle tree
+  pub merkle_tree: UncheckedAccount<'info>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub token_program: Program<'info, Token>,
   pub data_credits_program: Program<'info, DataCredits>,
+  pub compression_program: Program<'info, SplAccountCompression>,
   pub system_program: Program<'info, System>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub helium_sub_daos_program: Program<'info, HeliumSubDaos>,
 }
 
-pub fn handler(ctx: Context<PayMobileVoucherV0>) -> Result<()> {
+pub fn handler<'info>(
+  ctx: Context<'_, '_, '_, 'info, PayMobileVoucherV0<'info>>,
+  args: PayMobileVoucherArgsV0,
+) -> Result<()> {
+  verify_compressed_nft(VerifyCompressedNftArgs {
+    data_hash: args.data_hash,
+    creator_hash: args.creator_hash,
+    root: args.root,
+    index: args.index,
+    compression_program: ctx.accounts.compression_program.to_account_info(),
+    merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
+    owner: ctx.accounts.hotspot_owner.key(),
+    delegate: ctx.accounts.hotspot_owner.key(),
+    proof_accounts: ctx.remaining_accounts.to_vec(),
+  })?;
+
   let fees = ctx
     .accounts
     .rewardable_entity_config
     .settings
-    .mobile_device_fees(ctx.accounts.mobile_hotspot_voucher.device_type)
+    .mobile_device_fees(ctx.accounts.mobile_voucher.device_type)
     .ok_or(error!(ErrorCode::InvalidDeviceType))?;
 
   let dc_fee = fees.dc_onboarding_fee;
   if dc_fee > 0 {
-    if ctx.accounts.dnt_burner.amount < dc_fee {
+    if ctx.accounts.dc_burner.amount < dc_fee {
       mint_data_credits_v0(
         CpiContext::new_with_signer(
           ctx.accounts.data_credits_program.to_account_info(),
@@ -146,7 +183,7 @@ pub fn handler(ctx: Context<PayMobileVoucherV0>) -> Result<()> {
         ),
         MintDataCreditsArgsV0 {
           hnt_amount: None,
-          dc_amount: Some(ctx.accounts.dc_burner.amount - dc_fee),
+          dc_amount: Some(dc_fee - ctx.accounts.dc_burner.amount),
         },
       )?;
     }
@@ -247,8 +284,8 @@ pub fn handler(ctx: Context<PayMobileVoucherV0>) -> Result<()> {
     )?;
   }
 
-  ctx.accounts.mobile_hotspot_voucher.paid = true;
-  ctx.accounts.mobile_hotspot_voucher.dc_paid = dc_fee;
+  ctx.accounts.mobile_voucher.paid = true;
+  ctx.accounts.mobile_voucher.dc_paid = dc_fee;
 
   Ok(())
 }
