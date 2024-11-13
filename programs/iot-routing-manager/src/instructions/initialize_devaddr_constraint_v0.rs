@@ -71,8 +71,11 @@ pub fn handler(
     .start_addr
     .unwrap_or(ctx.accounts.net_id.current_addr_offset);
   let end_addr = start_addr + (args.num_blocks * 8) as u64;
+
+  // Increment end_addr by 1
+  // Since start_addr and end_addr of multiple devaddrs cant overlap
   if end_addr > ctx.accounts.net_id.current_addr_offset {
-    ctx.accounts.net_id.current_addr_offset = end_addr;
+    ctx.accounts.net_id.current_addr_offset = end_addr + 1;
   }
 
   let message = ctx.accounts.iot_price_oracle.price_message;
