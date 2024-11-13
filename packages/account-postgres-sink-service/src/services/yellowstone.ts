@@ -54,37 +54,45 @@ export const setupYellowstone = async (
         try {
           if (data.transaction) {
             const transaction = await convertYellowstoneTransaction(
-              data.transaction!.transaction
+              data.transaction.transaction
             );
 
             if (transaction) {
-              await handleTransactionWebhook({
-                fastify: server,
-                configs,
-                transaction,
-              });
+              try {
+                await handleTransactionWebhook({
+                  fastify: server,
+                  configs,
+                  transaction,
+                });
+              } catch (err) {
+                console.error(err);
+              }
             }
           }
 
-          if (data.account && isSubscribeUpdateAccount(data.account)) {
-            const account = data.account?.account;
-
+          if (data.account) {
+            const account = (data.account as SubscribeUpdateAccount)?.account;
             if (account && configs) {
               const owner = new PublicKey(account.owner).toBase58();
               const config = configs.find((x) => x.programId === owner);
+
               if (config) {
-                await handleAccountWebhook({
-                  fastify: server,
-                  programId: new PublicKey(config.programId),
-                  accounts: config.accounts,
-                  account: {
-                    ...account,
-                    pubkey: new PublicKey(account.pubkey).toBase58(),
-                    data: [account.data],
-                  },
-                  pluginsByAccountType:
-                    pluginsByAccountTypeByProgram[owner] || {},
-                });
+                try {
+                  await handleAccountWebhook({
+                    fastify: server,
+                    programId: new PublicKey(config.programId),
+                    accounts: config.accounts,
+                    account: {
+                      ...account,
+                      pubkey: new PublicKey(account.pubkey).toBase58(),
+                      data: [account.data],
+                    },
+                    pluginsByAccountType:
+                      pluginsByAccountTypeByProgram[owner] || {},
+                  });
+                } catch (err) {
+                  console.error(err);
+                }
               }
             }
           }
@@ -161,10 +169,6 @@ export const setupYellowstone = async (
     );
     setTimeout(() => connect(nextAttempt), RECONNECT_DELAY);
   };
-
-  const isSubscribeUpdateAccount = (
-    data: any
-  ): data is SubscribeUpdateAccount => data && "account" in data;
 
   await connect();
 };
