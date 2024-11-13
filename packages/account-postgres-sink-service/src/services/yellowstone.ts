@@ -12,6 +12,7 @@ import { IConfig } from "../types";
 import { convertYellowstoneTransaction } from "../utils/convertYellowstoneTransaction";
 import { handleAccountWebhook } from "../utils/handleAccountWebhook";
 import { handleTransactionWebhook } from "../utils/handleTransactionWebhook";
+import { limit } from "../utils/database";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 5000; // 5 seconds
@@ -52,50 +53,59 @@ export const setupYellowstone = async (
 
       stream.on("data", async (data: SubscribeUpdate) => {
         try {
+          const promises: Promise<void>[] = [];
+
           if (data.transaction) {
-            const transaction = await convertYellowstoneTransaction(
-              data.transaction.transaction
-            );
+            promises.push(
+              (async () => {
+                const transaction = await convertYellowstoneTransaction(
+                  data.transaction!.transaction
+                );
 
-            if (transaction) {
-              try {
-                await handleTransactionWebhook({
-                  fastify: server,
-                  configs,
-                  transaction,
-                });
-              } catch (err) {
-                console.error(err);
-              }
-            }
-          }
-
-          if (data.account) {
-            const account = (data.account as SubscribeUpdateAccount)?.account;
-            if (account && configs) {
-              const owner = new PublicKey(account.owner).toBase58();
-              const config = configs.find((x) => x.programId === owner);
-
-              if (config) {
-                try {
-                  await handleAccountWebhook({
+                if (transaction) {
+                  await handleTransactionWebhook({
                     fastify: server,
-                    programId: new PublicKey(config.programId),
-                    accounts: config.accounts,
-                    account: {
-                      ...account,
-                      pubkey: new PublicKey(account.pubkey).toBase58(),
-                      data: [account.data],
-                    },
-                    pluginsByAccountType:
-                      pluginsByAccountTypeByProgram[owner] || {},
+                    configs,
+                    transaction,
                   });
-                } catch (err) {
-                  console.error(err);
                 }
-              }
-            }
+              })()
+            );
           }
+
+          if (data.account && isSubscribeUpdateAccount(data.account)) {
+            promises.push(
+              (async () => {
+                const account = data.account?.account;
+
+                if (account && configs) {
+                  const owner = new PublicKey(account.owner).toBase58();
+                  const config = configs.find((x) => x.programId === owner);
+                  if (config) {
+                    await handleAccountWebhook({
+                      fastify: server,
+                      programId: new PublicKey(config.programId),
+                      accounts: config.accounts,
+                      account: {
+                        ...account,
+                        pubkey: new PublicKey(account.pubkey).toBase58(),
+                        data: [account.data],
+                      },
+                      pluginsByAccountType:
+                        pluginsByAccountTypeByProgram[owner] || {},
+                    });
+                  }
+                }
+              })()
+            );
+          }
+
+          await Promise.all(promises).catch((err) => {
+            console.error(
+              "Error processing updates:",
+              err instanceof Error ? err.message : err
+            );
+          });
         } catch (err) {
           console.error("Yellowstone: Error processing data:", err);
         }
@@ -169,6 +179,10 @@ export const setupYellowstone = async (
     );
     setTimeout(() => connect(nextAttempt), RECONNECT_DELAY);
   };
+
+  const isSubscribeUpdateAccount = (
+    data: any
+  ): data is SubscribeUpdateAccount => data && "account" in data;
 
   await connect();
 };

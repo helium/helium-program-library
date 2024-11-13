@@ -3,18 +3,22 @@ import { PublicKey } from "@solana/web3.js";
 import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
-import { Sequelize } from "sequelize";
+import { Sequelize, Transaction } from "sequelize";
 import { IAccountConfig, IInitedPlugin } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
 import database, { limit } from "./database";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { provider } from "./solana";
+import { OMIT_KEYS } from "../constants";
 
 interface HandleAccountWebhookArgs {
   fastify: FastifyInstance;
   programId: PublicKey;
   accounts: IAccountConfig[];
-  account: any;
+  account: {
+    pubkey: string;
+    data: any;
+  };
   isDelete?: boolean;
   sequelize?: Sequelize;
   pluginsByAccountType: Record<string, IInitedPlugin[]>;
@@ -47,8 +51,10 @@ export const handleAccountWebhook = async ({
       throw new Error("idl does not have every account type");
     }
 
-    const t = await sequelize.transaction();
-    const now = new Date().toISOString();
+    const t = await sequelize.transaction({
+      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+    });
+
     try {
       const program = new anchor.Program(idl, programId, provider);
       const data = Buffer.from(account.data[0], account.data[1]);
@@ -67,46 +73,41 @@ export const handleAccountWebhook = async ({
         return;
       }
 
-      const decodedAcc = program.coder.accounts.decode(
-        accName!,
-        data as Buffer
-      );
-
-      const omitKeys = ["refreshed_at", "createdAt"];
+      const decodedAcc = program.coder.accounts.decode(accName, data as Buffer);
       const model = sequelize.models[accName];
-      const existing = await model.findByPk(account.pubkey);
+      const existing = await model.findByPk(account.pubkey, {
+        transaction: t,
+      });
+
       let sanitized = sanitizeAccount(decodedAcc);
 
-      for (const plugin of pluginsByAccountType[accName]) {
-        if (plugin?.processAccount) {
-          sanitized = await plugin.processAccount(sanitized, t);
-        }
-      }
+      await Promise.all(
+        pluginsByAccountType[accName].map(async (plugin) => {
+          if (plugin?.processAccount) {
+            sanitized = await plugin.processAccount(sanitized, t);
+          }
+        })
+      );
 
       if (isDelete) {
         await model.destroy({
-          where: {
-            address: account.pubkey,
-          },
+          where: { address: account.pubkey },
           transaction: t,
         });
       } else {
-        const isEqual =
-          existing &&
-          deepEqual(
-            _omit(sanitized, omitKeys),
-            _omit(existing.dataValues, omitKeys)
-          );
+        sanitized = {
+          refreshed_at: new Date().toISOString(),
+          address: account.pubkey,
+          ...sanitized,
+        };
 
-        if (!isEqual) {
-          await model.upsert(
-            {
-              address: account.pubkey,
-              refreshed_at: now,
-              ...sanitized,
-            },
-            { transaction: t }
-          );
+        const shouldUpdate = !deepEqual(
+          _omit(sanitized, OMIT_KEYS),
+          _omit(existing?.dataValues, OMIT_KEYS)
+        );
+
+        if (shouldUpdate) {
+          await model.upsert({ ...sanitized }, { transaction: t });
         }
       }
 

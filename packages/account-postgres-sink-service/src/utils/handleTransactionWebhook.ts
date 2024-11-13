@@ -6,7 +6,7 @@ import {
 } from "@solana/web3.js";
 import { FastifyInstance } from "fastify";
 import { camelize, humanize, titleize } from "inflection";
-import { Sequelize } from "sequelize";
+import { Sequelize, Transaction } from "sequelize";
 import { IConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
 import database, { limit } from "./database";
@@ -58,7 +58,9 @@ export const handleTransactionWebhook = async ({
       const config = configs.find((x) => x.programId === owner);
 
       if (config) {
-        const t = await sequelize.transaction();
+        const t = await sequelize.transaction({
+          isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+        });
 
         try {
           const idl = await cachedIdlFetch.fetchIdl({

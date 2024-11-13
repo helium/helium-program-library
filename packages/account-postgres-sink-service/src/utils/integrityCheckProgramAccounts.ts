@@ -15,6 +15,7 @@ import { getBlockTimeWithRetry } from "./getBlockTimeWithRetry";
 import { getTransactionSignaturesUptoBlockTime } from "./getTransactionSignaturesUpToBlock";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
+import { OMIT_KEYS } from "../constants";
 
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;
@@ -36,7 +37,7 @@ export const integrityCheckProgramAccounts = async ({
   accounts,
   sequelize = database,
 }: IntegrityCheckProgramAccountsArgs) => {
-  console.log(`Integrity checking program: ${programId}`);
+  console.log(`Integrity checking: ${programId}`);
   anchor.setProvider(
     anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
   );
@@ -175,7 +176,6 @@ export const integrityCheckProgramAccounts = async ({
             );
 
             if (accName) {
-              const omitKeys = ["refreshed_at", "createdAt"];
               const model = sequelize.models[accName];
               const existing = await model.findByPk(c.pubkey, {
                 transaction: t,
@@ -194,8 +194,8 @@ export const integrityCheckProgramAccounts = async ({
               }
 
               const shouldUpdate = !deepEqual(
-                _omit(sanitized, omitKeys),
-                _omit(existing?.dataValues, omitKeys)
+                _omit(sanitized, OMIT_KEYS),
+                _omit(existing?.dataValues, OMIT_KEYS)
               );
 
               if (shouldUpdate) {
@@ -214,19 +214,21 @@ export const integrityCheckProgramAccounts = async ({
       );
 
       await t.commit();
-
+      console.log(`Integrity check complete for: ${programId}`);
       if (corrections.length > 0) {
         console.log(`Integrity check corrections for: ${programId}`);
-        for (const correction of corrections) {
-          // @ts-ignore
-          fastify.customMetrics.integrityCheckCounter.inc();
-          console.dir(correction, { depth: null });
-        }
+        await Promise.all(
+          corrections.map(async (correction) => {
+            // @ts-ignore
+            fastify.customMetrics.integrityCheckCounter.inc();
+            console.dir(correction, { depth: null });
+          })
+        );
       }
     } catch (err) {
       await t.rollback();
       console.error(
-        `Integrity check error while inserting for ${programId}:`,
+        `Integrity check error while inserting for: ${programId}`,
         err
       );
       throw err; // Rethrow the error to be caught by the retry mechanism

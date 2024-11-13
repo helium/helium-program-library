@@ -325,7 +325,7 @@ export class OracleServer {
   private async signTransaction(
     data: number[]
   ): Promise<{ success: boolean; message?: string; transaction?: Buffer }> {
-    console.log("data is", data)
+    console.log("data is", data);
     const conn = this.ldProgram.provider.connection;
     const tx = VersionedTransaction.deserialize(new Uint8Array(data));
     const LUTs = (
@@ -426,10 +426,13 @@ export class OracleServer {
 
       // Since recipient wont exist to fetch to get the mint id, grab it from the init recipient ix
       if (decoded.name === "initializeRecipientV0") {
-        const recipient = allAccs[ix.accountKeyIndexes[recipientIdxInitRecipient]].toBase58();
+        const recipient =
+          allAccs[ix.accountKeyIndexes[recipientIdxInitRecipient]].toBase58();
         recipientToLazyDistToMint[recipient] ||= {};
         const lazyDist =
-          allAccs[ix.accountKeyIndexes[lazyDistributorIdxInitRecipient]].toBase58();
+          allAccs[
+            ix.accountKeyIndexes[lazyDistributorIdxInitRecipient]
+          ].toBase58();
         recipientToLazyDistToMint[recipient][lazyDist] =
           allAccs[ix.accountKeyIndexes[mintIdx]];
       }
@@ -437,10 +440,14 @@ export class OracleServer {
       // Since recipient wont exist to fetch to get the asset id, grab it from the init recipient ix
       if (decoded.name === "initializeCompressionRecipientV0") {
         const recipient =
-          allAccs[ix.accountKeyIndexes[recipientIdxInitCompressionRecipient]].toBase58();
+          allAccs[
+            ix.accountKeyIndexes[recipientIdxInitCompressionRecipient]
+          ].toBase58();
         recipientToLazyDistToMint[recipient] ||= {};
         const lazyDist =
-          allAccs[ix.accountKeyIndexes[lazyDistributorIdxInitCompressionRecipient]].toBase58();
+          allAccs[
+            ix.accountKeyIndexes[lazyDistributorIdxInitCompressionRecipient]
+          ].toBase58();
         const merkleTree =
           allAccs[ix.accountKeyIndexes[merkleTreeIdxInitCompressionRecipient]];
 
@@ -494,7 +501,9 @@ export class OracleServer {
       let entityKey: Buffer;
       let keyToAssetK: PublicKey | undefined = undefined;
       if (
-        allAccs[ix.accountKeyIndexes[wrapperOracleKeyIdx]].equals(this.oracle.publicKey) &&
+        allAccs[ix.accountKeyIndexes[wrapperOracleKeyIdx]].equals(
+          this.oracle.publicKey
+        ) &&
         allAccs[ix.programIdIndex].equals(RO_PID)
       ) {
         let decoded = (
@@ -517,7 +526,9 @@ export class OracleServer {
           };
         }
       } else if (
-        allAccs[ix.accountKeyIndexes[oracleKeyIdx]].equals(this.oracle.publicKey) &&
+        allAccs[ix.accountKeyIndexes[oracleKeyIdx]].equals(
+          this.oracle.publicKey
+        ) &&
         allAccs[ix.programIdIndex].equals(LD_PID)
       ) {
         let decoded = (
@@ -582,7 +593,7 @@ export class OracleServer {
       tx.sign([this.oracle]);
     } catch (e: any) {
       if (!e.message.toString().includes("Cannot sign with non signer key")) {
-        throw e
+        throw e;
       }
     }
 
@@ -642,7 +653,7 @@ export class OracleServer {
       res
         .status(400)
         .send({ error: result.message || "Error signing transaction" });
-      return
+      return;
     }
 
     res.send({ success: true, transaction: result.transaction });
