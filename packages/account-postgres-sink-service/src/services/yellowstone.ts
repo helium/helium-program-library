@@ -52,59 +52,42 @@ export const setupYellowstone = async (
 
       stream.on("data", async (data: SubscribeUpdate) => {
         try {
-          const promises: Promise<void>[] = [];
-
           if (data.transaction) {
-            promises.push(
-              (async () => {
-                const transaction = await convertYellowstoneTransaction(
-                  data.transaction!.transaction
-                );
-
-                if (transaction) {
-                  await handleTransactionWebhook({
-                    fastify: server,
-                    configs,
-                    transaction,
-                  });
-                }
-              })()
+            const transaction = await convertYellowstoneTransaction(
+              data.transaction!.transaction
             );
+
+            if (transaction) {
+              await handleTransactionWebhook({
+                fastify: server,
+                configs,
+                transaction,
+              });
+            }
           }
 
           if (data.account && isSubscribeUpdateAccount(data.account)) {
-            promises.push(
-              (async () => {
-                const account = data.account?.account;
+            const account = data.account?.account;
 
-                if (account && configs) {
-                  const owner = new PublicKey(account.owner).toBase58();
-                  const config = configs.find((x) => x.programId === owner);
-                  if (config) {
-                    await handleAccountWebhook({
-                      fastify: server,
-                      programId: new PublicKey(config.programId),
-                      accounts: config.accounts,
-                      account: {
-                        ...account,
-                        pubkey: new PublicKey(account.pubkey).toBase58(),
-                        data: [account.data],
-                      },
-                      pluginsByAccountType:
-                        pluginsByAccountTypeByProgram[owner] || {},
-                    });
-                  }
-                }
-              })()
-            );
+            if (account && configs) {
+              const owner = new PublicKey(account.owner).toBase58();
+              const config = configs.find((x) => x.programId === owner);
+              if (config) {
+                await handleAccountWebhook({
+                  fastify: server,
+                  programId: new PublicKey(config.programId),
+                  accounts: config.accounts,
+                  account: {
+                    ...account,
+                    pubkey: new PublicKey(account.pubkey).toBase58(),
+                    data: [account.data],
+                  },
+                  pluginsByAccountType:
+                    pluginsByAccountTypeByProgram[owner] || {},
+                });
+              }
+            }
           }
-
-          await Promise.all(promises).catch((err) => {
-            console.error(
-              "Error processing updates:",
-              err instanceof Error ? err.message : err
-            );
-          });
         } catch (err) {
           console.error("Yellowstone: Error processing data:", err);
         }
