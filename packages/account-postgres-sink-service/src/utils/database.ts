@@ -20,6 +20,14 @@ export const database = new Sequelize({
     min: 5,
     acquire: 60000,
     idle: 10000,
+    validate: (client: any) => {
+      try {
+        client.query("SELECT 1");
+        return true;
+      } catch (err) {
+        return false;
+      }
+    },
   },
   hooks: {
     beforeConnect: async (config: any) => {
