@@ -22,12 +22,11 @@ export const setupYellowstone = async (
     throw new Error("YELLOWSTONE_TOKEN undefined");
   }
 
-  let isReconnecting = false;
   const pluginsByAccountTypeByProgram = await getPluginsByAccountTypeByProgram(
     configs
   );
 
-  const connect = async (attemptCount = 0) => {
+  const connect = async () => {
     await retry(
       async (bail, attempt) => {
         const client = new Client(YELLOWSTONE_URL, YELLOWSTONE_TOKEN, {
@@ -40,8 +39,6 @@ export const setupYellowstone = async (
         try {
           const stream = await client.subscribe();
           console.log("Connected to Yellowstone");
-          attemptCount = 0;
-          isReconnecting = false;
 
           stream.on("data", async (data: SubscribeUpdate) => {
             try {
