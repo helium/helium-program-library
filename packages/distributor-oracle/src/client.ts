@@ -178,10 +178,13 @@ export async function getPendingRewards(
     );
 
     const subbed = oracleMedian.sub(recipientAcc?.totalRewards || new BN(0));
-    acc[entityKey] = subbed.toString();
+    acc[entityKey] = {
+      pendingRewards: subbed.toString(),
+      lifetimeRewards: recipientAcc?.totalRewards?.toString() || '0',
+    };
 
     return acc;
-  }, {} as Record<string, string>);
+  }, {} as Record<string, { pendingRewards: string; lifetimeRewards: string }>);
 }
 
 export async function formBulkTransactions({
