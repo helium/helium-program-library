@@ -107,20 +107,14 @@ export async function getBulkRewards(
   });
 }
 
-export async function getPendingRewards(
+export async function getRecipients(
   program: Program<LazyDistributor>,
   lazyDistributor: PublicKey,
   dao: PublicKey,
   entityKeys: string[],
   encoding: BufferEncoding | "b58" = "b58",
   forceRequery = false
-): Promise<Record<string, string>> {
-  const oracleRewards = await getBulkRewards(
-    program,
-    lazyDistributor,
-    entityKeys
-  );
-
+): Promise<{ entityKey: string; recipientAcc: IdlAccounts<LazyDistributor>["recipientV0"] }[]> {
   const hemProgram = await init(program.provider as AnchorProvider);
   const cache = await getSingleton(hemProgram.provider.connection);
   const keyToAssetKs = entityKeys.map((entityKey) => {
@@ -161,12 +155,30 @@ export async function getPendingRewards(
     false,
     forceRequery
   );
-  const withRecipients = recipients.map((recipient, index) => {
+
+  return recipients.map((recipient, index) => {
     return {
       entityKey: entityKeys[index],
       recipientAcc: recipient?.info,
     };
   });
+}
+
+export async function getPendingRewards(
+  program: Program<LazyDistributor>,
+  lazyDistributor: PublicKey,
+  dao: PublicKey,
+  entityKeys: string[],
+  encoding: BufferEncoding | "b58" = "b58",
+  forceRequery = false
+): Promise<Record<string, string>> {
+  const oracleRewards = await getBulkRewards(
+    program,
+    lazyDistributor,
+    entityKeys
+  );
+
+  const withRecipients = await getRecipients(program, lazyDistributor, dao, entityKeys, encoding, forceRequery);
 
   return withRecipients.reduce((acc, { entityKey, recipientAcc }) => {
     const sortedOracleRewards = oracleRewards
@@ -191,59 +203,17 @@ export async function getPendingAndLifetimeRewards(
   entityKeys: string[],
   encoding: BufferEncoding | "b58" = "b58",
   forceRequery = false
-): Promise<Record<string, string>> {
+): Promise<Record<string, {
+  pendingRewards: string;
+  lifetimeRewards: string;
+}>> {
   const oracleRewards = await getBulkRewards(
     program,
     lazyDistributor,
     entityKeys
   );
 
-  const hemProgram = await init(program.provider as AnchorProvider);
-  const cache = await getSingleton(hemProgram.provider.connection);
-  const keyToAssetKs = entityKeys.map((entityKey) => {
-    return keyToAssetKey(dao, entityKey, encoding)[0];
-  });
-
-  const keyToAssets = await cache.searchMultiple(
-    keyToAssetKs,
-    (pubkey, account) => ({
-      pubkey,
-      account,
-      info: hemProgram.coder.accounts.decode<
-        IdlAccounts<HeliumEntityManager>["keyToAssetV0"]
-      >("KeyToAssetV0", account.data),
-    }),
-    true,
-    false
-  );
-  keyToAssets.forEach((kta, index) => {
-    if (!kta?.info) {
-      throw new Error(
-        `Key to asset account not found for entity key ${entityKeys[index]}`
-      );
-    }
-  });
-  const recipientKs = keyToAssets.map(
-    (keyToAsset) => recipientKey(lazyDistributor, keyToAsset!.info!.asset)[0]
-  );
-  const recipients = await cache.searchMultiple(
-    recipientKs,
-    (pubkey, account) => ({
-      pubkey,
-      account,
-      info: program.coder.accounts.decode<
-        IdlAccounts<LazyDistributor>["recipientV0"]
-      >("RecipientV0", account.data),
-    }),
-    false,
-    forceRequery
-  );
-  const withRecipients = recipients.map((recipient, index) => {
-    return {
-      entityKey: entityKeys[index],
-      recipientAcc: recipient?.info,
-    };
-  });
+  const withRecipients = await getRecipients(program, lazyDistributor, dao, entityKeys, encoding, forceRequery);
 
   return withRecipients.reduce((acc, { entityKey, recipientAcc }) => {
     const sortedOracleRewards = oracleRewards
