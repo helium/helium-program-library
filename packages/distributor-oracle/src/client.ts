@@ -178,6 +178,83 @@ export async function getPendingRewards(
     );
 
     const subbed = oracleMedian.sub(recipientAcc?.totalRewards || new BN(0));
+    acc[entityKey] = subbed.toString();
+
+    return acc;
+  }, {} as Record<string, string>);
+}
+
+export async function getPendingAndLifetimeRewards(
+  program: Program<LazyDistributor>,
+  lazyDistributor: PublicKey,
+  dao: PublicKey,
+  entityKeys: string[],
+  encoding: BufferEncoding | "b58" = "b58",
+  forceRequery = false
+): Promise<Record<string, string>> {
+  const oracleRewards = await getBulkRewards(
+    program,
+    lazyDistributor,
+    entityKeys
+  );
+
+  const hemProgram = await init(program.provider as AnchorProvider);
+  const cache = await getSingleton(hemProgram.provider.connection);
+  const keyToAssetKs = entityKeys.map((entityKey) => {
+    return keyToAssetKey(dao, entityKey, encoding)[0];
+  });
+
+  const keyToAssets = await cache.searchMultiple(
+    keyToAssetKs,
+    (pubkey, account) => ({
+      pubkey,
+      account,
+      info: hemProgram.coder.accounts.decode<
+        IdlAccounts<HeliumEntityManager>["keyToAssetV0"]
+      >("KeyToAssetV0", account.data),
+    }),
+    true,
+    false
+  );
+  keyToAssets.forEach((kta, index) => {
+    if (!kta?.info) {
+      throw new Error(
+        `Key to asset account not found for entity key ${entityKeys[index]}`
+      );
+    }
+  });
+  const recipientKs = keyToAssets.map(
+    (keyToAsset) => recipientKey(lazyDistributor, keyToAsset!.info!.asset)[0]
+  );
+  const recipients = await cache.searchMultiple(
+    recipientKs,
+    (pubkey, account) => ({
+      pubkey,
+      account,
+      info: program.coder.accounts.decode<
+        IdlAccounts<LazyDistributor>["recipientV0"]
+      >("RecipientV0", account.data),
+    }),
+    false,
+    forceRequery
+  );
+  const withRecipients = recipients.map((recipient, index) => {
+    return {
+      entityKey: entityKeys[index],
+      recipientAcc: recipient?.info,
+    };
+  });
+
+  return withRecipients.reduce((acc, { entityKey, recipientAcc }) => {
+    const sortedOracleRewards = oracleRewards
+      .map((rew) => rew.currentRewards[entityKey] || new BN(0))
+      .sort((a, b) => new BN(a).sub(new BN(b)).toNumber());
+
+    const oracleMedian = new BN(
+      sortedOracleRewards[Math.floor(sortedOracleRewards.length / 2)]
+    );
+
+    const subbed = oracleMedian.sub(recipientAcc?.totalRewards || new BN(0));
     acc[entityKey] = {
       pendingRewards: subbed.toString(),
       lifetimeRewards: recipientAcc?.totalRewards?.toString() || '0',
