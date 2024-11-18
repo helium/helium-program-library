@@ -360,13 +360,27 @@ LIMIT ${limit};
 server.get<{
   Params: { proposal: string };
 }>("/v1/proposals/:proposal/votes", async (request, reply) => {
-  const proposal = request.params.proposal;
+  const proposal = sequelize.escape(request.params.proposal);
 
-  return VoteMarker.findAll({
-    where: {
-      proposal,
-    },
-  });
+  return (
+    await sequelize.query(`
+      WITH exploded_choice_vote_markers AS (
+        SELECT voter, registrar, proposal, sum(weight) as weight, unnest(choices) as choice
+        FROM vote_markers
+        WHERE proposal = ${proposal}
+        GROUP BY voter, registrar, proposal, choice
+      )
+      SELECT
+        vm.voter,
+        vm.registrar,
+        vm.proposal,
+        vm.weight,
+        vm.choice,
+        p.choices[vm.choice + 1]->>'name' as "choiceName"
+      FROM exploded_choice_vote_markers vm
+      JOIN proposals p ON p.address = vm.proposal
+    `)
+  )[0].map(deepCamelCaseKeys);
 });
 
 function deepCamelCaseKeys(obj: any): any {
