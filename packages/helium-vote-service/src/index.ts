@@ -1,17 +1,8 @@
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import { organizationKey } from "@helium/organization-sdk";
-import {
-  Asset,
-  HNT_MINT,
-  IOT_MINT,
-  MOBILE_MINT,
-  searchAssets,
-} from "@helium/spl-utils";
-import {
-  getPositionKeysForOwner,
-  registrarCollectionKey,
-} from "@helium/voter-stake-registry-sdk";
+import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import { getPositionKeysForOwner } from "@helium/voter-stake-registry-sdk";
 import Fastify, { FastifyInstance } from "fastify";
 import fs from "fs";
 import { camelCase, isPlainObject, mapKeys } from "lodash";
@@ -23,6 +14,7 @@ import {
   Proxy,
   ProxyAssignment,
   ProxyRegistrar,
+  VoteMarker,
   Registrar,
   sequelize,
   setRelations,
@@ -30,9 +22,16 @@ import {
 import { cloneRepo, readProxiesAndUpsert } from "./repo";
 import { Connection, PublicKey } from "@solana/web3.js";
 
+const ORG_IDS = {
+  [HNT_MINT.toBase58()]: organizationKey("Helium")[0].toBase58(),
+  [MOBILE_MINT.toBase58()]: organizationKey("Helium MOBILE")[0].toBase58(),
+  [IOT_MINT.toBase58()]: organizationKey("Helium IOT")[0].toBase58(),
+};
+
 const server: FastifyInstance = Fastify({
   logger: true,
 });
+
 server.register(cors, {
   origin: "*",
 });
@@ -50,22 +49,12 @@ server.register(fastifyStatic, {
 server.get("/health", async () => {
   return { ok: true };
 });
+
 server.get("/v1/sync", async () => {
   await cloneRepo();
   await readProxiesAndUpsert();
 });
 
-const registrarsByMint = {
-  [HNT_MINT.toBase58()]: new PublicKey(
-    "BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz"
-  ),
-  [IOT_MINT.toBase58()]: new PublicKey(
-    "7ZZopN1mx6ECcb3YCG8dbxeLpA44xq4gzA1ETEiaLoeL"
-  ),
-  [MOBILE_MINT.toBase58()]: new PublicKey(
-    "C4DWaps9bLiqy4e81wJ7VTQ6QR7C4MWvwsei3ZjsaDuW"
-  ),
-};
 server.get<{
   Params: { registrar: string };
   Querystring: {
@@ -165,7 +154,7 @@ server.get<{
   const escapedRegistrar = sequelize.escape(registrar);
 
   const proxies = await sequelize.query(`
-WITH 
+WITH
   positions_with_proxy_assignments AS (
     SELECT
       *
@@ -196,7 +185,7 @@ WITH
       100 * sum(p.ve_tokens) / (select total_vetokens from total_vetokens) as "percent"
     FROM
       proxies
-    JOIN proxy_registrars pr ON pr.wallet = proxies.wallet 
+    JOIN proxy_registrars pr ON pr.wallet = proxies.wallet
     LEFT OUTER JOIN positions_with_proxy_assignments p ON p.voter = proxies.wallet
     WHERE pr.registrar = ${escapedRegistrar}
           ${
@@ -237,7 +226,7 @@ server.get<{
   const escapedWallet = sequelize.escape(request.params.wallet);
 
   const proxies = await sequelize.query(`
-WITH 
+WITH
   positions_with_proxy_assignments AS (
     SELECT
       *
@@ -326,12 +315,6 @@ server.get<{
   return registrars.map((r) => r.registrar);
 });
 
-const ORG_IDS = {
-  [HNT_MINT.toBase58()]: organizationKey("Helium")[0].toBase58(),
-  [MOBILE_MINT.toBase58()]: organizationKey("Helium MOBILE")[0].toBase58(),
-  [IOT_MINT.toBase58()]: organizationKey("Helium IOT")[0].toBase58(),
-};
-
 server.get<{
   Params: { registrar: string; wallet: string };
   Querystring: { limit: number; page: number };
@@ -354,7 +337,7 @@ WITH exploded_choice_vote_markers AS(
   FROM vote_markers
   GROUP BY voter, registrar, proposal, choice
 )
-SELECT 
+SELECT
   p.*,
   json_agg(json_build_object(
     'voter', vms.voter,
@@ -372,6 +355,18 @@ OFFSET ${offset}
 LIMIT ${limit};
     `);
   return result[0].map(deepCamelCaseKeys);
+});
+
+server.get<{
+  Params: { proposal: string };
+}>("/v1/proposals/:proposal/votes", async (request, reply) => {
+  const proposal = request.params.proposal;
+
+  return VoteMarker.findAll({
+    where: {
+      proposal,
+    },
+  });
 });
 
 function deepCamelCaseKeys(obj: any): any {
@@ -425,4 +420,5 @@ const start = async () => {
     process.exit(1);
   }
 };
+
 start();
