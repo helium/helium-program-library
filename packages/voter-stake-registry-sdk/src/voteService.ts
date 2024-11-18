@@ -3,7 +3,6 @@ import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry"
 import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import { PublicKey } from "@solana/web3.js";
 import axios, { AxiosInstance } from "axios";
-import BN from "bn.js";
 
 export type ProxyAssignment = {
   voter: string;
@@ -62,13 +61,15 @@ export type Proposal = {
 };
 
 export type ProposalWithVotes = Proposal & {
-  votes: {
-    voter: string;
-    registrar: string;
-    weight: string;
-    choice: number;
-    choiceName: string;
-  }[];
+  votes: Vote[];
+};
+
+export type Vote = {
+  voter: string;
+  registrar: string;
+  weight: string;
+  choice: number;
+  choiceName: string;
 };
 
 export class VoteService {
@@ -133,6 +134,26 @@ export class VoteService {
             params: { limit, page },
           }
         )
+      ).data;
+    } else {
+      throw new Error("This is not supported without an indexer");
+    }
+  }
+
+  async getVotesForProposal({
+    proposal,
+    page,
+    limit = 1000,
+  }: {
+    proposal: PublicKey;
+    page: number;
+    limit: number;
+  }): Promise<Vote[]> {
+    if (this.client) {
+      return (
+        await this.client.get(`/v1/proposals/${proposal.toBase58()}/votes`, {
+          params: { limit, page },
+        })
       ).data;
     } else {
       throw new Error("This is not supported without an indexer");
@@ -335,9 +356,7 @@ export class VoteService {
     return response.data.map(this.mapRoutes);
   }
 
-  async getProxy(
-    wallet: PublicKey
-  ): Promise<PartialEnhancedProxy> {
+  async getProxy(wallet: PublicKey): Promise<PartialEnhancedProxy> {
     if (!this.client) {
       throw new Error("This operation is not supported without an API");
     }
