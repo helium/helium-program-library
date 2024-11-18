@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.9.12",
+  "version": "0.9.13",
   "description": "Interface to the position-voting-rewards smart contract",
   "repository": {
     "type": "git",
@@ -32,9 +32,9 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.28.0",
-    "@helium/anchor-resolvers": "^0.9.12",
-    "@helium/idls": "^0.9.12",
-    "@helium/spl-utils": "^0.9.12",
+    "@helium/anchor-resolvers": "^0.9.13",
+    "@helium/idls": "^0.9.13",
+    "@helium/spl-utils": "^0.9.13",
     "@solana/spl-token": "^0.3.8",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
