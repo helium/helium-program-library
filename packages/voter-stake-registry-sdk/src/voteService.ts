@@ -140,20 +140,10 @@ export class VoteService {
     }
   }
 
-  async getVotesForProposal({
-    proposal,
-    page,
-    limit = 1000,
-  }: {
-    proposal: PublicKey;
-    page: number;
-    limit: number;
-  }): Promise<Vote[]> {
+  async getVotesForProposal(proposal: PublicKey): Promise<Vote[]> {
     if (this.client) {
       return (
-        await this.client.get(`/v1/proposals/${proposal.toBase58()}/votes`, {
-          params: { limit, page },
-        })
+        await this.client.get(`/v1/proposals/${proposal.toBase58()}/votes`)
       ).data;
     } else {
       throw new Error("This is not supported without an indexer");
