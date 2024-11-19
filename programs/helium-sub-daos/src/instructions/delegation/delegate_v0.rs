@@ -1,3 +1,10 @@
+use anchor_lang::{prelude::*, Discriminator};
+use anchor_spl::token::{Mint, TokenAccount};
+use voter_stake_registry::{
+  state::{LockupKind, PositionV0, Registrar},
+  VoterStakeRegistry,
+};
+
 use self::borsh::BorshSerialize;
 use crate::{
   create_account::{create_and_serialize_account_signed, AccountMaxSize},
@@ -6,13 +13,6 @@ use crate::{
   id,
   state::*,
   utils::*,
-};
-use anchor_lang::{prelude::*, Discriminator};
-use anchor_spl::token::{Mint, TokenAccount};
-
-use voter_stake_registry::{
-  state::{LockupKind, PositionV0, Registrar},
-  VoterStakeRegistry,
 };
 
 #[derive(Accounts)]
@@ -215,6 +215,8 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
             rewards_issued_at: None,
             initialized: false,
             dc_onboarding_fees_paid: 0,
+            hnt_delegation_rewards_issued: 0,
+            hnt_rewards_issued: 0,
           },
         },
         &[

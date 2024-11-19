@@ -41,14 +41,14 @@ pub struct ClaimRewardsV0<'info> {
   pub position_authority: Signer<'info>,
   pub registrar: Box<Account<'info, Registrar>>,
   #[account(
-    has_one = registrar
+    has_one = registrar,
+    has_one = hnt_mint
   )]
   pub dao: Box<Account<'info, DaoV0>>,
 
   #[account(
     mut,
-    has_one = delegator_pool,
-    has_one = dnt_mint,
+    has_one = hnt_delegator_pool,
     has_one = dao,
   )]
   pub sub_dao: Account<'info, SubDaoV0>,
@@ -60,7 +60,7 @@ pub struct ClaimRewardsV0<'info> {
   )]
   pub delegated_position: Account<'info, DelegatedPositionV0>,
 
-  pub dnt_mint: Box<Account<'info, Mint>>,
+  pub hnt_mint: Box<Account<'info, Mint>>,
 
   #[account(
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
@@ -69,11 +69,11 @@ pub struct ClaimRewardsV0<'info> {
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   #[account(mut)]
-  pub delegator_pool: Box<Account<'info, TokenAccount>>,
+  pub hnt_delegator_pool: Box<Account<'info, TokenAccount>>,
   #[account(
     init_if_needed,
     payer = position_authority,
-    associated_token::mint = dnt_mint,
+    associated_token::mint = hnt_mint,
     associated_token::authority = position_authority,
   )]
   pub delegator_ata: Box<Account<'info, TokenAccount>>,
@@ -81,7 +81,7 @@ pub struct ClaimRewardsV0<'info> {
   /// CHECK: checked via cpi
   #[account(
     mut,
-    seeds = ["account_windowed_breaker".as_bytes(), delegator_pool.key().as_ref()],
+    seeds = ["account_windowed_breaker".as_bytes(), hnt_delegator_pool.key().as_ref()],
     seeds::program = circuit_breaker_program.key(),
     bump
   )]
@@ -97,7 +97,7 @@ pub struct ClaimRewardsV0<'info> {
 impl<'info> ClaimRewardsV0<'info> {
   fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, TransferV0<'info>> {
     let cpi_accounts = TransferV0 {
-      from: self.delegator_pool.to_account_info(),
+      from: self.hnt_delegator_pool.to_account_info(),
       to: self.delegator_ata.to_account_info(),
       owner: self.sub_dao.to_account_info(),
       circuit_breaker: self.delegator_pool_circuit_breaker.to_account_info(),
@@ -133,14 +133,19 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
   msg!("Staked {} veHNT at start of epoch with {} total veHNT delegated to subdao and {} total rewards to subdao", 
     delegated_vehnt_at_epoch,
     ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start,
-    ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued
+    ctx.accounts.sub_dao_epoch_info.hnt_delegation_rewards_issued
   );
 
   // calculate the position's share of that epoch's rewards
   // rewards = staking_rewards_issued * staked_vehnt_at_epoch / total_vehnt
   let rewards = u64::try_from(
     delegated_vehnt_at_epoch
-      .checked_mul(ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued as u128)
+      .checked_mul(
+        ctx
+          .accounts
+          .sub_dao_epoch_info
+          .hnt_delegation_rewards_issued as u128,
+      )
       .unwrap()
       .checked_div(ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start as u128)
       .unwrap(),
@@ -149,7 +154,7 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
 
   delegated_position.set_claimed(args.epoch)?;
 
-  let amount_left = ctx.accounts.delegator_pool.amount;
+  let amount_left = ctx.accounts.hnt_delegator_pool.amount;
   transfer_v0(
     ctx.accounts.transfer_ctx().with_signer(&[&[
       b"sub_dao",
