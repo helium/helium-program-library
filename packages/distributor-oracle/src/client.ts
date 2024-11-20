@@ -114,7 +114,7 @@ export async function getRecipients(
   entityKeys: string[],
   encoding: BufferEncoding | "b58" = "b58",
   forceRequery = false
-): Promise<{ entityKey: string; recipientAcc: IdlAccounts<LazyDistributor>["recipientV0"] }[]> {
+) {
   const hemProgram = await init(program.provider as AnchorProvider);
   const cache = await getSingleton(hemProgram.provider.connection);
   const keyToAssetKs = entityKeys.map((entityKey) => {
@@ -178,7 +178,14 @@ export async function getPendingRewards(
     entityKeys
   );
 
-  const withRecipients = await getRecipients(program, lazyDistributor, dao, entityKeys, encoding, forceRequery);
+  const withRecipients = await getRecipients(
+    program,
+    lazyDistributor,
+    dao,
+    entityKeys,
+    encoding,
+    forceRequery
+  );
 
   return withRecipients.reduce((acc, { entityKey, recipientAcc }) => {
     const sortedOracleRewards = oracleRewards
@@ -203,17 +210,29 @@ export async function getPendingAndLifetimeRewards(
   entityKeys: string[],
   encoding: BufferEncoding | "b58" = "b58",
   forceRequery = false
-): Promise<Record<string, {
-  pendingRewards: string;
-  lifetimeRewards: string;
-}>> {
+): Promise<
+  Record<
+    string,
+    {
+      pendingRewards: string;
+      lifetimeRewards: string;
+    }
+  >
+> {
   const oracleRewards = await getBulkRewards(
     program,
     lazyDistributor,
     entityKeys
   );
 
-  const withRecipients = await getRecipients(program, lazyDistributor, dao, entityKeys, encoding, forceRequery);
+  const withRecipients = await getRecipients(
+    program,
+    lazyDistributor,
+    dao,
+    entityKeys,
+    encoding,
+    forceRequery
+  );
 
   return withRecipients.reduce((acc, { entityKey, recipientAcc }) => {
     const sortedOracleRewards = oracleRewards
@@ -227,7 +246,7 @@ export async function getPendingAndLifetimeRewards(
     const subbed = oracleMedian.sub(recipientAcc?.totalRewards || new BN(0));
     acc[entityKey] = {
       pendingRewards: subbed.toString(),
-      lifetimeRewards: recipientAcc?.totalRewards?.toString() || '0',
+      lifetimeRewards: recipientAcc?.totalRewards?.toString() || "0",
     };
 
     return acc;
