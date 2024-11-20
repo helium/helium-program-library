@@ -18,11 +18,8 @@ pub struct RelinquishExpiredVoteV0<'info> {
     close = rent_refund
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
-  #[account(
-    mut,
-    constraint = position.mint == marker.mint
-  )]
-  pub position: Box<Account<'info, PositionV0>>,
+  #[account(mut)]
+  pub position: AccountInfo<'info>,
   #[account(
     constraint = !matches!(proposal.state, ProposalState::Voting { .. })
   )]
@@ -31,9 +28,12 @@ pub struct RelinquishExpiredVoteV0<'info> {
 }
 
 pub fn handler(ctx: Context<RelinquishExpiredVoteV0>) -> Result<()> {
-  // Allow closing old markers that just had the relinquished boolean.
-  if !ctx.accounts.marker._deprecated_relinquished {
-    ctx.accounts.position.num_active_votes -= ctx.accounts.marker.choices.len() as u16;
+  let mut data = ctx.accounts.position.try_borrow_mut_data()?;
+  if !data.is_empty() && !ctx.accounts.marker._deprecated_relinquished {
+    let mut position = PositionV0::try_deserialize(&mut data.as_ref())?;
+    require_eq!(position.mint, ctx.accounts.marker.mint);
+    position.num_active_votes -= ctx.accounts.marker.choices.len() as u16;
+    position.try_serialize(&mut *data)?;
   }
 
   Ok(())
