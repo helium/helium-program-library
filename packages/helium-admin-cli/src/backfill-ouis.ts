@@ -341,7 +341,7 @@ export async function run(args: any = process.argv) {
             return await irm.methods
               .tempBackfillOrganizationDelegate()
               .accounts({
-                authority: wallet.publicKey,
+                payer: wallet.publicKey,
                 organization: orgK,
                 delegate: delegateSolAddr,
               })
@@ -377,7 +377,7 @@ export async function run(args: any = process.argv) {
         const [devaddrConstraintK] = devaddrConstraintKey(orgK, startAddrBn);
         if (!(await exists(conn, devaddrConstraintK))) {
           return await irm.methods
-            .initializeDevaddrConstraintV0({
+            .tempBackfillDevaddrConstraint({
               startAddr: startAddrBn,
               numBlocks: numBlocksBn.toNumber(),
             })

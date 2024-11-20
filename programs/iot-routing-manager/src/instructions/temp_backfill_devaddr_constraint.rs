@@ -6,14 +6,14 @@ use std::str::FromStr;
 use crate::{DevaddrConstraintV0, IotRoutingManagerV0, NetIdV0, OrganizationV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct TempBackfillDevaddrConstraintArgsV0 {
+pub struct TempBackfillDevaddrConstraintArgs {
   pub num_blocks: u32,
   pub start_addr: u64,
 }
 
 #[derive(Accounts)]
-#[instruction(args: TempBackfillDevaddrConstraintArgsV0)]
-pub struct TempBackfillDevaddrConstraintV0<'info> {
+#[instruction(args: TempBackfillDevaddrConstraintArgs)]
+pub struct TempBackfillDevaddrConstraint<'info> {
   #[account(
     mut,
     address = Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW").unwrap()
@@ -46,8 +46,8 @@ pub struct TempBackfillDevaddrConstraintV0<'info> {
 }
 
 pub fn handler(
-  ctx: Context<TempBackfillDevaddrConstraintV0>,
-  args: TempBackfillDevaddrConstraintArgsV0,
+  ctx: Context<TempBackfillDevaddrConstraint>,
+  args: TempBackfillDevaddrConstraintArgs,
 ) -> Result<()> {
   let start_addr = args.start_addr;
   let end_addr = start_addr + (args.num_blocks * 8) as u64;

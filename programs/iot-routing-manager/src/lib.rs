@@ -93,4 +93,11 @@ pub mod iot_routing_manager {
   ) -> Result<()> {
     temp_backfill_organization_delegate::handler(ctx)
   }
+
+  pub fn temp_backfill_devaddr_constraint(
+    ctx: Context<TempBackfillDevaddrConstraint>,
+    args: TempBackfillDevaddrConstraintArgs,
+  ) -> Result<()> {
+    temp_backfill_devaddr_constraint::handler(ctx, args)
+  }
 }
