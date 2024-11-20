@@ -9,11 +9,11 @@ pub struct TempBackfillOrganizationDelegate<'info> {
     mut,
     address = Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW").unwrap()
   )]
-  pub authority: Signer<'info>,
+  pub payer: Signer<'info>,
   pub organization: Account<'info, OrganizationV0>,
   #[account(
     init,
-    payer = authority,
+    payer = payer,
     space = 8 + OrganizationDelegateV0::INIT_SPACE + 32,
     seeds = [b"organization_delegate", organization.key().as_ref(), delegate.key().as_ref()],
     bump,

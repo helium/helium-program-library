@@ -1,5 +1,5 @@
 use crate::error::ErrorCode;
-use anchor_lang::{prelude::*, solana_program::pubkey};
+use anchor_lang::prelude::*;
 use anchor_spl::token::{burn, Burn, Mint, Token, TokenAccount};
 use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 
@@ -10,23 +10,15 @@ pub const TESTING: bool = std::option_env!("TESTING").is_some();
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDevaddrConstraintArgsV0 {
   pub num_blocks: u32,
-  /// Override the default start address for the devaddr constraint.
-  /// WARNING: This is dangerous and can create unvalidated overlap,
-  /// this should not happen under Helium managed net ids
-  pub start_addr: Option<u64>,
 }
 
-pub const ADMIN_KEY: Pubkey = pubkey!("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW");
 #[derive(Accounts)]
 #[instruction(args: InitializeDevaddrConstraintArgsV0)]
 pub struct InitializeDevaddrConstraintV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   pub authority: Signer<'info>,
-  #[account(
-    mut,
-    has_one = authority,
-  )]
+  #[account(mut)]
   pub net_id: Box<Account<'info, NetIdV0>>,
   #[account(
     has_one = iot_mint,
@@ -36,6 +28,7 @@ pub struct InitializeDevaddrConstraintV0<'info> {
   #[account(
     has_one = net_id,
     has_one = routing_manager,
+    has_one = authority,
     constraint = organization.approved @ ErrorCode::OrganizationNotApproved,
   )]
   pub organization: Box<Account<'info, OrganizationV0>>,
@@ -54,7 +47,7 @@ pub struct InitializeDevaddrConstraintV0<'info> {
   #[account(
     init,
     payer = payer,
-    seeds = [b"devaddr_constraint", organization.key().as_ref(), &args.start_addr.unwrap_or(net_id.current_addr_offset).to_le_bytes()[..]],
+    seeds = [b"devaddr_constraint", organization.key().as_ref(), &net_id.current_addr_offset.to_le_bytes()[..]],
     bump,
     space = 8 + DevaddrConstraintV0::INIT_SPACE + 60
   )]
@@ -67,9 +60,7 @@ pub fn handler(
   ctx: Context<InitializeDevaddrConstraintV0>,
   args: InitializeDevaddrConstraintArgsV0,
 ) -> Result<()> {
-  let start_addr = args
-    .start_addr
-    .unwrap_or(ctx.accounts.net_id.current_addr_offset);
+  let start_addr = ctx.accounts.net_id.current_addr_offset;
   let end_addr = start_addr + (args.num_blocks * 8) as u64;
 
   // Increment end_addr by 1
@@ -119,8 +110,8 @@ pub fn handler(
         .unwrap(),
     )
     .unwrap();
-  // TEMP: Admin doesn't have to burn, that way we can backfill
-  if iot_fee > 0 && ctx.accounts.payer.key() != ADMIN_KEY {
+
+  if iot_fee > 0 {
     burn(
       CpiContext::new(
         ctx.accounts.token_program.to_account_info(),
