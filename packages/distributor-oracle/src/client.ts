@@ -371,7 +371,7 @@ export async function formBulkTransactions({
               recipient: recipientKeys[idx],
               lazyDistributor,
               rewardsMint: lazyDistributorAcc.rewardsMint!,
-              owner: assetAcc.ownership.owner,
+              owner: destination,
               destinationAccount: getAssociatedTokenAddressSync(
                 lazyDistributorAcc.rewardsMint!,
                 destination,
