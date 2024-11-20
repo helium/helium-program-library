@@ -19,6 +19,7 @@ pub struct RelinquishExpiredVoteV0<'info> {
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
   #[account(mut)]
+  /// CHECK: Deserialized later
   pub position: AccountInfo<'info>,
   #[account(
     constraint = !matches!(proposal.state, ProposalState::Voting { .. })
