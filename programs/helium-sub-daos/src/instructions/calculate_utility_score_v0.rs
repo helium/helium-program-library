@@ -1,9 +1,10 @@
-use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, EPOCH_LENGTH};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
-use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
+use shared_utils::precise_number::PreciseNumber;
 use voter_stake_registry::state::Registrar;
+
+use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, EPOCH_LENGTH};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CalculateUtilityScoreArgsV0 {
@@ -54,6 +55,14 @@ pub struct CalculateUtilityScoreV0<'info> {
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
+  #[account(
+    init_if_needed,
+    payer = payer,
+    space = SubDaoEpochInfoV0::SIZE,
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &(args.epoch - 1).to_le_bytes()],
+    bump,
+  )]
+  pub prev_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
 }
 
 pub fn handler(
@@ -116,69 +125,37 @@ pub fn handler(
   ctx.accounts.dao_epoch_info.bump_seed = *ctx.bumps.get("dao_epoch_info").unwrap();
 
   // Calculate utility score
-  // utility score = V * D * A
+  // utility score = V
   // V = max(1, veHNT_dnp).
-  // D = max(1, sqrt(DCs burned in USD)). 1 DC = $0.00001.
-  // A = max(1, fourth_root(Total active device count * device activation fee)).
   let epoch_info = &mut ctx.accounts.sub_dao_epoch_info;
-
-  let dc_burned = PreciseNumber::new(epoch_info.dc_burned.into())
-    .unwrap()
-    .checked_div(&PreciseNumber::new(100000_u128).unwrap()) // DC has 0 decimals, plus 10^5 to get to dollars.
-    .unwrap();
-
-  msg!(
-    "Total onboarding dc: {}. Dc burned: {}.",
-    epoch_info.dc_onboarding_fees_paid,
-    epoch_info.dc_burned
-  );
-
-  let devices_with_fee = &PreciseNumber::new(u128::from(epoch_info.dc_onboarding_fees_paid))
-    .unwrap()
-    .checked_div(&PreciseNumber::new(100000_u128).unwrap()) // Need onboarding fee in dollars
-    .unwrap();
 
   // sqrt(x) = e^(ln(x)/2)
   // x^1/4 = e^(ln(x)/4))
-  let one = PreciseNumber::one();
-  let d = if epoch_info.dc_burned > 0 {
-    std::cmp::max(
-      one.clone(),
-      dc_burned
-        .log()
-        .unwrap()
-        .checked_div(&TWO_PREC.clone().signed())
-        .unwrap()
-        .exp()
-        .unwrap(),
-    )
-  } else {
-    one.clone()
-  };
-
   let vehnt_staked = PreciseNumber::new(epoch_info.vehnt_at_epoch_start.into())
     .unwrap()
     .checked_div(&PreciseNumber::new(100000000_u128).unwrap()) // vehnt has 8 decimals
     .unwrap();
 
-  let v = std::cmp::max(one.clone(), vehnt_staked);
-
-  let a = if epoch_info.dc_onboarding_fees_paid > 0 {
-    std::cmp::max(
-      one,
-      devices_with_fee
-        .log()
+  // Apply a 90 day smooth
+  let utility_score_prec = vehnt_staked
+    .checked_div(&PreciseNumber::new(90_u128).unwrap())
+    .unwrap()
+    .checked_add(
+      &PreciseNumber::new(89_u128)
         .unwrap()
-        .checked_div(&FOUR_PREC.clone().signed())
+        .checked_mul(
+          &ctx
+            .accounts
+            .prev_sub_dao_epoch_info
+            .utility_score
+            .and_then(PreciseNumber::new)
+            .unwrap_or(vehnt_staked),
+        )
         .unwrap()
-        .exp()
+        .checked_div(&PreciseNumber::new(90_u128).unwrap())
         .unwrap(),
     )
-  } else {
-    one
-  };
-
-  let utility_score_prec = d.checked_mul(&a).unwrap().checked_mul(&v).unwrap();
+    .unwrap();
   // Convert to u128 with 12 decimals of precision
   let utility_score = utility_score_prec
     .checked_mul(

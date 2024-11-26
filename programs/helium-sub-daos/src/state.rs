@@ -100,6 +100,8 @@ pub struct DaoV0 {
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub hst_emission_schedule: Vec<PercentItem>,
   pub bump_seed: u8,
+  pub rewards_escrow: Pubkey,
+  pub delegator_pool: Pubkey,
 }
 
 #[account]
@@ -220,7 +222,7 @@ pub struct SubDaoV0 {
   pub dnt_mint: Pubkey,       // Mint of the subdao token
   pub treasury: Pubkey,       // Treasury of HNT
   pub rewards_escrow: Pubkey, // Escrow account for DNT rewards
-  /// DEPRECATED: use hnt_delegator_pool instead. But some people still need to claim old DNT rewards
+  /// DEPRECATED: use dao.delegator_pool instead. But some people still need to claim old DNT rewards
   pub delegator_pool: Pubkey, // Pool of DNT tokens which veHNT delegators can claim from
   pub vehnt_delegated: u128, // the total amount of vehnt delegated to this subdao, with 12 decimals of extra precision
   pub vehnt_last_calculated_ts: i64,
@@ -238,13 +240,19 @@ pub struct SubDaoV0 {
   pub active_device_authority: Pubkey, // authority that can mark hotspots as active/inactive
   pub voting_rewards_percent: u64, // number between 0 - (100_u64 * 100_000_000). The % of DNT rewards voting rewards receive with 8 decimal places of accuracy
   pub vetoken_tracker: Pubkey,     // the vetoken tracker for subnetwork voting rewards
-  pub hnt_delegator_pool: Pubkey,
 }
 
 #[macro_export]
 macro_rules! sub_dao_seeds {
   ( $s:expr ) => {
     &[b"sub_dao".as_ref(), $s.dnt_mint.as_ref(), &[$s.bump_seed]]
+  };
+}
+
+#[macro_export]
+macro_rules! dao_seeds {
+  ( $s:expr ) => {
+    &[b"dao".as_ref(), $s.hnt_mint.as_ref(), &[$s.bump_seed]]
   };
 }
 

@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use circuit_breaker::{
@@ -8,7 +6,9 @@ use circuit_breaker::{
 };
 use shared_utils::precise_number::{InnerUint, PreciseNumber};
 
-use crate::{current_epoch, error::ErrorCode, state::*, OrArithError, EPOCH_LENGTH, TESTING};
+use crate::{
+  current_epoch, dao_seeds, error::ErrorCode, state::*, OrArithError, EPOCH_LENGTH, TESTING,
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueRewardsArgsV0 {
@@ -20,6 +20,8 @@ pub struct IssueRewardsArgsV0 {
 pub struct IssueRewardsV0<'info> {
   #[account(
     has_one = hnt_mint,
+    has_one = delegator_pool,
+    has_one = rewards_escrow,
   )]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(
@@ -27,8 +29,6 @@ pub struct IssueRewardsV0<'info> {
     has_one = dao,
     has_one = treasury,
     has_one = dnt_mint,
-    has_one = rewards_escrow,
-    has_one = delegator_pool,
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
@@ -55,13 +55,6 @@ pub struct IssueRewardsV0<'info> {
     bump = hnt_circuit_breaker.bump_seed
   )]
   pub hnt_circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
-  #[account(
-    mut,
-    seeds = ["mint_windowed_breaker".as_bytes(), dnt_mint.key().as_ref()],
-    seeds::program = circuit_breaker_program.key(),
-    bump = dnt_circuit_breaker.bump_seed
-  )]
-  pub dnt_circuit_breaker: Box<Account<'info, MintWindowedCircuitBreakerV0>>,
   #[account(mut)]
   pub hnt_mint: Box<Account<'info, Mint>>,
   #[account(mut)]
@@ -84,18 +77,6 @@ fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
 }
 
 impl<'info> IssueRewardsV0<'info> {
-  pub fn mint_dnt_emissions_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
-    let cpi_accounts = MintV0 {
-      mint: self.dnt_mint.to_account_info(),
-      to: self.rewards_escrow.to_account_info(),
-      mint_authority: self.sub_dao.to_account_info(),
-      circuit_breaker: self.dnt_circuit_breaker.to_account_info(),
-      token_program: self.token_program.to_account_info(),
-    };
-
-    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
-  }
-
   pub fn mint_delegation_rewards_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
     let cpi_accounts = MintV0 {
       mint: self.hnt_mint.to_account_info(),
@@ -162,30 +143,24 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .ok_or_else(|| error!(ErrorCode::ArithmeticError))?
     .try_into()
     .unwrap();
-  let delegators_present = ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start > 0;
   let max_percent = 100_u64.checked_mul(10_0000000).unwrap();
 
-  let delegation_rewards_amount = if delegators_present {
-    (rewards_amount as u128)
-      .checked_mul(u128::from(ctx.accounts.sub_dao.delegator_rewards_percent))
-      .unwrap()
-      .checked_div(max_percent as u128) // 100% with 2 decimals accuracy
-      .unwrap()
-      .try_into()
-      .unwrap()
-  } else {
-    0
-  };
+  let delegation_rewards_amount = (rewards_amount as u128)
+    .checked_mul(u128::from(ctx.accounts.sub_dao.delegator_rewards_percent))
+    .unwrap()
+    .checked_div(max_percent as u128) // 100% with 2 decimals accuracy
+    .unwrap()
+    .try_into()
+    .unwrap();
 
   msg!("Minting {} delegation rewards", delegation_rewards_amount);
 
   if delegation_rewards_amount > 0 {
     mint_v0(
-      ctx.accounts.mint_delegation_rewards_ctx().with_signer(&[&[
-        b"dao",
-        ctx.accounts.hnt_mint.key().as_ref(),
-        &[ctx.accounts.dao.bump_seed],
-      ]]),
+      ctx
+        .accounts
+        .mint_delegation_rewards_ctx()
+        .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
       MintArgsV0 {
         amount: delegation_rewards_amount, // send some dnt emissions to delegation pool
       },

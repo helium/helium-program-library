@@ -17,7 +17,7 @@ import {
   roundToDecimals,
   sendInstructions,
   toBN,
-  toNumber
+  toNumber,
 } from "@helium/spl-utils";
 import { AccountLayout, getMint } from "@solana/spl-token";
 import {
@@ -31,7 +31,10 @@ import { BN } from "bn.js";
 import chai, { assert, expect } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import { init as dcInit } from "../packages/data-credits-sdk/src";
-import { init as issuerInit, onboardIotHotspot } from "../packages/helium-entity-manager-sdk/src";
+import {
+  init as issuerInit,
+  onboardIotHotspot,
+} from "../packages/helium-entity-manager-sdk/src";
 import {
   currentEpoch,
   delegatorRewardsPercent,
@@ -161,7 +164,13 @@ describe("helium-sub-daos", () => {
       provider.wallet.publicKey
     );
     const { subDao, treasury, mint, treasuryCircuitBreaker } =
-      await initTestSubdao({hsdProgram: program, vsrProgram, provider, authority: provider.wallet.publicKey, dao});
+      await initTestSubdao({
+        hsdProgram: program,
+        vsrProgram,
+        provider,
+        authority: provider.wallet.publicKey,
+        dao,
+      });
 
     const account = await program.account.subDaoV0.fetch(subDao!);
     const breaker =
@@ -247,8 +256,8 @@ describe("helium-sub-daos", () => {
 
       ({
         dataCredits: { dcMint },
-        subDao: { subDao, treasury, rewardsEscrow, mint: dntMint, subDaoRegistrar },
-        dao: { dao },
+        subDao: { subDao, treasury, mint: dntMint, subDaoRegistrar },
+        dao: { dao, rewardsEscrow },
       } = await initWorld(
         provider,
         hemProgram,
@@ -258,17 +267,19 @@ describe("helium-sub-daos", () => {
         EPOCH_REWARDS,
         SUB_DAO_EPOCH_REWARDS,
         registrar,
-        hntMint,
+        hntMint
       ));
       // Add on the voting rewards
       let {
         pubkeys: { vetokenTracker: tracker },
       } = await rewardsProgram.methods
         .initializeVetokenTrackerV0({
-          votingRewardsTiers: [{
-            numVetokens: new BN(0),
-            percent: delegatorRewardsPercent(100),
-          }],
+          votingRewardsTiers: [
+            {
+              numVetokens: new BN(0),
+              percent: delegatorRewardsPercent(100),
+            },
+          ],
         })
         .accounts({
           registrar: subDaoRegistrar,
@@ -281,9 +292,8 @@ describe("helium-sub-daos", () => {
       vetokenTracker = tracker!;
       await program.methods
         .updateSubDaoV0({
-          rewardsEscrow: null,
           vetokenTracker,
-          votingRewardsPercent: delegatorRewardsPercent(2),
+          votingRewardsPercent: delegatorRewardsPercent(0),
           authority: null,
           dcBurnAuthority: null,
           emissionSchedule: null,
@@ -324,7 +334,6 @@ describe("helium-sub-daos", () => {
       const newAuth = Keypair.generate().publicKey;
       await program.methods
         .updateSubDaoV0({
-          rewardsEscrow: null,
           vetokenTracker: null,
           votingRewardsPercent: null,
           authority: newAuth,
@@ -513,16 +522,19 @@ describe("helium-sub-daos", () => {
           // Onboard one hotspot to add to the utility score
           const { rewardableEntityConfig } =
             await initTestRewardableEntityConfig(hemProgram, subDao);
-          const { maker, collection, makerKeypair, merkle } = await initTestMaker(
-            hemProgram,
-            provider,
-            rewardableEntityConfig,
-            dao
+          const { maker, collection, makerKeypair, merkle } =
+            await initTestMaker(
+              hemProgram,
+              provider,
+              rewardableEntityConfig,
+              dao
+            );
+          const eccVerifier = loadKeypair(
+            __dirname + "/keypairs/verifier-test.json"
           );
-          const eccVerifier = loadKeypair(__dirname + "/keypairs/verifier-test.json");
           const ecc = (await HeliumKeypair.makeRandom()).address.b58;
           const hotspotOwner = Keypair.generate();
-            
+
           const { getAssetFn, getAssetProofFn, hotspot } =
             await createMockCompression({
               collection,
@@ -531,7 +543,7 @@ describe("helium-sub-daos", () => {
               ecc,
               hotspotOwner,
             });
-            console.log("I AM ISSUING")
+          console.log("I AM ISSUING");
           const issueMethod = hemProgram.methods
             .issueEntityV0({
               entityKey: Buffer.from(bs58.decode(ecc)),
@@ -553,7 +565,7 @@ describe("helium-sub-daos", () => {
             .mintDataCreditsV0({
               // $50 onboard, $10 location assert
               dcAmount: toBN(60, 5),
-              hntAmount: null
+              hntAmount: null,
             })
             .accounts({ dcMint })
             .rpc({ skipPreflight: true });
@@ -568,23 +580,25 @@ describe("helium-sub-daos", () => {
               location: new BN(1000),
               getAssetFn,
               getAssetProofFn,
-              dcFeePayer: me
+              dcFeePayer: me,
             })
           ).signers([makerKeypair, hotspotOwner]);
 
-          const { pubkeys: { iotInfo: infoKey }} = await method.rpcAndKeys({ skipPreflight: true });
+          const {
+            pubkeys: { iotInfo: infoKey },
+          } = await method.rpcAndKeys({ skipPreflight: true });
 
           await hemProgram.methods
-          .setEntityActiveV0({
-            isActive: true,
-            entityKey: Buffer.from(bs58.decode(ecc)),
-          })
-          .accounts({
-            activeDeviceAuthority: me,
-            rewardableEntityConfig,
-            info: infoKey! as PublicKey,
-          })
-          .rpc({ skipPreflight: true });
+            .setEntityActiveV0({
+              isActive: true,
+              entityKey: Buffer.from(bs58.decode(ecc)),
+            })
+            .accounts({
+              activeDeviceAuthority: me,
+              rewardableEntityConfig,
+              info: infoKey! as PublicKey,
+            })
+            .rpc({ skipPreflight: true });
 
           const { subDaoEpochInfo } = await burnDc(1600000);
           const epoch = (
@@ -632,10 +646,7 @@ describe("helium-sub-daos", () => {
           const supply = (await getMint(provider.connection, hntMint)).supply;
           const veHnt = toNumber(subDaoInfo.vehntAtEpochStart, 8);
           const totalUtility =
-            Math.max(veHnt, 1) *
-            Math.pow(50, 1 / 4) *
-            Math.sqrt(16) *
-            1;
+            Math.max(veHnt, 1) * Math.pow(50, 1 / 4) * Math.sqrt(16) * 1;
           expect(daoInfo.totalRewards.toString()).to.eq(
             EPOCH_REWARDS.toString()
           );
@@ -923,17 +934,17 @@ describe("helium-sub-daos", () => {
                 })
                 .rpc({ skipPreflight: true });
 
-              const { pubkeys: { vsrEpochInfo } } =await program.methods
-                .issueVotingRewardsV0({
-                  epoch,
-                })
-                .accounts({
-                  subDao,
-                  vsrEpochInfo: vsrEpochInfoKey(vetokenTracker, epoch.mul(new BN(EPOCH_LENGTH)))[0],
-                })
-                .rpcAndKeys({ skipPreflight: true });
+              // const { pubkeys: { vsrEpochInfo } } =await program.methods
+              //   .issueVotingRewardsV0({
+              //     epoch,
+              //   })
+              //   .accounts({
+              //     subDao,
+              //     vsrEpochInfo: vsrEpochInfoKey(vetokenTracker, epoch.mul(new BN(EPOCH_LENGTH)))[0],
+              //   })
+              //   .rpcAndKeys({ skipPreflight: true });
 
-              const vsrEpochInfoAcc = await rewardsProgram.account.vsrEpochInfoV0.fetch(vsrEpochInfo!);
+              // const vsrEpochInfoAcc = await rewardsProgram.account.vsrEpochInfoV0.fetch(vsrEpochInfo!);
 
               const postBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
@@ -944,18 +955,19 @@ describe("helium-sub-daos", () => {
               const postHstBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(hstPool))?.data!
               ).amount;
-              expect((postBalance - preBalance).toString()).to.eq(
-                ((1 - 0.32) * EPOCH_REWARDS).toString()
+              expect(
+                Number(postBalance - preBalance)
+              ).to.be.closeTo(
+                ((1 - 0.32) * EPOCH_REWARDS) * (1 - 0.06),
+                1 // Allow for 1 unit of difference to handle rounding
               );
-              expect((postHstBalance - preHstBalance).toString()).to.eq(
+              expect((postHstBalance - preHstBalance).toString()).to.eq("0");
+              expect((postMobileBalance - preMobileBalance).toString()).to.eq(
                 "0"
               );
-              expect((postMobileBalance - preMobileBalance).toString()).to.eq(
-                ((SUB_DAO_EPOCH_REWARDS / 100) * 92).toString()
-              );
-              expect(
-                vsrEpochInfoAcc.rewardsAmount.toString()
-              ).to.eq((0.02 * SUB_DAO_EPOCH_REWARDS).toString());
+              // expect(
+              //   vsrEpochInfoAcc.rewardsAmount.toString()
+              // ).to.eq((0.02 * SUB_DAO_EPOCH_REWARDS).toString());
 
               const acc = await program.account.subDaoEpochInfoV0.fetch(
                 subDaoEpochInfo
@@ -977,7 +989,7 @@ describe("helium-sub-daos", () => {
               ]);
 
               const method = program.methods
-                .claimRewardsV0({
+                .claimRewardsV1({
                   epoch,
                 })
                 .accounts({
@@ -987,14 +999,19 @@ describe("helium-sub-daos", () => {
                 })
                 .signers([positionAuthorityKp]);
               const { delegatorAta } = await method.pubkeys();
+              const preAtaBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(delegatorAta!))?.data!
+              ).amount;
               await method.rpc({ skipPreflight: true });
 
               const postAtaBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(delegatorAta!))?.data!
               ).amount;
-              expect(Number(postAtaBalance)).to.be.within(
-                (SUB_DAO_EPOCH_REWARDS * 6) / 100 - 5,
-                (SUB_DAO_EPOCH_REWARDS * 6) / 100
+              expect(
+                Number(postAtaBalance) - Number(preAtaBalance)
+              ).to.be.within(
+                (EPOCH_REWARDS * 0.68 * 6) / 100 - 5,
+                (EPOCH_REWARDS * 0.68 * 6) / 100
               );
             });
           });

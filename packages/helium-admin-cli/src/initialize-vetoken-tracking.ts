@@ -142,7 +142,6 @@ export async function run(args: any = process.argv) {
         registrar: null,
         delegatorRewardsPercent: null,
         activeDeviceAuthority: null,
-        rewardsEscrow: null,
       })
       .accounts({
         subDao,

@@ -136,31 +136,6 @@ export async function run(args: any = process.argv) {
     );
   }
 
-  for (const subDao of [iotSubDao, mobileSubDao]) {
-    instructions.push(
-      await hsdProgram.methods
-        .updateSubDaoV0({
-          vetokenTracker: null,
-          votingRewardsPercent: null,
-          authority: null,
-          emissionSchedule: null,
-          dcBurnAuthority: null,
-          onboardingDcFee: null,
-          onboardingDataOnlyDcFee: null,
-          registrar: null,
-          delegatorRewardsPercent: null,
-          activeDeviceAuthority: null,
-          rewardsEscrow,
-        })
-        .accounts({
-          payer: authority,
-          authority,
-          subDao,
-        })
-        .instruction()
-    );
-  }
-
   instructions.push(
     await hsdProgram.methods
       .updateDaoV0({
@@ -179,6 +154,19 @@ export async function run(args: any = process.argv) {
       })
       .instruction()
   );
+
+  if (!daoAcc.rewardsEscrow) {
+    instructions.push(
+      await hsdProgram.methods
+        .initializeHntDelegatorPool()
+        .accounts({
+          dao,
+          payer: daoAcc.authority,
+          delegatorPool: getAssociatedTokenAddressSync(hntMint, dao, true),
+        })
+        .instruction()
+    );
+  }
 
   const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
     commitmentOrConfig: "finalized",

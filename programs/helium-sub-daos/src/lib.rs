@@ -95,6 +95,10 @@ pub mod helium_sub_daos {
     claim_rewards_v0::handler(ctx, args)
   }
 
+  pub fn claim_rewards_v1(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result<()> {
+    claim_rewards_v1::handler(ctx, args)
+  }
+
   pub fn transfer_v0(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
     transfer_v0::handler(ctx, args)
   }
@@ -133,5 +137,9 @@ pub mod helium_sub_daos {
     args: IssueVotingRewardsArgsV0,
   ) -> Result<()> {
     issue_voting_rewards_v0::handler(ctx, args)
+  }
+
+  pub fn initialize_hnt_delegator_pool(ctx: Context<InitializeHntDelegatorPool>) -> Result<()> {
+    initialize_hnt_delegator_pool::handler(ctx)
   }
 }

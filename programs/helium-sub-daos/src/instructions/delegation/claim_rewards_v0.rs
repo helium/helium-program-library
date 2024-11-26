@@ -12,12 +12,7 @@ use voter_stake_registry::{
   VoterStakeRegistry,
 };
 
-use crate::{current_epoch, error::ErrorCode, state::*, TESTING};
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct ClaimRewardsArgsV0 {
-  pub epoch: u64,
-}
+use crate::{current_epoch, error::ErrorCode, state::*, ClaimRewardsArgsV0, TESTING};
 
 #[derive(Accounts)]
 #[instruction(args: ClaimRewardsArgsV0)]
