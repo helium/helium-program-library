@@ -56,6 +56,7 @@ pub struct SwitchMobileOpsFund<'info> {
   pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
+#[allow(clippy::inconsistent_digit_grouping)]
 pub fn handler(ctx: Context<SwitchMobileOpsFund>) -> Result<()> {
   burn(
     CpiContext::new(
@@ -66,7 +67,7 @@ pub fn handler(ctx: Context<SwitchMobileOpsFund>) -> Result<()> {
         authority: ctx.accounts.authority.to_account_info(),
       },
     ),
-    18_197_425_725,
+    18_197_425_725_000000,
   )?;
   mint_v0(
     CpiContext::new_with_signer(

@@ -228,6 +228,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   // This contract will be deployed between December 3 and December 4 at UTC midnight.
   // That means this will emit payment from December 3 to August 1st, 2025 (because epochs are paid in arrears).
   // This is a total of 241 days. 2.9M HNT / 241 days = 12033.19502075 HNT per day.
+  #[allow(clippy::inconsistent_digit_grouping)]
   if epoch_curr_ts < 1754006400
     && ctx.accounts.dnt_mint.key()
       == Pubkey::from_str("mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6").unwrap()

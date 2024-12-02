@@ -265,7 +265,20 @@ describe("helium-sub-daos", () => {
         pubkeys: { vetokenTracker: tracker },
       } = await rewardsProgram.methods
         .initializeVetokenTrackerV0({
-          votingRewardsTiers: [],
+          votingRewardsTiers: [
+            {
+              numVetokens: new anchor.BN(0),
+              percent: delegatorRewardsPercent(0),
+            },
+            {
+              numVetokens: new anchor.BN(10),
+              percent: delegatorRewardsPercent(50),
+            },
+            {
+              numVetokens: new anchor.BN(1000000000000000),
+              percent: delegatorRewardsPercent(100),
+            },
+          ],
         })
         .accounts({
           registrar: subDaoRegistrar,
@@ -960,7 +973,7 @@ describe("helium-sub-daos", () => {
               );
               expect(
                 vsrEpochInfoAcc.rewardsAmount.toString()
-              ).to.eq((0.02 * SUB_DAO_EPOCH_REWARDS).toString());
+              ).to.eq("0");
 
               const acc = await program.account.subDaoEpochInfoV0.fetch(
                 subDaoEpochInfo
