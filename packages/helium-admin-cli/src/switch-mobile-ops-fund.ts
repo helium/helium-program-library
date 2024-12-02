@@ -60,7 +60,7 @@ export async function run(args: any = process.argv) {
           HNT_MINT
         ),
         opsFundMobile: getAssociatedTokenAddressSync(
-          wallet.publicKey,
+          daoAuth,
           MOBILE_MINT
         ),
         dao,
