@@ -39,7 +39,7 @@ pub struct CalculateUtilityScoreV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    space = 60 + 8 + std::mem::size_of::<DaoEpochInfoV0>(),
+    space = DaoEpochInfoV0::size(),
     seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
   )]
