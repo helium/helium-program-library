@@ -14,9 +14,6 @@ use shared_utils::token_metadata::{
   Metadata as MetadataProgram,
 };
 
-// 500m MOBILE
-pub const CARRIER_STAKE_AMOUNT: u64 = 500_000_000_000_000;
-
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeRoutingManagerArgsV0 {
   pub metadata_url: String,

@@ -23,8 +23,7 @@ pub const ENTITY_METADATA_URL: &str = "https://entities.nft.helium.io";
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TempBackfillOrganizationArgs {
   pub oui: u64,
-  // Default escrow key is OUI_<oui>. For legacy OUIs, this can be overridden
-  pub escrow_key_override: Option<String>,
+  pub escrow_key_override: String,
 }
 
 #[derive(Accounts)]
@@ -60,7 +59,7 @@ pub struct TempBackfillOrganization<'info> {
     init,
     payer = payer,
     seeds = ["organization".as_bytes(), routing_manager.key().as_ref(), &args.oui.to_le_bytes()],
-    space = 8 + std::mem::size_of::<OrganizationV0>() + args.escrow_key_override.map(|k| k.len()).unwrap_or(8) + 60,
+    space = 8 + std::mem::size_of::<OrganizationV0>() + args.escrow_key_override.len() + 60,
     bump
   )]
   pub organization: Box<Account<'info, OrganizationV0>>,
@@ -152,13 +151,12 @@ pub fn handler(
     net_id_seeds!(ctx.accounts.net_id),
   ];
   let key = format!("OUI_{}", args.oui);
-  let escrow_key = args.escrow_key_override.unwrap_or(key.clone());
 
   ctx.accounts.organization.set_inner(OrganizationV0 {
     oui: args.oui,
     routing_manager: ctx.accounts.routing_manager.key(),
     authority: ctx.accounts.authority.key(),
-    escrow_key,
+    escrow_key: args.escrow_key_override,
     bump_seed: ctx.bumps["organization"],
     net_id: ctx.accounts.net_id.key(),
     approved: false,
