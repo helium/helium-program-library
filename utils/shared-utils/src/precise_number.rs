@@ -71,8 +71,8 @@ pub const fn ln2hi() -> InnerUint {
   U192([13974485815783726801_u64, 3_u64, 0_u64])
 }
 pub const LN2HI: PreciseNumber = PreciseNumber { value: ln2hi() };
-#[inline]
 
+#[inline]
 pub const fn ln2hi_scale() -> InnerUint {
   U192([7766279631452241920_u64, 5_u64, 0_u64])
 }
