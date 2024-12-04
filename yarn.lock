@@ -609,11 +609,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-<<<<<<< HEAD
-"@helium/anchor-resolvers@^0.9.2, @helium/anchor-resolvers@^0.9.4, @helium/anchor-resolvers@workspace:packages/anchor-resolvers":
-=======
 "@helium/anchor-resolvers@^0.9.15, @helium/anchor-resolvers@workspace:packages/anchor-resolvers":
->>>>>>> develop
   version: 0.0.0-use.local
   resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
   dependencies:
@@ -941,11 +937,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-<<<<<<< HEAD
-"@helium/helium-entity-manager-sdk@^0.9.2, @helium/helium-entity-manager-sdk@^0.9.4, @helium/helium-entity-manager-sdk@workspace:packages/helium-entity-manager-sdk":
-=======
 "@helium/helium-entity-manager-sdk@^0.9.15, @helium/helium-entity-manager-sdk@workspace:packages/helium-entity-manager-sdk":
->>>>>>> develop
   version: 0.0.0-use.local
   resolution: "@helium/helium-entity-manager-sdk@workspace:packages/helium-entity-manager-sdk"
   dependencies:
