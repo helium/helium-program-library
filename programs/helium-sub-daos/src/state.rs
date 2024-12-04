@@ -102,36 +102,6 @@ pub struct DaoV0 {
   pub bump_seed: u8,
   pub rewards_escrow: Pubkey,
   pub delegator_pool: Pubkey,
-  pub recent_proposals: [RecentProposal; 4],
-}
-
-impl DaoV0 {
-  pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
-    let new_proposal = RecentProposal { proposal, ts };
-
-    // Find the insertion point to maintain descending order by timestamp
-    let insert_index = self
-      .recent_proposals
-      .iter()
-      .position(|p| p.ts <= ts)
-      .unwrap_or(self.recent_proposals.len());
-
-    let cloned_proposals = self.recent_proposals.clone();
-
-    // Shift elements to make room for the new proposal
-    if insert_index < self.recent_proposals.len() {
-      for i in (insert_index + 1..self.recent_proposals.len()).rev() {
-        self.recent_proposals[i] = cloned_proposals[i - 1].clone();
-      }
-      self.recent_proposals[insert_index] = new_proposal;
-    } else if ts > self.recent_proposals[self.recent_proposals.len() - 1].ts {
-      // If the new proposal is more recent than the oldest one, replace the oldest
-      self.recent_proposals[self.recent_proposals.len() - 1] = new_proposal;
-    }
-
-    // Re-sort the array to ensure it's in descending order by timestamp
-    self.recent_proposals.sort_by(|a, b| b.ts.cmp(&a.ts));
-  }
 }
 
 #[account]
@@ -149,19 +119,12 @@ pub struct DaoEpochInfoV0 {
   pub done_issuing_rewards: bool,
   pub done_issuing_hst_pool: bool,
   pub bump_seed: u8,
-  pub recent_proposals: [RecentProposal; 4],
 }
 
 impl DaoEpochInfoV0 {
   pub fn size() -> usize {
-    60 + 8 + std::mem::size_of::<DaoEpochInfoV0>() + 4 * std::mem::size_of::<RecentProposal>()
+    60 + 8 + std::mem::size_of::<DaoEpochInfoV0>()
   }
-}
-
-#[derive(Debug, InitSpace, Default, Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct RecentProposal {
-  pub proposal: Pubkey,
-  pub ts: i64,
 }
 
 #[account]
@@ -179,7 +142,6 @@ pub struct DelegatedPositionV0 {
   // This bitmap gets rotated as last_claimed_epoch increases.
   // This allows for claiming ~128 epochs worth of rewards in parallel.
   pub claimed_epochs_bitmap: u128,
-  pub recent_proposals: Vec<RecentProposal>,
 }
 
 impl DelegatedPositionV0 {
@@ -212,30 +174,6 @@ impl DelegatedPositionV0 {
 
       Ok(())
     }
-  }
-
-  // Add a proposal to the recent proposals list
-  pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
-    let new_proposal = RecentProposal { proposal, ts };
-
-    // Find the insertion point to maintain descending order by timestamp
-    let insert_index = self
-      .recent_proposals
-      .iter()
-      .position(|p| p.ts <= ts)
-      .unwrap_or(self.recent_proposals.len());
-
-    // Insert the new proposal
-    self.recent_proposals.insert(insert_index, new_proposal);
-  }
-
-  pub fn remove_recent_proposal(&mut self, proposal: Pubkey) {
-    self.recent_proposals.retain(|p| p.proposal != proposal);
-  }
-
-  // Remove proposals older than the given timestamp
-  pub fn remove_proposals_older_than(&mut self, ts: i64) {
-    self.recent_proposals.retain(|p| p.ts >= ts);
   }
 }
 
