@@ -20,8 +20,7 @@ const cachedIdlFetch = (() => {
       cache.delete(programId);
       cache.set(programId, idl);
     } else {
-      try {
-        idl = await anchor.Program.fetchIdl(programId, provider);
+      idl = await anchor.Program.fetchIdl(programId, provider);
 
       if (idl) {
         cache.set(programId, idl);
