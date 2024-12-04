@@ -277,7 +277,7 @@ export async function formBulkTransactions({
     assetEndpoint || provider.connection.rpcEndpoint,
     assets
   );
-  const willPay = (await axios.get(
+  const willPay = skipOracleSign || (await axios.get(
     `${lazyDistributorAcc.oracles[0].url}/will-pay-recipient`
   )).data.willPay;
   let ixsPerAsset = await Promise.all(
