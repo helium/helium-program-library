@@ -44,10 +44,6 @@ pub struct InitializeSharedMerkleV0<'info> {
 pub const STARTING_DEPTH: u32 = 17;
 pub const BUFFER_SIZE: u32 = 64;
 
-fn div_ceil(dividend: u64, divisor: u64) -> u64 {
-  (dividend + divisor - 1) / divisor
-}
-
 pub fn handler(
   ctx: Context<InitializeSharedMerkleV0>,
   args: InitializeSharedMerkleArgsV0,
@@ -56,7 +52,7 @@ pub fn handler(
   let total_lamports = ctx.accounts.merkle_tree.lamports() + ctx.accounts.tree_authority.lamports();
   ctx.accounts.shared_merkle.set_inner(SharedMerkleV0 {
     proof_size: args.proof_size,
-    price_per_mint: div_ceil(total_lamports, 2u64.pow(depth) - 3), // because we can swap with 3 left
+    price_per_mint: total_lamports.div_ceil(2u64.pow(depth) - 3), // because we can swap with 3 left
     merkle_tree: ctx.accounts.merkle_tree.key(),
     bump_seed: ctx.bumps["shared_merkle"],
   });
