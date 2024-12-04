@@ -107,20 +107,14 @@ export async function getBulkRewards(
   });
 }
 
-export async function getPendingRewards(
+export async function getRecipients(
   program: Program<LazyDistributor>,
   lazyDistributor: PublicKey,
   dao: PublicKey,
   entityKeys: string[],
   encoding: BufferEncoding | "b58" = "b58",
   forceRequery = false
-): Promise<Record<string, string>> {
-  const oracleRewards = await getBulkRewards(
-    program,
-    lazyDistributor,
-    entityKeys
-  );
-
+) {
   const hemProgram = await init(program.provider as AnchorProvider);
   const cache = await getSingleton(hemProgram.provider.connection);
   const keyToAssetKs = entityKeys.map((entityKey) => {
@@ -161,12 +155,37 @@ export async function getPendingRewards(
     false,
     forceRequery
   );
-  const withRecipients = recipients.map((recipient, index) => {
+
+  return recipients.map((recipient, index) => {
     return {
       entityKey: entityKeys[index],
       recipientAcc: recipient?.info,
     };
   });
+}
+
+export async function getPendingRewards(
+  program: Program<LazyDistributor>,
+  lazyDistributor: PublicKey,
+  dao: PublicKey,
+  entityKeys: string[],
+  encoding: BufferEncoding | "b58" = "b58",
+  forceRequery = false
+): Promise<Record<string, string>> {
+  const oracleRewards = await getBulkRewards(
+    program,
+    lazyDistributor,
+    entityKeys
+  );
+
+  const withRecipients = await getRecipients(
+    program,
+    lazyDistributor,
+    dao,
+    entityKeys,
+    encoding,
+    forceRequery
+  );
 
   return withRecipients.reduce((acc, { entityKey, recipientAcc }) => {
     const sortedOracleRewards = oracleRewards
@@ -182,6 +201,56 @@ export async function getPendingRewards(
 
     return acc;
   }, {} as Record<string, string>);
+}
+
+export async function getPendingAndLifetimeRewards(
+  program: Program<LazyDistributor>,
+  lazyDistributor: PublicKey,
+  dao: PublicKey,
+  entityKeys: string[],
+  encoding: BufferEncoding | "b58" = "b58",
+  forceRequery = false
+): Promise<
+  Record<
+    string,
+    {
+      pendingRewards: string;
+      lifetimeRewards: string;
+    }
+  >
+> {
+  const oracleRewards = await getBulkRewards(
+    program,
+    lazyDistributor,
+    entityKeys
+  );
+
+  const withRecipients = await getRecipients(
+    program,
+    lazyDistributor,
+    dao,
+    entityKeys,
+    encoding,
+    forceRequery
+  );
+
+  return withRecipients.reduce((acc, { entityKey, recipientAcc }) => {
+    const sortedOracleRewards = oracleRewards
+      .map((rew) => rew.currentRewards[entityKey] || new BN(0))
+      .sort((a, b) => new BN(a).sub(new BN(b)).toNumber());
+
+    const oracleMedian = new BN(
+      sortedOracleRewards[Math.floor(sortedOracleRewards.length / 2)]
+    );
+
+    const subbed = oracleMedian.sub(recipientAcc?.totalRewards || new BN(0));
+    acc[entityKey] = {
+      pendingRewards: subbed.toString(),
+      lifetimeRewards: recipientAcc?.totalRewards?.toString() || "0",
+    };
+
+    return acc;
+  }, {} as Record<string, { pendingRewards: string; lifetimeRewards: string }>);
 }
 
 export async function formBulkTransactions({
@@ -371,7 +440,7 @@ export async function formBulkTransactions({
               recipient: recipientKeys[idx],
               lazyDistributor,
               rewardsMint: lazyDistributorAcc.rewardsMint!,
-              owner: assetAcc.ownership.owner,
+              owner: destination,
               destinationAccount: getAssociatedTokenAddressSync(
                 lazyDistributorAcc.rewardsMint!,
                 destination,

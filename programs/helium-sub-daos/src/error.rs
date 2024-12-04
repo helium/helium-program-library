@@ -52,4 +52,7 @@ pub enum ErrorCode {
 
   #[msg("Cannot delegate on a position ending this epoch")]
   NoDelegateEndingPosition,
+
+  #[msg("Rewards were already issued")]
+  RewardsAlreadyIssued,
 }

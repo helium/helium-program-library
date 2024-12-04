@@ -6,11 +6,10 @@ import {
 } from "@solana/web3.js";
 import { FastifyInstance } from "fastify";
 import { camelize, humanize, titleize } from "inflection";
-import pLimit from "p-limit";
-import { Sequelize } from "sequelize";
+import { Sequelize, Transaction } from "sequelize";
 import { IConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
-import database from "./database";
+import database, { limit } from "./database";
 import { provider } from "./solana";
 
 interface HandleTransactionWebhookArgs {
@@ -20,12 +19,7 @@ interface HandleTransactionWebhookArgs {
   sequelize?: Sequelize;
 }
 
-// Ensure we never have more txns open than the pool size - 1
-const limit = pLimit(
-  (process.env.PG_POOL_SIZE ? Number(process.env.PG_POOL_SIZE) : 5) - 1
-);
-
-export const handleTransactionWebhoook = async ({
+export const handleTransactionWebhook = async ({
   fastify,
   configs,
   transaction,
@@ -64,7 +58,9 @@ export const handleTransactionWebhoook = async ({
       const config = configs.find((x) => x.programId === owner);
 
       if (config) {
-        const t = await sequelize.transaction();
+        const t = await sequelize.transaction({
+          isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+        });
 
         try {
           const idl = await cachedIdlFetch.fetchIdl({

@@ -1,17 +1,16 @@
-use crate::next_epoch_ts;
-use crate::{state::*, EPOCH_LENGTH};
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::spl_token::instruction::AuthorityType;
-use anchor_spl::token::{set_authority, Mint, SetAuthority, Token, TokenAccount};
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token::{
+    set_authority, spl_token::instruction::AuthorityType, Mint, SetAuthority, Token, TokenAccount,
+  },
+};
 use circuit_breaker::{
   cpi::{
-    accounts::InitializeAccountWindowedBreakerV0, accounts::InitializeMintWindowedBreakerV0,
+    accounts::{InitializeAccountWindowedBreakerV0, InitializeMintWindowedBreakerV0},
     initialize_account_windowed_breaker_v0, initialize_mint_windowed_breaker_v0,
   },
   CircuitBreaker, InitializeAccountWindowedBreakerArgsV0, InitializeMintWindowedBreakerArgsV0,
-};
-use circuit_breaker::{
   ThresholdType as CBThresholdType,
   WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
 };
@@ -25,6 +24,8 @@ use treasury_management::{
   cpi::{accounts::InitializeTreasuryManagementV0, initialize_treasury_management_v0},
   Curve as TreasuryCurve, InitializeTreasuryManagementArgsV0, TreasuryManagement,
 };
+
+use crate::{next_epoch_ts, state::*, EPOCH_LENGTH};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub enum Curve {
@@ -284,6 +285,8 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     onboarding_data_only_dc_fee: args.onboarding_data_only_dc_fee,
     active_device_authority: args.active_device_authority,
     dc_onboarding_fees_paid: 0,
+    voting_rewards_percent: 0,
+    vetoken_tracker: Pubkey::default(),
   });
 
   resize_to_fit(

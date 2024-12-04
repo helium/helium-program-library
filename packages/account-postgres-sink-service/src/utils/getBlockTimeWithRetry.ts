@@ -1,13 +1,15 @@
-import * as anchor from '@coral-xyz/anchor';
+import * as anchor from "@coral-xyz/anchor";
 
 export const getBlockTimeWithRetry = async ({
   slot,
   maxRetries = 3,
+  maxSlotIncrement = 1,
   retryInterval = 1000,
   provider,
 }: {
   slot: number;
   maxRetries?: number;
+  maxSlotIncrement?: number;
   retryInterval?: number;
   provider: anchor.AnchorProvider;
 }): Promise<number | null> => {
@@ -18,8 +20,8 @@ export const getBlockTimeWithRetry = async ({
     const blockTime = await connection.getBlockTime(slot);
 
     return blockTime;
-  } catch (error) {
-    console.error('Error fetching block time:', error);
+  } catch (err) {
+    console.error("Error fetching block time:", err);
 
     if (maxRetries > 0) {
       console.log(`Retrying in ${retryInterval / 1000} seconds...`);
@@ -31,7 +33,21 @@ export const getBlockTimeWithRetry = async ({
         provider,
       });
     } else {
-      throw new Error('Max retries reached. Unable to fetch block time.');
+      if (
+        maxSlotIncrement > 0 &&
+        (err as Error).message.toLowerCase().includes("slot") &&
+        (err as Error).message.toLowerCase().includes("was skipped")
+      ) {
+        return getBlockTimeWithRetry({
+          slot: slot + 1,
+          maxRetries: 1,
+          maxSlotIncrement: maxSlotIncrement - 1,
+          retryInterval,
+          provider,
+        });
+      }
+
+      throw new Error("Max retries reached. Unable to fetch block time.");
     }
   }
 };

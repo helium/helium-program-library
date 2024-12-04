@@ -1943,7 +1943,7 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.2.7"
+version = "0.2.11"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -1964,13 +1964,14 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.1.6"
+version = "0.1.10"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
  "circuit-breaker",
  "default-env",
  "mpl-token-metadata",
+ "position-voting-rewards",
  "rust_decimal",
  "shared-utils",
  "solana-security-txt",
@@ -2549,7 +2550,7 @@ dependencies = [
 
 [[package]]
 name = "mobile-entity-manager"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -3035,6 +3036,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "31114a898e107c51bb1609ffaf55a0e011cf6a4d7f1170d0015a165082c0338b"
 
 [[package]]
+name = "position-voting-rewards"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "default-env",
+ "proposal",
+ "shared-utils",
+ "solana-security-txt",
+ "voter-stake-registry",
+]
+
+[[package]]
 name = "powerfmt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3443,7 +3457,7 @@ dependencies = [
 
 [[package]]
 name = "rewards-oracle"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anchor-lang",
  "default-env",
@@ -5694,7 +5708,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.3.2"
+version = "0.3.4"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

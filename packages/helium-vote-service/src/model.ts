@@ -229,7 +229,7 @@ Proxy.init(
   {
     name: {
       type: DataTypes.STRING,
-      unique: true
+      unique: true,
     },
     image: DataTypes.STRING,
     wallet: {
@@ -290,7 +290,7 @@ export class ProxyAssignment extends Model {
   declare nextVoter: string;
   declare index: number;
   declare asset: string;
-  declare proxyConfig: string
+  declare proxyConfig: string;
   declare rentRefund: string;
   declare bumpSeed: number;
 }
@@ -298,7 +298,7 @@ ProxyAssignment.init(
   {
     address: {
       type: DataTypes.STRING,
-      primaryKey: true
+      primaryKey: true,
     },
     voter: DataTypes.STRING,
     nextVoter: DataTypes.STRING,
@@ -307,7 +307,7 @@ ProxyAssignment.init(
     proxyConfig: DataTypes.STRING,
     rentRefund: DataTypes.STRING,
     bumpSeed: DataTypes.INTEGER,
-    expirationTime: DataTypes.DECIMAL.UNSIGNED
+    expirationTime: DataTypes.DECIMAL.UNSIGNED,
   },
   {
     sequelize,
@@ -318,10 +318,15 @@ ProxyAssignment.init(
   }
 );
 
-
 export function setRelations() {
-  ProxyAssignment.belongsTo(Position, { foreignKey: "asset", targetKey: "asset" });
-  Position.hasMany(ProxyAssignment, { foreignKey: "asset", sourceKey: "asset" });
+  ProxyAssignment.belongsTo(Position, {
+    foreignKey: "asset",
+    targetKey: "asset",
+  });
+  Position.hasMany(ProxyAssignment, {
+    foreignKey: "asset",
+    sourceKey: "asset",
+  });
   Proxy.hasMany(ProxyAssignment, { foreignKey: "voter", sourceKey: "wallet" });
   ProxyRegistrar.hasMany(Proxy, { foreignKey: "wallet", sourceKey: "wallet" });
   Proxy.hasMany(ProxyRegistrar, { foreignKey: "wallet", sourceKey: "wallet" });

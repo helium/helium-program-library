@@ -1,4 +1,4 @@
-use crate::{rewardable_entity_config_seeds, state::*};
+use crate::state::*;
 use anchor_lang::{prelude::*, solana_program::hash::hash};
 
 use account_compression_cpi::program::SplAccountCompression;
@@ -15,11 +15,7 @@ use data_credits::{
   program::DataCredits,
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
-use helium_sub_daos::{
-  cpi::{accounts::TrackDcOnboardingFeesV0, track_dc_onboarding_fees_v0},
-  program::HeliumSubDaos,
-  DaoV0, SubDaoV0, TrackDcOnboardingFeesArgsV0,
-};
+use helium_sub_daos::{program::HeliumSubDaos, DaoV0, SubDaoV0};
 use shared_utils::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -70,7 +66,6 @@ pub struct OnboardDataOnlyIotHotspotV0<'info> {
   pub rewardable_entity_config: Box<Account<'info, RewardableEntityConfigV0>>,
 
   #[account(
-    mut,
     seeds = ["data_only_config".as_bytes(), dao.key().as_ref()],
     bump,
     has_one = merkle_tree,
@@ -160,24 +155,6 @@ pub fn handler<'info>(
     is_active: false,
     dc_onboarding_fee_paid: dc_fee,
   });
-
-  track_dc_onboarding_fees_v0(
-    CpiContext::new_with_signer(
-      ctx.accounts.helium_sub_daos_program.to_account_info(),
-      TrackDcOnboardingFeesV0 {
-        hem_auth: ctx.accounts.rewardable_entity_config.to_account_info(),
-        sub_dao: ctx.accounts.sub_dao.to_account_info(),
-      },
-      &[rewardable_entity_config_seeds!(
-        ctx.accounts.rewardable_entity_config
-      )],
-    ),
-    TrackDcOnboardingFeesArgsV0 {
-      amount: dc_fee,
-      add: true,
-      symbol: ctx.accounts.rewardable_entity_config.symbol.clone(),
-    },
-  )?;
 
   if let (
     Some(location),

@@ -2,7 +2,7 @@ import { AnchorProvider, BN } from "@coral-xyz/anchor";
 import { VoteService, positionKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useEffect } from "react";
+import { useMemo, useCallback } from "react";
 import { positionKeysForWalletQuery } from "../queries/positionKeysForWalletQuery";
 import { proxyAssignmentsForWalletQuery } from "../queries/proxyAssignmentsForWalletQuery";
 
@@ -17,29 +17,29 @@ export function usePositionKeysAndProxies({
   provider,
   voteService,
 }: GetPositionKeysAndProxiesArgs) {
+  const registrar = useMemo(
+    () =>
+      voteService ? new PublicKey(voteService?.config.registrar) : undefined,
+    [voteService]
+  );
+
   const {
     data: myProxies,
     error: myProxyError,
     isLoading: myProxyLoading,
+    refetch: proxyAssignmentsRefetch,
   } = useQuery(
     proxyAssignmentsForWalletQuery({
       wallet,
       voteService,
     })
   );
-  const proxyPositions = useMemo(
-    () => myProxies?.map((del) => positionKey(new PublicKey(del.asset))[0]),
-    [myProxies]
-  );
-  const registrar = useMemo(
-    () =>
-      voteService ? new PublicKey(voteService?.config.registrar) : undefined,
-    [voteService]
-  );
+
   const {
     data: positionKeys,
     error,
     isLoading,
+    refetch: positionKeysRefetch,
   } = useQuery(
     positionKeysForWalletQuery({
       wallet,
@@ -48,7 +48,18 @@ export function usePositionKeysAndProxies({
     })
   );
 
+  const proxyPositions = useMemo(
+    () => myProxies?.map((del) => positionKey(new PublicKey(del.asset))[0]),
+    [myProxies]
+  );
+
+  const refetch = useCallback(() => {
+    proxyAssignmentsRefetch();
+    positionKeysRefetch();
+  }, [proxyAssignmentsRefetch, positionKeysRefetch]);
+
   return {
+    refetch,
     error: error || myProxyError,
     isLoading: isLoading || myProxyLoading,
     positionKeys: positionKeys?.positions,

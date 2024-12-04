@@ -1,30 +1,30 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
+import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
-import pLimit from "p-limit";
-import { Sequelize } from "sequelize";
+import _omit from "lodash/omit";
+import { Sequelize, Transaction } from "sequelize";
 import { IAccountConfig, IInitedPlugin } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
-import database from "./database";
+import database, { limit } from "./database";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { provider } from "./solana";
+import { OMIT_KEYS } from "../constants";
 
 interface HandleAccountWebhookArgs {
   fastify: FastifyInstance;
   programId: PublicKey;
   accounts: IAccountConfig[];
-  account: any;
+  account: {
+    pubkey: string;
+    data: any;
+  };
   isDelete?: boolean;
   sequelize?: Sequelize;
   pluginsByAccountType: Record<string, IInitedPlugin[]>;
 }
 
-// Ensure we never have more txns open than the pool size - 1
-const limit = pLimit(
-  (process.env.PG_POOL_SIZE ? Number(process.env.PG_POOL_SIZE) : 5) - 1
-);
-
-export function handleAccountWebhook({
+export const handleAccountWebhook = async ({
   fastify,
   programId,
   accounts,
@@ -32,7 +32,7 @@ export function handleAccountWebhook({
   sequelize = database,
   pluginsByAccountType,
   isDelete = false,
-}: HandleAccountWebhookArgs) {
+}: HandleAccountWebhookArgs) => {
   return limit(async () => {
     const idl = await cachedIdlFetch.fetchIdl({
       programId: programId.toBase58(),
@@ -51,8 +51,10 @@ export function handleAccountWebhook({
       throw new Error("idl does not have every account type");
     }
 
-    const t = await sequelize.transaction();
-    const now = new Date().toISOString();
+    const t = await sequelize.transaction({
+      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+    });
+
     try {
       const program = new anchor.Program(idl, programId, provider);
       const data = Buffer.from(account.data[0], account.data[1]);
@@ -66,43 +68,46 @@ export function handleAccountWebhook({
         );
       })?.type;
 
-      if (accName) {
-        const decodedAcc = program.coder.accounts.decode(
-          accName!,
-          data as Buffer
-        );
-        let sanitized = sanitizeAccount(decodedAcc);
-        for (const plugin of pluginsByAccountType[accName]) {
+      if (!accName) {
+        await t.rollback();
+        return;
+      }
+
+      const decodedAcc = program.coder.accounts.decode(accName, data as Buffer);
+      const model = sequelize.models[accName];
+      const existing = await model.findByPk(account.pubkey, {
+        transaction: t,
+      });
+
+      let sanitized = sanitizeAccount(decodedAcc);
+
+      await Promise.all(
+        pluginsByAccountType[accName].map(async (plugin) => {
           if (plugin?.processAccount) {
             sanitized = await plugin.processAccount(sanitized, t);
           }
-        }
-        const model = sequelize.models[accName];
-        if (isDelete) {
-          await model.destroy({
-            where: {
-              address: account.pubkey,
-            },
-            transaction: t,
-          });
-        } else {
-          const value = await model.findByPk(account.pubkey);
-          const changed =
-            !value ||
-            Object.entries(sanitized).some(
-              ([k, v]) => v?.toString() !== value.dataValues[k]?.toString()
-            );
+        })
+      );
 
-          if (changed) {
-            await model.upsert(
-              {
-                address: account.pubkey,
-                refreshed_at: now,
-                ...sanitized,
-              },
-              { transaction: t }
-            );
-          }
+      if (isDelete) {
+        await model.destroy({
+          where: { address: account.pubkey },
+          transaction: t,
+        });
+      } else {
+        sanitized = {
+          refreshed_at: new Date().toISOString(),
+          address: account.pubkey,
+          ...sanitized,
+        };
+
+        const shouldUpdate = !deepEqual(
+          _omit(sanitized, OMIT_KEYS),
+          _omit(existing?.dataValues, OMIT_KEYS)
+        );
+
+        if (shouldUpdate) {
+          await model.upsert({ ...sanitized }, { transaction: t });
         }
       }
 
@@ -115,4 +120,4 @@ export function handleAccountWebhook({
       throw err;
     }
   });
-}
+};

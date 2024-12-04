@@ -1,12 +1,11 @@
-use crate::error::*;
-use crate::position_seeds;
-use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token;
-use anchor_spl::token::Mint;
-use anchor_spl::token::Token;
-use anchor_spl::token::TokenAccount;
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token,
+  token::{Mint, Token, TokenAccount},
+};
+
+use crate::{error::*, position_seeds, state::*};
 
 #[derive(Accounts)]
 pub struct TransferV0<'info> {
@@ -26,6 +25,7 @@ pub struct TransferV0<'info> {
     has_one = registrar,
     has_one = mint,
     constraint = source_position.key() != target_position.key() @ VsrError::SamePosition,
+    constraint = !source_position.is_frozen() @ VsrError::PositionFrozen,
   )]
   pub source_position: Box<Account<'info, PositionV0>>,
   pub mint: Box<Account<'info, Mint>>,
@@ -40,6 +40,7 @@ pub struct TransferV0<'info> {
     mut,
     has_one = registrar,
     constraint = target_position.num_active_votes == 0 @ VsrError::ActiveVotesExist,
+    constraint = !target_position.is_frozen() @ VsrError::PositionFrozen,
   )]
   pub target_position: Box<Account<'info, PositionV0>>,
   pub deposit_mint: Box<Account<'info, Mint>>,

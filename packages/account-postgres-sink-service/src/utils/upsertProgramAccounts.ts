@@ -1,6 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
-import { Op, Sequelize } from "sequelize";
+import retry from "async-retry";
+import { Op, Sequelize, Transaction } from "sequelize";
 import { SOLANA_URL } from "../env";
 import { initPlugins } from "../plugins";
 import { IAccountConfig } from "../types";
@@ -26,6 +27,7 @@ export const upsertProgramAccounts = async ({
     anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
   );
   const provider = anchor.getProvider() as anchor.AnchorProvider;
+  const connection = provider.connection;
   const idl = await cachedIdlFetch.fetchIdl({
     skipCache: true,
     programId: programId.toBase58(),
@@ -55,17 +57,71 @@ export const upsertProgramAccounts = async ({
     });
   } catch (e) {
     console.log(e);
+    throw e;
   }
 
-  for (const { type, batchSize, ...rest } of accounts) {
+  const processProgramAccounts = async (
+    connection: anchor.web3.Connection,
+    programId: anchor.web3.PublicKey,
+    accountType: string,
+    filters: anchor.web3.GetProgramAccountsFilter[],
+    batchSize: number,
+    processChunk: (
+      chunk: anchor.web3.GetProgramAccountsResponse,
+      transaction: Transaction
+    ) => Promise<void>
+  ) => {
+    const startTime = Date.now();
+    let processedCount = 0;
+
+    const accounts = await retry(
+      async () => {
+        return await connection.getProgramAccounts(programId, {
+          filters,
+          commitment: connection.commitment,
+        });
+      },
+      {
+        retries: 5,
+        factor: 2,
+        minTimeout: 1000,
+        maxTimeout: 60000,
+        onRetry: (err, attempt) => {
+          console.warn(
+            `Retrying getProgramAccounts for ${accountType}, attempt #${attempt}: Retrying due to ${err.message}`
+          );
+        },
+      }
+    );
+
+    for (const chunk of chunks(accounts, batchSize)) {
+      try {
+        const t = await sequelize.transaction({
+          isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+        });
+        await processChunk(chunk, t);
+        await t.commit();
+        processedCount += chunk.length;
+        console.log(`Processed ${processedCount} ${accountType} accounts`);
+      } catch (err) {
+        console.error(`Error processing chunk:`, err);
+        throw err;
+      }
+    }
+
+    const duration = (Date.now() - startTime) / 1000;
+    console.log(
+      `Finished processing ${accountType} accounts in ${duration} seconds`
+    );
+  };
+
+  for (const { type, batchSize = 50000, ...rest } of accounts) {
     try {
-      const filter: {
-        offset?: number;
-        bytes?: string;
-        dataSize?: number;
-      } = program.coder.accounts.memcmp(type, undefined);
-      const coderFilters: GetProgramAccountsFilter[] = [];
+      const model = sequelize.models[type];
       const plugins = await initPlugins(rest.plugins);
+      const filter = program.coder.accounts.memcmp(type, undefined);
+      const coderFilters: GetProgramAccountsFilter[] = [];
+
       if (filter?.offset != undefined && filter?.bytes != undefined) {
         coderFilters.push({
           memcmp: { offset: filter.offset, bytes: filter.bytes },
@@ -76,27 +132,21 @@ export const upsertProgramAccounts = async ({
         coderFilters.push({ dataSize: filter.dataSize });
       }
 
-      let resp = await provider.connection.getProgramAccounts(programId, {
-        commitment: provider.connection.commitment,
-        filters: [...coderFilters],
-      });
-      const model = sequelize.models[type];
-      const t = await sequelize.transaction();
-      // @ts-ignore
-      const respChunks = chunks(resp, batchSize || 50000);
       const now = new Date().toISOString();
-
-      try {
-        for (const c of respChunks) {
-          const accs = c
+      await processProgramAccounts(
+        connection,
+        programId,
+        type,
+        coderFilters,
+        batchSize,
+        async (chunk, transaction) => {
+          const accs = chunk
             .map(({ pubkey, account }) => {
-              // ignore accounts we cant decode
               try {
                 const decodedAcc = program.coder.accounts.decode(
                   type,
                   account.data
                 );
-
                 return {
                   publicKey: pubkey,
                   account: decodedAcc,
@@ -110,13 +160,11 @@ export const upsertProgramAccounts = async ({
 
           const updateOnDuplicateFields: string[] = [
             ...Object.keys(accs[0].account),
-            ...[
-              ...new Set(
-                plugins
-                  .map((plugin) => plugin?.updateOnDuplicateFields || [])
-                  .flat()
-              ),
-            ],
+            ...new Set(
+              plugins
+                .map((plugin) => plugin?.updateOnDuplicateFields || [])
+                .flat()
+            ),
           ];
 
           const values = await Promise.all(
@@ -140,7 +188,7 @@ export const upsertProgramAccounts = async ({
           );
 
           await model.bulkCreate(values, {
-            transaction: t,
+            transaction,
             updateOnDuplicate: [
               "address",
               "refreshed_at",
@@ -148,13 +196,7 @@ export const upsertProgramAccounts = async ({
             ],
           });
         }
-
-        await t.commit();
-      } catch (err) {
-        await t.rollback();
-        console.error("While inserting, err", err);
-        throw err;
-      }
+      );
 
       await model.destroy({
         where: {
@@ -164,7 +206,7 @@ export const upsertProgramAccounts = async ({
         },
       });
     } catch (err) {
-      throw err;
+      console.error(`Error processing account type ${type}:`, err);
     }
   }
 };

@@ -1,11 +1,6 @@
 import { createGrpcTransport } from "@connectrpc/connect-node";
 import cors from "@fastify/cors";
-import {
-  AccountInfo,
-  Connection,
-  PublicKey,
-  TransactionResponse,
-} from "@solana/web3.js";
+import { AccountInfo, PublicKey, TransactionResponse } from "@solana/web3.js";
 import {
   applyParams,
   authIssue,
@@ -17,48 +12,47 @@ import {
   streamBlocks,
   unpackMapOutput,
 } from "@substreams/core";
-import Client, {
-  SubscribeRequest,
-  SubscribeUpdate,
-  SubscribeUpdateAccount,
-} from "@triton-one/yellowstone-grpc";
+import retry from "async-retry";
 import { BloomFilter } from "bloom-filters";
 import { EventEmitter } from "events";
 import Fastify, { FastifyInstance } from "fastify";
-import fastifyCron from "fastify-cron";
+import fastifyCron, { Params as CronConfig } from "fastify-cron";
 import fs from "fs";
 import { ReasonPhrases, StatusCodes } from "http-status-codes";
 import { EachMessagePayload, Kafka, KafkaConfig } from "kafkajs";
 import { Op } from "sequelize";
 import {
   HELIUS_AUTH_SECRET,
+  KAFKA_BROKERS,
+  KAFKA_GROUP_ID,
+  KAFKA_PASSWORD,
+  KAFKA_TOPIC,
+  KAFKA_USER,
+  PG_POOL_SIZE,
   PROGRAM_ACCOUNT_CONFIGS,
   REFRESH_PASSWORD,
-  RUN_JOBS_AT_STARTUP,
   SUBSTREAM,
+  USE_HELIUS_WEBHOOK,
   USE_KAFKA,
   USE_SUBSTREAMS,
   USE_YELLOWSTONE,
-  YELLOWSTONE_TOKEN,
-  YELLOWSTONE_URL,
 } from "./env";
-import { initPlugins } from "./plugins";
+import { getPluginsByAccountTypeByProgram } from "./plugins";
 import { metrics } from "./plugins/metrics";
-import { IConfig, IInitedPlugin } from "./types";
-import { convertYellowstoneTransaction } from "./utils/convertYellowstoneTransaction";
+import { setupYellowstone } from "./services/yellowstone";
+import { IConfig } from "./types";
 import { createPgIndexes } from "./utils/createPgIndexes";
 import database, { Cursor } from "./utils/database";
 import { defineAllIdlModels } from "./utils/defineIdlModels";
+import { getMultipleAccounts } from "./utils/getMultipleAccounts";
 import { getWritableAccountKeys } from "./utils/getWritableAccountKeys";
 import { handleAccountWebhook } from "./utils/handleAccountWebhook";
-import { handleTransactionWebhoook } from "./utils/handleTransactionWebhook";
 import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAccounts";
 import { provider } from "./utils/solana";
-import { truthy } from "./utils/truthy";
 import { upsertProgramAccounts } from "./utils/upsertProgramAccounts";
 
-if (!HELIUS_AUTH_SECRET) {
-  throw new Error("Helius auth secret not available");
+if (PG_POOL_SIZE < 5) {
+  throw new Error("PG_POOL_SIZE must be minimum of 5");
 }
 
 (async () => {
@@ -78,18 +72,19 @@ if (!HELIUS_AUTH_SECRET) {
   const customJobs = configs
     .filter((x) => !!x.crons)
     .flatMap(({ programId, crons = [] }) =>
-      crons.map(({ schedule, type }) => ({
-        cronTime: schedule,
-        runOnInit: false,
-        onTick: async (server: any) => {
-          try {
-            console.log(`Running custom job: ${type}`);
-            await server.inject(`/${type}?program=${programId}`);
-          } catch (err) {
-            console.error(err);
-          }
-        },
-      }))
+      crons.map(
+        ({ schedule, type }): CronConfig => ({
+          cronTime: schedule,
+          onTick: async (server: any) => {
+            try {
+              console.log(`Running custom job: ${type}`);
+              await server.inject(`/${type}?program=${programId}`);
+            } catch (err) {
+              console.error(err);
+            }
+          },
+        })
+      )
     );
 
   const server: FastifyInstance = Fastify({ logger: false });
@@ -108,15 +103,18 @@ if (!HELIUS_AUTH_SECRET) {
             for (const config of configs) {
               if ((programId && programId == config.programId) || !programId) {
                 console.log(
-                  programId
-                    ? `Refreshing accounts for program: ${programId}`
-                    : `Refreshing accounts`
+                  `Refreshing accounts for program: ${config.programId}`
                 );
+
                 try {
                   await upsertProgramAccounts({
                     programId: new PublicKey(config.programId),
                     accounts: config.accounts,
                   });
+
+                  console.log(
+                    `Accounts refreshed for program: ${config.programId}`
+                  );
                 } catch (err) {
                   throw err;
                 }
@@ -156,8 +154,6 @@ if (!HELIUS_AUTH_SECRET) {
 
     try {
       if (!programId) throw new Error("program not provided");
-      console.log(`Integrity checking program: ${programId}`);
-
       if (configs) {
         const config = configs.find((c) => c.programId === programId);
         if (!config)
@@ -180,29 +176,9 @@ if (!HELIUS_AUTH_SECRET) {
     }
   });
 
-  const pluginsByAccountTypeByProgram = (
-    await Promise.all(
-      configs.map(async (config) => {
-        return {
-          programId: config.programId,
-          pluginsByAccountType: (
-            await Promise.all(
-              config.accounts.map(async (acc) => {
-                const plugins = await initPlugins(acc.plugins);
-                return { type: acc.type, plugins };
-              })
-            )
-          ).reduce((acc, { type, plugins }) => {
-            acc[type] = plugins.filter(truthy);
-            return acc;
-          }, {} as Record<string, IInitedPlugin[]>),
-        };
-      })
-    )
-  ).reduce((acc, { programId, pluginsByAccountType }) => {
-    acc[programId] = pluginsByAccountType;
-    return acc;
-  }, {} as Record<string, Record<string, IInitedPlugin[]>>);
+  const pluginsByAccountTypeByProgram = await getPluginsByAccountTypeByProgram(
+    configs
+  );
 
   // Assume 10 million accounts we might not want to watch (token accounts, etc)
   const nonWatchedAccountsFilter = BloomFilter.create(10000000, 0.05);
@@ -261,90 +237,97 @@ if (!HELIUS_AUTH_SECRET) {
       }
     }
   }
-  server.post<{ Body: any[] }>("/transaction-webhook", async (req, res) => {
-    if (req.headers.authorization != HELIUS_AUTH_SECRET) {
-      res.code(StatusCodes.FORBIDDEN).send({
-        message: "Invalid authorization",
-      });
-      return;
-    }
-    if (refreshing) {
-      res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
-        message: "Refresh is happening, cannot create transactions",
-      });
-      return;
+
+  if (USE_HELIUS_WEBHOOK) {
+    if (!HELIUS_AUTH_SECRET) {
+      throw new Error("HELIUS_AUTH_SECRET undefined");
     }
 
-    try {
-      const transactions = req.body as TransactionResponse[];
-      const writableAccountKeys = transactions.flatMap((tx) =>
-        getWritableAccountKeys(
-          tx.transaction.message.accountKeys,
-          tx.transaction.message.header
-        )
-      );
+    server.post<{ Body: any[] }>("/transaction-webhook", async (req, res) => {
+      if (req.headers.authorization != HELIUS_AUTH_SECRET) {
+        res.code(StatusCodes.FORBIDDEN).send({
+          message: "Invalid authorization",
+        });
+        return;
+      }
+      if (refreshing) {
+        res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
+          message: "Refresh is happening, cannot create transactions",
+        });
+        return;
+      }
 
-      await insertTransactionAccounts(
-        await getMultipleAccounts({
-          connection: provider.connection,
-          keys: writableAccountKeys,
-        })
-      );
-      res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-    } catch (err) {
-      res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
-      console.error(err);
-    }
-  });
+      try {
+        const transactions = req.body as TransactionResponse[];
+        const writableAccountKeys = transactions.flatMap((tx) =>
+          getWritableAccountKeys(
+            tx.transaction.message.accountKeys,
+            tx.transaction.message.header
+          )
+        );
 
-  server.post("/account-webhook", async (req, res) => {
-    if (req.headers.authorization != HELIUS_AUTH_SECRET) {
-      res.code(StatusCodes.FORBIDDEN).send({
-        message: "Invalid authorization",
-      });
-      return;
-    }
-    if (refreshing) {
-      res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
-        message: "Refresh is happening, cannot create transactions",
-      });
-      return;
-    }
+        await insertTransactionAccounts(
+          await getMultipleAccounts({
+            connection: provider.connection,
+            keys: writableAccountKeys,
+          })
+        );
+        res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+      } catch (err) {
+        res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
+        console.error(err);
+      }
+    });
 
-    try {
-      const accounts = req.body as any[];
+    server.post("/account-webhook", async (req, res) => {
+      if (req.headers.authorization != HELIUS_AUTH_SECRET) {
+        res.code(StatusCodes.FORBIDDEN).send({
+          message: "Invalid authorization",
+        });
+        return;
+      }
+      if (refreshing) {
+        res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
+          message: "Refresh is happening, cannot create transactions",
+        });
+        return;
+      }
 
-      if (configs) {
-        for (const account of accounts) {
-          const parsed = account["account"]["parsed"];
-          const config = configs.find((x) => x.programId == parsed["owner"]);
+      try {
+        const accounts = req.body as any[];
 
-          if (!config) {
-            // exit early if account doesn't need to be saved
-            res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-            return;
-          }
+        if (configs) {
+          for (const account of accounts) {
+            const parsed = account["account"]["parsed"];
+            const config = configs.find((x) => x.programId == parsed["owner"]);
 
-          try {
-            await handleAccountWebhook({
-              fastify: server,
-              programId: new PublicKey(config.programId),
-              accounts: config.accounts,
-              account: parsed,
-              pluginsByAccountType:
-                pluginsByAccountTypeByProgram[parsed["owner"]] || {},
-            });
-          } catch (err) {
-            throw err;
+            if (!config) {
+              // exit early if account doesn't need to be saved
+              res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+              return;
+            }
+
+            try {
+              await handleAccountWebhook({
+                fastify: server,
+                programId: new PublicKey(config.programId),
+                accounts: config.accounts,
+                account: parsed,
+                pluginsByAccountType:
+                  pluginsByAccountTypeByProgram[parsed["owner"]] || {},
+              });
+            } catch (err) {
+              throw err;
+            }
           }
         }
+        res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+      } catch (err) {
+        res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
+        console.error(err);
       }
-      res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-    } catch (err) {
-      res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
-      console.error(err);
-    }
-  });
+    });
+  }
 
   try {
     // models are defined on boot, and updated in refresh-accounts
@@ -355,38 +338,46 @@ if (!HELIUS_AUTH_SECRET) {
       port: Number(process.env.PORT || "3000"),
       host: "0.0.0.0",
     });
+
+    if (customJobs.length > 0) {
+      server.cron.startAllJobs();
+    }
+
     const address = server.server.address();
     const port = typeof address === "string" ? address : address?.port;
     console.log(`Running on 0.0.0.0:${port}`);
-    // By default, jobs are not running at startup
-    if (RUN_JOBS_AT_STARTUP) {
-      server.cron.startAllJobs();
-    }
   } catch (err) {
     console.error(err);
     process.exit(1);
   }
 
   if (USE_KAFKA) {
+    if (!KAFKA_USER) throw new Error("KAFKA_USER undefined");
+    if (!KAFKA_TOPIC) throw new Error("KAFKA_TOPIC undefined");
+    if (!KAFKA_BROKERS) throw new Error("KAFKA_BROKERS undefined");
+    if (!KAFKA_PASSWORD) throw new Error("KAFKA_PASSWORD undefined");
+    if (!KAFKA_GROUP_ID) throw new Error("KAFKA_GROUP_ID undefined");
+
     const kafkaConfig: KafkaConfig = {
       ssl: true,
       clientId: "helium-reader",
+      brokers: KAFKA_BROKERS,
       sasl: {
         mechanism: "scram-sha-512",
-        username: process.env.KAFKA_USER!,
-        // Remove newlines from password
-        password: process.env.KAFKA_PASSWORD!.replace(/(\r\n|\n|\r)/gm, ""),
+        username: KAFKA_USER,
+        password: KAFKA_PASSWORD,
       },
-      brokers: process.env.KAFKA_BROKERS!.split(","),
     };
+
     const kafka = new Kafka(kafkaConfig);
-    const consumer = kafka.consumer({ groupId: process.env.KAFKA_GROUP_ID! });
+    const consumer = kafka.consumer({ groupId: KAFKA_GROUP_ID });
 
     await consumer.connect();
     await consumer.subscribe({
-      topic: process.env.KAFKA_TOPIC!,
+      topic: KAFKA_TOPIC,
       fromBeginning: false,
     });
+
     await consumer.run({
       eachMessage: async ({ message }: EachMessagePayload) => {
         if (message.value) {
@@ -396,7 +387,9 @@ if (!HELIUS_AUTH_SECRET) {
             pubkey,
             isDelete,
           } = JSON.parse(message.value.toString());
+
           const config = configs.find((x) => x.programId == programId);
+
           if (config) {
             await handleAccountWebhook({
               fastify: server,
@@ -417,6 +410,8 @@ if (!HELIUS_AUTH_SECRET) {
   }
 
   if (USE_SUBSTREAMS) {
+    if (!SUBSTREAM) throw new Error("SUBSTREAM undefined");
+
     await Cursor.sync();
     const lastCursor = await Cursor.findOne({
       order: [["createdAt", "DESC"]],
@@ -467,46 +462,60 @@ if (!HELIUS_AUTH_SECRET) {
           }
           if (output !== undefined && !isEmptyMessage(output)) {
             // Re attempt insertion if possible.
-            await withRetries(10, async () => {
-              const slot: bigint = (output as any).slot;
-              if (slot % BigInt(100) == BigInt(0)) {
-                console.log("Slot", slot);
-                const diff = currentBlock - Number(slot);
-                if (diff > 0) {
-                  console.log(`${(diff * 400) / 1000} Seconds behind`);
+            await retry(
+              async () => {
+                const slot: bigint = (output as any).slot;
+                if (slot % BigInt(100) == BigInt(0)) {
+                  console.log("Slot", slot);
+                  const diff = currentBlock - Number(slot);
+                  if (diff > 0) {
+                    console.log(`${(diff * 400) / 1000} Seconds behind`);
+                  }
                 }
-              }
-              const allWritableAccounts = [
-                ...new Set(
-                  (output as any).instructions.flatMap((ix: any) =>
-                    ix.accounts
-                      .filter((acc: any) => acc.isWritable)
-                      .map((a: any) => a.pubkey)
-                  )
-                ),
-              ];
-
-              await insertTransactionAccounts(
-                await getMultipleAccounts({
-                  connection: provider.connection,
-                  keys: allWritableAccounts.map(
-                    (a) => new PublicKey(a as string)
+                const allWritableAccounts = [
+                  ...new Set(
+                    (output as any).instructions.flatMap((ix: any) =>
+                      ix.accounts
+                        .filter((acc: any) => acc.isWritable)
+                        .map((a: any) => a.pubkey)
+                    )
                   ),
-                  minContextSlot: Number(slot),
-                })
-              );
+                ];
 
-              await Cursor.upsert({
-                cursor,
-              });
-              await Cursor.destroy({
-                where: {
-                  cursor: {
-                    [Op.ne]: cursor,
+                await insertTransactionAccounts(
+                  await getMultipleAccounts({
+                    connection: provider.connection,
+                    keys: allWritableAccounts.map(
+                      (a) => new PublicKey(a as string)
+                    ),
+                    minContextSlot: Number(slot),
+                  })
+                );
+
+                await Cursor.upsert({
+                  cursor,
+                });
+                await Cursor.destroy({
+                  where: {
+                    cursor: {
+                      [Op.ne]: cursor,
+                    },
                   },
+                });
+              },
+              {
+                retries: 10,
+                factor: 2,
+                minTimeout: 1000,
+                maxTimeout: 60000,
+                onRetry: (error, attempt) => {
+                  console.log(
+                    `${new Date().toISOString()}: Retrying attempt ${attempt}...`,
+                    error
+                  );
                 },
-              });
-            });
+              }
+            );
           }
         }
       } catch (e: any) {
@@ -521,168 +530,10 @@ if (!HELIUS_AUTH_SECRET) {
     }
   }
 
-  try {
-    if (USE_YELLOWSTONE) {
-      const client = new Client(YELLOWSTONE_URL, YELLOWSTONE_TOKEN, {
-        "grpc.max_receive_message_length": 2065853043,
-        "grpc.": "true",
-      });
-
-      const stream = await client.subscribe();
-
-      console.log("Connected");
-
-      // Create `error` / `end` handler
-      const streamClosed = new Promise<void>((resolve, reject) => {
-        stream.on("error", (error) => {
-          reject(error);
-          stream.end();
-        });
-        stream.on("end", () => {
-          resolve();
-        });
-        stream.on("close", () => {
-          resolve();
-        });
-      });
-
-      // Handle updates
-      stream.on("data", async (data: SubscribeUpdate) => {
-        if (data.transaction) {
-          const transaction = await convertYellowstoneTransaction(
-            data.transaction.transaction
-          );
-
-          if (transaction) {
-            try {
-              await handleTransactionWebhoook({
-                fastify: server,
-                configs,
-                transaction,
-              });
-            } catch (err) {
-              console.error(err);
-            }
-          }
-        }
-
-        if (data.account) {
-          const account = (data.account as SubscribeUpdateAccount)?.account;
-          if (account && configs) {
-            const owner = new PublicKey(account.owner).toBase58();
-            const config = configs.find((x) => x.programId === owner);
-
-            if (config) {
-              try {
-                await handleAccountWebhook({
-                  fastify: server,
-                  programId: new PublicKey(config.programId),
-                  accounts: config.accounts,
-                  account: {
-                    ...account,
-                    pubkey: new PublicKey(account.pubkey).toBase58(),
-                    data: [account.data],
-                  },
-                  pluginsByAccountType:
-                    pluginsByAccountTypeByProgram[owner] || {},
-                });
-              } catch (err) {
-                console.error(err);
-              }
-            }
-          }
-        }
-      });
-
-      const request: SubscribeRequest = {
-        accounts: {
-          client: {
-            owner: configs.map((c) => c.programId),
-            account: [],
-            filters: [],
-          },
-        },
-        slots: {},
-        transactions: {
-          client: {
-            vote: false,
-            failed: false,
-            accountInclude: configs.map((c) => c.programId),
-            accountExclude: [],
-            accountRequired: [],
-          },
-        },
-        entry: {},
-        blocks: {},
-        blocksMeta: {},
-        accountsDataSlice: [],
-        ping: undefined,
-      };
-
-      await new Promise<void>((resolve, reject) => {
-        stream.write(request, (err: any) => {
-          if (err === null || err === undefined) {
-            resolve();
-          } else {
-            reject(err);
-          }
-        });
-      }).catch((reason) => {
-        console.error(reason);
-        throw reason;
-      });
-
-      await streamClosed;
-    }
-  } catch (e: any) {
-    console.error(e);
-    process.exit(1);
+  if (USE_YELLOWSTONE) {
+    await setupYellowstone(server, configs).catch((err: any) => {
+      console.error("Fatal error in Yellowstone connection:", err);
+      process.exit(1);
+    });
   }
 })();
-
-async function withRetries<A>(
-  tries: number,
-  input: () => Promise<A>
-): Promise<A> {
-  for (let i = 0; i < tries; i++) {
-    try {
-      return await input();
-    } catch (e) {
-      console.log(`${new Date().toISOString()}: Retrying ${i}...`, e);
-      await sleep(2000);
-    }
-  }
-  throw new Error("Failed after retries");
-}
-
-async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function getMultipleAccounts({
-  connection,
-  keys,
-  minContextSlot,
-}: {
-  connection: Connection;
-  keys: PublicKey[];
-  minContextSlot?: number;
-}): Promise<{ pubkey: PublicKey; account: AccountInfo<Buffer> | null }[]> {
-  const batchSize = 100;
-  const batches = Math.ceil(keys.length / batchSize);
-  const results: { pubkey: PublicKey; account: AccountInfo<Buffer> | null }[] =
-    [];
-
-  for (let i = 0; i < batches; i++) {
-    const batchKeys = keys.slice(i * batchSize, (i + 1) * batchSize);
-    const batchResults = await connection.getMultipleAccountsInfo(batchKeys, {
-      minContextSlot,
-      commitment: "confirmed",
-    });
-    results.push(
-      ...batchResults.map((account, i) => ({ account, pubkey: batchKeys[i] }))
-    );
-  }
-
-  return results;
-}

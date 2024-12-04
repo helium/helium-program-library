@@ -1,10 +1,11 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import retry from "async-retry";
+import retry, { Options as RetryOptions } from "async-retry";
 import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
-import { Sequelize } from "sequelize";
+import pLimit from "p-limit";
+import { Sequelize, Transaction } from "sequelize";
 import { SOLANA_URL } from "../env";
 import { initPlugins } from "../plugins";
 import { IAccountConfig, IInitedPlugin } from "../types";
@@ -14,6 +15,7 @@ import { getBlockTimeWithRetry } from "./getBlockTimeWithRetry";
 import { getTransactionSignaturesUptoBlockTime } from "./getTransactionSignaturesUpToBlock";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
+import { OMIT_KEYS } from "../constants";
 
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;
@@ -22,12 +24,20 @@ interface IntegrityCheckProgramAccountsArgs {
   sequelize?: Sequelize;
 }
 
+const retryOptions: RetryOptions = {
+  retries: 5,
+  factor: 2,
+  minTimeout: 1000,
+  maxTimeout: 60000,
+};
+
 export const integrityCheckProgramAccounts = async ({
   fastify,
   programId,
   accounts,
   sequelize = database,
 }: IntegrityCheckProgramAccountsArgs) => {
+  console.log(`Integrity checking: ${programId}`);
   anchor.setProvider(
     anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
   );
@@ -49,8 +59,9 @@ export const integrityCheckProgramAccounts = async ({
   }
 
   const performIntegrityCheck = async () => {
-    const t = await sequelize.transaction();
-    const now = new Date().toISOString();
+    const t = await sequelize.transaction({
+      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+    });
     const txIdsByAccountId: { [key: string]: string[] } = {};
     const corrections: {
       type: string;
@@ -84,10 +95,14 @@ export const integrityCheckProgramAccounts = async ({
             }),
             100
           ).map((chunk) =>
-            connection.getParsedTransactions(chunk, {
-              commitment: "confirmed",
-              maxSupportedTransactionVersion: 0,
-            })
+            retry(
+              () =>
+                connection.getParsedTransactions(chunk, {
+                  commitment: "finalized",
+                  maxSupportedTransactionVersion: 0,
+                }),
+              retryOptions
+            )
           )
         )
       ).flat();
@@ -107,12 +122,17 @@ export const integrityCheckProgramAccounts = async ({
 
       const accountInfosWithPk = (
         await Promise.all(
-          chunks([...uniqueWritableAccounts.values()], 100).map(
-            async (chunk) =>
-              await connection.getMultipleAccountsInfo(
-                chunk.map((c) => new PublicKey(c)),
-                "confirmed"
+          chunks([...uniqueWritableAccounts.values()], 100).map((chunk) =>
+            pLimit(100)(() =>
+              retry(
+                () =>
+                  connection.getMultipleAccountsInfo(
+                    chunk.map((c) => new PublicKey(c)),
+                    "confirmed"
+                  ),
+                retryOptions
               )
+            )
           )
         )
       )
@@ -145,6 +165,7 @@ export const integrityCheckProgramAccounts = async ({
                 )
               );
             })?.type;
+
             if (!accName) {
               continue;
             }
@@ -155,11 +176,13 @@ export const integrityCheckProgramAccounts = async ({
             );
 
             if (accName) {
-              const omitKeys = ["refreshed_at", "createdAt"];
               const model = sequelize.models[accName];
-              const existing = await model.findByPk(c.pubkey);
+              const existing = await model.findByPk(c.pubkey, {
+                transaction: t,
+              });
+
               let sanitized = {
-                refreshed_at: now,
+                refreshed_at: new Date().toISOString(),
                 address: c.pubkey,
                 ...sanitizeAccount(decodedAcc),
               };
@@ -170,14 +193,12 @@ export const integrityCheckProgramAccounts = async ({
                 }
               }
 
-              const isEqual =
-                existing &&
-                deepEqual(
-                  _omit(sanitized, omitKeys),
-                  _omit(existing.dataValues, omitKeys)
-                );
+              const shouldUpdate = !deepEqual(
+                _omit(sanitized, OMIT_KEYS),
+                _omit(existing?.dataValues, OMIT_KEYS)
+              );
 
-              if (!isEqual) {
+              if (shouldUpdate) {
                 corrections.push({
                   type: accName,
                   accountId: c.pubkey,
@@ -193,32 +214,39 @@ export const integrityCheckProgramAccounts = async ({
       );
 
       await t.commit();
-      for (const correction of corrections) {
-        // @ts-ignore
-        fastify.customMetrics.integrityCheckCounter.inc();
-        console.log("IntegrityCheckCorrection:");
-        console.dir(correction, { depth: null });
+      console.log(`Integrity check complete for: ${programId}`);
+      if (corrections.length > 0) {
+        console.log(`Integrity check corrections for: ${programId}`);
+        await Promise.all(
+          corrections.map(async (correction) => {
+            // @ts-ignore
+            fastify.customMetrics.integrityCheckCounter.inc();
+            console.dir(correction, { depth: null });
+          })
+        );
       }
     } catch (err) {
       await t.rollback();
-      console.error("While inserting, err", err);
-      throw err;
+      console.error(
+        `Integrity check error while inserting for: ${programId}`,
+        err
+      );
+      throw err; // Rethrow the error to be caught by the retry mechanism
     }
   };
 
   try {
     await retry(performIntegrityCheck, {
-      retries: 5,
-      factor: 2,
-      minTimeout: 1000,
-      maxTimeout: 60000,
+      ...retryOptions,
       onRetry: (error, attempt) => {
-        console.warn(`Attempt ${attempt}: Retrying due to ${error.message}`);
+        console.warn(
+          `Integrity check ${programId} attempt ${attempt}: Retrying due to ${error.message}`
+        );
       },
     });
   } catch (err) {
     console.error(
-      "Failed to perform integrity check after multiple attempts:",
+      `Failed to perform integrity check for ${programId} after multiple attempts:`,
       err
     );
     throw err;

@@ -7,7 +7,7 @@ import {
   createAtaAndTransfer,
   createMint,
   sendMultipleInstructions,
-  toBN
+  toBN,
 } from "@helium/spl-utils";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
@@ -16,7 +16,10 @@ import {
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { execSync } from "child_process";
 import { ThresholdType } from "../../packages/circuit-breaker-sdk/src";
-import { makerKey, sharedMerkleKey } from "../../packages/helium-entity-manager-sdk/src";
+import {
+  makerKey,
+  sharedMerkleKey,
+} from "../../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../../target/types/data_credits";
 import { HeliumEntityManager } from "../../target/types/helium_entity_manager";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
@@ -24,6 +27,7 @@ import { LazyDistributor } from "../../target/types/lazy_distributor";
 import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
 import { IotRoutingManager } from "../../target/types/iot_routing_manager";
+import { PositionVotingRewards } from "../../target/types/position_voting_rewards";
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =
@@ -116,9 +120,13 @@ export const initTestRewardableEntityConfig = async (
   };
 };
 
-export const initSharedMerkle = async (program: Program<HeliumEntityManager>) => {
+export const initSharedMerkle = async (
+  program: Program<HeliumEntityManager>
+) => {
   const sharedMerkle = sharedMerkleKey(3)[0];
-  const exists = !!(await program.provider.connection.getAccountInfo(sharedMerkle));
+  const exists = !!(await program.provider.connection.getAccountInfo(
+    sharedMerkle
+  ));
   if (exists) {
     return sharedMerkle;
   }
@@ -127,9 +135,9 @@ export const initSharedMerkle = async (program: Program<HeliumEntityManager>) =>
   const createMerkle = SystemProgram.createAccount({
     fromPubkey: (program.provider as anchor.AnchorProvider).wallet.publicKey,
     newAccountPubkey: merkle.publicKey,
-    lamports: await (program.provider as anchor.AnchorProvider).connection.getMinimumBalanceForRentExemption(
-      space
-    ),
+    lamports: await (
+      program.provider as anchor.AnchorProvider
+    ).connection.getMinimumBalanceForRentExemption(space),
     space: space,
     programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   });
@@ -144,7 +152,7 @@ export const initSharedMerkle = async (program: Program<HeliumEntityManager>) =>
     })
     .rpc({ skipPreflight: true });
 
-  return sharedMerkle
+  return sharedMerkle;
 };
 
 export const initTestMaker = async (
@@ -261,6 +269,20 @@ export async function ensureDCIdl(dcProgram: Program<DataCredits>) {
   }
 }
 
+export async function ensurePVRIdl(pvrProgram: Program<PositionVotingRewards>) {
+  try {
+    execSync(
+      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/position_voting_rewards.json ${pvrProgram.programId}`,
+      { stdio: "inherit", shell: "/bin/bash" }
+    );
+  } catch {
+    execSync(
+      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/position_voting_rewards.json ${pvrProgram.programId}`,
+      { stdio: "inherit", shell: "/bin/bash" }
+    );
+  }
+}
+
 export async function ensureMemIdl(memProgram: Program<MobileEntityManager>) {
   try {
     execSync(
@@ -350,16 +372,17 @@ export const initWorld = async (
   hemProgram: Program<HeliumEntityManager>,
   hsdProgram: Program<HeliumSubDaos>,
   dcProgram: Program<DataCredits>,
+  vsrProgram: Program<VoterStakeRegistry>,
   epochRewards?: number,
   subDaoEpochRewards?: number,
   registrar?: PublicKey,
-  hntMint?: PublicKey,
-  subDaoRegistrar?: PublicKey
+  hntMint?: PublicKey
 ): Promise<{
   dao: { mint: PublicKey; dao: PublicKey };
   subDao: {
     mint: PublicKey;
     subDao: PublicKey;
+    subDaoRegistrar: PublicKey;
     treasury: PublicKey;
     rewardsEscrow: PublicKey;
     delegatorPool: PublicKey;
@@ -401,13 +424,13 @@ export const initWorld = async (
   );
   const subDao = await initTestSubdao({
     hsdProgram,
+    vsrProgram,
     provider,
     authority: provider.wallet.publicKey,
     dao: dao.dao,
     epochRewards: subDaoEpochRewards,
-    registrar: subDaoRegistrar,
     // Enough to stake 4 makers
-    numTokens: MAKER_STAKING_FEE.mul(new anchor.BN(4))
+    numTokens: MAKER_STAKING_FEE.mul(new anchor.BN(4)),
   });
 
   const rewardableEntityConfig = await initTestRewardableEntityConfig(
