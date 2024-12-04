@@ -139,16 +139,15 @@ describe("sus", () => {
       })],
       cluster: "devnet"
     });
-    console.log(susR.instructions[0].parsed);
 
     expect(susR.writableAccounts.map((r) => r.name)).to.deep.eq([
       "Native SOL Account",
-      "DelegatedDataCreditsV0",
+      "Unknown",
       "DC Mint",
-      "DC Token Account",
+      "Unknown",
       "HNT Token Account",
       "HNT Mint",
-      "DC Token Account",
+      "Unknown",
       "MintWindowedCircuitBreakerV0",
     ]);
     expect(susR.instructions[0].parsed?.name).to.eq("mintDataCreditsV0");

@@ -126,11 +126,9 @@ pub fn handler(
 
   // Calculate utility score
   // utility score = V
-  // V = max(1, veHNT_dnp).
+  // V = veHNT_dnp.
   let epoch_info = &mut ctx.accounts.sub_dao_epoch_info;
 
-  // sqrt(x) = e^(ln(x)/2)
-  // x^1/4 = e^(ln(x)/4))
   let vehnt_staked = PreciseNumber::new(epoch_info.vehnt_at_epoch_start.into())
     .unwrap()
     .checked_div(&PreciseNumber::new(100000000_u128).unwrap()) // vehnt has 8 decimals

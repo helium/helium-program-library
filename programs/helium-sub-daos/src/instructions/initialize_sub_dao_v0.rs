@@ -1,9 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{
-    set_authority, spl_token::instruction::AuthorityType, Mint, SetAuthority, Token, TokenAccount,
-  },
+  token::{set_authority, spl_token::instruction::AuthorityType, Mint, SetAuthority, Token},
 };
 use circuit_breaker::CircuitBreaker;
 use shared_utils::resize_to_fit;
@@ -115,11 +113,6 @@ pub fn create_end_epoch_cron(curr_ts: i64, offset: u64) -> String {
 }
 
 pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -> Result<()> {
-  let signer_seeds: &[&[&[u8]]] = &[&[
-    "sub_dao".as_bytes(),
-    ctx.accounts.dnt_mint.to_account_info().key.as_ref(),
-    &[ctx.bumps["sub_dao"]],
-  ]];
   initialize_treasury_management_v0(
     CpiContext::new(
       ctx.accounts.treasury_management_program.to_account_info(),

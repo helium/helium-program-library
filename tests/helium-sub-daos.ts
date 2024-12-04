@@ -543,7 +543,6 @@ describe("helium-sub-daos", () => {
               ecc,
               hotspotOwner,
             });
-          console.log("I AM ISSUING");
           const issueMethod = hemProgram.methods
             .issueEntityV0({
               entityKey: Buffer.from(bs58.decode(ecc)),
@@ -645,8 +644,7 @@ describe("helium-sub-daos", () => {
 
           const supply = (await getMint(provider.connection, hntMint)).supply;
           const veHnt = toNumber(subDaoInfo.vehntAtEpochStart, 8);
-          const totalUtility =
-            Math.max(veHnt, 1) * Math.pow(50, 1 / 4) * Math.sqrt(16) * 1;
+          const totalUtility = veHnt;
           expect(daoInfo.totalRewards.toString()).to.eq(
             EPOCH_REWARDS.toString()
           );
@@ -955,10 +953,8 @@ describe("helium-sub-daos", () => {
               const postHstBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(hstPool))?.data!
               ).amount;
-              expect(
-                Number(postBalance - preBalance)
-              ).to.be.closeTo(
-                ((1 - 0.32) * EPOCH_REWARDS) * (1 - 0.06),
+              expect(Number(postBalance - preBalance)).to.be.closeTo(
+                (1 - 0.32) * EPOCH_REWARDS * (1 - 0.06),
                 1 // Allow for 1 unit of difference to handle rounding
               );
               expect((postHstBalance - preHstBalance).toString()).to.eq("0");
