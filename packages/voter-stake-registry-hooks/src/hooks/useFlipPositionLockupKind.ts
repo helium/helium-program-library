@@ -6,11 +6,8 @@ import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
-import {
-  init as initPvr,
-  vetokenTrackerKey,
-} from "@helium/position-voting-rewards-sdk";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
+
 function secsToDays(secs: number): number {
   return secs / (60 * 60 * 24);
 }
@@ -61,23 +58,6 @@ export const useFlipPositionLockupKind = () => {
               : position.lockup.endTs.sub(new BN(unixNow)).toNumber()
           )
         );
-
-        if (position.isEnrolled) {
-          const [vetokenTracker] = vetokenTrackerKey(
-            position.registrar
-          );
-          const pvrProgram = await initPvr(provider as any);
-
-          instructions.push(
-            await pvrProgram.methods
-              .unenrollV0()
-              .accounts({
-                position: position.pubkey,
-                vetokenTracker,
-              })
-              .instruction()
-          );
-        }
 
         if (isDao) {
           instructions.push(

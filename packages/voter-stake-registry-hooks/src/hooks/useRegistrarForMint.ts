@@ -27,6 +27,6 @@ export function useRegistrarForMint(mint: PublicKey | undefined) {
     registrarKey,
     subDao,
     dao,
-    loading: loadingDao || loadingSubdao
-  }
+    loading: loadingDao || loadingSubdao,
+  };
 }

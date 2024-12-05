@@ -23,7 +23,6 @@ import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { LazyDistributor } from "../../target/types/lazy_distributor";
 import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
-import { PositionVotingRewards } from "../../target/types/position_voting_rewards";
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =
@@ -230,20 +229,6 @@ export async function ensureDCIdl(dcProgram: Program<DataCredits>) {
   }
 }
 
-export async function ensurePVRIdl(pvrProgram: Program<PositionVotingRewards>) {
-  try {
-    execSync(
-      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/position_voting_rewards.json ${pvrProgram.programId}`,
-      { stdio: "inherit", shell: "/bin/bash" }
-    );
-  } catch {
-    execSync(
-      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/position_voting_rewards.json ${pvrProgram.programId}`,
-      { stdio: "inherit", shell: "/bin/bash" }
-    );
-  }
-}
-
 export async function ensureMemIdl(memProgram: Program<MobileEntityManager>) {
   try {
     execSync(
@@ -319,17 +304,16 @@ export const initWorld = async (
   hemProgram: Program<HeliumEntityManager>,
   hsdProgram: Program<HeliumSubDaos>,
   dcProgram: Program<DataCredits>,
-  vsrProgram: Program<VoterStakeRegistry>,
   epochRewards?: number,
   subDaoEpochRewards?: number,
   registrar?: PublicKey,
   hntMint?: PublicKey,
+  subDaoRegistrar?: PublicKey
 ): Promise<{
   dao: { mint: PublicKey; dao: PublicKey };
   subDao: {
     mint: PublicKey;
     subDao: PublicKey;
-    subDaoRegistrar: PublicKey;
     treasury: PublicKey;
     rewardsEscrow: PublicKey;
     delegatorPool: PublicKey;
@@ -371,11 +355,11 @@ export const initWorld = async (
   );
   const subDao = await initTestSubdao({
     hsdProgram,
-    vsrProgram,
     provider,
     authority: provider.wallet.publicKey,
     dao: dao.dao,
     epochRewards: subDaoEpochRewards,
+    registrar: subDaoRegistrar,
     // Enough to stake 4 makers
     numTokens: MAKER_STAKING_FEE.mul(new anchor.BN(4))
   });

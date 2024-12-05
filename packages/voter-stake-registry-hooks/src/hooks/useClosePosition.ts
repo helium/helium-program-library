@@ -8,10 +8,6 @@ import { HeliumVsrClient } from "../sdk/client";
 import { PositionWithMeta } from "../sdk/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { INDEXER_WAIT } from "../constants";
-import {
-  init as initPvr,
-  vetokenTrackerKey,
-} from "@helium/position-voting-rewards-sdk";
 
 export const useClosePosition = () => {
   const { provider, unixNow } = useHeliumVsrState();
@@ -79,22 +75,6 @@ export const useClosePosition = () => {
             position.votingMint.mint
           )
         );
-
-        if (position.isEnrolled) {
-          const pvrProgram = await initPvr(provider as any);
-          const [vetokenTracker] = vetokenTrackerKey(position.registrar);
-
-          instructions.push(
-            await pvrProgram.methods
-              .unenrollV0()
-              .accounts({
-                position: position.pubkey,
-                vetokenTracker,
-                rentRefund: provider.wallet.publicKey,
-              })
-              .instruction()
-          );
-        }
 
         instructions.push(
           await client.program.methods

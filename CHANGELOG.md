@@ -59,10 +59,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 ## [0.9.9](https://github.com/helium/helium-program-library/compare/v0.9.2...v0.9.9) (2024-10-28)
 
-
-### Reverts
-
-* Revert "Add temp endpoint to fix mobile hotspots (#683)" (#685) ([3f5a4be](https://github.com/helium/helium-program-library/commit/3f5a4be5fc7da0dcbcd10c0ade199831fc538a9b)), closes [#683](https://github.com/helium/helium-program-library/issues/683) [#685](https://github.com/helium/helium-program-library/issues/685) [#683](https://github.com/helium/helium-program-library/issues/683)
+**Note:** Version bump only for package helium-program-library
 
 
 

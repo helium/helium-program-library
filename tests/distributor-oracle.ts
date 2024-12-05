@@ -327,7 +327,6 @@ describe("distributor-oracle", () => {
       hemProgram,
       hsdProgram,
       dcProgram,
-      vsrProgram,
       1,
       1,
       registrar,

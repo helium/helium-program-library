@@ -4,7 +4,6 @@ import {
   delegatedPositionKey,
   init,
 } from "@helium/helium-sub-daos-sdk";
-import { PROGRAM_ID as PVR_PROGRAM_ID } from "@helium/position-voting-rewards-sdk";
 import { Status, batchSequentialParallelInstructions } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
@@ -20,14 +19,12 @@ export const useUndelegatePosition = () => {
     async ({
       position,
       programId = PROGRAM_ID,
-      pvrProgramId = PVR_PROGRAM_ID,
       onInstructions,
       onProgress,
       maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
     }: {
       position: PositionWithMeta;
       programId?: PublicKey;
-      pvrProgramId?: PublicKey;
       // Instead of sending the transaction, let the caller decide
       onInstructions?: (
         instructions: TransactionInstruction[]
@@ -55,7 +52,6 @@ export const useUndelegatePosition = () => {
               provider,
               positions: [position],
               hsdProgramId: programId,
-              pvrProgramId: pvrProgramId,
             }))
           );
         }
