@@ -32,7 +32,9 @@ echo "Using $RND for dao names"
 # init the dao and subdaos
 ./packages/helium-admin-cli/bin/helium-admin.js create-dao \
     --hntPriceOracle 4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33 \
-    --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium DAO" -u $CLUSTER_URL
+    --numHnt 200136852 --numHst 200000000 --numDc 2000000000000 --realmName "Helium DAO" -u $CLUSTER_URL \
+    --oracleKey $(solana address -k ./packages/helium-admin-cli/keypairs/hnt-price-oracle.json) \
+    --rewardsOracleUrl https://hnt-price-oracle.oracle.test-helium.com
 
 ./packages/helium-admin-cli/bin/helium-admin.js create-subdao \
     --hntPubkey $(solana address -k packages/helium-admin-cli/keypairs/hnt.json) \

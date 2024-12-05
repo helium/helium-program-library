@@ -7,6 +7,7 @@ import {
   init as initDc,
 } from "@helium/data-credits-sdk";
 import { fanoutKey } from "@helium/fanout-sdk";
+import { init as initLazy } from "@helium/lazy-distributor-sdk";
 import {
   dataOnlyConfigKey,
   init as initHem,
@@ -57,6 +58,7 @@ import {
   sendInstructionsOrSquads,
 } from "./utils";
 import { init } from "@helium/nft-proxy-sdk";
+import { oracleSignerKey } from "@helium/rewards-oracle-sdk";
 
 const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
@@ -165,6 +167,17 @@ export async function run(args: any = process.argv) {
       type: "string",
       required: true,
     },
+    rewardsOracleUrl: {
+      alias: "ro",
+      type: "string",
+      describe: "The rewards oracle URL",
+      required: true,
+    },
+    oracleKey: {
+      type: "string",
+      describe: "Pubkey of the oracle",
+      required: true,
+    },
     numHst: {
       type: "number",
       describe:
@@ -193,6 +206,7 @@ export async function run(args: any = process.argv) {
   const heliumSubDaosProgram = await initDao(provider);
   const heliumVsrProgram = await initVsr(provider);
   const hemProgram = await initHem(provider);
+  const lazyDistProgram = await initLazy(provider);
 
   const govProgramId = new PublicKey(argv.govProgramId);
   const councilKeypair = await loadKeypair(argv.councilKeypair);
@@ -455,6 +469,33 @@ export async function run(args: any = process.argv) {
       fanout,
       true
     );
+  const oracleKey = new PublicKey(argv.oracleKey!);
+  const { instruction: initLazyDist, pubkeys: { rewardsEscrow, lazyDistributor } } = await lazyDistProgram.methods
+    .initializeLazyDistributorV0({
+      authority,
+      oracles: [
+        {
+          oracle: oracleKey,
+          url: argv.rewardsOracleUrl,
+        },
+      ],
+      // 5 x epoch rewards in a 24 hour period
+      windowConfig: {
+        windowSizeSeconds: new anchor.BN(24 * 60 * 60),
+        thresholdType: ThresholdType.Absolute as never,
+        threshold: new anchor.BN(currentHntEmission.emissionsPerEpoch).mul(
+          new anchor.BN(5)
+        ),
+      },
+      approver: oracleSignerKey()[0],
+    })
+    .accounts({
+      payer: authority,
+      rewardsMint: hntKeypair.publicKey,
+    })
+    .prepare();
+    const ldExists = await exists(conn, lazyDistributor!);
+
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         registrar: registrar,
@@ -465,6 +506,7 @@ export async function run(args: any = process.argv) {
         emissionSchedule: [currentHntEmission],
       })
       .preInstructions([
+        ...(ldExists ? [] : [initLazyDist]),
         createAssociatedTokenAccountIdempotentInstruction(
           provider.wallet.publicKey,
           hstPool,
@@ -476,12 +518,14 @@ export async function run(args: any = process.argv) {
         dcMint: dcKeypair.publicKey,
         hntMint: hntKeypair.publicKey,
         hstPool,
+        rewardsEscrow,
       })
       .rpc({ skipPreflight: true });
 
     await sendInstructionsOrSquads({
       provider,
       instructions: [
+        initLazyDist,
         await heliumSubDaosProgram.methods
           .updateDaoV0({
             authority,
