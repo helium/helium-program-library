@@ -14,7 +14,7 @@ for program in $program_list; do
   cluster="${1:-localnet}"
 
   if [ -n "$id" ]; then
-    anchor_command="anchor28 idl upgrade ${id} --filepath ${filepath} --provider.cluster ${cluster} --provider.wallet $HOME/.config/solana/id.json"
+    anchor_command="anchor idl upgrade ${id} --filepath ${filepath} --provider.cluster ${cluster} --provider.wallet $HOME/.config/solana/id.json"
     echo "Running command: $anchor_command"
 
     # Run the anchor idl init command in the background and store the PID
