@@ -6,10 +6,6 @@ import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
-import {
-  init as initPvr,
-  vetokenTrackerKey,
-} from "@helium/position-voting-rewards-sdk";
 
 export const useExtendPosition = () => {
   const { provider } = useHeliumVsrState();
@@ -43,22 +39,6 @@ export const useExtendPosition = () => {
         const instructions: TransactionInstruction[] = [];
         const [dao] = daoKey(mint);
         const isDao = Boolean(await provider.connection.getAccountInfo(dao));
-
-        if (position.isEnrolled) {
-          const [vetokenTracker] = vetokenTrackerKey(position.registrar);
-          const pvrProgram = await initPvr(provider as any);
-
-          instructions.push(
-            await pvrProgram.methods
-              .unenrollV0()
-              .accounts({
-                position: position.pubkey,
-                vetokenTracker,
-                rentRefund: provider.wallet.publicKey,
-              })
-              .instruction()
-          );
-        }
 
         if (isDao) {
           instructions.push(

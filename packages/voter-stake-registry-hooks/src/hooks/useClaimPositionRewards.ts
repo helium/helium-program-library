@@ -14,14 +14,12 @@ export const useClaimPositionRewards = () => {
     async ({
       position,
       programId = PROGRAM_ID,
-      pvrProgramId = PVR_PROGRAM_ID,
       onProgress,
       onInstructions,
       maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
     }: {
       position: PositionWithMeta;
       programId?: PublicKey;
-      pvrProgramId?: PublicKey;
       onProgress?: (status: Status) => void;
       // Instead of sending the transaction, let the caller decide
       onInstructions?: (
@@ -39,7 +37,6 @@ export const useClaimPositionRewards = () => {
           provider,
           positions: [position],
           hsdProgramId: programId,
-          pvrProgramId: pvrProgramId,
         });
 
         if (onInstructions) {

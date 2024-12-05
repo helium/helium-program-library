@@ -6,20 +6,18 @@ import {
 } from "@helium/helium-sub-daos-sdk";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { init as initNftProxy } from "@helium/nft-proxy-sdk";
-import { enrolledPositionKey } from "@helium/position-voting-rewards-sdk";
 import { truthy } from "@helium/spl-utils";
 import { VoteService, init } from "@helium/voter-stake-registry-sdk";
 import { Connection, PublicKey } from "@solana/web3.js";
 import React, { createContext, useContext, useMemo } from "react";
 import { useAsync } from "react-async-hook";
 import { useDelegatedPositions } from "../hooks/useDelegatedPositions";
-import { useEnrolledPositions } from "../hooks/useEnrolledPositions";
 import { usePositionKeysAndProxies } from "../hooks/usePositionKeysAndProxies";
 import { usePositions } from "../hooks/usePositions";
 import { useRegistrar } from "../hooks/useRegistrar";
-import { useRegistrarForMint } from "../hooks/useRegistrarForMint";
 import { PositionWithMeta, ProxyAssignmentV0 } from "../sdk/types";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
+import { useRegistrarForMint } from "..";
 
 type Registrar = IdlAccounts<VoterStakeRegistry>["registrar"];
 
@@ -133,15 +131,8 @@ export const HeliumVsrStateProvider: React.FC<{
     return positionKeys?.map((pk) => delegatedPositionKey(pk)[0]);
   }, [positionKeys]);
 
-  const enrolledPositionKeys = useMemo(() => {
-    return positionKeys?.map((pk) => enrolledPositionKey(pk)[0]);
-  }, [positionKeys]);
-
   const { accounts: delegatedAccounts, loading: loadingDel } =
     useDelegatedPositions(delegatedPositionKeys);
-
-  const { accounts: enrolledAccounts, loading: loadingEnrolled } =
-    useEnrolledPositions(enrolledPositionKeys);
 
   const proxyAccountsByAsset = useMemo(() => {
     return proxyAccounts?.reduce((acc, prox) => {
@@ -174,13 +165,7 @@ export const HeliumVsrStateProvider: React.FC<{
 
   const { amountLocked, votingPower, positionsWithMeta, amountProxyLocked } =
     useMemo(() => {
-      if (
-        positions &&
-        registrar &&
-        delegatedAccounts &&
-        enrolledAccounts &&
-        now
-      ) {
+      if (positions && registrar && delegatedAccounts && now) {
         let amountLocked = new BN(0);
         let amountProxyLocked = new BN(0);
         let votingPower = new BN(0);
@@ -195,39 +180,17 @@ export const HeliumVsrStateProvider: React.FC<{
               const decayedEpoch = lockup.endTs.div(new BN(EPOCH_LENGTH));
               const currentEpoch = new BN(now).div(new BN(EPOCH_LENGTH));
               const isDelegated = !!delegatedAccounts?.[idx]?.info;
-              const isEnrolled = !!enrolledAccounts?.[idx]?.info;
-              let delegationRewards = false;
-              let enrollmentRewards = false;
               const proxy =
                 proxyAccountsByAsset?.[position.info.mint.toBase58()];
 
               const delegatedSubDao = isDelegated
                 ? delegatedAccounts[idx]?.info?.subDao
                 : null;
-
-              const enrollment = isEnrolled
-                ? enrolledAccounts[idx]?.info
-                : null;
-
-              if (isDelegated) {
-                const epoch = delegatedAccounts[
-                  idx
-                ]!.info!.lastClaimedEpoch.add(new BN(1));
-                const epochsCount = isDecayed
-                  ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
-                  : currentEpoch.sub(epoch).toNumber();
-
-                delegationRewards = epochsCount > 0;
-              }
-
-              if (isEnrolled) {
-                const epoch = enrollment!.lastClaimedEpoch.add(new BN(1));
-                const epochsCount = isDecayed
-                  ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
-                  : currentEpoch.sub(epoch).toNumber();
-
-                enrollmentRewards = epochsCount > 0;
-              }
+              const hasRewards = isDelegated
+                ? delegatedAccounts[idx]!.info!.lastClaimedEpoch.add(
+                    new BN(1)
+                  ).lt(new BN(now).div(new BN(EPOCH_LENGTH)))
+                : false;
 
               const posVotingPower = calcPositionVotingPower({
                 position: position?.info || null,
@@ -252,11 +215,8 @@ export const HeliumVsrStateProvider: React.FC<{
                 ...position.info,
                 pubkey: position?.publicKey,
                 isDelegated,
-                isEnrolled,
                 delegatedSubDao,
-                hasRewards: delegationRewards || enrollmentRewards,
-                hasDelegationRewards: delegationRewards,
-                hasEnrollmentRewards: enrollmentRewards,
+                hasRewards,
                 hasGenesisMultiplier: position.info.genesisEnd.gt(new BN(now)),
                 votingPower: posVotingPower,
                 votingMint: mintCfgs[position.info.votingMintConfigIdx],
@@ -283,7 +243,6 @@ export const HeliumVsrStateProvider: React.FC<{
       registrar,
       delegatedAccounts,
       proxyAccounts,
-      enrolledAccounts,
     ]);
 
   const sortedPositions = useMemo(
@@ -303,7 +262,7 @@ export const HeliumVsrStateProvider: React.FC<{
   const loadingPositions = loadingMyPositions || loadingDelPositions;
   const ret = useMemo(
     () => ({
-      loading: isLoading || loadingPositions || loadingDel || loadingEnrolled,
+      loading: isLoading || loadingPositions || loadingDel,
       error,
       amountLocked,
       amountProxyLocked,

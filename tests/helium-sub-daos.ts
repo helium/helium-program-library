@@ -1,15 +1,11 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
-import {
-  init as rewardsInit,
-  vsrEpochInfoKey,
-} from "@helium/position-voting-rewards-sdk";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { daoKey, EPOCH_LENGTH } from "@helium/helium-sub-daos-sdk";
-import { CircuitBreaker } from "../target/types/circuit_breaker";
-import { HeliumSubDaos } from "../target/types/helium_sub_daos";
-import { VoterStakeRegistry } from "../target/types/voter_stake_registry";
+import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
+import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import {
   createAtaAndMint,
   createAtaAndTransfer,
@@ -34,10 +30,8 @@ import { init as dcInit } from "../packages/data-credits-sdk/src";
 import { init as issuerInit, onboardIotHotspot } from "../packages/helium-entity-manager-sdk/src";
 import {
   currentEpoch,
-  delegatorRewardsPercent,
   heliumSubDaosResolvers,
   subDaoEpochInfoKey,
-  subDaoKey,
 } from "../packages/helium-sub-daos-sdk/src";
 import { init as vsrInit } from "../packages/voter-stake-registry-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
@@ -47,7 +41,6 @@ import { createMockCompression } from "./utils/compression";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import { expectBnAccuracy } from "./utils/expectBnAccuracy";
 import {
-  ensurePVRIdl,
   ensureDCIdl,
   ensureHSDIdl,
   ensureVSRIdl,
@@ -59,7 +52,6 @@ import { getUnixTimestamp, loadKeypair } from "./utils/solana";
 import { createPosition, initVsr } from "./utils/vsr";
 // @ts-ignore
 import bs58 from "bs58";
-import { PositionVotingRewards } from "../target/types/position_voting_rewards";
 
 chai.use(chaiAsPromised);
 
@@ -96,10 +88,8 @@ describe("helium-sub-daos", () => {
   let hemProgram: Program<HeliumEntityManager>;
   let cbProgram: Program<CircuitBreaker>;
   let vsrProgram: Program<VoterStakeRegistry>;
-  let rewardsProgram: Program<PositionVotingRewards>;
 
   let registrar: PublicKey;
-  let subDaoRegistrar: PublicKey;
   let position: PublicKey;
   let vault: PublicKey;
   let hntMint: PublicKey;
@@ -114,12 +104,6 @@ describe("helium-sub-daos", () => {
       anchor.workspace.DataCredits.programId,
       anchor.workspace.DataCredits.idl
     );
-    rewardsProgram = await rewardsInit(
-      provider,
-      anchor.workspace.PositionVotingRewards.programId,
-      anchor.workspace.PositionVotingRewards.idl
-    );
-    ensurePVRIdl(rewardsProgram);
     cbProgram = await cbInit(
       provider,
       anchor.workspace.CircuitBreaker.programId,
@@ -161,7 +145,7 @@ describe("helium-sub-daos", () => {
       provider.wallet.publicKey
     );
     const { subDao, treasury, mint, treasuryCircuitBreaker } =
-      await initTestSubdao({hsdProgram: program, vsrProgram, provider, authority: provider.wallet.publicKey, dao});
+      await initTestSubdao({hsdProgram: program, provider, authority: provider.wallet.publicKey, dao});
 
     const account = await program.account.subDaoV0.fetch(subDao!);
     const breaker =
@@ -182,10 +166,8 @@ describe("helium-sub-daos", () => {
     let subDao: PublicKey;
     let treasury: PublicKey;
     let hstPool: PublicKey;
-    let dntMint: PublicKey;
     let dcMint: PublicKey;
     let rewardsEscrow: PublicKey;
-    let vetokenTracker: PublicKey;
     let genesisVotePowerMultiplierExpirationTs = 1;
     let initialSupply = toBN(223_000_000, 8);
 
@@ -247,51 +229,18 @@ describe("helium-sub-daos", () => {
 
       ({
         dataCredits: { dcMint },
-        subDao: { subDao, treasury, rewardsEscrow, mint: dntMint, subDaoRegistrar },
+        subDao: { subDao, treasury, rewardsEscrow },
         dao: { dao },
       } = await initWorld(
         provider,
         hemProgram,
         program,
         dcProgram,
-        vsrProgram,
         EPOCH_REWARDS,
         SUB_DAO_EPOCH_REWARDS,
         registrar,
-        hntMint,
+        hntMint
       ));
-      // Add on the voting rewards
-      let {
-        pubkeys: { vetokenTracker: tracker },
-      } = await rewardsProgram.methods
-        .initializeVetokenTrackerV0()
-        .accounts({
-          registrar: subDaoRegistrar,
-          proposalNamespace: me,
-          rewardsMint: dntMint,
-          payer: me,
-          rewardsAuthority: subDao,
-        })
-        .rpcAndKeys({ skipPreflight: true });
-      vetokenTracker = tracker!;
-      await program.methods
-        .updateSubDaoV0({
-          vetokenTracker,
-          votingRewardsPercent: delegatorRewardsPercent(2),
-          authority: null,
-          dcBurnAuthority: null,
-          emissionSchedule: null,
-          onboardingDcFee: null,
-          onboardingDataOnlyDcFee: null,
-          registrar: null,
-          delegatorRewardsPercent: null,
-          activeDeviceAuthority: null,
-        })
-        .accounts({
-          subDao,
-        })
-        .rpc({ skipPreflight: true });
-
       hstPool = (await program.account.daoV0.fetch(dao)).hstPool;
     });
 
@@ -318,8 +267,6 @@ describe("helium-sub-daos", () => {
       const newAuth = Keypair.generate().publicKey;
       await program.methods
         .updateSubDaoV0({
-          vetokenTracker: null,
-          votingRewardsPercent: null,
           authority: newAuth,
           dcBurnAuthority: null,
           emissionSchedule: null,
@@ -898,7 +845,6 @@ describe("helium-sub-daos", () => {
             });
 
             it("issues hnt rewards to subdaos, dnt to rewards escrow, and hst to hst pool", async () => {
-              const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
               const preBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
               ).amount;
@@ -916,18 +862,6 @@ describe("helium-sub-daos", () => {
                   subDao,
                 })
                 .rpc({ skipPreflight: true });
-
-              const { pubkeys: { vsrEpochInfo } } =await program.methods
-                .issueVotingRewardsV0({
-                  epoch,
-                })
-                .accounts({
-                  subDao,
-                  vsrEpochInfo: vsrEpochInfoKey(vetokenTracker, epoch.mul(new BN(EPOCH_LENGTH)))[0],
-                })
-                .rpcAndKeys({ skipPreflight: true });
-
-              const vsrEpochInfoAcc = await rewardsProgram.account.vsrEpochInfoV0.fetch(vsrEpochInfo!);
 
               await program.methods
                 .issueHstPoolV0({
@@ -954,11 +888,8 @@ describe("helium-sub-daos", () => {
                 (0.32 * EPOCH_REWARDS).toString()
               );
               expect((postMobileBalance - preMobileBalance).toString()).to.eq(
-                ((SUB_DAO_EPOCH_REWARDS / 100) * 92).toString()
+                ((SUB_DAO_EPOCH_REWARDS / 100) * 94).toString()
               );
-              expect(
-                vsrEpochInfoAcc.rewardsAmount.toString()
-              ).to.eq((0.02 * SUB_DAO_EPOCH_REWARDS).toString());
 
               const acc = await program.account.subDaoEpochInfoV0.fetch(
                 subDaoEpochInfo

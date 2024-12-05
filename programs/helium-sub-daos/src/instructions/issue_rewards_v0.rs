@@ -1,12 +1,12 @@
-use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use crate::{current_epoch, error::ErrorCode, state::*, OrArithError, EPOCH_LENGTH, TESTING};
 use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
-use shared_utils::precise_number::{InnerUint, PreciseNumber};
 
-use crate::{current_epoch, error::ErrorCode, state::*, OrArithError, EPOCH_LENGTH, TESTING};
+use anchor_lang::prelude::*;
+use anchor_spl::token::{Mint, Token, TokenAccount};
+use shared_utils::precise_number::{InnerUint, PreciseNumber};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueRewardsArgsV0 {
@@ -43,7 +43,7 @@ pub struct IssueRewardsV0<'info> {
     has_one = sub_dao,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump = sub_dao_epoch_info.bump_seed,
-    constraint = TESTING || sub_dao_epoch_info.rewards_issued_at.is_none() @ ErrorCode::RewardsAlreadyIssued
+    constraint = TESTING || sub_dao_epoch_info.rewards_issued_at.is_none()
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   #[account(
@@ -172,9 +172,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   let max_percent = 100_u64.checked_mul(10_0000000).unwrap();
   let dnt_emissions = (total_emissions as u128)
     .checked_mul(u128::from(
-      max_percent
-        - ctx.accounts.sub_dao.delegator_rewards_percent
-        - ctx.accounts.sub_dao.voting_rewards_percent,
+      max_percent - ctx.accounts.sub_dao.delegator_rewards_percent,
     ))
     .unwrap()
     .checked_div(max_percent as u128) // 100% with 2 decimals accuracy
@@ -194,13 +192,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   )?;
 
   let delegation_rewards_amount = if delegators_present {
-    (total_emissions as u128)
-      .checked_mul(u128::from(ctx.accounts.sub_dao.delegator_rewards_percent))
-      .unwrap()
-      .checked_div(max_percent as u128) // 100% with 2 decimals accuracy
-      .unwrap()
-      .try_into()
-      .unwrap()
+    total_emissions.checked_sub(dnt_emissions).unwrap()
   } else {
     0
   };

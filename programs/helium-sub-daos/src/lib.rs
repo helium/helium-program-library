@@ -127,11 +127,4 @@ pub mod helium_sub_daos {
   ) -> Result<()> {
     admin_set_dc_onboarding_fees_paid_epoch_info::handler(ctx, args)
   }
-
-  pub fn issue_voting_rewards_v0(
-    ctx: Context<IssueVotingRewardsV0>,
-    args: IssueVotingRewardsArgsV0,
-  ) -> Result<()> {
-    issue_voting_rewards_v0::handler(ctx, args)
-  }
 }

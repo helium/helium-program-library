@@ -205,8 +205,6 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await program.methods
       .updateSubDaoV0({
-        vetokenTracker: null,
-        votingRewardsPercent: null,
         authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
         emissionSchedule: argv.newEmissionsSchedulePath
           ? await parseEmissionsSchedule(argv.newEmissionsSchedulePath)

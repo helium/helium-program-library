@@ -33,8 +33,7 @@ import {
   truthy,
 } from "@helium/spl-utils";
 import { getAccount } from "@solana/spl-token";
-import { init as initPVR, vsrEpochInfoKey } from "@helium/position-voting-rewards-sdk";
-import { ComputeBudgetProgram as CBP, Connection, Keypair, PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
+import { ComputeBudgetProgram as CBP, Connection, Keypair, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import BN from "bn.js";
 import bs58 from "bs58";
 
@@ -64,7 +63,6 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
     const errors: string[] = [];
     const provider = anchor.getProvider() as anchor.AnchorProvider;
     const heliumSubDaosProgram = await initDao(provider);
-    const pvrProgram = await initPVR(provider);
     const hntMint = HNT_MINT;
     const iotMint = IOT_MINT;
     const unixNow = new Date().valueOf() / 1000;
@@ -181,42 +179,6 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
             } catch (err: any) {
               errors.push(
                 `Failed to issue rewards for ${subDao.account.dntMint.toBase58()}: ${err}`
-              );
-            }
-          }
-        }
-
-        const hasVeTokenTracker = !subDao.account.vetokenTracker.equals(
-          PublicKey.default
-        );
-
-        if (hasVeTokenTracker) {
-          const [vsrEpoch] = vsrEpochInfoKey(
-            subDao.account.vetokenTracker,
-            targetTs
-          );
-          const vsrEpochInfo =
-            await pvrProgram.account.vsrEpochInfoV0.fetchNullable(vsrEpoch);
-          if (!vsrEpochInfo || !vsrEpochInfo.rewardsIssuedAt) {
-            try {
-              await sendInstructionsWithPriorityFee(
-                provider,
-                [
-                  await heliumSubDaosProgram.methods
-                    .issueVotingRewardsV0({ epoch })
-                    .accounts({
-                      subDao: subDao.publicKey,
-                      vsrEpochInfo: vsrEpoch,
-                    })
-                    .instruction(),
-                ],
-                {
-                  basePriorityFee: BASE_PRIORITY_FEE,
-                }
-              );
-            } catch (err: any) {
-              errors.push(
-                `Failed to issue voting rewards for ${subDao.account.dntMint.toBase58()}: ${err}`
               );
             }
           }

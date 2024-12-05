@@ -462,16 +462,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/modular-governance-idls@npm:^0.0.13":
-  version: 0.0.13
-  resolution: "@helium/modular-governance-idls@npm:0.0.13"
-  dependencies:
-    "@coral-xyz/anchor": ^0.28.0
-    "@solana/web3.js": ^1.78.4
-  checksum: d210bdbaf3d56c88e96a1cbb4066277629a34da33aff7f49323a376a3df68a9f1a8382edb02a97c61e2336aaec32a8eb0f11699ea1e3e7a07c542d4d3b5edd8f
-  languageName: node
-  linkType: hard
-
 "@helium/nft-proxy-sdk@npm:^0.0.12":
   version: 0.0.12
   resolution: "@helium/nft-proxy-sdk@npm:0.0.12"

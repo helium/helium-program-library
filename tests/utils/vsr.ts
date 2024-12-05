@@ -57,7 +57,6 @@ export async function initVsr(
   const createRegistrar = program.methods
     .initializeRegistrarV0({
       positionUpdateAuthority,
-      positionFreezeAuthorities: []
     })
     .accounts({
       realm: realmPk,

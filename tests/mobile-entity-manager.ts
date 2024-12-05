@@ -29,16 +29,13 @@ import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   getConcurrentMerkleTreeAccountSize,
 } from '@solana/spl-account-compression';
-import { VoterStakeRegistry } from '../target/types/voter_stake_registry';
 import { HeliumEntityManager } from '../target/types/helium_entity_manager';
-import { init as initVsr } from '../packages/voter-stake-registry-sdk/src';
 
 chai.use(chaiAsPromised);
 
 describe('mobile-entity-manager', () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
-  let vsrProgram: Program<VoterStakeRegistry>;
   let dcProgram: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
   let hemProgram: Program<HeliumEntityManager>;
@@ -56,12 +53,6 @@ describe('mobile-entity-manager', () => {
       provider,
       anchor.workspace.DataCredits.programId,
       anchor.workspace.DataCredits.idl
-    );
-
-    vsrProgram = await initVsr(
-      provider,
-      anchor.workspace.VoterStakeRegistry.programId,
-      anchor.workspace.VoterStakeRegistry.idl
     );
 
     ensureDCIdl(dcProgram);
@@ -98,7 +89,6 @@ describe('mobile-entity-manager', () => {
     ));
     ({ subDao } = await initTestSubdao({
       hsdProgram,
-      vsrProgram,
       provider,
       authority: me,
       dao,
