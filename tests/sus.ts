@@ -6,7 +6,7 @@ import { Asset, sus } from "@helium/sus";
 import {
   PROGRAM_ID as BUBBLEGUM_PROGRAM_ID,
   createBurnInstruction as createBubblegumBurnInstruction,
-  createTransferInstruction as createBubblegumTransferInstruction
+  createTransferInstruction as createBubblegumTransferInstruction,
 } from "@metaplex-foundation/mpl-bubblegum";
 import {
   ConcurrentMerkleTreeAccount,
@@ -29,6 +29,7 @@ import axios from "axios";
 import { BN } from "bn.js";
 import bs58 from "bs58";
 import { expect } from "chai";
+import { ensureDCIdl } from "./utils/fixtures";
 
 const SUS = new PublicKey("sustWW3deA7acADNGJnkYj2EAf65EmqUNLxKekDpu6w");
 const hotspot = "9Cyj2K3Fi7xH8fZ1xrp4gtr1CU6Zk8VFM4fZN9NR9ncz";
@@ -59,11 +60,13 @@ describe("sus", () => {
     const susR = await sus({
       connection,
       wallet: SUS,
-      serializedTransactions: [transaction.serialize({
-        verifySignatures: false,
-        requireAllSignatures: false,
-      })],
-      cluster: "devnet"
+      serializedTransactions: [
+        transaction.serialize({
+          verifySignatures: false,
+          requireAllSignatures: false,
+        }),
+      ],
+      cluster: "devnet",
     });
 
     const { writableAccounts, balanceChanges } = susR[0];
@@ -80,7 +83,7 @@ describe("sus", () => {
     expect(writableAccounts[2].owner?.toBase58()).to.eq(SUS.toBase58());
     expect(writableAccounts[2].metadata?.decimals).to.eq(8);
 
-    console.log(balanceChanges[0])
+    console.log(balanceChanges[0]);
     expect(balanceChanges[0].owner.toBase58()).to.eq(SUS.toBase58());
     expect(balanceChanges[0].amount).to.eq(BigInt(-2044280));
 
@@ -107,6 +110,7 @@ describe("sus", () => {
         {}
       )
     );
+    await ensureDCIdl(dataCredits);
 
     transaction.add(
       await dataCredits.methods
@@ -131,22 +135,23 @@ describe("sus", () => {
     const [susR] = await sus({
       connection,
       wallet: SUS,
-      serializedTransactions: [transaction.serialize({
-        verifySignatures: false,
-        requireAllSignatures: false,
-      })],
-      cluster: "devnet"
+      serializedTransactions: [
+        transaction.serialize({
+          verifySignatures: false,
+          requireAllSignatures: false,
+        }),
+      ],
+      cluster: "devnet",
     });
-    console.log(susR.instructions[0].parsed);
 
     expect(susR.writableAccounts.map((r) => r.name)).to.deep.eq([
       "Native SOL Account",
-      "DelegatedDataCreditsV0",
+      "Unknown",
       "DC Mint",
-      "DC Token Account",
+      "Unknown",
       "HNT Token Account",
       "HNT Mint",
-      "DC Token Account",
+      "Unknown",
       "MintWindowedCircuitBreakerV0",
     ]);
     expect(susR.instructions[0].parsed?.name).to.eq("mintDataCreditsV0");
@@ -179,10 +184,12 @@ describe("sus", () => {
     const [susR] = await sus({
       connection,
       wallet: SUS,
-      serializedTransactions: [transaction.serialize({
-        verifySignatures: false,
-        requireAllSignatures: false,
-      })],
+      serializedTransactions: [
+        transaction.serialize({
+          verifySignatures: false,
+          requireAllSignatures: false,
+        }),
+      ],
       checkCNfts: true,
       cNfts: [asset],
     });
@@ -205,23 +212,21 @@ describe("sus", () => {
       },
     });
     const asset = assetResponse.data.result;
-    const transaction = await burnCompressedCollectable(
-      connection,
-      SUS,
-      asset,
-    );
+    const transaction = await burnCompressedCollectable(connection, SUS, asset);
     const [susR] = await sus({
       connection,
       wallet: SUS,
-      serializedTransactions: [transaction.serialize({
-        verifySignatures: false,
-        requireAllSignatures: false,
-      })],
+      serializedTransactions: [
+        transaction.serialize({
+          verifySignatures: false,
+          requireAllSignatures: false,
+        }),
+      ],
       checkCNfts: true,
       cNfts: [asset],
-      cluster: "devnet"
+      cluster: "devnet",
     });
-    console.log(susR.explorerLink)
+    console.log(susR.explorerLink);
 
     expect(susR.possibleCNftChanges[0]).to.eq(asset);
     expect(susR.warnings[0].message).to.eq(
@@ -241,7 +246,7 @@ async function getBubblegumAuthorityPDA(merkleRollPubKey: PublicKey) {
 const burnCompressedCollectable = async (
   connection: Connection,
   wallet: PublicKey,
-  collectable: Asset,
+  collectable: Asset
 ): Promise<Transaction> => {
   const payer = wallet;
 
@@ -321,7 +326,6 @@ const burnCompressedCollectable = async (
 
   return transaction;
 };
-
 
 const transferCompressedCollectable = async (
   connection: Connection,

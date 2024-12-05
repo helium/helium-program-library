@@ -1,13 +1,11 @@
 //! Defines PreciseNumber, a U192 wrapper with float-like operations
 // Stolen from SPL math, but changing inner unit
 
-use std::cmp::Ordering;
-use std::convert::*;
+use std::{cmp::Ordering, convert::*};
 
 use anchor_lang::prelude::msg;
 
-use crate::signed_precise_number::SignedPreciseNumber;
-use crate::uint::U192;
+use crate::{signed_precise_number::SignedPreciseNumber, uint::U192};
 
 // Allows for easy swapping between different internal representations
 pub type InnerUint = U192;
