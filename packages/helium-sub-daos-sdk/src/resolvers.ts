@@ -16,7 +16,7 @@ const THREAD_PID = new PublicKey(
 );
 
 export const subDaoEpochInfoResolver = resolveIndividual(
-  async ({ provider, path, accounts }) => {
+  async ({ provider, path, accounts, args }) => {
     if (path[path.length - 1] === "subDaoEpochInfo" && accounts.registrar) {
       const vsr = await init(provider as AnchorProvider, VSR_PROGRAM_ID);
       let registrar;
@@ -29,7 +29,12 @@ export const subDaoEpochInfoResolver = resolveIndividual(
       const clock = await provider.connection.getAccountInfo(
         SYSVAR_CLOCK_PUBKEY
       );
-      const unixTime = Number(clock!.data.readBigInt64LE(8 * 4)) + (registrar?.timeOffset.toNumber() || 0);
+      let unixTime;
+      if (args[0].epoch) {
+        unixTime = args[0].epoch.toNumber() * EPOCH_LENGTH
+      } else {
+        unixTime = Number(clock!.data.readBigInt64LE(8 * 4)) + (registrar?.timeOffset.toNumber() || 0);
+      }
       const subDao = get(accounts, [
         ...path.slice(0, path.length - 1),
         "subDao",
@@ -54,9 +59,14 @@ export const subDaoEpochInfoResolver = resolveIndividual(
       const clock = await provider.connection.getAccountInfo(
         SYSVAR_CLOCK_PUBKEY
       );
-      const unixTime =
-        Number(clock!.data.readBigInt64LE(8 * 4)) +
-        (registrar?.timeOffset.toNumber() || 0);
+      let unixTime;
+      if (args[0].epoch) {
+        unixTime = args[0].epoch.toNumber() * EPOCH_LENGTH;
+      } else {
+        unixTime =
+          Number(clock!.data.readBigInt64LE(8 * 4)) +
+          (registrar?.timeOffset.toNumber() || 0);
+      }
       const subDao = get(accounts, [
         ...path.slice(0, path.length - 1),
         "subDao",
