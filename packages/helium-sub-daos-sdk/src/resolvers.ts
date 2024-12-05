@@ -30,7 +30,7 @@ export const subDaoEpochInfoResolver = resolveIndividual(
         SYSVAR_CLOCK_PUBKEY
       );
       let unixTime;
-      if (args[0].epoch) {
+      if (args && args[0] && args[0].epoch) {
         unixTime = args[0].epoch.toNumber() * EPOCH_LENGTH
       } else {
         unixTime = Number(clock!.data.readBigInt64LE(8 * 4)) + (registrar?.timeOffset.toNumber() || 0);
@@ -60,7 +60,7 @@ export const subDaoEpochInfoResolver = resolveIndividual(
         SYSVAR_CLOCK_PUBKEY
       );
       let unixTime;
-      if (args[0].epoch) {
+      if (args && args[0] && args[0].epoch) {
         unixTime = args[0].epoch.toNumber() * EPOCH_LENGTH;
       } else {
         unixTime =

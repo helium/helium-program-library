@@ -29,12 +29,6 @@ RND=$RANDOM
 echo "Using $RND for dao names"
 
 
-./packages/helium-admin-cli/bin/helium-admin.js create-price-oracle -u $SOLANA_URL \
-                                 --wallet $ANCHOR_WALLET \
-                                 --priceOracleKeypair ./packages/helium-admin-cli/keypairs/hnt-price-oracle.json \
-                                 --oracles packages/helium-admin-cli/price-oracle-authorities.json \
-                                 --decimals 8
-
 # init the dao and subdaos
 ./packages/helium-admin-cli/bin/helium-admin.js create-dao \
     --hntPriceOracle 4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33 \
