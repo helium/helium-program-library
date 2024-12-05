@@ -183,14 +183,20 @@ export const HeliumVsrStateProvider: React.FC<{
               const proxy =
                 proxyAccountsByAsset?.[position.info.mint.toBase58()];
 
+              let hasRewards = false;
               const delegatedSubDao = isDelegated
                 ? delegatedAccounts[idx]?.info?.subDao
                 : null;
-              const hasRewards = isDelegated
-                ? delegatedAccounts[idx]!.info!.lastClaimedEpoch.add(
-                    new BN(1)
-                  ).lt(new BN(now).div(new BN(EPOCH_LENGTH)))
-                : false;
+              if (isDelegated) {
+                const epoch = delegatedAccounts[
+                  idx
+                ]!.info!.lastClaimedEpoch.add(new BN(1));
+                const epochsCount = isDecayed
+                  ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
+                  : currentEpoch.sub(epoch).toNumber();
+
+                hasRewards = epochsCount > 0;
+              }
 
               const posVotingPower = calcPositionVotingPower({
                 position: position?.info || null,

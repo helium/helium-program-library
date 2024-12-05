@@ -33,7 +33,12 @@ import {
   truthy,
 } from "@helium/spl-utils";
 import { getAccount } from "@solana/spl-token";
-import { ComputeBudgetProgram as CBP, Connection, Keypair, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
+import {
+  ComputeBudgetProgram as CBP,
+  Connection,
+  Keypair,
+  SYSVAR_CLOCK_PUBKEY,
+} from "@solana/web3.js";
 import BN from "bn.js";
 import bs58 from "bs58";
 
@@ -42,7 +47,7 @@ const IOT_OPERATIONS_FUND = "iot_operations_fund";
 const NOT_EMITTED = "not_emitted";
 const MAX_CLAIM_AMOUNT = new BN("207020547945205");
 
-const BASE_PRIORITY_FEE = Number(process.env.BASE_PRIORITY_FEE || "1")
+const BASE_PRIORITY_FEE = Number(process.env.BASE_PRIORITY_FEE || "1");
 
 async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
   const clock = await connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
@@ -82,7 +87,7 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
       // Start one day back to ensure we at least close the epoch that the job is running in.
       new BN(unixNow - 24 * 60 * 60)
     );
-    const solanaTime = await getSolanaUnixTimestamp(provider.connection)
+    const solanaTime = await getSolanaUnixTimestamp(provider.connection);
 
     mainLoop: while (targetTs.toNumber() < unixNow) {
       const epoch = currentEpoch(targetTs);
@@ -145,7 +150,6 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
         }
       }
 
-      
       for (const subDao of subDaos) {
         if (!daoEpochInfo?.doneIssuingRewards) {
           const [subDaoEpoch] = subDaoEpochInfoKey(subDao.publicKey, targetTs);
@@ -255,9 +259,13 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
         mint: assetId,
       });
 
-      await sendInstructionsWithPriorityFee(provider, [await method.instruction()], {
-        basePriorityFee: BASE_PRIORITY_FEE
-      });
+      await sendInstructionsWithPriorityFee(
+        provider,
+        [await method.instruction()],
+        {
+          basePriorityFee: BASE_PRIORITY_FEE,
+        }
+      );
     }
 
     const rewards = await client.getCurrentRewards(
@@ -349,9 +357,13 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
                 lazyDistributor,
                 mint: assetId,
               });
-            await sendInstructionsWithPriorityFee(provider, [await method.instruction()], { 
-              basePriorityFee: BASE_PRIORITY_FEE
-            });
+            await sendInstructionsWithPriorityFee(
+              provider,
+              [await method.instruction()],
+              {
+                basePriorityFee: BASE_PRIORITY_FEE,
+              }
+            );
           }
 
           const rewards = await client.getCurrentRewards(
@@ -401,6 +413,5 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
 })();
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
-

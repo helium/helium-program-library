@@ -122,7 +122,7 @@ export const useVote = (proposalKey: PublicKey) => {
             !earlierDelegateVoted));
       return canVote;
     },
-    [registrar, unixNow]
+    [registrar, unixNow, markers, sortedPositions]
   );
   const canVote = useCallback(
     (choice: number) => {
