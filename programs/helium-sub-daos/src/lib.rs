@@ -134,4 +134,8 @@ pub mod helium_sub_daos {
   ) -> Result<()> {
     issue_voting_rewards_v0::handler(ctx, args)
   }
+
+  pub fn switch_mobile_ops_fund(ctx: Context<SwitchMobileOpsFund>) -> Result<()> {
+    switch_mobile_ops_fund::handler(ctx)
+  }
 }
