@@ -3,6 +3,7 @@ import { PositionVotingRewards } from "@helium/idls/lib/types/position_voting_re
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { positionVotingRewardsResolvers } from "./resolvers";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 export * from "./constants";
 export * from "./pdas";
 export * from "./resolvers";
@@ -13,7 +14,7 @@ export const init = async (
   idl?: Idl | null
 ): Promise<Program<PositionVotingRewards>> => {
   if (!idl) {
-    idl = await Program.fetchIdl(programId, provider);
+    idl = await fetchBackwardsCompatibleIdl(programId, provider);
   }
 
   const positionVotingRewards = new Program<PositionVotingRewards>(

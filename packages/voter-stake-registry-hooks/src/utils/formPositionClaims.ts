@@ -35,6 +35,7 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import { PositionWithMeta, SubDao, VeTokenTracker } from "../sdk/types";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 const DAO = daoKey(HNT_MINT)[0];
 
@@ -50,8 +51,8 @@ export const formPositionClaims = async ({
   pvrProgramId: PublicKey;
 }): Promise<TransactionInstruction[][]> => {
   const instructions: TransactionInstruction[][] = [];
-  const hsdIdl = await Program.fetchIdl(hsdProgramId, provider);
-  const pvrIdl = await Program.fetchIdl(pvrProgramId, provider);
+  const hsdIdl = await fetchBackwardsCompatibleIdl(hsdProgramId, provider as any);
+  const pvrIdl = await fetchBackwardsCompatibleIdl(pvrProgramId, provider as any);
   const hsdProgram = await init(provider as any, hsdProgramId, hsdIdl);
   const pvrProgram = await initPvr(provider as any, pvrProgramId, pvrIdl);
   const connNoCache = new Connection(provider.connection.rpcEndpoint);

@@ -14,7 +14,7 @@ import { bulkSendTransactions, chunks } from "@helium/spl-utils";
 import { Layout } from "buffer-layout";
 import cliProgress from "cli-progress";
 import * as Collections from "typescript-collections";
-
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 export * from "./constants";
 export * from "./pdas";
 export { MerkleTree };
@@ -27,7 +27,7 @@ export async function init(
   idl?: Idl | null
 ): Promise<Program<LazyTransactions>> {
   if (!idl) {
-    idl = await Program.fetchIdl(programId, provider);
+    idl = await fetchBackwardsCompatibleIdl(programId, provider);
   }
   const lazyTransactions = new Program<LazyTransactions>(
     idl as LazyTransactions,

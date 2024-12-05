@@ -11,6 +11,7 @@ import {
   init as initPvr,
   vetokenTrackerKey,
 } from "@helium/position-voting-rewards-sdk";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export const useTransferPosition = () => {
   const { provider } = useHeliumVsrState();
@@ -36,7 +37,7 @@ export const useTransferPosition = () => {
         sourcePosition.numActiveVotes > 0 ||
         targetPosition.numActiveVotes > 0;
 
-      const idl = await Program.fetchIdl(programId, provider);
+      const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const hsdProgram = await init(provider as any, programId, idl);
       const vsrProgram = await initVsr(provider as any);
       const mint = sourcePosition.votingMint.mint;

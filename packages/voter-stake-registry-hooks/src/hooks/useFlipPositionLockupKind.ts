@@ -10,7 +10,7 @@ import {
   init as initPvr,
   vetokenTrackerKey,
 } from "@helium/position-voting-rewards-sdk";
-
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 function secsToDays(secs: number): number {
   return secs / (60 * 60 * 24);
 }
@@ -36,7 +36,7 @@ export const useFlipPositionLockupKind = () => {
         !unixNow;
       const lockupKind = Object.keys(position.lockup.kind)[0] as string;
       const isConstant = lockupKind === "constant";
-      const idl = await Program.fetchIdl(programId, provider);
+      const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const hsdProgram = await init(provider as any, programId, idl);
       const vsrProgram = await initVsr(provider as any);
       const mint = position.votingMint.mint;

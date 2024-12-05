@@ -3,6 +3,7 @@ import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { dataCreditsResolvers } from "./resolvers";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 
 export * from "./constants";
@@ -14,7 +15,7 @@ export async function init(
   idl?: Idl | null
 ): Promise<Program<DataCredits>> {
   if (!idl) {
-    idl = await Program.fetchIdl(programId, provider);
+    idl = await fetchBackwardsCompatibleIdl(programId, provider);
   }
 
   const dataCredits = new Program<DataCredits>(

@@ -12,6 +12,7 @@ import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 import { formPositionClaims } from "../utils/formPositionClaims";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export const useUndelegatePosition = () => {
   const { provider, unixNow } = useHeliumVsrState();
@@ -35,7 +36,7 @@ export const useUndelegatePosition = () => {
       maxSignatureBatch?: number;
     }) => {
       const isInvalid = !unixNow || !provider || !position.isDelegated;
-      const idl = await Program.fetchIdl(programId, provider);
+      const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const hsdProgram = await init(provider as any, programId, idl);
 
       if (loading) return;

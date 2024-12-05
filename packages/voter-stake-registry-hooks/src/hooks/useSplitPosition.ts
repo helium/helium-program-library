@@ -26,7 +26,7 @@ import {
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
-
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 export const useSplitPosition = () => {
   const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
@@ -51,7 +51,7 @@ export const useSplitPosition = () => {
     }) => {
       const isInvalid = !provider || !provider.wallet;
 
-      const idl = await Program.fetchIdl(programId, provider);
+      const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const hsdProgram = await init(provider as any, programId, idl);
       const vsrProgram = await initVsr(provider as any);
 
