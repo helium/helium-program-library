@@ -146,12 +146,12 @@ describe("sus", () => {
 
     expect(susR.writableAccounts.map((r) => r.name)).to.deep.eq([
       "Native SOL Account",
-      "Unknown",
+      "DelegatedDataCreditsV0",
       "DC Mint",
-      "Unknown",
+      "DC Token Account",
       "HNT Token Account",
       "HNT Mint",
-      "Unknown",
+      "DC Token Account",
       "MintWindowedCircuitBreakerV0",
     ]);
     expect(susR.instructions[0].parsed?.name).to.eq("mintDataCreditsV0");
