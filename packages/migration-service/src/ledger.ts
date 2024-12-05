@@ -44,7 +44,10 @@ export async function getMigrateTransactions(
 ): Promise<VersionedTransaction[]> {
   const assetApiUrl =
     process.env.ASSET_API_URL || provider.connection.rpcEndpoint;
-  const assets = await getAssetsByOwner(assetApiUrl, from.toBase58());
+  // Filter out all subscriber NFTs
+  const assets = (await getAssetsByOwner(assetApiUrl, from.toBase58())).filter(
+    (asset) => asset?.content?.metadata?.symbol !== "SUBSCRIBER"
+  );
 
   const uniqueAssets = new Set(assets.map((asset) => asset.id.toBase58()));
   const vsrProgram = await initVsr(provider);
@@ -72,8 +75,10 @@ export async function getMigrateTransactions(
           proofPath.length - (canopyHeight || 0)
         );
         if (anchorRemainingAccounts.length > 10) {
-          console.log(`Asset ${asset.id} skipped due to having insufficient canopy`)
-          continue
+          console.log(
+            `Asset ${asset.id} skipped due to having insufficient canopy`
+          );
+          continue;
         }
 
         const ixn = createTransferInstruction(
@@ -229,7 +234,7 @@ export async function getMigrateTransactions(
         return provider.wallet.signTransaction(tx);
       }
 
-      return tx
+      return tx;
     })
   );
 }
