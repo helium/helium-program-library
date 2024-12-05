@@ -103,6 +103,13 @@ pub struct DaoV0 {
   pub bump_seed: u8,
 }
 
+#[macro_export]
+macro_rules! dao_seeds {
+  ( $s:expr ) => {
+    &[b"dao".as_ref(), $s.hnt_mint.as_ref(), &[$s.bump_seed]]
+  };
+}
+
 #[account]
 #[derive(Default)]
 pub struct DaoEpochInfoV0 {
