@@ -29,6 +29,7 @@ import axios from "axios";
 import { BN } from "bn.js";
 import bs58 from "bs58";
 import { expect } from "chai";
+import { ensureDCIdl } from "./utils/fixtures";
 
 const SUS = new PublicKey("sustWW3deA7acADNGJnkYj2EAf65EmqUNLxKekDpu6w");
 const hotspot = "9Cyj2K3Fi7xH8fZ1xrp4gtr1CU6Zk8VFM4fZN9NR9ncz";
@@ -107,6 +108,7 @@ describe("sus", () => {
         {}
       )
     );
+    await ensureDCIdl(dataCredits);
 
     transaction.add(
       await dataCredits.methods
@@ -137,8 +139,8 @@ describe("sus", () => {
       })],
       cluster: "devnet"
     });
-    console.log(susR.instructions[0].parsed);
 
+    console.log(susR.writableAccounts.map((r) => r.name));
     expect(susR.writableAccounts.map((r) => r.name)).to.deep.eq([
       "Native SOL Account",
       "DelegatedDataCreditsV0",

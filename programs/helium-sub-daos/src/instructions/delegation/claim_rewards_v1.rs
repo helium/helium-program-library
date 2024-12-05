@@ -12,11 +12,16 @@ use voter_stake_registry::{
   VoterStakeRegistry,
 };
 
-use crate::{current_epoch, error::ErrorCode, state::*, ClaimRewardsArgsV0, TESTING};
+use crate::{current_epoch, dao_seeds, error::ErrorCode, state::*, TESTING};
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct ClaimRewardsArgsV0 {
+  pub epoch: u64,
+}
 
 #[derive(Accounts)]
 #[instruction(args: ClaimRewardsArgsV0)]
-pub struct ClaimRewardsV0<'info> {
+pub struct ClaimRewardsV1<'info> {
   #[account(
     seeds = [b"position".as_ref(), mint.key().as_ref()],
     seeds::program = vsr_program.key(),
@@ -36,14 +41,14 @@ pub struct ClaimRewardsV0<'info> {
   pub position_authority: Signer<'info>,
   pub registrar: Box<Account<'info, Registrar>>,
   #[account(
-    has_one = registrar
+    has_one = registrar,
+    has_one = hnt_mint,
+    has_one = delegator_pool,
   )]
   pub dao: Box<Account<'info, DaoV0>>,
 
   #[account(
     mut,
-    has_one = delegator_pool,
-    has_one = dnt_mint,
     has_one = dao,
   )]
   pub sub_dao: Account<'info, SubDaoV0>,
@@ -55,7 +60,7 @@ pub struct ClaimRewardsV0<'info> {
   )]
   pub delegated_position: Account<'info, DelegatedPositionV0>,
 
-  pub dnt_mint: Box<Account<'info, Mint>>,
+  pub hnt_mint: Box<Account<'info, Mint>>,
 
   #[account(
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
@@ -68,7 +73,7 @@ pub struct ClaimRewardsV0<'info> {
   #[account(
     init_if_needed,
     payer = position_authority,
-    associated_token::mint = dnt_mint,
+    associated_token::mint = hnt_mint,
     associated_token::authority = position_authority,
   )]
   pub delegator_ata: Box<Account<'info, TokenAccount>>,
@@ -89,12 +94,12 @@ pub struct ClaimRewardsV0<'info> {
   pub token_program: Program<'info, Token>,
 }
 
-impl<'info> ClaimRewardsV0<'info> {
+impl<'info> ClaimRewardsV1<'info> {
   fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, TransferV0<'info>> {
     let cpi_accounts = TransferV0 {
       from: self.delegator_pool.to_account_info(),
       to: self.delegator_ata.to_account_info(),
-      owner: self.sub_dao.to_account_info(),
+      owner: self.dao.to_account_info(),
       circuit_breaker: self.delegator_pool_circuit_breaker.to_account_info(),
       token_program: self.token_program.to_account_info(),
     };
@@ -103,7 +108,7 @@ impl<'info> ClaimRewardsV0<'info> {
   }
 }
 
-pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result<()> {
+pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result<()> {
   // load the vehnt information
   let position = &mut ctx.accounts.position;
   let registrar = &ctx.accounts.registrar;
@@ -125,17 +130,22 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     ctx.accounts.sub_dao_epoch_info.start_ts(),
   )?;
 
-  msg!("Staked {} veHNT at start of epoch with {} total veHNT delegated to subdao and {} total rewards to subdao", 
+  msg!("Staked {} veHNT at start of epoch with {} total veHNT delegated to subdao and {} total rewards to subdao",
     delegated_vehnt_at_epoch,
     ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start,
-    ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued
+    ctx.accounts.sub_dao_epoch_info.hnt_delegation_rewards_issued
   );
 
   // calculate the position's share of that epoch's rewards
   // rewards = staking_rewards_issued * staked_vehnt_at_epoch / total_vehnt
   let rewards = u64::try_from(
     delegated_vehnt_at_epoch
-      .checked_mul(ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued as u128)
+      .checked_mul(
+        ctx
+          .accounts
+          .sub_dao_epoch_info
+          .hnt_delegation_rewards_issued as u128,
+      )
       .unwrap()
       .checked_div(ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start as u128)
       .unwrap(),
@@ -146,11 +156,10 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
 
   let amount_left = ctx.accounts.delegator_pool.amount;
   transfer_v0(
-    ctx.accounts.transfer_ctx().with_signer(&[&[
-      b"sub_dao",
-      ctx.accounts.sub_dao.dnt_mint.as_ref(),
-      &[ctx.accounts.sub_dao.bump_seed],
-    ]]),
+    ctx
+      .accounts
+      .transfer_ctx()
+      .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
     // Due to rounding down of vehnt fall rates it's possible the vehnt on the dao does not exactly match the
     // vehnt remaining. It could be off by a little bit of dust.
     TransferArgsV0 {

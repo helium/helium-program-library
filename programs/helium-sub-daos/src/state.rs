@@ -100,6 +100,8 @@ pub struct DaoV0 {
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub hst_emission_schedule: Vec<PercentItem>,
   pub bump_seed: u8,
+  pub rewards_escrow: Pubkey,
+  pub delegator_pool: Pubkey,
 }
 
 #[account]
@@ -117,6 +119,12 @@ pub struct DaoEpochInfoV0 {
   pub done_issuing_rewards: bool,
   pub done_issuing_hst_pool: bool,
   pub bump_seed: u8,
+}
+
+impl DaoEpochInfoV0 {
+  pub fn size() -> usize {
+    60 + 8 + std::mem::size_of::<DaoEpochInfoV0>()
+  }
 }
 
 #[account]
@@ -194,6 +202,10 @@ pub struct SubDaoEpochInfoV0 {
   pub bump_seed: u8,
   pub initialized: bool,
   pub dc_onboarding_fees_paid: u64,
+  /// The number of hnt delegation rewards issued this epoch, so that delegators can claim their share of the rewards
+  pub hnt_delegation_rewards_issued: u64,
+  /// The number of hnt rewards issued to the reward escrow this epoch
+  pub hnt_rewards_issued: u64,
 }
 
 impl SubDaoEpochInfoV0 {
@@ -216,6 +228,7 @@ pub struct SubDaoV0 {
   pub dnt_mint: Pubkey,       // Mint of the subdao token
   pub treasury: Pubkey,       // Treasury of HNT
   pub rewards_escrow: Pubkey, // Escrow account for DNT rewards
+  /// DEPRECATED: use dao.delegator_pool instead. But some people still need to claim old DNT rewards
   pub delegator_pool: Pubkey, // Pool of DNT tokens which veHNT delegators can claim from
   pub vehnt_delegated: u128, // the total amount of vehnt delegated to this subdao, with 12 decimals of extra precision
   pub vehnt_last_calculated_ts: i64,
@@ -239,6 +252,13 @@ pub struct SubDaoV0 {
 macro_rules! sub_dao_seeds {
   ( $s:expr ) => {
     &[b"sub_dao".as_ref(), $s.dnt_mint.as_ref(), &[$s.bump_seed]]
+  };
+}
+
+#[macro_export]
+macro_rules! dao_seeds {
+  ( $s:expr ) => {
+    &[b"dao".as_ref(), $s.hnt_mint.as_ref(), &[$s.bump_seed]]
   };
 }
 

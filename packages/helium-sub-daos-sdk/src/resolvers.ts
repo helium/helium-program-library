@@ -16,7 +16,7 @@ const THREAD_PID = new PublicKey(
 );
 
 export const subDaoEpochInfoResolver = resolveIndividual(
-  async ({ provider, path, accounts }) => {
+  async ({ provider, path, accounts, args }) => {
     if (path[path.length - 1] === "subDaoEpochInfo" && accounts.registrar) {
       const vsr = await init(provider as AnchorProvider, VSR_PROGRAM_ID);
       let registrar;
@@ -29,13 +29,50 @@ export const subDaoEpochInfoResolver = resolveIndividual(
       const clock = await provider.connection.getAccountInfo(
         SYSVAR_CLOCK_PUBKEY
       );
-      const unixTime = Number(clock!.data.readBigInt64LE(8 * 4)) + (registrar?.timeOffset.toNumber() || 0);
+      let unixTime;
+      if (args && args[0] && args[0].epoch) {
+        unixTime = args[0].epoch.toNumber() * EPOCH_LENGTH
+      } else {
+        unixTime = Number(clock!.data.readBigInt64LE(8 * 4)) + (registrar?.timeOffset.toNumber() || 0);
+      }
       const subDao = get(accounts, [
         ...path.slice(0, path.length - 1),
         "subDao",
       ]) as PublicKey;
       if (subDao) {
         const [key] = await subDaoEpochInfoKey(subDao, unixTime, PROGRAM_ID);
+
+        return key;
+      }
+    }
+    if (path[path.length - 1] === "prevSubDaoEpochInfo" && accounts.registrar) {
+      const vsr = await init(provider as AnchorProvider, VSR_PROGRAM_ID);
+      let registrar;
+      try {
+        registrar = await vsr.account.registrar.fetch(
+          accounts.registrar as PublicKey
+        );
+      } catch (e: any) {
+        // ignore. It's fine, we just won't use time offset which is only used in testing cases
+        console.error(e);
+      }
+      const clock = await provider.connection.getAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
+      let unixTime;
+      if (args && args[0] && args[0].epoch) {
+        unixTime = args[0].epoch.toNumber() * EPOCH_LENGTH;
+      } else {
+        unixTime =
+          Number(clock!.data.readBigInt64LE(8 * 4)) +
+          (registrar?.timeOffset.toNumber() || 0);
+      }
+      const subDao = get(accounts, [
+        ...path.slice(0, path.length - 1),
+        "subDao",
+      ]) as PublicKey;
+      if (subDao) {
+        const [key] = await subDaoEpochInfoKey(subDao, unixTime - EPOCH_LENGTH, PROGRAM_ID);
 
         return key;
       }
@@ -142,15 +179,21 @@ export const heliumSubDaosResolvers = combineResolvers(
     owner: "treasuryManagement",
   }),
   ataResolver({
-    instruction: "initializeSubDaoV0",
+    instruction: "initializeDaoV0",
     account: "delegatorPool",
-    mint: "dntMint",
-    owner: "subDao",
+    mint: "hntMint",
+    owner: "dao",
   }),
   ataResolver({
     instruction: "claimRewardsV0",
     account: "delegatorAta",
     mint: "dntMint",
+    owner: "positionAuthority",
+  }),
+  ataResolver({
+    instruction: "claimRewardsV1",
+    account: "delegatorAta",
+    mint: "hntMint",
     owner: "positionAuthority",
   }),
   ataResolver({

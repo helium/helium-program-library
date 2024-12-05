@@ -323,16 +323,19 @@ export const initWorld = async (
   epochRewards?: number,
   subDaoEpochRewards?: number,
   registrar?: PublicKey,
-  hntMint?: PublicKey,
+  hntMint?: PublicKey
 ): Promise<{
-  dao: { mint: PublicKey; dao: PublicKey };
+  dao: {
+    mint: PublicKey;
+    dao: PublicKey;
+    rewardsEscrow: PublicKey;
+    delegatorPool: PublicKey;
+  };
   subDao: {
     mint: PublicKey;
     subDao: PublicKey;
     subDaoRegistrar: PublicKey;
     treasury: PublicKey;
-    rewardsEscrow: PublicKey;
-    delegatorPool: PublicKey;
   };
   dataCredits: {
     dcKey: PublicKey;
@@ -377,7 +380,7 @@ export const initWorld = async (
     dao: dao.dao,
     epochRewards: subDaoEpochRewards,
     // Enough to stake 4 makers
-    numTokens: MAKER_STAKING_FEE.mul(new anchor.BN(4))
+    numTokens: MAKER_STAKING_FEE.mul(new anchor.BN(4)),
   });
 
   const rewardableEntityConfig = await initTestRewardableEntityConfig(
