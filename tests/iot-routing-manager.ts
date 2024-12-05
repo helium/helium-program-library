@@ -2,38 +2,27 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
-import {
-  SystemProgram,
-  Keypair,
-  PublicKey,
-  ComputeBudgetProgram,
-} from "@solana/web3.js";
+import { PublicKey, ComputeBudgetProgram } from "@solana/web3.js";
 import chai from "chai";
 import { init as initIotRoutingManager } from "../packages/iot-routing-manager-sdk/src";
-import {
-  init as initHeliumEntityManager,
-  sharedMerkleKey,
-} from "../packages/helium-entity-manager-sdk/src";
+import { init as initHeliumEntityManager } from "../packages/helium-entity-manager-sdk/src";
+import { init as initVsr } from "../packages/voter-stake-registry-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { IotRoutingManager } from "../target/types/iot_routing_manager";
+import { VoterStakeRegistry } from "../target/types/voter_stake_registry";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import {
   ensureIrmIdl,
   ensureDCIdl,
   ensureHSDIdl,
+  ensureVSRIdl,
   initTestDataCredits,
   initSharedMerkle,
   ensureHEMIdl,
 } from "./utils/fixtures";
 const { expect } = chai;
 import chaiAsPromised from "chai-as-promised";
-import { getAccount } from "@solana/spl-token";
-import { random } from "./utils/string";
-import {
-  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-  getConcurrentMerkleTreeAccountSize,
-} from "@solana/spl-account-compression";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { IOT_PRICE_FEED } from "@helium/spl-utils";
 
@@ -46,6 +35,7 @@ describe("iot-routing-manager", () => {
   let hsdProgram: Program<HeliumSubDaos>;
   let hemProgram: Program<HeliumEntityManager>;
   let irmProgram: Program<IotRoutingManager>;
+  let vsrProgram: Program<VoterStakeRegistry>;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -86,6 +76,13 @@ describe("iot-routing-manager", () => {
     );
     ensureIrmIdl(irmProgram);
 
+    vsrProgram = await initVsr(
+      provider,
+      anchor.workspace.VoterStakeRegistry.programId,
+      anchor.workspace.VoterStakeRegistry.idl
+    );
+    ensureVSRIdl(vsrProgram);
+
     const dataCredits = await initTestDataCredits(dcProgram, provider);
     dcMint = dataCredits.dcMint;
     ({ dao } = await initTestDao(
@@ -95,8 +92,10 @@ describe("iot-routing-manager", () => {
       me,
       dataCredits.dcMint
     ));
+
     ({ subDao, mint: iotMint } = await initTestSubdao({
       hsdProgram,
+      vsrProgram,
       provider,
       authority: me,
       dao,
@@ -173,7 +172,7 @@ describe("iot-routing-manager", () => {
         pubkeys: { netId },
       } = await irmProgram.methods
         .initializeNetIdV0({
-          netId: new anchor.BN(1),
+          netId: 1,
         })
         .accounts({
           authority: me,
@@ -183,7 +182,7 @@ describe("iot-routing-manager", () => {
 
       const netIdAcc = await irmProgram.account.netIdV0.fetch(netId!);
       expect(netIdAcc.authority.toBase58()).to.eq(me.toBase58());
-      expect(netIdAcc.id.toNumber()).to.eq(1);
+      expect(netIdAcc.id).to.eq(1);
     });
 
     describe("with net id", async () => {
@@ -193,7 +192,7 @@ describe("iot-routing-manager", () => {
           pubkeys: { netId: netIdK },
         } = await irmProgram.methods
           .initializeNetIdV0({
-            netId: new anchor.BN(1),
+            netId: 1,
           })
           .accounts({
             authority: me,
@@ -260,7 +259,6 @@ describe("iot-routing-manager", () => {
             pubkeys: { devaddrConstraint },
           } = await irmProgram.methods
             .initializeDevaddrConstraintV0({
-              startAddr: null,
               numBlocks: 2,
             })
             .accounts({

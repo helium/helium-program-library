@@ -55,8 +55,6 @@ const { expect } = chai;
 import { helium } from "@helium/proto";
 // @ts-ignore
 import axios from "axios";
-
-import { keyToAssetKey } from "@helium/helium-entity-manager-sdk";
 import {
   MerkleTree,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
