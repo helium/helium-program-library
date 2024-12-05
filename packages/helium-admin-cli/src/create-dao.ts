@@ -525,7 +525,6 @@ export async function run(args: any = process.argv) {
     await sendInstructionsOrSquads({
       provider,
       instructions: [
-        initLazyDist,
         await heliumSubDaosProgram.methods
           .updateDaoV0({
             authority,
