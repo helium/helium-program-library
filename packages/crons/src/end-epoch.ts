@@ -76,20 +76,12 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
         },
       },
     ]);
-    const vetokenTrackers = subDaos.map(subDao => subDao.account.vetokenTracker).filter(tracker => !tracker.equals(PublicKey.default));
-    const vetokenTrackerAccounts = await Promise.all(vetokenTrackers.map(tracker => pvrProgram.account.veTokenTrackerV0.fetch(tracker)));
-    const targetTsVetokenTrackers = vetokenTrackerAccounts.reduce(
-      (acc, tracker) => BN.min(acc, tracker.vetokenLastCalculatedTs),
-      // Start one day back to ensure we at least close the epoch that the job is running in.
-      new BN(unixNow - 24 * 60 * 60)
-    );
 
-    let targetTsSubdao = subDaos.reduce(
+    let targetTs = subDaos.reduce(
       (acc, subDao) => BN.min(acc, subDao.account.vehntLastCalculatedTs),
       // Start one day back to ensure we at least close the epoch that the job is running in.
       new BN(unixNow - 24 * 60 * 60)
     );
-    let targetTs = BN.min(targetTsSubdao, targetTsVetokenTrackers);
     const solanaTime = await getSolanaUnixTimestamp(provider.connection)
 
     mainLoop: while (targetTs.toNumber() < unixNow) {

@@ -1,5 +1,4 @@
 import { PROGRAM_ID } from "@helium/helium-sub-daos-sdk";
-import { PROGRAM_ID as PVR_PROGRAM_ID } from "@helium/position-voting-rewards-sdk";
 import { Status, batchSequentialParallelInstructions } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
@@ -9,7 +8,7 @@ import { PositionWithMeta } from "../sdk/types";
 import { formPositionClaims } from "../utils/formPositionClaims";
 
 export const useClaimPositionRewards = () => {
-  const { provider, unixNow } = useHeliumVsrState();
+  const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,
