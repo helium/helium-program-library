@@ -264,9 +264,7 @@ describe("helium-sub-daos", () => {
       let {
         pubkeys: { vetokenTracker: tracker },
       } = await rewardsProgram.methods
-        .initializeVetokenTrackerV0({
-          votingRewardsTiers: [],
-        })
+        .initializeVetokenTrackerV0()
         .accounts({
           registrar: subDaoRegistrar,
           proposalNamespace: me,

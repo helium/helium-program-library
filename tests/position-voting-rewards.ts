@@ -8,11 +8,7 @@ import { ensureVSRIdl } from "./utils/fixtures";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { createPosition, initVsr } from "./utils/vsr";
 import { createAtaAndMint, createMint, toBN, toNumber } from "../packages/spl-utils/src";
-import {
-  currentEpoch,
-  daoKey,
-  delegatorRewardsPercent,
-} from "../packages/helium-sub-daos-sdk/src";
+import { currentEpoch, daoKey } from "../packages/helium-sub-daos-sdk/src";
 import chai, { assert, expect } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import { expectBnAccuracy } from "./utils/expectBnAccuracy";
@@ -151,33 +147,13 @@ describe("position-voting-rewards", () => {
           options,
           positionAuthorityKp
         ));
-        let {
-          pubkeys: { vetokenTracker: tracker },
-        } = await program.methods
-          .initializeVetokenTrackerV0({
-            votingRewardsTiers: [
-              {
-                numVetokens: new anchor.BN(0),
-                percent: delegatorRewardsPercent(0),
-              },
-              {
-                numVetokens: new anchor.BN(10),
-                percent: delegatorRewardsPercent(50),
-              },
-              {
-                numVetokens: new anchor.BN(1000000000000000),
-                percent: delegatorRewardsPercent(100),
-              },
-            ],
-          })
-          .accounts({
-            registrar,
-            rewardsMint: hntMint,
-            payer: me,
-            rewardsAuthority: me,
-            proposalNamespace: me,
-          })
-          .rpcAndKeys({ skipPreflight: true });
+        let { pubkeys: { vetokenTracker: tracker } } = await program.methods.initializeVetokenTrackerV0().accounts({
+          registrar,
+          rewardsMint: hntMint,
+          payer: me,
+          rewardsAuthority: me,
+          proposalNamespace: me,
+        }).rpcAndKeys({ skipPreflight: true });
         vetokenTracker = tracker! as PublicKey;
 
         const registrarAcc = await vsrProgram.account.registrar.fetch(registrar);
@@ -592,7 +568,7 @@ describe("position-voting-rewards", () => {
             ).amount;
             expect(
               Number(postAtaBalance) - Number(preAtaBalance)
-            ).to.be.within(toBN(REWARDS / 2, 8).toNumber() - 5000, toBN(REWARDS / 2, 8).toNumber());
+            ).to.be.within(toBN(REWARDS, 8).toNumber() - 5000, toBN(REWARDS, 8).toNumber());
           });
         });
       });

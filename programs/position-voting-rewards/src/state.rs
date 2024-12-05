@@ -147,15 +147,6 @@ pub struct VeTokenTrackerV0 {
   pub total_vetokens: u128, // the total amount of vetoken staked to this subdao, with 12 decimals of extra precision
   pub recent_proposals: [RecentProposal; 4],
   pub bump_seed: u8,
-  #[max_len(5)]
-  pub voting_rewards_tiers: Vec<VotingRewardsTierV0>,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default, InitSpace)]
-pub struct VotingRewardsTierV0 {
-  pub num_vetokens: u128,
-  // number between 0 - (100_u64 * 100_000_000). The percent of the issued rewards to issue, the rest are burned
-  pub percent: u64,
 }
 
 #[macro_export]

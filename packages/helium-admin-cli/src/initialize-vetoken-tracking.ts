@@ -11,7 +11,6 @@ import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import BN from "bn.js";
 import {
   loadKeypair,
   sendInstructionsOrSquads
@@ -75,35 +74,11 @@ export async function run(args: any = process.argv) {
   const subDao = subDaoKey(dntMint)[0];
   const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
 
-  const votingRewardsTiers = [
-    {
-      numVetokens: new BN(0),
-      percent: delegatorRewardsPercent(12.5),
-    },
-    {
-      numVetokens: new BN("35000000000000000"),
-      percent: delegatorRewardsPercent(25),
-    },
-    {
-      numVetokens: new BN("50000000000000000"),
-      percent: delegatorRewardsPercent(50),
-    },
-    {
-      numVetokens: new BN("75000000000000000"),
-      percent: delegatorRewardsPercent(75),
-    },
-    {
-      numVetokens: new BN("100000000000000000"),
-      percent: delegatorRewardsPercent(100),
-    },
-  ];
   let {
     instruction,
     pubkeys: { vetokenTracker },
   } = await pvrProgram.methods
-    .initializeVetokenTrackerV0({
-      votingRewardsTiers,
-    })
+    .initializeVetokenTrackerV0()
     .accounts({
       registrar: subDaoAcc.registrar,
       proposalNamespace: organizationKey(argv.orgName)[0],
@@ -115,18 +90,6 @@ export async function run(args: any = process.argv) {
 
   if (!await provider.connection.getAccountInfo(vetokenTracker!)) {
     instructions.push(instruction);
-  } else {
-    instructions.push(
-      await pvrProgram.methods
-        .updateVetokenTrackerV0({
-          votingRewardsTiers,
-        })
-        .accounts({
-          vetokenTracker: vetokenTracker!,
-          realmAuthority: subDaoAcc.authority,
-        })
-        .instruction()
-    );
   }
 
   instructions.push(

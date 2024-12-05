@@ -32,18 +32,8 @@ use instructions::*;
 pub mod position_voting_rewards {
   use super::*;
 
-  pub fn initialize_vetoken_tracker_v0(
-    ctx: Context<InitializeVeTokenTrackerV0>,
-    args: InitializeVeTokenTrackerArgsV0,
-  ) -> Result<()> {
-    initialize_vetoken_tracker_v0::handler(ctx, args)
-  }
-
-  pub fn update_vetoken_tracker_v0(
-    ctx: Context<UpdateVeTokenTrackerV0>,
-    args: UpdateVeTokenTrackerArgsV0,
-  ) -> Result<()> {
-    update_vetoken_tracker_v0::handler(ctx, args)
+  pub fn initialize_vetoken_tracker_v0(ctx: Context<InitializeVeTokenTrackerV0>) -> Result<()> {
+    initialize_vetoken_tracker_v0::handler(ctx)
   }
 
   pub fn enroll_v0(ctx: Context<EnrollV0>) -> Result<()> {
