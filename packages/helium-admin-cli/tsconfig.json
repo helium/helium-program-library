@@ -17,9 +17,6 @@
       "path": "../data-credits-sdk"
     },
     {
-      "path": "../position-voting-rewards-sdk"
-    },
-    {
       "path": "../circuit-breaker-sdk"
     },
     {

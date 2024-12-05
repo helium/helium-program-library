@@ -1,8 +1,9 @@
+use crate::{error::VsrError, VoteArgsV0};
 use anchor_lang::prelude::*;
 use nft_proxy::ProxyAssignmentV0;
-use proposal::{ProposalConfigV0, ProposalV0};
 
-use crate::{error::VsrError, registrar_seeds, state::*, VoteArgsV0};
+use crate::{registrar_seeds, state::*};
+use proposal::{ProposalConfigV0, ProposalV0};
 
 #[derive(Accounts)]
 pub struct ProxiedVoteV0<'info> {
