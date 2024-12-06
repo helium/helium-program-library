@@ -28,6 +28,7 @@ import {
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 import { PositionWithMeta, SubDao } from "../sdk/types";
 
 const DAO = daoKey(HNT_MINT)[0];
@@ -42,7 +43,7 @@ export const formPositionClaims = async ({
   hsdProgramId: PublicKey;
 }): Promise<TransactionInstruction[][]> => {
   const instructions: TransactionInstruction[][] = [];
-  const hsdIdl = await Program.fetchIdl(hsdProgramId, provider);
+  const hsdIdl = await fetchBackwardsCompatibleIdl(hsdProgramId, provider as any);
   const hsdProgram = await init(provider as any, hsdProgramId, hsdIdl);
   const connNoCache = new Connection(provider.connection.rpcEndpoint);
   const clock = await connNoCache.getAccountInfo(SYSVAR_CLOCK_PUBKEY);

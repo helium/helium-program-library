@@ -4,6 +4,7 @@ import { TreasuryManagement } from "@helium/idls/lib/types/treasury_management";
 import { PROGRAM_ID } from "./constants";
 import { treasuryManagementResolvers } from "./resolvers";
 import BN from "bn.js";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export * from "./pdas";
 export * from "./resolvers";
@@ -65,7 +66,7 @@ export const init = async (
   idl?: Idl | null
 ): Promise<Program<TreasuryManagement>> => {
   if (!idl) {
-    idl = await Program.fetchIdl(programId, provider);
+    idl = await fetchBackwardsCompatibleIdl(programId, provider);
   }
 
   const treasuryManagement = new Program<TreasuryManagement>(

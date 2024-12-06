@@ -16,6 +16,7 @@ import { getTransactionSignaturesUptoBlockTime } from "./getTransactionSignature
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
 import { OMIT_KEYS } from "../constants";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;
@@ -44,7 +45,10 @@ export const integrityCheckProgramAccounts = async ({
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const connection = provider.connection;
-  const idl = await anchor.Program.fetchIdl(programId, provider);
+  const idl = await fetchBackwardsCompatibleIdl(
+    new PublicKey(programId),
+    provider
+  );
 
   if (!idl) {
     throw new Error(`unable to fetch idl for ${programId}`);

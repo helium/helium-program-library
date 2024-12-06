@@ -3,14 +3,14 @@ import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { fanoutResolvers } from "./resolvers";
 import { Fanout, IDL } from "@helium/idls/lib/types/fanout";
-
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 export async function init(
   provider: AnchorProvider,
   programId: PublicKey = PROGRAM_ID,
   idl?: Idl | null
 ): Promise<Program<Fanout>> {
   if (!idl) {
-    idl = await Program.fetchIdl(programId, provider);
+    idl = await fetchBackwardsCompatibleIdl(programId, provider);
   }
   const program = new Program<Fanout>(
     idl as Fanout,

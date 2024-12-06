@@ -1,4 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
+import { PublicKey } from "@solana/web3.js";
 
 const cachedIdlFetch = (() => {
   let cache: Map<string, anchor.Idl> = new Map();
@@ -20,7 +22,10 @@ const cachedIdlFetch = (() => {
       cache.delete(programId);
       cache.set(programId, idl);
     } else {
-      idl = await anchor.Program.fetchIdl(programId, provider);
+      idl = await fetchBackwardsCompatibleIdl(
+        new PublicKey(programId),
+        provider
+      );
 
       if (idl) {
         cache.set(programId, idl);
