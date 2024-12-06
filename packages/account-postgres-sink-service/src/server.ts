@@ -23,13 +23,19 @@ import { EachMessagePayload, Kafka, KafkaConfig } from "kafkajs";
 import { Op } from "sequelize";
 import {
   HELIUS_AUTH_SECRET,
+  KAFKA_BROKERS,
+  KAFKA_GROUP_ID,
+  KAFKA_PASSWORD,
+  KAFKA_TOPIC,
+  KAFKA_USER,
+  PG_POOL_SIZE,
   PROGRAM_ACCOUNT_CONFIGS,
   REFRESH_PASSWORD,
   SUBSTREAM,
+  USE_HELIUS_WEBHOOK,
   USE_KAFKA,
   USE_SUBSTREAMS,
   USE_YELLOWSTONE,
-  PG_POOL_SIZE,
 } from "./env";
 import { getPluginsByAccountTypeByProgram } from "./plugins";
 import { metrics } from "./plugins/metrics";
@@ -45,12 +51,8 @@ import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAcco
 import { provider } from "./utils/solana";
 import { upsertProgramAccounts } from "./utils/upsertProgramAccounts";
 
-if (!HELIUS_AUTH_SECRET) {
-  throw new Error("Helius auth secret not available");
-}
-
 if (PG_POOL_SIZE < 5) {
-  throw new Error("PG Pool size must be minimum of 5");
+  throw new Error("PG_POOL_SIZE must be minimum of 5");
 }
 
 (async () => {
@@ -101,16 +103,18 @@ if (PG_POOL_SIZE < 5) {
             for (const config of configs) {
               if ((programId && programId == config.programId) || !programId) {
                 console.log(
-                  programId
-                    ? `Refreshing accounts for program: ${programId}`
-                    : `Refreshing accounts`
+                  `Refreshing accounts for program: ${config.programId}`
                 );
+
                 try {
                   await upsertProgramAccounts({
                     programId: new PublicKey(config.programId),
                     accounts: config.accounts,
                   });
-                  console.log(`Accounts refreshed for program: ${programId}`);
+
+                  console.log(
+                    `Accounts refreshed for program: ${config.programId}`
+                  );
                 } catch (err) {
                   throw err;
                 }
@@ -233,90 +237,97 @@ if (PG_POOL_SIZE < 5) {
       }
     }
   }
-  server.post<{ Body: any[] }>("/transaction-webhook", async (req, res) => {
-    if (req.headers.authorization != HELIUS_AUTH_SECRET) {
-      res.code(StatusCodes.FORBIDDEN).send({
-        message: "Invalid authorization",
-      });
-      return;
-    }
-    if (refreshing) {
-      res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
-        message: "Refresh is happening, cannot create transactions",
-      });
-      return;
+
+  if (USE_HELIUS_WEBHOOK) {
+    if (!HELIUS_AUTH_SECRET) {
+      throw new Error("HELIUS_AUTH_SECRET undefined");
     }
 
-    try {
-      const transactions = req.body as TransactionResponse[];
-      const writableAccountKeys = transactions.flatMap((tx) =>
-        getWritableAccountKeys(
-          tx.transaction.message.accountKeys,
-          tx.transaction.message.header
-        )
-      );
+    server.post<{ Body: any[] }>("/transaction-webhook", async (req, res) => {
+      if (req.headers.authorization != HELIUS_AUTH_SECRET) {
+        res.code(StatusCodes.FORBIDDEN).send({
+          message: "Invalid authorization",
+        });
+        return;
+      }
+      if (refreshing) {
+        res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
+          message: "Refresh is happening, cannot create transactions",
+        });
+        return;
+      }
 
-      await insertTransactionAccounts(
-        await getMultipleAccounts({
-          connection: provider.connection,
-          keys: writableAccountKeys,
-        })
-      );
-      res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-    } catch (err) {
-      res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
-      console.error(err);
-    }
-  });
+      try {
+        const transactions = req.body as TransactionResponse[];
+        const writableAccountKeys = transactions.flatMap((tx) =>
+          getWritableAccountKeys(
+            tx.transaction.message.accountKeys,
+            tx.transaction.message.header
+          )
+        );
 
-  server.post("/account-webhook", async (req, res) => {
-    if (req.headers.authorization != HELIUS_AUTH_SECRET) {
-      res.code(StatusCodes.FORBIDDEN).send({
-        message: "Invalid authorization",
-      });
-      return;
-    }
-    if (refreshing) {
-      res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
-        message: "Refresh is happening, cannot create transactions",
-      });
-      return;
-    }
+        await insertTransactionAccounts(
+          await getMultipleAccounts({
+            connection: provider.connection,
+            keys: writableAccountKeys,
+          })
+        );
+        res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+      } catch (err) {
+        res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
+        console.error(err);
+      }
+    });
 
-    try {
-      const accounts = req.body as any[];
+    server.post("/account-webhook", async (req, res) => {
+      if (req.headers.authorization != HELIUS_AUTH_SECRET) {
+        res.code(StatusCodes.FORBIDDEN).send({
+          message: "Invalid authorization",
+        });
+        return;
+      }
+      if (refreshing) {
+        res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
+          message: "Refresh is happening, cannot create transactions",
+        });
+        return;
+      }
 
-      if (configs) {
-        for (const account of accounts) {
-          const parsed = account["account"]["parsed"];
-          const config = configs.find((x) => x.programId == parsed["owner"]);
+      try {
+        const accounts = req.body as any[];
 
-          if (!config) {
-            // exit early if account doesn't need to be saved
-            res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-            return;
-          }
+        if (configs) {
+          for (const account of accounts) {
+            const parsed = account["account"]["parsed"];
+            const config = configs.find((x) => x.programId == parsed["owner"]);
 
-          try {
-            await handleAccountWebhook({
-              fastify: server,
-              programId: new PublicKey(config.programId),
-              accounts: config.accounts,
-              account: parsed,
-              pluginsByAccountType:
-                pluginsByAccountTypeByProgram[parsed["owner"]] || {},
-            });
-          } catch (err) {
-            throw err;
+            if (!config) {
+              // exit early if account doesn't need to be saved
+              res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+              return;
+            }
+
+            try {
+              await handleAccountWebhook({
+                fastify: server,
+                programId: new PublicKey(config.programId),
+                accounts: config.accounts,
+                account: parsed,
+                pluginsByAccountType:
+                  pluginsByAccountTypeByProgram[parsed["owner"]] || {},
+              });
+            } catch (err) {
+              throw err;
+            }
           }
         }
+        res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+      } catch (err) {
+        res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
+        console.error(err);
       }
-      res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-    } catch (err) {
-      res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
-      console.error(err);
-    }
-  });
+    });
+  }
 
   try {
     // models are defined on boot, and updated in refresh-accounts
@@ -341,25 +352,32 @@ if (PG_POOL_SIZE < 5) {
   }
 
   if (USE_KAFKA) {
+    if (!KAFKA_USER) throw new Error("KAFKA_USER undefined");
+    if (!KAFKA_TOPIC) throw new Error("KAFKA_TOPIC undefined");
+    if (!KAFKA_BROKERS) throw new Error("KAFKA_BROKERS undefined");
+    if (!KAFKA_PASSWORD) throw new Error("KAFKA_PASSWORD undefined");
+    if (!KAFKA_GROUP_ID) throw new Error("KAFKA_GROUP_ID undefined");
+
     const kafkaConfig: KafkaConfig = {
       ssl: true,
       clientId: "helium-reader",
+      brokers: KAFKA_BROKERS,
       sasl: {
         mechanism: "scram-sha-512",
-        username: process.env.KAFKA_USER!,
-        // Remove newlines from password
-        password: process.env.KAFKA_PASSWORD!.replace(/(\r\n|\n|\r)/gm, ""),
+        username: KAFKA_USER,
+        password: KAFKA_PASSWORD,
       },
-      brokers: process.env.KAFKA_BROKERS!.split(","),
     };
+
     const kafka = new Kafka(kafkaConfig);
-    const consumer = kafka.consumer({ groupId: process.env.KAFKA_GROUP_ID! });
+    const consumer = kafka.consumer({ groupId: KAFKA_GROUP_ID });
 
     await consumer.connect();
     await consumer.subscribe({
-      topic: process.env.KAFKA_TOPIC!,
+      topic: KAFKA_TOPIC,
       fromBeginning: false,
     });
+
     await consumer.run({
       eachMessage: async ({ message }: EachMessagePayload) => {
         if (message.value) {
@@ -369,7 +387,9 @@ if (PG_POOL_SIZE < 5) {
             pubkey,
             isDelete,
           } = JSON.parse(message.value.toString());
+
           const config = configs.find((x) => x.programId == programId);
+
           if (config) {
             await handleAccountWebhook({
               fastify: server,
@@ -390,6 +410,8 @@ if (PG_POOL_SIZE < 5) {
   }
 
   if (USE_SUBSTREAMS) {
+    if (!SUBSTREAM) throw new Error("SUBSTREAM undefined");
+
     await Cursor.sync();
     const lastCursor = await Cursor.findOne({
       order: [["createdAt", "DESC"]],

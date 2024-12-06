@@ -1,16 +1,16 @@
-import { BN, Program } from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
 import {
-  EPOCH_LENGTH,
   PROGRAM_ID,
   delegatedPositionKey,
   init,
 } from "@helium/helium-sub-daos-sdk";
-import { Status, batchParallelInstructionsWithPriorityFee, sendInstructions } from "@helium/spl-utils";
+import { Status, batchSequentialParallelInstructions } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
+import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
-import { isClaimed } from "@helium/voter-stake-registry-sdk";
+import { formPositionClaims } from "../utils/formPositionClaims";
 
 export const useUndelegatePosition = () => {
   const { provider, unixNow } = useHeliumVsrState();
@@ -20,6 +20,7 @@ export const useUndelegatePosition = () => {
       programId = PROGRAM_ID,
       onInstructions,
       onProgress,
+      maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
     }: {
       position: PositionWithMeta;
       programId?: PublicKey;
@@ -28,6 +29,7 @@ export const useUndelegatePosition = () => {
         instructions: TransactionInstruction[]
       ) => Promise<void>;
       onProgress?: (status: Status) => void;
+      maxSignatureBatch?: number;
     }) => {
       const isInvalid = !unixNow || !provider || !position.isDelegated;
       const idl = await Program.fetchIdl(programId, provider);
@@ -38,61 +40,44 @@ export const useUndelegatePosition = () => {
       if (isInvalid || !hsdProgram) {
         throw new Error("Unable to Undelegate Position, Invalid params");
       } else {
+        const instructions: TransactionInstruction[][] = [];
         const delegatedPosKey = delegatedPositionKey(position.pubkey)[0];
         const delegatedPosAcc =
           await hsdProgram.account.delegatedPositionV0.fetch(delegatedPosKey);
-        const currentEpoch = new BN(unixNow).div(new BN(EPOCH_LENGTH));
 
-        const { lastClaimedEpoch, claimedEpochsBitmap } = delegatedPosAcc;
-        const epoch = lastClaimedEpoch.add(new BN(1));
-        const epochsToClaim = Array.from(
-          { length: currentEpoch.sub(epoch).toNumber() },
-          (_v, k) => epoch.addn(k)
-        ).filter(
-          (epoch) =>
-            !isClaimed({
-              epoch: epoch.toNumber(),
-              lastClaimedEpoch: lastClaimedEpoch.toNumber(),
-              claimedEpochsBitmap,
-            })
-        );
+        if (position.hasRewards) {
+          instructions.push(
+            ...(await formPositionClaims({
+              provider,
+              positions: [position],
+              hsdProgramId: programId,
+            }))
+          );
+        }
 
-        const instructions: TransactionInstruction[] = await Promise.all(
-          epochsToClaim.map(
-            async (epoch) =>
-              await hsdProgram.methods
-                .claimRewardsV0({
-                  epoch,
-                })
-                .accounts({
-                  position: position.pubkey,
-                  subDao: delegatedPosAcc.subDao,
-                })
-                .instruction()
-          )
-        );
-
-        instructions.push(
+        instructions.push([
           await hsdProgram.methods
             .closeDelegationV0()
             .accounts({
               position: position.pubkey,
               subDao: delegatedPosAcc.subDao,
             })
-            .instruction()
-        );
+            .instruction(),
+        ]);
 
         if (onInstructions) {
-          await onInstructions(instructions);
-        } else {
-          const claims = instructions.slice(0, instructions.length - 1);
-          const close = instructions[instructions.length - 1];
-          if (claims.length > 0) {
-            await batchParallelInstructionsWithPriorityFee(provider, claims, {
-              onProgress,
-            });
+          for (const ixs of instructions) {
+            await onInstructions(ixs);
           }
-          await sendInstructions(provider, [close]);
+        } else {
+          await batchSequentialParallelInstructions({
+            provider,
+            instructions,
+            onProgress,
+            triesRemaining: 10,
+            extraSigners: [],
+            maxSignatureBatch,
+          });
         }
       }
     }

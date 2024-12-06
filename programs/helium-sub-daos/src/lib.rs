@@ -127,4 +127,8 @@ pub mod helium_sub_daos {
   ) -> Result<()> {
     admin_set_dc_onboarding_fees_paid_epoch_info::handler(ctx, args)
   }
+
+  pub fn switch_mobile_ops_fund(ctx: Context<SwitchMobileOpsFund>) -> Result<()> {
+    switch_mobile_ops_fund::handler(ctx)
+  }
 }

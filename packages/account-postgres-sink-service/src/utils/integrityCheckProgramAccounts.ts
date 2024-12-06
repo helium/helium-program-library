@@ -15,6 +15,7 @@ import { getBlockTimeWithRetry } from "./getBlockTimeWithRetry";
 import { getTransactionSignaturesUptoBlockTime } from "./getTransactionSignaturesUpToBlock";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
+import { OMIT_KEYS } from "../constants";
 
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;
@@ -36,7 +37,7 @@ export const integrityCheckProgramAccounts = async ({
   accounts,
   sequelize = database,
 }: IntegrityCheckProgramAccountsArgs) => {
-  console.log(`Integrity checking program: ${programId}`);
+  console.log(`Integrity checking: ${programId}`);
   anchor.setProvider(
     anchor.AnchorProvider.local(process.env.ANCHOR_PROVIDER_URL || SOLANA_URL)
   );
@@ -61,7 +62,6 @@ export const integrityCheckProgramAccounts = async ({
     const t = await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
     });
-    const now = new Date().toISOString();
     const txIdsByAccountId: { [key: string]: string[] } = {};
     const corrections: {
       type: string;
@@ -98,7 +98,7 @@ export const integrityCheckProgramAccounts = async ({
             retry(
               () =>
                 connection.getParsedTransactions(chunk, {
-                  commitment: "confirmed",
+                  commitment: "finalized",
                   maxSupportedTransactionVersion: 0,
                 }),
               retryOptions
@@ -176,11 +176,13 @@ export const integrityCheckProgramAccounts = async ({
             );
 
             if (accName) {
-              const omitKeys = ["refreshed_at", "createdAt"];
               const model = sequelize.models[accName];
-              const existing = await model.findByPk(c.pubkey);
+              const existing = await model.findByPk(c.pubkey, {
+                transaction: t,
+              });
+
               let sanitized = {
-                refreshed_at: now,
+                refreshed_at: new Date().toISOString(),
                 address: c.pubkey,
                 ...sanitizeAccount(decodedAcc),
               };
@@ -191,14 +193,12 @@ export const integrityCheckProgramAccounts = async ({
                 }
               }
 
-              const isEqual =
-                existing &&
-                deepEqual(
-                  _omit(sanitized, omitKeys),
-                  _omit(existing.dataValues, omitKeys)
-                );
+              const shouldUpdate = !deepEqual(
+                _omit(sanitized, OMIT_KEYS),
+                _omit(existing?.dataValues, OMIT_KEYS)
+              );
 
-              if (!isEqual) {
+              if (shouldUpdate) {
                 corrections.push({
                   type: accName,
                   accountId: c.pubkey,
@@ -214,19 +214,21 @@ export const integrityCheckProgramAccounts = async ({
       );
 
       await t.commit();
-
+      console.log(`Integrity check complete for: ${programId}`);
       if (corrections.length > 0) {
         console.log(`Integrity check corrections for: ${programId}`);
-        for (const correction of corrections) {
-          // @ts-ignore
-          fastify.customMetrics.integrityCheckCounter.inc();
-          console.dir(correction, { depth: null });
-        }
+        await Promise.all(
+          corrections.map(async (correction) => {
+            // @ts-ignore
+            fastify.customMetrics.integrityCheckCounter.inc();
+            console.dir(correction, { depth: null });
+          })
+        );
       }
     } catch (err) {
       await t.rollback();
       console.error(
-        `Integrity check error while inserting for ${programId}:`,
+        `Integrity check error while inserting for: ${programId}`,
         err
       );
       throw err; // Rethrow the error to be caught by the retry mechanism

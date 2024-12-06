@@ -7,11 +7,7 @@ import {
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { init as initNftProxy } from "@helium/nft-proxy-sdk";
 import { truthy } from "@helium/spl-utils";
-import {
-  VoteService,
-  getRegistrarKey,
-  init,
-} from "@helium/voter-stake-registry-sdk";
+import { VoteService, init } from "@helium/voter-stake-registry-sdk";
 import { Connection, PublicKey } from "@solana/web3.js";
 import React, { createContext, useContext, useMemo } from "react";
 import { useAsync } from "react-async-hook";
@@ -21,6 +17,7 @@ import { usePositions } from "../hooks/usePositions";
 import { useRegistrar } from "../hooks/useRegistrar";
 import { PositionWithMeta, ProxyAssignmentV0 } from "../sdk/types";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
+import { useRegistrarForMint } from "..";
 
 type Registrar = IdlAccounts<VoterStakeRegistry>["registrar"];
 
@@ -84,10 +81,7 @@ export const HeliumVsrStateProvider: React.FC<{
     }
   }, [connection?.rpcEndpoint, wallet?.publicKey?.toBase58()]);
 
-  const registrarKey = useMemo(
-    () => mint && getRegistrarKey(mint),
-    [mint?.toBase58()]
-  );
+  const { registrarKey } = useRegistrarForMint(mint);
 
   const { info: registrar } = useRegistrar(registrarKey);
 
@@ -179,17 +173,30 @@ export const HeliumVsrStateProvider: React.FC<{
         const positionsWithMeta = positions
           .map((position, idx) => {
             if (position && position.info) {
+              const { lockup } = position.info;
+              const lockupKind = Object.keys(lockup.kind)[0] as string;
+              const isConstant = lockupKind === "constant";
+              const isDecayed = !isConstant && lockup.endTs.lte(new BN(now));
+              const decayedEpoch = lockup.endTs.div(new BN(EPOCH_LENGTH));
+              const currentEpoch = new BN(now).div(new BN(EPOCH_LENGTH));
               const isDelegated = !!delegatedAccounts?.[idx]?.info;
               const proxy =
                 proxyAccountsByAsset?.[position.info.mint.toBase58()];
+
+              let hasRewards = false;
               const delegatedSubDao = isDelegated
                 ? delegatedAccounts[idx]?.info?.subDao
                 : null;
-              const hasRewards = isDelegated
-                ? delegatedAccounts[idx]!.info!.lastClaimedEpoch.add(
-                    new BN(1)
-                  ).lt(new BN(now).div(new BN(EPOCH_LENGTH)))
-                : false;
+              if (isDelegated) {
+                const epoch = delegatedAccounts[
+                  idx
+                ]!.info!.lastClaimedEpoch.add(new BN(1));
+                const epochsCount = isDecayed
+                  ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
+                  : currentEpoch.sub(epoch).toNumber();
+
+                hasRewards = epochsCount > 0;
+              }
 
               const posVotingPower = calcPositionVotingPower({
                 position: position?.info || null,
