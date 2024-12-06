@@ -5,6 +5,9 @@
       "path": "../idls"
     },
     {
+      "path": "../spl-utils"
+    },
+    {
       "path": "./tsconfig.cjs.json"
     },
     {
