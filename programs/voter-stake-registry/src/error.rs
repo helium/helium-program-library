@@ -161,6 +161,4 @@ pub enum VsrError {
   SamePosition,
   MaxChoicesExceeded,
   NoVoteForThisChoice,
-  PositionFrozen,
-  UnauthorizedFreezeAuthority,
 }

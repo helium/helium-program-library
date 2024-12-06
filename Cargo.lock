@@ -1964,14 +1964,13 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
  "circuit-breaker",
  "default-env",
  "mpl-token-metadata",
- "position-voting-rewards",
  "rust_decimal",
  "shared-utils",
  "solana-security-txt",
@@ -2550,7 +2549,7 @@ dependencies = [
 
 [[package]]
 name = "mobile-entity-manager"
-version = "0.1.4"
+version = "0.1.3"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -3034,19 +3033,6 @@ name = "portable-atomic"
 version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "31114a898e107c51bb1609ffaf55a0e011cf6a4d7f1170d0015a165082c0338b"
-
-[[package]]
-name = "position-voting-rewards"
-version = "0.0.1"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "default-env",
- "proposal",
- "shared-utils",
- "solana-security-txt",
- "voter-stake-registry",
-]
 
 [[package]]
 name = "powerfmt"
@@ -5708,7 +5694,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.3.4"
+version = "0.3.3"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

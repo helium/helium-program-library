@@ -4,7 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import { PROGRAM_ID } from "./constants";
 import { circuitBreakerResolvers } from "./resolvers";
-
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export * from "./constants";
 export * from "./pdas";
@@ -27,7 +27,7 @@ export async function init(
   idl?: Idl | null
 ): Promise<Program<CircuitBreaker>> {
   if (!idl) {
-    idl = await Program.fetchIdl(programId, provider);
+    idl = await fetchBackwardsCompatibleIdl(programId, provider);
   }
 
   const circuitBreaker = new Program<CircuitBreaker>(

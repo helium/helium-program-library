@@ -4,6 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { heliumSubDaosResolvers } from "./resolvers";
 import { BN } from "bn.js";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export async function init(
   provider: Provider,
@@ -11,7 +12,7 @@ export async function init(
   idl?: Idl | null
 ): Promise<Program<HeliumSubDaos>> {
   if (!idl) {
-    idl = await Program.fetchIdl(programId, provider);
+    idl = await fetchBackwardsCompatibleIdl(programId, provider);
   }
   const program = new Program<HeliumSubDaos>(
     idl as HeliumSubDaos,

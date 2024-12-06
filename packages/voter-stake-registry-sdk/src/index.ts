@@ -13,6 +13,7 @@ export type {
   EnhancedProxy, EnhancedProxyData, PartialEnhancedProxy, ProposalWithVotes,
   ProxyAssignment, WithRank
 } from "./voteService";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export function getRegistrarKey(mint: PublicKey) {
   return registrarKey(
@@ -33,7 +34,7 @@ export const init = async (
   idl?: Idl | null
 ): Promise<Program<VoterStakeRegistry>> => {
   if (!idl) {
-    idl = await Program.fetchIdl(programId, provider);
+    idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
   }
 
   const heliumVoterStakeRegistry = new Program<VoterStakeRegistry>(

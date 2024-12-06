@@ -1,16 +1,13 @@
 import { Program } from "@coral-xyz/anchor";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
-import { getRegistrarKey, init as initVsr } from "@helium/voter-stake-registry-sdk";
+import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import { getMint } from "@solana/spl-token";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
-import {
-  init as initPvr,
-  vetokenTrackerKey,
-} from "@helium/position-voting-rewards-sdk";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export const useTransferPosition = () => {
   const { provider } = useHeliumVsrState();
@@ -36,7 +33,7 @@ export const useTransferPosition = () => {
         sourcePosition.numActiveVotes > 0 ||
         targetPosition.numActiveVotes > 0;
 
-      const idl = await Program.fetchIdl(programId, provider);
+      const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const hsdProgram = await init(provider as any, programId, idl);
       const vsrProgram = await initVsr(provider as any);
       const mint = sourcePosition.votingMint.mint;
@@ -53,34 +50,6 @@ export const useTransferPosition = () => {
         const isDao = Boolean(await provider.connection.getAccountInfo(dao));
         const mintAcc = await getMint(provider.connection, mint);
         const amountToTransfer = toBN(amount, mintAcc!.decimals);
-
-        if (sourcePosition.isEnrolled) {
-          const pvrProgram = await initPvr(provider as any);
-          const [vetokenTracker] = vetokenTrackerKey(sourcePosition.registrar);
-          instructions.push(
-            await pvrProgram.methods
-              .unenrollV0()
-              .accounts({
-                position: sourcePosition.pubkey,
-                vetokenTracker,
-                rentRefund: provider.wallet.publicKey,
-              })
-              .instruction()
-          );
-        }
-        if (targetPosition.isEnrolled) {
-          const pvrProgram = await initPvr(provider as any);
-          const [vetokenTracker] = vetokenTrackerKey(targetPosition.registrar);
-          instructions.push(
-            await pvrProgram.methods
-              .enrollV0()
-              .accounts({
-                position: targetPosition.pubkey,
-                vetokenTracker,
-              })
-              .instruction()
-          );
-        }
 
         if (isDao) {
           instructions.push(

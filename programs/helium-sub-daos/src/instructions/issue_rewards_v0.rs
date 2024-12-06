@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use circuit_breaker::{
@@ -6,7 +8,9 @@ use circuit_breaker::{
 };
 use shared_utils::precise_number::{InnerUint, PreciseNumber};
 
-use crate::{current_epoch, error::ErrorCode, state::*, OrArithError, EPOCH_LENGTH, TESTING};
+use crate::{
+  current_epoch, dao_seeds, error::ErrorCode, state::*, OrArithError, EPOCH_LENGTH, TESTING,
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueRewardsArgsV0 {
@@ -43,7 +47,7 @@ pub struct IssueRewardsV0<'info> {
     has_one = sub_dao,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump = sub_dao_epoch_info.bump_seed,
-    constraint = TESTING || sub_dao_epoch_info.rewards_issued_at.is_none() @ ErrorCode::RewardsAlreadyIssued
+    constraint = TESTING || sub_dao_epoch_info.rewards_issued_at.is_none()
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   #[account(
@@ -153,7 +157,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .unwrap();
   let total_rewards = PreciseNumber::new(emissions.into()).or_arith_error()?;
   let rewards_prec = percent_share.checked_mul(&total_rewards).or_arith_error()?;
-  let rewards_amount: u64 = rewards_prec
+  let mut rewards_amount: u64 = rewards_prec
     .floor() // Ensure we never overspend the defined rewards
     .or_arith_error()?
     .to_imprecise()
@@ -172,9 +176,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   let max_percent = 100_u64.checked_mul(10_0000000).unwrap();
   let dnt_emissions = (total_emissions as u128)
     .checked_mul(u128::from(
-      max_percent
-        - ctx.accounts.sub_dao.delegator_rewards_percent
-        - ctx.accounts.sub_dao.voting_rewards_percent,
+      max_percent - ctx.accounts.sub_dao.delegator_rewards_percent,
     ))
     .unwrap()
     .checked_div(max_percent as u128) // 100% with 2 decimals accuracy
@@ -194,13 +196,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   )?;
 
   let delegation_rewards_amount = if delegators_present {
-    (total_emissions as u128)
-      .checked_mul(u128::from(ctx.accounts.sub_dao.delegator_rewards_percent))
-      .unwrap()
-      .checked_div(max_percent as u128) // 100% with 2 decimals accuracy
-      .unwrap()
-      .try_into()
-      .unwrap()
+    total_emissions.checked_sub(dnt_emissions).unwrap()
   } else {
     0
   };
@@ -220,13 +216,24 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     )?;
   }
 
+  // Until August 1st, 2025, emit the 2.9M HNT to the treasury.
+  // This contract will be deployed between December 6 and December 7 at UTC midnight.
+  // That means this will emit payment from December 7 to August 1st, 2025 (because epochs are paid in arrears).
+  // This is a total of 237 days. 2.9M HNT / 237 days = 12236.28691983 HNT per day.
+  #[allow(clippy::inconsistent_digit_grouping)]
+  if epoch_curr_ts < 1754006400
+    && ctx.accounts.dnt_mint.key()
+      == Pubkey::from_str("mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6").unwrap()
+  {
+    rewards_amount += 12_236_28691983;
+  }
+
   msg!("Minting {} to treasury", rewards_amount);
   mint_v0(
-    ctx.accounts.mint_treasury_emissions_ctx().with_signer(&[&[
-      b"dao",
-      ctx.accounts.hnt_mint.key().as_ref(),
-      &[ctx.accounts.dao.bump_seed],
-    ]]),
+    ctx
+      .accounts
+      .mint_treasury_emissions_ctx()
+      .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
     MintArgsV0 {
       amount: rewards_amount,
     },

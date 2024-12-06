@@ -1,14 +1,12 @@
 import { Program } from "@coral-xyz/anchor";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
 import {
-  init as initPvr,
-  vetokenTrackerKey,
-} from "@helium/position-voting-rewards-sdk";
-import {
   batchInstructionsToTxsWithPriorityFee,
   sendAndConfirmWithRetry,
+  sendInstructions,
+  sendInstructionsWithPriorityFee,
   toBN,
-  toVersionedTx
+  toVersionedTx,
 } from "@helium/spl-utils";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
@@ -26,7 +24,7 @@ import {
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
-
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 export const useSplitPosition = () => {
   const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
@@ -51,7 +49,7 @@ export const useSplitPosition = () => {
     }) => {
       const isInvalid = !provider || !provider.wallet;
 
-      const idl = await Program.fetchIdl(programId, provider);
+      const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const hsdProgram = await init(provider as any, programId, idl);
       const vsrProgram = await initVsr(provider as any);
 
@@ -73,22 +71,6 @@ export const useSplitPosition = () => {
           );
         const mintAcc = await getMint(provider.connection, mint);
         const amountToTransfer = toBN(amount, mintAcc!.decimals);
-
-        if (sourcePosition.isEnrolled) {
-          const pvrProgram = await initPvr(provider as any);
-          const [vetokenTracker] = vetokenTrackerKey(sourcePosition.registrar);
-
-          instructions.push(
-            await pvrProgram.methods
-              .unenrollV0()
-              .accounts({
-                position: sourcePosition.pubkey,
-                vetokenTracker,
-                rentRefund: provider.wallet.publicKey,
-              })
-              .instruction()
-          );
-        }
 
         instructions.push(
           SystemProgram.createAccount({

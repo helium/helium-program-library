@@ -55,7 +55,6 @@ export const useCreatePosition = () => {
       ) => Promise<void>;
     }) => {
       const isInvalid = !provider || !client;
-
       if (isInvalid) {
         throw new Error("Unable to Create Position, Invalid params");
       } else {
@@ -63,7 +62,9 @@ export const useCreatePosition = () => {
         const [daoK] = daoKey(mint);
         const [subDaoK] = subDaoKey(mint);
         const myDao = await hsdProgram.account.daoV0.fetchNullable(daoK);
-        const mySubDao = await hsdProgram.account.subDaoV0.fetchNullable(subDaoK);
+        const mySubDao = await hsdProgram.account.subDaoV0.fetchNullable(
+          subDaoK
+        );
         const registrar = (mySubDao?.registrar || myDao?.registrar)!;
         const mintKeypair = Keypair.generate();
         const position = positionKey(mintKeypair.publicKey)[0];

@@ -26,10 +26,6 @@ export const heliumCommonResolver = resolveIndividual(async ({ path }) => {
       return new PublicKey("Sysvar1nstructions1111111111111111111111111");
     case "lazyDistributorProgram":
       return new PublicKey("1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w");
-    case "positionVotingRewardsProgram":
-      return new PublicKey("pvr1pJdeAcW6tzFyPRSmkL5Xwysi1Tq79f7KF2XB4zM");
-    case "positionVotingRewards":
-      return new PublicKey("pvr1pJdeAcW6tzFyPRSmkL5Xwysi1Tq79f7KF2XB4zM");
     case "noEmitProgram":
       return new PublicKey("noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv");
     case "heliumEntityManagerProgram":

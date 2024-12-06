@@ -13,6 +13,7 @@ import { PositionWithMeta, ProxyAssignmentV0 } from "../sdk/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ProxyAssignment } from "@helium/voter-stake-registry-sdk";
 import { INDEXER_WAIT } from "../constants";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export const useAssignProxies = () => {
   const { provider, registrar, mint, voteService } = useHeliumVsrState();
@@ -38,8 +39,7 @@ export const useAssignProxies = () => {
       maxSignatureBatch?: number;
     }) => {
       const isInvalid = !provider;
-
-      const idl = await Program.fetchIdl(programId, provider);
+      const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const nftProxyProgram = await init(provider as any, programId, idl);
 
       let resultingAssignments: ProxyAssignment[] = [];

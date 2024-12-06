@@ -9,7 +9,6 @@ import { useAsyncCallback } from "react-async-hook";
 import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
-import { PROGRAM_ID as PVR_PROGRAM_ID } from "@helium/position-voting-rewards-sdk";
 import { formPositionClaims } from "../utils/formPositionClaims";
 
 const DAO = daoKey(HNT_MINT)[0];
@@ -20,14 +19,12 @@ export const useClaimAllPositionsRewards = () => {
     async ({
       positions,
       programId = PROGRAM_ID,
-      pvrProgramId = PVR_PROGRAM_ID,
       onProgress,
       onInstructions,
       maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
     }: {
       positions: PositionWithMeta[];
       programId?: PublicKey;
-      pvrProgramId?: PublicKey;
       onProgress?: (status: Status) => void;
       // Instead of sending the transaction, let the caller decide
       onInstructions?: (
@@ -45,7 +42,6 @@ export const useClaimAllPositionsRewards = () => {
           provider,
           positions,
           hsdProgramId: programId,
-          pvrProgramId: pvrProgramId,
         });
 
         if (onInstructions) {

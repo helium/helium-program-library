@@ -1,22 +1,20 @@
-import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import { useProposal } from "@helium/modular-governance-hooks";
-import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
-import {
-  init as initPVR,
-  vetokenTrackerKey,
-} from "@helium/position-voting-rewards-sdk";
 import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
 import {
   PublicKey,
-  TransactionInstruction
+  SYSVAR_CLOCK_PUBKEY,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import BN from "bn.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
-import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 import { useVoteMarkers } from "./useVoteMarkers";
+import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
+import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
+import { useSolanaUnixNow } from "@helium/helium-react-hooks";
+import { PositionWithMeta } from "../sdk/types";
 
 export const useVote = (proposalKey: PublicKey) => {
   const { info: proposal } = useProposal(proposalKey);
@@ -156,20 +154,13 @@ export const useVote = (proposalKey: PublicKey) => {
         );
       } else {
         const vsrProgram = await init(provider);
-        const pvrProgram = await initPVR(provider);
-        const vetokenTrackerK = vetokenTrackerKey(registrar!.pubkey!)[0];
-        const vetokenTracker = await pvrProgram.account.veTokenTrackerV0.fetchNullable(
-          vetokenTrackerK
-        );
         const instructions = (
           await Promise.all(
             // vote with bigger positions first.
             sortedPositions.map(async (position, index) => {
               const marker = markers?.[index]?.info;
-              const markerK = voteMarkerKey(position.mint, proposalKey)[0];
               const canVote = canPositionVote(index, choice);
               if (canVote) {
-                const instructions: TransactionInstruction[] = [];
                 if (position.isProxiedToMe) {
                   if (
                     marker &&
@@ -181,73 +172,39 @@ export const useVote = (proposalKey: PublicKey) => {
                     return;
                   }
 
-
-                  instructions.push(
-                    await vsrProgram.methods
-                      .proxiedVoteV0({
-                        choice,
-                      })
-                      .accounts({
-                        proposal: proposalKey,
-                        voter: provider.wallet.publicKey,
-                        position: position.pubkey,
-                        registrar: registrar?.pubkey,
-                        marker: markerK,
-                        proxyAssignment: proxyAssignmentKey(
-                          registrar!.proxyConfig,
-                          position.mint,
-                          provider.wallet.publicKey
-                        )[0],
-                      })
-                      .instruction()
-                  );
-                } else {
-                  instructions.push(
-                    await vsrProgram.methods
-                      .voteV0({
-                        choice,
-                      })
-                      .accounts({
-                        proposal: proposalKey,
-                        voter: provider.wallet.publicKey,
-                        position: position.pubkey,
-                        marker: markerK,
-                      })
-                      .instruction()
-                  );
+                  return await vsrProgram.methods
+                    .proxiedVoteV0({
+                      choice,
+                    })
+                    .accounts({
+                      proposal: proposalKey,
+                      voter: provider.wallet.publicKey,
+                      position: position.pubkey,
+                      registrar: registrar?.pubkey,
+                      marker: voteMarkerKey(position.mint, proposalKey)[0],
+                      proxyAssignment: proxyAssignmentKey(
+                        registrar!.proxyConfig,
+                        position.mint,
+                        provider.wallet.publicKey
+                      )[0],
+                    })
+                    .instruction();
                 }
-
-                if (vetokenTracker && !position.isEnrolled) {
-                  instructions.push(
-                    await pvrProgram.methods
-                      .enrollV0()
-                      .accounts({
-                        vetokenTracker: vetokenTrackerK,
-                        position: position.pubkey,
-                      })
-                      .instruction()
-                  );
-                }
-
-                if (vetokenTracker) {
-                  instructions.push(
-                    await pvrProgram.methods
-                      .trackVoteV0()
-                      .accounts({
-                        proposal: proposalKey,
-                        marker: markerK,
-                        position: position.pubkey,
-                        vetokenTracker: vetokenTrackerK,
-                      })
-                      .instruction()
-                  );
-                }
-
-                return instructions;
+                return await vsrProgram.methods
+                  .voteV0({
+                    choice,
+                  })
+                  .accounts({
+                    proposal: proposalKey,
+                    voter: provider.wallet.publicKey,
+                    position: position.pubkey,
+                    marker: voteMarkerKey(position.mint, proposalKey)[0],
+                  })
+                  .instruction();
               }
             })
           )
-        ).filter(truthy).flat();
+        ).filter(truthy);
 
         if (onInstructions) {
           await onInstructions(instructions);
@@ -272,7 +229,6 @@ export const useVote = (proposalKey: PublicKey) => {
     markers,
     voteWeights,
     canVote,
-    canPositionVote,
     voters,
   };
 };

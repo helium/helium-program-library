@@ -51,7 +51,6 @@
     "@helium/mobile-entity-manager-sdk": "^0.9.15",
     "@helium/nft-proxy-sdk": "^0.0.12",
     "@helium/organization-sdk": "^0.0.13",
-    "@helium/position-voting-rewards-sdk": "^0.9.15",
     "@helium/price-oracle-sdk": "^0.9.15",
     "@helium/spl-utils": "^0.9.15",
     "@helium/treasury-management-sdk": "^0.9.15",

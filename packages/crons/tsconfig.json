@@ -14,9 +14,6 @@
       "path": "../no-emit-sdk"
     },
     {
-      "path": "../position-voting-rewards-sdk"
-    },
-    {
       "path": "../helium-sub-daos-sdk"
     },
     {
