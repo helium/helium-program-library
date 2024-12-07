@@ -96,7 +96,7 @@ pub fn handler(
   // That means this will emit payment from December 7 to August 1st, 2025 (because epochs are paid in arrears).
   // This is a total of 237 days. 2.9M HNT / 237 days = 12236.28691983 HNT per day.
   #[allow(clippy::inconsistent_digit_grouping)]
-  if curr_epoch * (EPOCH_LENGTH as u64) < 1754006400 {
+  if !TESTING && curr_epoch * (EPOCH_LENGTH as u64) < 1754006400 {
     ctx.accounts.dao_epoch_info.current_hnt_supply = ctx
       .accounts
       .dao_epoch_info
