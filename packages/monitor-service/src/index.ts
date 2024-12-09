@@ -110,7 +110,6 @@ async function run() {
   const mobileMint = mobile.dntMint;
   const mobileTreasury = mobile.treasury;
   const mobileRewardsEscrow = mobile.rewardsEscrow;
-
   await Recipient.sync();
   await monitorVehnt();
 
@@ -127,8 +126,11 @@ async function run() {
   await monitorTokenBalance(mobileTreasury, "mobile_treasury");
   await setTotalRewards(IOT_MINT);
   await setTotalRewards(MOBILE_MINT);
+  await setTotalRewards(HNT_MINT);
+
   const resetMobileTotal = debounce(() => setTotalRewards(MOBILE_MINT));
   const resetIotTotal = debounce(() => setTotalRewards(IOT_MINT));
+  const resetHntTotal = debounce(() => setTotalRewards(HNT_MINT));
   await monitorTokenBalance(
     iotRewardsEscrow,
     "iot_rewards_escrow",
@@ -143,6 +145,14 @@ async function run() {
     false,
     async () => {
       resetMobileTotal();
+    }
+  );
+  await monitorTokenBalance(
+    getAssociatedTokenAddressSync(hntMint, lazyDistributorKey(hntMint)[0], true),
+    "hnt_rewards_escrow",
+    false,
+    async () => {
+      resetHntTotal();
     }
   );
   await monitorTokenBalance(

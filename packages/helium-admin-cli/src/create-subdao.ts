@@ -478,7 +478,6 @@ export async function run(args: any = process.argv) {
       .accounts({
         dao,
         dntMint: subdaoKeypair.publicKey,
-        rewardsEscrow,
         hntMint: new PublicKey(argv.hntPubkey!),
         payer,
         dntMintAuthority: daoAcc.authority,

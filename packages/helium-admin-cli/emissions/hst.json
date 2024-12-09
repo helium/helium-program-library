@@ -1,14 +1,10 @@
 [
   {
-    "startTime": "2023-04-18T00:00:00Z",
-    "percent": 32
-  },
-  {
-    "startTime": "2023-08-01T00:00:00Z",
-    "percent": 31
-  },
-  {
     "startTime": "2024-08-01T00:00:01Z",
     "percent": 30
+  },
+  {
+    "startTime": "2025-08-01T00:00:01Z",
+    "percent": 0
   }
 ]

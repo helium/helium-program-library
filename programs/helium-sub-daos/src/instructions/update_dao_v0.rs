@@ -1,6 +1,7 @@
-use crate::state::*;
 use anchor_lang::prelude::*;
 use shared_utils::resize_to_fit;
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateDaoArgsV0 {

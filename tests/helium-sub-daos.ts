@@ -237,8 +237,8 @@ describe("helium-sub-daos", () => {
 
       ({
         dataCredits: { dcMint },
-        subDao: { subDao, treasury, rewardsEscrow },
-        dao: { dao },
+        subDao: { subDao, treasury },
+        dao: { dao, rewardsEscrow },
       } = await initWorld(
         provider,
         hemProgram,
@@ -482,7 +482,6 @@ describe("helium-sub-daos", () => {
               ecc,
               hotspotOwner,
             });
-          console.log("I AM ISSUING");
           const issueMethod = hemProgram.methods
             .issueEntityV0({
               entityKey: Buffer.from(bs58.decode(ecc)),
@@ -584,8 +583,7 @@ describe("helium-sub-daos", () => {
 
           const supply = (await getMint(provider.connection, hntMint)).supply;
           const veHnt = toNumber(subDaoInfo.vehntAtEpochStart, 8);
-          const totalUtility =
-            Math.max(veHnt, 1) * Math.pow(50, 1 / 4) * Math.sqrt(16) * 1;
+          const totalUtility = veHnt;
           expect(daoInfo.totalRewards.toString()).to.eq(
             EPOCH_REWARDS.toString()
           );
@@ -873,15 +871,6 @@ describe("helium-sub-daos", () => {
                 })
                 .rpc({ skipPreflight: true });
 
-              await program.methods
-                .issueHstPoolV0({
-                  epoch,
-                })
-                .accounts({
-                  dao,
-                })
-                .rpc({ skipPreflight: true });
-
               const postBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
               ).amount;
@@ -891,14 +880,13 @@ describe("helium-sub-daos", () => {
               const postHstBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(hstPool))?.data!
               ).amount;
-              expect((postBalance - preBalance).toString()).to.eq(
-                ((1 - 0.32) * EPOCH_REWARDS).toString()
+              expect(Number(postBalance - preBalance)).to.be.closeTo(
+                (1 - 0.32) * EPOCH_REWARDS * (1 - 0.06),
+                1 // Allow for 1 unit of difference to handle rounding
               );
-              expect((postHstBalance - preHstBalance).toString()).to.eq(
-                (0.32 * EPOCH_REWARDS).toString()
-              );
+              expect((postHstBalance - preHstBalance).toString()).to.eq("0");
               expect((postMobileBalance - preMobileBalance).toString()).to.eq(
-                ((SUB_DAO_EPOCH_REWARDS / 100) * 94).toString()
+                "0"
               );
 
               const acc = await program.account.subDaoEpochInfoV0.fetch(
@@ -921,7 +909,7 @@ describe("helium-sub-daos", () => {
               ]);
 
               const method = program.methods
-                .claimRewardsV0({
+                .claimRewardsV1({
                   epoch,
                 })
                 .accounts({
@@ -931,14 +919,19 @@ describe("helium-sub-daos", () => {
                 })
                 .signers([positionAuthorityKp]);
               const { delegatorAta } = await method.pubkeys();
+              const preAtaBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(delegatorAta!))?.data!
+              ).amount;
               await method.rpc({ skipPreflight: true });
 
               const postAtaBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(delegatorAta!))?.data!
               ).amount;
-              expect(Number(postAtaBalance)).to.be.within(
-                (SUB_DAO_EPOCH_REWARDS * 6) / 100 - 5,
-                (SUB_DAO_EPOCH_REWARDS * 6) / 100
+              expect(
+                Number(postAtaBalance) - Number(preAtaBalance)
+              ).to.be.within(
+                (EPOCH_REWARDS * 0.68 * 6) / 100 - 5,
+                (EPOCH_REWARDS * 0.68 * 6) / 100
               );
             });
           });
