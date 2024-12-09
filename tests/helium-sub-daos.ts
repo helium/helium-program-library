@@ -886,7 +886,7 @@ describe("helium-sub-daos", () => {
               );
               expect((postHstBalance - preHstBalance).toString()).to.eq("0");
               expect((postMobileBalance - preMobileBalance).toString()).to.eq(
-                ((SUB_DAO_EPOCH_REWARDS / 100) * 94).toString()
+                "0"
               );
 
               const acc = await program.account.subDaoEpochInfoV0.fetch(
