@@ -7,6 +7,7 @@ import { lazyDistributorResolvers } from "./resolvers";
 export { updateCompressionDestination } from "./functions/updateCompressionDestination";
 export { distributeCompressionRewards } from "./functions/distributeCompressionRewards";
 export { initializeCompressionRecipient } from "./functions/initializeCompressionRecipient";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export * from "./constants";
 export * from "./pdas";
@@ -18,7 +19,7 @@ export async function init(
   idl?: Idl | null,
 ): Promise<Program<LazyDistributor>> {
   if (!idl) {
-    idl = await Program.fetchIdl(programId, provider);
+    idl = await fetchBackwardsCompatibleIdl(programId, provider);
   }
   const lazyDistributor = new Program<LazyDistributor>(
     idl as LazyDistributor,

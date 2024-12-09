@@ -9,6 +9,7 @@ import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta, SubDaoWithMeta } from "../sdk/types";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export const useDelegatePosition = () => {
   const { provider } = useHeliumVsrState();
@@ -29,7 +30,7 @@ export const useDelegatePosition = () => {
     }) => {
       const isInvalid =
         !provider || !provider.wallet || (!position.isDelegated && !subDao);
-      const idl = await Program.fetchIdl(programId, provider);
+      const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const hsdProgram = await init(provider as any, programId, idl);
 
       if (loading) return;

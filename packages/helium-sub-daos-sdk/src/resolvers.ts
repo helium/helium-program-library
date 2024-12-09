@@ -207,18 +207,6 @@ export const heliumSubDaosResolvers = combineResolvers(
     mint: "mint",
     owner: "positionAuthority",
   }),
-  ataResolver({
-    instruction: "issueVotingRewardsV0",
-    account: "rewardsPool",
-    mint: "rewardsMint",
-    owner: "vsrEpochInfo",
-  }),
-  ataResolver({
-    instruction: "issueVotingRewardsV0",
-    account: "payerAta",
-    mint: "rewardsMint",
-    owner: "subDao",
-  }),
   resolveIndividual(async ({ args, path, accounts }) => {
     if (path[path.length - 1] == "clockwork") {
       return THREAD_PID;

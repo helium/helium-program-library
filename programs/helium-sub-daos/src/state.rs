@@ -104,6 +104,13 @@ pub struct DaoV0 {
   pub delegator_pool: Pubkey,
 }
 
+#[macro_export]
+macro_rules! dao_seeds {
+  ( $s:expr ) => {
+    &[b"dao".as_ref(), $s.hnt_mint.as_ref(), &[$s.bump_seed]]
+  };
+}
+
 #[account]
 #[derive(Default)]
 pub struct DaoEpochInfoV0 {
@@ -244,22 +251,6 @@ pub struct SubDaoV0 {
   pub onboarding_data_only_dc_fee: u64,
   pub dc_onboarding_fees_paid: u64, // the total amount of dc onboarding fees paid to this subdao by active hotspots (inactive hotspots are excluded)
   pub active_device_authority: Pubkey, // authority that can mark hotspots as active/inactive
-  pub voting_rewards_percent: u64, // number between 0 - (100_u64 * 100_000_000). The % of DNT rewards voting rewards receive with 8 decimal places of accuracy
-  pub vetoken_tracker: Pubkey,     // the vetoken tracker for subnetwork voting rewards
-}
-
-#[macro_export]
-macro_rules! sub_dao_seeds {
-  ( $s:expr ) => {
-    &[b"sub_dao".as_ref(), $s.dnt_mint.as_ref(), &[$s.bump_seed]]
-  };
-}
-
-#[macro_export]
-macro_rules! dao_seeds {
-  ( $s:expr ) => {
-    &[b"dao".as_ref(), $s.hnt_mint.as_ref(), &[$s.bump_seed]]
-  };
 }
 
 #[cfg(test)]

@@ -14,8 +14,6 @@ import { handleAccountWebhook } from "../utils/handleAccountWebhook";
 import { handleTransactionWebhook } from "../utils/handleTransactionWebhook";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
-const RECONNECT_DELAY = 5000; // 5 seconds
-
 export const setupYellowstone = async (
   server: FastifyInstance,
   configs: IConfig[]
@@ -167,7 +165,9 @@ export const setupYellowstone = async (
     console.log(
       `Attempting to reconnect (attempt ${nextAttempt} of ${MAX_RECONNECT_ATTEMPTS})...`
     );
-    setTimeout(() => connect(nextAttempt), RECONNECT_DELAY);
+
+    const delay = nextAttempt === 1 ? 0 : 1000;
+    setTimeout(() => connect(nextAttempt), delay);
   };
 
   await connect();

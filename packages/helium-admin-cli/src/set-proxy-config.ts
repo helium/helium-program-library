@@ -92,10 +92,7 @@ export async function run(args: any = process.argv) {
     provider,
     instructions: [
       await vsrProgram.methods
-        .updateRegistrarV0({
-          positionFreezeAuthorities: [],
-          positionUpdateAuthority: null,
-        })
+        .updateRegistrarV0()
         .accounts({
           proxyConfig,
           registrar,

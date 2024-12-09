@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use circuit_breaker::{
@@ -45,7 +47,7 @@ pub struct IssueRewardsV0<'info> {
     has_one = sub_dao,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump = sub_dao_epoch_info.bump_seed,
-    constraint = TESTING || sub_dao_epoch_info.rewards_issued_at.is_none() @ ErrorCode::RewardsAlreadyIssued
+    constraint = TESTING || sub_dao_epoch_info.rewards_issued_at.is_none()
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   #[account(
@@ -136,7 +138,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .unwrap();
   let total_rewards = PreciseNumber::new(emissions.into()).or_arith_error()?;
   let rewards_prec = percent_share.checked_mul(&total_rewards).or_arith_error()?;
-  let rewards_amount: u64 = rewards_prec
+  let mut rewards_amount: u64 = rewards_prec
     .floor() // Ensure we never overspend the defined rewards
     .or_arith_error()?
     .to_imprecise()
@@ -169,12 +171,24 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
 
   let escrow_amount = rewards_amount - delegation_rewards_amount;
   msg!("Minting {} to treasury", escrow_amount);
+  // Until August 1st, 2025, emit the 2.9M HNT to the treasury.
+  // This contract will be deployed between December 6 and December 7 at UTC midnight.
+  // That means this will emit payment from December 7 to August 1st, 2025 (because epochs are paid in arrears).
+  // This is a total of 237 days. 2.9M HNT / 237 days = 12236.28691983 HNT per day.
+  #[allow(clippy::inconsistent_digit_grouping)]
+  if epoch_curr_ts < 1754006400
+    && ctx.accounts.dnt_mint.key()
+      == Pubkey::from_str("mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6").unwrap()
+  {
+    rewards_amount += 12_236_28691983;
+  }
+
+  msg!("Minting {} to treasury", rewards_amount);
   mint_v0(
-    ctx.accounts.mint_treasury_emissions_ctx().with_signer(&[&[
-      b"dao",
-      ctx.accounts.hnt_mint.key().as_ref(),
-      &[ctx.accounts.dao.bump_seed],
-    ]]),
+    ctx
+      .accounts
+      .mint_treasury_emissions_ctx()
+      .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
     MintArgsV0 {
       amount: escrow_amount,
     },

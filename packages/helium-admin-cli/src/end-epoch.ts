@@ -6,16 +6,12 @@ import {
   init as initDao,
 } from "@helium/helium-sub-daos-sdk";
 import * as anchor from "@coral-xyz/anchor";
-import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
 import b58 from "bs58";
 import os from "os";
 import yargs from "yargs/yargs";
 import { sendInstructionsWithPriorityFee } from "@helium/spl-utils";
-import {
-  init as initPVR,
-  vsrEpochInfoKey,
-} from "@helium/position-voting-rewards-sdk";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -46,7 +42,6 @@ export async function run(args: any = process.argv) {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const heliumSubDaosProgram = await initDao(provider);
-  const pvrProgram = await initPVR(provider);
   const hntMint = new PublicKey(argv.hntMint!);
   const dao = await daoKey(hntMint)[0];
   const subdaos = await heliumSubDaosProgram.account.subDaoV0.all([
@@ -108,35 +103,9 @@ export async function run(args: any = process.argv) {
             }`
           );
         }
-
-        const hasVeTokenTracker = !subDao.account.vetokenTracker.equals(
-          PublicKey.default
-        );
-        if (hasVeTokenTracker) {
-          const [vsrEpoch] = vsrEpochInfoKey(
-            subDao.account.vetokenTracker,
-            targetTs
-          );
-          const vsrEpochInfo =
-            await pvrProgram.account.vsrEpochInfoV0.fetchNullable(vsrEpoch);
-          if (!vsrEpochInfo || !vsrEpochInfo.rewardsIssuedAt) {
-            try {
-              await sendInstructionsWithPriorityFee(provider, [
-                await heliumSubDaosProgram.methods
-                  .issueVotingRewardsV0({ epoch })
-                  .accounts({ subDao: subDao.publicKey, vsrEpochInfo: vsrEpoch })
-                  .instruction(),
-              ]);
-            } catch (err: any) {
-              console.log(
-                `Failed to issue voting rewards for ${subDao.account.dntMint.toBase58()}: ${err}`
-              );
-            }
-          }
-        }
       }
-    }
 
-    targetTs = targetTs.add(new BN(EPOCH_LENGTH));
+      targetTs = targetTs.add(new BN(EPOCH_LENGTH));
+    }
   }
 }

@@ -13,8 +13,6 @@ import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
 import { toU128 } from "../../packages/treasury-management-sdk/src";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { DC_FEE } from "./fixtures";
-import { initVsr } from "./vsr";
-import { VoterStakeRegistry } from "../../target/types/voter_stake_registry";
 
 export async function initTestDao(
   program: anchor.Program<HeliumSubDaos>,
@@ -93,32 +91,21 @@ export async function initTestDao(
   };
 }
 
-export async function initTestSubdao({
-  hsdProgram,
-  vsrProgram,
-  provider,
-  authority,
-  dao,
-  epochRewards,
-  registrar,
-  numTokens,
-  activeDeviceAuthority,
-}: {
-  hsdProgram: anchor.Program<HeliumSubDaos>;
-  vsrProgram: anchor.Program<VoterStakeRegistry>;
-  provider: anchor.AnchorProvider;
-  authority: PublicKey;
-  dao: PublicKey;
-  epochRewards?: number;
-  registrar?: PublicKey;
-  numTokens?: number | BN;
-  activeDeviceAuthority?: PublicKey;
+export async function initTestSubdao(
+  {hsdProgram, provider, authority, dao, epochRewards, registrar, numTokens, activeDeviceAuthority}: {
+  hsdProgram: anchor.Program<HeliumSubDaos>,
+  provider: anchor.AnchorProvider,
+  authority: PublicKey,
+  dao: PublicKey,
+  epochRewards?: number,
+  registrar?: PublicKey,
+  numTokens?: number | BN,
+  activeDeviceAuthority?: PublicKey,
 }): Promise<{
   mint: PublicKey;
   subDao: PublicKey;
   treasury: PublicKey;
   treasuryCircuitBreaker: PublicKey;
-  subDaoRegistrar: PublicKey;
 }> {
   const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
   const dntMint = await createMint(provider, 8, authority, authority);
@@ -126,17 +113,6 @@ export async function initTestSubdao({
     await createAtaAndMint(provider, dntMint, numTokens, authority);
   }
   const subDao = subDaoKey(dntMint)[0];
-  if (!registrar) {
-    ({ registrar } = await initVsr(
-      vsrProgram,
-      provider,
-      authority,
-      dntMint,
-      subDao,
-      0,
-      3
-    ));
-  }
 
   const method = hsdProgram.methods
     .initializeSubDaoV0({
@@ -174,6 +150,7 @@ export async function initTestSubdao({
     mint: dntMint,
     subDao: subDao!,
     treasury: treasury!,
-    subDaoRegistrar: registrar!,
+    rewardsEscrow,
+    delegatorPool: delegatorPool!,
   };
 }

@@ -69,7 +69,6 @@ pub const fn ln2hi() -> InnerUint {
   U192([13974485815783726801_u64, 3_u64, 0_u64])
 }
 pub const LN2HI: PreciseNumber = PreciseNumber { value: ln2hi() };
-
 #[inline]
 pub const fn ln2hi_scale() -> InnerUint {
   U192([7766279631452241920_u64, 5_u64, 0_u64])
@@ -328,7 +327,7 @@ impl PreciseNumber {
         Some((frac, -bits))
       }
     } else {
-      let bits = 128_i64.checked_sub(i64::from(self.to_imprecise()?.leading_zeros()))?;
+      let bits = (128_i64).checked_sub(i64::from(self.to_imprecise()?.leading_zeros()))?;
       let frac = PreciseNumber {
         value: self.value >> bits,
       };
@@ -441,7 +440,7 @@ impl PreciseNumber {
 
     let f = f1.signed().checked_sub(&PreciseNumber::one().signed())?;
 
-    let s_divisor = PreciseNumber { value: two() }.signed().checked_add(&f)?;
+    let s_divisor = (PreciseNumber { value: two() }).signed().checked_add(&f)?;
     let s = &f.checked_div(&s_divisor)?;
     let s2 = s.checked_mul(s)?.value;
     let s4 = s2.checked_mul(&s2)?;
@@ -457,7 +456,7 @@ impl PreciseNumber {
     let r = t1.checked_add(&t2)?;
     let hfsq = f
       .checked_mul(&f)?
-      .checked_div(&PreciseNumber { value: two() }.signed())?;
+      .checked_div(&(PreciseNumber { value: two() }).signed())?;
     let k = SignedPreciseNumber {
       value: PreciseNumber::new(u128::try_from(ki.abs()).ok()?)?,
       is_negative: ki < 0,

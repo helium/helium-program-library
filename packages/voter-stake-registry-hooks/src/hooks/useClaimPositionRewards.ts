@@ -1,5 +1,4 @@
 import { PROGRAM_ID } from "@helium/helium-sub-daos-sdk";
-import { PROGRAM_ID as PVR_PROGRAM_ID } from "@helium/position-voting-rewards-sdk";
 import { Status, batchSequentialParallelInstructions } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
@@ -9,19 +8,17 @@ import { PositionWithMeta } from "../sdk/types";
 import { formPositionClaims } from "../utils/formPositionClaims";
 
 export const useClaimPositionRewards = () => {
-  const { provider, unixNow } = useHeliumVsrState();
+  const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,
       programId = PROGRAM_ID,
-      pvrProgramId = PVR_PROGRAM_ID,
       onProgress,
       onInstructions,
       maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
     }: {
       position: PositionWithMeta;
       programId?: PublicKey;
-      pvrProgramId?: PublicKey;
       onProgress?: (status: Status) => void;
       // Instead of sending the transaction, let the caller decide
       onInstructions?: (
@@ -39,7 +36,6 @@ export const useClaimPositionRewards = () => {
           provider,
           positions: [position],
           hsdProgramId: programId,
-          pvrProgramId: pvrProgramId,
         });
 
         if (onInstructions) {

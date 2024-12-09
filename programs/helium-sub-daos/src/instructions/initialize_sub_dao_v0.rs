@@ -179,8 +179,6 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     onboarding_data_only_dc_fee: args.onboarding_data_only_dc_fee,
     active_device_authority: args.active_device_authority,
     dc_onboarding_fees_paid: 0,
-    voting_rewards_percent: 0,
-    vetoken_tracker: Pubkey::default(),
   });
 
   resize_to_fit(
