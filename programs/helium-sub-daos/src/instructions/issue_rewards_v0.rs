@@ -168,7 +168,6 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     )?;
   }
 
-  let escrow_amount = rewards_amount - delegation_rewards_amount;
   // Until August 1st, 2025, emit the 2.9M HNT to the treasury.
   // This contract will be deployed between December 6 and December 7 at UTC midnight.
   // That means this will emit payment from December 7 to August 1st, 2025 (because epochs are paid in arrears).
@@ -190,6 +189,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     )?;
   }
 
+  let escrow_amount = rewards_amount - delegation_rewards_amount;
   msg!("Minting {} to treasury", escrow_amount);
   mint_v0(
     ctx
