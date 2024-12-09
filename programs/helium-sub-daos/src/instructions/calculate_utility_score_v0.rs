@@ -92,11 +92,26 @@ pub fn handler(
       ctx.accounts.dao.net_emissions_cap,
     ))
     .unwrap();
+
   ctx.accounts.dao_epoch_info.epoch = args.epoch;
 
   ctx.accounts.dao_epoch_info.current_hnt_supply = curr_supply
     .checked_add(ctx.accounts.dao_epoch_info.total_rewards)
     .unwrap();
+
+  // Until August 1st, 2025, emit the 2.9M HNT to the treasury.
+  // This contract will be deployed between December 6 and December 7 at UTC midnight.
+  // That means this will emit payment from December 7 to August 1st, 2025 (because epochs are paid in arrears).
+  // This is a total of 237 days. 2.9M HNT / 237 days = 12236.28691983 HNT per day.
+  #[allow(clippy::inconsistent_digit_grouping)]
+  if !TESTING && curr_epoch * (EPOCH_LENGTH as u64) < 1754006400 {
+    ctx.accounts.dao_epoch_info.current_hnt_supply = ctx
+      .accounts
+      .dao_epoch_info
+      .current_hnt_supply
+      .checked_add(12_236_28691983)
+      .unwrap();
+  }
 
   if !TESTING && args.epoch >= curr_epoch {
     return Err(error!(ErrorCode::EpochNotOver));

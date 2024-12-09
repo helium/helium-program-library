@@ -138,7 +138,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .unwrap();
   let total_rewards = PreciseNumber::new(emissions.into()).or_arith_error()?;
   let rewards_prec = percent_share.checked_mul(&total_rewards).or_arith_error()?;
-  let mut rewards_amount: u64 = rewards_prec
+  let rewards_amount: u64 = rewards_prec
     .floor() // Ensure we never overspend the defined rewards
     .or_arith_error()?
     .to_imprecise()
@@ -178,7 +178,16 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     && ctx.accounts.dnt_mint.key()
       == Pubkey::from_str("mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6").unwrap()
   {
-    rewards_amount += 12_236_28691983;
+    msg!("Minting HIP-138 HNT to MOBILE treasury");
+    mint_v0(
+      ctx
+        .accounts
+        .mint_treasury_emissions_ctx()
+        .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
+      MintArgsV0 {
+        amount: 12_236_28691983,
+      },
+    )?;
   }
 
   msg!("Minting {} to treasury", escrow_amount);

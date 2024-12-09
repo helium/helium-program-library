@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.9.15",
+  "version": "0.9.16",
   "description": "API for helium vote",
   "repository": {
     "type": "git",
@@ -34,9 +34,9 @@
   "dependencies": {
     "@fastify/cors": "^8.1.1",
     "@fastify/static": "^6",
-    "@helium/organization-sdk": "^0.0.12",
-    "@helium/spl-utils": "^0.9.15",
-    "@helium/voter-stake-registry-sdk": "^0.9.15",
+    "@helium/organization-sdk": "^0.0.15",
+    "@helium/spl-utils": "^0.9.16",
+    "@helium/voter-stake-registry-sdk": "^0.9.16",
     "@solana/web3.js": "^1.78.8",
     "aws-sdk": "^2.1650.0",
     "dotenv": "^16.0.3",
