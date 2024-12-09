@@ -361,7 +361,6 @@ export const initWorld = async (
     authority: provider.wallet.publicKey,
     dao: dao.dao,
     epochRewards: subDaoEpochRewards,
-    registrar: subDaoRegistrar,
     // Enough to stake 4 makers
     numTokens: MAKER_STAKING_FEE.mul(new anchor.BN(4)),
   });

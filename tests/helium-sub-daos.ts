@@ -237,7 +237,7 @@ describe("helium-sub-daos", () => {
 
       ({
         dataCredits: { dcMint },
-        subDao: { subDao, treasury, mint: dntMint },
+        subDao: { subDao, treasury },
         dao: { dao, rewardsEscrow },
       } = await initWorld(
         provider,

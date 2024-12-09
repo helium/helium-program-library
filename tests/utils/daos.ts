@@ -150,7 +150,5 @@ export async function initTestSubdao(
     mint: dntMint,
     subDao: subDao!,
     treasury: treasury!,
-    rewardsEscrow,
-    delegatorPool: delegatorPool!,
   };
 }
