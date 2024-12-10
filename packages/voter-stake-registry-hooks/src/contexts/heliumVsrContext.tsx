@@ -17,7 +17,7 @@ import { usePositions } from "../hooks/usePositions";
 import { useRegistrar } from "../hooks/useRegistrar";
 import { PositionWithMeta, ProxyAssignmentV0 } from "../sdk/types";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
-import { useRegistrarForMint } from "..";
+import { useRegistrarForMint } from "../hooks/useRegistrarForMint";
 
 type Registrar = IdlAccounts<VoterStakeRegistry>["registrar"];
 
