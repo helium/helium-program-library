@@ -233,6 +233,17 @@ export class OracleServer {
   private addRoutes() {
     this.app.get("/active-devices", this.getActiveDevicesHandler.bind(this));
     this.app.post("/bulk-rewards", this.getAllRewardsHandler.bind(this));
+    this.app.get(
+      "/will-pay-recipient",
+      (
+        _req: FastifyRequest<{ Body: { entityKeys: string[] } }>,
+        res: FastifyReply
+      ) => {
+        res.send({
+          willPay: process.env.WILL_PAY_RECIPIENT === "true",
+        });
+      }
+    );
     this.app.get<{
       Querystring: {
         assetId?: string;
@@ -361,6 +372,10 @@ export class OracleServer {
       initCompressionRecipientTx.accounts.findIndex(
         (x) => x.name === "lazyDistributor"
       )!;
+    const payerIdxInitCompressionRecipient =
+      initCompressionRecipientTx.accounts.findIndex(
+        (x) => x.name === "payer"
+      )!;
     const mintIdx = initRecipientTx.accounts.findIndex(
       (x) => x.name === "mint"
     )!;
@@ -443,6 +458,15 @@ export class OracleServer {
           allAccs[ix.accountKeyIndexes[lazyDistributorIdxInitCompressionRecipient]].toBase58();
         const merkleTree =
           allAccs[ix.accountKeyIndexes[merkleTreeIdxInitCompressionRecipient]];
+        const payer =
+          allAccs[ix.accountKeyIndexes[payerIdxInitCompressionRecipient]].toBase58();
+
+        if (process.env.WILL_PAY_RECIPIENT !== "true" && payer === this.oracle.publicKey.toBase58()) {
+          return {
+            success: false,
+            message: "Cannot set this oracle as the payer",
+          };
+        }
 
         const index = (decoded.data as any).args.index;
         recipientToLazyDistToMint[recipient][lazyDist] = await getLeafAssetId(

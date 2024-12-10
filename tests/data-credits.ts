@@ -169,6 +169,12 @@ describe("data-credits", () => {
           daoKey(hntMint)[0]
         )
       ).registrar;
+      const rewardsEscrow = await createAtaAndMint(
+        provider,
+        hntMint,
+        0,
+        provider.wallet.publicKey
+      );
       const method = await hsdProgram.methods
         .initializeDaoV0({
           authority: me,
@@ -197,6 +203,7 @@ describe("data-credits", () => {
         ])
         .accounts({
           dcMint,
+          rewardsEscrow,
           hntMint,
           hstPool: await getAssociatedTokenAddress(hntMint, me),
         });
