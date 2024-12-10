@@ -422,7 +422,7 @@ export async function sus({
           });
         }
 
-        // Catch malicious sol ownwer change
+        // Catch malicious sol owner change
         const sysProg = new PublicKey("11111111111111111111111111111111");
         const postOwner = acc.post.account?.owner || sysProg;
         const preOwner = acc.pre.account?.owner || sysProg;

@@ -97,7 +97,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
               if (marker && canRelinquishVote) {
                 if (position.isProxiedToMe) {
                   if (marker.proxyIndex < (position.proxy?.index || 0)) {
-                    // Do not vote with a position that has been delegated to us, but voting overidden
+                    // Do not vote with a position that has been delegated to us, but voting overridden
                     return;
                   }
 

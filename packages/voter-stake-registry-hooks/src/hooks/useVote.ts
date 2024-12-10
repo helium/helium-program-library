@@ -167,7 +167,7 @@ export const useVote = (proposalKey: PublicKey) => {
                     (marker.proxyIndex < (position.proxy?.index || 0) ||
                       marker.choices.includes(choice))
                   ) {
-                    // Do not vote with a position that has been delegated to us, but voting overidden
+                    // Do not vote with a position that has been delegated to us, but voting overridden
                     // Also ignore voting for the same choice twice
                     return;
                   }
