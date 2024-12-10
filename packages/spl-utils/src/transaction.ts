@@ -561,7 +561,7 @@ export async function bulkSendTransactions(
   return ret;
 }
 
-// Returns the list of succesfully sent txns
+// Returns the list of successfully sent txns
 // NOTE: The return signatures are ordered by confirmation, not by order they are passed
 // This list should be in order. Seom txns may fail
 // due to blockhash exp
