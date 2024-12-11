@@ -6,9 +6,11 @@ import {
 } from "@helium/anchor-resolvers";
 import { treasuryManagementResolvers } from "@helium/treasury-management-sdk";
 import { init, PROGRAM_ID as VSR_PROGRAM_ID, vsrResolvers } from "@helium/voter-stake-registry-sdk";
-import { AnchorProvider, Provider } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Provider } from "@coral-xyz/anchor";
 import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { EPOCH_LENGTH, PROGRAM_ID } from "./constants";
+import { init as initNftProxy } from "@helium/nft-proxy-sdk";
+import { init as initHsd } from "./init";
 import { daoEpochInfoKey, subDaoEpochInfoKey } from "./pdas";
 
 const THREAD_PID = new PublicKey(
@@ -87,6 +89,8 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
         provider as AnchorProvider,
         VSR_PROGRAM_ID,
       );
+      const hsdProgram = await initHsd(provider as AnchorProvider);
+      const nftProxyProgram = await initNftProxy(provider as AnchorProvider);
 
       const subDao = get(accounts, [
         ...path.slice(0, path.length - 1),
@@ -96,13 +100,30 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
         ...path.slice(0, path.length - 1),
         "position",
       ]) as PublicKey;
+      const proxyConfig = get(accounts, [
+        ...path.slice(0, path.length - 1),
+        "proxyConfig",
+      ]) as PublicKey;
+      const delegatedPosition = get(accounts, [
+        ...path.slice(0, path.length - 1),
+        "delegatedPosition",
+      ]) as PublicKey;
       const positionAcc = position && await program.account.positionV0.fetch(
         position
       );
-      if (positionAcc) {
+      const delegatedPositionAcc = delegatedPosition && await hsdProgram.account.delegatedPositionV0.fetchNullable(delegatedPosition);
+      const proxyConfigAcc = proxyConfig && await nftProxyProgram.account.proxyConfigV0.fetch(proxyConfig);
+      const now = await getSolanaUnixTimestamp(provider);
+      if (positionAcc && (proxyConfigAcc || delegatedPositionAcc)) {
+        const expirationTs =
+          !delegatedPositionAcc || delegatedPositionAcc.expirationTs.isZero()
+            ? proxyConfigAcc?.seasons.find((s) =>
+                new BN(now.toString()).gte(s.start)
+              )?.end || positionAcc.lockup.endTs
+            : delegatedPositionAcc.expirationTs;
         const [key] = await subDaoEpochInfoKey(
           subDao,
-          positionAcc.lockup.endTs,
+          bnMin(positionAcc.lockup.endTs, expirationTs)
         );
 
         return key;
@@ -219,3 +240,7 @@ export const heliumSubDaosResolvers = combineResolvers(
   }),
   vsrResolvers
 );
+function bnMin(a: BN, b: BN): BN {
+  return a.lt(b) ? a : b;
+}
+

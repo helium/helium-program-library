@@ -30,9 +30,11 @@ import { daoKey } from "../packages/helium-sub-daos-sdk/src";
 import { toBN, toNumber } from "../packages/spl-utils/src";
 import * as vsr from "../packages/voter-stake-registry-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
+import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestSubdao } from "./utils/daos";
 import { ensureHSDIdl, ensureVSRIdl } from "./utils/fixtures";
+import { init as initNftProxy } from "@helium/nft-proxy-sdk";
 import { initVsr } from "./utils/vsr";
 
 const EPOCH_REWARDS = 100000000;
@@ -77,6 +79,7 @@ describe("data-credits", () => {
   let program: Program<DataCredits>;
   let hsdProgram: Program<HeliumSubDaos>;
   let vsrProgram: Program<VoterStakeRegistry>;
+  let nftProxyProgram: Program<NftProxy>;
   let pythProgram: Program<PythSolanaReceiverProgram>;
   let dcKey: PublicKey;
   let hntMint: PublicKey;
@@ -108,6 +111,7 @@ describe("data-credits", () => {
       vsr.PROGRAM_ID,
       anchor.workspace.VoterStakeRegistry.idl
     );
+    nftProxyProgram = await initNftProxy(provider);
     ensureVSRIdl(vsrProgram);
     // fresh start
     hntMint = await createMint(provider, hntDecimals, me, me);
@@ -163,6 +167,7 @@ describe("data-credits", () => {
       const registrar = (
         await initVsr(
           vsrProgram,
+          nftProxyProgram,
           provider,
           provider.wallet.publicKey,
           hntMint,

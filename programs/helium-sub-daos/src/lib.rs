@@ -135,4 +135,8 @@ pub mod helium_sub_daos {
   pub fn initialize_hnt_delegator_pool(ctx: Context<InitializeHntDelegatorPool>) -> Result<()> {
     initialize_hnt_delegator_pool::handler(ctx)
   }
+
+  pub fn add_expiration_ts(ctx: Context<AddExpirationTs>) -> Result<()> {
+    add_expiration_ts::handler(ctx)
+  }
 }

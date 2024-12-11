@@ -149,6 +149,7 @@ pub struct DelegatedPositionV0 {
   // This bitmap gets rotated as last_claimed_epoch increases.
   // This allows for claiming ~128 epochs worth of rewards in parallel.
   pub claimed_epochs_bitmap: u128,
+  pub expiration_ts: i64,
 }
 
 impl DelegatedPositionV0 {
