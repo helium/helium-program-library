@@ -185,6 +185,7 @@ impl Delegated {
         position.delegated_position.start_ts,
         &position.position,
         &voting_mint_config,
+        position.delegated_position.expiration_ts
       )?;
       let vehnt = position
         .position
