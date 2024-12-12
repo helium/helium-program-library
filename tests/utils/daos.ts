@@ -46,6 +46,7 @@ export async function initTestDao(
 
   const method = await program.methods
     .initializeDaoV0({
+      delegatorRewardsPercent: delegatorRewardsPercent(6), // 6%
       registrar: registrar || Keypair.generate().publicKey,
       authority: authority,
       netEmissionsCap: toBN(34.24, 8),
@@ -61,7 +62,7 @@ export async function initTestDao(
           percent: 32,
         },
       ],
-      proposalNamespace: me
+      proposalNamespace: me,
     })
     .preInstructions([
       createAssociatedTokenAccountIdempotentInstruction(
@@ -133,7 +134,6 @@ export async function initTestSubdao(
         },
       } as any,
       dcBurnAuthority: authority,
-      delegatorRewardsPercent: delegatorRewardsPercent(6), // 6%
       activeDeviceAuthority: activeDeviceAuthority || authority,
     })
     .preInstructions([

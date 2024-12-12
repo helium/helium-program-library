@@ -12,7 +12,7 @@ import {
   dataOnlyConfigKey,
   init as initHem,
 } from "@helium/helium-entity-manager-sdk";
-import { daoKey, init as initDao } from "@helium/helium-sub-daos-sdk";
+import { daoKey, delegatorRewardsPercent, init as initDao } from "@helium/helium-sub-daos-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import {
   init as initVsr,
@@ -95,6 +95,12 @@ export async function run(args: any = process.argv) {
       type: "string",
       describe: "Keypair of the Data Credit token",
       default: `${__dirname}/../../keypairs/dc.json`,
+    },
+    delegatorRewardsPercent: {
+      type: "number",
+      required: true,
+      describe:
+        "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
     },
     numHnt: {
       type: "number",
@@ -505,6 +511,7 @@ export async function run(args: any = process.argv) {
         hstEmissionSchedule: [currentHstEmission],
         emissionSchedule: [currentHntEmission],
         proposalNamespace: organizationKey("Helium")[0],
+        delegatorRewardsPercent: delegatorRewardsPercent(argv.delegatorRewardsPercent),
       })
       .preInstructions([
         ...(ldExists ? [] : [initLazyDist]),
@@ -534,6 +541,7 @@ export async function run(args: any = process.argv) {
             hstPool: null,
             netEmissionsCap: null,
             proposalNamespace: organizationKey("Helium")[0],
+            delegatorRewardsPercent: delegatorRewardsPercent(argv.delegatorRewardsPercent),
           })
           .accounts({
             dao,

@@ -10,7 +10,6 @@ import {
   init as initDao,
   subDaoKey,
   threadKey,
-  delegatorRewardsPercent,
 } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
@@ -173,12 +172,6 @@ export async function run(args: any = process.argv) {
       type: "number",
       describe: "Authority index for squads. Defaults to 1",
       default: 1,
-    },
-    delegatorRewardsPercent: {
-      type: "number",
-      required: true,
-      describe:
-        "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
     },
     emissionSchedulePath: {
       required: true,
@@ -468,9 +461,6 @@ export async function run(args: any = process.argv) {
           name.toUpperCase() == "IOT" ? toBN(4000000, 0) : toBN(0, 0),
         onboardingDataOnlyDcFee:
           name.toUpperCase() == "IOT" ? toBN(1000000, 0) : toBN(0, 0),
-        delegatorRewardsPercent: delegatorRewardsPercent(
-          argv.delegatorRewardsPercent
-        ),
         activeDeviceAuthority: argv.activeDeviceAuthority
           ? new PublicKey(argv.activeDeviceAuthority)
           : authority,
@@ -517,7 +507,6 @@ export async function run(args: any = process.argv) {
             onboardingDcFee: null,
             onboardingDataOnlyDcFee: null,
             registrar: null,
-            delegatorRewardsPercent: null,
             activeDeviceAuthority: null,
           })
           .accounts({

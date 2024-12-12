@@ -2,6 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { init as initLazy } from "@helium/lazy-distributor-sdk";
 import {
   daoKey,
+  delegatorRewardsPercent,
   init as initHsd,
   subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
@@ -159,6 +160,7 @@ export async function run(args: any = process.argv) {
         netEmissionsCap: null,
         hstPool: null,
         proposalNamespace: organizationKey("Helium")[0],
+        delegatorRewardsPercent: delegatorRewardsPercent(6),
       })
       .accounts({
         dao,

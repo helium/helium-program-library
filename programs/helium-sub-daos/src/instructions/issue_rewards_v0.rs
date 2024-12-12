@@ -148,7 +148,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   let max_percent = 100_u64.checked_mul(10_0000000).unwrap();
 
   let delegation_rewards_amount = (rewards_amount as u128)
-    .checked_mul(u128::from(ctx.accounts.sub_dao.delegator_rewards_percent))
+    .checked_mul(u128::from(ctx.accounts.dao.delegator_rewards_percent))
     .unwrap()
     .checked_div(max_percent as u128) // 100% with 2 decimals accuracy
     .unwrap()

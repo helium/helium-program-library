@@ -11,6 +11,7 @@ pub struct UpdateDaoArgsV0 {
   pub hst_pool: Option<Pubkey>,
   pub net_emissions_cap: Option<u64>,
   pub proposal_namespace: Option<Pubkey>,
+  pub delegator_rewards_percent: Option<u64>,
 }
 
 #[derive(Accounts)]
@@ -55,6 +56,14 @@ pub fn handler(ctx: Context<UpdateDaoV0>, args: UpdateDaoArgsV0) -> Result<()> {
 
   if let Some(proposal_namespace) = args.proposal_namespace {
     ctx.accounts.dao.proposal_namespace = proposal_namespace;
+  }
+
+  if let Some(delegator_rewards_percent) = args.delegator_rewards_percent {
+    require_gte!(
+      100_u64.checked_mul(10_0000000).unwrap(),
+      delegator_rewards_percent,
+    );
+    ctx.accounts.dao.delegator_rewards_percent = delegator_rewards_percent;
   }
 
   if should_resize {

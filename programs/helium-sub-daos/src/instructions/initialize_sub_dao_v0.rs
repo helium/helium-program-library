@@ -46,7 +46,6 @@ pub struct InitializeSubDaoArgsV0 {
   /// Authority to burn delegated data credits
   pub dc_burn_authority: Pubkey,
   pub registrar: Pubkey,
-  pub delegator_rewards_percent: u64,
   pub onboarding_data_only_dc_fee: u64,
   pub active_device_authority: Pubkey,
 }
@@ -154,10 +153,6 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     Some(ctx.accounts.sub_dao.key()),
   )?;
 
-  require_gte!(
-    100_u64.checked_mul(10_0000000).unwrap(),
-    args.delegator_rewards_percent,
-  );
   ctx.accounts.dao.num_sub_daos += 1;
   ctx.accounts.sub_dao.set_inner(SubDaoV0 {
     _deprecated_active_device_aggregator: Pubkey::default(),
@@ -175,7 +170,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     vehnt_last_calculated_ts: Clock::get()?.unix_timestamp,
     vehnt_fall_rate: 0,
     delegator_pool: Pubkey::default(),
-    delegator_rewards_percent: args.delegator_rewards_percent,
+    _deprecated_delegator_rewards_percent: 0,
     onboarding_data_only_dc_fee: args.onboarding_data_only_dc_fee,
     active_device_authority: args.active_device_authority,
     dc_onboarding_fees_paid: 0,

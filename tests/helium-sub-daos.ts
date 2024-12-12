@@ -297,7 +297,6 @@ describe("helium-sub-daos", () => {
           onboardingDcFee: null,
           onboardingDataOnlyDcFee: null,
           registrar: null,
-          delegatorRewardsPercent: null,
           activeDeviceAuthority: null,
         })
         .accounts({

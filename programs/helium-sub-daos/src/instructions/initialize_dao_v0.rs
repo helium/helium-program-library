@@ -27,6 +27,7 @@ pub struct InitializeDaoArgsV0 {
   pub net_emissions_cap: u64,
   pub registrar: Pubkey,
   pub proposal_namespace: Pubkey,
+  pub delegator_rewards_percent: u64,
 }
 
 #[derive(Accounts)]
@@ -86,7 +87,12 @@ pub struct InitializeDaoV0<'info> {
 }
 
 pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Result<()> {
+  require_gte!(
+    100_u64.checked_mul(10_0000000).unwrap(),
+    args.delegator_rewards_percent,
+  );
   ctx.accounts.dao.set_inner(DaoV0 {
+    delegator_rewards_percent: args.delegator_rewards_percent,
     hst_emission_schedule: args.hst_emission_schedule,
     dc_mint: ctx.accounts.dc_mint.key(),
     hnt_mint: ctx.accounts.hnt_mint.key(),
