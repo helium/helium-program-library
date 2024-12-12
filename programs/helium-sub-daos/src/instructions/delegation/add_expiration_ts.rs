@@ -1,4 +1,4 @@
-use std::{i64, str::FromStr};
+use std::{cmp::min, str::FromStr};
 
 use anchor_lang::prelude::*;
 use nft_proxy::ProxyConfigV0;
@@ -57,7 +57,7 @@ pub struct AddExpirationTs<'info> {
     payer = payer,
     space = SubDaoEpochInfoV0::SIZE,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(
-        proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end
+        min(proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end, position.lockup.end_ts)
     ).to_le_bytes()],
     bump,
   )]

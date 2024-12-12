@@ -205,6 +205,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.9.18
     "@helium/circuit-breaker-sdk": ^0.9.18
+    "@helium/nft-proxy-sdk": ^0.0.15
     "@helium/spl-utils": ^0.9.18
     "@helium/treasury-management-sdk": ^0.9.18
     "@helium/voter-stake-registry-sdk": ^0.9.18

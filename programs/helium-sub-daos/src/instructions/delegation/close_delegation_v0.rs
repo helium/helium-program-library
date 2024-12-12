@@ -2,7 +2,6 @@ use std::cmp::min;
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
-use nft_proxy::ProxyConfigV0;
 use voter_stake_registry::{
   state::{LockupKind, PositionV0, Registrar},
   VoterStakeRegistry,
