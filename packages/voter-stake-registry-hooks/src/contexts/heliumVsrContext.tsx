@@ -17,7 +17,7 @@ import { usePositions } from "../hooks/usePositions";
 import { useRegistrar } from "../hooks/useRegistrar";
 import { PositionWithMeta, ProxyAssignmentV0 } from "../sdk/types";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
-import { useRegistrarForMint } from "..";
+import { useRegistrarForMint } from "../hooks/useRegistrarForMint";
 
 type Registrar = IdlAccounts<VoterStakeRegistry>["registrar"];
 
@@ -187,15 +187,19 @@ export const HeliumVsrStateProvider: React.FC<{
               const delegatedSubDao = isDelegated
                 ? delegatedAccounts[idx]?.info?.subDao
                 : null;
+
               if (isDelegated) {
                 const epoch = delegatedAccounts[
                   idx
                 ]!.info!.lastClaimedEpoch.add(new BN(1));
+
                 const epochsCount = isDecayed
                   ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
                   : currentEpoch.sub(epoch).toNumber();
 
-                hasRewards = epochsCount > 0;
+                hasRewards =
+                  epochsCount > 0 &&
+                  !(isDecayed && decayedEpoch.eq(currentEpoch));
               }
 
               const posVotingPower = calcPositionVotingPower({
