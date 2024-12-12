@@ -20,7 +20,7 @@ impl ProxyConfigV0 {
       if let Some(current) = self.seasons.get(middle) {
         // Move to the right side if target time is greater
         if current.start <= unix_time {
-          ans = Some(current.clone());
+          ans = Some(*current);
           low = middle + 1;
         } else {
           if middle == 0 {
