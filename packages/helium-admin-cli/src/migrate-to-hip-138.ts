@@ -191,7 +191,7 @@ export async function run(args: any = process.argv) {
       })
       .instruction()
   );
-  const daoEpochInfos = await hsdProgram.account.daoEpochInfoV0.all([dao]);
+  const daoEpochInfos = await hsdProgram.account.daoEpochInfoV0.all();
   for (const daoEpochInfo of daoEpochInfos) {
     resizes.push(
       await hsdProgram.methods
