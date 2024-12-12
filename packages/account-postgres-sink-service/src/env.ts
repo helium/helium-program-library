@@ -22,7 +22,9 @@ export const YELLOWSTONE_URL =
 export const USE_HELIUS_WEBHOOK = getEnvBoolean("USE_HELIUS_WEBHOOK");
 export const HELIUS_AUTH_SECRET = process.env.HELIUS_AUTH_SECRET;
 
-export const USE_SUBSTREAMS = getEnvBoolean("USE_SUBSTREAMS");
+export const USE_SUBSTREAM = getEnvBoolean("USE_SUBSTREAM");
+export const SUBSTREAM_API_KEY = process.env.SUBSTREAM_API_KEY;
+export const SUBSTREAM_URL = process.env.SUBSTREAM_URL;
 export const SUBSTREAM = process.env.SUBSTREAM;
 
 export const USE_KAFKA = getEnvBoolean("USE_KAFKA");

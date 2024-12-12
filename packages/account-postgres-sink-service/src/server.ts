@@ -1,18 +1,5 @@
-import { createGrpcTransport } from "@connectrpc/connect-node";
 import cors from "@fastify/cors";
 import { AccountInfo, PublicKey, TransactionResponse } from "@solana/web3.js";
-import {
-  applyParams,
-  authIssue,
-  createAuthInterceptor,
-  createRegistry,
-  createRequest,
-  fetchSubstream,
-  isEmptyMessage,
-  streamBlocks,
-  unpackMapOutput,
-} from "@substreams/core";
-import retry from "async-retry";
 import { BloomFilter } from "bloom-filters";
 import { EventEmitter } from "events";
 import Fastify, { FastifyInstance } from "fastify";
@@ -20,7 +7,6 @@ import fastifyCron, { Params as CronConfig } from "fastify-cron";
 import fs from "fs";
 import { ReasonPhrases, StatusCodes } from "http-status-codes";
 import { EachMessagePayload, Kafka, KafkaConfig } from "kafkajs";
-import { Op } from "sequelize";
 import {
   HELIUS_AUTH_SECRET,
   KAFKA_BROKERS,
@@ -31,10 +17,9 @@ import {
   PG_POOL_SIZE,
   PROGRAM_ACCOUNT_CONFIGS,
   REFRESH_PASSWORD,
-  SUBSTREAM,
   USE_HELIUS_WEBHOOK,
   USE_KAFKA,
-  USE_SUBSTREAMS,
+  USE_SUBSTREAM,
   USE_YELLOWSTONE,
 } from "./env";
 import { getPluginsByAccountTypeByProgram } from "./plugins";
@@ -42,7 +27,6 @@ import { metrics } from "./plugins/metrics";
 import { setupYellowstone } from "./services/yellowstone";
 import { IConfig } from "./types";
 import { createPgIndexes } from "./utils/createPgIndexes";
-import database, { Cursor } from "./utils/database";
 import { defineAllIdlModels } from "./utils/defineIdlModels";
 import { getMultipleAccounts } from "./utils/getMultipleAccounts";
 import { getWritableAccountKeys } from "./utils/getWritableAccountKeys";
@@ -50,6 +34,8 @@ import { handleAccountWebhook } from "./utils/handleAccountWebhook";
 import { integrityCheckProgramAccounts } from "./utils/integrityCheckProgramAccounts";
 import { provider } from "./utils/solana";
 import { upsertProgramAccounts } from "./utils/upsertProgramAccounts";
+import { setupSubstream } from "./services/substream";
+import database from "./utils/database";
 
 if (PG_POOL_SIZE < 5) {
   throw new Error("PG_POOL_SIZE must be minimum of 5");
@@ -409,7 +395,7 @@ if (PG_POOL_SIZE < 5) {
     });
   }
 
-  if (USE_SUBSTREAMS) {
+  /* if (USE_SUBSTREAM) {
     if (!SUBSTREAM) throw new Error("SUBSTREAM undefined");
 
     await Cursor.sync();
@@ -495,6 +481,7 @@ if (PG_POOL_SIZE < 5) {
                 await Cursor.upsert({
                   cursor,
                 });
+
                 await Cursor.destroy({
                   where: {
                     cursor: {
@@ -528,6 +515,13 @@ if (PG_POOL_SIZE < 5) {
         }
       }
     }
+  } */
+
+  if (USE_SUBSTREAM) {
+    await setupSubstream(server, configs).catch((err: any) => {
+      console.error("Fatal error in Substream connection:", err);
+      process.exit(1);
+    });
   }
 
   if (USE_YELLOWSTONE) {

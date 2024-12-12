@@ -64,6 +64,7 @@ export const database = new Sequelize({
 export class Cursor extends Model {
   declare cursor: string;
 }
+
 Cursor.init(
   {
     cursor: {
