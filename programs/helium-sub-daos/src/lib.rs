@@ -139,4 +139,12 @@ pub mod helium_sub_daos {
   pub fn add_expiration_ts(ctx: Context<AddExpirationTs>) -> Result<()> {
     add_expiration_ts::handler(ctx)
   }
+
+  pub fn temp_resize_account(ctx: Context<TempResizeAccount>) -> Result<()> {
+    temp_resize_account::handler(ctx)
+  }
+
+  pub fn track_vote_v0(ctx: Context<TrackVoteV0>) -> Result<()> {
+    track_vote_v0::handler(ctx)
+  }
 }

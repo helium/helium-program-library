@@ -21,7 +21,7 @@ export async function initTestDao(
   authority: PublicKey,
   dcMint?: PublicKey,
   mint?: PublicKey,
-  registrar?: PublicKey
+  registrar?: PublicKey,
 ): Promise<{
   mint: PublicKey;
   dao: PublicKey;
@@ -61,6 +61,7 @@ export async function initTestDao(
           percent: 32,
         },
       ],
+      proposalNamespace: me
     })
     .preInstructions([
       createAssociatedTokenAccountIdempotentInstruction(

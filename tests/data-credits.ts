@@ -197,6 +197,7 @@ describe("data-credits", () => {
               emissionsPerEpoch: new BN(EPOCH_REWARDS),
             },
           ],
+          proposalNamespace: PublicKey.default,
         })
         .preInstructions([
           createAssociatedTokenAccountIdempotentInstruction(

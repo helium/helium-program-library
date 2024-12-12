@@ -1972,6 +1972,7 @@ dependencies = [
  "default-env",
  "mpl-token-metadata",
  "nft-proxy",
+ "proposal",
  "rust_decimal",
  "shared-utils",
  "solana-security-txt",

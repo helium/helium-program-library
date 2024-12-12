@@ -1,7 +1,9 @@
+use std::collections::HashSet;
+
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{Mint, Token, TokenAccount},
+  token::{burn, Burn, Mint, Token, TokenAccount},
 };
 use circuit_breaker::{
   cpi::{accounts::TransferV0, transfer_v0},
@@ -106,6 +108,16 @@ impl<'info> ClaimRewardsV1<'info> {
 
     CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
   }
+
+  fn burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Burn<'info>> {
+    let cpi_accounts = Burn {
+      mint: self.mint.to_account_info(),
+      authority: self.position_authority.to_account_info(),
+      from: self.delegator_ata.to_account_info(),
+    };
+
+    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+  }
 }
 
 pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result<()> {
@@ -154,7 +166,40 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
 
   delegated_position.set_claimed(args.epoch)?;
 
+  let first_ts = ctx.accounts.dao.recent_proposals.last().unwrap().ts;
+  let last_ts = ctx.accounts.dao.recent_proposals.first().unwrap().ts;
+  ctx
+    .accounts
+    .delegated_position
+    .remove_proposals_older_than(first_ts - 1);
+  let proposal_set = ctx
+    .accounts
+    .delegated_position
+    .recent_proposals
+    .iter()
+    .filter(|p| p.ts <= last_ts)
+    .map(|rp| rp.proposal)
+    .collect::<HashSet<_>>();
+  // Check eligibility based on recent proposals
+  let eligible_count = ctx
+    .accounts
+    .dao
+    .recent_proposals
+    .iter()
+    .filter(|&proposal| proposal_set.contains(&proposal.proposal))
+    .count();
+  let not_two_proposals = ctx.accounts.dao.recent_proposals.len() < 2
+    || ctx
+      .accounts
+      .dao
+      .recent_proposals
+      .iter()
+      .filter(|p| p.proposal == Pubkey::default())
+      .count()
+      < 2;
+
   let amount_left = ctx.accounts.delegator_pool.amount;
+  let amount = std::cmp::min(rewards, amount_left);
   transfer_v0(
     ctx
       .accounts
@@ -162,9 +207,17 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
       .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
     // Due to rounding down of vehnt fall rates it's possible the vehnt on the dao does not exactly match the
     // vehnt remaining. It could be off by a little bit of dust.
-    TransferArgsV0 {
-      amount: std::cmp::min(rewards, amount_left),
-    },
+    TransferArgsV0 { amount },
   )?;
+
+  if !not_two_proposals && eligible_count < 2 {
+    msg!(
+      "Position is not eligible, burning rewards. Position proposals {:?}, recent proposals {:?}",
+      ctx.accounts.delegated_position.recent_proposals,
+      ctx.accounts.dao.recent_proposals
+    );
+    burn(ctx.accounts.burn_ctx(), amount)?;
+  }
+
   Ok(())
 }

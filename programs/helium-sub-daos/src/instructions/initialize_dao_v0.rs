@@ -1,3 +1,5 @@
+use std::array;
+
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
@@ -24,6 +26,7 @@ pub struct InitializeDaoArgsV0 {
   pub hst_emission_schedule: Vec<PercentItem>,
   pub net_emissions_cap: u64,
   pub registrar: Pubkey,
+  pub proposal_namespace: Pubkey,
 }
 
 #[derive(Accounts)]
@@ -96,6 +99,8 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
     hst_pool: ctx.accounts.hst_pool.key(),
     delegator_pool: ctx.accounts.delegator_pool.key(),
     rewards_escrow: ctx.accounts.rewards_escrow.key(),
+    recent_proposals: array::from_fn(|_| RecentProposal::default()),
+    proposal_namespace: args.proposal_namespace,
   });
   initialize_account_windowed_breaker_v0(
     CpiContext::new_with_signer(

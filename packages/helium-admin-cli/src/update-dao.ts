@@ -13,6 +13,7 @@ import {
   parseEmissionsSchedule,
   sendInstructionsOrSquads,
 } from './utils';
+import { organizationKey } from "@helium/organization-sdk";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -121,6 +122,7 @@ export async function run(args: any = process.argv) {
           ? new anchor.BN(argv.newNetEmissionsCap)
           : null,
         hstPool: argv.newHstPool ? new PublicKey(argv.newHstPool) : null,
+        proposalNamespace: organizationKey("Helium")[0],
       })
       .accounts({
         dao,

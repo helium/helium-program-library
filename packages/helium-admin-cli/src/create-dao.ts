@@ -31,6 +31,7 @@ import {
   withCreateRealm,
   withSetRealmAuthority,
 } from "@solana/spl-governance";
+import { organizationKey } from "@helium/organization-sdk";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddressSync,
@@ -503,6 +504,7 @@ export async function run(args: any = process.argv) {
         // Tx too large to do in initialize dao, so do it with update
         hstEmissionSchedule: [currentHstEmission],
         emissionSchedule: [currentHntEmission],
+        proposalNamespace: organizationKey("Helium")[0],
       })
       .preInstructions([
         ...(ldExists ? [] : [initLazyDist]),
@@ -531,6 +533,7 @@ export async function run(args: any = process.argv) {
             hstEmissionSchedule: hstEmission,
             hstPool: null,
             netEmissionsCap: null,
+            proposalNamespace: organizationKey("Helium")[0],
           })
           .accounts({
             dao,

@@ -5,12 +5,22 @@ import {
   init as initHsd,
   subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
-import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import {
+  batchParallelInstructionsWithPriorityFee,
+  HNT_MINT,
+  IOT_MINT,
+  MOBILE_MINT,
+} from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
+import { organizationKey } from "@helium/organization-sdk";
 import yargs from "yargs/yargs";
-import { loadKeypair, parseEmissionsSchedule, sendInstructionsOrSquads } from "./utils";
+import {
+  loadKeypair,
+  parseEmissionsSchedule,
+  sendInstructionsOrSquads,
+} from "./utils";
 import { lazyDistributorKey } from "@helium/lazy-distributor-sdk";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { oracleSignerKey } from "@helium/rewards-oracle-sdk";
@@ -104,7 +114,9 @@ export async function run(args: any = process.argv) {
 
   const ld = lazyDistributorKey(hntMint)[0];
   const rewardsEscrow = getAssociatedTokenAddressSync(hntMint, ld, true);
-  const ldAcc = await lazyDistProgram.account.lazyDistributorV0.fetchNullable(ld);
+  const ldAcc = await lazyDistProgram.account.lazyDistributorV0.fetchNullable(
+    ld
+  );
   if (ldAcc) {
     console.warn("Lazy distributor already exists, skipping.");
   } else {
@@ -146,6 +158,7 @@ export async function run(args: any = process.argv) {
         ),
         netEmissionsCap: null,
         hstPool: null,
+        proposalNamespace: organizationKey("Helium")[0],
       })
       .accounts({
         dao,
@@ -167,6 +180,31 @@ export async function run(args: any = process.argv) {
         .instruction()
     );
   }
+
+  const resizes: TransactionInstruction[] = [];
+  resizes.push(
+    await hsdProgram.methods
+      .tempResizeAccount()
+      .accounts({
+        account: dao,
+        payer: daoAcc.authority,
+      })
+      .instruction()
+  );
+  const daoEpochInfos = await hsdProgram.account.daoEpochInfoV0.all([dao]);
+  for (const daoEpochInfo of daoEpochInfos) {
+    resizes.push(
+      await hsdProgram.methods
+        .tempResizeAccount()
+        .accounts({
+          account: daoEpochInfo.publicKey,
+          payer: daoAcc.authority,
+        })
+        .instruction()
+    );
+  }
+  console.log("Resizing accounts");
+  await batchParallelInstructionsWithPriorityFee(provider, resizes);
 
   const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
     commitmentOrConfig: "finalized",

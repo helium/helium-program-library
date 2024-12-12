@@ -10,6 +10,7 @@ pub struct UpdateDaoArgsV0 {
   pub hst_emission_schedule: Option<Vec<PercentItem>>,
   pub hst_pool: Option<Pubkey>,
   pub net_emissions_cap: Option<u64>,
+  pub proposal_namespace: Option<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -50,6 +51,10 @@ pub fn handler(ctx: Context<UpdateDaoV0>, args: UpdateDaoArgsV0) -> Result<()> {
 
   if let Some(hst_pool) = args.hst_pool {
     ctx.accounts.dao.hst_pool = hst_pool;
+  }
+
+  if let Some(proposal_namespace) = args.proposal_namespace {
+    ctx.accounts.dao.proposal_namespace = proposal_namespace;
   }
 
   if should_resize {

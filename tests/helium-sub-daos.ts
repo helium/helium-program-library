@@ -6,6 +6,8 @@ import { daoKey, EPOCH_LENGTH } from "@helium/helium-sub-daos-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { Proposal } from "@helium/modular-governance-idls/lib/types/proposal";
+import { init as initProposal } from "@helium/proposal-sdk";
 import { init as initProxy } from "@helium/nft-proxy-sdk";
 import {
   createAtaAndMint,
@@ -57,6 +59,7 @@ import { getUnixTimestamp, loadKeypair } from "./utils/solana";
 import { createPosition, initVsr } from "./utils/vsr";
 // @ts-ignore
 import bs58 from "bs58";
+import { random } from "./utils/string";
 
 chai.use(chaiAsPromised);
 
@@ -94,6 +97,7 @@ describe("helium-sub-daos", () => {
   let cbProgram: Program<CircuitBreaker>;
   let vsrProgram: Program<VoterStakeRegistry>;
   let proxyProgram: Program<NftProxy>;
+  let proposalProgram: Program<Proposal>;
 
   let registrar: PublicKey;
   let position: PublicKey;
@@ -130,6 +134,8 @@ describe("helium-sub-daos", () => {
       anchor.workspace.VoterStakeRegistry.idl
     );
     ensureVSRIdl(vsrProgram);
+
+    proposalProgram = await initProposal(provider);
   });
 
   it("initializes a dao", async () => {
@@ -270,6 +276,7 @@ describe("helium-sub-daos", () => {
           hstEmissionSchedule: null,
           hstPool: null,
           netEmissionsCap: null,
+          proposalNamespace: null,
         })
         .accounts({
           dao,
@@ -905,6 +912,73 @@ describe("helium-sub-daos", () => {
             });
 
             it("claim rewards", async () => {
+              // Create and vote on two proposals
+              const {
+                pubkeys: { proposalConfig },
+              } = await proposalProgram.methods
+                .initializeProposalConfigV0({
+                  name: random(10),
+                  voteController: registrar,
+                  stateController: me,
+                  onVoteHook: PublicKey.default,
+                  authority: me,
+                })
+                .rpcAndKeys({ skipPreflight: true });
+              for (let i = 0; i < 2; i++) {
+                const proposalName = `Proposal ${random(10)}`;
+                const {
+                  pubkeys: { proposal },
+                } = await proposalProgram.methods
+                  .initializeProposalV0({
+                    seed: Buffer.from(proposalName, "utf-8"),
+                    maxChoicesPerVoter: 1,
+                    name: proposalName,
+                    uri: "https://example.com",
+                    choices: [
+                      { name: "Yes", uri: null },
+                      { name: "No", uri: null },
+                    ],
+                    tags: ["test"],
+                  })
+                  .accounts({ proposalConfig })
+                  .rpcAndKeys({ skipPreflight: true });
+                await proposalProgram.methods
+                  .updateStateV0({
+                    newState: {
+                      voting: {
+                        startTs: new anchor.BN(new Date().valueOf() / 1000),
+                      } as any,
+                    },
+                  })
+                  .accounts({ proposal })
+                  .rpc({ skipPreflight: true });
+                const {
+                  pubkeys: { marker },
+                } = await vsrProgram.methods
+                  .voteV0({
+                    choice: 0,
+                  })
+                  .accounts({
+                    position,
+                    proposal: proposal as PublicKey,
+                    voter: positionAuthorityKp.publicKey,
+                  })
+                  .signers([positionAuthorityKp])
+                  .rpcAndKeys({ skipPreflight: true });
+                console.log(
+                  "track",
+                  await program.methods
+                    .trackVoteV0()
+                    .accounts({
+                      marker: marker as PublicKey,
+                      dao,
+                      subDao,
+                      proposal: proposal as PublicKey,
+                      position,
+                    })
+                    .rpc({ skipPreflight: true })
+                );
+              }
               // issue rewards
               await sendInstructions(provider, [
                 await program.methods

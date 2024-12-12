@@ -17,6 +17,43 @@ const THREAD_PID = new PublicKey(
   "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
 );
 
+export const daoEpochInfoResolver = resolveIndividual(
+  async ({ provider, path, accounts, args }) => {
+    if (path[path.length - 1] === "daoEpochInfo" && accounts.registrar) {
+      const vsr = await init(provider as AnchorProvider, VSR_PROGRAM_ID);
+      let registrar;
+      try {
+        registrar = await vsr.account.registrar.fetch(
+          accounts.registrar as PublicKey
+        );
+      } catch (e: any) {
+        // ignore. It's fine, we just won't use time offset which is only used in testing cases
+        console.error(e);
+      }
+      const clock = await provider.connection.getAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
+      let unixTime;
+      if (args && args[0] && args[0].epoch) {
+        unixTime = args[0].epoch.toNumber() * EPOCH_LENGTH;
+      } else {
+        unixTime =
+          Number(clock!.data.readBigInt64LE(8 * 4)) +
+          (registrar?.timeOffset.toNumber() || 0);
+      }
+      const dao = get(accounts, [
+        ...path.slice(0, path.length - 1),
+        "dao",
+      ]) as PublicKey;
+      if (dao) {
+        const [key] = await daoEpochInfoKey(dao, unixTime, PROGRAM_ID);
+
+        return key;
+      }
+    }
+  }
+);
+
 export const subDaoEpochInfoResolver = resolveIndividual(
   async ({ provider, path, accounts, args }) => {
     if (path[path.length - 1] === "subDaoEpochInfo" && accounts.registrar) {
@@ -193,6 +230,7 @@ export const heliumSubDaosResolvers = combineResolvers(
   genesisEndEpochInfoResolver,
   closingTimeEpochInfoResolver,
   treasuryManagementResolvers,
+  daoEpochInfoResolver,
   ataResolver({
     instruction: "initializeSubDaoV0",
     account: "treasury",
