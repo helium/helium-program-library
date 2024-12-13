@@ -204,10 +204,8 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   ctx.accounts.sub_dao_epoch_info.hnt_rewards_issued = escrow_amount;
   ctx.accounts.dao_epoch_info.num_rewards_issued += 1;
   ctx.accounts.sub_dao_epoch_info.rewards_issued_at = Some(Clock::get()?.unix_timestamp);
-  ctx
-    .accounts
-    .sub_dao_epoch_info
-    .hnt_delegation_rewards_issued = delegation_rewards_amount;
+  ctx.accounts.dao_epoch_info.delegation_rewards_issued = delegation_rewards_amount;
+  ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued = 0;
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 

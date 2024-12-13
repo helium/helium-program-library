@@ -93,6 +93,9 @@ pub fn handler(
     ))
     .unwrap();
 
+  ctx.accounts.dao_epoch_info.vehnt_at_epoch_start +=
+    ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start;
+
   ctx.accounts.dao_epoch_info.epoch = args.epoch;
 
   ctx.accounts.dao_epoch_info.current_hnt_supply = curr_supply

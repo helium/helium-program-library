@@ -6,6 +6,7 @@ import {
 import {
   EPOCH_LENGTH,
   PROGRAM_ID as HSD_PROGRAM_ID,
+  daoEpochInfoKey,
   daoKey,
   delegatedPositionKey,
   init,
@@ -22,6 +23,7 @@ import {
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import {
+  AccountInfo,
   Connection,
   PublicKey,
   SYSVAR_CLOCK_PUBKEY,
@@ -88,7 +90,7 @@ export const formPositionClaims = async ({
       }
       return acc;
     }, {} as Record<string, SubDao>);
-
+    const daoAcc = await hsdProgram.account.daoV0.fetch(Object.values(subDaos)[0].dao);
 
     for (const [idx, position] of positions.entries()) {
       bucketedEpochsByPosition[position.pubkey.toBase58()] =
@@ -127,10 +129,58 @@ export const formPositionClaims = async ({
 
         // Chunk size is 128 because we want each chunk to correspond to the 128 bits in bitmap
         for (const chunk of chunks(epochsToClaim, 128)) {
+          const daoEpochInfoKeys = chunk.map((epoch) =>
+            daoEpochInfoKey(subDaoAcc.dao, epoch.mul(new BN(EPOCH_LENGTH)))[0]
+          );
+          const daoEpochInfoAccounts = await getMultipleAccounts({
+            connection: hsdProgram.provider.connection,
+            keys: daoEpochInfoKeys,
+          });
           bucketedEpochsByPosition[position.pubkey.toBase58()].push(
             await Promise.all(
-              chunk.map((epoch) =>
-                hsdProgram.methods
+              chunk.map((epoch, index) => {
+                const daoEpochInfoAccount = daoEpochInfoAccounts[index];
+                const daoEpochInfoData = hsdProgram.coder.accounts.decode(
+                  "daoEpochInfoV0",
+                  daoEpochInfoAccount?.data
+                );
+
+                if (daoEpochInfoData.delegationRewardsIssued.gt(new BN(0))) {
+                  return hsdProgram.methods
+                    .claimRewardsV1({
+                      epoch,
+                    })
+                    .accountsStrict({
+                      position: position.pubkey,
+                      mint: position.mint,
+                      positionTokenAccount: getAssociatedTokenAddressSync(
+                        position.mint,
+                        provider.wallet.publicKey
+                      ),
+                      positionAuthority: provider.wallet.publicKey,
+                      registrar: position.registrar,
+                      dao: DAO,
+                      subDao: delegatedPosition.account!.subDao,
+                      delegatedPosition: delegatedPosition.key,
+                      hntMint: daoAcc.hntMint,
+                      daoEpochInfo: daoEpochInfoKey(subDaoAcc.dao, epoch.mul(new BN(EPOCH_LENGTH)))[0],
+                      delegatorPool: daoAcc.delegatorPool,
+                      delegatorAta: getAssociatedTokenAddressSync(
+                        daoAcc.hntMint,
+                        provider.wallet.publicKey
+                      ),
+                      delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
+                        daoAcc.delegatorPool
+                      )[0],
+                      vsrProgram: VSR_PROGRAM_ID,
+                      systemProgram: SystemProgram.programId,
+                      circuitBreakerProgram: CIRCUIT_BREAKER_PROGRAM_ID,
+                      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+                      tokenProgram: TOKEN_PROGRAM_ID,
+                    })
+                    .instruction();
+                } else {
+                return hsdProgram.methods
                   .claimRewardsV0({
                     epoch,
                   })
@@ -165,8 +215,9 @@ export const formPositionClaims = async ({
                     associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                     tokenProgram: TOKEN_PROGRAM_ID,
                   })
-                  .instruction()
-              )
+                    .instruction();
+                }
+              })
             )
           );
         }
@@ -189,3 +240,20 @@ export const formPositionClaims = async ({
 
   return instructions;
 };
+
+async function getMultipleAccounts({
+  connection,
+  keys,
+}): Promise<AccountInfo<Buffer>[]> {
+  const batchSize = 100;
+  const batches = Math.ceil(keys.length / batchSize);
+  const results: AccountInfo<Buffer>[] = [];
+
+  for (let i = 0; i < batches; i++) {
+    const batchKeys = keys.slice(i * batchSize, (i + 1) * batchSize);
+    const batchResults = await connection.getMultipleAccountsInfo(batchKeys);
+    results.push(...batchResults);
+  }
+
+  return results;
+}

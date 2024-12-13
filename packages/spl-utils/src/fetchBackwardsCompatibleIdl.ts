@@ -1340,7 +1340,7 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
             isSigner: false,
           },
           {
-            name: "subDaoEpochInfo",
+            name: "daoEpochInfo",
             isMut: false,
             isSigner: false,
             pda: {
@@ -1348,13 +1348,13 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
                 {
                   kind: "const",
                   type: "string",
-                  value: "sub_dao_epoch_info",
+                  value: "dao_epoch_info",
                 },
                 {
                   kind: "account",
                   type: "publicKey",
-                  account: "SubDaoV0",
-                  path: "sub_dao",
+                  account: "DaoV0",
+                  path: "dao",
                 },
                 {
                   kind: "arg",
@@ -2314,6 +2314,14 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
                 ],
               },
             },
+            {
+              name: "delegationRewardsIssued",
+              type: "u64",
+            },
+            {
+              name: "vehntAtEpochStart",
+              type: "u64",
+            },
           ],
         },
       },
@@ -2446,13 +2454,6 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
             },
             {
               name: "dcOnboardingFeesPaid",
-              type: "u64",
-            },
-            {
-              name: "hntDelegationRewardsIssued",
-              docs: [
-                "The number of hnt delegation rewards issued this epoch, so that delegators can claim their share of the rewards",
-              ],
               type: "u64",
             },
             {
