@@ -26,7 +26,7 @@ import {
 } from "../packages/data-credits-sdk/src";
 import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
 import * as hsd from "../packages/helium-sub-daos-sdk/src";
-import { daoKey } from "../packages/helium-sub-daos-sdk/src";
+import { daoKey, delegatorRewardsPercent } from "../packages/helium-sub-daos-sdk/src";
 import { toBN, toNumber } from "../packages/spl-utils/src";
 import * as vsr from "../packages/voter-stake-registry-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
@@ -198,6 +198,7 @@ describe("data-credits", () => {
             },
           ],
           proposalNamespace: PublicKey.default,
+          delegatorRewardsPercent: delegatorRewardsPercent(6),
         })
         .preInstructions([
           createAssociatedTokenAccountIdempotentInstruction(

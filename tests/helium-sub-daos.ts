@@ -277,6 +277,7 @@ describe("helium-sub-daos", () => {
           hstPool: null,
           netEmissionsCap: null,
           proposalNamespace: null,
+          delegatorRewardsPercent: null,
         })
         .accounts({
           dao,
