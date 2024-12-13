@@ -7,11 +7,12 @@ import {
   init as initDc,
 } from "@helium/data-credits-sdk";
 import { fanoutKey } from "@helium/fanout-sdk";
+import { init as initLazy } from "@helium/lazy-distributor-sdk";
 import {
   dataOnlyConfigKey,
   init as initHem,
 } from "@helium/helium-entity-manager-sdk";
-import { daoKey, init as initDao } from "@helium/helium-sub-daos-sdk";
+import { daoKey, delegatorRewardsPercent, init as initDao } from "@helium/helium-sub-daos-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import {
   init as initVsr,
@@ -30,6 +31,7 @@ import {
   withCreateRealm,
   withSetRealmAuthority,
 } from "@solana/spl-governance";
+import { organizationKey } from "@helium/organization-sdk";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddressSync,
@@ -57,6 +59,7 @@ import {
   sendInstructionsOrSquads,
 } from "./utils";
 import { init } from "@helium/nft-proxy-sdk";
+import { oracleSignerKey } from "@helium/rewards-oracle-sdk";
 
 const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
@@ -92,6 +95,12 @@ export async function run(args: any = process.argv) {
       type: "string",
       describe: "Keypair of the Data Credit token",
       default: `${__dirname}/../../keypairs/dc.json`,
+    },
+    delegatorRewardsPercent: {
+      type: "number",
+      required: true,
+      describe:
+        "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
     },
     numHnt: {
       type: "number",
@@ -165,6 +174,17 @@ export async function run(args: any = process.argv) {
       type: "string",
       required: true,
     },
+    rewardsOracleUrl: {
+      alias: "ro",
+      type: "string",
+      describe: "The rewards oracle URL",
+      required: true,
+    },
+    oracleKey: {
+      type: "string",
+      describe: "Pubkey of the oracle",
+      required: true,
+    },
     numHst: {
       type: "number",
       describe:
@@ -193,6 +213,7 @@ export async function run(args: any = process.argv) {
   const heliumSubDaosProgram = await initDao(provider);
   const heliumVsrProgram = await initVsr(provider);
   const hemProgram = await initHem(provider);
+  const lazyDistProgram = await initLazy(provider);
 
   const govProgramId = new PublicKey(argv.govProgramId);
   const councilKeypair = await loadKeypair(argv.councilKeypair);
@@ -454,6 +475,33 @@ export async function run(args: any = process.argv) {
       fanout,
       true
     );
+  const oracleKey = new PublicKey(argv.oracleKey!);
+  const { instruction: initLazyDist, pubkeys: { rewardsEscrow, lazyDistributor } } = await lazyDistProgram.methods
+    .initializeLazyDistributorV0({
+      authority,
+      oracles: [
+        {
+          oracle: oracleKey,
+          url: argv.rewardsOracleUrl,
+        },
+      ],
+      // 5 x epoch rewards in a 24 hour period
+      windowConfig: {
+        windowSizeSeconds: new anchor.BN(24 * 60 * 60),
+        thresholdType: ThresholdType.Absolute as never,
+        threshold: new anchor.BN(currentHntEmission.emissionsPerEpoch).mul(
+          new anchor.BN(5)
+        ),
+      },
+      approver: oracleSignerKey()[0],
+    })
+    .accounts({
+      payer: authority,
+      rewardsMint: hntKeypair.publicKey,
+    })
+    .prepare();
+    const ldExists = await exists(conn, lazyDistributor!);
+
     await heliumSubDaosProgram.methods
       .initializeDaoV0({
         registrar: registrar,
@@ -462,8 +510,11 @@ export async function run(args: any = process.argv) {
         // Tx too large to do in initialize dao, so do it with update
         hstEmissionSchedule: [currentHstEmission],
         emissionSchedule: [currentHntEmission],
+        proposalNamespace: organizationKey("Helium")[0],
+        delegatorRewardsPercent: delegatorRewardsPercent(argv.delegatorRewardsPercent),
       })
       .preInstructions([
+        ...(ldExists ? [] : [initLazyDist]),
         createAssociatedTokenAccountIdempotentInstruction(
           provider.wallet.publicKey,
           hstPool,
@@ -475,6 +526,7 @@ export async function run(args: any = process.argv) {
         dcMint: dcKeypair.publicKey,
         hntMint: hntKeypair.publicKey,
         hstPool,
+        rewardsEscrow,
       })
       .rpc({ skipPreflight: true });
 
@@ -488,6 +540,8 @@ export async function run(args: any = process.argv) {
             hstEmissionSchedule: hstEmission,
             hstPool: null,
             netEmissionsCap: null,
+            proposalNamespace: organizationKey("Helium")[0],
+            delegatorRewardsPercent: delegatorRewardsPercent(argv.delegatorRewardsPercent),
           })
           .accounts({
             dao,

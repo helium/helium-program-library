@@ -17,6 +17,9 @@ import { useAsync, useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { HeliumVsrClient } from "../sdk/client";
 import { SubDaoWithMeta } from "../sdk/types";
+import { init as initProxy } from "@helium/nft-proxy-sdk";
+import { init as initVsr } from "@helium/voter-stake-registry-sdk";
+
 import {
   daoKey,
   init as initHsd,
@@ -59,6 +62,8 @@ export const useCreatePosition = () => {
         throw new Error("Unable to Create Position, Invalid params");
       } else {
         const hsdProgram = await initHsd(provider);
+        const proxyProgram = await initProxy(provider);
+        const vsrProgram = await initVsr(provider);
         const [daoK] = daoKey(mint);
         const [subDaoK] = subDaoKey(mint);
         const myDao = await hsdProgram.account.daoV0.fetchNullable(daoK);
@@ -66,6 +71,8 @@ export const useCreatePosition = () => {
           subDaoK
         );
         const registrar = (mySubDao?.registrar || myDao?.registrar)!;
+        const registarAcc = await vsrProgram.account.registrar.fetch(registrar);
+        const proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(registarAcc.proxyConfig);
         const mintKeypair = Keypair.generate();
         const position = positionKey(mintKeypair.publicKey)[0];
         const instructions: TransactionInstruction[] = [];
@@ -131,7 +138,7 @@ export const useCreatePosition = () => {
             registrar
           );
           const currTs = Number(unixTime) + registrarAcc.timeOffset.toNumber();
-          const endTs = lockupPeriodsInDays * SECS_PER_DAY + currTs;
+          const endTs = proxyConfig.seasons.find(season => new BN(currTs).gte(season.start))?.end || (currTs + lockupPeriodsInDays * SECS_PER_DAY);
           const [subDaoEpochInfo] = subDaoEpochInfoKey(subDao.pubkey, currTs);
           const [endSubDaoEpochInfoKey] = subDaoEpochInfoKey(
             subDao.pubkey,

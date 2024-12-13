@@ -11,7 +11,6 @@ import {
 import {
   init as initHsd,
   subDaoKey,
-  delegatorRewardsPercent,
 } from '@helium/helium-sub-daos-sdk';
 import { PublicKey, TransactionInstruction } from '@solana/web3.js';
 import Squads from '@sqds/sdk';
@@ -86,13 +85,6 @@ export async function run(args: any = process.argv) {
       type: 'string',
       required: false,
       describe: 'VSR Registrar of subdao',
-      default: null,
-    },
-    delegatorRewardsPercent: {
-      type: 'number',
-      required: false,
-      describe:
-        'Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.',
       default: null,
     },
     onboardingDcFee: {
@@ -195,13 +187,6 @@ export async function run(args: any = process.argv) {
     );
   }
 
-  if (
-    argv.delegatorRewardsPercent &&
-    (argv.delegatorRewardsPercent > 100 || argv.delegatorRewardsPercent < 0)
-  ) {
-    throw new Error('Delegator rewards percent must be between 0 and 100');
-  }
-
   instructions.push(
     await program.methods
       .updateSubDaoV0({
@@ -219,9 +204,6 @@ export async function run(args: any = process.argv) {
           ? new BN(argv.onboardingDataOnlyDcFee)
           : null,
         registrar: argv.registrar ? new PublicKey(argv.registrar) : null,
-        delegatorRewardsPercent: argv.delegatorRewardsPercent
-          ? delegatorRewardsPercent(argv.delegatorRewardsPercent)
-          : null,
         activeDeviceAuthority: argv.activeDeviceAuthority
           ? new PublicKey(argv.activeDeviceAuthority)
           : null,

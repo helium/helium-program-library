@@ -1,20 +1,23 @@
+import { useSolanaUnixNow } from "@helium/helium-react-hooks";
+import { init as hsdInit } from "@helium/helium-sub-daos-sdk";
 import { useProposal } from "@helium/modular-governance-hooks";
-import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
+import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
+import {
+  Status,
+  batchParallelInstructions,
+  truthy
+} from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
 import {
   PublicKey,
-  SYSVAR_CLOCK_PUBKEY,
-  TransactionInstruction,
+  TransactionInstruction
 } from "@solana/web3.js";
 import BN from "bn.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
-import { useVoteMarkers } from "./useVoteMarkers";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
-import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
-import { useSolanaUnixNow } from "@helium/helium-react-hooks";
-import { PositionWithMeta } from "../sdk/types";
+import { useVoteMarkers } from "./useVoteMarkers";
 
 export const useVote = (proposalKey: PublicKey) => {
   const { info: proposal } = useProposal(proposalKey);
@@ -154,13 +157,18 @@ export const useVote = (proposalKey: PublicKey) => {
         );
       } else {
         const vsrProgram = await init(provider);
+        const hsdProgram = await hsdInit(provider);
         const instructions = (
           await Promise.all(
             // vote with bigger positions first.
             sortedPositions.map(async (position, index) => {
               const marker = markers?.[index]?.info;
+              const markerK = voteMarkerKey(position.mint, proposalKey)[0];
+
               const canVote = canPositionVote(index, choice);
               if (canVote) {
+                const instructions: TransactionInstruction[] = [];
+
                 if (position.isProxiedToMe) {
                   if (
                     marker &&
@@ -172,39 +180,55 @@ export const useVote = (proposalKey: PublicKey) => {
                     return;
                   }
 
-                  return await vsrProgram.methods
-                    .proxiedVoteV0({
+                  instructions.push(
+                    await vsrProgram.methods
+                      .proxiedVoteV0({
+                        choice,
+                      })
+                      .accounts({
+                        proposal: proposalKey,
+                        voter: provider.wallet.publicKey,
+                        position: position.pubkey,
+                        registrar: registrar?.pubkey,
+                        marker: voteMarkerKey(position.mint, proposalKey)[0],
+                        proxyAssignment: proxyAssignmentKey(
+                          registrar!.proxyConfig,
+                          position.mint,
+                          provider.wallet.publicKey
+                        )[0],
+                      })
+                      .instruction()
+                  );
+                }
+                instructions.push(
+                  await vsrProgram.methods
+                    .voteV0({
                       choice,
                     })
                     .accounts({
                       proposal: proposalKey,
                       voter: provider.wallet.publicKey,
                       position: position.pubkey,
-                      registrar: registrar?.pubkey,
                       marker: voteMarkerKey(position.mint, proposalKey)[0],
-                      proxyAssignment: proxyAssignmentKey(
-                        registrar!.proxyConfig,
-                        position.mint,
-                        provider.wallet.publicKey
-                      )[0],
                     })
-                    .instruction();
-                }
-                return await vsrProgram.methods
-                  .voteV0({
-                    choice,
-                  })
+                    .instruction()
+                );
+              }
+
+              instructions.push(
+                await hsdProgram.methods
+                  .trackVoteV0()
                   .accounts({
                     proposal: proposalKey,
-                    voter: provider.wallet.publicKey,
+                    marker: markerK,
                     position: position.pubkey,
-                    marker: voteMarkerKey(position.mint, proposalKey)[0],
                   })
-                  .instruction();
-              }
+                  .instruction()
+              );
+              return instructions;
             })
           )
-        ).filter(truthy);
+        ).filter(truthy).flat();
 
         if (onInstructions) {
           await onInstructions(instructions);

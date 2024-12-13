@@ -10,6 +10,7 @@ import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 import BN from "bn.js";
 import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
+import { init as initHsd } from "@helium/helium-sub-daos-sdk";
 
 export const useRelinquishVote = (proposal: PublicKey) => {
   const { positions, provider, registrar } = useHeliumVsrState();
@@ -85,6 +86,8 @@ export const useRelinquishVote = (proposal: PublicKey) => {
         );
       } else {
         const vsrProgram = await init(provider);
+        const hsdProgram = await initHsd(provider);
+
         const instructions = (
           await Promise.all(
             sortedPositions.map(async (position, index) => {
@@ -93,45 +96,66 @@ export const useRelinquishVote = (proposal: PublicKey) => {
                 choice
               );
               const marker = markers?.[index]?.info;
+              const markerK = voteMarkerKey(position.mint, proposal)[0];
 
               if (marker && canRelinquishVote) {
+                const instructions: TransactionInstruction[] = [];
+
                 if (position.isProxiedToMe) {
                   if (marker.proxyIndex < (position.proxy?.index || 0)) {
                     // Do not vote with a position that has been delegated to us, but voting overidden
                     return;
                   }
 
-                  return await vsrProgram.methods
-                    .proxiedRelinquishVoteV0({
+                  instructions.push(
+                    await vsrProgram.methods
+                      .proxiedRelinquishVoteV0({
+                        choice,
+                      })
+                      .accounts({
+                        proposal,
+                        voter: provider.wallet.publicKey,
+                        position: position.pubkey,
+                        marker: voteMarkerKey(position.mint, proposal)[0],
+                        proxyAssignment: proxyAssignmentKey(
+                          registrar!.proxyConfig,
+                          position.mint,
+                          provider.wallet.publicKey
+                        )[0],
+                      })
+                      .instruction()
+                  );
+                }
+                instructions.push(
+                  await vsrProgram.methods
+                    .relinquishVoteV1({
                       choice,
                     })
                     .accounts({
                       proposal,
                       voter: provider.wallet.publicKey,
                       position: position.pubkey,
-                      marker: voteMarkerKey(position.mint, proposal)[0],
-                      proxyAssignment: proxyAssignmentKey(
-                        registrar!.proxyConfig,
-                        position.mint,
-                        provider.wallet.publicKey,
-                      )[0],
                     })
-                    .instruction();
-                }
-                return await vsrProgram.methods
-                  .relinquishVoteV1({
-                    choice,
-                  })
+                    .instruction()
+                );
+              }
+
+              instructions.push(
+                await hsdProgram.methods
+                  .trackVoteV0()
                   .accounts({
                     proposal,
-                    voter: provider.wallet.publicKey,
+                    marker: markerK,
                     position: position.pubkey,
                   })
-                  .instruction();
-              }
+                  .instruction()
+              );
+              return instructions;
             })
           )
-        ).filter(truthy);
+        )
+          .filter(truthy)
+          .flat();
 
         if (onInstructions) {
           await onInstructions(instructions);
