@@ -1,31 +1,29 @@
 import * as anchor from "@coral-xyz/anchor";
-import { init as initLazy } from "@helium/lazy-distributor-sdk";
+import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
   daoKey,
   delegatorRewardsPercent,
-  init as initHsd,
-  subDaoKey,
+  init as initHsd
 } from "@helium/helium-sub-daos-sdk";
+import { init as initLazy, lazyDistributorKey } from "@helium/lazy-distributor-sdk";
+import { organizationKey } from "@helium/organization-sdk";
+import { oracleSignerKey } from "@helium/rewards-oracle-sdk";
 import {
   batchParallelInstructionsWithPriorityFee,
   HNT_MINT,
   IOT_MINT,
   MOBILE_MINT,
 } from "@helium/spl-utils";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
-import { organizationKey } from "@helium/organization-sdk";
 import yargs from "yargs/yargs";
 import {
   loadKeypair,
   parseEmissionsSchedule,
   sendInstructionsOrSquads,
 } from "./utils";
-import { lazyDistributorKey } from "@helium/lazy-distributor-sdk";
-import { ThresholdType } from "@helium/circuit-breaker-sdk";
-import { oracleSignerKey } from "@helium/rewards-oracle-sdk";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -100,8 +98,6 @@ export async function run(args: any = process.argv) {
 
   const instructions: TransactionInstruction[] = [];
 
-  const iotMint = new PublicKey(argv.iotMint);
-  const mobileMint = new PublicKey(argv.mobileMint);
   const hntMint = new PublicKey(argv.hntMint);
   const dao = daoKey(hntMint)[0];
 
@@ -138,7 +134,6 @@ export async function run(args: any = process.argv) {
   );
 
   const ld = lazyDistributorKey(hntMint)[0];
-  const rewardsEscrow = getAssociatedTokenAddressSync(hntMint, ld, true);
   const ldAcc = await lazyDistProgram.account.lazyDistributorV0.fetchNullable(
     ld
   );
