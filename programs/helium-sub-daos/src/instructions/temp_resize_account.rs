@@ -27,6 +27,8 @@ pub fn handler(ctx: Context<TempResizeAccount>) -> Result<()> {
   // This is the dao account.
   if account.key() == Pubkey::from_str("BQ3MCuTT5zVBhNfQ4SjMh3NPVhFy73MPV8rjfq5d1zie").unwrap() {
     new_size += 104; // Add space for rewards_escrow, delegator_pool, delegator_rewards_percent, proposal_namespace
+  } else {
+    new_size += 8; // Delegation rewards issued
   }
   let rent = Rent::get()?;
   let new_minimum_balance = rent.minimum_balance(new_size);

@@ -65,11 +65,11 @@ pub struct ClaimRewardsV1<'info> {
   pub hnt_mint: Box<Account<'info, Mint>>,
 
   #[account(
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
+    seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
-    constraint = sub_dao_epoch_info.rewards_issued_at.is_some() @ ErrorCode::EpochNotClosed
+    constraint = dao_epoch_info.done_issuing_rewards @ ErrorCode::EpochNotClosed
   )]
-  pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
+  pub dao_epoch_info: Box<Account<'info, DaoEpochInfoV0>>,
   #[account(mut)]
   pub delegator_pool: Box<Account<'info, TokenAccount>>,
   #[account(
@@ -137,29 +137,22 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
     }
   }
 
-  let delegated_vehnt_at_epoch = position.voting_power(
-    voting_mint_config,
-    ctx.accounts.sub_dao_epoch_info.start_ts(),
-  )?;
+  let delegated_vehnt_at_epoch =
+    position.voting_power(voting_mint_config, ctx.accounts.dao_epoch_info.start_ts())?;
 
-  msg!("Staked {} veHNT at start of epoch with {} total veHNT delegated to subdao and {} total rewards to subdao",
+  msg!("Staked {} veHNT at start of epoch with {} total veHNT delegated to dao and {} total rewards to dao",
     delegated_vehnt_at_epoch,
-    ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start,
-    ctx.accounts.sub_dao_epoch_info.hnt_delegation_rewards_issued
+    ctx.accounts.dao_epoch_info.vehnt_at_epoch_start,
+    ctx.accounts.dao_epoch_info.delegation_rewards_issued
   );
 
   // calculate the position's share of that epoch's rewards
   // rewards = staking_rewards_issued * staked_vehnt_at_epoch / total_vehnt
   let rewards = u64::try_from(
     delegated_vehnt_at_epoch
-      .checked_mul(
-        ctx
-          .accounts
-          .sub_dao_epoch_info
-          .hnt_delegation_rewards_issued as u128,
-      )
+      .checked_mul(ctx.accounts.dao_epoch_info.delegation_rewards_issued as u128)
       .unwrap()
-      .checked_div(ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start as u128)
+      .checked_div(ctx.accounts.dao_epoch_info.vehnt_at_epoch_start as u128)
       .unwrap(),
   )
   .unwrap();

@@ -232,7 +232,6 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
           rewards_issued_at: None,
           initialized: false,
           dc_onboarding_fees_paid: 0,
-          hnt_delegation_rewards_issued: 0,
           hnt_rewards_issued: 0,
         },
       },

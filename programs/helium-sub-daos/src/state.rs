@@ -155,6 +155,9 @@ pub struct DaoEpochInfoV0 {
   pub done_issuing_hst_pool: bool,
   pub bump_seed: u8,
   pub recent_proposals: [RecentProposal; 4],
+  // The number of delegation rewards issued this epoch, so that delegators can claim their share of the rewards
+  pub delegation_rewards_issued: u64,
+  pub vehnt_at_epoch_start: u64,
 }
 
 #[derive(Debug, InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Default)]
@@ -166,6 +169,14 @@ pub struct RecentProposal {
 impl DaoEpochInfoV0 {
   pub fn size() -> usize {
     60 + 8 + std::mem::size_of::<DaoEpochInfoV0>()
+  }
+
+  pub fn start_ts(&self) -> i64 {
+    i64::try_from(self.epoch).unwrap() * EPOCH_LENGTH
+  }
+
+  pub fn end_ts(&self) -> i64 {
+    i64::try_from(self.epoch + 1).unwrap() * EPOCH_LENGTH
   }
 }
 
@@ -266,8 +277,6 @@ pub struct SubDaoEpochInfoV0 {
   pub bump_seed: u8,
   pub initialized: bool,
   pub dc_onboarding_fees_paid: u64,
-  /// The number of hnt delegation rewards issued this epoch, so that delegators can claim their share of the rewards
-  pub hnt_delegation_rewards_issued: u64,
   /// The number of hnt rewards issued to the reward escrow this epoch
   pub hnt_rewards_issued: u64,
 }
