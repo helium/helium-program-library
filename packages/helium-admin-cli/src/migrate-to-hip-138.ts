@@ -103,9 +103,33 @@ export async function run(args: any = process.argv) {
   const iotMint = new PublicKey(argv.iotMint);
   const mobileMint = new PublicKey(argv.mobileMint);
   const hntMint = new PublicKey(argv.hntMint);
-  const iotSubDao = subDaoKey(iotMint)[0];
-  const mobileSubDao = subDaoKey(mobileMint)[0];
   const dao = daoKey(hntMint)[0];
+
+  const resizes: TransactionInstruction[] = [];
+  resizes.push(
+    await hsdProgram.methods
+      .tempResizeAccount()
+      .accounts({
+        account: dao,
+        payer: wallet.publicKey,
+      })
+      .instruction()
+  );
+  const daoEpochInfos = await hsdProgram.account.daoEpochInfoV0.all();
+  for (const daoEpochInfo of daoEpochInfos) {
+    resizes.push(
+      await hsdProgram.methods
+        .tempResizeAccount()
+        .accounts({
+          account: daoEpochInfo.publicKey,
+          payer: wallet.publicKey,
+        })
+        .instruction()
+    );
+  }
+  console.log("Resizing accounts");
+  await batchParallelInstructionsWithPriorityFee(provider, resizes);``
+
   const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
   const authority = daoAcc.authority;
   const oracleKey = new PublicKey(argv.oracleKey!);
@@ -182,31 +206,6 @@ export async function run(args: any = process.argv) {
         .instruction()
     );
   }
-
-  const resizes: TransactionInstruction[] = [];
-  resizes.push(
-    await hsdProgram.methods
-      .tempResizeAccount()
-      .accounts({
-        account: dao,
-        payer: daoAcc.authority,
-      })
-      .instruction()
-  );
-  const daoEpochInfos = await hsdProgram.account.daoEpochInfoV0.all();
-  for (const daoEpochInfo of daoEpochInfos) {
-    resizes.push(
-      await hsdProgram.methods
-        .tempResizeAccount()
-        .accounts({
-          account: daoEpochInfo.publicKey,
-          payer: daoAcc.authority,
-        })
-        .instruction()
-    );
-  }
-  console.log("Resizing accounts");
-  await batchParallelInstructionsWithPriorityFee(provider, resizes);
 
   const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
     commitmentOrConfig: "finalized",
