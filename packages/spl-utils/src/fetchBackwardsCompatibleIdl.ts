@@ -18,7 +18,7 @@ export async function fetchBackwardsCompatibleIdl(
 
 const IDLS_BY_PROGRAM: Record<string, any> = {
   hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR: {
-    version: "0.1.11",
+    version: "0.1.12",
     name: "helium_sub_daos",
     instructions: [
       {
@@ -114,6 +114,46 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
             isMut: false,
             isSigner: false,
           },
+          {
+            name: "delegatorPoolCircuitBreaker",
+            isMut: true,
+            isSigner: false,
+            pda: {
+              seeds: [
+                {
+                  kind: "const",
+                  type: "string",
+                  value: "account_windowed_breaker",
+                },
+                {
+                  kind: "account",
+                  type: "publicKey",
+                  account: "TokenAccount",
+                  path: "delegator_pool",
+                },
+              ],
+              programId: {
+                kind: "account",
+                type: "publicKey",
+                path: "circuit_breaker_program",
+              },
+            },
+          },
+          {
+            name: "rewardsEscrow",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "delegatorPool",
+            isMut: true,
+            isSigner: false,
+          },
+          {
+            name: "associatedTokenProgram",
+            isMut: false,
+            isSigner: false,
+          },
         ],
         args: [
           {
@@ -184,31 +224,6 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
             isSigner: true,
           },
           {
-            name: "circuitBreaker",
-            isMut: true,
-            isSigner: false,
-            pda: {
-              seeds: [
-                {
-                  kind: "const",
-                  type: "string",
-                  value: "mint_windowed_breaker",
-                },
-                {
-                  kind: "account",
-                  type: "publicKey",
-                  account: "Mint",
-                  path: "dnt_mint",
-                },
-              ],
-              programId: {
-                kind: "account",
-                type: "publicKey",
-                path: "circuit_breaker_program",
-              },
-            },
-          },
-          {
             name: "treasury",
             isMut: true,
             isSigner: false,
@@ -260,56 +275,6 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
                 type: "publicKey",
                 path: "treasury_management_program",
               },
-            },
-          },
-          {
-            name: "rewardsEscrow",
-            isMut: false,
-            isSigner: false,
-          },
-          {
-            name: "delegatorPoolCircuitBreaker",
-            isMut: true,
-            isSigner: false,
-            pda: {
-              seeds: [
-                {
-                  kind: "const",
-                  type: "string",
-                  value: "account_windowed_breaker",
-                },
-                {
-                  kind: "account",
-                  type: "publicKey",
-                  account: "TokenAccount",
-                  path: "delegator_pool",
-                },
-              ],
-              programId: {
-                kind: "account",
-                type: "publicKey",
-                path: "circuit_breaker_program",
-              },
-            },
-          },
-          {
-            name: "delegatorPool",
-            isMut: true,
-            isSigner: false,
-            pda: {
-              seeds: [
-                {
-                  kind: "const",
-                  type: "string",
-                  value: "delegator_pool",
-                },
-                {
-                  kind: "account",
-                  type: "publicKey",
-                  account: "Mint",
-                  path: "dnt_mint",
-                },
-              ],
             },
           },
           {
@@ -707,6 +672,11 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
             isMut: false,
             isSigner: false,
           },
+          {
+            name: "prevSubDaoEpochInfo",
+            isMut: true,
+            isSigner: false,
+          },
         ],
         args: [
           {
@@ -724,19 +694,13 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
             name: "dao",
             isMut: false,
             isSigner: false,
-            relations: ["hnt_mint"],
+            relations: ["hnt_mint", "delegator_pool", "rewards_escrow"],
           },
           {
             name: "subDao",
             isMut: true,
             isSigner: false,
-            relations: [
-              "dao",
-              "treasury",
-              "dnt_mint",
-              "rewards_escrow",
-              "delegator_pool",
-            ],
+            relations: ["dao", "treasury", "dnt_mint"],
           },
           {
             name: "daoEpochInfo",
@@ -810,31 +774,6 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
                   type: "publicKey",
                   account: "Mint",
                   path: "hnt_mint",
-                },
-              ],
-              programId: {
-                kind: "account",
-                type: "publicKey",
-                path: "circuit_breaker_program",
-              },
-            },
-          },
-          {
-            name: "dntCircuitBreaker",
-            isMut: true,
-            isSigner: false,
-            pda: {
-              seeds: [
-                {
-                  kind: "const",
-                  type: "string",
-                  value: "mint_windowed_breaker",
-                },
-                {
-                  kind: "account",
-                  type: "publicKey",
-                  account: "Mint",
-                  path: "dnt_mint",
                 },
               ],
               programId: {
@@ -947,6 +886,7 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
             name: "registrar",
             isMut: false,
             isSigner: false,
+            relations: ["proxy_config"],
           },
           {
             name: "dao",
@@ -1002,6 +942,11 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
           },
           {
             name: "systemProgram",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "proxyConfig",
             isMut: false,
             isSigner: false,
           },
@@ -1308,6 +1253,190 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
         ],
       },
       {
+        name: "claimRewardsV1",
+        accounts: [
+          {
+            name: "position",
+            isMut: false,
+            isSigner: false,
+            pda: {
+              seeds: [
+                {
+                  kind: "const",
+                  type: "string",
+                  value: "position",
+                },
+                {
+                  kind: "account",
+                  type: "publicKey",
+                  account: "Mint",
+                  path: "mint",
+                },
+              ],
+              programId: {
+                kind: "account",
+                type: "publicKey",
+                path: "vsr_program",
+              },
+            },
+            relations: ["mint", "registrar"],
+          },
+          {
+            name: "mint",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "positionTokenAccount",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "positionAuthority",
+            isMut: true,
+            isSigner: true,
+          },
+          {
+            name: "registrar",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "dao",
+            isMut: false,
+            isSigner: false,
+            relations: ["registrar", "hnt_mint", "delegator_pool"],
+          },
+          {
+            name: "subDao",
+            isMut: true,
+            isSigner: false,
+            relations: ["dao"],
+          },
+          {
+            name: "delegatedPosition",
+            isMut: true,
+            isSigner: false,
+            pda: {
+              seeds: [
+                {
+                  kind: "const",
+                  type: "string",
+                  value: "delegated_position",
+                },
+                {
+                  kind: "account",
+                  type: "publicKey",
+                  account: "PositionV0",
+                  path: "position",
+                },
+              ],
+            },
+            relations: ["sub_dao"],
+          },
+          {
+            name: "hntMint",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "subDaoEpochInfo",
+            isMut: false,
+            isSigner: false,
+            pda: {
+              seeds: [
+                {
+                  kind: "const",
+                  type: "string",
+                  value: "sub_dao_epoch_info",
+                },
+                {
+                  kind: "account",
+                  type: "publicKey",
+                  account: "SubDaoV0",
+                  path: "sub_dao",
+                },
+                {
+                  kind: "arg",
+                  type: {
+                    defined: "ClaimRewardsArgsV0",
+                  },
+                  path: "args.epoch",
+                },
+              ],
+            },
+          },
+          {
+            name: "delegatorPool",
+            isMut: true,
+            isSigner: false,
+          },
+          {
+            name: "delegatorAta",
+            isMut: true,
+            isSigner: false,
+          },
+          {
+            name: "delegatorPoolCircuitBreaker",
+            isMut: true,
+            isSigner: false,
+            pda: {
+              seeds: [
+                {
+                  kind: "const",
+                  type: "string",
+                  value: "account_windowed_breaker",
+                },
+                {
+                  kind: "account",
+                  type: "publicKey",
+                  account: "TokenAccount",
+                  path: "delegator_pool",
+                },
+              ],
+              programId: {
+                kind: "account",
+                type: "publicKey",
+                path: "circuit_breaker_program",
+              },
+            },
+          },
+          {
+            name: "vsrProgram",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "systemProgram",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "circuitBreakerProgram",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "associatedTokenProgram",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "tokenProgram",
+            isMut: false,
+            isSigner: false,
+          },
+        ],
+        args: [
+          {
+            name: "args",
+            type: {
+              defined: "ClaimRewardsArgsV0",
+            },
+          },
+        ],
+      },
+      {
         name: "transferV0",
         accounts: [
           {
@@ -1459,103 +1588,6 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
             name: "args",
             type: {
               defined: "TransferArgsV0",
-            },
-          },
-        ],
-      },
-      {
-        name: "issueHstPoolV0",
-        accounts: [
-          {
-            name: "dao",
-            isMut: true,
-            isSigner: false,
-            relations: ["hnt_mint", "hst_pool"],
-          },
-          {
-            name: "daoEpochInfo",
-            isMut: true,
-            isSigner: false,
-            pda: {
-              seeds: [
-                {
-                  kind: "const",
-                  type: "string",
-                  value: "dao_epoch_info",
-                },
-                {
-                  kind: "account",
-                  type: "publicKey",
-                  account: "DaoV0",
-                  path: "dao",
-                },
-                {
-                  kind: "arg",
-                  type: {
-                    defined: "IssueHstPoolArgsV0",
-                  },
-                  path: "args.epoch",
-                },
-              ],
-            },
-            relations: ["dao"],
-          },
-          {
-            name: "hntCircuitBreaker",
-            isMut: true,
-            isSigner: false,
-            pda: {
-              seeds: [
-                {
-                  kind: "const",
-                  type: "string",
-                  value: "mint_windowed_breaker",
-                },
-                {
-                  kind: "account",
-                  type: "publicKey",
-                  account: "Mint",
-                  path: "hnt_mint",
-                },
-              ],
-              programId: {
-                kind: "account",
-                type: "publicKey",
-                path: "circuit_breaker_program",
-              },
-            },
-          },
-          {
-            name: "hntMint",
-            isMut: true,
-            isSigner: false,
-          },
-          {
-            name: "hstPool",
-            isMut: true,
-            isSigner: false,
-          },
-          {
-            name: "systemProgram",
-            isMut: false,
-            isSigner: false,
-          },
-          {
-            name: "tokenProgram",
-            isMut: false,
-            isSigner: false,
-          },
-          {
-            name: "circuitBreakerProgram",
-            isMut: false,
-            isSigner: false,
-          },
-        ],
-        args: [
-          {
-            name: "args",
-            type: {
-              defined: "IssueHstPoolArgsV0",
             },
           },
         ],
@@ -1848,10 +1880,298 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
         ],
         args: [],
       },
+      {
+        name: "initializeHntDelegatorPool",
+        accounts: [
+          {
+            name: "payer",
+            isMut: true,
+            isSigner: true,
+          },
+          {
+            name: "dao",
+            isMut: true,
+            isSigner: false,
+            relations: ["authority", "hnt_mint"],
+          },
+          {
+            name: "authority",
+            isMut: false,
+            isSigner: true,
+          },
+          {
+            name: "hntMint",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "delegatorPoolCircuitBreaker",
+            isMut: true,
+            isSigner: false,
+            pda: {
+              seeds: [
+                {
+                  kind: "const",
+                  type: "string",
+                  value: "account_windowed_breaker",
+                },
+                {
+                  kind: "account",
+                  type: "publicKey",
+                  account: "TokenAccount",
+                  path: "delegator_pool",
+                },
+              ],
+              programId: {
+                kind: "account",
+                type: "publicKey",
+                path: "circuit_breaker_program",
+              },
+            },
+          },
+          {
+            name: "delegatorPool",
+            isMut: true,
+            isSigner: false,
+          },
+          {
+            name: "rewardsEscrow",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "systemProgram",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "tokenProgram",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "circuitBreakerProgram",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "associatedTokenProgram",
+            isMut: false,
+            isSigner: false,
+          },
+        ],
+        args: [],
+      },
+      {
+        name: "addExpirationTs",
+        accounts: [
+          {
+            name: "payer",
+            isMut: true,
+            isSigner: true,
+          },
+          {
+            name: "position",
+            isMut: true,
+            isSigner: false,
+          },
+          {
+            name: "registrar",
+            isMut: false,
+            isSigner: false,
+            relations: ["proxy_config"],
+          },
+          {
+            name: "dao",
+            isMut: false,
+            isSigner: false,
+            relations: ["registrar"],
+          },
+          {
+            name: "subDao",
+            isMut: true,
+            isSigner: false,
+            relations: ["dao"],
+          },
+          {
+            name: "delegatedPosition",
+            isMut: true,
+            isSigner: false,
+            pda: {
+              seeds: [
+                {
+                  kind: "const",
+                  type: "string",
+                  value: "delegated_position",
+                },
+                {
+                  kind: "account",
+                  type: "publicKey",
+                  account: "PositionV0",
+                  path: "position",
+                },
+              ],
+            },
+            relations: ["position", "sub_dao"],
+          },
+          {
+            name: "oldClosingTimeSubDaoEpochInfo",
+            isMut: true,
+            isSigner: false,
+          },
+          {
+            name: "closingTimeSubDaoEpochInfo",
+            isMut: true,
+            isSigner: false,
+          },
+          {
+            name: "genesisEndSubDaoEpochInfo",
+            isMut: true,
+            isSigner: false,
+          },
+          {
+            name: "proxyConfig",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "systemProgram",
+            isMut: false,
+            isSigner: false,
+          },
+        ],
+        args: [],
+      },
+      {
+        name: "tempResizeAccount",
+        accounts: [
+          {
+            name: "payer",
+            isMut: true,
+            isSigner: true,
+          },
+          {
+            name: "account",
+            isMut: true,
+            isSigner: false,
+          },
+          {
+            name: "systemProgram",
+            isMut: false,
+            isSigner: false,
+          },
+        ],
+        args: [],
+      },
+      {
+        name: "trackVoteV0",
+        accounts: [
+          {
+            name: "payer",
+            isMut: true,
+            isSigner: true,
+          },
+          {
+            name: "proposal",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "registrar",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "position",
+            isMut: true,
+            isSigner: false,
+            relations: ["mint", "registrar"],
+          },
+          {
+            name: "mint",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "marker",
+            isMut: false,
+            isSigner: false,
+            pda: {
+              seeds: [
+                {
+                  kind: "const",
+                  type: "string",
+                  value: "marker",
+                },
+                {
+                  kind: "account",
+                  type: "publicKey",
+                  account: "Mint",
+                  path: "mint",
+                },
+                {
+                  kind: "account",
+                  type: "publicKey",
+                  account: "ProposalV0",
+                  path: "proposal",
+                },
+              ],
+            },
+          },
+          {
+            name: "dao",
+            isMut: true,
+            isSigner: false,
+          },
+          {
+            name: "subDao",
+            isMut: false,
+            isSigner: false,
+            relations: ["dao"],
+          },
+          {
+            name: "delegatedPosition",
+            isMut: true,
+            isSigner: false,
+            pda: {
+              seeds: [
+                {
+                  kind: "const",
+                  type: "string",
+                  value: "delegated_position",
+                },
+                {
+                  kind: "account",
+                  type: "publicKey",
+                  account: "PositionV0",
+                  path: "position",
+                },
+              ],
+            },
+            relations: ["sub_dao"],
+          },
+          {
+            name: "daoEpochInfo",
+            isMut: true,
+            isSigner: false,
+          },
+          {
+            name: "vsrProgram",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "systemProgram",
+            isMut: false,
+            isSigner: false,
+          },
+        ],
+        args: [],
+      },
     ],
     accounts: [
       {
-        name: "daoV0",
+        name: "DaoV0",
         type: {
           kind: "struct",
           fields: [
@@ -1903,11 +2223,38 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
               name: "bumpSeed",
               type: "u8",
             },
+            {
+              name: "rewardsEscrow",
+              type: "publicKey",
+            },
+            {
+              name: "delegatorPool",
+              type: "publicKey",
+            },
+            {
+              name: "delegatorRewardsPercent",
+              type: "u64",
+            },
+            {
+              name: "proposalNamespace",
+              type: "publicKey",
+            },
+            {
+              name: "recentProposals",
+              type: {
+                array: [
+                  {
+                    defined: "RecentProposal",
+                  },
+                  4,
+                ],
+              },
+            },
           ],
         },
       },
       {
-        name: "daoEpochInfoV0",
+        name: "DaoEpochInfoV0",
         type: {
           kind: "struct",
           fields: [
@@ -1956,11 +2303,22 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
               name: "bumpSeed",
               type: "u8",
             },
+            {
+              name: "recentProposals",
+              type: {
+                array: [
+                  {
+                    defined: "RecentProposal",
+                  },
+                  4,
+                ],
+              },
+            },
           ],
         },
       },
       {
-        name: "delegatedPositionV0",
+        name: "DelegatedPositionV0",
         type: {
           kind: "struct",
           fields: [
@@ -2000,11 +2358,23 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
               name: "claimedEpochsBitmap",
               type: "u128",
             },
+            {
+              name: "expirationTs",
+              type: "i64",
+            },
+            {
+              name: "recentProposals",
+              type: {
+                vec: {
+                  defined: "RecentProposal",
+                },
+              },
+            },
           ],
         },
       },
       {
-        name: "subDaoEpochInfoV0",
+        name: "SubDaoEpochInfoV0",
         type: {
           kind: "struct",
           fields: [
@@ -2078,11 +2448,25 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
               name: "dcOnboardingFeesPaid",
               type: "u64",
             },
+            {
+              name: "hntDelegationRewardsIssued",
+              docs: [
+                "The number of hnt delegation rewards issued this epoch, so that delegators can claim their share of the rewards",
+              ],
+              type: "u64",
+            },
+            {
+              name: "hntRewardsIssued",
+              docs: [
+                "The number of hnt rewards issued to the reward escrow this epoch",
+              ],
+              type: "u64",
+            },
           ],
         },
       },
       {
-        name: "subDaoV0",
+        name: "SubDaoV0",
         type: {
           kind: "struct",
           fields: [
@@ -2104,6 +2488,9 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
             },
             {
               name: "delegatorPool",
+              docs: [
+                "DEPRECATED: use dao.delegator_pool instead. But some people still need to claim old DNT rewards",
+              ],
               type: "publicKey",
             },
             {
@@ -2151,7 +2538,7 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
               type: "publicKey",
             },
             {
-              name: "delegatorRewardsPercent",
+              name: "deprecatedDelegatorRewardsPercent",
               type: "u64",
             },
             {
@@ -2304,6 +2691,14 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
               name: "registrar",
               type: "publicKey",
             },
+            {
+              name: "proposalNamespace",
+              type: "publicKey",
+            },
+            {
+              name: "delegatorRewardsPercent",
+              type: "u64",
+            },
           ],
         },
       },
@@ -2344,28 +2739,12 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
               type: "publicKey",
             },
             {
-              name: "delegatorRewardsPercent",
-              type: "u64",
-            },
-            {
               name: "onboardingDataOnlyDcFee",
               type: "u64",
             },
             {
               name: "activeDeviceAuthority",
               type: "publicKey",
-            },
-          ],
-        },
-      },
-      {
-        name: "IssueHstPoolArgsV0",
-        type: {
-          kind: "struct",
-          fields: [
-            {
-              name: "epoch",
-              type: "u64",
             },
           ],
         },
@@ -2485,6 +2864,18 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
                 option: "u64",
               },
             },
+            {
+              name: "proposalNamespace",
+              type: {
+                option: "publicKey",
+              },
+            },
+            {
+              name: "delegatorRewardsPercent",
+              type: {
+                option: "u64",
+              },
+            },
           ],
         },
       },
@@ -2525,12 +2916,6 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
               name: "registrar",
               type: {
                 option: "publicKey",
-              },
-            },
-            {
-              name: "delegatorRewardsPercent",
-              type: {
-                option: "u64",
               },
             },
             {
@@ -2602,6 +2987,22 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
             {
               name: "percent",
               type: "u8",
+            },
+          ],
+        },
+      },
+      {
+        name: "RecentProposal",
+        type: {
+          kind: "struct",
+          fields: [
+            {
+              name: "proposal",
+              type: "publicKey",
+            },
+            {
+              name: "ts",
+              type: "i64",
             },
           ],
         },
@@ -2741,7 +3142,15 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
         name: "NoDelegateEndingPosition",
         msg: "Cannot delegate on a position ending this epoch",
       },
+      {
+        code: 6017,
+        name: "InvalidMarker",
+        msg: "Invalid vote marker",
+      },
     ],
+    metadata: {
+      address: "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR",
+    },
   },
   credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT: {
     version: "0.2.2",
