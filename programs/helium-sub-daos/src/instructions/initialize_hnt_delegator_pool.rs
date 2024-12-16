@@ -39,11 +39,6 @@ pub struct InitializeHntDelegatorPool<'info> {
     associated_token::authority = dao,
   )]
   pub delegator_pool: Box<Account<'info, TokenAccount>>,
-  #[account(
-    token::mint = hnt_mint,
-  )]
-  pub rewards_escrow: Box<Account<'info, TokenAccount>>,
-
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,

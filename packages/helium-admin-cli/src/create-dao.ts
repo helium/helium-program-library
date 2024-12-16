@@ -542,6 +542,7 @@ export async function run(args: any = process.argv) {
             netEmissionsCap: null,
             proposalNamespace: organizationKey("Helium")[0],
             delegatorRewardsPercent: delegatorRewardsPercent(argv.delegatorRewardsPercent),
+            rewardsEscrow,
           })
           .accounts({
             dao,

@@ -12,6 +12,7 @@ pub struct UpdateDaoArgsV0 {
   pub net_emissions_cap: Option<u64>,
   pub proposal_namespace: Option<Pubkey>,
   pub delegator_rewards_percent: Option<u64>,
+  pub rewards_escrow: Option<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -34,6 +35,10 @@ pub fn handler(ctx: Context<UpdateDaoV0>, args: UpdateDaoArgsV0) -> Result<()> {
   let mut should_resize = false;
   if let Some(new_authority) = args.authority {
     ctx.accounts.dao.authority = new_authority;
+  }
+
+  if let Some(rewards_escrow) = args.rewards_escrow {
+    ctx.accounts.dao.rewards_escrow = rewards_escrow;
   }
 
   if let Some(hst_emission_schedule) = args.hst_emission_schedule {
