@@ -539,6 +539,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.28.0
     "@fastify/cors": ^8.1.1
     "@helium/account-fetch-cache": ^0.9.18
+    "@helium/spl-utils": ^0.9.18
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/web3.js": ^1.78.8
     "@substreams/core": ^0.16.0

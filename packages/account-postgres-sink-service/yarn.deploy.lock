@@ -200,6 +200,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.28.0
     "@fastify/cors": ^8.1.1
     "@helium/account-fetch-cache": ^0.9.18
+    "@helium/spl-utils": ^0.9.18
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/web3.js": ^1.78.8
     "@substreams/core": ^0.16.0
@@ -241,6 +242,53 @@ __metadata:
     ts-node-dev: ^2.0.0
     typescript: ^5.2.2
     yargs: ^17.7.1
+  languageName: unknown
+  linkType: soft
+
+"@helium/address@npm:^4.10.2":
+  version: 4.10.2
+  resolution: "@helium/address@npm:4.10.2"
+  dependencies:
+    bs58: "npm:^5.0.0"
+    js-sha256: "npm:^0.9.0"
+    multiformats: "npm:^9.6.4"
+  checksum: 4d83df57c638ed1496a92241a2f45da671e11b6397f02ab65c5281cbd1a435548e7ffd5be969d8d214b5af045e9be4bdd2d89f41744289c17e6410d458b03bcc
+  languageName: node
+  linkType: hard
+
+"@helium/anchor-resolvers@^0.9.18":
+  version: 0.0.0-use.local
+  resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
+  dependencies:
+    "@solana/spl-token": ^0.3.8
+    "@solana/web3.js": ^1.78.8
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  peerDependencies:
+    "@coral-xyz/anchor": ^0.28.0
+  languageName: unknown
+  linkType: soft
+
+"@helium/spl-utils@^0.9.18":
+  version: 0.0.0-use.local
+  resolution: "@helium/spl-utils@workspace:packages/spl-utils"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@helium/account-fetch-cache": ^0.9.18
+    "@helium/address": ^4.10.2
+    "@helium/anchor-resolvers": ^0.9.18
+    "@metaplex-foundation/mpl-token-metadata": ^2.10.0
+    "@solana/spl-account-compression": ^0.1.7
+    "@solana/spl-token": ^0.3.8
+    "@solana/web3.js": ^1.78.8
+    axios: ^1.5.0
+    bn.js: ^5.2.0
+    borsh: ^0.7.0
+    bs58: ^4.0.1
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
   languageName: unknown
   linkType: soft
 
@@ -476,7 +524,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/spl-token@npm:^0.3.6":
+"@solana/spl-account-compression@npm:^0.1.7":
+  version: 0.1.10
+  resolution: "@solana/spl-account-compression@npm:0.1.10"
+  dependencies:
+    "@metaplex-foundation/beet": "npm:^0.7.1"
+    "@metaplex-foundation/beet-solana": "npm:^0.4.0"
+    bn.js: "npm:^5.2.1"
+    borsh: "npm:^0.7.0"
+    js-sha3: "npm:^0.8.0"
+    typescript-collections: "npm:^1.3.3"
+  peerDependencies:
+    "@solana/web3.js": ^1.50.1
+  checksum: 99bd851933c46a068dbd13484770edd7ae12488b1474ee2e9d7dfd114087f3f9f813745795f91278142fbeb09aec1024f74ef2d2c8be2b47f1df319d37f0af11
+  languageName: node
+  linkType: hard
+
+"@solana/spl-token@npm:^0.3.6, @solana/spl-token@npm:^0.3.8":
   version: 0.3.8
   resolution: "@solana/spl-token@npm:0.3.8"
   dependencies:
@@ -1009,7 +1073,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"axios@npm:^1.3.6":
+"axios@npm:^1.3.6, axios@npm:^1.5.0":
   version: 1.5.0
   resolution: "axios@npm:1.5.0"
   dependencies:
@@ -2561,6 +2625,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"js-sha3@npm:^0.8.0":
+  version: 0.8.0
+  resolution: "js-sha3@npm:0.8.0"
+  checksum: 75df77c1fc266973f06cce8309ce010e9e9f07ec35ab12022ed29b7f0d9c8757f5a73e1b35aa24840dced0dea7059085aa143d817aea9e188e2a80d569d9adce
+  languageName: node
+  linkType: hard
+
 "json-schema-traverse@npm:^1.0.0":
   version: 1.0.0
   resolution: "json-schema-traverse@npm:1.0.0"
@@ -2891,6 +2962,13 @@ __metadata:
   version: 2.1.3
   resolution: "ms@npm:2.1.3"
   checksum: aa92de608021b242401676e35cfa5aa42dd70cbdc082b916da7fb925c542173e36bce97ea3e804923fe92c0ad991434e4a38327e15a1b5b5f945d66df615ae6d
+  languageName: node
+  linkType: hard
+
+"multiformats@npm:^9.6.4":
+  version: 9.9.0
+  resolution: "multiformats@npm:9.9.0"
+  checksum: d3e8c1be400c09a014f557ea02251a2710dbc9fca5aa32cc702ff29f636c5471e17979f30bdcb0a9cbb556f162a8591dc2e1219c24fc21394a56115b820bb84e
   languageName: node
   linkType: hard
 
@@ -4170,6 +4248,13 @@ __metadata:
   version: 2.6.2
   resolution: "tslib@npm:2.6.2"
   checksum: 329ea56123005922f39642318e3d1f0f8265d1e7fcb92c633e0809521da75eeaca28d2cf96d7248229deb40e5c19adf408259f4b9640afd20d13aecc1430f3ad
+  languageName: node
+  linkType: hard
+
+"typescript-collections@npm:^1.3.3":
+  version: 1.3.3
+  resolution: "typescript-collections@npm:1.3.3"
+  checksum: a27f07dffdfe8407c4302eedb3e578b1360de783626cbd53519bd9c7943293a2940ed1ec3004cafae9dce049768b143185a36ca812d0d5c3c0f621a289239633
   languageName: node
   linkType: hard
 
