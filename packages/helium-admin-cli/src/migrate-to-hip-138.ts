@@ -193,7 +193,7 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  if (!daoAcc.rewardsEscrow || daoAcc.rewardsEscrow.equals(PublicKey.default)) {
+  if (!daoAcc.delegatorPool || daoAcc.delegatorPool.equals(PublicKey.default)) {
     instructions.push(
       await hsdProgram.methods
         .initializeHntDelegatorPool()
@@ -201,7 +201,6 @@ export async function run(args: any = process.argv) {
           dao,
           payer: daoAcc.authority,
           delegatorPool: getAssociatedTokenAddressSync(hntMint, dao, true),
-          rewardsEscrow: getAssociatedTokenAddressSync(hntMint, ld, true),
           authority: daoAcc.authority,
         })
         .instruction()
