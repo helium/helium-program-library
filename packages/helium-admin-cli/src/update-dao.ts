@@ -132,6 +132,7 @@ export async function run(args: any = process.argv) {
         delegatorRewardsPercent: argv.delegatorRewardsPercent
           ? delegatorRewardsPercent(argv.delegatorRewardsPercent)
           : null,
+        rewardsEscrow: null,  
       })
       .accounts({
         dao,
