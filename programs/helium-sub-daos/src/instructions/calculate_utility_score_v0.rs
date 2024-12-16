@@ -154,6 +154,9 @@ pub fn handler(
 
   // Apply a 90 day smooth
   let utility_score_prec = vehnt_staked
+    // Add 12 decimals of precision
+    .checked_mul(&PreciseNumber::new(1000000000000_u128).unwrap()) // First convert vehnt to 12 decimals
+    .unwrap()
     .checked_div(&PreciseNumber::new(90_u128).unwrap())
     .unwrap()
     .checked_add(
@@ -165,21 +168,20 @@ pub fn handler(
             .prev_sub_dao_epoch_info
             .utility_score
             .and_then(PreciseNumber::new)
-            .unwrap_or(vehnt_staked),
+            .unwrap_or_else(|| {
+              vehnt_staked
+                // Add 12 decimals of precision
+                .checked_mul(&PreciseNumber::new(1000000000000_u128).unwrap())
+                .unwrap()
+            }),
         )
         .unwrap()
         .checked_div(&PreciseNumber::new(90_u128).unwrap())
         .unwrap(),
     )
     .unwrap();
-  // Convert to u128 with 12 decimals of precision
-  let utility_score = utility_score_prec
-    .checked_mul(
-      &PreciseNumber::new(1000000000000_u128).unwrap(), // u128 with 12 decimal places
-    )
-    .unwrap()
-    .to_imprecise()
-    .unwrap();
+
+  let utility_score = utility_score_prec.to_imprecise().unwrap();
 
   // Store utility scores
   epoch_info.utility_score = Some(utility_score);
