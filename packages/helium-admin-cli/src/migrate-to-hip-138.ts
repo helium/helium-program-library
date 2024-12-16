@@ -3,9 +3,12 @@ import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
   daoKey,
   delegatorRewardsPercent,
-  init as initHsd
+  init as initHsd,
 } from "@helium/helium-sub-daos-sdk";
-import { init as initLazy, lazyDistributorKey } from "@helium/lazy-distributor-sdk";
+import {
+  init as initLazy,
+  lazyDistributorKey,
+} from "@helium/lazy-distributor-sdk";
 import { organizationKey } from "@helium/organization-sdk";
 import { oracleSignerKey } from "@helium/rewards-oracle-sdk";
 import {
@@ -102,29 +105,29 @@ export async function run(args: any = process.argv) {
   const dao = daoKey(hntMint)[0];
 
   const resizes: TransactionInstruction[] = [];
-  resizes.push(
-    await hsdProgram.methods
-      .tempResizeAccount()
-      .accounts({
-        account: dao,
-        payer: wallet.publicKey,
-      })
-      .instruction()
-  );
-  const daoEpochInfos = await hsdProgram.account.daoEpochInfoV0.all();
-  for (const daoEpochInfo of daoEpochInfos) {
-    resizes.push(
-      await hsdProgram.methods
-        .tempResizeAccount()
-        .accounts({
-          account: daoEpochInfo.publicKey,
-          payer: wallet.publicKey,
-        })
-        .instruction()
-    );
-  }
+  // resizes.push(
+  //   await hsdProgram.methods
+  //     .tempResizeAccount()
+  //     .accounts({
+  //       account: dao,
+  //       payer: wallet.publicKey,
+  //     })
+  //     .instruction()
+  // );
+  // const daoEpochInfos = await hsdProgram.account.daoEpochInfoV0.all();
+  // for (const daoEpochInfo of daoEpochInfos) {
+  //   resizes.push(
+  //     await hsdProgram.methods
+  //       .tempResizeAccount()
+  //       .accounts({
+  //         account: daoEpochInfo.publicKey,
+  //         payer: wallet.publicKey,
+  //       })
+  //       .instruction()
+  //   );
+  // }
   console.log("Resizing accounts");
-  await batchParallelInstructionsWithPriorityFee(provider, resizes);``
+  // await batchParallelInstructionsWithPriorityFee(provider, resizes);
 
   const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
   const authority = daoAcc.authority;
@@ -180,6 +183,7 @@ export async function run(args: any = process.argv) {
         hstPool: null,
         proposalNamespace: organizationKey("Helium")[0],
         delegatorRewardsPercent: delegatorRewardsPercent(6),
+        rewardsEscrow: getAssociatedTokenAddressSync(hntMint, ld, true),
       })
       .accounts({
         dao,
@@ -189,7 +193,7 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  if (!daoAcc.rewardsEscrow) {
+  if (!daoAcc.rewardsEscrow || daoAcc.rewardsEscrow.equals(PublicKey.default)) {
     instructions.push(
       await hsdProgram.methods
         .initializeHntDelegatorPool()
@@ -197,6 +201,8 @@ export async function run(args: any = process.argv) {
           dao,
           payer: daoAcc.authority,
           delegatorPool: getAssociatedTokenAddressSync(hntMint, dao, true),
+          rewardsEscrow: getAssociatedTokenAddressSync(hntMint, ld, true),
+          authority: daoAcc.authority,
         })
         .instruction()
     );
