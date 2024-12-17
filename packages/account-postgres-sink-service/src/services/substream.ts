@@ -13,7 +13,12 @@ import {
 } from "@substreams/core";
 import { FastifyInstance } from "fastify";
 import { Op } from "sequelize";
-import { SUBSTREAM, SUBSTREAM_API_KEY, SUBSTREAM_URL } from "../env";
+import {
+  PRODUCTION,
+  SUBSTREAM,
+  SUBSTREAM_API_KEY,
+  SUBSTREAM_URL,
+} from "../env";
 import { getPluginsByAccountTypeByProgram } from "../plugins";
 import { IConfig } from "../types";
 import { Cursor, database } from "../utils/database";
@@ -79,8 +84,7 @@ export const setupSubstream = async (
       const request = createRequest({
         substreamPackage: substream,
         outputModule: MODULE,
-        // Todo Bry: Setup as env
-        productionMode: false,
+        productionMode: PRODUCTION,
         startBlockNum: cursor ? undefined : currentBlock,
         startCursor: cursor,
       });

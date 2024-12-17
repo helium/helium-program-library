@@ -6,6 +6,7 @@ process.env.ANCHOR_WALLET =
   process.env.ANCHOR_WALLET || os.homedir() + "/.config/solana/id.json";
 
 const getEnvBoolean = (key: string): boolean => process.env[key] === "true";
+export const PRODUCTION = process.env.NODE_ENV === "production" || false;
 export const SOLANA_URL = process.env.SOLANA_URL || "http://127.0.0.1:8899";
 
 export const REFRESH_PASSWORD = process.env.REFRESH_PASSWORD;
