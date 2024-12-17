@@ -18,6 +18,7 @@ import {
   SUBSTREAM,
   SUBSTREAM_API_KEY,
   SUBSTREAM_URL,
+  SUBSTREAM_CURSOR_MAX_AGE_DAYS,
 } from "../env";
 import { getPluginsByAccountTypeByProgram } from "../plugins";
 import { IConfig } from "../types";
@@ -77,9 +78,33 @@ export const setupSubstream = async (
 
     await Cursor.sync({ alter: true });
     const lastCursor = await Cursor.findOne({ order: [["createdAt", "DESC"]] });
+    let cursor: string | undefined;
 
     try {
-      let cursor = lastCursor?.cursor;
+      console.log("Connected to Substream");
+      if (lastCursor) {
+        const cursorDate = new Date(lastCursor.dataValues.createdAt);
+        const cursorAge =
+          (Date.now() - cursorDate.getTime()) / (24 * 60 * 60 * 1000);
+
+        if (cursorAge > SUBSTREAM_CURSOR_MAX_AGE_DAYS) {
+          console.log(
+            `Cursor is ${Math.floor(
+              cursorAge
+            )} days old, starting from current block`
+          );
+          cursor = undefined;
+        } else {
+          cursor = lastCursor.cursor;
+          console.log(
+            `Using existing cursor from ${Math.floor(cursorAge)} days ago`
+          );
+        }
+      } else {
+        cursor = undefined;
+        console.log("No existing cursor found, starting from current block");
+      }
+
       const currentBlock = await provider.connection.getSlot("finalized");
       const request = createRequest({
         substreamPackage: substream,
@@ -89,10 +114,9 @@ export const setupSubstream = async (
         startCursor: cursor,
       });
 
-      console.log("Connected to Substream");
       console.log(
         `Substream: Streaming from ${
-          lastCursor ? `cursor ${lastCursor.cursor}` : `block ${currentBlock}`
+          cursor ? `cursor ${cursor}` : `block ${currentBlock}`
         }`
       );
 
@@ -111,7 +135,6 @@ export const setupSubstream = async (
           try {
             const output = unpackMapOutput(response, registry);
             const cursor = message.value.cursor;
-
             if (output !== undefined && !isEmptyMessage(output)) {
               const accountPromises = (output as any).accounts
                 .map(async (account: IOuputAccount) => {

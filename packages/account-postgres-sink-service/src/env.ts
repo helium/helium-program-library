@@ -27,6 +27,8 @@ export const USE_SUBSTREAM = getEnvBoolean("USE_SUBSTREAM");
 export const SUBSTREAM_API_KEY = process.env.SUBSTREAM_API_KEY;
 export const SUBSTREAM_URL = process.env.SUBSTREAM_URL;
 export const SUBSTREAM = process.env.SUBSTREAM;
+export const SUBSTREAM_CURSOR_MAX_AGE_DAYS =
+  Number(process.env.SUBSTREAM_CURSOR_MAX_AGE_DAYS) || 5;
 
 export const USE_KAFKA = getEnvBoolean("USE_KAFKA");
 export const KAFKA_USER = process.env.KAFKA_USER;
