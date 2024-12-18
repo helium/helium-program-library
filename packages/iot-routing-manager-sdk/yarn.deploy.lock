@@ -67,36 +67,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache-hooks@^0.9.18":
-  version: 0.0.0-use.local
-  resolution: "@helium/account-fetch-cache-hooks@workspace:packages/account-fetch-cache-hooks"
-  dependencies:
-    "@helium/account-fetch-cache": ^0.9.18
-    "@solana/web3.js": ^1.78.8
-    git-format-staged: ^2.1.3
-    react-async-hook: ^4.0.0
-    ts-loader: ^9.2.3
-    typescript: ^5.2.2
-  peerDependencies:
-    react: ^16.8 || ^17 || ^18
-    react-dom: ^16.8 || ^17 || ^18
-  languageName: unknown
-  linkType: soft
-
-"@helium/account-fetch-cache-hooks@npm:^0.5.0":
-  version: 0.5.0
-  resolution: "@helium/account-fetch-cache-hooks@npm:0.5.0"
-  dependencies:
-    "@helium/account-fetch-cache": ^0.5.0
-    "@solana/web3.js": ^1.78.4
-    react-async-hook: ^4.0.0
-  peerDependencies:
-    react: ^16.8 || ^17 || ^18
-    react-dom: ^16.8 || ^17 || ^18
-  checksum: a71679ac7d66f201a29db27241ff0642d3ee1717afe5118b4854fc5362b1d6cd26854ca09795b46ba34df1d7baa475bfe57ec65998bbd4e98dec5d1fc2d2c4c9
-  languageName: node
-  linkType: hard
-
 "@helium/account-fetch-cache@^0.9.18":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
@@ -107,15 +77,6 @@ __metadata:
     typescript: ^5.2.2
   languageName: unknown
   linkType: soft
-
-"@helium/account-fetch-cache@npm:^0.5.0":
-  version: 0.5.0
-  resolution: "@helium/account-fetch-cache@npm:0.5.0"
-  dependencies:
-    "@solana/web3.js": ^1.78.4
-  checksum: a6b97424eff96240a0fbe8f7b2890432cb0f4a9ed0a369506c0f6905e8879f4ad13a82a9093ebe005c062bfdedce6e37f03b5bc569a184acbba22ac7d9d8c6dc
-  languageName: node
-  linkType: hard
 
 "@helium/address@npm:^4.10.2":
   version: 4.10.2
@@ -128,7 +89,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@^0.9.18":
+"@helium/anchor-resolvers@^0.9.18, @helium/anchor-resolvers@^0.9.2":
   version: 0.0.0-use.local
   resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
   dependencies:
@@ -183,48 +144,28 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/helium-react-hooks@^0.9.18":
+"@helium/helium-entity-manager-sdk@^0.9.2":
   version: 0.0.0-use.local
-  resolution: "@helium/helium-react-hooks@workspace:packages/helium-react-hooks"
+  resolution: "@helium/helium-entity-manager-sdk@workspace:packages/helium-entity-manager-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.9.18
-    "@helium/account-fetch-cache-hooks": ^0.9.18
-    "@solana/spl-token": ^0.3.8
-    "@solana/wallet-adapter-react": ^0.15.32
-    "@solana/web3.js": ^1.78.8
+    "@helium/address": ^4.10.2
+    "@helium/anchor-resolvers": ^0.9.18
+    "@helium/helium-sub-daos-sdk": ^0.9.18
+    "@helium/idls": ^0.9.18
+    "@helium/no-emit-sdk": ^0.9.18
+    "@helium/spl-utils": ^0.9.18
+    "@types/crypto-js": ^4.1.1
+    bn.js: ^5.2.0
     bs58: ^4.0.1
+    crypto-js: ^4.1.1
     git-format-staged: ^2.1.3
-    pako: ^2.0.3
-    react-async-hook: ^4.0.0
+    js-sha256: ^0.9.0
     ts-loader: ^9.2.3
+    ts-node: ^10.9.1
     typescript: ^5.2.2
-  peerDependencies:
-    "@solana/wallet-adapter-react": ^0.15.32
-    react: ^16.8 || ^17 || ^18
-    react-dom: ^16.8 || ^17 || ^18
   languageName: unknown
   linkType: soft
-
-"@helium/helium-react-hooks@npm:^0.5.0":
-  version: 0.5.0
-  resolution: "@helium/helium-react-hooks@npm:0.5.0"
-  dependencies:
-    "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.5.0
-    "@helium/account-fetch-cache-hooks": ^0.5.0
-    "@solana/spl-token": ^0.3.8
-    "@solana/web3.js": ^1.78.4
-    bs58: ^4.0.1
-    pako: ^2.0.3
-    react-async-hook: ^4.0.0
-  peerDependencies:
-    "@solana/wallet-adapter-react": ^0.15.32
-    react: ^16.8 || ^17 || ^18
-    react-dom: ^16.8 || ^17 || ^18
-  checksum: 4485fd1f46cdd501a990bc16436c89eb8f4a162d09cd580040bc1d34924ac0b15bf37c4b20a1a80995453573f1deac46b11ead6a5b373f3bc13a435d51c6165e
-  languageName: node
-  linkType: hard
 
 "@helium/helium-sub-daos-sdk@^0.9.18":
   version: 0.0.0-use.local
@@ -260,23 +201,21 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/modular-governance-hooks@npm:^0.0.15":
-  version: 0.0.15
-  resolution: "@helium/modular-governance-hooks@npm:0.0.15"
+"@helium/iot-routing-manager-sdk@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "@helium/iot-routing-manager-sdk@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.5.0
-    "@helium/account-fetch-cache-hooks": ^0.5.0
-    "@helium/helium-react-hooks": ^0.5.0
-    "@helium/modular-governance-idls": ^0.0.15
-    "@helium/organization-sdk": ^0.0.15
-    "@solana/web3.js": ^1.78.4
-  peerDependencies:
-    react: ^16.8 || ^17 || ^18
-    react-dom: ^16.8 || ^17 || ^18
-  checksum: fa100950a1f94bfb0cdf06ccbaf6c4fd0596b080b9d4d8380a39f1fb9f13e694e25f3b20d63f3f1b937071dd4ed09b09e33d37cfea23961c516b313609118f6b
-  languageName: node
-  linkType: hard
+    "@helium/anchor-resolvers": ^0.9.2
+    "@helium/helium-entity-manager-sdk": ^0.9.2
+    bn.js: ^5.2.0
+    bs58: ^4.0.1
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@helium/modular-governance-idls@npm:^0.0.10":
   version: 0.0.10
@@ -285,16 +224,6 @@ __metadata:
     "@coral-xyz/anchor": ^0.28.0
     "@solana/web3.js": ^1.78.4
   checksum: 300a5a3085747f7de769ae4ca73620d3aa3902ef4d35ffc1157cff3162ab712410161917ec3e1641bcd128b2657ce22f21b81ae73eecc754f363459791ddd6a7
-  languageName: node
-  linkType: hard
-
-"@helium/modular-governance-idls@npm:^0.0.15":
-  version: 0.0.15
-  resolution: "@helium/modular-governance-idls@npm:0.0.15"
-  dependencies:
-    "@coral-xyz/anchor": ^0.28.0
-    "@solana/web3.js": ^1.78.4
-  checksum: cbfaa2a83b074fb24d138de1901acaa7a0cf0de715bdabb3fdad9ab04b59a34e5f6c02216fdb6b6d78d4fa48bf80fe76d2c657107458f9d9b53d64aa532bc547
   languageName: node
   linkType: hard
 
@@ -310,28 +239,22 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/organization-sdk@npm:^0.0.15":
-  version: 0.0.15
-  resolution: "@helium/organization-sdk@npm:0.0.15"
+"@helium/no-emit-sdk@^0.9.18":
+  version: 0.0.0-use.local
+  resolution: "@helium/no-emit-sdk@workspace:packages/no-emit-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
     "@helium/anchor-resolvers": ^0.5.0
-    "@helium/modular-governance-idls": ^0.0.15
-    "@helium/proposal-sdk": ^0.0.15
-  checksum: 3cdc6f174c9faf0b548c79993fe40ad1985a8f23e8fdafe7c1de9b53eff532deb1fd6e8b68c62e61daad880a976539fdb5dd2630d6249f095db682774dd8ddbf
-  languageName: node
-  linkType: hard
-
-"@helium/proposal-sdk@npm:^0.0.15":
-  version: 0.0.15
-  resolution: "@helium/proposal-sdk@npm:0.0.15"
-  dependencies:
-    "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.5.0
-    "@helium/modular-governance-idls": ^0.0.15
-  checksum: b127e09f428c7f8076341bb692e50bfa19f632dd887502e9d6464fb6066f79975c0fabca223c298c7427c9c6560c49d348f5c33674fd9cc4570f532b34e345dc
-  languageName: node
-  linkType: hard
+    "@helium/idls": ^0.9.18
+    "@helium/spl-utils": ^0.9.18
+    bn.js: ^5.2.0
+    bs58: ^4.0.1
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@helium/spl-utils@^0.9.18":
   version: 0.0.0-use.local
@@ -370,36 +293,6 @@ __metadata:
     ts-loader: ^9.2.3
     ts-node: ^10.9.1
     typescript: ^5.2.2
-  languageName: unknown
-  linkType: soft
-
-"@helium/voter-stake-registry-hooks@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "@helium/voter-stake-registry-hooks@workspace:."
-  dependencies:
-    "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.9.18
-    "@helium/account-fetch-cache-hooks": ^0.9.18
-    "@helium/circuit-breaker-sdk": ^0.9.18
-    "@helium/helium-react-hooks": ^0.9.18
-    "@helium/helium-sub-daos-sdk": ^0.9.18
-    "@helium/modular-governance-hooks": ^0.0.15
-    "@helium/modular-governance-idls": ^0.0.15
-    "@helium/spl-utils": ^0.9.18
-    "@helium/voter-stake-registry-sdk": ^0.9.18
-    "@solana/wallet-adapter-base": ^0.9.22
-    "@solana/wallet-adapter-react": ^0.15.32
-    "@solana/web3.js": ^1.78.8
-    "@tanstack/react-query": ^5.45.0
-    axios: ^1.3.6
-    bs58: ^4.0.1
-    git-format-staged: ^2.1.3
-    react-async-hook: ^4.0.0
-    ts-loader: ^9.2.3
-    typescript: ^5.2.2
-  peerDependencies:
-    react: ^16.8 || ^17 || ^18
-    react-dom: ^16.8 || ^17 || ^18
   languageName: unknown
   linkType: soft
 
@@ -506,7 +399,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@noble/curves@npm:^1.0.0, @noble/curves@npm:^1.1.0":
+"@noble/curves@npm:^1.0.0":
   version: 1.2.0
   resolution: "@noble/curves@npm:1.2.0"
   dependencies:
@@ -551,53 +444,6 @@ __metadata:
   version: 0.11.0
   resolution: "@pkgjs/parseargs@npm:0.11.0"
   checksum: 6ad6a00fc4f2f2cfc6bff76fb1d88b8ee20bc0601e18ebb01b6d4be583733a860239a521a7fbca73b612e66705078809483549d2b18f370eb346c5155c8e4a0f
-  languageName: node
-  linkType: hard
-
-"@react-native-async-storage/async-storage@npm:^1.17.7":
-  version: 1.19.3
-  resolution: "@react-native-async-storage/async-storage@npm:1.19.3"
-  dependencies:
-    merge-options: "npm:^3.0.4"
-  peerDependencies:
-    react-native: ^0.0.0-0 || 0.60 - 0.72 || 1000.0.0
-  checksum: d849e5c8bb08d2130d95cc246749dae820cc1996b6b31defa063a1b67070524d72aed5a0e57ce2fafe3c3726712c09a5a3babaed1358182060ce7cfd8bd2c1a3
-  languageName: node
-  linkType: hard
-
-"@solana-mobile/mobile-wallet-adapter-protocol-web3js@npm:^2.0.1":
-  version: 2.0.1
-  resolution: "@solana-mobile/mobile-wallet-adapter-protocol-web3js@npm:2.0.1"
-  dependencies:
-    "@solana-mobile/mobile-wallet-adapter-protocol": "npm:^1.0.0"
-    bs58: "npm:^5.0.0"
-    js-base64: "npm:^3.7.2"
-  peerDependencies:
-    "@solana/web3.js": ^1.58.0
-  checksum: d5f89e2c002ead3c21591512d50375cc15e4d58969566cd7b71a6125e027707c476821fda099cfe8d5e9182e92f8739c184db8d78fb1562702c9e9f3f54fbe63
-  languageName: node
-  linkType: hard
-
-"@solana-mobile/mobile-wallet-adapter-protocol@npm:^1.0.0":
-  version: 1.0.1
-  resolution: "@solana-mobile/mobile-wallet-adapter-protocol@npm:1.0.1"
-  peerDependencies:
-    react-native: ">0.69"
-  checksum: 898852048c26e8b65fdebdd07f50dbe7a00af113a73f8f414f768c97cde17031432bcb879de670c508b44b4568585c1d58e97f3485c5e9461c731c1614efe256
-  languageName: node
-  linkType: hard
-
-"@solana-mobile/wallet-adapter-mobile@npm:^2.0.0":
-  version: 2.0.1
-  resolution: "@solana-mobile/wallet-adapter-mobile@npm:2.0.1"
-  dependencies:
-    "@react-native-async-storage/async-storage": "npm:^1.17.7"
-    "@solana-mobile/mobile-wallet-adapter-protocol-web3js": "npm:^2.0.1"
-    "@solana/wallet-adapter-base": "npm:^0.9.17"
-    js-base64: "npm:^3.7.2"
-  peerDependencies:
-    "@solana/web3.js": ^1.58.0
-  checksum: 242d2efb5b42fcac7f365c59eb71fe5597332e7732e650ff65212c15d2fc9096e5123639b09038467f5be185f55bf5abfd8a87deebc1de4d1f46c34654024222
   languageName: node
   linkType: hard
 
@@ -651,97 +497,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/wallet-adapter-base@npm:^0.9.17, @solana/wallet-adapter-base@npm:^0.9.22, @solana/wallet-adapter-base@npm:^0.9.23":
-  version: 0.9.23
-  resolution: "@solana/wallet-adapter-base@npm:0.9.23"
-  dependencies:
-    "@solana/wallet-standard-features": "npm:^1.1.0"
-    "@wallet-standard/base": "npm:^1.0.1"
-    "@wallet-standard/features": "npm:^1.0.3"
-    eventemitter3: "npm:^4.0.7"
-  peerDependencies:
-    "@solana/web3.js": ^1.77.3
-  checksum: bd2fc54ae3d82758378c3eb92ab47b976335376082323d3e954e1c18dd35db1fa503eb8d2dd1dd6f6d7936cedfc02ff5db7a5e2f8fc00f6c7d37cf131df906cc
-  languageName: node
-  linkType: hard
-
-"@solana/wallet-adapter-react@npm:^0.15.32":
-  version: 0.15.34
-  resolution: "@solana/wallet-adapter-react@npm:0.15.34"
-  dependencies:
-    "@solana-mobile/wallet-adapter-mobile": "npm:^2.0.0"
-    "@solana/wallet-adapter-base": "npm:^0.9.23"
-    "@solana/wallet-standard-wallet-adapter-react": "npm:^1.1.0"
-  peerDependencies:
-    "@solana/web3.js": ^1.77.3
-    react: "*"
-  checksum: a21b5ebe2e3aa3935f66af6db35fe74383d838a3b6d143d1cd457b23db824552f0dafb0ee9637dda2a5df49c852a068c5e6f548763f4164aa80b8b377cf539b0
-  languageName: node
-  linkType: hard
-
-"@solana/wallet-standard-chains@npm:^1.1.0":
-  version: 1.1.0
-  resolution: "@solana/wallet-standard-chains@npm:1.1.0"
-  dependencies:
-    "@wallet-standard/base": "npm:^1.0.1"
-  checksum: bb408e3a1a71a4571ba6bda31c3679aafeaa1cfe9a34283e5f9c5ff20bada5d128f848eed08aa2fe696199eb462fd688d5c821df75cf6b8eb24ae0c4a354e02e
-  languageName: node
-  linkType: hard
-
-"@solana/wallet-standard-features@npm:^1.1.0":
-  version: 1.1.0
-  resolution: "@solana/wallet-standard-features@npm:1.1.0"
-  dependencies:
-    "@wallet-standard/base": "npm:^1.0.1"
-    "@wallet-standard/features": "npm:^1.0.3"
-  checksum: fc55221bfe006397908bcd951d03e85afc76947207554d5c77b4043f0776c25fb47e3609f6fa5aaad3120a526a351316402ffd4682dcdc23ec13c2b22b5f1970
-  languageName: node
-  linkType: hard
-
-"@solana/wallet-standard-util@npm:^1.1.0":
-  version: 1.1.0
-  resolution: "@solana/wallet-standard-util@npm:1.1.0"
-  dependencies:
-    "@noble/curves": "npm:^1.1.0"
-    "@solana/wallet-standard-chains": "npm:^1.1.0"
-    "@solana/wallet-standard-features": "npm:^1.1.0"
-  checksum: 02608a1c95fcf716784f9edf5eb72377d081ab8a0b921d67e50a866187b7a8247f62f74c6de4881faef35ff47cb915507d0e6f81d3017336d3a0a968d7e7f0a7
-  languageName: node
-  linkType: hard
-
-"@solana/wallet-standard-wallet-adapter-base@npm:^1.1.1":
-  version: 1.1.1
-  resolution: "@solana/wallet-standard-wallet-adapter-base@npm:1.1.1"
-  dependencies:
-    "@solana/wallet-adapter-base": "npm:^0.9.23"
-    "@solana/wallet-standard-chains": "npm:^1.1.0"
-    "@solana/wallet-standard-features": "npm:^1.1.0"
-    "@solana/wallet-standard-util": "npm:^1.1.0"
-    "@wallet-standard/app": "npm:^1.0.1"
-    "@wallet-standard/base": "npm:^1.0.1"
-    "@wallet-standard/features": "npm:^1.0.3"
-    "@wallet-standard/wallet": "npm:^1.0.1"
-  peerDependencies:
-    "@solana/web3.js": ^1.58.0
-    bs58: ^4.0.1
-  checksum: 888cf1cbde8f7daf3da4af5c781ecf944c8e9ffd485d6f75b8a871b4c970b0d964c5c0fa207febc6fbdad46aecb1bf823da13a0194510bbfb6e32af119f8bd82
-  languageName: node
-  linkType: hard
-
-"@solana/wallet-standard-wallet-adapter-react@npm:^1.1.0":
-  version: 1.1.1
-  resolution: "@solana/wallet-standard-wallet-adapter-react@npm:1.1.1"
-  dependencies:
-    "@solana/wallet-standard-wallet-adapter-base": "npm:^1.1.1"
-    "@wallet-standard/app": "npm:^1.0.1"
-    "@wallet-standard/base": "npm:^1.0.1"
-  peerDependencies:
-    "@solana/wallet-adapter-base": "*"
-    react: "*"
-  checksum: 65a6527156af5d53fb00a0a964a14a1ff525ced23f411748c81488825a7b4bc2868520c467f192e0dd1baaa92b1ba7a14ea7e6aa55e83173cd7fb554e53d8d21
-  languageName: node
-  linkType: hard
-
 "@solana/web3.js@npm:^1.32.0, @solana/web3.js@npm:^1.43.4, @solana/web3.js@npm:^1.56.2, @solana/web3.js@npm:^1.66.2, @solana/web3.js@npm:^1.68.0, @solana/web3.js@npm:^1.78.4":
   version: 1.78.4
   resolution: "@solana/web3.js@npm:1.78.4"
@@ -785,24 +540,6 @@ __metadata:
     rpc-websockets: ^7.5.1
     superstruct: ^0.14.2
   checksum: 5b251915057368d0615d6a6f0de7b4d4129c3d0643599551c0a342125601418634851b633a47d19da481973406f0f2928fa4bf1a2c57fb19914e69fd5b81c302
-  languageName: node
-  linkType: hard
-
-"@tanstack/query-core@npm:5.52.0":
-  version: 5.52.0
-  resolution: "@tanstack/query-core@npm:5.52.0"
-  checksum: 1e142995fa9b0eec88009dd1083cd226eaec9125dc668b6485699639f45edb1386e4acd634e0eddc33d3a29e0c9636302824c42ac8c4106935d776fdc41d2638
-  languageName: node
-  linkType: hard
-
-"@tanstack/react-query@npm:^5.45.0":
-  version: 5.52.1
-  resolution: "@tanstack/react-query@npm:5.52.1"
-  dependencies:
-    "@tanstack/query-core": 5.52.0
-  peerDependencies:
-    react: ^18 || ^19
-  checksum: f46bf1f85cc03b8329aee5d8a5a96b4e30dc88aff04d5256ebd0efefe1f507720b42a4be4a9bee340d3ade6cf0ae7b59187de90d87ea973c0f67e3764f76260c
   languageName: node
   linkType: hard
 
@@ -850,6 +587,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/crypto-js@npm:^4.1.1":
+  version: 4.1.1
+  resolution: "@types/crypto-js@npm:4.1.1"
+  checksum: ea3d6a67b69f88baeb6af96004395903d2367a41bd5cd86306da23a44dd96589749495da50974a9b01bb5163c500764c8a33706831eade036bddae016417e3ea
+  languageName: node
+  linkType: hard
+
 "@types/node@npm:*":
   version: 20.5.7
   resolution: "@types/node@npm:20.5.7"
@@ -870,40 +614,6 @@ __metadata:
   dependencies:
     "@types/node": "npm:*"
   checksum: b4c9b8ad209620c9b21e78314ce4ff07515c0cadab9af101c1651e7bfb992d7fd933bd8b9c99d110738fd6db523ed15f82f29f50b45510288da72e964dedb1a3
-  languageName: node
-  linkType: hard
-
-"@wallet-standard/app@npm:^1.0.1":
-  version: 1.0.1
-  resolution: "@wallet-standard/app@npm:1.0.1"
-  dependencies:
-    "@wallet-standard/base": "npm:^1.0.1"
-  checksum: 71d2f1f9a90138d84cacd2aee5512b04e0975f1ddbee55603cf3b8e5c1ede7ba13511aa446ef72a04a4b03beeb4ccb8a928306bc7a21846135d80e1d209d1a71
-  languageName: node
-  linkType: hard
-
-"@wallet-standard/base@npm:^1.0.1":
-  version: 1.0.1
-  resolution: "@wallet-standard/base@npm:1.0.1"
-  checksum: 8f40bee1c69d2c3c0a4c317b3069301406025f8dc1a794b4b4b6d36d2e8e1e38193e6db1c3ac729c773d380f4e2c3a7454bfd3e138708aa6821b6e2029063590
-  languageName: node
-  linkType: hard
-
-"@wallet-standard/features@npm:^1.0.3":
-  version: 1.0.3
-  resolution: "@wallet-standard/features@npm:1.0.3"
-  dependencies:
-    "@wallet-standard/base": "npm:^1.0.1"
-  checksum: 000a4087d6fd70aaed7f66b118c85097f1d75aa29b962467ee7dee179d01ce009ee685552f53caaef67fdfab63d452073f6fb3bcc0471e3c88fc7e742d2c4e05
-  languageName: node
-  linkType: hard
-
-"@wallet-standard/wallet@npm:^1.0.1":
-  version: 1.0.1
-  resolution: "@wallet-standard/wallet@npm:1.0.1"
-  dependencies:
-    "@wallet-standard/base": "npm:^1.0.1"
-  checksum: ada9f3e8f5f42136293b8887673f71dba66ba0037ecade76643f5ec97db53bd7889e70118b154d11cab5efe64d316bcd7db914a2deb564dc8d85d0707dbdc648
   languageName: node
   linkType: hard
 
@@ -1038,7 +748,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"axios@npm:^1.3.6, axios@npm:^1.5.0":
+"axios@npm:^1.5.0":
   version: 1.5.0
   resolution: "axios@npm:1.5.0"
   dependencies:
@@ -1333,6 +1043,13 @@ __metadata:
   version: 1.3.0
   resolution: "crypto-hash@npm:1.3.0"
   checksum: a3a507e0d2b18fbd2da8088a1c62d0c53c009a99bbfa6d851cac069734ffa546922fa51bdd776d006459701cdda873463e5059ece3431aca048fd99e7573d138
+  languageName: node
+  linkType: hard
+
+"crypto-js@npm:^4.1.1":
+  version: 4.1.1
+  resolution: "crypto-js@npm:4.1.1"
+  checksum: b3747c12ee3a7632fab3b3e171ea50f78b182545f0714f6d3e7e2858385f0f4101a15f2517e033802ce9d12ba50a391575ff4638c9de3dd9b2c4bc47768d5425
   languageName: node
   linkType: hard
 
@@ -1743,13 +1460,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"is-plain-obj@npm:^2.1.0":
-  version: 2.1.0
-  resolution: "is-plain-obj@npm:2.1.0"
-  checksum: cec9100678b0a9fe0248a81743041ed990c2d4c99f893d935545cfbc42876cbe86d207f3b895700c690ad2fa520e568c44afc1605044b535a7820c1d40e38daa
-  languageName: node
-  linkType: hard
-
 "isexe@npm:^2.0.0":
   version: 2.0.0
   resolution: "isexe@npm:2.0.0"
@@ -1798,13 +1508,6 @@ __metadata:
   bin:
     jayson: bin/jayson.js
   checksum: 86464322fbdc6db65d2bb4fc278cb6c86fad5c2a506065490d39459f09ba0d30f2b4fb740b33828a1424791419b6c8bd295dc54d361a4ad959bf70cc62b1ca7e
-  languageName: node
-  linkType: hard
-
-"js-base64@npm:^3.7.2":
-  version: 3.7.5
-  resolution: "js-base64@npm:3.7.5"
-  checksum: 67a78c8b1c47b73f1c6fba1957e9fe6fd9dc78ac93ac46cc2e43472dcb9cf150d126fb0e593192e88e0497354fa634d17d255add7cc6ee3c7b4d29870faa8e18
   languageName: node
   linkType: hard
 
@@ -1895,15 +1598,6 @@ __metadata:
     socks-proxy-agent: "npm:^7.0.0"
     ssri: "npm:^10.0.0"
   checksum: 7268bf274a0f6dcf0343829489a4506603ff34bd0649c12058753900b0eb29191dce5dba12680719a5d0a983d3e57810f594a12f3c18494e93a1fbc6348a4540
-  languageName: node
-  linkType: hard
-
-"merge-options@npm:^3.0.4":
-  version: 3.0.4
-  resolution: "merge-options@npm:3.0.4"
-  dependencies:
-    is-plain-obj: "npm:^2.1.0"
-  checksum: d86ddb3dd6e85d558dbf25dc944f3527b6bacb944db3fdda6e84a3f59c4e4b85231095f58b835758b9a57708342dee0f8de0dffa352974a48221487fe9f4584f
   languageName: node
   linkType: hard
 
@@ -2221,15 +1915,6 @@ __metadata:
   version: 1.1.0
   resolution: "proxy-from-env@npm:1.1.0"
   checksum: ed7fcc2ba0a33404958e34d95d18638249a68c430e30fcb6c478497d72739ba64ce9810a24f53a7d921d0c065e5b78e3822759800698167256b04659366ca4d4
-  languageName: node
-  linkType: hard
-
-"react-async-hook@npm:^4.0.0":
-  version: 4.0.0
-  resolution: "react-async-hook@npm:4.0.0"
-  peerDependencies:
-    react: ">=16.8"
-  checksum: 059042027bff2751c89d1226ce7b463e73b54ad4018c627bd27d57c029469280d8e37e282bb943b35f91050fbd7d330965f65f0d8b1b7c0b9492fc848c6d82a3
   languageName: node
   linkType: hard
 
