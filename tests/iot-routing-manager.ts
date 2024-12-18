@@ -228,6 +228,20 @@ describe("iot-routing-manager", () => {
         );
       });
 
+      it("should update the net id", async () => {
+        await irmProgram.methods
+          .updateNetIdV0({
+            authority: PublicKey.default,
+          })
+          .accounts({ netId })
+          .rpc();
+
+        const netIdAcc = await irmProgram.account.netIdV0.fetch(netId);
+        expect(netIdAcc.authority.toBase58()).to.eq(
+          PublicKey.default.toBase58()
+        );
+      });
+
       describe("with an organization", () => {
         let organization: PublicKey;
         beforeEach(async () => {
@@ -271,7 +285,50 @@ describe("iot-routing-manager", () => {
           expect(devaddr.startAddr.toNumber()).to.eq(0);
           expect(devaddr.endAddr.toNumber()).to.eq(16);
         });
+
+        it("should update the organization", async () => {
+          await irmProgram.methods
+            .updateOrganizationV0({
+              authority: PublicKey.default,
+            })
+            .accounts({ organization })
+            .rpc();
+
+          const orgAcc = await irmProgram.account.netIdV0.fetch(netId);
+          expect(orgAcc.authority.toBase58()).to.eq(
+            PublicKey.default.toBase58()
+          );
+        });
       });
+    });
+
+    it("should update the routing manager", async () => {
+      await irmProgram.methods
+        .updateRoutingManagerV0({
+          updateAuthority: PublicKey.default,
+          netIdAuthority: PublicKey.default,
+          devaddrPriceUsd: new anchor.BN(10_000000),
+          ouiPriceUsd: new anchor.BN(10_000000),
+        })
+        .accounts({
+          routingManager,
+        })
+        .rpc();
+
+      const routingManagerAcc =
+        await irmProgram.account.iotRoutingManagerV0.fetch(routingManager);
+      expect(routingManagerAcc.updateAuthority.toBase58).to.eq(
+        PublicKey.default.toBase58()
+      );
+      expect(routingManagerAcc.netIdAuthority.toBase58).to.eq(
+        PublicKey.default.toBase58()
+      );
+      expect(routingManagerAcc.devaddrPriceUsd.toNumber()).to.eq(
+        new anchor.BN(10_000000).toNumber()
+      );
+      expect(routingManagerAcc.ouiPriceUsd.toNumber()).to.eq(
+        new anchor.BN(10_000000).toNumber()
+      );
     });
   });
 });

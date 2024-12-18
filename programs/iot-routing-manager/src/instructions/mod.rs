@@ -9,7 +9,9 @@ pub mod remove_organization_delegate_v0;
 pub mod temp_backfill_devaddr_constraint;
 pub mod temp_backfill_organization;
 pub mod temp_backfill_organization_delegate;
+pub mod update_net_id_v0;
 pub mod update_organization_v0;
+pub mod update_routing_manager_v0;
 
 pub use approve_organization_v0::*;
 pub use initialize_devaddr_constraint_v0::*;
@@ -22,4 +24,6 @@ pub use remove_organization_delegate_v0::*;
 pub use temp_backfill_devaddr_constraint::*;
 pub use temp_backfill_organization::*;
 pub use temp_backfill_organization_delegate::*;
+pub use update_net_id_v0::*;
 pub use update_organization_v0::*;
+pub use update_routing_manager_v0::*;

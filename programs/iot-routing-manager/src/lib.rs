@@ -74,6 +74,17 @@ pub mod iot_routing_manager {
     approve_organization_v0::handler(ctx)
   }
 
+  pub fn update_routing_manager_v0(
+    ctx: Context<UpdateRoutingManagerV0>,
+    args: UpdateRoutingManagerArgsV0,
+  ) -> Result<()> {
+    update_routing_manager_v0::handler(ctx, args)
+  }
+
+  pub fn update_net_id_v0(ctx: Context<UpdateNetIdV0>, args: UpdateNetIdArgsV0) -> Result<()> {
+    update_net_id_v0::handler(ctx, args)
+  }
+
   pub fn update_organization_v0(
     ctx: Context<UpdateOrganizationV0>,
     args: UpdateOrganizationArgsV0,

@@ -4,7 +4,7 @@ use crate::OrganizationV0;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateOrganizationArgsV0 {
-  new_authority: Option<Pubkey>,
+  authority: Option<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -18,8 +18,11 @@ pub struct UpdateOrganizationV0<'info> {
 }
 
 pub fn handler(ctx: Context<UpdateOrganizationV0>, args: UpdateOrganizationArgsV0) -> Result<()> {
-  if let Some(authority) = args.new_authority {
-    ctx.accounts.organization.authority = authority;
+  let organization = &mut ctx.accounts.organization;
+
+  if args.authority.is_some() {
+    organization.authority = args.authority.unwrap()
   }
+
   Ok(())
 }
