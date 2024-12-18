@@ -78,6 +78,11 @@ export async function run(args: any = process.argv) {
       describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
+    oui_wallet: {
+      required: true,
+      type: "string",
+      describe: "Address of wallet to control oui operations",
+    },
     url: {
       alias: "u",
       default: "http://127.0.0.1:8899",
@@ -119,6 +124,7 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const conn = provider.connection;
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
+  const oui_wallet = new PublicKey(argv.oui_wallet);
   const irm = await initIRM(provider);
   const hem = await initHEM(provider);
   const isRds = argv.pgHost.includes("rds.amazon.com");
@@ -392,4 +398,21 @@ export async function run(args: any = process.argv) {
 
   console.log(`Initializing (${devaddrIxs.length}) devaddrConstraints`);
   await batchParallelInstructionsWithPriorityFee(provider, devaddrIxs);
+
+  console.log(`Updating authorites to ${argv.helium_oui_wallet}`);
+  await batchParallelInstructionsWithPriorityFee(provider, [
+    await irm.methods
+      .updateRoutingManagerV0({
+        updateAuthority: null,
+        netIdAuthority: oui_wallet,
+        devaddrPriceUsd: null,
+        ouiPriceUsd: null,
+      })
+      .instruction(),
+    await irm.methods
+      .updateNetIdV0({
+        authority: oui_wallet,
+      })
+      .instruction(),
+  ]);
 }
