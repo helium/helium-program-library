@@ -1,12 +1,14 @@
-use crate::{error::ErrorCode, state::*, TESTING};
-use anchor_lang::prelude::*;
-use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
 use std::{
   cmp::{min, Ordering},
   convert::TryInto,
 };
+
+use anchor_lang::prelude::*;
+use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
 use time::{Duration, OffsetDateTime};
 use voter_stake_registry::state::{LockupKind, PositionV0, VotingMintConfigV0};
+
+use crate::{error::ErrorCode, state::*, TESTING};
 
 pub trait OrArithError<T> {
   fn or_arith_error(self) -> Result<T>;
@@ -279,6 +281,7 @@ pub fn caclulate_vhnt_info(
   curr_ts: i64,
   position: &PositionV0,
   voting_mint_config: &VotingMintConfigV0,
+  expiration_ts: i64,
 ) -> Result<VehntInfo> {
   let vehnt_at_curr_ts = position.voting_power_precise(voting_mint_config, curr_ts)?;
 
@@ -308,7 +311,10 @@ pub fn caclulate_vhnt_info(
     )
     .unwrap()
   } else {
-    position.lockup.seconds_left(curr_ts)
+    min(
+      u64::try_from(expiration_ts.checked_sub(curr_ts).unwrap()).unwrap(),
+      position.lockup.seconds_left(curr_ts),
+    )
   };
   // One second before genesis end, the last moment we have the multiplier
   let vehnt_at_genesis_end = position.voting_power_precise(
@@ -317,26 +323,27 @@ pub fn caclulate_vhnt_info(
       .checked_add(i64::try_from(seconds_to_genesis).unwrap())
       .unwrap(),
   )?;
-  let vehnt_at_genesis_end_exact = if has_genesis {
+  let vehnt_at_genesis_end_exact = if has_genesis && position.genesis_end < expiration_ts {
     position.voting_power_precise(voting_mint_config, position.genesis_end)?
   } else {
     position.voting_power_precise(voting_mint_config, curr_ts)?
   };
-  let vehnt_at_position_end =
-    position.voting_power_precise(voting_mint_config, position.lockup.end_ts)?;
+  let delegation_end_ts = min(expiration_ts, position.lockup.end_ts);
+  let vehnt_at_delegation_end =
+    position.voting_power_precise(voting_mint_config, delegation_end_ts)?;
 
   let pre_genesis_end_fall_rate =
     calculate_fall_rate(vehnt_at_curr_ts, vehnt_at_genesis_end, seconds_to_genesis).unwrap();
   let post_genesis_end_fall_rate = calculate_fall_rate(
     vehnt_at_genesis_end_exact,
-    vehnt_at_position_end,
+    vehnt_at_delegation_end,
     seconds_from_genesis_to_end,
   )
   .unwrap();
 
   let mut genesis_end_vehnt_correction = 0;
   let mut genesis_end_fall_rate_correction = 0;
-  if has_genesis {
+  if has_genesis && position.genesis_end < expiration_ts {
     let genesis_end_epoch_start_ts =
       i64::try_from(current_epoch(position.genesis_end)).unwrap() * EPOCH_LENGTH;
 
@@ -353,7 +360,7 @@ pub fn caclulate_vhnt_info(
     // Only do this if the genesis end epoch isn't the same as the position end epoch.
     // If these are the same, then the full vehnt at epoch start is already being taken off.
     if position.lockup.kind == LockupKind::Constant
-      || current_epoch(position.genesis_end) != current_epoch(position.lockup.end_ts)
+      || current_epoch(position.genesis_end) != current_epoch(delegation_end_ts)
     {
       // edge case, if the genesis end is _exactly_ the start of the epoch, getting the voting power at the epoch start
       // will not include the genesis. When this happens, we'll miss a vehnt correction
@@ -390,12 +397,16 @@ pub fn caclulate_vhnt_info(
   let mut end_vehnt_correction = 0;
   if position.lockup.kind == LockupKind::Cliff {
     let end_epoch_start_ts =
-      i64::try_from(current_epoch(position.lockup.end_ts)).unwrap() * EPOCH_LENGTH;
+      i64::try_from(current_epoch(delegation_end_ts)).unwrap() * EPOCH_LENGTH;
     let vehnt_at_closing_epoch_start =
       position.voting_power_precise(voting_mint_config, end_epoch_start_ts)?;
 
     end_vehnt_correction = vehnt_at_closing_epoch_start;
-    end_fall_rate_correction = post_genesis_end_fall_rate;
+    if position.genesis_end < expiration_ts {
+      end_fall_rate_correction = post_genesis_end_fall_rate;
+    } else {
+      end_fall_rate_correction = pre_genesis_end_fall_rate;
+    }
   }
 
   Ok(VehntInfo {

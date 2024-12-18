@@ -6,6 +6,7 @@ process.env.ANCHOR_WALLET =
   process.env.ANCHOR_WALLET || os.homedir() + "/.config/solana/id.json";
 
 const getEnvBoolean = (key: string): boolean => process.env[key] === "true";
+export const PRODUCTION = process.env.NODE_ENV === "production" || false;
 export const SOLANA_URL = process.env.SOLANA_URL || "http://127.0.0.1:8899";
 
 export const REFRESH_PASSWORD = process.env.REFRESH_PASSWORD;
@@ -22,8 +23,12 @@ export const YELLOWSTONE_URL =
 export const USE_HELIUS_WEBHOOK = getEnvBoolean("USE_HELIUS_WEBHOOK");
 export const HELIUS_AUTH_SECRET = process.env.HELIUS_AUTH_SECRET;
 
-export const USE_SUBSTREAMS = getEnvBoolean("USE_SUBSTREAMS");
+export const USE_SUBSTREAM = getEnvBoolean("USE_SUBSTREAM");
+export const SUBSTREAM_API_KEY = process.env.SUBSTREAM_API_KEY;
+export const SUBSTREAM_URL = process.env.SUBSTREAM_URL;
 export const SUBSTREAM = process.env.SUBSTREAM;
+export const SUBSTREAM_CURSOR_MAX_AGE_DAYS =
+  Number(process.env.SUBSTREAM_CURSOR_MAX_AGE_DAYS) || 5;
 
 export const USE_KAFKA = getEnvBoolean("USE_KAFKA");
 export const KAFKA_USER = process.env.KAFKA_USER;

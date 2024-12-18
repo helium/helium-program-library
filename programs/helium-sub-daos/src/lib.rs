@@ -95,12 +95,12 @@ pub mod helium_sub_daos {
     claim_rewards_v0::handler(ctx, args)
   }
 
-  pub fn transfer_v0(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
-    transfer_v0::handler(ctx, args)
+  pub fn claim_rewards_v1(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result<()> {
+    claim_rewards_v1::handler(ctx, args)
   }
 
-  pub fn issue_hst_pool_v0(ctx: Context<IssueHstPoolV0>, args: IssueHstPoolArgsV0) -> Result<()> {
-    issue_hst_pool_v0::handler(ctx, args)
+  pub fn transfer_v0(ctx: Context<TransferV0>, args: TransferArgsV0) -> Result<()> {
+    transfer_v0::handler(ctx, args)
   }
 
   pub fn reset_lockup_v0(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<()> {
@@ -130,5 +130,21 @@ pub mod helium_sub_daos {
 
   pub fn switch_mobile_ops_fund(ctx: Context<SwitchMobileOpsFund>) -> Result<()> {
     switch_mobile_ops_fund::handler(ctx)
+  }
+
+  pub fn initialize_hnt_delegator_pool(ctx: Context<InitializeHntDelegatorPool>) -> Result<()> {
+    initialize_hnt_delegator_pool::handler(ctx)
+  }
+
+  pub fn add_expiration_ts(ctx: Context<AddExpirationTs>) -> Result<()> {
+    add_expiration_ts::handler(ctx)
+  }
+
+  pub fn temp_resize_account(ctx: Context<TempResizeAccount>) -> Result<()> {
+    temp_resize_account::handler(ctx)
+  }
+
+  pub fn track_vote_v0(ctx: Context<TrackVoteV0>) -> Result<()> {
+    track_vote_v0::handler(ctx)
   }
 }

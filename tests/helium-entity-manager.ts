@@ -889,7 +889,6 @@ describe("helium-entity-manager", () => {
             onboardingDcFee: new BN(0),
             onboardingDataOnlyDcFee: null,
             registrar: null,
-            delegatorRewardsPercent: null,
             activeDeviceAuthority: null,
           })
           .accounts({

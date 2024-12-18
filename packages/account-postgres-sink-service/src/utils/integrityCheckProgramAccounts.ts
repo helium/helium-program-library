@@ -56,7 +56,7 @@ export const integrityCheckProgramAccounts = async ({
 
   if (
     !accounts.every(({ type }) =>
-      idl.accounts!.some(({ name }) => name === type)
+      idl.accounts!.some((account: { name: string }) => account.name === type)
     )
   ) {
     throw new Error("idl does not have every account type");

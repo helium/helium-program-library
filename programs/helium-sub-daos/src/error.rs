@@ -52,4 +52,7 @@ pub enum ErrorCode {
 
   #[msg("Cannot delegate on a position ending this epoch")]
   NoDelegateEndingPosition,
+
+  #[msg("Invalid vote marker")]
+  InvalidMarker,
 }

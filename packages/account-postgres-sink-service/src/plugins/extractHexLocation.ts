@@ -2,7 +2,7 @@ import BN from "bn.js";
 import { cellToLatLng } from "h3-js";
 import { camelize } from "inflection";
 import _omit from "lodash/omit";
-import { DECIMAL, DataTypes, Model, QueryTypes } from "sequelize";
+import { DataTypes, Model, QueryTypes } from "sequelize";
 import { IPlugin } from "../types";
 import { database } from "../utils/database";
 import { MapboxService } from "../utils/mapboxService";
@@ -11,7 +11,7 @@ const parseH3BNLocation = (location: BN) =>
   cellToLatLng(location.toString("hex"));
 
 export class ReverseGeoCache extends Model {
-  declare h3: string;
+  declare location: number;
   declare street: string;
   declare city: string;
   declare state: string;
@@ -20,18 +20,19 @@ export class ReverseGeoCache extends Model {
   declare lng: number;
   declare raw: Object;
 }
+
 ReverseGeoCache.init(
   {
     location: {
-      type: DECIMAL,
+      type: DataTypes.DECIMAL,
       primaryKey: true,
     },
     street: DataTypes.STRING,
-    lat: DataTypes.DECIMAL(8, 6),
-    long: DataTypes.DECIMAL(9, 6),
     city: DataTypes.STRING,
     state: DataTypes.STRING,
     country: DataTypes.STRING,
+    lat: DataTypes.DECIMAL(8, 6),
+    long: DataTypes.DECIMAL(9, 6),
     raw: DataTypes.JSONB,
   },
   {
@@ -42,6 +43,7 @@ ReverseGeoCache.init(
     timestamps: true,
   }
 );
+
 const locationFetchCache: { [location: string]: Promise<ReverseGeoCache> } = {};
 export const ExtractHexLocationPlugin = ((): IPlugin => {
   const name = "ExtractHexLocation";
@@ -54,6 +56,7 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
       "lat",
       "long",
     ];
+
     const existingColumns = (
       await database.query(
         `
@@ -68,13 +71,13 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
     const columns = Object.keys(ReverseGeoCache.getAttributes()).map((att) =>
       camelize(att, true)
     );
+
     if (
       !existingColumns.length ||
       !columns.every((col) => existingColumns.includes(col))
     ) {
-      ReverseGeoCache.sync({ alter: true });
+      await ReverseGeoCache.sync({ alter: true });
     }
-    await ReverseGeoCache.sync({ alter: true });
 
     const addFields = (schema: { [key: string]: any }, accountName: string) => {
       schema[accountName] = {

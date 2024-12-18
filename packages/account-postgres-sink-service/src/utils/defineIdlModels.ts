@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { camelize, underscore } from "inflection";
 import { DataTypes, QueryTypes, Sequelize } from "sequelize";
-import { Plugins, initPlugins } from "../plugins";
+import { initPlugins } from "../plugins";
 import { IAccountConfig, IConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
 import { provider } from "./solana";
@@ -92,7 +92,9 @@ export const defineIdlModels = async ({
           updatedAt: false,
           schema: underscore(accConfig.schema || "public"),
           tableName: underscore(accConfig.table || acc.name),
-          createdAt: !schema[acc.name] || (!schema[acc.name].createdAt && !schema[acc.name].created_at),
+          createdAt:
+            !schema[acc.name] ||
+            (!schema[acc.name].createdAt && !schema[acc.name].created_at),
         }
       );
 

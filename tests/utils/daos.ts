@@ -1,6 +1,9 @@
 import * as anchor from "@coral-xyz/anchor";
 import { BN } from "@coral-xyz/anchor";
-import { delegatorRewardsPercent, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import {
+  delegatorRewardsPercent,
+  subDaoKey,
+} from "@helium/helium-sub-daos-sdk";
 import { createAtaAndMint, createMint, toBN } from "@helium/spl-utils";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
@@ -18,10 +21,12 @@ export async function initTestDao(
   authority: PublicKey,
   dcMint?: PublicKey,
   mint?: PublicKey,
-  registrar?: PublicKey
+  registrar?: PublicKey,
 ): Promise<{
   mint: PublicKey;
   dao: PublicKey;
+  rewardsEscrow: PublicKey;
+  delegatorPool: PublicKey;
 }> {
   const me = provider.wallet.publicKey;
   if (!mint) {
@@ -32,8 +37,16 @@ export async function initTestDao(
     dcMint = await createMint(provider, 8, me, me);
   }
 
+  const rewardsEscrow = await createAtaAndMint(
+    provider,
+    mint,
+    0,
+    provider.wallet.publicKey
+  );
+
   const method = await program.methods
     .initializeDaoV0({
+      delegatorRewardsPercent: delegatorRewardsPercent(6), // 6%
       registrar: registrar || Keypair.generate().publicKey,
       authority: authority,
       netEmissionsCap: toBN(34.24, 8),
@@ -49,6 +62,7 @@ export async function initTestDao(
           percent: 32,
         },
       ],
+      proposalNamespace: me,
     })
     .preInstructions([
       createAssociatedTokenAccountIdempotentInstruction(
@@ -59,17 +73,24 @@ export async function initTestDao(
       ),
     ])
     .accounts({
+      rewardsEscrow,
       hntMint: mint,
       dcMint,
       hstPool: await getAssociatedTokenAddress(mint, me),
     });
-  const { dao } = await method.pubkeys();
+
+  const { dao, delegatorPool } = await method.pubkeys();
 
   if (!(await provider.connection.getAccountInfo(dao!))) {
     await method.rpc({ skipPreflight: true });
   }
 
-  return { mint: mint!, dao: dao! };
+  return {
+    mint: mint!,
+    dao: dao!,
+    rewardsEscrow,
+    delegatorPool: delegatorPool!,
+  };
 }
 
 export async function initTestSubdao(
@@ -86,8 +107,6 @@ export async function initTestSubdao(
   mint: PublicKey;
   subDao: PublicKey;
   treasury: PublicKey;
-  rewardsEscrow: PublicKey;
-  delegatorPool: PublicKey;
   treasuryCircuitBreaker: PublicKey;
 }> {
   const daoAcc = await hsdProgram.account.daoV0.fetch(dao);
@@ -95,12 +114,6 @@ export async function initTestSubdao(
   if (numTokens) {
     await createAtaAndMint(provider, dntMint, numTokens, authority);
   }
-  const rewardsEscrow = await createAtaAndMint(
-    provider,
-    dntMint,
-    0,
-    provider.wallet.publicKey
-  );
   const subDao = subDaoKey(dntMint)[0];
 
   const method = hsdProgram.methods
@@ -121,7 +134,6 @@ export async function initTestSubdao(
         },
       } as any,
       dcBurnAuthority: authority,
-      delegatorRewardsPercent: delegatorRewardsPercent(6), // 6%
       activeDeviceAuthority: activeDeviceAuthority || authority,
     })
     .preInstructions([
@@ -129,19 +141,15 @@ export async function initTestSubdao(
     ])
     .accounts({
       dao,
-      rewardsEscrow,
       dntMint,
       hntMint: daoAcc.hntMint,
     });
-  const { treasury, treasuryCircuitBreaker, delegatorPool } =
-    await method.pubkeys();
-  await method.rpc();
+  const { treasury, treasuryCircuitBreaker } = await method.pubkeys();
+  await method.rpc({ skipPreflight: true });
   return {
     treasuryCircuitBreaker: treasuryCircuitBreaker!,
     mint: dntMint,
     subDao: subDao!,
     treasury: treasury!,
-    rewardsEscrow,
-    delegatorPool: delegatorPool!,
   };
 }

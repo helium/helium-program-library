@@ -144,6 +144,7 @@ describe("sus", () => {
       cluster: "devnet",
     });
 
+    console.log(susR.writableAccounts.map((r) => r.name));
     expect(susR.writableAccounts.map((r) => r.name)).to.deep.eq([
       "Native SOL Account",
       "DelegatedDataCreditsV0",

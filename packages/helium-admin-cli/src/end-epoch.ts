@@ -3,10 +3,10 @@ import {
   daoEpochInfoKey,
   daoKey,
   EPOCH_LENGTH,
-  init as initDao
+  init as initDao,
 } from "@helium/helium-sub-daos-sdk";
 import * as anchor from "@coral-xyz/anchor";
-import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
 import b58 from "bs58";
 import os from "os";
@@ -44,17 +44,21 @@ export async function run(args: any = process.argv) {
   const heliumSubDaosProgram = await initDao(provider);
   const hntMint = new PublicKey(argv.hntMint!);
   const dao = await daoKey(hntMint)[0];
-  const subdaos = await heliumSubDaosProgram.account.subDaoV0.all([{
-    memcmp: {
-      offset: 8,
-      bytes: b58.encode(dao.toBuffer()),
-    }
-  }]);
-  let targetTs = argv.from ? new BN(argv.from) : subdaos[0].account.vehntLastCalculatedTs;
+  const subdaos = await heliumSubDaosProgram.account.subDaoV0.all([
+    {
+      memcmp: {
+        offset: 8,
+        bytes: b58.encode(dao.toBuffer()),
+      },
+    },
+  ]);
+  let targetTs = argv.from
+    ? new BN(argv.from)
+    : subdaos[0].account.vehntLastCalculatedTs;
 
   while (targetTs.toNumber() < new Date().valueOf() / 1000) {
     const epoch = currentEpoch(targetTs);
-    console.log(epoch.toNumber(), targetTs.toNumber())
+    console.log(epoch.toNumber(), targetTs.toNumber());
     const daoEpochInfo =
       await heliumSubDaosProgram.account.daoEpochInfoV0.fetchNullable(
         daoEpochInfoKey(dao, targetTs)[0]
@@ -101,21 +105,7 @@ export async function run(args: any = process.argv) {
         }
       }
 
-        
+      targetTs = targetTs.add(new BN(EPOCH_LENGTH));
     }
-    try {
-      if (!daoEpochInfo?.doneIssuingHstPool) {
-        await sendInstructionsWithPriorityFee(provider, [
-          await heliumSubDaosProgram.methods
-            .issueHstPoolV0({ epoch })
-            .accounts({ dao })
-            .instruction(),
-        ]);
-      }
-    } catch (e: any) {
-      console.log(`Failed to issue hst pool: ${e.message}`);
-    }
-    
-    targetTs = targetTs.add(new BN(EPOCH_LENGTH));
   }
 }
