@@ -86,18 +86,17 @@ export const setupSubstream = async (
         const cursorDate = new Date(lastCursor.dataValues.createdAt);
         const cursorAge =
           (Date.now() - cursorDate.getTime()) / (24 * 60 * 60 * 1000);
-
-        if (cursorAge > SUBSTREAM_CURSOR_MAX_AGE_DAYS) {
+        if (cursorAge >= SUBSTREAM_CURSOR_MAX_AGE_DAYS) {
           console.log(
-            `Cursor is ${Math.floor(
-              cursorAge
+            `Cursor is ${cursorAge.toFixed(
+              1
             )} days old, starting from current block`
           );
           cursor = undefined;
         } else {
           cursor = lastCursor.cursor;
           console.log(
-            `Using existing cursor from ${Math.floor(cursorAge)} days ago`
+            `Using existing cursor from ${cursorAge.toFixed(1)} days ago`
           );
         }
       } else {
