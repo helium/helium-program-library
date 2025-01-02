@@ -225,10 +225,8 @@ export const setupSubstream = async (
     } catch (err) {
       cursorManager.stopStalenessCheck();
       console.log("Substream connection error:", err);
-      if (!isConnecting) {
-        isConnecting = true;
-        handleReconnect(attemptCount + 1);
-      }
+      isConnecting = false;
+      handleReconnect(attemptCount + 1);
     }
   };
 
