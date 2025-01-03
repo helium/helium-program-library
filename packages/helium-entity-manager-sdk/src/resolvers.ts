@@ -10,7 +10,7 @@ import {
 } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { init } from "./init";
-import { iotInfoKey, keyToAssetKey, mobileInfoKey, programApprovalKey } from "./pdas";
+import { iotInfoKey, keyToAssetKey, mobileInfoKey, programApprovalKey, sharedMerkleKey } from "./pdas";
 import { notEmittedKey } from "@helium/no-emit-sdk";
 
 export const heliumEntityManagerResolvers = combineResolvers(
@@ -149,6 +149,14 @@ export const heliumEntityManagerResolvers = combineResolvers(
         accounts.hotspot as PublicKey,
         (accounts.owner || accounts.hotspotOwner) as PublicKey
       );
+    }
+  }),
+  resolveIndividual(async ({ path, args }) => {
+    if (
+      path[path.length - 1] === "sharedMerkle" &&
+      args[0].proofSize
+    ) {
+      return sharedMerkleKey(args[0].proofSize)[0];
     }
   }),
   ataResolver({

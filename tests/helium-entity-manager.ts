@@ -3,7 +3,7 @@ import { Program } from "@coral-xyz/anchor";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
-import { notEmittedKey, init as initBurn } from "@helium/no-emit-sdk";
+import { init as initBurn, notEmittedKey } from "@helium/no-emit-sdk";
 import {
   Asset,
   AssetProof,
@@ -15,7 +15,7 @@ import {
   toBN,
 } from "@helium/spl-utils";
 import { AddGatewayV1 } from "@helium/transactions";
-import { getAssociatedTokenAddressSync, getAccount } from "@solana/spl-token";
+import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
   Keypair,
@@ -35,18 +35,18 @@ import {
 } from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
-import { NoEmit } from "../target/types/no_emit";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
+import { NoEmit } from "../target/types/no_emit";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import {
   DC_FEE,
+  MAKER_STAKING_FEE,
   ensureDCIdl,
-  ensureHSDIdl,
   ensureHEMIdl,
+  ensureHSDIdl,
   initTestDataCredits,
   initTestMaker,
   initTestRewardableEntityConfig,
-  MAKER_STAKING_FEE,
 } from "./utils/fixtures";
 // @ts-ignore
 import bs58 from "bs58";
@@ -55,7 +55,6 @@ const { expect } = chai;
 import { helium } from "@helium/proto";
 // @ts-ignore
 import axios from "axios";
-
 import {
   MerkleTree,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,

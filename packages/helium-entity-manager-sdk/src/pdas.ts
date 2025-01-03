@@ -50,6 +50,18 @@ export const dataOnlyEscrowKey = (dataOnly: PublicKey, programId: PublicKey = PR
     programId,
   );
 
+export const sharedMerkleKey = (
+  proofSize: number,
+  programId: PublicKey = PROGRAM_ID
+) => {
+  const proofSizeBuffer = Buffer.alloc(1);
+  proofSizeBuffer.writeUint8(proofSize);
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("shared_merkle", "utf-8"), proofSizeBuffer],
+    programId
+  );
+};
+
 export const makerKey = (dao: PublicKey, name: String, programId: PublicKey = PROGRAM_ID) =>
   PublicKey.findProgramAddressSync(
     [Buffer.from("maker", "utf-8"), dao.toBuffer(), Buffer.from(name, "utf-8")],
