@@ -1,11 +1,10 @@
-use crate::error::*;
-use crate::position_seeds;
-use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{transfer, Mint, Token, TokenAccount, Transfer},
 };
+
+use crate::{error::*, position_seeds, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct WithdrawArgsV0 {
@@ -33,8 +32,8 @@ pub struct WithdrawV0<'info> {
   #[account(
     init_if_needed,
     payer = position_authority,
-    token::mint = mint,
-    token::authority = position_authority,
+    associated_token::mint = mint,
+    associated_token::authority = position_authority,
     constraint = position_token_account.amount > 0
   )]
   pub position_token_account: Box<Account<'info, TokenAccount>>,
