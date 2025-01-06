@@ -16,7 +16,7 @@ pub struct WithdrawArgsV0 {
 #[instruction(args: WithdrawArgsV0)]
 pub struct WithdrawV0<'info> {
   #[account(mut)]
-  pub payer: Signer<'info>,
+  pub position_authority: Signer<'info>,
   pub registrar: Box<Account<'info, Registrar>>,
 
   #[account(
@@ -32,13 +32,12 @@ pub struct WithdrawV0<'info> {
   pub mint: Box<Account<'info, Mint>>,
   #[account(
     init_if_needed,
-    payer = payer,
+    payer = position_authority,
     token::mint = mint,
     token::authority = position_authority,
     constraint = position_token_account.amount > 0
   )]
   pub position_token_account: Box<Account<'info, TokenAccount>>,
-  pub position_authority: Signer<'info>,
 
   #[account(
     mut,
