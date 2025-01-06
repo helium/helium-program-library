@@ -137,8 +137,12 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
     }
   }
 
-  let delegated_vehnt_at_epoch =
-    position.voting_power(voting_mint_config, ctx.accounts.dao_epoch_info.start_ts())?;
+  let epoch_start_ts = ctx.accounts.dao_epoch_info.start_ts();
+  let delegated_vehnt_at_epoch = if delegated_position.expiration_ts > epoch_start_ts {
+    position.voting_power(voting_mint_config, epoch_start_ts)?
+  } else {
+    0
+  };
 
   msg!("Staked {} veHNT at start of epoch with {} total veHNT delegated to dao and {} total rewards to dao",
     delegated_vehnt_at_epoch,
