@@ -55,7 +55,7 @@ pub struct ExtendExpirationTsV0<'info> {
         if delegated_position.expiration_ts == 0 {
           position.lockup.end_ts
         } else {
-          delegated_position.expiration_ts
+          min(position.lockup.end_ts, delegated_position.expiration_ts)
         }
     ).to_le_bytes()],
     bump,
