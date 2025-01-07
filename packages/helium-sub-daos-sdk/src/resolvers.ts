@@ -262,6 +262,11 @@ export const heliumSubDaosResolvers = combineResolvers(
     owner: "positionAuthority",
   }),
   ataResolver({
+    account: "positionTokenAccount",
+    mint: "mint",
+    owner: "positionAuthority",
+  }),
+  ataResolver({
     instruction: "extendExpirationTsV0",
     account: "positionTokenAccount",
     mint: "mint",
