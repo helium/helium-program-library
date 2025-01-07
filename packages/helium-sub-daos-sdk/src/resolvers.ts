@@ -262,9 +262,10 @@ export const heliumSubDaosResolvers = combineResolvers(
     owner: "positionAuthority",
   }),
   ataResolver({
+    instruction: "extendExpirationTsV0",
     account: "positionTokenAccount",
     mint: "mint",
-    owner: "positionAuthority",
+    owner: "authority",
   }),
   resolveIndividual(async ({ args, path, accounts }) => {
     if (path[path.length - 1] == "clockwork") {

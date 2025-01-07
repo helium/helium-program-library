@@ -1277,19 +1277,20 @@ describe("helium-sub-daos", () => {
         const expectedFallRates = subDaoEpochInfo.fallRatesFromClosingPositions.toString();
         const expectedVehntInClosingPositions = subDaoEpochInfo.vehntInClosingPositions.toString();
 
-        console.log("dat old one is ", closingTimeSubDaoEpochInfo!.toBase58());
         const newClosingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
           subDao,
           seasonEnd
         )[0]
         await program.methods
-          .addExpirationTs()
+          .extendExpirationTsV0()
           .accounts({
             position,
             subDao,
             oldClosingTimeSubDaoEpochInfo: closingTimeSubDaoEpochInfo,
             closingTimeSubDaoEpochInfo: newClosingTimeSubDaoEpochInfo,
+            authority: positionAuthorityKp.publicKey,
           })
+          .signers([positionAuthorityKp])
           .rpc({ skipPreflight: true });
 
           const oldSubDaoEpochInfo = await program.account.subDaoEpochInfoV0.fetch(closingTimeSubDaoEpochInfo!);

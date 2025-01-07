@@ -8,6 +8,7 @@ import { min } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
 import { loadKeypair } from "./utils";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -58,17 +59,23 @@ export async function run(args: any = process.argv) {
 
   const currTs = await getSolanaUnixTimestamp(provider);
   const currTsBN = new anchor.BN(currTs.toString());
-  const proxyEndTs = proxyConfig.seasons.find(s => currTsBN.gt(s.start))?.end;
+  const proxyEndTs = proxyConfig.seasons.reverse().find(s => currTsBN.gte(s.start))?.end;
   for (const [delegation, position] of zip(needsMigration, positionAccs)) {
     const subDao = delegation.account.subDao;
+    const positionTokenAccount = (
+      await provider.connection.getTokenLargestAccounts(position.mint)
+    ).value[0].address;
     instructions.push(
       await hsdProgram.methods
-        .addExpirationTs()
+        .extendExpirationTsV0()
         .accountsStrict({
           payer: wallet.publicKey,
           position: delegation.account.position,
           delegatedPosition: delegation.publicKey,
           registrar: registrarK,
+          mint: position.mint,
+          authority: wallet.publicKey,
+          positionTokenAccount,
           dao,
           subDao: delegation.account.subDao,
           oldClosingTimeSubDaoEpochInfo: subDaoEpochInfoKey(
