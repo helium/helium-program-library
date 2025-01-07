@@ -1935,11 +1935,6 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
             isSigner: false,
           },
           {
-            name: "rewardsEscrow",
-            isMut: false,
-            isSigner: false,
-          },
-          {
             name: "systemProgram",
             isMut: false,
             isSigner: false,
@@ -1963,7 +1958,7 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
         args: [],
       },
       {
-        name: "addExpirationTs",
+        name: "extendExpirationTsV0",
         accounts: [
           {
             name: "payer",
@@ -1974,6 +1969,22 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
             name: "position",
             isMut: true,
             isSigner: false,
+            relations: ["mint"],
+          },
+          {
+            name: "mint",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "positionTokenAccount",
+            isMut: false,
+            isSigner: false,
+          },
+          {
+            name: "authority",
+            isMut: false,
+            isSigner: true,
           },
           {
             name: "registrar",
@@ -2875,6 +2886,12 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
               name: "delegatorRewardsPercent",
               type: {
                 option: "u64",
+              },
+            },
+            {
+              name: "rewardsEscrow",
+              type: {
+                option: "publicKey",
               },
             },
           ],
