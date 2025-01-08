@@ -169,6 +169,8 @@ pub fn handler(
 
   // Initialize previous percentage if it's not already set
   ctx.accounts.prev_sub_dao_epoch_info.previous_percentage = match previous_percentage {
+    // This was just deployed, so we don't have a previous utility score set
+    // Set it by using the percentage of the total utility score
     0 => match prev_epoch_info.utility_score {
       Some(prev_score) => {
         if prev_total_utility_score == 0 {
@@ -181,9 +183,16 @@ pub fn handler(
             .unwrap_or(0)
         }
       }
-      None => u32::MAX
-        .checked_div(ctx.accounts.dao.num_sub_daos)
-        .unwrap_or(0),
+      // Either this is a new subnetwork or this whole program was just deployed
+      None => match prev_total_utility_score {
+        // If there is no previous utility score, this is a new program deployment
+        // Set it by using the percentage of the total utility score
+        0 => u32::MAX
+          .checked_div(ctx.accounts.dao.num_sub_daos)
+          .unwrap_or(0),
+        // If there is a previous utility score, this is a new subnetwork
+        _ => 0,
+      },
     },
     _ => previous_percentage,
   };
