@@ -12,6 +12,8 @@ use crate::{
   current_epoch, dao_seeds, error::ErrorCode, state::*, OrArithError, EPOCH_LENGTH, TESTING,
 };
 
+const SMOOTHING_FACTOR: u128 = 30;
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueRewardsArgsV0 {
   pub epoch: u64,
@@ -135,15 +137,15 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
       .or_arith_error()?;
 
   let percent_share = prev_percentage
-    .checked_mul(&PreciseNumber::new(29).or_arith_error()?)
+    .checked_mul(&PreciseNumber::new(SMOOTHING_FACTOR - 1).or_arith_error()?)
     .or_arith_error()?
-    .checked_div(&PreciseNumber::new(30).or_arith_error()?)
+    .checked_div(&PreciseNumber::new(SMOOTHING_FACTOR).or_arith_error()?)
     .or_arith_error()?
     .checked_add(
       &percent_share_pre_smooth
         .checked_mul(&PreciseNumber::new(1).or_arith_error()?)
         .or_arith_error()?
-        .checked_div(&PreciseNumber::new(30).or_arith_error()?)
+        .checked_div(&PreciseNumber::new(SMOOTHING_FACTOR).or_arith_error()?)
         .or_arith_error()?,
     )
     .or_arith_error()?;
