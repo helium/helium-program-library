@@ -279,10 +279,11 @@ pub struct SubDaoEpochInfoV0 {
   pub dc_onboarding_fees_paid: u64,
   /// The number of hnt rewards issued to the reward escrow this epoch
   pub hnt_rewards_issued: u64,
+  pub previous_percentage: u32,
 }
 
 impl SubDaoEpochInfoV0 {
-  pub const SIZE: usize = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>() - 8 - 8 - 8; // subtract 8 the extra u64 we added to vehnt, dc onboarding fees paid, and hnt rewards issued
+  pub const SIZE: usize = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>() - 8 - 8 - 8 - 4; // subtract 8 the extra u64 we added to vehnt, dc onboarding fees paid, hnt rewards issued, and prev percentage
 }
 impl SubDaoEpochInfoV0 {
   pub fn start_ts(&self) -> i64 {

@@ -10,6 +10,7 @@ export { useClaimPositionRewards } from "./hooks/useClaimPositionRewards";
 export { useClosePosition } from "./hooks/useClosePosition";
 export { useCreatePosition } from "./hooks/useCreatePosition";
 export { useDao } from "./hooks/useDao";
+export { useExtendDelegation } from "./hooks/useExtendDelegation";
 export { useDelegatePosition } from "./hooks/useDelegatePosition";
 export { useDelegatedPositions } from "./hooks/useDelegatedPositions";
 export { useExtendPosition } from "./hooks/useExtendPosition";

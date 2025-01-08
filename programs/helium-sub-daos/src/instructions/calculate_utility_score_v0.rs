@@ -76,9 +76,11 @@ pub fn handler(
   // burned hnt since last supply setting.
   let curr_supply = ctx.accounts.hnt_mint.supply;
   let mut prev_supply = curr_supply;
+  let mut prev_total_utility_score = 0;
   if ctx.accounts.prev_dao_epoch_info.lamports() > 0 {
     let info: Account<DaoEpochInfoV0> = Account::try_from(&ctx.accounts.prev_dao_epoch_info)?;
     prev_supply = info.current_hnt_supply;
+    prev_total_utility_score = info.total_utility_score;
   }
 
   ctx.accounts.dao_epoch_info.total_rewards = ctx
@@ -152,39 +154,48 @@ pub fn handler(
     .checked_div(&PreciseNumber::new(100000000_u128).unwrap()) // vehnt has 8 decimals
     .unwrap();
 
-  // Apply a 90 day smooth
   let utility_score_prec = vehnt_staked
     // Add 12 decimals of precision
     .checked_mul(&PreciseNumber::new(1000000000000_u128).unwrap()) // First convert vehnt to 12 decimals
-    .unwrap()
-    .checked_div(&PreciseNumber::new(90_u128).unwrap())
-    .unwrap()
-    .checked_add(
-      &PreciseNumber::new(89_u128)
-        .unwrap()
-        .checked_mul(
-          &ctx
-            .accounts
-            .prev_sub_dao_epoch_info
-            .utility_score
-            .and_then(PreciseNumber::new)
-            .unwrap_or_else(|| {
-              vehnt_staked
-                // Add 12 decimals of precision
-                .checked_mul(&PreciseNumber::new(1000000000000_u128).unwrap())
-                .unwrap()
-            }),
-        )
-        .unwrap()
-        .checked_div(&PreciseNumber::new(90_u128).unwrap())
-        .unwrap(),
-    )
     .unwrap();
 
   let utility_score = utility_score_prec.to_imprecise().unwrap();
 
   // Store utility scores
   epoch_info.utility_score = Some(utility_score);
+
+  let prev_epoch_info = &ctx.accounts.prev_sub_dao_epoch_info;
+  let previous_percentage = prev_epoch_info.previous_percentage;
+
+  // Initialize previous percentage if it's not already set
+  ctx.accounts.prev_sub_dao_epoch_info.previous_percentage = match previous_percentage {
+    // This was just deployed, so we don't have a previous utility score set
+    // Set it by using the percentage of the total utility score
+    0 => match prev_epoch_info.utility_score {
+      Some(prev_score) => {
+        if prev_total_utility_score == 0 {
+          0
+        } else {
+          prev_score
+            .checked_mul(u32::MAX as u128)
+            .and_then(|x| x.checked_div(prev_total_utility_score))
+            .map(|x| x as u32)
+            .unwrap_or(0)
+        }
+      }
+      // Either this is a new subnetwork or this whole program was just deployed
+      None => match prev_total_utility_score {
+        // If there is no previous utility score, this is a new program deployment
+        // Set it by using the percentage of the total utility score
+        0 => u32::MAX
+          .checked_div(ctx.accounts.dao.num_sub_daos)
+          .unwrap_or(0),
+        // If there is a previous utility score, this is a new subnetwork
+        _ => 0,
+      },
+    },
+    _ => previous_percentage,
+  };
 
   // Only increment utility scores when either (a) in prod or (b) testing and we haven't already over-calculated utility scores.
   // TODO: We can remove this after breakpoint demo

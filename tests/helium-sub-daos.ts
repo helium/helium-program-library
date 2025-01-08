@@ -879,14 +879,18 @@ describe("helium-sub-daos", () => {
               const preMobileBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
               ).amount;
-              await program.methods
+              const { pubkeys: { prevSubDaoEpochInfo, daoEpochInfo } } = await program.methods
                 .issueRewardsV0({
                   epoch,
                 })
                 .accounts({
                   subDao,
                 })
-                .rpc({ skipPreflight: true });
+                .rpcAndKeys({ skipPreflight: true });
+
+              console.log("subDaoEpochInfo", await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo!));
+              console.log("prevSubDaoEpochInfo", await program.account.subDaoEpochInfoV0.fetch(prevSubDaoEpochInfo!));
+              console.log("daoEpochInfo", await program.account.daoEpochInfoV0.fetch(daoEpochInfo!));
 
               const postBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
@@ -1277,19 +1281,20 @@ describe("helium-sub-daos", () => {
         const expectedFallRates = subDaoEpochInfo.fallRatesFromClosingPositions.toString();
         const expectedVehntInClosingPositions = subDaoEpochInfo.vehntInClosingPositions.toString();
 
-        console.log("dat old one is ", closingTimeSubDaoEpochInfo!.toBase58());
         const newClosingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
           subDao,
           seasonEnd
         )[0]
         await program.methods
-          .addExpirationTs()
+          .extendExpirationTsV0()
           .accounts({
             position,
             subDao,
             oldClosingTimeSubDaoEpochInfo: closingTimeSubDaoEpochInfo,
             closingTimeSubDaoEpochInfo: newClosingTimeSubDaoEpochInfo,
+            authority: positionAuthorityKp.publicKey,
           })
+          .signers([positionAuthorityKp])
           .rpc({ skipPreflight: true });
 
           const oldSubDaoEpochInfo = await program.account.subDaoEpochInfoV0.fetch(closingTimeSubDaoEpochInfo!);

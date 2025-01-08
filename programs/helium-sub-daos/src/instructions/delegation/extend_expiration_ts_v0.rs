@@ -1,27 +1,33 @@
 use std::{cmp::min, str::FromStr};
 
 use anchor_lang::prelude::*;
+use anchor_spl::token::{Mint, TokenAccount};
 use nft_proxy::ProxyConfigV0;
 use voter_stake_registry::state::{PositionV0, Registrar};
 
 use crate::{
   caclulate_vhnt_info, current_epoch, id, DaoV0, DelegatedPositionV0, SubDaoEpochInfoV0, SubDaoV0,
-  TESTING,
 };
 
 #[derive(Accounts)]
-pub struct AddExpirationTs<'info> {
+pub struct ExtendExpirationTsV0<'info> {
+  #[account(mut)]
+  pub payer: Signer<'info>,
   #[account(
     mut,
-    address = if TESTING {
-      payer.key()
-    } else {
-      Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW").unwrap()
-    }
+    has_one = mint,
   )]
-  pub payer: Signer<'info>,
-  #[account(mut)]
   pub position: Account<'info, PositionV0>,
+  pub mint: Box<Account<'info, Mint>>,
+  #[account(
+    token::mint = mint,
+    constraint = position_token_account.amount > 0
+  )]
+  pub position_token_account: Box<Account<'info, TokenAccount>>,
+  #[account(
+    constraint = authority.key() == position_token_account.owner || authority.key() == Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW").unwrap()
+  )]
+  pub authority: Signer<'info>,
   #[account(
     has_one = proxy_config
   )]
@@ -41,13 +47,16 @@ pub struct AddExpirationTs<'info> {
     has_one = position,
     has_one = sub_dao,
     bump = delegated_position.bump_seed,
-    constraint = TESTING || delegated_position.expiration_ts == 0
   )]
   pub delegated_position: Account<'info, DelegatedPositionV0>,
   #[account(
     mut,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(
-        position.lockup.end_ts
+        if delegated_position.expiration_ts == 0 {
+          position.lockup.end_ts
+        } else {
+          min(position.lockup.end_ts, delegated_position.expiration_ts)
+        }
     ).to_le_bytes()],
     bump,
   )]
@@ -85,7 +94,7 @@ pub struct AddExpirationTs<'info> {
   pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<AddExpirationTs>) -> Result<()> {
+pub fn handler(ctx: Context<ExtendExpirationTsV0>) -> Result<()> {
   let position = &mut ctx.accounts.position;
   let registrar = &ctx.accounts.registrar;
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
