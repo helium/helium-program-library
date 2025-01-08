@@ -879,14 +879,18 @@ describe("helium-sub-daos", () => {
               const preMobileBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
               ).amount;
-              await program.methods
+              const { pubkeys: { prevSubDaoEpochInfo, daoEpochInfo } } = await program.methods
                 .issueRewardsV0({
                   epoch,
                 })
                 .accounts({
                   subDao,
                 })
-                .rpc({ skipPreflight: true });
+                .rpcAndKeys({ skipPreflight: true });
+
+              console.log("subDaoEpochInfo", await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo!));
+              console.log("prevSubDaoEpochInfo", await program.account.subDaoEpochInfoV0.fetch(prevSubDaoEpochInfo!));
+              console.log("daoEpochInfo", await program.account.daoEpochInfoV0.fetch(daoEpochInfo!));
 
               const postBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!

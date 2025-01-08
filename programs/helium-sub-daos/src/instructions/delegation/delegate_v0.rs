@@ -223,6 +223,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
           epoch: genesis_end_epoch,
           bump_seed: ctx.bumps["genesis_end_sub_dao_epoch_info"],
           sub_dao: sub_dao.key(),
+          previous_percentage: 0,
           dc_burned: 0,
           vehnt_at_epoch_start: 0,
           vehnt_in_closing_positions: genesis_end_vehnt_correction,

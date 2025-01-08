@@ -70,6 +70,11 @@ pub struct IssueRewardsV0<'info> {
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
+  #[account(
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &(args.epoch - 1).to_le_bytes()],
+    bump = prev_sub_dao_epoch_info.bump_seed,
+  )]
+  pub prev_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
 }
 
 fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
@@ -118,9 +123,39 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   let total_utility_score = to_prec(Some(ctx.accounts.dao_epoch_info.total_utility_score))
     .ok_or_else(|| error!(ErrorCode::NoUtilityScore))?;
 
-  let percent_share = utility_score
+  let percent_share_pre_smooth = utility_score
     .checked_div(&total_utility_score)
     .or_arith_error()?;
+
+  // Convert previous percentage from u32 to PreciseNumber (divide by u32::MAX)
+  let prev_percentage =
+    PreciseNumber::new(ctx.accounts.prev_sub_dao_epoch_info.previous_percentage as u128)
+      .or_arith_error()?
+      .checked_div(&PreciseNumber::new(u32::MAX as u128).or_arith_error()?)
+      .or_arith_error()?;
+
+  let percent_share = prev_percentage
+    .checked_mul(&PreciseNumber::new(29).or_arith_error()?)
+    .or_arith_error()?
+    .checked_div(&PreciseNumber::new(30).or_arith_error()?)
+    .or_arith_error()?
+    .checked_add(
+      &percent_share_pre_smooth
+        .checked_mul(&PreciseNumber::new(1).or_arith_error()?)
+        .or_arith_error()?
+        .checked_div(&PreciseNumber::new(30).or_arith_error()?)
+        .or_arith_error()?,
+    )
+    .or_arith_error()?;
+
+  ctx.accounts.sub_dao_epoch_info.previous_percentage = prev_percentage
+    .checked_mul(&PreciseNumber::new(u32::MAX as u128).or_arith_error()?)
+    .or_arith_error()?
+    .to_imprecise()
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?
+    .try_into()
+    .unwrap();
+
   let total_emissions = ctx.accounts.dao_epoch_info.total_rewards;
   let hst_percent = ctx
     .accounts

@@ -116,6 +116,22 @@ export const subDaoEpochInfoResolver = resolveIndividual(
         return key;
       }
     }
+    if (path[path.length - 1] === "prevSubDaoEpochInfo" && args && args[0] && args[0].epoch) {
+      const unixTime = args[0].epoch.toNumber() * EPOCH_LENGTH;
+      const subDao = get(accounts, [
+        ...path.slice(0, path.length - 1),
+        "subDao",
+      ]) as PublicKey;
+      if (subDao) {
+        const [key] = await subDaoEpochInfoKey(
+          subDao,
+          unixTime - EPOCH_LENGTH,
+          PROGRAM_ID
+        );
+
+        return key;
+      }
+    }
   }
 );
 
