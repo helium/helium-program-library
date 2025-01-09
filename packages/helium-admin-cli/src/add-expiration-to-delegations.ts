@@ -38,7 +38,6 @@ export async function run(args: any = process.argv) {
   const vsrProgram = await initVsr(provider);
   const hsdProgram = await initHsd(provider);
 
-
   const hntMint = new PublicKey(argv.hntMint);
   const dao = daoKey(hntMint)[0];
   const registrarK = (await hsdProgram.account.daoV0.fetch(dao)).registrar;
@@ -48,18 +47,22 @@ export async function run(args: any = process.argv) {
   );
 
   const instructions: TransactionInstruction[] = [];
-  const delegations = await hsdProgram.account.delegatedPositionV0.all()
+  const delegations = await hsdProgram.account.delegatedPositionV0.all();
   const needsMigration = delegations.filter(d => d.account.expirationTs.isZero());
-  const positionKeys = needsMigration.map(d => d.account.position);
-  const coder = vsrProgram.coder.accounts
-  const positionAccs = (await getMultipleAccounts({
-    connection: provider.connection,
-    keys: positionKeys,
-  })).map(a => coder.decode("PositionV0", a.data));
+  const positionKeys = needsMigration.map((d) => d.account.position);
+  const coder = vsrProgram.coder.accounts;
+  const positionAccs = (
+    await getMultipleAccounts({
+      connection: provider.connection,
+      keys: positionKeys,
+    })
+  ).map((a) => coder.decode("PositionV0", a.data));
 
   const currTs = await getSolanaUnixTimestamp(provider);
   const currTsBN = new anchor.BN(currTs.toString());
-  const proxyEndTs = proxyConfig.seasons.reverse().find(s => currTsBN.gte(s.start))?.end;
+  const proxyEndTs = proxyConfig.seasons
+    .reverse()
+    .find((s) => currTsBN.gte(s.start))?.end;
   for (const [delegation, position] of zip(needsMigration, positionAccs)) {
     const subDao = delegation.account.subDao;
     const positionTokenAccount = (
@@ -80,7 +83,9 @@ export async function run(args: any = process.argv) {
           subDao: delegation.account.subDao,
           oldClosingTimeSubDaoEpochInfo: subDaoEpochInfoKey(
             subDao,
-            position.lockup.endTs
+            delegation.account.expirationTs.isZero()
+              ? position.lockup.endTs
+              : min(position.lockup.endTs, delegation.account.expirationTs)
           )[0],
           closingTimeSubDaoEpochInfo: subDaoEpochInfoKey(
             subDao,
@@ -88,7 +93,9 @@ export async function run(args: any = process.argv) {
           )[0],
           genesisEndSubDaoEpochInfo: subDaoEpochInfoKey(
             subDao,
-            position.genesisEnd.isZero() ? min(position.lockup.endTs, proxyEndTs!) : position.genesisEnd
+            position.genesisEnd.isZero()
+              ? min(position.lockup.endTs, proxyEndTs!)
+              : position.genesisEnd
           )[0],
           proxyConfig: registrar.proxyConfig,
           systemProgram: SystemProgram.programId,
