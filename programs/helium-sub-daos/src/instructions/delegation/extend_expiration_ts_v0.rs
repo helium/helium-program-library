@@ -105,16 +105,20 @@ pub fn handler(ctx: Context<ExtendExpirationTsV0>) -> Result<()> {
     .get_current_season(registrar.clock_unix_timestamp())
     .unwrap()
     .end;
-  ctx.accounts.delegated_position.expiration_ts = expiration_ts;
   let epoch = current_epoch(registrar.clock_unix_timestamp());
 
   // Calculate vehnt info once
+  msg!(
+    "Calculating vehnt info for old expiration ts {}",
+    ctx.accounts.delegated_position.expiration_ts
+  );
   let vehnt_info_old = caclulate_vhnt_info(
     ctx.accounts.delegated_position.start_ts,
     position,
     voting_mint_config,
-    i64::MAX,
+    ctx.accounts.delegated_position.expiration_ts,
   )?;
+  ctx.accounts.delegated_position.expiration_ts = expiration_ts;
   let vehnt_info_new = caclulate_vhnt_info(
     ctx.accounts.delegated_position.start_ts,
     position,
@@ -181,10 +185,14 @@ pub fn handler(ctx: Context<ExtendExpirationTsV0>) -> Result<()> {
 
   let genesis_end_is_closing = ctx.accounts.genesis_end_sub_dao_epoch_info.key()
     == ctx.accounts.closing_time_sub_dao_epoch_info.key();
-  if !ctx.accounts.genesis_end_sub_dao_epoch_info.data_len() == 0 {
+  let genesis_end_is_old_closing = ctx.accounts.genesis_end_sub_dao_epoch_info.key()
+    == ctx.accounts.old_closing_time_sub_dao_epoch_info.key();
+  if ctx.accounts.genesis_end_sub_dao_epoch_info.data_len() > 0 {
     let mut parsed: Account<SubDaoEpochInfoV0>;
     let genesis_end_sdei: &mut Account<SubDaoEpochInfoV0> = if genesis_end_is_closing {
       &mut ctx.accounts.closing_time_sub_dao_epoch_info
+    } else if genesis_end_is_old_closing {
+      &mut ctx.accounts.old_closing_time_sub_dao_epoch_info
     } else {
       parsed = Account::try_from(
         &ctx
