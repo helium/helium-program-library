@@ -83,11 +83,7 @@ pub struct ExtendExpirationTsV0<'info> {
         // no need to pass an extra account here. Just pass the closing time sdei and
         // do not change it.
         if position.genesis_end <= registrar.clock_unix_timestamp() {
-          if delegated_position.expiration_ts == 0 {
-            position.lockup.end_ts
-          } else {
-            min(position.lockup.end_ts, delegated_position.expiration_ts)
-          }
+          min(proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end, position.lockup.end_ts)
         } else {
           position.genesis_end
         }
