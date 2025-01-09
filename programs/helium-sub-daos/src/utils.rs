@@ -412,7 +412,7 @@ pub fn caclulate_vhnt_info(
       position.voting_power_precise(voting_mint_config, end_epoch_start_ts)?;
 
     end_vehnt_correction = vehnt_at_closing_epoch_start;
-    if position.genesis_end < expiration_ts {
+    if position.genesis_end < delegation_end_ts {
       end_fall_rate_correction = post_genesis_end_fall_rate;
     } else {
       end_fall_rate_correction = pre_genesis_end_fall_rate;
