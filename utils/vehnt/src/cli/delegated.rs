@@ -165,10 +165,12 @@ impl Delegated {
     epoch_infos_by_subdao_and_epoch
       .insert(Pubkey::from_str(MOBILE_SUBDAO).unwrap(), HashMap::new());
     for info in infos {
+        if info.1.sub_dao == Pubkey::from_str(IOT_SUBDAO).unwrap() || info.1.sub_dao == Pubkey::from_str(MOBILE_SUBDAO).unwrap() {
       epoch_infos_by_subdao_and_epoch
-        .get_mut(&info.1.sub_dao)
-        .unwrap()
-        .insert(info.1.epoch, info);
+          .get_mut(&info.1.sub_dao)
+          .unwrap()
+          .insert(info.1.epoch, info);
+      }
     }
     let mut new_epoch_infos_by_subdao_and_epoch: HashMap<
       Pubkey,
