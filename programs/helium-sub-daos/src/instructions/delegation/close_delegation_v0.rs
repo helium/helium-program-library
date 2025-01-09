@@ -88,7 +88,14 @@ pub struct CloseDelegationV0<'info> {
         // no need to pass an extra account here. Just pass the closing time sdei and
         // do not change it.
         if position.genesis_end <= registrar.clock_unix_timestamp() {
-          position.lockup.end_ts
+          min(
+              position.lockup.end_ts,
+              if delegated_position.expiration_ts == 0 {
+                position.lockup.end_ts
+              } else {
+                min(position.lockup.end_ts, delegated_position.expiration_ts)
+              }
+            )
         } else {
           position.genesis_end
         }

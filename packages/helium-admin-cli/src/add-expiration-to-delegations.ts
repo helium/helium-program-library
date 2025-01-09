@@ -51,11 +51,11 @@ export async function run(args: any = process.argv) {
   const delegations = await hsdProgram.account.delegatedPositionV0.all()
   const needsMigration = delegations.filter(d => d.account.expirationTs.isZero());
   const positionKeys = needsMigration.map(d => d.account.position);
-  const coder = hsdProgram.coder.accounts
+  const coder = vsrProgram.coder.accounts
   const positionAccs = (await getMultipleAccounts({
     connection: provider.connection,
     keys: positionKeys,
-  })).map(a => coder.decode("positionV0", a.data));
+  })).map(a => coder.decode("PositionV0", a.data));
 
   const currTs = await getSolanaUnixTimestamp(provider);
   const currTsBN = new anchor.BN(currTs.toString());
@@ -88,7 +88,7 @@ export async function run(args: any = process.argv) {
           )[0],
           genesisEndSubDaoEpochInfo: subDaoEpochInfoKey(
             subDao,
-            position.genesisEnd
+            position.genesisEnd.isZero() ? min(position.lockup.endTs, proxyEndTs!) : position.genesisEnd
           )[0],
           proxyConfig: registrar.proxyConfig,
           systemProgram: SystemProgram.programId,
