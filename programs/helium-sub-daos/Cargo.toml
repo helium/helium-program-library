@@ -37,3 +37,4 @@ default-env = { workspace = true }
 
 [dev-dependencies]
 rust_decimal = "=1.26.0"
+
