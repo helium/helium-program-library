@@ -325,7 +325,7 @@ pub fn caclulate_vhnt_info(
       .checked_add(i64::try_from(seconds_to_genesis).unwrap())
       .unwrap(),
   )?;
-  let vehnt_at_genesis_end_exact = if has_genesis && position.genesis_end < expiration_ts {
+  let vehnt_at_genesis_end_exact = if has_genesis {
     position.voting_power_precise(voting_mint_config, position.genesis_end)?
   } else {
     position.voting_power_precise(voting_mint_config, curr_ts)?
