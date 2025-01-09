@@ -81,7 +81,7 @@ pub struct DelegateV0<'info> {
         // Avoid passing an extra account if the end is 0 (no genesis on this position).
         // Pass instead closing time epoch info, txn account deduplication will reduce the overall tx size
         if position.genesis_end <= registrar.clock_unix_timestamp() {
-          position.lockup.end_ts
+          min(position.lockup.end_ts, proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end)
         } else {
           position.genesis_end
         }
