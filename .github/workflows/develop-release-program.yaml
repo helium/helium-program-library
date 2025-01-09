@@ -89,13 +89,13 @@ jobs:
           program-id: ${{ env.PROGRAM_ID }}
 
       - name: Store so files
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{matrix.program}}-so
           path: |
             ./target/deploy/${{env.PROGRAM_NAME}}.so
       - name: Store idl files
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{matrix.program}}-idl
           path: |
