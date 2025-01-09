@@ -72,7 +72,9 @@ pub struct ExtendExpirationTsV0<'info> {
   )]
   pub closing_time_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   #[account(
-    mut,
+    init_if_needed,
+    payer = payer,
+    space = SubDaoEpochInfoV0::SIZE,
     seeds = [
       "sub_dao_epoch_info".as_bytes(), 
       sub_dao.key().as_ref(),
@@ -91,7 +93,7 @@ pub struct ExtendExpirationTsV0<'info> {
         }
       ).to_le_bytes()
     ],
-    bump = genesis_end_sub_dao_epoch_info.bump_seed,
+    bump,
   )]
   pub genesis_end_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   pub proxy_config: Box<Account<'info, ProxyConfigV0>>,
