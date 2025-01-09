@@ -340,12 +340,16 @@ pub fn caclulate_vhnt_info(
 
   let pre_genesis_end_fall_rate =
     calculate_fall_rate(vehnt_at_curr_ts, vehnt_at_genesis_end, seconds_to_genesis).unwrap();
-  let post_genesis_end_fall_rate = calculate_fall_rate(
-    vehnt_at_genesis_end_exact,
-    vehnt_at_delegation_end,
-    seconds_from_genesis_to_end,
-  )
-  .unwrap();
+  let post_genesis_end_fall_rate = if position.genesis_end < delegation_end_ts {
+    calculate_fall_rate(
+      vehnt_at_genesis_end_exact,
+      vehnt_at_delegation_end,
+      seconds_from_genesis_to_end,
+    )
+    .unwrap()
+  } else {
+    0
+  };
 
   let mut genesis_end_vehnt_correction = 0;
   let mut genesis_end_fall_rate_correction = 0;
