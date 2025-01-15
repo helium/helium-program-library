@@ -1,19 +1,19 @@
 import { PublicKey } from "@solana/web3.js";
 
 export const DC_MINT = new PublicKey(
-  "EMsZWzk2zqwtTvvimTVD1qq4usxsNptt1HWSHYurcBWA"
+  "dcuc8Amr83Wz27ZkQ2K9NS6r8zRpf1J6cvArEBDZDmm"
 );
 
 export const HNT_MINT = new PublicKey(
-  "2ZiWvqkZ8DCZwjoJ3HudxnChPrPPk6UVWraouC3GHvRN"
+  "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux"
 );
 
 export const MOBILE_MINT = new PublicKey(
-  "BuPZsYRpvVrYUPZMqZAJun2E7mTeAUwpCekb2uJUvapr"
+  "mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6"
 );
 
 export const IOT_MINT = new PublicKey(
-  "2GtqVJo9yKXuJbyZrxr3ouQbU8AXDJQq74DQpFXFrHg7"
+  "iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9fns"
 );
 
 // TODO: Replace with actual HNT feed
