@@ -78,7 +78,7 @@ export async function run(args: any = process.argv) {
       describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
-    oui_wallet: {
+    ouiWallet: {
       required: true,
       type: "string",
       describe: "Address of wallet to control oui operations",
@@ -124,7 +124,7 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const conn = provider.connection;
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
-  const oui_wallet = new PublicKey(argv.oui_wallet);
+  const ouiWallet = new PublicKey(argv.ouiWallet);
   const irm = await initIRM(provider);
   const hem = await initHEM(provider);
   const isRds = argv.pgHost.includes("rds.amazon.com");
@@ -311,10 +311,15 @@ export async function run(args: any = process.argv) {
     await Promise.all(
       orgs.map(async (org) => {
         const [orgK] = organizationKey(routingManager, new anchor.BN(org.oui));
-        return await irm.methods
-          .approveOrganizationV0()
-          .accounts({ organization: orgK })
-          .instruction();
+        if (
+          !(await exists(conn, orgK)) ||
+          !(await irm.account.organizationV0.fetch(orgK)).approved
+        ) {
+          return await irm.methods
+            .approveOrganizationV0()
+            .accounts({ organization: orgK })
+            .instruction();
+        }
       })
     )
   ).filter(truthy);
@@ -399,20 +404,55 @@ export async function run(args: any = process.argv) {
   console.log(`Initializing (${devaddrIxs.length}) devaddrConstraints`);
   await batchParallelInstructionsWithPriorityFee(provider, devaddrIxs);
 
-  console.log(`Updating authorites to ${argv.helium_oui_wallet}`);
-  await batchParallelInstructionsWithPriorityFee(provider, [
-    await irm.methods
-      .updateRoutingManagerV0({
-        updateAuthority: null,
-        netIdAuthority: oui_wallet,
-        devaddrPriceUsd: null,
-        ouiPriceUsd: null,
+  if (
+    (await exists(conn, routingManager)) &&
+    !(
+      await irm.account.iotRoutingManagerV0.fetch(routingManager)
+    ).netIdAuthority.equals(ouiWallet)
+  ) {
+    console.log(`Updating routingManager netIdAuthority to ${argv.ouiWallet}`);
+    await batchParallelInstructionsWithPriorityFee(provider, [
+      await irm.methods
+        .updateRoutingManagerV0({
+          updateAuthority: null,
+          netIdAuthority: ouiWallet,
+          devaddrPriceUsd: null,
+          ouiPriceUsd: null,
+        })
+        .accounts({
+          updateAuthority: wallet.publicKey,
+          routingManager,
+        })
+        .instruction(),
+    ]);
+  }
+
+  const netIdUpdateIxs = (
+    await Promise.all(
+      netIds.map(async (netId) => {
+        const [netIdK] = netIdKey(routingManager, new anchor.BN(netId));
+        if (
+          (await exists(conn, netIdK)) &&
+          !(await irm.account.netIdV0.fetch(netIdK)).authority.equals(ouiWallet)
+        ) {
+          return await irm.methods
+            .updateNetIdV0({
+              authority: ouiWallet,
+            })
+            .accounts({
+              authority: wallet.publicKey,
+              netId: netIdK,
+            })
+            .instruction();
+        }
       })
-      .instruction(),
-    await irm.methods
-      .updateNetIdV0({
-        authority: oui_wallet,
-      })
-      .instruction(),
-  ]);
+    )
+  ).filter(truthy);
+
+  if (netIdUpdateIxs.length > 0) {
+    console.log(
+      `Updating (${netIdUpdateIxs.length}) netIdAuthorites to ${argv.ouiWallet}`
+    );
+    await batchParallelInstructionsWithPriorityFee(provider, netIdUpdateIxs);
+  }
 }
