@@ -5,7 +5,7 @@ const path = require("path");
 const args = hideBin(process.argv);
 const script = args[0];
 
-const correctPath = path.join(__dirname, "..", "lib", "cjs", `${script}`);
+const correctPath = path.join(__dirname, "..", "lib", "hpl-crons-runner", "src", `${script}`);
 
 require(correctPath)
   .run(args.filter((arg) => arg !== script))

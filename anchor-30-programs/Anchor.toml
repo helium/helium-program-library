@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-hpl_crons = "EmtovPSZEHXavXT6cpZZ8vvvsudnkeFcK7Y2k8fKEoJS"
+hpl_crons = "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu"
 
 [registry]
 url = "https://api.apr.dev"

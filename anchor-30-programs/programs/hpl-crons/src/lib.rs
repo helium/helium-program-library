@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use helium_sub_daos::helium_sub_daos::accounts::{DaoV0, SubDaoV0};
 use tuktuk_program::TaskQueueV0;
 
-declare_id!("EmtovPSZEHXavXT6cpZZ8vvvsudnkeFcK7Y2k8fKEoJS");
+declare_id!("hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu");
 
 mod no_emit {
   use anchor_lang::{declare_id, declare_program};
@@ -44,7 +44,7 @@ pub mod hpl_crons {
 
   use super::*;
 
-  pub fn queue_end_epoch(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
+  pub fn queue_end_epoch(ctx: Context<QueueEndEpoch>) -> Result<tuktuk_program::RunTaskReturnV0> {
     let circuit_breaker_program =
       Pubkey::from_str("circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g").unwrap();
     let sub_daos = vec![
@@ -226,7 +226,7 @@ pub mod hpl_crons {
           ),
           transaction: TransactionSourceV0::CompiledV0(compiled_reschedule_tx.clone()),
           crank_reward: None,
-          free_tasks: 0,
+          free_tasks: 2,
         },
       ]
       .into_iter(),
@@ -252,6 +252,7 @@ pub struct QueueEndEpoch<'info> {
   pub dao: Account<'info, DaoV0>,
   pub iot_sub_dao: Account<'info, SubDaoV0>,
   pub mobile_sub_dao: Account<'info, SubDaoV0>,
+  /// CHECK: We init this when writing
   #[account(
     mut,
     seeds = [b"task_return_account"],
