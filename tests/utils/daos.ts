@@ -44,6 +44,7 @@ export async function initTestDao(
     provider.wallet.publicKey
   );
 
+  const hstWallet = Keypair.generate().publicKey;
   const method = await program.methods
     .initializeDaoV0({
       delegatorRewardsPercent: delegatorRewardsPercent(6), // 6%
@@ -59,7 +60,7 @@ export async function initTestDao(
       hstEmissionSchedule: [
         {
           startUnixTime: new anchor.BN(0),
-          percent: 32,
+          percent: 0,
         },
       ],
       proposalNamespace: me,
@@ -71,12 +72,18 @@ export async function initTestDao(
         me,
         mint
       ),
+      createAssociatedTokenAccountIdempotentInstruction(
+        me,
+        await getAssociatedTokenAddress(mint, hstWallet),
+        hstWallet,
+        mint
+      ),
     ])
     .accounts({
       rewardsEscrow,
       hntMint: mint,
       dcMint,
-      hstPool: await getAssociatedTokenAddress(mint, me),
+      hstPool: await getAssociatedTokenAddress(mint, hstWallet),
     });
 
   const { dao, delegatorPool } = await method.pubkeys();
