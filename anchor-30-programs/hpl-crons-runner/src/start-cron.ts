@@ -72,6 +72,21 @@ export async function run(args: any = process.argv) {
   const bumpBuffer = Buffer.alloc(1);
   bumpBuffer.writeUint8(bump);
   console.log("Using custom wallet", customWallet.toBase58());
+  const [epochTracker] = PublicKey.findProgramAddressSync(
+    [Buffer.from("epoch_tracker", "utf-8"), dao.toBuffer()],
+    PROGRAM_ID
+  );
+  let ixs: TransactionInstruction[] = [];
+  if (!(await provider.connection.getAccountInfo(epochTracker))) {
+    ixs.push(
+      await program.methods
+        .initEpochTracker()
+        .accounts({
+          dao,
+        })
+        .instruction()
+    );
+  }
   const { transaction, remainingAccounts } = compileTransaction(
     [
       await program.methods
@@ -80,6 +95,10 @@ export async function run(args: any = process.argv) {
           payer: customWallet,
           taskReturnAccount: PublicKey.findProgramAddressSync(
             [Buffer.from("task_return_account", "utf-8")],
+            PROGRAM_ID
+          )[0],
+          epochTracker: PublicKey.findProgramAddressSync(
+            [Buffer.from("epoch_tracker", "utf-8"), dao.toBuffer()],
             PROGRAM_ID
           )[0],
           taskQueue,
@@ -93,7 +112,7 @@ export async function run(args: any = process.argv) {
     [[Buffer.from("helium", "utf-8"), bumpBuffer]]
   );
 
-  const ixs = [
+  ixs.push(
     await tuktukProgram.methods
       .queueTaskV0({
         id: argv.index,
@@ -109,8 +128,8 @@ export async function run(args: any = process.argv) {
         taskQueue,
       })
       .remainingAccounts(remainingAccounts)
-      .instruction(),
-  ];
+      .instruction()
+  );
 
   await sendInstructions(provider, ixs);
 }
