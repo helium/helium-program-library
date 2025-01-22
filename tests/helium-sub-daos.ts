@@ -1029,8 +1029,8 @@ describe("helium-sub-daos", () => {
               expect(
                 Number(postAtaBalance) - Number(preAtaBalance)
               ).to.be.within(
-                (EPOCH_REWARDS * 0.68 * 6) / 100 - 5,
-                (EPOCH_REWARDS * 0.68 * 6) / 100
+                (EPOCH_REWARDS * 6) / 100 - 5,
+                (EPOCH_REWARDS * 6) / 100
               );
             });
           });
