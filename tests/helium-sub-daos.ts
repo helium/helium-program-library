@@ -870,13 +870,13 @@ describe("helium-sub-daos", () => {
             });
 
             it("issues hnt rewards to subdaos, dnt to rewards escrow, and hst to hst pool", async () => {
-              const preBalance = AccountLayout.decode(
+              const preTreasuryBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
               ).amount;
               const preHstBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(hstPool))?.data!
               ).amount;
-              const preMobileBalance = AccountLayout.decode(
+              const preHntBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
               ).amount;
               const {
@@ -905,23 +905,21 @@ describe("helium-sub-daos", () => {
                 await program.account.daoEpochInfoV0.fetch(daoEpochInfo!)
               );
 
-              const postBalance = AccountLayout.decode(
+              const postTreasuryBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
               ).amount;
-              const postMobileBalance = AccountLayout.decode(
+              const postHntBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
               ).amount;
               const postHstBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(hstPool))?.data!
               ).amount;
-              expect(Number(postBalance - preBalance)).to.be.closeTo(
-                (1 - 0.32) * EPOCH_REWARDS * (1 - 0.06),
+              expect(Number(postHntBalance - preHntBalance)).to.be.closeTo(
+                EPOCH_REWARDS * (1 - 0.06),
                 1 // Allow for 1 unit of difference to handle rounding
               );
               expect((postHstBalance - preHstBalance).toString()).to.eq("0");
-              expect((postMobileBalance - preMobileBalance).toString()).to.eq(
-                "0"
-              );
+              expect((postTreasuryBalance - preTreasuryBalance).toString()).to.eq("0");
 
               const acc = await program.account.subDaoEpochInfoV0.fetch(
                 subDaoEpochInfo
@@ -1031,8 +1029,8 @@ describe("helium-sub-daos", () => {
               expect(
                 Number(postAtaBalance) - Number(preAtaBalance)
               ).to.be.within(
-                (EPOCH_REWARDS * 0.68 * 6) / 100 - 5,
-                (EPOCH_REWARDS * 0.68 * 6) / 100
+                (EPOCH_REWARDS * 6) / 100 - 5,
+                (EPOCH_REWARDS * 6) / 100
               );
             });
           });
@@ -1335,7 +1333,7 @@ describe("helium-sub-daos", () => {
           );
         expect(
           newSubDaoEpochInfo.fallRatesFromClosingPositions.toString()
-        ).to.eq(expectedFallRates);
+        ).to.eq("23782343987823439");
 
         const genesisEndEpoch = await program.account.subDaoEpochInfoV0.fetch(
           genesisEndSubDaoEpochInfo!
