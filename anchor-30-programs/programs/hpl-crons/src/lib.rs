@@ -179,7 +179,15 @@ pub mod hpl_crons {
     ixs.extend(calculates);
     ixs.extend(issues);
     ixs.push(no_emit);
-    let (compiled_tx, _) = compile_transaction(ixs, vec![vec![b"helium".to_vec()]]).unwrap();
+    let (_, bump) = Pubkey::find_program_address(
+      &[b"custom", ctx.accounts.task_queue.key().as_ref(), b"helium"],
+      &tuktuk_program::ID,
+    );
+    let (compiled_tx, _) = compile_transaction(
+      ixs,
+      vec![vec![b"helium".to_vec(), bump.to_le_bytes().to_vec()]],
+    )
+    .unwrap();
 
     let reschedule_ix = Instruction {
       program_id: crate::ID,
