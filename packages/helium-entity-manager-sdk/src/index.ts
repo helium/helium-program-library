@@ -16,4 +16,5 @@ export * from "./pdas";
 export * from "./resolvers";
 export { keyToAssetForAsset } from "./helpers";
 
-export type MobileDeploymentInfoV0 = IdlTypes<HeliumEntityManager>["MobileDeploymentInfoV0"];
+export type MobileDeploymentInfoV0 =
+  IdlTypes<HeliumEntityManager>["MobileDeploymentInfoV0"];
