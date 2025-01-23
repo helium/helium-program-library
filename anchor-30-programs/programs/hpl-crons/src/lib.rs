@@ -241,7 +241,7 @@ pub mod hpl_crons {
       system_program: ctx.accounts.system_program.to_account_info(),
       tasks: vec![
         TaskReturnV0 {
-          trigger: TriggerV0::Timestamp((curr_epoch * EPOCH_LENGTH).try_into().unwrap()),
+          trigger: TriggerV0::Timestamp(((curr_epoch + 1) * EPOCH_LENGTH).try_into().unwrap()),
           transaction: TransactionSourceV0::CompiledV0(compiled_tx.clone()),
           crank_reward: None,
           free_tasks: 0,
