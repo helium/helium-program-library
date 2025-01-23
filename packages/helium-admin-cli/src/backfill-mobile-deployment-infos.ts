@@ -183,56 +183,60 @@ export async function run(args: any = process.argv) {
   const ixs = (
     await Promise.all(
       accountInfosWithPk.map(async (acc) => {
-        let correction: {
-          location?: anchor.BN;
-          deploymentInfo?: MobileDeploymentInfoV0;
-        } = {};
+        if (acc.data) {
+          let correction: {
+            location?: anchor.BN;
+            deploymentInfo?: MobileDeploymentInfoV0;
+          } = {};
 
-        const decodedAcc: MobileHotspotInfo = hem.coder.accounts.decode(
-          "MobileHotspotInfoV0",
-          acc.data as Buffer
-        );
+          const decodedAcc: MobileHotspotInfo = hem.coder.accounts.decode(
+            "MobileHotspotInfoV0",
+            acc.data as Buffer
+          );
 
-        const hasNewDeploymentInfo =
-          !decodedAcc.deploymentInfo && hasDeploymentInfo(acc.wifiInfo);
-        const deploymentInfoChanged = !deepEqual(
-          decodedAcc.deploymentInfo?.wifiInfoV0,
-          acc.wifiInfo.deploymentInfo
-        );
+          const hasNewDeploymentInfo =
+            !decodedAcc.deploymentInfo && hasDeploymentInfo(acc.wifiInfo);
+          const deploymentInfoChanged = !deepEqual(
+            decodedAcc.deploymentInfo?.wifiInfoV0,
+            acc.wifiInfo.deploymentInfo
+          );
 
-        const locationMissing = !decodedAcc.location && acc.wifiInfo.location;
-        const locationChanged =
-          decodedAcc.location && !acc.wifiInfo.location.eq(decodedAcc.location);
+          const locationMissing = !decodedAcc.location && acc.wifiInfo.location;
+          const locationChanged =
+            decodedAcc.location &&
+            !acc.wifiInfo.location.eq(decodedAcc.location);
 
-        if (hasNewDeploymentInfo || deploymentInfoChanged) {
-          correction = {
-            ...correction,
-            deploymentInfo: {
-              wifiInfoV0: {
-                ...acc.wifiInfo.deploymentInfo,
+          if (hasNewDeploymentInfo || deploymentInfoChanged) {
+            correction = {
+              ...correction,
+              deploymentInfo: {
+                wifiInfoV0: {
+                  ...acc.wifiInfo.deploymentInfo,
+                },
               },
-            },
-          };
-        }
+            };
+          }
 
-        if (locationMissing || locationChanged) {
-          correction = {
-            ...correction,
-            location: acc.wifiInfo.location,
-          };
-        }
+          if (locationMissing || locationChanged) {
+            correction = {
+              ...correction,
+              location: acc.wifiInfo.location,
+            };
+          }
 
-        if (Object.keys(correction).length > 0) {
-          return await hem.methods
-            .tempBackfillMobileInfo({
-              location: correction.location || null,
-              deploymentInfo: correction.deploymentInfo || null,
-            })
-            .accounts({
-              payer: wallet.publicKey,
-              mobileInfo: acc.pubkey,
-            })
-            .instruction();
+          if (Object.keys(correction).length > 0) {
+            console.log("ERHE");
+            return await hem.methods
+              .tempBackfillMobileInfo({
+                location: correction.location || null,
+                deploymentInfo: correction.deploymentInfo || null,
+              })
+              .accounts({
+                payer: wallet.publicKey,
+                mobileInfo: acc.pubkey,
+              })
+              .instruction();
+          }
         }
       })
     )
