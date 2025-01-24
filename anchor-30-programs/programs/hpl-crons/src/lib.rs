@@ -26,6 +26,12 @@ pub fn current_epoch(unix_timestamp: i64) -> u64 {
   (unix_timestamp / (EPOCH_LENGTH as i64)).try_into().unwrap()
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct UpdateEpochTrackerArgs {
+  pub epoch: Option<u64>,
+  pub authority: Option<Pubkey>,
+}
+
 #[program]
 pub mod hpl_crons {
   use anchor_lang::{
@@ -48,9 +54,24 @@ pub mod hpl_crons {
   pub fn init_epoch_tracker(ctx: Context<InitEpochTracker>) -> Result<()> {
     ctx.accounts.epoch_tracker.set_inner(EpochTrackerV0 {
       dao: ctx.accounts.dao.key(),
-      epoch: current_epoch(Clock::get().unwrap().unix_timestamp),
+      epoch: current_epoch(Clock::get().unwrap().unix_timestamp) - 1,
       bump_seed: ctx.bumps.epoch_tracker,
+      authority: ctx.accounts.authority.key(),
     });
+    Ok(())
+  }
+
+  pub fn update_epoch_tracker(
+    ctx: Context<UpdateEpochTracker>,
+    args: UpdateEpochTrackerArgs,
+  ) -> Result<()> {
+    if let Some(epoch) = args.epoch {
+      ctx.accounts.epoch_tracker.epoch = epoch;
+    }
+    if let Some(authority) = args.authority {
+      ctx.accounts.epoch_tracker.authority = authority;
+    }
+
     Ok(())
   }
 
@@ -228,6 +249,9 @@ pub mod hpl_crons {
     };
     let (compiled_reschedule_tx, _) = compile_transaction(vec![reschedule_ix], seeds).unwrap();
 
+    let end_of_epoch_trigger =
+      TriggerV0::Timestamp(((curr_epoch + 1) * EPOCH_LENGTH).try_into().unwrap());
+
     let return_accounts = write_return_tasks(WriteReturnTasksArgs {
       program_id: crate::ID,
       payer_info: PayerInfo::Signer(ctx.accounts.payer.to_account_info()),
@@ -240,19 +264,15 @@ pub mod hpl_crons {
       }],
       system_program: ctx.accounts.system_program.to_account_info(),
       tasks: vec![
+        // At the end of each epoch, schedule the next epoch end and reschedule the cron
         TaskReturnV0 {
-          trigger: TriggerV0::Timestamp(((curr_epoch + 1) * EPOCH_LENGTH).try_into().unwrap()),
+          trigger: end_of_epoch_trigger,
           transaction: TransactionSourceV0::CompiledV0(compiled_tx.clone()),
           crank_reward: None,
           free_tasks: 0,
         },
         TaskReturnV0 {
-          // 1 hour before the next epoch
-          trigger: TriggerV0::Timestamp(
-            ((curr_epoch + 1) * EPOCH_LENGTH - 60 * 60)
-              .try_into()
-              .unwrap(),
-          ),
+          trigger: end_of_epoch_trigger,
           transaction: TransactionSourceV0::CompiledV0(compiled_reschedule_tx.clone()),
           crank_reward: None,
           free_tasks: 2,
@@ -271,6 +291,7 @@ pub mod hpl_crons {
 #[account]
 #[derive(Default, InitSpace)]
 pub struct EpochTrackerV0 {
+  pub authority: Pubkey,
   pub dao: Pubkey,
   pub epoch: u64,
   pub bump_seed: u8,
@@ -285,11 +306,20 @@ pub struct InitEpochTracker<'info> {
     payer = payer,
     seeds = [b"epoch_tracker", dao.key().as_ref()],
     bump,
-    space = 8 + EpochTrackerV0::INIT_SPACE,
+    space = 8 + EpochTrackerV0::INIT_SPACE + 60,
   )]
   pub epoch_tracker: Box<Account<'info, EpochTrackerV0>>,
   pub dao: Box<Account<'info, DaoV0>>,
+  /// CHECK: The authority to set
+  pub authority: AccountInfo<'info>,
   pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateEpochTracker<'info> {
+  pub authority: Signer<'info>,
+  #[account(mut, has_one = authority)]
+  pub epoch_tracker: Box<Account<'info, EpochTrackerV0>>,
 }
 
 #[derive(Accounts)]

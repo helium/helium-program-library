@@ -42,6 +42,11 @@ export async function run(args: any = process.argv) {
       alias: "t",
       describe: "The task queue to queue",
     },
+    epoch: {
+      optional: true,
+      type: "number",
+      describe: "The epoch to set",
+    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -72,17 +77,34 @@ export async function run(args: any = process.argv) {
   const bumpBuffer = Buffer.alloc(1);
   bumpBuffer.writeUint8(bump);
   console.log("Using custom wallet", customWallet.toBase58());
-  const [epochTracker] = PublicKey.findProgramAddressSync(
+  const [epochTracker, etBumpSeed] = PublicKey.findProgramAddressSync(
     [Buffer.from("epoch_tracker", "utf-8"), dao.toBuffer()],
     PROGRAM_ID
   );
   let ixs: TransactionInstruction[] = [];
+  if (argv.epoch) {
+    ixs.push(
+      await program.methods
+        .updateEpochTracker({
+          epoch: new anchor.BN(argv.epoch),
+          authority: provider.wallet.publicKey,
+          dao: dao,
+          bumpSeed: etBumpSeed,
+        })
+        .accountsStrict({
+          authority: provider.wallet.publicKey,
+          epochTracker,
+        })
+        .instruction()
+    );
+  }
   if (!(await provider.connection.getAccountInfo(epochTracker))) {
     ixs.push(
       await program.methods
         .initEpochTracker()
         .accounts({
           dao,
+          authority: provider.wallet.publicKey,
         })
         .instruction()
     );
