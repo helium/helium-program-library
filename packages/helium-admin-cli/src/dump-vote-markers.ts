@@ -60,6 +60,9 @@ export async function run(args: any = process.argv) {
 
   // Track votes in a map: proposalKey -> voter marker id --> VoteMarkerV0
   const votesByProposal = new Map<string, Map<string, VoteMarkerV0>>();
+  for (const proposal of proposals) {
+    votesByProposal.set(proposal.publicKey.toBase58(), new Map());
+  }
 
   // Add position cache
   const positionCache = new Map<string, { mint: PublicKey }>();
@@ -67,40 +70,27 @@ export async function run(args: any = process.argv) {
   for (const proposal of proposals) {
     console.log(`Getting vote markers for ${proposal.publicKey.toBase58()}`);
     
-    let signatures: anchor.web3.ConfirmedSignatureInfo[] = [
-      // @ts-ignore
-      {
-        signature:
-          "21LJHawnnMu9sYUQPH8hhkgRcHyzq2z2WhXYuuJZYcz5P1py8upJdRHaHfKZtnwFdHuvi2nZkoXbAM9RrJhqQw5n",
-      },
-      // @ts-ignore
-      {
-        signature:
-          "4taBk1uz8mMFdMo6rqnMpPWp3b8vFPHw1W9WrniZS4gbgWiVNTgHvxwJMjv7rZsMLaQWUm6nuNEcagU9qM55vFTi",
-      },
-    ];
+    let signatures: anchor.web3.ConfirmedSignatureInfo[] = [];
     let lastSig: string | undefined = undefined;
     
     // // Keep fetching until we get all signatures
-    // while (true) {
-    //   const sigs = await provider.connection.getSignaturesForAddress(
-    //     proposal.publicKey,
-    //     { before: lastSig, limit: 1000 },
-    //     "confirmed"
-    //   );
+    while (true) {
+      const sigs = await provider.connection.getSignaturesForAddress(
+        proposal.publicKey,
+        { before: lastSig, limit: 1000 },
+        "confirmed"
+      );
       
-    //   if (sigs.length === 0) break;
+      if (sigs.length === 0) break;
       
-    //   signatures.push(...sigs);
-    //   lastSig = sigs[sigs.length - 1].signature;
+      signatures.push(...sigs);
+      lastSig = sigs[sigs.length - 1].signature;
       
-    //   // If we got less than 1000, we've hit the end
-    //   if (sigs.length < 1000) break;
-    // }
+      // If we got less than 1000, we've hit the end
+      if (sigs.length < 1000) break;
+    }
 
     console.log("signatures", signatures.length);
-
-    votesByProposal.set(proposal.publicKey.toBase58(), new Map());
 
     const hvsrCoder = new anchor.BorshInstructionCoder(hvsrProgram.idl);
     const proposalCoder = new anchor.BorshInstructionCoder(proposalProgram.idl);
@@ -174,6 +164,7 @@ export async function run(args: any = process.argv) {
               // @ts-ignore
               let { weight, choice } = innerVoteDecoded!.data.args;
               let propMap = votesByProposal.get(proposal!.toBase58());
+
               let voteMarker = propMap!.get(marker!.toBase58());
               if (!voteMarker) {
                 voteMarker = {
@@ -274,11 +265,10 @@ export async function run(args: any = process.argv) {
                 voteMarker.weight = weight;
               }
               propMap!.set(marker!.toBase58(), voteMarker);
-            } else if (decoded.name === "relinquishVoteV1") {
+            } else if (decoded.name === "relinquishVoteV1" || decoded.name === "proxiedRelinquishVoteV0") {
               const firstIsSigner = message.isAccountSigner(ix.accountKeyIndexes[0]);
-              console.log("firstIsSigner", firstIsSigner);
               // HACK: At some point we removed rent refund as first account and made it the last account.
-              if (firstIsSigner) {
+              if (firstIsSigner && decoded.name === "relinquishVoteV1") {
                 const len = ix.accountKeyIndexes.length;
                 let refund = ix.accountKeyIndexes.shift();
                 if (len != 12) { // super legacy
@@ -326,8 +316,8 @@ export async function run(args: any = process.argv) {
     }
   }
 
-  let flattened = Object.entries(votesByProposal).flatMap(([proposal, markers]) => {
-    return Object.entries(markers).map(([marker, voteMarker]) => voteMarker)
+  let flattened = Array.from(votesByProposal.values()).flatMap((markers) => {
+    return Array.from(markers.values())
   });
   // Write results to file
   const fs = require('fs');
