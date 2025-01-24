@@ -1,26 +1,17 @@
 import * as anchor from "@coral-xyz/anchor";
-import {
-  daoKey,
-  init as initDao,
-  subDaoKey,
-} from "@helium/helium-sub-daos-sdk";
-import b58 from "bs58";
-import { init as initVsr } from "@helium/voter-stake-registry-sdk";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { organizationKey } from "@helium/organization-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";
-import { ParsedInstruction, PublicKey, TransactionInstruction } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
+import { init as initVsr } from "@helium/voter-stake-registry-sdk";
+import { PublicKey } from "@solana/web3.js";
+import b58 from "bs58";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
-  getTimestampFromDays,
-  getUnixTimestamp,
-  loadKeypair,
-  sendInstructionsOrSquads,
+  loadKeypair
 } from "./utils";
-import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
-import { organizationKey } from "@helium/organization-sdk";
 
-type VoteMarkerV0 = anchor.IdlAccounts<VoterStakeRegistry>["voteMarkerV0"] & { pubkey: PublicKey };
+type VoteMarkerV0 = anchor.IdlAccounts<VoterStakeRegistry>["voteMarkerV0"] & { address: PublicKey };
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -168,13 +159,14 @@ export async function run(args: any = process.argv) {
               let voteMarker = propMap!.get(marker!.toBase58());
               if (!voteMarker) {
                 voteMarker = {
+                  address: marker,
                   voter,
                   registrar,
                   proposal,
                   mint,
                   // @ts-ignore
                   choices: [choice],
-                  weight,
+                  weight: weight,
                   bumpSeed: 0,
                   deprecatedRelinquished: false,
                   proxyIndex: 0,
@@ -245,6 +237,7 @@ export async function run(args: any = process.argv) {
               let voteMarker = propMap!.get(marker!.toBase58());
               if (!voteMarker) {
                 voteMarker = {
+                  address: marker,
                   voter,
                   registrar,
                   proposal,
@@ -317,7 +310,19 @@ export async function run(args: any = process.argv) {
   }
 
   let flattened = Array.from(votesByProposal.values()).flatMap((markers) => {
-    return Array.from(markers.values())
+    return Array.from(markers.values()).map(marker => ({
+      address: marker.address.toBase58(),
+      voter: marker.voter.toBase58(),
+      registrar: marker.registrar.toBase58(),
+      proposal: marker.proposal.toBase58(),
+      mint: marker.mint.toBase58(),
+      choices: marker.choices,
+      weight: marker.weight.toString(),
+      bumpSeed: marker.bumpSeed,
+      deprecatedRelinquished: marker.deprecatedRelinquished,
+      proxyIndex: marker.proxyIndex,
+      rentRefund: marker.rentRefund.toBase58(),
+    }))
   });
   // Write results to file
   const fs = require('fs');
