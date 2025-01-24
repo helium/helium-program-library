@@ -331,6 +331,7 @@ __metadata:
     "@helium/nft-proxy-sdk": ^0.0.15
     "@helium/organization-sdk": ^0.0.13
     "@helium/price-oracle-sdk": ^0.9.19
+    "@helium/proposal-sdk": ^0.0.15
     "@helium/spl-utils": ^0.9.19
     "@helium/treasury-management-sdk": ^0.9.19
     "@solana/spl-account-compression": ^0.1.7
@@ -465,6 +466,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@helium/modular-governance-idls@npm:^0.0.15":
+  version: 0.0.15
+  resolution: "@helium/modular-governance-idls@npm:0.0.15"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@solana/web3.js": ^1.78.4
+  checksum: cbfaa2a83b074fb24d138de1901acaa7a0cf0de715bdabb3fdad9ab04b59a34e5f6c02216fdb6b6d78d4fa48bf80fe76d2c657107458f9d9b53d64aa532bc547
+  languageName: node
+  linkType: hard
+
 "@helium/nft-proxy-sdk@npm:^0.0.15":
   version: 0.0.15
   resolution: "@helium/nft-proxy-sdk@npm:0.0.15"
@@ -530,6 +541,17 @@ __metadata:
     "@helium/anchor-resolvers": ^0.5.0
     "@helium/modular-governance-idls": ^0.0.13
   checksum: 70b8c02906f0361b1c32308b09492fb5c6b847aceee922c6b1a5b2bfca8eb2f425fa42782a51cb993157b338f7422229c1694a48e6fdfe41040e2ad5b646bff6
+  languageName: node
+  linkType: hard
+
+"@helium/proposal-sdk@npm:^0.0.15":
+  version: 0.0.15
+  resolution: "@helium/proposal-sdk@npm:0.0.15"
+  dependencies:
+    "@coral-xyz/anchor": ^0.28.0
+    "@helium/anchor-resolvers": ^0.5.0
+    "@helium/modular-governance-idls": ^0.0.15
+  checksum: b127e09f428c7f8076341bb692e50bfa19f632dd887502e9d6464fb6066f79975c0fabca223c298c7427c9c6560c49d348f5c33674fd9cc4570f532b34e345dc
   languageName: node
   linkType: hard
 
