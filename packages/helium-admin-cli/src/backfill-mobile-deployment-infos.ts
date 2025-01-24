@@ -225,7 +225,6 @@ export async function run(args: any = process.argv) {
           }
 
           if (Object.keys(correction).length > 0) {
-            console.log("ERHE");
             return await hem.methods
               .tempBackfillMobileInfo({
                 location: correction.location || null,
