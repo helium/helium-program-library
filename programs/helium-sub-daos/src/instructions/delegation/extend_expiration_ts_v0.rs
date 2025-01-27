@@ -81,15 +81,16 @@ pub struct ExtendExpirationTsV0<'info> {
         // no need to pass an extra account here. Just pass the closing time sdei and
         // do not change it.
         if position.genesis_end <= registrar.clock_unix_timestamp() {
-          position.lockup.end_ts
+          min(proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end, position.lockup.end_ts)
         } else {
           position.genesis_end
         }
       ).to_le_bytes()
     ],
-    bump = genesis_end_sub_dao_epoch_info.bump_seed,
+    bump,
   )]
-  pub genesis_end_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
+  /// CHECK: Verified when needed in the inner instr
+  pub genesis_end_sub_dao_epoch_info: UncheckedAccount<'info>,
   pub proxy_config: Box<Account<'info, ProxyConfigV0>>,
   pub system_program: Program<'info, System>,
 }
@@ -104,16 +105,20 @@ pub fn handler(ctx: Context<ExtendExpirationTsV0>) -> Result<()> {
     .get_current_season(registrar.clock_unix_timestamp())
     .unwrap()
     .end;
-  ctx.accounts.delegated_position.expiration_ts = expiration_ts;
   let epoch = current_epoch(registrar.clock_unix_timestamp());
 
   // Calculate vehnt info once
+  msg!(
+    "Calculating vehnt info for old expiration ts {}",
+    ctx.accounts.delegated_position.expiration_ts
+  );
   let vehnt_info_old = caclulate_vhnt_info(
     ctx.accounts.delegated_position.start_ts,
     position,
     voting_mint_config,
-    i64::MAX,
+    ctx.accounts.delegated_position.expiration_ts,
   )?;
+  ctx.accounts.delegated_position.expiration_ts = expiration_ts;
   let vehnt_info_new = caclulate_vhnt_info(
     ctx.accounts.delegated_position.start_ts,
     position,
@@ -178,43 +183,60 @@ pub fn handler(ctx: Context<ExtendExpirationTsV0>) -> Result<()> {
     closing_time_sdei.exit(&id())?;
   }
 
-  // Always update genesis_end_sdei
-  ctx.accounts.genesis_end_sub_dao_epoch_info.reload()?;
-  let genesis_end_sdei = &mut ctx.accounts.genesis_end_sub_dao_epoch_info;
-  if genesis_end_sdei.epoch > epoch {
-    msg!(
-      "Subtracting vehnt info from genesis end sdei {:?}",
-      vehnt_info_old
-    );
-    genesis_end_sdei.vehnt_in_closing_positions = genesis_end_sdei
-      .vehnt_in_closing_positions
-      .checked_sub(vehnt_info_old.genesis_end_vehnt_correction)
-      .unwrap();
-    genesis_end_sdei.fall_rates_from_closing_positions = genesis_end_sdei
-      .fall_rates_from_closing_positions
-      .checked_sub(vehnt_info_old.genesis_end_fall_rate_correction)
-      .unwrap();
-    msg!(
-      "Post subtraction genesis end sdei {} {}",
-      genesis_end_sdei.vehnt_in_closing_positions,
-      genesis_end_sdei.fall_rates_from_closing_positions
-    );
+  let genesis_end_is_closing = ctx.accounts.genesis_end_sub_dao_epoch_info.key()
+    == ctx.accounts.closing_time_sub_dao_epoch_info.key();
+  let genesis_end_is_old_closing = ctx.accounts.genesis_end_sub_dao_epoch_info.key()
+    == ctx.accounts.old_closing_time_sub_dao_epoch_info.key();
+  if ctx.accounts.genesis_end_sub_dao_epoch_info.data_len() > 0 {
+    let mut parsed: Account<SubDaoEpochInfoV0>;
+    let genesis_end_sdei: &mut Account<SubDaoEpochInfoV0> = if genesis_end_is_closing {
+      &mut ctx.accounts.closing_time_sub_dao_epoch_info
+    } else if genesis_end_is_old_closing {
+      &mut ctx.accounts.old_closing_time_sub_dao_epoch_info
+    } else {
+      parsed = Account::try_from(
+        &ctx
+          .accounts
+          .genesis_end_sub_dao_epoch_info
+          .to_account_info(),
+      )?;
+      &mut parsed
+    };
+    if genesis_end_sdei.epoch > epoch {
+      msg!(
+        "Subtracting vehnt info from genesis end sdei {:?}",
+        vehnt_info_old
+      );
+      genesis_end_sdei.vehnt_in_closing_positions = genesis_end_sdei
+        .vehnt_in_closing_positions
+        .checked_sub(vehnt_info_old.genesis_end_vehnt_correction)
+        .unwrap();
+      genesis_end_sdei.fall_rates_from_closing_positions = genesis_end_sdei
+        .fall_rates_from_closing_positions
+        .checked_sub(vehnt_info_old.genesis_end_fall_rate_correction)
+        .unwrap();
+      msg!(
+        "Post subtraction genesis end sdei {} {}",
+        genesis_end_sdei.vehnt_in_closing_positions,
+        genesis_end_sdei.fall_rates_from_closing_positions
+      );
 
-    genesis_end_sdei.vehnt_in_closing_positions = genesis_end_sdei
-      .vehnt_in_closing_positions
-      .checked_add(vehnt_info_new.genesis_end_vehnt_correction)
-      .unwrap();
-    genesis_end_sdei.fall_rates_from_closing_positions = genesis_end_sdei
-      .fall_rates_from_closing_positions
-      .checked_add(vehnt_info_new.genesis_end_fall_rate_correction)
-      .unwrap();
-    msg!(
-      "Post addition genesis end sdei {} {}",
-      genesis_end_sdei.vehnt_in_closing_positions,
-      genesis_end_sdei.fall_rates_from_closing_positions
-    );
+      genesis_end_sdei.vehnt_in_closing_positions = genesis_end_sdei
+        .vehnt_in_closing_positions
+        .checked_add(vehnt_info_new.genesis_end_vehnt_correction)
+        .unwrap();
+      genesis_end_sdei.fall_rates_from_closing_positions = genesis_end_sdei
+        .fall_rates_from_closing_positions
+        .checked_add(vehnt_info_new.genesis_end_fall_rate_correction)
+        .unwrap();
+      msg!(
+        "Post addition genesis end sdei {} {}",
+        genesis_end_sdei.vehnt_in_closing_positions,
+        genesis_end_sdei.fall_rates_from_closing_positions
+      );
 
-    genesis_end_sdei.exit(&id())?;
+      genesis_end_sdei.exit(&id())?;
+    }
   }
 
   Ok(())

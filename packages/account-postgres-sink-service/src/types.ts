@@ -22,6 +22,7 @@ export interface IAccountConfig {
   batchSize: number;
   plugins?: IPluginConfig[];
   ix_side_effects?: IIxSideEffect[];
+  ignore_deletes?: boolean;
 }
 
 export interface IConfig {

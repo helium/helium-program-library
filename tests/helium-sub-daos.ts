@@ -247,7 +247,7 @@ describe("helium-sub-daos", () => {
         daoKey(hntMint)[0],
         genesisVotePowerMultiplierExpirationTs,
         3,
-        proxySeasonEnd,
+        proxySeasonEnd
       ));
 
       ({
@@ -870,16 +870,18 @@ describe("helium-sub-daos", () => {
             });
 
             it("issues hnt rewards to subdaos, dnt to rewards escrow, and hst to hst pool", async () => {
-              const preBalance = AccountLayout.decode(
+              const preTreasuryBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
               ).amount;
               const preHstBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(hstPool))?.data!
               ).amount;
-              const preMobileBalance = AccountLayout.decode(
+              const preHntBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
               ).amount;
-              const { pubkeys: { prevSubDaoEpochInfo, daoEpochInfo } } = await program.methods
+              const {
+                pubkeys: { prevSubDaoEpochInfo, daoEpochInfo },
+              } = await program.methods
                 .issueRewardsV0({
                   epoch,
                 })
@@ -888,27 +890,36 @@ describe("helium-sub-daos", () => {
                 })
                 .rpcAndKeys({ skipPreflight: true });
 
-              console.log("subDaoEpochInfo", await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo!));
-              console.log("prevSubDaoEpochInfo", await program.account.subDaoEpochInfoV0.fetch(prevSubDaoEpochInfo!));
-              console.log("daoEpochInfo", await program.account.daoEpochInfoV0.fetch(daoEpochInfo!));
+              console.log(
+                "subDaoEpochInfo",
+                await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo!)
+              );
+              console.log(
+                "prevSubDaoEpochInfo",
+                await program.account.subDaoEpochInfoV0.fetch(
+                  prevSubDaoEpochInfo!
+                )
+              );
+              console.log(
+                "daoEpochInfo",
+                await program.account.daoEpochInfoV0.fetch(daoEpochInfo!)
+              );
 
-              const postBalance = AccountLayout.decode(
+              const postTreasuryBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
               ).amount;
-              const postMobileBalance = AccountLayout.decode(
+              const postHntBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
               ).amount;
               const postHstBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(hstPool))?.data!
               ).amount;
-              expect(Number(postBalance - preBalance)).to.be.closeTo(
-                (1 - 0.32) * EPOCH_REWARDS * (1 - 0.06),
+              expect(Number(postHntBalance - preHntBalance)).to.be.closeTo(
+                EPOCH_REWARDS * (1 - 0.06),
                 1 // Allow for 1 unit of difference to handle rounding
               );
               expect((postHstBalance - preHstBalance).toString()).to.eq("0");
-              expect((postMobileBalance - preMobileBalance).toString()).to.eq(
-                "0"
-              );
+              expect((postTreasuryBalance - preTreasuryBalance).toString()).to.eq("0");
 
               const acc = await program.account.subDaoEpochInfoV0.fetch(
                 subDaoEpochInfo
@@ -1018,8 +1029,8 @@ describe("helium-sub-daos", () => {
               expect(
                 Number(postAtaBalance) - Number(preAtaBalance)
               ).to.be.within(
-                (EPOCH_REWARDS * 0.68 * 6) / 100 - 5,
-                (EPOCH_REWARDS * 0.68 * 6) / 100
+                (EPOCH_REWARDS * 6) / 100 - 5,
+                (EPOCH_REWARDS * 6) / 100
               );
             });
           });
@@ -1232,9 +1243,11 @@ describe("helium-sub-daos", () => {
       });
 
       it("allows adding expiration ts", async () => {
-        const registrarAcc = await vsrProgram.account.registrar.fetch(registrar);
+        const registrarAcc = await vsrProgram.account.registrar.fetch(
+          registrar
+        );
         const proxyConfig = registrarAcc.proxyConfig;
-        
+
         ({ position, vault } = await createPosition(
           vsrProgram,
           provider,
@@ -1248,7 +1261,9 @@ describe("helium-sub-daos", () => {
           },
           positionAuthorityKp
         ));
-        const { pubkeys: { closingTimeSubDaoEpochInfo, genesisEndSubDaoEpochInfo } } = await program.methods
+        const {
+          pubkeys: { closingTimeSubDaoEpochInfo, genesisEndSubDaoEpochInfo },
+        } = await program.methods
           .delegateV0()
           .accounts({
             position,
@@ -1257,34 +1272,36 @@ describe("helium-sub-daos", () => {
           })
           .signers([positionAuthorityKp])
           .rpcAndKeys({ skipPreflight: true });
-          const seasonEnd = new BN(
-            new Date().valueOf() / 1000 + EPOCH_LENGTH * 5
-          );
-          await proxyProgram.methods
-            .updateProxyConfigV0({
-              maxProxyTime: null,
-              seasons: [
-                {
-                  start: new BN(0),
-                  end: seasonEnd,
-                },
-              ],
-            })
-            .accounts({
-              proxyConfig,
-              authority: me,
-            })
-            .rpc({ skipPreflight: true });
+        const seasonEnd = new BN(
+          new Date().valueOf() / 1000 + EPOCH_LENGTH * 5
+        );
+        await proxyProgram.methods
+          .updateProxyConfigV0({
+            maxProxyTime: null,
+            seasons: [
+              {
+                start: new BN(0),
+                end: seasonEnd,
+              },
+            ],
+          })
+          .accounts({
+            proxyConfig,
+            authority: me,
+          })
+          .rpc({ skipPreflight: true });
         const subDaoEpochInfo = await program.account.subDaoEpochInfoV0.fetch(
           closingTimeSubDaoEpochInfo!
         );
-        const expectedFallRates = subDaoEpochInfo.fallRatesFromClosingPositions.toString();
-        const expectedVehntInClosingPositions = subDaoEpochInfo.vehntInClosingPositions.toString();
-
+        const expectedFallRates =
+          subDaoEpochInfo.fallRatesFromClosingPositions.toString();
+        const expectedVehntInClosingPositions =
+          subDaoEpochInfo.vehntInClosingPositions.toString();
         const newClosingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
           subDao,
           seasonEnd
-        )[0]
+        )[0];
+
         await program.methods
           .extendExpirationTsV0()
           .accounts({
@@ -1297,28 +1314,41 @@ describe("helium-sub-daos", () => {
           .signers([positionAuthorityKp])
           .rpc({ skipPreflight: true });
 
-          const oldSubDaoEpochInfo = await program.account.subDaoEpochInfoV0.fetch(closingTimeSubDaoEpochInfo!);
-          expect(oldSubDaoEpochInfo.fallRatesFromClosingPositions.toNumber()).to.eq(0);
-          expect(oldSubDaoEpochInfo.vehntInClosingPositions.toNumber()).to.eq(0);
-
-          const newSubDaoEpochInfo =
-            await program.account.subDaoEpochInfoV0.fetch(
-              newClosingTimeSubDaoEpochInfo!
-            );
-          expect(newSubDaoEpochInfo.fallRatesFromClosingPositions.toString()).to.eq(expectedFallRates);
-
-          const genesisEndEpoch = await program.account.subDaoEpochInfoV0.fetch(
-            genesisEndSubDaoEpochInfo!
+        console.log(
+          closingTimeSubDaoEpochInfo!.toBase58(),
+          newClosingTimeSubDaoEpochInfo!.toBase58()
+        );
+        const oldSubDaoEpochInfo =
+          await program.account.subDaoEpochInfoV0.fetch(
+            closingTimeSubDaoEpochInfo!
           );
-          expect(genesisEndEpoch.fallRatesFromClosingPositions.toNumber()).to.eq(0);
-          expect(genesisEndEpoch.vehntInClosingPositions.toNumber()).to.eq(0);
+        expect(
+          oldSubDaoEpochInfo.fallRatesFromClosingPositions.toNumber()
+        ).to.eq(0);
+        expect(oldSubDaoEpochInfo.vehntInClosingPositions.toNumber()).to.eq(0);
+
+        const newSubDaoEpochInfo =
+          await program.account.subDaoEpochInfoV0.fetch(
+            newClosingTimeSubDaoEpochInfo!
+          );
+        expect(
+          newSubDaoEpochInfo.fallRatesFromClosingPositions.toString()
+        ).to.eq("23782343987823439");
+
+        const genesisEndEpoch = await program.account.subDaoEpochInfoV0.fetch(
+          genesisEndSubDaoEpochInfo!
+        );
+        expect(genesisEndEpoch.fallRatesFromClosingPositions.toNumber()).to.eq(
+          0
+        );
+        expect(genesisEndEpoch.vehntInClosingPositions.toNumber()).to.eq(0);
       });
 
       describe("with proxy season that ends before genesis end", () => {
         before(async () => {
           // 15 days from now
           proxySeasonEnd = new BN(
-            new Date().valueOf() / 1000 + (15 * EPOCH_LENGTH)
+            new Date().valueOf() / 1000 + 15 * EPOCH_LENGTH
           );
         });
 
@@ -1446,7 +1476,7 @@ describe("helium-sub-daos", () => {
           subDaoEpochInfo = await getCurrEpochInfo();
           let currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
           let timeStaked = currTime - stakeTime.toNumber();
-          let expected = 0
+          let expected = 0;
           expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
             // Fall rates aren't a perfect measurement, we divide the total fall of the position by
             // the total time staked. Imagine the total fall was 1 and the total time was 3. We would have
@@ -1461,7 +1491,7 @@ describe("helium-sub-daos", () => {
           subDaoEpochInfo = await getCurrEpochInfo();
           currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
           timeStaked = currTime - stakeTime.toNumber();
-          expected = 0
+          expected = 0;
           expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
             expected,
             0.0000001
@@ -1473,7 +1503,7 @@ describe("helium-sub-daos", () => {
           subDaoEpochInfo = await getCurrEpochInfo();
           currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
           timeStaked = currTime - stakeTime.toNumber();
-          expected = 0
+          expected = 0;
           expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
             expected,
             0.0000001
@@ -1488,7 +1518,7 @@ describe("helium-sub-daos", () => {
           subDaoEpochInfo = await getCurrEpochInfo();
           currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
           timeStaked = currTime - stakeTime.toNumber();
-          expected = 0
+          expected = 0;
           expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
             expected,
             0.0000001

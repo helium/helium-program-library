@@ -109,6 +109,18 @@ impl<'info> IssueRewardsV0<'info> {
 
     CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
   }
+
+  pub fn mint_rewards_emissions_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
+    let cpi_accounts = MintV0 {
+      mint: self.hnt_mint.to_account_info(),
+      to: self.rewards_escrow.to_account_info(),
+      mint_authority: self.dao.to_account_info(),
+      circuit_breaker: self.hnt_circuit_breaker.to_account_info(),
+      token_program: self.token_program.to_account_info(),
+    };
+
+    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
+  }
 }
 
 pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<()> {
@@ -227,11 +239,11 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   }
 
   let escrow_amount = rewards_amount - delegation_rewards_amount;
-  msg!("Minting {} to treasury", escrow_amount);
+  msg!("Minting {} to rewards escrow", escrow_amount);
   mint_v0(
     ctx
       .accounts
-      .mint_treasury_emissions_ctx()
+      .mint_rewards_emissions_ctx()
       .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
     MintArgsV0 {
       amount: escrow_amount,

@@ -5,6 +5,9 @@ runs:
   steps:
     - uses: ./.github/actions/setup/
     - uses: ./.github/actions/setup-solana/
+    - run: rustup install 1.79 && rustup default 1.79
+      shell: bash
+      if: steps.cache-anchor-cli.outputs.cache-hit != 'true'
     - uses: actions/cache@v2
       name: Cache Anchor Cli
       id: cache-anchor-cli

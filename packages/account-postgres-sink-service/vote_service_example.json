@@ -29,6 +29,18 @@
           "schema": "public"
         }
       ]
+    },
+    {
+      "programId": "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR",
+      "accounts": [
+        { "type": "SubDaoV0", "table": "sub_daos", "schema": "public" },
+        { "type": "DaoV0", "table": "daos", "schema": "public" },
+        {
+          "type": "DelegatedPositionV0",
+          "table": "delegated_positions",
+          "schema": "public"
+        }
+      ]
     }
   ],
   "indexConfigs": []
