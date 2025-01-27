@@ -19,7 +19,6 @@ import yargs from "yargs/yargs";
 import { loadKeypair } from "./utils";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import deepEqual from "fast-deep-equal";
-import { latLngToCell } from "h3-js";
 
 type WifiInfoRow = {
   hs_pubkey: string;
@@ -34,7 +33,6 @@ type WifiInfoRow = {
 
 type WifiInfo = {
   hs_pubkey: string;
-  location: anchor.BN;
   deploymentInfo: {
     antenna: number;
     elevation: number;
@@ -55,11 +53,6 @@ const hasDeploymentInfo = (wi: WifiInfo) => {
     wi.deploymentInfo.mechanicalDownTilt ||
     wi.deploymentInfo.electricalDownTilt
   );
-};
-
-export const getH3Location = (lat: number, lng: number) => {
-  const h3Index = latLngToCell(lat, lng, 12);
-  return new anchor.BN(h3Index, 16);
 };
 
 export async function run(args: any = process.argv) {
@@ -151,7 +144,6 @@ export async function run(args: any = process.argv) {
   const wifiInfos = (await client.query(`SELECT * FROM wifi_infos`)).rows.map(
     (wifiInfo: WifiInfoRow): WifiInfo => ({
       ...wifiInfo,
-      location: getH3Location(Number(wifiInfo.lat), Number(wifiInfo.lng)),
       deploymentInfo: {
         antenna: Number(wifiInfo.antenna),
         elevation: Number(wifiInfo.elevation),
@@ -201,11 +193,6 @@ export async function run(args: any = process.argv) {
             acc.wifiInfo.deploymentInfo
           );
 
-          const locationMissing = !decodedAcc.location && acc.wifiInfo.location;
-          const locationChanged =
-            decodedAcc.location &&
-            !acc.wifiInfo.location.eq(decodedAcc.location);
-
           if (hasNewDeploymentInfo || deploymentInfoChanged) {
             correction = {
               ...correction,
@@ -214,13 +201,6 @@ export async function run(args: any = process.argv) {
                   ...acc.wifiInfo.deploymentInfo,
                 },
               },
-            };
-          }
-
-          if (locationMissing || locationChanged) {
-            correction = {
-              ...correction,
-              location: acc.wifiInfo.location,
             };
           }
 
@@ -243,6 +223,15 @@ export async function run(args: any = process.argv) {
 
   console.log(`Total corrections needed: ${ixs.length}`);
   if (commit) {
-    await batchParallelInstructionsWithPriorityFee(provider, ixs);
+    try {
+      await Promise.all(
+        chunks(ixs, 100).map((chunk) =>
+          batchParallelInstructionsWithPriorityFee(provider, chunk)
+        )
+      );
+    } catch (e) {
+      console.error("Failed to process mobile deployment info updates:", e);
+      process.exit(1);
+    }
   }
 }
