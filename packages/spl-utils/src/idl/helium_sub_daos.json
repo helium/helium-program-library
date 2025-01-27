@@ -1,0 +1,3286 @@
+{
+  "version": "0.1.12",
+  "name": "helium_sub_daos",
+  "instructions": [
+    {
+      "name": "initializeDaoV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dao",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "dao"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "hnt_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hntMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "hntMintAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "hntFreezeAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "hntCircuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "mint_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "hnt_mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "circuit_breaker_program"
+            }
+          }
+        },
+        {
+          "name": "dcMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "hstPool",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "circuitBreakerProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "delegatorPoolCircuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "account_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "TokenAccount",
+                "path": "delegator_pool"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "circuit_breaker_program"
+            }
+          }
+        },
+        {
+          "name": "rewardsEscrow",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "delegatorPool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializeDaoArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "initializeSubDaoV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "authority",
+            "hnt_mint"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "sub_dao"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "dnt_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hntMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dntMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dntMintAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "subDaoFreezeAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "treasury",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "treasuryCircuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "account_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "treasury"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "circuit_breaker_program"
+            }
+          }
+        },
+        {
+          "name": "treasuryManagement",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "treasury_management"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "dnt_mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "treasury_management_program"
+            }
+          }
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "treasuryManagementProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "circuitBreakerProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializeSubDaoArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateDaoV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dao",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "dao"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao.hnt_mint"
+              }
+            ]
+          },
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateDaoArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateSubDaoV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "sub_dao"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "SubDaoV0",
+                "path": "sub_dao.dnt_mint"
+              }
+            ]
+          },
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateSubDaoArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tempUpdateSubDaoEpochInfo",
+      "accounts": [
+        {
+          "name": "subDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "sub_dao_epoch_info"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "SubDaoV0",
+                "path": "sub_dao"
+              },
+              {
+                "kind": "arg",
+                "type": {
+                  "defined": "TempUpdateSubDaoEpochInfoArgs"
+                },
+                "path": "args.epoch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subDao",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "TempUpdateSubDaoEpochInfoArgs"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateSubDaoVehntV0",
+      "accounts": [
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "sub_dao"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "SubDaoV0",
+                "path": "sub_dao.dnt_mint"
+              }
+            ]
+          },
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateSubDaoVeHntArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "trackDcBurnV0",
+      "accounts": [
+        {
+          "name": "subDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dc_mint",
+            "registrar"
+          ]
+        },
+        {
+          "name": "dcMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "accountPayer",
+          "isMut": true,
+          "isSigner": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "account_payer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "TrackDcBurnArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "calculateUtilityScoreV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "registrar",
+            "hnt_mint"
+          ]
+        },
+        {
+          "name": "hntMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "prevDaoEpochInfo",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "daoEpochInfo",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "dao_epoch_info"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              },
+              {
+                "kind": "arg",
+                "type": {
+                  "defined": "CalculateUtilityScoreArgsV0"
+                },
+                "path": "args.epoch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "sub_dao_epoch_info"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "SubDaoV0",
+                "path": "sub_dao"
+              },
+              {
+                "kind": "arg",
+                "type": {
+                  "defined": "CalculateUtilityScoreArgsV0"
+                },
+                "path": "args.epoch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "circuitBreakerProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "prevSubDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "CalculateUtilityScoreArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "issueRewardsV0",
+      "accounts": [
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "hnt_mint",
+            "delegator_pool",
+            "rewards_escrow"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "dao",
+            "treasury",
+            "dnt_mint"
+          ]
+        },
+        {
+          "name": "daoEpochInfo",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "dao_epoch_info"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              },
+              {
+                "kind": "arg",
+                "type": {
+                  "defined": "IssueRewardsArgsV0"
+                },
+                "path": "args.epoch"
+              }
+            ]
+          },
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "subDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "sub_dao_epoch_info"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "SubDaoV0",
+                "path": "sub_dao"
+              },
+              {
+                "kind": "arg",
+                "type": {
+                  "defined": "IssueRewardsArgsV0"
+                },
+                "path": "args.epoch"
+              }
+            ]
+          },
+          "relations": [
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "hntCircuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "mint_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "hnt_mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "circuit_breaker_program"
+            }
+          }
+        },
+        {
+          "name": "hntMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dntMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "treasury",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardsEscrow",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "delegatorPool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "circuitBreakerProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "prevSubDaoEpochInfo",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "IssueRewardsArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "delegateV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "position",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "vsr_program"
+            }
+          },
+          "relations": [
+            "mint",
+            "registrar"
+          ]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionTokenAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionAuthority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "proxy_config"
+          ]
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "registrar"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "subDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "closingTimeSubDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "genesisEndSubDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "delegatedPosition",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "delegated_position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "PositionV0",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vsrProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "proxyConfig",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "closeDelegationV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "position",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "vsr_program"
+            }
+          },
+          "relations": [
+            "mint",
+            "registrar"
+          ]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionTokenAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionAuthority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "registrar"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "delegatedPosition",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "delegated_position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "PositionV0",
+                "path": "position"
+              }
+            ]
+          },
+          "relations": [
+            "position",
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "subDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "closingTimeSubDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "genesisEndSubDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "vsrProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claimRewardsV0",
+      "accounts": [
+        {
+          "name": "position",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "vsr_program"
+            }
+          },
+          "relations": [
+            "mint",
+            "registrar"
+          ]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionTokenAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionAuthority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "registrar"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "delegator_pool",
+            "dnt_mint",
+            "dao"
+          ]
+        },
+        {
+          "name": "delegatedPosition",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "delegated_position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "PositionV0",
+                "path": "position"
+              }
+            ]
+          },
+          "relations": [
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "dntMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "subDaoEpochInfo",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "sub_dao_epoch_info"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "SubDaoV0",
+                "path": "sub_dao"
+              },
+              {
+                "kind": "arg",
+                "type": {
+                  "defined": "ClaimRewardsArgsV0"
+                },
+                "path": "args.epoch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "delegatorPool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "delegatorAta",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "delegatorPoolCircuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "account_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "TokenAccount",
+                "path": "delegator_pool"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "circuit_breaker_program"
+            }
+          }
+        },
+        {
+          "name": "vsrProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "circuitBreakerProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "ClaimRewardsArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "claimRewardsV1",
+      "accounts": [
+        {
+          "name": "position",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "vsr_program"
+            }
+          },
+          "relations": [
+            "mint",
+            "registrar"
+          ]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionTokenAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionAuthority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "registrar",
+            "hnt_mint",
+            "delegator_pool"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "delegatedPosition",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "delegated_position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "PositionV0",
+                "path": "position"
+              }
+            ]
+          },
+          "relations": [
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "hntMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "daoEpochInfo",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "dao_epoch_info"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              },
+              {
+                "kind": "arg",
+                "type": {
+                  "defined": "ClaimRewardsArgsV0"
+                },
+                "path": "args.epoch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "delegatorPool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "delegatorAta",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "delegatorPoolCircuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "account_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "TokenAccount",
+                "path": "delegator_pool"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "circuit_breaker_program"
+            }
+          }
+        },
+        {
+          "name": "vsrProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "circuitBreakerProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "ClaimRewardsArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "transferV0",
+      "accounts": [
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "dao"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "deposit_mint"
+              }
+            ]
+          },
+          "relations": [
+            "registrar"
+          ]
+        },
+        {
+          "name": "sourcePosition",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "vsr_program"
+            }
+          },
+          "relations": [
+            "registrar",
+            "mint"
+          ]
+        },
+        {
+          "name": "sourceDelegatedPosition",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "delegated_position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "PositionV0",
+                "path": "source_position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionTokenAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "targetPosition",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "registrar"
+          ]
+        },
+        {
+          "name": "targetDelegatedPosition",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "delegated_position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "PositionV0",
+                "path": "target_position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "depositMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "sourceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "targetVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "vsrProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "TransferArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "resetLockupV0",
+      "accounts": [
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "registrar"
+          ]
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "vsr_program"
+            }
+          },
+          "relations": [
+            "registrar",
+            "mint"
+          ]
+        },
+        {
+          "name": "delegatedPosition",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "delegated_position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "PositionV0",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionTokenAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "vsrProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "ResetLockupArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "trackDcOnboardingFeesV0",
+      "accounts": [
+        {
+          "name": "hemAuth",
+          "isMut": false,
+          "isSigner": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "rewardable_entity_config"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "SubDaoV0",
+                "path": "sub_dao"
+              },
+              {
+                "kind": "arg",
+                "type": {
+                  "defined": "TrackDcOnboardingFeesArgsV0"
+                },
+                "path": "args.symbol"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "TrackDcOnboardingFeesArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "adminSetDcOnboardingFeesPaid",
+      "accounts": [
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "AdminSetDcOnboardingFeesPaidArgs"
+          }
+        }
+      ]
+    },
+    {
+      "name": "adminSetDcOnboardingFeesPaidEpochInfo",
+      "accounts": [
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "subDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "AdminSetDcOnboardingFeesPaidEpochInfoArgs"
+          }
+        }
+      ]
+    },
+    {
+      "name": "switchMobileOpsFund",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "opsFundMobile",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mobileMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "opsFundHnt",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "hnt_mint",
+            "authority"
+          ]
+        },
+        {
+          "name": "hntMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "hntCircuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "mint_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "hnt_mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "circuit_breaker_program"
+            }
+          }
+        },
+        {
+          "name": "circuitBreakerProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initializeHntDelegatorPool",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "authority",
+            "hnt_mint"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "hntMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "delegatorPoolCircuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "account_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "TokenAccount",
+                "path": "delegator_pool"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "circuit_breaker_program"
+            }
+          }
+        },
+        {
+          "name": "delegatorPool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "circuitBreakerProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "extendExpirationTsV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "mint"
+          ]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionTokenAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "proxy_config"
+          ]
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "registrar"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "delegatedPosition",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "delegated_position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "PositionV0",
+                "path": "position"
+              }
+            ]
+          },
+          "relations": [
+            "position",
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "oldClosingTimeSubDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "closingTimeSubDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "genesisEndSubDaoEpochInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "proxyConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "tempResizeAccount",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "trackVoteV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "proposal",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "mint",
+            "registrar"
+          ]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "marker",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "marker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "ProposalV0",
+                "path": "proposal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dao",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "subDao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "delegatedPosition",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "delegated_position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "PositionV0",
+                "path": "position"
+              }
+            ]
+          },
+          "relations": [
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "daoEpochInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "vsrProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "DaoV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hntMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "dcMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "registrar",
+            "type": "publicKey"
+          },
+          {
+            "name": "hstPool",
+            "type": "publicKey"
+          },
+          {
+            "name": "netEmissionsCap",
+            "type": "u64"
+          },
+          {
+            "name": "numSubDaos",
+            "type": "u32"
+          },
+          {
+            "name": "emissionSchedule",
+            "type": {
+              "vec": {
+                "defined": "EmissionScheduleItem"
+              }
+            }
+          },
+          {
+            "name": "hstEmissionSchedule",
+            "type": {
+              "vec": {
+                "defined": "PercentItem"
+              }
+            }
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "rewardsEscrow",
+            "type": "publicKey"
+          },
+          {
+            "name": "delegatorPool",
+            "type": "publicKey"
+          },
+          {
+            "name": "delegatorRewardsPercent",
+            "type": "u64"
+          },
+          {
+            "name": "proposalNamespace",
+            "type": "publicKey"
+          },
+          {
+            "name": "recentProposals",
+            "type": {
+              "array": [
+                {
+                  "defined": "RecentProposal"
+                },
+                4
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DaoEpochInfoV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "doneCalculatingScores",
+            "type": "bool"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "dao",
+            "type": "publicKey"
+          },
+          {
+            "name": "totalRewards",
+            "type": "u64"
+          },
+          {
+            "name": "currentHntSupply",
+            "type": "u64"
+          },
+          {
+            "name": "totalUtilityScore",
+            "docs": [
+              "Precise number with 12 decimals"
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "numUtilityScoresCalculated",
+            "type": "u32"
+          },
+          {
+            "name": "numRewardsIssued",
+            "type": "u32"
+          },
+          {
+            "name": "doneIssuingRewards",
+            "type": "bool"
+          },
+          {
+            "name": "doneIssuingHstPool",
+            "type": "bool"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "recentProposals",
+            "type": {
+              "array": [
+                {
+                  "defined": "RecentProposal"
+                },
+                4
+              ]
+            }
+          },
+          {
+            "name": "delegationRewardsIssued",
+            "type": "u64"
+          },
+          {
+            "name": "vehntAtEpochStart",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DelegatedPositionV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "publicKey"
+          },
+          {
+            "name": "position",
+            "type": "publicKey"
+          },
+          {
+            "name": "hntAmount",
+            "type": "u64"
+          },
+          {
+            "name": "subDao",
+            "type": "publicKey"
+          },
+          {
+            "name": "lastClaimedEpoch",
+            "type": "u64"
+          },
+          {
+            "name": "startTs",
+            "type": "i64"
+          },
+          {
+            "name": "purged",
+            "type": "bool"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "claimedEpochsBitmap",
+            "type": "u128"
+          },
+          {
+            "name": "expirationTs",
+            "type": "i64"
+          },
+          {
+            "name": "recentProposals",
+            "type": {
+              "vec": {
+                "defined": "RecentProposal"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubDaoEpochInfoV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "subDao",
+            "type": "publicKey"
+          },
+          {
+            "name": "dcBurned",
+            "type": "u64"
+          },
+          {
+            "name": "vehntAtEpochStart",
+            "type": "u64"
+          },
+          {
+            "name": "vehntInClosingPositions",
+            "docs": [
+              "The vehnt amount associated with positions that are closing this epoch. This is the amount that will be subtracted from the subdao",
+              "total vehnt after the epoch passes. Typically these positions close somewhere between the epoch start and end time, so we cannot rely",
+              "on fall rate calculations alone without knowing the exact end date of each position. Instead, just keep track of what needs to be",
+              "removed."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "fallRatesFromClosingPositions",
+            "docs": [
+              "The vehnt amount that is decaying per second, with 12 decimals of extra precision. Associated with positions that are closing this epoch,",
+              "which means they must be subtracted from the total fall rate on the subdao after this epoch passes"
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "delegationRewardsIssued",
+            "docs": [
+              "The number of delegation rewards issued this epoch, so that delegators can claim their share of the rewards"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "utilityScore",
+            "docs": [
+              "Precise number with 12 decimals"
+            ],
+            "type": {
+              "option": "u128"
+            }
+          },
+          {
+            "name": "rewardsIssuedAt",
+            "docs": [
+              "The program only needs to know whether or not rewards were issued, however having a history of when they were issued could prove",
+              "useful in the future, or at least for debugging purposes"
+            ],
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "initialized",
+            "type": "bool"
+          },
+          {
+            "name": "dcOnboardingFeesPaid",
+            "type": "u64"
+          },
+          {
+            "name": "hntRewardsIssued",
+            "docs": [
+              "The number of hnt rewards issued to the reward escrow this epoch"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "previousPercentage",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubDaoV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "publicKey"
+          },
+          {
+            "name": "dntMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "treasury",
+            "type": "publicKey"
+          },
+          {
+            "name": "rewardsEscrow",
+            "type": "publicKey"
+          },
+          {
+            "name": "delegatorPool",
+            "docs": [
+              "DEPRECATED: use dao.delegator_pool instead. But some people still need to claim old DNT rewards"
+            ],
+            "type": "publicKey"
+          },
+          {
+            "name": "vehntDelegated",
+            "type": "u128"
+          },
+          {
+            "name": "vehntLastCalculatedTs",
+            "type": "i64"
+          },
+          {
+            "name": "vehntFallRate",
+            "type": "u128"
+          },
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "deprecatedActiveDeviceAggregator",
+            "type": "publicKey"
+          },
+          {
+            "name": "dcBurnAuthority",
+            "type": "publicKey"
+          },
+          {
+            "name": "onboardingDcFee",
+            "type": "u64"
+          },
+          {
+            "name": "emissionSchedule",
+            "type": {
+              "vec": {
+                "defined": "EmissionScheduleItem"
+              }
+            }
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "registrar",
+            "type": "publicKey"
+          },
+          {
+            "name": "deprecatedDelegatorRewardsPercent",
+            "type": "u64"
+          },
+          {
+            "name": "onboardingDataOnlyDcFee",
+            "type": "u64"
+          },
+          {
+            "name": "dcOnboardingFeesPaid",
+            "type": "u64"
+          },
+          {
+            "name": "activeDeviceAuthority",
+            "type": "publicKey"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "WindowedCircuitBreakerConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "windowSizeSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "thresholdType",
+            "type": {
+              "defined": "ThresholdType"
+            }
+          },
+          {
+            "name": "threshold",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminSetDcOnboardingFeesPaidEpochInfoArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dcOnboardingFeesPaid",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminSetDcOnboardingFeesPaidArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dcOnboardingFeesPaid",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CalculateUtilityScoreArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClaimRewardsArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResetLockupArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "kind",
+            "type": {
+              "defined": "LockupKind"
+            }
+          },
+          {
+            "name": "periods",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransferArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeDaoArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "emissionSchedule",
+            "type": {
+              "vec": {
+                "defined": "EmissionScheduleItem"
+              }
+            }
+          },
+          {
+            "name": "hstEmissionSchedule",
+            "type": {
+              "vec": {
+                "defined": "PercentItem"
+              }
+            }
+          },
+          {
+            "name": "netEmissionsCap",
+            "type": "u64"
+          },
+          {
+            "name": "registrar",
+            "type": "publicKey"
+          },
+          {
+            "name": "proposalNamespace",
+            "type": "publicKey"
+          },
+          {
+            "name": "delegatorRewardsPercent",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeSubDaoArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "emissionSchedule",
+            "type": {
+              "vec": {
+                "defined": "EmissionScheduleItem"
+              }
+            }
+          },
+          {
+            "name": "treasuryCurve",
+            "type": {
+              "defined": "Curve"
+            }
+          },
+          {
+            "name": "onboardingDcFee",
+            "type": "u64"
+          },
+          {
+            "name": "dcBurnAuthority",
+            "docs": [
+              "Authority to burn delegated data credits"
+            ],
+            "type": "publicKey"
+          },
+          {
+            "name": "registrar",
+            "type": "publicKey"
+          },
+          {
+            "name": "onboardingDataOnlyDcFee",
+            "type": "u64"
+          },
+          {
+            "name": "activeDeviceAuthority",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IssueRewardsArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TempUpdateSubDaoEpochInfoArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vehntInClosingPositions",
+            "type": {
+              "option": "u128"
+            }
+          },
+          {
+            "name": "fallRatesFromClosingPositions",
+            "type": {
+              "option": "u128"
+            }
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TrackDcBurnArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dcBurned",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TrackDcOnboardingFeesArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "add",
+            "type": "bool"
+          },
+          {
+            "name": "symbol",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateDaoArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "emissionSchedule",
+            "type": {
+              "option": {
+                "vec": {
+                  "defined": "EmissionScheduleItem"
+                }
+              }
+            }
+          },
+          {
+            "name": "hstEmissionSchedule",
+            "type": {
+              "option": {
+                "vec": {
+                  "defined": "PercentItem"
+                }
+              }
+            }
+          },
+          {
+            "name": "hstPool",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "netEmissionsCap",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "proposalNamespace",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "delegatorRewardsPercent",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "rewardsEscrow",
+            "type": {
+              "option": "publicKey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateSubDaoArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "emissionSchedule",
+            "type": {
+              "option": {
+                "vec": {
+                  "defined": "EmissionScheduleItem"
+                }
+              }
+            }
+          },
+          {
+            "name": "onboardingDcFee",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "dcBurnAuthority",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "registrar",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "onboardingDataOnlyDcFee",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "activeDeviceAuthority",
+            "type": {
+              "option": "publicKey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateSubDaoVeHntArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vehntDelegated",
+            "type": {
+              "option": "u128"
+            }
+          },
+          {
+            "name": "vehntLastCalculatedTs",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "vehntFallRate",
+            "type": {
+              "option": "u128"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "EmissionScheduleItem",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "startUnixTime",
+            "type": "i64"
+          },
+          {
+            "name": "emissionsPerEpoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PercentItem",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "startUnixTime",
+            "type": "i64"
+          },
+          {
+            "name": "percent",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RecentProposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal",
+            "type": "publicKey"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ThresholdType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Percent"
+          },
+          {
+            "name": "Absolute"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockupKind",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "None"
+          },
+          {
+            "name": "Cliff"
+          },
+          {
+            "name": "Constant"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Curve",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "ExponentialCurveV0",
+            "fields": [
+              {
+                "name": "k",
+                "type": "u128"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidDataIncrease",
+      "msg": "The realloc increase was too large"
+    },
+    {
+      "code": 6001,
+      "name": "ArithmeticError",
+      "msg": "Error in arithmetic"
+    },
+    {
+      "code": 6002,
+      "name": "UtilityScoreAlreadyCalculated",
+      "msg": "Utility score was already calculated for this sub dao"
+    },
+    {
+      "code": 6003,
+      "name": "EpochNotOver",
+      "msg": "Cannot calculate rewards until the epoch is over"
+    },
+    {
+      "code": 6004,
+      "name": "MissingUtilityScores",
+      "msg": "All utility scores must be calculated before rewards can be issued"
+    },
+    {
+      "code": 6005,
+      "name": "NoUtilityScore",
+      "msg": "The subdao does not have a utility score"
+    },
+    {
+      "code": 6006,
+      "name": "NotEnoughVeHnt",
+      "msg": "Not enough veHNT"
+    },
+    {
+      "code": 6007,
+      "name": "LockupNotExpired",
+      "msg": "Lockup hasn't expired yet"
+    },
+    {
+      "code": 6008,
+      "name": "PositionAlreadyPurged",
+      "msg": "This staking position has already been purged"
+    },
+    {
+      "code": 6009,
+      "name": "RefreshNotNeeded",
+      "msg": "This position is healthy, refresh not needed"
+    },
+    {
+      "code": 6010,
+      "name": "FailedVotingPowerCalculation",
+      "msg": "Failed to calculate the voting power"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidClaimEpoch",
+      "msg": "Rewards need to be claimed in the correct epoch order"
+    },
+    {
+      "code": 6012,
+      "name": "EpochTooEarly",
+      "msg": "Epochs start after the earliest emission schedule"
+    },
+    {
+      "code": 6013,
+      "name": "MustCalculateVehntLinearly",
+      "msg": "Must calculate vehnt linearly. Please ensure the previous epoch has been completed"
+    },
+    {
+      "code": 6014,
+      "name": "PositionChangeWhileDelegated",
+      "msg": "Cannot change a position while it is delegated"
+    },
+    {
+      "code": 6015,
+      "name": "EpochNotClosed",
+      "msg": "This epoch was not closed, cannot claim rewards."
+    },
+    {
+      "code": 6016,
+      "name": "NoDelegateEndingPosition",
+      "msg": "Cannot delegate on a position ending this epoch"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidMarker",
+      "msg": "Invalid vote marker"
+    }
+  ],
+  "metadata": {
+    "address": "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR"
+  }
+}

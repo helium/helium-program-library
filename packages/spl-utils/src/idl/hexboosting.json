@@ -1,0 +1,651 @@
+{
+  "version": "0.1.0",
+  "name": "hexboosting",
+  "instructions": [
+    {
+      "name": "boostV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "boostConfig",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "boost_config"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "payment_mint"
+              }
+            ]
+          },
+          "relations": [
+            "payment_mint",
+            "price_oracle"
+          ]
+        },
+        {
+          "name": "carrier",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "hexboost_authority"
+          ]
+        },
+        {
+          "name": "hexboostAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "priceOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "paymentMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "paymentAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "boostedHex",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "BoostArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "initializeBoostConfigV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "subDao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "authority",
+            "dnt_mint"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "rentReclaimAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "startAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "priceOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dntMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "boostConfig",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "boost_config"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "dnt_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializeBoostConfigArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "startBoostV0",
+      "accounts": [
+        {
+          "name": "startAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "boostConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "start_authority"
+          ]
+        },
+        {
+          "name": "boostedHex",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "boost_config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "StartBoostArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "startBoostV1",
+      "accounts": [
+        {
+          "name": "startAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "boostConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "start_authority"
+          ]
+        },
+        {
+          "name": "boostedHex",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "boost_config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "StartBoostArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "closeBoostV0",
+      "accounts": [
+        {
+          "name": "rentReclaimAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "boostConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "rent_reclaim_authority"
+          ]
+        },
+        {
+          "name": "boostedHex",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "boost_config"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateBoostConfigV0",
+      "accounts": [
+        {
+          "name": "subDao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "boostConfig",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "sub_dao"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateBoostConfigArgsV0"
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "BoostConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "priceOracle",
+            "type": "publicKey"
+          },
+          {
+            "name": "paymentMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "subDao",
+            "type": "publicKey"
+          },
+          {
+            "name": "rentReclaimAuthority",
+            "docs": [
+              "Authority to reclaim rent from hexes no longer boosted"
+            ],
+            "type": "publicKey"
+          },
+          {
+            "name": "boostPrice",
+            "docs": [
+              "The price in the oracle (usd) to burn boost",
+              "For simplicity, this should have the same number of decimals as the price oracle"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "periodLength",
+            "docs": [
+              "The length of a period (defined as a month in the HIP)"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "minimumPeriods",
+            "docs": [
+              "The minimum of periods to boost"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "startAuthority",
+            "docs": [
+              "Authority to start the hex"
+            ],
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BoostedHexV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "boostConfig",
+            "type": "publicKey"
+          },
+          {
+            "name": "location",
+            "type": "u64"
+          },
+          {
+            "name": "startTs",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u64",
+                8
+              ]
+            }
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "boostsByPeriod",
+            "docs": [
+              "Each entry represents the boost multiplier for a given period"
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BoostedHexV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "deviceType",
+            "type": {
+              "defined": "DeviceTypeV0"
+            }
+          },
+          {
+            "name": "boostConfig",
+            "type": "publicKey"
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "location",
+            "type": "u64"
+          },
+          {
+            "name": "startTs",
+            "type": "i64"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "boostsByPeriod",
+            "docs": [
+              "Each entry represents the boost multiplier for a given period"
+            ],
+            "type": "bytes"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "BoostArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "location",
+            "type": "u64"
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "amounts",
+            "type": {
+              "vec": {
+                "defined": "BoostAmountV0"
+              }
+            }
+          },
+          {
+            "name": "deviceType",
+            "type": {
+              "defined": "DeviceTypeV0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "BoostAmountV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "period",
+            "type": "u16"
+          },
+          {
+            "name": "amount",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeBoostConfigArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "boostPrice",
+            "docs": [
+              "The price in the oracle (usd) to burn boost"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "periodLength",
+            "docs": [
+              "The length of a period (defined as a month in the HIP)"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "minimumPeriods",
+            "docs": [
+              "The minimum of periods to boost"
+            ],
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StartBoostArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "startTs",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateBoostConfigArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "startAuthority",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "rentReclaimAuthority",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "boostPrice",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "minimumPeriods",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "priceOracle",
+            "type": {
+              "option": "publicKey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeviceTypeV0",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "CbrsIndoor"
+          },
+          {
+            "name": "CbrsOutdoor"
+          },
+          {
+            "name": "WifiIndoor"
+          },
+          {
+            "name": "WifiOutdoor"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "BelowMinimumBoost",
+      "msg": "Must boost for the minimum boosting duration"
+    },
+    {
+      "code": 6001,
+      "name": "NoOraclePrice",
+      "msg": "No mobile oracle price"
+    },
+    {
+      "code": 6002,
+      "name": "MaxBoostExceeded",
+      "msg": "Hex is already boosted the maximum amount of 256x"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidVersion",
+      "msg": "Hexboost version has changed since this instruction was formed, transaction rejected for safety"
+    },
+    {
+      "code": 6004,
+      "name": "PythError",
+      "msg": "Error from pyth"
+    },
+    {
+      "code": 6005,
+      "name": "PythPriceNotFound",
+      "msg": "No pyth price found"
+    },
+    {
+      "code": 6006,
+      "name": "ArithmeticError",
+      "msg": "Error in arithmetic"
+    },
+    {
+      "code": 6007,
+      "name": "BoostPeriodOver",
+      "msg": "Cannot boost a period that is in progress or over"
+    },
+    {
+      "code": 6008,
+      "name": "NoEmptyPeriods",
+      "msg": "Cannot leave a gap in boost periods"
+    },
+    {
+      "code": 6009,
+      "name": "PythPriceFeedStale",
+      "msg": "Pyth price is stale"
+    }
+  ],
+  "metadata": {
+    "address": "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ"
+  }
+}

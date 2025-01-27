@@ -1,0 +1,256 @@
+{
+  "version": "0.2.1",
+  "name": "price_oracle",
+  "instructions": [
+    {
+      "name": "initializePriceOracleV0",
+      "accounts": [
+        {
+          "name": "priceOracle",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializePriceOracleArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updatePriceOracleV0",
+      "accounts": [
+        {
+          "name": "priceOracle",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdatePriceOracleArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "submitPriceV0",
+      "accounts": [
+        {
+          "name": "priceOracle",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "SubmitPriceArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updatePriceV0",
+      "accounts": [
+        {
+          "name": "priceOracle",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "PriceOracleV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "numOracles",
+            "type": "u8"
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
+            "name": "oracles",
+            "type": {
+              "vec": {
+                "defined": "OracleV0"
+              }
+            }
+          },
+          {
+            "name": "currentPrice",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "lastCalculatedTimestamp",
+            "type": {
+              "option": "i64"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "InitializePriceOracleArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oracles",
+            "type": {
+              "vec": {
+                "defined": "OracleV0"
+              }
+            }
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
+            "name": "authority",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubmitPriceArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oracleIndex",
+            "type": "u8"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdatePriceOracleArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oracles",
+            "type": {
+              "option": {
+                "vec": {
+                  "defined": "OracleV0"
+                }
+              }
+            }
+          },
+          {
+            "name": "authority",
+            "type": {
+              "option": "publicKey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "lastSubmittedTimestamp",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "lastSubmittedPrice",
+            "type": {
+              "option": "u64"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidDataIncrease",
+      "msg": "The realloc increase was too large"
+    },
+    {
+      "code": 6001,
+      "name": "UnauthorisedOracle",
+      "msg": "Not authorised to submit a price"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidPriceUpdate",
+      "msg": "Unable to update price"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidArgs",
+      "msg": "Invalid argument"
+    }
+  ],
+  "metadata": {
+    "address": "porcSnvH9pvcYPmQ65Y8qcZSRxQBiBBQX7UV5nmBegy"
+  }
+}
