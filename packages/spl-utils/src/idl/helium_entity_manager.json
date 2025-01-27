@@ -1,0 +1,4602 @@
+{
+  "version": "0.2.11",
+  "name": "helium_entity_manager",
+  "instructions": [
+    {
+      "name": "initializeRewardableEntityConfigV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "subDao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "rewardableEntityConfig",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "rewardable_entity_config"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "SubDaoV0",
+                "path": "sub_dao"
+              },
+              {
+                "kind": "arg",
+                "type": {
+                  "defined": "InitializeRewardableEntityConfigArgsV0"
+                },
+                "path": "args.symbol"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializeRewardableEntityConfigArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "approveMakerV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "rewardableEntityConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "authority",
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dnt_mint"
+          ]
+        },
+        {
+          "name": "dntMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "escrow",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "maker",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "makerApproval",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "maker_approval"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "RewardableEntityConfigV0",
+                "path": "rewardable_entity_config"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "MakerV0",
+                "path": "maker"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "revokeMakerV0",
+      "accounts": [
+        {
+          "name": "refund",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "rewardableEntityConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "maker",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "makerApproval",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "maker_approval"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "RewardableEntityConfigV0",
+                "path": "rewardable_entity_config"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "MakerV0",
+                "path": "maker"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "approveProgramV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "programApproval",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "program_approval"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              },
+              {
+                "kind": "arg",
+                "type": {
+                  "defined": "ApproveProgramArgsV0"
+                },
+                "path": "args.program_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "ApproveProgramArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "revokeProgramV0",
+      "accounts": [
+        {
+          "name": "refund",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "programApproval",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "program_approval"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              },
+              {
+                "kind": "arg",
+                "type": {
+                  "defined": "RevokeProgramArgsV0"
+                },
+                "path": "args.program_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "RevokeProgramArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "initializeMakerV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "maker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "maker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              },
+              {
+                "kind": "arg",
+                "type": {
+                  "defined": "InitializeMakerArgsV0"
+                },
+                "path": "args.name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "collection",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "collection"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "MakerV0",
+                "path": "maker"
+              }
+            ]
+          }
+        },
+        {
+          "name": "metadata",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "masterEdition",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "edition"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenMetadataProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializeMakerArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "issueEntityV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "eccVerifier",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "issuingAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "collection",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "collectionMetadata",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "collectionMasterEdition",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "edition"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "maker",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "issuing_authority",
+            "collection",
+            "merkle_tree",
+            "dao"
+          ]
+        },
+        {
+          "name": "entityCreator",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "entity_creator"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "keyToAsset",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "treeAuthority",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "merkle_tree"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "recipient",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "merkleTree",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "bubblegumSigner",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "collection_cpi"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "tokenMetadataProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "logWrapper",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "bubblegumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "IssueEntityArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "issueProgramEntityV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "programApprover",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "programApproval",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "collectionAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "collection",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "collectionMetadata",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "collectionMasterEdition",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "edition"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "entityCreator",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "entity_creator"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "keyToAsset",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "treeAuthority",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "merkle_tree"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "recipient",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "merkleTree",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "bubblegumSigner",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "collection_cpi"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "tokenMetadataProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "logWrapper",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "bubblegumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "IssueProgramEntityArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "issueNotEmittedEntityV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "entityCreator",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "entity_creator"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              }
+            ]
+          }
+        },
+        {
+          "name": "keyToAsset",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "recipient",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "not_emitted"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "no_emit_program"
+            }
+          }
+        },
+        {
+          "name": "recipientAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "metadata",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "masterEdition",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "edition"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "tokenMetadataProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "instructions",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "noEmitProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "issueIotOperationsFundV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "entityCreator",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "entity_creator"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              }
+            ]
+          }
+        },
+        {
+          "name": "keyToAsset",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "recipient",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "recipientAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "metadata",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "masterEdition",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "edition"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "tokenMetadataProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "onboardIotHotspotV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dcFeePayer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "issuingAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "iotInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "hotspotOwner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "merkleTree",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dcBurner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardableEntityConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "makerApproval",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "maker_approval"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "RewardableEntityConfigV0",
+                "path": "rewardable_entity_config"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "MakerV0",
+                "path": "maker"
+              }
+            ]
+          },
+          "relations": [
+            "maker",
+            "rewardable_entity_config"
+          ]
+        },
+        {
+          "name": "maker",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "merkle_tree",
+            "issuing_authority",
+            "dao"
+          ]
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dc_mint"
+          ]
+        },
+        {
+          "name": "keyToAsset",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "dcMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dc",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "dc"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "dc_mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "data_credits_program"
+            }
+          },
+          "relations": [
+            "dc_mint"
+          ]
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dataCreditsProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "heliumSubDaosProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "OnboardIotHotspotArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "onboardMobileHotspotV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dcFeePayer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "issuingAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "mobileInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "hotspotOwner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "merkleTree",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dcBurner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dntBurner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardableEntityConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "makerApproval",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "maker_approval"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "RewardableEntityConfigV0",
+                "path": "rewardable_entity_config"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "MakerV0",
+                "path": "maker"
+              }
+            ]
+          },
+          "relations": [
+            "maker",
+            "rewardable_entity_config"
+          ]
+        },
+        {
+          "name": "maker",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "merkle_tree",
+            "issuing_authority",
+            "dao"
+          ]
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dc_mint"
+          ]
+        },
+        {
+          "name": "keyToAsset",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "dao",
+            "dnt_mint"
+          ]
+        },
+        {
+          "name": "dcMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dntMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dntPrice",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dc",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "dc"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "dc_mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "data_credits_program"
+            }
+          },
+          "relations": [
+            "dc_mint"
+          ]
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dataCreditsProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "heliumSubDaosProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "OnboardMobileHotspotArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateRewardableEntityConfigV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "rewardableEntityConfig",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateRewardableEntityConfigArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateMakerV0",
+      "accounts": [
+        {
+          "name": "maker",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "update_authority"
+          ]
+        },
+        {
+          "name": "updateAuthority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateMakerArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "setMakerTreeV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "updateAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "maker",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "update_authority"
+          ]
+        },
+        {
+          "name": "treeAuthority",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "merkle_tree"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "merkleTree",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "logWrapper",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "bubblegumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "SetMakerTreeArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateMakerTreeV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "maker",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "treeAuthority",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "MakerV0",
+                "path": "maker.merkle_tree"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "newTreeAuthority",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "new_merkle_tree"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "newMerkleTree",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "logWrapper",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "bubblegumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateMakerTreeArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateIotInfoV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dcFeePayer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "iotInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "hotspotOwner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "merkleTree",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "treeAuthority",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "merkle_tree"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "dcBurner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardableEntityConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dc_mint"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "dcMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dc",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "dc"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "dc_mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "data_credits_program"
+            }
+          },
+          "relations": [
+            "dc_mint"
+          ]
+        },
+        {
+          "name": "bubblegumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dataCreditsProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateIotInfoArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateMobileInfoV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "dcFeePayer",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "mobileInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "hotspotOwner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "merkleTree",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "treeAuthority",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "merkle_tree"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "dcBurner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardableEntityConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dc_mint"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "dcMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dc",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "dc"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "dc_mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "data_credits_program"
+            }
+          },
+          "relations": [
+            "dc_mint"
+          ]
+        },
+        {
+          "name": "bubblegumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dataCreditsProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateMobileInfoArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "initializeDataOnlyV0",
+      "accounts": [
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dataOnlyConfig",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "data_only_config"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "treeAuthority",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "merkle_tree"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "merkleTree",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "collection",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "collection"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DataOnlyConfigV0",
+                "path": "data_only_config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "masterEdition",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "edition"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "metadata",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "tokenMetadataProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "logWrapper",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "bubblegumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializeDataOnlyArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "issueDataOnlyEntityV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "eccVerifier",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "collection",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "collectionMetadata",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "collectionMasterEdition",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "edition"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "dataOnlyConfig",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "data_only_config"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              }
+            ]
+          },
+          "relations": [
+            "collection",
+            "merkle_tree",
+            "dao"
+          ]
+        },
+        {
+          "name": "entityCreator",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "entity_creator"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "keyToAsset",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "treeAuthority",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "merkle_tree"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "recipient",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "merkleTree",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dataOnlyEscrow",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "data_only_escrow"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DataOnlyConfigV0",
+                "path": "data_only_config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bubblegumSigner",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "collection_cpi"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "tokenMetadataProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "logWrapper",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "bubblegumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "IssueDataOnlyEntityArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "onboardDataOnlyIotHotspotV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dcFeePayer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "iotInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "hotspotOwner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "merkleTree",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dcBurner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardableEntityConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "dataOnlyConfig",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "data_only_config"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              }
+            ]
+          },
+          "relations": [
+            "merkle_tree",
+            "dao"
+          ]
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dc_mint"
+          ]
+        },
+        {
+          "name": "keyToAsset",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "dcMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dc",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "dc"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "dc_mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "data_credits_program"
+            }
+          },
+          "relations": [
+            "dc_mint"
+          ]
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dataCreditsProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "heliumSubDaosProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "OnboardDataOnlyIotHotspotArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateDataOnlyTreeV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dataOnlyConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oldTreeAuthority",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DataOnlyConfigV0",
+                "path": "data_only_config.merkle_tree"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "newTreeAuthority",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "new_merkle_tree"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "dataOnlyEscrow",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "data_only_escrow"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DataOnlyConfigV0",
+                "path": "data_only_config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "newMerkleTree",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "logWrapper",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "bubblegumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "setEntityActiveV0",
+      "accounts": [
+        {
+          "name": "activeDeviceAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "rewardableEntityConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "active_device_authority"
+          ]
+        },
+        {
+          "name": "info",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "heliumSubDaosProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "SetEntityActiveArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tempPayMobileOnboardingFeeV0",
+      "accounts": [
+        {
+          "name": "dcFeePayer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dcBurner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardableEntityConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dc_mint"
+          ]
+        },
+        {
+          "name": "dcMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dc",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "dc"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "dc_mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "data_credits_program"
+            }
+          },
+          "relations": [
+            "dc_mint"
+          ]
+        },
+        {
+          "name": "keyToAsset",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "mobileInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dataCreditsProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "heliumSubDaosProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "tempStandardizeEntity",
+      "accounts": [
+        {
+          "name": "keyToAsset",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "merkleTree",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "maker",
+          "isMut": true,
+          "isSigner": false,
+          "isOptional": true
+        },
+        {
+          "name": "dataOnlyConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "treeAuthority",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "merkle_tree"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "bubblegum_program"
+            }
+          }
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "collection",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "collectionMetadata",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "leafOwner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "payer",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "logWrapper",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "bubblegumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenMetadataProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "TempStandardizeEntityArgs"
+          }
+        }
+      ]
+    },
+    {
+      "name": "onboardDataOnlyMobileHotspotV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dcFeePayer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "mobileInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "hotspotOwner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "merkleTree",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dcBurner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dntBurner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardableEntityConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "sub_dao"
+          ]
+        },
+        {
+          "name": "dataOnlyConfig",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "data_only_config"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "DaoV0",
+                "path": "dao"
+              }
+            ]
+          },
+          "relations": [
+            "merkle_tree",
+            "dao"
+          ]
+        },
+        {
+          "name": "dao",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dc_mint"
+          ]
+        },
+        {
+          "name": "keyToAsset",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "subDao",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "dao",
+            "dnt_mint"
+          ]
+        },
+        {
+          "name": "dcMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dntMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dntPrice",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dc",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "dc"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "dc_mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "data_credits_program"
+            }
+          },
+          "relations": [
+            "dc_mint"
+          ]
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "dataCreditsProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "heliumSubDaosProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "OnboardDataOnlyMobileHotspotArgsV0"
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "RewardableEntityConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "symbol",
+            "type": "string"
+          },
+          {
+            "name": "subDao",
+            "type": "publicKey"
+          },
+          {
+            "name": "settings",
+            "type": {
+              "defined": "ConfigSettingsV0"
+            }
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "stakingRequirement",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MakerV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "updateAuthority",
+            "type": "publicKey"
+          },
+          {
+            "name": "issuingAuthority",
+            "type": "publicKey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "collection",
+            "type": "publicKey"
+          },
+          {
+            "name": "merkleTree",
+            "type": "publicKey"
+          },
+          {
+            "name": "collectionBumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "dao",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MakerApprovalV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "rewardableEntityConfig",
+            "type": "publicKey"
+          },
+          {
+            "name": "maker",
+            "type": "publicKey"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DataOnlyConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "collection",
+            "type": "publicKey"
+          },
+          {
+            "name": "merkleTree",
+            "type": "publicKey"
+          },
+          {
+            "name": "collectionBumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "dao",
+            "type": "publicKey"
+          },
+          {
+            "name": "newTreeDepth",
+            "type": "u32"
+          },
+          {
+            "name": "newTreeBufferSize",
+            "type": "u32"
+          },
+          {
+            "name": "newTreeSpace",
+            "type": "u64"
+          },
+          {
+            "name": "newTreeFeeLamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramApprovalV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "publicKey"
+          },
+          {
+            "name": "programId",
+            "type": "publicKey"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "KeyToAssetV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "publicKey"
+          },
+          {
+            "name": "asset",
+            "type": "publicKey"
+          },
+          {
+            "name": "entityKey",
+            "type": "bytes"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "keySerialization",
+            "type": {
+              "defined": "KeySerialization"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "IotHotspotInfoV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset",
+            "type": "publicKey"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "location",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "elevation",
+            "type": {
+              "option": "i32"
+            }
+          },
+          {
+            "name": "gain",
+            "type": {
+              "option": "i32"
+            }
+          },
+          {
+            "name": "isFullHotspot",
+            "type": "bool"
+          },
+          {
+            "name": "numLocationAsserts",
+            "type": "u16"
+          },
+          {
+            "name": "isActive",
+            "type": "bool"
+          },
+          {
+            "name": "dcOnboardingFeePaid",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MobileHotspotInfoV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset",
+            "type": "publicKey"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "location",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "isFullHotspot",
+            "type": "bool"
+          },
+          {
+            "name": "numLocationAsserts",
+            "type": "u16"
+          },
+          {
+            "name": "isActive",
+            "type": "bool"
+          },
+          {
+            "name": "dcOnboardingFeePaid",
+            "type": "u64"
+          },
+          {
+            "name": "deviceType",
+            "type": {
+              "defined": "MobileDeviceTypeV0"
+            }
+          },
+          {
+            "name": "deploymentInfo",
+            "type": {
+              "option": {
+                "defined": "MobileDeploymentInfoV0"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "ApproveProgramArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "programId",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeDataOnlyArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "newTreeDepth",
+            "type": "u32"
+          },
+          {
+            "name": "newTreeBufferSize",
+            "type": "u32"
+          },
+          {
+            "name": "newTreeSpace",
+            "type": "u64"
+          },
+          {
+            "name": "newTreeFeeLamports",
+            "type": "u64"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "metadataUrl",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeMakerArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "updateAuthority",
+            "type": "publicKey"
+          },
+          {
+            "name": "issuingAuthority",
+            "type": "publicKey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "metadataUrl",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeRewardableEntityConfigArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "symbol",
+            "type": "string"
+          },
+          {
+            "name": "settings",
+            "type": {
+              "defined": "ConfigSettingsV0"
+            }
+          },
+          {
+            "name": "stakingRequirement",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IssueDataOnlyEntityArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "entityKey",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IssueEntityArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "entityKey",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IssueProgramEntityArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "entityKey",
+            "type": "bytes"
+          },
+          {
+            "name": "keySerialization",
+            "type": {
+              "defined": "KeySerialization"
+            }
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "symbol",
+            "type": "string"
+          },
+          {
+            "name": "approverSeeds",
+            "type": {
+              "vec": "bytes"
+            }
+          },
+          {
+            "name": "metadataUrl",
+            "type": {
+              "option": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OnboardDataOnlyIotHotspotArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dataHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "creatorHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "index",
+            "type": "u32"
+          },
+          {
+            "name": "location",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "elevation",
+            "type": {
+              "option": "i32"
+            }
+          },
+          {
+            "name": "gain",
+            "type": {
+              "option": "i32"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OnboardDataOnlyMobileHotspotArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dataHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "creatorHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "index",
+            "type": "u32"
+          },
+          {
+            "name": "location",
+            "type": {
+              "option": "u64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OnboardIotHotspotArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dataHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "creatorHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "index",
+            "type": "u32"
+          },
+          {
+            "name": "location",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "elevation",
+            "type": {
+              "option": "i32"
+            }
+          },
+          {
+            "name": "gain",
+            "type": {
+              "option": "i32"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OnboardMobileHotspotArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dataHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "creatorHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "index",
+            "type": "u32"
+          },
+          {
+            "name": "location",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "deviceType",
+            "type": {
+              "defined": "MobileDeviceTypeV0"
+            }
+          },
+          {
+            "name": "deploymentInfo",
+            "type": {
+              "option": {
+                "defined": "MobileDeploymentInfoV0"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RevokeProgramArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "programId",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SetEntityActiveArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "isActive",
+            "type": "bool"
+          },
+          {
+            "name": "entityKey",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SetMakerTreeArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "maxDepth",
+            "type": "u32"
+          },
+          {
+            "name": "maxBufferSize",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MetadataArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "name",
+            "docs": [
+              "The name of the asset"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "symbol",
+            "docs": [
+              "The symbol for the asset"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "uri",
+            "docs": [
+              "URI pointing to JSON representing the asset"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "creators",
+            "type": {
+              "vec": {
+                "defined": "Creator"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Creator",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "publicKey"
+          },
+          {
+            "name": "verified",
+            "type": "bool"
+          },
+          {
+            "name": "share",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TempStandardizeEntityArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "index",
+            "type": "u32"
+          },
+          {
+            "name": "currentMetadata",
+            "type": {
+              "defined": "MetadataArgs"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateIotInfoArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "location",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "elevation",
+            "type": {
+              "option": "i32"
+            }
+          },
+          {
+            "name": "gain",
+            "type": {
+              "option": "i32"
+            }
+          },
+          {
+            "name": "dataHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "creatorHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "index",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateMakerTreeArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "maxDepth",
+            "type": "u32"
+          },
+          {
+            "name": "maxBufferSize",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateMakerArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "issuingAuthority",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "updateAuthority",
+            "type": {
+              "option": "publicKey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateMobileInfoArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "location",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "dataHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "creatorHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "index",
+            "type": "u32"
+          },
+          {
+            "name": "deploymentInfo",
+            "type": {
+              "option": {
+                "defined": "MobileDeploymentInfoV0"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateRewardableEntityConfigArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "newAuthority",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "settings",
+            "type": {
+              "option": {
+                "defined": "ConfigSettingsV0"
+              }
+            }
+          },
+          {
+            "name": "stakingRequirement",
+            "type": {
+              "option": "u64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeviceFeesV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "deviceType",
+            "type": {
+              "defined": "MobileDeviceTypeV0"
+            }
+          },
+          {
+            "name": "dcOnboardingFee",
+            "type": "u64"
+          },
+          {
+            "name": "locationStakingFee",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeviceFeesV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "deviceType",
+            "type": {
+              "defined": "MobileDeviceTypeV0"
+            }
+          },
+          {
+            "name": "dcOnboardingFee",
+            "type": "u64"
+          },
+          {
+            "name": "locationStakingFee",
+            "type": "u64"
+          },
+          {
+            "name": "mobileOnboardingFeeUsd",
+            "type": "u64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u64",
+                8
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RadioInfoV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "radioId",
+            "type": "string"
+          },
+          {
+            "name": "elevation",
+            "type": "i32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MobileDeviceTypeV0",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Cbrs"
+          },
+          {
+            "name": "WifiIndoor"
+          },
+          {
+            "name": "WifiOutdoor"
+          },
+          {
+            "name": "WifiDataOnly"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigSettingsV0",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "IotConfig",
+            "fields": [
+              {
+                "name": "min_gain",
+                "type": "i32"
+              },
+              {
+                "name": "max_gain",
+                "type": "i32"
+              },
+              {
+                "name": "full_location_staking_fee",
+                "type": "u64"
+              },
+              {
+                "name": "dataonly_location_staking_fee",
+                "type": "u64"
+              }
+            ]
+          },
+          {
+            "name": "MobileConfig",
+            "fields": [
+              {
+                "name": "full_location_staking_fee",
+                "type": "u64"
+              },
+              {
+                "name": "dataonly_location_staking_fee",
+                "type": "u64"
+              }
+            ]
+          },
+          {
+            "name": "MobileConfigV1",
+            "fields": [
+              {
+                "name": "fees_by_device",
+                "type": {
+                  "vec": {
+                    "defined": "DeviceFeesV0"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "name": "MobileConfigV2",
+            "fields": [
+              {
+                "name": "fees_by_device",
+                "type": {
+                  "vec": {
+                    "defined": "DeviceFeesV1"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "KeySerialization",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "B58"
+          },
+          {
+            "name": "UTF8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MobileDeploymentInfoV0",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "WifiInfoV0",
+            "fields": [
+              {
+                "name": "antenna",
+                "type": "u32"
+              },
+              {
+                "name": "elevation",
+                "type": "i32"
+              },
+              {
+                "name": "azimuth",
+                "type": "u16"
+              },
+              {
+                "name": "mechanical_down_tilt",
+                "type": "u16"
+              },
+              {
+                "name": "electrical_down_tilt",
+                "type": "u16"
+              }
+            ]
+          },
+          {
+            "name": "CbrsInfoV0",
+            "fields": [
+              {
+                "name": "radio_infos",
+                "type": {
+                  "vec": {
+                    "defined": "RadioInfoV0"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidEccCompact",
+      "msg": "Invalid ecc compcat"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidStringLength",
+      "msg": "Invalid string length, your string was likely too long"
+    },
+    {
+      "code": 6002,
+      "name": "StringNotAlphanumeric",
+      "msg": "The string was not alphanumeric"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidMetadataProgram",
+      "msg": "Metadata Program Mismatch"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidDataIncrease",
+      "msg": "The realloc increase was too large"
+    },
+    {
+      "code": 6005,
+      "name": "NoGenesis",
+      "msg": "Genesis endpoints are currently disabled"
+    },
+    {
+      "code": 6006,
+      "name": "TreeNotFull",
+      "msg": "The tree can only be replaced when it is close to full"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidTreeSpace",
+      "msg": "The provided tree is an invalid size"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidSeeds",
+      "msg": "Invalid seeds provided"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidSettings",
+      "msg": "Invalid settings provided"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidDcFee",
+      "msg": "Invalid DC fee"
+    },
+    {
+      "code": 6011,
+      "name": "OnboardingFeeAlreadySet",
+      "msg": "Onboarding fee has already been set for this account"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidAccountAddress",
+      "msg": "Account doesn't matched expected address"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidSymbol",
+      "msg": "Invalid symbol, must be 'IOT' or 'MOBILE'"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidDeviceType",
+      "msg": "Mobile device type not found"
+    },
+    {
+      "code": 6015,
+      "name": "PythError",
+      "msg": "Error loading Pyth data"
+    },
+    {
+      "code": 6016,
+      "name": "PythPriceNotFound",
+      "msg": "Pyth price is not available"
+    },
+    {
+      "code": 6017,
+      "name": "PythPriceFeedStale",
+      "msg": "Pyth price is stale"
+    },
+    {
+      "code": 6018,
+      "name": "ArithmeticError",
+      "msg": "Arithmetic error"
+    }
+  ],
+  "metadata": {
+    "address": "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8"
+  }
+}

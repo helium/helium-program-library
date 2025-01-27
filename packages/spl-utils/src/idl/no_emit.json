@@ -1,0 +1,92 @@
+{
+  "version": "0.0.1",
+  "name": "no_emit",
+  "instructions": [
+    {
+      "name": "noEmitV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "noEmitWallet",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "not_emitted"
+              }
+            ]
+          }
+        },
+        {
+          "name": "notEmittedCounter",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "not_emitted_counter"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "NotEmittedCounterV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amountNotEmitted",
+            "type": "u64"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "address": "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv"
+  }
+}

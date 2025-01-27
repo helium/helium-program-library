@@ -1,0 +1,1239 @@
+{
+  "version": "0.2.1",
+  "name": "lazy_distributor",
+  "instructions": [
+    {
+      "name": "initializeLazyDistributorV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "lazyDistributor",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "lazy_distributor"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "rewards_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rewardsMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardsEscrow",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "circuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "account_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "TokenAccount",
+                "path": "rewards_escrow"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "circuit_breaker_program"
+            }
+          }
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "circuitBreakerProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializeLazyDistributorArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "initializeRecipientV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "lazyDistributor",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "lazy_distributor"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "LazyDistributorV0",
+                "path": "lazy_distributor.rewards_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "recipient"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "LazyDistributorV0",
+                "path": "lazy_distributor"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "targetMetadata",
+          "isMut": false,
+          "isSigner": false,
+          "relations": ["mint"]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initializeCompressionRecipientV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "lazyDistributor",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "lazy_distributor"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "LazyDistributorV0",
+                "path": "lazy_distributor.rewards_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "merkleTree",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "delegate",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializeCompressionRecipientArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "setCurrentRewardsV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "lazyDistributor",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "recipient",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["lazy_distributor"]
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "SetCurrentRewardsArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "distributeRewardsV0",
+      "accounts": [
+        {
+          "name": "common",
+          "accounts": [
+            {
+              "name": "payer",
+              "isMut": true,
+              "isSigner": true
+            },
+            {
+              "name": "lazyDistributor",
+              "isMut": false,
+              "isSigner": false,
+              "relations": ["rewards_mint", "rewards_escrow"]
+            },
+            {
+              "name": "recipient",
+              "isMut": true,
+              "isSigner": false,
+              "relations": ["lazy_distributor"]
+            },
+            {
+              "name": "rewardsMint",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "rewardsEscrow",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "circuitBreaker",
+              "isMut": true,
+              "isSigner": false,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "type": "string",
+                    "value": "account_windowed_breaker"
+                  },
+                  {
+                    "kind": "account",
+                    "type": "publicKey",
+                    "account": "TokenAccount",
+                    "path": "rewards_escrow"
+                  }
+                ],
+                "programId": {
+                  "kind": "account",
+                  "type": "publicKey",
+                  "path": "circuit_breaker_program"
+                }
+              }
+            },
+            {
+              "name": "owner",
+              "isMut": true,
+              "isSigner": false,
+              "docs": [
+                "TODO: Should this be permissioned? Should the owner have to sign to receive rewards?"
+              ]
+            },
+            {
+              "name": "destinationAccount",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "associatedTokenProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "circuitBreakerProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "systemProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "tokenProgram",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        },
+        {
+          "name": "recipientMintAccount",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "distributeCompressionRewardsV0",
+      "accounts": [
+        {
+          "name": "common",
+          "accounts": [
+            {
+              "name": "payer",
+              "isMut": true,
+              "isSigner": true
+            },
+            {
+              "name": "lazyDistributor",
+              "isMut": false,
+              "isSigner": false,
+              "relations": ["rewards_mint", "rewards_escrow"]
+            },
+            {
+              "name": "recipient",
+              "isMut": true,
+              "isSigner": false,
+              "relations": ["lazy_distributor"]
+            },
+            {
+              "name": "rewardsMint",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "rewardsEscrow",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "circuitBreaker",
+              "isMut": true,
+              "isSigner": false,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "type": "string",
+                    "value": "account_windowed_breaker"
+                  },
+                  {
+                    "kind": "account",
+                    "type": "publicKey",
+                    "account": "TokenAccount",
+                    "path": "rewards_escrow"
+                  }
+                ],
+                "programId": {
+                  "kind": "account",
+                  "type": "publicKey",
+                  "path": "circuit_breaker_program"
+                }
+              }
+            },
+            {
+              "name": "owner",
+              "isMut": true,
+              "isSigner": false,
+              "docs": [
+                "TODO: Should this be permissioned? Should the owner have to sign to receive rewards?"
+              ]
+            },
+            {
+              "name": "destinationAccount",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "associatedTokenProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "circuitBreakerProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "systemProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "tokenProgram",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        },
+        {
+          "name": "merkleTree",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "DistributeCompressionRewardsArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateLazyDistributorV0",
+      "accounts": [
+        {
+          "name": "lazyDistributor",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "lazy_distributor"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "rewards_mint"
+              }
+            ]
+          },
+          "relations": ["authority", "rewards_mint"]
+        },
+        {
+          "name": "rewardsMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateLazyDistributorArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateCompressionDestinationV0",
+      "accounts": [
+        {
+          "name": "recipient",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "destination",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "merkleTree",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "compressionProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateCompressionDestinationArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateDestinationV0",
+      "accounts": [
+        {
+          "name": "recipient",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "destination",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "recipientMintAccount",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "distributeCustomDestinationV0",
+      "accounts": [
+        {
+          "name": "common",
+          "accounts": [
+            {
+              "name": "payer",
+              "isMut": true,
+              "isSigner": true
+            },
+            {
+              "name": "lazyDistributor",
+              "isMut": false,
+              "isSigner": false,
+              "relations": ["rewards_mint", "rewards_escrow"]
+            },
+            {
+              "name": "recipient",
+              "isMut": true,
+              "isSigner": false,
+              "relations": ["lazy_distributor"]
+            },
+            {
+              "name": "rewardsMint",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "rewardsEscrow",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "circuitBreaker",
+              "isMut": true,
+              "isSigner": false,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "type": "string",
+                    "value": "account_windowed_breaker"
+                  },
+                  {
+                    "kind": "account",
+                    "type": "publicKey",
+                    "account": "TokenAccount",
+                    "path": "rewards_escrow"
+                  }
+                ],
+                "programId": {
+                  "kind": "account",
+                  "type": "publicKey",
+                  "path": "circuit_breaker_program"
+                }
+              }
+            },
+            {
+              "name": "owner",
+              "isMut": true,
+              "isSigner": false,
+              "docs": [
+                "TODO: Should this be permissioned? Should the owner have to sign to receive rewards?"
+              ]
+            },
+            {
+              "name": "destinationAccount",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "associatedTokenProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "circuitBreakerProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "systemProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "tokenProgram",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "LazyDistributorV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "rewardsMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "rewardsEscrow",
+            "type": "publicKey"
+          },
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "oracles",
+            "type": {
+              "vec": {
+                "defined": "OracleConfigV0"
+              }
+            }
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "approver",
+            "type": {
+              "option": "publicKey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RecipientV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "lazyDistributor",
+            "type": "publicKey"
+          },
+          {
+            "name": "asset",
+            "type": "publicKey"
+          },
+          {
+            "name": "totalRewards",
+            "type": "u64"
+          },
+          {
+            "name": "currentConfigVersion",
+            "type": "u16"
+          },
+          {
+            "name": "currentRewards",
+            "type": {
+              "vec": {
+                "option": "u64"
+              }
+            }
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": "u64"
+          },
+          {
+            "name": "destination",
+            "docs": ["Pubkey::Default if not being used."],
+            "type": "publicKey"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "WindowedCircuitBreakerConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "windowSizeSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "thresholdType",
+            "type": {
+              "defined": "ThresholdType"
+            }
+          },
+          {
+            "name": "threshold",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DistributeCompressionRewardsArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dataHash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "creatorHash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "root",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "index",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeCompressionRecipientArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dataHash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "creatorHash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "root",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "index",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeLazyDistributorArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oracles",
+            "type": {
+              "vec": {
+                "defined": "OracleConfigV0"
+              }
+            }
+          },
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "windowConfig",
+            "type": {
+              "defined": "WindowedCircuitBreakerConfigV0"
+            }
+          },
+          {
+            "name": "approver",
+            "type": {
+              "option": "publicKey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SetCurrentRewardsArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oracleIndex",
+            "type": "u16"
+          },
+          {
+            "name": "currentRewards",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateCompressionDestinationArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dataHash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "creatorHash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "root",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "index",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateLazyDistributorArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oracles",
+            "type": {
+              "option": {
+                "vec": {
+                  "defined": "OracleConfigV0"
+                }
+              }
+            }
+          },
+          {
+            "name": "authority",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "approver",
+            "type": {
+              "option": {
+                "option": "publicKey"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oracle",
+            "type": "publicKey"
+          },
+          {
+            "name": "url",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Creator",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "publicKey"
+          },
+          {
+            "name": "verified",
+            "type": "bool"
+          },
+          {
+            "name": "share",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Uses",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "useMethod",
+            "type": {
+              "defined": "UseMethod"
+            }
+          },
+          {
+            "name": "remaining",
+            "type": "u64"
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Collection",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "verified",
+            "type": "bool"
+          },
+          {
+            "name": "key",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MetadataArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "name",
+            "docs": ["The name of the asset"],
+            "type": "string"
+          },
+          {
+            "name": "symbol",
+            "docs": ["The symbol for the asset"],
+            "type": "string"
+          },
+          {
+            "name": "uri",
+            "docs": ["URI pointing to JSON representing the asset"],
+            "type": "string"
+          },
+          {
+            "name": "sellerFeeBasisPoints",
+            "docs": [
+              "Royalty basis points that goes to creators in secondary sales (0-10000)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "primarySaleHappened",
+            "type": "bool"
+          },
+          {
+            "name": "isMutable",
+            "type": "bool"
+          },
+          {
+            "name": "editionNonce",
+            "docs": ["nonce for easy calculation of editions, if present"],
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "tokenStandard",
+            "docs": [
+              "Since we cannot easily change Metadata, we add the new DataV2 fields here at the end."
+            ],
+            "type": {
+              "option": {
+                "defined": "TokenStandard"
+              }
+            }
+          },
+          {
+            "name": "collection",
+            "docs": ["Collection"],
+            "type": {
+              "option": {
+                "defined": "Collection"
+              }
+            }
+          },
+          {
+            "name": "uses",
+            "docs": ["Uses"],
+            "type": {
+              "option": {
+                "defined": "Uses"
+              }
+            }
+          },
+          {
+            "name": "tokenProgramVersion",
+            "type": {
+              "defined": "TokenProgramVersion"
+            }
+          },
+          {
+            "name": "creators",
+            "type": {
+              "vec": {
+                "defined": "Creator"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ThresholdType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Percent"
+          },
+          {
+            "name": "Absolute"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenProgramVersion",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Original"
+          },
+          {
+            "name": "Token2022"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenStandard",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "NonFungible"
+          },
+          {
+            "name": "FungibleAsset"
+          },
+          {
+            "name": "Fungible"
+          },
+          {
+            "name": "NonFungibleEdition"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UseMethod",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Burn"
+          },
+          {
+            "name": "Multiple"
+          },
+          {
+            "name": "Single"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidDataIncrease",
+      "msg": "The realloc increase was too large"
+    },
+    {
+      "code": 6001,
+      "name": "ArithmeticError",
+      "msg": "Error in arithmetic"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidAsset",
+      "msg": "Provided asset was invalid"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidOracleIndex",
+      "msg": "Oracle index was out of range"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidApproverSignature",
+      "msg": "Approver signature required"
+    },
+    {
+      "code": 6005,
+      "name": "CustomDestination",
+      "msg": "This recipient uses a custom destination. Use distribute_custom_destination_v0"
+    }
+  ]
+}
