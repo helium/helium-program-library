@@ -11,6 +11,7 @@ import { TransactionDraft, populateMissingDraftInfo } from "./draft";
 import { toVersionedTx } from "./transaction";
 
 const MAX_RECENT_PRIORITY_FEE_ACCOUNTS = 128;
+export const MAX_PRIO_FEE = 2500000;
 
 // Borrowed with love from https://github.com/blockworks-foundation/mango-v4/blob/57a9835aa8f636b6d231ba2c4008bfe89cbf08ba/ts/client/src/client.ts#L4552
 /**
@@ -24,7 +25,9 @@ const MAX_RECENT_PRIORITY_FEE_ACCOUNTS = 128;
 export async function estimatePrioritizationFee(
   connection: Connection,
   ixs: TransactionInstruction[],
-  basePriorityFee?: number
+  basePriorityFee?: number,
+  maxPriorityFee: number = MAX_PRIO_FEE,
+  priorityFeeOptions: any = {}
 ): Promise<number> {
   const accounts = ixs.map((x) => x.keys.filter(k => k.isWritable).map((k) => k.pubkey)).flat();
   const uniqueAccounts = [...new Set(accounts.map((x) => x.toBase58()))]
@@ -32,16 +35,23 @@ export async function estimatePrioritizationFee(
     .slice(0, MAX_RECENT_PRIORITY_FEE_ACCOUNTS);
 
   try {
-    // @ts-ignore
-    const { result: { priorityFeeEstimate } } = await connection._rpcRequest(
+    const {
+      result: { priorityFeeEstimate },
+      // @ts-ignore
+    } = await connection._rpcRequest(
       "getPriorityFeeEstimate",
       connection._buildArgs([
         {
           accountKeys: uniqueAccounts.map((a) => a.toBase58()),
+          options: {
+            recommended: true,
+            evaluateEmptySlotAsZero: true,
+            ...priorityFeeOptions,
+          },
         },
       ])
     );
-    return Math.max(basePriorityFee || 1, Math.ceil(priorityFeeEstimate));
+    return Math.min(maxPriorityFee, Math.max(basePriorityFee || 1, Math.ceil(priorityFeeEstimate)));
   } catch (e: any) {
     console.error(
       "Failed to use getPriorityFeeEstimate, falling back to getRecentPrioritizationFees",
@@ -118,6 +128,8 @@ export async function withPriorityFees({
   computeUnits,
   instructions = [],
   basePriorityFee,
+  maxPriorityFee = MAX_PRIO_FEE,
+  priorityFeeOptions,
   computeScaleUp,
   ...rest
 }: {
@@ -125,6 +137,8 @@ export async function withPriorityFees({
   computeUnits?: number;
   basePriorityFee?: number;
   computeScaleUp?: number;
+  priorityFeeOptions?: any;
+  maxPriorityFee?: number;
 } & Partial<TransactionDraft>): Promise<TransactionInstruction[]> {
   if (!computeUnits && !rest.feePayer) {
     throw new Error("Must provide feePayer if estimating compute units");
@@ -133,7 +147,9 @@ export async function withPriorityFees({
   const estimate = await estimatePrioritizationFee(
     connection,
     instructions,
-    basePriorityFee
+    basePriorityFee,
+    maxPriorityFee,
+    priorityFeeOptions,
   );
   if (!computeUnits) {
     const temp = {

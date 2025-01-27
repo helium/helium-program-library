@@ -1,0 +1,167 @@
+{
+  "version": "0.2.2",
+  "name": "rewards_oracle",
+  "instructions": [
+    {
+      "name": "setCurrentRewardsWrapperV0",
+      "accounts": [
+        {
+          "name": "oracle",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "lazyDistributor",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "recipient",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "lazy_distributor"
+          ]
+        },
+        {
+          "name": "keyToAsset",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "oracleSigner",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "oracle_signer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lazyDistributorProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "SetCurrentRewardsWrapperArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "setCurrentRewardsWrapperV1",
+      "accounts": [
+        {
+          "name": "oracle",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "lazyDistributor",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "recipient",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "lazy_distributor"
+          ]
+        },
+        {
+          "name": "keyToAsset",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "oracleSigner",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "oracle_signer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lazyDistributorProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "SetCurrentRewardsWrapperArgsV1"
+          }
+        }
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "SetCurrentRewardsWrapperArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "entityKey",
+            "type": "bytes"
+          },
+          {
+            "name": "oracleIndex",
+            "type": "u16"
+          },
+          {
+            "name": "currentRewards",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SetCurrentRewardsWrapperArgsV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oracleIndex",
+            "type": "u16"
+          },
+          {
+            "name": "currentRewards",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "address": "rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF"
+  }
+}

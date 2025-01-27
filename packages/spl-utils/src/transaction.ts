@@ -23,7 +23,7 @@ import {
 import { TransactionCompletionQueue } from "@helium/account-fetch-cache";
 import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
-import { estimatePrioritizationFee, withPriorityFees } from "./priorityFees";
+import { estimatePrioritizationFee, MAX_PRIO_FEE, withPriorityFees } from "./priorityFees";
 import { TransactionDraft, populateMissingDraftInfo } from "./draft";
 
 export const chunks = <T>(array: T[], size: number): T[][] =>
@@ -104,6 +104,8 @@ export async function sendInstructionsWithPriorityFee(
     idlErrors = new Map(),
     computeUnitLimit = 200000,
     basePriorityFee = 1,
+    maxPriorityFee = MAX_PRIO_FEE,
+    priorityFeeOptions,
   }: {
     signers?: Signer[];
     payer?: PublicKey;
@@ -111,6 +113,8 @@ export async function sendInstructionsWithPriorityFee(
     idlErrors?: Map<number, string>;
     computeUnitLimit?: number;
     basePriorityFee?: number;
+    maxPriorityFee?: number;
+    priorityFeeOptions?: any;
   } = {}
 ): Promise<string> {
   return await sendInstructions(
@@ -121,7 +125,9 @@ export async function sendInstructionsWithPriorityFee(
         microLamports: await estimatePrioritizationFee(
           provider.connection,
           instructions,
-          basePriorityFee
+          basePriorityFee,
+          maxPriorityFee,
+          priorityFeeOptions
         ),
       }),
       ...instructions,

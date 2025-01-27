@@ -1,0 +1,550 @@
+{
+  "version": "0.1.1",
+  "name": "circuit_breaker",
+  "instructions": [
+    {
+      "name": "initializeMintWindowedBreakerV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "circuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "mint_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mintAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializeMintWindowedBreakerArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "initializeAccountWindowedBreakerV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "circuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "account_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "TokenAccount",
+                "path": "token_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializeAccountWindowedBreakerArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "mintV0",
+      "accounts": [
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "to",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mintAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "circuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "mint_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ]
+          },
+          "relations": [
+            "mint_authority",
+            "mint"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "MintArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "transferV0",
+      "accounts": [
+        {
+          "name": "from",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "to",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "circuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "account_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "TokenAccount",
+                "path": "from"
+              }
+            ]
+          },
+          "relations": [
+            "owner"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "TransferArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateAccountWindowedBreakerV0",
+      "accounts": [
+        {
+          "name": "circuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateAccountWindowedBreakerArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateMintWindowedBreakerV0",
+      "accounts": [
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "circuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "authority"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateMintWindowedBreakerArgsV0"
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "MintWindowedCircuitBreakerV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "publicKey"
+          },
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "mintAuthority",
+            "type": "publicKey"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": "WindowedCircuitBreakerConfigV0"
+            }
+          },
+          {
+            "name": "lastWindow",
+            "type": {
+              "defined": "WindowV0"
+            }
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AccountWindowedCircuitBreakerV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenAccount",
+            "type": "publicKey"
+          },
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": "WindowedCircuitBreakerConfigV0"
+            }
+          },
+          {
+            "name": "lastWindow",
+            "type": {
+              "defined": "WindowV0"
+            }
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "InitializeAccountWindowedBreakerArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": "WindowedCircuitBreakerConfigV0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeMintWindowedBreakerArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "mintAuthority",
+            "type": "publicKey"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": "WindowedCircuitBreakerConfigV0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MintArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransferArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateAccountWindowedBreakerArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "newAuthority",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "config",
+            "type": {
+              "option": {
+                "defined": "WindowedCircuitBreakerConfigV0"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateMintWindowedBreakerArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "newAuthority",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "config",
+            "type": {
+              "option": {
+                "defined": "WindowedCircuitBreakerConfigV0"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "WindowV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "lastAggregatedValue",
+            "type": "u64"
+          },
+          {
+            "name": "lastUnixTimestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WindowedCircuitBreakerConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "windowSizeSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "thresholdType",
+            "type": {
+              "defined": "ThresholdType"
+            }
+          },
+          {
+            "name": "threshold",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ThresholdType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Percent"
+          },
+          {
+            "name": "Absolute"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "CircuitBreakerTriggered",
+      "msg": "The circuit breaker was triggered"
+    },
+    {
+      "code": 6001,
+      "name": "ArithmeticError",
+      "msg": "Error in arithmetic"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidConfig",
+      "msg": "Invalid config"
+    }
+  ],
+  "metadata": {
+    "address": "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g"
+  }
+}
