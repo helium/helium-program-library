@@ -12,7 +12,6 @@ import {
   MOBILE_MINT,
   truthy,
 } from "@helium/spl-utils";
-import AWS from "aws-sdk";
 import os from "os";
 import { Client } from "pg";
 import yargs from "yargs/yargs";
@@ -27,8 +26,6 @@ type WifiInfoRow = {
   azimuth: number;
   mechanical_down_tilt: number;
   electrical_down_tilt: number;
-  lat: string;
-  lng: string;
 };
 
 type WifiInfo = {
@@ -82,13 +79,6 @@ export async function run(args: any = process.argv) {
     pgPort: {
       default: "5432",
     },
-    awsRegion: {
-      default: "us-east-1",
-    },
-    noSsl: {
-      type: "boolean",
-      default: false,
-    },
     commit: {
       type: "boolean",
       default: false,
@@ -105,29 +95,9 @@ export async function run(args: any = process.argv) {
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const hem = await initHEM(provider);
   const isRds = argv.pgHost.includes("rds.amazon.com");
-  let password = argv.pgPassword;
-
-  if (isRds && !password) {
-    const signer = new AWS.RDS.Signer({
-      region: argv.awsRegion,
-      hostname: argv.pgHost,
-      port: Number(argv.pgPort),
-      username: argv.pgUser,
-    });
-
-    password = await new Promise((resolve, reject) =>
-      signer.getAuthToken({}, (err, token) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve(token);
-      })
-    );
-  }
-
   const client = new Client({
     user: argv.pgUser,
-    password,
+    password: argv.pgPassword,
     host: argv.pgHost,
     database: argv.pgDatabase,
     port: Number(argv.pgPort),
@@ -141,7 +111,20 @@ export async function run(args: any = process.argv) {
   await client.connect();
   const [subDao] = subDaoKey(MOBILE_MINT);
   const [rewardableEntityconfig] = rewardableEntityConfigKey(subDao, "MOBILE");
-  const wifiInfos = (await client.query(`SELECT * FROM wifi_infos`)).rows.map(
+  const wifiInfos = (
+    await client.query(`
+      SELECT c.hs_pubkey,
+       c.antenna,
+       c.height AS elevation,
+       c.azimuth AS azimuth,
+       c.mt AS mechanical_down_tilt,
+       c.et AS electrical_down_tilt
+      FROM radios AS r
+      JOIN calculations c ON r.last_success_calculation = c.id
+      WHERE r.is_active IS TRUE
+        AND radio_type = 'Wifi';
+        `)
+  ).rows.map(
     (wifiInfo: WifiInfoRow): WifiInfo => ({
       ...wifiInfo,
       deploymentInfo: {
@@ -177,7 +160,6 @@ export async function run(args: any = process.argv) {
       accountInfosWithPk.map(async (acc) => {
         if (acc.data) {
           let correction: {
-            location?: anchor.BN;
             deploymentInfo?: MobileDeploymentInfoV0;
           } = {};
 
@@ -207,7 +189,6 @@ export async function run(args: any = process.argv) {
           if (Object.keys(correction).length > 0) {
             return await hem.methods
               .tempBackfillMobileInfo({
-                location: correction.location || null,
                 deploymentInfo: correction.deploymentInfo || null,
               })
               .accounts({
@@ -224,11 +205,9 @@ export async function run(args: any = process.argv) {
   console.log(`Total corrections needed: ${ixs.length}`);
   if (commit) {
     try {
-      await Promise.all(
-        chunks(ixs, 100).map((chunk) =>
-          batchParallelInstructionsWithPriorityFee(provider, chunk)
-        )
-      );
+      for (const c of chunks(ixs, 250)) {
+        await batchParallelInstructionsWithPriorityFee(provider, c);
+      }
     } catch (e) {
       console.error("Failed to process mobile deployment info updates:", e);
       process.exit(1);
