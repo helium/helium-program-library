@@ -77,7 +77,13 @@ pub fn handler(
   let curr_supply = ctx.accounts.hnt_mint.supply;
   let mut prev_supply = curr_supply;
   let mut prev_total_utility_score = 0;
-  if ctx.accounts.prev_dao_epoch_info.lamports() > 0 {
+  if ctx.accounts.prev_dao_epoch_info.lamports() > 0
+    && !ctx
+      .accounts
+      .prev_dao_epoch_info
+      .to_account_info()
+      .data_is_empty()
+  {
     let info: Account<DaoEpochInfoV0> = Account::try_from(&ctx.accounts.prev_dao_epoch_info)?;
     prev_supply = info.current_hnt_supply;
     prev_total_utility_score = info.total_utility_score;
@@ -149,23 +155,22 @@ pub fn handler(
   ctx.accounts.dao_epoch_info.bump_seed = *ctx.bumps.get("dao_epoch_info").unwrap();
 
   // Calculate utility score
-  // utility score = V
-  // V = veHNT_dnp.
+  // utility score = V = veHNT_dnp
   let epoch_info = &mut ctx.accounts.sub_dao_epoch_info;
 
+  // Convert veHNT to utility score:
+  // 1. veHNT starts with 8 decimals
+  // 2. We want 12 decimals in the final utility score
+  // 3. Therefore multiply by 10^4 (since 10^12/10^8 = 10^4)
+  // This is equivalent to dividing by 10^8 and multiplying by 10^12, but no lost precision
   let vehnt_staked = PreciseNumber::new(epoch_info.vehnt_at_epoch_start.into())
     .unwrap()
-    .checked_div(&PreciseNumber::new(100000000_u128).unwrap()) // vehnt has 8 decimals
+    .checked_mul(&PreciseNumber::new(10000_u128).unwrap()) // Multiply by 10^4 to convert from 8 to 12 decimals
     .unwrap();
 
-  let utility_score_prec = vehnt_staked
-    // Add 12 decimals of precision
-    .checked_mul(&PreciseNumber::new(1000000000000_u128).unwrap()) // First convert vehnt to 12 decimals
-    .unwrap();
+  let utility_score = vehnt_staked.to_imprecise().unwrap();
 
-  let utility_score = utility_score_prec.to_imprecise().unwrap();
-
-  // Store utility scores
+  // Store utility scores for this epoch
   epoch_info.utility_score = Some(utility_score);
 
   let prev_epoch_info = &ctx.accounts.prev_sub_dao_epoch_info;
