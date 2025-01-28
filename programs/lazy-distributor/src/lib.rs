@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-pub use ed25519::{RemoteTaskTransactionV0, SetCurrentRewardsTransactionV0};
 #[cfg(not(feature = "no-entrypoint"))]
 use {default_env::default_env, solana_security_txt::security_txt};
 

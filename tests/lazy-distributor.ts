@@ -252,12 +252,12 @@ describe("lazy-distributor", () => {
         const coder = program.coder.accounts;
         const setCurrentRewardsTransaction = {
           lazyDistributor,
-          recipient,
+          asset,
           currentRewards: new anchor.BN("5000000"),
           oracleIndex: 0,
         };
         const setCurrentRewardsTransactionBytes = await coder.encode(
-          "setCurrentRewardsTransactionV0",
+          "SetCurrentRewardsTransactionV0",
           setCurrentRewardsTransaction
         );
         const signature = Buffer.from(
