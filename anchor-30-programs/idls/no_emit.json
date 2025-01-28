@@ -1,0 +1,142 @@
+{
+  "address": "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv",
+  "metadata": {
+    "name": "no_emit",
+    "version": "0.0.1",
+    "spec": "0.1.0"
+  },
+  "instructions": [
+    {
+      "name": "no_emit_v0",
+      "discriminator": [
+        1,
+        49,
+        211,
+        57,
+        73,
+        147,
+        227,
+        61
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "no_emit_wallet",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  34,
+                  110,
+                  111,
+                  116,
+                  95,
+                  101,
+                  109,
+                  105,
+                  116,
+                  116,
+                  101,
+                  100,
+                  34
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "not_emitted_counter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  34,
+                  110,
+                  111,
+                  116,
+                  95,
+                  101,
+                  109,
+                  105,
+                  116,
+                  116,
+                  101,
+                  100,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114,
+                  34
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint",
+                "account": "Mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_account",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "NotEmittedCounterV0",
+      "discriminator": [
+        131,
+        6,
+        110,
+        176,
+        104,
+        133,
+        70,
+        109
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "NotEmittedCounterV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount_not_emitted",
+            "type": "u64"
+          },
+          {
+            "name": "bump_seed",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}
