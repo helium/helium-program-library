@@ -90,10 +90,13 @@ export const handleAccountWebhook = async ({
       );
 
       if (isDelete) {
-        await model.destroy({
-          where: { address: account.pubkey },
-          transaction: t,
-        });
+        let ignoreDelete = accounts.find(acc => acc.type == accName)?.ignore_deletes;
+        if (!ignoreDelete) {
+          await model.destroy({
+            where: { address: account.pubkey },
+            transaction: t,
+          });
+        }
       } else {
         sanitized = {
           refreshed_at: new Date().toISOString(),

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
-use shared_utils::precise_number::{PreciseNumber, FOUR_PREC, TWO_PREC};
+use shared_utils::precise_number::PreciseNumber;
 use voter_stake_registry::state::Registrar;
 
 use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, EPOCH_LENGTH};
@@ -39,7 +39,7 @@ pub struct CalculateUtilityScoreV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    space = 60 + 8 + std::mem::size_of::<DaoEpochInfoV0>(),
+    space = DaoEpochInfoV0::size(),
     seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
   )]
@@ -55,6 +55,14 @@ pub struct CalculateUtilityScoreV0<'info> {
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
+  #[account(
+    init_if_needed,
+    payer = payer,
+    space = SubDaoEpochInfoV0::SIZE,
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &(args.epoch - 1).to_le_bytes()],
+    bump,
+  )]
+  pub prev_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
 }
 
 pub fn handler(
@@ -68,9 +76,17 @@ pub fn handler(
   // burned hnt since last supply setting.
   let curr_supply = ctx.accounts.hnt_mint.supply;
   let mut prev_supply = curr_supply;
-  if ctx.accounts.prev_dao_epoch_info.lamports() > 0 {
+  let mut prev_total_utility_score = 0;
+  if ctx.accounts.prev_dao_epoch_info.lamports() > 0
+    && !ctx
+      .accounts
+      .prev_dao_epoch_info
+      .to_account_info()
+      .data_is_empty()
+  {
     let info: Account<DaoEpochInfoV0> = Account::try_from(&ctx.accounts.prev_dao_epoch_info)?;
     prev_supply = info.current_hnt_supply;
+    prev_total_utility_score = info.total_utility_score;
   }
 
   ctx.accounts.dao_epoch_info.total_rewards = ctx
@@ -84,6 +100,9 @@ pub fn handler(
       ctx.accounts.dao.net_emissions_cap,
     ))
     .unwrap();
+
+  ctx.accounts.dao_epoch_info.vehnt_at_epoch_start +=
+    ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start;
 
   ctx.accounts.dao_epoch_info.epoch = args.epoch;
 
@@ -129,83 +148,63 @@ pub fn handler(
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
   ctx.accounts.sub_dao_epoch_info.bump_seed = *ctx.bumps.get("sub_dao_epoch_info").unwrap();
   ctx.accounts.sub_dao_epoch_info.initialized = true;
+  ctx.accounts.prev_sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
+  ctx.accounts.prev_sub_dao_epoch_info.bump_seed =
+    *ctx.bumps.get("prev_sub_dao_epoch_info").unwrap();
+  ctx.accounts.prev_sub_dao_epoch_info.epoch = args.epoch - 1;
   ctx.accounts.dao_epoch_info.bump_seed = *ctx.bumps.get("dao_epoch_info").unwrap();
 
   // Calculate utility score
-  // utility score = V * D * A
-  // V = max(1, veHNT_dnp).
-  // D = max(1, sqrt(DCs burned in USD)). 1 DC = $0.00001.
-  // A = max(1, fourth_root(Total active device count * device activation fee)).
+  // utility score = V = veHNT_dnp
   let epoch_info = &mut ctx.accounts.sub_dao_epoch_info;
 
-  let dc_burned = PreciseNumber::new(epoch_info.dc_burned.into())
-    .unwrap()
-    .checked_div(&PreciseNumber::new(100000_u128).unwrap()) // DC has 0 decimals, plus 10^5 to get to dollars.
-    .unwrap();
-
-  msg!(
-    "Total onboarding dc: {}. Dc burned: {}.",
-    epoch_info.dc_onboarding_fees_paid,
-    epoch_info.dc_burned
-  );
-
-  let devices_with_fee = &PreciseNumber::new(u128::from(epoch_info.dc_onboarding_fees_paid))
-    .unwrap()
-    .checked_div(&PreciseNumber::new(100000_u128).unwrap()) // Need onboarding fee in dollars
-    .unwrap();
-
-  // sqrt(x) = e^(ln(x)/2)
-  // x^1/4 = e^(ln(x)/4))
-  let one = PreciseNumber::one();
-  let d = if epoch_info.dc_burned > 0 {
-    std::cmp::max(
-      one.clone(),
-      dc_burned
-        .log()
-        .unwrap()
-        .checked_div(&TWO_PREC.clone().signed())
-        .unwrap()
-        .exp()
-        .unwrap(),
-    )
-  } else {
-    one.clone()
-  };
-
+  // Convert veHNT to utility score:
+  // 1. veHNT starts with 8 decimals
+  // 2. We want 12 decimals in the final utility score
+  // 3. Therefore multiply by 10^4 (since 10^12/10^8 = 10^4)
+  // This is equivalent to dividing by 10^8 and multiplying by 10^12, but no lost precision
   let vehnt_staked = PreciseNumber::new(epoch_info.vehnt_at_epoch_start.into())
     .unwrap()
-    .checked_div(&PreciseNumber::new(100000000_u128).unwrap()) // vehnt has 8 decimals
+    .checked_mul(&PreciseNumber::new(10000_u128).unwrap()) // Multiply by 10^4 to convert from 8 to 12 decimals
     .unwrap();
 
-  let v = std::cmp::max(one.clone(), vehnt_staked);
+  let utility_score = vehnt_staked.to_imprecise().unwrap();
 
-  let a = if epoch_info.dc_onboarding_fees_paid > 0 {
-    std::cmp::max(
-      one,
-      devices_with_fee
-        .log()
-        .unwrap()
-        .checked_div(&FOUR_PREC.clone().signed())
-        .unwrap()
-        .exp()
-        .unwrap(),
-    )
-  } else {
-    one
-  };
-
-  let utility_score_prec = d.checked_mul(&a).unwrap().checked_mul(&v).unwrap();
-  // Convert to u128 with 12 decimals of precision
-  let utility_score = utility_score_prec
-    .checked_mul(
-      &PreciseNumber::new(1000000000000_u128).unwrap(), // u128 with 12 decimal places
-    )
-    .unwrap()
-    .to_imprecise()
-    .unwrap();
-
-  // Store utility scores
+  // Store utility scores for this epoch
   epoch_info.utility_score = Some(utility_score);
+
+  let prev_epoch_info = &ctx.accounts.prev_sub_dao_epoch_info;
+  let previous_percentage = prev_epoch_info.previous_percentage;
+
+  // Initialize previous percentage if it's not already set
+  ctx.accounts.prev_sub_dao_epoch_info.previous_percentage = match previous_percentage {
+    // This was just deployed, so we don't have a previous utility score set
+    // Set it by using the percentage of the total utility score
+    0 => match prev_epoch_info.utility_score {
+      Some(prev_score) => {
+        if prev_total_utility_score == 0 {
+          0
+        } else {
+          prev_score
+            .checked_mul(u32::MAX as u128)
+            .and_then(|x| x.checked_div(prev_total_utility_score))
+            .map(|x| x as u32)
+            .unwrap_or(0)
+        }
+      }
+      // Either this is a new subnetwork or this whole program was just deployed
+      None => match prev_total_utility_score {
+        // If there is no previous utility score, this is a new program deployment
+        // Set it by using the percentage of the total utility score
+        0 => u32::MAX
+          .checked_div(ctx.accounts.dao.num_sub_daos)
+          .unwrap_or(0),
+        // If there is a previous utility score, this is a new subnetwork
+        _ => 0,
+      },
+    },
+    _ => previous_percentage,
+  };
 
   // Only increment utility scores when either (a) in prod or (b) testing and we haven't already over-calculated utility scores.
   // TODO: We can remove this after breakpoint demo

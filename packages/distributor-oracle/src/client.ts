@@ -346,18 +346,22 @@ export async function formBulkTransactions({
     assetEndpoint || provider.connection.rpcEndpoint,
     assets
   );
+  const willPay = skipOracleSign || (await axios.get(
+    `${lazyDistributorAcc.oracles[0].url}/will-pay-recipient`
+  )).data.willPay;
   let ixsPerAsset = await Promise.all(
     recipientAccs.map(async (recipientAcc, idx) => {
       if (!recipientAcc) {
         return [
-          await (
+          await(
             await initializeCompressionRecipient({
               program: lazyDistributorProgram,
               assetId: assets![idx],
               lazyDistributor,
               assetEndpoint,
               owner: wallet,
-              payer,
+              // Temporarily set oracle as the payer to subsidize new HNT wallets.
+              payer: willPay ? lazyDistributorAcc.oracles[0].oracle : payer,
               getAssetFn: () => Promise.resolve(compressionAssetAccs![idx]), // cache result so we don't hit again
               getAssetProofFn: assetProofsById
                 ? () =>
@@ -591,6 +595,9 @@ export async function formTransaction({
   const recipientAcc =
     await lazyDistributorProgram.account.recipientV0.fetchNullable(recipient);
   if (!recipientAcc) {
+    const willPay = (
+      await axios.get(`${lazyDistributorAcc.oracles[0].url}/will-pay-recipient`)
+    ).data.willPay;
     let initRecipientIx;
     if (assetAcc.compression.compressed) {
       initRecipientIx = await (
@@ -600,7 +607,7 @@ export async function formTransaction({
           lazyDistributor,
           assetEndpoint,
           owner: wallet,
-          payer,
+          payer: willPay ? lazyDistributorAcc.oracles[0].oracle : payer,
           getAssetFn: () => Promise.resolve(assetAcc), // cache result so we don't hit again
           getAssetProofFn,
         })

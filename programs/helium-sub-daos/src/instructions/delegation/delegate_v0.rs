@@ -1,3 +1,13 @@
+use std::cmp::min;
+
+use anchor_lang::{prelude::*, Discriminator};
+use anchor_spl::token::{Mint, TokenAccount};
+use nft_proxy::ProxyConfigV0;
+use voter_stake_registry::{
+  state::{LockupKind, PositionV0, Registrar},
+  VoterStakeRegistry,
+};
+
 use self::borsh::BorshSerialize;
 use crate::{
   create_account::{create_and_serialize_account_signed, AccountMaxSize},
@@ -6,13 +16,6 @@ use crate::{
   id,
   state::*,
   utils::*,
-};
-use anchor_lang::{prelude::*, Discriminator};
-use anchor_spl::token::{Mint, TokenAccount};
-
-use voter_stake_registry::{
-  state::{LockupKind, PositionV0, Registrar},
-  VoterStakeRegistry,
 };
 
 #[derive(Accounts)]
@@ -37,6 +40,9 @@ pub struct DelegateV0<'info> {
   pub position_token_account: Box<Account<'info, TokenAccount>>,
   #[account(mut)]
   pub position_authority: Signer<'info>,
+  #[account(
+    has_one = proxy_config
+  )]
   pub registrar: Box<Account<'info, Registrar>>,
   #[account(
     has_one = registrar,
@@ -60,7 +66,9 @@ pub struct DelegateV0<'info> {
     init_if_needed,
     payer = payer,
     space = SubDaoEpochInfoV0::SIZE,
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(position.lockup.end_ts).to_le_bytes()],
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(
+        min(position.lockup.end_ts, proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end)
+    ).to_le_bytes()],
     bump,
   )]
   pub closing_time_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
@@ -73,7 +81,7 @@ pub struct DelegateV0<'info> {
         // Avoid passing an extra account if the end is 0 (no genesis on this position).
         // Pass instead closing time epoch info, txn account deduplication will reduce the overall tx size
         if position.genesis_end <= registrar.clock_unix_timestamp() {
-          position.lockup.end_ts
+          min(position.lockup.end_ts, proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end)
         } else {
           position.genesis_end
         }
@@ -95,6 +103,7 @@ pub struct DelegateV0<'info> {
 
   pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
+  pub proxy_config: Account<'info, ProxyConfigV0>,
 }
 
 pub struct SubDaoEpochInfoV0WithDescriminator {
@@ -121,7 +130,14 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
 
-  let vehnt_info = caclulate_vhnt_info(curr_ts, position, voting_mint_config)?;
+  let expiration_ts = ctx
+    .accounts
+    .proxy_config
+    .get_current_season(curr_ts)
+    .unwrap()
+    .end;
+
+  let vehnt_info = caclulate_vhnt_info(curr_ts, position, voting_mint_config, expiration_ts)?;
   let VehntInfo {
     has_genesis,
     vehnt_at_curr_ts,
@@ -133,7 +149,11 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
     end_vehnt_correction,
   } = vehnt_info;
 
-  msg!("Vehnt calculations: {:?}", vehnt_info);
+  msg!(
+    "Vehnt calculations: {:?}, expiration ts {}",
+    vehnt_info,
+    expiration_ts
+  );
 
   let curr_epoch = current_epoch(curr_ts);
 
@@ -180,92 +200,90 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
     .checked_add(end_vehnt_correction)
     .unwrap();
   ctx.accounts.closing_time_sub_dao_epoch_info.sub_dao = sub_dao.key();
-  ctx.accounts.closing_time_sub_dao_epoch_info.epoch = current_epoch(position.lockup.end_ts);
+  ctx.accounts.closing_time_sub_dao_epoch_info.epoch = current_epoch(expiration_ts);
   ctx.accounts.closing_time_sub_dao_epoch_info.bump_seed =
     ctx.bumps["closing_time_sub_dao_epoch_info"];
 
   let genesis_end_is_closing = ctx.accounts.genesis_end_sub_dao_epoch_info.key()
     == ctx.accounts.closing_time_sub_dao_epoch_info.key();
-  if position.genesis_end > curr_ts
-    && (genesis_end_fall_rate_correction > 0 || genesis_end_vehnt_correction > 0)
-  {
-    // If the end account doesn't exist, init it. Otherwise just set the correcitons
-    if !genesis_end_is_closing && ctx.accounts.genesis_end_sub_dao_epoch_info.data_len() == 0 {
-      msg!("Genesis end doesn't exist, initting");
-      let genesis_end_epoch = current_epoch(position.genesis_end);
-      // Anchor doesn't natively support dynamic account creation using remaining_accounts
-      // and we have to take it on the manual drive
-      create_and_serialize_account_signed(
-        &ctx.accounts.payer.to_account_info(),
+  // If the end account doesn't exist, init it. Otherwise just set the correcitons
+  if !genesis_end_is_closing && ctx.accounts.genesis_end_sub_dao_epoch_info.data_len() == 0 {
+    msg!("Genesis end doesn't exist, initting");
+    let genesis_end_epoch = current_epoch(position.genesis_end);
+    // Anchor doesn't natively support dynamic account creation using remaining_accounts
+    // and we have to take it on the manual drive
+    create_and_serialize_account_signed(
+      &ctx.accounts.payer.to_account_info(),
+      &ctx
+        .accounts
+        .genesis_end_sub_dao_epoch_info
+        .to_account_info(),
+      &SubDaoEpochInfoV0WithDescriminator {
+        sub_dao_epoch_info: SubDaoEpochInfoV0 {
+          epoch: genesis_end_epoch,
+          bump_seed: ctx.bumps["genesis_end_sub_dao_epoch_info"],
+          sub_dao: sub_dao.key(),
+          previous_percentage: 0,
+          dc_burned: 0,
+          vehnt_at_epoch_start: 0,
+          vehnt_in_closing_positions: genesis_end_vehnt_correction,
+          fall_rates_from_closing_positions: genesis_end_fall_rate_correction,
+          delegation_rewards_issued: 0,
+          utility_score: None,
+          rewards_issued_at: None,
+          initialized: false,
+          dc_onboarding_fees_paid: 0,
+          hnt_rewards_issued: 0,
+        },
+      },
+      &[
+        "sub_dao_epoch_info".as_bytes(),
+        sub_dao.key().as_ref(),
+        &genesis_end_epoch.to_le_bytes(),
+      ],
+      &id(),
+      &ctx.accounts.system_program.to_account_info(),
+      &Rent::get()?,
+      0,
+    )?;
+  } else {
+    // closing can be the same account as genesis end. Make sure to use the proper account
+    let mut parsed: Account<SubDaoEpochInfoV0>;
+    let genesis_end_sub_dao_epoch_info: &mut Account<SubDaoEpochInfoV0> = if genesis_end_is_closing
+    {
+      &mut ctx.accounts.closing_time_sub_dao_epoch_info
+    } else {
+      parsed = Account::try_from(
         &ctx
           .accounts
           .genesis_end_sub_dao_epoch_info
           .to_account_info(),
-        &SubDaoEpochInfoV0WithDescriminator {
-          sub_dao_epoch_info: SubDaoEpochInfoV0 {
-            epoch: genesis_end_epoch,
-            bump_seed: ctx.bumps["genesis_end_sub_dao_epoch_info"],
-            sub_dao: sub_dao.key(),
-            dc_burned: 0,
-            vehnt_at_epoch_start: 0,
-            vehnt_in_closing_positions: genesis_end_vehnt_correction,
-            fall_rates_from_closing_positions: genesis_end_fall_rate_correction,
-            delegation_rewards_issued: 0,
-            utility_score: None,
-            rewards_issued_at: None,
-            initialized: false,
-            dc_onboarding_fees_paid: 0,
-          },
-        },
-        &[
-          "sub_dao_epoch_info".as_bytes(),
-          sub_dao.key().as_ref(),
-          &genesis_end_epoch.to_le_bytes(),
-        ],
-        &id(),
-        &ctx.accounts.system_program.to_account_info(),
-        &Rent::get()?,
-        0,
       )?;
+      &mut parsed
+    };
+
+    // EDGE CASE: The genesis end could be this epoch. Do not override what was done with update_subdao_vehnt
+    if genesis_end_sub_dao_epoch_info.key() == ctx.accounts.sub_dao_epoch_info.key() {
+      genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions = ctx
+        .accounts
+        .sub_dao_epoch_info
+        .fall_rates_from_closing_positions;
+      genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions =
+        ctx.accounts.sub_dao_epoch_info.vehnt_in_closing_positions;
     } else {
-      // closing can be the same account as genesis end. Make sure to use the proper account
-      let mut parsed: Account<SubDaoEpochInfoV0>;
-      let genesis_end_sub_dao_epoch_info: &mut Account<SubDaoEpochInfoV0> =
-        if genesis_end_is_closing {
-          &mut ctx.accounts.closing_time_sub_dao_epoch_info
-        } else {
-          parsed = Account::try_from(
-            &ctx
-              .accounts
-              .genesis_end_sub_dao_epoch_info
-              .to_account_info(),
-          )?;
-          &mut parsed
-        };
-
-      // EDGE CASE: The genesis end could be this epoch. Do not override what was done with update_subdao_vehnt
-      if genesis_end_sub_dao_epoch_info.key() == ctx.accounts.sub_dao_epoch_info.key() {
-        genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions = ctx
-          .accounts
-          .sub_dao_epoch_info
-          .fall_rates_from_closing_positions;
-        genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions =
-          ctx.accounts.sub_dao_epoch_info.vehnt_in_closing_positions;
-      } else {
-        genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions =
-          genesis_end_sub_dao_epoch_info
-            .fall_rates_from_closing_positions
-            .checked_add(genesis_end_fall_rate_correction)
-            .unwrap();
-
-        genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = genesis_end_sub_dao_epoch_info
-          .vehnt_in_closing_positions
-          .checked_add(genesis_end_vehnt_correction)
+      genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions =
+        genesis_end_sub_dao_epoch_info
+          .fall_rates_from_closing_positions
+          .checked_add(genesis_end_fall_rate_correction)
           .unwrap();
-      }
 
-      genesis_end_sub_dao_epoch_info.exit(&id())?;
+      genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = genesis_end_sub_dao_epoch_info
+        .vehnt_in_closing_positions
+        .checked_add(genesis_end_vehnt_correction)
+        .unwrap();
     }
+
+    genesis_end_sub_dao_epoch_info.exit(&id())?;
   }
 
   delegated_position.purged = false;
@@ -276,6 +294,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
   delegated_position.mint = ctx.accounts.mint.key();
   delegated_position.position = ctx.accounts.position.key();
   delegated_position.bump_seed = ctx.bumps["delegated_position"];
+  delegated_position.expiration_ts = expiration_ts;
 
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
   ctx.accounts.sub_dao_epoch_info.bump_seed = *ctx.bumps.get("sub_dao_epoch_info").unwrap();

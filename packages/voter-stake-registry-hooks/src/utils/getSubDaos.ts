@@ -9,6 +9,7 @@ import {
   PROGRAM_ID as MPL_PID,
   Metadata,
 } from "@metaplex-foundation/mpl-token-metadata";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 const cache = {};
 
@@ -19,7 +20,7 @@ export const getSubDaos = async (
   const connection = provider.connection;
   try {
     const subDaos: SubDaoWithMeta[] = [];
-    const idl = await Program.fetchIdl(programId, provider);
+    const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
     const hsdProgram = await init(provider as any, programId, idl);
 
     const dao = await daoKey(HNT_MINT, programId)[0];

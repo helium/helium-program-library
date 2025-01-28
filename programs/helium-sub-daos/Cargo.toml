@@ -1,6 +1,6 @@
 [package]
 name = "helium-sub-daos"
-version = "0.1.12"
+version = "0.2.0"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -28,6 +28,8 @@ voter-stake-registry = { path = "../voter-stake-registry", features = ["no-entry
 shared-utils = { workspace = true }
 circuit-breaker = { workspace = true }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }
+nft-proxy = { path = "../../utils/nft-proxy" }
+proposal = { path = "../../utils/proposal" }
 
 time = "0.3.17"
 solana-security-txt = { workspace = true }

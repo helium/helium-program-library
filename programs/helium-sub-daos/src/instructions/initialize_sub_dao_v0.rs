@@ -1,20 +1,9 @@
-use crate::next_epoch_ts;
-use crate::{state::*, EPOCH_LENGTH};
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::spl_token::instruction::AuthorityType;
-use anchor_spl::token::{set_authority, Mint, SetAuthority, Token, TokenAccount};
-use circuit_breaker::{
-  cpi::{
-    accounts::InitializeAccountWindowedBreakerV0, accounts::InitializeMintWindowedBreakerV0,
-    initialize_account_windowed_breaker_v0, initialize_mint_windowed_breaker_v0,
-  },
-  CircuitBreaker, InitializeAccountWindowedBreakerArgsV0, InitializeMintWindowedBreakerArgsV0,
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token::{set_authority, spl_token::instruction::AuthorityType, Mint, SetAuthority, Token},
 };
-use circuit_breaker::{
-  ThresholdType as CBThresholdType,
-  WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
-};
+use circuit_breaker::CircuitBreaker;
 use shared_utils::resize_to_fit;
 use time::OffsetDateTime;
 use treasury_management::{
@@ -25,6 +14,8 @@ use treasury_management::{
   cpi::{accounts::InitializeTreasuryManagementV0, initialize_treasury_management_v0},
   Curve as TreasuryCurve, InitializeTreasuryManagementArgsV0, TreasuryManagement,
 };
+
+use crate::{next_epoch_ts, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub enum Curve {
@@ -55,7 +46,6 @@ pub struct InitializeSubDaoArgsV0 {
   /// Authority to burn delegated data credits
   pub dc_burn_authority: Pubkey,
   pub registrar: Pubkey,
-  pub delegator_rewards_percent: u64,
   pub onboarding_data_only_dc_fee: u64,
   pub active_device_authority: Pubkey,
 }
@@ -85,14 +75,6 @@ pub struct InitializeSubDaoV0<'info> {
   pub dnt_mint: Box<Account<'info, Mint>>,
   pub dnt_mint_authority: Signer<'info>,
   pub sub_dao_freeze_authority: Signer<'info>,
-  /// CHECK: Initialized via cpi
-  #[account(
-    mut,
-    seeds = ["mint_windowed_breaker".as_bytes(), dnt_mint.key().as_ref()],
-    seeds::program = circuit_breaker_program.key(),
-    bump
-  )]
-  pub circuit_breaker: AccountInfo<'info>,
   /// CHECK: Checked via CPI
   #[account(mut)]
   pub treasury: AccountInfo<'info>,
@@ -112,28 +94,6 @@ pub struct InitializeSubDaoV0<'info> {
     bump,
   )]
   pub treasury_management: AccountInfo<'info>,
-  #[account(
-    token::mint = dnt_mint
-  )]
-  pub rewards_escrow: Box<Account<'info, TokenAccount>>,
-
-  /// CHECK: Initialized via cpi
-  #[account(
-    mut,
-    seeds = ["account_windowed_breaker".as_bytes(), delegator_pool.key().as_ref()],
-    seeds::program = circuit_breaker_program.key(),
-    bump
-  )]
-  pub delegator_pool_circuit_breaker: AccountInfo<'info>,
-  #[account(
-    init,
-    payer = payer,
-    seeds = ["delegator_pool".as_bytes(), dnt_mint.key().as_ref()],
-    bump,
-    token::mint = dnt_mint,
-    token::authority = sub_dao,
-  )]
-  pub delegator_pool: Box<Account<'info, TokenAccount>>,
 
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
@@ -151,42 +111,7 @@ pub fn create_end_epoch_cron(curr_ts: i64, offset: u64) -> String {
   format!("0 {:?} {:?} * * * *", dt.minute(), dt.hour())
 }
 
-impl<'info> InitializeSubDaoV0<'info> {
-  fn initialize_delegator_pool_breaker_ctx(
-    &self,
-  ) -> CpiContext<'_, '_, '_, 'info, InitializeAccountWindowedBreakerV0<'info>> {
-    let cpi_accounts = InitializeAccountWindowedBreakerV0 {
-      payer: self.payer.to_account_info(),
-      circuit_breaker: self.delegator_pool_circuit_breaker.to_account_info(),
-      token_account: self.delegator_pool.to_account_info(),
-      owner: self.sub_dao.to_account_info(),
-      token_program: self.token_program.to_account_info(),
-      system_program: self.system_program.to_account_info(),
-    };
-    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
-  }
-
-  fn initialize_dnt_mint_breaker_ctx(
-    &self,
-  ) -> CpiContext<'_, '_, '_, 'info, InitializeMintWindowedBreakerV0<'info>> {
-    let cpi_accounts = InitializeMintWindowedBreakerV0 {
-      payer: self.payer.to_account_info(),
-      circuit_breaker: self.circuit_breaker.to_account_info(),
-      mint: self.dnt_mint.to_account_info(),
-      mint_authority: self.dnt_mint_authority.to_account_info(),
-      token_program: self.token_program.to_account_info(),
-      system_program: self.system_program.to_account_info(),
-    };
-    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
-  }
-}
-
 pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -> Result<()> {
-  let signer_seeds: &[&[&[u8]]] = &[&[
-    "sub_dao".as_bytes(),
-    ctx.accounts.dnt_mint.to_account_info().key.as_ref(),
-    &[ctx.bumps["sub_dao"]],
-  ]];
   initialize_treasury_management_v0(
     CpiContext::new(
       ctx.accounts.treasury_management_program.to_account_info(),
@@ -216,37 +141,6 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     },
   )?;
 
-  initialize_mint_windowed_breaker_v0(
-    ctx.accounts.initialize_dnt_mint_breaker_ctx(),
-    InitializeMintWindowedBreakerArgsV0 {
-      authority: args.authority,
-      config: CBWindowedCircuitBreakerConfigV0 {
-        // No more than 5 epochs worth can be distributed. We should be distributing once per epoch so this
-        // should never get triggered.
-        window_size_seconds: u64::try_from(EPOCH_LENGTH).unwrap(),
-        threshold_type: CBThresholdType::Absolute,
-        threshold: 5 * args.emission_schedule[0].emissions_per_epoch,
-      },
-      mint_authority: ctx.accounts.sub_dao.key(),
-    },
-  )?;
-
-  initialize_account_windowed_breaker_v0(
-    ctx
-      .accounts
-      .initialize_delegator_pool_breaker_ctx()
-      .with_signer(signer_seeds),
-    InitializeAccountWindowedBreakerArgsV0 {
-      authority: args.authority,
-      config: CBWindowedCircuitBreakerConfigV0 {
-        window_size_seconds: u64::try_from(EPOCH_LENGTH).unwrap(),
-        threshold_type: CBThresholdType::Absolute,
-        threshold: 5 * args.emission_schedule[0].emissions_per_epoch,
-      },
-      owner: ctx.accounts.sub_dao.key(),
-    },
-  )?;
-
   set_authority(
     CpiContext::new(
       ctx.accounts.token_program.to_account_info(),
@@ -259,10 +153,6 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     Some(ctx.accounts.sub_dao.key()),
   )?;
 
-  require_gte!(
-    100_u64.checked_mul(10_0000000).unwrap(),
-    args.delegator_rewards_percent,
-  );
   ctx.accounts.dao.num_sub_daos += 1;
   ctx.accounts.sub_dao.set_inner(SubDaoV0 {
     _deprecated_active_device_aggregator: Pubkey::default(),
@@ -271,7 +161,7 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     dc_burn_authority: args.dc_burn_authority,
     treasury: ctx.accounts.treasury.key(),
     onboarding_dc_fee: args.onboarding_dc_fee,
-    rewards_escrow: ctx.accounts.rewards_escrow.key(),
+    rewards_escrow: Pubkey::default(),
     authority: args.authority,
     emission_schedule: args.emission_schedule,
     registrar: args.registrar,
@@ -279,8 +169,8 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
     vehnt_delegated: 0,
     vehnt_last_calculated_ts: Clock::get()?.unix_timestamp,
     vehnt_fall_rate: 0,
-    delegator_pool: ctx.accounts.delegator_pool.key(),
-    delegator_rewards_percent: args.delegator_rewards_percent,
+    delegator_pool: Pubkey::default(),
+    _deprecated_delegator_rewards_percent: 0,
     onboarding_data_only_dc_fee: args.onboarding_data_only_dc_fee,
     active_device_authority: args.active_device_authority,
     dc_onboarding_fees_paid: 0,

@@ -1964,13 +1964,15 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.1.12"
+version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
  "circuit-breaker",
  "default-env",
  "mpl-token-metadata",
+ "nft-proxy",
+ "proposal",
  "rust_decimal",
  "shared-utils",
  "solana-security-txt",
@@ -5673,7 +5675,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

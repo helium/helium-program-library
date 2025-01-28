@@ -128,4 +128,8 @@ pub mod voter_stake_registry {
   pub fn update_registrar_v0(ctx: Context<UpdateRegistrarV0>) -> Result<()> {
     instructions::update_registrar_v0::handler(ctx)
   }
+
+  pub fn temp_release_position_v0(ctx: Context<TempReleasePositionV0>) -> Result<()> {
+    instructions::temp_release_position_v0::handler(ctx)
+  }
 }

@@ -34,6 +34,7 @@ import {
 import chai, { assert, expect } from "chai";
 import chaiHttp from "chai-http";
 import fs from "fs";
+import { init as initNftProxy } from "@helium/nft-proxy-sdk";
 import * as client from "../packages/distributor-oracle/src/client";
 import {
   Database,
@@ -301,9 +302,10 @@ describe("distributor-oracle", () => {
       VSR_PID,
       anchor.workspace.VoterStakeRegistry.idl
     );
-
+    const nftProxyProgram = await initNftProxy(provider);
     const { registrar } = await initVsr(
       vsrProgram,
+      nftProxyProgram,
       provider,
       me,
       hntMint,

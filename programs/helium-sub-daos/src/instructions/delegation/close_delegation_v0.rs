@@ -1,13 +1,15 @@
-use crate::{
-  caclulate_vhnt_info, current_epoch, id, state::*, update_subdao_vehnt, PrecisePosition,
-  VehntInfo, TESTING,
-};
+use std::cmp::min;
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
-
 use voter_stake_registry::{
   state::{LockupKind, PositionV0, Registrar},
   VoterStakeRegistry,
+};
+
+use crate::{
+  caclulate_vhnt_info, current_epoch, id, state::*, update_subdao_vehnt, PrecisePosition,
+  VehntInfo, TESTING,
 };
 
 #[derive(Accounts)]
@@ -48,7 +50,7 @@ pub struct CloseDelegationV0<'info> {
     seeds = ["delegated_position".as_bytes(), position.key().as_ref()],
     has_one = position,
     has_one = sub_dao,
-    bump
+    bump = delegated_position.bump_seed
   )]
   pub delegated_position: Account<'info, DelegatedPositionV0>,
   #[account(
@@ -63,7 +65,16 @@ pub struct CloseDelegationV0<'info> {
   // They were used when delegate_v0 was called
   #[account(
     mut,
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(position.lockup.end_ts).to_le_bytes()],
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(
+        min(
+            position.lockup.end_ts,
+            if delegated_position.expiration_ts == 0 {
+                position.lockup.end_ts
+            } else {
+                min(position.lockup.end_ts, delegated_position.expiration_ts)
+            }
+        )
+    ).to_le_bytes()],
     bump = closing_time_sub_dao_epoch_info.bump_seed,
   )]
   pub closing_time_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
@@ -77,7 +88,14 @@ pub struct CloseDelegationV0<'info> {
         // no need to pass an extra account here. Just pass the closing time sdei and
         // do not change it.
         if position.genesis_end <= registrar.clock_unix_timestamp() {
-          position.lockup.end_ts
+          min(
+              position.lockup.end_ts,
+              if delegated_position.expiration_ts == 0 {
+                position.lockup.end_ts
+              } else {
+                min(position.lockup.end_ts, delegated_position.expiration_ts)
+              }
+            )
         } else {
           position.genesis_end
         }
@@ -98,10 +116,12 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
   let vehnt_at_curr_ts = position.voting_power_precise(voting_mint_config, curr_ts)?;
+  let expiration_ts = ctx.accounts.delegated_position.expiration_ts;
   let vehnt_info = caclulate_vhnt_info(
     ctx.accounts.delegated_position.start_ts,
     position,
     voting_mint_config,
+    expiration_ts,
   )?;
 
   let VehntInfo {

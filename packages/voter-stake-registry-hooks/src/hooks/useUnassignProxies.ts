@@ -17,6 +17,7 @@ import {
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export const useUnassignProxies = () => {
   const { provider, registrar, voteService, mint } = useHeliumVsrState();
@@ -39,7 +40,7 @@ export const useUnassignProxies = () => {
     }) => {
       const isInvalid = !provider;
 
-      const idl = await Program.fetchIdl(programId, provider);
+      const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const nftProxyProgram = await init(provider as any, programId, idl);
 
       if (isInvalid || !nftProxyProgram || !registrar || !voteService) {

@@ -1,6 +1,7 @@
-use crate::state::*;
 use anchor_lang::prelude::*;
 use shared_utils::resize_to_fit;
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateSubDaoArgsV0 {
@@ -9,7 +10,6 @@ pub struct UpdateSubDaoArgsV0 {
   pub onboarding_dc_fee: Option<u64>,
   pub dc_burn_authority: Option<Pubkey>,
   pub registrar: Option<Pubkey>,
-  pub delegator_rewards_percent: Option<u64>,
   pub onboarding_data_only_dc_fee: Option<u64>,
   pub active_device_authority: Option<Pubkey>,
 }
@@ -53,12 +53,6 @@ pub fn handler(ctx: Context<UpdateSubDaoV0>, args: UpdateSubDaoArgsV0) -> Result
 
   if let Some(onboarding_data_only_dc_fee) = args.onboarding_data_only_dc_fee {
     ctx.accounts.sub_dao.onboarding_data_only_dc_fee = onboarding_data_only_dc_fee;
-  }
-
-  let max_percent = 100_u64.checked_mul(10_0000000).unwrap();
-  if let Some(delegator_rewards_percent) = args.delegator_rewards_percent {
-    require_gte!(max_percent, delegator_rewards_percent);
-    ctx.accounts.sub_dao.delegator_rewards_percent = delegator_rewards_percent;
   }
 
   if let Some(active_device_authority) = args.active_device_authority {

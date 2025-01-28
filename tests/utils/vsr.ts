@@ -1,4 +1,5 @@
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import {
   createMintInstructions,
   sendInstructions,
@@ -19,18 +20,22 @@ import {
   ComputeBudgetProgram,
 } from "@solana/web3.js";
 import { positionKey } from "../../packages/voter-stake-registry-sdk/src";
+import { random } from "./string";
 export const SPL_GOVERNANCE_PID = new PublicKey(
   "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S"
 );
 
 export async function initVsr(
   program: Program<VoterStakeRegistry>,
+  proxyProgram: Program<NftProxy>,
   provider: AnchorProvider,
   me: PublicKey,
   hntMint: PublicKey,
   positionUpdateAuthority: PublicKey,
   genesisVotePowerMultiplierExpirationTs = 1,
   genesisVotePowerMultiplier = 0,
+  // Default is to set proxy season to end so far ahead it isn't relevant
+  proxySeasonEnd = new BN(new Date().valueOf() / 1000 + (24 * 60 * 60 * 5 * 365)),
 ) {
   const programVersion = await getGovernanceProgramVersion(
     program.provider.connection,
@@ -54,6 +59,24 @@ export async function initVsr(
     new BN(1)
   );
 
+  const {
+    pubkeys: { proxyConfig },
+  } = await proxyProgram.methods
+    .initializeProxyConfigV0({
+      maxProxyTime: new BN(1000000000000),
+      name: random(10),
+      seasons: [
+        {
+          start: new BN(0),
+          end: proxySeasonEnd,
+        },
+      ],
+    })
+    .accounts({
+      authority: me,
+    })
+    .rpcAndKeys();
+
   const createRegistrar = program.methods
     .initializeRegistrarV0({
       positionUpdateAuthority,
@@ -61,7 +84,7 @@ export async function initVsr(
     .accounts({
       realm: realmPk,
       realmGoverningTokenMint: hntMint,
-      proxyConfig: null
+      proxyConfig
     });
   instructions.push(await createRegistrar.instruction());
   const registrar = (await createRegistrar.pubkeys()).registrar as PublicKey;

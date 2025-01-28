@@ -1,7 +1,6 @@
-use crate::error::ErrorCode;
 use anchor_lang::prelude::*;
 
-use crate::EPOCH_LENGTH;
+use crate::{error::ErrorCode, EPOCH_LENGTH};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct EmissionScheduleItem {
@@ -101,6 +100,11 @@ pub struct DaoV0 {
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub hst_emission_schedule: Vec<PercentItem>,
   pub bump_seed: u8,
+  pub rewards_escrow: Pubkey,
+  pub delegator_pool: Pubkey,
+  pub delegator_rewards_percent: u64, // number between 0 - (100_u64 * 100_000_000). The % of DNT rewards delegators receive with 8 decimal places of accuracy
+  pub proposal_namespace: Pubkey,
+  pub recent_proposals: [RecentProposal; 4],
 }
 
 #[macro_export]
@@ -108,6 +112,31 @@ macro_rules! dao_seeds {
   ( $s:expr ) => {
     &[b"dao".as_ref(), $s.hnt_mint.as_ref(), &[$s.bump_seed]]
   };
+}
+
+impl DaoV0 {
+  pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
+    let new_proposal = RecentProposal { proposal, ts };
+    // Find the insertion point to maintain descending order by timestamp
+    let insert_index = self
+      .recent_proposals
+      .iter()
+      .position(|p| p.ts <= ts)
+      .unwrap_or(self.recent_proposals.len());
+    let cloned_proposals = self.recent_proposals.clone();
+    // Shift elements to make room for the new proposal
+    if insert_index < self.recent_proposals.len() {
+      for i in (insert_index + 1..self.recent_proposals.len()).rev() {
+        self.recent_proposals[i] = cloned_proposals[i - 1].clone();
+      }
+      self.recent_proposals[insert_index] = new_proposal;
+    } else if ts > self.recent_proposals[self.recent_proposals.len() - 1].ts {
+      // If the new proposal is more recent than the oldest one, replace the oldest
+      self.recent_proposals[self.recent_proposals.len() - 1] = new_proposal;
+    }
+    // Re-sort the array to ensure it's in descending order by timestamp
+    self.recent_proposals.sort_by(|a, b| b.ts.cmp(&a.ts));
+  }
 }
 
 #[account]
@@ -125,6 +154,30 @@ pub struct DaoEpochInfoV0 {
   pub done_issuing_rewards: bool,
   pub done_issuing_hst_pool: bool,
   pub bump_seed: u8,
+  pub recent_proposals: [RecentProposal; 4],
+  // The number of delegation rewards issued this epoch, so that delegators can claim their share of the rewards
+  pub delegation_rewards_issued: u64,
+  pub vehnt_at_epoch_start: u64,
+}
+
+#[derive(Debug, InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Default)]
+pub struct RecentProposal {
+  pub proposal: Pubkey,
+  pub ts: i64,
+}
+
+impl DaoEpochInfoV0 {
+  pub fn size() -> usize {
+    60 + 8 + std::mem::size_of::<DaoEpochInfoV0>()
+  }
+
+  pub fn start_ts(&self) -> i64 {
+    i64::try_from(self.epoch).unwrap() * EPOCH_LENGTH
+  }
+
+  pub fn end_ts(&self) -> i64 {
+    i64::try_from(self.epoch + 1).unwrap() * EPOCH_LENGTH
+  }
 }
 
 #[account]
@@ -142,6 +195,8 @@ pub struct DelegatedPositionV0 {
   // This bitmap gets rotated as last_claimed_epoch increases.
   // This allows for claiming ~128 epochs worth of rewards in parallel.
   pub claimed_epochs_bitmap: u128,
+  pub expiration_ts: i64,
+  pub recent_proposals: Vec<RecentProposal>,
 }
 
 impl DelegatedPositionV0 {
@@ -175,6 +230,26 @@ impl DelegatedPositionV0 {
       Ok(())
     }
   }
+
+  // Add a proposal to the recent proposals list
+  pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
+    let new_proposal = RecentProposal { proposal, ts };
+    // Find the insertion point to maintain descending order by timestamp
+    let insert_index = self
+      .recent_proposals
+      .iter()
+      .position(|p| p.ts <= ts)
+      .unwrap_or(self.recent_proposals.len());
+    // Insert the new proposal
+    self.recent_proposals.insert(insert_index, new_proposal);
+  }
+  pub fn remove_recent_proposal(&mut self, proposal: Pubkey) {
+    self.recent_proposals.retain(|p| p.proposal != proposal);
+  }
+  // Remove proposals older than the given timestamp
+  pub fn remove_proposals_older_than(&mut self, ts: i64) {
+    self.recent_proposals.retain(|p| p.ts >= ts);
+  }
 }
 
 #[account]
@@ -202,10 +277,13 @@ pub struct SubDaoEpochInfoV0 {
   pub bump_seed: u8,
   pub initialized: bool,
   pub dc_onboarding_fees_paid: u64,
+  /// The number of hnt rewards issued to the reward escrow this epoch
+  pub hnt_rewards_issued: u64,
+  pub previous_percentage: u32,
 }
 
 impl SubDaoEpochInfoV0 {
-  pub const SIZE: usize = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>() - 8 - 8; // subtract 8 the extra u64 we added to vehnt, and dc onboarding fees paid
+  pub const SIZE: usize = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>() - 8 - 8 - 8; // subtract 8 the extra u64 we added to vehnt, dc onboarding fees paid, hnt rewards issued, and prev percentage
 }
 impl SubDaoEpochInfoV0 {
   pub fn start_ts(&self) -> i64 {
@@ -224,6 +302,7 @@ pub struct SubDaoV0 {
   pub dnt_mint: Pubkey,       // Mint of the subdao token
   pub treasury: Pubkey,       // Treasury of HNT
   pub rewards_escrow: Pubkey, // Escrow account for DNT rewards
+  /// DEPRECATED: use dao.delegator_pool instead. But some people still need to claim old DNT rewards
   pub delegator_pool: Pubkey, // Pool of DNT tokens which veHNT delegators can claim from
   pub vehnt_delegated: u128, // the total amount of vehnt delegated to this subdao, with 12 decimals of extra precision
   pub vehnt_last_calculated_ts: i64,
@@ -234,8 +313,8 @@ pub struct SubDaoV0 {
   pub onboarding_dc_fee: u64,
   pub emission_schedule: Vec<EmissionScheduleItem>,
   pub bump_seed: u8,
-  pub registrar: Pubkey,              // vsr registrar
-  pub delegator_rewards_percent: u64, // number between 0 - (100_u64 * 100_000_000). The % of DNT rewards delegators receive with 8 decimal places of accuracy
+  pub registrar: Pubkey,                          // vsr registrar
+  pub _deprecated_delegator_rewards_percent: u64, // number between 0 - (100_u64 * 100_000_000). The % of DNT rewards delegators receive with 8 decimal places of accuracy
   pub onboarding_data_only_dc_fee: u64,
   pub dc_onboarding_fees_paid: u64, // the total amount of dc onboarding fees paid to this subdao by active hotspots (inactive hotspots are excluded)
   pub active_device_authority: Pubkey, // authority that can mark hotspots as active/inactive
