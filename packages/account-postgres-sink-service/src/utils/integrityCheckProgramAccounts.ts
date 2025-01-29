@@ -190,9 +190,6 @@ export const integrityCheckProgramAccounts = async ({
               const model = sequelize.models[accName];
               await Promise.all(
                 accounts.map(async (c) => {
-                  const existing = await model.findByPk(c.pubkey, {
-                    transaction: t,
-                  });
                   const decodedAcc = program.coder.accounts.decode(
                     accName,
                     c.data as Buffer
@@ -217,6 +214,10 @@ export const integrityCheckProgramAccounts = async ({
                       sanitized
                     );
                   }
+
+                  const existing = await model.findByPk(c.pubkey, {
+                    transaction: t,
+                  });
 
                   const shouldUpdate =
                     !deepEqual(
