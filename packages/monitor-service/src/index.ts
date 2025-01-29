@@ -190,6 +190,13 @@ async function run() {
 
   await monitorSolBalance(
     new PublicKey(
+      process.env.HPL_CRONS_QUEUE_KEY ||
+        "H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7"
+    ),
+    "hpl-crons-queue"
+  );
+  await monitorSolBalance(
+    new PublicKey(
       process.env.CRON_KEY || "cronjz7v2xsWdXr8BVz38ihi5DTWPihGZKuRr6vSPEU"
     ),
     "cron"
