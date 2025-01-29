@@ -112,9 +112,8 @@ export async function run(args: any = process.argv) {
             )[0],
             genesisEndSubDaoEpochInfo: subDaoEpochInfoKey(
               subDao,
-              position.genesisEnd.isZero()
-                ? min(position.lockup.endTs, proxyEndTs!)
-                : position.genesisEnd
+              position.genesisEnd.lt(currTsBN) ?
+                min(position.lockup.endTs, proxyEndTs!) : position.genesisEnd
             )[0],
             proxyConfig: registrar.proxyConfig,
             systemProgram: SystemProgram.programId,
@@ -130,6 +129,7 @@ export async function run(args: any = process.argv) {
     instructions,
     {
       useFirstEstimateForAll: true,
+      computeUnitLimit: 400000,
     }
   );
 
