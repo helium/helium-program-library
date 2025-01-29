@@ -1,14 +1,12 @@
-use crate::error::ErrorCode;
-use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
-use anchor_spl::token::TokenAccount;
-use voter_stake_registry::state::LockupKind as VsrLockupKind;
+use anchor_spl::token::{Mint, TokenAccount};
 use voter_stake_registry::{
   cpi::{accounts::ResetLockupV0 as VsrResetLockupV0, reset_lockup_v0},
-  state::{PositionV0, Registrar},
+  state::{LockupKind as VsrLockupKind, PositionV0, Registrar},
   ResetLockupArgsV0 as VsrResetLockupArgsV0, VoterStakeRegistry,
 };
+
+use crate::{error::ErrorCode, state::*};
 
 #[derive(Accounts)]
 pub struct ResetLockupV0<'info> {
@@ -30,7 +28,7 @@ pub struct ResetLockupV0<'info> {
   #[account(
     seeds = ["delegated_position".as_bytes(), position.key().as_ref()],
     bump,
-    constraint = delegated_position.data_is_empty() && delegated_position.lamports() == 0 @ ErrorCode::PositionChangeWhileDelegated
+    constraint = delegated_position.data_is_empty() @ ErrorCode::PositionChangeWhileDelegated
   )]
   pub delegated_position: UncheckedAccount<'info>,
   pub mint: Box<Account<'info, Mint>>,

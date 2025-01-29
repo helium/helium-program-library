@@ -1,15 +1,15 @@
-use crate::error::ErrorCode;
-use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::Mint;
-use anchor_spl::token::Token;
-use anchor_spl::token::TokenAccount;
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token::{Mint, Token, TokenAccount},
+};
 use voter_stake_registry::{
   cpi::{accounts::TransferV0 as VsrTransferV0, transfer_v0},
   state::{PositionV0, Registrar},
   TransferArgsV0 as VsrTransferArgsV0, VoterStakeRegistry,
 };
+
+use crate::{error::ErrorCode, state::*};
 
 #[derive(Accounts)]
 pub struct TransferV0<'info> {
@@ -33,7 +33,7 @@ pub struct TransferV0<'info> {
   #[account(
     seeds = ["delegated_position".as_bytes(), source_position.key().as_ref()],
     bump,
-    constraint = source_delegated_position.data_is_empty() && source_delegated_position.lamports() == 0 @ ErrorCode::PositionChangeWhileDelegated
+    constraint = source_delegated_position.data_is_empty() @ ErrorCode::PositionChangeWhileDelegated
   )]
   pub source_delegated_position: UncheckedAccount<'info>,
   pub mint: Box<Account<'info, Mint>>,
@@ -53,7 +53,7 @@ pub struct TransferV0<'info> {
   #[account(
     seeds = ["delegated_position".as_bytes(), target_position.key().as_ref()],
     bump,
-    constraint = target_delegated_position.data_is_empty() && target_delegated_position.lamports() == 0 @ ErrorCode::PositionChangeWhileDelegated
+    constraint = target_delegated_position.data_is_empty() @ ErrorCode::PositionChangeWhileDelegated
   )]
   pub target_delegated_position: UncheckedAccount<'info>,
   pub deposit_mint: Box<Account<'info, Mint>>,
