@@ -204,7 +204,7 @@ async function run() {
     new PublicKey(
       process.env.MIGRATION_KEY || "mgrArTL62g582wWV6iM4fwU1LKnbUikDN6akKJ76pzK"
     ),
-    "oracle"
+    "migration-service"
   );
   await monitorSolBalance(
     lazySignerKey(process.env.LAZY_SIGNER || "nJWGUMOK")[0],
