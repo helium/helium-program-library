@@ -231,6 +231,20 @@ impl DelegatedPositionV0 {
     }
   }
 
+  pub fn set_unclaimed(&mut self, epoch: u64) -> Result<()> {
+    if epoch <= self.last_claimed_epoch {
+      Err(error!(ErrorCode::InvalidClaimEpoch))
+    } else if epoch > self.last_claimed_epoch + 128 {
+      Err(error!(ErrorCode::InvalidClaimEpoch))
+    } else {
+      let bit_index = (epoch - self.last_claimed_epoch - 1) as u128;
+      // Clear the bit at bit_index (set to 0)
+      self.claimed_epochs_bitmap &= !(1_u128 << (127_u128 - bit_index));
+
+      Ok(())
+    }
+  }
+
   // Add a proposal to the recent proposals list
   pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
     let new_proposal = RecentProposal { proposal, ts };
@@ -340,5 +354,19 @@ mod tests {
     assert!(position.is_claimed(epoch).unwrap());
     assert_eq!(position.last_claimed_epoch, 2);
     assert_eq!(position.claimed_epochs_bitmap, 0);
+  }
+
+  #[test]
+  fn test_unclaimed() {
+    let mut position = DelegatedPositionV0::default();
+    let epoch = 2;
+
+    // First claim the epoch
+    position.set_claimed(epoch).unwrap();
+    assert!(position.is_claimed(epoch).unwrap());
+
+    // Then unclaim it
+    position.set_unclaimed(epoch).unwrap();
+    assert!(!position.is_claimed(epoch).unwrap());
   }
 }

@@ -147,4 +147,8 @@ pub mod helium_sub_daos {
   pub fn track_vote_v0(ctx: Context<TrackVoteV0>) -> Result<()> {
     track_vote_v0::handler(ctx)
   }
+
+  pub fn temp_fix_claimed_epoch(ctx: Context<TempFixClaimedEpoch>) -> Result<()> {
+    temp_fix_claimed_epoch::handler(ctx)
+  }
 }
