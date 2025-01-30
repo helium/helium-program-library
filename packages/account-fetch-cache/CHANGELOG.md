@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.22](https://github.com/helium/helium-program-library/compare/v0.9.21...v0.9.22) (2025-01-30)
+
+**Note:** Version bump only for package @helium/account-fetch-cache
+
+
+
+
+
 ## [0.9.21](https://github.com/helium/helium-program-library/compare/v0.9.20...v0.9.21) (2025-01-30)
 
 **Note:** Version bump only for package @helium/account-fetch-cache
