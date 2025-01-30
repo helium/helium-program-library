@@ -60,7 +60,8 @@ pub struct ClaimRewardsV0<'info> {
   #[account(
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
-    constraint = sub_dao_epoch_info.rewards_issued_at.is_some() @ ErrorCode::EpochNotClosed
+    constraint = sub_dao_epoch_info.rewards_issued_at.is_some() @ ErrorCode::EpochNotClosed,
+    constraint = sub_dao_epoch_info.hnt_rewards_issued == 0,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   #[account(mut)]
