@@ -138,7 +138,7 @@ export const useCreatePosition = () => {
             registrar
           );
           const currTs = Number(unixTime) + registrarAcc.timeOffset.toNumber();
-          const endTs = proxyConfig.seasons.find(season => new BN(currTs).gte(season.start))?.end || (currTs + lockupPeriodsInDays * SECS_PER_DAY);
+          const endTs = proxyConfig.seasons.reverse().find(season => new BN(currTs).gte(season.start))?.end || (currTs + lockupPeriodsInDays * SECS_PER_DAY);
           const [subDaoEpochInfo] = subDaoEpochInfoKey(subDao.pubkey, currTs);
           const [endSubDaoEpochInfoKey] = subDaoEpochInfoKey(
             subDao.pubkey,
