@@ -41,7 +41,7 @@ export async function run(args: any = process.argv) {
   const validPositions = positions.filter(
     (p) =>
       registrars.has(p.account.registrar.toBase58()) &&
-      (p.account.lockup.endTs.eq(new BN(1738195200)) ||
+      (!p.account.lockup.endTs.eq(new BN(1738195200)) ||
         !!p.account.lockup.kind.constant)
   );
   console.log(`Updating ${validPositions.length} positions`);
