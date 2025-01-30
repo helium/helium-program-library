@@ -63,5 +63,5 @@ export async function run(args: any = process.argv) {
         .instruction()
     );
   }
-  // await batchParallelInstructionsWithPriorityFee(provider, instructions, {maxSignatureBatch: 100});
+  await batchParallelInstructionsWithPriorityFee(provider, instructions, {maxSignatureBatch: 100});
 }
