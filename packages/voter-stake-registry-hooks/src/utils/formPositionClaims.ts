@@ -133,7 +133,7 @@ export const formPositionClaims = async ({
             daoEpochInfoKey(subDaoAcc.dao, epoch.mul(new BN(EPOCH_LENGTH)))[0]
           );
           const daoEpochInfoAccounts = await getMultipleAccounts({
-            connection: hsdProgram.provider.connection,
+            connection: connNoCache,
             keys: daoEpochInfoKeys,
           });
           bucketedEpochsByPosition[position.pubkey.toBase58()].push(
