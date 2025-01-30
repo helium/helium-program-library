@@ -98,29 +98,28 @@ export const defineIdlModels = async ({
         }
       );
 
-      // const columns = Object.keys(model.getAttributes()).map((att) =>
-      //   camelize(att, true)
-      // );
+      const columns = Object.keys(model.getAttributes()).map((att) =>
+        camelize(att, true)
+      );
 
-      // const existingColumns = (
-      //   await sequelize.query(
-      //     `
-      //   SELECT column_name
-      //     FROM information_schema.columns
-      //   WHERE table_schema = '${underscore(accConfig.schema || "public")}'
-      //     AND table_name = '${underscore(accConfig.table || acc.name)}'
-      // `,
-      //     { type: QueryTypes.SELECT }
-      //   )
-      // ).map((x: any) => camelize(x.column_name, true));
+      const existingColumns = (
+        await sequelize.query(
+          `
+        SELECT column_name
+          FROM information_schema.columns
+        WHERE table_schema = '${underscore(accConfig.schema || "public")}'
+          AND table_name = '${underscore(accConfig.table || acc.name)}'
+      `,
+          { type: QueryTypes.SELECT }
+        )
+      ).map((x: any) => camelize(x.column_name, true));
 
-      // if (
-      //   !existingColumns.length ||
-      //   !columns.every((col) => existingColumns.includes(col))
-      // ) {
-      //   model.sync({ alter: true });
-      // }
-      model.sync({ alter: true });
+      if (
+        !existingColumns.length ||
+        !columns.every((col) => existingColumns.includes(col))
+      ) {
+        model.sync({ alter: true });
+      }
     }
   }
 };
