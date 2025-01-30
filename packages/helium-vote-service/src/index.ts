@@ -407,10 +407,11 @@ function deepCamelCaseKeys(obj: any): any {
   }
 }
 
+const MODIFY_DB = (process.env.MODIFY_DB || "true") === "true";
 const start = async () => {
   try {
-    await ProxyRegistrar.sync({ alter: true });
-    await Proxy.sync({ alter: true });
+    await ProxyRegistrar.sync({ alter: MODIFY_DB });
+    await Proxy.sync({ alter: MODIFY_DB });
     const port = process.env.PORT ? Number(process.env.PORT) : 8081;
     await server.listen({
       port,
@@ -431,7 +432,9 @@ const start = async () => {
     const sqlQuery = fs.readFileSync(sqlFilePath, "utf8");
 
     // Execute SQL query
-    await sequelize.query(sqlQuery);
+    if (MODIFY_DB) {
+      await sequelize.query(sqlQuery);
+    }
     await cloneRepo();
     await readProxiesAndUpsert();
     console.log("Created models");
