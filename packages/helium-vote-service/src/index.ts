@@ -197,7 +197,7 @@ WITH
     FROM
       proxies
     JOIN proxy_registrars pr ON pr.wallet = proxies.wallet
-    LEFT JOIN positions_with_proxy_assignments p ON p.voter = proxies.wallet
+    LEFT OUTER JOIN positions_with_proxy_assignments p ON p.voter = proxies.wallet
     WHERE pr.registrar = ${escapedRegistrar}
           ${
             request.query.query
