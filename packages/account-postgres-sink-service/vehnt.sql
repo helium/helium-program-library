@@ -1,4 +1,3 @@
-
 WITH
   readable_positions AS (
     SELECT p.*,

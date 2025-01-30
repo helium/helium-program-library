@@ -182,7 +182,10 @@ WITH
       detail,
       count(p.voter) as "numAssignments",
       floor(sum(p.ve_tokens)) as "proxiedVeTokens",
-      100 * sum(p.ve_tokens) / (select total_vetokens from total_vetokens) as "percent"
+      CASE 
+        WHEN (select total_vetokens from total_vetokens) = 0 THEN 0
+        ELSE 100 * sum(COALESCE(p.ve_tokens, 0)) / (select total_vetokens from total_vetokens)
+      END as "percent"
     FROM
       proxies
     JOIN proxy_registrars pr ON pr.wallet = proxies.wallet
@@ -254,7 +257,10 @@ WITH
       detail,
       count(p.voter) as "numAssignments",
       floor(sum(p.ve_tokens)) as "proxiedVeTokens",
-      100 * sum(p.ve_tokens) / (select total_vetokens from total_vetokens) as "percent"
+      CASE 
+        WHEN (select total_vetokens from total_vetokens) = 0 THEN 0
+        ELSE 100 * sum(COALESCE(p.ve_tokens, 0)) / (select total_vetokens from total_vetokens)
+      END as "percent"
     FROM
       (SELECT DISTINCT voter as wallet FROM positions_with_proxy_assignments
        UNION
