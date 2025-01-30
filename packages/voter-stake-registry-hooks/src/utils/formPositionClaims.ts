@@ -141,7 +141,7 @@ export const formPositionClaims = async ({
               chunk.map((epoch, index) => {
                 const daoEpochInfoAccount = daoEpochInfoAccounts[index];
                 const daoEpochInfoData = hsdProgram.coder.accounts.decode(
-                  "daoEpochInfoV0",
+                  "DaoEpochInfoV0",
                   daoEpochInfoAccount?.data
                 );
 
