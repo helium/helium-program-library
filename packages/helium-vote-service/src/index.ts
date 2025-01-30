@@ -21,6 +21,7 @@ import {
 } from "./model";
 import { cloneRepo, readProxiesAndUpsert } from "./repo";
 import { Connection, PublicKey } from "@solana/web3.js";
+import NodeCache from 'node-cache';
 
 const ORG_IDS = {
   [HNT_MINT.toBase58()]: organizationKey("Helium")[0].toBase58(),
@@ -140,6 +141,9 @@ server.get<{
   });
 });
 
+// Create cache instance with 10 minute TTL
+const proxyCache = new NodeCache({ stdTTL: 600 }); // 600 seconds = 10 minutes
+
 server.get<{
   Params: { registrar: string };
   Querystring: {
@@ -148,11 +152,23 @@ server.get<{
     query: string;
   };
 }>("/v1/registrars/:registrar/proxies", async (request, reply) => {
-  const limit = Number(request.query.limit || 1000); // default limit
+  const limit = Number(request.query.limit || 1000);
+  const page = Number(request.query.page || 1);
   const offset = Number((request.query.page || 1) - 1) * limit;
   const registrar = request.params.registrar;
-  const escapedRegistrar = sequelize.escape(registrar);
+  const query = request.query.query || '';
+  
+  // Create cache key from all params
+  const cacheKey = `proxies:${registrar}:${limit}:${page}:${query}`;
+  
+  // Try to get from cache first
+  const cachedResult = proxyCache.get(cacheKey);
+  if (cachedResult) {
+    return cachedResult;
+  }
 
+  const escapedRegistrar = sequelize.escape(registrar);
+  
   const proxies = await sequelize.query(`
 WITH
   positions_with_proxy_assignments AS (
@@ -218,7 +234,12 @@ ORDER BY "proxiedVeTokens" DESC NULLS LAST
 OFFSET ${offset}
 LIMIT ${limit};
       `);
-  return proxies[0];
+  const result = proxies[0];
+  
+  // Store in cache before returning
+  proxyCache.set(cacheKey, result);
+  
+  return result;
 });
 
 server.get<{
