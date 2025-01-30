@@ -1,5 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
-import { HplCrons } from "../../target/types/hpl_crons";
+import { sendInstructionsWithPriorityFee } from "@helium/spl-utils";
 import {
   compileTransaction,
   customSignerKey,
@@ -13,8 +13,7 @@ import {
 } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair } from "./utils";
-import { sendInstructions } from "@helium/spl-utils";
+import { HplCrons } from "../../target/types/hpl_crons";
 
 const PROGRAM_ID = new PublicKey("hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu");
 
@@ -53,7 +52,6 @@ export async function run(args: any = process.argv) {
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
-  const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const taskQueue = new PublicKey(argv.taskQueue);
   const idl = await anchor.Program.fetchIdl(PROGRAM_ID, provider);
   const program = new anchor.Program<HplCrons>(
@@ -62,7 +60,6 @@ export async function run(args: any = process.argv) {
   ) as anchor.Program<HplCrons>;
   const tuktukProgram = await initTuktuk(provider);
 
-  const instructions: TransactionInstruction[] = [];
   const [task] = taskKey(taskQueue, argv.index);
   const dao = new PublicKey("BQ3MCuTT5zVBhNfQ4SjMh3NPVhFy73MPV8rjfq5d1zie");
   const iotSubDao = new PublicKey(
@@ -88,8 +85,6 @@ export async function run(args: any = process.argv) {
         .updateEpochTracker({
           epoch: new anchor.BN(argv.epoch),
           authority: provider.wallet.publicKey,
-          dao: dao,
-          bumpSeed: etBumpSeed,
         })
         .accountsStrict({
           authority: provider.wallet.publicKey,
@@ -153,5 +148,5 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  await sendInstructions(provider, ixs);
+  await sendInstructionsWithPriorityFee(provider, ixs);
 }

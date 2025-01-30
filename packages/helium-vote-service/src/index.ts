@@ -21,6 +21,7 @@ import {
 } from "./model";
 import { cloneRepo, readProxiesAndUpsert } from "./repo";
 import { Connection, PublicKey } from "@solana/web3.js";
+import NodeCache from 'node-cache';
 
 const ORG_IDS = {
   [HNT_MINT.toBase58()]: organizationKey("Helium")[0].toBase58(),
@@ -140,6 +141,9 @@ server.get<{
   });
 });
 
+// Create cache instance with 10 minute TTL
+const proxyCache = new NodeCache({ stdTTL: 600 }); // 600 seconds = 10 minutes
+
 server.get<{
   Params: { registrar: string };
   Querystring: {
@@ -148,11 +152,23 @@ server.get<{
     query: string;
   };
 }>("/v1/registrars/:registrar/proxies", async (request, reply) => {
-  const limit = Number(request.query.limit || 1000); // default limit
+  const limit = Number(request.query.limit || 1000);
+  const page = Number(request.query.page || 1);
   const offset = Number((request.query.page || 1) - 1) * limit;
   const registrar = request.params.registrar;
-  const escapedRegistrar = sequelize.escape(registrar);
+  const query = request.query.query || '';
+  
+  // Create cache key from all params
+  const cacheKey = `proxies:${registrar}:${limit}:${page}:${query}`;
+  
+  // Try to get from cache first
+  const cachedResult = proxyCache.get(cacheKey);
+  if (cachedResult) {
+    return cachedResult;
+  }
 
+  const escapedRegistrar = sequelize.escape(registrar);
+  
   const proxies = await sequelize.query(`
 WITH
   positions_with_proxy_assignments AS (
@@ -182,7 +198,10 @@ WITH
       detail,
       count(p.voter) as "numAssignments",
       floor(sum(p.ve_tokens)) as "proxiedVeTokens",
-      100 * sum(p.ve_tokens) / (select total_vetokens from total_vetokens) as "percent"
+      CASE 
+        WHEN (select total_vetokens from total_vetokens) = 0 THEN 0
+        ELSE 100 * sum(COALESCE(p.ve_tokens, 0)) / (select total_vetokens from total_vetokens)
+      END as "percent"
     FROM
       proxies
     JOIN proxy_registrars pr ON pr.wallet = proxies.wallet
@@ -215,7 +234,12 @@ ORDER BY "proxiedVeTokens" DESC NULLS LAST
 OFFSET ${offset}
 LIMIT ${limit};
       `);
-  return proxies[0];
+  const result = proxies[0];
+  
+  // Store in cache before returning
+  proxyCache.set(cacheKey, result);
+  
+  return result;
 });
 
 server.get<{
@@ -254,7 +278,10 @@ WITH
       detail,
       count(p.voter) as "numAssignments",
       floor(sum(p.ve_tokens)) as "proxiedVeTokens",
-      100 * sum(p.ve_tokens) / (select total_vetokens from total_vetokens) as "percent"
+      CASE 
+        WHEN (select total_vetokens from total_vetokens) = 0 THEN 0
+        ELSE 100 * sum(COALESCE(p.ve_tokens, 0)) / (select total_vetokens from total_vetokens)
+      END as "percent"
     FROM
       (SELECT DISTINCT voter as wallet FROM positions_with_proxy_assignments
        UNION
@@ -401,10 +428,11 @@ function deepCamelCaseKeys(obj: any): any {
   }
 }
 
+const MODIFY_DB = (process.env.MODIFY_DB || "true") === "true";
 const start = async () => {
   try {
-    await ProxyRegistrar.sync({ alter: true });
-    await Proxy.sync({ alter: true });
+    await ProxyRegistrar.sync({ alter: MODIFY_DB });
+    await Proxy.sync({ alter: MODIFY_DB });
     const port = process.env.PORT ? Number(process.env.PORT) : 8081;
     await server.listen({
       port,
@@ -425,7 +453,9 @@ const start = async () => {
     const sqlQuery = fs.readFileSync(sqlFilePath, "utf8");
 
     // Execute SQL query
-    await sequelize.query(sqlQuery);
+    if (MODIFY_DB) {
+      await sequelize.query(sqlQuery);
+    }
     await cloneRepo();
     await readProxiesAndUpsert();
     console.log("Created models");

@@ -19,8 +19,10 @@ impl ProxyConfigV0 {
       let middle = (high + low) / 2;
       if let Some(current) = self.seasons.get(middle) {
         // Move to the right side if target time is greater
-        if current.start <= unix_time && current.end > unix_time {
-          ans = Some(*current);
+        if current.start <= unix_time {
+          if current.end > unix_time {
+            ans = Some(*current);
+          }
           low = middle + 1;
         } else {
           if middle == 0 {
@@ -128,6 +130,44 @@ mod tests {
       empty_config.get_current_season(100),
       None,
       "Should handle empty seasons"
+    );
+
+    let config = ProxyConfigV0 {
+      seasons: vec![
+        SeasonV0 {
+          start: 1688169600,
+          end: 1722470400,
+        },
+        SeasonV0 {
+          start: 1719792000,
+          end: 1754006400,
+        },
+        SeasonV0 {
+          start: 1751328000,
+          end: 1785542400,
+        },
+        SeasonV0 {
+          start: 1782864000,
+          end: 1817078400,
+        },
+        SeasonV0 {
+          start: 1814400000,
+          end: 1848700800,
+        },
+        SeasonV0 {
+          start: 1846022400,
+          end: 1880236800,
+        },
+      ],
+      ..Default::default()
+    };
+    assert_eq!(
+      config.get_current_season(1738176109),
+      Some(SeasonV0 {
+        start: 1719792000,
+        end: 1754006400,
+      }),
+      "Bug: Returns ended season for timestamp in gap"
     );
   }
 }

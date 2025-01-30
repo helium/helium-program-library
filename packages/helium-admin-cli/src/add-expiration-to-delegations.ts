@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { daoKey, init as initHsd, subDaoEpochInfoKey } from "@helium/helium-sub-daos-sdk";
 import { init as initProxy } from "@helium/nft-proxy-sdk";
-import { batchParallelInstructionsWithPriorityFee, HNT_MINT } from "@helium/spl-utils";
+import { batchInstructionsToTxsWithPriorityFee, batchParallelInstructionsWithPriorityFee, bulkSendTransactions, HNT_MINT } from "@helium/spl-utils";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import { AccountInfo, PublicKey, SystemProgram, SYSVAR_CLOCK_PUBKEY, TransactionInstruction } from "@solana/web3.js";
 import { min } from "bn.js";
@@ -56,59 +56,84 @@ export async function run(args: any = process.argv) {
       connection: provider.connection,
       keys: positionKeys,
     })
-  ).map((a) => coder.decode("PositionV0", a.data));
+  ).map((a) => a ? coder.decode("PositionV0", a.data) : null);
 
   const currTs = await getSolanaUnixTimestamp(provider);
   const currTsBN = new anchor.BN(currTs.toString());
   const proxyEndTs = proxyConfig.seasons
     .reverse()
     .find((s) => currTsBN.gte(s.start))?.end;
-  for (const [delegation, position] of zip(needsMigration, positionAccs)) {
-    const subDao = delegation.account.subDao;
-    const positionTokenAccount = (
-      await provider.connection.getTokenLargestAccounts(position.mint)
-    ).value[0].address;
-    instructions.push(
-      await hsdProgram.methods
-        .extendExpirationTsV0()
-        .accountsStrict({
-          payer: wallet.publicKey,
-          position: delegation.account.position,
-          delegatedPosition: delegation.publicKey,
-          registrar: registrarK,
-          mint: position.mint,
-          authority: wallet.publicKey,
-          positionTokenAccount,
-          dao,
-          subDao: delegation.account.subDao,
-          oldClosingTimeSubDaoEpochInfo: subDaoEpochInfoKey(
-            subDao,
-            delegation.account.expirationTs.isZero()
-              ? position.lockup.endTs
-              : min(position.lockup.endTs, delegation.account.expirationTs)
-          )[0],
-          closingTimeSubDaoEpochInfo: subDaoEpochInfoKey(
-            subDao,
-            min(position.lockup.endTs, proxyEndTs!)
-          )[0],
-          genesisEndSubDaoEpochInfo: subDaoEpochInfoKey(
-            subDao,
-            position.genesisEnd.isZero()
-              ? min(position.lockup.endTs, proxyEndTs!)
-              : position.genesisEnd
-          )[0],
-          proxyConfig: registrar.proxyConfig,
-          systemProgram: SystemProgram.programId,
-        })
-        .instruction()
-    );
-  }
+  console.log(`Processing ${needsMigration.length} delegations`);
+  // Process in batches of 10
+  const batchSize = 10;
+  for (let i = 0; i < needsMigration.length; i += batchSize) {
+    // Log progress every 100 positions
+    if (i > 0 && i % 100 === 0) {
+      console.log(`Processed ${i} delegations`);
+    }
 
-  await batchParallelInstructionsWithPriorityFee(provider, instructions, {
-    onProgress: (status) => {
-      console.log(status);
-    },
-  });
+    const batch = needsMigration.slice(i, i + batchSize);
+    const batchPositions = positionAccs.slice(i, i + batchSize);
+    
+    await Promise.all(batch.map(async (delegation, j) => {
+      const position = batchPositions[j];
+      if (!position) {
+        console.log(`Position not found for ${delegation.account.position.toBase58()}`);
+        return;
+      }
+
+      const subDao = delegation.account.subDao;
+      const positionTokenAccount = (
+        await provider.connection.getTokenLargestAccounts(position.mint)
+      ).value[0].address;
+      
+      instructions.push(
+        await hsdProgram.methods
+          .extendExpirationTsV0()
+          .accountsStrict({
+            payer: wallet.publicKey,
+            position: delegation.account.position,
+            delegatedPosition: delegation.publicKey,
+            registrar: registrarK,
+            mint: position.mint,
+            authority: wallet.publicKey,
+            positionTokenAccount,
+            dao,
+            subDao: delegation.account.subDao,
+            oldClosingTimeSubDaoEpochInfo: subDaoEpochInfoKey(
+              subDao,
+              delegation.account.expirationTs.isZero()
+                ? position.lockup.endTs
+                : min(position.lockup.endTs, delegation.account.expirationTs)
+            )[0],
+            closingTimeSubDaoEpochInfo: subDaoEpochInfoKey(
+              subDao,
+              min(position.lockup.endTs, proxyEndTs!)
+            )[0],
+            genesisEndSubDaoEpochInfo: subDaoEpochInfoKey(
+              subDao,
+              position.genesisEnd.lt(currTsBN) ?
+                min(position.lockup.endTs, proxyEndTs!) : position.genesisEnd
+            )[0],
+            proxyConfig: registrar.proxyConfig,
+            systemProgram: SystemProgram.programId,
+          })
+          .instruction()
+      );
+    }));
+  }
+  console.log(`Finished processing ${needsMigration.length} delegations`);
+
+  const transactions = await batchInstructionsToTxsWithPriorityFee(
+    provider,
+    instructions,
+    {
+      useFirstEstimateForAll: true,
+      computeUnitLimit: 400000,
+    }
+  );
+
+  await bulkSendTransactions(provider, transactions, console.log, 10, [], 100);
 }
 
 async function getMultipleAccounts({
