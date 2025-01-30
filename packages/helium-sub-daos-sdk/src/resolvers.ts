@@ -170,7 +170,7 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
       if (positionAcc && (proxyConfigAcc || delegatedPositionAcc)) {
         const expirationTs =
           !delegatedPositionAcc || delegatedPositionAcc.expirationTs.isZero()
-            ? proxyConfigAcc?.seasons.find((s) =>
+            ? proxyConfigAcc?.seasons?.reverse().find((s) =>
                 new BN(now.toString()).gte(s.start)
               )?.end || positionAcc.lockup.endTs
             : delegatedPositionAcc.expirationTs;
