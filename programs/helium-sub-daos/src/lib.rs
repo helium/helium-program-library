@@ -140,15 +140,7 @@ pub mod helium_sub_daos {
     extend_expiration_ts_v0::handler(ctx)
   }
 
-  pub fn temp_resize_account(ctx: Context<TempResizeAccount>) -> Result<()> {
-    temp_resize_account::handler(ctx)
-  }
-
   pub fn track_vote_v0(ctx: Context<TrackVoteV0>) -> Result<()> {
     track_vote_v0::handler(ctx)
-  }
-
-  pub fn temp_fix_claimed_epoch(ctx: Context<TempFixClaimedEpoch>) -> Result<()> {
-    temp_fix_claimed_epoch::handler(ctx)
   }
 }
