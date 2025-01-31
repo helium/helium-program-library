@@ -12,6 +12,7 @@ import { EPOCH_LENGTH, PROGRAM_ID } from "./constants";
 import { init as initNftProxy } from "@helium/nft-proxy-sdk";
 import { init as initHsd } from "./init";
 import { daoEpochInfoKey, subDaoEpochInfoKey } from "./pdas";
+import { min } from "bn.js";
 
 const THREAD_PID = new PublicKey(
   "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
@@ -196,6 +197,8 @@ export const genesisEndEpochInfoResolver = resolveIndividual(
   async ({ provider, path, accounts }) => {
     if (path[path.length - 1] === "genesisEndSubDaoEpochInfo") {
       const program = await init(provider as AnchorProvider, VSR_PROGRAM_ID);
+      const hsdProgram = await initHsd(provider as AnchorProvider);
+      const nftProxyProgram = await initNftProxy(provider as AnchorProvider);
 
       const subDao = get(accounts, [
         ...path.slice(0, path.length - 1),
@@ -211,15 +214,35 @@ export const genesisEndEpochInfoResolver = resolveIndividual(
       ]) as PublicKey;
       const positionAcc = position && await program.account.positionV0.fetch(position);
       const registrarAcc = registrar && await program.account.registrar.fetch(registrar);
+      const proxyConfig = get(accounts, [
+        ...path.slice(0, path.length - 1),
+        "proxyConfig",
+      ]) as PublicKey;
+            const delegatedPosition = get(accounts, [
+              ...path.slice(0, path.length - 1),
+              "delegatedPosition",
+            ]) as PublicKey;
+      const delegatedPositionAcc =
+        delegatedPosition &&
+        (await hsdProgram.account.delegatedPositionV0.fetchNullable(
+          delegatedPosition
+        ));
+      const proxyConfigAcc = proxyConfig && await nftProxyProgram.account.proxyConfigV0.fetch(proxyConfig);
       if (positionAcc && registrarAcc) {
-        const currTs = Number(await getSolanaUnixTimestamp(provider)) + registrarAcc.timeOffset.toNumber();
-        const ts =
-          positionAcc.genesisEnd.toNumber() < currTs
-            ? positionAcc.lockup.endTs.toNumber()
-            : positionAcc.genesisEnd;
+        const now =
+          Number(await getSolanaUnixTimestamp(provider)) +
+          registrarAcc.timeOffset.toNumber();
+        const seasonEnd = proxyConfigAcc?.seasons
+          ?.reverse()
+          .find((s) => new BN(now.toString()).gte(s.start))?.end;
+        const expirationTs =
+          !delegatedPositionAcc || delegatedPositionAcc.expirationTs.isZero()
+            ? seasonEnd || positionAcc.lockup.endTs
+            : delegatedPositionAcc.expirationTs;
+        const epochTs = positionAcc.genesisEnd.lte(new BN(now)) ? min(positionAcc.lockup.endTs, expirationTs) : positionAcc.genesisEnd;
         const [key] = await subDaoEpochInfoKey(
           subDao,
-          ts
+          epochTs
         );
 
         return key;
