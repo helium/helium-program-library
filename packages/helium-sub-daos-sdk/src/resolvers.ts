@@ -218,10 +218,10 @@ export const genesisEndEpochInfoResolver = resolveIndividual(
         ...path.slice(0, path.length - 1),
         "proxyConfig",
       ]) as PublicKey;
-            const delegatedPosition = get(accounts, [
-              ...path.slice(0, path.length - 1),
-              "delegatedPosition",
-            ]) as PublicKey;
+      const delegatedPosition = get(accounts, [
+        ...path.slice(0, path.length - 1),
+        "delegatedPosition",
+      ]) as PublicKey;
       const delegatedPositionAcc =
         delegatedPosition &&
         (await hsdProgram.account.delegatedPositionV0.fetchNullable(
