@@ -13,6 +13,7 @@ import {
   PROGRAM_ID as HSD_PID,
   init as initHeliumSubDaos,
 } from "@helium/helium-sub-daos-sdk";
+import { init as initNftProxy } from "@helium/nft-proxy-sdk";
 import {
   Asset,
   AssetProof,
@@ -23,7 +24,11 @@ import {
   sendInstructions,
 } from "@helium/spl-utils";
 import {
+  init as initTuktuk
+} from "@helium/tuktuk-sdk";
+import {
   ComputeBudgetProgram,
+  Ed25519Program,
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
@@ -34,7 +39,6 @@ import {
 import chai, { assert, expect } from "chai";
 import chaiHttp from "chai-http";
 import fs from "fs";
-import { init as initNftProxy } from "@helium/nft-proxy-sdk";
 import * as client from "../packages/distributor-oracle/src/client";
 import {
   Database,
@@ -62,14 +66,14 @@ import {
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { RewardsOracle } from "../target/types/rewards_oracle";
+import { createMockCompression } from "./utils/compression";
 import {
-  ensureLDIdl,
   ensureHEMIdl,
-  initWorld,
   ensureHSDIdl,
+  ensureLDIdl,
+  initWorld,
 } from "./utils/fixtures";
 import { initVsr } from "./utils/vsr";
-import { createMockCompression } from "./utils/compression";
 
 chai.use(chaiHttp);
 
@@ -173,7 +177,7 @@ export class DatabaseMock implements Database {
           totalClicks:
             (this.inMemHash.byHotspot[hotspotKey]?.totalClicks || 0) + 1,
           lifetimeRewards:
-            this.inMemHash.byHotspot[hotspotKey]?.lifetimeRewards || 0,
+            (this.inMemHash.byHotspot[hotspotKey]?.lifetimeRewards || 0) + 1,
         },
       },
     };
@@ -220,6 +224,7 @@ function loadKeypair(keypair: string): Keypair {
 
 describe("distributor-oracle", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
+  let tuktukProgram: any;
   let ldProgram: Program<LazyDistributor>;
   let rewardsProgram: Program<RewardsOracle>;
   let hemProgram: Program<HeliumEntityManager>;
@@ -237,6 +242,7 @@ describe("distributor-oracle", () => {
   let getAssetProofFn: () => Promise<AssetProof | undefined>;
 
   beforeEach(async () => {
+    tuktukProgram = await initTuktuk(provider);
     ldProgram = await initLazy(
       provider,
       LD_PID,
@@ -381,6 +387,7 @@ describe("distributor-oracle", () => {
     let db = new DatabaseMock(hemProgram, getAssetFn);
     db.incrementHotspotRewards(ecc);
     oracleServer = new OracleServer(
+      tuktukProgram,
       ldProgram,
       rewardsProgram,
       hemProgram,
@@ -525,6 +532,44 @@ describe("distributor-oracle", () => {
       },
       "confirmed"
     );
+
+    const recipientAcc = await ldProgram.account.recipientV0.fetch(recipient);
+    assert.equal(
+      recipientAcc.totalRewards.toNumber(),
+      Number(await oracleServer.db.getCurrentRewards(asset))
+    );
+  });
+
+  it("should set rewards with the v1 endpoint", async () => {
+    const keyToAsset = keyToAssetKey(daoK, ecc)[0];
+    const res = await chai
+      .request(oracleServer.server)
+      .post(`/v1/sign/${keyToAsset.toBase58()}`)
+      .send({ });
+
+    assert.hasAllKeys(res.body, ["message", "signature", "serialiedMessage"]);
+    const { signature, serialiedMessage } = res.body;
+    await rewardsProgram.methods
+      .setCurrentRewardsWrapperV2({
+        currentRewards: new anchor.BN("100000000"),
+        oracleIndex: 0,
+      })
+      .accounts({
+        lazyDistributor,
+        recipient,
+        keyToAsset,
+        lazyDistributorProgram: new PublicKey(
+          "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w"
+        ),
+      })
+      .preInstructions([
+        Ed25519Program.createInstructionWithPublicKey({
+          publicKey: oracle.publicKey.toBytes(),
+          message: Buffer.from(serialiedMessage, "base64"),
+          signature: Buffer.from(signature, "base64"),
+        }),
+      ])
+      .rpc({ skipPreflight: true });
 
     const recipientAcc = await ldProgram.account.recipientV0.fetch(recipient);
     assert.equal(

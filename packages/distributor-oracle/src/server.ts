@@ -265,7 +265,8 @@ export class OracleServer {
     }>("/", this.getCurrentRewardsHandler.bind(this));
     this.app.post("/", this.signTransactionHandler.bind(this));
     this.app.post("/bulk-sign", this.signBulkTransactionsHandler.bind(this));
-    this.app.post("/tuktuk/:keyToAssetKey", this.tuktukHandler.bind(this));
+    this.app.post("/v1/tuktuk/:keyToAssetKey", this.tuktukHandler.bind(this));
+    this.app.post("/v1/sign/:keyToAssetKey", this.signHandler.bind(this));
   }
 
   private async getActiveDevicesHandler(
@@ -641,6 +642,49 @@ export class OracleServer {
     return { success: true, transaction: Buffer.from(serialized) };
   }
 
+  private async signHandler(
+    request: FastifyRequest<{
+      Params: { keyToAssetKey: string };
+    }>,
+    reply: FastifyReply
+  ) {
+    try {
+      let keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
+        new PublicKey(request.params.keyToAssetKey)
+      );
+      const entityKey = decodeEntityKey(
+        keyToAsset.entityKey,
+        keyToAsset.keySerialization
+      )!;
+
+      const message = {
+        lazyDistributor: this.lazyDistributor,
+        oracleIndex: process.env.ORACLE_INDEX
+          ? parseInt(process.env.ORACLE_INDEX)
+          : 0,
+        currentRewards: new BN(await this.db.getCurrentRewardsByEntity(entityKey)),
+        asset: keyToAsset.asset,
+      };
+      const serializedMessage = await this.ldProgram.coder.accounts.encode(
+        "SetCurrentRewardsTransactionV0",
+        message
+      );
+      const resp = {
+        message,
+        serialiedMessage: serializedMessage.toString("base64"),
+        signature: Buffer.from(
+          sign.detached(Uint8Array.from(serializedMessage), this.oracle.secretKey)
+        ).toString("base64"),
+      };
+      reply.status(200).send(resp);
+    } catch (err) {
+      console.error(err);
+      reply.status(500).send({
+        message: "Request failed",
+      });
+    }
+  }
+
   private async tuktukHandler(
     request: FastifyRequest<{
       Params: { keyToAssetKey: string };
@@ -652,7 +696,9 @@ export class OracleServer {
     const task = new PublicKey(request.body.task);
     const taskQueuedAt = new BN(request.body.task_queued_at);
     try {
-      const [wallet, bump] = customSignerKey(taskQueue, [Buffer.from("orace")]);
+      const [wallet, bump] = customSignerKey(taskQueue, [
+        Buffer.from("oracle"),
+      ]);
       const bumpBuffer = Buffer.alloc(1);
       bumpBuffer.writeUint8(bump);
       let keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
@@ -687,7 +733,7 @@ export class OracleServer {
           })
           .instruction();
       } else {
-        distributeIx = await(
+        distributeIx = await (
           await distributeCompressionRewards({
             program: this.ldProgram,
             assetId: keyToAsset.asset,
@@ -698,23 +744,31 @@ export class OracleServer {
         ).instruction();
       }
 
+      const entityKey = decodeEntityKey(
+        keyToAsset.entityKey,
+        keyToAsset.keySerialization
+      )!;
+
       // Transfer some tokens from lazy signer to me
       const instructions: TransactionInstruction[] = [
-        await this.roProgram.methods.setCurrentRewardsWrapperV2({
-          currentRewards: new BN(1000000000000000000),
-          oracleIndex: process.env.ORACLE_INDEX
-            ? parseInt(process.env.ORACLE_INDEX)
-            : 0,
-        }).accounts({
-          lazyDistributor: this.lazyDistributor,
-          recipient,
-          keyToAsset: new PublicKey(request.params.keyToAssetKey),
-        }).instruction(),
+        await this.roProgram.methods
+          .setCurrentRewardsWrapperV2({
+            currentRewards: new BN(await this.db.getCurrentRewardsByEntity(entityKey)),
+            oracleIndex: process.env.ORACLE_INDEX
+              ? parseInt(process.env.ORACLE_INDEX)
+              : 0,
+          })
+          .accounts({
+            lazyDistributor: this.lazyDistributor,
+            recipient,
+            keyToAsset: new PublicKey(request.params.keyToAssetKey),
+          })
+          .instruction(),
         distributeIx,
       ];
       const { transaction, remainingAccounts } = await compileTransaction(
         instructions,
-        [[Buffer.from("test"), bumpBuffer]]
+        [[Buffer.from("oracle"), bumpBuffer]]
       );
       const remoteTx = new RemoteTaskTransactionV0({
         task,
