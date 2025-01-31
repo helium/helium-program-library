@@ -472,7 +472,7 @@ export type Status = {
   currentBatchProgress: number;
   currentBatchSize: number;
 };
-const TX_BATCH_SIZE = 200;
+const TX_BATCH_SIZE = 100;
 export async function bulkSendTransactions(
   provider: Provider,
   txs: TransactionDraft[],

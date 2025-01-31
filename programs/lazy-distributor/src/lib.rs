@@ -94,4 +94,10 @@ pub mod lazy_distributor {
   ) -> Result<()> {
     distribute_custom_destination_v0::handler(ctx)
   }
+
+  pub fn temp_update_matching_destination(
+    ctx: Context<TempUpdateMatchingDestination>,
+  ) -> Result<()> {
+    temp_update_matching_destination::handler(ctx)
+  }
 }

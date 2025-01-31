@@ -2318,6 +2318,7 @@ dependencies = [
  "default-env",
  "mpl-token-metadata",
  "shared-utils",
+ "solana-program",
  "solana-security-txt",
 ]
 
