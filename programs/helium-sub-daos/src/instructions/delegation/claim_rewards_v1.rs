@@ -32,6 +32,7 @@ pub struct ClaimRewardsV1<'info> {
     has_one = registrar,
   )]
   pub position: Box<Account<'info, PositionV0>>,
+  #[account(mut)]
   pub mint: Box<Account<'info, Mint>>,
   #[account(
     token::mint = mint,
@@ -191,7 +192,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
       .dao
       .recent_proposals
       .iter()
-      .filter(|p| p.proposal == Pubkey::default())
+      .filter(|p| p.proposal != Pubkey::default())
       .count()
       < 2;
 

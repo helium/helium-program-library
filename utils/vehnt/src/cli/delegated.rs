@@ -112,6 +112,9 @@ impl Delegated {
     let positions_with_delegations: Vec<FullPosition> = delegated_positions
       .iter()
       .zip(positions_raw)
+      .filter(|((_, delegated_position), position)| {
+        position.is_some()
+      })
       .map(|((pubkey, delegated_position), position)| {
         let position_unwrapped = position.unwrap();
         let mut data = position_unwrapped.data.as_slice();

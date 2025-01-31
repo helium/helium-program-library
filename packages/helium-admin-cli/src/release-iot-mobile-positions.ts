@@ -1,5 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
-import { batchParallelInstructions } from "@helium/spl-utils";
+import { batchInstructionsToTxsWithPriorityFee, batchParallelInstructionsWithPriorityFee, bulkSendTransactions } from "@helium/spl-utils";
 import {
   init as initVsr,
 } from "@helium/voter-stake-registry-sdk";
@@ -41,7 +41,7 @@ export async function run(args: any = process.argv) {
   const validPositions = positions.filter(
     (p) =>
       registrars.has(p.account.registrar.toBase58()) &&
-      (p.account.lockup.endTs.eq(new BN(1738195200)) ||
+      (!p.account.lockup.endTs.eq(new BN(1738195200)) ||
         !!p.account.lockup.kind.constant)
   );
   console.log(`Updating ${validPositions.length} positions`);
@@ -51,9 +51,23 @@ export async function run(args: any = process.argv) {
       authority: wallet.publicKey,
     }).instruction();
   }));
-  await batchParallelInstructions({
+
+  console.log(`Constructing ${instructions.length} instructions`);
+  const transactions = await batchInstructionsToTxsWithPriorityFee(
     provider,
     instructions,
-    onProgress: console.log,
-  });
+    {
+      useFirstEstimateForAll: true,
+    }
+  );
+  console.log(`Sending ${transactions.length} transactions`);
+
+  await bulkSendTransactions(
+    provider,
+    transactions,
+    console.log,
+    10,
+    [],
+    100
+  );
 }
