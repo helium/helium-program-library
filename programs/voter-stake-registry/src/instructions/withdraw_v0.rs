@@ -48,8 +48,8 @@ pub struct WithdrawV0<'info> {
   #[account(
     init_if_needed,
     payer = position_authority,
-    token::mint = mint,
-    token::authority = position_authority
+    associated_token::mint = deposit_mint,
+    associated_token::authority = position_authority
   )]
   pub destination: Box<Account<'info, TokenAccount>>,
 
