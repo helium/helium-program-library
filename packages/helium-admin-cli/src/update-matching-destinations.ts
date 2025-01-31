@@ -59,30 +59,32 @@ export async function run(args: any = process.argv) {
     // Only doing this to cNFTs
     if (!assetOnChain) {
       const hntRecipient = hntRecipientsByKey[r.account.destination.toString()];
-      let hntRecipientKey = hntRecipient?.publicKey;
-      if (!hntRecipient) {
-        const { instruction, pubkeys } = await (
-          await initializeCompressionRecipient({
-            program: lazyProgram,
-            assetId: asset,
-            lazyDistributor: LD_HNT,
-            payer: provider.wallet.publicKey,
-          })
-        ).prepare();
-        hntRecipientKey = pubkeys.recipient;
-        instructions.push(instruction);
-      }
+      if (!hntRecipient || hntRecipient?.account.destination.equals(PublicKey.default)) {
+        let hntRecipientKey = hntRecipient?.publicKey;
+        if (!hntRecipient) {
+          const { instruction, pubkeys } = await (
+            await initializeCompressionRecipient({
+              program: lazyProgram,
+              assetId: asset,
+              lazyDistributor: LD_HNT,
+              payer: provider.wallet.publicKey,
+            })
+          ).prepare();
+          hntRecipientKey = pubkeys.recipient;
+          instructions.push(instruction);
+        }
 
-      instructions.push(
-        await lazyProgram.methods
-          .tempUpdateMatchingDestination()
-          .accountsStrict({
-            recipient: hntRecipientKey,
-            authority: provider.wallet.publicKey,
-            originalRecipient: r.publicKey,
-          })
-          .instruction()
-      );
+        instructions.push(
+          await lazyProgram.methods
+            .tempUpdateMatchingDestination()
+            .accountsStrict({
+              recipient: hntRecipientKey,
+              authority: provider.wallet.publicKey,
+              originalRecipient: r.publicKey,
+            })
+            .instruction()
+        );
+      }
     }
   }
 
