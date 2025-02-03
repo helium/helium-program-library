@@ -4053,6 +4053,12 @@
         "kind": "struct",
         "fields": [
           {
+            "name": "location",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
             "name": "deploymentInfo",
             "type": {
               "option": {
