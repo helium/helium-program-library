@@ -5,19 +5,20 @@ import {
   mobileInfoKey,
   rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
+import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import {
+  MOBILE_MINT,
   batchParallelInstructionsWithPriorityFee,
   chunks,
-  MOBILE_MINT,
   truthy,
 } from "@helium/spl-utils";
+import deepEqual from "fast-deep-equal";
+import { latLngToCell } from "h3-js";
 import os from "os";
 import { Client } from "pg";
 import yargs from "yargs/yargs";
 import { loadKeypair } from "./utils";
-import { subDaoKey } from "@helium/helium-sub-daos-sdk";
-import deepEqual from "fast-deep-equal";
 
 type WifiInfoRow = {
   hs_pubkey: string;
@@ -26,10 +27,13 @@ type WifiInfoRow = {
   azimuth: number;
   mechanical_down_tilt: number;
   electrical_down_tilt: number;
+  lat: string;
+  lng: string;
 };
 
 type WifiInfo = {
   hs_pubkey: string;
+  location?: anchor.BN;
   deploymentInfo: {
     antenna: number;
     elevation: number;
@@ -50,6 +54,15 @@ const hasDeploymentInfo = (wi: WifiInfo) => {
     wi.deploymentInfo.mechanicalDownTilt ||
     wi.deploymentInfo.electricalDownTilt
   );
+};
+
+export const getH3Location = (lat: number, lng: number) => {
+  try {
+    const h3Index = latLngToCell(lat, lng, 12);
+    return new anchor.BN(h3Index, 16);
+  } catch (e) {
+    return undefined;
+  }
 };
 
 export async function run(args: any = process.argv) {
@@ -127,6 +140,7 @@ export async function run(args: any = process.argv) {
   ).rows.map(
     (wifiInfo: WifiInfoRow): WifiInfo => ({
       ...wifiInfo,
+      location: getH3Location(Number(wifiInfo.lat), Number(wifiInfo.lng)),
       deploymentInfo: {
         antenna: Number(wifiInfo.antenna),
         elevation: Number(wifiInfo.elevation),
@@ -160,6 +174,7 @@ export async function run(args: any = process.argv) {
       accountInfosWithPk.map(async (acc) => {
         if (acc.data) {
           let correction: {
+            location?: anchor.BN;
             deploymentInfo?: MobileDeploymentInfoV0;
           } = {};
 
@@ -168,27 +183,58 @@ export async function run(args: any = process.argv) {
             acc.data as Buffer
           );
 
-          const hasNewDeploymentInfo =
+          const deploymentInfoMissing =
             !decodedAcc.deploymentInfo && hasDeploymentInfo(acc.wifiInfo);
+
           const deploymentInfoChanged = !deepEqual(
             decodedAcc.deploymentInfo?.wifiInfoV0,
             acc.wifiInfo.deploymentInfo
           );
 
-          if (hasNewDeploymentInfo || deploymentInfoChanged) {
+          const locationMissing = !decodedAcc.location && acc.wifiInfo.location;
+
+          if (deploymentInfoMissing || deploymentInfoChanged) {
             correction = {
               ...correction,
               deploymentInfo: {
                 wifiInfoV0: {
-                  ...acc.wifiInfo.deploymentInfo,
+                  antenna:
+                    // db record is source of truth for antenna
+                    acc.wifiInfo.deploymentInfo.antenna ||
+                    decodedAcc.deploymentInfo?.wifiInfoV0?.antenna ||
+                    0,
+                  elevation:
+                    decodedAcc.deploymentInfo?.wifiInfoV0?.elevation ||
+                    acc.wifiInfo.deploymentInfo.elevation ||
+                    0,
+                  azimuth:
+                    decodedAcc.deploymentInfo?.wifiInfoV0?.azimuth ||
+                    acc.wifiInfo.deploymentInfo.azimuth ||
+                    0,
+                  mechanicalDownTilt:
+                    decodedAcc.deploymentInfo?.wifiInfoV0?.mechanicalDownTilt ||
+                    acc.wifiInfo.deploymentInfo.mechanicalDownTilt ||
+                    0,
+                  electricalDownTilt:
+                    decodedAcc.deploymentInfo?.wifiInfoV0?.electricalDownTilt ||
+                    acc.wifiInfo.deploymentInfo.electricalDownTilt ||
+                    0,
                 },
               },
+            };
+          }
+
+          if (locationMissing) {
+            correction = {
+              ...correction,
+              location: acc.wifiInfo.location,
             };
           }
 
           if (Object.keys(correction).length > 0) {
             return await hem.methods
               .tempBackfillMobileInfo({
+                location: correction.location || null,
                 deploymentInfo: correction.deploymentInfo || null,
               })
               .accounts({

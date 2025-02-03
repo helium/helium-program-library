@@ -5,6 +5,7 @@ use std::str::FromStr;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TempBackfillMobileInfoArgs {
+  pub location: Option<u64>,
   pub deployment_info: Option<MobileDeploymentInfoV0>,
 }
 
@@ -25,6 +26,10 @@ pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, TempBackfillMobileInfo<'info>>,
   args: TempBackfillMobileInfoArgs,
 ) -> Result<()> {
+  if let Some(new_location) = args.location {
+    ctx.accounts.mobile_info.location = Some(new_location);
+  }
+
   if let Some(deployment_info) = args.deployment_info {
     ctx.accounts.mobile_info.deployment_info = Some(deployment_info);
   }
