@@ -210,7 +210,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@^0.9.2, @helium/anchor-resolvers@^0.9.22":
+"@helium/anchor-resolvers@^0.9.2, @helium/anchor-resolvers@^0.9.23":
   version: 0.0.0-use.local
   resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
   dependencies:
@@ -305,12 +305,12 @@ __metadata:
     "@fastify/cors": ^8.1.1
     "@helium/account-fetch-cache": ^0.9.23
     "@helium/address": ^4.10.2
-    "@helium/helium-entity-manager-sdk": ^0.9.22
-    "@helium/helium-sub-daos-sdk": ^0.9.22
-    "@helium/idls": ^0.9.22
-    "@helium/lazy-distributor-sdk": ^0.9.22
-    "@helium/rewards-oracle-sdk": ^0.9.22
-    "@helium/spl-utils": ^0.9.22
+    "@helium/helium-entity-manager-sdk": ^0.9.23
+    "@helium/helium-sub-daos-sdk": ^0.9.23
+    "@helium/idls": ^0.9.23
+    "@helium/lazy-distributor-sdk": ^0.9.23
+    "@helium/rewards-oracle-sdk": ^0.9.23
+    "@helium/spl-utils": ^0.9.23
     "@helium/tuktuk-sdk": ^0.0.1
     "@metaplex-foundation/mpl-bubblegum": ^0.7.0
     "@solana/spl-token": ^0.3.8
@@ -678,7 +678,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/voter-stake-registry-sdk@^0.9.22":
+"@helium/voter-stake-registry-sdk@^0.9.23":
   version: 0.0.0-use.local
   resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:
