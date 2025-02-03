@@ -9,7 +9,9 @@ import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import {
   MOBILE_MINT,
+  batchInstructionsToTxsWithPriorityFee,
   batchParallelInstructionsWithPriorityFee,
+  bulkSendTransactions,
   chunks,
   truthy,
 } from "@helium/spl-utils";
@@ -251,9 +253,12 @@ export async function run(args: any = process.argv) {
   console.log(`Total corrections needed: ${ixs.length}`);
   if (commit) {
     try {
-      for (const c of chunks(ixs, 250)) {
-        await batchParallelInstructionsWithPriorityFee(provider, c);
-      }
+      const transactions = await batchInstructionsToTxsWithPriorityFee(
+        provider,
+        ixs,
+        { useFirstEstimateForAll: true }
+      );
+      await bulkSendTransactions(provider, transactions, console.log);
     } catch (e) {
       console.error("Failed to process mobile deployment info updates:", e);
       process.exit(1);
