@@ -1,0 +1,423 @@
+{
+  "version": "0.2.1",
+  "name": "treasury_management",
+  "instructions": [
+    {
+      "name": "initializeTreasuryManagementV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "treasuryManagement",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "treasury_management"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "supply_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasuryMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "supplyMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mintAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "circuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "account_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "TokenAccount",
+                "path": "treasury"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "circuit_breaker_program"
+            }
+          }
+        },
+        {
+          "name": "treasury",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "circuitBreakerProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializeTreasuryManagementArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateTreasuryManagementV0",
+      "accounts": [
+        {
+          "name": "treasuryManagement",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "authority"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateTreasuryManagementArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "redeemV0",
+      "accounts": [
+        {
+          "name": "treasuryManagement",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "treasury_management"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "supply_mint"
+              }
+            ]
+          },
+          "relations": [
+            "treasury",
+            "supply_mint",
+            "treasury_mint"
+          ]
+        },
+        {
+          "name": "treasuryMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "supplyMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "treasury",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "circuitBreaker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "account_windowed_breaker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "TokenAccount",
+                "path": "treasury"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "circuit_breaker_program"
+            }
+          }
+        },
+        {
+          "name": "from",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "owner"
+          ]
+        },
+        {
+          "name": "to",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "circuitBreakerProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "RedeemArgsV0"
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "TreasuryManagementV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "treasuryMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "supplyMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "treasury",
+            "type": "publicKey"
+          },
+          {
+            "name": "curve",
+            "docs": [
+              "The bonding curve to use"
+            ],
+            "type": {
+              "defined": "Curve"
+            }
+          },
+          {
+            "name": "freezeUnixTime",
+            "docs": [
+              "Freeze this curve at this time."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "WindowedCircuitBreakerConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "windowSizeSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "thresholdType",
+            "type": {
+              "defined": "ThresholdType"
+            }
+          },
+          {
+            "name": "threshold",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeTreasuryManagementArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "curve",
+            "type": {
+              "defined": "Curve"
+            }
+          },
+          {
+            "name": "freezeUnixTime",
+            "type": "i64"
+          },
+          {
+            "name": "windowConfig",
+            "type": {
+              "defined": "WindowedCircuitBreakerConfigV0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RedeemArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "expectedOutputAmount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateTreasuryManagementArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "curve",
+            "type": {
+              "defined": "Curve"
+            }
+          },
+          {
+            "name": "freezeUnixTime",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ThresholdType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Percent"
+          },
+          {
+            "name": "Absolute"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Curve",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "ExponentialCurveV0",
+            "fields": [
+              {
+                "name": "k",
+                "type": "u128"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Frozen",
+      "msg": "Treasury management is currently frozen"
+    },
+    {
+      "code": 6001,
+      "name": "ArithmeticError",
+      "msg": "Error in arithmetic"
+    }
+  ],
+  "metadata": {
+    "address": "treaf4wWBBty3fHdyBpo35Mz84M8k3heKXmjmi9vFt5"
+  }
+}

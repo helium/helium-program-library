@@ -310,6 +310,8 @@ pub fn caclulate_vhnt_info(
         .unwrap(),
     )
     .unwrap()
+  } else if expiration_ts == 0 {
+    position.lockup.seconds_left(curr_ts)
   } else {
     min(
       u64::try_from(expiration_ts.checked_sub(curr_ts).unwrap()).unwrap(),
@@ -323,23 +325,31 @@ pub fn caclulate_vhnt_info(
       .checked_add(i64::try_from(seconds_to_genesis).unwrap())
       .unwrap(),
   )?;
-  let vehnt_at_genesis_end_exact = if has_genesis && position.genesis_end < expiration_ts {
+  let vehnt_at_genesis_end_exact = if has_genesis {
     position.voting_power_precise(voting_mint_config, position.genesis_end)?
   } else {
     position.voting_power_precise(voting_mint_config, curr_ts)?
   };
-  let delegation_end_ts = min(expiration_ts, position.lockup.end_ts);
+  let delegation_end_ts = if expiration_ts == 0 {
+    position.lockup.end_ts
+  } else {
+    min(expiration_ts, position.lockup.end_ts)
+  };
   let vehnt_at_delegation_end =
     position.voting_power_precise(voting_mint_config, delegation_end_ts)?;
 
   let pre_genesis_end_fall_rate =
     calculate_fall_rate(vehnt_at_curr_ts, vehnt_at_genesis_end, seconds_to_genesis).unwrap();
-  let post_genesis_end_fall_rate = calculate_fall_rate(
-    vehnt_at_genesis_end_exact,
-    vehnt_at_delegation_end,
-    seconds_from_genesis_to_end,
-  )
-  .unwrap();
+  let post_genesis_end_fall_rate = if position.genesis_end < delegation_end_ts {
+    calculate_fall_rate(
+      vehnt_at_genesis_end_exact,
+      vehnt_at_delegation_end,
+      seconds_from_genesis_to_end,
+    )
+    .unwrap()
+  } else {
+    0
+  };
 
   let mut genesis_end_vehnt_correction = 0;
   let mut genesis_end_fall_rate_correction = 0;
@@ -402,7 +412,7 @@ pub fn caclulate_vhnt_info(
       position.voting_power_precise(voting_mint_config, end_epoch_start_ts)?;
 
     end_vehnt_correction = vehnt_at_closing_epoch_start;
-    if position.genesis_end < expiration_ts {
+    if position.genesis_end < delegation_end_ts {
       end_fall_rate_correction = post_genesis_end_fall_rate;
     } else {
       end_fall_rate_correction = pre_genesis_end_fall_rate;

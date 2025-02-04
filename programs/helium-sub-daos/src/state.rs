@@ -231,6 +231,21 @@ impl DelegatedPositionV0 {
     }
   }
 
+  pub fn set_unclaimed(&mut self, epoch: u64) -> Result<()> {
+    while epoch <= self.last_claimed_epoch {
+      self.last_claimed_epoch -= 1;
+      if self.claimed_epochs_bitmap & 1 != 0 {
+        return Err(error!(ErrorCode::InvalidClaimEpoch));
+      }
+      self.claimed_epochs_bitmap >>= 1;
+    }
+
+    let bit_index = (epoch - self.last_claimed_epoch - 1) as u128;
+    // Clear the bit at bit_index
+    self.claimed_epochs_bitmap &= !(1_u128 << (127_u128 - bit_index));
+    Ok(())
+  }
+
   // Add a proposal to the recent proposals list
   pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
     let new_proposal = RecentProposal { proposal, ts };
@@ -279,10 +294,11 @@ pub struct SubDaoEpochInfoV0 {
   pub dc_onboarding_fees_paid: u64,
   /// The number of hnt rewards issued to the reward escrow this epoch
   pub hnt_rewards_issued: u64,
+  pub previous_percentage: u32,
 }
 
 impl SubDaoEpochInfoV0 {
-  pub const SIZE: usize = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>() - 8 - 8 - 8; // subtract 8 the extra u64 we added to vehnt, dc onboarding fees paid, and hnt rewards issued
+  pub const SIZE: usize = 60 + 8 + std::mem::size_of::<SubDaoEpochInfoV0>() - 8 - 8 - 8; // subtract 8 the extra u64 we added to vehnt, dc onboarding fees paid, hnt rewards issued, and prev percentage
 }
 impl SubDaoEpochInfoV0 {
   pub fn start_ts(&self) -> i64 {
@@ -339,5 +355,34 @@ mod tests {
     assert!(position.is_claimed(epoch).unwrap());
     assert_eq!(position.last_claimed_epoch, 2);
     assert_eq!(position.claimed_epochs_bitmap, 0);
+  }
+
+  #[test]
+  fn test_unclaimed() {
+    let mut position = DelegatedPositionV0::default();
+    let epoch = 1;
+
+    // First claim the epoch
+    position.set_claimed(epoch).unwrap();
+    assert!(position.is_claimed(epoch).unwrap());
+    assert!(position.last_claimed_epoch == 1);
+
+    // Then unclaim it
+    position.set_unclaimed(epoch).unwrap();
+    assert!(!position.is_claimed(epoch).unwrap());
+    assert!(!position.is_claimed(epoch + 1).unwrap());
+    assert!(position.last_claimed_epoch == 0);
+    assert!(position.claimed_epochs_bitmap == 0);
+
+    let epoch = 2;
+    position.set_claimed(epoch).unwrap();
+    assert!(position.is_claimed(epoch).unwrap());
+    assert!(position.last_claimed_epoch == 0);
+
+    // Then unclaim it
+    position.set_unclaimed(epoch).unwrap();
+    assert!(!position.is_claimed(epoch).unwrap());
+    assert!(position.last_claimed_epoch == 0);
+    assert!(position.claimed_epochs_bitmap == 0);
   }
 }

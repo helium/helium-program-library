@@ -190,6 +190,13 @@ async function run() {
 
   await monitorSolBalance(
     new PublicKey(
+      process.env.HPL_CRONS_QUEUE_KEY ||
+        "H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7"
+    ),
+    "hpl-crons-queue"
+  );
+  await monitorSolBalance(
+    new PublicKey(
       process.env.CRON_KEY || "cronjz7v2xsWdXr8BVz38ihi5DTWPihGZKuRr6vSPEU"
     ),
     "cron"
@@ -204,7 +211,7 @@ async function run() {
     new PublicKey(
       process.env.MIGRATION_KEY || "mgrArTL62g582wWV6iM4fwU1LKnbUikDN6akKJ76pzK"
     ),
-    "oracle"
+    "migration-service"
   );
   await monitorSolBalance(
     lazySignerKey(process.env.LAZY_SIGNER || "nJWGUMOK")[0],

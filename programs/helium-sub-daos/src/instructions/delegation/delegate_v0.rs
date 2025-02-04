@@ -81,7 +81,7 @@ pub struct DelegateV0<'info> {
         // Avoid passing an extra account if the end is 0 (no genesis on this position).
         // Pass instead closing time epoch info, txn account deduplication will reduce the overall tx size
         if position.genesis_end <= registrar.clock_unix_timestamp() {
-          position.lockup.end_ts
+          min(position.lockup.end_ts, proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end)
         } else {
           position.genesis_end
         }
@@ -223,6 +223,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
           epoch: genesis_end_epoch,
           bump_seed: ctx.bumps["genesis_end_sub_dao_epoch_info"],
           sub_dao: sub_dao.key(),
+          previous_percentage: 0,
           dc_burned: 0,
           vehnt_at_epoch_start: 0,
           vehnt_in_closing_positions: genesis_end_vehnt_correction,

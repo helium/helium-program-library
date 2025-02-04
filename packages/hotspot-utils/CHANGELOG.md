@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.23](https://github.com/helium/helium-program-library/compare/v0.9.22...v0.9.23) (2025-01-31)
+
+**Note:** Version bump only for package @helium/hotspot-utils
+
+
+
+
+
+## [0.9.22](https://github.com/helium/helium-program-library/compare/v0.9.21...v0.9.22) (2025-01-30)
+
+**Note:** Version bump only for package @helium/hotspot-utils
+
+
+
+
+
+## [0.9.21](https://github.com/helium/helium-program-library/compare/v0.9.20...v0.9.21) (2025-01-30)
+
+**Note:** Version bump only for package @helium/hotspot-utils
+
+
+
+
+
+## [0.9.20](https://github.com/helium/helium-program-library/compare/v0.9.19...v0.9.20) (2025-01-30)
+
+**Note:** Version bump only for package @helium/hotspot-utils
+
+
+
+
+
+## [0.9.19](https://github.com/helium/helium-program-library/compare/v0.9.16...v0.9.19) (2025-01-07)
+
+**Note:** Version bump only for package @helium/hotspot-utils
+
+
+
+
+
 ## [0.9.18](https://github.com/helium/helium-program-library/compare/v0.9.12...v0.9.18) (2024-12-10)
 
 **Note:** Version bump only for package @helium/hotspot-utils

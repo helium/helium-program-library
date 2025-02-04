@@ -124,6 +124,14 @@ if (PG_POOL_SIZE < 5) {
 
     server.get("/refresh-accounts", async (req, res) => {
       const { program: programId, password } = req.query as any;
+
+      if (!programId) {
+        res.code(StatusCodes.BAD_REQUEST).send({
+          message: "Program parameter is required",
+        });
+        return;
+      }
+
       if (password !== REFRESH_PASSWORD) {
         res.code(StatusCodes.FORBIDDEN).send({
           message: "Invalid password",

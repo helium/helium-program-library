@@ -12,6 +12,8 @@ use crate::{
   current_epoch, dao_seeds, error::ErrorCode, state::*, OrArithError, EPOCH_LENGTH, TESTING,
 };
 
+const SMOOTHING_FACTOR: u128 = 30;
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueRewardsArgsV0 {
   pub epoch: u64,
@@ -70,6 +72,11 @@ pub struct IssueRewardsV0<'info> {
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
+  #[account(
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &(args.epoch - 1).to_le_bytes()],
+    bump = prev_sub_dao_epoch_info.bump_seed,
+  )]
+  pub prev_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
 }
 
 fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
@@ -102,6 +109,18 @@ impl<'info> IssueRewardsV0<'info> {
 
     CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
   }
+
+  pub fn mint_rewards_emissions_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
+    let cpi_accounts = MintV0 {
+      mint: self.hnt_mint.to_account_info(),
+      to: self.rewards_escrow.to_account_info(),
+      mint_authority: self.dao.to_account_info(),
+      circuit_breaker: self.hnt_circuit_breaker.to_account_info(),
+      token_program: self.token_program.to_account_info(),
+    };
+
+    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
+  }
 }
 
 pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<()> {
@@ -118,9 +137,39 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   let total_utility_score = to_prec(Some(ctx.accounts.dao_epoch_info.total_utility_score))
     .ok_or_else(|| error!(ErrorCode::NoUtilityScore))?;
 
-  let percent_share = utility_score
+  let percent_share_pre_smooth = utility_score
     .checked_div(&total_utility_score)
     .or_arith_error()?;
+
+  // Convert previous percentage from u32 to PreciseNumber (divide by u32::MAX)
+  let prev_percentage =
+    PreciseNumber::new(ctx.accounts.prev_sub_dao_epoch_info.previous_percentage as u128)
+      .or_arith_error()?
+      .checked_div(&PreciseNumber::new(u32::MAX as u128).or_arith_error()?)
+      .or_arith_error()?;
+
+  let percent_share = prev_percentage
+    .checked_mul(&PreciseNumber::new(SMOOTHING_FACTOR - 1).or_arith_error()?)
+    .or_arith_error()?
+    .checked_div(&PreciseNumber::new(SMOOTHING_FACTOR).or_arith_error()?)
+    .or_arith_error()?
+    .checked_add(
+      &percent_share_pre_smooth
+        .checked_mul(&PreciseNumber::new(1).or_arith_error()?)
+        .or_arith_error()?
+        .checked_div(&PreciseNumber::new(SMOOTHING_FACTOR).or_arith_error()?)
+        .or_arith_error()?,
+    )
+    .or_arith_error()?;
+
+  ctx.accounts.sub_dao_epoch_info.previous_percentage = prev_percentage
+    .checked_mul(&PreciseNumber::new(u32::MAX as u128).or_arith_error()?)
+    .or_arith_error()?
+    .to_imprecise()
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?
+    .try_into()
+    .unwrap();
+
   let total_emissions = ctx.accounts.dao_epoch_info.total_rewards;
   let hst_percent = ctx
     .accounts
@@ -190,11 +239,11 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   }
 
   let escrow_amount = rewards_amount - delegation_rewards_amount;
-  msg!("Minting {} to treasury", escrow_amount);
+  msg!("Minting {} to rewards escrow", escrow_amount);
   mint_v0(
     ctx
       .accounts
-      .mint_treasury_emissions_ctx()
+      .mint_rewards_emissions_ctx()
       .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
     MintArgsV0 {
       amount: escrow_amount,
@@ -204,8 +253,8 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   ctx.accounts.sub_dao_epoch_info.hnt_rewards_issued = escrow_amount;
   ctx.accounts.dao_epoch_info.num_rewards_issued += 1;
   ctx.accounts.sub_dao_epoch_info.rewards_issued_at = Some(Clock::get()?.unix_timestamp);
-  ctx.accounts.dao_epoch_info.delegation_rewards_issued = delegation_rewards_amount;
-  ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued = 0;
+  ctx.accounts.dao_epoch_info.delegation_rewards_issued += delegation_rewards_amount;
+  ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued = delegation_rewards_amount;
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 

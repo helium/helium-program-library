@@ -1973,7 +1973,7 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.1.12"
+version = "0.2.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1981,6 +1981,7 @@ dependencies = [
  "default-env",
  "mpl-token-metadata",
  "nft-proxy",
+ "proposal",
  "shared-utils",
  "solana-security-txt",
  "time 0.3.36",
@@ -5224,7 +5225,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

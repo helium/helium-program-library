@@ -1,9 +1,10 @@
-use crate::error::*;
-use crate::position_seeds;
-use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
-use anchor_spl::token::{self, Token, TokenAccount};
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token::{transfer, Mint, Token, TokenAccount, Transfer},
+};
+
+use crate::{error::*, position_seeds, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct WithdrawArgsV0 {
@@ -13,6 +14,8 @@ pub struct WithdrawArgsV0 {
 #[derive(Accounts)]
 #[instruction(args: WithdrawArgsV0)]
 pub struct WithdrawV0<'info> {
+  #[account(mut)]
+  pub position_authority: Signer<'info>,
   pub registrar: Box<Account<'info, Registrar>>,
 
   #[account(
@@ -27,12 +30,13 @@ pub struct WithdrawV0<'info> {
   pub position: Box<Account<'info, PositionV0>>,
   pub mint: Box<Account<'info, Mint>>,
   #[account(
-    token::mint = mint,
-    token::authority = position_authority,
+    init_if_needed,
+    payer = position_authority,
+    associated_token::mint = mint,
+    associated_token::authority = position_authority,
     constraint = position_token_account.amount > 0
   )]
   pub position_token_account: Box<Account<'info, TokenAccount>>,
-  pub position_authority: Signer<'info>,
 
   #[account(
     mut,
@@ -42,18 +46,22 @@ pub struct WithdrawV0<'info> {
   pub vault: Box<Account<'info, TokenAccount>>,
   pub deposit_mint: Box<Account<'info, Mint>>,
   #[account(
-    mut,
-    token::mint = deposit_mint
+    init_if_needed,
+    payer = position_authority,
+    associated_token::mint = deposit_mint,
+    associated_token::authority = position_authority
   )]
   pub destination: Box<Account<'info, TokenAccount>>,
 
+  pub associated_token_program: Program<'info, AssociatedToken>,
   pub token_program: Program<'info, Token>,
+  pub system_program: Program<'info, System>,
 }
 
 impl<'info> WithdrawV0<'info> {
-  pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
+  pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
     let program = self.token_program.to_account_info();
-    let accounts = token::Transfer {
+    let accounts = Transfer {
       from: self.vault.to_account_info(),
       to: self.destination.to_account_info(),
       authority: self.position.to_account_info(),
@@ -65,13 +73,12 @@ impl<'info> WithdrawV0<'info> {
 /// Withdraws tokens from a deposit entry, if they are unlocked
 ///
 /// `deposit_entry_index`: The deposit entry to withdraw from.
-/// `amount` is in units of the native currency being withdrawn.
 pub fn handler(ctx: Context<WithdrawV0>, args: WithdrawArgsV0) -> Result<()> {
   let amount = args.amount;
 
   // Transfer the tokens to withdraw.
   let seeds = position_seeds!(ctx.accounts.position);
-  token::transfer(ctx.accounts.transfer_ctx().with_signer(&[seeds]), amount)?;
+  transfer(ctx.accounts.transfer_ctx().with_signer(&[seeds]), amount)?;
 
   let position = &mut ctx.accounts.position;
   let registrar = &ctx.accounts.registrar;

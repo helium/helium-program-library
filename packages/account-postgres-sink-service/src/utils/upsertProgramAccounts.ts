@@ -198,13 +198,15 @@ export const upsertProgramAccounts = async ({
         }
       );
 
-      await model.destroy({
-        where: {
-          refreshed_at: {
-            [Op.lt]: now,
+      if (!rest.ignore_deletes) {
+        await model.destroy({
+          where: {
+            refreshed_at: {
+              [Op.lt]: now,
+            },
           },
-        },
-      });
+        });
+      }
     } catch (err) {
       console.error(`Error processing account type ${type}:`, err);
     }

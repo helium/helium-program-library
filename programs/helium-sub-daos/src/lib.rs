@@ -136,8 +136,8 @@ pub mod helium_sub_daos {
     initialize_hnt_delegator_pool::handler(ctx)
   }
 
-  pub fn add_expiration_ts(ctx: Context<AddExpirationTs>) -> Result<()> {
-    add_expiration_ts::handler(ctx)
+  pub fn extend_expiration_ts_v0(ctx: Context<ExtendExpirationTsV0>) -> Result<()> {
+    extend_expiration_ts_v0::handler(ctx)
   }
 
   pub fn temp_resize_account(ctx: Context<TempResizeAccount>) -> Result<()> {
@@ -146,5 +146,9 @@ pub mod helium_sub_daos {
 
   pub fn track_vote_v0(ctx: Context<TrackVoteV0>) -> Result<()> {
     track_vote_v0::handler(ctx)
+  }
+
+  pub fn temp_fix_claimed_epoch(ctx: Context<TempFixClaimedEpoch>) -> Result<()> {
+    temp_fix_claimed_epoch::handler(ctx)
   }
 }

@@ -6,6 +6,7 @@ members = [
 ]
 
 exclude = [
+  "anchor-30-programs",
   "deps/metaplex-program-library/bubblegum/program",
   "deps/metaplex-program-library/token-metadata/program",
   "utils/ecc-sig-verifier",
