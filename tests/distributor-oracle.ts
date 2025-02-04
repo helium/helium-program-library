@@ -45,8 +45,10 @@ import {
   OracleServer,
 } from "../packages/distributor-oracle/src/server";
 import {
+  decodeEntityKey,
   PROGRAM_ID as HEM_PID,
   init as initHeliumEntityManager,
+  keyToAssetForAsset,
   keyToAssetKey,
 } from "../packages/helium-entity-manager-sdk/src";
 import {
@@ -78,6 +80,7 @@ import { initVsr } from "./utils/vsr";
 chai.use(chaiHttp);
 
 export class DatabaseMock implements Database {
+  dao: PublicKey;
   inMemHash: {
     totalClicks: number;
     lifetimeRewards: number;
@@ -94,8 +97,10 @@ export class DatabaseMock implements Database {
     readonly getAssetFn: (
       url: string,
       asset: PublicKey
-    ) => Promise<Asset | undefined> = getAsset
+    ) => Promise<Asset | undefined> = getAsset,
+    dao: PublicKey
   ) {
+    this.dao = dao;
     this.inMemHash = {
       totalClicks: 0,
       lifetimeRewards: 0,
@@ -123,8 +128,9 @@ export class DatabaseMock implements Database {
     let _this = this;
     const res: Record<string, string> = entityKeys.reduce(
       (acc: Record<string, string>, key) => {
+        const pubkey = Address.fromB58(key);
         acc[key] = Math.floor(
-          (_this.inMemHash.byHotspot[key]?.lifetimeRewards || 0) *
+          (_this.inMemHash.byHotspot[pubkey.b58]?.lifetimeRewards || 0) *
             Math.pow(10, 8)
         ).toString();
         return acc;
@@ -153,11 +159,15 @@ export class DatabaseMock implements Database {
       console.error("No asset found", assetId.toBase58());
       return "0";
     }
-    const eccCompact = asset.content.json_uri.split("/").slice(-1)[0] as string;
+    const kta = keyToAssetForAsset(asset, this.dao)
+    const ktaAcc = await this.hemProgram.account.keyToAssetV0.fetch(kta)
+    const eccCompact = decodeEntityKey(
+      ktaAcc.entityKey,
+      ktaAcc.keySerialization
+    )!;
     try {
-      const pubkey = Address.fromB58(eccCompact);
       return Math.floor(
-        (this.inMemHash.byHotspot[pubkey.b58]?.lifetimeRewards || 0) *
+        (this.inMemHash.byHotspot[eccCompact]?.lifetimeRewards || 0) *
           Math.pow(10, 8)
       ).toString();
     } catch (err) {
@@ -384,7 +394,7 @@ describe("distributor-oracle", () => {
     await recipientMethod.rpc({ skipPreflight: true });
     recipient = (await recipientMethod.pubkeys()).recipient!;
 
-    let db = new DatabaseMock(hemProgram, getAssetFn);
+    let db = new DatabaseMock(hemProgram, getAssetFn, dao);
     db.incrementHotspotRewards(ecc);
     oracleServer = new OracleServer(
       tuktukProgram,
@@ -491,6 +501,11 @@ describe("distributor-oracle", () => {
     );
 
     const recipientAcc = await ldProgram.account.recipientV0.fetch(recipient);
+    console.log(
+      recipientAcc.totalRewards.toNumber(),
+      Number(await oracleServer.db.getCurrentRewards(asset)),
+      await oracleServer.db.getBulkRewards([ecc])
+    );
     assert.equal(
       recipientAcc.totalRewards.toNumber(),
       Number(await oracleServer.db.getCurrentRewards(asset))
