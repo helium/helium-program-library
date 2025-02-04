@@ -761,6 +761,7 @@ export class OracleServer {
           .accounts({
             lazyDistributor: this.lazyDistributor,
             recipient,
+            payer: wallet,
             keyToAsset: new PublicKey(request.params.keyToAssetKey),
           })
           .instruction(),
