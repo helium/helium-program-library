@@ -334,7 +334,6 @@ describe("distributor-oracle", () => {
     await ensureHEMIdl(hemProgram);
     await ensureHSDIdl(hsdProgram);
 
-    console.log(dcProgram.methods);
     const {
       dao: { dao },
       dataCredits: { dcMint },
@@ -501,11 +500,6 @@ describe("distributor-oracle", () => {
     );
 
     const recipientAcc = await ldProgram.account.recipientV0.fetch(recipient);
-    console.log(
-      recipientAcc.totalRewards.toNumber(),
-      Number(await oracleServer.db.getCurrentRewards(asset)),
-      await oracleServer.db.getBulkRewards([ecc])
-    );
     assert.equal(
       recipientAcc.totalRewards.toNumber(),
       Number(await oracleServer.db.getCurrentRewards(asset))
@@ -588,7 +582,7 @@ describe("distributor-oracle", () => {
 
     const recipientAcc = await ldProgram.account.recipientV0.fetch(recipient);
     assert.equal(
-      recipientAcc.totalRewards.toNumber(),
+      recipientAcc.currentRewards[0]?.toNumber(),
       Number(await oracleServer.db.getCurrentRewards(asset))
     );
   });
