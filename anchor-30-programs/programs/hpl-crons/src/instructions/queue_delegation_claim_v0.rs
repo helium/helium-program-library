@@ -48,7 +48,7 @@ pub struct QueueDelegationClaimV0<'info> {
   pub payer: Signer<'info>,
   #[account(
     mut,
-    seeds = [b"custom", task_queue.key().as_ref(), b"position", position.key().as_ref()],
+    seeds = [b"custom", task_queue.key().as_ref(), b"position"],
     seeds::program = tuktuk_program::ID,
     bump,
   )]
@@ -100,7 +100,6 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
     vec![b"helium".to_vec(), bump.to_le_bytes().to_vec()],
     vec![
       b"position".to_vec(),
-      ctx.accounts.position.key().as_ref().to_vec(),
       ctx.bumps.position_claim_payer.to_le_bytes().to_vec(),
     ],
   ];

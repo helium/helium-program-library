@@ -30,7 +30,6 @@ circuit-breaker = { workspace = true }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }
 nft-proxy = { path = "../../utils/nft-proxy" }
 proposal = { path = "../../utils/proposal" }
-lazy_static = "1.5.0"
 solana-program = { workspace = true }
 
 time = "0.3.17"

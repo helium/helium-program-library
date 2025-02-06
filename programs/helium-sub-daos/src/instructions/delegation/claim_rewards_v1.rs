@@ -23,9 +23,7 @@ pub struct ClaimRewardsArgsV0 {
 
 const TUKTUK_ID: Pubkey = pubkey!("tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA");
 const TASK_QUEUE_KEY: Pubkey = pubkey!("H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7");
-lazy_static::lazy_static! {
-  static ref TUKTUK_SIGNER_KEY: Pubkey = Pubkey::find_program_address(&[b"custom", TASK_QUEUE_KEY.as_ref(), b"position"], &TUKTUK_ID).0;
-}
+const TUKTUK_SIGNER_KEY: Pubkey = pubkey!("8m6iyXwcu8obaXdqKwzBqHE5HM2tRZZfSXV5qNALiPk4");
 
 #[derive(Accounts)]
 #[instruction(args: ClaimRewardsArgsV0)]
@@ -48,7 +46,7 @@ pub struct ClaimRewardsV1<'info> {
   pub position_token_account: Box<Account<'info, TokenAccount>>,
   /// CHECK: By constraint
   #[account(
-    constraint = position_authority.is_signer && (position_authority.key() == payer.key()) || payer.key() == *TUKTUK_SIGNER_KEY
+    constraint = position_authority.is_signer && (position_authority.key() == payer.key()) || payer.key() == TUKTUK_SIGNER_KEY
   )]
   pub position_authority: AccountInfo<'info>,
   pub registrar: Box<Account<'info, Registrar>>,

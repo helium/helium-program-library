@@ -78,7 +78,7 @@ export async function run(args: any = process.argv) {
   ]);
   const [positionClaimPayer, positionClaimPayerBump] = customSignerKey(
     taskQueue,
-    [Buffer.from("position", "utf-8"), position.toBuffer()]
+    [Buffer.from("position", "utf-8")]
   );
   const bumpBuffer = Buffer.alloc(1);
   bumpBuffer.writeUint8(bump);

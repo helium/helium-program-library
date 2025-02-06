@@ -1970,7 +1970,6 @@ dependencies = [
  "anchor-spl",
  "circuit-breaker",
  "default-env",
- "lazy_static",
  "mpl-token-metadata",
  "nft-proxy",
  "proposal",
