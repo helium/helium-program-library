@@ -46,6 +46,7 @@ pub struct ClaimRewardsV1<'info> {
     constraint = position_token_account.amount > 0
   )]
   pub position_token_account: Box<Account<'info, TokenAccount>>,
+  /// CHECK: By constraint
   #[account(
     constraint = position_authority.is_signer && (position_authority.key() == payer.key()) || payer.key() == *TUKTUK_SIGNER_KEY
   )]

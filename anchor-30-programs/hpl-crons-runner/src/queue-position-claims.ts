@@ -11,11 +11,13 @@ import {
   init as initTuktuk,
   taskKey,
 } from "@helium/tuktuk-sdk";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import { getAccount } from "@solana/spl-token";
 import {
   PublicKey,
-  TransactionInstruction
+  SystemProgram,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -47,11 +49,6 @@ export async function run(args: any = process.argv) {
       required: true,
       type: "string",
       describe: "The position to trigger automated claims for",
-    },
-    initialFunding: {
-      required: true,
-      type: "number",
-      describe: "The initial funding in lamports for crank turns",
     },
   });
   const argv = await yarg.argv;
@@ -104,30 +101,83 @@ export async function run(args: any = process.argv) {
     instructions.push(
       await program.methods
         .initDelegationClaimBotV0()
-        .accounts({
+        .accountsPartial({
           delegatedPosition,
+          position: delegatedPositionAcc.position,
           taskQueue,
+          mint: positionAcc.mint,
           positionTokenAccount: positionTokenAccount.address,
         })
         .instruction()
     );
+    // @ts-ignore
+    const endEpoch = (delegatedPositionAcc.expirationTs as BN).div(
+      new BN(EPOCH_LENGTH)
+    );
+    instructions.push(
+      SystemProgram.transfer({
+        fromPubkey: provider.wallet.publicKey,
+        toPubkey: claimBot,
+        lamports: BigInt(
+          taskQueueAcc.minCrankReward
+            .mul(
+              endEpoch.sub(
+                // @ts-ignore
+                delegatedPositionAcc.lastClaimedEpoch
+              )
+            )
+            .toString()
+        ),
+      })
+    );
   }
-  const bot = await program.account.delegationClaimBotV0.fetch(claimBot);
   console.log("Payer for claims", positionClaimPayer.toBase58());
+  // TODO: Have to do a bunch of manual stuff because the anchor 28 IDL
+  // prevents account resolution from working :/
+  const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(
+    delegatedPositionAcc.subDao
+  );
+  const daoAcc = await hsdProgram.account.daoV0.fetch(subDaoAcc.dao);
   const { transaction, remainingAccounts } = compileTransaction(
     [
       await program.methods
         .queueDelegationClaimV0()
-        .accountsPartial({
+        .accountsStrict({
           delegationClaimBot: claimBot,
+          position: delegatedPositionAcc.position,
+          subDao: delegatedPositionAcc.subDao,
+          dao: subDaoAcc.dao,
+          mint: positionAcc.mint,
+          hntMint: daoAcc.hntMint,
           positionAuthority: (
             await getAccount(provider.connection, positionTokenAccount.address)
           ).owner,
           positionTokenAccount: positionTokenAccount.address,
+          taskQueue,
+          rentRefund: provider.wallet.publicKey,
+          delegatedPosition,
+          systemProgram: SystemProgram.programId,
+          payer: customWallet,
+          positionClaimPayer,
+          delegatorAta: getAssociatedTokenAddressSync(
+            daoAcc.hntMint,
+            provider.wallet.publicKey
+          ),
+          taskReturnAccount: PublicKey.findProgramAddressSync(
+            [Buffer.from("task_return_account", "utf-8")],
+            PROGRAM_ID
+          )[0],
         })
         .instruction(),
     ],
-    [[Buffer.from("helium", "utf-8"), bumpBuffer]]
+    [
+      [Buffer.from("helium", "utf-8"), bumpBuffer],
+      [
+        Buffer.from("position", "utf-8"),
+        position.toBuffer(),
+        positionClaimPayerBumpBuffer,
+      ],
+    ]
   );
 
   // @ts-ignore

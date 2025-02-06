@@ -29,7 +29,6 @@ const TEN_MINUTES: i64 = 60 * 10;
 #[derive(Accounts)]
 pub struct QueueDelegationClaimV0<'info> {
   /// CHECK: Doesn't matter
-
   #[account(mut)]
   pub rent_refund: AccountInfo<'info>,
   #[account(
@@ -37,8 +36,6 @@ pub struct QueueDelegationClaimV0<'info> {
     has_one = delegated_position,
     has_one = rent_refund,
     has_one = task_queue,
-    seeds = [b"delegation_claim_bot", task_queue.key().as_ref(), delegated_position.key().as_ref()],
-    bump = delegation_claim_bot.bump_seed,
   )]
   pub delegation_claim_bot: Account<'info, DelegationClaimBotV0>,
   /// CHECK: This account needs to be funded to pay for the cron PDA
@@ -99,7 +96,14 @@ pub struct QueueDelegationClaimV0<'info> {
 pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> {
   let curr_epoch = ctx.accounts.delegated_position.last_claimed_epoch + 1;
   let bump = ctx.bumps.payer;
-  let seeds = vec![vec![b"helium".to_vec(), bump.to_le_bytes().to_vec()]];
+  let seeds = vec![
+    vec![b"helium".to_vec(), bump.to_le_bytes().to_vec()],
+    vec![
+      b"position".to_vec(),
+      ctx.accounts.position.key().as_ref().to_vec(),
+      ctx.bumps.position_claim_payer.to_le_bytes().to_vec(),
+    ],
+  ];
   let dao_epoch_info = Pubkey::find_program_address(
     &[
       b"dao_epoch_info",
@@ -158,7 +162,7 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
     .data(),
   }];
 
-  let (compiled_tx, _) = compile_transaction(ixs, seeds.clone())?;
+  let (compiled_tx, _) = compile_transaction(ixs, vec![seeds[1].clone()])?;
 
   let reschedule_ix = Instruction {
     program_id: crate::ID,
@@ -182,7 +186,7 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
     }
     .to_account_metas(None)
     .to_vec(),
-    data: crate::instruction::QueueEndEpoch.data(),
+    data: crate::instruction::QueueDelegationClaimV0.data(),
   };
   let (compiled_reschedule_tx, _) = compile_transaction(vec![reschedule_ix], seeds).unwrap();
 
