@@ -25,7 +25,6 @@ import {
   IOT_MINT,
   MOBILE_MINT,
   batchParallelInstructionsWithPriorityFee,
-  chunks,
   createMintInstructions,
   sendAndConfirmWithRetry,
   sendInstructions,
@@ -33,12 +32,7 @@ import {
   truthy,
 } from "@helium/spl-utils";
 import { getAccount } from "@solana/spl-token";
-import {
-  ComputeBudgetProgram as CBP,
-  Connection,
-  Keypair,
-  SYSVAR_CLOCK_PUBKEY,
-} from "@solana/web3.js";
+import { Connection, Keypair, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import BN from "bn.js";
 import bs58 from "bs58";
 
@@ -69,7 +63,6 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
     const provider = anchor.getProvider() as anchor.AnchorProvider;
     const heliumSubDaosProgram = await initDao(provider);
     const hntMint = HNT_MINT;
-    const iotMint = IOT_MINT;
     const unixNow = new Date().valueOf() / 1000;
     const [dao] = daoKey(hntMint);
 

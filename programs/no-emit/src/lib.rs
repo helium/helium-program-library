@@ -64,6 +64,15 @@ pub struct NoEmitV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
+#[derive(Clone)]
+pub struct NoEmit;
+
+impl anchor_lang::Id for NoEmit {
+  fn id() -> Pubkey {
+    crate::id()
+  }
+}
+
 #[program]
 pub mod no_emit {
   use anchor_spl::token::{burn, Burn};

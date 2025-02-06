@@ -1,7 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { resolveIndividual } from "./individual";
 
-
 export const heliumCommonResolver = resolveIndividual(async ({ path }) => {
   switch (path[path.length - 1]) {
     case "dataCreditsProgram":
