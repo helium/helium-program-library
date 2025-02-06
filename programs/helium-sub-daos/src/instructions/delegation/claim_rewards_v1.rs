@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::pubkey};
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{burn, Burn, Mint, Token, TokenAccount},
@@ -19,6 +19,12 @@ use crate::{current_epoch, dao_seeds, error::ErrorCode, state::*, TESTING};
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ClaimRewardsArgsV0 {
   pub epoch: u64,
+}
+
+const TUKTUK_ID: Pubkey = pubkey!("tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA");
+const TASK_QUEUE_KEY: Pubkey = pubkey!("H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7");
+lazy_static::lazy_static! {
+  static ref TUKTUK_SIGNER_KEY: Pubkey = Pubkey::find_program_address(&[b"custom", TASK_QUEUE_KEY.as_ref(), b"position"], &TUKTUK_ID).0;
 }
 
 #[derive(Accounts)]
@@ -40,8 +46,10 @@ pub struct ClaimRewardsV1<'info> {
     constraint = position_token_account.amount > 0
   )]
   pub position_token_account: Box<Account<'info, TokenAccount>>,
-  #[account(mut)]
-  pub position_authority: Signer<'info>,
+  #[account(
+    constraint = position_authority.is_signer && (position_authority.key() == payer.key()) || payer.key() == *TUKTUK_SIGNER_KEY
+  )]
+  pub position_authority: AccountInfo<'info>,
   pub registrar: Box<Account<'info, Registrar>>,
   #[account(
     has_one = registrar,
@@ -75,7 +83,7 @@ pub struct ClaimRewardsV1<'info> {
   pub delegator_pool: Box<Account<'info, TokenAccount>>,
   #[account(
     init_if_needed,
-    payer = position_authority,
+    payer = payer,
     associated_token::mint = hnt_mint,
     associated_token::authority = position_authority,
   )]
@@ -95,6 +103,8 @@ pub struct ClaimRewardsV1<'info> {
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub token_program: Program<'info, Token>,
+  #[account(mut)]
+  pub payer: Signer<'info>,
 }
 
 impl<'info> ClaimRewardsV1<'info> {
