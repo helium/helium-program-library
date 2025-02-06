@@ -1673,9 +1673,7 @@
           "name": "position_token_account"
         },
         {
-          "name": "position_authority",
-          "writable": true,
-          "signer": true
+          "name": "position_authority"
         },
         {
           "name": "registrar"
@@ -1846,6 +1844,11 @@
         },
         {
           "name": "token_program"
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
         }
       ],
       "args": [

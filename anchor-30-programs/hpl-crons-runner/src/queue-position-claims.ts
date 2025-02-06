@@ -172,11 +172,7 @@ export async function run(args: any = process.argv) {
     ],
     [
       [Buffer.from("helium", "utf-8"), bumpBuffer],
-      [
-        Buffer.from("position", "utf-8"),
-        position.toBuffer(),
-        positionClaimPayerBumpBuffer,
-      ],
+      [Buffer.from("position", "utf-8"), positionClaimPayerBumpBuffer],
     ]
   );
 

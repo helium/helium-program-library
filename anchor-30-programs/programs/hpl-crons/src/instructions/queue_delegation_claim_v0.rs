@@ -153,6 +153,7 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
       delegator_pool_circuit_breaker,
       vsr_program: voter_stake_registry::ID,
       associated_token_program: spl_associated_token_account::ID,
+      payer: ctx.accounts.position_claim_payer.key(),
     }
     .to_account_metas(None),
     data: helium_sub_daos::helium_sub_daos::client::args::ClaimRewardsV1 {

@@ -167,7 +167,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
       .checked_mul(ctx.accounts.dao_epoch_info.delegation_rewards_issued as u128)
       .unwrap()
       .checked_div(ctx.accounts.dao_epoch_info.vehnt_at_epoch_start as u128)
-      .unwrap(),
+      .unwrap_or(0),
   )
   .unwrap();
 
